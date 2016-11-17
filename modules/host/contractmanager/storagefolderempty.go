@@ -185,7 +185,7 @@ func (wal *writeAheadLog) managedEmptyStorageFolder(sfIndex uint16, startingPoin
 	// them.
 	var errCount uint64
 	var wg sync.WaitGroup
-	var readHead int
+	readHead := startingPoint * sectorMetadataDiskSize
 	for _, usage := range sf.usage[startingPoint/storageFolderGranularity:] {
 		// The usage is a bitfield indicating where sectors exist. Iterate
 		// through each bit to check for a sector.

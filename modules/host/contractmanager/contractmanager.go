@@ -32,6 +32,10 @@ package contractmanager
 
 // TODO: Write some tests that have disks randomly failing.
 
+// TODO: EmptyStorageFolder should be able to move a sector to a storage folder
+// that is locked and being emptied if the part of that storage folder being
+// emptied
+
 import (
 	"errors"
 	"path/filepath"
