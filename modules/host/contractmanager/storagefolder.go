@@ -295,8 +295,11 @@ func (cm *ContractManager) ResetStorageFolderHealth(index uint16) error {
 	return nil
 }
 
-// TODO: Make this function better.
-func (cm *ContractManager) ResizeStorageFolder(index uint16, newSize uint64) error {
+// ResizeStorageFolder will resize a storage folder, moving sectors as
+// necessary. The resize operation will stop and return an error if any of the
+// sector move operations fail. If the force flag is set to true, the resize
+// operation will continue through failures, meaning that data will be lost.
+func (cm *ContractManager) ResizeStorageFolder(index uint16, newSize uint64, force bool) error {
 	err := cm.tg.Add()
 	if err != nil {
 		return err
@@ -323,7 +326,7 @@ func (cm *ContractManager) ResizeStorageFolder(index uint16, newSize uint64) err
 	}
 	newSectorCount := uint32(newSize / modules.SectorSize)
 	if oldSize > newSize {
-		return cm.wal.shrinkStorageFolder(index, newSectorCount, true)
+		return cm.wal.shrinkStorageFolder(index, newSectorCount, force)
 	}
 	return cm.wal.growStorageFolder(index, newSectorCount)
 }

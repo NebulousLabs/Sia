@@ -237,6 +237,7 @@ func (wal *writeAheadLog) queueSectorMove(wg *sync.WaitGroup, id sectorID, errCo
 		err := wal.managedMoveSector(id)
 		if err != nil {
 			atomic.AddUint64(errCount, 1)
+			wal.cm.log.Println("Unable to write sector:", err)
 		}
 	}()
 }

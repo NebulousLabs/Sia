@@ -64,7 +64,7 @@ func TestGrowStorageFolder(t *testing.T) {
 	}
 
 	// Increase the size of the storage folder.
-	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*2)
+	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,6 +124,7 @@ func TestGrowStorageFolder(t *testing.T) {
 type dependencyIncompleteGrow struct {
 	productionDependencies
 	triggered bool
+	threshold int
 	mu        sync.Mutex
 }
 
@@ -168,21 +169,21 @@ func (l *triggerLimitFile) WriteAt(b []byte, offset int64) (int, error) {
 	}
 
 	// If the limit has already been reached, return an error.
-	if l.throughput >= 1<<20 {
+	if l.throughput >= l.dig.threshold {
 		return 0, errors.New("triggerLimitFile throughput limit reached earlier")
 	}
 
 	// If the limit has not been reached, pass the call through to the
 	// underlying file.
-	if l.throughput+len(b) <= 1<<20 {
+	if l.throughput+len(b) <= l.dig.threshold {
 		l.throughput += len(b)
 		return l.File.WriteAt(b, offset)
 	}
 
 	// If the limit has been reached, write enough bytes to get to 8 MiB, then
 	// return an error.
-	remaining := 1<<20 - l.throughput
-	l.throughput = 1 << 20
+	remaining := l.dig.threshold - l.throughput
+	l.throughput = l.dig.threshold
 	written, err := l.File.WriteAt(b[:remaining], offset)
 	if err != nil {
 		return written, err
@@ -230,12 +231,13 @@ func TestGrowStorageFolderIncompleteWrite(t *testing.T) {
 
 	// Trigger the dependencies, so that writes begin failing.
 	d.mu.Lock()
+	d.threshold = 1 << 20
 	d.triggered = true
 	d.mu.Unlock()
 
 	// Increase the size of the storage folder, to large enough that it will
 	// fail.
-	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*25)
+	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*25, false)
 	if err == nil {
 		t.Fatal("expecting error upon resize")
 	}
@@ -352,7 +354,7 @@ func TestGrowStorageFolderShutdownAfterWrite(t *testing.T) {
 
 	// Increase the size of the storage folder, to large enough that it will
 	// fail.
-	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*25)
+	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*25, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -452,7 +454,7 @@ func TestGrowStorageFolderWAL(t *testing.T) {
 
 	// Increase the size of the storage folder, to large enough that it will
 	// fail.
-	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*25)
+	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*25, false)
 	if err != nil {
 		t.Fatal(err)
 	}

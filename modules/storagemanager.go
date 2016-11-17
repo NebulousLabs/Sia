@@ -106,8 +106,10 @@ type (
 		// folder, any data in the folder that needs to be moved will be placed
 		// into other storage folders, meaning that no data will be lost. If
 		// the manager is unable to migrate the data, an error will be returned
-		// and the operation will be stopped.
-		ResizeStorageFolder(index uint16, newSize uint64) error
+		// and the operation will be stopped. If the force flag is set to true,
+		// errors will be ignored and the resize operation completed, meaning
+		// that data will be lost.
+		ResizeStorageFolder(index uint16, newSize uint64, force bool) error
 
 		// StorageFolders will return a list of storage folders tracked by the
 		// manager.

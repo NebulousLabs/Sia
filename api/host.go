@@ -170,7 +170,7 @@ func (api *API) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Req
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	err = api.host.ResizeStorageFolder(uint16(folderIndex), newSize)
+	err = api.host.ResizeStorageFolder(uint16(folderIndex), newSize, false)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
