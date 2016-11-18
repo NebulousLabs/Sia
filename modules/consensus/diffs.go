@@ -102,13 +102,13 @@ func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir module
 
 	if dir == modules.DiffApply {
 		// Sanity check - sfpd.Previous should equal the current siafund pool.
-		if build.DEBUG && getSiafundPool(tx).Cmp(sfpd.Previous) != 0 {
+		if build.DEBUG && !getSiafundPool(tx).Equals(sfpd.Previous) {
 			panic(errApplySiafundPoolDiffMismatch)
 		}
 		setSiafundPool(tx, sfpd.Adjusted)
 	} else {
 		// Sanity check - sfpd.Adjusted should equal the current siafund pool.
-		if build.DEBUG && getSiafundPool(tx).Cmp(sfpd.Adjusted) != 0 {
+		if build.DEBUG && !getSiafundPool(tx).Equals(sfpd.Adjusted) {
 			panic(errRevertSiafundPoolDiffMismatch)
 		}
 		setSiafundPool(tx, sfpd.Previous)

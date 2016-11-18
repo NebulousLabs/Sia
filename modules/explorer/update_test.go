@@ -81,22 +81,22 @@ func TestIntegrationExplorerFileContractMetrics(t *testing.T) {
 	if !ok {
 		t.Fatal("couldn't get current facts")
 	}
-	if facts.ActiveContractCost.Cmp(types.NewCurrency64(5e9)) != 0 {
+	if !facts.ActiveContractCost.Equals64(5e9) {
 		t.Error("active resources providing wrong file contract cost")
 	}
 	if facts.ActiveContractCount != 1 {
 		t.Error("active contract count does not read correctly")
 	}
-	if facts.ActiveContractSize.Cmp(types.NewCurrency64(5e3)) != 0 {
+	if !facts.ActiveContractSize.Equals64(5e3) {
 		t.Error("active contract size is not correctly reported")
 	}
-	if facts.TotalContractCost.Cmp(types.NewCurrency64(5e9)) != 0 {
+	if !facts.TotalContractCost.Equals64(5e9) {
 		t.Error("total cost is not tallied correctly")
 	}
 	if facts.FileContractCount != 1 {
 		t.Error("total contract count is not accurate")
 	}
-	if facts.TotalContractSize.Cmp(types.NewCurrency64(5e3)) != 0 {
+	if !facts.TotalContractSize.Equals64(5e3) {
 		t.Error("total contract size is not accurate")
 	}
 
@@ -132,22 +132,22 @@ func TestIntegrationExplorerFileContractMetrics(t *testing.T) {
 	if !ok {
 		t.Fatal("couldn't get current facts")
 	}
-	if facts.ActiveContractCost.Cmp(types.NewCurrency64(6e9)) != 0 {
+	if !facts.ActiveContractCost.Equals64(6e9) {
 		t.Error("active resources providing wrong file contract cost")
 	}
 	if facts.ActiveContractCount != 2 {
 		t.Error("active contract count does not read correctly")
 	}
-	if facts.ActiveContractSize.Cmp(types.NewCurrency64(20e3)) != 0 {
+	if !facts.ActiveContractSize.Equals64(20e3) {
 		t.Error("active contract size is not correctly reported")
 	}
-	if facts.TotalContractCost.Cmp(types.NewCurrency64(6e9)) != 0 {
+	if !facts.TotalContractCost.Equals64(6e9) {
 		t.Error("total cost is not tallied correctly")
 	}
 	if facts.FileContractCount != 2 {
 		t.Error("total contract count is not accurate")
 	}
-	if facts.TotalContractSize.Cmp(types.NewCurrency64(20e3)) != 0 {
+	if !facts.TotalContractSize.Equals64(20e3) {
 		t.Error("total contract size is not accurate")
 	}
 
@@ -162,22 +162,22 @@ func TestIntegrationExplorerFileContractMetrics(t *testing.T) {
 	if !ok {
 		t.Fatal("couldn't get current facts")
 	}
-	if facts.ActiveContractCost.Cmp(types.NewCurrency64(1e9)) != 0 {
+	if !facts.ActiveContractCost.Equals64(1e9) {
 		t.Error("active resources providing wrong file contract cost", facts.ActiveContractCost)
 	}
 	if facts.ActiveContractCount != 1 {
 		t.Error("active contract count does not read correctly")
 	}
-	if facts.ActiveContractSize.Cmp(types.NewCurrency64(15e3)) != 0 {
+	if !facts.ActiveContractSize.Equals64(15e3) {
 		t.Error("active contract size is not correctly reported")
 	}
-	if facts.TotalContractCost.Cmp(types.NewCurrency64(6e9)) != 0 {
+	if !facts.TotalContractCost.Equals64(6e9) {
 		t.Error("total cost is not tallied correctly")
 	}
 	if facts.FileContractCount != 2 {
 		t.Error("total contract count is not accurate")
 	}
-	if facts.TotalContractSize.Cmp(types.NewCurrency64(20e3)) != 0 {
+	if !facts.TotalContractSize.Equals64(20e3) {
 		t.Error("total contract size is not accurate")
 	}
 

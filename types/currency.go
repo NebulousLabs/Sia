@@ -78,6 +78,12 @@ func (x Currency) Cmp(y Currency) int {
 	return x.i.Cmp(&y.i)
 }
 
+// Cmp64 compares x to a uint64. The return value follows the convention of
+// math/big.
+func (x Currency) Cmp64(y uint64) int {
+	return x.Cmp(NewCurrency64(y))
+}
+
 // Div returns a new Currency value c = x / y.
 func (x Currency) Div(y Currency) (c Currency) {
 	c.i.Div(&x.i, &y.i)
@@ -88,6 +94,16 @@ func (x Currency) Div(y Currency) (c Currency) {
 func (x Currency) Div64(y uint64) (c Currency) {
 	c.i.Div(&x.i, new(big.Int).SetUint64(y))
 	return
+}
+
+// Equals returns true if x and y have the same value.
+func (x Currency) Equals(y Currency) bool {
+	return x.Cmp(y) == 0
+}
+
+// Equals64 returns true if x and y have the same value.
+func (x Currency) Equals64(y uint64) bool {
+	return x.Cmp64(y) == 0
 }
 
 // Mul returns a new Currency value c = x * y.

@@ -108,7 +108,7 @@ func TestAverageContractPrice(t *testing.T) {
 	if len(hdb.activeHosts) != 2 {
 		t.Error("host was not added:", hdb.activeHosts)
 	}
-	if avg := hdb.AverageContractPrice(); avg.Cmp(types.NewCurrency64(200)) != 0 {
+	if avg := hdb.AverageContractPrice(); avg.Cmp64(200) != 0 {
 		t.Error("average of two hosts should be their sum/2:", avg)
 	}
 }

@@ -44,7 +44,7 @@ func postEncryptionTesting(m modules.TestMiner, w *Wallet, masterKey crypto.Twof
 		}
 	}
 	siacoinBal, _, _ := w.ConfirmedBalance()
-	if siacoinBal.Cmp(types.NewCurrency64(0)) <= 0 {
+	if siacoinBal.Cmp64(0) <= 0 {
 		panic("wallet balance reported as 0 after maturing some mined blocks")
 	}
 	err = w.Unlock(masterKey)
@@ -215,7 +215,7 @@ func TestLock(t *testing.T) {
 	}
 	// Compare to the original balance.
 	siacoinBalance2, _, _ := wt.wallet.ConfirmedBalance()
-	if siacoinBalance2.Cmp(siacoinBalance) != 0 {
+	if !siacoinBalance2.Equals(siacoinBalance) {
 		t.Error("siacoin balance reporting changed upon closing the wallet")
 	}
 	// Check that the keys and seeds were wiped.
