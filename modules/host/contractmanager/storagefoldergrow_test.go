@@ -295,8 +295,8 @@ func TestGrowStorageFolderIncompleteWrite(t *testing.T) {
 	}
 }
 
-// dependencyGrowNoFinalize will start to have disk failures after too much
-// data is written and also after 'triggered' ahs been set to true.
+// dependencyGrowNoFinalize will not add a confirmation to the WAL that a
+// growStorageFolder operation has completed.
 type dependencyGrowNoFinalize struct {
 	productionDependencies
 }

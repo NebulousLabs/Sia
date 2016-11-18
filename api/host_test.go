@@ -350,7 +350,7 @@ func TestResizeNonemptyStorageFolder(t *testing.T) {
 		// Attempt to resize the host's storage folder.
 		resizeValues.Set("newsize", test.sizeString)
 		err = st.stdPostAPI("/host/storage/folders/resize", resizeValues)
-		if (err == nil && test.err != nil) || (err != nil && err.Error() != test.err.Error()) {
+		if (err == nil && test.err != nil) || (err != nil && test.err == nil) || (err != nil && err.Error() != test.err.Error()) {
 			t.Fatalf("expected error to be %v, got %v", test.err, err)
 		}
 

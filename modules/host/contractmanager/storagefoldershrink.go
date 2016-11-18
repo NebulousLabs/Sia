@@ -73,6 +73,12 @@ func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint3
 	wal.mu.Unlock()
 	<-syncChan
 
+	// Allow unclean shutdown to be simulated by returning before the state
+	// change gets committed.
+	if wal.cm.dependencies.disrupt("incompleteShrinkStorageFolder") {
+		return nil
+	}
+
 	// Submit a storage folder truncation to the WAL and wait until the update
 	// is synced.
 	wal.mu.Lock()
