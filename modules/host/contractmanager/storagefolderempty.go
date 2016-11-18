@@ -181,10 +181,34 @@ func (wal *writeAheadLog) managedEmptyStorageFolder(sfIndex uint16, startingPoin
 	}
 	atomic.AddUint64(&sf.atomicSuccessfulReads, 1)
 
-	// Iterate through all of the sectors and perform the move operation on
-	// them.
+	// Before iterating through the sectors and moving them, set up a thread
+	// pool that can parallelize the transfers without spinning up 250,000
+	// goroutines per TB.
 	var errCount uint64
 	var wg sync.WaitGroup
+	workers := 250
+	workChan := make(chan sectorID)
+	doneChan := make(chan struct{})
+	for i := 0; i < workers; i++ {
+		go func() {
+			for {
+				select {
+				case id := <-workChan:
+					err := wal.managedMoveSector(id)
+					if err != nil {
+						atomic.AddUint64(&errCount, 1)
+						wal.cm.log.Println("Unable to write sector:", err)
+					}
+					wg.Done()
+				case <-doneChan:
+					return
+				}
+			}
+		}()
+	}
+
+	// Iterate through all of the sectors and perform the move operation on
+	// them.
 	readHead := startingPoint * sectorMetadataDiskSize
 	for _, usage := range sf.usage[startingPoint/storageFolderGranularity:] {
 		// The usage is a bitfield indicating where sectors exist. Iterate
@@ -207,16 +231,16 @@ func (wal *writeAheadLog) managedEmptyStorageFolder(sfIndex uint16, startingPoin
 					continue
 				}
 
-				// Queue the sector move. The queue will handle multithreading
-				// and throughput optimization.
+				// Queue the sector move.
 				wg.Add(1)
-				wal.queueSectorMove(&wg, id, &errCount)
+				workChan <- id
 			}
 			readHead += sectorMetadataDiskSize
 			usageMask = usageMask << 1
 		}
 	}
 	wg.Wait()
+	close(doneChan)
 
 	// Return errPartialRelocation if not every sector was migrated out
 	// successfully.
@@ -224,20 +248,4 @@ func (wal *writeAheadLog) managedEmptyStorageFolder(sfIndex uint16, startingPoin
 		return errCount, ErrPartialRelocation
 	}
 	return 0, nil
-}
-
-// queueSectorMove will block until a thread is available to handle the move
-// operation, and then will pass off the operation to that thread.
-// queueSectorMove will also dynamically scale the threadpool size?
-func (wal *writeAheadLog) queueSectorMove(wg *sync.WaitGroup, id sectorID, errCount *uint64) {
-	// TODO: Implement a smarter thread pool. Millions of goroutines for a
-	// large resize is totally unacceptable.
-	go func() {
-		defer wg.Done()
-		err := wal.managedMoveSector(id)
-		if err != nil {
-			atomic.AddUint64(errCount, 1)
-			wal.cm.log.Println("Unable to write sector:", err)
-		}
-	}()
 }

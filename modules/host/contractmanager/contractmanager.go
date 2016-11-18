@@ -1,40 +1,21 @@
 package contractmanager
 
-// TODO: Currently, we don't do any directory syncs after atomic save-then-move
-// file operations, that may be necessary to provide strong guarantees against
-// data corruption.
+// TODO: Need to sync the directory after doing rename and create operations.
 
-// TODO: In managedAddStorageFolder, fallocate can be used instead of
-// file.Write, which means that storage folders can be added substantially
-// faster. Windows and other non-linux systems will need to continue doing it
-// using the current implementation.
+// TODO: Use fallocate when adding + growing storage folders.
 
-// TODO: Currently the long running storage folder operations are expected to
-// have their progress value's menaing determined by context, but that's really
-// only possible with the WAL, which external callers cannot view. Explicit
-// context should be added to the struct.
+// TODO: Long-running operations (add, empty) don't tally progress, and don't
+// indicate what operation is running.
 
 // TODO: Add disk failure testing.
-
-// TODO: The close order could probably use some cleanup so that the file
-// handles that get picked up during load get released upon close in the event
-// of an error.
-
-// TODO: Specific test - add two storage folders, maybe add some sectors,
-// close. Then rig one to have a disk failure upon opening. Try to open and
-// close the contract manager and make sure the stats are correct on the good
-// one.
 
 // TODO: Write some code into the production dependencies that will, during
 // testing, arbitrarily write less than the full data to a file until Sync()
 // has been called. That way, disruptions can effectively simulate partial
 // writes even though the disk writes are actually completing.
 
-// TODO: Write some tests that have disks randomly failing.
-
-// TODO: EmptyStorageFolder should be able to move a sector to a storage folder
-// that is locked and being emptied if the part of that storage folder being
-// emptied
+// TODO: emptyStorageFolder should be able to move sectors into folders that
+// are being resized, into the sectors that are not affected by the resize.
 
 import (
 	"errors"
