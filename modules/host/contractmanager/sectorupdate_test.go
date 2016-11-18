@@ -1,9 +1,7 @@
 package contractmanager
 
-// TODO: Verify that the code gracefully handles all storage folders failing.
-
 // TODO: Verify that the code gracefully handles multiple storage folders
-// failiing.
+// failiing, as well as all of them failing.
 
 // Verify that the actual data stored on disk matches the sector roots that it
 // is suppsed to match. Especially for multi-storage folder,

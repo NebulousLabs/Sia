@@ -1148,5 +1148,154 @@ func TestShrinkStorageFolderWAL(t *testing.T) {
 	}
 }
 
-// TODO: Write a test shrinking a single storage folder, where the storage
-// folder must move the sectors to itself.
+// TestShrinkSingleStorageFolder verifies that it's possible to shirnk a single
+// storage folder with no destination for the sectors.
+func TestShirnkSingleStorageFolder (t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	cmt, err := newContractManagerTester("TestShrinkStorageFolderWithSectors")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderOne, modules.SectorSize*storageFolderGranularity*8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Get the index of the storage folder.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("there should only be one storage folder")
+	}
+	sfIndex := sfs[0].Index
+
+	// Create some sectors and add them to the storage folder.
+	roots := make([]crypto.Hash, storageFolderGranularity*3)
+	datas := make([][]byte, storageFolderGranularity*3)
+	for i := 0; i < storageFolderGranularity*3; i++ {
+		root, data, err := randSector()
+		if err != nil {
+			t.Fatal(err)
+		}
+		roots[i] = root
+		datas[i] = data
+	}
+	// Add all of the sectors.
+	var wg sync.WaitGroup
+	wg.Add(len(roots))
+	for i := 0; i < len(roots); i++ {
+		go func(i int) {
+			err := cmt.cm.AddSector(roots[i], datas[i])
+			if err != nil {
+				t.Error(err)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	// Decrease the size of the storage folder.
+	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Verify that the capacity and file sizes are correct.
+	sfs = cmt.cm.StorageFolders()
+	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*4 {
+		t.Error("new storage folder is reporting the wrong capacity")
+	}
+	if capacityRemaining != modules.SectorSize*storageFolderGranularity*1 {
+		t.Error("new storage folder capacity remaining is reporting the wrong remaining capacity")
+	}
+	mfi, err = os.Stat(mfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sfi, err = os.Stat(sfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uint64(mfi.Size()) != sectorMetadataDiskSize*storageFolderGranularity*4 {
+		t.Error("metadata file is the wrong size")
+	}
+	if uint64(sfi.Size()) != modules.SectorSize*storageFolderGranularity*4 {
+		t.Error("sector file is the wrong size")
+	}
+
+	// Verify that every single sector is readable and has the correct data.
+	wg.Add(len(roots))
+	misses = 0
+	for i := 0; i < len(roots); i++ {
+		go func(i int) {
+			data, err := cmt.cm.ReadSector(roots[i])
+			if err != nil || !bytes.Equal(data, datas[i]) {
+				atomic.AddUint64(&misses, 1)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+	if misses != 0 {
+		t.Errorf("Could not find all %v sectors: %v\n", len(roots), misses)
+	}
+
+	// Restart the contract manager to see that the change is persistent.
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the capacity and file sizes are correct.
+	sfs = cmt.cm.StorageFolders()
+	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*4 {
+		t.Error("new storage folder is reporting the wrong capacity")
+	}
+	if sfs[0].CapacityRemaining != modules.SectorSize*storageFolderGranularity*1 {
+		t.Error("new storage folder capacity remaining is reporting the wrong remaining capacity")
+	}
+	mfi, err = os.Stat(mfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sfi, err = os.Stat(sfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uint64(mfi.Size()) != sectorMetadataDiskSize*storageFolderGranularity*4 {
+		t.Error("metadata file is the wrong size")
+	}
+	if uint64(sfi.Size()) != modules.SectorSize*storageFolderGranularity*4 {
+		t.Error("sector file is the wrong size")
+	}
+
+	// Verify that every single sector is readable and has the correct data.
+	wg.Add(len(roots))
+	misses = 0
+	for i := 0; i < len(roots); i++ {
+		go func(i int) {
+			data, err := cmt.cm.ReadSector(roots[i])
+			if err != nil || !bytes.Equal(data, datas[i]) {
+				atomic.AddUint64(&misses, 1)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+	if misses != 0 {
+		t.Errorf("Could not find all %v sectors: %v\n", len(roots), misses)
+	}
+}
