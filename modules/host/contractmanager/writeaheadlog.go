@@ -182,7 +182,7 @@ func (wal *writeAheadLog) commitChange(sc stateChange) {
 	}
 	for _, sfr := range sc.StorageFolderRemovals {
 		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
-			wal.commitRemoveStorageFolder(sfr)
+			wal.commitStorageFolderRemoval(sfr)
 		}
 	}
 	for _, su := range sc.SectorUpdates {

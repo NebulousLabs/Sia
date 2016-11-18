@@ -110,6 +110,21 @@ func (wal *writeAheadLog) syncResources() {
 		}
 	}
 
+	// Perform any cleanup actions on the updates.
+	for _, sc := range wal.uncommittedChanges {
+		for _, sfe := range sc.StorageFolderExtensions {
+			wal.commitStorageFolderExtension(sfe)
+		}
+		for _, sfr := range sc.StorageFolderReductions {
+			wal.commitStorageFolderReduction(sfr)
+		}
+		for _, sfr := range sc.StorageFolderRemovals {
+			wal.commitStorageFolderRemoval(sfr)
+		}
+
+		// TODO: Virtual sector handling here.
+	}
+
 	// Now that the WAL is sync'd and updated, any calls waiting on ACID
 	// guarantees can safely return.
 	close(wal.syncChan)
@@ -129,18 +144,6 @@ func (wal *writeAheadLog) syncResources() {
 func (wal *writeAheadLog) commit() {
 	// Sync all open, non-WAL files on the host.
 	wal.syncResources()
-
-	// Perform any cleanup actions on the updates.
-	for _, sc := range wal.uncommittedChanges {
-		for _, sfe := range sc.StorageFolderExtensions {
-			wal.commitStorageFolderExtension(sfe)
-		}
-		for _, sfr := range sc.StorageFolderReductions {
-			wal.commitStorageFolderReduction(sfr)
-		}
-
-		// TODO: Virtual sector handling here.
-	}
 
 	// Extract any unfinished long-running jobs from the list of WAL items.
 	unfinishedAdditions := findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)

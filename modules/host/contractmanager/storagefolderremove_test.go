@@ -165,11 +165,11 @@ func TestRemoveStorageFolderWithSector(t *testing.T) {
 	// Check that the disk objects were removed.
 	_, err = os.Stat(filepath.Join(storageFolderDir, metadataFile))
 	if !os.IsNotExist(err) {
-		t.Fatal("metadata file should have been removed")
+		t.Error("metadata file should have been removed")
 	}
 	_, err = os.Stat(filepath.Join(storageFolderDir, sectorFile))
 	if !os.IsNotExist(err) {
-		t.Fatal("sector file should have been removed")
+		t.Error("sector file should have been removed")
 	}
 
 	// Restart the contract manager to see if the storage folder is still gone.
