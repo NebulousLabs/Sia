@@ -124,3 +124,34 @@ func TestIntegrationLoad2of3Siag(t *testing.T) {
 		t.Error("expecting balance of 6988 after sending siafunds to the void")
 	}
 }
+
+// TestSweepSiag tests that sweeping a siag key results in the transfer of its
+// siafund outputs to the wallet.
+func TestSweepSiag(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// create a wallet
+	wt, err := createWalletTester("TestSweepSiag")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// sweep a siag key
+	_, sweptFunds, err := wt.wallet.SweepSiag([]string{"../../types/siag0of2of3.siakey", "../../types/siag1of2of3.siakey"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mine until funds are confirmed
+	wt.miner.AddBlock()
+
+	// new wallet should have exactly 'sweptCoins' coins
+	_, funds, _ := wt.wallet.ConfirmedBalance()
+	if funds.Cmp(sweptFunds) != 0 {
+		t.Fatalf("wallet should have correct balance after sweeping siag key: wanted %v, got %v", sweptFunds, funds)
+	}
+}
