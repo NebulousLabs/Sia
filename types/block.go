@@ -5,7 +5,6 @@ package types
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 
@@ -164,15 +163,5 @@ func (bid BlockID) String() string {
 
 // UnmarshalJSON decodes the json hex string of the block id.
 func (bid *BlockID) UnmarshalJSON(b []byte) error {
-	if len(b) != crypto.HashSize*2+2 {
-		return crypto.ErrHashWrongLen
-	}
-
-	var bidBytes []byte
-	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &bidBytes)
-	if err != nil {
-		return errors.New("could not unmarshal BlockID: " + err.Error())
-	}
-	copy(bid[:], bidBytes)
-	return nil
+	return (*crypto.Hash)(bid).UnmarshalJSON(b)
 }
