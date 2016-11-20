@@ -69,9 +69,6 @@ func TestScanLargeIndex(t *testing.T) {
 	// no outputs should have been added
 	if len(ss.siacoinOutputs) != 0 {
 		t.Error("expected 0 outputs, got", len(ss.siacoinOutputs))
-		for _, o := range ss.siacoinOutputs {
-			t.Log(o.seedIndex, o.value)
-		}
 	}
 	if ss.largestIndexSeen != 0 {
 		t.Error("expected no index to be seen, got", ss.largestIndexSeen)

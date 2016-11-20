@@ -46,7 +46,7 @@ type siagKeyPair struct {
 type savedKey033x struct {
 	SecretKey        crypto.SecretKey
 	UnlockConditions types.UnlockConditions
-	Visible          bool
+	Visible          bool // indicates whether user created the key manually
 }
 
 // decryptSpendableKeyFile decrypts a spendableKeyFile, returning a
@@ -119,25 +119,24 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 	// solution.
 }
 
-// loadSiagKeys loads a set of siag keyfiles into the wallet, so that the
-// wallet may spend the siafunds.
-func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) error {
+// recoverSiagKey creates a spendableKey from a set of siag keyfiles.
+func recoverSiagKey(keyfiles []string) (spendableKey, error) {
 	// Load the keyfiles from disk.
 	if len(keyfiles) < 1 {
-		return ErrNoKeyfile
+		return spendableKey{}, ErrNoKeyfile
 	}
 	skps := make([]siagKeyPair, len(keyfiles))
 	for i, keyfile := range keyfiles {
 		err := encoding.ReadFile(keyfile, &skps[i])
 		if err != nil {
-			return err
+			return spendableKey{}, err
 		}
 
 		if skps[i].Header != SiagFileHeader {
-			return ErrUnknownHeader
+			return spendableKey{}, ErrUnknownHeader
 		}
 		if skps[i].Version != SiagFileVersion {
-			return ErrUnknownVersion
+			return spendableKey{}, ErrUnknownVersion
 		}
 	}
 
@@ -146,11 +145,11 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	baseUnlockHash := skps[0].UnlockConditions.UnlockHash()
 	for _, skp := range skps {
 		if skp.UnlockConditions.UnlockHash() != baseUnlockHash {
-			return ErrInconsistentKeys
+			return spendableKey{}, ErrInconsistentKeys
 		}
 	}
 	if uint64(len(skps)) < skps[0].UnlockConditions.SignaturesRequired {
-		return ErrInsufficientKeys
+		return spendableKey{}, ErrInsufficientKeys
 	}
 	// Drop all unneeded keys.
 	skps = skps[0:skps[0].UnlockConditions.SignaturesRequired]
@@ -161,11 +160,7 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	for _, skp := range skps {
 		sk.SecretKeys = append(sk.SecretKeys, skp.SecretKey)
 	}
-	err := w.loadSpendableKey(masterKey, sk)
-	if err != nil {
-		return err
-	}
-	return nil
+	return sk, nil
 }
 
 // LoadSiagKeys loads a set of siag-generated keys into the wallet.
@@ -176,7 +171,11 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.loadSiagKeys(masterKey, keyfiles)
+	sk, err := recoverSiagKey(keyfiles)
+	if err != nil {
+		return err
+	}
+	return w.loadSpendableKey(masterKey, sk)
 }
 
 // Load033xWallet loads a v0.3.3.x wallet as an unseeded key, such that the
@@ -212,4 +211,84 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 		return errAllDuplicates
 	}
 	return nil
+}
+
+// Sweep033x sweeps the outputs of a v0.3.3.x wallet into the current wallet.
+func (w *Wallet) Sweep033x(filepath033x string) (coins, funds types.Currency, err error) {
+	if err = w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
+	if !w.cs.Synced() {
+		return types.Currency{}, types.Currency{}, errors.New("cannot sweep until blockchain is synced")
+	}
+
+	// read savedKeys and convert to spendableKeys
+	var savedKeys []savedKey033x
+	err = encoding.ReadFile(filepath033x, &savedKeys)
+	if err != nil {
+		return
+	}
+	keys := make([]spendableKey, len(savedKeys))
+	for i := range savedKeys {
+		keys[i] = spendableKey{
+			UnlockConditions: savedKeys[i].UnlockConditions,
+			SecretKeys:       []crypto.SecretKey{savedKeys[i].SecretKey},
+		}
+	}
+
+	s := newKeyScanner(keys)
+	_, maxFee := w.tpool.FeeEstimation()
+	s.dustThreshold = maxFee.Mul64(outputSize)
+	err = s.scan(w.cs)
+	if err != nil {
+		return
+	}
+
+	scos := make([]scannedOutput, 0, len(s.siacoinOutputs))
+	sfos := make([]scannedOutput, 0, len(s.siafundOutputs))
+	for _, output := range s.siacoinOutputs {
+		scos = append(scos, output)
+	}
+	for _, output := range s.siafundOutputs {
+		sfos = append(sfos, output)
+	}
+	return w.sweepOutputs(scos, sfos)
+}
+
+// SweepSiag sweeps the outputs belonging to a siag key into the current
+// wallet.
+func (w *Wallet) SweepSiag(keyfiles []string) (coins, funds types.Currency, err error) {
+	if err = w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
+	if !w.cs.Synced() {
+		return types.Currency{}, types.Currency{}, errors.New("cannot sweep until blockchain is synced")
+	}
+
+	sk, err := recoverSiagKey(keyfiles)
+	if err != nil {
+		return
+	}
+
+	s := newKeyScanner([]spendableKey{sk})
+	_, maxFee := w.tpool.FeeEstimation()
+	s.dustThreshold = maxFee.Mul64(outputSize)
+	err = s.scan(w.cs)
+	if err != nil {
+		return
+	}
+
+	scos := make([]scannedOutput, 0, len(s.siacoinOutputs))
+	sfos := make([]scannedOutput, 0, len(s.siafundOutputs))
+	for _, output := range s.siacoinOutputs {
+		scos = append(scos, output)
+	}
+	for _, output := range s.siafundOutputs {
+		sfos = append(sfos, output)
+	}
+	return w.sweepOutputs(scos, sfos)
 }

@@ -308,6 +308,14 @@ type (
 		// outputs, minus the fee. If only siafunds were found, the fee is
 		// deducted from the wallet.
 		SweepSeed(seed Seed) (coins, funds types.Currency, err error)
+
+		// Sweep033x behaves like SweepSeed, except that it sweeps outputs
+		// belonging to a v0.3.3.x wallet file.
+		Sweep033x(string) (coins, funds types.Currency, err error)
+
+		// SweepSiag behaves like SweepSeed, except that it sweeps outputs
+		// belonging to a siag key.
+		SweepSiag([]string) (coins, funds types.Currency, err error)
 	}
 
 	// Wallet stores and manages siacoins and siafunds. The wallet file is
