@@ -37,9 +37,13 @@ var (
 		{tooLargeFolderString, modules.SectorSize * (contractmanager.MaximumSectorsPerStorageFolder + 1), contractmanager.ErrLargeStorageFolder},
 
 		// valid sizes
-		{minFolderSizeString, contractmanager.MinimumSectorsPerStorageFolder * modules.SectorSize, nil},
-		{maxFolderSizeString, contractmanager.MaximumSectorsPerStorageFolder * modules.SectorSize, nil},
-		{mediumSizeFolderString, 3 * contractmanager.MinimumSectorsPerStorageFolder * modules.SectorSize, nil},
+		//
+		// TODO: Re-enable these when the host can support resizing into the
+		// same folder.
+		//
+		// {minFolderSizeString, contractmanager.MinimumSectorsPerStorageFolder * modules.SectorSize, nil},
+		// {maxFolderSizeString, contractmanager.MaximumSectorsPerStorageFolder * modules.SectorSize, nil},
+		// {mediumSizeFolderString, 3 * contractmanager.MinimumSectorsPerStorageFolder * modules.SectorSize, nil},
 	}
 )
 
