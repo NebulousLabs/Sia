@@ -1,9 +1,8 @@
 package renter
 
-// TODO: Replace the killChan with a thread group.
-
 import (
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -58,13 +57,13 @@ type (
 		// A busy higher priority channel is able to entriely starve all of the
 		// channels with lower priority.
 		downloadChan         chan downloadWork // higher priority than all uploads
-		killChan             chan struct{}     // highest priority
 		priorityDownloadChan chan downloadWork // higher priority than standard downloads (used when reparing low-redundancy files w/o original file)
 		priorityUploadChan   chan uploadWork   // higher priority than standard uploads (used for low-redundancy files)
 		uploadChan           chan uploadWork   // lowest priority
 
-		// contractor
+		// Utilities
 		contractor hostContractor
+		tg         *sync.ThreadGroup
 	}
 )
 
@@ -94,57 +93,59 @@ func (w *worker) upload(uw uploadWork) {
 	uw.resultChan <- finishedUpload{root, err}
 }
 
-// work will wait for either a kill signal or for work, then will quit or
-// perform the provided work.
+// work will perform one unit of work, exiting early if there is a kill signal
+// given before work is completed.
 func (w *worker) work() {
+	// Check for priority downloads.
+	select {
+	case d := <-w.priorityDownloadChan:
+		w.download(d)
+		return
+	default:
+		// do nothing
+	}
+
+	// Check for standard downloads.
+	select {
+	case d := <-w.downloadChan:
+		w.download(d)
+		return
+	default:
+		// do nothing
+	}
+
+	// Check for priority uploads.
+	select {
+	case u := <-w.priorityUploadChan:
+		w.upload(u)
+		return
+	default:
+		// do nothing
+	}
+
+	// None of the priority channels have work, listen on all channels.
+	select {
+	case d := <-w.downloadChan:
+		w.download(d)
+	case <-w.tg.StopChan():
+		return
+	case d := <-w.priorityDownloadChan:
+		w.download(d)
+	case u := <-w.priorityUploadChan:
+		w.upload(u)
+	case u := <-w.uploadChan:
+		w.upload(u)
+	}
+}
+
+// workLoop repeatedly issues work to a worker, stopping when the thread group
+// is closed.
+func (w *worker) workLoop() {
 	for {
-		// Check for the kill signal.
-		select {
-		case <-w.killChan:
+		if w.tg.Add() != nil {
 			return
-		default:
-			// do nothing
 		}
-
-		// Check for priority downloads.
-		select {
-		case d := <-w.priorityDownloadChan:
-			w.download(d)
-			continue
-		default:
-			// do nothing
-		}
-
-		// Check for standard downloads.
-		select {
-		case d := <-w.downloadChan:
-			w.download(d)
-			continue
-		default:
-			// do nothing
-		}
-
-		// Check for priority uploads.
-		select {
-		case u := <-w.priorityUploadChan:
-			w.upload(u)
-			continue
-		default:
-			// do nothing
-		}
-
-		// None of the priority channels have work, listen on all channels.
-		select {
-		case d := <-w.downloadChan:
-			w.download(d)
-		case <-w.killChan:
-			return
-		case d := <-w.priorityDownloadChan:
-			w.download(d)
-		case u := <-w.priorityUploadChan:
-			w.upload(u)
-		case u := <-w.uploadChan:
-			w.upload(u)
-		}
+		w.work()
+		w.tg.Done()
 	}
 }
