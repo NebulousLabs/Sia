@@ -63,25 +63,35 @@ type (
 		priorityUploadChan   chan uploadWork   // higher priority than standard uploads (used for low-redundancy files)
 		uploadChan           chan uploadWork   // lowest priority
 
-		// contractor 
+		// contractor
 		contractor hostContractor
 	}
 )
 
 // download will perform some download work.
 func (w *worker) download(dw downloadWork) {
-	d := w.r.hostContractor.Downloader(w.contractID)
-	data, err := hf.downloader.Sector(dw.MerkleRoot)
+	d, err := w.contractor.Downloader(w.contractID)
+	if err != nil {
+		dw.resultChan <- finishedDownload{nil, err}
+		return
+	}
+	defer d.Close()
+
+	data, err := d.Sector(dw.dataRoot)
 	dw.resultChan <- finishedDownload{data, err}
-	d.Close()
 }
 
 // upload will perform some upload work.
 func (w *worker) upload(uw uploadWork) {
-	e := w.r.hostContractor.Editor(w.contractID)
+	e, err := w.contractor.Editor(w.contractID)
+	if err != nil {
+		uw.resultChan <- finishedUpload{crypto.Hash{}, err}
+		return
+	}
+	defer e.Close()
+
 	root, err := e.Upload(uw.data)
 	uw.resultChan <- finishedUpload{root, err}
-	e.Close()
 }
 
 // work will wait for either a kill signal or for work, then will quit or

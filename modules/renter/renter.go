@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	errNilCS    = errors.New("cannot create renter with nil consensus set")
-	errNilTpool = errors.New("cannot create renter with nil transaction pool")
-	errNilHdb   = errors.New("cannot create renter with nil hostdb")
+	errNilContractor = errors.New("cannot create renter with nil contractor")
+	errNilCS         = errors.New("cannot create renter with nil consensus set")
+	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
+	errNilHdb        = errors.New("cannot create renter with nil hostdb")
 )
 
 // A hostDB is a database of hosts that the renter can use for figuring out who
@@ -80,25 +81,26 @@ type trackedFile struct {
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
-	// modules
-	cs modules.ConsensusSet
+	// File management.
+	files    map[string]*file
+	tracking map[string]trackedFile // map from nickname to metadata
 
-	// resources
-	hostDB         hostDB
-	hostContractor hostContractor
-	log            *persist.Logger
-
-	// variables
-	files         map[string]*file
-	tracking      map[string]trackedFile // map from nickname to metadata
+	// Work management.
+	workerPool    map[types.FileContractID]worker
 	downloadQueue []*download
-	uploading     bool
-	downloading   bool
 
-	// constants
-	persistDir string
+	// Status Variables.
+	uploading   bool
+	downloading bool
 
-	mu *sync.RWMutex
+	// Utilities.
+	cs             modules.ConsensusSet
+	hostContractor hostContractor
+	hostDB         hostDB
+	log            *persist.Logger
+	persistDir     string
+	mu             *sync.RWMutex
+	tg             *sync.ThreadGroup
 }
 
 // New returns an initialized renter.
@@ -123,21 +125,25 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	if tpool == nil {
 		return nil, errNilTpool
 	}
+	if hc == nil {
+		return nil, errNilContractor
+	}
 	if hdb == nil {
 		// Nil hdb currently allowed for testing purposes. :(
 		// return nil, errNilHdb
 	}
 
 	r := &Renter{
-		cs:             cs,
-		hostDB:         hdb,
-		hostContractor: hc,
-
 		files:    make(map[string]*file),
 		tracking: make(map[string]trackedFile),
 
-		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 1),
+		workerPool: make(map[types.FileContractID]worker),
+
+		cs:             cs,
+		hostDB:         hdb,
+		hostContractor: hc,
+		persistDir:     persistDir,
+		mu:             sync.New(modules.SafeMutexDelay, 1),
 	}
 	if err := r.initPersist(); err != nil {
 		return nil, err
