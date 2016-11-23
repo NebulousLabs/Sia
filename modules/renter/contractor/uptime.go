@@ -2,12 +2,22 @@ package contractor
 
 import (
 	"time"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
-const (
-	// uptimeInterval specifies how frequently hosts are checked.
-	uptimeInterval = 30 * time.Minute
-)
+// uptimeInterval specifies how frequently hosts are checked.
+var uptimeInterval = func() time.Duration {
+	switch build.Release {
+	case "dev":
+		return 1 * time.Minute
+	case "standard":
+		return 30 * time.Minute
+	case "testing":
+		return 100 * time.Millisecond
+	}
+	panic("undefined uptimeInterval")
+}()
 
 // threadedMonitorUptime regularly checks host uptime, and deletes contracts
 // whose hosts fall below a minimum uptime threshold.
@@ -38,6 +48,6 @@ func (c *Contractor) threadedMonitorUptime() {
 		}
 		c.mu.Unlock()
 		c.editLock.Unlock()
-		c.log.Println("INFO: deleted %v contracts because their hosts were offline", len(badContracts))
+		c.log.Printf("INFO: deleted %v contracts because their hosts were offline", len(badContracts))
 	}
 }
