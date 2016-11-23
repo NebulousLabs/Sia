@@ -86,7 +86,7 @@ type Renter struct {
 	tracking map[string]trackedFile // map from nickname to metadata
 
 	// Work management.
-	workerPool    map[types.FileContractID]worker
+	workerPool    map[types.FileContractID]*worker
 	downloadQueue []*download
 
 	// Status Variables.
@@ -137,16 +137,26 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		files:    make(map[string]*file),
 		tracking: make(map[string]trackedFile),
 
-		workerPool: make(map[types.FileContractID]worker),
+		workerPool: make(map[types.FileContractID]*worker),
 
 		cs:             cs,
 		hostDB:         hdb,
 		hostContractor: hc,
 		persistDir:     persistDir,
 		mu:             sync.New(modules.SafeMutexDelay, 1),
+		tg:             new(sync.ThreadGroup),
 	}
 	if err := r.initPersist(); err != nil {
 		return nil, err
+	}
+
+	// Spin up the workers for the work pool.
+	contracts := hc.Contracts()
+	for _, c := range contracts {
+		err := r.addWorker(c.ID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	go r.threadedRepairLoop()
@@ -156,7 +166,66 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 
 // Close closes the Renter and its dependencies
 func (r *Renter) Close() error {
+	r.tg.Stop()
 	return r.hostDB.Close()
+}
+
+// SetSettings will update the settings for the renter.
+func (r *Renter) SetSettings(s modules.RenterSettings) error {
+	err := r.hostContractor.SetAllowance(s.Allowance)
+	if err != nil {
+		return err
+	}
+
+	id := r.mu.Lock()
+	defer r.mu.Unlock(id)
+
+	// Get the list of contracts in the contractor.
+	newContracts := r.hostContractor.Contracts()
+
+	// Get the list of contracts in the work pool.
+	oldContracts := make([]types.FileContractID, 0, len(r.workerPool))
+	for fcid := range r.workerPool {
+		oldContracts = append(oldContracts, fcid)
+	}
+
+	// Find all elements in newContracts that are not in oldContracts and make
+	// workers for them.
+	for _, nc := range newContracts {
+		found := false
+		for _, ofcid := range oldContracts {
+			if nc.ID == ofcid {
+				found = true
+				break
+			}
+		}
+		if !found {
+			err = r.addWorker(nc.ID)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Find all elements in oldContracts that are not in newContracts and kill
+	// their workers.
+	for _, ocid := range oldContracts {
+		found := false
+		for _, nc := range newContracts {
+			if nc.ID == ocid {
+				found = true
+				break
+			}
+		}
+		if !found {
+			err = r.retireWorker(ocid)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // hostdb passthroughs
@@ -172,9 +241,6 @@ func (r *Renter) Settings() modules.RenterSettings {
 	return modules.RenterSettings{
 		Allowance: r.hostContractor.Allowance(),
 	}
-}
-func (r *Renter) SetSettings(s modules.RenterSettings) error {
-	return r.hostContractor.SetAllowance(s.Allowance)
 }
 
 // enforce that Renter satisfies the modules.Renter interface

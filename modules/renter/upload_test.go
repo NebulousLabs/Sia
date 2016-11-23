@@ -2,6 +2,7 @@ package renter
 
 import (
 	"bytes"
+	"crypto/rand"
 	"io/ioutil"
 	"path/filepath"
 	"sync"
@@ -28,7 +29,14 @@ func (uc *uploadDownloadContractor) Contract(modules.NetAddress) (modules.Renter
 }
 
 func (uc *uploadDownloadContractor) Contracts() []modules.RenterContract {
-	return make([]modules.RenterContract, 24) // exact number shouldn't matter, as long as its large enough
+	contracts := make([]modules.RenterContract, 24)
+	for i := range contracts {
+		_, err := rand.Read(contracts[i].ID[:])
+		if err != nil {
+			panic(err)
+		}
+	}
+	return contracts
 }
 
 // Editor simply returns the uploadDownloadContractor, since it also implements the

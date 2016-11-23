@@ -1,9 +1,21 @@
 package renter
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	// errWorkerDoesNotExist is returned if retireWorker is called for a
+	// contract id that does not have a worker associated with it.
+	errWorkerDoesNotExist = errors.New("no worker exists for that contract id")
+
+	// errWorkerExists is returned if addWorker is called for a contract id
+	// that already has a worker.
+	errWorkerExists = errors.New("there is already a worker for that contract id")
 )
 
 type (
@@ -57,6 +69,7 @@ type (
 		// A busy higher priority channel is able to entriely starve all of the
 		// channels with lower priority.
 		downloadChan         chan downloadWork // higher priority than all uploads
+		killChan             chan struct{}
 		priorityDownloadChan chan downloadWork // higher priority than standard downloads (used when reparing low-redundancy files w/o original file)
 		priorityUploadChan   chan uploadWork   // higher priority than standard uploads (used for low-redundancy files)
 		uploadChan           chan uploadWork   // lowest priority
@@ -127,25 +140,79 @@ func (w *worker) work() {
 	select {
 	case d := <-w.downloadChan:
 		w.download(d)
-	case <-w.tg.StopChan():
+		return
+	case <-w.killChan:
 		return
 	case d := <-w.priorityDownloadChan:
 		w.download(d)
+		return
 	case u := <-w.priorityUploadChan:
 		w.upload(u)
+		return
 	case u := <-w.uploadChan:
 		w.upload(u)
+		return
+	case <-w.tg.StopChan():
+		return
 	}
 }
 
 // workLoop repeatedly issues work to a worker, stopping when the thread group
 // is closed.
-func (w *worker) workLoop() {
+func (w *worker) threadedWorkLoop() {
 	for {
+		// Check if the worker has been killed individually.
+		select {
+		case <-w.killChan:
+			return
+		default:
+			// do nothing
+		}
+
+		// Wrap a call to work() in a threadgroup reservation.
 		if w.tg.Add() != nil {
 			return
 		}
 		w.work()
 		w.tg.Done()
 	}
+}
+
+// addWorker will create a worker for the provided file contract id and add it
+// to the renter. Upon return, the work loop for the worker will have been
+// spawned.
+func (r *Renter) addWorker(fcid types.FileContractID) error {
+	_, exists := r.workerPool[fcid]
+	if exists {
+		return errWorkerExists
+	}
+
+	worker := &worker{
+		contractID: fcid,
+
+		downloadChan:         make(chan downloadWork, 1),
+		killChan:             make(chan struct{}, 1),
+		priorityDownloadChan: make(chan downloadWork, 1),
+		priorityUploadChan:   make(chan uploadWork, 1),
+		uploadChan:           make(chan uploadWork, 1),
+
+		contractor: r.hostContractor,
+		tg:         r.tg,
+	}
+	r.workerPool[fcid] = worker
+	go worker.threadedWorkLoop()
+	return nil
+}
+
+// retireWorker will remove a worker from the work pool, terminating the work
+// loop and deleting the worker from the renter's worker pool.
+func (r *Renter) retireWorker(fcid types.FileContractID) error {
+	w, exists := r.workerPool[fcid]
+	if !exists {
+		return errWorkerDoesNotExist
+	}
+
+	delete(r.workerPool, fcid)
+	close(w.killChan)
+	return nil
 }
