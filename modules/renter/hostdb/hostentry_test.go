@@ -119,7 +119,7 @@ func TestIsOffline(t *testing.T) {
 	hdb := &HostDB{
 		allHosts: map[modules.NetAddress]*hostEntry{
 			"foo.com:1234": {LastScanned: now, LastSeen: now},
-			"bar.com:1234": {LastScanned: now, LastSeen: now.Add(-uptimeThreshold)},
+			"bar.com:1234": {LastScanned: now, LastSeen: now.Add(-uptimeThreshold * 2)},
 			"baz.com:1234": {LastScanned: now, LastSeen: now.Add(-uptimeThreshold / 2)},
 		},
 		activeHosts: map[modules.NetAddress]*hostNode{
