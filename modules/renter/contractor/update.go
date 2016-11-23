@@ -44,7 +44,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// only attempt contract formation/renewal if we are synced
 	// (harmless if not synced, since hosts will reject our renewal attempts,
-	// (but very slow)
+	// but very slow)
 	if cc.Synced {
 		go func() {
 			// only one goroutine should be editing contracts at a time

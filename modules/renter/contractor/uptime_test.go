@@ -39,6 +39,13 @@ func TestIntegrationMonitorUptime(t *testing.T) {
 	// override IsOffline to always return true for h
 	c.hdb = uptimeHostDB{c.hdb, h.ExternalSettings().NetAddress}
 
+	// create another host
+	dir := build.TempDir("contractor", "TestIntegrationMonitorUptime", "Host2")
+	h2, err := newTestingHost(dir, c.cs.(modules.ConsensusSet), c.tpool.(modules.TransactionPool))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// form a contract with h
 	c.SetAllowance(modules.Allowance{
 		Funds:       types.SiacoinPrecision.Mul64(100),
@@ -60,12 +67,7 @@ func TestIntegrationMonitorUptime(t *testing.T) {
 		t.Fatal("contract was not removed")
 	}
 
-	// create another host and announce it
-	dir := build.TempDir("contractor", "TestIntegrationMonitorUptime", "Host2")
-	h2, err := newTestingHost(dir, c.cs.(modules.ConsensusSet), c.tpool.(modules.TransactionPool))
-	if err != nil {
-		t.Fatal(err)
-	}
+	// announce the second host
 	err = h2.Announce()
 	if err != nil {
 		t.Fatal(err)
@@ -82,11 +84,12 @@ func TestIntegrationMonitorUptime(t *testing.T) {
 		t.Fatal("host did not make it into the contractor hostdb in time", c.hdb.RandomHosts(2, nil))
 	}
 
-	// mine a new block. ProcessConsensusChange will trigger
-	// managedFormAllowanceContracts, which should form a new contract with h2
-	m.AddBlock()
+	// mine blocks until a new contract is formed. ProcessConsensusChange will
+	// trigger managedFormAllowanceContracts, which should form a new contract
+	// with h2
 	for i := 0; i < 100 && len(c.Contracts()) != 1; i++ {
-		time.Sleep(10 * time.Millisecond)
+		m.AddBlock()
+		time.Sleep(100 * time.Millisecond)
 	}
 	if len(c.Contracts()) != 1 {
 		t.Fatal("contract was not replaced")

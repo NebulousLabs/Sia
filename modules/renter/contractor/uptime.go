@@ -41,13 +41,11 @@ func (c *Contractor) threadedMonitorUptime() {
 		// delete contracts with bad hosts. When a new block arrives,
 		// ProcessConsensusChange will take care of forming new contracts as
 		// needed.
-		c.editLock.Lock()
 		c.mu.Lock()
 		for _, contract := range badContracts {
 			delete(c.contracts, contract.ID)
 		}
 		c.mu.Unlock()
-		c.editLock.Unlock()
 		c.log.Printf("INFO: deleted %v contracts because their hosts were offline", len(badContracts))
 	}
 }
