@@ -168,5 +168,8 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		return nil, errors.New("contractor subscription failed: " + err.Error())
 	}
 
+	// spawn uptime loop
+	go c.threadedMonitorUptime()
+
 	return c, nil
 }

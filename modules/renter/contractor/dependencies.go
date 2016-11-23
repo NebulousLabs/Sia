@@ -47,6 +47,7 @@ type (
 
 	hostDB interface {
 		Host(modules.NetAddress) (modules.HostDBEntry, bool)
+		IsOffline(modules.NetAddress) bool
 		RandomHosts(n int, exclude []modules.NetAddress) []modules.HostDBEntry
 	}
 

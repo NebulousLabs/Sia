@@ -33,6 +33,7 @@ func (newStub) FeeEstimation() (a types.Currency, b types.Currency) { return }
 
 // hdb stubs
 func (newStub) Host(modules.NetAddress) (settings modules.HostDBEntry, ok bool) { return }
+func (newStub) IsOffline(modules.NetAddress) bool                               { return false }
 func (newStub) RandomHosts(int, []modules.NetAddress) []modules.HostDBEntry     { return nil }
 
 // TestNew tests the New function.
@@ -185,6 +186,7 @@ func TestAllowance(t *testing.T) {
 type stubHostDB struct{}
 
 func (stubHostDB) Host(modules.NetAddress) (h modules.HostDBEntry, ok bool)         { return }
+func (stubHostDB) IsOffline(modules.NetAddress) (offline bool)                      { return }
 func (stubHostDB) RandomHosts(int, []modules.NetAddress) (hs []modules.HostDBEntry) { return }
 
 // TestIntegrationSetAllowance tests the SetAllowance method.
