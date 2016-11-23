@@ -34,6 +34,10 @@ const (
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
 	scanningThreads = 50
+
+	// uptimeThreshold is the amount of time since the last successful scan that
+	// qualifies a host as being "offline."
+	uptimeThreshold = 3 * 24 * time.Hour
 )
 
 // Reliability is a measure of a host's uptime.
@@ -103,7 +107,6 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 		return
 	}
 	entry.Reliability = entry.Reliability.Sub(penalty)
-	entry.Online = false
 
 	// If the entry is in the active database, remove it from the active
 	// database.
@@ -128,7 +131,9 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 
-	// Regardless of whether the host responded, add it to allHosts.
+	// Regardless of whether the host responded, update LastScanned and add it
+	// to allHosts.
+	entry.LastScanned = time.Now()
 	priorHost, exists := hdb.allHosts[entry.NetAddress]
 	if !exists {
 		hdb.allHosts[entry.NetAddress] = entry
@@ -145,6 +150,8 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 		}
 		return
 	}
+	// Otherwise, update LastSeen.
+	entry.LastSeen = time.Now()
 
 	// The host entry should be updated to reflect the new weight. The safety
 	// properties of the tree require that the weight does not change while the
@@ -164,7 +171,6 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	newSettings.NetAddress = entry.HostExternalSettings.NetAddress
 	entry.HostExternalSettings = newSettings
 	entry.Reliability = MaxReliability
-	entry.Online = true
 	entry.Weight = calculateHostWeight(hdb.blockHeight, *entry)
 	hdb.insertNode(entry)
 

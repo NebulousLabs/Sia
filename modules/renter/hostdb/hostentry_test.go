@@ -115,11 +115,12 @@ func TestAverageContractPrice(t *testing.T) {
 
 // TestIsOffline tests the IsOffline method.
 func TestIsOffline(t *testing.T) {
+	now := time.Now()
 	hdb := &HostDB{
 		allHosts: map[modules.NetAddress]*hostEntry{
-			"foo.com:1234": {Online: true},
-			"bar.com:1234": {Online: false},
-			"baz.com:1234": {Online: true},
+			"foo.com:1234": {LastScanned: now, LastSeen: now},
+			"bar.com:1234": {LastScanned: now, LastSeen: now.Add(-uptimeThreshold)},
+			"baz.com:1234": {LastScanned: now, LastSeen: now.Add(-uptimeThreshold / 2)},
 		},
 		activeHosts: map[modules.NetAddress]*hostNode{
 			"foo.com:1234": nil,
