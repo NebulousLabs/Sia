@@ -2,6 +2,7 @@ package renter
 
 import (
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/sync"
@@ -42,6 +43,7 @@ type (
 	finishedUpload struct {
 		dataRoot crypto.Hash
 		err      error
+		workerID types.FileContractID
 	}
 
 	// uploadWork contains instructions to upload a piece to a host, and a
@@ -69,10 +71,14 @@ type (
 		// A busy higher priority channel is able to entriely starve all of the
 		// channels with lower priority.
 		downloadChan         chan downloadWork // higher priority than all uploads
-		killChan             chan struct{}
-		priorityDownloadChan chan downloadWork // higher priority than standard downloads (used when reparing low-redundancy files w/o original file)
-		priorityUploadChan   chan uploadWork   // higher priority than standard uploads (used for low-redundancy files)
+		killChan             chan struct{}     // highest priority
+		priorityDownloadChan chan downloadWork // higher priority than downloads (used for user-initiated downloads)
 		uploadChan           chan uploadWork   // lowest priority
+
+		// recentUploadFailure documents the most recent time that an upload
+		// has failed. The repair loop ignores workers that have had an upload
+		// failure in the past two hours.
+		recentUploadFailure time.Time
 
 		// Utilities
 		contractor hostContractor
@@ -97,13 +103,13 @@ func (w *worker) download(dw downloadWork) {
 func (w *worker) upload(uw uploadWork) {
 	e, err := w.contractor.Editor(w.contractID)
 	if err != nil {
-		uw.resultChan <- finishedUpload{crypto.Hash{}, err}
+		uw.resultChan <- finishedUpload{crypto.Hash{}, err, w.contractID}
 		return
 	}
 	defer e.Close()
 
 	root, err := e.Upload(uw.data)
-	uw.resultChan <- finishedUpload{root, err}
+	uw.resultChan <- finishedUpload{root, err, w.contractID}
 }
 
 // work will perform one unit of work, exiting early if there is a kill signal
@@ -127,15 +133,6 @@ func (w *worker) work() {
 		// do nothing
 	}
 
-	// Check for priority uploads.
-	select {
-	case u := <-w.priorityUploadChan:
-		w.upload(u)
-		return
-	default:
-		// do nothing
-	}
-
 	// None of the priority channels have work, listen on all channels.
 	select {
 	case d := <-w.downloadChan:
@@ -145,9 +142,6 @@ func (w *worker) work() {
 		return
 	case d := <-w.priorityDownloadChan:
 		w.download(d)
-		return
-	case u := <-w.priorityUploadChan:
-		w.upload(u)
 		return
 	case u := <-w.uploadChan:
 		w.upload(u)
@@ -190,11 +184,10 @@ func (r *Renter) addWorker(fcid types.FileContractID) error {
 	worker := &worker{
 		contractID: fcid,
 
-		downloadChan:         make(chan downloadWork, 1),
-		killChan:             make(chan struct{}, 1),
-		priorityDownloadChan: make(chan downloadWork, 1),
-		priorityUploadChan:   make(chan uploadWork, 1),
-		uploadChan:           make(chan uploadWork, 1),
+		downloadChan:         make(chan downloadWork),
+		killChan:             make(chan struct{}),
+		priorityDownloadChan: make(chan downloadWork),
+		uploadChan:           make(chan uploadWork),
 
 		contractor: r.hostContractor,
 		tg:         r.tg,

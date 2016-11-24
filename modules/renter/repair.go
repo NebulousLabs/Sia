@@ -1,20 +1,15 @@
 package renter
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-const (
-	// repairThreads is the number of repairs that can run concurrently.
-	repairThreads = 10
 )
 
 // When a file contract is within 'renewThreshold' blocks of expiring, the renter
@@ -26,7 +21,7 @@ var renewThreshold = func() types.BlockHeight {
 	case "dev":
 		return 200
 	default:
-		return 144 * 7 * 3 // TODO TODO TODO: 3 weeks - to soon be 6 weeks.
+		return 144 * 7 * 6
 	}
 }()
 
@@ -126,33 +121,6 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	return nil
 }
 
-// incompleteChunks returns a map of chunks containing pieces that have not
-// been uploaded.
-func (f *file) incompleteChunks() map[uint64][]uint64 {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	present := make([][]bool, f.numChunks())
-	for i := range present {
-		present[i] = make([]bool, f.erasureCode.NumPieces())
-	}
-	for _, fc := range f.contracts {
-		for _, p := range fc.Pieces {
-			present[p.Chunk][p.Piece] = true
-		}
-	}
-
-	incomplete := make(map[uint64][]uint64)
-	for chunkIndex, pieceBools := range present {
-		for pieceIndex, ok := range pieceBools {
-			if !ok {
-				incomplete[uint64(chunkIndex)] = append(incomplete[uint64(chunkIndex)], uint64(pieceIndex))
-			}
-		}
-	}
-	return incomplete
-}
-
 // chunkHosts returns the hosts storing the given chunk.
 func (f *file) chunkHosts(chunk uint64) []modules.NetAddress {
 	f.mu.RLock()
@@ -211,92 +179,6 @@ func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 	return filtered
 }
 
-// threadedRepairLoop improves the health of files tracked by the renter by
-// reuploading their missing pieces. Multiple repair attempts may be necessary
-// before the file reaches full redundancy.
-func (r *Renter) threadedRepairLoop() {
-	for {
-		time.Sleep(5 * time.Second)
-
-		if len(r.hostContractor.Contracts()) == 0 {
-			// nothing to revise
-			continue
-		}
-
-		// if the downloading flag is set, abort early. Otherwise, set the
-		// uploading flag.
-		id := r.mu.Lock()
-		downloading := r.downloading
-		if !downloading {
-			r.uploading = true
-		}
-		r.mu.Unlock(id)
-		if downloading {
-			continue
-		}
-
-		// make copy of repair set under lock
-		repairing := make(map[string]trackedFile)
-		id = r.mu.RLock()
-		for name, meta := range r.tracking {
-			repairing[name] = meta
-		}
-		r.mu.RUnlock(id)
-
-		// create host pool
-		pool := r.newHostPool()
-		for name, meta := range repairing {
-			r.threadedRepairFile(name, meta, pool)
-		}
-		pool.Close() // heh
-
-		// unset uploading flag
-		id = r.mu.Lock()
-		r.uploading = false
-		r.mu.Unlock(id)
-	}
-}
-
-// threadedRepairFile repairs and saves an individual file.
-func (r *Renter) threadedRepairFile(name string, meta trackedFile, pool *hostPool) {
-	// helper function
-	logAndRemove := func(fmt string, args ...interface{}) {
-		r.log.Printf(fmt, args...)
-		id := r.mu.Lock()
-		delete(r.tracking, name)
-		r.save()
-		r.mu.Unlock(id)
-	}
-
-	id := r.mu.RLock()
-	f, ok := r.files[name]
-	r.mu.RUnlock(id)
-	if !ok {
-		logAndRemove("removing %v from repair set: no longer tracking that file", name)
-		return
-	}
-
-	// determine if there is any work to do
-	incChunks := f.incompleteChunks()
-	if len(incChunks) == 0 {
-		return
-	}
-
-	// open file handle
-	handle, err := os.Open(meta.RepairPath)
-	if err != nil {
-		logAndRemove("removing %v from repair set: %v", name, err)
-		return
-	}
-	defer handle.Close()
-
-	// repair incomplete chunks
-	if len(incChunks) != 0 {
-		r.log.Printf("repairing %v chunks of %v", len(incChunks), f.name)
-		r.repairChunks(f, handle, incChunks, pool)
-	}
-}
-
 // repairChunks uploads missing chunks of f to new hosts.
 func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]uint64, pool *hostPool) {
 	for chunk, pieces := range chunks {
@@ -343,6 +225,354 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 		r.mu.RUnlock(id)
 		if downloading {
 			return
+		}
+	}
+}
+
+// incompleteChunks returns a set of chunks on a file that are not at full
+// redundancy. incompleteChunks will only return chunks/peices if there are
+// hosts available to accept the data.
+func (f *file) incompleteChunks() map[uint64][]uint64 {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	present := make([][]bool, f.numChunks())
+	for i := range present {
+		present[i] = make([]bool, f.erasureCode.NumPieces())
+	}
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			present[p.Chunk][p.Piece] = true
+		}
+	}
+
+	incomplete := make(map[uint64][]uint64)
+	for chunkIndex, pieceBools := range present {
+		for pieceIndex, ok := range pieceBools {
+			if !ok {
+				incomplete[uint64(chunkIndex)] = append(incomplete[uint64(chunkIndex)], uint64(pieceIndex))
+			}
+		}
+	}
+	return incomplete
+}
+
+/*
+// repairFile repairs and saves an individual file.
+func (r *Renter) repairFile(name string, meta trackedFile) {
+	// Fetch the file. It's possible that the file has been deleted since the
+	// repair set was created, if this is the case just move on to the next
+	// file.
+	id := r.mu.RLock()
+	f, ok := r.files[name]
+	r.mu.RUnlock(id)
+	if !ok {
+		return
+	}
+
+	// Get a list of chunks that are not at full redundancy.
+	incompleteChunks := f.incompleteChunks()
+	if len(incChunks) == 0 {
+		return
+	}
+
+	// hmm... not really enough to figure out which chunks are incomplete, also
+	// need to know which hosts are missing from the chunk.
+
+	// open file handle
+	handle, err := os.Open(meta.RepairPath)
+	if err != nil {
+		return
+	}
+	defer handle.Close()
+
+	// repair incomplete chunks
+	if len(incChunks) != 0 {
+		r.log.Printf("repairing %v chunks of %v", len(incChunks), f.name)
+		r.repairChunks(f, handle, incChunks, pool)
+	}
+}
+*/
+
+type chunkGaps struct {
+	contracts []types.FileContractID
+	pieces    []uint64
+	numGaps   int
+}
+
+func (r *Renter) addFileToRepairMatrix(file *file, availableWorkers map[types.FileContractID]struct{}, repairMatrix map[string]*chunkGaps, gapCounts map[int]int) {
+	// Flatten availableWorkers into a list of contracts.
+	contracts := make([]types.FileContractID, 0)
+	for contract, _ := range availableWorkers {
+		contracts = append(contracts, contract)
+	}
+
+	// If the file is not being tracked, don't add it to the repair matrix.
+	_, exists := r.tracking[file.name]
+	if exists {
+		return
+	}
+
+	// For each chunk, create a map from the chunk to the pieces that it
+	// has, and to the contracts that have that chunk.
+	chunkCount := file.numChunks()
+	contractMap := make(map[uint64][]types.FileContractID)
+	pieceMap := make(map[uint64][]uint64)
+	for i := uint64(0); i < chunkCount; i++ {
+		contractMap[i] = make([]types.FileContractID, 0)
+		pieceMap[i] = make([]uint64, 0)
+	}
+
+	// Iterate through each contract and figure out what's available.
+	for _, contract := range file.contracts {
+		for _, piece := range contract.Pieces {
+			contractMap[piece.Chunk] = append(contractMap[piece.Chunk], contract.ID)
+			pieceMap[piece.Chunk] = append(pieceMap[piece.Chunk], piece.Piece)
+		}
+	}
+
+	// Iterate through each chunk and, if there are gaps, add the inverse
+	// to the repair matrix.
+	for i := uint64(0); i < chunkCount; i++ {
+		if len(pieceMap[i]) < file.erasureCode.NumPieces() {
+			// Find the gaps in the pieces and contracts.
+			potentialPieceGaps := make(map[uint64]struct{})
+			for j := 0; j < file.erasureCode.NumPieces(); i++ {
+				potentialPieceGaps[i] = struct{}{}
+			}
+			potentialContractGaps := make(map[types.FileContractID]struct{})
+			for _, contract := range contracts {
+				potentialContractGaps[contract] = struct{}{}
+			}
+
+			// Delete every available piece from the potential piece gaps,
+			// and every utilized contract form the potential contract
+			// gaps.
+			for _, fcid := range contractMap[i] {
+				delete(potentialContractGaps, fcid)
+			}
+			for _, piece := range pieceMap[i] {
+				delete(potentialPieceGaps, piece)
+			}
+
+			// Merge the gaps into a slice.
+			var gaps chunkGaps
+			for fcid, _ := range potentialContractGaps {
+				gaps.contracts = append(gaps.contracts, fcid)
+			}
+			for piece, _ := range potentialPieceGaps {
+				gaps.pieces = append(gaps.pieces, piece)
+			}
+
+			// Figure out the largest number of workers that could be
+			// repairing this piece simultaneously.
+			if len(potentialPieceGaps) < len(potentialContractGaps) {
+				gaps.numGaps = len(potentialPieceGaps)
+			} else {
+				gaps.numGaps = len(potentialContractGaps)
+			}
+
+			// Record the number of gaps that this chunk has, which makes
+			// blocking-related decisions easier.
+			gapCounts[gaps.numGaps] = gapCounts[gaps.numGaps] + 1
+
+			// Create a name for the incomplete chunk.
+			chunkPrefix := make([]byte, 8)
+			binary.LittleEndian.PutUint64(chunkPrefix, i)
+			chunkName := string(chunkPrefix)+file.name
+
+			// Add the chunk to the repair matrix.
+			repairMatrix[chunkName] = &gaps
+		}
+	}
+}
+
+func (r *Renter) createRepairMatrix(availableWorkers map[types.FileContractID]struct{}) (map[string]*chunkGaps, map[int]int) {
+	repairMatrix := make(map[string]*chunkGaps)
+	gapCounts := make(map[int]int)
+
+	// Add all of the files to the repair matrix.
+	for _, file := range r.files {
+		r.addFileToRepairMatrix(file, availableWorkers, repairMatrix, gapCounts)
+	}
+	return repairMatrix, gapCounts
+}
+
+// threadedRepairLoop improves the health of files tracked by the renter by
+// reuploading their missing pieces. Multiple repair attempts may be necessary
+// before the file reaches full redundancy.
+func (r *Renter) threadedRepairLoop() {
+	for {
+		// Create the initial set of workers that are used to perform
+		// uploading.
+		availableWorkers := make(map[types.FileContractID]struct{})
+		id := r.mu.RLock()
+		for id, worker := range r.workerPool {
+			// Ignore workers that have had an upload failure in the past two
+			// hours.
+			if worker.recentUploadFailure.Add(time.Minute * 120).Before(time.Now()) {
+				availableWorkers[id] = struct{}{}
+			}
+		}
+		r.mu.RUnlock(id)
+
+		// Create the repair matrix. The repair matrix is a set of chunks,
+		// linked from chunk id to the set of hosts that do not have that
+		// chunk.
+		repairMatrix, gapCounts := r.createRepairMatrix(availableWorkers)
+		maxGaps := 0
+		for i := 1; i < len(gapCounts); i++ {
+			if gapCounts[i] > 0 {
+				maxGaps = i
+			}
+		}
+		if maxGaps == 0 {
+			// There is no work to do. Sleep for 15 minutes, or until there has
+			// been a new upload. Then iterate to make a new repair matrix and
+			// check again.
+			select{
+				case <-time.After(time.Minute * 15):
+					continue
+				case <-r.newFiles:
+					continue
+			}
+		}
+
+		// Set up a loop that first waits for enough workers to become
+		// available, and then iterates through the repair matrix to find a
+		// chunk to repair. The loop will create a chunk if as few as 4 pieces
+		// can be handed off to workers simultaneously.
+		startTime := time.Now()
+		activeWorkers := availableWorkers
+		var retiredWorkers []types.FileContractID
+		resultChan := make(chan finishedUpload)
+		for {
+			// Determine the maximum number of gaps that any chunk has.
+			maxGaps := 0
+			for i := 1; i < len(gapCounts); i++ {
+				if gapCounts[i] != 0 {
+					maxGaps = i
+				}
+			}
+			if maxGaps == 0 {
+				// None of the chunks have any more opportunity to upload.
+				break
+			}
+
+			// Iterate through the chunks until a candidate chunk is found.
+			for _, chunkGaps := range repairMatrix {
+				// Figure out how many pieces in this chunk could be repaired
+				// by the current availableWorkers.
+				var usefulWorkers []types.FileContractID
+				for worker, _ := range availableWorkers {
+					for _, contract := range chunkGaps.contracts {
+						if worker == contract {
+								usefulWorkers = append(usefulWorkers, worker)
+						}
+					}
+				}
+
+				if maxGaps >= 4 && len(usefulWorkers) < 4 {
+					// These workers in particular are not useful for this
+					// chunk - need a different or broader set of workers.
+					// Update the gapCount for this chunk - retired workers may
+					// have altered the number.
+
+					// Remove the contract ids of any workers that have
+					// retired.
+					for _, retire := range retiredWorkers {
+						for i := range chunkGaps.contracts {
+							if chunkGaps.contracts[i] == retire {
+								chunkGaps.contracts = append(chunkGaps.contracts[:i], chunkGaps.contracts[i+1:]...)
+								break
+							}
+						}
+					}
+					// Update the gap counts if they have been affected in any
+					// way.
+					if len(chunkGaps.contracts) < len(chunkGaps.pieces) && len(chunkGaps.contracts) < chunkGaps.numGaps {
+						oldNumGaps := chunkGaps.numGaps
+						chunkGaps.numGaps = len(chunkGaps.contracts)
+						gapCounts[oldNumGaps] = gapCounts[oldNumGaps] - 1
+						gapCounts[chunkGaps.numGaps] = gapCounts[chunkGaps.numGaps] + 1
+					}
+					continue
+				}
+
+				// TODO: Send off the workers. As the workers get sent off,
+				// update chunkGaps and availableWorkers.
+
+				// Update the number of gaps.
+				oldNumGaps := chunkGaps.numGaps
+				if len(chunkGaps.contracts) < len(chunkGaps.pieces) {
+					chunkGaps.numGaps = len(chunkGaps.contracts)
+				} else {
+					chunkGaps.numGaps = len(chunkGaps.pieces)
+				}
+				gapCounts[oldNumGaps] = gapCounts[oldNumGaps] - 1
+				gapCounts[chunkGaps.numGaps] = gapCounts[chunkGaps.numGaps] + 1
+				break
+			}
+
+			// Determine the number of workers we need in 'available'.
+			exclude := maxGaps - 4
+			if exclude < 0 {
+				exclude = 0
+			}
+			need := len(activeWorkers) - exclude
+			if need <= len(availableWorkers) {
+				need = len(availableWorkers)+1
+			}
+			if need > len(activeWorkers) {
+				need = len(activeWorkers)
+			}
+			newMatrix := false
+			if time.Since(startTime) > time.Hour {
+				newMatrix = true
+				need = len(activeWorkers)
+			}
+
+			// Wait until 'need' workers are available.
+			for len(availableWorkers) < need {
+				finishedUpload := <-resultChan
+
+				if finishedUpload.err != nil {
+					r.log.Debugln("Error while performing upload to", finishedUpload.workerID, "::", finishedUpload.err)
+					id := r.mu.RLock()
+					worker, exists := r.workerPool[finishedUpload.workerID]
+					if exists {
+						worker.recentUploadFailure = time.Now()
+						retiredWorkers = append(retiredWorkers, finishedUpload.workerID)
+						delete(activeWorkers, finishedUpload.workerID)
+						need--
+					}
+					r.mu.Unlock(id)
+					continue
+				}
+
+				// TODO: Update the rest of the state of the renter according
+				// to the received upload.
+
+				// Mark that the worker is available again.
+				availableWorkers[finishedUpload.workerID] = struct{}{}
+			}
+
+			// Grab a new repair matrix if we've been using this repair matrix
+			// for more than an hour.
+			if newMatrix {
+				break
+			}
+
+			// Receive all of the new files and add them to the repair matrix
+			// before continuing.
+			for {
+				select {
+					case file := <-r.newFiles:
+						r.addFileToRepairMatrix(file, activeWorkers, repairMatrix, gapCounts)
+					default:
+						break
+				}
+			}
 		}
 	}
 }

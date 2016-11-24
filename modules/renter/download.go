@@ -191,6 +191,8 @@ func (r *Renter) Download(path, destination string) error {
 	}
 
 	// Create the download object and add it to the queue.
+	//
+	// TODO: This might not be the best ordering for this code.
 	d := file.newDownload([]fetcher{}, destination)
 	lockID = r.mu.Lock()
 	r.downloadQueue = append(r.downloadQueue, d)

@@ -82,6 +82,7 @@ type trackedFile struct {
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
 	// File management.
+	newFiles chan *file
 	files    map[string]*file
 	tracking map[string]trackedFile // map from nickname to metadata
 
@@ -134,6 +135,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	}
 
 	r := &Renter{
+		newFiles: make(chan *file),
 		files:    make(map[string]*file),
 		tracking: make(map[string]trackedFile),
 
