@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -395,14 +396,14 @@ func (r *Renter) threadedRepairLoop() {
 			}
 
 			// Iterate through the chunks until a candidate chunk is found.
-			for _, chunkGaps := range repairMatrix {
+			for chunkID, chunkGaps := range repairMatrix {
 				// Figure out how many pieces in this chunk could be repaired
 				// by the current availableWorkers.
 				var usefulWorkers []types.FileContractID
 				for worker, _ := range availableWorkers {
 					for _, contract := range chunkGaps.contracts {
 						if worker == contract {
-								usefulWorkers = append(usefulWorkers, worker)
+							usefulWorkers = append(usefulWorkers, worker)
 						}
 					}
 				}
@@ -434,8 +435,78 @@ func (r *Renter) threadedRepairLoop() {
 					continue
 				}
 
-				// TODO: Send off the workers. As the workers get sent off,
-				// update chunkGaps and availableWorkers.
+				// Parse the filename and chunk index from the repair
+				// matrix key.
+				chunkIndexBytes := chunkID[:8]
+				filename := chunkID[8:]
+				chunkIndex := binary.LittleEndian.Uint64([]byte(chunkIndexBytes))
+				file, exists := r.files[filename]
+				if !exists {
+					// TODO: Should pull this chunk out of the repair
+					// matrix. The other errors in this block should do the
+					// same.
+					continue
+				}
+
+				// Grab the chunk and code it into its separate pieces.
+				meta, exists := r.tracking[filename]
+				if !exists {
+					continue
+				}
+				fHandle, err := os.Open(meta.RepairPath)
+				if err != nil {
+					// TODO: Perform a download-and-repair. Though, this
+					// may block other uploads that are in progress. Not
+					// sure how to do this cleanly in the background?
+					//
+					// TODO: Manage err
+					continue
+				}
+				chunk := make([]byte, file.chunkSize())
+				_, err = fHandle.ReadAt(chunk, int64(chunkIndex*file.chunkSize()))
+				if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+					// TODO: Manage this error.
+					continue
+				}
+				pieces, err := file.erasureCode.Encode(chunk)
+				if err != nil {
+					// TODO: Manage this error.
+					continue
+				}
+				// encrypt pieces
+				for i := range pieces {
+					key := deriveKey(file.masterKey, chunkIndex, uint64(i))
+					pieces[i], err = key.EncryptBytes(pieces[i])
+					if err != nil {
+						// TODO: Manage this error.
+						continue
+					}
+				}
+
+				// Give each piece to a worker, updating the chunkGaps and
+				// availableWorkers along the way.
+				var i int
+				for i = 0; i < len(usefulWorkers) && i < len(chunkGaps.pieces); i++ {
+					uw := uploadWork{
+						chunkIndex: chunkGaps.pieces[i],
+						data: pieces[chunkGaps.pieces[i]],
+						file: file,
+						pieceIndex: chunkGaps.pieces[i],
+
+						resultChan: resultChan,
+					}
+					worker := r.workerPool[usefulWorkers[i]]
+					worker.uploadChan <- uw
+
+					delete(availableWorkers, usefulWorkers[i])
+					for j := 0; j < len(chunkGaps.contracts); j++ {
+						if chunkGaps.contracts[j] == usefulWorkers[i] {
+							chunkGaps.contracts = append(chunkGaps.contracts[:j], chunkGaps.contracts[j+1:]...)
+							break
+						}
+					}
+				}
+				chunkGaps.pieces = chunkGaps.pieces[i:]
 
 				// Update the number of gaps.
 				oldNumGaps := chunkGaps.numGaps
