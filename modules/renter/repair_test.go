@@ -4,17 +4,142 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
+	"fmt"
+	"io"
 	"reflect"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// hostErr and hostErrs are helpers for reporting repair errors. The actual
+// Error implementations aren't that important; we just need to be able to
+// extract the NetAddress of the failed host.
+
+type hostErr struct {
+	host modules.NetAddress
+	err  error
+}
+
+func (he hostErr) Error() string {
+	return fmt.Sprintf("host %v failed: %v", he.host, he.err)
+}
+
+type hostErrs []*hostErr
+
+func (hs hostErrs) Error() string {
+	var errs []error
+	for _, h := range hs {
+		errs = append(errs, h)
+	}
+	return build.JoinErrors(errs, "\n").Error()
+}
+
+// offlineChunks returns the chunks belonging to "offline" hosts -- hosts that
+// do not meet uptime requirements. Importantly, only chunks missing more than
+// half their redundancy are returned.
+func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	// mark all pieces belonging to offline hosts.
+	offline := make(map[uint64][]uint64)
+	for _, fc := range f.contracts {
+		if hdb.IsOffline(fc.IP) {
+			for _, p := range fc.Pieces {
+				offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
+			}
+		}
+	}
+	// filter out chunks missing less than half of their redundancy
+	filtered := make(map[uint64][]uint64)
+	for chunk, pieces := range offline {
+		if len(pieces) > f.erasureCode.NumPieces()/2 {
+			filtered[chunk] = pieces
+		}
+	}
+	return filtered
+}
+
+// repair attempts to repair a file chunk by uploading its pieces to more
+// hosts.
+func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []contractor.Editor) error {
+	// read chunk data and encode
+	chunk := make([]byte, f.chunkSize())
+	_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return err
+	}
+	pieces, err := f.erasureCode.Encode(chunk)
+	if err != nil {
+		return err
+	}
+	// encrypt pieces
+	for i := range pieces {
+		key := deriveKey(f.masterKey, chunkIndex, uint64(i))
+		pieces[i], err = key.EncryptBytes(pieces[i])
+		if err != nil {
+			return err
+		}
+	}
+
+	// upload one piece per host
+	numPieces := len(missingPieces)
+	if len(hosts) < numPieces {
+		numPieces = len(hosts)
+	}
+	errChan := make(chan *hostErr)
+	for i := 0; i < numPieces; i++ {
+		go func(pieceIndex uint64, host contractor.Editor) {
+			// upload data to host
+			root, err := host.Upload(pieces[pieceIndex])
+			if err != nil {
+				errChan <- &hostErr{host.Address(), err}
+				return
+			}
+
+			// create contract entry, if necessary
+			f.mu.Lock()
+			contract, ok := f.contracts[host.ContractID()]
+			if !ok {
+				contract = fileContract{
+					ID:          host.ContractID(),
+					IP:          host.Address(),
+					WindowStart: host.EndHeight(),
+				}
+			}
+
+			// update contract
+			contract.Pieces = append(contract.Pieces, pieceData{
+				Chunk:      chunkIndex,
+				Piece:      pieceIndex,
+				MerkleRoot: root,
+			})
+			f.contracts[host.ContractID()] = contract
+			f.mu.Unlock()
+			errChan <- nil
+		}(missingPieces[i], hosts[i])
+	}
+	var errs hostErrs
+	for i := 0; i < numPieces; i++ {
+		err := <-errChan
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if errs != nil {
+		return errs
+	}
+
+	return nil
+}
 
 // incompleteChunks returns a set of chunks on a file that are not at full
 // redundancy. incompleteChunks will only return chunks/peices if there are

@@ -50,8 +50,8 @@ type (
 	uploadWork struct {
 		// data is the payload of the upload.
 		chunkIndex uint64
-		data []byte
-		file *file
+		data       []byte
+		file       *file
 		pieceIndex uint64
 
 		// resultChan is a channel that the worker will use to return the
@@ -120,14 +120,14 @@ func (w *worker) upload(uw uploadWork) {
 	contract, exists := uw.file.contracts[w.contractID]
 	if !exists {
 		contract = fileContract{
-			ID: w.contractID,
-			IP: e.Address(),
+			ID:          w.contractID,
+			IP:          e.Address(),
 			WindowStart: e.EndHeight(),
 		}
 	}
 	contract.Pieces = append(contract.Pieces, pieceData{
-		Chunk: uw.chunkIndex,
-		Piece: uw.pieceIndex,
+		Chunk:      uw.chunkIndex,
+		Piece:      uw.pieceIndex,
 		MerkleRoot: root,
 	})
 	uw.file.contracts[w.contractID] = contract

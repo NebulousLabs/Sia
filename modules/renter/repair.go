@@ -2,14 +2,11 @@ package renter
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -25,210 +22,6 @@ var renewThreshold = func() types.BlockHeight {
 		return 144 * 7 * 6
 	}
 }()
-
-// hostErr and hostErrs are helpers for reporting repair errors. The actual
-// Error implementations aren't that important; we just need to be able to
-// extract the NetAddress of the failed host.
-
-type hostErr struct {
-	host modules.NetAddress
-	err  error
-}
-
-func (he hostErr) Error() string {
-	return fmt.Sprintf("host %v failed: %v", he.host, he.err)
-}
-
-type hostErrs []*hostErr
-
-func (hs hostErrs) Error() string {
-	var errs []error
-	for _, h := range hs {
-		errs = append(errs, h)
-	}
-	return build.JoinErrors(errs, "\n").Error()
-}
-
-// repair attempts to repair a file chunk by uploading its pieces to more
-// hosts.
-func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []contractor.Editor) error {
-	// read chunk data and encode
-	chunk := make([]byte, f.chunkSize())
-	_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-		return err
-	}
-	pieces, err := f.erasureCode.Encode(chunk)
-	if err != nil {
-		return err
-	}
-	// encrypt pieces
-	for i := range pieces {
-		key := deriveKey(f.masterKey, chunkIndex, uint64(i))
-		pieces[i], err = key.EncryptBytes(pieces[i])
-		if err != nil {
-			return err
-		}
-	}
-
-	// upload one piece per host
-	numPieces := len(missingPieces)
-	if len(hosts) < numPieces {
-		numPieces = len(hosts)
-	}
-	errChan := make(chan *hostErr)
-	for i := 0; i < numPieces; i++ {
-		go func(pieceIndex uint64, host contractor.Editor) {
-			// upload data to host
-			root, err := host.Upload(pieces[pieceIndex])
-			if err != nil {
-				errChan <- &hostErr{host.Address(), err}
-				return
-			}
-
-			// create contract entry, if necessary
-			f.mu.Lock()
-			contract, ok := f.contracts[host.ContractID()]
-			if !ok {
-				contract = fileContract{
-					ID:          host.ContractID(),
-					IP:          host.Address(),
-					WindowStart: host.EndHeight(),
-				}
-			}
-
-			// update contract
-			contract.Pieces = append(contract.Pieces, pieceData{
-				Chunk:      chunkIndex,
-				Piece:      pieceIndex,
-				MerkleRoot: root,
-			})
-			f.contracts[host.ContractID()] = contract
-			f.mu.Unlock()
-			errChan <- nil
-		}(missingPieces[i], hosts[i])
-	}
-	var errs hostErrs
-	for i := 0; i < numPieces; i++ {
-		err := <-errChan
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if errs != nil {
-		return errs
-	}
-
-	return nil
-}
-
-// chunkHosts returns the hosts storing the given chunk.
-func (f *file) chunkHosts(chunk uint64) []modules.NetAddress {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	var old []modules.NetAddress
-	for _, fc := range f.contracts {
-		for _, p := range fc.Pieces {
-			if p.Chunk == chunk {
-				old = append(old, fc.IP)
-				break
-			}
-		}
-	}
-	return old
-}
-
-// expiringContracts returns the contracts that will expire soon.
-// TODO: what if contract has fully expired?
-func (f *file) expiringContracts(height types.BlockHeight) []fileContract {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	var expiring []fileContract
-	for _, fc := range f.contracts {
-		if height >= fc.WindowStart-renewThreshold {
-			expiring = append(expiring, fc)
-		}
-	}
-	return expiring
-}
-
-// offlineChunks returns the chunks belonging to "offline" hosts -- hosts that
-// do not meet uptime requirements. Importantly, only chunks missing more than
-// half their redundancy are returned.
-func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	// mark all pieces belonging to offline hosts.
-	offline := make(map[uint64][]uint64)
-	for _, fc := range f.contracts {
-		if hdb.IsOffline(fc.IP) {
-			for _, p := range fc.Pieces {
-				offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
-			}
-		}
-	}
-	// filter out chunks missing less than half of their redundancy
-	filtered := make(map[uint64][]uint64)
-	for chunk, pieces := range offline {
-		if len(pieces) > f.erasureCode.NumPieces()/2 {
-			filtered[chunk] = pieces
-		}
-	}
-	return filtered
-}
-
-// repairChunks uploads missing chunks of f to new hosts.
-func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]uint64, pool *hostPool) {
-	for chunk, pieces := range chunks {
-		// Determine host set. We want one host for each missing piece, and no
-		// repeats of other hosts of this chunk.
-		hosts := pool.uniqueHosts(len(pieces), f.chunkHosts(chunk))
-		if len(hosts) == 0 {
-			r.log.Debugf("aborting repair of %v: host pool is empty", f.name)
-			return
-		}
-		// upload to new hosts
-		err := f.repair(chunk, pieces, handle, hosts)
-		if err != nil {
-			if he, ok := err.(hostErrs); ok {
-				// if a specific host failed, remove it from the pool
-				for _, h := range he {
-					// only log non-graceful errors
-					if h.err != modules.ErrStopResponse {
-						r.log.Printf("failed to upload to host %v: %v", h.host, h.err)
-					}
-					pool.remove(h.host)
-				}
-			} else {
-				// any other type of error indicates a serious problem
-				r.log.Printf("aborting repair of %v: %v", f.name, err)
-				return
-			}
-		}
-
-		// save the new contract
-		f.mu.RLock()
-		err = r.saveFile(f)
-		f.mu.RUnlock()
-		if err != nil {
-			// If saving failed for this chunk, it will probably fail for the
-			// next chunk as well. Better to try again on the next cycle.
-			r.log.Printf("failed to save repaired file %v: %v", f.name, err)
-			return
-		}
-
-		// check for download interruption
-		id := r.mu.RLock()
-		downloading := r.downloading
-		r.mu.RUnlock(id)
-		if downloading {
-			return
-		}
-	}
-}
 
 type chunkGaps struct {
 	contracts []types.FileContractID
@@ -315,7 +108,7 @@ func (r *Renter) addFileToRepairMatrix(file *file, availableWorkers map[types.Fi
 			// Create a name for the incomplete chunk.
 			chunkPrefix := make([]byte, 8)
 			binary.LittleEndian.PutUint64(chunkPrefix, i)
-			chunkName := string(chunkPrefix)+file.name
+			chunkName := string(chunkPrefix) + file.name
 
 			// Add the chunk to the repair matrix.
 			repairMatrix[chunkName] = &gaps
@@ -366,11 +159,11 @@ func (r *Renter) threadedRepairLoop() {
 			// There is no work to do. Sleep for 15 minutes, or until there has
 			// been a new upload. Then iterate to make a new repair matrix and
 			// check again.
-			select{
-				case <-time.After(time.Minute * 15):
-					continue
-				case <-r.newFiles:
-					continue
+			select {
+			case <-time.After(time.Minute * 15):
+				continue
+			case <-r.newFiles:
+				continue
 			}
 		}
 
@@ -489,8 +282,8 @@ func (r *Renter) threadedRepairLoop() {
 				for i = 0; i < len(usefulWorkers) && i < len(chunkGaps.pieces); i++ {
 					uw := uploadWork{
 						chunkIndex: chunkGaps.pieces[i],
-						data: pieces[chunkGaps.pieces[i]],
-						file: file,
+						data:       pieces[chunkGaps.pieces[i]],
+						file:       file,
 						pieceIndex: chunkGaps.pieces[i],
 
 						resultChan: resultChan,
@@ -527,7 +320,7 @@ func (r *Renter) threadedRepairLoop() {
 			}
 			need := len(activeWorkers) - exclude
 			if need <= len(availableWorkers) {
-				need = len(availableWorkers)+1
+				need = len(availableWorkers) + 1
 			}
 			if need > len(activeWorkers) {
 				need = len(activeWorkers)
@@ -570,10 +363,10 @@ func (r *Renter) threadedRepairLoop() {
 			// before continuing.
 			for {
 				select {
-					case file := <-r.newFiles:
-						r.addFileToRepairMatrix(file, activeWorkers, repairMatrix, gapCounts)
-					default:
-						break
+				case file := <-r.newFiles:
+					r.addFileToRepairMatrix(file, activeWorkers, repairMatrix, gapCounts)
+				default:
+					break
 				}
 			}
 		}
