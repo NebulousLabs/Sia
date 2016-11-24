@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -50,7 +49,10 @@ type (
 	// channel for returning the results.
 	uploadWork struct {
 		// data is the payload of the upload.
+		chunkIndex uint64
 		data []byte
+		file *file
+		pieceIndex uint64
 
 		// resultChan is a channel that the worker will use to return the
 		// results of the upload.
@@ -81,14 +83,13 @@ type (
 		recentUploadFailure time.Time
 
 		// Utilities
-		contractor hostContractor
-		tg         *sync.ThreadGroup
+		renter *Renter
 	}
 )
 
 // download will perform some download work.
 func (w *worker) download(dw downloadWork) {
-	d, err := w.contractor.Downloader(w.contractID)
+	d, err := w.renter.hostContractor.Downloader(w.contractID)
 	if err != nil {
 		dw.resultChan <- finishedDownload{nil, err}
 		return
@@ -101,7 +102,7 @@ func (w *worker) download(dw downloadWork) {
 
 // upload will perform some upload work.
 func (w *worker) upload(uw uploadWork) {
-	e, err := w.contractor.Editor(w.contractID)
+	e, err := w.renter.hostContractor.Editor(w.contractID)
 	if err != nil {
 		uw.resultChan <- finishedUpload{crypto.Hash{}, err, w.contractID}
 		return
@@ -109,6 +110,30 @@ func (w *worker) upload(uw uploadWork) {
 	defer e.Close()
 
 	root, err := e.Upload(uw.data)
+	if err != nil {
+		uw.resultChan <- finishedUpload{root, err, w.contractID}
+		return
+	}
+
+	// Update the renter metadata.
+	uw.file.mu.Lock()
+	contract, exists := uw.file.contracts[w.contractID]
+	if !exists {
+		contract = fileContract{
+			ID: w.contractID,
+			IP: e.Address(),
+			WindowStart: e.EndHeight(),
+		}
+	}
+	contract.Pieces = append(contract.Pieces, pieceData{
+		Chunk: uw.chunkIndex,
+		Piece: uw.pieceIndex,
+		MerkleRoot: root,
+	})
+	uw.file.contracts[w.contractID] = contract
+	uw.file.mu.Unlock()
+	w.renter.saveFile(uw.file)
+
 	uw.resultChan <- finishedUpload{root, err, w.contractID}
 }
 
@@ -146,7 +171,7 @@ func (w *worker) work() {
 	case u := <-w.uploadChan:
 		w.upload(u)
 		return
-	case <-w.tg.StopChan():
+	case <-w.renter.tg.StopChan():
 		return
 	}
 }
@@ -164,11 +189,11 @@ func (w *worker) threadedWorkLoop() {
 		}
 
 		// Wrap a call to work() in a threadgroup reservation.
-		if w.tg.Add() != nil {
+		if w.renter.tg.Add() != nil {
 			return
 		}
 		w.work()
-		w.tg.Done()
+		w.renter.tg.Done()
 	}
 }
 
@@ -189,8 +214,7 @@ func (r *Renter) addWorker(fcid types.FileContractID) error {
 		priorityDownloadChan: make(chan downloadWork),
 		uploadChan:           make(chan uploadWork),
 
-		contractor: r.hostContractor,
-		tg:         r.tg,
+		renter: r,
 	}
 	r.workerPool[fcid] = worker
 	go worker.threadedWorkLoop()

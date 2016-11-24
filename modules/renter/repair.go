@@ -229,71 +229,6 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 	}
 }
 
-// incompleteChunks returns a set of chunks on a file that are not at full
-// redundancy. incompleteChunks will only return chunks/peices if there are
-// hosts available to accept the data.
-func (f *file) incompleteChunks() map[uint64][]uint64 {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	present := make([][]bool, f.numChunks())
-	for i := range present {
-		present[i] = make([]bool, f.erasureCode.NumPieces())
-	}
-	for _, fc := range f.contracts {
-		for _, p := range fc.Pieces {
-			present[p.Chunk][p.Piece] = true
-		}
-	}
-
-	incomplete := make(map[uint64][]uint64)
-	for chunkIndex, pieceBools := range present {
-		for pieceIndex, ok := range pieceBools {
-			if !ok {
-				incomplete[uint64(chunkIndex)] = append(incomplete[uint64(chunkIndex)], uint64(pieceIndex))
-			}
-		}
-	}
-	return incomplete
-}
-
-/*
-// repairFile repairs and saves an individual file.
-func (r *Renter) repairFile(name string, meta trackedFile) {
-	// Fetch the file. It's possible that the file has been deleted since the
-	// repair set was created, if this is the case just move on to the next
-	// file.
-	id := r.mu.RLock()
-	f, ok := r.files[name]
-	r.mu.RUnlock(id)
-	if !ok {
-		return
-	}
-
-	// Get a list of chunks that are not at full redundancy.
-	incompleteChunks := f.incompleteChunks()
-	if len(incChunks) == 0 {
-		return
-	}
-
-	// hmm... not really enough to figure out which chunks are incomplete, also
-	// need to know which hosts are missing from the chunk.
-
-	// open file handle
-	handle, err := os.Open(meta.RepairPath)
-	if err != nil {
-		return
-	}
-	defer handle.Close()
-
-	// repair incomplete chunks
-	if len(incChunks) != 0 {
-		r.log.Printf("repairing %v chunks of %v", len(incChunks), f.name)
-		r.repairChunks(f, handle, incChunks, pool)
-	}
-}
-*/
-
 type chunkGaps struct {
 	contracts []types.FileContractID
 	pieces    []uint64
@@ -549,9 +484,6 @@ func (r *Renter) threadedRepairLoop() {
 					r.mu.Unlock(id)
 					continue
 				}
-
-				// TODO: Update the rest of the state of the renter according
-				// to the received upload.
 
 				// Mark that the worker is available again.
 				availableWorkers[finishedUpload.workerID] = struct{}{}

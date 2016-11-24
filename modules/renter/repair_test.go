@@ -16,6 +16,34 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// incompleteChunks returns a set of chunks on a file that are not at full
+// redundancy. incompleteChunks will only return chunks/peices if there are
+// hosts available to accept the data.
+func (f *file) incompleteChunks() map[uint64][]uint64 {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	present := make([][]bool, f.numChunks())
+	for i := range present {
+		present[i] = make([]bool, f.erasureCode.NumPieces())
+	}
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			present[p.Chunk][p.Piece] = true
+		}
+	}
+
+	incomplete := make(map[uint64][]uint64)
+	for chunkIndex, pieceBools := range present {
+		for pieceIndex, ok := range pieceBools {
+			if !ok {
+				incomplete[uint64(chunkIndex)] = append(incomplete[uint64(chunkIndex)], uint64(pieceIndex))
+			}
+		}
+	}
+	return incomplete
+}
+
 // a testHost simulates a host. It implements the contractor.Editor interface.
 type testHost struct {
 	ip      modules.NetAddress
