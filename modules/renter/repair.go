@@ -30,6 +30,19 @@ var renewThreshold = func() types.BlockHeight {
 	}
 }()
 
+// uptimeWindow specifies the duration in which host uptime is checked.
+var uptimeWindow = func() time.Duration {
+	switch build.Release {
+	case "dev":
+		return 24 * time.Hour // 1 day
+	case "standard":
+		return 7 * 24 * time.Hour // 1 week
+	case "testing":
+		return 1 * time.Minute // 1 minute
+	}
+	panic("undefined uptimeWindow")
+}()
+
 // hostErr and hostErrs are helpers for reporting repair errors. The actual
 // Error implementations aren't that important; we just need to be able to
 // extract the NetAddress of the failed host.
@@ -185,6 +198,28 @@ func (f *file) expiringContracts(height types.BlockHeight) []fileContract {
 	return expiring
 }
 
+// isOffline decides whether a host should be considered offline, based on its
+// scan metrics.
+func isOffline(host modules.HostDBEntry) bool {
+	// consider a host offline if:
+	// 1) it has been scanned at least 3 times within the uptime window, and
+	// 2) the 3 most recent scans all failed
+	var lastWeek []modules.HostDBScan
+	for _, scan := range host.ScanHistory {
+		if time.Since(scan.Timestamp) < uptimeWindow {
+			lastWeek = append(lastWeek, scan)
+		}
+	}
+	// need at least 3 scans to make a fair judgment
+	if len(lastWeek) < 3 {
+		return false
+	}
+	// return true if all 3 most recent scans failed
+	// NOTE: lastWeek is ordered from oldest to newest
+	lastWeek = lastWeek[len(lastWeek)-3:]
+	return !lastWeek[0].Success && !lastWeek[1].Success && !lastWeek[2].Success
+}
+
 // offlineChunks returns the chunks belonging to "offline" hosts -- hosts that
 // do not meet uptime requirements. Importantly, only chunks missing more than
 // half their redundancy are returned.
@@ -195,10 +230,12 @@ func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 	// mark all pieces belonging to offline hosts.
 	offline := make(map[uint64][]uint64)
 	for _, fc := range f.contracts {
-		if hdb.IsOffline(fc.IP) {
-			for _, p := range fc.Pieces {
-				offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
-			}
+		host, ok := hdb.Host(fc.IP)
+		if !ok || !isOffline(host) {
+			continue
+		}
+		for _, p := range fc.Pieces {
+			offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
 		}
 	}
 	// filter out chunks missing less than half of their redundancy

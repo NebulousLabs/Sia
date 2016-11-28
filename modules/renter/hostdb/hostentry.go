@@ -2,7 +2,6 @@ package hostdb
 
 import (
 	"bytes"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -15,8 +14,6 @@ type hostEntry struct {
 	FirstSeen   types.BlockHeight
 	Weight      types.Currency
 	Reliability types.Currency
-	LastScanned time.Time
-	LastSeen    time.Time
 }
 
 // insertHost adds a host entry to the state. The host will be inserted into
@@ -113,45 +110,4 @@ func (hdb *HostDB) AverageContractPrice() types.Currency {
 		totalPrice = totalPrice.Add(host.ContractPrice)
 	}
 	return totalPrice.Div64(uint64(len(hosts)))
-}
-
-// IsOffline reports whether h is offline. A host is considered offline if it
-// has been scanned at least once in the last three days, but hasn't responded
-// to the scan during that period. If the host has not been scanned in the last
-// three days, IsOffline will scan it, so the caller should treat this call as
-// blocking. If the host is not present in the HostDB, IsOffline returns false.
-func (hdb *HostDB) IsOffline(addr modules.NetAddress) bool {
-	// lookup entry
-	hdb.mu.RLock()
-	var lastSeen, lastScanned time.Time
-	entry, ok := hdb.allHosts[addr]
-	if ok {
-		lastSeen, lastScanned = entry.LastSeen, entry.LastScanned
-	}
-	hdb.mu.RUnlock()
-	if !ok {
-		return false
-	}
-
-	if time.Since(lastScanned) > uptimeThreshold {
-		// if entry hasn't been scanned in the last 3 days, scan it now
-		hdb.managedScanHost(entry)
-
-		// update lastSeen
-		hdb.mu.RLock()
-		entry, ok := hdb.allHosts[addr]
-		if ok {
-			lastSeen = entry.LastSeen
-		}
-		hdb.mu.RUnlock()
-		if !ok {
-			// should (almost) never happen
-			hdb.log.Printf("WARN: no entry in allHosts for %v immediately after scanning", addr)
-			return false
-		}
-	}
-
-	// at this point we know the host has been scanned at least once within the
-	// last 3 days, so return whether it has been seen during that time.
-	return time.Since(lastSeen) > uptimeThreshold
 }

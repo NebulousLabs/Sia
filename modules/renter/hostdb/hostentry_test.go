@@ -112,34 +112,3 @@ func TestAverageContractPrice(t *testing.T) {
 		t.Error("average of two hosts should be their sum/2:", avg)
 	}
 }
-
-// TestIsOffline tests the IsOffline method.
-func TestIsOffline(t *testing.T) {
-	now := time.Now()
-	hdb := &HostDB{
-		allHosts: map[modules.NetAddress]*hostEntry{
-			"foo.com:1234": {LastScanned: now, LastSeen: now},
-			"bar.com:1234": {LastScanned: now, LastSeen: now.Add(-uptimeThreshold * 2)},
-			"baz.com:1234": {LastScanned: now, LastSeen: now.Add(-uptimeThreshold / 2)},
-		},
-		activeHosts: map[modules.NetAddress]*hostNode{
-			"foo.com:1234": nil,
-		},
-		scanPool: make(chan *hostEntry),
-	}
-
-	tests := []struct {
-		addr    modules.NetAddress
-		offline bool
-	}{
-		{"foo.com:1234", false},
-		{"bar.com:1234", true},
-		{"baz.com:1234", false},
-		{"quux.com:1234", false},
-	}
-	for _, test := range tests {
-		if offline := hdb.IsOffline(test.addr); offline != test.offline {
-			t.Errorf("IsOffline(%v) = %v, expected %v", test.addr, offline, test.offline)
-		}
-	}
-}

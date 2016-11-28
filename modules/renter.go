@@ -95,10 +95,18 @@ type RenterFinancialMetrics struct {
 }
 
 // A HostDBEntry represents one host entry in the Renter's host DB. It
-// aggregates the host's external settings with its public key.
+// aggregates the host's external settings and metrics with its public key.
 type HostDBEntry struct {
 	HostExternalSettings
 	PublicKey types.SiaPublicKey `json:"publickey"`
+	// metrics
+	ScanHistory []HostDBScan
+}
+
+// HostDBScan represents a single scan event.
+type HostDBScan struct {
+	Timestamp time.Time
+	Success   bool
 }
 
 // A RenterContract contains all the metadata necessary to revise or renew a

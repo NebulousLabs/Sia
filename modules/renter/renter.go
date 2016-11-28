@@ -34,8 +34,8 @@ type hostDB interface {
 	// Close closes the hostdb.
 	Close() error
 
-	// IsOffline reports whether a host is consider offline.
-	IsOffline(modules.NetAddress) bool
+	// Host returns the HostDBEntry for a given host.
+	Host(modules.NetAddress) (modules.HostDBEntry, bool)
 }
 
 // A hostContractor negotiates, revises, renews, and provides access to file

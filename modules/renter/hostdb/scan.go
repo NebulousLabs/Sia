@@ -34,10 +34,6 @@ const (
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
 	scanningThreads = 50
-
-	// uptimeThreshold is the amount of time since the last successful scan that
-	// qualifies a host as being "offline."
-	uptimeThreshold = 3 * 24 * time.Hour
 )
 
 // Reliability is a measure of a host's uptime.
@@ -131,9 +127,13 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 
-	// Regardless of whether the host responded, update LastScanned and add it
-	// to allHosts.
-	entry.LastScanned = time.Now()
+	// Add a data point for the scan.
+	entry.ScanHistory = append(entry.ScanHistory, modules.HostDBScan{
+		Timestamp: time.Now(),
+		Success:   netErr == nil,
+	})
+
+	// Add the host to allHosts.
 	priorHost, exists := hdb.allHosts[entry.NetAddress]
 	if !exists {
 		hdb.allHosts[entry.NetAddress] = entry
@@ -150,8 +150,6 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 		}
 		return
 	}
-	// Otherwise, update LastSeen.
-	entry.LastSeen = time.Now()
 
 	// The host entry should be updated to reflect the new weight. The safety
 	// properties of the tree require that the weight does not change while the

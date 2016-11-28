@@ -10,17 +10,20 @@ import (
 )
 
 // uptimeHostDB overrides an existing hostDB so that it always returns
-// IsOffline == true for a specified address.
+// isOffline == true for a specified address.
 type uptimeHostDB struct {
 	hostDB
 	addr modules.NetAddress
 }
 
-func (u uptimeHostDB) IsOffline(addr modules.NetAddress) bool {
-	if addr == u.addr {
-		return true
+func (u uptimeHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
+	host, ok := u.hostDB.Host(addr)
+	if ok && addr == u.addr {
+		// fake three scans, all of which failed
+		badScan := modules.HostDBScan{Timestamp: time.Now(), Success: false}
+		host.ScanHistory = []modules.HostDBScan{badScan, badScan, badScan}
 	}
-	return u.hostDB.IsOffline(addr)
+	return host, ok
 }
 
 // TestIntegrationMonitorUptime tests that when a host goes offline, its
@@ -96,5 +99,35 @@ func TestIntegrationMonitorUptime(t *testing.T) {
 	}
 	if c.Contracts()[0].NetAddress != h2.ExternalSettings().NetAddress {
 		t.Fatal("contractor formed replacement contract with wrong host")
+	}
+}
+
+// TestIsOffline tests the isOffline helper function.
+func TestIsOffline(t *testing.T) {
+	now := time.Now()
+	oldScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow * 2), Success: false}
+	newBadScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow / 2), Success: false}
+	newGoodScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow / 2), Success: true}
+
+	tests := []struct {
+		scans   []modules.HostDBScan
+		offline bool
+	}{
+		// no data
+		{nil, false},
+		// not enough data
+		{[]modules.HostDBScan{oldScan, newGoodScan}, false},
+		// not recent enough data
+		{[]modules.HostDBScan{oldScan, oldScan, oldScan}, false},
+		// recent data, but at least 1 scan succeded
+		{[]modules.HostDBScan{newBadScan, newGoodScan, newBadScan}, false},
+		// recent data, but no scans succeded
+		{[]modules.HostDBScan{newBadScan, newBadScan, newBadScan}, true},
+	}
+	for i, test := range tests {
+		h := modules.HostDBEntry{ScanHistory: test.scans}
+		if offline := isOffline(h); offline != test.offline {
+			t.Errorf("IsOffline(%v) = %v, expected %v", i, offline, test.offline)
+		}
 	}
 }
