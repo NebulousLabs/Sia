@@ -25,11 +25,11 @@ var (
 	uptimeWindow = func() time.Duration {
 		switch build.Release {
 		case "dev":
-			return 24 * time.Hour // 1 day
+			return 30 * time.Minute
 		case "standard":
 			return 7 * 24 * time.Hour // 1 week
 		case "testing":
-			return 1 * time.Minute // 1 minute
+			return 15 * time.Second
 		}
 		panic("undefined uptimeWindow")
 	}()
