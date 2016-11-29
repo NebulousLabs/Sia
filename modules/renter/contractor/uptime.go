@@ -39,22 +39,29 @@ var (
 // scan metrics.
 func isOffline(host modules.HostDBEntry) bool {
 	// consider a host offline if:
-	// 1) it has been scanned at least 3 times within the uptime window, and
-	// 2) the 3 most recent scans all failed
-	var lastWeek []modules.HostDBScan
+	// 1) The host has been scanned at least 3 times in the past uptimeWindow, and
+	// 2) The scans occurred over a period of at least 1/3 the uptimeWindow, and
+	// 3) None of the scans succeeded
+	var pastWeek []modules.HostDBScan
 	for _, scan := range host.ScanHistory {
 		if time.Since(scan.Timestamp) < uptimeWindow {
-			lastWeek = append(lastWeek, scan)
+			if scan.Success {
+				// at least one scan in the uptimeWindow succeeded
+				return false
+			}
+			pastWeek = append(pastWeek, scan)
 		}
 	}
-	// need at least 3 scans to make a fair judgment
-	if len(lastWeek) < 3 {
+	if len(pastWeek) < 3 {
+		// not enough data to make a fair judgment
 		return false
 	}
-	// return true if all 3 most recent scans failed
-	// NOTE: lastWeek is ordered from oldest to newest
-	lastWeek = lastWeek[len(lastWeek)-3:]
-	return !lastWeek[0].Success && !lastWeek[1].Success && !lastWeek[2].Success
+	if pastWeek[len(pastWeek)-1].Timestamp.Sub(pastWeek[0].Timestamp) < uptimeWindow/3 {
+		// scans were not sufficiently far apart to make a fair judgment
+		return false
+	}
+	// all conditions satisfied
+	return true
 }
 
 // threadedMonitorUptime regularly checks host uptime, and deletes contracts

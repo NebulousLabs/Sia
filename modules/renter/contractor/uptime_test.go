@@ -105,9 +105,10 @@ func TestIntegrationMonitorUptime(t *testing.T) {
 // TestIsOffline tests the isOffline helper function.
 func TestIsOffline(t *testing.T) {
 	now := time.Now()
-	oldScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow * 2), Success: false}
+	oldBadScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow * 2), Success: false}
 	newBadScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow / 2), Success: false}
 	newGoodScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow / 2), Success: true}
+	currentBadScan := modules.HostDBScan{Timestamp: now, Success: false}
 
 	tests := []struct {
 		scans   []modules.HostDBScan
@@ -116,13 +117,15 @@ func TestIsOffline(t *testing.T) {
 		// no data
 		{nil, false},
 		// not enough data
-		{[]modules.HostDBScan{oldScan, newGoodScan}, false},
+		{[]modules.HostDBScan{oldBadScan, newGoodScan}, false},
 		// not recent enough data
-		{[]modules.HostDBScan{oldScan, oldScan, oldScan}, false},
+		{[]modules.HostDBScan{oldBadScan, oldBadScan, oldBadScan}, false},
 		// recent data, but at least 1 scan succeded
-		{[]modules.HostDBScan{newBadScan, newGoodScan, newBadScan}, false},
-		// recent data, but no scans succeded
-		{[]modules.HostDBScan{newBadScan, newBadScan, newBadScan}, true},
+		{[]modules.HostDBScan{newGoodScan, newBadScan, currentBadScan}, false},
+		// recent data, but scans are too close together
+		{[]modules.HostDBScan{newBadScan, newBadScan, newBadScan}, false},
+		// recent data, no scans succeded
+		{[]modules.HostDBScan{newBadScan, newBadScan, currentBadScan}, true},
 	}
 	for i, test := range tests {
 		h := modules.HostDBEntry{ScanHistory: test.scans}
