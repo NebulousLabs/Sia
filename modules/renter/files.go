@@ -170,6 +170,9 @@ func newFile(name string, code modules.ErasureCoder, pieceSize, fileSize uint64)
 
 // DeleteFile removes a file entry from the renter and deletes its data from
 // the hosts it is stored on.
+//
+// TODO: The data is not cleared from any contracts where the host is not
+// immediately online.
 func (r *Renter) DeleteFile(nickname string) error {
 	lockID := r.mu.Lock()
 	f, exists := r.files[nickname]
@@ -186,8 +189,6 @@ func (r *Renter) DeleteFile(nickname string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	// TODO: this is ugly because we only have the Contracts method for
-	// looking up contracts.
 	var contracts []modules.RenterContract
 	for _, c := range r.hostContractor.Contracts() {
 		if _, ok := f.contracts[c.ID]; ok {
@@ -197,7 +198,6 @@ func (r *Renter) DeleteFile(nickname string) error {
 	for _, c := range contracts {
 		editor, err := r.hostContractor.Editor(c.ID)
 		if err != nil {
-			// TODO: what if the host isn't online?
 			continue
 		}
 		for _, root := range c.MerkleRoots {
@@ -216,8 +216,6 @@ func (r *Renter) FileList() []modules.FileInfo {
 
 	files := make([]modules.FileInfo, 0, len(r.files))
 	for _, f := range r.files {
-		// _, renewing := r.tracking[f.name]
-		// TODO: bring back per-file renewing
 		renewing := true
 		files = append(files, modules.FileInfo{
 			SiaPath:        f.name,
@@ -272,10 +270,6 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	}
 
 	// Delete the old .sia file.
-	// NOTE: proper error handling is difficult here. For example, if the
-	// removal fails, should the entry in r.files be preserved? For now we will
-	// keep things simple, but it is important that our approach feels
-	// intuitive/unsurprising and doesn't put the user's data at risk.
 	oldPath := filepath.Join(r.persistDir, currentName+ShareExtension)
 	return os.RemoveAll(oldPath)
 }
