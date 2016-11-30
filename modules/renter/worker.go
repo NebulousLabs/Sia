@@ -26,6 +26,8 @@ type (
 		// as an ID when requesting data from the host.
 		dataRoot crypto.Hash
 
+		chunkIndex uint64
+
 		// resultChan is a channel that the worker will use to return the
 		// results of the download.
 		resultChan chan finishedDownload
@@ -33,8 +35,10 @@ type (
 
 	// finishedDownload contains the data and error from performing a download.
 	finishedDownload struct {
-		data []byte
-		err  error
+		chunkIndex uint64
+		data       []byte
+		err        error
+		workerID   types.FileContractID
 	}
 
 	// finishedUpload contains the Merkle root and error from performing an
@@ -82,6 +86,12 @@ type (
 		// failure in the past two hours.
 		recentUploadFailure time.Time
 
+		// consecutiveDownloadFailures records the number of download failures
+		// in a row that have been experienced by this worker. This number is
+		// used to determine whether the worker should be removed from the
+		// download pool or not.
+		consecutiveDownloadFailures int
+
 		// Utilities
 		renter *Renter
 	}
@@ -91,13 +101,13 @@ type (
 func (w *worker) download(dw downloadWork) {
 	d, err := w.renter.hostContractor.Downloader(w.contractID)
 	if err != nil {
-		dw.resultChan <- finishedDownload{nil, err}
+		dw.resultChan <- finishedDownload{dw.chunkIndex, nil, err, w.contractID}
 		return
 	}
 	defer d.Close()
 
 	data, err := d.Sector(dw.dataRoot)
-	dw.resultChan <- finishedDownload{data, err}
+	dw.resultChan <- finishedDownload{dw.chunkIndex, data, err, w.contractID}
 }
 
 // upload will perform some upload work.

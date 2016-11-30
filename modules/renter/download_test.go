@@ -1,5 +1,6 @@
 package renter
 
+/*
 import (
 	"bytes"
 	"io"
@@ -137,7 +138,8 @@ func TestErasureDownload(t *testing.T) {
 		}
 		t.Log("Optimal fetches:", i*uint64(rsc.MinPieces()))
 		t.Log("Total fetches:  ", totFetch)
-	*/
+*/
+/*
 }
 
 type downloadContractor struct {
@@ -185,3 +187,4 @@ func TestDownloadContracts(t *testing.T) {
 		t.Fatalf("expected Downloader to be called %v times, got %v", nContracts, hc.downloaders)
 	}
 }
+*/

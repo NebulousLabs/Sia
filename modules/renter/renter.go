@@ -90,10 +90,6 @@ type Renter struct {
 	workerPool    map[types.FileContractID]*worker
 	downloadQueue []*download
 
-	// Status Variables.
-	uploading   bool
-	downloading bool
-
 	// Utilities.
 	cs             modules.ConsensusSet
 	hostContractor hostContractor

@@ -1,17 +1,14 @@
 package renter
 
 import (
+	"bytes"
 	"errors"
-	"fmt"
-	"io"
 	"os"
-	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/contractor"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -19,79 +16,21 @@ var (
 	errInsufficientPieces = errors.New("couldn't fetch enough pieces to recover data")
 )
 
-// A fetcher fetches pieces from a host. This interface exists to facilitate
-// easy testing.
-type fetcher interface {
-	// pieces returns the set of pieces corresponding to a given chunk.
-	pieces(chunk uint64) []pieceData
+// chunkDownload tracks the progress of a chunk.
+type chunkDownload struct {
+	// Map of workers who have attempted downloads for this chunk, from the
+	// worker id to the index of the piece they are trying to download.
+	workerAttempts map[types.FileContractID]uint64
 
-	// fetch returns the data specified by piece metadata.
-	fetch(pieceData) ([]byte, error)
-}
-
-// A hostFetcher fetches pieces from a host. It implements the fetcher
-// interface.
-type hostFetcher struct {
-	downloader contractor.Downloader
-	pieceMap   map[uint64][]pieceData
-	masterKey  crypto.TwofishKey
-}
-
-// pieces returns the pieces stored on this host that are part of a given
-// chunk.
-func (hf *hostFetcher) pieces(chunk uint64) []pieceData {
-	return hf.pieceMap[chunk]
-}
-
-// fetch downloads the piece specified by p.
-func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
-	// request piece
-	data, err := hf.downloader.Sector(p.MerkleRoot)
-	if err != nil {
-		return nil, err
-	}
-
-	// generate decryption key
-	key := deriveKey(hf.masterKey, p.Chunk, p.Piece)
-
-	// decrypt and return
-	return key.DecryptBytes(data)
-}
-
-// newHostFetcher creates a new hostFetcher.
-func newHostFetcher(d contractor.Downloader, pieces []pieceData, masterKey crypto.TwofishKey) *hostFetcher {
-	// make piece map
-	pieceMap := make(map[uint64][]pieceData)
-	for _, p := range pieces {
-		pieceMap[p.Chunk] = append(pieceMap[p.Chunk], p)
-	}
-	return &hostFetcher{
-		downloader: d,
-		pieceMap:   pieceMap,
-		masterKey:  masterKey,
-	}
-}
-
-// checkHosts checks that a set of hosts is sufficient to download a file.
-func checkHosts(hosts []fetcher, minPieces int, numChunks uint64) error {
-	for i := uint64(0); i < numChunks; i++ {
-		pieces := 0
-		for _, h := range hosts {
-			pieces += len(h.pieces(i))
-		}
-		if pieces < minPieces {
-			return errInsufficientHosts
-		}
-	}
-	return nil
+	// List of completed pieces, mapping from the index of the piece to the
+	// data.
+	completedPieces map[uint64][]byte
 }
 
 // A download is a file download that has been queued by the renter.
 type download struct {
-	// NOTE: received is the first field to ensure 64-bit alignment, which is
-	// required for atomic operations.
-	received   uint64
-	chunkIndex uint64
+	atomicReceived   uint64
+	atomicChunkIndex uint64
 
 	startTime   time.Time
 	siapath     string
@@ -100,83 +39,252 @@ type download struct {
 	erasureCode modules.ErasureCoder
 	chunkSize   uint64
 	fileSize    uint64
-	hosts       []fetcher
-}
 
-// getPiece locates and downloads a specific piece.
-func (d *download) getPiece(chunkIndex, pieceIndex uint64) []byte {
-	for _, h := range d.hosts {
-		for _, p := range h.pieces(chunkIndex) {
-			if p.Piece == pieceIndex {
-				data, err := h.fetch(p)
-				if err != nil {
-					break // try next host
-				}
-				return data
-			}
-		}
-	}
-	return nil
-}
-
-// run performs the actual download. It spawns one worker per host, and
-// instructs them to sequentially download chunks. It then writes the recovered
-// chunks to w. It returns its progress along with a bool indicating whether
-// another iteration should be used.
-func (d *download) run(w io.Writer) error {
-	for ; d.received < d.fileSize; d.chunkIndex++ {
-		// load pieces into chunk
-		chunk := make([][]byte, d.erasureCode.NumPieces())
-		left := d.erasureCode.MinPieces()
-		// pick hosts at random
-		chunkOrder, err := crypto.Perm(len(chunk))
-		if err != nil {
-			return err
-		}
-		for _, j := range chunkOrder {
-			chunk[j] = d.getPiece(d.chunkIndex, uint64(j))
-			if chunk[j] != nil {
-				left--
-			}
-			if left == 0 {
-				break
-			}
-		}
-		if left != 0 {
-			return errInsufficientPieces
-		}
-
-		// Write pieces to w. We always write chunkSize bytes unless this is
-		// the last chunk; in that case, we write the remainder.
-		n := d.chunkSize
-		if n > d.fileSize-d.received {
-			n = d.fileSize - d.received
-		}
-		err = d.erasureCode.Recover(chunk, uint64(n), w)
-		if err != nil {
-			return err
-		}
-		atomic.AddUint64(&d.received, n)
-	}
-
-	return nil
+	downloadFinished chan error
 }
 
 // newDownload initializes and returns a download object.
-func (f *file) newDownload(hosts []fetcher, destination string) *download {
+func (f *file) newDownload(destination string) *download {
 	d := &download{
+		atomicChunkIndex: 0,
+		atomicReceived:   0,
+
 		erasureCode: f.erasureCode,
 		chunkSize:   f.chunkSize(),
 		fileSize:    f.size,
-		hosts:       hosts,
 
 		startTime:   time.Now(),
-		chunkIndex:  0,
-		received:    0,
 		siapath:     f.name,
 		destination: destination,
+
+		downloadFinished: make(chan error),
 	}
 	return d
+}
+
+// managedDownloadIteraiton downloads a chunk from the next available file.
+func (r *Renter) managedDownloadIteration() {
+	// Get the set of available workers.
+	availableWorkers := make([]*worker, 0)
+	id := r.mu.RLock()
+	for _, worker := range r.workerPool {
+		availableWorkers = append(availableWorkers, worker)
+	}
+	r.mu.RUnlock(id)
+
+	// Grab the next file to be downloaded.
+	id = r.mu.RLock()
+	if len(r.downloadQueue) == 0 {
+		// TODO: Block until either there's another download, or until
+		// shutdown, or until enough time has passed that the workers should be
+		// reassembled?
+		//
+		// TODO: This should probably be moved to the outer loop, and then the
+		// managedDownloadIteraton can be turned into managedDownloadFile
+		// taking a file as input.
+		r.mu.RUnlock(id)
+		return
+	}
+	nextDownload := r.downloadQueue[0]
+	r.downloadQueue = r.downloadQueue[1:]
+	r.mu.RUnlock(id)
+
+	// Reject this download if there are not enough workers to complete the
+	// download.
+	if len(availableWorkers) < nextDownload.erasureCode.MinPieces() {
+		// Signal that the download has errored and quit.
+		nextDownload.downloadFinished <- errInsufficientHosts
+		return
+	}
+
+	// TODO: Exclude the most expensive workers, and perhaps the slowest as
+	// well.
+
+	// Open a file handle for the download.
+	fileDest, err := os.OpenFile(nextDownload.destination, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+	if err != nil {
+		nextDownload.downloadFinished <- err
+		return
+	}
+
+	// Grab each chunk from the download.
+	chunkDownloads := make([]chunkDownload, nextDownload.fileSize/nextDownload.chunkSize)
+
+	// Assemble the file pieces as a set of chunks pointing from the file
+	// contract id to the piece that the file contract is protecting.
+	pieceSet := make([]map[types.FileContractID]pieceData, len(chunkDownloads))
+	for i := range pieceSet {
+		pieceSet[i] = make(map[types.FileContractID]pieceData)
+	}
+	file := r.files[nextDownload.siapath]
+	for _, contract := range file.contracts {
+		for _, piece := range contract.Pieces {
+			pieceSet[piece.Chunk][contract.ID] = piece
+		}
+	}
+
+	var activeDownloads int
+	var chunkIndex uint64
+	incompleteChunks := make([]uint64, 0)
+	resultChan := make(chan finishedDownload)
+	for {
+		// Break if tg.Stop() has been called, to facilitate quick shutdown.
+		select {
+		case <-r.tg.StopChan():
+			break
+		default:
+			// Stop is not called, continue with the iteration.
+		}
+
+		// Break if there are no active downloads and no chunks remain, as that
+		// indicates that the file has finished downloading.
+		if activeDownloads == 0 && len(incompleteChunks) == 0 && int(chunkIndex) == len(chunkDownloads) {
+			break
+		}
+
+		// Check if there are any available workers that can be matched to an
+		// incmplete download.
+		if len(incompleteChunks) > 0 {
+			chunkIndex := incompleteChunks[0]
+			incompleteChunks = incompleteChunks[1:]
+
+			// Scan the set of available workers for a worker that is not
+			// working on this chunk.
+			for i := range availableWorkers {
+				_, exists := chunkDownloads[chunkIndex].workerAttempts[availableWorkers[i].contractID]
+				if !exists {
+					dw := downloadWork{
+						dataRoot:   pieceSet[chunkIndex][availableWorkers[i].contractID].MerkleRoot,
+						chunkIndex: chunkIndex,
+						resultChan: resultChan,
+					}
+					chunkDownloads[chunkIndex].workerAttempts[availableWorkers[i].contractID] = pieceSet[chunkIndex][availableWorkers[i].contractID].Piece
+					availableWorkers[i].downloadChan <- dw
+					availableWorkers = append(availableWorkers[:i], availableWorkers[:i+1]...)
+					activeDownloads++
+					break
+				}
+			}
+		}
+
+		// Check that there are still enough workers to complete the download.
+		if len(availableWorkers)+activeDownloads < nextDownload.erasureCode.MinPieces() {
+			// Signal that the download has errored and quit.
+			nextDownload.downloadFinished <- errInsufficientHosts
+			return
+		}
+
+		// If there is room to download another chunk, and enough workers to
+		// tackle the task, begin performing another download.
+		if activeDownloads < 4 && int(chunkIndex) < len(chunkDownloads) && len(availableWorkers) > nextDownload.erasureCode.MinPieces() {
+			// Create the chunkDownload object and insert it into the
+			// chunkDownloads slice.
+			chunkDownloads[chunkIndex] = chunkDownload{
+				workerAttempts:  make(map[types.FileContractID]uint64),
+				completedPieces: make(map[uint64][]byte),
+			}
+
+			// Assign the available workers to this download.
+			for i := 0; i < nextDownload.erasureCode.MinPieces(); i++ {
+				dw := downloadWork{
+					dataRoot:   pieceSet[chunkIndex][availableWorkers[i].contractID].MerkleRoot,
+					chunkIndex: chunkIndex,
+					resultChan: resultChan,
+				}
+				chunkDownloads[chunkIndex].workerAttempts[availableWorkers[i].contractID] = pieceSet[chunkIndex][availableWorkers[i].contractID].Piece
+
+				// Send the work to the worker.
+				availableWorkers[i].downloadChan <- dw
+			}
+			// Clear out the set of available workers.
+			availableWorkers = availableWorkers[nextDownload.erasureCode.MinPieces():]
+
+			// Indicate that this chunk has been started.
+			activeDownloads++
+			chunkIndex++
+		} else if activeDownloads > 0 {
+			// Wait for a piece to return.
+			finishedDownload := <-resultChan
+			chunkIndex := finishedDownload.chunkIndex
+			workerID := finishedDownload.workerID
+			activeDownloads--
+
+			// Check for an error.
+			if finishedDownload.err != nil {
+				// Add this piece to the list of incomplete chunks.
+				incompleteChunks = append(incompleteChunks, chunkIndex)
+
+				// Continue using this worker if it has had less than 20
+				// consecutive failures. Such a high tolerance allows the
+				// renter to reliable download files that are hundreds of GBs
+				// in size from hosts that may be missing as much as 25% of the
+				// pieces due to disk failure.
+				id := r.mu.Lock()
+				worker, exists := r.workerPool[workerID]
+				if exists {
+					worker.consecutiveDownloadFailures++
+					if worker.consecutiveDownloadFailures < 20 {
+						availableWorkers = append(availableWorkers, worker)
+					}
+				}
+				r.mu.Unlock(id)
+			} else {
+				// Add this returned piece to the appropriate chunk.
+				chunkDownloads[chunkIndex].completedPieces[pieceSet[chunkIndex][workerID].Piece] = finishedDownload.data
+				if len(chunkDownloads[chunkIndex].completedPieces) == file.erasureCode.MinPieces() {
+					// Assemble the repair pieces for the chunk.
+					chunk := make([][]byte, file.erasureCode.NumPieces())
+					for pieceIndex, pieceData := range chunkDownloads[chunkIndex].completedPieces {
+						chunk[pieceIndex] = pieceData
+					}
+
+					// Recover the chunk into a byte slice.
+					recoverBytes := make([]byte, file.chunkSize())
+					recoverBytesWriter := bytes.NewBuffer(recoverBytes)
+					err := nextDownload.erasureCode.Recover(chunk, nextDownload.chunkSize, recoverBytesWriter)
+					if err != nil {
+						// Signal that the download has failed.
+						nextDownload.downloadFinished <- err
+						return
+					}
+					if int(chunkIndex) == len(chunkDownloads) {
+						recoverBytes = recoverBytes[:nextDownload.fileSize%nextDownload.chunkSize]
+					}
+
+					// Write the bytes to the download file.
+					_, err = fileDest.WriteAt(recoverBytes, int64(chunkIndex*nextDownload.chunkSize))
+					if err != nil {
+						// Signal that the download has failed.
+						nextDownload.downloadFinished <- err
+						return
+					}
+				}
+
+				// Return the worker to the list of available workers.
+				id := r.mu.RLock()
+				worker, exists := r.workerPool[workerID]
+				r.mu.RUnlock(id)
+				if exists {
+					availableWorkers = append(availableWorkers, worker)
+				}
+			}
+		}
+	}
+
+	// Download complete, signal that there was no error during the download.
+	nextDownload.downloadFinished <- nil
+}
+
+// threadedDownloadLoop utilizes the worker pool to make progress on any queued
+// downloads.
+func (r *Renter) threadedDownloadLoop() {
+	for {
+		if r.tg.Add() != nil {
+			return
+		}
+		r.managedDownloadIteration()
+		r.tg.Done()
+	}
 }
 
 // Download downloads a file, identified by its path, to the destination
@@ -190,14 +298,6 @@ func (r *Renter) Download(path, destination string) error {
 		return errors.New("no file with that path")
 	}
 
-	// Create the download object and add it to the queue.
-	//
-	// TODO: This might not be the best ordering for this code.
-	d := file.newDownload([]fetcher{}, destination)
-	lockID = r.mu.Lock()
-	r.downloadQueue = append(r.downloadQueue, d)
-	r.mu.Unlock(lockID)
-
 	// Create file on disk with the correct permissions.
 	perm := os.FileMode(file.mode)
 	if perm == 0 {
@@ -210,94 +310,14 @@ func (r *Renter) Download(path, destination string) error {
 	}
 	defer f.Close()
 
-	// A loop that will iterate until the download is complete.
-	// Downloads are canceled if they make no progress for 120 minutes.
-	progressDeadline := time.Now().Add(120 * time.Minute)
-	for {
-		// copy file contracts
-		file.mu.RLock()
-		contracts := make([]fileContract, 0, len(file.contracts))
-		for _, c := range file.contracts {
-			contracts = append(contracts, c)
-		}
-		file.mu.RUnlock()
-		if len(contracts) < file.erasureCode.MinPieces() {
-			return fmt.Errorf("contracts could not be located for this file - file may not be recoverable - needed %v, got %v", file.erasureCode.MinPieces(), len(contracts))
-		}
+	// Create the download object and add it to the queue.
+	d := file.newDownload(destination)
+	lockID = r.mu.Lock()
+	r.downloadQueue = append(r.downloadQueue, d)
+	r.mu.Unlock(lockID)
 
-		// interrupt upload loop
-		lockID = r.mu.Lock()
-		r.downloading = true
-		uploading := r.uploading
-		r.mu.Unlock(lockID)
-		resumeUploads := func() {
-			lockID = r.mu.Lock()
-			r.downloading = false
-			r.mu.Unlock(lockID)
-		}
-		// wait up to 60 minutes for upload loop to exit
-		timeout := time.Now().Add(60 * time.Minute)
-		for uploading && time.Now().Before(timeout) {
-			time.Sleep(time.Second)
-			lockID = r.mu.RLock()
-			uploading = r.uploading
-			r.mu.RUnlock(lockID)
-		}
-		if uploading {
-			resumeUploads()
-			return errors.New("timed out waiting for uploads to finish")
-		}
-
-		// Grab a set of hosts and attempt a download.
-		done, err := func() (bool, error) {
-			// Initiate connections to each host.
-			var hosts []fetcher
-			var errs []string
-			for _, c := range file.contracts {
-				d, err := r.hostContractor.Downloader(c.ID)
-				if err != nil {
-					errs = append(errs, fmt.Sprintf("\t%v: %v", c.IP, err))
-					continue
-				}
-				defer d.Close()
-				hosts = append(hosts, newHostFetcher(d, c.Pieces, file.masterKey))
-			}
-			if len(hosts) < file.erasureCode.MinPieces() {
-				return false, errors.New("could not connect to enough hosts:\n" + strings.Join(errs, "\n"))
-			}
-			// Check that this host set is sufficient to download the file.
-			err := checkHosts(hosts, file.erasureCode.MinPieces(), file.numChunks())
-			if err != nil {
-				return false, err
-			}
-			// Update the downloader with the new set of hosts.
-			d.hosts = hosts
-
-			// Perform download.
-			err = d.run(f)
-			done := err == nil
-			return done, nil
-		}()
-		if done {
-			// Download is complete!
-			resumeUploads()
-			break
-		} else if err != nil {
-			// One of the more severe errors occurred, wait a bit before trying
-			// the download again.
-			resumeUploads()
-			time.Sleep(time.Second * 90)
-		} else {
-			// We made progress, but haven't finished yet. Reset the progress
-			// deadline.
-			progressDeadline = time.Now().Add(30 * time.Minute)
-		}
-		// if we haven't made any progress in 30 minutes, give up
-		if time.Now().After(progressDeadline) {
-			return errors.New("no progress in 30 minutes; giving up")
-		}
-	}
-	return nil
+	// Block until the download has completed.
+	return <-d.downloadFinished
 }
 
 // DownloadQueue returns the list of downloads in the queue.
@@ -313,7 +333,7 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 			SiaPath:     d.siapath,
 			Destination: d.destination,
 			Filesize:    d.fileSize,
-			Received:    atomic.LoadUint64(&d.received),
+			Received:    atomic.LoadUint64(&d.atomicReceived),
 			StartTime:   d.startTime,
 		}
 	}
