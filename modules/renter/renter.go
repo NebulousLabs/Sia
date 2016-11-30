@@ -158,7 +158,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	}
 
 	go r.threadedRepairLoop()
-
+	go r.threadedDownloadLoop()
 	return r, nil
 }
 
