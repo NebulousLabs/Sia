@@ -99,7 +99,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	// Look up the entry and decrement the reliability.
 	entry, exists := hdb.allHosts[addr]
 	if !exists {
-		// TODO: should panic here
+		build.Critical("host to be decremented did not exist in hostdb")
 		return
 	}
 	entry.Reliability = entry.Reliability.Sub(penalty)
