@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -242,4 +243,31 @@ func (r *Renter) retireWorker(fcid types.FileContractID) error {
 	delete(r.workerPool, fcid)
 	close(w.killChan)
 	return nil
+}
+
+// updateWorkerPool will grab the set of contracts from the contractor and
+// update the worker pool to match.
+func (r *Renter) updateWorkerPool() (errorSet error) {
+	// Get a map of all the contracts in the contractor.
+	newContracts := make(map[types.FileContractID]struct{})
+	for _, nc := range r.hostContractor.Contracts() {
+		newContracts[nc.ID] = struct{}{}
+	}
+
+	// Add a worker for any contract that does not already have a worker.
+	for id := range newContracts {
+		_, exists := r.workerPool[id]
+		if !exists {
+			errorSet = build.ComposeErrors(errorSet, r.addWorker(id))
+		}
+	}
+
+	// Remove a worker for any worker that is not in the set of new contracts.
+	for id := range r.workerPool {
+		_, exists := newContracts[id]
+		if !exists {
+			errorSet = build.ComposeErrors(errorSet, r.retireWorker(id))
+		}
+	}
+	return errorSet
 }

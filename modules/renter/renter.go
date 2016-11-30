@@ -177,53 +177,7 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 
 	id := r.mu.Lock()
 	defer r.mu.Unlock(id)
-
-	// Get the list of contracts in the contractor.
-	newContracts := r.hostContractor.Contracts()
-
-	// Get the list of contracts in the work pool.
-	oldContracts := make([]types.FileContractID, 0, len(r.workerPool))
-	for fcid := range r.workerPool {
-		oldContracts = append(oldContracts, fcid)
-	}
-
-	// Find all elements in newContracts that are not in oldContracts and make
-	// workers for them.
-	for _, nc := range newContracts {
-		found := false
-		for _, ofcid := range oldContracts {
-			if nc.ID == ofcid {
-				found = true
-				break
-			}
-		}
-		if !found {
-			err = r.addWorker(nc.ID)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	// Find all elements in oldContracts that are not in newContracts and kill
-	// their workers.
-	for _, ocid := range oldContracts {
-		found := false
-		for _, nc := range newContracts {
-			if nc.ID == ocid {
-				found = true
-				break
-			}
-		}
-		if !found {
-			err = r.retireWorker(ocid)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
+	return r.updateWorkerPool()
 }
 
 // hostdb passthroughs

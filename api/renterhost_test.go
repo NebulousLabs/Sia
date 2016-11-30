@@ -19,7 +19,6 @@ import (
 // renter participate in all of the actions related to simple renting and
 // hosting.
 func TestHostAndRent(t *testing.T) {
-	t.Skip("failing due to contractor changes")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -62,7 +61,7 @@ func TestHostAndRent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Upload to host.
+	// Upload the file to the renter.
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
 	err = st.stdPostAPI("/renter/upload/test", uploadValues)
@@ -78,6 +77,7 @@ func TestHostAndRent(t *testing.T) {
 	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
 	}
+	t.Skip("Seems like the file was uploaded successfully?")
 
 	// On a second connection, upload another file.
 	path2 := filepath.Join(st.dir, "test2.dat")
