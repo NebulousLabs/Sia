@@ -121,12 +121,16 @@ func TestContract(t *testing.T) {
 
 // TestContracts tests the Contracts method.
 func TestContracts(t *testing.T) {
-	c := &Contractor{
-		contracts: map[types.FileContractID]modules.RenterContract{
-			{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
-			{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
-			{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},
-		},
+	var stub newStub
+	dir := build.TempDir("contractor", "TestNew")
+	c, err := New(stub, stub, stub, stub, dir)
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+	c.contracts = map[types.FileContractID]modules.RenterContract{
+		{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
+		{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
+		{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},
 	}
 	for _, contract := range c.Contracts() {
 		if exp := c.contracts[contract.ID]; exp.NetAddress != contract.NetAddress {

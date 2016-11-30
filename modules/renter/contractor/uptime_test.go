@@ -19,16 +19,18 @@ type uptimeHostDB struct {
 func (u uptimeHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
 	host, ok := u.hostDB.Host(addr)
 	if ok && addr == u.addr {
-		// fake three scans, all of which failed
-		badScan := modules.HostDBScan{Timestamp: time.Now(), Success: false}
-		host.ScanHistory = []modules.HostDBScan{badScan, badScan, badScan}
+		// fake three scans over the past uptimeWindow, all of which failed
+		badScan1 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow / 2), Success: false}
+		badScan2 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow / 2), Success: false}
+		badScan3 := modules.HostDBScan{Timestamp: time.Now(), Success: false}
+		host.ScanHistory = []modules.HostDBScan{badScan1, badScan2, badScan3}
 	}
 	return host, ok
 }
 
-// TestIntegrationMonitorUptime tests that when a host goes offline, its
+// TestIntegrationReplaceOffline tests that when a host goes offline, its
 // contract is eventually replaced.
-func TestIntegrationMonitorUptime(t *testing.T) {
+func TestIntegrationReplaceOffline(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -56,18 +58,13 @@ func TestIntegrationMonitorUptime(t *testing.T) {
 		Period:      100,
 		RenewWindow: 10,
 	})
-	// we should have a contract
-	if len(c.Contracts()) != 1 {
+	// we should have a contract, but it will be marked as offline due to the
+	// hocked hostDB
+	if len(c.contracts) != 1 {
 		t.Fatal("contract not formed")
 	}
-
-	// close the host; contractor should eventually delete contract
-	h.Close()
-	for i := 0; i < 100 && len(c.Contracts()) != 0; i++ {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if len(c.Contracts()) != 0 {
-		t.Fatal("contract was not removed")
+	if len(c.onlineContracts()) != 0 {
+		t.Fatal("contract should not be reported as online")
 	}
 
 	// announce the second host
@@ -87,11 +84,11 @@ func TestIntegrationMonitorUptime(t *testing.T) {
 		t.Fatal("host did not make it into the contractor hostdb in time", c.hdb.RandomHosts(2, nil))
 	}
 
-	// mine blocks until a new contract is formed. ProcessConsensusChange will
+	// mine a block and wait for a new contract is formed. ProcessConsensusChange will
 	// trigger managedFormAllowanceContracts, which should form a new contract
 	// with h2
+	m.AddBlock()
 	for i := 0; i < 100 && len(c.Contracts()) != 1; i++ {
-		m.AddBlock()
 		time.Sleep(100 * time.Millisecond)
 	}
 	if len(c.Contracts()) != 1 {

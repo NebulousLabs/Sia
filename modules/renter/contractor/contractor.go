@@ -85,14 +85,12 @@ func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContra
 	return modules.RenterContract{}, false
 }
 
-// Contracts returns the contracts formed by the contractor.
+// Contracts returns the contracts formed by the contractor. Only contracts
+// formed with currently online hosts are returned.
 func (c *Contractor) Contracts() (cs []modules.RenterContract) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	for _, c := range c.contracts {
-		cs = append(cs, c)
-	}
-	return
+	return c.onlineContracts()
 }
 
 // resolveID returns the ID of the most recent renewal of id.
@@ -167,9 +165,6 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 	if err != nil {
 		return nil, errors.New("contractor subscription failed: " + err.Error())
 	}
-
-	// spawn uptime loop
-	go c.threadedMonitorUptime()
 
 	return c, nil
 }

@@ -66,36 +66,18 @@ func isOffline(host modules.HostDBEntry) bool {
 
 // threadedMonitorUptime regularly checks host uptime, and deletes contracts
 // whose hosts fall below a minimum uptime threshold.
-func (c *Contractor) threadedMonitorUptime() {
-	for range time.Tick(uptimeInterval) {
-		// get current contracts
-		contracts := c.Contracts()
-
-		// identify hosts with poor uptime
-		var badContracts []modules.RenterContract
-		for _, contract := range contracts {
-			host, ok := c.hdb.Host(contract.NetAddress)
-			if !ok {
-				c.log.Printf("WARN: missing host entry for %v", contract.NetAddress)
-				continue
-			}
-			if isOffline(host) {
-				badContracts = append(badContracts, contract)
-			}
-		}
-		if len(badContracts) == 0 {
-			// nothing to do
+func (c *Contractor) onlineContracts() []modules.RenterContract {
+	var cs []modules.RenterContract
+	for _, contract := range c.contracts {
+		host, ok := c.hdb.Host(contract.NetAddress)
+		if !ok {
+			c.log.Printf("WARN: missing host entry for %v", contract.NetAddress)
 			continue
 		}
-
-		// delete contracts with bad hosts. When a new block arrives,
-		// ProcessConsensusChange will take care of forming new contracts as
-		// needed.
-		c.mu.Lock()
-		for _, contract := range badContracts {
-			delete(c.contracts, contract.ID)
+		// only returns contracts not marked as being offline
+		if !isOffline(host) {
+			cs = append(cs, contract)
 		}
-		c.mu.Unlock()
-		c.log.Printf("INFO: deleted %v contracts because their hosts were offline", len(badContracts))
 	}
+	return cs
 }
