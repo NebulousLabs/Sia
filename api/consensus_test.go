@@ -6,17 +6,18 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestIntegrationConsensusGet probes the GET call to /consensus.
+// TestConsensusGet probes the GET call to /consensus.
 func TestIntegrationConsensusGET(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestIntegrationConsensusGET")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.server.Close()
+
 	var cg ConsensusGET
 	err = st.getAPI("/consensus", &cg)
 	if err != nil {

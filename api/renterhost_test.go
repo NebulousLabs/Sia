@@ -3,8 +3,6 @@ package api
 // renterhost_test.go sets up larger integration tests between renters and
 // hosts, checking that the whole storage ecosystem is functioning cohesively.
 
-// TODO: There are a bunch of magic numbers in this file.
-
 import (
 	"bytes"
 	"io/ioutil"
@@ -17,15 +15,16 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestIntegrationHostAndRent sets up an integration test where a host and
+// TestHostAndRent sets up an integration test where a host and
 // renter participate in all of the actions related to simple renting and
 // hosting.
-func TestIntegrationHostAndRent(t *testing.T) {
+func TestHostAndRent(t *testing.T) {
 	t.Skip("failing due to contractor changes")
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationHostAndRent")
+	t.Parallel()
+	st, err := createServerTester("TestHostAndRent")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,13 +147,14 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	}
 }
 
-// TestIntegrationUploadDownload tests that downloading and uploading in
+// TestUploadDownload tests that downloading and uploading in
 // parallel does not result in failures or stalling.
-func TestIntegrationUploadDownload(t *testing.T) {
+func TestUploadDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationUploadDownload")
+	t.Parallel()
+	st, err := createServerTester("TestUploadDownload")
 	if err != nil {
 		t.Fatal(err)
 	}

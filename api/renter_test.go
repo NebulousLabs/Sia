@@ -35,6 +35,7 @@ func TestRenterPaths(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestRenterPaths")
 	if err != nil {
 		t.Fatal(err)
@@ -79,6 +80,7 @@ func TestRenterConflicts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestRenterConflicts")
 	if err != nil {
 		t.Fatal(err)
@@ -139,6 +141,7 @@ func TestRenterHostsActiveHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestRenterHostsActiveHandler")
 	if err != nil {
 		t.Fatal(err)
@@ -228,6 +231,7 @@ func TestRenterHostsAllHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestRenterHostsAllHandler")
 	if err != nil {
 		t.Fatal(err)
@@ -260,7 +264,7 @@ func TestRenterHandlerContracts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterHandlerContracts")
 	if err != nil {
 		t.Fatal(err)
@@ -325,7 +329,7 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterHandlerGetAndPost")
 	if err != nil {
 		t.Fatal(err)
@@ -422,7 +426,7 @@ func TestRenterLoadNonexistent(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterLoadNonexistent")
 	if err != nil {
 		t.Fatal(err)
@@ -480,7 +484,7 @@ func TestRenterHandlerRename(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterHandlerRename")
 	if err != nil {
 		t.Fatal(err)
@@ -563,7 +567,7 @@ func TestRenterHandlerDelete(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterHandlerDelete")
 	if err != nil {
 		t.Fatal(err)
@@ -628,7 +632,7 @@ func TestRenterRelativePathErrorUpload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterRelativePathErrorUpload")
 	if err != nil {
 		t.Fatal(err)
@@ -689,7 +693,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterRelativePathErrorUpload")
 	if err != nil {
 		t.Fatal(err)
@@ -742,7 +746,11 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 
 	// This should fail.
 	downloadPath = filepath.Join(st.dir, "test1.dat")
-	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); !strings.Contains(err.Error(), "contract") {
-		t.Fatal(err)
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err == nil {
+		t.Fatal("expecting an error")
+	}
+	if !strings.Contains(err.Error(), "contract") {
+		t.Fatal("Expecting the word 'contract' to appear in the error:", err)
 	}
 }
