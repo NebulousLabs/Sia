@@ -135,7 +135,9 @@ func (r *Renter) createRepairMatrix(availableWorkers map[types.FileContractID]st
 		if !exists {
 			continue
 		}
+		file.mu.Lock()
 		addFileToRepairMatrix(file, availableWorkers, repairMatrix, gapCounts)
+		file.mu.Unlock()
 	}
 	return repairMatrix, gapCounts
 }
@@ -148,7 +150,7 @@ func (r *Renter) managedRepairIteration() {
 	for id, worker := range r.workerPool {
 		// Ignore workers that have had an upload failure in the past two
 		// hours.
-		if worker.recentUploadFailure.Add(time.Minute * 120).Before(time.Now()) {
+		if worker.recentUploadFailure.Add(time.Hour).Before(time.Now()) {
 			availableWorkers[id] = struct{}{}
 		}
 	}
@@ -181,10 +183,6 @@ func (r *Renter) managedRepairIteration() {
 			return
 		}
 	}
-
-	// TODO: Ignoring a failed upload for two hours may be too aggressive,
-	// because the problem might just be that the user is offline. Problem
-	// might also be that a single connection failed.
 
 	// Set up a loop that first waits for enough workers to become
 	// available, and then iterates through the repair matrix to find a
@@ -316,7 +314,11 @@ func (r *Renter) managedRepairIteration() {
 					resultChan: resultChan,
 				}
 				worker := r.workerPool[usefulWorkers[i]]
-				worker.uploadChan <- uw
+				select {
+					case worker.uploadChan <- uw:
+					case <-r.tg.StopChan():
+						return
+				}
 
 				delete(availableWorkers, usefulWorkers[i])
 				for j := 0; j < len(chunkGaps.contracts); j++ {
@@ -360,7 +362,12 @@ func (r *Renter) managedRepairIteration() {
 
 		// Wait until 'need' workers are available.
 		for len(availableWorkers) < need {
-			finishedUpload := <-resultChan
+			var finishedUpload finishedUpload
+			select {
+			case finishedUpload = <-resultChan:
+			case <-r.tg.StopChan():
+				return
+			}
 
 			if finishedUpload.err != nil {
 				r.log.Debugln("Error while performing upload to", finishedUpload.workerID, "::", finishedUpload.err)
@@ -388,12 +395,13 @@ func (r *Renter) managedRepairIteration() {
 
 		// Receive all of the new files and add them to the repair matrix
 		// before continuing.
-		for {
+		var done bool
+		for !done {
 			select {
 			case file := <-r.newFiles:
 				addFileToRepairMatrix(file, activeWorkers, repairMatrix, gapCounts)
 			default:
-				break
+				done = true
 			}
 		}
 	}

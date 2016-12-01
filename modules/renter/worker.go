@@ -122,7 +122,10 @@ func (w *worker) upload(uw uploadWork) {
 
 	root, err := e.Upload(uw.data)
 	if err != nil {
-		uw.resultChan <- finishedUpload{root, err, w.contractID}
+		select{
+		case uw.resultChan <- finishedUpload{root, err, w.contractID}:
+		case <-w.renter.tg.StopChan():
+		}
 		return
 	}
 
@@ -142,10 +145,15 @@ func (w *worker) upload(uw uploadWork) {
 		MerkleRoot: root,
 	})
 	uw.file.contracts[w.contractID] = contract
-	uw.file.mu.Unlock()
+	id := w.renter.mu.Lock()
 	w.renter.saveFile(uw.file)
+	w.renter.mu.Unlock(id)
+	uw.file.mu.Unlock()
 
-	uw.resultChan <- finishedUpload{root, err, w.contractID}
+	select{
+	case uw.resultChan <- finishedUpload{root, err, w.contractID}:
+	case <-w.renter.tg.StopChan():
+	}
 }
 
 // work will perform one unit of work, exiting early if there is a kill signal
@@ -199,7 +207,6 @@ func (w *worker) threadedWorkLoop() {
 			// do nothing
 		}
 
-		// Wrap a call to work() in a threadgroup reservation.
 		if w.renter.tg.Add() != nil {
 			return
 		}
