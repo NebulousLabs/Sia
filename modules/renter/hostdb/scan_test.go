@@ -15,10 +15,15 @@ import (
 func TestDecrementReliability(t *testing.T) {
 	hdb := bareHostDB()
 
-	// Decrementing a non-existent host should be a no-op.
-	// NOTE: can't check any post-conditions here; only indication of correct
-	// behavior is that the test doesn't panic.
-	hdb.decrementReliability("foo", types.NewCurrency64(0))
+	// Decrementing a non-existent host should be a no-op, and should build.Critical.
+	func() {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatal("decrementReliability should build.Critical with nonexistent host")
+			}
+		}()
+		hdb.decrementReliability("foo", types.NewCurrency64(0))
+	}()
 
 	// Add a host to allHosts and activeHosts. Decrementing it should remove it
 	// from activeHosts.
