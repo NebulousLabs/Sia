@@ -165,9 +165,9 @@ func (hdb offlineHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, boo
 	if addr == hdb.addr {
 		return modules.HostDBEntry{}, false
 	}
-	// fake three scans over the past uptimeWindow, all of which failed
-	badScan1 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow / 2), Success: false}
-	badScan2 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow / 2), Success: false}
+	// fake three scans, all of which failed
+	badScan1 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow * 2), Success: false}
+	badScan2 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow), Success: false}
 	badScan3 := modules.HostDBScan{Timestamp: time.Now(), Success: false}
 	host := modules.HostDBEntry{ScanHistory: []modules.HostDBScan{badScan1, badScan2, badScan3}}
 	return host, true

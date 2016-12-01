@@ -7,61 +7,54 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// uptimeInterval specifies how frequently hosts are checked.
-var (
-	uptimeInterval = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 1 * time.Minute
-		case "standard":
-			return 30 * time.Minute
-		case "testing":
-			return 100 * time.Millisecond
-		}
-		panic("undefined uptimeInterval")
-	}()
+// uptimeMinScans is the minimum number of scans required to judge whether a
+// host is offline or not.
+const uptimeMinScans = 3
 
-	// uptimeWindow specifies the duration in which host uptime is checked.
-	uptimeWindow = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 30 * time.Minute
-		case "standard":
-			return 7 * 24 * time.Hour // 1 week
-		case "testing":
-			return 15 * time.Second
-		}
-		panic("undefined uptimeWindow")
-	}()
-)
+// uptimeWindow specifies the duration in which host uptime is checked.
+var uptimeWindow = func() time.Duration {
+	switch build.Release {
+	case "dev":
+		return 30 * time.Minute
+	case "standard":
+		return 7 * 24 * time.Hour // 1 week
+	case "testing":
+		return 15 * time.Second
+	}
+	panic("undefined uptimeWindow")
+}()
 
 // isOffline decides whether a host should be considered offline, based on its
 // scan metrics.
 func isOffline(host modules.HostDBEntry) bool {
 	// consider a host offline if:
-	// 1) The host has been scanned at least 3 times in the past uptimeWindow, and
-	// 2) The scans occurred over a period of at least 1/3 the uptimeWindow, and
-	// 3) None of the scans succeeded
-	var pastWeek []modules.HostDBScan
-	for _, scan := range host.ScanHistory {
-		if time.Since(scan.Timestamp) < uptimeWindow {
-			if scan.Success {
-				// at least one scan in the uptimeWindow succeeded
-				return false
-			}
-			pastWeek = append(pastWeek, scan)
-		}
-	}
-	if len(pastWeek) < 3 {
+	// 1) The host has been scanned at least three times, and
+	// 2) The three most recent scans have all failed, and
+	// 3) The time between the most recent scan and the last successful scan
+	//    (or first scan) is at least uptimeWindow
+	numScans := len(host.ScanHistory)
+	if numScans < uptimeMinScans {
 		// not enough data to make a fair judgment
 		return false
 	}
-	if pastWeek[len(pastWeek)-1].Timestamp.Sub(pastWeek[0].Timestamp) < uptimeWindow/3 {
-		// scans were not sufficiently far apart to make a fair judgment
-		return false
+	// NOTE: ScanHistory is ordered from oldest-newest
+	recent := host.ScanHistory[numScans-uptimeMinScans:]
+	for _, scan := range recent {
+		if scan.Success {
+			// one of the scans succeeded
+			return false
+		}
 	}
-	// all conditions satisfied
-	return true
+	// initialize window bounds
+	windowStart, windowEnd := host.ScanHistory[0].Timestamp, host.ScanHistory[numScans-1].Timestamp
+	// iterate from newest-oldest, seeking to last successful scan
+	for i := numScans - 1; i >= 0; i-- {
+		if scan := host.ScanHistory[i]; scan.Success {
+			windowStart = scan.Timestamp
+			break
+		}
+	}
+	return windowEnd.Sub(windowStart) >= uptimeWindow
 }
 
 // threadedMonitorUptime regularly checks host uptime, and deletes contracts

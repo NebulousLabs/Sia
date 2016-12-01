@@ -20,8 +20,8 @@ func (u uptimeHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) 
 	host, ok := u.hostDB.Host(addr)
 	if ok && addr == u.addr {
 		// fake three scans over the past uptimeWindow, all of which failed
-		badScan1 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow / 2), Success: false}
-		badScan2 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow / 2), Success: false}
+		badScan1 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow * 2), Success: false}
+		badScan2 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow), Success: false}
 		badScan3 := modules.HostDBScan{Timestamp: time.Now(), Success: false}
 		host.ScanHistory = []modules.HostDBScan{badScan1, badScan2, badScan3}
 	}
@@ -115,14 +115,12 @@ func TestIsOffline(t *testing.T) {
 		{nil, false},
 		// not enough data
 		{[]modules.HostDBScan{oldBadScan, newGoodScan}, false},
-		// not recent enough data
+		// data covers small range
 		{[]modules.HostDBScan{oldBadScan, oldBadScan, oldBadScan}, false},
-		// recent data, but at least 1 scan succeded
-		{[]modules.HostDBScan{newGoodScan, newBadScan, currentBadScan}, false},
-		// recent data, but scans are too close together
-		{[]modules.HostDBScan{newBadScan, newBadScan, newBadScan}, false},
-		// recent data, no scans succeded
-		{[]modules.HostDBScan{newBadScan, newBadScan, currentBadScan}, true},
+		// data covers large range, but at least 1 scan succeded
+		{[]modules.HostDBScan{oldBadScan, newGoodScan, currentBadScan}, false},
+		// data covers large range, no scans succeded
+		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan}, true},
 	}
 	for i, test := range tests {
 		h := modules.HostDBEntry{ScanHistory: test.scans}
