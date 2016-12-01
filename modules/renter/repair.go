@@ -157,10 +157,14 @@ func (r *Renter) managedRepairIteration() {
 	// Create the repair matrix. The repair matrix is a set of chunks,
 	// linked from chunk id to the set of hosts that do not have that
 	// chunk.
+	id = r.mu.RLock()
 	repairMatrix, gapCounts := r.createRepairMatrix(availableWorkers)
+	r.mu.RUnlock(id)
+
+	// Determine the maximum number of gaps of any chunk in the repair matrix.
 	maxGaps := 0
-	for i := 1; i < len(gapCounts); i++ {
-		if gapCounts[i] > 0 {
+	for i, gaps := range gapCounts {
+		if i > maxGaps && gaps > 0 {
 			maxGaps = i
 		}
 	}
@@ -169,6 +173,8 @@ func (r *Renter) managedRepairIteration() {
 		// been a new upload. Then iterate to make a new repair matrix and
 		// check again.
 		select {
+		case <-r.tg.StopChan():
+			return
 		case <-time.After(time.Minute * 15):
 			return
 		case <-r.newFiles:
@@ -199,8 +205,8 @@ func (r *Renter) managedRepairIteration() {
 
 		// Determine the maximum number of gaps that any chunk has.
 		maxGaps := 0
-		for i := 1; i < len(gapCounts); i++ {
-			if gapCounts[i] != 0 {
+		for i, gaps  := range gapCounts {
+			if i > maxGaps && gaps > 0 {
 				maxGaps = i
 			}
 		}
@@ -401,7 +407,7 @@ func (r *Renter) threadedRepairLoop() {
 		if r.tg.Add() != nil {
 			return
 		}
-		r.managedDownloadIteration()
+		r.managedRepairIteration()
 		r.tg.Done()
 	}
 }

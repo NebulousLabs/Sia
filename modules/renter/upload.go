@@ -99,5 +99,10 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		return err
 	}
 
+	// TODO: Do this using some sort of queue.
+	go func() {
+		r.newFiles <- f
+	}()
+
 	return nil
 }
