@@ -65,8 +65,8 @@ func (f *file) newDownload(destination string) *download {
 // managedDownloadIteraiton downloads a chunk from the next available file.
 func (r *Renter) managedDownloadIteration() {
 	// Get the set of available workers.
-	availableWorkers := make([]*worker, 0)
 	id := r.mu.RLock()
+	availableWorkers := make([]*worker, 0, len(r.workerPool))
 	for _, worker := range r.workerPool {
 		availableWorkers = append(availableWorkers, worker)
 	}
@@ -101,11 +101,12 @@ func (r *Renter) managedDownloadIteration() {
 	// well.
 
 	// Open a file handle for the download.
-	fileDest, err := os.OpenFile(nextDownload.destination, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+	fileDest, err := os.OpenFile(nextDownload.destination, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
 		nextDownload.downloadFinished <- err
 		return
 	}
+	defer fileDest.Close()
 
 	// Grab each chunk from the download.
 	chunkDownloads := make([]chunkDownload, nextDownload.fileSize/nextDownload.chunkSize)
@@ -125,7 +126,7 @@ func (r *Renter) managedDownloadIteration() {
 
 	var activeDownloads int
 	var chunkIndex uint64
-	incompleteChunks := make([]uint64, 0)
+	var incompleteChunks []uint64
 	resultChan := make(chan finishedDownload)
 	for {
 		// Break if tg.Stop() has been called, to facilitate quick shutdown.
@@ -298,18 +299,6 @@ func (r *Renter) Download(path, destination string) error {
 		return errors.New("no file with that path")
 	}
 
-	// Create file on disk with the correct permissions.
-	perm := os.FileMode(file.mode)
-	if perm == 0 {
-		// sane default
-		perm = 0666
-	}
-	f, err := os.OpenFile(destination, os.O_CREATE|os.O_RDWR|os.O_TRUNC, perm)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
 	// Create the download object and add it to the queue.
 	d := file.newDownload(destination)
 	lockID = r.mu.Lock()
@@ -317,6 +306,9 @@ func (r *Renter) Download(path, destination string) error {
 	r.mu.Unlock(lockID)
 
 	// Block until the download has completed.
+	//
+	// TODO: Eventually just return the channel to the error instead of the
+	// error itself.
 	return <-d.downloadFinished
 }
 

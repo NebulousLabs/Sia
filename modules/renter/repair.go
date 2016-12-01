@@ -7,7 +7,6 @@ package renter
 // pieces.
 
 import (
-	"encoding/binary"
 	"io"
 	"os"
 	"time"
@@ -29,13 +28,28 @@ var renewThreshold = func() types.BlockHeight {
 	}
 }()
 
-type chunkGaps struct {
-	contracts []types.FileContractID
-	pieces    []uint64
-	numGaps   int
-}
+type (
+	// chunkGaps points to all of the missing pieces in a chunk, as well as all
+	// of the hosts that are missing. The 'numGaps' value is the minimum of
+	// len(contracts) and len(pieces).
+	//
+	// TODO: Replace 'numGaps' with a method that computes the number of gaps
+	// in real time.
+	chunkGaps struct {
+		contracts []types.FileContractID
+		pieces    []uint64
+		numGaps   int
+	}
 
-func addFileToRepairMatrix(file *file, availableWorkers map[types.FileContractID]struct{}, repairMatrix map[string]*chunkGaps, gapCounts map[int]int) {
+	// chunkID can be used to uniquely identify a chunk within the repair
+	// matrix.
+	chunkID struct {
+		chunkIndex uint64
+		filename   string
+	}
+)
+
+func addFileToRepairMatrix(file *file, availableWorkers map[types.FileContractID]struct{}, repairMatrix map[chunkID]*chunkGaps, gapCounts map[int]int) {
 	// Flatten availableWorkers into a list of contracts.
 	contracts := make([]types.FileContractID, 0)
 	for contract := range availableWorkers {
@@ -104,19 +118,15 @@ func addFileToRepairMatrix(file *file, availableWorkers map[types.FileContractID
 			// blocking-related decisions easier.
 			gapCounts[gaps.numGaps]++
 
-			// Create a name for the incomplete chunk.
-			chunkPrefix := make([]byte, 8)
-			binary.LittleEndian.PutUint64(chunkPrefix, i)
-			chunkName := string(chunkPrefix) + file.name
-
 			// Add the chunk to the repair matrix.
-			repairMatrix[chunkName] = &gaps
+			cid := chunkID{i, file.name}
+			repairMatrix[cid] = &gaps
 		}
 	}
 }
 
-func (r *Renter) createRepairMatrix(availableWorkers map[types.FileContractID]struct{}) (map[string]*chunkGaps, map[int]int) {
-	repairMatrix := make(map[string]*chunkGaps)
+func (r *Renter) createRepairMatrix(availableWorkers map[types.FileContractID]struct{}) (map[chunkID]*chunkGaps, map[int]int) {
+	repairMatrix := make(map[chunkID]*chunkGaps)
 	gapCounts := make(map[int]int)
 
 	// Add all of the files to the repair matrix.
@@ -233,17 +243,16 @@ func (r *Renter) managedRepairIteration() {
 				if len(chunkGaps.contracts) < len(chunkGaps.pieces) && len(chunkGaps.contracts) < chunkGaps.numGaps {
 					oldNumGaps := chunkGaps.numGaps
 					chunkGaps.numGaps = len(chunkGaps.contracts)
-					gapCounts[oldNumGaps] = gapCounts[oldNumGaps] - 1
-					gapCounts[chunkGaps.numGaps] = gapCounts[chunkGaps.numGaps] + 1
+					gapCounts[oldNumGaps]--
+					gapCounts[chunkGaps.numGaps]++
 				}
 				continue
 			}
 
 			// Parse the filename and chunk index from the repair
 			// matrix key.
-			chunkIndexBytes := chunkID[:8]
-			filename := chunkID[8:]
-			chunkIndex := binary.LittleEndian.Uint64([]byte(chunkIndexBytes))
+			chunkIndex := chunkID.chunkIndex
+			filename := chunkID.filename
 			file, exists := r.files[filename]
 			if !exists {
 				// TODO: Should pull this chunk out of the repair
@@ -266,6 +275,7 @@ func (r *Renter) managedRepairIteration() {
 				// TODO: Manage err
 				continue
 			}
+			defer fHandle.Close()
 			chunk := make([]byte, file.chunkSize())
 			_, err = fHandle.ReadAt(chunk, int64(chunkIndex*file.chunkSize()))
 			if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
@@ -375,7 +385,7 @@ func (r *Renter) managedRepairIteration() {
 		for {
 			select {
 			case file := <-r.newFiles:
-				r.addFileToRepairMatrix(file, activeWorkers, repairMatrix, gapCounts)
+				addFileToRepairMatrix(file, activeWorkers, repairMatrix, gapCounts)
 			default:
 				break
 			}
