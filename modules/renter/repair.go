@@ -23,9 +23,9 @@ var renewThreshold = func() types.BlockHeight {
 	case "testing":
 		return 10
 	case "dev":
-		return 200
+		return 100 // 20 minutes
 	default:
-		return 144 * 7 * 6
+		return 144 * 7 * 6 // 6 weeks
 	}
 }()
 
@@ -35,17 +35,11 @@ type chunkGaps struct {
 	numGaps   int
 }
 
-func (r *Renter) addFileToRepairMatrix(file *file, availableWorkers map[types.FileContractID]struct{}, repairMatrix map[string]*chunkGaps, gapCounts map[int]int) {
+func addFileToRepairMatrix(file *file, availableWorkers map[types.FileContractID]struct{}, repairMatrix map[string]*chunkGaps, gapCounts map[int]int) {
 	// Flatten availableWorkers into a list of contracts.
 	contracts := make([]types.FileContractID, 0)
 	for contract := range availableWorkers {
 		contracts = append(contracts, contract)
-	}
-
-	// If the file is not being tracked, don't add it to the repair matrix.
-	_, exists := r.tracking[file.name]
-	if exists {
-		return
 	}
 
 	// For each chunk, create a map from the chunk to the pieces that it
@@ -71,10 +65,7 @@ func (r *Renter) addFileToRepairMatrix(file *file, availableWorkers map[types.Fi
 	for i := uint64(0); i < chunkCount; i++ {
 		if len(pieceMap[i]) < file.erasureCode.NumPieces() {
 			// Find the gaps in the pieces and contracts.
-			potentialPieceGaps := make(map[uint64]struct{})
-			for j := 0; j < file.erasureCode.NumPieces(); i++ {
-				potentialPieceGaps[i] = struct{}{}
-			}
+			potentialPieceGaps := make([]bool, file.erasureCode.NumPieces())
 			potentialContractGaps := make(map[types.FileContractID]struct{})
 			for _, contract := range contracts {
 				potentialContractGaps[contract] = struct{}{}
@@ -83,20 +74,22 @@ func (r *Renter) addFileToRepairMatrix(file *file, availableWorkers map[types.Fi
 			// Delete every available piece from the potential piece gaps,
 			// and every utilized contract form the potential contract
 			// gaps.
+			for _, piece := range pieceMap[i] {
+				potentialPieceGaps[piece] = true
+			}
 			for _, fcid := range contractMap[i] {
 				delete(potentialContractGaps, fcid)
-			}
-			for _, piece := range pieceMap[i] {
-				delete(potentialPieceGaps, piece)
 			}
 
 			// Merge the gaps into a slice.
 			var gaps chunkGaps
+			for j, piece := range potentialPieceGaps {
+				if !piece {
+					gaps.pieces = append(gaps.pieces, uint64(j))
+				}
+			}
 			for fcid := range potentialContractGaps {
 				gaps.contracts = append(gaps.contracts, fcid)
-			}
-			for piece := range potentialPieceGaps {
-				gaps.pieces = append(gaps.pieces, piece)
 			}
 
 			// Figure out the largest number of workers that could be
@@ -109,7 +102,7 @@ func (r *Renter) addFileToRepairMatrix(file *file, availableWorkers map[types.Fi
 
 			// Record the number of gaps that this chunk has, which makes
 			// blocking-related decisions easier.
-			gapCounts[gaps.numGaps] = gapCounts[gaps.numGaps] + 1
+			gapCounts[gaps.numGaps]++
 
 			// Create a name for the incomplete chunk.
 			chunkPrefix := make([]byte, 8)
@@ -128,7 +121,11 @@ func (r *Renter) createRepairMatrix(availableWorkers map[types.FileContractID]st
 
 	// Add all of the files to the repair matrix.
 	for _, file := range r.files {
-		r.addFileToRepairMatrix(file, availableWorkers, repairMatrix, gapCounts)
+		_, exists := r.tracking[file.name]
+		if !exists {
+			continue
+		}
+		addFileToRepairMatrix(file, availableWorkers, repairMatrix, gapCounts)
 	}
 	return repairMatrix, gapCounts
 }
@@ -163,7 +160,9 @@ func (r *Renter) managedRepairIteration() {
 		// check again.
 		select {
 		case <-time.After(time.Minute * 15):
+			return
 		case <-r.newFiles:
+			return
 		}
 	}
 
