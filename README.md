@@ -119,8 +119,8 @@ Version Information
   or responses, but none of the routes present in v1.0.0 will be removed, nor
   will any of their parameters or response fields be removed.
 
-- siad now supports API authentication, enabled by the `--authenticate-api`
-  flag.
+- v1.0.4 has a companion LTS release, v1.0.4-lts. Please read our [forum post](http://forum.sia.tech/topic/793/november-2016-update-roadmap)
+  for more information.
 
 Please tell us about any problems you run into, and any features you want! The
 advantage of being a beta user is that your feedback will have a large impact
