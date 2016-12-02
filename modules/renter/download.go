@@ -1,5 +1,9 @@
 package renter
 
+// TODO: There's very little thread safety on the file - what if the file is
+// renamed, etc. while it is being downloaded? Unclear what the behavior will
+// be.
+
 import (
 	"bytes"
 	"errors"
@@ -7,9 +11,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// TODO: Move to const file.
+const maxConcurrentDownloadChunks = 4
 
 var (
 	errInsufficientHosts  = errors.New("insufficient hosts to recover file")
@@ -36,11 +44,42 @@ type download struct {
 	siapath     string
 	destination string
 
-	erasureCode modules.ErasureCoder
 	chunkSize   uint64
+	erasureCode modules.ErasureCoder
 	fileSize    uint64
+	masterKey   crypto.TwofishKey
+	numChunks   uint64
 
 	downloadFinished chan error
+}
+
+func recoverChunk(download *download, chunkIndex uint64, chunkDownload chunkDownload, fileDest *os.File) error {
+	// Assemble the repair pieces for the chunk.
+	chunk := make([][]byte, download.erasureCode.NumPieces())
+	for pieceIndex, pieceData := range chunkDownload.completedPieces {
+		key := deriveKey(download.masterKey, chunkIndex, pieceIndex)
+		pieceBytes, err := key.DecryptBytes(pieceData)
+		if err != nil {
+			return err
+		}
+		chunk[pieceIndex] = pieceBytes
+	}
+
+	// Recover the chunk into a byte slice.
+	recoverWriter := new(bytes.Buffer)
+	recoverSize := download.chunkSize
+	if chunkIndex == download.numChunks-1 && download.fileSize % download.chunkSize != 0 {
+		recoverSize = download.fileSize % download.chunkSize
+	}
+	err := download.erasureCode.Recover(chunk, recoverSize, recoverWriter)
+	if err != nil {
+		return err
+	}
+
+	// Write the bytes to the download file.
+	result := recoverWriter.Bytes()
+	_, err = fileDest.WriteAt(result, int64(chunkIndex*download.chunkSize))
+	return err
 }
 
 // newDownload initializes and returns a download object.
@@ -49,13 +88,15 @@ func (f *file) newDownload(destination string) *download {
 		atomicChunkIndex: 0,
 		atomicReceived:   0,
 
-		erasureCode: f.erasureCode,
-		chunkSize:   f.chunkSize(),
-		fileSize:    f.size,
-
 		startTime:   time.Now(),
 		siapath:     f.name,
 		destination: destination,
+
+		chunkSize:   f.chunkSize(),
+		erasureCode: f.erasureCode,
+		fileSize:    f.size,
+		masterKey:   f.masterKey,
+		numChunks:   f.numChunks(),
 
 		downloadFinished: make(chan error),
 	}
@@ -109,7 +150,7 @@ func (r *Renter) managedDownloadIteration() {
 	defer fileDest.Close()
 
 	// Grab each chunk from the download.
-	chunkDownloads := make([]chunkDownload, nextDownload.fileSize/nextDownload.chunkSize)
+	chunkDownloads := make([]chunkDownload, nextDownload.numChunks)
 
 	// Assemble the file pieces as a set of chunks pointing from the file
 	// contract id to the piece that the file contract is protecting.
@@ -117,12 +158,16 @@ func (r *Renter) managedDownloadIteration() {
 	for i := range pieceSet {
 		pieceSet[i] = make(map[types.FileContractID]pieceData)
 	}
+	id = r.mu.RLock()
 	file := r.files[nextDownload.siapath]
+	r.mu.RUnlock(id)
+	file.mu.Lock()
 	for _, contract := range file.contracts {
 		for _, piece := range contract.Pieces {
 			pieceSet[piece.Chunk][contract.ID] = piece
 		}
 	}
+	file.mu.Unlock()
 
 	var activeDownloads int
 	var chunkIndex uint64
@@ -177,7 +222,7 @@ func (r *Renter) managedDownloadIteration() {
 
 		// If there is room to download another chunk, and enough workers to
 		// tackle the task, begin performing another download.
-		if activeDownloads < 4 && int(chunkIndex) < len(chunkDownloads) && len(availableWorkers) > nextDownload.erasureCode.MinPieces() {
+		if activeDownloads < maxConcurrentDownloadChunks && int(chunkIndex) < len(chunkDownloads) && len(availableWorkers) >= nextDownload.erasureCode.MinPieces() {
 			// Create the chunkDownload object and insert it into the
 			// chunkDownloads slice.
 			chunkDownloads[chunkIndex] = chunkDownload{
@@ -233,29 +278,8 @@ func (r *Renter) managedDownloadIteration() {
 				// Add this returned piece to the appropriate chunk.
 				chunkDownloads[chunkIndex].completedPieces[pieceSet[chunkIndex][workerID].Piece] = finishedDownload.data
 				if len(chunkDownloads[chunkIndex].completedPieces) == file.erasureCode.MinPieces() {
-					// Assemble the repair pieces for the chunk.
-					chunk := make([][]byte, file.erasureCode.NumPieces())
-					for pieceIndex, pieceData := range chunkDownloads[chunkIndex].completedPieces {
-						chunk[pieceIndex] = pieceData
-					}
-
-					// Recover the chunk into a byte slice.
-					recoverBytes := make([]byte, file.chunkSize())
-					recoverBytesWriter := bytes.NewBuffer(recoverBytes)
-					err := nextDownload.erasureCode.Recover(chunk, nextDownload.chunkSize, recoverBytesWriter)
+					err := recoverChunk(nextDownload, chunkIndex, chunkDownloads[chunkIndex], fileDest)
 					if err != nil {
-						// Signal that the download has failed.
-						nextDownload.downloadFinished <- err
-						return
-					}
-					if int(chunkIndex) == len(chunkDownloads) {
-						recoverBytes = recoverBytes[:nextDownload.fileSize%nextDownload.chunkSize]
-					}
-
-					// Write the bytes to the download file.
-					_, err = fileDest.WriteAt(recoverBytes, int64(chunkIndex*nextDownload.chunkSize))
-					if err != nil {
-						// Signal that the download has failed.
 						nextDownload.downloadFinished <- err
 						return
 					}
@@ -269,6 +293,8 @@ func (r *Renter) managedDownloadIteration() {
 					availableWorkers = append(availableWorkers, worker)
 				}
 			}
+		} else {
+			time.Sleep(time.Millisecond * 500)
 		}
 	}
 
@@ -285,6 +311,8 @@ func (r *Renter) threadedDownloadLoop() {
 		}
 		r.managedDownloadIteration()
 		r.tg.Done()
+		// TODO: Come up with a better method for blocking during downloads.
+		time.Sleep(time.Millisecond * 500)
 	}
 }
 
