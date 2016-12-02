@@ -129,7 +129,7 @@ func latestLTS(releases []githubRelease) (githubRelease, error) {
 	// filter the releases to exclude non-LTS releases
 	var ltsReleases []githubRelease
 	for _, r := range releases {
-		if strings.Contains(r.TagName, "lts") {
+		if strings.Contains(r.TagName, "lts") && build.IsVersion(strings.TrimPrefix(r.TagName, "lts-v")) {
 			ltsReleases = append(ltsReleases, r)
 		}
 	}
