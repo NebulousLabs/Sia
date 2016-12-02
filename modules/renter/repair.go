@@ -159,9 +159,9 @@ func (r *Renter) managedRepairIteration() {
 	// Create the repair matrix. The repair matrix is a set of chunks,
 	// linked from chunk id to the set of hosts that do not have that
 	// chunk.
-	id = r.mu.RLock()
+	id = r.mu.Lock()
 	repairMatrix, gapCounts := r.createRepairMatrix(availableWorkers)
-	r.mu.RUnlock(id)
+	r.mu.Unlock(id)
 
 	// Determine the maximum number of gaps of any chunk in the repair matrix.
 	maxGaps := 0
@@ -257,7 +257,9 @@ func (r *Renter) managedRepairIteration() {
 			// matrix key.
 			chunkIndex := chunkID.chunkIndex
 			filename := chunkID.filename
+			id := r.mu.RLock()
 			file, exists := r.files[filename]
+			r.mu.RUnlock(id)
 			if !exists {
 				// TODO: Should pull this chunk out of the repair
 				// matrix. The other errors in this block should do the
@@ -266,7 +268,9 @@ func (r *Renter) managedRepairIteration() {
 			}
 
 			// Grab the chunk and code it into its separate pieces.
+			id = r.mu.RLock()
 			meta, exists := r.tracking[filename]
+			r.mu.RUnlock(id)
 			if !exists {
 				continue
 			}
