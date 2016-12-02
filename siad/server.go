@@ -110,6 +110,12 @@ bwIDAQAB
 -----END PUBLIC KEY-----`
 )
 
+// version returns the version number of an LTS release. This assumes that LTS
+// tag names will always be of the form "lts-vX.Y.Z".
+func (r *githubRelease) version() string {
+	return strings.TrimPrefix(r.TagName, "lts-v")
+}
+
 // byVersion sorts LTS releases by their version string, placing the highest
 // version number first.
 type byVersion []githubRelease
@@ -117,22 +123,21 @@ type byVersion []githubRelease
 func (rs byVersion) Len() int      { return len(rs) }
 func (rs byVersion) Swap(i, j int) { rs[i], rs[j] = rs[j], rs[i] }
 func (rs byVersion) Less(i, j int) bool {
-	// strip "lts-" from the tag names; this assumes the tag names will always
-	// be of the form "lts-v0.0.0".
-	vi, vj := strings.TrimPrefix(rs[i].TagName, "lts-"), strings.TrimPrefix(rs[j].TagName, "lts-")
 	// we want the higher version number to reported as "less" so that it is
 	// placed first inthe slice
-	return build.VersionCmp(vi, vj) >= 0
+	return build.VersionCmp(rs[i].version(), rs[j].version()) >= 0
 }
 
+// latestLTS returns the latest LTS release, given a set of arbitrary releases.
 func latestLTS(releases []githubRelease) (githubRelease, error) {
 	// filter the releases to exclude non-LTS releases
 	var ltsReleases []githubRelease
 	for _, r := range releases {
-		if strings.Contains(r.TagName, "lts") && build.IsVersion(strings.TrimPrefix(r.TagName, "lts-v")) {
+		if strings.Contains(r.TagName, "lts") && build.IsVersion(r.version()) {
 			ltsReleases = append(ltsReleases, r)
 		}
 	}
+
 	// sort by version
 	sort.Sort(byVersion(ltsReleases))
 

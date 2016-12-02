@@ -12,6 +12,22 @@ func TestLatestLTS(t *testing.T) {
 		{
 			releases: []githubRelease{
 				{TagName: "lts-v1.0.4"},
+				{TagName: "v3.0.7"},
+				{TagName: "lts-v2.0.0"},
+			},
+			expectedTag: "lts-v2.0.0",
+		},
+		{
+			releases: []githubRelease{
+				{TagName: "lts-v1.0.4"},
+				{TagName: "v3.0.7"},
+				{TagName: "lts-v1.1.0"},
+			},
+			expectedTag: "lts-v1.1.0",
+		},
+		{
+			releases: []githubRelease{
+				{TagName: "lts-v1.0.4"},
 				{TagName: "v1.0.7"},
 				{TagName: "lts-v1.0.5"},
 			},
@@ -32,6 +48,14 @@ func TestLatestLTS(t *testing.T) {
 				{TagName: "lts-v1.0.4-patch1"},
 			},
 			expectedTag: "lts-v1.0.4.1", // -patch is invalid
+		},
+		{
+			releases: []githubRelease{
+				{TagName: "lts-abc"},
+				{TagName: "lts-def"},
+				{TagName: "lts-ghi"},
+			},
+			expectedTag: "", // invalid version strings
 		},
 	}
 	for i, test := range tests {
