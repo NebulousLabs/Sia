@@ -26,7 +26,7 @@ import (
 	"github.com/kardianos/osext"
 )
 
-var errEmptyUpdateResponse = errors.New("API call to https://api.github.com/repos/NebulousLabs/Sia/releases/latest is returning an empty response")
+var errEmptyUpdateResponse = errors.New("no LTS releases found")
 
 type (
 	// Server creates and serves a HTTP server that offers communication with a
