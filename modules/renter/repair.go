@@ -189,7 +189,10 @@ func (r *Renter) managedRepairIteration() {
 	// chunk to repair. The loop will create a chunk if as few as 4 pieces
 	// can be handed off to workers simultaneously.
 	startTime := time.Now()
-	activeWorkers := availableWorkers
+	activeWorkers := make(map[types.FileContractID]struct{})
+	for k, v := range availableWorkers {
+		activeWorkers[k] = v
+	}
 	var retiredWorkers []types.FileContractID
 	resultChan := make(chan finishedUpload)
 	for {
