@@ -1,4 +1,4 @@
-Sia 1.0.3
+Sia 1.0.4
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -128,6 +128,10 @@ on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+December 2016:
+
+v1.0.4 (LTS release)
 
 October 2016:
 
