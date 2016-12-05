@@ -27,7 +27,7 @@ type (
 		// as an ID when requesting data from the host.
 		dataRoot crypto.Hash
 
-		chunkIndex uint64
+		chunkDownload *chunkDownload
 
 		// resultChan is a channel that the worker will use to return the
 		// results of the download.
@@ -36,7 +36,7 @@ type (
 
 	// finishedDownload contains the data and error from performing a download.
 	finishedDownload struct {
-		chunkIndex uint64
+		chunkDownload *chunkDownload
 		data       []byte
 		err        error
 		workerID   types.FileContractID
@@ -87,31 +87,31 @@ type (
 		// failure in the past two hours.
 		recentUploadFailure time.Time
 
-		// consecutiveDownloadFailures records the number of download failures
-		// in a row that have been experienced by this worker. This number is
-		// used to determine whether the worker should be removed from the
-		// download pool or not.
-		consecutiveDownloadFailures int
-
 		// Utilities
 		renter *Renter
 	}
 )
 
 // download will perform some download work.
+//
+// TODO: If there is a failure, the worker should record the failure
+// internally.
 func (w *worker) download(dw downloadWork) {
 	d, err := w.renter.hostContractor.Downloader(w.contractID)
 	if err != nil {
-		dw.resultChan <- finishedDownload{dw.chunkIndex, nil, err, w.contractID}
+		dw.resultChan <- finishedDownload{dw.chunkDownload, nil, err, w.contractID}
 		return
 	}
 	defer d.Close()
 
 	data, err := d.Sector(dw.dataRoot)
-	dw.resultChan <- finishedDownload{dw.chunkIndex, data, err, w.contractID}
+	dw.resultChan <- finishedDownload{dw, data, err, w.contractID}
 }
 
 // upload will perform some upload work.
+//
+// TODO: The worker should be internally responsible for marking when the
+// upload has failed.
 func (w *worker) upload(uw uploadWork) {
 	e, err := w.renter.hostContractor.Editor(w.contractID)
 	if err != nil {
@@ -122,7 +122,7 @@ func (w *worker) upload(uw uploadWork) {
 
 	root, err := e.Upload(uw.data)
 	if err != nil {
-		select{
+		select {
 		case uw.resultChan <- finishedUpload{root, err, w.contractID}:
 		case <-w.renter.tg.StopChan():
 		}
@@ -150,7 +150,7 @@ func (w *worker) upload(uw uploadWork) {
 	w.renter.mu.Unlock(id)
 	uw.file.mu.Unlock()
 
-	select{
+	select {
 	case uw.resultChan <- finishedUpload{root, err, w.contractID}:
 	case <-w.renter.tg.StopChan():
 	}
@@ -195,8 +195,8 @@ func (w *worker) work() {
 	}
 }
 
-// workLoop repeatedly issues work to a worker, stopping when the thread group
-// is closed.
+// threadedWorkLoop repeatedly issues work to a worker, stopping when the
+// thread group is closed.
 func (w *worker) threadedWorkLoop() {
 	for {
 		// Check if the worker has been killed individually.

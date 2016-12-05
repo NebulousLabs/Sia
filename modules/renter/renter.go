@@ -82,13 +82,23 @@ type trackedFile struct {
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
 	// File management.
+	//
+	// tracking contains a list of files that the user intends to maintain. By
+	// default, files loaded through sharing are not maintained by the user.
 	newFiles chan *file
 	files    map[string]*file
 	tracking map[string]trackedFile // map from nickname to metadata
 
 	// Work management.
-	workerPool    map[types.FileContractID]*worker
+	//
+	// chunkQueue contains a list of incomplete work that the download loop
+	// acts upon.
+	//
+	// downloadQueue contains a complete history of work that has been
+	// submitted to the download loop.
+	chunkQueue    []*chunkDownload
 	downloadQueue []*download
+	workerPool    map[types.FileContractID]*worker
 
 	// Utilities.
 	cs             modules.ConsensusSet

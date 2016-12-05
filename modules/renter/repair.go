@@ -206,7 +206,7 @@ func (r *Renter) managedRepairIteration() {
 
 		// Determine the maximum number of gaps that any chunk has.
 		maxGaps := 0
-		for i, gaps  := range gapCounts {
+		for i, gaps := range gapCounts {
 			if i > maxGaps && gaps > 0 {
 				maxGaps = i
 			}
@@ -322,9 +322,9 @@ func (r *Renter) managedRepairIteration() {
 				}
 				worker := r.workerPool[usefulWorkers[i]]
 				select {
-					case worker.uploadChan <- uw:
-					case <-r.tg.StopChan():
-						return
+				case worker.uploadChan <- uw:
+				case <-r.tg.StopChan():
+					return
 				}
 
 				delete(availableWorkers, usefulWorkers[i])
@@ -378,7 +378,7 @@ func (r *Renter) managedRepairIteration() {
 
 			if finishedUpload.err != nil {
 				r.log.Debugln("Error while performing upload to", finishedUpload.workerID, "::", finishedUpload.err)
-				id := r.mu.RLock()
+				id := r.mu.Lock()
 				worker, exists := r.workerPool[finishedUpload.workerID]
 				if exists {
 					worker.recentUploadFailure = time.Now()

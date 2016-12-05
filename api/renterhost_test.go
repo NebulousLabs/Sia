@@ -77,7 +77,6 @@ func TestHostAndRent(t *testing.T) {
 	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
 	}
-	t.Skip("Seems like the file was uploaded successfully?")
 
 	// On a second connection, upload another file.
 	path2 := filepath.Join(st.dir, "test2.dat")
@@ -101,14 +100,15 @@ func TestHostAndRent(t *testing.T) {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
 	}
 
-	// Try downloading the second file.
+	// Try downloading the first file.
+	println("beginning download")
 	downpath := filepath.Join(st.dir, "testdown.dat")
-	err = st.stdGetAPI("/renter/download/test2?destination=" + downpath)
+	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Check that the download has the right contents.
-	orig, err := ioutil.ReadFile(path2)
+	orig, err := ioutil.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,6 +119,7 @@ func TestHostAndRent(t *testing.T) {
 	if bytes.Compare(orig, download) != 0 {
 		t.Fatal("data mismatch when downloading a file")
 	}
+	println("queue check")
 
 	// The renter's downloads queue should have 1 entry now.
 	var queue RenterDownloadQueue
@@ -128,6 +129,7 @@ func TestHostAndRent(t *testing.T) {
 	if len(queue.Downloads) != 1 {
 		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
 	}
+	t.Skip("So far so good")
 
 	// Mine blocks until the host recognizes profit. The host will wait for 12
 	// blocks after the storage window has closed to report the profit, a total
