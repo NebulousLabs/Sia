@@ -202,55 +202,20 @@ func (f *file) expiringContracts(height types.BlockHeight) []fileContract {
 	return expiring
 }
 
-// isOffline decides whether a host should be considered offline, based on its
-// scan metrics.
-func isOffline(host modules.HostDBEntry) bool {
-	// consider a host offline if:
-	// 1) The host has been scanned at least three times, and
-	// 2) The three most recent scans have all failed, and
-	// 3) The time between the most recent scan and the last successful scan
-	//    (or first scan) is at least uptimeWindow
-	numScans := len(host.ScanHistory)
-	if numScans < uptimeMinScans {
-		// not enough data to make a fair judgment
-		return false
-	}
-	// NOTE: ScanHistory is ordered from oldest-newest
-	recent := host.ScanHistory[numScans-uptimeMinScans:]
-	for _, scan := range recent {
-		if scan.Success {
-			// one of the scans succeeded
-			return false
-		}
-	}
-	// initialize window bounds
-	windowStart, windowEnd := host.ScanHistory[0].Timestamp, host.ScanHistory[numScans-1].Timestamp
-	// iterate from newest-oldest, seeking to last successful scan
-	for i := numScans - 1; i >= 0; i-- {
-		if scan := host.ScanHistory[i]; scan.Success {
-			windowStart = scan.Timestamp
-			break
-		}
-	}
-	return windowEnd.Sub(windowStart) >= uptimeWindow
-}
-
 // offlineChunks returns the chunks belonging to "offline" hosts -- hosts that
 // do not meet uptime requirements. Importantly, only chunks missing more than
 // half their redundancy are returned.
-func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
+func (f *file) offlineChunks(hc hostContractor) map[uint64][]uint64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
 	// mark all pieces belonging to offline hosts.
 	offline := make(map[uint64][]uint64)
 	for _, fc := range f.contracts {
-		host, ok := hdb.Host(fc.IP)
-		if !ok || !isOffline(host) {
-			continue
-		}
-		for _, p := range fc.Pieces {
-			offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
+		if hc.IsOffline(fc.IP) {
+			for _, p := range fc.Pieces {
+				offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
+			}
 		}
 	}
 	// filter out chunks missing less than half of their redundancy

@@ -24,9 +24,15 @@ var uptimeWindow = func() time.Duration {
 	panic("undefined uptimeWindow")
 }()
 
-// isOffline decides whether a host should be considered offline, based on its
-// scan metrics.
-func isOffline(host modules.HostDBEntry) bool {
+// IsOffline indicates whether a contract's host should be considered offline,
+// based on its scan metrics.
+func (c *Contractor) IsOffline(addr modules.NetAddress) bool {
+	// lookup the contract's host
+	host, ok := c.hdb.Host(addr)
+	if !ok {
+		return false
+	}
+
 	// consider a host offline if:
 	// 1) The host has been scanned at least three times, and
 	// 2) The three most recent scans have all failed, and
@@ -62,13 +68,7 @@ func isOffline(host modules.HostDBEntry) bool {
 func (c *Contractor) onlineContracts() []modules.RenterContract {
 	var cs []modules.RenterContract
 	for _, contract := range c.contracts {
-		host, ok := c.hdb.Host(contract.NetAddress)
-		if !ok {
-			c.log.Printf("WARN: missing host entry for %v", contract.NetAddress)
-			continue
-		}
-		// only returns contracts not marked as being offline
-		if !isOffline(host) {
+		if !c.IsOffline(contract.NetAddress) {
 			cs = append(cs, contract)
 		}
 	}

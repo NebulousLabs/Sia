@@ -154,29 +154,21 @@ func TestRepair(t *testing.T) {
 	*/
 }
 
-// offlineHostDB overrides an existing hostDB so that it always returns
-// isOffline == false for a specified address.
-type offlineHostDB struct {
-	stubHostDB
+// offlineContractor overrides an existing contractor so that it always
+// returns isOffline == false for a specified address, and true otherwise.
+type offlineContractor struct {
+	stubContractor
 	addr modules.NetAddress
 }
 
-func (hdb offlineHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
-	if addr == hdb.addr {
-		return modules.HostDBEntry{}, false
-	}
-	// fake three scans, all of which failed
-	badScan1 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow * 2), Success: false}
-	badScan2 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow), Success: false}
-	badScan3 := modules.HostDBScan{Timestamp: time.Now(), Success: false}
-	host := modules.HostDBEntry{ScanHistory: []modules.HostDBScan{badScan1, badScan2, badScan3}}
-	return host, true
+func (oc offlineContractor) IsOffline(addr modules.NetAddress) bool {
+	return addr != oc.addr
 }
 
 // TestOfflineChunks tests the offlineChunks method of the file type.
 func TestOfflineChunks(t *testing.T) {
-	// Create a mock hostdb that reports everyone as offline except "baz".
-	hdb := &offlineHostDB{addr: "baz"}
+	// Create a mock contractor that reports everyone as offline except "baz".
+	oc := &offlineContractor{addr: "baz"}
 	rsc, _ := NewRSCode(1, 1)
 	f := &file{
 		erasureCode: rsc,
@@ -192,7 +184,7 @@ func TestOfflineChunks(t *testing.T) {
 	expChunks := map[uint64][]uint64{
 		0: {0, 1},
 	}
-	chunks := f.offlineChunks(hdb)
+	chunks := f.offlineChunks(oc)
 	if !reflect.DeepEqual(chunks, expChunks) {
 		// pieces may have been in a different order
 		if !reflect.DeepEqual(chunks, map[uint64][]uint64{0: {1, 0}}) {

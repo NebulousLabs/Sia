@@ -63,6 +63,9 @@ type hostContractor interface {
 	// FinancialMetrics returns the financial metrics of the contractor.
 	FinancialMetrics() modules.RenterFinancialMetrics
 
+	// IsOffline reports whether the specified host is considered offline.
+	IsOffline(modules.NetAddress) bool
+
 	// Downloader creates a Downloader from the specified contract ID,
 	// allowing the retrieval of sectors.
 	Downloader(types.FileContractID) (contractor.Downloader, error)

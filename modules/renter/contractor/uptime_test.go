@@ -9,8 +9,8 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// offlineHostDB overrides an existing hostDB so that it always returns
-// isOffline == true for a specified address.
+// offlineHostDB overrides an existing hostDB so that it returns a modified
+// scan history for a specific host.
 type offlineHostDB struct {
 	hostDB
 	addr modules.NetAddress
@@ -101,7 +101,18 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	}
 }
 
-// TestIsOffline tests the isOffline helper function.
+// mapHostDB is a hostDB that implements the Host method via a simple map.
+type mapHostDB struct {
+	stubHostDB
+	hosts map[modules.NetAddress]modules.HostDBEntry
+}
+
+func (m mapHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
+	h, exists := m.hosts[addr]
+	return h, exists
+}
+
+// TestIsOffline tests the IsOffline method.
 func TestIsOffline(t *testing.T) {
 	now := time.Now()
 	oldBadScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow * 2), Success: false}
@@ -131,8 +142,15 @@ func TestIsOffline(t *testing.T) {
 		{[]modules.HostDBScan{oldBadScan, oldBadScan, oldBadScan, currentGoodScan}, false},
 	}
 	for i, test := range tests {
-		h := modules.HostDBEntry{ScanHistory: test.scans}
-		if offline := isOffline(h); offline != test.offline {
+		// construct a contractor with a hostdb containing the scans
+		c := &Contractor{
+			hdb: mapHostDB{
+				hosts: map[modules.NetAddress]modules.HostDBEntry{
+					"foo": {ScanHistory: test.scans},
+				},
+			},
+		}
+		if offline := c.IsOffline("foo"); offline != test.offline {
 			t.Errorf("IsOffline(%v) = %v, expected %v", i, offline, test.offline)
 		}
 	}
