@@ -1,6 +1,7 @@
 package contractor
 
 import (
+	"sort"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -33,6 +34,12 @@ func (c *Contractor) IsOffline(addr modules.NetAddress) bool {
 		return false
 	}
 
+	// NOTE: ScanHistory should always be ordered from oldest to newest.
+	if build.DEBUG && !sort.IsSorted(host.ScanHistory) {
+		sort.Sort(host.ScanHistory)
+		build.Critical("host's scan history was not sorted")
+	}
+
 	// consider a host offline if:
 	// 1) The host has been scanned at least three times, and
 	// 2) The three most recent scans have all failed, and
@@ -43,7 +50,6 @@ func (c *Contractor) IsOffline(addr modules.NetAddress) bool {
 		// not enough data to make a fair judgment
 		return false
 	}
-	// NOTE: ScanHistory is ordered from oldest-newest
 	recent := host.ScanHistory[numScans-uptimeMinScans:]
 	for _, scan := range recent {
 		if scan.Success {

@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"math/big"
 	"net"
+	"sort"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -132,6 +133,10 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 		Timestamp: time.Now(),
 		Success:   netErr == nil,
 	})
+	// Ensure the scans are sorted.
+	if !sort.IsSorted(entry.ScanHistory) {
+		sort.Sort(entry.ScanHistory)
+	}
 
 	// Add the host to allHosts.
 	priorHost, exists := hdb.allHosts[entry.NetAddress]
