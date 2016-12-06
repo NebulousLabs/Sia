@@ -24,49 +24,28 @@ var (
 	// new block every 'headerMemory / blockMemory' times it is
 	// called. This reduces the amount of memory used, but comes at the cost of
 	// not always having the most recent transactions.
-	HeaderMemory = func() int {
-		if build.Release == "dev" {
-			return 500
-		}
-		if build.Release == "standard" {
-			return 10000
-		}
-		if build.Release == "testing" {
-			return 50
-		}
-		panic("unrecognized build.Release")
-	}()
+	HeaderMemory = build.Select(build.Var{
+		Standard: 10000,
+		Dev:      500,
+		Testing:  50,
+	}).(int)
 
 	// BlockMemory is the maximum number of blocks the miner will store
 	// Blocks take up to 2 megabytes of memory, which is why this number is
 	// limited.
-	BlockMemory = func() int {
-		if build.Release == "dev" {
-			return 10
-		}
-		if build.Release == "standard" {
-			return 50
-		}
-		if build.Release == "testing" {
-			return 5
-		}
-		panic("unrecognized build.Release")
-	}()
+	BlockMemory = build.Select(build.Var{
+		Standard: 50,
+		Dev:      10,
+		Testing:  5,
+	}).(int)
 
 	// MaxSourceBlockAge is the maximum amount of time that is allowed to
 	// elapse between generating source blocks.
-	MaxSourceBlockAge = func() time.Duration {
-		if build.Release == "dev" {
-			return 5 * time.Second
-		}
-		if build.Release == "standard" {
-			return 30 * time.Second
-		}
-		if build.Release == "testing" {
-			return 1 * time.Second
-		}
-		panic("unrecognized build.Release")
-	}()
+	MaxSourceBlockAge = build.Select(build.Var{
+		Standard: 30 * time.Second,
+		Dev:      5 * time.Second,
+		Testing:  1 * time.Second,
+	}).(time.Duration)
 )
 
 // Miner struct contains all variables the miner needs
