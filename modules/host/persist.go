@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -16,16 +15,6 @@ import (
 
 // persistence is the data that is kept when the host is restarted.
 type persistence struct {
-	// RPC Metrics.
-	DownloadCalls       uint64 `json:"downloadcalls"`
-	ErroredCalls        uint64 `json:"erroredcalls"`
-	FormContractCalls   uint64 `json:"formcontractcalls"`
-	RenewCalls          uint64 `json:"renewcalls"`
-	ReviseCalls         uint64 `json:"revisecalls"`
-	RecentRevisionCalls uint64 `json:"recentrevisioncalls"`
-	SettingsCalls       uint64 `json:"settingscalls"`
-	UnrecognizedCalls   uint64 `json:"unrecognizedcalls"`
-
 	// Consensus Tracking.
 	BlockHeight  types.BlockHeight         `json:"blockheight"`
 	RecentChange modules.ConsensusChangeID `json:"recentchange"`
@@ -44,16 +33,6 @@ type persistence struct {
 // persistData returns the data in the Host that will be saved to disk.
 func (h *Host) persistData() persistence {
 	return persistence{
-		// RPC Metrics.
-		DownloadCalls:       atomic.LoadUint64(&h.atomicDownloadCalls),
-		ErroredCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
-		FormContractCalls:   atomic.LoadUint64(&h.atomicFormContractCalls),
-		RenewCalls:          atomic.LoadUint64(&h.atomicRenewCalls),
-		ReviseCalls:         atomic.LoadUint64(&h.atomicReviseCalls),
-		RecentRevisionCalls: atomic.LoadUint64(&h.atomicRecentRevisionCalls),
-		SettingsCalls:       atomic.LoadUint64(&h.atomicSettingsCalls),
-		UnrecognizedCalls:   atomic.LoadUint64(&h.atomicUnrecognizedCalls),
-
 		// Consensus Tracking.
 		BlockHeight:  h.blockHeight,
 		RecentChange: h.recentChange,
@@ -151,16 +130,6 @@ func (h *Host) load() error {
 	} else if err != nil {
 		return err
 	}
-
-	// Copy over rpc tracking.
-	atomic.StoreUint64(&h.atomicDownloadCalls, p.DownloadCalls)
-	atomic.StoreUint64(&h.atomicErroredCalls, p.ErroredCalls)
-	atomic.StoreUint64(&h.atomicFormContractCalls, p.FormContractCalls)
-	atomic.StoreUint64(&h.atomicRenewCalls, p.RenewCalls)
-	atomic.StoreUint64(&h.atomicReviseCalls, p.ReviseCalls)
-	atomic.StoreUint64(&h.atomicRecentRevisionCalls, p.RecentRevisionCalls)
-	atomic.StoreUint64(&h.atomicSettingsCalls, p.SettingsCalls)
-	atomic.StoreUint64(&h.atomicUnrecognizedCalls, p.UnrecognizedCalls)
 
 	// Copy over consensus tracking.
 	h.blockHeight = p.BlockHeight

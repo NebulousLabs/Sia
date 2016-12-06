@@ -311,7 +311,7 @@ func TestManagedLogError(t *testing.T) {
 		t.Fatal(err)
 	}
 	if logLines < baseLines+remaining/6 || logLines > baseLines+remaining {
-		t.Error("probabilistic logging is not logging with the correct probability:", baseLines, logLines, logsNeeded)
+		t.Error("probabilistic logging is not logging with the correct probability:", baseLines, logLines, logsNeeded, remaining)
 	}
 	// Log enough ErrorCommunication errors to bring it all the way to
 	// 'logFewLimit'.
@@ -323,6 +323,6 @@ func TestManagedLogError(t *testing.T) {
 		t.Fatal(err)
 	}
 	if logLines < baseLines+remaining || logLines > baseLines+logsNeeded*2 {
-		t.Error("probabilisitic logging is not clamping correctly:", baseLines, logLines, logsNeeded)
+		t.Error("probabilisitic logging is not clamping correctly:", baseLines, logLines, logsNeeded, remaining)
 	}
 }
