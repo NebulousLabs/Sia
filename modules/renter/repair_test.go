@@ -154,29 +154,21 @@ func TestRepair(t *testing.T) {
 	*/
 }
 
-// offlineHostDB is a mocked hostDB, used for testing the offlineChunks method
-// of the file type. It is implemented as a map from NetAddresses to booleans,
-// where the bool indicates whether the host is active.
-type offlineHostDB struct {
-	stubHostDB
-	hosts map[modules.NetAddress]bool
+// offlineContractor overrides an existing contractor so that it always
+// returns isOffline == false for a specified address, and true otherwise.
+type offlineContractor struct {
+	stubContractor
+	addr modules.NetAddress
 }
 
-// IsOffline is a stub implementation of the IsOffline method.
-func (hdb *offlineHostDB) IsOffline(addr modules.NetAddress) bool {
-	return !hdb.hosts[addr]
+func (oc offlineContractor) IsOffline(addr modules.NetAddress) bool {
+	return addr != oc.addr
 }
 
 // TestOfflineChunks tests the offlineChunks method of the file type.
 func TestOfflineChunks(t *testing.T) {
-	// Create a mock hostdb.
-	hdb := &offlineHostDB{
-		hosts: map[modules.NetAddress]bool{
-			"foo": false,
-			"bar": false,
-			"baz": true,
-		},
-	}
+	// Create a mock contractor that reports everyone as offline except "baz".
+	oc := &offlineContractor{addr: "baz"}
 	rsc, _ := NewRSCode(1, 1)
 	f := &file{
 		erasureCode: rsc,
@@ -192,7 +184,7 @@ func TestOfflineChunks(t *testing.T) {
 	expChunks := map[uint64][]uint64{
 		0: {0, 1},
 	}
-	chunks := f.offlineChunks(hdb)
+	chunks := f.offlineChunks(oc)
 	if !reflect.DeepEqual(chunks, expChunks) {
 		// pieces may have been in a different order
 		if !reflect.DeepEqual(chunks, map[uint64][]uint64{0: {1, 0}}) {

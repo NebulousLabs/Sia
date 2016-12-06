@@ -14,7 +14,6 @@ type hostEntry struct {
 	FirstSeen   types.BlockHeight
 	Weight      types.Currency
 	Reliability types.Currency
-	Online      bool
 }
 
 // insertHost adds a host entry to the state. The host will be inserted into
@@ -111,21 +110,4 @@ func (hdb *HostDB) AverageContractPrice() types.Currency {
 		totalPrice = totalPrice.Add(host.ContractPrice)
 	}
 	return totalPrice.Div64(uint64(len(hosts)))
-}
-
-// IsOffline reports whether a host is offline. If the HostDB has no record of
-// the host, IsOffline will return false.
-//
-// TODO: Is this behavior that makes sense?
-func (hdb *HostDB) IsOffline(addr modules.NetAddress) bool {
-	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
-
-	if _, ok := hdb.activeHosts[addr]; ok {
-		return false
-	}
-	if h, ok := hdb.allHosts[addr]; ok {
-		return !h.Online
-	}
-	return false
 }

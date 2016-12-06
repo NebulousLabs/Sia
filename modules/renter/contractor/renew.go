@@ -59,8 +59,11 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 func (c *Contractor) managedRenewContracts() error {
 	c.mu.RLock()
 	// Renew contracts when they enter the renew window.
+	// NOTE: offline contracts are not considered here, since we may have
+	// replaced them (and we probably won't be able to connect to their host
+	// anyway)
 	var renewSet []types.FileContractID
-	for _, contract := range c.contracts {
+	for _, contract := range c.onlineContracts() {
 		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
 			renewSet = append(renewSet, contract.ID)
 		}

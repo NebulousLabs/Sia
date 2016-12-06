@@ -183,6 +183,7 @@ func (stubContractor) Contract(modules.NetAddress) (modules.RenterContract, bool
 }
 func (stubContractor) Contracts() []modules.RenterContract                    { return nil }
 func (stubContractor) FinancialMetrics() (m modules.RenterFinancialMetrics)   { return }
+func (stubContractor) IsOffline(modules.NetAddress) bool                      { return false }
 func (stubContractor) Editor(types.FileContractID) (contractor.Editor, error) { return nil, nil }
 func (stubContractor) Downloader(types.FileContractID) (contractor.Downloader, error) {
 	return nil, nil

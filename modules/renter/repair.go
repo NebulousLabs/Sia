@@ -15,6 +15,10 @@ import (
 const (
 	// repairThreads is the number of repairs that can run concurrently.
 	repairThreads = 10
+
+	// uptimeMinScans is the minimum number of scans required to judge whether a
+	// host is offline or not.
+	uptimeMinScans = 3
 )
 
 // When a file contract is within 'renewThreshold' blocks of expiring, the renter
@@ -28,6 +32,19 @@ var renewThreshold = func() types.BlockHeight {
 	default:
 		return 144 * 7 * 3 // 3 weeks - to soon be 6 weeks.
 	}
+}()
+
+// uptimeWindow specifies the duration in which host uptime is checked.
+var uptimeWindow = func() time.Duration {
+	switch build.Release {
+	case "dev":
+		return 30 * time.Minute
+	case "standard":
+		return 7 * 24 * time.Hour // 1 week
+	case "testing":
+		return 15 * time.Second
+	}
+	panic("undefined uptimeWindow")
 }()
 
 // hostErr and hostErrs are helpers for reporting repair errors. The actual
@@ -188,14 +205,14 @@ func (f *file) expiringContracts(height types.BlockHeight) []fileContract {
 // offlineChunks returns the chunks belonging to "offline" hosts -- hosts that
 // do not meet uptime requirements. Importantly, only chunks missing more than
 // half their redundancy are returned.
-func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
+func (f *file) offlineChunks(hc hostContractor) map[uint64][]uint64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
 	// mark all pieces belonging to offline hosts.
 	offline := make(map[uint64][]uint64)
 	for _, fc := range f.contracts {
-		if hdb.IsOffline(fc.IP) {
+		if hc.IsOffline(fc.IP) {
 			for _, p := range fc.Pieces {
 				offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
 			}

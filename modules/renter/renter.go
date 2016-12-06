@@ -34,8 +34,8 @@ type hostDB interface {
 	// Close closes the hostdb.
 	Close() error
 
-	// IsOffline reports whether a host is consider offline.
-	IsOffline(modules.NetAddress) bool
+	// Host returns the HostDBEntry for a given host.
+	Host(modules.NetAddress) (modules.HostDBEntry, bool)
 }
 
 // A hostContractor negotiates, revises, renews, and provides access to file
@@ -62,6 +62,9 @@ type hostContractor interface {
 
 	// FinancialMetrics returns the financial metrics of the contractor.
 	FinancialMetrics() modules.RenterFinancialMetrics
+
+	// IsOffline reports whether the specified host is considered offline.
+	IsOffline(modules.NetAddress) bool
 
 	// Downloader creates a Downloader from the specified contract ID,
 	// allowing the retrieval of sectors.

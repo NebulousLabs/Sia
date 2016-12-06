@@ -37,6 +37,10 @@ func (uc *uploadDownloadContractor) Editor(types.FileContractID) (contractor.Edi
 	return uc, nil
 }
 
+func (uc *uploadDownloadContractor) IsOffline(modules.NetAddress) bool {
+	return false
+}
+
 // Downloader simply returns the uploadDownloadContractor, since it also
 // implements the Downloader interface.
 func (uc *uploadDownloadContractor) Downloader(types.FileContractID) (contractor.Downloader, error) {
