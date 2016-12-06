@@ -28,6 +28,14 @@ var uptimeWindow = func() time.Duration {
 // IsOffline indicates whether a contract's host should be considered offline,
 // based on its scan metrics.
 func (c *Contractor) IsOffline(addr modules.NetAddress) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.isOffline(addr)
+}
+
+// isOffline indicates whether a contract's host should be considered offline,
+// based on its scan metrics.
+func (c *Contractor) isOffline(addr modules.NetAddress) bool {
 	// lookup the contract's host
 	host, ok := c.hdb.Host(addr)
 	if !ok {
@@ -69,12 +77,12 @@ func (c *Contractor) IsOffline(addr modules.NetAddress) bool {
 	return windowEnd.Sub(windowStart) >= uptimeWindow
 }
 
-// threadedMonitorUptime regularly checks host uptime, and deletes contracts
-// whose hosts fall below a minimum uptime threshold.
+// onlineContracts returns the subset of the Contractor's contracts whose
+// hosts are considered online.
 func (c *Contractor) onlineContracts() []modules.RenterContract {
 	var cs []modules.RenterContract
 	for _, contract := range c.contracts {
-		if !c.IsOffline(contract.NetAddress) {
+		if !c.isOffline(contract.NetAddress) {
 			cs = append(cs, contract)
 		}
 	}
