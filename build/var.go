@@ -9,6 +9,8 @@ type Var struct {
 	Standard interface{}
 	Dev      interface{}
 	Testing  interface{}
+	// prevent unkeyed literals
+	_ struct{}
 }
 
 // Select returns the field of v that corresponds to the current Release.
