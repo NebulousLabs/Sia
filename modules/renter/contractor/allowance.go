@@ -59,11 +59,16 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return errAllowanceWindowSize
 	}
 
-	// check that allowance is sufficient to store at least one sector
-	numSectors, err := maxSectors(a, c.hdb, c.tpool)
+	// calculate the maximum sectors this allowance can store
+	max, err := maxSectors(a, c.hdb, c.tpool)
 	if err != nil {
 		return err
-	} else if numSectors == 0 {
+	}
+	// Only allocate half as many sectors as the max. This leaves some leeway
+	// for replacing contracts, transaction fees, etc.
+	numSectors := max / 2
+	// check that this is sufficient to store at least one sector
+	if numSectors == 0 {
 		return ErrInsufficientAllowance
 	}
 
