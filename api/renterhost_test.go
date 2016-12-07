@@ -101,7 +101,6 @@ func TestHostAndRent(t *testing.T) {
 	}
 
 	// Try downloading the first file.
-	println("beginning download")
 	downpath := filepath.Join(st.dir, "testdown.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
 	if err != nil {
@@ -119,7 +118,6 @@ func TestHostAndRent(t *testing.T) {
 	if bytes.Compare(orig, download) != 0 {
 		t.Fatal("data mismatch when downloading a file")
 	}
-	println("queue check")
 
 	// The renter's downloads queue should have 1 entry now.
 	var queue RenterDownloadQueue
@@ -129,11 +127,38 @@ func TestHostAndRent(t *testing.T) {
 	if len(queue.Downloads) != 1 {
 		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
 	}
-	t.Skip("So far so good")
+
+	// Try downloading the second file.
+	downpath2 := filepath.Join(st.dir, "testdown2.dat")
+	err = st.stdGetAPI("/renter/download/test2?destination=" + downpath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the download has the right contents.
+	orig2, err := ioutil.ReadFile(path2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	download2, err := ioutil.ReadFile(downpath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(orig2, download2) != 0 {
+		t.Fatal("data mismatch when downloading a file")
+	}
+
+	// The renter's downloads queue should have 2 entries now.
+	if err = st.getAPI("/renter/downloads", &queue); err != nil {
+		t.Fatal(err)
+	}
+	if len(queue.Downloads) != 2 {
+		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
+	}
 
 	// Mine blocks until the host recognizes profit. The host will wait for 12
 	// blocks after the storage window has closed to report the profit, a total
 	// of 40 blocks should be mined.
+	t.Skip("TODO: NEED TO GET THE CONTRACT STUFF WORKING AGAIN????")
 	for i := 0; i < 40; i++ {
 		st.miner.AddBlock()
 	}

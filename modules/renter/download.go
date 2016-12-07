@@ -121,13 +121,13 @@ func newDownload(f *file, destination string) *download {
 	}
 
 	// Assemble the piece set for the download.
-	pieceSet := make([]map[types.FileContractID]pieceData, f.numChunks())
-	for i := range pieceSet {
-		pieceSet[i] = make(map[types.FileContractID]pieceData)
+	d.pieceSet = make([]map[types.FileContractID]pieceData, f.numChunks())
+	for i := range d.pieceSet {
+		d.pieceSet[i] = make(map[types.FileContractID]pieceData)
 	}
 	for _, contract := range f.contracts {
-		for _, piece := range contract.Pieces {
-			pieceSet[piece.Chunk][contract.ID] = piece
+		for i := range contract.Pieces {
+			d.pieceSet[contract.Pieces[i].Chunk][contract.ID] = contract.Pieces[i]
 		}
 	}
 
@@ -192,7 +192,7 @@ func (cd *chunkDownload) recoverChunk() error {
 	}
 
 	// Open a file handle for the download.
-	fileDest, err := os.OpenFile(cd.download.destination, os.O_CREATE|os.O_RDWR|os.O_TRUNC, defaultFilePerm)
+	fileDest, err := os.OpenFile(cd.download.destination, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
 	if err != nil {
 		return build.ExtendErr("unable to open download destination", err)
 	}
@@ -290,14 +290,30 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 		}
 	}
 
-	// TODO: Update the set of workers to optimally choose workers based on
-	// price, reliability, local bandwidth speeds, etc.
+	// Update the set of workers to include everyone in the worker pool.
+	id = r.mu.Lock()
+	err := r.updateWorkerPool()
+	if err != nil {
+		r.log.Println("Error returned when updating the worker pool")
+	}
+	ds.availableWorkers = make([]*worker, 0, len(r.workerPool))
+	for _, worker := range r.workerPool {
+		_, exists := ds.activeWorkers[worker.contractID]
+		if !exists {
+			ds.availableWorkers = append(ds.availableWorkers, worker)
+		}
+	}
+	r.mu.Unlock(id)
 
-	// Check for incomplete chunks, and assign workers to them where possible.
-	r.managedScheduleIncompleteChunks(ds)
+	// TODO: Prune workers that do not provide value. In bandwidth can be
+	// saturated with fewer workers, then the more expensive ones should be
+	// eliminated. Unreliable ones should be eliminated. Etc.
 
 	// Add new chunks to the extent that resources allow.
 	r.managedScheduleNewChunks(ds)
+
+	// Check for incomplete chunks, and assign workers to them where possible.
+	r.managedScheduleIncompleteChunks(ds)
 
 	// Wait for workers to return after downloading pieces.
 	r.managedWaitOnWork(ds)
@@ -341,12 +357,13 @@ ICL:
 
 			dw := downloadWork{
 				dataRoot: incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID].MerkleRoot,
+				pieceIndex: incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID].Piece,
 				chunkDownload: incompleteChunk,
 				resultChan: ds.resultChan,
 			}
 			incompleteChunk.workerAttempts[worker.contractID] = true
 			worker.downloadChan <- dw
-			ds.availableWorkers = append(ds.availableWorkers[:i], ds.availableWorkers[i:]...)
+			ds.availableWorkers = append(ds.availableWorkers[:i], ds.availableWorkers[i+1:]...)
 			ds.activeWorkers[worker.contractID] = struct{}{}
 			continue ICL
 		}
@@ -437,6 +454,11 @@ func (r *Renter) managedScheduleNewChunks(ds *downloadState) {
 // managedWaitOnWork will wait for workers to return after attempting to
 // download a piece.
 func (r *Renter) managedWaitOnWork(ds *downloadState) {
+	// If there are no workers performing work, return early.
+	if len(ds.activeWorkers) == 0 {
+		return
+	}
+
 	// Wait for a piece to return.
 	finishedDownload := <-ds.resultChan
 	workerID := finishedDownload.workerID
@@ -455,10 +477,10 @@ func (r *Renter) managedWaitOnWork(ds *downloadState) {
 		ds.incompleteChunks = append(ds.incompleteChunks, finishedDownload.chunkDownload)
 		return
 	}
-	cd := finishedDownload.chunkDownload
 
 	// Add this returned piece to the appropriate chunk.
-	cd.completedPieces[cd.index] = finishedDownload.data
+	cd := finishedDownload.chunkDownload
+	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
 
 	// Recover the chunk and save to disk.
 	if len(cd.completedPieces) == cd.download.erasureCode.MinPieces() {

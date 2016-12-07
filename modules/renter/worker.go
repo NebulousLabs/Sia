@@ -26,6 +26,7 @@ type (
 		// dataRoot is the MerkleRoot of the data being requested, which serves
 		// as an ID when requesting data from the host.
 		dataRoot crypto.Hash
+		pieceIndex uint64
 
 		chunkDownload *chunkDownload
 
@@ -39,6 +40,7 @@ type (
 		chunkDownload *chunkDownload
 		data       []byte
 		err        error
+		pieceIndex uint64
 		workerID   types.FileContractID
 	}
 
@@ -99,13 +101,13 @@ type (
 func (w *worker) download(dw downloadWork) {
 	d, err := w.renter.hostContractor.Downloader(w.contractID)
 	if err != nil {
-		dw.resultChan <- finishedDownload{dw.chunkDownload, nil, err, w.contractID}
+		dw.resultChan <- finishedDownload{dw.chunkDownload, nil, err, dw.pieceIndex, w.contractID}
 		return
 	}
 	defer d.Close()
 
 	data, err := d.Sector(dw.dataRoot)
-	dw.resultChan <- finishedDownload{dw.chunkDownload, data, err, w.contractID}
+	dw.resultChan <- finishedDownload{dw.chunkDownload, data, err, dw.pieceIndex, w.contractID}
 }
 
 // upload will perform some upload work.

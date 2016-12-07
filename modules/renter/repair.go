@@ -313,7 +313,7 @@ func (r *Renter) managedRepairIteration() {
 			var i int
 			for i = 0; i < len(usefulWorkers) && i < len(chunkGaps.pieces); i++ {
 				uw := uploadWork{
-					chunkIndex: chunkGaps.pieces[i],
+					chunkIndex: chunkIndex,
 					data:       pieces[chunkGaps.pieces[i]],
 					file:       file,
 					pieceIndex: chunkGaps.pieces[i],
