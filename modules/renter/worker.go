@@ -105,7 +105,7 @@ func (w *worker) download(dw downloadWork) {
 	defer d.Close()
 
 	data, err := d.Sector(dw.dataRoot)
-	dw.resultChan <- finishedDownload{dw, data, err, w.contractID}
+	dw.resultChan <- finishedDownload{dw.chunkDownload, data, err, w.contractID}
 }
 
 // upload will perform some upload work.

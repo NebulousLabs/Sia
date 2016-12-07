@@ -85,8 +85,8 @@ type Renter struct {
 	//
 	// tracking contains a list of files that the user intends to maintain. By
 	// default, files loaded through sharing are not maintained by the user.
-	newFiles chan *file
 	files    map[string]*file
+	newFiles chan *file
 	tracking map[string]trackedFile // map from nickname to metadata
 
 	// Work management.
@@ -98,6 +98,7 @@ type Renter struct {
 	// submitted to the download loop.
 	chunkQueue    []*chunkDownload
 	downloadQueue []*download
+	newDownloads  chan *download
 	workerPool    map[types.FileContractID]*worker
 
 	// Utilities.
@@ -145,6 +146,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		files:    make(map[string]*file),
 		tracking: make(map[string]trackedFile),
 
+		newDownloads: make(chan *download),
 		workerPool: make(map[types.FileContractID]*worker),
 
 		cs:             cs,
