@@ -97,7 +97,6 @@ func (n *node) recursiveInsert(entry *HostEntry) (nodesAdded int, newnode *node)
 		n.entry = entry
 		n.taken = true
 		n.weight = entry.Weight
-		nodesAdded = 0
 		newnode = n
 		return
 	}
@@ -251,7 +250,10 @@ func (ht *HostTree) Fetch(n int, ignore []types.SiaPublicKey) ([]modules.HostDBE
 	}
 
 	for _, entry := range removedEntries {
-		ht.Insert(entry)
+		err := ht.Insert(entry)
+		if err != nil {
+			return hosts, err
+		}
 	}
 
 	return hosts, nil
