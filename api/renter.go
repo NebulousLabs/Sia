@@ -83,9 +83,10 @@ type (
 
 // renterHandlerGET handles the API call to /renter.
 func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	renterMetrics, _ := api.renter.Metrics()
 	WriteJSON(w, RenterGET{
 		Settings:         api.renter.Settings(),
-		FinancialMetrics: api.renter.FinancialMetrics(),
+		FinancialMetrics: renterMetrics,
 	})
 }
 

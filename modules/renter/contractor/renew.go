@@ -51,6 +51,13 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 		return modules.RenterContract{}, err
 	}
 
+	// add metrics entry for contract
+	txn, _ := txnBuilder.View()
+	metrics := initialContractMetrics(newContract, host, txn)
+	c.mu.Lock()
+	c.contractMetrics[newContract.ID] = metrics
+	c.mu.Unlock()
+
 	return newContract, nil
 }
 

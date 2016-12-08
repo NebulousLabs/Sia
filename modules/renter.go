@@ -94,6 +94,32 @@ type RenterFinancialMetrics struct {
 	UploadSpending   types.Currency `json:"uploadspending"`
 }
 
+// RenterContractMetrics contains metrics relevant to a single file contract.
+type RenterContractMetrics struct {
+	// The ID of the associated contract.
+	ID types.FileContractID
+
+	// The total amount of money that the Renter spent to create the contract
+	// and submit it to the blockchain.
+	TotalCost types.Currency `json:"totalcost"`
+
+	// The transaction fee on the transaction that contained the contract.
+	TxnFee types.Currency `json:"txnfee"`
+	// The flat fee required by the host for forming a contract.
+	ContractFee types.Currency `json:"contractfee"`
+	// The tax paid out to siafund holders.
+	SiafundFee types.Currency `json:"siafundfee"`
+
+	DownloadSpending types.Currency `json:"downloadspending"`
+	StorageSpending  types.Currency `json:"storagespending"`
+	UploadSpending   types.Currency `json:"uploadspending"`
+
+	// TotalCost minus all the preceeding fields; in other words, the amount
+	// of money that the Renter can still spend on storage, downloads, and
+	// uploads. Note that this is the same as RenterContract.RenterFunds.
+	Unspent types.Currency `json:"unspent"`
+}
+
 // A HostDBEntry represents one host entry in the Renter's host DB. It
 // aggregates the host's external settings and metrics with its public key.
 type HostDBEntry struct {
@@ -169,9 +195,6 @@ type Renter interface {
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
 
-	// FinancialMetrics returns the financial metrics of the Renter.
-	FinancialMetrics() RenterFinancialMetrics
-
 	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
 	// contain multiple files. The paths of the added files are returned.
 	LoadSharedFiles(source string) ([]string, error)
@@ -179,6 +202,9 @@ type Renter interface {
 	// LoadSharedFilesAscii loads an ASCII-encoded '.sia' file into the
 	// renter.
 	LoadSharedFilesAscii(asciiSia string) ([]string, error)
+
+	// Metrics returns the metrics of the Renter.
+	Metrics() (RenterFinancialMetrics, []RenterContractMetrics)
 
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error
