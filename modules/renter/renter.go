@@ -150,7 +150,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		tracking: make(map[string]trackedFile),
 
 		newDownloads: make(chan *download),
-		workerPool: make(map[types.FileContractID]*worker),
+		workerPool:   make(map[types.FileContractID]*worker),
 
 		cs:             cs,
 		hostDB:         hdb,

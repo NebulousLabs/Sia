@@ -25,7 +25,7 @@ type (
 	downloadWork struct {
 		// dataRoot is the MerkleRoot of the data being requested, which serves
 		// as an ID when requesting data from the host.
-		dataRoot crypto.Hash
+		dataRoot   crypto.Hash
 		pieceIndex uint64
 
 		chunkDownload *chunkDownload
@@ -38,10 +38,10 @@ type (
 	// finishedDownload contains the data and error from performing a download.
 	finishedDownload struct {
 		chunkDownload *chunkDownload
-		data       []byte
-		err        error
-		pieceIndex uint64
-		workerID   types.FileContractID
+		data          []byte
+		err           error
+		pieceIndex    uint64
+		workerID      types.FileContractID
 	}
 
 	// finishedUpload contains the Merkle root and error from performing an

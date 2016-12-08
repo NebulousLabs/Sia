@@ -1,11 +1,5 @@
 package renter
 
-// TODO: Need to replace all of the magic numbers with constants.
-
-// TODO: The host gracefully handles losing pieces, but I'm not sure that the
-// renter gracefully handles hosts that are only missing a fraction of the
-// pieces.
-
 import (
 	"io"
 	"os"
@@ -18,13 +12,9 @@ type (
 	// chunkGaps points to all of the missing pieces in a chunk, as well as all
 	// of the hosts that are missing. The 'numGaps' value is the minimum of
 	// len(contracts) and len(pieces).
-	//
-	// TODO: Replace 'numGaps' with a method that computes the number of gaps
-	// in real time.
 	chunkGaps struct {
 		contracts []types.FileContractID
 		pieces    []uint64
-		numGaps   int
 	}
 
 	// chunkID can be used to uniquely identify a chunk within the repair
@@ -35,6 +25,8 @@ type (
 	}
 )
 
+// addFileToRepairMatrix will take a file and add each of the incomplete chunks
+// to the repair matrix.
 func addFileToRepairMatrix(file *file, availableWorkers map[types.FileContractID]struct{}, repairMatrix map[chunkID]*chunkGaps, gapCounts map[int]int) {
 	// Flatten availableWorkers into a list of contracts.
 	contracts := make([]types.FileContractID, 0)
@@ -45,17 +37,25 @@ func addFileToRepairMatrix(file *file, availableWorkers map[types.FileContractID
 	// For each chunk, create a map from the chunk to the pieces that it
 	// has, and to the contracts that have that chunk.
 	chunkCount := file.numChunks()
-	contractMap := make(map[uint64][]types.FileContractID)
-	pieceMap := make(map[uint64][]uint64)
+	completedPieces := make(map[uint64][]uint64)
+	utilizedContracts := make(map[uint64][]types.FileContractID)
 	for i := uint64(0); i < chunkCount; i++ {
-		contractMap[i] = make([]types.FileContractID, 0)
-		pieceMap[i] = make([]uint64, 0)
+		completedPieces[i] = make([]uint64, 0)
+		utilizedContracts[i] = make([]types.FileContractID, 0)
 	}
 
 	// Iterate through each contract and figure out what's available.
 	for _, contract := range file.contracts {
+		// Grab the contract from the contractor and see if the corresponding
+		// host is online.
 		for _, piece := range contract.Pieces {
-			contractMap[piece.Chunk] = append(contractMap[piece.Chunk], contract.ID)
+			utilizedContracts[piece.Chunk] = append(utilizedContracts[piece.Chunk], contract.ID)
+
+			// Only mark the piece as available if the piece can be recovered.
+			//
+			// TODO: Add an 'unavailable' flag to the piece that gets set to
+			// true if the host loses the piece, and only add the piece to the
+			// 'completedPieces' set if !unavailable.
 			pieceMap[piece.Chunk] = append(pieceMap[piece.Chunk], piece.Piece)
 		}
 	}
@@ -92,23 +92,23 @@ func addFileToRepairMatrix(file *file, availableWorkers map[types.FileContractID
 				gaps.contracts = append(gaps.contracts, fcid)
 			}
 
-			// Figure out the largest number of workers that could be
-			// repairing this piece simultaneously.
-			if len(potentialPieceGaps) < len(potentialContractGaps) {
-				gaps.numGaps = len(potentialPieceGaps)
-			} else {
-				gaps.numGaps = len(potentialContractGaps)
-			}
-
 			// Record the number of gaps that this chunk has, which makes
 			// blocking-related decisions easier.
-			gapCounts[gaps.numGaps]++
+			gapCounts[gaps.numGaps()]++
 
 			// Add the chunk to the repair matrix.
 			cid := chunkID{i, file.name}
 			repairMatrix[cid] = &gaps
 		}
 	}
+}
+
+// numGaps returns the number of gaps that a chunk has.
+func (cg *chunkGaps) numGaps() int {
+	if len(cg.contracts) <= len(cg.pieces) {
+		return len(cg.contracts)
+	}
+	return len(cg.pieces)
 }
 
 func (r *Renter) createRepairMatrix(availableWorkers map[types.FileContractID]struct{}) (map[chunkID]*chunkGaps, map[int]int) {
@@ -233,11 +233,11 @@ func (r *Renter) managedRepairIteration() {
 				}
 				// Update the gap counts if they have been affected in any
 				// way.
-				if len(chunkGaps.contracts) < len(chunkGaps.pieces) && len(chunkGaps.contracts) < chunkGaps.numGaps {
-					oldNumGaps := chunkGaps.numGaps
+				if len(chunkGaps.contracts) < len(chunkGaps.pieces) && len(chunkGaps.contracts) < chunkGaps.numGaps() {
+					oldNumGaps := chunkGaps.numGaps()
 					chunkGaps.numGaps = len(chunkGaps.contracts)
 					gapCounts[oldNumGaps]--
-					gapCounts[chunkGaps.numGaps]++
+					gapCounts[chunkGaps.numGaps()]++
 				}
 				continue
 			}

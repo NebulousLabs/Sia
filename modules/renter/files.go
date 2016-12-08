@@ -46,6 +46,9 @@ type fileContract struct {
 
 // pieceData contains the metadata necessary to request a piece from a
 // fetcher.
+//
+// TODO: Add an 'Unavailable' flag that can be set if the host loses the piece.
+// Some TODOs exist in 'repair.go' related to this field.
 type pieceData struct {
 	Chunk      uint64      // which chunk the piece belongs to
 	Piece      uint64      // the index of the piece in the chunk

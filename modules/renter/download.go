@@ -20,7 +20,7 @@ import (
 // modules.SectorSize of RAM. Parallelism for downloads is improved when this
 // number is increased.
 const (
-	defaultFilePerm = 0666
+	defaultFilePerm         = 0666
 	maxActiveDownloadPieces = 25
 	maxDownloadLoopIdleTime = time.Minute * 10
 )
@@ -95,7 +95,7 @@ type (
 		// resultChan is the channel that is used to receive completed worker
 		// downloads.
 		activePieces     int
-		activeWorkers   map[types.FileContractID]struct{}
+		activeWorkers    map[types.FileContractID]struct{}
 		availableWorkers []*worker
 		incompleteChunks []*chunkDownload
 		resultChan       chan finishedDownload
@@ -107,7 +107,7 @@ func newDownload(f *file, destination string) *download {
 	d := &download{
 		finishedChunks: make([]bool, f.numChunks()),
 
-		startTime:   time.Now(),
+		startTime: time.Now(),
 
 		chunkSize:   f.chunkSize(),
 		destination: destination,
@@ -356,10 +356,10 @@ ICL:
 			}
 
 			dw := downloadWork{
-				dataRoot: incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID].MerkleRoot,
-				pieceIndex: incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID].Piece,
+				dataRoot:      incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID].MerkleRoot,
+				pieceIndex:    incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID].Piece,
 				chunkDownload: incompleteChunk,
-				resultChan: ds.resultChan,
+				resultChan:    ds.resultChan,
 			}
 			incompleteChunk.workerAttempts[worker.contractID] = true
 			worker.downloadChan <- dw
@@ -422,7 +422,7 @@ func (r *Renter) managedScheduleNewChunks(ds *downloadState) {
 		r.mu.RUnlock(id)
 
 		// Check whether there are enough resources to perform the download.
-		if ds.activePieces + nextChunk.download.erasureCode.MinPieces() > maxActiveDownloadPieces {
+		if ds.activePieces+nextChunk.download.erasureCode.MinPieces() > maxActiveDownloadPieces {
 			// There is a limited amount of RAM available, and scheduling the
 			// next piece would consume too much RAM.
 			return
@@ -507,7 +507,7 @@ func (r *Renter) threadedDownloadLoop() {
 	r.mu.RUnlock(id)
 
 	// Create the download state.
-	ds := &downloadState {
+	ds := &downloadState{
 		activeWorkers:    make(map[types.FileContractID]struct{}),
 		availableWorkers: availableWorkers,
 		incompleteChunks: make([]*chunkDownload, 0),
@@ -538,7 +538,7 @@ func (r *Renter) Download(path, destination string) error {
 	lockID = r.mu.Lock()
 	r.downloadQueue = append(r.downloadQueue, d)
 	r.mu.Unlock(lockID)
-	r.newDownloads <-d
+	r.newDownloads <- d
 
 	// Block until the download has completed.
 	//
