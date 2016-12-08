@@ -31,78 +31,43 @@ const (
 var (
 	// healthyNodeListLen defines the number of nodes that the gateway must
 	// have in the node list before it will stop asking peers for more nodes.
-	healthyNodeListLen = func() int {
-		switch build.Release {
-		case "dev":
-			return 30
-		case "standard":
-			return 200
-		case "testing":
-			return 15
-		default:
-			panic("unrecognized build.Release in healthyNodeListLen")
-		}
-	}()
+	healthyNodeListLen = build.Select(build.Var{
+		Standard: 200,
+		Dev:      30,
+		Testing:  15,
+	}).(int)
 
 	// maxSharedNodes defines the number of nodes that will be shared between
 	// peers when they are expanding their node lists.
-	maxSharedNodes = func() uint64 {
-		switch build.Release {
-		case "dev":
-			return 5
-		case "standard":
-			return 10
-		case "testing":
-			return 3
-		default:
-			panic("unrecognized build.Release in healthyNodeListLen")
-		}
-	}()
+	maxSharedNodes = build.Select(build.Var{
+		Standard: uint64(10),
+		Dev:      uint64(5),
+		Testing:  uint64(3),
+	}).(uint64)
 
 	// nodePurgeDelay defines the amount of time that is waited between each
 	// iteration of the node purge loop.
-	nodePurgeDelay = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 20 * time.Second
-		case "standard":
-			return 10 * time.Minute
-		case "testing":
-			return 500 * time.Millisecond
-		default:
-			panic("unrecognized build.Release in nodePurgeDelay")
-		}
-	}()
+	nodePurgeDelay = build.Select(build.Var{
+		Standard: 10 * time.Minute,
+		Dev:      20 * time.Second,
+		Testing:  500 * time.Millisecond,
+	}).(time.Duration)
 
 	// nodeListDelay defines the amount of time that is waited between each
 	// iteration of the node list loop.
-	nodeListDelay = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 3 * time.Second
-		case "standard":
-			return 5 * time.Second
-		case "testing":
-			return 500 * time.Millisecond
-		default:
-			panic("unrecognized build.Release in nodePurgeDelay")
-		}
-	}()
+	nodeListDelay = build.Select(build.Var{
+		Standard: 5 * time.Second,
+		Dev:      3 * time.Second,
+		Testing:  500 * time.Millisecond,
+	}).(time.Duration)
 
 	// pruneNodeListLen defines the number of nodes that the gateway must have
 	// to be pruning nodes from the node list.
-	pruneNodeListLen = func() int {
-		switch build.Release {
-		case "dev":
-			return 15
-		case "standard":
-			return 50
-		case "testing":
-			return 10
-		default:
-			panic("unrecognized build.Release in pruneNodeListLen")
-		}
-	}()
+	pruneNodeListLen = build.Select(build.Var{
+		Standard: 50,
+		Dev:      15,
+		Testing:  10,
+	}).(int)
 )
 
 var (
@@ -114,80 +79,45 @@ var (
 	// needs to completely dominate the nodelist and the peerlist to be
 	// successful, so just a few honest nodes from requests to the bootstraps
 	// should be enough to fend from most attacks.
-	acceptInterval = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 3 * time.Second
-		case "standard":
-			return 6 * time.Second
-		case "testing":
-			return 100 * time.Millisecond
-		default:
-			panic("unrecognized build.Release in acceptInterval")
-		}
-	}()
+	acceptInterval = build.Select(build.Var{
+		Standard: 6 * time.Second,
+		Dev:      3 * time.Second,
+		Testing:  100 * time.Millisecond,
+	}).(time.Duration)
 
 	// acquiringPeersDelay defines the amount of time that is waited between
 	// iterations of the peer acquisition loop if the gateway is actively
 	// forming new connections with peers.
-	acquiringPeersDelay = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 3 * time.Second
-		case "standard":
-			return 5 * time.Second
-		case "testing":
-			return 500 * time.Millisecond
-		default:
-			panic("unrecognized build.Release in wellConnectedDelay")
-		}
-	}()
+	acquiringPeersDelay = build.Select(build.Var{
+		Standard: 5 * time.Second,
+		Dev:      3 * time.Second,
+		Testing:  500 * time.Millisecond,
+	}).(time.Duration)
 
 	// fullyConnectedThreshold defines the number of peers that the gateway can
 	// have before it stops accepting inbound connections.
-	fullyConnectedThreshold = func() int {
-		switch build.Release {
-		case "dev":
-			return 20
-		case "standard":
-			return 128
-		case "testing":
-			return 10
-		default:
-			panic("unrecognized build.Release in fullyConnectedThreshold")
-		}
-	}()
+	fullyConnectedThreshold = build.Select(build.Var{
+		Standard: 128,
+		Dev:      20,
+		Testing:  10,
+	}).(int)
 
 	// maxConcurrentOutboundPeerRequests defines the maximum number of peer
 	// connections that the gateway will try to form concurrently.
-	maxConcurrentOutboundPeerRequests = func() int {
-		switch build.Release {
-		case "dev":
-			return 2
-		case "standard":
-			return 3
-		case "testing":
-			return 2
-		default:
-			panic("unrecognized build.Release in maxConcurrentOutboundPeerRequests")
-		}
-	}()
+	maxConcurrentOutboundPeerRequests = build.Select(build.Var{
+		Standard: 3,
+		Dev:      2,
+		Testing:  2,
+	}).(int)
 
 	// noNodesDelay defines the amount of time that is waited between
 	// iterations of the peer acquisition loop if the gateway does not have any
 	// nodes in the nodelist.
-	noNodesDelay = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 10 * time.Second
-		case "standard":
-			return 20 * time.Second
-		case "testing":
-			return 3 * time.Second
-		default:
-			panic("unrecognized build.Release in noNodesDelay")
-		}
-	}()
+	noNodesDelay = build.Select(build.Var{
+		Standard: 20 * time.Second,
+		Dev:      10 * time.Second,
+		Testing:  3 * time.Second,
+	}).(time.Duration)
 
 	// unwawntedLocalPeerDelay defines the amount of time that is waited
 	// between iterations of the permanentPeerManager if the gateway has at
@@ -195,78 +125,43 @@ var (
 	// selected peer was a local peer. The wait is mostly to prevent the
 	// gateway from hogging the CPU in the event that all peers are local
 	// peers.
-	unwantedLocalPeerDelay = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 1 * time.Second
-		case "standard":
-			return 2 * time.Second
-		case "testing":
-			return 100 * time.Millisecond
-		default:
-			panic("unrecognized build.Release in unwawntedLocalPeerDelay")
-		}
-	}()
+	unwantedLocalPeerDelay = build.Select(build.Var{
+		Standard: 2 * time.Second,
+		Dev:      1 * time.Second,
+		Testing:  100 * time.Millisecond,
+	}).(time.Duration)
 
 	// wellConnectedDelay defines the amount of time that is waited between
 	// iterations of the peer acquisition loop if the gateway is well
 	// connected.
-	wellConnectedDelay = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 1 * time.Minute
-		case "standard":
-			return 5 * time.Minute
-		case "testing":
-			return 3 * time.Second
-		default:
-			panic("unrecognized build.Release in wellConnectedDelay")
-		}
-	}()
+	wellConnectedDelay = build.Select(build.Var{
+		Standard: 5 * time.Minute,
+		Dev:      1 * time.Minute,
+		Testing:  3 * time.Second,
+	}).(time.Duration)
 
 	// wellConnectedThreshold is the number of outbound connections at which
 	// the gateway will not attempt to make new outbound connections.
-	wellConnectedThreshold = func() int {
-		switch build.Release {
-		case "dev":
-			return 5
-		case "standard":
-			return 8
-		case "testing":
-			return 4
-		default:
-			panic("unrecognized build.Release in wellConnectedThreshold")
-		}
-	}()
+	wellConnectedThreshold = build.Select(build.Var{
+		Standard: 8,
+		Dev:      5,
+		Testing:  4,
+	}).(int)
 )
 
 var (
 	// connStdDeadline defines the standard deadline that should be used for
 	// all temporary connections to the gateway.
-	connStdDeadline = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 2 * time.Minute
-		case "standard":
-			return 5 * time.Minute
-		case "testing":
-			return 30 * time.Second
-		default:
-			panic("unrecognized build.Release in connStdDeadline")
-		}
-	}()
+	connStdDeadline = build.Select(build.Var{
+		Standard: 5 * time.Minute,
+		Dev:      2 * time.Minute,
+		Testing:  30 * time.Second,
+	}).(time.Duration)
 
 	// the gateway will abort a connection attempt after this long
-	dialTimeout = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 20 * time.Second
-		case "standard":
-			return 2 * time.Minute
-		case "testing":
-			return 500 * time.Millisecond
-		default:
-			panic("unrecognized build.Release in dialTimeout")
-		}
-	}()
+	dialTimeout = build.Select(build.Var{
+		Standard: 2 * time.Minute,
+		Dev:      20 * time.Second,
+		Testing:  500 * time.Millisecond,
+	}).(time.Duration)
 )
