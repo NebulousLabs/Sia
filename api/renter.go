@@ -1,5 +1,8 @@
 package api
 
+// TODO: When setting renter settings, leave empty values unchanged instead of
+// zeroing them out.
+
 import (
 	"fmt"
 	"net/http"
@@ -14,22 +17,32 @@ import (
 )
 
 var (
-	// recommendedHosts is the number of hosts that is used by default when
-	// setting the renter settings.
-	recommendedHosts = func() uint64 {
-		if build.Release == "dev" {
-			return 2
-		}
-		if build.Release == "standard" {
-			return 24
-		}
-		if build.Release == "testing" {
-			return 1
-		}
-		panic("unrecognized release constant in api")
-	}()
+	// recommendedHosts is the number of hosts that the renter will form
+	// contracts with if the value is not specified explicity in the call to
+	// SetSettings.
+	recommendedHosts = build.Select(build.Var{
+		Standard: uint64(30),
+		Dev:      uint64(4),
+		Testing:  uint64(2),
+	}).(uint64)
 
-	requiredHosts = func() uint64 { ASDFASDF
+	// requiredHosts specifies the minimum number of hosts that must be set in
+	// the renter settings for the renter settings to be valid. This minimum is
+	// there to prevent users from shooting themselves in the foot.
+	requiredHosts = build.Select(build.Var{
+		Standard: uint64(24),
+		Dev:      uint64(1),
+		Testing:  uint64(1),
+	}).(uint64)
+
+	// requiredRenewWindow establishes the minimum allowed renew window for the
+	// renter settings. This minimum is here to prevent users from shooting
+	// themselves in the foot.
+	requiredRenewWindow = build.Select(build.Var{
+		Standard: types.BlockHeight(288),
+		Dev:      types.BlockHeight(1),
+		Testing:  types.BlockHeight(1),
+	}).(types.BlockHeight)
 )
 
 type (
@@ -106,10 +119,10 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 	if req.FormValue("hosts") != "" {
 		_, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
 		if err != nil {
-			WriteError(w, Error{"Couldn't parse hosts: "+err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"Couldn't parse hosts: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
-		if !build.DEBUG && hosts < recommendedHosts {
+		if hosts < requiredHosts {
 			WriteError(w, Error{fmt.Sprintf("Insufficient number of hosts, need at least %v but have %v.", recommendedHosts, hosts)}, http.StatusBadRequest)
 			return
 		}
@@ -130,10 +143,13 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 	if req.FormValue("renewwindow") != "" {
 		_, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
 		if err != nil {
-			WriteError(w, Error{"Couldn't parse renewwindow: "+err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"Couldn't parse renewwindow: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
-		if !build.DEBUG && renewWindow < 288
+		if renewWindow < requiredRenewWindow {
+			WriteError(w, Error{fmt.Sprintf("Renew window is too small, must be at least %v blocks but have %v blocks.", requiredRenewWindow, renewWindow)}, http.StatusBadRequest)
+			return
+		}
 	} else {
 		renewWindow = period / 2
 	}
@@ -141,9 +157,9 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 	// Set the settings in the renter.
 	err = api.renter.SetSettings(modules.RenterSettings{
 		Allowance: modules.Allowance{
-			Funds:  funds,
+			Funds:       funds,
 			Hosts:       hosts,
-			Period: period,
+			Period:      period,
 			RenewWindow: renewWindow,
 		},
 	})
