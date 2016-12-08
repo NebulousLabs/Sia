@@ -57,8 +57,8 @@ type (
 		left   *node
 		right  *node
 
-		count int
-		taken bool
+		count int  // cumulative count of this node and all children
+		taken bool // `taken` indicates whether there is an active host at this node or not.
 
 		weight types.Currency
 		entry  *HostEntry
