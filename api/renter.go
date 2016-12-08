@@ -11,6 +11,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/julienschmidt/httprouter"
@@ -34,6 +35,24 @@ var (
 		Dev:      uint64(1),
 		Testing:  uint64(1),
 	}).(uint64)
+
+	// requiredParityPieces specifies the minimum number of parity pieces that
+	// must be used when uploading a file. This minimum exists to prevent users
+	// from shooting themselves in the foot.
+	requiredParityPieces = build.Select(build.Var{
+		Standard: int(12),
+		Dev:      int(0),
+		Testing:  int(0),
+	}).(int)
+
+	// requiredRedundancy specifies the minimum redundancy that will be
+	// accepted by the renter when uploading a file. This minimum exists to
+	// prevent users from shooting themselves in the foot.
+	requiredRedundancy = build.Select(build.Var{
+		Standard: float64(2.5),
+		Dev:      float64(1),
+		Testing:  float64(1),
+	}).(float64)
 
 	// requiredRenewWindow establishes the minimum allowed renew window for the
 	// renter settings. This minimum is here to prevent users from shooting
@@ -312,17 +331,57 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 		return
 	}
 
+	// Check whether the erasure coding parameters have been supplied.
+	var ec modules.ErasureCoder
+	if req.FormValue("datapieces") != "" || req.FormValue("paritypieces") != "" {
+		// Check that both values have been supplied.
+		if req.FormValue("datapieces") == "" || req.FormValue("partiypieces") == "" {
+			WriteError(w, Error{"Must provide both the datapieces paramaeter and the paritypieces parameter if specifying erasure coding parameters"}, http.StatusBadRequest)
+			return
+		}
+
+		// Parse the erasure coding parameters.
+		var dataPieces, parityPieces int
+		_, err := fmt.Sscan(req.FormValue("datapieces"), &dataPieces)
+		if err != nil {
+			WriteError(w, Error{"Unable to read parameter 'datapieces': " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		_, err = fmt.Sscan(req.FormValue("paritypieces"), &parityPieces)
+		if err != nil {
+			WriteError(w, Error{"Unable to read parameter 'paritypieces': " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+
+		// Verify that sane values for parityPieces and redundancy are being
+		// supplied.
+		if parityPieces < requiredParityPieces {
+			WriteError(w, Error{fmt.Sprintf("A minimum of %v parity pieces is required, but %v parity pieces requested.", parityPieces, requiredParityPieces)}, http.StatusBadRequest)
+		}
+		redundancy := float64(dataPieces+parityPieces)/float64(dataPieces)
+		if float64(dataPieces+parityPieces)/float64(dataPieces) < requiredRedundancy {
+			WriteError(w, Error{fmt.Sprintf("A redundancy of %.2f is required, but redundancy of %.2f supplied", redundancy, requiredRedundancy)}, http.StatusBadRequest)
+			return
+		}
+
+		// Create the erasure coder.
+		ec, err = renter.NewRSCode(dataPieces, parityPieces)
+		if err != nil {
+			WriteError(w, Error{"Unable to encode file using the provided parameters: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Call the renter to upload the file.
 	err := api.renter.Upload(modules.FileUploadParams{
-		Source:  source,
-		SiaPath: strings.TrimPrefix(ps.ByName("siapath"), "/"),
-		// let the renter decide these values; eventually they will be configurable
-		ErasureCode: nil,
+		Source:      source,
+		SiaPath:     strings.TrimPrefix(ps.ByName("siapath"), "/"),
+		ErasureCode: ec,
 	})
 	if err != nil {
 		WriteError(w, Error{"Upload failed: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
-
 	WriteSuccess(w)
 }
 

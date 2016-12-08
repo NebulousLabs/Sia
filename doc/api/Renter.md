@@ -281,8 +281,15 @@ uploads a file to the network from the local filesystem.
 
 ###### Query String Parameters
 ```
+// The number of data pieces to use when erasure coding the file.
+datapieces // int
+
+// The number of parity pieces to use when erasure coding the file. Total
+// redundancy of the file is (datapieces+paritypieces)/datapieces.
+paritypieces // int
+
 // Location on disk of the file being uploaded.
-source
+source // string - a filepath
 ```
 
 ###### Response

@@ -216,37 +216,33 @@ func TestHostAndRentMultiHost(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO: Set an allowance that has files being uploaded with 2-of-6
-	// redundancy, such that at least 2 hosts are required to upload and
-	// download a file. This will do a good job of putting pressure on the
-	// parallelization algorithms.
-
-	// Set an allowance for the renter, allowing a contract to be formed.
+	// Set an allowance with three hosts.
 	allowanceValues := url.Values{}
-	testFunds := "10000000000000000000000000000" // 10k SC
-	testPeriod := "5"
-	allowanceValues.Set("funds", testFunds)
-	allowanceValues.Set("period", testPeriod)
+	allowanceValues.Set("funds", "50000000000000000000000000") // 50k SC
+	allowanceValues.Set("hosts", "3")
+	allowanceValues.Set("period", "5")
+	allowanceValues.Set("renewwindow", "2")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create a file.
+	// Create a file to upload.
+	filesize := int(45678)
 	path := filepath.Join(st.dir, "test.dat")
-	err = createRandFile(path, 1024)
+	err = createRandFile(path, filesize)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Upload the file to the renter.
+	// Upload a file with 2-of-6 redundancy.
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
 	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Only one piece will be uploaded (10% at current redundancy).
+	// Three pieces should get uploaded.
 	var rf RenterFiles
 	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
 		st.getAPI("/renter/files", &rf)
