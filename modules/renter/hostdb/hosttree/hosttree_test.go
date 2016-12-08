@@ -14,7 +14,7 @@ import (
 )
 
 func verifyTree(tree *HostTree, nentries int) error {
-	expectedWeight := tree.root.entry.Weight.Mul64(uint64(nentries))
+	expectedWeight := tree.root.entry.weight.Mul64(uint64(nentries))
 	if tree.root.weight.Cmp(expectedWeight) != 0 {
 		return fmt.Errorf("expected weight is incorrect: got %v wanted %v\n", tree.root.weight, expectedWeight)
 	}
@@ -97,7 +97,7 @@ func makeHostEntry(weight types.Currency) *HostEntry {
 
 	return &HostEntry{
 		HostDBEntry: dbe,
-		Weight:      weight,
+		weight:      weight,
 	}
 }
 
@@ -240,7 +240,7 @@ func TestVariedWeights(t *testing.T) {
 		if !exists {
 			t.Fatal("can't find randomly selected node in tree")
 		}
-		selectionMap[node.entry.Weight.String()]++
+		selectionMap[node.entry.weight.String()]++
 	}
 
 	// Check that each host was selected an expected number of times. An error
@@ -274,7 +274,7 @@ func TestRepeatInsert(t *testing.T) {
 
 	tree.Insert(entry1)
 
-	entry2.Weight = types.NewCurrency64(100)
+	entry2.weight = types.NewCurrency64(100)
 
 	tree.Insert(entry2)
 	if len(tree.hosts) != 1 {
@@ -294,12 +294,12 @@ func TestNodeAtWeight(t *testing.T) {
 	}
 
 	// overweight
-	_, err = tree.root.nodeAtWeight(entry.Weight.Mul64(2))
+	_, err = tree.root.nodeAtWeight(entry.weight.Mul64(2))
 	if err != ErrWeightTooHeavy {
 		t.Errorf("expected %v, got %v", ErrWeightTooHeavy, err)
 	}
 
-	h, err := tree.root.nodeAtWeight(entry.Weight)
+	h, err := tree.root.nodeAtWeight(entry.weight)
 	if err != nil {
 		t.Error(err)
 	} else if h.entry != entry {

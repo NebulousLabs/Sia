@@ -45,9 +45,9 @@ type (
 	// HostEntry is an entry in the host tree.
 	HostEntry struct {
 		modules.HostDBEntry
+		weight types.Currency
 
 		FirstSeen   types.BlockHeight
-		Weight      types.Currency
 		Reliability types.Currency
 	}
 
@@ -69,7 +69,7 @@ type (
 func createNode(parent *node, entry *HostEntry) *node {
 	return &node{
 		parent: parent,
-		weight: entry.Weight,
+		weight: entry.weight,
 		count:  1,
 
 		taken: true,
@@ -96,12 +96,12 @@ func (n *node) recursiveInsert(entry *HostEntry) (nodesAdded int, newnode *node)
 	if n.parent == nil && n.left == nil && n.right == nil && !n.taken {
 		n.entry = entry
 		n.taken = true
-		n.weight = entry.Weight
+		n.weight = entry.weight
 		newnode = n
 		return
 	}
 
-	n.weight = n.weight.Add(entry.Weight)
+	n.weight = n.weight.Add(entry.weight)
 
 	// If the current node is empty, add the entry but don't increase the
 	// count.
@@ -163,11 +163,11 @@ func (n *node) nodeAtWeight(weight types.Currency) (*node, error) {
 // remove takes a node and removes it from the tree by climbing through the
 // list of parents. remove does not delete nodes.
 func (n *node) remove() {
-	n.weight = n.weight.Sub(n.entry.Weight)
+	n.weight = n.weight.Sub(n.entry.weight)
 	n.taken = false
 	current := n.parent
 	for current != nil {
-		current.weight = current.weight.Sub(n.entry.Weight)
+		current.weight = current.weight.Sub(n.entry.weight)
 		current = current.parent
 	}
 }
