@@ -73,6 +73,8 @@ func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, er
 	return numSectors, nil
 }
 
+// initialContractMetrics returns the metrics for a newly-formed (or renewed)
+// contract. Download/Upload/Storage spending is assumed to be zero.
 func initialContractMetrics(contract modules.RenterContract, host modules.HostDBEntry, txn types.Transaction) modules.RenterContractMetrics {
 	metrics := modules.RenterContractMetrics{
 		ID:          contract.ID,
