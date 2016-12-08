@@ -180,20 +180,19 @@ func TestHostTreeModify(t *testing.T) {
 	}
 
 	// should fail with a nonexistent key
-	err = tree.Modify(types.SiaPublicKey{}, &HostEntry{})
+	err = tree.Modify(&HostEntry{})
 	if err != ErrNoSuchHost {
 		t.Fatalf("modify should fail with ErrNoSuchHost when provided a nonexistent public key. Got error: %v\n", err)
 	}
 
 	targetKey := keys[randIndex.Uint64()]
 
-	oldDBEntry := tree.hosts[targetKey.String()].entry
+	oldEntry := tree.hosts[targetKey.String()].entry
+	newEntry := makeHostEntry(types.NewCurrency64(30))
+	newEntry.AcceptingContracts = false
+	newEntry.PublicKey = oldEntry.PublicKey
 
-	newDBEntry := &HostEntry{}
-	newDBEntry.PublicKey = oldDBEntry.PublicKey
-	newDBEntry.AcceptingContracts = false
-
-	err = tree.Modify(targetKey, newDBEntry)
+	err = tree.Modify(newEntry)
 	if err != nil {
 		t.Fatal(err)
 	}

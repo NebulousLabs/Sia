@@ -200,16 +200,16 @@ func (ht *HostTree) Remove(pk types.SiaPublicKey) error {
 
 // Modify updates a host entry at the given public key, replacing the old entry
 // with the entry provided by `newEntry`.
-func (ht *HostTree) Modify(pk types.SiaPublicKey, newEntry *HostEntry) error {
-	node, exists := ht.hosts[pk.String()]
+func (ht *HostTree) Modify(entry *HostEntry) error {
+	node, exists := ht.hosts[entry.PublicKey.String()]
 	if !exists {
 		return ErrNoSuchHost
 	}
 
 	node.remove()
-	_, node = ht.recursiveInsert(newEntry)
+	_, node = ht.recursiveInsert(entry)
 
-	ht.hosts[pk.String()] = node
+	ht.hosts[entry.PublicKey.String()] = node
 	return nil
 }
 
