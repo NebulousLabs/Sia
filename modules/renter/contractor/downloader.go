@@ -87,6 +87,7 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	c.mu.Lock()
 	metrics := c.contractMetrics[contract.ID]
 	metrics.DownloadSpending = metrics.DownloadSpending.Add(delta)
+	metrics.Unspent = metrics.Unspent.Sub(delta)
 	c.contractMetrics[contract.ID] = metrics
 	c.financialMetrics.DownloadSpending = c.financialMetrics.DownloadSpending.Add(delta)
 	c.contracts[contract.ID] = contract

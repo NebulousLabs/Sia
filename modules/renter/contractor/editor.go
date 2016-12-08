@@ -122,6 +122,7 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	metrics := c.contractMetrics[contract.ID]
 	metrics.UploadSpending = metrics.UploadSpending.Add(uploadDelta)
 	metrics.StorageSpending = metrics.StorageSpending.Add(storageDelta)
+	metrics.Unspent = metrics.Unspent.Sub(uploadDelta.Add(storageDelta))
 	c.contractMetrics[contract.ID] = metrics
 	c.financialMetrics.UploadSpending = c.financialMetrics.UploadSpending.Add(uploadDelta)
 	c.financialMetrics.StorageSpending = c.financialMetrics.StorageSpending.Add(storageDelta)
