@@ -158,7 +158,7 @@ func TestHostAndRent(t *testing.T) {
 	// Mine blocks until the host recognizes profit. The host will wait for 12
 	// blocks after the storage window has closed to report the profit, a total
 	// of 40 blocks should be mined.
-	t.Skip("TODO: NEED TO GET THE CONTRACT STUFF WORKING AGAIN????")
+	t.Skip("TODO: NEED TO GET THE CONTRACT STUFF WORKING AGAIN")
 	for i := 0; i < 40; i++ {
 		st.miner.AddBlock()
 	}
