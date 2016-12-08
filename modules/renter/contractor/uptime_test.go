@@ -104,12 +104,20 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 // mapHostDB is a hostDB that implements the Host method via a simple map.
 type mapHostDB struct {
 	stubHostDB
-	hosts map[modules.NetAddress]modules.HostDBEntry
+	hosts map[types.FileContractID]modules.HostDBEntry
 }
 
 func (m mapHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
-	h, exists := m.hosts[addr]
-	return h, exists
+	if len(m.hosts) == 0 {
+		return modules.HostDBEntry{}, false
+	}
+	if len(m.hosts) != 1 {
+		panic("oops")
+	}
+	for _, host := range m.hosts {
+		return host, true
+	}
+	return modules.HostDBEntry{}, false
 }
 
 // TestIsOffline tests the IsOffline method.
@@ -136,21 +144,21 @@ func TestIsOffline(t *testing.T) {
 		{[]modules.HostDBScan{oldBadScan, newGoodScan, currentBadScan}, false},
 		// data covers large range, no scans succeded
 		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan}, true},
-		// recent scan was good (and within uptimeWindow of oldBadScan, but that shouldn't matter)
-		{[]modules.HostDBScan{oldBadScan, oldBadScan, oldBadScan, oldGoodScan}, false},
-		// recent scan was good (and outside uptimeWindow of oldBadScan, but that shouldn't matter)
-		{[]modules.HostDBScan{oldBadScan, oldBadScan, oldBadScan, currentGoodScan}, false},
+		// recent scan was good (and within uptimeWindow of oldBadScan)
+		{[]modules.HostDBScan{oldBadScan, oldGoodScan, newBadScan, currentBadScan}, true},
+		// recent scan was good (and outside uptimeWindow of oldBadScan)
+		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan, currentGoodScan}, false},
 	}
 	for i, test := range tests {
 		// construct a contractor with a hostdb containing the scans
 		c := &Contractor{
 			hdb: mapHostDB{
-				hosts: map[modules.NetAddress]modules.HostDBEntry{
-					"foo": {ScanHistory: test.scans},
+				hosts: map[types.FileContractID]modules.HostDBEntry{
+					types.FileContractID{1}: {ScanHistory: test.scans},
 				},
 			},
 		}
-		if offline := c.IsOffline("foo"); offline != test.offline {
+		if offline := c.IsOffline(types.FileContractID{1}); offline != test.offline {
 			t.Errorf("IsOffline(%v) = %v, expected %v", i, offline, test.offline)
 		}
 	}
