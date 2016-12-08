@@ -14,9 +14,9 @@ import (
 )
 
 func verifyTree(tree *HostTree, nentries int) error {
-	expectedWeight := tree.entry.Weight.Mul64(uint64(nentries))
-	if tree.weight.Cmp(expectedWeight) != 0 {
-		return fmt.Errorf("expected weight is incorrect: got %v wanted %v\n", tree.weight, expectedWeight)
+	expectedWeight := tree.root.entry.Weight.Mul64(uint64(nentries))
+	if tree.root.weight.Cmp(expectedWeight) != 0 {
+		return fmt.Errorf("expected weight is incorrect: got %v wanted %v\n", tree.root.weight, expectedWeight)
 	}
 
 	// Check that the length of activeHosts and the count of hostTree are
@@ -55,14 +55,14 @@ func verifyTree(tree *HostTree, nentries int) error {
 	// Try removing an re-adding all hosts.
 	var removedEntries []*HostEntry
 	for {
-		if tree.weight.IsZero() {
+		if tree.root.weight.IsZero() {
 			break
 		}
-		randWeight, err := rand.Int(rand.Reader, tree.weight.Big())
+		randWeight, err := rand.Int(rand.Reader, tree.root.weight.Big())
 		if err != nil {
 			break
 		}
-		node, err := tree.nodeAtWeight(types.NewCurrency(randWeight))
+		node, err := tree.root.nodeAtWeight(types.NewCurrency(randWeight))
 		if err != nil {
 			break
 		}
@@ -294,12 +294,12 @@ func TestNodeAtWeight(t *testing.T) {
 	}
 
 	// overweight
-	_, err = tree.nodeAtWeight(entry.Weight.Mul64(2))
+	_, err = tree.root.nodeAtWeight(entry.Weight.Mul64(2))
 	if err != ErrWeightTooHeavy {
 		t.Errorf("expected %v, got %v", ErrWeightTooHeavy, err)
 	}
 
-	h, err := tree.nodeAtWeight(entry.Weight)
+	h, err := tree.root.nodeAtWeight(entry.Weight)
 	if err != nil {
 		t.Error(err)
 	} else if h.entry != entry {
@@ -339,9 +339,9 @@ func TestRandomHosts(t *testing.T) {
 	if len(tree.hosts) != 3 {
 		t.Error("wrong number of hosts")
 	}
-	if tree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+	if tree.root.weight.Cmp(types.NewCurrency64(6)) != 0 {
 		t.Error("unexpected weight at initialization")
-		t.Error(tree.weight)
+		t.Error(tree.root.weight)
 	}
 
 	// Grab 1 random host.

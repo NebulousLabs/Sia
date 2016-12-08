@@ -36,7 +36,7 @@ type (
 	// `HostEntries`, and provides methods for inserting, retreiving, and
 	// modifing entries.
 	HostTree struct {
-		*node
+		root *node
 
 		// hosts is a map of public keys to nodes.
 		hosts map[string]*node
@@ -80,7 +80,7 @@ func createNode(parent *node, entry *HostEntry) *node {
 // New creates a new, empty, HostTree.
 func New() *HostTree {
 	return &HostTree{
-		node: &node{
+		root: &node{
 			count: 1,
 		},
 		hosts: make(map[string]*node),
@@ -179,7 +179,7 @@ func (ht *HostTree) Insert(entry *HostEntry) error {
 		return ErrHostExists
 	}
 
-	_, node := ht.recursiveInsert(entry)
+	_, node := ht.root.recursiveInsert(entry)
 
 	ht.hosts[entry.PublicKey.String()] = node
 	return nil
@@ -206,7 +206,7 @@ func (ht *HostTree) Modify(entry *HostEntry) error {
 	}
 
 	node.remove()
-	_, node = ht.recursiveInsert(entry)
+	_, node = ht.root.recursiveInsert(entry)
 
 	ht.hosts[entry.PublicKey.String()] = node
 	return nil
@@ -231,11 +231,11 @@ func (ht *HostTree) Fetch(n int, ignore []types.SiaPublicKey) ([]modules.HostDBE
 	}
 
 	for len(hosts) < n && len(ht.hosts) > 0 {
-		randWeight, err := rand.Int(rand.Reader, ht.weight.Big())
+		randWeight, err := rand.Int(rand.Reader, ht.root.weight.Big())
 		if err != nil {
 			return hosts, err
 		}
-		node, err := ht.nodeAtWeight(types.NewCurrency(randWeight))
+		node, err := ht.root.nodeAtWeight(types.NewCurrency(randWeight))
 		if err != nil {
 			return hosts, err
 		}
