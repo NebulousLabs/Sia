@@ -351,7 +351,7 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 }
 
 // blankServerTester creates a server tester object that is ready for testing,
-// without any money in the wallet.
+// without mining any blocks.
 func blankServerTester(name string) (*serverTester, error) {
 	// createServerTester is expensive, and therefore should not be called
 	// during short tests.
