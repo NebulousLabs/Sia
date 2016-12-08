@@ -182,7 +182,7 @@ func TestHostTreeModify(t *testing.T) {
 	// should fail with a nonexistent key
 	err = tree.Modify(types.SiaPublicKey{}, &HostEntry{})
 	if err != ErrNoSuchHost {
-		t.Fatalf("modify should fail with ErrNoSuchHost when provided a nonexistent public key. Got error: %v\n")
+		t.Fatalf("modify should fail with ErrNoSuchHost when provided a nonexistent public key. Got error: %v\n", err)
 	}
 
 	targetKey := keys[randIndex.Uint64()]
