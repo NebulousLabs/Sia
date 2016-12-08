@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -109,9 +110,49 @@ bwIDAQAB
 -----END PUBLIC KEY-----`
 )
 
-// fetchLatestRelease returns metadata about the most recent GitHub release.
+// version returns the version number of a non-LTS release. This assumes that
+// tag names will always be of the form "vX.Y.Z".
+func (r *githubRelease) version() string {
+	return strings.TrimPrefix(r.TagName, "v")
+}
+
+// byVersion sorts non-LTS releases by their version string, placing the highest
+// version number first.
+type byVersion []githubRelease
+
+func (rs byVersion) Len() int      { return len(rs) }
+func (rs byVersion) Swap(i, j int) { rs[i], rs[j] = rs[j], rs[i] }
+func (rs byVersion) Less(i, j int) bool {
+	// we want the higher version number to reported as "less" so that it is
+	// placed first in the slice
+	return build.VersionCmp(rs[i].version(), rs[j].version()) >= 0
+}
+
+// latestRelease returns the latest non-LTS release, given a set of arbitrary
+// releases.
+func latestRelease(releases []githubRelease) (githubRelease, error) {
+	// filter the releases to exclude LTS releases
+	nonLTS := releases[:0]
+	for _, r := range releases {
+		if !strings.Contains(r.TagName, "lts") && build.IsVersion(r.version()) {
+			nonLTS = append(nonLTS, r)
+		}
+	}
+
+	// sort by version
+	sort.Sort(byVersion(nonLTS))
+
+	// return the latest release
+	if len(nonLTS) == 0 {
+		return githubRelease{}, errEmptyUpdateResponse
+	}
+	return nonLTS[0], nil
+}
+
+// fetchLatestRelease returns metadata about the most recent non-LTS GitHub
+// release.
 func fetchLatestRelease() (githubRelease, error) {
-	req, err := http.NewRequest("GET", "https://api.github.com/repos/NebulousLabs/Sia/releases/latest", nil)
+	req, err := http.NewRequest("GET", "https://api.github.com/repos/NebulousLabs/Sia/releases", nil)
 	if err != nil {
 		return githubRelease{}, err
 	}
@@ -121,15 +162,12 @@ func fetchLatestRelease() (githubRelease, error) {
 		return githubRelease{}, err
 	}
 	defer resp.Body.Close()
-	var release githubRelease
-	err = json.NewDecoder(resp.Body).Decode(&release)
+	var releases []githubRelease
+	err = json.NewDecoder(resp.Body).Decode(&releases)
 	if err != nil {
 		return githubRelease{}, err
 	}
-	if release.TagName == "" && len(release.Assets) == 0 {
-		return githubRelease{}, errEmptyUpdateResponse
-	}
-	return release, nil
+	return latestRelease(releases)
 }
 
 // updateToRelease updates siad and siac to the release specified. siac is

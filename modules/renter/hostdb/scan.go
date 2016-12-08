@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"math/big"
 	"net"
+	"sort"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -99,11 +100,10 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	// Look up the entry and decrement the reliability.
 	entry, exists := hdb.allHosts[addr]
 	if !exists {
-		// TODO: should panic here
+		build.Critical("host to be decremented did not exist in hostdb")
 		return
 	}
 	entry.Reliability = entry.Reliability.Sub(penalty)
-	entry.Online = false
 
 	// If the entry is in the active database, remove it from the active
 	// database.
@@ -128,7 +128,17 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 
-	// Regardless of whether the host responded, add it to allHosts.
+	// Add a data point for the scan.
+	entry.ScanHistory = append(entry.ScanHistory, modules.HostDBScan{
+		Timestamp: time.Now(),
+		Success:   netErr == nil,
+	})
+	// Ensure the scans are sorted.
+	if !sort.IsSorted(entry.ScanHistory) {
+		sort.Sort(entry.ScanHistory)
+	}
+
+	// Add the host to allHosts.
 	priorHost, exists := hdb.allHosts[entry.NetAddress]
 	if !exists {
 		hdb.allHosts[entry.NetAddress] = entry
@@ -164,7 +174,6 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	newSettings.NetAddress = entry.HostExternalSettings.NetAddress
 	entry.HostExternalSettings = newSettings
 	entry.Reliability = MaxReliability
-	entry.Online = true
 	entry.Weight = calculateHostWeight(hdb.blockHeight, *entry)
 	hdb.insertNode(entry)
 

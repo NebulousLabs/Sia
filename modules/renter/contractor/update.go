@@ -44,7 +44,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// only attempt contract formation/renewal if we are synced
 	// (harmless if not synced, since hosts will reject our renewal attempts,
-	// (but very slow)
+	// but very slow)
 	if cc.Synced {
 		go func() {
 			// only one goroutine should be editing contracts at a time
@@ -53,16 +53,16 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			defer c.editLock.Unlock()
 
-			// renew any contracts that have entered the renew window
+			// renew any (online) contracts that have entered the renew window
 			err := c.managedRenewContracts()
 			if err != nil {
 				c.log.Debugln("WARN: failed to renew contracts after processing a consensus chage:", err)
 			}
 
-			// if we don't have enough contracts, form new ones
+			// if we don't have enough (online) contracts, form new ones
 			c.mu.RLock()
 			a := c.allowance
-			remaining := int(a.Hosts) - len(c.contracts)
+			remaining := int(a.Hosts) - len(c.onlineContracts())
 			c.mu.RUnlock()
 			if remaining <= 0 {
 				return

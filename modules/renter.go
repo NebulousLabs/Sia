@@ -95,11 +95,27 @@ type RenterFinancialMetrics struct {
 }
 
 // A HostDBEntry represents one host entry in the Renter's host DB. It
-// aggregates the host's external settings with its public key.
+// aggregates the host's external settings and metrics with its public key.
 type HostDBEntry struct {
 	HostExternalSettings
 	PublicKey types.SiaPublicKey `json:"publickey"`
+	// ScanHistory is the set of scans performed on the host. It should always
+	// be ordered according to the scan's Timestamp, oldest to newest.
+	ScanHistory HostDBScans
 }
+
+// HostDBScan represents a single scan event.
+type HostDBScan struct {
+	Timestamp time.Time
+	Success   bool
+}
+
+// HostDBScans represents a sortable slice of scans.
+type HostDBScans []HostDBScan
+
+func (s HostDBScans) Len() int           { return len(s) }
+func (s HostDBScans) Less(i, j int) bool { return s[i].Timestamp.Before(s[j].Timestamp) }
+func (s HostDBScans) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // A RenterContract contains all the metadata necessary to revise or renew a
 // file contract.

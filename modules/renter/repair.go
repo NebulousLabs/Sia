@@ -11,22 +11,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// When a file contract is within 'renewThreshold' blocks of expiring, the renter
-// will attempt to renew the contract.
-var renewThreshold = func() types.BlockHeight {
-	switch build.Release {
-	case "testing":
-		return 10
-	case "dev":
-		return 100 // 20 minutes
-	default:
-		return 144 * 7 * 6 // 6 weeks
-	}
-}()
 
 type (
 	// chunkGaps points to all of the missing pieces in a chunk, as well as all
