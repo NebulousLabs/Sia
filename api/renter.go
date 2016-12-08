@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	// TODO: Replace this function by accepting user input.
+	// recommendedHosts is the number of hosts that is used by default when
+	// setting the renter settings.
 	recommendedHosts = func() uint64 {
 		if build.Release == "dev" {
 			return 2
@@ -27,6 +28,8 @@ var (
 		}
 		panic("unrecognized release constant in api")
 	}()
+
+	requiredHosts = func() uint64 { ASDFASDF
 )
 
 type (
@@ -91,39 +94,57 @@ func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ htt
 
 // renterHandlerPOST handles the API call to set the Renter's settings.
 func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// scan values
+	// Scan the allowance amount.
 	funds, ok := scanAmount(req.FormValue("funds"))
 	if !ok {
 		WriteError(w, Error{"Couldn't parse funds"}, http.StatusBadRequest)
 		return
 	}
-	// var hosts uint64
-	// _, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
-	// if err != nil {
-	// 	WriteError(w, Error{"Couldn't parse hosts: "+err.Error()}, http.StatusBadRequest)
-	// 	return
-	// }
+
+	// Scan the number of hosts to use. (optional parameter)
+	var hosts uint64
+	if req.FormValue("hosts") != "" {
+		_, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
+		if err != nil {
+			WriteError(w, Error{"Couldn't parse hosts: "+err.Error()}, http.StatusBadRequest)
+			return
+		}
+		if !build.DEBUG && hosts < recommendedHosts {
+			WriteError(w, Error{fmt.Sprintf("Insufficient number of hosts, need at least %v but have %v.", recommendedHosts, hosts)}, http.StatusBadRequest)
+			return
+		}
+	} else {
+		hosts = recommendedHosts
+	}
+
+	// Scan the period.
 	var period types.BlockHeight
 	_, err := fmt.Sscan(req.FormValue("period"), &period)
 	if err != nil {
 		WriteError(w, Error{"Couldn't parse period: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	// var renewWindow types.BlockHeight
-	// _, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
-	// if err != nil {
-	// 	WriteError(w, Error{"Couldn't parse renewwindow: "+err.Error()}, http.StatusBadRequest)
-	// 	return
-	// }
 
+	// Scan the renew window. (optional parameter)
+	var renewWindow types.BlockHeight
+	if req.FormValue("renewwindow") != "" {
+		_, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
+		if err != nil {
+			WriteError(w, Error{"Couldn't parse renewwindow: "+err.Error()}, http.StatusBadRequest)
+			return
+		}
+		if !build.DEBUG && renewWindow < 288
+	} else {
+		renewWindow = period / 2
+	}
+
+	// Set the settings in the renter.
 	err = api.renter.SetSettings(modules.RenterSettings{
 		Allowance: modules.Allowance{
 			Funds:  funds,
+			Hosts:       hosts,
 			Period: period,
-
-			// TODO: let user specify these
-			Hosts:       recommendedHosts,
-			RenewWindow: period / 2,
+			RenewWindow: renewWindow,
 		},
 	})
 	if err != nil {

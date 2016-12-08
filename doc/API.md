@@ -652,8 +652,10 @@ modify settings that control the renter's behavior.
 
 ###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters)
 ```
-funds  // hastings
-period // block height
+funds // hastings
+hosts
+period      // block height
+renewwindow // block height
 ```
 
 ###### Response
