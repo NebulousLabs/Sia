@@ -23,8 +23,8 @@ var (
 	// SetSettings.
 	recommendedHosts = build.Select(build.Var{
 		Standard: uint64(30),
-		Dev:      uint64(4),
-		Testing:  uint64(2),
+		Dev:      uint64(2),
+		Testing:  uint64(1),
 	}).(uint64)
 
 	// requiredHosts specifies the minimum number of hosts that must be set in
@@ -335,7 +335,7 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 	var ec modules.ErasureCoder
 	if req.FormValue("datapieces") != "" || req.FormValue("paritypieces") != "" {
 		// Check that both values have been supplied.
-		if req.FormValue("datapieces") == "" || req.FormValue("partiypieces") == "" {
+		if req.FormValue("datapieces") == "" || req.FormValue("paritypieces") == "" {
 			WriteError(w, Error{"Must provide both the datapieces paramaeter and the paritypieces parameter if specifying erasure coding parameters"}, http.StatusBadRequest)
 			return
 		}
@@ -358,7 +358,7 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 		if parityPieces < requiredParityPieces {
 			WriteError(w, Error{fmt.Sprintf("A minimum of %v parity pieces is required, but %v parity pieces requested.", parityPieces, requiredParityPieces)}, http.StatusBadRequest)
 		}
-		redundancy := float64(dataPieces+parityPieces)/float64(dataPieces)
+		redundancy := float64(dataPieces+parityPieces) / float64(dataPieces)
 		if float64(dataPieces+parityPieces)/float64(dataPieces) < requiredRedundancy {
 			WriteError(w, Error{fmt.Sprintf("A redundancy of %.2f is required, but redundancy of %.2f supplied", redundancy, requiredRedundancy)}, http.StatusBadRequest)
 			return

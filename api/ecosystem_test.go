@@ -20,21 +20,24 @@ import (
 // blockchain.
 func announceAllHosts(sts []*serverTester) error {
 	// Check that all announcements will be on the same chain.
-	chainTip, err := synchronizationCheck(sts)
+	_, err := synchronizationCheck(sts)
 	if err != nil {
 		return err
 	}
 
 	// Announce each host.
 	for _, st := range sts {
-		err := waitForBlock(chainTip, st)
+		// Set the host to be accepting contracts.
+		acceptingContractsValues := url.Values{}
+		acceptingContractsValues.Set("acceptingcontracts", "true")
+		err = st.stdPostAPI("/host", acceptingContractsValues)
 		if err != nil {
 			return err
 		}
 
 		// Fetch the host net address.
 		var hg HostGET
-		err = st.getAPI("/host/", &hg)
+		err = st.getAPI("/host", &hg)
 		if err != nil {
 			return err
 		}
@@ -42,10 +45,27 @@ func announceAllHosts(sts []*serverTester) error {
 		// Make the announcement.
 		announceValues := url.Values{}
 		announceValues.Set("address", string(hg.ExternalSettings.NetAddress))
-		err = st.stdPostAPI("/host/announce/", announceValues)
+		err = st.stdPostAPI("/host/announce", announceValues)
 		if err != nil {
 			return err
 		}
+	}
+
+	// Wait until all of the transactions have propagated to all of the nodes.
+	//
+	// TODO: Replace this direct transaction pool call with a call to the
+	// /transactionpool endpoint.
+	//
+	// TODO: At some point the number of transactions needed to make an
+	// announcement may change. Currently its 2.
+	for i := 0; i < 50; i++ {
+		if len(sts[0].tpool.TransactionList()) == len(sts)*2 {
+			break
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	if len(sts[0].tpool.TransactionList()) != len(sts)*2 {
+		return errors.New("Host announcements do not seem to have propagated to the leader's tpool")
 	}
 
 	// Mine a block and then wait for all of the nodes to syncrhonize to it.
@@ -88,18 +108,13 @@ func announceAllHosts(sts []*serverTester) error {
 func fullyConnectNodes(sts []*serverTester) error {
 	for i, sta := range sts {
 		var gg GatewayGET
-		err := sta.getAPI("/gateway/", &gg)
+		err := sta.getAPI("/gateway", &gg)
 		if err != nil {
 			return err
 		}
 
 		// Connect this node to every other node.
-		for j, stb := range sts {
-			// Don't connect the node to itself.
-			if i == j {
-				continue
-			}
-
+		for _, stb := range sts[i+1:] {
 			err := stb.stdPostAPI("/gateway/connect/"+string(gg.NetAddress), nil)
 			if err != nil {
 				return err
@@ -138,11 +153,17 @@ func fundAllNodes(sts []*serverTester) error {
 		chainTip = block.ID()
 	}
 
+	// Wait until the chain tip has propagated to the first node.
+	err = waitForBlock(chainTip, sts[0])
+	if err != nil {
+		return err
+	}
+
 	// Mine types.MaturityDelay more blocks from the final node to mine a
 	// block, to guarantee that all nodes have had their payouts mature, such
 	// that their wallets can begin spending immediately.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, err := sts[len(sts)-1].miner.AddBlock()
+		_, err := sts[0].miner.AddBlock()
 		if err != nil {
 			return err
 		}

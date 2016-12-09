@@ -180,17 +180,17 @@ func TestHostAndRentMultiHost(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostAndRentMultiHost")
+	st, err := createServerTester("TestHostAndRentMultiHost - Host 1 + Renter")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.server.Close()
-	stH1, err := blankServerTester("TestHostAndRentMultiHost - H1")
+	stH1, err := blankServerTester("TestHostAndRentMultiHost - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stH1.server.Close()
-	stH2, err := blankServerTester("TestHostAndRentMultiHost - H2")
+	stH2, err := blankServerTester("TestHostAndRentMultiHost - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestHostAndRentMultiHost(t *testing.T) {
 
 	// Set an allowance with three hosts.
 	allowanceValues := url.Values{}
-	allowanceValues.Set("funds", "50000000000000000000000000") // 50k SC
+	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
 	allowanceValues.Set("hosts", "3")
 	allowanceValues.Set("period", "5")
 	allowanceValues.Set("renewwindow", "2")
@@ -238,43 +238,23 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	// Upload a file with 2-of-6 redundancy.
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
+	uploadValues.Set("datapieces", "2")
+	uploadValues.Set("paritypieces", "4")
 	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Three pieces should get uploaded.
 	var rf RenterFiles
-	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 50); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(100 * time.Millisecond)
 	}
-	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 50 {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
 	}
 
-	// On a second connection, upload another file.
-	path2 := filepath.Join(st.dir, "test2.dat")
-	test2Size := modules.SectorSize*2 + 1
-	err = createRandFile(path2, int(test2Size))
-	if err != nil {
-		t.Fatal(err)
-	}
-	uploadValues = url.Values{}
-	uploadValues.Set("source", path2)
-	err = st.stdPostAPI("/renter/upload/test2", uploadValues)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Only one piece will be uploaded (10% at current redundancy).
-	for i := 0; i < 200 && (len(rf.Files) != 2 || rf.Files[0].UploadProgress < 10 || rf.Files[1].UploadProgress < 10); i++ {
-		st.getAPI("/renter/files", &rf)
-		time.Sleep(100 * time.Millisecond)
-	}
-	if len(rf.Files) != 2 || rf.Files[0].UploadProgress < 10 || rf.Files[1].UploadProgress < 10 {
-		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
-	}
-
-	// Try downloading the first file.
+	// Try downloading the file.
 	downpath := filepath.Join(st.dir, "testdown.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
 	if err != nil {
@@ -299,33 +279,6 @@ func TestHostAndRentMultiHost(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(queue.Downloads) != 1 {
-		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
-	}
-
-	// Try downloading the second file.
-	downpath2 := filepath.Join(st.dir, "testdown2.dat")
-	err = st.stdGetAPI("/renter/download/test2?destination=" + downpath2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Check that the download has the right contents.
-	orig2, err := ioutil.ReadFile(path2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	download2, err := ioutil.ReadFile(downpath2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if bytes.Compare(orig2, download2) != 0 {
-		t.Fatal("data mismatch when downloading a file")
-	}
-
-	// The renter's downloads queue should have 2 entries now.
-	if err = st.getAPI("/renter/downloads", &queue); err != nil {
-		t.Fatal(err)
-	}
-	if len(queue.Downloads) != 2 {
 		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
 	}
 
