@@ -10,35 +10,36 @@ import (
 )
 
 var (
-	// ErrWeightTooHeavy is returned from a Fetch() call if a weight that exceeds
+	// errWeightTooHeavy is returned from a Fetch() call if a weight that exceeds
 	// the total weight of the tree is requested.
-	ErrWeightTooHeavy = errors.New("requested a too-heavy weight")
+	errWeightTooHeavy = errors.New("requested a too-heavy weight")
 
-	// ErrNegativeWeight is returned from an Insert() call if an entry with a
+	// errNegativeWeight is returned from an Insert() call if an entry with a
 	// negative weight is added to the tree. Entries must always have a positive
 	// weight.
-	ErrNegativeWeight = errors.New("cannot insert using a negative weight")
+	errNegativeWeight = errors.New("cannot insert using a negative weight")
 
-	// ErrNilEntry is returned if a fetch call results in a nil tree entry. nodes
+	// errNilEntry is returned if a fetch call results in a nil tree entry. nodes
 	// should always have a non-nil entry, unless they have been Delete()ed.
-	ErrNilEntry = errors.New("node has a nil entry")
+	errNilEntry = errors.New("node has a nil entry")
 
-	// ErrHostExists is returned if an Insert is called with a public key that
+	// errHostExists is returned if an Insert is called with a public key that
 	// already exists in the tree.
-	ErrHostExists = errors.New("host already exists in the tree")
+	errHostExists = errors.New("host already exists in the tree")
 
-	// ErrNoSuchHost is returned if Remove is called with a public key that does
+	// errNoSuchHost is returned if Remove is called with a public key that does
 	// not exist in the tree.
-	ErrNoSuchHost = errors.New("no host with specified public key")
+	errNoSuchHost = errors.New("no host with specified public key")
 )
 
 type (
 	// WeightFunc is a function used to weight a given HostDBEntry in the tree.
 	WeightFunc func(modules.HostDBEntry) types.Currency
 
-	// HostTree is a data structure that contains a weighted tree of
-	// `HostEntries`, and provides methods for inserting, retreiving, and
-	// modifing entries.
+	// HostTree is used to store and select host database entries. Each HostTree
+	// is initialized with a weighting func that is able to assign a weight to
+	// each entry. The entries can then be selected at random, weighted by the
+	// weight func.
 	HostTree struct {
 		root *node
 
@@ -145,7 +146,7 @@ func (n *node) recursiveInsert(entry *hostEntry) (nodesAdded int, newnode *node)
 func (n *node) nodeAtWeight(weight types.Currency) (*node, error) {
 	// Sanity check - weight must be less than the total weight of the tree.
 	if weight.Cmp(n.weight) > 0 {
-		return nil, ErrWeightTooHeavy
+		return nil, errWeightTooHeavy
 	}
 
 	// Check if the left or right child should be returned.
@@ -161,7 +162,7 @@ func (n *node) nodeAtWeight(weight types.Currency) (*node, error) {
 
 	// Should we panic here instead?
 	if !n.taken {
-		return nil, ErrNilEntry
+		return nil, errNilEntry
 	}
 
 	// Return the root entry.
@@ -192,7 +193,7 @@ func (ht *HostTree) Insert(hdbe modules.HostDBEntry) error {
 	}
 
 	if _, exists := ht.hosts[string(entry.PublicKey.Key)]; exists {
-		return ErrHostExists
+		return errHostExists
 	}
 
 	_, node := ht.root.recursiveInsert(entry)
@@ -208,7 +209,7 @@ func (ht *HostTree) Remove(pk types.SiaPublicKey) error {
 
 	node, exists := ht.hosts[string(pk.Key)]
 	if !exists {
-		return ErrNoSuchHost
+		return errNoSuchHost
 	}
 	node.remove()
 	delete(ht.hosts, string(pk.Key))
@@ -224,7 +225,7 @@ func (ht *HostTree) Modify(hdbe modules.HostDBEntry) error {
 
 	node, exists := ht.hosts[string(hdbe.PublicKey.Key)]
 	if !exists {
-		return ErrNoSuchHost
+		return errNoSuchHost
 	}
 
 	node.remove()

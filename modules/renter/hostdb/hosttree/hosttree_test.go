@@ -300,7 +300,7 @@ func TestHostTreeModify(t *testing.T) {
 
 	// should fail with a nonexistent key
 	err = tree.Modify(modules.HostDBEntry{})
-	if err != ErrNoSuchHost {
+	if err != errNoSuchHost {
 		t.Fatalf("modify should fail with ErrNoSuchHost when provided a nonexistent public key. Got error: %v\n", err)
 	}
 
@@ -418,8 +418,8 @@ func TestNodeAtWeight(t *testing.T) {
 
 	// overweight
 	_, err = tree.root.nodeAtWeight(weight.Mul64(2))
-	if err != ErrWeightTooHeavy {
-		t.Errorf("expected %v, got %v", ErrWeightTooHeavy, err)
+	if err != errWeightTooHeavy {
+		t.Errorf("expected %v, got %v", errWeightTooHeavy, err)
 	}
 
 	h, err := tree.root.nodeAtWeight(weight)
