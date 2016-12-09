@@ -33,6 +33,9 @@ var (
 )
 
 type (
+	// WeightFunc is a function used to weight a given HostDBEntry in the tree.
+	WeightFunc func(modules.HostDBEntry) types.Currency
+
 	// HostTree is a data structure that contains a weighted tree of
 	// `HostEntries`, and provides methods for inserting, retreiving, and
 	// modifing entries.
@@ -42,8 +45,8 @@ type (
 		// hosts is a map of public keys to nodes.
 		hosts map[string]*node
 
-		// a weightfunc applies a weight to a hostEntry
-		weightfunc func(modules.HostDBEntry) types.Currency
+		// wf applies a weight to a hostEntry
+		wf WeightFunc
 
 		mu sync.Mutex
 	}
@@ -80,14 +83,15 @@ func createNode(parent *node, entry *hostEntry) *node {
 	}
 }
 
-// New creates a new, empty, HostTree.
-func New(wf func(modules.HostDBEntry) types.Currency) *HostTree {
+// New creates a new, empty, HostTree. It takes one argument, a `WeightFunc`,
+// which is used to determine the weight of a node on Insert.
+func New(wf WeightFunc) *HostTree {
 	return &HostTree{
 		root: &node{
 			count: 1,
 		},
-		weightfunc: wf,
-		hosts:      make(map[string]*node),
+		wf:    wf,
+		hosts: make(map[string]*node),
 	}
 }
 
@@ -184,7 +188,7 @@ func (ht *HostTree) Insert(hdbe modules.HostDBEntry) error {
 
 	entry := &hostEntry{
 		HostDBEntry: hdbe,
-		weight:      ht.weightfunc(hdbe),
+		weight:      ht.wf(hdbe),
 	}
 
 	if _, exists := ht.hosts[string(entry.PublicKey.Key)]; exists {
@@ -227,7 +231,7 @@ func (ht *HostTree) Modify(hdbe modules.HostDBEntry) error {
 
 	entry := &hostEntry{
 		HostDBEntry: hdbe,
-		weight:      ht.weightfunc(hdbe),
+		weight:      ht.wf(hdbe),
 	}
 
 	_, node = ht.root.recursiveInsert(entry)
