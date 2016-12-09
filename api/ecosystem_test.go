@@ -16,6 +16,21 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// addStorageToAllHosts adds a storage folder with a bunch of storage to each
+// host.
+func addStorageToAllHosts(sts []*serverTester) error {
+	for _, st := range sts {
+		values := url.Values{}
+		values.Set("path", st.dir)
+		values.Set("size", "1048576")
+		err := st.stdPostAPI("/host/storage/folders/add", values)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // announceAllHosts will announce every host in the tester set to the
 // blockchain.
 func announceAllHosts(sts []*serverTester) error {

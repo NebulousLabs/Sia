@@ -13,15 +13,8 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TODO: Move to const file.
-//
-// maxActiveDownloadPieces indicates the maximum number of pieces that can be
-// actively getting downloaded at a time. Each piece will consume up to
-// modules.SectorSize of RAM. Parallelism for downloads is improved when this
-// number is increased.
 const (
 	defaultFilePerm         = 0666
-	maxActiveDownloadPieces = 25
 	maxDownloadLoopIdleTime = time.Minute * 10
 )
 
@@ -29,6 +22,17 @@ var (
 	errPrevErr            = errors.New("download could not be completed due to a previous error")
 	errInsufficientHosts  = errors.New("insufficient hosts to recover file")
 	errInsufficientPieces = errors.New("couldn't fetch enough pieces to recover data")
+
+	// maxActiveDownloadPieces determines the maximum number of pieces that are
+	// allowed to be concurrently downloading. More pieces means more
+	// parallelism, but also more RAM usage.
+	//
+	// TODO: Allow this number to be established in the renter settings.
+	maxActiveDownloadPieces = build.Select(build.Var{
+		Standard: int(25),
+		Dev:      int(10),
+		Testing:  int(5),
+	}).(int)
 )
 
 type (
@@ -125,11 +129,13 @@ func newDownload(f *file, destination string) *download {
 	for i := range d.pieceSet {
 		d.pieceSet[i] = make(map[types.FileContractID]pieceData)
 	}
+	f.mu.RLock()
 	for _, contract := range f.contracts {
 		for i := range contract.Pieces {
 			d.pieceSet[contract.Pieces[i].Chunk][contract.ID] = contract.Pieces[i]
 		}
 	}
+	f.mu.RUnlock()
 
 	return d
 }
@@ -279,7 +285,8 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 	r.mu.RUnlock(id)
 	if len(ds.incompleteChunks) == 0 && len(ds.activeWorkers) == 0 && queueSize == 0 {
 		// Nothing to do. Sleep until there is something to do, or until
-		// shutdown. Dislodge occasionally as a preventative measure.
+		// shutdown. Dislodge occasionally in case r.newDownloads misses a new
+		// download.
 		select {
 		case d := <-r.newDownloads:
 			r.addDownloadToChunkQueue(d)

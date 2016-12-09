@@ -79,40 +79,43 @@ func (r *Renter) addFileToRepairMatrix(file *file, availableWorkers map[types.Fi
 	// Iterate through each chunk and add the list of gaps to the repair
 	// matrix. The chunk will not be added if there are no gaps.
 	for i := uint64(0); i < chunkCount; i++ {
-		if len(availablePieces[i]) < file.erasureCode.NumPieces() {
-			// Find the gaps in the pieces and contracts.
-			potentialPieceGaps := make([]bool, file.erasureCode.NumPieces())
-			potentialContractGaps := make(map[types.FileContractID]struct{})
-			for _, contract := range contracts {
-				potentialContractGaps[contract] = struct{}{}
-			}
-
-			// Delete every available piece from the potential piece gaps, and
-			// every utilized contract from the potential contract gaps.
-			for _, piece := range availablePieces[i] {
-				potentialPieceGaps[piece] = true
-			}
-			for _, fcid := range utilizedContracts[i] {
-				delete(potentialContractGaps, fcid)
-			}
-
-			// Merge the gaps into a slice.
-			var gaps chunkGaps
-			for j, piece := range potentialPieceGaps {
-				if !piece {
-					gaps.pieces = append(gaps.pieces, uint64(j))
-				}
-			}
-			for fcid := range potentialContractGaps {
-				gaps.contracts = append(gaps.contracts, fcid)
-			}
-
-			// Record the number of gaps that this chunk has and add the chunk
-			// to the repair matrix.
-			gapCounts[gaps.numGaps()]++
-			cid := chunkID{i, file.name}
-			repairMatrix[cid] = &gaps
+		// Skip this chunk if all pieces have been uploaded.
+		if len(availablePieces[i]) >= file.erasureCode.NumPieces() {
+			continue
 		}
+
+		// Find the gaps in the pieces and contracts.
+		potentialPieceGaps := make([]bool, file.erasureCode.NumPieces())
+		potentialContractGaps := make(map[types.FileContractID]struct{})
+		for _, contract := range contracts {
+			potentialContractGaps[contract] = struct{}{}
+		}
+
+		// Delete every available piece from the potential piece gaps, and
+		// every utilized contract from the potential contract gaps.
+		for _, piece := range availablePieces[i] {
+			potentialPieceGaps[piece] = true
+		}
+		for _, fcid := range utilizedContracts[i] {
+			delete(potentialContractGaps, fcid)
+		}
+
+		// Merge the gaps into a slice.
+		var gaps chunkGaps
+		for j, piece := range potentialPieceGaps {
+			if !piece {
+				gaps.pieces = append(gaps.pieces, uint64(j))
+			}
+		}
+		for fcid := range potentialContractGaps {
+			gaps.contracts = append(gaps.contracts, fcid)
+		}
+
+		// Record the number of gaps that this chunk has and add the chunk
+		// to the repair matrix.
+		gapCounts[gaps.numGaps()]++
+		cid := chunkID{i, file.name}
+		repairMatrix[cid] = &gaps
 	}
 }
 
@@ -158,12 +161,25 @@ func (r *Renter) managedRepairIteration() {
 	}
 	r.mu.RUnlock(id)
 
+	// Drain the new file channel before making the repair matrix.
+	var done bool
+	for !done {
+		select{
+		case <-r.newFiles:
+		default:
+			done = true
+		}
+	}
+
 	// Create the repair matrix. The repair matrix is a set of chunks,
 	// linked from chunk id to the set of hosts that do not have that
 	// chunk.
+	println("creating repair matrix")
 	id = r.mu.Lock()
 	repairMatrix, gapCounts := r.createRepairMatrix(availableWorkers)
 	r.mu.Unlock(id)
+	println("the repair matrix has some elements in it")
+	println(len(repairMatrix))
 
 	// Determine the maximum number of gaps of any chunk in the repair matrix.
 	maxGaps := 0
@@ -186,20 +202,24 @@ func (r *Renter) managedRepairIteration() {
 		}
 	}
 
-	// Set up a loop that first waits for enough workers to become
-	// available, and then iterates through the repair matrix to find a
-	// chunk to repair.
+	// Create the worker state that will govern the chunk repair loop.
 	activeWorkers := make(map[types.FileContractID]struct{})
 	for k, v := range availableWorkers {
 		activeWorkers[k] = v
 	}
 	var retiredWorkers []types.FileContractID
 	resultChan := make(chan finishedUpload)
+
+	// Iterate until there is no more work to do. The loop starts by queuing up
+	// some work, and then proceeds to block until enough workers have returned
+	// that more work can be queued up.
 	for {
+		println("We are running circles around this loop, unable to make a difference becaues the gap accounting is incorrect")
+		time.Sleep(time.Millisecond * 50)
 		// Break if tg.Stop() has been called, to facilitate quick shutdown.
 		select {
 		case <-r.tg.StopChan():
-			break
+			return
 		default:
 		}
 
@@ -215,7 +235,11 @@ func (r *Renter) managedRepairIteration() {
 
 		// Determine the maximum number of gaps that any chunk has.
 		maxGaps := 0
+		println("gap count roundoff")
 		for i, gaps := range gapCounts {
+			println("gc iter")
+			println(i)
+			println(gaps)
 			if i > maxGaps && gaps > 0 {
 				maxGaps = i
 			}
@@ -226,8 +250,16 @@ func (r *Renter) managedRepairIteration() {
 		}
 
 		// Iterate through the chunks until a candidate chunk is found.
+		println("iter through repair")
 		var chunksToDelete []chunkID
 		for chunkID, chunkGaps := range repairMatrix {
+			println("got a chunk")
+			println(chunkGaps.numGaps())
+			// Skip this chunk if it does not have enough gaps.
+			if maxGaps >= minPiecesRepair && chunkGaps.numGaps() < minPiecesRepair {
+				continue
+			}
+
 			// Figure out how many pieces in this chunk could be repaired
 			// by the current availableWorkers.
 			var usefulWorkers []types.FileContractID
@@ -246,7 +278,7 @@ func (r *Renter) managedRepairIteration() {
 			//
 			// If there are gaps with the minimum number of gaps and this chunk
 			// cannot benefit sufficiently, iterate past it.
-			if maxGaps >= minPiecesRepair && (len(usefulWorkers) < minPiecesRepair || chunkGaps.numGaps() < minPiecesRepair) {
+			if maxGaps >= minPiecesRepair && len(usefulWorkers) < minPiecesRepair {
 				// The maxGaps for this chunk may have changed due to retired
 				// workers, so it should be updated. Remove the contract ids of
 				// any workers that have retired.
@@ -335,6 +367,7 @@ func (r *Renter) managedRepairIteration() {
 				delete(availableWorkers, usefulWorkers[0])
 				for j := 0; j < len(chunkGaps.contracts); j++ {
 					if chunkGaps.contracts[j] == usefulWorkers[0] {
+						println("found a storgm to delete")
 						gapCounts[chunkGaps.numGaps()]--
 						chunkGaps.contracts = append(chunkGaps.contracts[:j], chunkGaps.contracts[j+1:]...)
 						chunkGaps.pieces = chunkGaps.pieces[1:]
@@ -351,6 +384,13 @@ func (r *Renter) managedRepairIteration() {
 		// Delete any chunks that do not need work.
 		for _, ctd := range chunksToDelete {
 			delete(repairMatrix, ctd)
+		}
+
+		// If the number of workers currently available is equal to the number
+		// of active workers, there is no more work to be performed.
+		if len(activeWorkers) == len(availableWorkers) {
+			r.log.Debugln("WARN: Breaking early because there's no work to do.")
+			return
 		}
 
 		// Determine the number of workers we need in 'available'.
@@ -407,6 +447,7 @@ func (r *Renter) managedRepairIteration() {
 			select {
 			case file := <-r.newFiles:
 				r.addFileToRepairMatrix(file, activeWorkers, repairMatrix, gapCounts)
+				println("ADDED A NEW FILE TO THE REPAIR MATRIX!")
 			default:
 				done = true
 			}

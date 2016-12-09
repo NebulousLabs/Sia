@@ -505,7 +505,7 @@ func (st *serverTester) acceptContracts() error {
 	return st.stdPostAPI("/host", settingsValues)
 }
 
-// setHostStorage adds a 1 GB folder to the host.
+// setHostStorage adds a storage folder to the host.
 func (st *serverTester) setHostStorage() error {
 	values := url.Values{}
 	values.Set("path", st.dir)

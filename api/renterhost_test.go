@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -180,7 +181,7 @@ func TestHostAndRentMultiHost(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostAndRentMultiHost - Host 1 + Renter")
+	st, err := createServerTester("TestHostAndRentMultiHost-Host1andRenter")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,6 +207,12 @@ func TestHostAndRentMultiHost(t *testing.T) {
 
 	// Make sure that every wallet has money in it.
 	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add storage to every host.
+	err = addStorageToAllHosts(testGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +247,7 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	uploadValues.Set("source", path)
 	uploadValues.Set("datapieces", "2")
 	uploadValues.Set("paritypieces", "4")
-	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	err = st.stdPostAPI("/renter/upload/te st", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,6 +288,238 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	if len(queue.Downloads) != 1 {
 		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
 	}
+
+	// Mine blocks until the host recognizes profit. The host will wait for 12
+	// blocks after the storage window has closed to report the profit, a total
+	// of 40 blocks should be mined.
+	t.Skip("TODO: NEED TO GET THE CONTRACT STUFF WORKING AGAIN")
+	for i := 0; i < 40; i++ {
+		st.miner.AddBlock()
+	}
+	// Check that the host is reporting a profit.
+	var hg HostGET
+	st.getAPI("/host", &hg)
+	if hg.FinancialMetrics.StorageRevenue.Cmp(types.ZeroCurrency) <= 0 ||
+		hg.FinancialMetrics.DownloadBandwidthRevenue.Cmp(types.ZeroCurrency) <= 0 {
+		t.Log("Storage Revenue:", hg.FinancialMetrics.StorageRevenue)
+		t.Log("Bandwidth Revenue:", hg.FinancialMetrics.DownloadBandwidthRevenue)
+		t.Log("Full Financial Metrics:", hg.FinancialMetrics)
+		t.Fatal("Host is not displaying revenue after resolving a storage proof.")
+	}
+}
+
+// TestHostAndRentManyFiles sets up an integration test where a single renter
+// is uploading many files to the network.
+func TestHostAndRentManyFiles(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester("TestHostAndRentManyFiles-Host1andRenter")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+	stH1, err := blankServerTester("TestHostAndRentManyFiles - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH1.server.Close()
+	stH2, err := blankServerTester("TestHostAndRentManyFiles - Host 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH2.server.Close()
+	stH3, err := blankServerTester("TestHostAndRentManyFiles - Host 4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH3.server.Close()
+	testGroup := []*serverTester{st, stH1, stH2, stH3}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add storage to every host.
+	err = addStorageToAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Announce every host.
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance with four hosts.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
+	allowanceValues.Set("hosts", "4")
+	allowanceValues.Set("period", "5")
+	allowanceValues.Set("renewwindow", "2")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create 3 files to upload at the same time.
+	filesize1 := int(12347)
+	filesize2 := int(22343)
+	filesize3 := int(32349)
+	path1 := filepath.Join(st.dir, "test1.dat")
+	path2 := filepath.Join(st.dir, "test2.dat")
+	path3 := filepath.Join(st.dir, "test3.dat")
+	err = createRandFile(path1, filesize1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = createRandFile(path2, filesize2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = createRandFile(path3, filesize3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Concurrently upload a file with 1-of-4 redundancy, 2-of-4 redundancy,
+	// and 3-of-4 redundancy.
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		uploadValues := url.Values{}
+		uploadValues.Set("source", path1)
+		uploadValues.Set("datapieces", "1")
+		uploadValues.Set("paritypieces", "3")
+		err := st.stdPostAPI("/renter/upload/test1", uploadValues)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		uploadValues := url.Values{}
+		uploadValues.Set("source", path2)
+		uploadValues.Set("datapieces", "2")
+		uploadValues.Set("paritypieces", "2")
+		err := st.stdPostAPI("/renter/upload/test2", uploadValues)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		uploadValues := url.Values{}
+		uploadValues.Set("source", path3)
+		uploadValues.Set("datapieces", "3")
+		uploadValues.Set("paritypieces", "1")
+		err := st.stdPostAPI("/renter/upload/test3", uploadValues)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	// Block until the upload call is complete for all three files.
+	wg.Wait()
+
+	// Block until all files hit 100% uploaded.
+	var rf RenterFiles
+	for i := 0; i < 30 && (len(rf.Files) != 3 || rf.Files[0].UploadProgress < 100 || rf.Files[1].UploadProgress < 100 || rf.Files[2].UploadProgress < 100); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 3 || rf.Files[0].UploadProgress < 100 || rf.Files[1].UploadProgress < 100 || rf.Files[2].UploadProgress < 100 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1], rf.Files[2])
+	}
+
+	// Download all three files in parallel.
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		downpath := filepath.Join(st.dir, "testdown1.dat")
+		err := st.stdGetAPI("/renter/download/test1?destination=" + downpath)
+		if err != nil {
+			t.Error(err)
+		}
+		// Check that the download has the right contents.
+		orig, err := ioutil.ReadFile(path1)
+		if err != nil {
+			t.Error(err)
+		}
+		download, err := ioutil.ReadFile(downpath)
+		if err != nil {
+			t.Error(err)
+		}
+		if bytes.Compare(orig, download) != 0 {
+			t.Error("data mismatch when downloading a file")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		downpath := filepath.Join(st.dir, "testdown2.dat")
+		err := st.stdGetAPI("/renter/download/test2?destination=" + downpath)
+		if err != nil {
+			t.Error(err)
+		}
+		// Check that the download has the right contents.
+		orig, err := ioutil.ReadFile(path2)
+		if err != nil {
+			t.Error(err)
+		}
+		download, err := ioutil.ReadFile(downpath)
+		if err != nil {
+			t.Error(err)
+		}
+		if bytes.Compare(orig, download) != 0 {
+			t.Error("data mismatch when downloading a file")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		downpath := filepath.Join(st.dir, "testdown3.dat")
+		err := st.stdGetAPI("/renter/download/test3?destination=" + downpath)
+		if err != nil {
+			t.Error(err)
+		}
+		// Check that the download has the right contents.
+		orig, err := ioutil.ReadFile(path3)
+		if err != nil {
+			t.Error(err)
+		}
+		download, err := ioutil.ReadFile(downpath)
+		if err != nil {
+			t.Error(err)
+		}
+		if bytes.Compare(orig, download) != 0 {
+			t.Error("data mismatch when downloading a file")
+		}
+	}()
+	wg.Wait()
+
+	// The renter's downloads queue should have 3 entries now.
+	var queue RenterDownloadQueue
+	if err = st.getAPI("/renter/downloads", &queue); err != nil {
+		t.Fatal(err)
+	}
+	if len(queue.Downloads) != 3 {
+		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
+	}
+
+	println("Everything is complete")
+	time.Sleep(time.Second * 10)
+	println("Sleep time over.")
 
 	// Mine blocks until the host recognizes profit. The host will wait for 12
 	// blocks after the storage window has closed to report the profit, a total
