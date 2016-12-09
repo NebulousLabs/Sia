@@ -7,10 +7,12 @@ import (
 	"io"
 	"math/big"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -161,33 +163,118 @@ func TestHostTree(t *testing.T) {
 	}
 }
 
-// Verify that inserting and fetching in parallel from the hosttree does not
-// cause a data race. We rely on the race detector for this test.
+// Verify that inserting, fetching, deleting, and modifying in parallel from
+// the hosttree does not cause inconsistency.
 func TestHostTreeParallel(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	tree := New(func(dbe modules.HostDBEntry) types.Currency {
 		return types.NewCurrency64(10)
 	})
 
-	go func() {
-		time.Sleep(time.Millisecond * 4)
-		treeSize := 100
-		var keys []types.SiaPublicKey
-		for i := 0; i < treeSize; i++ {
-			entry := makeHostDBEntry()
-			keys = append(keys, entry.PublicKey)
-			err := tree.Insert(entry)
-			if err != nil {
-				t.Fatal(err)
+	// spin up 100 goroutines all randomly inserting, removing, modifying, and
+	// fetching nodes from the tree.
+	var tg siasync.ThreadGroup
+	nthreads := 100
+	nelements := 0
+	var mu sync.Mutex
+	for i := 0; i < nthreads; i++ {
+		go func() {
+			tg.Add()
+			defer tg.Done()
+
+			inserted := make(map[string]modules.HostDBEntry)
+			randEntry := func() *modules.HostDBEntry {
+				for _, entry := range inserted {
+					return &entry
+				}
+				return nil
 			}
-		}
-	}()
-	go func() {
-		time.Sleep(time.Millisecond * 5)
-		_, err := tree.Fetch(2, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+
+			for {
+				select {
+				case <-time.After(time.Second * 50):
+				case <-tg.StopChan():
+					return
+				default:
+					randInt, err := rand.Int(rand.Reader, big.NewInt(4))
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					// INSERT
+					if randInt.Uint64() == 0 {
+						entry := makeHostDBEntry()
+						err := tree.Insert(entry)
+						if err != nil {
+							t.Error(err)
+						}
+						inserted[string(entry.PublicKey.Key)] = entry
+
+						mu.Lock()
+						nelements++
+						mu.Unlock()
+					}
+
+					// REMOVE
+					if randInt.Uint64() == 1 {
+						entry := randEntry()
+						if entry == nil {
+							continue
+						}
+						err := tree.Remove(entry.PublicKey)
+						if err != nil {
+							t.Error(err)
+						}
+						delete(inserted, string(entry.PublicKey.Key))
+
+						mu.Lock()
+						nelements--
+						mu.Unlock()
+					}
+
+					// MODIFY
+					if randInt.Uint64() == 2 {
+						entry := randEntry()
+						if entry == nil {
+							continue
+						}
+						newentry := makeHostDBEntry()
+						newentry.PublicKey = entry.PublicKey
+						newentry.NetAddress = "127.0.0.1:31337"
+
+						err := tree.Modify(newentry)
+						if err != nil {
+							t.Error(err)
+						}
+						inserted[string(entry.PublicKey.Key)] = newentry
+					}
+
+					// FETCH
+					if randInt.Uint64() == 3 {
+						_, err := tree.Fetch(3, nil)
+						if err != nil {
+							t.Error(err)
+						}
+					}
+				}
+			}
+		}()
+	}
+
+	// let these goroutines operate on the tree for 5 seconds
+	time.Sleep(time.Second * 5)
+
+	// stop the goroutines
+	tg.Stop()
+
+	// verify the consistency of the tree
+	err := verifyTree(tree, int(nelements))
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestHostTreeModify(t *testing.T) {
