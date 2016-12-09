@@ -5,7 +5,7 @@ Sia 1.0.4
 [![GoDoc](https://godoc.org/github.com/NebulousLabs/Sia?status.svg)](https://godoc.org/github.com/NebulousLabs/Sia)
 [![Go Report Card](https://goreportcard.com/badge/github.com/NebulousLabs/Sia)](https://goreportcard.com/report/github.com/NebulousLabs/Sia)
 
-Binaries can be found at [our website](http://siacoin.com). Code for the graphical front-end can be found at the [Sia-UI](https://github.com/NebulousLabs/Sia-UI) repo.
+Binaries can be found at [our website](http://sia.tech). Code for the graphical front-end can be found at the [Sia-UI](https://github.com/NebulousLabs/Sia-UI) repo.
 
 Sia is a new decentralized cloud storage platform aimed at giving users control
 of their data. Data is split into hundreds of erasure coded pieces and
@@ -97,7 +97,7 @@ Troubleshooting
 
 If your issue is not addressed above, you can get in touch with us personally:
 
-  slack: http://slackin.siacoin.com (ping @taek, @nemo, or @jordan)
+  slack: http://siatalk.sia.tech (ping @taek, @nemo, or @jordan)
 
   email:
   
