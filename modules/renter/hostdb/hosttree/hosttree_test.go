@@ -40,7 +40,7 @@ func verifyTree(tree *HostTree, nentries int) error {
 			if len(entries) == 0 {
 				return errors.New("no hosts")
 			}
-			selectionMap[entries[0].PublicKey.String()]++
+			selectionMap[string(entries[0].PublicKey.Key)]++
 		}
 
 		// See if each host was selected enough times.
@@ -67,7 +67,7 @@ func verifyTree(tree *HostTree, nentries int) error {
 			break
 		}
 		node.remove()
-		delete(tree.hosts, node.entry.PublicKey.String())
+		delete(tree.hosts, string(node.entry.PublicKey.Key))
 
 		// remove the entry from the hostdb so it won't be selected as a
 		// repeat
@@ -187,7 +187,7 @@ func TestHostTreeModify(t *testing.T) {
 
 	targetKey := keys[randIndex.Uint64()]
 
-	oldEntry := tree.hosts[targetKey.String()].entry
+	oldEntry := tree.hosts[string(targetKey.Key)].entry
 	newEntry := makeHostEntry(types.NewCurrency64(30))
 	newEntry.AcceptingContracts = false
 	newEntry.PublicKey = oldEntry.PublicKey
@@ -197,7 +197,7 @@ func TestHostTreeModify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if tree.hosts[targetKey.String()].entry.AcceptingContracts {
+	if tree.hosts[string(targetKey.Key)].entry.AcceptingContracts {
 		t.Fatal("modify did not update host entry")
 	}
 }
@@ -236,7 +236,7 @@ func TestVariedWeights(t *testing.T) {
 		if len(randEntry) == 0 {
 			t.Fatal("no hosts!")
 		}
-		node, exists := tree.hosts[randEntry[0].PublicKey.String()]
+		node, exists := tree.hosts[string(randEntry[0].PublicKey.Key)]
 		if !exists {
 			t.Fatal("can't find randomly selected node in tree")
 		}

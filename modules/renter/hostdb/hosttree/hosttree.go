@@ -175,24 +175,24 @@ func (n *node) remove() {
 // Insert inserts the entry provided to `entry` into the host tree. Insert will
 // return an error if the input host already exists.
 func (ht *HostTree) Insert(entry *HostEntry) error {
-	if _, exists := ht.hosts[entry.PublicKey.String()]; exists {
+	if _, exists := ht.hosts[string(entry.PublicKey.Key)]; exists {
 		return ErrHostExists
 	}
 
 	_, node := ht.root.recursiveInsert(entry)
 
-	ht.hosts[entry.PublicKey.String()] = node
+	ht.hosts[string(entry.PublicKey.Key)] = node
 	return nil
 }
 
 // Remove removes the host with the public key provided by `pk`.
 func (ht *HostTree) Remove(pk types.SiaPublicKey) error {
-	node, exists := ht.hosts[pk.String()]
+	node, exists := ht.hosts[string(pk.Key)]
 	if !exists {
 		return ErrNoSuchHost
 	}
 	node.remove()
-	delete(ht.hosts, pk.String())
+	delete(ht.hosts, string(pk.Key))
 
 	return nil
 }
@@ -200,7 +200,7 @@ func (ht *HostTree) Remove(pk types.SiaPublicKey) error {
 // Modify updates a host entry at the given public key, replacing the old entry
 // with the entry provided by `newEntry`.
 func (ht *HostTree) Modify(entry *HostEntry) error {
-	node, exists := ht.hosts[entry.PublicKey.String()]
+	node, exists := ht.hosts[string(entry.PublicKey.Key)]
 	if !exists {
 		return ErrNoSuchHost
 	}
@@ -208,7 +208,7 @@ func (ht *HostTree) Modify(entry *HostEntry) error {
 	node.remove()
 	_, node = ht.root.recursiveInsert(entry)
 
-	ht.hosts[entry.PublicKey.String()] = node
+	ht.hosts[string(entry.PublicKey.Key)] = node
 	return nil
 }
 
@@ -221,12 +221,12 @@ func (ht *HostTree) Fetch(n int, ignore []types.SiaPublicKey) ([]modules.HostDBE
 	var removedEntries []*HostEntry
 
 	for _, pubkey := range ignore {
-		node, exists := ht.hosts[pubkey.String()]
+		node, exists := ht.hosts[string(pubkey.Key)]
 		if !exists {
 			continue
 		}
 		node.remove()
-		delete(ht.hosts, pubkey.String())
+		delete(ht.hosts, string(pubkey.Key))
 		removedEntries = append(removedEntries, node.entry)
 	}
 
@@ -246,7 +246,7 @@ func (ht *HostTree) Fetch(n int, ignore []types.SiaPublicKey) ([]modules.HostDBE
 
 		removedEntries = append(removedEntries, node.entry)
 		node.remove()
-		delete(ht.hosts, node.entry.PublicKey.String())
+		delete(ht.hosts, string(node.entry.PublicKey.Key))
 	}
 
 	for _, entry := range removedEntries {
