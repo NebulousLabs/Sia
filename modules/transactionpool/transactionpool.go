@@ -135,6 +135,9 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 // The transactions are provided in an order that can acceptably be put into a
 // block.
 func (tp *TransactionPool) TransactionList() []types.Transaction {
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
 	var txns []types.Transaction
 	for _, tSet := range tp.transactionSets {
 		txns = append(txns, tSet...)
