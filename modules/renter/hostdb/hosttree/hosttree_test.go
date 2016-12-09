@@ -36,7 +36,7 @@ func verifyTree(tree *HostTree, nentries int) error {
 		selectionMap := make(map[string]int)
 		expected := 100
 		for i := 0; i < expected*nentries; i++ {
-			entries, err := tree.Fetch(1, nil)
+			entries, err := tree.SelectRandom(1, nil)
 			if err != nil {
 				return err
 			}
@@ -254,7 +254,7 @@ func TestHostTreeParallel(t *testing.T) {
 
 					// FETCH
 					if randInt.Uint64() == 3 {
-						_, err := tree.Fetch(3, nil)
+						_, err := tree.SelectRandom(3, nil)
 						if err != nil {
 							t.Error(err)
 						}
@@ -350,7 +350,7 @@ func TestVariedWeights(t *testing.T) {
 	// time.
 	selectionMap := make(map[string]int)
 	for i := 0; i < selections; i++ {
-		randEntry, err := tree.Fetch(1, nil)
+		randEntry, err := tree.SelectRandom(1, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -430,7 +430,7 @@ func TestNodeAtWeight(t *testing.T) {
 	}
 }
 
-// TestRandomHosts probes the Fetch method.
+// TestRandomHosts probes the SelectRandom method.
 func TestRandomHosts(t *testing.T) {
 	calls := 0
 	// Create the tree.
@@ -440,7 +440,7 @@ func TestRandomHosts(t *testing.T) {
 	})
 
 	// Empty.
-	hosts, err := tree.Fetch(1, nil)
+	hosts, err := tree.SelectRandom(1, nil)
 	if len(hosts) != 0 {
 		t.Errorf("empty hostdb returns %v hosts: %v", len(hosts), hosts)
 	}
@@ -472,7 +472,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 1 random host.
-	randHosts, err := tree.Fetch(1, nil)
+	randHosts, err := tree.SelectRandom(1, nil)
 	if len(randHosts) != 1 {
 		t.Error("didn't get 1 hosts")
 	}
@@ -481,7 +481,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 2 random hosts.
-	randHosts, err = tree.Fetch(2, nil)
+	randHosts, err = tree.SelectRandom(2, nil)
 	if len(randHosts) != 2 {
 		t.Error("didn't get 2 hosts")
 	}
@@ -493,7 +493,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 3 random hosts.
-	randHosts, err = tree.Fetch(3, nil)
+	randHosts, err = tree.SelectRandom(3, nil)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
@@ -506,7 +506,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 4 random hosts. 3 should be returned.
-	randHosts, err = tree.Fetch(4, nil)
+	randHosts, err = tree.SelectRandom(4, nil)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
@@ -520,7 +520,7 @@ func TestRandomHosts(t *testing.T) {
 
 	// Ask for 3 hosts that are not in randHosts. No hosts should be
 	// returned.
-	uniqueHosts, err := tree.Fetch(3, []types.SiaPublicKey{
+	uniqueHosts, err := tree.SelectRandom(3, []types.SiaPublicKey{
 		randHosts[0].PublicKey,
 		randHosts[1].PublicKey,
 		randHosts[2].PublicKey,
@@ -533,7 +533,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Ask for 3 hosts, blacklisting non-existent hosts. 3 should be returned.
-	randHosts, err = tree.Fetch(3, []types.SiaPublicKey{{}, {}, {}})
+	randHosts, err = tree.SelectRandom(3, []types.SiaPublicKey{{}, {}, {}})
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
@@ -552,7 +552,7 @@ func TestRandomHosts(t *testing.T) {
 	tree.Insert(entry4)
 
 	// Grab 4 random hosts. 3 should be returned.
-	randHosts, err = tree.Fetch(4, nil)
+	randHosts, err = tree.SelectRandom(4, nil)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}

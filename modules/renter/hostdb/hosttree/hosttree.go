@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	// errWeightTooHeavy is returned from a Fetch() call if a weight that exceeds
+	// errWeightTooHeavy is returned from a SelectRandom() call if a weight that exceeds
 	// the total weight of the tree is requested.
 	errWeightTooHeavy = errors.New("requested a too-heavy weight")
 
@@ -241,11 +241,11 @@ func (ht *HostTree) Modify(hdbe modules.HostDBEntry) error {
 	return nil
 }
 
-// Fetch grabs a random `n` hosts from the tree. There will be no repeats, but
-// the length of the slice returned may be less than `n`, and may even be zero.
+// SelectRandom grabs a random n hosts from the tree. There will be no repeats, but
+// the length of the slice returned may be less than n, and may even be zero.
 // The hosts that are returned first have the higher priority. Hosts passed to
-// `ignore` will not be considered; pass `nil` if no blacklist is desired.
-func (ht *HostTree) Fetch(n int, ignore []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
+// 'ignore' will not be considered; pass `nil` if no blacklist is desired.
+func (ht *HostTree) SelectRandom(n int, ignore []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
 	ht.mu.Lock()
 	defer ht.mu.Unlock()
 
