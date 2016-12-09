@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -158,6 +159,33 @@ func TestHostTree(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+// Verify that inserting and fetching in parallel from the hosttree does not
+// cause a data race. We rely on the race detector for this test.
+func TestHostTreeParallel(t *testing.T) {
+	tree := New()
+
+	go func() {
+		time.Sleep(time.Millisecond * 4)
+		treeSize := 100
+		var keys []types.SiaPublicKey
+		for i := 0; i < treeSize; i++ {
+			entry := makeHostEntry(types.NewCurrency64(20))
+			keys = append(keys, entry.PublicKey)
+			err := tree.Insert(entry)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}()
+	go func() {
+		time.Sleep(time.Millisecond * 5)
+		_, err := tree.Fetch(2, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 }
 
 func TestHostTreeModify(t *testing.T) {
