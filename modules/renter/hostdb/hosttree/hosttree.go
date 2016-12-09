@@ -42,16 +42,16 @@ type (
 		// hosts is a map of public keys to nodes.
 		hosts map[string]*node
 
+		// a weightfunc applies a weight to a hostEntry
+		weightfunc func(modules.HostDBEntry) types.Currency
+
 		mu sync.Mutex
 	}
 
-	// HostEntry is an entry in the host tree.
-	HostEntry struct {
+	// hostEntry is an entry in the host tree.
+	hostEntry struct {
 		modules.HostDBEntry
 		weight types.Currency
-
-		FirstSeen   types.BlockHeight
-		Reliability types.Currency
 	}
 
 	// node is a node in the tree.
@@ -64,12 +64,12 @@ type (
 		taken bool // `taken` indicates whether there is an active host at this node or not.
 
 		weight types.Currency
-		entry  *HostEntry
+		entry  *hostEntry
 	}
 )
 
 // createNode creates a new node using the provided `parent` and `entry`.
-func createNode(parent *node, entry *HostEntry) *node {
+func createNode(parent *node, entry *hostEntry) *node {
 	return &node{
 		parent: parent,
 		weight: entry.weight,
@@ -81,19 +81,20 @@ func createNode(parent *node, entry *HostEntry) *node {
 }
 
 // New creates a new, empty, HostTree.
-func New() *HostTree {
+func New(wf func(modules.HostDBEntry) types.Currency) *HostTree {
 	return &HostTree{
 		root: &node{
 			count: 1,
 		},
-		hosts: make(map[string]*node),
+		weightfunc: wf,
+		hosts:      make(map[string]*node),
 	}
 }
 
 // recursiveInsert inserts an entry into the appropriate place in the tree. The
 // running time of recursiveInsert is log(n) in the maximum number of elements
 // that have ever been in the tree.
-func (n *node) recursiveInsert(entry *HostEntry) (nodesAdded int, newnode *node) {
+func (n *node) recursiveInsert(entry *hostEntry) (nodesAdded int, newnode *node) {
 	// If there is no parent and no children, and the node is not taken, assign
 	// this entry to this node.
 	if n.parent == nil && n.left == nil && n.right == nil && !n.taken {
@@ -177,9 +178,14 @@ func (n *node) remove() {
 
 // Insert inserts the entry provided to `entry` into the host tree. Insert will
 // return an error if the input host already exists.
-func (ht *HostTree) Insert(entry *HostEntry) error {
+func (ht *HostTree) Insert(hdbe modules.HostDBEntry) error {
 	ht.mu.Lock()
 	defer ht.mu.Unlock()
+
+	entry := &hostEntry{
+		HostDBEntry: hdbe,
+		weight:      ht.weightfunc(hdbe),
+	}
 
 	if _, exists := ht.hosts[string(entry.PublicKey.Key)]; exists {
 		return ErrHostExists
@@ -208,16 +214,22 @@ func (ht *HostTree) Remove(pk types.SiaPublicKey) error {
 
 // Modify updates a host entry at the given public key, replacing the old entry
 // with the entry provided by `newEntry`.
-func (ht *HostTree) Modify(entry *HostEntry) error {
+func (ht *HostTree) Modify(hdbe modules.HostDBEntry) error {
 	ht.mu.Lock()
 	defer ht.mu.Unlock()
 
-	node, exists := ht.hosts[string(entry.PublicKey.Key)]
+	node, exists := ht.hosts[string(hdbe.PublicKey.Key)]
 	if !exists {
 		return ErrNoSuchHost
 	}
 
 	node.remove()
+
+	entry := &hostEntry{
+		HostDBEntry: hdbe,
+		weight:      ht.weightfunc(hdbe),
+	}
+
 	_, node = ht.root.recursiveInsert(entry)
 
 	ht.hosts[string(entry.PublicKey.Key)] = node
@@ -233,7 +245,7 @@ func (ht *HostTree) Fetch(n int, ignore []types.SiaPublicKey) ([]modules.HostDBE
 	defer ht.mu.Unlock()
 
 	var hosts []modules.HostDBEntry
-	var removedEntries []*HostEntry
+	var removedEntries []*hostEntry
 
 	for _, pubkey := range ignore {
 		node, exists := ht.hosts[string(pubkey.Key)]

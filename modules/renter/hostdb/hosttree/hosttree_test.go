@@ -54,7 +54,7 @@ func verifyTree(tree *HostTree, nentries int) error {
 	}
 
 	// Try removing an re-adding all hosts.
-	var removedEntries []*HostEntry
+	var removedEntries []*hostEntry
 	for {
 		if tree.root.weight.IsZero() {
 			break
@@ -75,14 +75,16 @@ func verifyTree(tree *HostTree, nentries int) error {
 		removedEntries = append(removedEntries, node.entry)
 	}
 	for _, entry := range removedEntries {
-		tree.Insert(entry)
+		tree.Insert(entry.HostDBEntry)
 	}
 	return nil
 }
 
-// makeHostEntry makes a new host entry with a random public key and the weight
+// makeHostDBEntry makes a new host entry with a random public key and the weight
 // provided to `weight`.
-func makeHostEntry(weight types.Currency) *HostEntry {
+func makeHostDBEntry() modules.HostDBEntry {
+	dbe := modules.HostDBEntry{}
+
 	pk := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       make([]byte, 32),
@@ -92,24 +94,22 @@ func makeHostEntry(weight types.Currency) *HostEntry {
 		panic(err)
 	}
 
-	dbe := modules.HostDBEntry{}
 	dbe.AcceptingContracts = true
 	dbe.PublicKey = pk
 
-	return &HostEntry{
-		HostDBEntry: dbe,
-		weight:      weight,
-	}
+	return dbe
 }
 
 func TestHostTree(t *testing.T) {
-	tree := New()
+	tree := New(func(hdbe modules.HostDBEntry) types.Currency {
+		return types.NewCurrency64(20)
+	})
 
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64
 	var keys []types.SiaPublicKey
 	for i := 0; i < firstInsertions; i++ {
-		entry := makeHostEntry(types.NewCurrency64(10))
+		entry := makeHostDBEntry()
 		keys = append(keys, entry.PublicKey)
 		err := tree.Insert(entry)
 		if err != nil {
@@ -152,7 +152,7 @@ func TestHostTree(t *testing.T) {
 	// Do some more insertions.
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
-		entry := makeHostEntry(types.NewCurrency64(10))
+		entry := makeHostDBEntry()
 		tree.Insert(entry)
 	}
 	err = verifyTree(tree, firstInsertions-len(removed)+secondInsertions)
@@ -164,14 +164,16 @@ func TestHostTree(t *testing.T) {
 // Verify that inserting and fetching in parallel from the hosttree does not
 // cause a data race. We rely on the race detector for this test.
 func TestHostTreeParallel(t *testing.T) {
-	tree := New()
+	tree := New(func(dbe modules.HostDBEntry) types.Currency {
+		return types.NewCurrency64(10)
+	})
 
 	go func() {
 		time.Sleep(time.Millisecond * 4)
 		treeSize := 100
 		var keys []types.SiaPublicKey
 		for i := 0; i < treeSize; i++ {
-			entry := makeHostEntry(types.NewCurrency64(20))
+			entry := makeHostDBEntry()
 			keys = append(keys, entry.PublicKey)
 			err := tree.Insert(entry)
 			if err != nil {
@@ -189,12 +191,14 @@ func TestHostTreeParallel(t *testing.T) {
 }
 
 func TestHostTreeModify(t *testing.T) {
-	tree := New()
+	tree := New(func(dbe modules.HostDBEntry) types.Currency {
+		return types.NewCurrency64(10)
+	})
 
 	treeSize := 100
 	var keys []types.SiaPublicKey
 	for i := 0; i < treeSize; i++ {
-		entry := makeHostEntry(types.NewCurrency64(20))
+		entry := makeHostDBEntry()
 		keys = append(keys, entry.PublicKey)
 		err := tree.Insert(entry)
 		if err != nil {
@@ -208,7 +212,7 @@ func TestHostTreeModify(t *testing.T) {
 	}
 
 	// should fail with a nonexistent key
-	err = tree.Modify(&HostEntry{})
+	err = tree.Modify(modules.HostDBEntry{})
 	if err != ErrNoSuchHost {
 		t.Fatalf("modify should fail with ErrNoSuchHost when provided a nonexistent public key. Got error: %v\n", err)
 	}
@@ -216,7 +220,7 @@ func TestHostTreeModify(t *testing.T) {
 	targetKey := keys[randIndex.Uint64()]
 
 	oldEntry := tree.hosts[string(targetKey.Key)].entry
-	newEntry := makeHostEntry(types.NewCurrency64(30))
+	newEntry := makeHostDBEntry()
 	newEntry.AcceptingContracts = false
 	newEntry.PublicKey = oldEntry.PublicKey
 
@@ -237,18 +241,20 @@ func TestVariedWeights(t *testing.T) {
 		t.SkipNow()
 	}
 
-	tree := New()
-
 	// insert i hosts with the weights 0, 1, ..., i-1. 100e3 selections will be made
 	// per weight added to the tree, the total number of selections necessary
 	// will be tallied up as hosts are created.
-	var dbe modules.HostDBEntry
-	dbe.AcceptingContracts = true
+	i := 0
+
+	tree := New(func(dbe modules.HostDBEntry) types.Currency {
+		return types.NewCurrency64(uint64(i))
+	})
+
 	hostCount := 5
 	expectedPerWeight := int(10e3)
 	selections := 0
-	for i := 0; i < hostCount; i++ {
-		entry := makeHostEntry(types.NewCurrency64(uint64(i)))
+	for i = 0; i < hostCount; i++ {
+		entry := makeHostDBEntry()
 		tree.Insert(entry)
 		selections += i * expectedPerWeight
 	}
@@ -295,15 +301,14 @@ func TestRepeatInsert(t *testing.T) {
 		t.SkipNow()
 	}
 
-	tree := New()
+	tree := New(func(dbe modules.HostDBEntry) types.Currency {
+		return types.NewCurrency64(10)
+	})
 
-	entry1 := makeHostEntry(types.NewCurrency64(1))
+	entry1 := makeHostDBEntry()
 	entry2 := entry1
 
 	tree.Insert(entry1)
-
-	entry2.weight = types.NewCurrency64(100)
-
 	tree.Insert(entry2)
 	if len(tree.hosts) != 1 {
 		t.Error("insterting the same entry twice should result in only 1 entry")
@@ -312,33 +317,40 @@ func TestRepeatInsert(t *testing.T) {
 
 // TestNodeAtWeight tests the nodeAtWeight method.
 func TestNodeAtWeight(t *testing.T) {
+	weight := types.NewCurrency64(10)
 	// create hostTree
-	tree := New()
+	tree := New(func(dbe modules.HostDBEntry) types.Currency {
+		return weight
+	})
 
-	entry := makeHostEntry(types.NewCurrency64(100))
+	entry := makeHostDBEntry()
 	err := tree.Insert(entry)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// overweight
-	_, err = tree.root.nodeAtWeight(entry.weight.Mul64(2))
+	_, err = tree.root.nodeAtWeight(weight.Mul64(2))
 	if err != ErrWeightTooHeavy {
 		t.Errorf("expected %v, got %v", ErrWeightTooHeavy, err)
 	}
 
-	h, err := tree.root.nodeAtWeight(entry.weight)
+	h, err := tree.root.nodeAtWeight(weight)
 	if err != nil {
 		t.Error(err)
-	} else if h.entry != entry {
+	} else if string(h.entry.HostDBEntry.PublicKey.Key) != string(entry.PublicKey.Key) {
 		t.Errorf("nodeAtWeight returned wrong node: expected %v, got %v", entry, h.entry)
 	}
 }
 
 // TestRandomHosts probes the Fetch method.
 func TestRandomHosts(t *testing.T) {
+	calls := 0
 	// Create the tree.
-	tree := New()
+	tree := New(func(dbe modules.HostDBEntry) types.Currency {
+		calls++
+		return types.NewCurrency64(uint64(calls))
+	})
 
 	// Empty.
 	hosts, err := tree.Fetch(1, nil)
@@ -350,9 +362,9 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Insert 3 hosts to be selected.
-	entry1 := makeHostEntry(types.NewCurrency64(1))
-	entry2 := makeHostEntry(types.NewCurrency64(2))
-	entry3 := makeHostEntry(types.NewCurrency64(3))
+	entry1 := makeHostDBEntry()
+	entry2 := makeHostDBEntry()
+	entry3 := makeHostDBEntry()
 
 	if err = tree.Insert(entry1); err != nil {
 		t.Fatal(err)
@@ -448,7 +460,7 @@ func TestRandomHosts(t *testing.T) {
 
 	// entry4 should not every be returned by RandomHosts because it is not
 	// accepting contracts.
-	entry4 := makeHostEntry(types.NewCurrency64(4))
+	entry4 := makeHostDBEntry()
 	entry4.AcceptingContracts = false
 	tree.Insert(entry4)
 
