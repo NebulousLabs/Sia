@@ -3,6 +3,7 @@ package hosttree
 import (
 	"crypto/rand"
 	"errors"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -40,6 +41,8 @@ type (
 
 		// hosts is a map of public keys to nodes.
 		hosts map[string]*node
+
+		mu sync.Mutex
 	}
 
 	// HostEntry is an entry in the host tree.
@@ -175,6 +178,9 @@ func (n *node) remove() {
 // Insert inserts the entry provided to `entry` into the host tree. Insert will
 // return an error if the input host already exists.
 func (ht *HostTree) Insert(entry *HostEntry) error {
+	ht.mu.Lock()
+	defer ht.mu.Unlock()
+
 	if _, exists := ht.hosts[string(entry.PublicKey.Key)]; exists {
 		return ErrHostExists
 	}
@@ -187,6 +193,9 @@ func (ht *HostTree) Insert(entry *HostEntry) error {
 
 // Remove removes the host with the public key provided by `pk`.
 func (ht *HostTree) Remove(pk types.SiaPublicKey) error {
+	ht.mu.Lock()
+	defer ht.mu.Unlock()
+
 	node, exists := ht.hosts[string(pk.Key)]
 	if !exists {
 		return ErrNoSuchHost
@@ -200,6 +209,9 @@ func (ht *HostTree) Remove(pk types.SiaPublicKey) error {
 // Modify updates a host entry at the given public key, replacing the old entry
 // with the entry provided by `newEntry`.
 func (ht *HostTree) Modify(entry *HostEntry) error {
+	ht.mu.Lock()
+	defer ht.mu.Unlock()
+
 	node, exists := ht.hosts[string(entry.PublicKey.Key)]
 	if !exists {
 		return ErrNoSuchHost
@@ -217,6 +229,9 @@ func (ht *HostTree) Modify(entry *HostEntry) error {
 // The hosts that are returned first have the higher priority. Hosts passed to
 // `ignore` will not be considered; pass `nil` if no blacklist is desired.
 func (ht *HostTree) Fetch(n int, ignore []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
+	ht.mu.Lock()
+	defer ht.mu.Unlock()
+
 	var hosts []modules.HostDBEntry
 	var removedEntries []*HostEntry
 
@@ -250,10 +265,9 @@ func (ht *HostTree) Fetch(n int, ignore []types.SiaPublicKey) ([]modules.HostDBE
 	}
 
 	for _, entry := range removedEntries {
-		err := ht.Insert(entry)
-		if err != nil {
-			return hosts, err
-		}
+		_, node := ht.root.recursiveInsert(entry)
+
+		ht.hosts[string(entry.PublicKey.Key)] = node
 	}
 
 	return hosts, nil
