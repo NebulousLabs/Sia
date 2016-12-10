@@ -1,5 +1,14 @@
 package renter
 
+// TODO: Need to make sure that the activePieces variable is being managed
+// correctly, as inconsistencies with it could cause a lot of problems, and
+// inconsistencies aren't necessarily easy to detect during testing.
+
+// NOTE: All chunk recovery (which involves high computation and disk syncing)
+// is done in the primary download loop thread. This may eventually become a
+// significant performance bottleneck, however other factors are currently more
+// significant.
+
 import (
 	"bytes"
 	"errors"
@@ -14,8 +23,7 @@ import (
 )
 
 const (
-	defaultFilePerm         = 0666
-	maxDownloadLoopIdleTime = time.Minute * 10
+	defaultFilePerm = 0666
 )
 
 var (
@@ -89,6 +97,10 @@ type (
 		//
 		// availableWorkers tracks which workers are currently idle and ready
 		// to receive work.
+		//
+		// activeWorkers indicates the list of workers which are actively
+		// download a piece, and can be utilized again later but are currently
+		// unavailable.
 		//
 		// incompleteChunks is a list of chunks (by index) which have had a
 		// download fail. Repeat entries means that multiple downloads failed.
@@ -280,9 +292,7 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 // downloadIteration performs one iteration of the download loop.
 func (r *Renter) managedDownloadIteration(ds *downloadState) {
 	// Check for sleep and break conditions.
-	id := r.mu.RLock()
 	queueSize := len(r.chunkQueue)
-	r.mu.RUnlock(id)
 	if len(ds.incompleteChunks) == 0 && len(ds.activeWorkers) == 0 && queueSize == 0 {
 		// Nothing to do. Sleep until there is something to do, or until
 		// shutdown. Dislodge occasionally in case r.newDownloads misses a new
@@ -290,31 +300,32 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 		select {
 		case d := <-r.newDownloads:
 			r.addDownloadToChunkQueue(d)
-		case <-time.After(maxDownloadLoopIdleTime):
-			return
 		case <-r.tg.StopChan():
 			return
 		}
 	}
 
 	// Update the set of workers to include everyone in the worker pool.
-	id = r.mu.Lock()
+	id := r.mu.Lock()
 	err := r.updateWorkerPool()
 	if err != nil {
-		r.log.Println("Error returned when updating the worker pool")
+		r.log.Println("ERROR: unable to update worker pool:", err)
 	}
 	ds.availableWorkers = make([]*worker, 0, len(r.workerPool))
 	for _, worker := range r.workerPool {
+		// Ignore workers that are already in the active set of workers.
 		_, exists := ds.activeWorkers[worker.contractID]
-		if !exists {
-			ds.availableWorkers = append(ds.availableWorkers, worker)
+		if exists {
+			continue
 		}
+
+		// TODO: Prune workers that do not provide value. If bandwidth can be
+		// saturated with fewer workers, then the more expensive ones should be
+		// eliminated. Unreliable ones should be eliminated. Etc.
+
+		ds.availableWorkers = append(ds.availableWorkers, worker)
 	}
 	r.mu.Unlock(id)
-
-	// TODO: Prune workers that do not provide value. In bandwidth can be
-	// saturated with fewer workers, then the more expensive ones should be
-	// eliminated. Unreliable ones should be eliminated. Etc.
 
 	// Add new chunks to the extent that resources allow.
 	r.managedScheduleNewChunks(ds)
@@ -323,7 +334,7 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 	r.managedScheduleIncompleteChunks(ds)
 
 	// Wait for workers to return after downloading pieces.
-	r.managedWaitOnWork(ds)
+	r.managedWaitOnDownloadWork(ds)
 }
 
 // managedScheduleIncompleteChunks iterates through all of the incomplete
@@ -369,9 +380,13 @@ ICL:
 				resultChan:    ds.resultChan,
 			}
 			incompleteChunk.workerAttempts[worker.contractID] = true
-			worker.downloadChan <- dw
 			ds.availableWorkers = append(ds.availableWorkers[:i], ds.availableWorkers[i+1:]...)
 			ds.activeWorkers[worker.contractID] = struct{}{}
+			select {
+			case worker.downloadChan <- dw:
+			default:
+				r.log.Critical("Download work not immediately received by worker")
+			}
 			continue ICL
 		}
 
@@ -415,18 +430,14 @@ ICL:
 func (r *Renter) managedScheduleNewChunks(ds *downloadState) {
 	// Keep adding chunks until a break condition is hit.
 	for {
-		id := r.mu.RLock()
 		chunkQueueLen := len(r.chunkQueue)
-		r.mu.RUnlock(id)
 		if chunkQueueLen == 0 {
 			// There are no more chunks to initiate, return.
 			return
 		}
 
 		// View the next chunk.
-		id = r.mu.RLock()
 		nextChunk := r.chunkQueue[0]
-		r.mu.RUnlock(id)
 
 		// Check whether there are enough resources to perform the download.
 		if ds.activePieces+nextChunk.download.erasureCode.MinPieces() > maxActiveDownloadPieces {
@@ -436,9 +447,7 @@ func (r *Renter) managedScheduleNewChunks(ds *downloadState) {
 		}
 
 		// Chunk is set to be downloaded. Clear it from the queue.
-		id = r.mu.Lock()
 		r.chunkQueue = r.chunkQueue[1:]
-		r.mu.Unlock(id)
 
 		// Check if the download has already completed. If it has, it's because
 		// the download failed.
@@ -458,16 +467,27 @@ func (r *Renter) managedScheduleNewChunks(ds *downloadState) {
 	}
 }
 
-// managedWaitOnWork will wait for workers to return after attempting to
+// managedWaitOnDownloadWork will wait for workers to return after attempting to
 // download a piece.
-func (r *Renter) managedWaitOnWork(ds *downloadState) {
+func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	// If there are no workers performing work, return early.
 	if len(ds.activeWorkers) == 0 {
 		return
 	}
 
-	// Wait for a piece to return.
-	finishedDownload := <-ds.resultChan
+	// Wait for a piece to return. If a new download arrives while waiting, add
+	// it to the download queue immediately.
+	var finishedDownload finishedDownload
+	select {
+	case <-r.tg.StopChan():
+		return
+	case d := <-r.newDownloads:
+		r.addDownloadToChunkQueue(d)
+		return
+	case finishedDownload = <-ds.resultChan:
+	}
+
+	// Prepare the piece.
 	workerID := finishedDownload.workerID
 	delete(ds.activeWorkers, workerID)
 

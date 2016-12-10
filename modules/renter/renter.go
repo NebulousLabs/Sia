@@ -1,5 +1,12 @@
 package renter
 
+// TODO: Change the upload loop to have an upload state, and make it so that
+// instead of occasionally rebuildling the whole file matrix it has just a
+// single matrix that it's constantly pulling chunks from. Have a separate loop
+// which goes through the files and adds them to the matrix. Have the loop
+// listen on the channel for new files, so that they can go directly into the
+// matrix.
+
 import (
 	"errors"
 
@@ -89,19 +96,20 @@ type Renter struct {
 	// tracking contains a list of files that the user intends to maintain. By
 	// default, files loaded through sharing are not maintained by the user.
 	files    map[string]*file
-	newFiles chan *file
 	tracking map[string]trackedFile // map from nickname to metadata
 
 	// Work management.
 	//
 	// chunkQueue contains a list of incomplete work that the download loop
-	// acts upon.
+	// acts upon. The chunkQueue is only ever modified by the main download
+	// loop thread, which means it can be accessed and updated without locks.
 	//
 	// downloadQueue contains a complete history of work that has been
 	// submitted to the download loop.
-	chunkQueue    []*chunkDownload
+	chunkQueue    []*chunkDownload // Accessed without locks.
 	downloadQueue []*download
 	newDownloads  chan *download
+	newRepairs    chan *file
 	workerPool    map[types.FileContractID]*worker
 
 	// Utilities.
@@ -145,9 +153,9 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	}
 
 	r := &Renter{
-		newFiles: make(chan *file),
-		files:    make(map[string]*file),
-		tracking: make(map[string]trackedFile),
+		newRepairs: make(chan *file),
+		files:      make(map[string]*file),
+		tracking:   make(map[string]trackedFile),
 
 		newDownloads: make(chan *download),
 		workerPool:   make(map[types.FileContractID]*worker),

@@ -1,5 +1,9 @@
 package renter
 
+// TODO: Need to make sure that we do not end up with two workers for the same
+// host, which could potentially happen over renewals because the contract ids
+// will be different.
+
 import (
 	"errors"
 	"time"
@@ -47,16 +51,18 @@ type (
 	// finishedUpload contains the Merkle root and error from performing an
 	// upload.
 	finishedUpload struct {
-		dataRoot crypto.Hash
-		err      error
-		workerID types.FileContractID
+		chunkID    chunkID
+		dataRoot   crypto.Hash
+		err        error
+		pieceIndex uint64
+		workerID   types.FileContractID
 	}
 
 	// uploadWork contains instructions to upload a piece to a host, and a
 	// channel for returning the results.
 	uploadWork struct {
 		// data is the payload of the upload.
-		chunkIndex uint64
+		chunkID    chunkID
 		data       []byte
 		file       *file
 		pieceIndex uint64
@@ -95,9 +101,6 @@ type (
 )
 
 // download will perform some download work.
-//
-// TODO: If there is a failure, the worker should record the failure
-// internally.
 func (w *worker) download(dw downloadWork) {
 	d, err := w.renter.hostContractor.Downloader(w.contractID)
 	if err != nil {
@@ -111,21 +114,23 @@ func (w *worker) download(dw downloadWork) {
 }
 
 // upload will perform some upload work.
-//
-// TODO: The worker should be internally responsible for marking when the
-// upload has failed.
 func (w *worker) upload(uw uploadWork) {
 	e, err := w.renter.hostContractor.Editor(w.contractID)
 	if err != nil {
-		uw.resultChan <- finishedUpload{crypto.Hash{}, err, w.contractID}
+		w.recentUploadFailure = time.Now()
+		select {
+		case uw.resultChan <- finishedUpload{uw.chunkID, crypto.Hash{}, err, uw.pieceIndex, w.contractID}:
+		case <-w.renter.tg.StopChan():
+		}
 		return
 	}
 	defer e.Close()
 
 	root, err := e.Upload(uw.data)
 	if err != nil {
+		w.recentUploadFailure = time.Now()
 		select {
-		case uw.resultChan <- finishedUpload{root, err, w.contractID}:
+		case uw.resultChan <- finishedUpload{uw.chunkID, root, err, uw.pieceIndex, w.contractID}:
 		case <-w.renter.tg.StopChan():
 		}
 		return
@@ -142,7 +147,7 @@ func (w *worker) upload(uw uploadWork) {
 		}
 	}
 	contract.Pieces = append(contract.Pieces, pieceData{
-		Chunk:      uw.chunkIndex,
+		Chunk:      uw.chunkID.index,
 		Piece:      uw.pieceIndex,
 		MerkleRoot: root,
 	})
@@ -153,7 +158,7 @@ func (w *worker) upload(uw uploadWork) {
 	uw.file.mu.Unlock()
 
 	select {
-	case uw.resultChan <- finishedUpload{root, err, w.contractID}:
+	case uw.resultChan <- finishedUpload{uw.chunkID, root, err, uw.pieceIndex, w.contractID}:
 	case <-w.renter.tg.StopChan():
 	}
 }
