@@ -138,7 +138,7 @@ func (w *worker) upload(uw uploadWork) {
 
 	// Update the renter metadata.
 	id := w.renter.mu.Lock()
-	id2 := uw.file.mu.Lock()
+	uw.file.mu.Lock()
 	contract, exists := uw.file.contracts[w.contractID]
 	if !exists {
 		contract = fileContract{
@@ -154,7 +154,7 @@ func (w *worker) upload(uw uploadWork) {
 	})
 	uw.file.contracts[w.contractID] = contract
 	w.renter.saveFile(uw.file)
-	uw.file.mu.Unlock(id2)
+	uw.file.mu.Unlock()
 	w.renter.mu.Unlock(id)
 
 	select {

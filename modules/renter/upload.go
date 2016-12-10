@@ -98,6 +98,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Send the upload to the repair loop.
-	r.newRepairs <-f
+	r.newRepairs <- f
 	return nil
 }

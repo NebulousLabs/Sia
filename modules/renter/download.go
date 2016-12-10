@@ -141,13 +141,13 @@ func newDownload(f *file, destination string) *download {
 	for i := range d.pieceSet {
 		d.pieceSet[i] = make(map[types.FileContractID]pieceData)
 	}
-	id := f.mu.RLock()
+	f.mu.RLock()
 	for _, contract := range f.contracts {
 		for i := range contract.Pieces {
 			d.pieceSet[contract.Pieces[i].Chunk][contract.ID] = contract.Pieces[i]
 		}
 	}
-	f.mu.RUnlock(id)
+	f.mu.RUnlock()
 
 	return d
 }
@@ -353,7 +353,7 @@ ICL:
 			// The download has most likely failed. No need to complete this
 			// chunk.
 			ds.activePieces-- // for the current incomplete chunk
-			for _ = range incompleteChunk.completedPieces {
+			for range incompleteChunk.completedPieces {
 				ds.activePieces-- // for the completed chunk
 			}
 			// Clear the set of completed pieces so that we do not
@@ -415,7 +415,7 @@ ICL:
 
 		// Clear out the piece burden for this chunk.
 		ds.activePieces-- // for the current incomplete chunk
-		for _ = range incompleteChunk.completedPieces {
+		for range incompleteChunk.completedPieces {
 			ds.activePieces-- // for the completed chunk
 		}
 		// Clear the set of completed pieces so that we do not

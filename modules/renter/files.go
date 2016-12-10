@@ -4,11 +4,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -27,12 +27,12 @@ type file struct {
 	name        string
 	size        uint64 // Static - can be accessed without lock.
 	contracts   map[types.FileContractID]fileContract
-	masterKey   crypto.TwofishKey // Static - can be accessed without lock.
+	masterKey   crypto.TwofishKey    // Static - can be accessed without lock.
 	erasureCode modules.ErasureCoder // Static - can be accessed without lock.
-	pieceSize   uint64 // Static - can be accessed without lock.
-	mode        uint32 // actually an os.FileMode
+	pieceSize   uint64               // Static - can be accessed without lock.
+	mode        uint32               // actually an os.FileMode
 
-	mu          *sync.RWMutex
+	mu sync.RWMutex
 }
 
 // A fileContract is a contract covering an arbitrary number of file pieces.
@@ -163,8 +163,6 @@ func newFile(name string, code modules.ErasureCoder, pieceSize, fileSize uint64)
 		masterKey:   key,
 		erasureCode: code,
 		pieceSize:   pieceSize,
-
-		mu: sync.New(modules.SafeMutexDelay/2, 1),
 	}
 }
 
@@ -186,8 +184,8 @@ func (r *Renter) DeleteFile(nickname string) error {
 	r.mu.Unlock(lockID)
 
 	// delete the file's associated contract data.
-	id := f.mu.Lock()
-	defer f.mu.Unlock(id)
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	var contracts []modules.RenterContract
 	for _, c := range r.hostContractor.Contracts() {
@@ -216,7 +214,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 
 	files := make([]modules.FileInfo, 0, len(r.files))
 	for _, f := range r.files {
-		id := f.mu.RLock()
+		f.mu.RLock()
 		renewing := true
 		files = append(files, modules.FileInfo{
 			SiaPath:        f.name,
@@ -227,7 +225,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
 		})
-		f.mu.RUnlock(id)
+		f.mu.RUnlock()
 	}
 	return files
 }
@@ -255,10 +253,10 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	}
 
 	// Modify the file and save it to disk.
-	id := file.mu.Lock()
+	file.mu.Lock()
 	file.name = newName
 	err := r.saveFile(file)
-	file.mu.Unlock(id)
+	file.mu.Unlock()
 	if err != nil {
 		return err
 	}
