@@ -45,7 +45,6 @@ var (
 
 // TestStorageHandler tests that host storage is being reported correctly.
 func TestStorageHandler(t *testing.T) {
-	t.Skip("uploading to the renter does not work")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -278,7 +277,6 @@ func TestResizeEmptyStorageFolder(t *testing.T) {
 // where the host tries to resize to a size smaller than the amount of data
 // in the folder), but that would be a very expensive test.
 func TestResizeNonemptyStorageFolder(t *testing.T) {
-	t.Skip("Uploading to the renter does not work")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -499,7 +497,6 @@ func TestRemoveStorageFolderError(t *testing.T) {
 // folder will result in data loss, that call succeeds if and only if "force"
 // has been set to "true".
 func TestRemoveStorageFolderForced(t *testing.T) {
-	t.Skip("uploading to the renter does not work")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -571,7 +568,6 @@ func TestRemoveStorageFolderForced(t *testing.T) {
 
 // TestDeleteSector tests the call to delete a storage sector from the host.
 func TestDeleteSector(t *testing.T) {
-	t.Skip("uploading to the renter does not work")
 	if testing.Short() {
 		t.SkipNow()
 	}

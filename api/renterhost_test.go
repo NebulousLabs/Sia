@@ -16,14 +16,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestHostAndRent sets up an integration test where a host and
-// renter do basic uploads and downloads.
-func TestHostAndRent(t *testing.T) {
+// TestHostAndRentVanilla sets up an integration test where a host and renter
+// do basic uploads and downloads.
+func TestHostAndRentVanilla(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostAndRent")
+	st, err := createServerTester("TestHostAndRentVanilla")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +247,7 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	uploadValues.Set("source", path)
 	uploadValues.Set("datapieces", "2")
 	uploadValues.Set("paritypieces", "4")
-	err = st.stdPostAPI("/renter/upload/te st", uploadValues)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,7 +436,7 @@ func TestHostAndRentManyFiles(t *testing.T) {
 
 	// Block until all files hit 100% uploaded.
 	var rf RenterFiles
-	for i := 0; i < 30 && (len(rf.Files) != 3 || rf.Files[0].UploadProgress < 100 || rf.Files[1].UploadProgress < 100 || rf.Files[2].UploadProgress < 100); i++ {
+	for i := 0; i < 200 && (len(rf.Files) != 3 || rf.Files[0].UploadProgress < 100 || rf.Files[1].UploadProgress < 100 || rf.Files[2].UploadProgress < 100); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -517,10 +517,6 @@ func TestHostAndRentManyFiles(t *testing.T) {
 		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
 	}
 
-	println("Everything is complete")
-	time.Sleep(time.Second * 10)
-	println("Sleep time over.")
-
 	// Mine blocks until the host recognizes profit. The host will wait for 12
 	// blocks after the storage window has closed to report the profit, a total
 	// of 40 blocks should be mined.
@@ -543,7 +539,6 @@ func TestHostAndRentManyFiles(t *testing.T) {
 // TestUploadDownload tests that downloading and uploading in
 // parallel does not result in failures or stalling.
 func TestUploadDownload(t *testing.T) {
-	t.Skip("uploading to the renter does not work")
 	if testing.Short() {
 		t.SkipNow()
 	}

@@ -690,7 +690,6 @@ func TestRenterRelativePathErrorUpload(t *testing.T) {
 
 // Tests that the /renter/download call checks for relative paths.
 func TestRenterRelativePathErrorDownload(t *testing.T) {
-	t.Skip("uploading to the renter does not work")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -750,8 +749,5 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
 	if err == nil {
 		t.Fatal("expecting an error")
-	}
-	if !strings.Contains(err.Error(), "contract") {
-		t.Fatal("Expecting the word 'contract' to appear in the error:", err)
 	}
 }

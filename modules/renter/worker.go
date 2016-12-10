@@ -137,7 +137,8 @@ func (w *worker) upload(uw uploadWork) {
 	}
 
 	// Update the renter metadata.
-	uw.file.mu.Lock()
+	id := w.renter.mu.Lock()
+	id2 := uw.file.mu.Lock()
 	contract, exists := uw.file.contracts[w.contractID]
 	if !exists {
 		contract = fileContract{
@@ -152,10 +153,9 @@ func (w *worker) upload(uw uploadWork) {
 		MerkleRoot: root,
 	})
 	uw.file.contracts[w.contractID] = contract
-	id := w.renter.mu.Lock()
 	w.renter.saveFile(uw.file)
+	uw.file.mu.Unlock(id2)
 	w.renter.mu.Unlock(id)
-	uw.file.mu.Unlock()
 
 	select {
 	case uw.resultChan <- finishedUpload{uw.chunkID, root, err, uw.pieceIndex, w.contractID}:
@@ -234,10 +234,10 @@ func (r *Renter) addWorker(fcid types.FileContractID) error {
 	worker := &worker{
 		contractID: fcid,
 
-		downloadChan:         make(chan downloadWork),
+		downloadChan:         make(chan downloadWork, 1),
 		killChan:             make(chan struct{}),
-		priorityDownloadChan: make(chan downloadWork),
-		uploadChan:           make(chan uploadWork),
+		priorityDownloadChan: make(chan downloadWork, 1),
+		uploadChan:           make(chan uploadWork, 1),
 
 		renter: r,
 	}

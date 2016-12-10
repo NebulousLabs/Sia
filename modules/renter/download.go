@@ -141,13 +141,13 @@ func newDownload(f *file, destination string) *download {
 	for i := range d.pieceSet {
 		d.pieceSet[i] = make(map[types.FileContractID]pieceData)
 	}
-	f.mu.RLock()
+	id := f.mu.RLock()
 	for _, contract := range f.contracts {
 		for i := range contract.Pieces {
 			d.pieceSet[contract.Pieces[i].Chunk][contract.ID] = contract.Pieces[i]
 		}
 	}
-	f.mu.RUnlock()
+	f.mu.RUnlock(id)
 
 	return d
 }
@@ -383,7 +383,7 @@ ICL:
 			ds.availableWorkers = append(ds.availableWorkers[:i], ds.availableWorkers[i+1:]...)
 			ds.activeWorkers[worker.contractID] = struct{}{}
 			select {
-			case worker.downloadChan <- dw:
+			case worker.priorityDownloadChan <- dw:
 			default:
 				r.log.Critical("Download work not immediately received by worker")
 			}

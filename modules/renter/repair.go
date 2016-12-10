@@ -1,11 +1,7 @@
 package renter
 
-// TODO: At startup, no repair matrix is created. Instead, a method is created
-// which iterates through the files of the renter and adds them one at a time
-// to the repair matrix, such that the repair matrix stays manageably small,
-// the load for processing/updating files also stays small, and files still get
-// processed frequently enough that they are properly repaired as contracts are
-// cycled through.
+// TODO: Need a loop that will add files to the repairState. Need some loose
+// counter telling the loop how safe it is to be adding more chunks.
 
 // TODO: There are no download-to-reupload strategies implemented.
 
@@ -27,7 +23,9 @@ const uploadFailureCooldown = time.Hour * 3
 const minPiecesRepair = 4
 
 var (
-	errFileDeleted = errors.New("cannot repair chunk as the file is no longer in the renter")
+	// errFileDeleted indicates that a chunk which is trying to be repaired
+	// cannot be found in the renter.
+	errFileDeleted = errors.New("cannot repair chunk as the file is not being tracked by the renter")
 )
 
 type (
@@ -42,6 +40,7 @@ type (
 		//
 		// recordedGaps indicates the value that this chunk has recorded in the
 		// gapCounts map.
+		activePieces int
 		contracts    map[types.FileContractID]struct{}
 		pieces       map[uint64]struct{}
 		recordedGaps int
@@ -168,16 +167,8 @@ func (r *Renter) addFileToRepairState(rs *repairState, file *file) {
 // scanning all of the files for missing pieces and attempting repair them by
 // uploading to chunks.
 func (r *Renter) managedRepairIteration(rs *repairState) {
-	// Determine the maximum number of gaps of any chunk in the repair matrix.
-	maxGaps := 0
-	for i, gaps := range rs.gapCounts {
-		if i > maxGaps && gaps > 0 {
-			maxGaps = i
-		}
-	}
-
 	// Wait for work if there is nothing to do.
-	if maxGaps == 0 && len(rs.activeWorkers) == 0 {
+	if len(rs.activeWorkers) == 0 && len(rs.incompleteChunks) == 0 {
 		select {
 		case <-r.tg.StopChan():
 			return
@@ -215,7 +206,15 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 
 		rs.availableWorkers[id] = worker
 	}
-	r.mu.RUnlock(id)
+	r.mu.Unlock(id)
+
+	// Determine the maximum number of gaps of any chunk in the repair matrix.
+	maxGaps := 0
+	for i, gaps := range rs.gapCounts {
+		if i > maxGaps && gaps > 0 {
+			maxGaps = i
+		}
+	}
 
 	// Scan through the chunks until a candidate for uploads is found.
 	var chunksToDelete []chunkID
@@ -227,8 +226,8 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		chunkStatus.recordedGaps = numGaps
 
 		// Remove this chunk from the set of incomplete chunks if it has been
-		// completed.
-		if numGaps == 0 {
+		// completed and there are no workers still working on it.
+		if numGaps == 0 && chunkStatus.activePieces == 0 {
 			chunksToDelete = append(chunksToDelete, chunkID)
 			continue
 		}
@@ -336,8 +335,10 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 		}
 		// Grab the worker, and update the worker tracking in the repair state.
 		worker := rs.availableWorkers[usefulWorkers[0]]
-		delete(rs.availableWorkers, usefulWorkers[0])
 		rs.activeWorkers[usefulWorkers[0]] = worker
+		delete(rs.availableWorkers, usefulWorkers[0])
+
+		chunkStatus.activePieces++
 		chunkStatus.contracts[usefulWorkers[0]] = struct{}{}
 		chunkStatus.pieces[missingPieces[0]] = struct{}{}
 
@@ -380,6 +381,9 @@ func (r *Renter) managedWaitOnRepairWork(rs *repairState) {
 	case <-r.tg.StopChan():
 		return
 	}
+
+	// Mark that the worker of this chunk has completed its work.
+	rs.incompleteChunks[finishedUpload.chunkID].activePieces--
 
 	// If there was no error, add the worker back to the set of
 	// available workers and wait for the next worker.

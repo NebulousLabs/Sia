@@ -11,6 +11,8 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 )
 
 // newTestingFile initializes a file object with random parameters.
@@ -27,6 +29,8 @@ func newTestingFile() *file {
 		masterKey:   key,
 		erasureCode: rsc,
 		pieceSize:   encoding.DecUint64(data[6:8]),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 }
 
