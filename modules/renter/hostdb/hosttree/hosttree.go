@@ -46,8 +46,8 @@ type (
 		// hosts is a map of public keys to nodes.
 		hosts map[string]*node
 
-		// weight applies a weight to a hostEntry
-		weight WeightFunc
+		// weightFn calculates the weight of a hostEntry
+		weightFn WeightFunc
 
 		mu sync.Mutex
 	}
@@ -91,8 +91,8 @@ func New(wf WeightFunc) *HostTree {
 		root: &node{
 			count: 1,
 		},
-		weight: wf,
-		hosts:  make(map[string]*node),
+		weightFn: wf,
+		hosts:    make(map[string]*node),
 	}
 }
 
@@ -189,7 +189,7 @@ func (ht *HostTree) Insert(hdbe modules.HostDBEntry) error {
 
 	entry := &hostEntry{
 		HostDBEntry: hdbe,
-		weight:      ht.weight(hdbe),
+		weight:      ht.weightFn(hdbe),
 	}
 
 	if _, exists := ht.hosts[string(entry.PublicKey.Key)]; exists {
@@ -232,7 +232,7 @@ func (ht *HostTree) Modify(hdbe modules.HostDBEntry) error {
 
 	entry := &hostEntry{
 		HostDBEntry: hdbe,
-		weight:      ht.weight(hdbe),
+		weight:      ht.weightFn(hdbe),
 	}
 
 	_, node = ht.root.recursiveInsert(entry)
