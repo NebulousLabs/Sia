@@ -40,17 +40,11 @@ func (c *Contractor) isOffline(id types.FileContractID) bool {
 	// Get the net address associated with the contract.
 	//
 	// TODO: This should eventually be updated to query the host by public key.
-	var addr modules.NetAddress
-	var found bool
-	for _, contract := range c.contracts {
-		if contract.ID == id {
-			found = true
-			addr = contract.NetAddress
-		}
-	}
-	if !found {
+	contract, exists := c.contracts[id]
+	if !exists {
 		return false
 	}
+	addr := contract.NetAddress
 	// Look up the host by address.
 	//
 	// TODO: Eventually the host should be getting queried by public key.

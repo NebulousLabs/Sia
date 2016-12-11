@@ -144,14 +144,19 @@ func TestIsOffline(t *testing.T) {
 		{[]modules.HostDBScan{oldBadScan, newGoodScan, currentBadScan}, false},
 		// data covers large range, no scans succeded
 		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan}, true},
-		// recent scan was good (and within uptimeWindow of oldBadScan)
-		{[]modules.HostDBScan{oldBadScan, oldGoodScan, newBadScan, currentBadScan}, true},
-		// recent scan was good (and outside uptimeWindow of oldBadScan)
+		// old scan was good, recent scans are bad.
+		{[]modules.HostDBScan{oldGoodScan, newBadScan, newBadScan, currentBadScan}, true},
+		// recent scan was good, with many recent bad scans.
+		{[]modules.HostDBScan{oldBadScan, newGoodScan, newBadScan, currentBadScan, currentBadScan}, false},
+		// recent scan was good, old scans were bad.
 		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan, currentGoodScan}, false},
 	}
 	for i, test := range tests {
 		// construct a contractor with a hostdb containing the scans
 		c := &Contractor{
+			contracts: map[types.FileContractID]modules.RenterContract{
+				types.FileContractID{1}: {},
+			},
 			hdb: mapHostDB{
 				hosts: map[types.FileContractID]modules.HostDBEntry{
 					types.FileContractID{1}: {ScanHistory: test.scans},
