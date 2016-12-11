@@ -182,6 +182,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 
 	go r.threadedRepairLoop()
 	go r.threadedDownloadLoop()
+	go r.threadedQueueRepairs()
 	return r, nil
 }
 

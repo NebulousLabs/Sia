@@ -149,6 +149,13 @@ func (r *Renter) addFileToRepairState(rs *repairState, file *file) {
 			continue
 		}
 
+		// Skip this chunk if it's already in the set of incomplete chunks.
+		cid := chunkID{i, file.name}
+		_, exists := rs.incompleteChunks[cid]
+		if exists {
+			continue
+		}
+
 		// Create the chunkStatus object and add it to the set of incomplete
 		// chunks.
 		cs := &chunkStatus{
@@ -157,7 +164,6 @@ func (r *Renter) addFileToRepairState(rs *repairState, file *file) {
 			totalPieces: file.erasureCode.NumPieces(),
 		}
 		cs.recordedGaps = cs.numGaps(rs)
-		cid := chunkID{i, file.name}
 		rs.incompleteChunks[cid] = cs
 		rs.gapCounts[cs.recordedGaps]++
 	}
@@ -400,6 +406,50 @@ func (r *Renter) managedWaitOnRepairWork(rs *repairState) {
 	// Indicate in the set of incomplete chunks that this piece was not
 	// completed.
 	rs.incompleteChunks[finishedUpload.chunkID].pieces[finishedUpload.pieceIndex] = struct{}{}
+}
+
+// threadedQueueRepairs is a goroutine that runs in the background and
+// continuously adds files to the repair loop, slow enough that it's not a
+// resource burden but fast enough that no file is ever at risk.
+//
+// NOTE: This loop is pretty naive in terms of work management. As the number
+// of files goes up, and as the number of chunks per file goes up, this will
+// become a performance bottleneck, and even inhibit repair progress.
+func (r *Renter) threadedQueueRepairs() {
+	for {
+		// Compress the set of files into a slice.
+		id := r.mu.RLock()
+		var files []*file
+		for _, file := range r.files {
+			files = append(files, file)
+		}
+		r.mu.RUnlock(id)
+
+		// Add one file every 30 seconds.
+		for _, file := range files {
+			// Send the file down the repair channel.
+			select{
+			case r.newRepairs <-file:
+			case <-r.tg.StopChan():
+				return
+			}
+
+			// Wait 30 seconds before going to the next file.
+			select{
+			case <-time.After(time.Second * 30):
+			case <-r.tg.StopChan():
+				return
+			}
+		}
+
+		// Chill out for an extra 5 minutes before going through the files
+		// again.
+		select{
+		case <-time.After(time.Minute * 5):
+		case <-r.tg.StopChan():
+			return
+		}
+	}
 }
 
 // threadedRepairLoop improves the health of files tracked by the renter by
