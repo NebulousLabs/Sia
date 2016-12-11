@@ -428,14 +428,14 @@ func (r *Renter) threadedQueueRepairs() {
 		// Add one file every 30 seconds.
 		for _, file := range files {
 			// Send the file down the repair channel.
-			select{
-			case r.newRepairs <-file:
+			select {
+			case r.newRepairs <- file:
 			case <-r.tg.StopChan():
 				return
 			}
 
 			// Wait 30 seconds before going to the next file.
-			select{
+			select {
 			case <-time.After(time.Second * 30):
 			case <-r.tg.StopChan():
 				return
@@ -444,7 +444,7 @@ func (r *Renter) threadedQueueRepairs() {
 
 		// Chill out for an extra 5 minutes before going through the files
 		// again.
-		select{
+		select {
 		case <-time.After(time.Minute * 5):
 		case <-r.tg.StopChan():
 			return
