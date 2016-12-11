@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestHostAndRentVanilla sets up an integration test where a host and renter
@@ -46,7 +45,7 @@ func TestHostAndRentVanilla(t *testing.T) {
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
-	testPeriod := "5"
+	testPeriod := "10"
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
@@ -153,24 +152,6 @@ func TestHostAndRentVanilla(t *testing.T) {
 	}
 	if len(queue.Downloads) != 2 {
 		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
-	}
-
-	// Mine blocks until the host recognizes profit. The host will wait for 12
-	// blocks after the storage window has closed to report the profit, a total
-	// of 40 blocks should be mined.
-	t.Skip("TODO: NEED TO GET THE CONTRACT STUFF WORKING AGAIN")
-	for i := 0; i < 40; i++ {
-		st.miner.AddBlock()
-	}
-	// Check that the host is reporting a profit.
-	var hg HostGET
-	st.getAPI("/host", &hg)
-	if hg.FinancialMetrics.StorageRevenue.Cmp(types.ZeroCurrency) <= 0 ||
-		hg.FinancialMetrics.DownloadBandwidthRevenue.Cmp(types.ZeroCurrency) <= 0 {
-		t.Log("Storage Revenue:", hg.FinancialMetrics.StorageRevenue)
-		t.Log("Bandwidth Revenue:", hg.FinancialMetrics.DownloadBandwidthRevenue)
-		t.Log("Full Financial Metrics:", hg.FinancialMetrics)
-		t.Fatal("Host is not displaying revenue after resolving a storage proof.")
 	}
 }
 
@@ -287,24 +268,6 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	}
 	if len(queue.Downloads) != 1 {
 		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
-	}
-
-	// Mine blocks until the host recognizes profit. The host will wait for 12
-	// blocks after the storage window has closed to report the profit, a total
-	// of 40 blocks should be mined.
-	t.Skip("TODO: NEED TO GET THE CONTRACT STUFF WORKING AGAIN")
-	for i := 0; i < 40; i++ {
-		st.miner.AddBlock()
-	}
-	// Check that the host is reporting a profit.
-	var hg HostGET
-	st.getAPI("/host", &hg)
-	if hg.FinancialMetrics.StorageRevenue.Cmp(types.ZeroCurrency) <= 0 ||
-		hg.FinancialMetrics.DownloadBandwidthRevenue.Cmp(types.ZeroCurrency) <= 0 {
-		t.Log("Storage Revenue:", hg.FinancialMetrics.StorageRevenue)
-		t.Log("Bandwidth Revenue:", hg.FinancialMetrics.DownloadBandwidthRevenue)
-		t.Log("Full Financial Metrics:", hg.FinancialMetrics)
-		t.Fatal("Host is not displaying revenue after resolving a storage proof.")
 	}
 }
 
@@ -516,24 +479,6 @@ func TestHostAndRentManyFiles(t *testing.T) {
 	if len(queue.Downloads) != 3 {
 		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
 	}
-
-	// Mine blocks until the host recognizes profit. The host will wait for 12
-	// blocks after the storage window has closed to report the profit, a total
-	// of 40 blocks should be mined.
-	t.Skip("TODO: NEED TO GET THE CONTRACT STUFF WORKING AGAIN")
-	for i := 0; i < 40; i++ {
-		st.miner.AddBlock()
-	}
-	// Check that the host is reporting a profit.
-	var hg HostGET
-	st.getAPI("/host", &hg)
-	if hg.FinancialMetrics.StorageRevenue.Cmp(types.ZeroCurrency) <= 0 ||
-		hg.FinancialMetrics.DownloadBandwidthRevenue.Cmp(types.ZeroCurrency) <= 0 {
-		t.Log("Storage Revenue:", hg.FinancialMetrics.StorageRevenue)
-		t.Log("Bandwidth Revenue:", hg.FinancialMetrics.DownloadBandwidthRevenue)
-		t.Log("Full Financial Metrics:", hg.FinancialMetrics)
-		t.Fatal("Host is not displaying revenue after resolving a storage proof.")
-	}
 }
 
 // TestUploadDownload tests that downloading and uploading in
@@ -566,7 +511,7 @@ func TestUploadDownload(t *testing.T) {
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
-	testPeriod := "5"
+	testPeriod := "10"
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
