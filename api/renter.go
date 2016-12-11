@@ -357,6 +357,7 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 		// supplied.
 		if parityPieces < requiredParityPieces {
 			WriteError(w, Error{fmt.Sprintf("A minimum of %v parity pieces is required, but %v parity pieces requested.", parityPieces, requiredParityPieces)}, http.StatusBadRequest)
+			return
 		}
 		redundancy := float64(dataPieces+parityPieces) / float64(dataPieces)
 		if float64(dataPieces+parityPieces)/float64(dataPieces) < requiredRedundancy {
