@@ -195,7 +195,6 @@ func TestHostTreeParallel(t *testing.T) {
 
 			for {
 				select {
-				case <-time.After(time.Millisecond * 50):
 				case <-tg.StopChan():
 					return
 				default:
