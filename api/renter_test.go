@@ -632,7 +632,7 @@ func TestRenterRelativePathErrorUpload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	// TODO: t.Parallel()
 	st, err := createServerTester("TestRenterRelativePathErrorUpload")
 	if err != nil {
 		t.Fatal(err)
