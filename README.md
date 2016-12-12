@@ -97,15 +97,13 @@ Troubleshooting
 
 If your issue is not addressed above, you can get in touch with us personally:
 
-  slack: http://siatalk.sia.tech (ping @taek, @nemo, or @jordan)
+  slack: https://siatalk.slack.com (https://slackin.sia.tech for an invite)
 
   email:
   
   david@nebulouslabs.com
   
   luke@nebulouslabs.com
-  
-  jordan@nebulouslabs.com
 
 Version Information
 -------------------
