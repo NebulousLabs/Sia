@@ -92,6 +92,10 @@ type RenterFinancialMetrics struct {
 	DownloadSpending types.Currency `json:"downloadspending"`
 	StorageSpending  types.Currency `json:"storagespending"`
 	UploadSpending   types.Currency `json:"uploadspending"`
+
+	// AllowancePeriodStart is the blockheight at which the current allowance
+	// period began.
+	AllowancePeriodStart types.BlockHeight `json:"allowanceperiodstart"`
 }
 
 // RenterContractMetrics contains metrics relevant to a single file contract.
