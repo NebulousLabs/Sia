@@ -75,9 +75,11 @@ func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, er
 
 // initialContractMetrics returns the metrics for a newly-formed (or renewed)
 // contract. Download/Upload/Storage spending is assumed to be zero.
-func initialContractMetrics(contract modules.RenterContract, host modules.HostDBEntry, txn types.Transaction) modules.RenterContractMetrics {
+func initialContractMetrics(contract modules.RenterContract, host modules.HostDBEntry, txn types.Transaction, startHeight types.BlockHeight) modules.RenterContractMetrics {
 	metrics := modules.RenterContractMetrics{
 		ID:          contract.ID,
+		StartHeight: startHeight,
+		EndHeight:   contract.EndHeight(),
 		ContractFee: host.ContractPrice,
 		SiafundFee:  types.Tax(contract.EndHeight(), contract.FileContract.Payout),
 		Unspent:     contract.RenterFunds(),
@@ -129,7 +131,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 	}
 	// add metrics entry for contract
 	txn, _ := txnBuilder.View()
-	metrics := initialContractMetrics(contract, host, txn)
+	metrics := initialContractMetrics(contract, host, txn, currentHeight)
 	c.mu.Lock()
 	c.contractMetrics[contract.ID] = metrics
 	c.mu.Unlock()

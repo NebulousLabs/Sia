@@ -97,7 +97,12 @@ type RenterFinancialMetrics struct {
 // RenterContractMetrics contains metrics relevant to a single file contract.
 type RenterContractMetrics struct {
 	// The ID of the associated contract.
-	ID types.FileContractID
+	ID types.FileContractID `json:"id"`
+
+	// The starting and ending height of the contract. Note that EndHeight is
+	// the same as RenterContract.EndHeight.
+	StartHeight types.BlockHeight `json:"startheight"`
+	EndHeight   types.BlockHeight `json:"endheight"`
 
 	// The total amount of money that the Renter spent to create the contract
 	// and submit it to the blockchain.

@@ -33,10 +33,11 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 
 	// create contract params
 	c.mu.RLock()
+	currentHeight := c.blockHeight
 	params := proto.ContractParams{
 		Host:          host,
 		Filesize:      numSectors * modules.SectorSize,
-		StartHeight:   c.blockHeight,
+		StartHeight:   currentHeight,
 		EndHeight:     newEndHeight,
 		RefundAddress: uc.UnlockHash(),
 	}
@@ -53,7 +54,7 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 
 	// add metrics entry for contract
 	txn, _ := txnBuilder.View()
-	metrics := initialContractMetrics(newContract, host, txn)
+	metrics := initialContractMetrics(newContract, host, txn, currentHeight)
 	c.mu.Lock()
 	c.contractMetrics[newContract.ID] = metrics
 	c.mu.Unlock()
