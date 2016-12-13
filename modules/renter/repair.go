@@ -1,8 +1,5 @@
 package renter
 
-// TODO: Need a loop that will add files to the repairState. Need some loose
-// counter telling the loop how safe it is to be adding more chunks.
-
 // TODO: There are no download-to-reupload strategies implemented.
 
 // TODO: The chunkStatus stuff needs to recognize when two different contract
@@ -20,7 +17,7 @@ import (
 
 // TODO: Move to a consts file.
 const uploadFailureCooldown = time.Hour * 3
-const minPiecesRepair = 4
+const minPiecesRepair = 6
 
 var (
 	// errFileDeleted indicates that a chunk which is trying to be repaired
@@ -250,8 +247,15 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 			}
 		}
 
-		// Skip this chunk if the set of useful workers is not large enough.
+		// Skip this chunk if the set of useful workers does not meet the
+		// minimum pieces requirement.
 		if maxGaps >= minPiecesRepair && len(usefulWorkers) < minPiecesRepair {
+			continue
+		}
+
+		// Skip this chunk if the set of useful workers is not complete, and
+		// the maxGaps value is less than the minPiecesRepair value.
+		if maxGaps < minPiecesRepair && len(usefulWorkers) < numGaps {
 			continue
 		}
 
@@ -422,7 +426,7 @@ func (r *Renter) threadedQueueRepairs() {
 		}
 		r.mu.RUnlock(id)
 
-		// Add one file every 30 seconds.
+		// Add files one at a time.
 		for _, file := range files {
 			// Send the file down the repair channel.
 			select {
