@@ -14,6 +14,7 @@ import (
 	"errors"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -37,7 +38,7 @@ var (
 	//
 	// TODO: Allow this number to be established in the renter settings.
 	maxActiveDownloadPieces = build.Select(build.Var{
-		Standard: int(25),
+		Standard: int(50),
 		Dev:      int(10),
 		Testing:  int(5),
 	}).(int)
@@ -63,10 +64,10 @@ type (
 	// A download is a file download that has been queued by the renter.
 	download struct {
 		// Progress variables.
-		dataReceived     uint64
-		downloadComplete bool
-		downloadErr      error
-		finishedChunks   []bool
+		atomicDataReceived uint64
+		downloadComplete   bool
+		downloadErr        error
+		finishedChunks     []bool
 
 		// Timestamp information.
 		completeTime time.Time
@@ -505,6 +506,7 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	// Add this returned piece to the appropriate chunk.
 	cd := finishedDownload.chunkDownload
 	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
+	atomic.AddUint64(&finishedDownload.chunkDownload.download.atomicDataReceived, modules.SectorSize)
 
 	// Recover the chunk and save to disk.
 	if len(cd.completedPieces) == cd.download.erasureCode.MinPieces() {
@@ -568,7 +570,12 @@ func (r *Renter) Download(path, destination string) error {
 	//
 	// TODO: Eventually just return the channel to the error instead of the
 	// error itself.
-	return <-d.downloadFinished
+	select {
+	case err := <-d.downloadFinished:
+		return err
+	case <-r.tg.StopChan():
+		return errors.New("download interrupted by shutdown")
+	}
 }
 
 // DownloadQueue returns the list of downloads in the queue.
@@ -584,9 +591,9 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 			SiaPath:     d.siapath,
 			Destination: d.destination,
 			Filesize:    d.fileSize,
-			Received:    d.dataReceived,
 			StartTime:   d.startTime,
 		}
+		atomic.LoadUint64(&d.atomicDataReceived)
 	}
 	return downloads
 }
