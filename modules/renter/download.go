@@ -593,7 +593,7 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 			Filesize:    d.fileSize,
 			StartTime:   d.startTime,
 		}
-		atomic.LoadUint64(&d.atomicDataReceived)
+		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)
 	}
 	return downloads
 }
