@@ -67,11 +67,14 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 			if remaining <= 0 {
 				return
 			}
-			numSectors, err := maxSectors(a, c.hdb, c.tpool)
+			max, err := maxSectors(a, c.hdb, c.tpool)
 			if err != nil {
 				c.log.Debugln("ERROR: couldn't calculate maxSectors after processing a consensus change:", err)
 				return
 			}
+			// Only allocate half as many sectors as the max. This leaves some leeway
+			// for replacing contracts, transaction fees, etc.
+			numSectors := max / 2
 			err = c.managedFormAllowanceContracts(remaining, numSectors, a)
 			if err != nil {
 				c.log.Debugln("WARN: failed to form contracts after processing a consensus change:", err)

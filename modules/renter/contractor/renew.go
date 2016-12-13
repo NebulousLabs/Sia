@@ -11,8 +11,8 @@ import (
 )
 
 // managedRenew negotiates a new contract for data already stored with a host.
-// It returns the new contract. This is a blocking call that
-// performs network I/O.
+// It returns the new contract. This is a blocking call that performs network
+// I/O.
 func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
 	host, ok := c.hdb.Host(contract.NetAddress)
 	if !ok {
@@ -78,12 +78,17 @@ func (c *Contractor) managedRenewContracts() error {
 
 	c.mu.RLock()
 	endHeight := c.blockHeight + c.allowance.Period
-	numSectors, err := maxSectors(c.allowance, c.hdb, c.tpool)
+	max, err := maxSectors(c.allowance, c.hdb, c.tpool)
 	c.mu.RUnlock()
 	if err != nil {
 		return err
-	} else if numSectors == 0 {
-		return errors.New("allowance is too small")
+	}
+	// Only allocate half as many sectors as the max. This leaves some leeway
+	// for replacing contracts, transaction fees, etc.
+	numSectors := max / 2
+	// check that this is sufficient to store at least one sector
+	if numSectors == 0 {
+		return ErrInsufficientAllowance
 	}
 
 	// invalidate all active editors/downloaders for the contracts we want to
