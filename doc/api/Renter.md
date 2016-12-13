@@ -63,9 +63,6 @@ returns the current settings along with metrics on the renter's spending.
   // Metrics about how much the Renter has spent on storage, uploads, and
   // downloads.
   "financialmetrics": {
-    // Blockheight at which the current allowance period began.
-    "allowanceperiodstart": 5678,
-
     // How much money, in hastings, the Renter has paid into file contracts
     // formed with hosts. Note that some of this money may be returned to the
     // Renter when the contract ends. To calculate how much will be returned,
@@ -86,6 +83,15 @@ returns the current settings along with metrics on the renter's spending.
   // Metrics pertaining to each contract formed by the Renter.
   "contractmetrics": [
     {
+      // Allowance that the contract was formed under. See settings.allowance
+      // for a description of each allowance field.
+      "allowance": {
+        "funds":       "1234", // hastings
+        "hosts":       24,
+        "period":      6048, // blocks
+        "renewwindow": 3024  // blocks
+      },
+
       // Flat fee required by the host for forming a contract.
       "contractfee": "1234",
 

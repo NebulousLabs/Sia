@@ -103,6 +103,9 @@ type RenterContractMetrics struct {
 	// The ID of the associated contract.
 	ID types.FileContractID `json:"id"`
 
+	// The allowance that the contract was formed under.
+	Allowance Allowance `json:"allowance"`
+
 	// The starting and ending height of the contract. Note that EndHeight is
 	// the same as RenterContract.EndHeight.
 	StartHeight types.BlockHeight `json:"startheight"`

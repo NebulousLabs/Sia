@@ -87,7 +87,6 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		// They will be renewed with the new allowance when they expire.
 		c.mu.Lock()
 		c.allowance = a
-		c.financialMetrics.AllowancePeriodStart = c.blockHeight
 		err = c.saveSync()
 		c.mu.Unlock()
 		return err
@@ -154,7 +153,6 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		spending = spending.Add(contract.RenterFunds())
 	}
 	c.financialMetrics.ContractSpending = spending
-	c.financialMetrics.AllowancePeriodStart = endHeight - a.Period
 	err = c.saveSync()
 	c.mu.Unlock()
 
