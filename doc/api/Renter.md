@@ -63,6 +63,9 @@ returns the current settings along with metrics on the renter's spending.
   // Metrics about how much the Renter has spent on storage, uploads, and
   // downloads.
   "financialmetrics": {
+    // Blockheight at which the current allowance period began.
+    "allowanceperiodstart": 5678,
+
     // How much money, in hastings, the Renter has paid into file contracts
     // formed with hosts. Note that some of this money may be returned to the
     // Renter when the contract ends. To calculate how much will be returned,
@@ -78,7 +81,47 @@ returns the current settings along with metrics on the renter's spending.
 
     // Amount of money spent on uploads.
     "uploadspending": "5678" // hastings
-  }
+  },
+
+  // Metrics pertaining to each contract formed by the Renter.
+  "contractmetrics": [
+    {
+      // Flat fee required by the host for forming a contract.
+      "contractfee": "1234",
+
+      // Amount of money spent on downloads.
+      "downloadspending": "9876",
+
+      // Ending height of the contract.
+      "endheight": 5678,
+
+      // ID of the associated contract.
+      "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
+      // Tax paid out to siafund holders.
+      "siafundfee": "5678",
+
+      // Starting height of the contract.
+      "startheight": 1234,
+
+      // Amount of money spend on storage.
+      "storagespending": "5432",
+
+      // Total amount of money that the Renter spent to create the contract
+      // and submit it to the blockchain.
+      "totalcost": "9876",
+
+      // Transaction fee on the transaction that contained the contract.
+      "txnfee": "5432",
+
+      // Amount of money in the contract that can still spend on storage,
+      // downloads, and uploads.
+      "unspent": "5678",
+
+      // Amount of money spent on uploads.
+      "uploadspending": "1234"
+    }
+  ]
 }
 ```
 
