@@ -341,7 +341,7 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 // completed.
 func (r *Renter) managedScheduleIncompleteChunks(ds *downloadState) {
 	var newIncompleteChunks []*chunkDownload
-ICL:
+loop:
 	for _, incompleteChunk := range ds.incompleteChunks {
 		// Drop this chunk if the file download has failed in any way.
 		incompleteChunk.download.mu.Lock()
@@ -385,7 +385,7 @@ ICL:
 			default:
 				r.log.Critical("Download work not immediately received by worker")
 			}
-			continue ICL
+			continue loop
 		}
 
 		// Determine whether any of the workers in the set of active workers is
@@ -398,7 +398,7 @@ ICL:
 				// but is busy. Keep this chunk until the next iteration of the
 				// download loop.
 				newIncompleteChunks = append(newIncompleteChunks, incompleteChunk)
-				continue ICL
+				continue loop
 			}
 		}
 
