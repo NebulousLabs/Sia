@@ -308,17 +308,10 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 		return build.ExtendErr("unable to read file to repair chunk", err)
 	}
 
-	// Erasure code and encrypt the pieces.
+	// Erasure code the pieces.
 	pieces, err := file.erasureCode.Encode(chunkData)
 	if err != nil {
 		return build.ExtendErr("unable to erasure code chunk data", err)
-	}
-	for i := range pieces {
-		key := deriveKey(file.masterKey, chunkIndex, uint64(i))
-		pieces[i], err = key.EncryptBytes(pieces[i])
-		if err != nil {
-			return build.ExtendErr("unable to encrypt chunk pieces", err)
-		}
 	}
 
 	// Get the set of pieces that are missing from the chunk.
@@ -327,6 +320,20 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 		_, exists := chunkStatus.pieces[i]
 		if !exists {
 			missingPieces = append(missingPieces, i)
+		}
+	}
+
+	// Truncate the pieces so that they match the size of the useful workers.
+	if len(usefulWorkers) < len(missingPieces) {
+		missingPieces = missingPieces[:len(usefulWorkers)]
+	}
+
+	// Encrypt the missing pieces.
+	for _, missingPiece := range missingPieces {
+		key := deriveKey(file.masterKey, chunkIndex, uint64(missingPiece))
+		pieces[missingPiece], err = key.EncryptBytes(pieces[missingPiece])
+		if err != nil {
+			return build.ExtendErr("unable to encrypt chunk pieces", err)
 		}
 	}
 
