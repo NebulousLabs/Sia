@@ -84,7 +84,8 @@ func (c *Contractor) managedRenewContracts() error {
 	c.log.Printf("renewing %v contracts", len(renewSet))
 
 	c.mu.RLock()
-	endHeight := c.blockHeight + c.allowance.Period
+	periodStart := c.blockHeight
+	endHeight := periodStart + c.allowance.Period
 	max, err := maxSectors(c.allowance, c.hdb, c.tpool)
 	c.mu.RUnlock()
 	if err != nil {
@@ -162,6 +163,8 @@ func (c *Contractor) managedRenewContracts() error {
 		c.contracts[contract.ID] = contract
 		c.renewedIDs[id] = contract.ID
 	}
+	// update periodStart
+	c.periodStart = periodStart
 	err = c.saveSync()
 	c.mu.Unlock()
 	return err
