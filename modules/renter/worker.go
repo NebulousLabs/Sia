@@ -104,13 +104,19 @@ type (
 func (w *worker) download(dw downloadWork) {
 	d, err := w.renter.hostContractor.Downloader(w.contractID)
 	if err != nil {
-		dw.resultChan <- finishedDownload{dw.chunkDownload, nil, err, dw.pieceIndex, w.contractID}
+		select {
+		case dw.resultChan <- finishedDownload{dw.chunkDownload, nil, err, dw.pieceIndex, w.contractID}:
+		case <-w.renter.tg.StopChan():
+		}
 		return
 	}
 	defer d.Close()
 
 	data, err := d.Sector(dw.dataRoot)
-	dw.resultChan <- finishedDownload{dw.chunkDownload, data, err, dw.pieceIndex, w.contractID}
+	select {
+	case dw.resultChan <- finishedDownload{dw.chunkDownload, data, err, dw.pieceIndex, w.contractID}:
+	case <-w.renter.tg.StopChan():
+	}
 }
 
 // upload will perform some upload work.
