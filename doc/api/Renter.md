@@ -93,39 +93,42 @@ returns the current settings along with metrics on the renter's spending.
       },
 
       // Flat fee required by the host for forming a contract.
-      "contractfee": "1234",
+      "contractfee": "1234", // hastings
 
       // Amount of money spent on downloads.
-      "downloadspending": "9876",
+      "downloadspending": "9876", // hastings
 
       // Ending height of the contract.
-      "endheight": 5678,
+      "endheight": 5678, // blocks
 
       // ID of the associated contract.
       "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 
+      // Start of the allowance period that the contract was formed in.
+      "periodstart": 1234, // blocks
+
       // Tax paid out to siafund holders.
-      "siafundfee": "5678",
+      "siafundfee": "5678", // hastings
 
       // Starting height of the contract.
-      "startheight": 1234,
+      "startheight": 1234, // blocks
 
       // Amount of money spend on storage.
-      "storagespending": "5432",
+      "storagespending": "5432", // hastings
 
       // Total amount of money that the Renter spent to create the contract
       // and submit it to the blockchain.
-      "totalcost": "9876",
+      "totalcost": "9876", // hastings
 
       // Transaction fee on the transaction that contained the contract.
-      "txnfee": "5432",
+      "txnfee": "5432", // hastings
 
       // Amount of money in the contract that can still spend on storage,
       // downloads, and uploads.
-      "unspent": "5678",
+      "unspent": "5678", // hastings
 
       // Amount of money spent on uploads.
-      "uploadspending": "1234"
+      "uploadspending": "1234" // hastings
     }
   ]
 }

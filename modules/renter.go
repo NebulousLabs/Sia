@@ -106,6 +106,10 @@ type RenterContractMetrics struct {
 	// The allowance that the contract was formed under.
 	Allowance Allowance `json:"allowance"`
 
+	// The starting height of the allowance period that the contract was
+	// formed in.
+	PeriodStart types.BlockHeight `json:"allowanceperiodstart"`
+
 	// The starting and ending height of the contract. Note that EndHeight is
 	// the same as RenterContract.EndHeight.
 	StartHeight types.BlockHeight `json:"startheight"`

@@ -79,6 +79,7 @@ func (c *Contractor) initialContractMetrics(contract modules.RenterContract, hos
 	metrics := modules.RenterContractMetrics{
 		ID:          contract.ID,
 		Allowance:   c.allowance,
+		PeriodStart: c.periodStart,
 		StartHeight: c.blockHeight,
 		EndHeight:   contract.EndHeight(),
 		ContractFee: host.ContractPrice,

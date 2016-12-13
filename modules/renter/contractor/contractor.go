@@ -40,6 +40,7 @@ type Contractor struct {
 	wallet  wallet
 
 	allowance       modules.Allowance
+	periodStart     types.BlockHeight // start of current allowance period
 	blockHeight     types.BlockHeight
 	cachedRevisions map[types.FileContractID]cachedRevision
 	contracts       map[types.FileContractID]modules.RenterContract

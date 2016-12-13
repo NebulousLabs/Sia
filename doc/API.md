@@ -655,6 +655,7 @@ returns the current settings along with metrics on the renter's spending.
       "downloadspending": "9876", // hastings
       "endheight":        5678,   // blocks
       "id":               "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "periodstart":      5678,   // blocks
       "siafundfee":       "5678", // hastings
       "startheight":      1234,   // blocks
       "storagespending":  "5432", // hastings
