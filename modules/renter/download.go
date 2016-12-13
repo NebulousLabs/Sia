@@ -307,10 +307,7 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 
 	// Update the set of workers to include everyone in the worker pool.
 	id := r.mu.Lock()
-	err := r.updateWorkerPool()
-	if err != nil {
-		r.log.Println("ERROR: unable to update worker pool:", err)
-	}
+	r.updateWorkerPool()
 	ds.availableWorkers = make([]*worker, 0, len(r.workerPool))
 	for _, worker := range r.workerPool {
 		// Ignore workers that are already in the active set of workers.

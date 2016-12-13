@@ -5,22 +5,10 @@ package renter
 // will be different.
 
 import (
-	"errors"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-var (
-	// errWorkerDoesNotExist is returned if retireWorker is called for a
-	// contract id that does not have a worker associated with it.
-	errWorkerDoesNotExist = errors.New("no worker exists for that contract id")
-
-	// errWorkerExists is returned if addWorker is called for a contract id
-	// that already has a worker.
-	errWorkerExists = errors.New("there is already a worker for that contract id")
 )
 
 type (
@@ -228,46 +216,9 @@ func (w *worker) threadedWorkLoop() {
 	}
 }
 
-// addWorker will create a worker for the provided file contract id and add it
-// to the renter. Upon return, the work loop for the worker will have been
-// spawned.
-func (r *Renter) addWorker(fcid types.FileContractID) error {
-	_, exists := r.workerPool[fcid]
-	if exists {
-		return errWorkerExists
-	}
-
-	worker := &worker{
-		contractID: fcid,
-
-		downloadChan:         make(chan downloadWork, 1),
-		killChan:             make(chan struct{}),
-		priorityDownloadChan: make(chan downloadWork, 1),
-		uploadChan:           make(chan uploadWork, 1),
-
-		renter: r,
-	}
-	r.workerPool[fcid] = worker
-	go worker.threadedWorkLoop()
-	return nil
-}
-
-// retireWorker will remove a worker from the work pool, terminating the work
-// loop and deleting the worker from the renter's worker pool.
-func (r *Renter) retireWorker(fcid types.FileContractID) error {
-	w, exists := r.workerPool[fcid]
-	if !exists {
-		return errWorkerDoesNotExist
-	}
-
-	delete(r.workerPool, fcid)
-	close(w.killChan)
-	return nil
-}
-
 // updateWorkerPool will grab the set of contracts from the contractor and
 // update the worker pool to match.
-func (r *Renter) updateWorkerPool() (errorSet error) {
+func (r *Renter) updateWorkerPool() {
 	// Get a map of all the contracts in the contractor.
 	newContracts := make(map[types.FileContractID]struct{})
 	for _, nc := range r.hostContractor.Contracts() {
@@ -278,16 +229,27 @@ func (r *Renter) updateWorkerPool() (errorSet error) {
 	for id := range newContracts {
 		_, exists := r.workerPool[id]
 		if !exists {
-			errorSet = build.ComposeErrors(errorSet, r.addWorker(id))
+			worker := &worker{
+				contractID: id,
+
+				downloadChan:         make(chan downloadWork, 1),
+				killChan:             make(chan struct{}),
+				priorityDownloadChan: make(chan downloadWork, 1),
+				uploadChan:           make(chan uploadWork, 1),
+
+				renter: r,
+			}
+			r.workerPool[id] = worker
+			go worker.threadedWorkLoop()
 		}
 	}
 
 	// Remove a worker for any worker that is not in the set of new contracts.
-	for id := range r.workerPool {
+	for id, worker := range r.workerPool {
 		_, exists := newContracts[id]
 		if !exists {
-			errorSet = build.ComposeErrors(errorSet, r.retireWorker(id))
+			delete(r.workerPool, id)
+			close(worker.killChan)
 		}
 	}
-	return errorSet
 }

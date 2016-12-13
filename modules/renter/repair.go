@@ -186,10 +186,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 
 	// Reset the available workers.
 	id := r.mu.Lock()
-	err := r.updateWorkerPool()
-	if err != nil {
-		r.log.Println("ERROR: unable to update worker pool:", err)
-	}
+	r.updateWorkerPool()
 	rs.availableWorkers = make(map[types.FileContractID]*worker)
 	for id, worker := range r.workerPool {
 		// Ignore workers that are already in the active set of workers.
