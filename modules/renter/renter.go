@@ -60,8 +60,8 @@ type hostContractor interface {
 	// insertion, deletion, and modification of sectors.
 	Editor(types.FileContractID) (contractor.Editor, error)
 
-	// FinancialMetrics returns the financial metrics of the contractor.
-	FinancialMetrics() modules.RenterFinancialMetrics
+	// Metrics returns the financial metrics of the contractor.
+	Metrics() (modules.RenterFinancialMetrics, []modules.RenterContractMetrics)
 
 	// IsOffline reports whether the specified host is considered offline.
 	IsOffline(modules.NetAddress) bool
@@ -162,8 +162,8 @@ func (r *Renter) AllHosts() []modules.HostDBEntry    { return r.hostDB.AllHosts(
 
 // contractor passthroughs
 func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
-func (r *Renter) FinancialMetrics() modules.RenterFinancialMetrics {
-	return r.hostContractor.FinancialMetrics()
+func (r *Renter) Metrics() (modules.RenterFinancialMetrics, []modules.RenterContractMetrics) {
+	return r.hostContractor.Metrics()
 }
 func (r *Renter) Settings() modules.RenterSettings {
 	return modules.RenterSettings{

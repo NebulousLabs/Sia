@@ -638,11 +638,27 @@ returns the current settings along with metrics on the renter's spending.
     }
   },
   "financialmetrics": {
-    "contractspending": "1234", // hastings
-    "downloadspending": "5678", // hastings
-    "storagespending":  "1234", // hastings
-    "uploadspending":   "5678"  // hastings
-  }
+    "contractspending":     "1234", // hastings
+    "downloadspending":     "5678", // hastings
+    "storagespending":      "1234", // hastings
+    "uploadspending":       "5678"  // hastings
+  },
+  "contractmetrics": [
+    {
+      "contractfee":      "1234", // hastings
+      "downloadspending": "9876", // hastings
+      "endheight":        5678,   // blocks
+      "id":               "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "periodstart":      5678,   // blocks
+      "siafundfee":       "5678", // hastings
+      "startheight":      1234,   // blocks
+      "storagespending":  "5432", // hastings
+      "totalcost":        "9876", // hastings
+      "txnfee":           "5432", // hastings
+      "unspent":          "5678", // hastings
+      "uploadspending":   "1234"  // hastings
+    }
+  ]
 }
 ```
 

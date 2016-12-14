@@ -9,8 +9,10 @@ import (
 // contractorPersist defines what Contractor data persists across sessions.
 type contractorPersist struct {
 	Allowance        modules.Allowance
+	PeriodStart      types.BlockHeight
 	BlockHeight      types.BlockHeight
 	CachedRevisions  []cachedRevision
+	ContractMetrics  []modules.RenterContractMetrics
 	Contracts        []modules.RenterContract
 	FinancialMetrics modules.RenterFinancialMetrics
 	LastChange       modules.ConsensusChangeID
@@ -21,6 +23,7 @@ type contractorPersist struct {
 func (c *Contractor) persistData() contractorPersist {
 	data := contractorPersist{
 		Allowance:        c.allowance,
+		PeriodStart:      c.periodStart,
 		BlockHeight:      c.blockHeight,
 		FinancialMetrics: c.financialMetrics,
 		LastChange:       c.lastChange,
@@ -28,6 +31,9 @@ func (c *Contractor) persistData() contractorPersist {
 	}
 	for _, rev := range c.cachedRevisions {
 		data.CachedRevisions = append(data.CachedRevisions, rev)
+	}
+	for _, m := range c.contractMetrics {
+		data.ContractMetrics = append(data.ContractMetrics, m)
 	}
 	for _, contract := range c.contracts {
 		data.Contracts = append(data.Contracts, contract)
@@ -46,9 +52,13 @@ func (c *Contractor) load() error {
 		return err
 	}
 	c.allowance = data.Allowance
+	c.periodStart = data.PeriodStart
 	c.blockHeight = data.BlockHeight
 	for _, rev := range data.CachedRevisions {
 		c.cachedRevisions[rev.revision.ParentID] = rev
+	}
+	for _, m := range data.ContractMetrics {
+		c.contractMetrics[m.ID] = m
 	}
 	for _, contract := range data.Contracts {
 		c.contracts[contract.ID] = contract
