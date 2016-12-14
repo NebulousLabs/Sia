@@ -83,15 +83,6 @@ returns the current settings along with metrics on the renter's spending.
   // Metrics pertaining to each contract formed by the Renter.
   "contractmetrics": [
     {
-      // Allowance that the contract was formed under. See settings.allowance
-      // for a description of each allowance field.
-      "allowance": {
-        "funds":       "1234", // hastings
-        "hosts":       24,
-        "period":      6048, // blocks
-        "renewwindow": 3024  // blocks
-      },
-
       // Flat fee required by the host for forming a contract.
       "contractfee": "1234", // hastings
 

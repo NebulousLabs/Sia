@@ -645,12 +645,6 @@ returns the current settings along with metrics on the renter's spending.
   },
   "contractmetrics": [
     {
-      "allowance": {
-        "funds":       "1234", // hastings
-        "hosts":       24,
-        "period":      6048, // blocks
-        "renewwindow": 3024  // blocks
-      },
       "contractfee":      "1234", // hastings
       "downloadspending": "9876", // hastings
       "endheight":        5678,   // blocks

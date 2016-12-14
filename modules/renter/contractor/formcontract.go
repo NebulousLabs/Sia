@@ -78,7 +78,6 @@ func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, er
 func (c *Contractor) initialContractMetrics(contract modules.RenterContract, host modules.HostDBEntry, txn types.Transaction) modules.RenterContractMetrics {
 	metrics := modules.RenterContractMetrics{
 		ID:          contract.ID,
-		Allowance:   c.allowance,
 		PeriodStart: c.periodStart,
 		StartHeight: c.blockHeight,
 		EndHeight:   contract.EndHeight(),

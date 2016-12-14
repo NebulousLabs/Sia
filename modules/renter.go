@@ -103,9 +103,6 @@ type RenterContractMetrics struct {
 	// The ID of the associated contract.
 	ID types.FileContractID `json:"id"`
 
-	// The allowance that the contract was formed under.
-	Allowance Allowance `json:"allowance"`
-
 	// The starting height of the allowance period that the contract was
 	// formed in.
 	PeriodStart types.BlockHeight `json:"allowanceperiodstart"`
