@@ -38,7 +38,7 @@ var (
 	//
 	// TODO: Allow this number to be established in the renter settings.
 	maxActiveDownloadPieces = build.Select(build.Var{
-		Standard: int(50),
+		Standard: int(20),
 		Dev:      int(10),
 		Testing:  int(5),
 	}).(int)
@@ -371,9 +371,16 @@ loop:
 				continue
 			}
 
+			// If no piece exists for this worker, do not give the worker this
+			// download.
+			piece, exists := incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID]
+			if !exists {
+				continue
+			}
+
 			dw := downloadWork{
-				dataRoot:      incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID].MerkleRoot,
-				pieceIndex:    incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID].Piece,
+				dataRoot:      piece.MerkleRoot,
+				pieceIndex:    piece.Piece,
 				chunkDownload: incompleteChunk,
 				resultChan:    ds.resultChan,
 			}
@@ -392,8 +399,10 @@ loop:
 		// able to pick up the slack, indicating that the chunk can be
 		// completed just not at this time.
 		for fcid := range ds.activeWorkers {
-			scheduled, exists := incompleteChunk.workerAttempts[fcid]
-			if !scheduled && exists {
+			// Check whether a piece exists for this worker.
+			_, exists1 := incompleteChunk.download.pieceSet[incompleteChunk.index][fcid]
+			scheduled, exists2 := incompleteChunk.workerAttempts[fcid]
+			if !scheduled && exists1 && exists2 {
 				// This worker is able to complete the download for this chunk,
 				// but is busy. Keep this chunk until the next iteration of the
 				// download loop.
@@ -498,17 +507,17 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	}
 
 	// Check for an error.
+	cd := finishedDownload.chunkDownload
 	if finishedDownload.err != nil {
-		ds.incompleteChunks = append(ds.incompleteChunks, finishedDownload.chunkDownload)
+		ds.incompleteChunks = append(ds.incompleteChunks, cd)
 		return
 	}
 
 	// Add this returned piece to the appropriate chunk.
-	cd := finishedDownload.chunkDownload
 	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
 	atomic.AddUint64(&finishedDownload.chunkDownload.download.atomicDataReceived, modules.SectorSize)
 
-	// Recover the chunk and save to disk.
+	// If the chunk has completed, perform chunk recovery.
 	if len(cd.completedPieces) == cd.download.erasureCode.MinPieces() {
 		err := cd.recoverChunk()
 		if err != nil {
