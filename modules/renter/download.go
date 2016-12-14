@@ -520,13 +520,14 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	// If the chunk has completed, perform chunk recovery.
 	if len(cd.completedPieces) == cd.download.erasureCode.MinPieces() {
 		err := cd.recoverChunk()
+		ds.activePieces -= len(cd.completedPieces)
+		cd.completedPieces = make(map[uint64][]byte)
 		if err != nil {
 			r.log.Println("Download failed - could not recover a chunk:", err)
 			cd.download.mu.Lock()
 			cd.download.fail(err)
 			cd.download.mu.Unlock()
 		}
-		ds.activePieces -= len(cd.completedPieces)
 	}
 }
 

@@ -748,6 +748,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 	downloadPath = filepath.Join(st.dir, "test1.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
 	if err == nil {
+		t.Log(downloadPath)
 		t.Fatal("expecting an error")
 	}
 }
