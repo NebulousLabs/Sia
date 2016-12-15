@@ -293,8 +293,13 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 // downloadIteration performs one iteration of the download loop.
 func (r *Renter) managedDownloadIteration(ds *downloadState) {
 	// Check for sleep and break conditions.
-	queueSize := len(r.chunkQueue)
-	if len(ds.incompleteChunks) == 0 && len(ds.activeWorkers) == 0 && queueSize == 0 {
+	if len(ds.incompleteChunks) == 0 && len(ds.activeWorkers) == 0 && len(r.chunkQueue) == 0 {
+		// If the above conditions are true, it should also be the case that
+		// the number of active pieces is zero.
+		if ds.activePieces != 0 {
+			r.log.Critical("ERROR: the renter is idle , but tracking active pieces:", ds.activePieces)
+		}
+
 		// Nothing to do. Sleep until there is something to do, or until
 		// shutdown. Dislodge occasionally in case r.newDownloads misses a new
 		// download.
@@ -429,6 +434,7 @@ loop:
 		// over-subtract if the above code is run multiple times.
 		incompleteChunk.completedPieces = make(map[uint64][]byte)
 	}
+	r.log.Debugln("Finished scheduling incomplete chunks:", len(ds.incompleteChunks), len(r.chunkQueue))
 	ds.incompleteChunks = newIncompleteChunks
 }
 
@@ -472,6 +478,7 @@ func (r *Renter) managedScheduleNewChunks(ds *downloadState) {
 		}
 		ds.activePieces += nextChunk.download.erasureCode.MinPieces()
 	}
+	r.log.Debugln("Finsihed scheduling new chunks.", len(ds.incompleteChunks), len(r.chunkQueue))
 }
 
 // managedWaitOnDownloadWork will wait for workers to return after attempting to
