@@ -132,7 +132,10 @@ func newDownload(f *file, destination string) *download {
 
 		downloadFinished: make(chan error),
 	}
-	// Allocate the piece size and progress bar so that the
+	// Allocate the piece size and progress bar so that the download will
+	// finish at exactly 100%. Due to rounding error and padding, there is not
+	// a strict mapping between 'progress' and 'bytes downloaded' - it is
+	// actually necessary to download more bytes than the size of the file.
 	d.reportedPieceSize = d.fileSize / (d.numChunks * uint64(d.erasureCode.MinPieces()))
 	d.atomicDataReceived = d.fileSize - (d.reportedPieceSize * d.numChunks * uint64(d.erasureCode.MinPieces()))
 
