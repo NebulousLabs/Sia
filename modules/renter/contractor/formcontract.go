@@ -73,6 +73,25 @@ func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, er
 	return numSectors, nil
 }
 
+// initialContractMetrics returns the metrics for a newly-formed (or renewed)
+// contract. Download/Upload/Storage spending is assumed to be zero.
+func (c *Contractor) initialContractMetrics(contract modules.RenterContract, host modules.HostDBEntry, txn types.Transaction) modules.RenterContractMetrics {
+	metrics := modules.RenterContractMetrics{
+		ID:          contract.ID,
+		PeriodStart: c.periodStart,
+		StartHeight: c.blockHeight,
+		EndHeight:   contract.EndHeight(),
+		ContractFee: host.ContractPrice,
+		SiafundFee:  types.Tax(contract.EndHeight(), contract.FileContract.Payout),
+		Unspent:     contract.RenterFunds(),
+	}
+	for _, fee := range txn.MinerFees {
+		metrics.TxnFee = metrics.TxnFee.Add(fee)
+	}
+	metrics.TotalCost = metrics.Unspent.Add(metrics.ContractFee).Add(metrics.TxnFee).Add(metrics.SiafundFee)
+	return metrics
+}
+
 // managedNewContract negotiates an initial file contract with the specified
 // host, saves it, and returns it.
 func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uint64, endHeight types.BlockHeight) (modules.RenterContract, error) {
@@ -93,10 +112,11 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 
 	// create contract params
 	c.mu.RLock()
+	currentHeight := c.blockHeight
 	params := proto.ContractParams{
 		Host:          host,
 		Filesize:      numSectors * modules.SectorSize,
-		StartHeight:   c.blockHeight,
+		StartHeight:   currentHeight,
 		EndHeight:     endHeight,
 		RefundAddress: uc.UnlockHash(),
 	}
@@ -110,6 +130,11 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 		txnBuilder.Drop()
 		return modules.RenterContract{}, err
 	}
+	// add metrics entry for contract
+	txn, _ := txnBuilder.View()
+	c.mu.Lock()
+	c.contractMetrics[contract.ID] = c.initialContractMetrics(contract, host, txn)
+	c.mu.Unlock()
 
 	contractValue := contract.RenterFunds()
 	c.log.Printf("Formed contract with %v for %v SC", host.NetAddress, contractValue.Div(types.SiacoinPrecision))

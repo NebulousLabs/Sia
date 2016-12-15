@@ -33,10 +33,11 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 
 	// create contract params
 	c.mu.RLock()
+	currentHeight := c.blockHeight
 	params := proto.ContractParams{
 		Host:          host,
 		Filesize:      numSectors * modules.SectorSize,
-		StartHeight:   c.blockHeight,
+		StartHeight:   currentHeight,
 		EndHeight:     newEndHeight,
 		RefundAddress: uc.UnlockHash(),
 	}
@@ -50,6 +51,12 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 		txnBuilder.Drop() // return unused outputs to wallet
 		return modules.RenterContract{}, err
 	}
+
+	// add metrics entry for contract
+	txn, _ := txnBuilder.View()
+	c.mu.Lock()
+	c.contractMetrics[newContract.ID] = c.initialContractMetrics(newContract, host, txn)
+	c.mu.Unlock()
 
 	return newContract, nil
 }
@@ -77,7 +84,8 @@ func (c *Contractor) managedRenewContracts() error {
 	c.log.Printf("renewing %v contracts", len(renewSet))
 
 	c.mu.RLock()
-	endHeight := c.blockHeight + c.allowance.Period
+	periodStart := c.blockHeight
+	endHeight := periodStart + c.allowance.Period
 	max, err := maxSectors(c.allowance, c.hdb, c.tpool)
 	c.mu.RUnlock()
 	if err != nil {
@@ -155,6 +163,8 @@ func (c *Contractor) managedRenewContracts() error {
 		c.contracts[contract.ID] = contract
 		c.renewedIDs[id] = contract.ID
 	}
+	// update periodStart
+	c.periodStart = periodStart
 	err = c.saveSync()
 	c.mu.Unlock()
 	return err

@@ -117,12 +117,18 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
 	storageDelta := he.editor.StorageSpending.Sub(oldStorageSpending)
 
-	he.contractor.mu.Lock()
-	he.contractor.financialMetrics.UploadSpending = he.contractor.financialMetrics.UploadSpending.Add(uploadDelta)
-	he.contractor.financialMetrics.StorageSpending = he.contractor.financialMetrics.StorageSpending.Add(storageDelta)
-	he.contractor.contracts[contract.ID] = contract
-	he.contractor.saveSync()
-	he.contractor.mu.Unlock()
+	c := he.contractor
+	c.mu.Lock()
+	metrics := c.contractMetrics[contract.ID]
+	metrics.UploadSpending = metrics.UploadSpending.Add(uploadDelta)
+	metrics.StorageSpending = metrics.StorageSpending.Add(storageDelta)
+	metrics.Unspent = metrics.Unspent.Sub(uploadDelta).Sub(storageDelta)
+	c.contractMetrics[contract.ID] = metrics
+	c.financialMetrics.UploadSpending = c.financialMetrics.UploadSpending.Add(uploadDelta)
+	c.financialMetrics.StorageSpending = c.financialMetrics.StorageSpending.Add(storageDelta)
+	c.contracts[contract.ID] = contract
+	c.saveSync()
+	c.mu.Unlock()
 	he.contract = contract
 
 	return sectorRoot, nil
@@ -246,8 +252,8 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 			return nil, err
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
-		contract.LastRevision = cached.revision
-		contract.MerkleRoots = cached.merkleRoots
+		contract.LastRevision = cached.Revision
+		contract.MerkleRoots = cached.MerkleRoots
 		e, err = proto.NewEditor(host, contract, height)
 	}
 	if err != nil {

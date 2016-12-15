@@ -583,3 +583,111 @@ func TestUploadDownload(t *testing.T) {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
 	}
 }
+
+// TestIntegrationRenterMetrics tests that the renter's metrics are properly
+// reported after uploading and downloading.
+func TestIntegrationRenterMetrics(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestIntegrationRenterMetrics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and start accepting contracts.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Renter metrics should be zero.
+	var metrics RenterGET
+	err = st.getAPI("/renter", &metrics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !metrics.FinancialMetrics.ContractSpending.IsZero() || len(metrics.ContractMetrics) > 0 {
+		t.Error("renter should not have formed any contracts yet:", metrics.FinancialMetrics)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "5"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Metrics should reflect new allowance.
+	err = st.getAPI("/renter", &metrics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if metrics.FinancialMetrics.ContractSpending.IsZero() || len(metrics.ContractMetrics) == 0 {
+		t.Error("renter metrics should reflect contract spending:", metrics.FinancialMetrics)
+	}
+
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only one piece will be uploaded (10% at current redundancy).
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+	}
+
+	// Metrics should reflect upload spending and storage spending.
+	err = st.getAPI("/renter", &metrics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if metrics.FinancialMetrics.UploadSpending.IsZero() || !metrics.FinancialMetrics.UploadSpending.Equals(metrics.ContractMetrics[0].UploadSpending) {
+		t.Error("renter metrics should reflect upload spending:", metrics.FinancialMetrics)
+	}
+	if metrics.FinancialMetrics.StorageSpending.IsZero() || !metrics.FinancialMetrics.StorageSpending.Equals(metrics.ContractMetrics[0].StorageSpending) {
+		t.Error("renter metrics should reflect storage spending:", metrics.FinancialMetrics)
+	}
+
+	// Download the first file.
+	err = st.stdGetAPI("/renter/download/test?destination=" + filepath.Join(st.dir, "testdown.dat"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Metrics should reflect upload spending and storage spending.
+	err = st.getAPI("/renter", &metrics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if metrics.FinancialMetrics.DownloadSpending.IsZero() || !metrics.FinancialMetrics.DownloadSpending.Equals(metrics.ContractMetrics[0].DownloadSpending) {
+		t.Error("renter metrics should reflect download spending:", metrics.FinancialMetrics)
+	}
+}

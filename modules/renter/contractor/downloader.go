@@ -83,11 +83,16 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 
 	hd.speed = uint64(duration.Seconds()) / modules.SectorSize
 
-	hd.contractor.mu.Lock()
-	hd.contractor.financialMetrics.DownloadSpending = hd.contractor.financialMetrics.DownloadSpending.Add(delta)
-	hd.contractor.contracts[contract.ID] = contract
-	hd.contractor.saveSync()
-	hd.contractor.mu.Unlock()
+	c := hd.contractor
+	c.mu.Lock()
+	metrics := c.contractMetrics[contract.ID]
+	metrics.DownloadSpending = metrics.DownloadSpending.Add(delta)
+	metrics.Unspent = metrics.Unspent.Sub(delta)
+	c.contractMetrics[contract.ID] = metrics
+	c.financialMetrics.DownloadSpending = c.financialMetrics.DownloadSpending.Add(delta)
+	c.contracts[contract.ID] = contract
+	c.saveSync()
+	c.mu.Unlock()
 
 	return sector, nil
 }
@@ -180,10 +185,11 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 		c.mu.RUnlock()
 		if !ok {
 			// nothing we can do; return original error
+			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
 			return nil, err
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
-		contract.LastRevision = cached.revision
+		contract.LastRevision = cached.Revision
 		d, err = proto.NewDownloader(host, contract)
 	}
 	if err != nil {
