@@ -185,10 +185,11 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 		c.mu.RUnlock()
 		if !ok {
 			// nothing we can do; return original error
+			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
 			return nil, err
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
-		contract.LastRevision = cached.revision
+		contract.LastRevision = cached.Revision
 		d, err = proto.NewDownloader(host, contract)
 	}
 	if err != nil {

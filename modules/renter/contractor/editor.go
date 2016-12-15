@@ -252,8 +252,8 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 			return nil, err
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
-		contract.LastRevision = cached.revision
-		contract.MerkleRoots = cached.merkleRoots
+		contract.LastRevision = cached.Revision
+		contract.MerkleRoots = cached.MerkleRoots
 		e, err = proto.NewEditor(host, contract, height)
 	}
 	if err != nil {
