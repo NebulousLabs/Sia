@@ -1,13 +1,8 @@
 package renter
 
-// TODO: Need to make sure that the activePieces variable is being managed
-// correctly, as inconsistencies with it could cause a lot of problems, and
-// inconsistencies aren't necessarily easy to detect during testing.
-
 // NOTE: All chunk recovery (which involves high computation and disk syncing)
-// is done in the primary download loop thread. This may eventually become a
-// significant performance bottleneck, however other factors are currently more
-// significant.
+// is done in the primary download loop thread. At some point this may be a
+// significant performance bottleneck.
 
 import (
 	"bytes"
@@ -74,14 +69,15 @@ type (
 		startTime    time.Time
 
 		// Static information about the file - can be read without a lock.
-		chunkSize   uint64
-		destination string
-		erasureCode modules.ErasureCoder
-		fileSize    uint64
-		masterKey   crypto.TwofishKey
-		numChunks   uint64
-		pieceSet    []map[types.FileContractID]pieceData
-		siapath     string
+		chunkSize         uint64
+		destination       string
+		erasureCode       modules.ErasureCoder
+		fileSize          uint64
+		masterKey         crypto.TwofishKey
+		numChunks         uint64
+		pieceSet          []map[types.FileContractID]pieceData
+		reportedPieceSize uint64
+		siapath           string
 
 		// Syncrhonization tools.
 		downloadFinished chan error
@@ -136,6 +132,9 @@ func newDownload(f *file, destination string) *download {
 
 		downloadFinished: make(chan error),
 	}
+	// Allocate the piece size and progress bar so that the
+	d.reportedPieceSize = d.fileSize / (d.numChunks * uint64(d.erasureCode.MinPieces()))
+	d.atomicDataReceived = d.fileSize - (d.reportedPieceSize * d.numChunks * uint64(d.erasureCode.MinPieces()))
 
 	// Assemble the piece set for the download.
 	d.pieceSet = make([]map[types.FileContractID]pieceData, f.numChunks())
@@ -434,7 +433,6 @@ loop:
 		// over-subtract if the above code is run multiple times.
 		incompleteChunk.completedPieces = make(map[uint64][]byte)
 	}
-	r.log.Debugln("Finished scheduling incomplete chunks:", len(ds.incompleteChunks), len(r.chunkQueue))
 	ds.incompleteChunks = newIncompleteChunks
 }
 
@@ -478,7 +476,6 @@ func (r *Renter) managedScheduleNewChunks(ds *downloadState) {
 		}
 		ds.activePieces += nextChunk.download.erasureCode.MinPieces()
 	}
-	r.log.Debugln("Finsihed scheduling new chunks.", len(ds.incompleteChunks), len(r.chunkQueue))
 }
 
 // managedWaitOnDownloadWork will wait for workers to return after attempting to
@@ -522,7 +519,7 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 
 	// Add this returned piece to the appropriate chunk.
 	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
-	atomic.AddUint64(&finishedDownload.chunkDownload.download.atomicDataReceived, modules.SectorSize)
+	atomic.AddUint64(&cd.download.atomicDataReceived, cd.download.reportedPieceSize)
 
 	// If the chunk has completed, perform chunk recovery.
 	if len(cd.completedPieces) == cd.download.erasureCode.MinPieces() {
