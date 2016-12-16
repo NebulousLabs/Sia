@@ -165,6 +165,9 @@ func (c *Contractor) managedRenewContracts() error {
 	}
 	// update periodStart
 	c.periodStart = periodStart
+	// archive the old metrics and recalculate current metrics
+	c.periodMetrics = append(c.periodMetrics, c.currentPeriodMetrics)
+	c.currentPeriodMetrics = c.calculatePeriodMetrics()
 	err = c.saveSync()
 	c.mu.Unlock()
 	return err

@@ -187,6 +187,6 @@ func (stubContractor) Editor(types.FileContractID) (contractor.Editor, error) { 
 func (stubContractor) Downloader(types.FileContractID) (contractor.Downloader, error) {
 	return nil, nil
 }
-func (stubContractor) Metrics() (m modules.RenterFinancialMetrics, cs []modules.RenterContractMetrics) {
+func (stubContractor) Metrics() (m modules.RenterFinancialMetrics, ps []modules.RenterPeriodMetrics, cs []modules.RenterContractMetrics) {
 	return
 }

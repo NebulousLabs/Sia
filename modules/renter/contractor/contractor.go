@@ -40,19 +40,21 @@ type Contractor struct {
 	wallet  wallet
 
 	allowance       modules.Allowance
-	periodStart     types.BlockHeight // start of current allowance period
 	blockHeight     types.BlockHeight
 	cachedRevisions map[types.FileContractID]cachedRevision
 	contracts       map[types.FileContractID]modules.RenterContract
 	downloaders     map[types.FileContractID]*hostDownloader
 	editors         map[types.FileContractID]*hostEditor
 	lastChange      modules.ConsensusChangeID
+	periodStart     types.BlockHeight // start of current allowance period
 	renewedIDs      map[types.FileContractID]types.FileContractID
 	renewing        map[types.FileContractID]bool // prevent revising during renewal
 	revising        map[types.FileContractID]bool // prevent overlapping revisions
 
-	financialMetrics modules.RenterFinancialMetrics
-	contractMetrics  map[types.FileContractID]modules.RenterContractMetrics
+	contractMetrics      map[types.FileContractID]modules.RenterContractMetrics
+	financialMetrics     modules.RenterFinancialMetrics
+	periodMetrics        []modules.RenterPeriodMetrics
+	currentPeriodMetrics modules.RenterPeriodMetrics
 
 	mu sync.RWMutex
 
@@ -69,14 +71,15 @@ func (c *Contractor) Allowance() modules.Allowance {
 }
 
 // Metrics returns the metrics of the Contractor.
-func (c *Contractor) Metrics() (modules.RenterFinancialMetrics, []modules.RenterContractMetrics) {
+func (c *Contractor) Metrics() (modules.RenterFinancialMetrics, []modules.RenterPeriodMetrics, []modules.RenterContractMetrics) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	contractMetrics := make([]modules.RenterContractMetrics, 0, len(c.contractMetrics))
 	for _, m := range c.contractMetrics {
 		contractMetrics = append(contractMetrics, m)
 	}
-	return c.financialMetrics, contractMetrics
+	periodMetrics := append(c.periodMetrics, c.currentPeriodMetrics)
+	return c.financialMetrics, periodMetrics, contractMetrics
 }
 
 // Contract returns the latest contract formed with the specified host.

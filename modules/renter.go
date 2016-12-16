@@ -92,10 +92,35 @@ type RenterFinancialMetrics struct {
 	DownloadSpending types.Currency `json:"downloadspending"`
 	StorageSpending  types.Currency `json:"storagespending"`
 	UploadSpending   types.Currency `json:"uploadspending"`
+}
 
-	// AllowancePeriodStart is the blockheight at which the current allowance
-	// period began.
-	AllowancePeriodStart types.BlockHeight `json:"allowanceperiodstart"`
+// RenterPeriodMetrics contains metrics relevant to an allowance period.
+type RenterPeriodMetrics struct {
+	// The specified Allowance for the period, and the height at which it went
+	// into effect. If the allowance was changed mid-period, this field
+	// reflects the most recent version. The PeriodStart, however, is
+	// unchanged.
+	Allowance   Allowance         `json:"allowance"`
+	PeriodStart types.BlockHeight `json:"periodstart"`
+
+	// The amount of money spent on fees during the period.
+	TxnFeeSpending      types.Currency `json:"txnfeespending"`
+	ContractFeeSpending types.Currency `json:"contractfeespending"`
+	SiafundFeeSpending  types.Currency `json:"siafundfeespending"`
+
+	// The amount of money allocated for uploads, downloads, and storage
+	// during the period.
+	ContractAllocations types.Currency `json:"contractallocations"`
+
+	// The amount of money spent on uploads, downloads, and storage during the
+	// period.
+	DownloadSpending types.Currency `json:"downloadspending"`
+	StorageSpending  types.Currency `json:"storagespending"`
+	UploadSpending   types.Currency `json:"uploadspending"`
+
+	// The portion of the allowance funds that were not spent. Note that this
+	// includes money that was allocated in contracts but not spent.
+	Unspent types.Currency `json:"unspent"`
 }
 
 // RenterContractMetrics contains metrics relevant to a single file contract.
@@ -217,7 +242,7 @@ type Renter interface {
 	LoadSharedFilesAscii(asciiSia string) ([]string, error)
 
 	// Metrics returns the metrics of the Renter.
-	Metrics() (RenterFinancialMetrics, []RenterContractMetrics)
+	Metrics() (RenterFinancialMetrics, []RenterPeriodMetrics, []RenterContractMetrics)
 
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error
