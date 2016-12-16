@@ -71,6 +71,18 @@ func (c *Contractor) load() error {
 		newHash.LoadString(newString)
 		c.renewedIDs[types.FileContractID(oldHash)] = types.FileContractID(newHash)
 	}
+	// For any contracts that we don't have metrics about, create a "best
+	// effort" metrics entry. This will at least prevent negative currency
+	// errors when money is subtracted from the Unspent field.
+	for id, contract := range c.contracts {
+		if _, ok := c.contractMetrics[id]; !ok && len(contract.LastRevision.NewValidProofOutputs) > 0 {
+			c.contractMetrics[id] = modules.RenterContractMetrics{
+				ID:        id,
+				EndHeight: contract.EndHeight(),
+				Unspent:   contract.RenterFunds(),
+			}
+		}
+	}
 	return nil
 }
 
