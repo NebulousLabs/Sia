@@ -8,26 +8,29 @@ import (
 
 // contractorPersist defines what Contractor data persists across sessions.
 type contractorPersist struct {
-	Allowance        modules.Allowance
-	PeriodStart      types.BlockHeight
-	BlockHeight      types.BlockHeight
-	CachedRevisions  []cachedRevision
-	ContractMetrics  []modules.RenterContractMetrics
-	Contracts        []modules.RenterContract
-	FinancialMetrics modules.RenterFinancialMetrics
-	LastChange       modules.ConsensusChangeID
-	RenewedIDs       map[string]string
+	Allowance            modules.Allowance
+	PeriodStart          types.BlockHeight
+	BlockHeight          types.BlockHeight
+	CachedRevisions      []cachedRevision
+	ContractMetrics      []modules.RenterContractMetrics
+	Contracts            []modules.RenterContract
+	CurrentPeriodMetrics modules.RenterPeriodMetrics
+	FinancialMetrics     modules.RenterFinancialMetrics
+	LastChange           modules.ConsensusChangeID
+	PeriodMetrics        []modules.RenterPeriodMetrics
+	RenewedIDs           map[string]string
 }
 
 // persistData returns the data in the Contractor that will be saved to disk.
 func (c *Contractor) persistData() contractorPersist {
 	data := contractorPersist{
-		Allowance:        c.allowance,
-		PeriodStart:      c.periodStart,
-		BlockHeight:      c.blockHeight,
-		FinancialMetrics: c.financialMetrics,
-		LastChange:       c.lastChange,
-		RenewedIDs:       make(map[string]string),
+		Allowance:            c.allowance,
+		PeriodStart:          c.periodStart,
+		BlockHeight:          c.blockHeight,
+		CurrentPeriodMetrics: c.currentPeriodMetrics,
+		FinancialMetrics:     c.financialMetrics,
+		LastChange:           c.lastChange,
+		RenewedIDs:           make(map[string]string),
 	}
 	for _, rev := range c.cachedRevisions {
 		data.CachedRevisions = append(data.CachedRevisions, rev)
@@ -40,6 +43,9 @@ func (c *Contractor) persistData() contractorPersist {
 	}
 	for oldID, newID := range c.renewedIDs {
 		data.RenewedIDs[oldID.String()] = newID.String()
+	}
+	for _, m := range c.periodMetrics {
+		data.PeriodMetrics = append(data.PeriodMetrics, m)
 	}
 	return data
 }
@@ -65,11 +71,24 @@ func (c *Contractor) load() error {
 	}
 	c.financialMetrics = data.FinancialMetrics
 	c.lastChange = data.LastChange
+	c.currentPeriodMetrics = data.CurrentPeriodMetrics
 	for oldString, newString := range data.RenewedIDs {
 		var oldHash, newHash crypto.Hash
 		oldHash.LoadString(oldString)
 		newHash.LoadString(newString)
 		c.renewedIDs[types.FileContractID(oldHash)] = types.FileContractID(newHash)
+	}
+	// For any contracts that we don't have metrics about, create a "best
+	// effort" metrics entry. This will at least prevent negative currency
+	// errors when money is subtracted from the Unspent field.
+	for id, contract := range c.contracts {
+		if _, ok := c.contractMetrics[id]; !ok && len(contract.LastRevision.NewValidProofOutputs) > 0 {
+			c.contractMetrics[id] = modules.RenterContractMetrics{
+				ID:        id,
+				EndHeight: contract.EndHeight(),
+				Unspent:   contract.RenterFunds(),
+			}
+		}
 	}
 	return nil
 }

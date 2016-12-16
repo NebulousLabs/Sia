@@ -154,6 +154,8 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	// prevent metrics math from causing an underflow
+	c.currentPeriodMetrics.Unspent = types.SiacoinPrecision.Mul64(100000)
 
 	// announce the host
 	err = h.Announce()

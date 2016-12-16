@@ -89,6 +89,8 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	metrics.DownloadSpending = metrics.DownloadSpending.Add(delta)
 	metrics.Unspent = metrics.Unspent.Sub(delta)
 	c.contractMetrics[contract.ID] = metrics
+	c.currentPeriodMetrics.DownloadSpending = c.currentPeriodMetrics.DownloadSpending.Add(delta)
+	c.currentPeriodMetrics.Unspent = c.currentPeriodMetrics.Unspent.Sub(delta)
 	c.financialMetrics.DownloadSpending = c.financialMetrics.DownloadSpending.Add(delta)
 	c.contracts[contract.ID] = contract
 	c.saveSync()

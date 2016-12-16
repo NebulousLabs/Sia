@@ -73,7 +73,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	}
 
 	c.mu.RLock()
-	shouldRenew := a.Period != c.allowance.Period || a.Funds.Cmp(c.allowance.Funds) != 0
+	shouldRenew := a.Period != c.allowance.Period || !a.Funds.Equals(c.allowance.Funds)
 	shouldWait := c.blockHeight+a.Period < c.contractEndHeight()
 	remaining := int(a.Hosts) - len(c.contracts)
 	c.mu.RUnlock()
@@ -87,7 +87,6 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		// They will be renewed with the new allowance when they expire.
 		c.mu.Lock()
 		c.allowance = a
-		c.periodStart = c.blockHeight
 		err = c.saveSync()
 		c.mu.Unlock()
 		return err
@@ -147,15 +146,15 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 	// Set the allowance and replace the contract set
 	c.mu.Lock()
+	// if we're past the end of the old period, update periodStart
+	if periodStart > c.periodStart+c.allowance.Period {
+		c.periodStart = periodStart
+	}
 	c.allowance = a
 	c.contracts = newContracts
 	// update metrics
-	var spending types.Currency
-	for _, contract := range c.contracts {
-		spending = spending.Add(contract.RenterFunds())
-	}
-	c.financialMetrics.ContractSpending = spending
-	c.periodStart = periodStart
+	c.currentPeriodMetrics = c.calculatePeriodMetrics()
+	c.financialMetrics.ContractSpending = c.currentPeriodMetrics.ContractAllocations
 	err = c.saveSync()
 	c.mu.Unlock()
 
@@ -173,7 +172,8 @@ func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a m
 	// have the same endHeight as the existing ones. Otherwise, the endHeight
 	// should be a full period.
 	c.mu.RLock()
-	endHeight := c.blockHeight + a.Period
+	periodStart := c.blockHeight
+	endHeight := periodStart + a.Period
 	if len(c.contracts) > 0 {
 		endHeight = c.contractEndHeight()
 	}
@@ -192,13 +192,36 @@ func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a m
 		c.contracts[contract.ID] = contract
 	}
 	// update metrics
-	var spending types.Currency
-	for _, contract := range c.contracts {
-		spending = spending.Add(contract.RenterFunds())
-	}
-	c.financialMetrics.ContractSpending = spending
+	c.currentPeriodMetrics = c.calculatePeriodMetrics()
+	c.financialMetrics.ContractSpending = c.currentPeriodMetrics.ContractAllocations
 	err = c.saveSync()
 	c.mu.Unlock()
 
 	return err
+}
+
+// calculatePeriodMetrics calculates the current period metrics from the
+// current contract set.
+func (c *Contractor) calculatePeriodMetrics() modules.RenterPeriodMetrics {
+	pm := modules.RenterPeriodMetrics{
+		Allowance:   c.allowance,
+		PeriodStart: c.periodStart,
+	}
+	for id := range c.contracts {
+		m, ok := c.contractMetrics[id]
+		if !ok {
+			c.log.Println("WARN: missing metrics for contract", id)
+			continue
+		}
+		pm.TxnFeeSpending = pm.TxnFeeSpending.Add(m.TxnFee)
+		pm.ContractFeeSpending = pm.ContractFeeSpending.Add(m.ContractFee)
+		pm.SiafundFeeSpending = pm.SiafundFeeSpending.Add(m.SiafundFee)
+		pm.ContractAllocations = pm.ContractAllocations.Add(m.Unspent.Add(m.StorageSpending).Add(m.UploadSpending).Add(m.DownloadSpending))
+		pm.DownloadSpending = pm.DownloadSpending.Add(m.DownloadSpending)
+		pm.UploadSpending = pm.UploadSpending.Add(m.UploadSpending)
+		pm.StorageSpending = pm.StorageSpending.Add(m.StorageSpending)
+	}
+	pm.Unspent = pm.Allowance.Funds.Sub(pm.TxnFeeSpending).Sub(pm.ContractFeeSpending).Sub(pm.SiafundFeeSpending).
+		Sub(pm.DownloadSpending).Sub(pm.UploadSpending).Sub(pm.StorageSpending)
+	return pm
 }
