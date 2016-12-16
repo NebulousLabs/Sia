@@ -48,7 +48,7 @@ func (c *Contractor) load() error {
 	c.allowance = data.Allowance
 	c.blockHeight = data.BlockHeight
 	for _, rev := range data.CachedRevisions {
-		c.cachedRevisions[rev.revision.ParentID] = rev
+		c.cachedRevisions[rev.Revision.ParentID] = rev
 	}
 	for _, contract := range data.Contracts {
 		c.contracts[contract.ID] = contract
