@@ -79,9 +79,12 @@ type (
 		uploadChan           chan uploadWork   // lowest priority
 
 		// recentUploadFailure documents the most recent time that an upload
-		// has failed. The repair loop ignores workers that have had an upload
-		// failure in the past two hours.
-		recentUploadFailure time.Time
+		// has failed.
+		recentUploadFailure time.Time // Only modified by primary repair loop.
+
+		// recentDownloadFailure documents the most recent time that a download
+		// has failed.
+		recentDownloadFailure time.Time // Only modified by the primary download loop.
 
 		// Utilities
 		renter *Renter

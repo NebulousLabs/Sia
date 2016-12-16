@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	defaultFilePerm = 0666
+	defaultFilePerm         = 0666
+	downloadFailureCooldown = time.Minute * 30
 )
 
 var (
@@ -324,9 +325,14 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 			continue
 		}
 
+		// Ignore workers that have a download failure recently.
+		if worker.recentDownloadFailure.Add(downloadFailureCooldown).After(time.Now()) {
+			continue
+		}
+
 		// TODO: Prune workers that do not provide value. If bandwidth can be
 		// saturated with fewer workers, then the more expensive ones should be
-		// eliminated. Unreliable ones should be eliminated. Etc.
+		// eliminated.
 
 		ds.availableWorkers = append(ds.availableWorkers, worker)
 	}
@@ -516,6 +522,7 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	// Check for an error.
 	cd := finishedDownload.chunkDownload
 	if finishedDownload.err != nil {
+		worker.recentDownloadFailure = time.Now()
 		ds.incompleteChunks = append(ds.incompleteChunks, cd)
 		return
 	}
