@@ -34,6 +34,7 @@ type (
 	RenterGET struct {
 		Settings         modules.RenterSettings          `json:"settings"`
 		FinancialMetrics modules.RenterFinancialMetrics  `json:"financialmetrics"`
+		PeriodMetrics    []modules.RenterPeriodMetrics   `json:"periodmetrics"`
 		ContractMetrics  []modules.RenterContractMetrics `json:"contractmetrics"`
 	}
 
@@ -84,10 +85,11 @@ type (
 
 // renterHandlerGET handles the API call to /renter.
 func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	renterMetrics, contractMetrics := api.renter.Metrics()
+	renterMetrics, periodMetrics, contractMetrics := api.renter.Metrics()
 	WriteJSON(w, RenterGET{
 		Settings:         api.renter.Settings(),
 		FinancialMetrics: renterMetrics,
+		PeriodMetrics:    periodMetrics,
 		ContractMetrics:  contractMetrics,
 	})
 }
