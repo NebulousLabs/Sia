@@ -40,7 +40,6 @@ type Contractor struct {
 	wallet  wallet
 
 	allowance       modules.Allowance
-	periodStart     types.BlockHeight // start of current allowance period
 	blockHeight     types.BlockHeight
 	cachedRevisions map[types.FileContractID]cachedRevision
 	contracts       map[types.FileContractID]modules.RenterContract
@@ -52,7 +51,6 @@ type Contractor struct {
 	revising        map[types.FileContractID]bool // prevent overlapping revisions
 
 	financialMetrics modules.RenterFinancialMetrics
-	contractMetrics  map[types.FileContractID]modules.RenterContractMetrics
 
 	mu sync.RWMutex
 
@@ -68,15 +66,11 @@ func (c *Contractor) Allowance() modules.Allowance {
 	return c.allowance
 }
 
-// Metrics returns the metrics of the Contractor.
-func (c *Contractor) Metrics() (modules.RenterFinancialMetrics, []modules.RenterContractMetrics) {
+// FinancialMetrics returns the financial metrics of the Contractor.
+func (c *Contractor) FinancialMetrics() modules.RenterFinancialMetrics {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	contractMetrics := make([]modules.RenterContractMetrics, 0, len(c.contractMetrics))
-	for _, m := range c.contractMetrics {
-		contractMetrics = append(contractMetrics, m)
-	}
-	return c.financialMetrics, contractMetrics
+	return c.financialMetrics
 }
 
 // Contract returns the latest contract formed with the specified host.
@@ -148,7 +142,6 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 
 		cachedRevisions: make(map[types.FileContractID]cachedRevision),
 		contracts:       make(map[types.FileContractID]modules.RenterContract),
-		contractMetrics: make(map[types.FileContractID]modules.RenterContractMetrics),
 		downloaders:     make(map[types.FileContractID]*hostDownloader),
 		editors:         make(map[types.FileContractID]*hostEditor),
 		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
