@@ -16,7 +16,7 @@ import (
 )
 
 // TODO: Move to a consts file.
-const uploadFailureCooldown = time.Hour * 3
+const uploadFailureCooldown = time.Hour
 const minPiecesRepair = 6
 
 var (
