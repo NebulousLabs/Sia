@@ -442,9 +442,9 @@ func (r *Renter) threadedQueueRepairs() {
 				return
 			}
 
-			// Wait 30 seconds before going to the next file.
+			// Wait 5 seconds before going to the next file.
 			select {
-			case <-time.After(time.Second * 30):
+			case <-time.After(time.Second * 5):
 			case <-r.tg.StopChan():
 				return
 			}

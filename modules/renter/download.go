@@ -522,6 +522,7 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	// Check for an error.
 	cd := finishedDownload.chunkDownload
 	if finishedDownload.err != nil {
+		r.log.Debugln("Error when downloading a piece:", err)
 		worker.recentDownloadFailure = time.Now()
 		ds.incompleteChunks = append(ds.incompleteChunks, cd)
 		return
