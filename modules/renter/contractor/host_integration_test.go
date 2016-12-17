@@ -702,15 +702,15 @@ func TestIntegrationResync(t *testing.T) {
 	}
 	contract = c.contracts[contract.ID]
 
-	// corrupt contract and delete its cachedRevision
+	// Add some corruption to the set of cached revisions.
 	badContract := contract
 	badContract.LastRevision.NewRevisionNumber--
 	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
-
 	c.mu.Lock()
-	delete(c.cachedRevisions, contract.ID)
-	c.mu.Unlock()
-	c.mu.Lock()
+	cr := c.cachedRevisions[contract.ID]
+	cr.Revision.NewRevisionNumber = 0
+	cr.Revision.NewRevisionNumber--
+	c.cachedRevisions[contract.ID] = cr
 	c.contracts[badContract.ID] = badContract
 	c.mu.Unlock()
 
@@ -739,14 +739,16 @@ func TestIntegrationResync(t *testing.T) {
 	}
 	downloader.Close()
 
-	// corrupt contract and delete its cachedRevision
+	// Add some corruption to the set of cached revisions.
 	badContract = contract
 	badContract.LastRevision.NewRevisionNumber--
-	badContract.MerkleRoots = nil // delete Merkle roots
-
+	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
 	c.mu.Lock()
+	cr = c.cachedRevisions[contract.ID]
+	cr.Revision.NewRevisionNumber = 0
+	cr.Revision.NewRevisionNumber--
+	c.cachedRevisions[contract.ID] = cr
 	c.contracts[badContract.ID] = badContract
-	delete(c.cachedRevisions, contract.ID)
 	c.mu.Unlock()
 
 	// Editor should fail with the bad contract

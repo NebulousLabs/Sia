@@ -511,12 +511,12 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	workerID := finishedDownload.workerID
 	delete(ds.activeWorkers, workerID)
 
-	// Return the worker to the list of available workers.
+	// Fetch the corresponding worker.
 	id := r.mu.RLock()
 	worker, exists := r.workerPool[workerID]
 	r.mu.RUnlock(id)
-	if exists {
-		ds.availableWorkers = append(ds.availableWorkers, worker)
+	if !exists {
+		return
 	}
 
 	// Check for an error.
