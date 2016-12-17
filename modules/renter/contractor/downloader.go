@@ -83,16 +83,11 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 
 	hd.speed = uint64(duration.Seconds()) / modules.SectorSize
 
-	c := hd.contractor
-	c.mu.Lock()
-	metrics := c.contractMetrics[contract.ID]
-	metrics.DownloadSpending = metrics.DownloadSpending.Add(delta)
-	metrics.Unspent = metrics.Unspent.Sub(delta)
-	c.contractMetrics[contract.ID] = metrics
-	c.financialMetrics.DownloadSpending = c.financialMetrics.DownloadSpending.Add(delta)
-	c.contracts[contract.ID] = contract
-	c.saveSync()
-	c.mu.Unlock()
+	hd.contractor.mu.Lock()
+	hd.contractor.financialMetrics.DownloadSpending = hd.contractor.financialMetrics.DownloadSpending.Add(delta)
+	hd.contractor.contracts[contract.ID] = contract
+	hd.contractor.saveSync()
+	hd.contractor.mu.Unlock()
 
 	return sector, nil
 }

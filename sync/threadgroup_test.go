@@ -417,7 +417,7 @@ func TestThreadGroupSiaExample(t *testing.T) {
 		tg.Done()
 	}()
 	tg.Stop()
-	if !threadFinished2 || !listenerCleanedUp || !fileClosed {
+	if !threadFinished || !listenerCleanedUp || !fileClosed {
 		t.Error("stop did not block until all running resources had closed")
 	}
 }

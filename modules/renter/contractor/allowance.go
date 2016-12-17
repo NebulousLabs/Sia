@@ -87,7 +87,6 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		// They will be renewed with the new allowance when they expire.
 		c.mu.Lock()
 		c.allowance = a
-		c.periodStart = c.blockHeight
 		err = c.saveSync()
 		c.mu.Unlock()
 		return err
@@ -102,8 +101,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 	// calculate new endHeight; if the period has not changed, the endHeight
 	// should not change either
-	periodStart := c.blockHeight
-	endHeight := periodStart + a.Period
+	endHeight := c.blockHeight + a.Period
 	if a.Period == c.allowance.Period && len(c.contracts) > 0 {
 		// COMPAT v0.6.0 - old hosts require end height increase by at least 1
 		endHeight = c.contractEndHeight() + 1
@@ -155,7 +153,6 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		spending = spending.Add(contract.RenterFunds())
 	}
 	c.financialMetrics.ContractSpending = spending
-	c.periodStart = periodStart
 	err = c.saveSync()
 	c.mu.Unlock()
 
