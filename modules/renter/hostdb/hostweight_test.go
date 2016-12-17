@@ -7,10 +7,12 @@ import (
 )
 
 func calculateWeightFromUInt64Price(price uint64) (weight types.Currency) {
+	hdb := bareHostDB()
+	hdb.blockHeight = 0
 	var entry hostEntry
 	entry.RemainingStorage = 250e3
 	entry.StoragePrice = types.NewCurrency64(price)
-	return calculateHostWeight(0, entry)
+	return hdb.calculateHostWeight()(entry.HostDBEntry)
 }
 
 func TestHostWeightDistinctPrices(t *testing.T) {

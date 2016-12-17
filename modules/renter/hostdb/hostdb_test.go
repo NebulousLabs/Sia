@@ -7,19 +7,22 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/hostdb/hosttree"
 	"github.com/NebulousLabs/Sia/persist"
 )
 
 // bareHostDB returns a HostDB with its fields initialized, but without any
 // dependencies or scanning threads. It is only intended for use in unit tests.
 func bareHostDB() *HostDB {
-	return &HostDB{
+	hdb := &HostDB{
 		log: persist.NewLogger(ioutil.Discard),
 
-		activeHosts: make(map[modules.NetAddress]*hostNode),
+		activeHosts: make(map[modules.NetAddress]*hostEntry),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 	}
+	hdb.hostTree = hosttree.New(hdb.calculateHostWeight())
+	return hdb
 }
 
 // newStub is used to test the New function. It implements all of the hostdb's

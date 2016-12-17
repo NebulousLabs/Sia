@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/hostdb/hosttree"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -55,8 +56,8 @@ type HostDB struct {
 	// corresponding node, as the hostTree is unsorted. A host is active if
 	// it is currently responding to queries about price and other
 	// settings.
-	hostTree    *hostNode
-	activeHosts map[modules.NetAddress]*hostNode
+	hostTree    *hosttree.HostTree
+	activeHosts map[modules.NetAddress]*hostEntry
 
 	// allHosts is a simple list of all known hosts by their network address,
 	// including hosts that are currently offline.
@@ -107,10 +108,12 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 		log:     l,
 
 		// TODO: should index by pubkey, not ip
-		activeHosts: make(map[modules.NetAddress]*hostNode),
+		activeHosts: make(map[modules.NetAddress]*hostEntry),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 	}
+
+	hdb.hostTree = hosttree.New(hdb.calculateHostWeight())
 
 	// Load the prior persistence structures.
 	err := hdb.load()
@@ -122,7 +125,7 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 	if err == modules.ErrInvalidConsensusChangeID {
 		hdb.lastChange = modules.ConsensusChangeBeginning
 		// clear the host sets
-		hdb.activeHosts = make(map[modules.NetAddress]*hostNode)
+		hdb.activeHosts = make(map[modules.NetAddress]*hostEntry)
 		hdb.allHosts = make(map[modules.NetAddress]*hostEntry)
 		// subscribe again using the new ID
 		err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
@@ -143,4 +146,21 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 // Close closes the hostdb, terminating its scanning threads
 func (hdb *HostDB) Close() error {
 	return hdb.tg.Stop()
+}
+
+func (hdb *HostDB) RandomHosts(n int, exclude []modules.NetAddress) []modules.HostDBEntry {
+	// Convert exclusion netaddresses to public keys
+	var excludeKeys []types.SiaPublicKey
+	for _, addr := range exclude {
+		entry, exists := hdb.activeHosts[addr]
+		if exists {
+			excludeKeys = append(excludeKeys, entry.HostDBEntry.PublicKey)
+		}
+	}
+
+	hosts, err := hdb.hostTree.SelectRandom(n, excludeKeys)
+	if err != nil {
+		// TODO: handle this err
+	}
+	return hosts
 }

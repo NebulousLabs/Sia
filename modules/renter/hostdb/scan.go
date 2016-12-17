@@ -107,10 +107,10 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 
 	// If the entry is in the active database, remove it from the active
 	// database.
-	node, exists := hdb.activeHosts[addr]
+	existingEntry, exists := hdb.activeHosts[addr]
 	if exists {
 		hdb.log.Debugln("host is being pulled from list of active hosts", addr)
-		node.removeNode()
+		hdb.hostTree.Remove(existingEntry.PublicKey)
 		delete(hdb.activeHosts, entry.NetAddress)
 	}
 
@@ -160,9 +160,9 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	// properties of the tree require that the weight does not change while the
 	// node is in the tree, so the node must be removed before the settings and
 	// weight are changed.
-	existingNode, exists := hdb.activeHosts[entry.NetAddress]
+	existingEntry, exists := hdb.activeHosts[entry.NetAddress]
 	if exists {
-		existingNode.removeNode()
+		hdb.hostTree.Remove(existingEntry.PublicKey)
 		delete(hdb.activeHosts, entry.NetAddress)
 	} else if len(hdb.activeHosts) > maxActiveHosts {
 		// We already have the maximum number of active hosts, do not add more.
@@ -174,8 +174,11 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	newSettings.NetAddress = entry.HostExternalSettings.NetAddress
 	entry.HostExternalSettings = newSettings
 	entry.Reliability = MaxReliability
-	entry.Weight = calculateHostWeight(hdb.blockHeight, *entry)
-	hdb.insertNode(entry)
+	err := hdb.hostTree.Insert(entry.HostDBEntry)
+	hdb.activeHosts[entry.NetAddress] = entry
+	if err != nil {
+		// TODO: handle this error
+	}
 
 	// Sanity check - the node should be in the hostdb now.
 	_, exists = hdb.activeHosts[entry.NetAddress]
@@ -274,7 +277,7 @@ func (hdb *HostDB) threadedScan() {
 
 			// Scan all active hosts.
 			for _, host := range hdb.activeHosts {
-				hdb.queueHostEntry(host.hostEntry)
+				hdb.queueHostEntry(host)
 			}
 
 			// Assemble all of the inactive hosts into a single array.

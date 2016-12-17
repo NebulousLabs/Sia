@@ -2,6 +2,7 @@ package hostdb
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -49,9 +50,9 @@ func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 // Remove deletes an entry from the hostdb.
 func (hdb *HostDB) removeHost(addr modules.NetAddress) error {
 	// See if the node is in the set of active hosts.
-	node, exists := hdb.activeHosts[addr]
+	entry, exists := hdb.activeHosts[addr]
 	if exists {
-		node.removeNode()
+		hdb.hostTree.Remove(entry.HostDBEntry.PublicKey)
 		delete(hdb.activeHosts, addr)
 	}
 
@@ -81,7 +82,10 @@ func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostDBEntry) {
 	hdb.mu.RUnlock()
 
 	// Get the hosts using RandomHosts so that they are in sorted order.
-	sortedHosts := hdb.RandomHosts(numHosts, nil)
+	sortedHosts, err := hdb.hostTree.SelectRandom(numHosts, nil)
+	if err != nil {
+		// TODO: handle this error
+	}
 	return sortedHosts
 }
 
@@ -102,7 +106,11 @@ func (hdb *HostDB) AverageContractPrice() types.Currency {
 	// maybe a more sophisticated way of doing this
 	var totalPrice types.Currency
 	sampleSize := 18
-	hosts := hdb.RandomHosts(sampleSize, nil)
+	hosts, err := hdb.hostTree.SelectRandom(sampleSize, nil)
+	if err != nil {
+		fmt.Println(err)
+		// TODO: handle this error
+	}
 	if len(hosts) == 0 {
 		return totalPrice
 	}
