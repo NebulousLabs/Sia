@@ -12,7 +12,6 @@ import (
 type hostEntry struct {
 	modules.HostDBEntry
 
-	FirstSeen   types.BlockHeight
 	Weight      types.Currency
 	Reliability types.Currency
 }
