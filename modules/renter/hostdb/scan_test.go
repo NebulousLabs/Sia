@@ -213,19 +213,6 @@ func TestThreadedProbeHostsCorruption(t *testing.T) {
 	if len(hdb.ActiveHosts()) != 1 {
 		t.Error("host was not added")
 	}
-
-	/*
-		TODO
-		// Check that the host tree has not been corrupted.
-		err = repeatCheck(hdb.hostTree)
-		if err != nil {
-			t.Error(err)
-		}
-		err = uniformTreeVerification(hdb, 1)
-		if err != nil {
-			t.Error(err)
-		}
-	*/
 }
 
 // TestThreadedScan tests the threadedScan method.

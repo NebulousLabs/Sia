@@ -2,7 +2,6 @@ package hostdb
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -84,7 +83,7 @@ func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostDBEntry) {
 	// Get the hosts using RandomHosts so that they are in sorted order.
 	sortedHosts, err := hdb.hostTree.SelectRandom(numHosts, nil)
 	if err != nil {
-		// TODO: handle this error
+		hdb.log.Severe("error selecting random hosts in ActiveHosts() call: ", err)
 	}
 	return sortedHosts
 }
@@ -108,8 +107,7 @@ func (hdb *HostDB) AverageContractPrice() types.Currency {
 	sampleSize := 18
 	hosts, err := hdb.hostTree.SelectRandom(sampleSize, nil)
 	if err != nil {
-		fmt.Println(err)
-		// TODO: handle this error
+		hdb.log.Severe("error selecting random hosts in AverageContractPrice() call: ", err)
 	}
 	if len(hosts) == 0 {
 		return totalPrice
