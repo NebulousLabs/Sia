@@ -59,3 +59,53 @@ func TestNew(t *testing.T) {
 		t.Fatalf("expected invalid directory, got %v", err)
 	}
 }
+
+// TestRandomHosts tests the hostdb's exported RandomHosts method.
+func TestRandomHosts(t *testing.T) {
+	hdb := bareHostDB()
+
+	var entries []modules.HostDBEntry
+	nentries := 10
+	for i := 0; i < nentries; i++ {
+		entry := makeHostDBEntry()
+		entry.NetAddress = fakeAddr(uint8(i))
+		entries = append(entries, entry)
+		hdb.activeHosts[entry.NetAddress] = &hostEntry{HostDBEntry: entry}
+		hdb.hostTree.Insert(entry)
+	}
+
+	hosts := hdb.RandomHosts(nentries, nil)
+	if len(hosts) != nentries {
+		t.Fatalf("RandomHosts returned fewer entries than expected. got %v wanted %v\n", len(hosts), nentries)
+	}
+
+	hosts = hdb.RandomHosts(nentries/2, nil)
+	if len(hosts) != nentries/2 {
+		t.Fatalf("RandomHosts returned fewer entries than expected. got %v wanted %v\n", len(hosts), nentries/2)
+	}
+
+	// ignore every other entry and verify that the exclude list worked correctly
+	var exclude []modules.HostDBEntry
+	for idx, entry := range entries {
+		if idx%2 == 0 {
+			exclude = append(exclude, entry)
+		}
+	}
+
+	var exclusionAddresses []modules.NetAddress
+	for _, exclusionHost := range exclude {
+		exclusionAddresses = append(exclusionAddresses, exclusionHost.NetAddress)
+	}
+
+	hosts = hdb.RandomHosts(nentries, exclusionAddresses)
+	if len(hosts) != len(entries)/2 {
+		t.Fatalf("hosts had wrong length after passing exclusion slice. got %v wanted %v\n", len(hosts), len(entries)/2)
+	}
+	for _, host := range hosts {
+		for _, excluded := range exclude {
+			if string(host.PublicKey.Key) == string(excluded.PublicKey.Key) {
+				t.Fatal("RandomHosts returned an excluded host!")
+			}
+		}
+	}
+}

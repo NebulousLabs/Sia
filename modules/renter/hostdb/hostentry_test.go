@@ -3,12 +3,19 @@ package hostdb
 import (
 	"crypto/rand"
 	"io"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// fakeAddr returns a modules.NetAddress to be used in a HostEntry. Such
+// addresses are needed in order to satisfy the HostDB's "1 host per IP" rule.
+func fakeAddr(n uint8) modules.NetAddress {
+	return modules.NetAddress("127.0.0." + strconv.Itoa(int(n)) + ":1")
+}
 
 // makeHostDBEntry makes a new host entry with a random public key
 func makeHostDBEntry() modules.HostDBEntry {

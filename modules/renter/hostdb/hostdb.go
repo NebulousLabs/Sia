@@ -159,7 +159,7 @@ func (hdb *HostDB) RandomHosts(n int, exclude []modules.NetAddress) []modules.Ho
 	for _, addr := range exclude {
 		entry, exists := hdb.activeHosts[addr]
 		if exists {
-			excludeKeys = append(excludeKeys, entry.HostDBEntry.PublicKey)
+			excludeKeys = append(excludeKeys, entry.PublicKey)
 		}
 	}
 
