@@ -148,8 +148,13 @@ func (hdb *HostDB) Close() error {
 	return hdb.tg.Stop()
 }
 
+// RandomHosts implements the HostDB interface's RandomHosts() method. It takes
+// a number of hosts to return, and a slice of netaddresses to ignore, and
+// returns a slice of entries.
 func (hdb *HostDB) RandomHosts(n int, exclude []modules.NetAddress) []modules.HostDBEntry {
-	// Convert exclusion netaddresses to public keys
+	// The HostTree uses public keys: we have to convert the exclusion netaddress
+	// to keys using activeHosts first. This will go away once the HostDB is
+	// transitioned to using public keys.
 	var excludeKeys []types.SiaPublicKey
 	for _, addr := range exclude {
 		entry, exists := hdb.activeHosts[addr]
@@ -160,7 +165,7 @@ func (hdb *HostDB) RandomHosts(n int, exclude []modules.NetAddress) []modules.Ho
 
 	hosts, err := hdb.hostTree.SelectRandom(n, excludeKeys)
 	if err != nil {
-		// TODO: handle this err
+		hdb.log.Debugln("error selecting random hosts from the tree: ", err)
 	}
 	return hosts
 }
