@@ -127,6 +127,16 @@ type RenterContract struct {
 	MerkleRoots     []crypto.Hash              `json:"merkleroots"`
 	NetAddress      NetAddress                 `json:"netaddress"`
 	SecretKey       crypto.SecretKey           `json:"secretkey"`
+	StartHeight     types.BlockHeight          `json:"startheight"`
+
+	DownloadSpending types.Currency `json:"downloadspending"`
+	StorageSpending  types.Currency `json:"storagespending"`
+	UploadSpending   types.Currency `json:"uploadspending"`
+
+	TotalCost   types.Currency `json:"totalcost"`
+	ContractFee types.Currency `json:"contractfee"`
+	TxnFee      types.Currency `json:"txnfee"`
+	SiafundFee  types.Currency `json:"siafundfee"`
 }
 
 // EndHeight returns the height at which the host is no longer obligated to

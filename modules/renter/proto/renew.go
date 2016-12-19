@@ -74,17 +74,17 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 
 	// calculate transaction fee
 	_, maxFee := tpool.FeeEstimation()
-	fee := maxFee.Mul64(estTxnSize)
+	txnFee := maxFee.Mul64(estTxnSize)
 
 	// build transaction containing fc
-	err := txnBuilder.FundSiacoins(renterCost.Add(fee))
+	err := txnBuilder.FundSiacoins(renterCost.Add(txnFee))
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
 	txnBuilder.AddFileContract(fc)
 
 	// add miner fee
-	txnBuilder.AddMinerFee(fee)
+	txnBuilder.AddMinerFee(txnFee)
 
 	// create initial transaction set
 	txn, parentTxns := txnBuilder.View()
@@ -255,5 +255,11 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 		MerkleRoots:     contract.MerkleRoots,
 		NetAddress:      host.NetAddress,
 		SecretKey:       ourSK,
+		StartHeight:     startHeight,
+
+		TotalCost:   renterCost,
+		ContractFee: host.ContractPrice,
+		TxnFee:      txnFee,
+		SiafundFee:  types.Tax(startHeight, fc.Payout),
 	}, nil
 }

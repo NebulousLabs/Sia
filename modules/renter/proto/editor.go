@@ -43,10 +43,6 @@ type Editor struct {
 	contract modules.RenterContract // updated after each revision
 
 	SaveFn revisionSaver
-
-	// metrics
-	StorageSpending types.Currency
-	UploadSpending  types.Currency
 }
 
 // Close cleanly terminates the revision loop with the host and closes the
@@ -151,8 +147,8 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 	}
 
 	// update metrics
-	he.StorageSpending = he.StorageSpending.Add(sectorStoragePrice)
-	he.UploadSpending = he.UploadSpending.Add(sectorBandwidthPrice)
+	he.contract.StorageSpending = he.contract.StorageSpending.Add(sectorStoragePrice)
+	he.contract.UploadSpending = he.contract.UploadSpending.Add(sectorBandwidthPrice)
 
 	return he.contract, sectorRoot, nil
 }
@@ -235,7 +231,7 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 	}
 
 	// update metrics
-	he.UploadSpending = he.UploadSpending.Add(sectorBandwidthPrice)
+	he.contract.UploadSpending = he.contract.UploadSpending.Add(sectorBandwidthPrice)
 
 	return he.contract, nil
 }
