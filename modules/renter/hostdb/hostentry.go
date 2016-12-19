@@ -34,9 +34,10 @@ func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 		return
 	}
 
+	host.FirstSeen = hdb.blockHeight
+
 	// Create hostEntry and add to allHosts.
 	h := &hostEntry{
-		FirstSeen:   hdb.blockHeight,
 		HostDBEntry: host,
 		Reliability: DefaultReliability,
 	}
