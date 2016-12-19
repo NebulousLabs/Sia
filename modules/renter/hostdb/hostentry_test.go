@@ -61,7 +61,6 @@ func TestInsertHost(t *testing.T) {
 	}
 }
 
-/*
 // TestActiveHosts tests the ActiveHosts method.
 func TestActiveHosts(t *testing.T) {
 	hdb := bareHostDB()
@@ -73,9 +72,9 @@ func TestActiveHosts(t *testing.T) {
 
 	// with one host
 	h1 := makeHostDBEntry()
-	h1.Weight = types.NewCurrency64(1)
 	h1.AcceptingContracts = true
-	hdb.hostTree.Insert(h1.HostDBEntry)
+	hdb.hostTree.Insert(h1)
+	hdb.activeHosts[h1.NetAddress] = &hostEntry{HostDBEntry: h1}
 	if hosts := hdb.ActiveHosts(); len(hosts) != 1 {
 		t.Errorf("wrong number of hosts: expected %v, got %v", 1, len(hosts))
 	} else if hosts[0].NetAddress != h1.NetAddress {
@@ -83,11 +82,11 @@ func TestActiveHosts(t *testing.T) {
 	}
 
 	// with multiple hosts
-	h2 := new(hostEntry)
+	h2 := makeHostDBEntry()
 	h2.NetAddress = "bar"
-	h2.Weight = types.NewCurrency64(1)
 	h2.AcceptingContracts = true
-	hdb.hostTree.Insert(h2.HostDBEntry)
+	hdb.hostTree.Insert(h2)
+	hdb.activeHosts[h2.NetAddress] = &hostEntry{HostDBEntry: h2}
 	if hosts := hdb.ActiveHosts(); len(hosts) != 2 {
 		t.Errorf("wrong number of hosts: expected %v, got %v", 2, len(hosts))
 	} else if hosts[0].NetAddress != h1.NetAddress && hosts[1].NetAddress != h1.NetAddress {
@@ -96,7 +95,6 @@ func TestActiveHosts(t *testing.T) {
 		t.Errorf("ActiveHosts did not contain an inserted host: %v (missing %v)", hosts, h2.NetAddress)
 	}
 }
-*/
 
 // TestAverageContractPrice tests the AverageContractPrice method, which also depends on the
 // randomHosts method.
