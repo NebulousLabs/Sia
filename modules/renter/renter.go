@@ -56,12 +56,13 @@ type hostContractor interface {
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
+	// CurrentPeriod returns the height at which the current allowance period
+	// began.
+	CurrentPeriod() types.BlockHeight
+
 	// Editor creates an Editor from the specified contract ID, allowing the
 	// insertion, deletion, and modification of sectors.
 	Editor(types.FileContractID) (contractor.Editor, error)
-
-	// FinancialMetrics returns the financial metrics of the contractor.
-	FinancialMetrics() modules.RenterFinancialMetrics
 
 	// IsOffline reports whether the specified host is considered offline.
 	IsOffline(modules.NetAddress) bool
@@ -162,9 +163,7 @@ func (r *Renter) AllHosts() []modules.HostDBEntry    { return r.hostDB.AllHosts(
 
 // contractor passthroughs
 func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
-func (r *Renter) FinancialMetrics() modules.RenterFinancialMetrics {
-	return r.hostContractor.FinancialMetrics()
-}
+func (r *Renter) CurrentPeriod() types.BlockHeight    { return r.hostContractor.CurrentPeriod() }
 func (r *Renter) Settings() modules.RenterSettings {
 	return modules.RenterSettings{
 		Allowance: r.hostContractor.Allowance(),

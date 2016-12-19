@@ -107,19 +107,11 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	if he.invalid {
 		return crypto.Hash{}, errInvalidEditor
 	}
-
-	oldUploadSpending := he.editor.UploadSpending
-	oldStorageSpending := he.editor.StorageSpending
 	contract, sectorRoot, err := he.editor.Upload(data)
 	if err != nil {
 		return crypto.Hash{}, err
 	}
-	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
-	storageDelta := he.editor.StorageSpending.Sub(oldStorageSpending)
-
 	he.contractor.mu.Lock()
-	he.contractor.financialMetrics.UploadSpending = he.contractor.financialMetrics.UploadSpending.Add(uploadDelta)
-	he.contractor.financialMetrics.StorageSpending = he.contractor.financialMetrics.StorageSpending.Add(storageDelta)
 	he.contractor.contracts[contract.ID] = contract
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
@@ -157,16 +149,11 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 	if he.invalid {
 		return errInvalidEditor
 	}
-
-	oldUploadSpending := he.editor.UploadSpending
 	contract, err := he.editor.Modify(oldRoot, newRoot, offset, newData)
 	if err != nil {
 		return err
 	}
-	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
-
 	he.contractor.mu.Lock()
-	he.contractor.financialMetrics.UploadSpending = he.contractor.financialMetrics.UploadSpending.Add(uploadDelta)
 	he.contractor.contracts[contract.ID] = contract
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()

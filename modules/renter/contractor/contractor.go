@@ -43,14 +43,13 @@ type Contractor struct {
 	blockHeight     types.BlockHeight
 	cachedRevisions map[types.FileContractID]cachedRevision
 	contracts       map[types.FileContractID]modules.RenterContract
+	currentPeriod   types.BlockHeight
 	downloaders     map[types.FileContractID]*hostDownloader
 	editors         map[types.FileContractID]*hostEditor
 	lastChange      modules.ConsensusChangeID
 	renewedIDs      map[types.FileContractID]types.FileContractID
 	renewing        map[types.FileContractID]bool // prevent revising during renewal
 	revising        map[types.FileContractID]bool // prevent overlapping revisions
-
-	financialMetrics modules.RenterFinancialMetrics
 
 	mu sync.RWMutex
 
@@ -64,13 +63,6 @@ func (c *Contractor) Allowance() modules.Allowance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.allowance
-}
-
-// FinancialMetrics returns the financial metrics of the Contractor.
-func (c *Contractor) FinancialMetrics() modules.RenterFinancialMetrics {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.financialMetrics
 }
 
 // Contract returns the latest contract formed with the specified host.
@@ -91,6 +83,14 @@ func (c *Contractor) Contracts() (cs []modules.RenterContract) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.onlineContracts()
+}
+
+// CurrentPeriod returns the height at which the current allowance period
+// began.
+func (c *Contractor) CurrentPeriod() types.BlockHeight {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.currentPeriod
 }
 
 // resolveID returns the ID of the most recent renewal of id.

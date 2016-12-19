@@ -35,6 +35,11 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 		c.log.Debugln("INFO: deleted expired contract", id)
 	}
 
+	// if we have entered the next period, update currentPeriod
+	if c.blockHeight > c.currentPeriod+c.allowance.Period {
+		c.currentPeriod += c.allowance.Period
+	}
+
 	c.lastChange = cc.ID
 	err := c.save()
 	if err != nil {

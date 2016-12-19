@@ -32,8 +32,24 @@ var (
 type (
 	// RenterGET contains various renter metrics.
 	RenterGET struct {
-		Settings         modules.RenterSettings         `json:"settings"`
-		FinancialMetrics modules.RenterFinancialMetrics `json:"financialmetrics"`
+		Settings         modules.RenterSettings `json:"settings"`
+		FinancialMetrics RenterFinancialMetrics `json:"financialmetrics"`
+		CurrentPeriod    types.BlockHeight      `json:"currentperiod"`
+	}
+
+	// RenterFinancialMetrics contains metrics about how much the Renter has
+	// spent on storage, uploads, and downloads.
+	RenterFinancialMetrics struct {
+		// Amount of money in the allowance spent on file contracts including
+		// fees.
+		ContractSpending types.Currency `json:"contractspending"`
+
+		DownloadSpending types.Currency `json:"downloadspending"`
+		StorageSpending  types.Currency `json:"storagespending"`
+		UploadSpending   types.Currency `json:"uploadspending"`
+
+		// Amount of money in the allowance that has not been spent.
+		Unspent types.Currency `json:"unspent"`
 	}
 
 	// RenterContract represents a contract formed by the renter.
@@ -83,9 +99,32 @@ type (
 
 // renterHandlerGET handles the API call to /renter.
 func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// calculate financial metrics from contracts
+	periodStart := api.renter.CurrentPeriod()
+	var fm RenterFinancialMetrics
+	for _, c := range api.renter.Contracts() {
+		if c.StartHeight < periodStart {
+			continue
+		}
+		fm.ContractSpending = fm.ContractSpending.Add(c.TotalCost)
+		fm.DownloadSpending = fm.DownloadSpending.Add(c.DownloadSpending)
+		fm.UploadSpending = fm.UploadSpending.Add(c.UploadSpending)
+		fm.StorageSpending = fm.StorageSpending.Add(c.StorageSpending)
+		fm.Unspent = fm.Unspent.Add(c.RenterFunds())
+	}
+	settings := api.renter.Settings()
+	fm.Unspent = fm.Unspent.Add(settings.Allowance.Funds)
+	if fm.Unspent.Cmp(fm.ContractSpending) < 0 {
+		// avoid negative currency error
+		fm.Unspent = types.ZeroCurrency
+	} else {
+		fm.Unspent = fm.Unspent.Sub(fm.ContractSpending)
+	}
+
 	WriteJSON(w, RenterGET{
-		Settings:         api.renter.Settings(),
-		FinancialMetrics: api.renter.FinancialMetrics(),
+		Settings:         settings,
+		FinancialMetrics: fm,
+		CurrentPeriod:    periodStart,
 	})
 }
 
