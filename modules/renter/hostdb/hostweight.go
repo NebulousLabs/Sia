@@ -99,7 +99,6 @@ func (hdb *HostDB) calculateHostWeight() hosttree.WeightFunc {
 
 		// Enact penalities for newer hosts, as it's less certain that they will
 		// have reliable uptime.
-		/* todo: add FirstSeen field
 		if hdb.blockHeight >= entry.FirstSeen {
 			age := hdb.blockHeight - entry.FirstSeen
 			if age < 6000 {
@@ -121,7 +120,6 @@ func (hdb *HostDB) calculateHostWeight() hosttree.WeightFunc {
 			// Shouldn't happen, but the usecase is covered anyway.
 			weight = weight.Div64(1000) // Because something weird is happening, don't trust this host very much.
 		}
-		*/
 
 		// Account for collateral. Collateral has a somewhat complicated
 		// relationship with price, because raising the collateral inherently

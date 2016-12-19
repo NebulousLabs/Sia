@@ -87,6 +87,8 @@ type HostDBEntry struct {
 	// ScanHistory is the set of scans performed on the host. It should always
 	// be ordered according to the scan's Timestamp, oldest to newest.
 	ScanHistory HostDBScans
+	// FirstSeen is the last block height at which this host was announced.
+	FirstSeen types.BlockHeight
 }
 
 // HostDBScan represents a single scan event.
