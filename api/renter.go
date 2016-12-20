@@ -99,9 +99,11 @@ type (
 
 // renterHandlerGET handles the API call to /renter.
 func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// calculate financial metrics from contracts
+	settings := api.renter.Settings()
 	periodStart := api.renter.CurrentPeriod()
+	// calculate financial metrics from contracts
 	var fm RenterFinancialMetrics
+	fm.Unspent = settings.Allowance.Funds
 	for _, c := range api.renter.Contracts() {
 		if c.StartHeight < periodStart {
 			continue
@@ -110,15 +112,11 @@ func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ htt
 		fm.DownloadSpending = fm.DownloadSpending.Add(c.DownloadSpending)
 		fm.UploadSpending = fm.UploadSpending.Add(c.UploadSpending)
 		fm.StorageSpending = fm.StorageSpending.Add(c.StorageSpending)
-		fm.Unspent = fm.Unspent.Add(c.RenterFunds())
-	}
-	settings := api.renter.Settings()
-	fm.Unspent = fm.Unspent.Add(settings.Allowance.Funds)
-	if fm.Unspent.Cmp(fm.ContractSpending) < 0 {
-		// avoid negative currency error
-		fm.Unspent = types.ZeroCurrency
-	} else {
-		fm.Unspent = fm.Unspent.Sub(fm.ContractSpending)
+		// total unspent is:
+		//    allowance - (cost to form contracts) + (money left in contracts)
+		if fm.Unspent.Add(c.RenterFunds()).Cmp(c.TotalCost) > 0 {
+			fm.Unspent = fm.Unspent.Add(c.RenterFunds()).Sub(c.TotalCost)
+		}
 	}
 
 	WriteJSON(w, RenterGET{
