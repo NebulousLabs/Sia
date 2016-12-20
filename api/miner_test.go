@@ -9,12 +9,13 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestIntegrationMinerGET checks the GET call to the /miner endpoint.
-func TestIntegrationMinerGET(t *testing.T) {
+// TestMinerGET checks the GET call to the /miner endpoint.
+func TestMinerGET(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationMinerGET")
+	t.Parallel()
+	st, err := createServerTester("TestMinerGET")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,13 +44,14 @@ func TestIntegrationMinerGET(t *testing.T) {
 	}
 }
 
-// TestIntegrationMinerStartStop checks that the miner start and miner stop api endpoints
+// TestMinerStartStop checks that the miner start and miner stop api endpoints
 // toggle the cpu miner.
-func TestIntegrationMinerStartStop(t *testing.T) {
+func TestMinerStartStop(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationMinerStartStop")
+	t.Parallel()
+	st, err := createServerTester("TestMinerStartStop")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,13 +98,14 @@ func TestIntegrationMinerStartStop(t *testing.T) {
 	}
 }
 
-// TestIntegrationMinerHeader checks that the header GET and POST calls are
+// TestMinerHeader checks that the header GET and POST calls are
 // useful tools for mining blocks.
-func TestIntegrationMinerHeader(t *testing.T) {
+func TestMinerHeader(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationMinerHeader")
+	t.Parallel()
+	st, err := createServerTester("TestMinerHeader")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -108,8 +108,8 @@ type mapHostDB struct {
 }
 
 func (m mapHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
-	h, exists := m.hosts[addr]
-	return h, exists
+	h, e := m.hosts[addr]
+	return h, e
 }
 
 // TestIsOffline tests the IsOffline method.
@@ -136,21 +136,26 @@ func TestIsOffline(t *testing.T) {
 		{[]modules.HostDBScan{oldBadScan, newGoodScan, currentBadScan}, false},
 		// data covers large range, no scans succeded
 		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan}, true},
-		// recent scan was good (and within uptimeWindow of oldBadScan, but that shouldn't matter)
-		{[]modules.HostDBScan{oldBadScan, oldBadScan, oldBadScan, oldGoodScan}, false},
-		// recent scan was good (and outside uptimeWindow of oldBadScan, but that shouldn't matter)
-		{[]modules.HostDBScan{oldBadScan, oldBadScan, oldBadScan, currentGoodScan}, false},
+		// old scan was good, recent scans are bad.
+		{[]modules.HostDBScan{oldGoodScan, newBadScan, newBadScan, currentBadScan}, true},
+		// recent scan was good, with many recent bad scans.
+		{[]modules.HostDBScan{oldBadScan, newGoodScan, newBadScan, currentBadScan, currentBadScan}, false},
+		// recent scan was good, old scans were bad.
+		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan, currentGoodScan}, false},
 	}
 	for i, test := range tests {
 		// construct a contractor with a hostdb containing the scans
 		c := &Contractor{
+			contracts: map[types.FileContractID]modules.RenterContract{
+				types.FileContractID{1}: {NetAddress: "foo"},
+			},
 			hdb: mapHostDB{
 				hosts: map[modules.NetAddress]modules.HostDBEntry{
 					"foo": {ScanHistory: test.scans},
 				},
 			},
 		}
-		if offline := c.IsOffline("foo"); offline != test.offline {
+		if offline := c.IsOffline(types.FileContractID{1}); offline != test.offline {
 			t.Errorf("IsOffline(%v) = %v, expected %v", i, offline, test.offline)
 		}
 	}

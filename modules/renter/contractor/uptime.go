@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // uptimeMinScans is the minimum number of scans required to judge whether a
@@ -27,22 +28,33 @@ var uptimeWindow = func() time.Duration {
 
 // IsOffline indicates whether a contract's host should be considered offline,
 // based on its scan metrics.
-func (c *Contractor) IsOffline(addr modules.NetAddress) bool {
+func (c *Contractor) IsOffline(id types.FileContractID) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.isOffline(addr)
+	return c.isOffline(id)
 }
 
 // isOffline indicates whether a contract's host should be considered offline,
 // based on its scan metrics.
-func (c *Contractor) isOffline(addr modules.NetAddress) bool {
-	// lookup the contract's host
+func (c *Contractor) isOffline(id types.FileContractID) bool {
+	// Get the net address associated with the contract.
+	//
+	// TODO: This should eventually be updated to query the host by public key.
+	contract, exists := c.contracts[id]
+	if !exists {
+		return false
+	}
+	addr := contract.NetAddress
+	// Look up the host by address.
+	//
+	// TODO: Eventually the host should be getting queried by public key.
 	host, ok := c.hdb.Host(addr)
 	if !ok {
 		return false
 	}
 
-	// NOTE: ScanHistory should always be ordered from oldest to newest.
+	// Sanity check - ScanHistory should always be ordered from oldest to
+	// newest.
 	if build.DEBUG && !sort.IsSorted(host.ScanHistory) {
 		sort.Sort(host.ScanHistory)
 		build.Critical("host's scan history was not sorted")
@@ -82,7 +94,7 @@ func (c *Contractor) isOffline(addr modules.NetAddress) bool {
 func (c *Contractor) onlineContracts() []modules.RenterContract {
 	var cs []modules.RenterContract
 	for _, contract := range c.contracts {
-		if !c.isOffline(contract.NetAddress) {
+		if !c.isOffline(contract.ID) {
 			cs = append(cs, contract)
 		}
 	}

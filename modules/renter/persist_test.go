@@ -82,7 +82,9 @@ func TestFileShareLoad(t *testing.T) {
 
 	// Create a file and add it to the renter.
 	savedFile := newTestingFile()
+	id := rt.renter.mu.Lock()
 	rt.renter.files[savedFile.name] = savedFile
+	rt.renter.mu.Unlock(id)
 
 	// Share .sia file to disk.
 	path := filepath.Join(build.SiaTestingDir, "renter", "TestRenterShareLoad", "test.sia")
@@ -150,7 +152,9 @@ func TestFileShareLoadASCII(t *testing.T) {
 
 	// Create a file and add it to the renter.
 	savedFile := newTestingFile()
+	id := rt.renter.mu.Lock()
 	rt.renter.files[savedFile.name] = savedFile
+	rt.renter.mu.Unlock(id)
 
 	ascii, err := rt.renter.ShareFilesAscii([]string{savedFile.name})
 	if err != nil {

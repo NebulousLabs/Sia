@@ -91,8 +91,20 @@ modify settings that control the renter's behavior.
 // Number of hastings allocated for file contracts in the given period.
 funds // hastings
 
+// Number of hosts that contracts should be formed with. Files cannot be
+// uploaded to more hosts than you have contracts with, and it's generally good
+// to form a few more contracts than you need.
+hosts
+
 // Duration of contracts formed. Must be nonzero.
 period // block height
+
+// Renew window specifies how many blocks before the expriation of the current
+// contracts the renter will wait before renewing the contracts. A smaller
+// renew window means that Sia must be run more frequently, but also means
+// fewer total transaction fees. Storage spending is not affected by the renew
+// window size.
+renewwindow // block height
 ```
 
 ###### Response
@@ -269,8 +281,15 @@ uploads a file to the network from the local filesystem.
 
 ###### Query String Parameters
 ```
+// The number of data pieces to use when erasure coding the file.
+datapieces // int
+
+// The number of parity pieces to use when erasure coding the file. Total
+// redundancy of the file is (datapieces+paritypieces)/datapieces.
+paritypieces // int
+
 // Location on disk of the file being uploaded.
-source
+source // string - a filepath
 ```
 
 ###### Response

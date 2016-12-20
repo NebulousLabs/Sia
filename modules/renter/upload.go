@@ -91,13 +91,13 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		RepairPath: up.Source,
 	}
 	r.saveSync()
-	r.mu.Unlock(lockID)
-
-	// Save the .sia file to the renter directory.
 	err = r.saveFile(f)
+	r.mu.Unlock(lockID)
 	if err != nil {
 		return err
 	}
 
+	// Send the upload to the repair loop.
+	r.newRepairs <- f
 	return nil
 }

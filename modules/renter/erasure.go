@@ -49,7 +49,6 @@ func (rs *rsCode) Recover(pieces [][]byte, n uint64, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// TODO: implement this manually
 	return rs.enc.Join(w, pieces, int(n))
 }
 

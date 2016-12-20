@@ -6,10 +6,11 @@ import (
 
 // TestApiClient tests that the API client connects to the server tester and
 // can call and decode routes correctly.
-func TestIntegrationApiClient(t *testing.T) {
+func TestApiClient(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestApiClient")
 	if err != nil {
 		t.Fatal(err)
@@ -27,10 +28,11 @@ func TestIntegrationApiClient(t *testing.T) {
 // TestAuthenticatedApiClient tests that the API client connects to an
 // authenticated server tester and can call and decode routes correctly, using
 // the correct password.
-func TestIntegrationAuthenticatedApiClient(t *testing.T) {
+func TestAuthenticatedApiClient(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	testpass := "testPassword"
 	st, err := createAuthenticatedServerTester("TestAuthenticatedApiClient", testpass)
 	if err != nil {

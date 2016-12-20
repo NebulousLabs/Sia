@@ -1,5 +1,12 @@
 package renter
 
+// TODO: Change the upload loop to have an upload state, and make it so that
+// instead of occasionally rebuildling the whole file matrix it has just a
+// single matrix that it's constantly pulling chunks from. Have a separate loop
+// which goes through the files and adds them to the matrix. Have the loop
+// listen on the channel for new files, so that they can go directly into the
+// matrix.
+
 import (
 	"errors"
 
@@ -12,9 +19,10 @@ import (
 )
 
 var (
-	errNilCS    = errors.New("cannot create renter with nil consensus set")
-	errNilTpool = errors.New("cannot create renter with nil transaction pool")
-	errNilHdb   = errors.New("cannot create renter with nil hostdb")
+	errNilContractor = errors.New("cannot create renter with nil contractor")
+	errNilCS         = errors.New("cannot create renter with nil consensus set")
+	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
+	errNilHdb        = errors.New("cannot create renter with nil hostdb")
 )
 
 // A hostDB is a database of hosts that the renter can use for figuring out who
@@ -65,7 +73,7 @@ type hostContractor interface {
 	Editor(types.FileContractID) (contractor.Editor, error)
 
 	// IsOffline reports whether the specified host is considered offline.
-	IsOffline(modules.NetAddress) bool
+	IsOffline(types.FileContractID) bool
 
 	// Downloader creates a Downloader from the specified contract ID,
 	// allowing the retrieval of sectors.
@@ -84,25 +92,35 @@ type trackedFile struct {
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
-	// modules
-	cs modules.ConsensusSet
+	// File management.
+	//
+	// tracking contains a list of files that the user intends to maintain. By
+	// default, files loaded through sharing are not maintained by the user.
+	files    map[string]*file
+	tracking map[string]trackedFile // map from nickname to metadata
 
-	// resources
-	hostDB         hostDB
-	hostContractor hostContractor
-	log            *persist.Logger
-
-	// variables
-	files         map[string]*file
-	tracking      map[string]trackedFile // map from nickname to metadata
+	// Work management.
+	//
+	// chunkQueue contains a list of incomplete work that the download loop
+	// acts upon. The chunkQueue is only ever modified by the main download
+	// loop thread, which means it can be accessed and updated without locks.
+	//
+	// downloadQueue contains a complete history of work that has been
+	// submitted to the download loop.
+	chunkQueue    []*chunkDownload // Accessed without locks.
 	downloadQueue []*download
-	uploading     bool
-	downloading   bool
+	newDownloads  chan *download
+	newRepairs    chan *file
+	workerPool    map[types.FileContractID]*worker
 
-	// constants
-	persistDir string
-
-	mu *sync.RWMutex
+	// Utilities.
+	cs             modules.ConsensusSet
+	hostContractor hostContractor
+	hostDB         hostDB
+	log            *persist.Logger
+	persistDir     string
+	mu             *sync.RWMutex
+	tg             *sync.ThreadGroup
 }
 
 // New returns an initialized renter.
@@ -127,34 +145,58 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	if tpool == nil {
 		return nil, errNilTpool
 	}
+	if hc == nil {
+		return nil, errNilContractor
+	}
 	if hdb == nil {
 		// Nil hdb currently allowed for testing purposes. :(
 		// return nil, errNilHdb
 	}
 
 	r := &Renter{
+		newRepairs: make(chan *file),
+		files:      make(map[string]*file),
+		tracking:   make(map[string]trackedFile),
+
+		newDownloads: make(chan *download),
+		workerPool:   make(map[types.FileContractID]*worker),
+
 		cs:             cs,
 		hostDB:         hdb,
 		hostContractor: hc,
-
-		files:    make(map[string]*file),
-		tracking: make(map[string]trackedFile),
-
-		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 1),
+		persistDir:     persistDir,
+		mu:             sync.New(modules.SafeMutexDelay, 1),
+		tg:             new(sync.ThreadGroup),
 	}
 	if err := r.initPersist(); err != nil {
 		return nil, err
 	}
 
+	// Spin up the workers for the work pool.
+	r.updateWorkerPool()
 	go r.threadedRepairLoop()
-
+	go r.threadedDownloadLoop()
+	go r.threadedQueueRepairs()
 	return r, nil
 }
 
 // Close closes the Renter and its dependencies
 func (r *Renter) Close() error {
+	r.tg.Stop()
 	return r.hostDB.Close()
+}
+
+// SetSettings will update the settings for the renter.
+func (r *Renter) SetSettings(s modules.RenterSettings) error {
+	err := r.hostContractor.SetAllowance(s.Allowance)
+	if err != nil {
+		return err
+	}
+
+	id := r.mu.Lock()
+	r.updateWorkerPool()
+	r.mu.Unlock(id)
+	return nil
 }
 
 // hostdb passthroughs
@@ -168,9 +210,6 @@ func (r *Renter) Settings() modules.RenterSettings {
 	return modules.RenterSettings{
 		Allowance: r.hostContractor.Allowance(),
 	}
-}
-func (r *Renter) SetSettings(s modules.RenterSettings) error {
-	return r.hostContractor.SetAllowance(s.Allowance)
 }
 
 // enforce that Renter satisfies the modules.Renter interface

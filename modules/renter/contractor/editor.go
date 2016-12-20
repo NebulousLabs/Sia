@@ -220,6 +220,17 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 		}
 	}()
 
+	// Sanity check, unless this is a brand new contract, a cached revision
+	// should exist.
+	if build.DEBUG && contract.LastRevision.NewRevisionNumber > 1 {
+		c.mu.RLock()
+		_, exists := c.cachedRevisions[contract.ID]
+		c.mu.RUnlock()
+		if !exists {
+			c.log.Critical("Cached revision does not exist for contract.")
+		}
+	}
+
 	// create editor
 	e, err := proto.NewEditor(host, contract, height)
 	if proto.IsRevisionMismatch(err) {

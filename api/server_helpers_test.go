@@ -351,7 +351,7 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 }
 
 // blankServerTester creates a server tester object that is ready for testing,
-// without any money in the wallet.
+// without mining any blocks.
 func blankServerTester(name string) (*serverTester, error) {
 	// createServerTester is expensive, and therefore should not be called
 	// during short tests.
@@ -505,7 +505,7 @@ func (st *serverTester) acceptContracts() error {
 	return st.stdPostAPI("/host", settingsValues)
 }
 
-// setHostStorage adds a 1 GB folder to the host.
+// setHostStorage adds a storage folder to the host.
 func (st *serverTester) setHostStorage() error {
 	values := url.Values{}
 	values.Set("path", st.dir)

@@ -1,5 +1,8 @@
 package api
 
+// TODO: When setting renter settings, leave empty values unchanged instead of
+// zeroing them out.
+
 import (
 	"fmt"
 	"net/http"
@@ -8,25 +11,57 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/julienschmidt/httprouter"
 )
 
 var (
-	// TODO: Replace this function by accepting user input.
-	recommendedHosts = func() uint64 {
-		if build.Release == "dev" {
-			return 2
-		}
-		if build.Release == "standard" {
-			return 24
-		}
-		if build.Release == "testing" {
-			return 1
-		}
-		panic("unrecognized release constant in api")
-	}()
+	// recommendedHosts is the number of hosts that the renter will form
+	// contracts with if the value is not specified explicity in the call to
+	// SetSettings.
+	recommendedHosts = build.Select(build.Var{
+		Standard: uint64(30),
+		Dev:      uint64(2),
+		Testing:  uint64(1),
+	}).(uint64)
+
+	// requiredHosts specifies the minimum number of hosts that must be set in
+	// the renter settings for the renter settings to be valid. This minimum is
+	// there to prevent users from shooting themselves in the foot.
+	requiredHosts = build.Select(build.Var{
+		Standard: uint64(24),
+		Dev:      uint64(1),
+		Testing:  uint64(1),
+	}).(uint64)
+
+	// requiredParityPieces specifies the minimum number of parity pieces that
+	// must be used when uploading a file. This minimum exists to prevent users
+	// from shooting themselves in the foot.
+	requiredParityPieces = build.Select(build.Var{
+		Standard: int(12),
+		Dev:      int(0),
+		Testing:  int(0),
+	}).(int)
+
+	// requiredRedundancy specifies the minimum redundancy that will be
+	// accepted by the renter when uploading a file. This minimum exists to
+	// prevent users from shooting themselves in the foot.
+	requiredRedundancy = build.Select(build.Var{
+		Standard: float64(2.5),
+		Dev:      float64(1),
+		Testing:  float64(1),
+	}).(float64)
+
+	// requiredRenewWindow establishes the minimum allowed renew window for the
+	// renter settings. This minimum is here to prevent users from shooting
+	// themselves in the foot.
+	requiredRenewWindow = build.Select(build.Var{
+		Standard: types.BlockHeight(288),
+		Dev:      types.BlockHeight(1),
+		Testing:  types.BlockHeight(1),
+	}).(types.BlockHeight)
 )
 
 type (
@@ -128,39 +163,60 @@ func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ htt
 
 // renterHandlerPOST handles the API call to set the Renter's settings.
 func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// scan values
+	// Scan the allowance amount.
 	funds, ok := scanAmount(req.FormValue("funds"))
 	if !ok {
-		WriteError(w, Error{"Couldn't parse funds"}, http.StatusBadRequest)
+		WriteError(w, Error{"unable to parse funds"}, http.StatusBadRequest)
 		return
 	}
-	// var hosts uint64
-	// _, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
-	// if err != nil {
-	// 	WriteError(w, Error{"Couldn't parse hosts: "+err.Error()}, http.StatusBadRequest)
-	// 	return
-	// }
+
+	// Scan the number of hosts to use. (optional parameter)
+	var hosts uint64
+	if req.FormValue("hosts") != "" {
+		_, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
+		if err != nil {
+			WriteError(w, Error{"unable to parse hosts: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		if hosts < requiredHosts {
+			WriteError(w, Error{fmt.Sprintf("insufficient number of hosts, need at least %v but have %v", recommendedHosts, hosts)}, http.StatusBadRequest)
+			return
+		}
+	} else {
+		hosts = recommendedHosts
+	}
+
+	// Scan the period.
 	var period types.BlockHeight
 	_, err := fmt.Sscan(req.FormValue("period"), &period)
 	if err != nil {
-		WriteError(w, Error{"Couldn't parse period: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"unable to parse period: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	// var renewWindow types.BlockHeight
-	// _, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
-	// if err != nil {
-	// 	WriteError(w, Error{"Couldn't parse renewwindow: "+err.Error()}, http.StatusBadRequest)
-	// 	return
-	// }
 
+	// Scan the renew window. (optional parameter)
+	var renewWindow types.BlockHeight
+	if req.FormValue("renewwindow") != "" {
+		_, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
+		if err != nil {
+			WriteError(w, Error{"unable to parse renewwindow: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		if renewWindow < requiredRenewWindow {
+			WriteError(w, Error{fmt.Sprintf("renew window is too small, must be at least %v blocks but have %v blocks", requiredRenewWindow, renewWindow)}, http.StatusBadRequest)
+			return
+		}
+	} else {
+		renewWindow = period / 2
+	}
+
+	// Set the settings in the renter.
 	err = api.renter.SetSettings(modules.RenterSettings{
 		Allowance: modules.Allowance{
-			Funds:  funds,
-			Period: period,
-
-			// TODO: let user specify these
-			Hosts:       recommendedHosts,
-			RenewWindow: period / 2,
+			Funds:       funds,
+			Hosts:       hosts,
+			Period:      period,
+			RenewWindow: renewWindow,
 		},
 	})
 	if err != nil {
@@ -265,7 +321,7 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 
 	err := api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
 	if err != nil {
-		WriteError(w, Error{"Download failed: " + err.Error()}, http.StatusInternalServerError)
+		WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 
@@ -312,17 +368,58 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 		return
 	}
 
-	err := api.renter.Upload(modules.FileUploadParams{
-		Source:  source,
-		SiaPath: strings.TrimPrefix(ps.ByName("siapath"), "/"),
-		// let the renter decide these values; eventually they will be configurable
-		ErasureCode: nil,
-	})
-	if err != nil {
-		WriteError(w, Error{"Upload failed: " + err.Error()}, http.StatusInternalServerError)
-		return
+	// Check whether the erasure coding parameters have been supplied.
+	var ec modules.ErasureCoder
+	if req.FormValue("datapieces") != "" || req.FormValue("paritypieces") != "" {
+		// Check that both values have been supplied.
+		if req.FormValue("datapieces") == "" || req.FormValue("paritypieces") == "" {
+			WriteError(w, Error{"must provide both the datapieces paramaeter and the paritypieces parameter if specifying erasure coding parameters"}, http.StatusBadRequest)
+			return
+		}
+
+		// Parse the erasure coding parameters.
+		var dataPieces, parityPieces int
+		_, err := fmt.Sscan(req.FormValue("datapieces"), &dataPieces)
+		if err != nil {
+			WriteError(w, Error{"unable to read parameter 'datapieces': " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		_, err = fmt.Sscan(req.FormValue("paritypieces"), &parityPieces)
+		if err != nil {
+			WriteError(w, Error{"unable to read parameter 'paritypieces': " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+
+		// Verify that sane values for parityPieces and redundancy are being
+		// supplied.
+		if parityPieces < requiredParityPieces {
+			WriteError(w, Error{fmt.Sprintf("a minimum of %v parity pieces is required, but %v parity pieces requested", parityPieces, requiredParityPieces)}, http.StatusBadRequest)
+			return
+		}
+		redundancy := float64(dataPieces+parityPieces) / float64(dataPieces)
+		if float64(dataPieces+parityPieces)/float64(dataPieces) < requiredRedundancy {
+			WriteError(w, Error{fmt.Sprintf("a redundancy of %.2f is required, but redundancy of %.2f supplied", redundancy, requiredRedundancy)}, http.StatusBadRequest)
+			return
+		}
+
+		// Create the erasure coder.
+		ec, err = renter.NewRSCode(dataPieces, parityPieces)
+		if err != nil {
+			WriteError(w, Error{"unable to encode file using the provided parameters: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
 	}
 
+	// Call the renter to upload the file.
+	err := api.renter.Upload(modules.FileUploadParams{
+		Source:      source,
+		SiaPath:     strings.TrimPrefix(ps.ByName("siapath"), "/"),
+		ErasureCode: ec,
+	})
+	if err != nil {
+		WriteError(w, Error{"upload failed: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
 	WriteSuccess(w)
 }
 

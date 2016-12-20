@@ -16,15 +16,15 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestIntegrationWalletGETEncrypted probes the GET call to /wallet when the
+// TestWalletGETEncrypted probes the GET call to /wallet when the
 // wallet has never been encrypted.
-func TestIntegrationWalletGETEncrypted(t *testing.T) {
+func TestWalletGETEncrypted(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	// Check a wallet that has never been encrypted.
-	testdir := build.TempDir("api", "TestIntegrationWalletGETEncrypted")
+	testdir := build.TempDir("api", "TestWalletGETEncrypted")
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal("Failed to create gateway:", err)
@@ -81,15 +81,16 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 	}
 }
 
-// TestIntegrationWalletBlankEncrypt tries to encrypt and unlock the wallet
+// TestWalletBlankEncrypt tries to encrypt and unlock the wallet
 // through the api using a blank encryption key - meaning that the wallet seed
 // returned by the encryption call can be used as the encryption key.
-func TestIntegrationWalletBlankEncrypt(t *testing.T) {
+func TestWalletBlankEncrypt(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// Create a server object without encrypting or unlocking the wallet.
-	testdir := build.TempDir("api", "TestIntegrationWalletBlankEncrypt")
+	testdir := build.TempDir("api", "TestWalletBlankEncrypt")
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -146,13 +147,14 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 	}
 }
 
-// TestIntegrationWalletGETSiacoins probes the GET call to /wallet when the
+// TestWalletGETSiacoins probes the GET call to /wallet when the
 // siacoin balance is being manipulated.
-func TestIntegrationWalletGETSiacoins(t *testing.T) {
+func TestWalletGETSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationWalletGETSiacoins")
+	t.Parallel()
+	st, err := createServerTester("TestWalletGETSiacoins")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,13 +242,14 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	}
 }
 
-// TestIntegrationWalletTransactionGETid queries the /wallet/transaction/$(id)
+// TestWalletTransactionGETid queries the /wallet/transaction/$(id)
 // api call.
-func TestIntegrationWalletTransactionGETid(t *testing.T) {
+func TestWalletTransactionGETid(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationWalletTransactionGETid")
+	t.Parallel()
+	st, err := createServerTester("TestWalletTransactionGETid")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,6 +299,7 @@ func TestWalletRelativePathErrorBackup(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestWalletRelativePathErrorBackup")
 	if err != nil {
 		t.Fatal(err)
@@ -343,6 +347,7 @@ func TestWalletRelativePathError033x(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestWalletRelativePathError033x")
 	if err != nil {
 		t.Fatal(err)
@@ -411,6 +416,7 @@ func TestWalletRelativePathErrorSiag(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestWalletRelativePathErrorSiag")
 	if err != nil {
 		t.Fatal(err)

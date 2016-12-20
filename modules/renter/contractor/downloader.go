@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
@@ -154,6 +155,17 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 			c.mu.Unlock()
 		}
 	}()
+
+	// Sanity check, unless this is a brand new contract, a cached revision
+	// should exist.
+	if build.DEBUG && contract.LastRevision.NewRevisionNumber > 1 {
+		c.mu.RLock()
+		_, exists := c.cachedRevisions[contract.ID]
+		c.mu.RUnlock()
+		if !exists {
+			c.log.Critical("Cached revision does not exist for contract.")
+		}
+	}
 
 	// create downloader
 	d, err := proto.NewDownloader(host, contract)
