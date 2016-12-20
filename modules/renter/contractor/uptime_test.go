@@ -37,10 +37,11 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	h, c, m, err := newTestingTrio("TestIntegrationMonitorUptime")
+	hosts, c, m, err := newTestingTrio("TestIntegrationMonitorUptime", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
+	h := hosts[0]
 	defer h.Close()
 
 	// override IsOffline to always return true for h
