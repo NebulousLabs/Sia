@@ -166,7 +166,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 	// Scan the allowance amount.
 	funds, ok := scanAmount(req.FormValue("funds"))
 	if !ok {
-		WriteError(w, Error{"Couldn't parse funds"}, http.StatusBadRequest)
+		WriteError(w, Error{"unable to parse funds"}, http.StatusBadRequest)
 		return
 	}
 
@@ -175,11 +175,11 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 	if req.FormValue("hosts") != "" {
 		_, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
 		if err != nil {
-			WriteError(w, Error{"Couldn't parse hosts: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"unable to parse hosts: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 		if hosts < requiredHosts {
-			WriteError(w, Error{fmt.Sprintf("Insufficient number of hosts, need at least %v but have %v.", recommendedHosts, hosts)}, http.StatusBadRequest)
+			WriteError(w, Error{fmt.Sprintf("insuccificent number of hosts, need at least %v but have %v", recommendedHosts, hosts)}, http.StatusBadRequest)
 			return
 		}
 	} else {
@@ -190,7 +190,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 	var period types.BlockHeight
 	_, err := fmt.Sscan(req.FormValue("period"), &period)
 	if err != nil {
-		WriteError(w, Error{"Couldn't parse period: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"unable to parse period: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -199,11 +199,11 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 	if req.FormValue("renewwindow") != "" {
 		_, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
 		if err != nil {
-			WriteError(w, Error{"Couldn't parse renewwindow: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"unable to parse renewwindow: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 		if renewWindow < requiredRenewWindow {
-			WriteError(w, Error{fmt.Sprintf("Renew window is too small, must be at least %v blocks but have %v blocks.", requiredRenewWindow, renewWindow)}, http.StatusBadRequest)
+			WriteError(w, Error{fmt.Sprintf("renew window is too small, must be at least %v blocks but have %v blocks", requiredRenewWindow, renewWindow)}, http.StatusBadRequest)
 			return
 		}
 	} else {
@@ -321,7 +321,7 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 
 	err := api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
 	if err != nil {
-		WriteError(w, Error{"Download failed: " + err.Error()}, http.StatusInternalServerError)
+		WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 
@@ -373,7 +373,7 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 	if req.FormValue("datapieces") != "" || req.FormValue("paritypieces") != "" {
 		// Check that both values have been supplied.
 		if req.FormValue("datapieces") == "" || req.FormValue("paritypieces") == "" {
-			WriteError(w, Error{"Must provide both the datapieces paramaeter and the paritypieces parameter if specifying erasure coding parameters"}, http.StatusBadRequest)
+			WriteError(w, Error{"must provide both the datapieces paramaeter and the paritypieces parameter if specifying erasure coding parameters"}, http.StatusBadRequest)
 			return
 		}
 
@@ -381,31 +381,31 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 		var dataPieces, parityPieces int
 		_, err := fmt.Sscan(req.FormValue("datapieces"), &dataPieces)
 		if err != nil {
-			WriteError(w, Error{"Unable to read parameter 'datapieces': " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"unable to read parameter 'datapieces': " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 		_, err = fmt.Sscan(req.FormValue("paritypieces"), &parityPieces)
 		if err != nil {
-			WriteError(w, Error{"Unable to read parameter 'paritypieces': " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"unable to read parameter 'paritypieces': " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 
 		// Verify that sane values for parityPieces and redundancy are being
 		// supplied.
 		if parityPieces < requiredParityPieces {
-			WriteError(w, Error{fmt.Sprintf("A minimum of %v parity pieces is required, but %v parity pieces requested.", parityPieces, requiredParityPieces)}, http.StatusBadRequest)
+			WriteError(w, Error{fmt.Sprintf("a minimum of %v parity pieces is required, but %v parity pieces requested", parityPieces, requiredParityPieces)}, http.StatusBadRequest)
 			return
 		}
 		redundancy := float64(dataPieces+parityPieces) / float64(dataPieces)
 		if float64(dataPieces+parityPieces)/float64(dataPieces) < requiredRedundancy {
-			WriteError(w, Error{fmt.Sprintf("A redundancy of %.2f is required, but redundancy of %.2f supplied", redundancy, requiredRedundancy)}, http.StatusBadRequest)
+			WriteError(w, Error{fmt.Sprintf("a redundancy of %.2f is required, but redundancy of %.2f supplied", redundancy, requiredRedundancy)}, http.StatusBadRequest)
 			return
 		}
 
 		// Create the erasure coder.
 		ec, err = renter.NewRSCode(dataPieces, parityPieces)
 		if err != nil {
-			WriteError(w, Error{"Unable to encode file using the provided parameters: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"unable to encode file using the provided parameters: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 	}
@@ -417,7 +417,7 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 		ErasureCode: ec,
 	})
 	if err != nil {
-		WriteError(w, Error{"Upload failed: " + err.Error()}, http.StatusInternalServerError)
+		WriteError(w, Error{"upload failed: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 	WriteSuccess(w)
