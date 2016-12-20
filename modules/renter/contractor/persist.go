@@ -14,6 +14,7 @@ type contractorPersist struct {
 	Contracts       []modules.RenterContract
 	CurrentPeriod   types.BlockHeight
 	LastChange      modules.ConsensusChangeID
+	OldContracts    []modules.RenterContract
 	RenewedIDs      map[string]string
 }
 
@@ -31,6 +32,9 @@ func (c *Contractor) persistData() contractorPersist {
 	}
 	for _, contract := range c.contracts {
 		data.Contracts = append(data.Contracts, contract)
+	}
+	for _, contract := range c.oldContracts {
+		data.OldContracts = append(data.OldContracts, contract)
 	}
 	for oldID, newID := range c.renewedIDs {
 		data.RenewedIDs[oldID.String()] = newID.String()
@@ -67,6 +71,9 @@ func (c *Contractor) load() error {
 		c.currentPeriod = highestEnd - c.allowance.Period
 	}
 	c.lastChange = data.LastChange
+	for _, contract := range data.OldContracts {
+		c.contracts[contract.ID] = contract
+	}
 	for oldString, newString := range data.RenewedIDs {
 		var oldHash, newHash crypto.Hash
 		oldHash.LoadString(oldString)
