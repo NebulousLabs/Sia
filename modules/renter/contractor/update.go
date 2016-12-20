@@ -36,8 +36,12 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 
 	// if we have entered the next period, update currentPeriod
-	if c.blockHeight > c.currentPeriod+c.allowance.Period {
-		c.currentPeriod += c.allowance.Period
+	// NOTE: "period" refers to the duration of contracts, whereas "cycle"
+	// refers to how frequently the period metrics are reset. Should think
+	// about how to make this more explicit.
+	cycleLen := c.allowance.Period - c.allowance.RenewWindow
+	if c.blockHeight > c.currentPeriod+cycleLen {
+		c.currentPeriod += cycleLen
 	}
 
 	c.lastChange = cc.ID
