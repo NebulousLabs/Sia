@@ -104,20 +104,12 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 // mapHostDB is a hostDB that implements the Host method via a simple map.
 type mapHostDB struct {
 	stubHostDB
-	hosts map[types.FileContractID]modules.HostDBEntry
+	hosts map[modules.NetAddress]modules.HostDBEntry
 }
 
 func (m mapHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
-	if len(m.hosts) == 0 {
-		return modules.HostDBEntry{}, false
-	}
-	if len(m.hosts) != 1 {
-		panic("oops")
-	}
-	for _, host := range m.hosts {
-		return host, true
-	}
-	return modules.HostDBEntry{}, false
+	h, e := m.hosts[addr]
+	return h, e
 }
 
 // TestIsOffline tests the IsOffline method.
@@ -155,11 +147,11 @@ func TestIsOffline(t *testing.T) {
 		// construct a contractor with a hostdb containing the scans
 		c := &Contractor{
 			contracts: map[types.FileContractID]modules.RenterContract{
-				types.FileContractID{1}: {},
+				types.FileContractID{1}: {NetAddress: "foo"},
 			},
 			hdb: mapHostDB{
-				hosts: map[types.FileContractID]modules.HostDBEntry{
-					types.FileContractID{1}: {ScanHistory: test.scans},
+				hosts: map[modules.NetAddress]modules.HostDBEntry{
+					"foo": {ScanHistory: test.scans},
 				},
 			},
 		}
