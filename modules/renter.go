@@ -79,21 +79,6 @@ type RenterSettings struct {
 	Allowance Allowance `json:"allowance"`
 }
 
-// RenterFinancialMetrics contains metrics about how much the Renter has
-// spent on storage, uploads, and downloads.
-type RenterFinancialMetrics struct {
-	// ContractSpending is how much the Renter has paid into file contracts
-	// formed with hosts. Note that some of this money may be returned to the
-	// Renter when the contract ends. To calculate how much will be returned,
-	// subtract the storage, upload, and download metrics from
-	// ContractSpending.
-	ContractSpending types.Currency `json:"contractspending"`
-
-	DownloadSpending types.Currency `json:"downloadspending"`
-	StorageSpending  types.Currency `json:"storagespending"`
-	UploadSpending   types.Currency `json:"uploadspending"`
-}
-
 // A HostDBEntry represents one host entry in the Renter's host DB. It
 // aggregates the host's external settings and metrics with its public key.
 type HostDBEntry struct {
@@ -127,6 +112,16 @@ type RenterContract struct {
 	MerkleRoots     []crypto.Hash              `json:"merkleroots"`
 	NetAddress      NetAddress                 `json:"netaddress"`
 	SecretKey       crypto.SecretKey           `json:"secretkey"`
+	StartHeight     types.BlockHeight          `json:"startheight"`
+
+	DownloadSpending types.Currency `json:"downloadspending"`
+	StorageSpending  types.Currency `json:"storagespending"`
+	UploadSpending   types.Currency `json:"uploadspending"`
+
+	TotalCost   types.Currency `json:"totalcost"`
+	ContractFee types.Currency `json:"contractfee"`
+	TxnFee      types.Currency `json:"txnfee"`
+	SiafundFee  types.Currency `json:"siafundfee"`
 }
 
 // EndHeight returns the height at which the host is no longer obligated to
@@ -157,6 +152,10 @@ type Renter interface {
 	// Contracts returns the contracts formed by the renter.
 	Contracts() []RenterContract
 
+	// CurrentPeriod returns the height at which the current allowance period
+	// began.
+	CurrentPeriod() types.BlockHeight
+
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error
 
@@ -168,9 +167,6 @@ type Renter interface {
 
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
-
-	// FinancialMetrics returns the financial metrics of the Renter.
-	FinancialMetrics() RenterFinancialMetrics
 
 	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
 	// contain multiple files. The paths of the added files are returned.

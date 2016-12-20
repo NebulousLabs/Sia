@@ -148,13 +148,13 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	}
 }
 
-// TestIntegrationUploadDownload tests that downloading and uploading in
-// parallel does not result in failures or stalling.
-func TestIntegrationUploadDownload(t *testing.T) {
+// TestRenterUploadDownload tests that downloading and uploading in parallel
+// does not result in failures or stalling.
+func TestRenterUploadDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationUploadDownload")
+	st, err := createServerTester("TestRenterUploadDownload")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,6 +183,17 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Check financial metrics; coins should have been spent on contracts
+	var rg RenterGET
+	err = st.getAPI("/renter", &rg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spent := rg.Settings.Allowance.Funds.Sub(rg.FinancialMetrics.Unspent)
+	if spent.IsZero() {
+		t.Fatal("financial metrics do not reflect contract spending")
 	}
 
 	// Create a file.
@@ -247,5 +258,18 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 	if len(rf.Files) != 2 || rf.Files[0].UploadProgress < 10 || rf.Files[1].UploadProgress < 10 {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
+	}
+
+	// Check financial metrics; funds should have been spent on uploads/downloads
+	err = st.getAPI("/renter", &rg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fm := rg.FinancialMetrics
+	newSpent := rg.Settings.Allowance.Funds.Sub(fm.Unspent)
+	// all new spending should be reflected in upload/download/storage spending
+	diff := fm.UploadSpending.Add(fm.DownloadSpending).Add(fm.StorageSpending)
+	if !diff.Equals(newSpent.Sub(spent)) {
+		t.Fatal("all new spending should be reflected in metrics:", diff, newSpent.Sub(spent))
 	}
 }

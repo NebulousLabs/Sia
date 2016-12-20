@@ -63,11 +63,8 @@ returns the current settings along with metrics on the renter's spending.
   // Metrics about how much the Renter has spent on storage, uploads, and
   // downloads.
   "financialmetrics": {
-    // How much money, in hastings, the Renter has paid into file contracts
-    // formed with hosts. Note that some of this money may be returned to the
-    // Renter when the contract ends. To calculate how much will be returned,
-    // subtract the storage, upload, and download metrics from
-    // ContractSpending.
+    // How much money, in hastings, the Renter has spent on file contracts,
+    // including fees.
     "contractspending": "1234", // hastings
 
     // Amount of money spent on downloads.
@@ -77,7 +74,10 @@ returns the current settings along with metrics on the renter's spending.
     "storagespending": "1234", // hastings
 
     // Amount of money spent on uploads.
-    "uploadspending": "5678" // hastings
+    "uploadspending": "5678", // hastings
+
+    // Amount of money in the allowance that has not been spent.
+    "unspent": "1234" // hastings
   }
 }
 ```

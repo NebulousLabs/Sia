@@ -641,7 +641,8 @@ returns the current settings along with metrics on the renter's spending.
     "contractspending": "1234", // hastings
     "downloadspending": "5678", // hastings
     "storagespending":  "1234", // hastings
-    "uploadspending":   "5678"  // hastings
+    "uploadspending":   "5678", // hastings
+    "unspent":          "1234"  // hastings
   }
 }
 ```

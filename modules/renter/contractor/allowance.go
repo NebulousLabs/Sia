@@ -73,7 +73,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	}
 
 	c.mu.RLock()
-	shouldRenew := a.Period != c.allowance.Period || a.Funds.Cmp(c.allowance.Funds) != 0
+	shouldRenew := a.Period != c.allowance.Period || !a.Funds.Equals(c.allowance.Funds)
 	shouldWait := c.blockHeight+a.Period < c.contractEndHeight()
 	remaining := int(a.Hosts) - len(c.contracts)
 	c.mu.RUnlock()
@@ -101,7 +101,8 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 	// calculate new endHeight; if the period has not changed, the endHeight
 	// should not change either
-	endHeight := c.blockHeight + a.Period
+	periodStart := c.blockHeight
+	endHeight := periodStart + a.Period
 	if a.Period == c.allowance.Period && len(c.contracts) > 0 {
 		// COMPAT v0.6.0 - old hosts require end height increase by at least 1
 		endHeight = c.contractEndHeight() + 1
@@ -147,12 +148,10 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	c.mu.Lock()
 	c.allowance = a
 	c.contracts = newContracts
-	// update metrics
-	var spending types.Currency
-	for _, contract := range c.contracts {
-		spending = spending.Add(contract.RenterFunds())
+	// if the currentPeriod was previously unset, set it now
+	if c.currentPeriod == 0 {
+		c.currentPeriod = periodStart
 	}
-	c.financialMetrics.ContractSpending = spending
 	err = c.saveSync()
 	c.mu.Unlock()
 
@@ -188,12 +187,6 @@ func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a m
 	for _, contract := range formed {
 		c.contracts[contract.ID] = contract
 	}
-	// update metrics
-	var spending types.Currency
-	for _, contract := range c.contracts {
-		spending = spending.Add(contract.RenterFunds())
-	}
-	c.financialMetrics.ContractSpending = spending
 	err = c.saveSync()
 	c.mu.Unlock()
 

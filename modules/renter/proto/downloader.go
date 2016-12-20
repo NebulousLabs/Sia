@@ -8,7 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // A Downloader retrieves sectors by calling the download RPC on a host.
@@ -19,9 +18,6 @@ type Downloader struct {
 	conn     net.Conn
 
 	SaveFn revisionSaver
-
-	// metrics
-	DownloadSpending types.Currency
 }
 
 // Sector retrieves the sector with the specified Merkle root, and revises
@@ -94,7 +90,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	// update contract and metrics
 	hd.contract.LastRevision = rev
 	hd.contract.LastRevisionTxn = signedTxn
-	hd.DownloadSpending = hd.DownloadSpending.Add(sectorPrice)
+	hd.contract.DownloadSpending = hd.contract.DownloadSpending.Add(sectorPrice)
 
 	return hd.contract, sector, nil
 }
