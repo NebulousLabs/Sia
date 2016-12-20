@@ -63,11 +63,8 @@ returns the current settings along with metrics on the renter's spending.
   // Metrics about how much the Renter has spent on storage, uploads, and
   // downloads.
   "financialmetrics": {
-    // How much money, in hastings, the Renter has paid into file contracts
-    // formed with hosts. Note that some of this money may be returned to the
-    // Renter when the contract ends. To calculate how much will be returned,
-    // subtract the storage, upload, and download metrics from
-    // ContractSpending.
+    // How much money, in hastings, the Renter has spent on file contracts,
+    // including fees.
     "contractspending": "1234", // hastings
 
     // Amount of money spent on downloads.
@@ -77,51 +74,11 @@ returns the current settings along with metrics on the renter's spending.
     "storagespending": "1234", // hastings
 
     // Amount of money spent on uploads.
-    "uploadspending": "5678" // hastings
-  },
+    "uploadspending": "5678", // hastings
 
-  // Metrics pertaining to each contract formed by the Renter.
-  "contractmetrics": [
-    {
-      // Flat fee required by the host for forming a contract.
-      "contractfee": "1234", // hastings
-
-      // Amount of money spent on downloads.
-      "downloadspending": "9876", // hastings
-
-      // Ending height of the contract.
-      "endheight": 5678, // blocks
-
-      // ID of the associated contract.
-      "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-
-      // Start of the allowance period that the contract was formed in.
-      "periodstart": 1234, // blocks
-
-      // Tax paid out to siafund holders.
-      "siafundfee": "5678", // hastings
-
-      // Starting height of the contract.
-      "startheight": 1234, // blocks
-
-      // Amount of money spend on storage.
-      "storagespending": "5432", // hastings
-
-      // Total amount of money that the Renter spent to create the contract
-      // and submit it to the blockchain.
-      "totalcost": "9876", // hastings
-
-      // Transaction fee on the transaction that contained the contract.
-      "txnfee": "5432", // hastings
-
-      // Amount of money in the contract that can still spend on storage,
-      // downloads, and uploads.
-      "unspent": "5678", // hastings
-
-      // Amount of money spent on uploads.
-      "uploadspending": "1234" // hastings
-    }
-  ]
+    // Amount of money in the allowance that has not been spent.
+    "unspent": "1234" // hastings
+  }
 }
 ```
 

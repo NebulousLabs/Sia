@@ -3,7 +3,6 @@ package contractor
 import (
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -73,37 +72,17 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	if hd.invalid {
 		return nil, errInvalidDownloader
 	}
-	oldSpending := hd.downloader.DownloadSpending
-	start := time.Now()
 	contract, sector, err := hd.downloader.Sector(root)
-	duration := time.Since(start)
 	if err != nil {
 		return nil, err
 	}
-	delta := hd.downloader.DownloadSpending.Sub(oldSpending)
 
-	hd.speed = uint64(duration.Seconds()) / modules.SectorSize
-
-	c := hd.contractor
-	c.mu.Lock()
-	metrics := c.contractMetrics[contract.ID]
-	metrics.DownloadSpending = metrics.DownloadSpending.Add(delta)
-	metrics.Unspent = metrics.Unspent.Sub(delta)
-	c.contractMetrics[contract.ID] = metrics
-	c.financialMetrics.DownloadSpending = c.financialMetrics.DownloadSpending.Add(delta)
-	c.contracts[contract.ID] = contract
-	c.saveSync()
-	c.mu.Unlock()
+	hd.contractor.mu.Lock()
+	hd.contractor.contracts[contract.ID] = contract
+	hd.contractor.saveSync()
+	hd.contractor.mu.Unlock()
 
 	return sector, nil
-}
-
-// Speed returns the most recent download speed of this host, in bytes per
-// second.
-func (hd *hostDownloader) Speed() uint64 {
-	hd.mu.Lock()
-	defer hd.mu.Unlock()
-	return hd.speed
 }
 
 // Close cleanly terminates the download loop with the host and closes the

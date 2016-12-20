@@ -107,28 +107,14 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	if he.invalid {
 		return crypto.Hash{}, errInvalidEditor
 	}
-
-	oldUploadSpending := he.editor.UploadSpending
-	oldStorageSpending := he.editor.StorageSpending
 	contract, sectorRoot, err := he.editor.Upload(data)
 	if err != nil {
 		return crypto.Hash{}, err
 	}
-	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
-	storageDelta := he.editor.StorageSpending.Sub(oldStorageSpending)
-
-	c := he.contractor
-	c.mu.Lock()
-	metrics := c.contractMetrics[contract.ID]
-	metrics.UploadSpending = metrics.UploadSpending.Add(uploadDelta)
-	metrics.StorageSpending = metrics.StorageSpending.Add(storageDelta)
-	metrics.Unspent = metrics.Unspent.Sub(uploadDelta).Sub(storageDelta)
-	c.contractMetrics[contract.ID] = metrics
-	c.financialMetrics.UploadSpending = c.financialMetrics.UploadSpending.Add(uploadDelta)
-	c.financialMetrics.StorageSpending = c.financialMetrics.StorageSpending.Add(storageDelta)
-	c.contracts[contract.ID] = contract
-	c.saveSync()
-	c.mu.Unlock()
+	he.contractor.mu.Lock()
+	he.contractor.contracts[contract.ID] = contract
+	he.contractor.saveSync()
+	he.contractor.mu.Unlock()
 	he.contract = contract
 
 	return sectorRoot, nil
@@ -163,16 +149,11 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 	if he.invalid {
 		return errInvalidEditor
 	}
-
-	oldUploadSpending := he.editor.UploadSpending
 	contract, err := he.editor.Modify(oldRoot, newRoot, offset, newData)
 	if err != nil {
 		return err
 	}
-	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
-
 	he.contractor.mu.Lock()
-	he.contractor.financialMetrics.UploadSpending = he.contractor.financialMetrics.UploadSpending.Add(uploadDelta)
 	he.contractor.contracts[contract.ID] = contract
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()

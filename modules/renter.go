@@ -79,60 +79,6 @@ type RenterSettings struct {
 	Allowance Allowance `json:"allowance"`
 }
 
-// RenterFinancialMetrics contains metrics about how much the Renter has
-// spent on storage, uploads, and downloads.
-type RenterFinancialMetrics struct {
-	// ContractSpending is how much the Renter has paid into file contracts
-	// formed with hosts. Note that some of this money may be returned to the
-	// Renter when the contract ends. To calculate how much will be returned,
-	// subtract the storage, upload, and download metrics from
-	// ContractSpending.
-	ContractSpending types.Currency `json:"contractspending"`
-
-	DownloadSpending types.Currency `json:"downloadspending"`
-	StorageSpending  types.Currency `json:"storagespending"`
-	UploadSpending   types.Currency `json:"uploadspending"`
-
-	// AllowancePeriodStart is the blockheight at which the current allowance
-	// period began.
-	AllowancePeriodStart types.BlockHeight `json:"allowanceperiodstart"`
-}
-
-// RenterContractMetrics contains metrics relevant to a single file contract.
-type RenterContractMetrics struct {
-	// The ID of the associated contract.
-	ID types.FileContractID `json:"id"`
-
-	// The starting height of the allowance period that the contract was
-	// formed in.
-	PeriodStart types.BlockHeight `json:"allowanceperiodstart"`
-
-	// The starting and ending height of the contract. Note that EndHeight is
-	// the same as RenterContract.EndHeight.
-	StartHeight types.BlockHeight `json:"startheight"`
-	EndHeight   types.BlockHeight `json:"endheight"`
-
-	// The total amount of money that the Renter spent to create the contract
-	// and submit it to the blockchain.
-	TotalCost types.Currency `json:"totalcost"`
-
-	// The transaction fee on the transaction that contained the contract.
-	TxnFee types.Currency `json:"txnfee"`
-	// The flat fee required by the host for forming a contract.
-	ContractFee types.Currency `json:"contractfee"`
-	// The tax paid out to siafund holders.
-	SiafundFee types.Currency `json:"siafundfee"`
-
-	DownloadSpending types.Currency `json:"downloadspending"`
-	StorageSpending  types.Currency `json:"storagespending"`
-	UploadSpending   types.Currency `json:"uploadspending"`
-
-	// TotalCost minus all the preceeding fields; in other words, the amount
-	// of money that the Renter can still spend on storage, downloads, and
-	// uploads. Note that this is the same as RenterContract.RenterFunds.
-	Unspent types.Currency `json:"unspent"`
-}
-
 // A HostDBEntry represents one host entry in the Renter's host DB. It
 // aggregates the host's external settings and metrics with its public key.
 type HostDBEntry struct {
@@ -166,6 +112,16 @@ type RenterContract struct {
 	MerkleRoots     []crypto.Hash              `json:"merkleroots"`
 	NetAddress      NetAddress                 `json:"netaddress"`
 	SecretKey       crypto.SecretKey           `json:"secretkey"`
+	StartHeight     types.BlockHeight          `json:"startheight"`
+
+	DownloadSpending types.Currency `json:"downloadspending"`
+	StorageSpending  types.Currency `json:"storagespending"`
+	UploadSpending   types.Currency `json:"uploadspending"`
+
+	TotalCost   types.Currency `json:"totalcost"`
+	ContractFee types.Currency `json:"contractfee"`
+	TxnFee      types.Currency `json:"txnfee"`
+	SiafundFee  types.Currency `json:"siafundfee"`
 }
 
 // EndHeight returns the height at which the host is no longer obligated to
@@ -196,6 +152,10 @@ type Renter interface {
 	// Contracts returns the contracts formed by the renter.
 	Contracts() []RenterContract
 
+	// CurrentPeriod returns the height at which the current allowance period
+	// began.
+	CurrentPeriod() types.BlockHeight
+
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error
 
@@ -215,9 +175,6 @@ type Renter interface {
 	// LoadSharedFilesAscii loads an ASCII-encoded '.sia' file into the
 	// renter.
 	LoadSharedFilesAscii(asciiSia string) ([]string, error)
-
-	// Metrics returns the metrics of the Renter.
-	Metrics() (RenterFinancialMetrics, []RenterContractMetrics)
 
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error

@@ -8,32 +8,26 @@ import (
 
 // contractorPersist defines what Contractor data persists across sessions.
 type contractorPersist struct {
-	Allowance        modules.Allowance
-	PeriodStart      types.BlockHeight
-	BlockHeight      types.BlockHeight
-	CachedRevisions  []cachedRevision
-	ContractMetrics  []modules.RenterContractMetrics
-	Contracts        []modules.RenterContract
-	FinancialMetrics modules.RenterFinancialMetrics
-	LastChange       modules.ConsensusChangeID
-	RenewedIDs       map[string]string
+	Allowance       modules.Allowance
+	BlockHeight     types.BlockHeight
+	CachedRevisions []cachedRevision
+	Contracts       []modules.RenterContract
+	CurrentPeriod   types.BlockHeight
+	LastChange      modules.ConsensusChangeID
+	RenewedIDs      map[string]string
 }
 
 // persistData returns the data in the Contractor that will be saved to disk.
 func (c *Contractor) persistData() contractorPersist {
 	data := contractorPersist{
-		Allowance:        c.allowance,
-		PeriodStart:      c.periodStart,
-		BlockHeight:      c.blockHeight,
-		FinancialMetrics: c.financialMetrics,
-		LastChange:       c.lastChange,
-		RenewedIDs:       make(map[string]string),
+		Allowance:     c.allowance,
+		BlockHeight:   c.blockHeight,
+		CurrentPeriod: c.currentPeriod,
+		LastChange:    c.lastChange,
+		RenewedIDs:    make(map[string]string),
 	}
 	for _, rev := range c.cachedRevisions {
 		data.CachedRevisions = append(data.CachedRevisions, rev)
-	}
-	for _, m := range c.contractMetrics {
-		data.ContractMetrics = append(data.ContractMetrics, m)
 	}
 	for _, contract := range c.contracts {
 		data.Contracts = append(data.Contracts, contract)
@@ -52,18 +46,26 @@ func (c *Contractor) load() error {
 		return err
 	}
 	c.allowance = data.Allowance
-	c.periodStart = data.PeriodStart
 	c.blockHeight = data.BlockHeight
 	for _, rev := range data.CachedRevisions {
 		c.cachedRevisions[rev.Revision.ParentID] = rev
 	}
-	for _, m := range data.ContractMetrics {
-		c.contractMetrics[m.ID] = m
-	}
 	for _, contract := range data.Contracts {
 		c.contracts[contract.ID] = contract
 	}
-	c.financialMetrics = data.FinancialMetrics
+	c.currentPeriod = data.CurrentPeriod
+	if c.currentPeriod == 0 {
+		// COMPATv1.0.4-lts
+		// If loading old persist, current period will be unknown. Best we can
+		// do is guess based on contracts + allowance.
+		var highestEnd types.BlockHeight
+		for _, contract := range data.Contracts {
+			if h := contract.EndHeight(); h > highestEnd {
+				highestEnd = h
+			}
+		}
+		c.currentPeriod = highestEnd - c.allowance.Period
+	}
 	c.lastChange = data.LastChange
 	for oldString, newString := range data.RenewedIDs {
 		var oldHash, newHash crypto.Hash
