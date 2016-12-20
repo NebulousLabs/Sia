@@ -78,12 +78,24 @@ func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContra
 	return modules.RenterContract{}, false
 }
 
-// Contracts returns the contracts formed by the contractor. Only contracts
-// formed with currently online hosts are returned.
+// Contracts returns the contracts formed by the contractor in the current
+// allowance period. Only contracts formed with currently online hosts are
+// returned.
 func (c *Contractor) Contracts() (cs []modules.RenterContract) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.onlineContracts()
+}
+
+// AllContracts returns the contracts formed by the contractor in the current
+// allowance period.
+func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, contract := range c.contracts {
+		cs = append(cs, contract)
+	}
+	return
 }
 
 // CurrentPeriod returns the height at which the current allowance period

@@ -136,10 +136,14 @@ type (
 func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	settings := api.renter.Settings()
 	periodStart := api.renter.CurrentPeriod()
-	// calculate financial metrics from contracts
+	// calculate financial metrics from contracts. We use the special
+	// AllContracts method to include contracts that are offline.
 	var fm RenterFinancialMetrics
 	fm.Unspent = settings.Allowance.Funds
-	for _, c := range api.renter.Contracts() {
+	contracts := api.renter.(interface {
+		AllContracts() []modules.RenterContract
+	}).AllContracts()
+	for _, c := range contracts {
 		if c.StartHeight < periodStart {
 			continue
 		}
