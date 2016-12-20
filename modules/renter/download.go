@@ -326,7 +326,7 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 		}
 
 		// Ignore workers that have a download failure recently.
-		if worker.recentDownloadFailure.Add(downloadFailureCooldown).After(time.Now()) {
+		if time.Since(worker.recentDownloadFailure) < downloadFailureCooldown {
 			continue
 		}
 
@@ -363,10 +363,8 @@ loop:
 		if downloadComplete {
 			// The download has most likely failed. No need to complete this
 			// chunk.
-			ds.activePieces-- // for the current incomplete chunk
-			for range incompleteChunk.completedPieces {
-				ds.activePieces-- // for the completed chunk
-			}
+			ds.activePieces--                                       // for the current incomplete chunk
+			ds.activePieces -= len(incompleteChunk.completedPieces) // for all completed pieces
 			// Clear the set of completed pieces so that we do not
 			// over-subtract if the above code is run multiple times.
 			incompleteChunk.completedPieces = make(map[uint64][]byte)
@@ -434,10 +432,8 @@ loop:
 		incompleteChunk.download.fail(errInsufficientHosts)
 
 		// Clear out the piece burden for this chunk.
-		ds.activePieces-- // for the current incomplete chunk
-		for range incompleteChunk.completedPieces {
-			ds.activePieces-- // for the completed chunk
-		}
+		ds.activePieces--                                       // for the current incomplete chunk
+		ds.activePieces -= len(incompleteChunk.completedPieces) // for all completed pieces
 		// Clear the set of completed pieces so that we do not
 		// over-subtract if the above code is run multiple times.
 		incompleteChunk.completedPieces = make(map[uint64][]byte)

@@ -193,7 +193,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		}
 
 		// Ignore workers that have had an upload failure recently.
-		if worker.recentUploadFailure.Add(uploadFailureCooldown).After(time.Now()) {
+		if time.Since(worker.recentUploadFailure) < uploadFailureCooldown {
 			continue
 		}
 
