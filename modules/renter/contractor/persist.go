@@ -55,6 +55,7 @@ func (c *Contractor) load() error {
 	}
 	c.currentPeriod = data.CurrentPeriod
 	if c.currentPeriod == 0 {
+		// COMPATv1.0.4-lts
 		// If loading old persist, current period will be unknown. Best we can
 		// do is guess based on contracts + allowance.
 		var highestEnd types.BlockHeight
