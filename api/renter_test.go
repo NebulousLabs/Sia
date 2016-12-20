@@ -123,9 +123,9 @@ func TestRenterConflicts(t *testing.T) {
 
 	// Upload using the same nickname.
 	err = st.stdPostAPI("/renter/upload/foo/bar.sia/test", uploadValues)
-	expectedErr := Error{"Upload failed: " + renter.ErrPathOverload.Error()}
+	expectedErr := Error{"upload failed: " + renter.ErrPathOverload.Error()}
 	if err != expectedErr {
-		t.Fatalf("expected %v, got %v", Error{"Upload failed: " + renter.ErrPathOverload.Error()}, err)
+		t.Fatalf("expected %v, got %v", Error{"upload failed: " + renter.ErrPathOverload.Error()}, err)
 	}
 
 	// Upload using nickname that conflicts with folder.
@@ -387,8 +387,8 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	allowanceValues.Set("funds", "")
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err == nil || err.Error() != "Couldn't parse funds" {
-		t.Errorf("expected error to be 'Couldn't parse funds'; got %v", err)
+	if err == nil || err.Error() != "unable to parse funds" {
+		t.Errorf("expected error to be 'unable to parse funds'; got %v", err)
 	}
 	// Try an invalid funds string. Can't test a negative value since
 	// ErrNegativeCurrency triggers a build.Critical, which calls a panic in
@@ -402,14 +402,14 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", "")
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err == nil || !strings.HasPrefix(err.Error(), "Couldn't parse period: ") {
-		t.Errorf("expected error to begin with 'Couldn't parse period: '; got %v", err)
+	if err == nil || !strings.HasPrefix(err.Error(), "unable to parse period: ") {
+		t.Errorf("expected error to begin with 'unable to parse period: '; got %v", err)
 	}
 	// Try an invalid period string.
 	allowanceValues.Set("period", "-1")
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err == nil || err.Error()[:23] != "Couldn't parse period: " {
-		t.Errorf("expected error to begin with 'Couldn't parse period: '; got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "unable to parse period") {
+		t.Errorf("expected error to begin with 'unable to parse period'; got %v", err)
 	}
 	// Try a period that will lead to a length-zero RenewWindow.
 	allowanceValues.Set("period", "1")
@@ -463,8 +463,8 @@ func TestRenterLoadNonexistent(t *testing.T) {
 	// Try downloading a nonexistent file.
 	downpath := filepath.Join(st.dir, "dnedown.dat")
 	err = st.stdGetAPI("/renter/download/dne?destination=" + downpath)
-	if err == nil || err.Error() != "Download failed: no file with that path" {
-		t.Errorf("expected error to be 'Download failed: no file with that path'; got %v instead", err)
+	if err == nil || err.Error() != "download failed: no file with that path" {
+		t.Errorf("expected error to be 'download failed: no file with that path'; got %v instead", err)
 	}
 
 	// The renter's downloads queue should be empty.

@@ -179,7 +179,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 			return
 		}
 		if hosts < requiredHosts {
-			WriteError(w, Error{fmt.Sprintf("insuccificent number of hosts, need at least %v but have %v", recommendedHosts, hosts)}, http.StatusBadRequest)
+			WriteError(w, Error{fmt.Sprintf("insufficient number of hosts, need at least %v but have %v", recommendedHosts, hosts)}, http.StatusBadRequest)
 			return
 		}
 	} else {
