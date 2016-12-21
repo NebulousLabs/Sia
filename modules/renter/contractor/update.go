@@ -45,6 +45,10 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	cycleLen := c.allowance.Period - c.allowance.RenewWindow
 	if c.blockHeight > c.currentPeriod+cycleLen {
 		c.currentPeriod += cycleLen
+		// COMPATv1.0.4-lts
+		// if we were storing a special metrics contract, it will be invalid
+		// after we enter the next period.
+		delete(c.oldContracts, metricsContractID)
 	}
 
 	c.lastChange = cc.ID

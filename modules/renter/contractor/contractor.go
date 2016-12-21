@@ -17,6 +17,11 @@ var (
 	errNilCS     = errors.New("cannot create contractor with nil consensus set")
 	errNilWallet = errors.New("cannot create contractor with nil wallet")
 	errNilTpool  = errors.New("cannot create contractor with nil transaction pool")
+
+	// COMPATv1.0.4-lts
+	// metricsContractID identifies a special contract that contains aggregate
+	// financial metrics from older contractors
+	metricsContractID = types.FileContractID{'m', 'e', 't', 'r', 'i', 'c', 's'}
 )
 
 // A cachedRevision contains changes that would be applied to a RenterContract
@@ -94,6 +99,13 @@ func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
 	defer c.mu.RUnlock()
 	for _, contract := range c.contracts {
 		cs = append(cs, contract)
+	}
+	// COMPATv1.0.4-lts
+	// also return the special metrics contract (see persist.go)
+	for _, contract := range c.oldContracts {
+		if contract.ID == metricsContractID {
+			cs = append(cs, contract)
+		}
 	}
 	return
 }
