@@ -17,7 +17,7 @@ import (
 
 // TODO: Move to a consts file.
 const uploadFailureCooldown = time.Hour
-const minPiecesRepair = 6
+const minPiecesRepair = 5
 
 var (
 	// errFileDeleted indicates that a chunk which is trying to be repaired

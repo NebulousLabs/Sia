@@ -23,7 +23,7 @@ var (
 		case "dev":
 			return 1
 		case "standard":
-			return 4
+			return 8
 		case "testing":
 			return 1
 		}
@@ -37,7 +37,7 @@ var (
 		case "dev":
 			return 1
 		case "standard":
-			return 20
+			return 24
 		case "testing":
 			return 8
 		}
