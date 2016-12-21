@@ -150,10 +150,16 @@ func (c *Contractor) managedRenewContracts() error {
 
 	// replace old contracts with renewed ones
 	c.mu.Lock()
-	for id, contract := range newContracts {
-		delete(c.contracts, id)
+	for oldID, contract := range newContracts {
+		// archive the old contract
+		if oldContract, ok := c.contracts[oldID]; ok {
+			c.oldContracts[oldID] = oldContract
+			delete(c.contracts, oldID)
+		}
+		// insert the new contract
 		c.contracts[contract.ID] = contract
-		c.renewedIDs[id] = contract.ID
+		// add a mapping from old->new contract
+		c.renewedIDs[oldID] = contract.ID
 	}
 	err = c.saveSync()
 	c.mu.Unlock()

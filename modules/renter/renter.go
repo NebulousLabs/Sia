@@ -211,6 +211,11 @@ func (r *Renter) Settings() modules.RenterSettings {
 		Allowance: r.hostContractor.Allowance(),
 	}
 }
+func (r *Renter) AllContracts() []modules.RenterContract {
+	return r.hostContractor.(interface {
+		AllContracts() []modules.RenterContract
+	}).AllContracts()
+}
 
 // enforce that Renter satisfies the modules.Renter interface
 var _ modules.Renter = (*Renter)(nil)

@@ -14,7 +14,16 @@ type contractorPersist struct {
 	Contracts       []modules.RenterContract
 	CurrentPeriod   types.BlockHeight
 	LastChange      modules.ConsensusChangeID
+	OldContracts    []modules.RenterContract
 	RenewedIDs      map[string]string
+
+	// COMPATv1.0.4-lts
+	FinancialMetrics struct {
+		ContractSpending types.Currency `json:"contractspending"`
+		DownloadSpending types.Currency `json:"downloadspending"`
+		StorageSpending  types.Currency `json:"storagespending"`
+		UploadSpending   types.Currency `json:"uploadspending"`
+	}
 }
 
 // persistData returns the data in the Contractor that will be saved to disk.
@@ -31,6 +40,9 @@ func (c *Contractor) persistData() contractorPersist {
 	}
 	for _, contract := range c.contracts {
 		data.Contracts = append(data.Contracts, contract)
+	}
+	for _, contract := range c.oldContracts {
+		data.OldContracts = append(data.OldContracts, contract)
 	}
 	for oldID, newID := range c.renewedIDs {
 		data.RenewedIDs[oldID.String()] = newID.String()
@@ -67,12 +79,29 @@ func (c *Contractor) load() error {
 		c.currentPeriod = highestEnd - c.allowance.Period
 	}
 	c.lastChange = data.LastChange
+	for _, contract := range data.OldContracts {
+		c.contracts[contract.ID] = contract
+	}
 	for oldString, newString := range data.RenewedIDs {
 		var oldHash, newHash crypto.Hash
 		oldHash.LoadString(oldString)
 		newHash.LoadString(newString)
 		c.renewedIDs[types.FileContractID(oldHash)] = types.FileContractID(newHash)
 	}
+
+	// COMPATv1.0.4-lts
+	// If loading old persist, only aggregate metrics are known. Store these
+	// in a special contract under a special identifier.
+	if fm := data.FinancialMetrics; !fm.ContractSpending.Add(fm.DownloadSpending).Add(fm.StorageSpending).Add(fm.UploadSpending).IsZero() {
+		c.oldContracts[metricsContractID] = modules.RenterContract{
+			ID:               metricsContractID,
+			TotalCost:        fm.ContractSpending,
+			DownloadSpending: fm.DownloadSpending,
+			StorageSpending:  fm.StorageSpending,
+			UploadSpending:   fm.UploadSpending,
+		}
+	}
+
 	return nil
 }
 

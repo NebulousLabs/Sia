@@ -20,7 +20,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 
-	// delete expired contracts
+	// archive expired contracts
 	var expired []types.FileContractID
 	for id, contract := range c.contracts {
 		if c.blockHeight > contract.EndHeight() {
@@ -28,11 +28,14 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// depend on this contract should have taken care of any issues
 			// already.
 			expired = append(expired, id)
+			// move to oldContracts
+			c.oldContracts[id] = contract
 		}
 	}
+	// delete expired contracts (can't delete while iterating)
 	for _, id := range expired {
 		delete(c.contracts, id)
-		c.log.Debugln("INFO: deleted expired contract", id)
+		c.log.Println("INFO: archived expired contract", id)
 	}
 
 	// if we have entered the next period, update currentPeriod
@@ -42,6 +45,10 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	cycleLen := c.allowance.Period - c.allowance.RenewWindow
 	if c.blockHeight > c.currentPeriod+cycleLen {
 		c.currentPeriod += cycleLen
+		// COMPATv1.0.4-lts
+		// if we were storing a special metrics contract, it will be invalid
+		// after we enter the next period.
+		delete(c.oldContracts, metricsContractID)
 	}
 
 	c.lastChange = cc.ID

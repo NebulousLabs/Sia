@@ -17,6 +17,11 @@ var (
 	errNilCS     = errors.New("cannot create contractor with nil consensus set")
 	errNilWallet = errors.New("cannot create contractor with nil wallet")
 	errNilTpool  = errors.New("cannot create contractor with nil transaction pool")
+
+	// COMPATv1.0.4-lts
+	// metricsContractID identifies a special contract that contains aggregate
+	// financial metrics from older contractors
+	metricsContractID = types.FileContractID{'m', 'e', 't', 'r', 'i', 'c', 's'}
 )
 
 // A cachedRevision contains changes that would be applied to a RenterContract
@@ -47,6 +52,7 @@ type Contractor struct {
 	downloaders     map[types.FileContractID]*hostDownloader
 	editors         map[types.FileContractID]*hostEditor
 	lastChange      modules.ConsensusChangeID
+	oldContracts    map[types.FileContractID]modules.RenterContract
 	renewedIDs      map[types.FileContractID]types.FileContractID
 	renewing        map[types.FileContractID]bool // prevent revising during renewal
 	revising        map[types.FileContractID]bool // prevent overlapping revisions
@@ -77,12 +83,31 @@ func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContra
 	return modules.RenterContract{}, false
 }
 
-// Contracts returns the contracts formed by the contractor. Only contracts
-// formed with currently online hosts are returned.
+// Contracts returns the contracts formed by the contractor in the current
+// allowance period. Only contracts formed with currently online hosts are
+// returned.
 func (c *Contractor) Contracts() (cs []modules.RenterContract) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.onlineContracts()
+}
+
+// AllContracts returns the contracts formed by the contractor in the current
+// allowance period.
+func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, contract := range c.contracts {
+		cs = append(cs, contract)
+	}
+	// COMPATv1.0.4-lts
+	// also return the special metrics contract (see persist.go)
+	for _, contract := range c.oldContracts {
+		if contract.ID == metricsContractID {
+			cs = append(cs, contract)
+		}
+	}
+	return
 }
 
 // CurrentPeriod returns the height at which the current allowance period
@@ -144,6 +169,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		contracts:       make(map[types.FileContractID]modules.RenterContract),
 		downloaders:     make(map[types.FileContractID]*hostDownloader),
 		editors:         make(map[types.FileContractID]*hostEditor),
+		oldContracts:    make(map[types.FileContractID]modules.RenterContract),
 		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
 		renewing:        make(map[types.FileContractID]bool),
 		revising:        make(map[types.FileContractID]bool),

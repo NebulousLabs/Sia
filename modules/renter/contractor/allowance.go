@@ -144,9 +144,14 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return errors.New("unable to form or renew any contracts")
 	}
 
-	// Set the allowance and replace the contract set
 	c.mu.Lock()
+	// update the allowance
 	c.allowance = a
+	// archive the current contract set
+	for id, contract := range c.contracts {
+		c.oldContracts[id] = contract
+	}
+	// replace the current contract set with new contracts
 	c.contracts = newContracts
 	// if the currentPeriod was previously unset, set it now
 	if c.currentPeriod == 0 {
