@@ -22,7 +22,7 @@ var (
 	// contracts with if the value is not specified explicity in the call to
 	// SetSettings.
 	recommendedHosts = build.Select(build.Var{
-		Standard: uint64(30),
+		Standard: uint64(42),
 		Dev:      uint64(2),
 		Testing:  uint64(1),
 	}).(uint64)
@@ -31,7 +31,7 @@ var (
 	// the renter settings for the renter settings to be valid. This minimum is
 	// there to prevent users from shooting themselves in the foot.
 	requiredHosts = build.Select(build.Var{
-		Standard: uint64(24),
+		Standard: uint64(20),
 		Dev:      uint64(1),
 		Testing:  uint64(1),
 	}).(uint64)
