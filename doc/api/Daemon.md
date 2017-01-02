@@ -56,12 +56,12 @@ returns the set of constants in use.
   // Number of coins given to the miner of the first block. Note that elsewhere
   // in the API currency is typically returned in hastings and as a bignum.
   // This is not the case here.
-  "initialcoinbase": 300000, // SiaCoins.
+  "initialcoinbase": 300000, // Siacoins.
   // Minimum number of coins paid out to the miner of a block (the coinbase
   // decreases with each block). Note that elsewhere in the API currency is
   // typically returned in hastings and as a bignum. This is not the case
   // here.
-  "minimumcoinbase": 30000, // SiaCoins
+  "minimumcoinbase": 30000, // Siacoins
 
   // Initial target.
   "roottarget": [0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
