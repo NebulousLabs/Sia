@@ -3,7 +3,6 @@ package contractor
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -105,9 +104,9 @@ func newTestingContractor(testdir string, cs modules.ConsensusSet, tp modules.Tr
 	return New(cs, w, tp, hdb, filepath.Join(testdir, "contractor"))
 }
 
-// newTestingTrio a Contractor, TestMiner, and a slice of hosts that can be
-// used for testing host/renter interactions.
-func newTestingTrio(name string, nhosts int) ([]modules.Host, *Contractor, modules.TestMiner, error) {
+// newTestingTrio creates a Host, Contractor, and TestMiner that can be used
+// for testing host/renter interactions.
+func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, error) {
 	testdir := build.TempDir("contractor", name)
 
 	// create miner
@@ -146,41 +145,34 @@ func newTestingTrio(name string, nhosts int) ([]modules.Host, *Contractor, modul
 		return nil, nil, nil, err
 	}
 
-	// create the hosts
-	var hosts []modules.Host
-	for i := 0; i < nhosts; i++ {
-		h, err := newTestingHost(filepath.Join(testdir, fmt.Sprintf("Host%v", i)), cs, tp)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		hosts = append(hosts, h)
+	// create host and contractor, using same consensus set and gateway
+	h, err := newTestingHost(filepath.Join(testdir, "Host"), cs, tp)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-
 	c, err := newTestingContractor(filepath.Join(testdir, "Contractor"), cs, tp)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	// announce the hosts
-	for i, h := range hosts {
-		err = h.Announce()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		// mine a block, processing the announcement
-		m.AddBlock()
-
-		// wait for hostdb to scan host
-		for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
-			time.Sleep(time.Millisecond * 50)
-		}
-		if len(c.hdb.RandomHosts(i+1, nil)) == 0 {
-			return nil, nil, nil, errors.New("host did not make it into the contractor hostdb in time")
-		}
+	// announce the host
+	err = h.Announce()
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	return hosts, c, m, nil
+	// mine a block, processing the announcement
+	m.AddBlock()
+
+	// wait for hostdb to scan host
+	for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
+		time.Sleep(time.Millisecond * 50)
+	}
+	if len(c.hdb.RandomHosts(1, nil)) == 0 {
+		return nil, nil, nil, errors.New("host did not make it into the contractor hostdb in time")
+	}
+
+	return h, c, m, nil
 }
 
 // TestIntegrationFormContract tests that the contractor can form contracts
@@ -190,11 +182,10 @@ func TestIntegrationFormContract(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	hosts, c, _, err := newTestingTrio("TestIntegrationFormContract", 1)
+	h, c, _, err := newTestingTrio("TestIntegrationFormContract")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := hosts[0]
 	defer h.Close()
 
 	// get the host's entry from the db
@@ -222,11 +213,10 @@ func TestIntegrationReviseContract(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	hosts, c, _, err := newTestingTrio("TestIntegrationReviseContract", 1)
+	h, c, _, err := newTestingTrio("TestIntegrationReviseContract")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := hosts[0]
 	defer h.Close()
 
 	// get the host's entry from the db
@@ -271,11 +261,10 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	hosts, c, _, err := newTestingTrio("TestIntegrationUploadDownload", 1)
+	h, c, _, err := newTestingTrio("TestIntegrationUploadDownload")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := hosts[0]
 	defer h.Close()
 
 	// get the host's entry from the db
@@ -337,11 +326,10 @@ func TestIntegrationDelete(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	hosts, c, _, err := newTestingTrio("TestIntegrationDelete", 1)
+	h, c, _, err := newTestingTrio("TestIntegrationDelete")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := hosts[0]
 	defer h.Close()
 
 	// get the host's entry from the db
@@ -403,11 +391,10 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	hosts, c, _, err := newTestingTrio("TestIntegrationInsertDelete", 1)
+	h, c, _, err := newTestingTrio("TestIntegrationInsertDelete")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := hosts[0]
 	defer h.Close()
 
 	// get the host's entry from the db
@@ -464,11 +451,10 @@ func TestIntegrationModify(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	hosts, c, _, err := newTestingTrio("TestIntegrationModify", 1)
+	h, c, _, err := newTestingTrio("TestIntegrationModify")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := hosts[0]
 	defer h.Close()
 
 	// get the host's entry from the db
@@ -532,11 +518,10 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	hosts, c, _, err := newTestingTrio("TestIntegrationRenew", 1)
+	h, c, _, err := newTestingTrio("TestIntegrationRenew")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := hosts[0]
 	defer h.Close()
 
 	// get the host's entry from the db
@@ -660,11 +645,10 @@ func TestIntegrationResync(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	hosts, c, _, err := newTestingTrio("TestIntegrationResync", 1)
+	h, c, _, err := newTestingTrio("TestIntegrationResync")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := hosts[0]
 	defer h.Close()
 
 	// get the host's entry from the db
@@ -799,11 +783,10 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	hosts, c, _, err := newTestingTrio("TestIntegrationDownloaderCaching", 1)
+	h, c, _, err := newTestingTrio("TestIntegrationDownloaderCaching")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := hosts[0]
 	defer h.Close()
 
 	// get the host's entry from the db
@@ -893,11 +876,10 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	hosts, c, _, err := newTestingTrio("TestIntegrationEditorCaching", 1)
+	h, c, _, err := newTestingTrio("TestIntegrationEditorCaching")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := hosts[0]
 	defer h.Close()
 
 	// get the host's entry from the db

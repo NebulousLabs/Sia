@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -196,9 +197,29 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.SkipNow()
 	}
 	// create testing trio
-	_, c, m, err := newTestingTrio("TestIntegrationSetAllowance", 2)
+	_, c, m, err := newTestingTrio("TestIntegrationSetAllowance")
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// this test requires two hosts: create another one
+	h, err := newTestingHost(build.TempDir("hostdata", ""), c.cs.(modules.ConsensusSet), c.tpool.(modules.TransactionPool))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// announce the extra host
+	err = h.Announce()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mine a block, processing the announcement
+	m.AddBlock()
+
+	// wait for hostdb to scan host
+	for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
+		time.Sleep(time.Millisecond * 50)
 	}
 
 	// cancel allowance

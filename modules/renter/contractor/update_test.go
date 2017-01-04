@@ -57,7 +57,7 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	_, c, m, err := newTestingTrio("TestIntegrationAutoRenew", 1)
+	_, c, m, err := newTestingTrio("TestIntegrationAutoRenew")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	_, c, m, err := newTestingTrio("TestIntegrationRenewInvalidate", 1)
+	_, c, m, err := newTestingTrio("TestIntegrationRenewInvalidate")
 	if err != nil {
 		t.Fatal(err)
 	}
