@@ -71,7 +71,7 @@ Units
 
 Unless otherwise specified, all parameters should be specified in their
 smallest possible unit. For example, size should always be specified in bytes
-and SiaCoins should be specified in hastings. JSON values returned by the API
+and Siacoins should be specified in hastings. JSON values returned by the API
 will also use the smallest possible unit, unless otherwise specified.
 
 If a numbers is returned as a string in JSON, it should be treated as an
@@ -120,8 +120,8 @@ returns the set of constants in use.
   "siafundportion":        "39/1000",
   "maturitydelay":         144,        // blocks
 
-  "initialcoinbase": 300000, // SiaCoins (see note in Daemon.md)
-  "minimumcoinbase": 30000,  // SiaCoins (see note in Daemon.md)
+  "initialcoinbase": 300000, // Siacoins (see note in Daemon.md)
+  "minimumcoinbase": 30000,  // Siacoins (see note in Daemon.md)
 
   "roottarget": [0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   "rootdepth":  [255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255],
