@@ -40,7 +40,11 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 // forming new ones. This preserves the data on those hosts. When this occurs,
 // the renewed contracts will atomically replace their previous versions. If
 // SetAllowance is interrupted, renewed contracts may be lost, though the
-// allocated funds will eventually be returned,
+// allocated funds will eventually be returned.
+//
+// If a is the empty allowance, SetAllowance will archive the current contract
+// set. The contracts cannot be used to create Editors or Downloads, and will
+// not be renewed.
 //
 // TODO: can an Editor or Downloader be used across renewals?
 // TODO: will hosts allow renewing the same contract twice?
@@ -48,6 +52,20 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 // NOTE: At this time, transaction fees are not counted towards the allowance.
 // This means the contractor may spend more than allowance.Funds.
 func (c *Contractor) SetAllowance(a modules.Allowance) error {
+	if a.Funds.IsZero() && a.Hosts == 0 && a.Period == 0 && a.RenewWindow == 0 {
+		// Special case: reset currentPeriod and archive current contracts
+		c.mu.Lock()
+		c.allowance = a
+		c.currentPeriod = 0
+		for id, contract := range c.contracts {
+			c.oldContracts[id] = contract
+		}
+		c.contracts = make(map[types.FileContractID]modules.RenterContract)
+		err := c.saveSync()
+		c.mu.Unlock()
+		return err
+	}
+
 	// sanity checks
 	if a.Hosts == 0 {
 		return errAllowanceNoHosts
