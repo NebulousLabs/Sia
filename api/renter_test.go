@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -478,7 +479,7 @@ func TestRenterLoadNonexistent(t *testing.T) {
 }
 
 // TestRenterHandlerRename checks that valid /renter/rename calls are
-// successful, and that invalid  calls fail with the appropriate error.
+// successful, and that invalid calls fail with the appropriate error.
 func TestRenterHandlerRename(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -501,6 +502,14 @@ func TestRenterHandlerRename(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Try renaming a nonexistent file.
+	renameValues := url.Values{}
+	renameValues.Set("newsiapath", "newdne")
+	err = st.stdPostAPI("/renter/rename/dne", renameValues)
+	if err == nil || err.Error() != renter.ErrUnknownPath.Error() {
+		t.Errorf("expected error to be %v; got %v", renter.ErrUnknownPath, err)
+	}
+
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
 	allowanceValues.Set("funds", testFunds)
@@ -509,13 +518,9 @@ func TestRenterHandlerRename(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create two files.
+	// Create a file.
 	path1 := filepath.Join(st.dir, "test1.dat")
 	if err = createRandFile(path1, 512); err != nil {
-		t.Fatal(err)
-	}
-	path2 := filepath.Join(st.dir, "test2.dat")
-	if err = createRandFile(path2, 512); err != nil {
 		t.Fatal(err)
 	}
 
@@ -525,18 +530,6 @@ func TestRenterHandlerRename(t *testing.T) {
 	if err = st.stdPostAPI("/renter/upload/test1", uploadValues); err != nil {
 		t.Fatal(err)
 	}
-	uploadValues.Set("source", path2)
-	if err = st.stdPostAPI("/renter/upload/test2", uploadValues); err != nil {
-		t.Fatal(err)
-	}
-
-	// Try renaming to a name that's already taken.
-	renameValues := url.Values{}
-	renameValues.Set("newsiapath", "test1")
-	err = st.stdPostAPI("/renter/rename/test2", renameValues)
-	if err == nil || err.Error() != renter.ErrPathOverload.Error() {
-		t.Errorf("expected error to be %v; got %v", renter.ErrPathOverload, err)
-	}
 
 	// Try renaming to an empty string.
 	renameValues.Set("newsiapath", "")
@@ -545,17 +538,40 @@ func TestRenterHandlerRename(t *testing.T) {
 		t.Fatalf("expected error to be %v; got %v", renter.ErrEmptyFilename, err)
 	}
 
-	// Rename the first file.
+	// Rename the file.
 	renameValues.Set("newsiapath", "newtest1")
 	if err = st.stdPostAPI("/renter/rename/test1", renameValues); err != nil {
 		t.Fatal(err)
 	}
 
-	// Try renaming a nonexistent file.
-	renameValues.Set("newsiapath", "newdne")
-	err = st.stdPostAPI("/renter/rename/dne", renameValues)
-	if err == nil || err.Error() != renter.ErrUnknownPath.Error() {
-		t.Errorf("expected error to be %v; got %v", renter.ErrUnknownPath, err)
+	// Should be able to continue uploading and downloading using the new name.
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("upload is not succeeding:", rf.Files[0])
+	}
+	err = st.stdGetAPI("/renter/download/newtest1?destination=" + filepath.Join(st.dir, "testdown2.dat"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create and upload another file.
+	path2 := filepath.Join(st.dir, "test2.dat")
+	if err = createRandFile(path2, 512); err != nil {
+		t.Fatal(err)
+	}
+	uploadValues.Set("source", path2)
+	if err = st.stdPostAPI("/renter/upload/test2", uploadValues); err != nil {
+		t.Fatal(err)
+	}
+	// Try renaming to a name that's already taken.
+	renameValues.Set("newsiapath", "newtest1")
+	err = st.stdPostAPI("/renter/rename/test2", renameValues)
+	if err == nil || err.Error() != renter.ErrPathOverload.Error() {
+		t.Errorf("expected error to be %v; got %v", renter.ErrPathOverload, err)
 	}
 }
 
