@@ -264,6 +264,10 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	// Update the entries in the renter.
 	delete(r.files, currentName)
 	r.files[newName] = file
+	if t, ok := r.tracking[currentName]; ok {
+		delete(r.tracking, currentName)
+		r.tracking[newName] = t
+	}
 	err = r.saveSync()
 	if err != nil {
 		return err
