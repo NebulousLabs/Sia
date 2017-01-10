@@ -690,14 +690,14 @@ func TestRenterCancelAllowance(t *testing.T) {
 	}
 }
 
-// TestRenterUploadDelete tests that uploading and deleting parallel does not
+// TestRenterParallelDelete tests that uploading and deleting parallel does not
 // result in failures or stalling.
-func TestRenterUploadDelete(t *testing.T) {
+func TestRenterParallelDelete(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestRenterUploadDelete")
+	st, err := createServerTester("TestRenterParallelDelete")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -730,12 +730,12 @@ func TestRenterUploadDelete(t *testing.T) {
 
 	// Create two files.
 	path := filepath.Join(st.dir, "test.dat")
-	err = createRandFile(path, 256e3)
+	err = createRandFile(path, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
 	path2 := filepath.Join(st.dir, "test2.dat")
-	err = createRandFile(path2, 256e3)
+	err = createRandFile(path2, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -764,6 +764,7 @@ func TestRenterUploadDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	err = st.stdPostAPI("/renter/delete/test", url.Values{})
 	if err != nil {
 		t.Fatal(err)
@@ -781,5 +782,20 @@ func TestRenterUploadDelete(t *testing.T) {
 	}
 	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files)
+	}
+
+	// In parallel, download and delete the second file.
+	go st.stdPostAPI("/renter/delete/test2", url.Values{})
+	time.Sleep(100 * time.Millisecond)
+	downpath := filepath.Join(st.dir, "testdown.dat")
+	err = st.stdGetAPI("/renter/download/test2?destination=" + downpath)
+	if err == nil {
+		t.Fatal("download should fail after delete")
+	}
+
+	// No files should be present
+	st.getAPI("/renter/files", &rf)
+	if len(rf.Files) != 0 {
+		t.Fatal("file was not deleted properly:", rf.Files)
 	}
 }
