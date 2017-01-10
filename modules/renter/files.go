@@ -187,22 +187,7 @@ func (r *Renter) DeleteFile(nickname string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	var contracts []modules.RenterContract
-	for _, c := range r.hostContractor.Contracts() {
-		if _, ok := f.contracts[c.ID]; ok {
-			contracts = append(contracts, c)
-		}
-	}
-	for _, c := range contracts {
-		editor, err := r.hostContractor.Editor(c.ID)
-		if err != nil {
-			continue
-		}
-		for _, root := range c.MerkleRoots {
-			editor.Delete(root)
-		}
-		delete(f.contracts, c.ID)
-	}
+	// TODO: delete the sectors of the file as well.
 
 	return nil
 }
