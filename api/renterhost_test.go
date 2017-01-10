@@ -689,3 +689,98 @@ func TestRenterCancelAllowance(t *testing.T) {
 		t.Fatal("expected insufficient hosts error, got", err)
 	}
 }
+
+// TestRenterUploadDelete tests that uploading and deleting parallel does not
+// result in failures or stalling.
+func TestRenterUploadDelete(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester("TestRenterUploadDelete")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and start accepting contracts.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "10"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Wait for file to be registered in renter.
+	var rf RenterFiles
+	for i := 0; i < 200 && len(rf.Files) != 1; i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 {
+		t.Fatal("file is not being registered:", rf.Files)
+	}
+
+	// In parallel, upload another file and delete the first file.
+	path2 := filepath.Join(st.dir, "test2.dat")
+	test2Size := modules.SectorSize*2 + 1
+	err = createRandFile(path2, int(test2Size))
+	if err != nil {
+		t.Fatal(err)
+	}
+	uploadValues = url.Values{}
+	uploadValues.Set("source", path2)
+	err = st.stdPostAPI("/renter/upload/test2", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.stdPostAPI("/renter/delete/test", url.Values{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only the second file should be present
+	st.getAPI("/renter/files", &rf)
+	if len(rf.Files) != 1 || rf.Files[0].SiaPath != "test2" {
+		t.Fatal("file was not deleted properly:", rf.Files)
+	}
+
+	// Wait for the second upload to complete.
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files)
+	}
+}
