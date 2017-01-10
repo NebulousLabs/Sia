@@ -161,11 +161,7 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	// node is in the tree, so the node must be removed before the settings and
 	// weight are changed.
 	existingEntry, exists := hdb.activeHosts[entry.NetAddress]
-	if exists {
-		hdb.hostTree.Remove(existingEntry.PublicKey)
-		delete(hdb.activeHosts, entry.NetAddress)
-	} else if len(hdb.activeHosts) > maxActiveHosts {
-		// We already have the maximum number of active hosts, do not add more.
+	if !exists && len(hdb.activeHosts) > maxActiveHosts {
 		return
 	}
 
@@ -174,10 +170,15 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	newSettings.NetAddress = entry.HostExternalSettings.NetAddress
 	entry.HostExternalSettings = newSettings
 	entry.Reliability = MaxReliability
+
+	if exists {
+		hdb.hostTree.Remove(existingEntry.PublicKey)
+		delete(hdb.activeHosts, entry.NetAddress)
+	}
 	err := hdb.hostTree.Insert(entry.HostDBEntry)
 	hdb.activeHosts[entry.NetAddress] = entry
 	if err != nil {
-		hdb.log.Debugln("error inserting entry into tree: ", err)
+		hdb.log.Println("errorinserting entry into tree: ", err)
 	}
 
 	// Sanity check - the node should be in the hostdb now.
