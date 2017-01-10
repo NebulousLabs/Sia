@@ -200,9 +200,10 @@ func (r *Renter) load() error {
 	// encountered during loading are logged, but are not considered fatal.
 	err := filepath.Walk(r.persistDir, func(path string, info os.FileInfo, err error) error {
 		// This error is non-nil if filepath.Walk couldn't stat a file or
-		// folder. This generally indicates a serious error.
+		// folder.
 		if err != nil {
-			return err
+			r.log.Println("WARN: could not stat file or folder during walk:", err)
+			return nil
 		}
 
 		// Skip folders and non-sia files.
