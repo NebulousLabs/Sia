@@ -13,6 +13,7 @@ var (
 	errAllowanceNoHosts    = errors.New("hosts must be non-zero")
 	errAllowanceZeroPeriod = errors.New("period must be non-zero")
 	errAllowanceWindowSize = errors.New("renew window must be less than period")
+	errAllowanceNotSynced  = errors.New("you must be synced to set an allowance")
 
 	// ErrAllowanceZeroWindow is returned when the caller requests a
 	// zero-length renewal window. This will happen if the caller sets the
@@ -65,6 +66,8 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return ErrAllowanceZeroWindow
 	} else if a.RenewWindow >= a.Period {
 		return errAllowanceWindowSize
+	} else if !c.cs.Synced() {
+		return errAllowanceNotSynced
 	}
 
 	// calculate the maximum sectors this allowance can store
