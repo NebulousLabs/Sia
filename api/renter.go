@@ -182,7 +182,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 			WriteError(w, Error{"unable to parse hosts: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
-		if hosts < requiredHosts {
+		if hosts != 0 && hosts < requiredHosts {
 			WriteError(w, Error{fmt.Sprintf("insufficient number of hosts, need at least %v but have %v", recommendedHosts, hosts)}, http.StatusBadRequest)
 			return
 		}
@@ -206,7 +206,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 			WriteError(w, Error{"unable to parse renewwindow: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
-		if renewWindow < requiredRenewWindow {
+		if renewWindow != 0 && renewWindow < requiredRenewWindow {
 			WriteError(w, Error{fmt.Sprintf("renew window is too small, must be at least %v blocks but have %v blocks", requiredRenewWindow, renewWindow)}, http.StatusBadRequest)
 			return
 		}

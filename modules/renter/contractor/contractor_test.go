@@ -202,12 +202,14 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// bad args
+	// cancel allowance
 	var a modules.Allowance
 	err = c.SetAllowance(a)
-	if err != errAllowanceNoHosts {
-		t.Errorf("expected %q, got %q", errAllowanceNoHosts, err)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	// bad args
 	a.Hosts = 1
 	err = c.SetAllowance(a)
 	if err != errAllowanceZeroPeriod {

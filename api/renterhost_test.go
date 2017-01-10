@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -605,5 +606,86 @@ func TestRenterUploadDownload(t *testing.T) {
 	diff := fm.UploadSpending.Add(fm.DownloadSpending).Add(fm.StorageSpending)
 	if !diff.Equals(newSpent.Sub(spent)) {
 		t.Fatal("all new spending should be reflected in metrics:", diff, newSpent.Sub(spent))
+	}
+}
+
+// TestRenterCancelAllowance tests that setting an empty allowance causes
+// uploads, downloads, and renewals to cease.
+func TestRenterCancelAllowance(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester("TestRenterCancelAllowance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and start accepting contracts.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "10"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload the file to the renter.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only one piece will be uploaded (10% at current redundancy).
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+	}
+
+	// Cancel the allowance
+	allowanceValues = url.Values{}
+	allowanceValues.Set("funds", "0")
+	allowanceValues.Set("hosts", "0")
+	allowanceValues.Set("period", "0")
+	allowanceValues.Set("renewwindow", "0")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Try downloading the file; should fail
+	downpath := filepath.Join(st.dir, "testdown.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+	if err == nil || !strings.Contains(err.Error(), "insufficient hosts") {
+		t.Fatal("expected insufficient hosts error, got", err)
 	}
 }

@@ -40,7 +40,11 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 // forming new ones. This preserves the data on those hosts. When this occurs,
 // the renewed contracts will atomically replace their previous versions. If
 // SetAllowance is interrupted, renewed contracts may be lost, though the
-// allocated funds will eventually be returned,
+// allocated funds will eventually be returned.
+//
+// If a is the empty allowance, SetAllowance will archive the current contract
+// set. The contracts cannot be used to create Editors or Downloads, and will
+// not be renewed.
 //
 // TODO: can an Editor or Downloader be used across renewals?
 // TODO: will hosts allow renewing the same contract twice?
@@ -48,6 +52,10 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 // NOTE: At this time, transaction fees are not counted towards the allowance.
 // This means the contractor may spend more than allowance.Funds.
 func (c *Contractor) SetAllowance(a modules.Allowance) error {
+	if a.Funds.IsZero() && a.Hosts == 0 && a.Period == 0 && a.RenewWindow == 0 {
+		return c.managedCancelAllowance(a)
+	}
+
 	// sanity checks
 	if a.Hosts == 0 {
 		return errAllowanceNoHosts
@@ -195,5 +203,51 @@ func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a m
 	err = c.saveSync()
 	c.mu.Unlock()
 
+	return err
+}
+
+// managedCancelAllowance handles the special case where the allowance is empty.
+func (c *Contractor) managedCancelAllowance(a modules.Allowance) error {
+	// first need to invalidate any active editors/downloaders
+	// NOTE: this code is the same as in managedRenewContracts
+	var ids []types.FileContractID
+	c.mu.Lock()
+	for id := range c.contracts {
+		ids = append(ids, id)
+		// we aren't renewing, but we don't want new editors or downloaders to
+		// be created
+		c.renewing[id] = true
+	}
+	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		for _, id := range ids {
+			delete(c.renewing, id)
+		}
+		c.mu.Unlock()
+	}()
+	for _, id := range ids {
+		c.mu.RLock()
+		e, eok := c.editors[id]
+		d, dok := c.downloaders[id]
+		c.mu.RUnlock()
+		if eok {
+			e.invalidate()
+		}
+		if dok {
+			d.invalidate()
+		}
+	}
+
+	// reset currentPeriod and archive all contracts
+	c.mu.Lock()
+	c.allowance = a
+	c.currentPeriod = 0
+	for id, contract := range c.contracts {
+		c.oldContracts[id] = contract
+	}
+	c.contracts = make(map[types.FileContractID]modules.RenterContract)
+	err := c.saveSync()
+	c.mu.Unlock()
 	return err
 }
