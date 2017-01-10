@@ -338,4 +338,16 @@ func TestRenterRenameFile(t *testing.T) {
 	if err != ErrPathOverload {
 		t.Error("Expecting ErrPathOverload, got", err)
 	}
+
+	// Renaming should also update the tracking set
+	rt.renter.tracking["1"] = trackedFile{"foo"}
+	err = rt.renter.RenameFile("1", "1b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, oldexists := rt.renter.tracking["1"]
+	_, newexists := rt.renter.tracking["1b"]
+	if oldexists || !newexists {
+		t.Error("renaming should have updated the entry in the tracking set")
+	}
 }
