@@ -728,21 +728,26 @@ func TestRenterUploadDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a file.
+	// Create two files.
 	path := filepath.Join(st.dir, "test.dat")
-	err = createRandFile(path, 1024)
+	err = createRandFile(path, 256e3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path2 := filepath.Join(st.dir, "test2.dat")
+	err = createRandFile(path2, 256e3)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Upload to host.
+	// Upload the first file to host.
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
 	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Wait for file to be registered in renter.
+	// Wait for the first file to be registered in the renter.
 	var rf RenterFiles
 	for i := 0; i < 200 && len(rf.Files) != 1; i++ {
 		st.getAPI("/renter/files", &rf)
@@ -752,13 +757,7 @@ func TestRenterUploadDelete(t *testing.T) {
 		t.Fatal("file is not being registered:", rf.Files)
 	}
 
-	// In parallel, upload another file and delete the first file.
-	path2 := filepath.Join(st.dir, "test2.dat")
-	test2Size := modules.SectorSize*2 + 1
-	err = createRandFile(path2, int(test2Size))
-	if err != nil {
-		t.Fatal(err)
-	}
+	// In parallel, start uploading the other file, and delete the first file.
 	uploadValues = url.Values{}
 	uploadValues.Set("source", path2)
 	err = st.stdPostAPI("/renter/upload/test2", uploadValues)

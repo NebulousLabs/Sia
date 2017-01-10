@@ -397,7 +397,15 @@ func (r *Renter) managedWaitOnRepairWork(rs *repairState) {
 	}
 
 	// Mark that the worker of this chunk has completed its work.
-	rs.incompleteChunks[finishedUpload.chunkID].activePieces--
+	if cs, ok := rs.incompleteChunks[finishedUpload.chunkID]; !ok {
+		// The file was deleted mid-upload. Add the worker back to the set of
+		// available workers.
+		rs.availableWorkers[finishedUpload.workerID] = rs.activeWorkers[finishedUpload.workerID]
+		delete(rs.activeWorkers, finishedUpload.workerID)
+		return
+	} else {
+		cs.activePieces--
+	}
 
 	// If there was no error, add the worker back to the set of
 	// available workers and wait for the next worker.
