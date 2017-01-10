@@ -113,7 +113,7 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 	}
 
-	hdb.hostTree = hosttree.New(hdb.calculateHostWeight())
+	hdb.hostTree = hosttree.New(hdb.calculateHostWeight)
 
 	// Load the prior persistence structures.
 	err := hdb.load()

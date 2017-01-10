@@ -21,7 +21,7 @@ func bareHostDB() *HostDB {
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 	}
-	hdb.hostTree = hosttree.New(hdb.calculateHostWeight())
+	hdb.hostTree = hosttree.New(hdb.calculateHostWeight)
 	return hdb
 }
 
