@@ -177,7 +177,7 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	err := hdb.hostTree.Insert(entry.HostDBEntry)
 	hdb.activeHosts[entry.NetAddress] = entry
 	if err != nil {
-		// TODO: handle this error
+		hdb.log.Debugln("error inserting entry into tree: ", err)
 	}
 
 	// Sanity check - the node should be in the hostdb now.
