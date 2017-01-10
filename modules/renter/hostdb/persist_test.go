@@ -31,10 +31,10 @@ func TestSaveLoad(t *testing.T) {
 		host2.NetAddress: &host2,
 		host3.NetAddress: &host3,
 	}
-	hdb.activeHosts = map[modules.NetAddress]*hostNode{
-		host1.NetAddress: {hostEntry: &host1},
-		host2.NetAddress: {hostEntry: &host2},
-		host3.NetAddress: {hostEntry: &host3},
+	hdb.activeHosts = map[modules.NetAddress]*hostEntry{
+		host1.NetAddress: &host1,
+		host2.NetAddress: &host2,
+		host3.NetAddress: &host3,
 	}
 	hdb.lastChange = modules.ConsensusChangeID{1, 2, 3}
 
@@ -120,10 +120,10 @@ func TestRescan(t *testing.T) {
 		host2.NetAddress: &host2,
 		host3.NetAddress: &host3,
 	}
-	hdb.activeHosts = map[modules.NetAddress]*hostNode{
-		host1.NetAddress: {hostEntry: &host1},
-		host2.NetAddress: {hostEntry: &host2},
-		host3.NetAddress: {hostEntry: &host3},
+	hdb.activeHosts = map[modules.NetAddress]*hostEntry{
+		host1.NetAddress: &host1,
+		host2.NetAddress: &host2,
+		host3.NetAddress: &host3,
 	}
 
 	// use a bogus change ID

@@ -17,8 +17,8 @@ func (hdb *HostDB) persistData() hdbPersist {
 	for _, entry := range hdb.allHosts {
 		data.AllHosts = append(data.AllHosts, *entry)
 	}
-	for _, node := range hdb.activeHosts {
-		data.ActiveHosts = append(data.ActiveHosts, *node.hostEntry)
+	for _, entry := range hdb.activeHosts {
+		data.ActiveHosts = append(data.ActiveHosts, *entry)
 	}
 	data.LastChange = hdb.lastChange
 	return data
@@ -45,7 +45,9 @@ func (hdb *HostDB) load() error {
 		hdb.allHosts[data.AllHosts[i].NetAddress] = &data.AllHosts[i]
 	}
 	for i := range data.ActiveHosts {
-		hdb.insertNode(hdb.allHosts[data.ActiveHosts[i].NetAddress])
+		host := data.AllHosts[i]
+		hdb.activeHosts[host.NetAddress] = &host
+		hdb.hostTree.Insert(host.HostDBEntry)
 	}
 	hdb.lastChange = data.LastChange
 	return nil

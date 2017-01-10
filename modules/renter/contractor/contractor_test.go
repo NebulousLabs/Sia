@@ -197,9 +197,29 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.SkipNow()
 	}
 	// create testing trio
-	h, c, m, err := newTestingTrio("TestIntegrationSetAllowance")
+	_, c, m, err := newTestingTrio("TestIntegrationSetAllowance")
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// this test requires two hosts: create another one
+	h, err := newTestingHost(build.TempDir("hostdata", ""), c.cs.(modules.ConsensusSet), c.tpool.(modules.TransactionPool))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// announce the extra host
+	err = h.Announce()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mine a block, processing the announcement
+	m.AddBlock()
+
+	// wait for hostdb to scan host
+	for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
+		time.Sleep(time.Millisecond * 50)
 	}
 
 	// cancel allowance
@@ -246,18 +266,7 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal("expected 1 contract, got", len(c.contracts))
 	}
 
-	// reannounce host on different IP (easier than creating a new host)
-	addr := modules.NetAddress("127.0.0.1:" + c.Contracts()[0].NetAddress.Port())
-	err = h.AnnounceAddress(addr)
-	if err != nil {
-		t.Fatal(err)
-	}
 	m.AddBlock()
-
-	// wait for hostdb to scan host
-	for i := 0; i < 500 && len(c.hdb.RandomHosts(2, nil)) != 2; i++ {
-		time.Sleep(time.Millisecond)
-	}
 
 	// set allowance with Hosts = 2; should only form one new contract
 	a.Hosts = 2
@@ -275,6 +284,7 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(c.contracts) != 2 {
 		t.Fatal("expected 2 contracts, got", len(c.contracts))
 	}
@@ -282,12 +292,11 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	// delete one of the contracts and set allowance with Funds*2; should
 	// trigger 1 renewal and 1 new contract
 	c.mu.Lock()
-	for id, contract := range c.contracts {
-		if contract.NetAddress == addr {
-			delete(c.contracts, id)
-			break
-		}
+	for id := range c.contracts {
+		delete(c.contracts, id)
+		break
 	}
+
 	c.mu.Unlock()
 	a.Funds = a.Funds.Mul64(2)
 	err = c.SetAllowance(a)

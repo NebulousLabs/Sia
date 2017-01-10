@@ -11,7 +11,6 @@ import (
 type hostEntry struct {
 	modules.HostDBEntry
 
-	FirstSeen   types.BlockHeight
 	Weight      types.Currency
 	Reliability types.Currency
 }
@@ -33,9 +32,10 @@ func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 		return
 	}
 
+	host.FirstSeen = hdb.blockHeight
+
 	// Create hostEntry and add to allHosts.
 	h := &hostEntry{
-		FirstSeen:   hdb.blockHeight,
 		HostDBEntry: host,
 		Reliability: DefaultReliability,
 	}
@@ -49,9 +49,9 @@ func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 // Remove deletes an entry from the hostdb.
 func (hdb *HostDB) removeHost(addr modules.NetAddress) error {
 	// See if the node is in the set of active hosts.
-	node, exists := hdb.activeHosts[addr]
+	entry, exists := hdb.activeHosts[addr]
 	if exists {
-		node.removeNode()
+		hdb.hostTree.Remove(entry.HostDBEntry.PublicKey)
 		delete(hdb.activeHosts, addr)
 	}
 
@@ -81,7 +81,10 @@ func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostDBEntry) {
 	hdb.mu.RUnlock()
 
 	// Get the hosts using RandomHosts so that they are in sorted order.
-	sortedHosts := hdb.RandomHosts(numHosts, nil)
+	sortedHosts, err := hdb.hostTree.SelectRandom(numHosts, nil)
+	if err != nil {
+		hdb.log.Severe("error selecting random hosts in ActiveHosts() call: ", err)
+	}
 	return sortedHosts
 }
 
@@ -102,7 +105,10 @@ func (hdb *HostDB) AverageContractPrice() types.Currency {
 	// maybe a more sophisticated way of doing this
 	var totalPrice types.Currency
 	sampleSize := 18
-	hosts := hdb.RandomHosts(sampleSize, nil)
+	hosts, err := hdb.hostTree.SelectRandom(sampleSize, nil)
+	if err != nil {
+		hdb.log.Severe("error selecting random hosts in AverageContractPrice() call: ", err)
+	}
 	if len(hosts) == 0 {
 		return totalPrice
 	}

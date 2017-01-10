@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -31,7 +32,7 @@ var (
 
 // calculateHostWeight returns the weight of a host according to the settings of
 // the host database entry. Currently, only the price is considered.
-func calculateHostWeight(currentHeight types.BlockHeight, entry hostEntry) (weight types.Currency) {
+func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency {
 	// Prices tiered as follows:
 	//    - the storage price is presented as 'per block per byte'
 	//    - the contract price is presented as a flat rate
@@ -56,7 +57,7 @@ func calculateHostWeight(currentHeight types.BlockHeight, entry hostEntry) (weig
 	// raised to the fifth power. This means that a host which has half the
 	// total price will be 32x as likely to be selected. A host with a quarter
 	// the total price will be 1024x as likely to be selected, and so on.
-	weight = baseWeight
+	weight := baseWeight
 	if !totalPrice.IsZero() {
 		// To avoid a divide-by-zero error, this operation is only performed on
 		// non-zero prices.
@@ -83,7 +84,7 @@ func calculateHostWeight(currentHeight types.BlockHeight, entry hostEntry) (weig
 		weight = weight.Div64(10) // 5,700x total penalty
 	}
 	if entry.RemainingStorage < requiredStorage {
-		weight = weight.Div64(100) // 570,000 total penalty
+		weight = weight.Div64(100) // 570,000x total penalty
 	}
 
 	// Enact penalities for hosts running older versions.
@@ -96,8 +97,8 @@ func calculateHostWeight(currentHeight types.BlockHeight, entry hostEntry) (weig
 
 	// Enact penalities for newer hosts, as it's less certain that they will
 	// have reliable uptime.
-	if currentHeight >= entry.FirstSeen {
-		age := currentHeight - entry.FirstSeen
+	if hdb.blockHeight >= entry.FirstSeen {
+		age := hdb.blockHeight - entry.FirstSeen
 		if age < 6000 {
 			weight = weight.Div64(2) // 2x total
 		}

@@ -31,7 +31,7 @@ func TestDecrementReliability(t *testing.T) {
 	h.NetAddress = "foo"
 	h.Reliability = types.NewCurrency64(1)
 	hdb.allHosts[h.NetAddress] = h
-	hdb.activeHosts[h.NetAddress] = &hostNode{hostEntry: h}
+	hdb.activeHosts[h.NetAddress] = h
 	hdb.decrementReliability(h.NetAddress, types.NewCurrency64(0))
 	if len(hdb.ActiveHosts()) != 0 {
 		t.Error("decrementing did not remove host from activeHosts")
@@ -213,16 +213,6 @@ func TestThreadedProbeHostsCorruption(t *testing.T) {
 	if len(hdb.ActiveHosts()) != 1 {
 		t.Error("host was not added")
 	}
-
-	// Check that the host tree has not been corrupted.
-	err = repeatCheck(hdb.hostTree)
-	if err != nil {
-		t.Error(err)
-	}
-	err = uniformTreeVerification(hdb, 1)
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 // TestThreadedScan tests the threadedScan method.
@@ -242,7 +232,7 @@ func TestThreadedScan(t *testing.T) {
 	h := new(hostEntry)
 	h.NetAddress = "foo"
 	h.Reliability = types.NewCurrency64(1)
-	hdb.activeHosts[h.NetAddress] = &hostNode{hostEntry: h}
+	hdb.activeHosts[h.NetAddress] = h
 
 	// perform one scan
 	go hdb.threadedScan()
