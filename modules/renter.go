@@ -4,6 +4,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -135,6 +136,10 @@ func (rc *RenterContract) EndHeight() types.BlockHeight {
 // RenterFunds returns the funds remaining in the contract's Renter payout as
 // of the most recent revision.
 func (rc *RenterContract) RenterFunds() types.Currency {
+	if len(rc.LastRevision.NewValidProofOutputs) < 2 {
+		build.Critical("malformed RenterContract:", rc)
+		return types.ZeroCurrency
+	}
 	return rc.LastRevision.NewValidProofOutputs[0].Value
 }
 
