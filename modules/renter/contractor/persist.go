@@ -80,7 +80,7 @@ func (c *Contractor) load() error {
 	}
 	c.lastChange = data.LastChange
 	for _, contract := range data.OldContracts {
-		c.contracts[contract.ID] = contract
+		c.oldContracts[contract.ID] = contract
 	}
 	for oldString, newString := range data.RenewedIDs {
 		var oldHash, newHash crypto.Hash
