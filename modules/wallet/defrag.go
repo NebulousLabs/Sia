@@ -41,7 +41,7 @@ func (w *Wallet) defragWallet() {
 		totalOutputValue = totalOutputValue.Add(output.Value)
 	}
 
-	w.log.Printf("defragmenting wallet: %v outputs, %v total value\n", len(defragOutputs), totalOutputValue)
+	w.log.Printf("performing wallet defragmentation transaction: %v outputs, %v total value\n", len(defragOutputs), totalOutputValue)
 
 	// grab a new address from the wallet
 	addr, err := w.nextPrimarySeedAddress()
@@ -55,7 +55,8 @@ func (w *Wallet) defragWallet() {
 	go func() {
 		txns, err := w.SendSiacoins(totalOutputValue, addr.UnlockHash())
 		if err != nil {
-			w.log.Println("error after call to SendSiacoins: ", err)
+			w.log.Printf("error sending defrag transaction with value %v: %v\n ", totalOutputValue, err)
+			return
 		}
 
 		w.log.Println("defrag transaction size: ", len(encoding.Marshal(txns)))
