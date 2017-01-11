@@ -3,16 +3,17 @@ package wallet
 import (
 	"sort"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
 	// defragThreshold is the number of outputs a wallet is allowed before it is
 	// defragmented.
-	defragThreshold = 20
+	defragThreshold = 50
 
 	// defragBatchSize defines how many outputs are combined during one defrag.
-	defragBatchSize = 15
+	defragBatchSize = 40
 )
 
 // defragWallet computes the sum of the 15 largest outputs in the wallet and
@@ -52,9 +53,11 @@ func (w *Wallet) defragWallet() {
 	// send the sum of the outputs to this wallet. This operation is done in a
 	// goroutine since defragWallet() is called under lock.
 	go func() {
-		_, err := w.SendSiacoins(totalOutputValue, addr.UnlockHash())
+		txns, err := w.SendSiacoins(totalOutputValue, addr.UnlockHash())
 		if err != nil {
 			w.log.Println("error after call to SendSiacoins: ", err)
 		}
+
+		w.log.Println("defrag transaction size: ", len(encoding.Marshal(txns)))
 	}()
 }
