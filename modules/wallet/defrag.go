@@ -33,7 +33,6 @@ func (w *Wallet) defragWallet() {
 	for _, output := range defragOutputs {
 		totalOutputValue = totalOutputValue.Add(output.Value)
 	}
-	totalOutputValue = totalOutputValue.Div64(uint64(len(defragOutputs)))
 
 	w.log.Printf("defragmenting wallet: %v outputs, %v total value\n", len(defragOutputs), totalOutputValue)
 
