@@ -266,10 +266,11 @@ func UnrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
 func WriteError(w http.ResponseWriter, err Error, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
-	if encodeErr := json.NewEncoder(w).Encode(err); encodeErr != nil {
+	encodingErr := json.NewEncoder(w).Encode(err)
+	if _, isJsonErr := encodingErr.(*json.SyntaxError); isJsonErr {
 		// Marshalling should only fail in the event of a developer error.
 		// Specifically, only non-marshallable types should cause an error here.
-		build.Critical("failed to encode API error response:", encodeErr)
+		build.Critical("failed to encode API error response:", encodingErr)
 	}
 }
 
@@ -278,7 +279,8 @@ func WriteError(w http.ResponseWriter, err Error, code int) {
 // accordingly.
 func WriteJSON(w http.ResponseWriter, obj interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if err := json.NewEncoder(w).Encode(obj); err != nil {
+	err := json.NewEncoder(w).Encode(obj)
+	if _, isJsonErr := err.(*json.SyntaxError); isJsonErr {
 		// Marshalling should only fail in the event of a developer error.
 		// Specifically, only non-marshallable types should cause an error here.
 		build.Critical("failed to encode API response:", err)
