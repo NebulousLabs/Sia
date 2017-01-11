@@ -19,8 +19,8 @@ const (
 // defragWallet computes the sum of the 15 largest outputs in the wallet and
 // sends that sum to itself, effectively defragmenting the wallet. This defrag
 // operation is only performed if the wallet has greater than defragThreshold
-// outputs.
-func (w *Wallet) defragWallet() {
+// outputs. Returns true if a defrag was performed.
+func (w *Wallet) defragWallet() bool {
 	// accumulate a map of non-dust outputs
 	nonDustOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	for id, output := range w.siacoinOutputs {
@@ -31,7 +31,7 @@ func (w *Wallet) defragWallet() {
 
 	// only defrag if there are >defragThreshold non-dust outputs
 	if len(nonDustOutputs) < defragThreshold {
-		return
+		return false
 	}
 
 	// sort the outputs from largest -> smallest
@@ -53,7 +53,7 @@ func (w *Wallet) defragWallet() {
 	addr, err := w.nextPrimarySeedAddress()
 	if err != nil {
 		w.log.Println("Error getting an address for defragmentation: ", err)
-		return
+		return false
 	}
 
 	// send the sum of the outputs to this wallet. This operation is done in a
@@ -67,4 +67,6 @@ func (w *Wallet) defragWallet() {
 
 		w.log.Printf("Successfully defragmented wallet. %v outputs used, %vH coins defragmented. Defragment transaction size: %vB.\n", len(defragOutputs), totalOutputValue, len(encoding.Marshal(txns)))
 	}()
+
+	return true
 }
