@@ -21,14 +21,22 @@ const (
 // operation is only performed if the wallet has greater than defragThreshold
 // outputs.
 func (w *Wallet) defragWallet() {
-	if len(w.siacoinOutputs) < defragThreshold {
+	// accumulate a map of non-dust outputs
+	nonDustOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	for id, output := range w.siacoinOutputs {
+		if output.Value.Cmp(types.SiacoinPrecision) > 0 {
+			nonDustOutputs[id] = output
+		}
+	}
+
+	// only defrag if there are >defragThreshold non-dust outputs
+	if len(nonDustOutputs) < defragThreshold {
 		return
 	}
 
-	// grab all the outputs from the wallet and sort them from
-	// largest -> smallest
+	// sort the outputs from largest -> smallest
 	var so sortedOutputs
-	for scoid, sco := range w.siacoinOutputs {
+	for scoid, sco := range nonDustOutputs {
 		so.ids = append(so.ids, scoid)
 		so.outputs = append(so.outputs, sco)
 	}
