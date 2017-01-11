@@ -20,11 +20,8 @@ func (m memPersist) load(data *contractorPersist) error     { *data = contractor
 func TestSaveLoad(t *testing.T) {
 	// create contractor with mocked persist dependency
 	c := &Contractor{
-		contracts:       make(map[types.FileContractID]modules.RenterContract),
-		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
-		cachedRevisions: make(map[types.FileContractID]cachedRevision),
+		persist: new(memPersist),
 	}
-	c.persist = new(memPersist)
 
 	// add some fake contracts
 	c.contracts = map[types.FileContractID]modules.RenterContract{
@@ -42,6 +39,11 @@ func TestSaveLoad(t *testing.T) {
 		{1}: {Revision: types.FileContractRevision{ParentID: types.FileContractID{1}}},
 		{2}: {Revision: types.FileContractRevision{ParentID: types.FileContractID{2}}},
 	}
+	c.oldContracts = map[types.FileContractID]modules.RenterContract{
+		{0}: {ID: types.FileContractID{0}, NetAddress: "foo"},
+		{1}: {ID: types.FileContractID{1}, NetAddress: "bar"},
+		{2}: {ID: types.FileContractID{2}, NetAddress: "baz"},
+	}
 
 	// save, clear, and reload
 	err := c.save()
@@ -51,6 +53,7 @@ func TestSaveLoad(t *testing.T) {
 	c.contracts = make(map[types.FileContractID]modules.RenterContract)
 	c.renewedIDs = make(map[types.FileContractID]types.FileContractID)
 	c.cachedRevisions = make(map[types.FileContractID]cachedRevision)
+	c.oldContracts = make(map[types.FileContractID]modules.RenterContract)
 	err = c.load()
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +77,12 @@ func TestSaveLoad(t *testing.T) {
 	if !ok0 || !ok1 || !ok2 {
 		t.Fatal("cached revisions were not restored properly:", c.cachedRevisions)
 	}
+	_, ok0 = c.oldContracts[types.FileContractID{0}]
+	_, ok1 = c.oldContracts[types.FileContractID{1}]
+	_, ok2 = c.oldContracts[types.FileContractID{2}]
+	if !ok0 || !ok1 || !ok2 {
+		t.Fatal("oldContracts were not restored properly:", c.oldContracts)
+	}
 
 	// use stdPersist instead of mock
 	c.persist = newPersist(build.TempDir("contractor", "TestSaveLoad"))
@@ -87,6 +96,7 @@ func TestSaveLoad(t *testing.T) {
 	c.contracts = make(map[types.FileContractID]modules.RenterContract)
 	c.renewedIDs = make(map[types.FileContractID]types.FileContractID)
 	c.cachedRevisions = make(map[types.FileContractID]cachedRevision)
+	c.oldContracts = make(map[types.FileContractID]modules.RenterContract)
 	err = c.load()
 	if err != nil {
 		t.Fatal(err)
@@ -109,5 +119,11 @@ func TestSaveLoad(t *testing.T) {
 	_, ok2 = c.cachedRevisions[types.FileContractID{2}]
 	if !ok0 || !ok1 || !ok2 {
 		t.Fatal("cached revisions were not restored properly:", c.cachedRevisions)
+	}
+	_, ok0 = c.oldContracts[types.FileContractID{0}]
+	_, ok1 = c.oldContracts[types.FileContractID{1}]
+	_, ok2 = c.oldContracts[types.FileContractID{2}]
+	if !ok0 || !ok1 || !ok2 {
+		t.Fatal("oldContracts were not restored properly:", c.oldContracts)
 	}
 }
