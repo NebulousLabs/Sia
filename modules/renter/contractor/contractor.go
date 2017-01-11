@@ -102,10 +102,8 @@ func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
 	}
 	// COMPATv1.0.4-lts
 	// also return the special metrics contract (see persist.go)
-	for _, contract := range c.oldContracts {
-		if contract.ID == metricsContractID {
-			cs = append(cs, contract)
-		}
+	if contract, ok := c.oldContracts[metricsContractID]; ok {
+		cs = append(cs, contract)
 	}
 	return
 }
