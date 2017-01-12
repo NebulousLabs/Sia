@@ -7,6 +7,8 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestDefragWallet mines many blocks and checks that the wallet's outputs are
+// consolidated once more than defragThreshold blocks are mined.
 func TestDefragWallet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -46,6 +48,8 @@ func TestDefragWallet(t *testing.T) {
 	}
 }
 
+// TestDefragWalletDust verifies that dust outputs do not trigger the defrag
+// operation.
 func TestDefragWalletDust(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -95,10 +99,6 @@ func TestDefragWalletDust(t *testing.T) {
 	}
 
 	time.Sleep(time.Second)
-
-	if defragged := wt.wallet.defragWallet(); defragged {
-		t.Fatal("defrag consolidated dust outputs")
-	}
 
 	if len(wt.wallet.siacoinOutputs) < defragThreshold {
 		t.Fatal("defrag consolidated dust outputs")
