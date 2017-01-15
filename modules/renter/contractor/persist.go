@@ -23,7 +23,7 @@ type contractorPersist struct {
 		DownloadSpending types.Currency `json:"downloadspending"`
 		StorageSpending  types.Currency `json:"storagespending"`
 		UploadSpending   types.Currency `json:"uploadspending"`
-	}
+	} `json:",omitempty"`
 }
 
 // persistData returns the data in the Contractor that will be saved to disk.
@@ -99,6 +99,17 @@ func (c *Contractor) load() error {
 			DownloadSpending: fm.DownloadSpending,
 			StorageSpending:  fm.StorageSpending,
 			UploadSpending:   fm.UploadSpending,
+			// Give the contract a fake startheight so that it will included
+			// with the other contracts in the current period. Note that in
+			// update.go, the special contract is specifically deleted when a
+			// new period begins.
+			StartHeight: c.currentPeriod + 1,
+			// We also need to add a ValidProofOutput so that the RenterFunds
+			// method will not panic. The value should be 0, i.e. "all funds
+			// were spent."
+			LastRevision: types.FileContractRevision{
+				NewValidProofOutputs: make([]types.SiacoinOutput, 2),
+			},
 		}
 	}
 
