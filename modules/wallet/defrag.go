@@ -3,7 +3,7 @@ package wallet
 import (
 	"sort"
 
-	"github.com/NebulousLabs/Sia/encoding"
+	//"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -14,6 +14,10 @@ const (
 
 	// defragBatchSize defines how many outputs are combined during one defrag.
 	defragBatchSize = 40
+
+	// defragStartIndex is the number of outputs to skip over when performing a
+	// defrag.
+	defragStartIndex = 10
 )
 
 // defragWallet computes the sum of the 15 largest outputs in the wallet and
@@ -47,8 +51,9 @@ func (w *Wallet) defragWallet() {
 	}
 	sort.Sort(sort.Reverse(so))
 
-	// choose the defragBatchSizeth largest outputs from the wallet and sum them
-	defragOutputs := so.outputs[:defragBatchSize]
+	// choose the defragBatchSizeth largest outputs, ignoring the first
+	// defragStartIndex largest outputs, from the wallet and sum them
+	defragOutputs := so.outputs[defragStartIndex : defragStartIndex+defragBatchSize]
 	var totalOutputValue types.Currency
 	for _, output := range defragOutputs {
 		totalOutputValue = totalOutputValue.Add(output.Value)
@@ -64,12 +69,46 @@ func (w *Wallet) defragWallet() {
 	// send the sum of the outputs to this wallet. This operation is done in a
 	// goroutine since defragWallet() is called under lock.
 	go func() {
-		txns, err := w.SendSiacoins(totalOutputValue, addr.UnlockHash())
+		tbuilder := w.StartTransaction()
+		fee := types.SiacoinPrecision.Mul64(10)
+
+		err := tbuilder.FundSiacoins(fee)
 		if err != nil {
-			w.log.Printf("Attempted to defragment wallet but failed. %v outputs used, %vH total coins. Error: %v.\n ", len(defragOutputs), totalOutputValue, err)
+			w.log.Println("Error funding fee in defrag transaction: ", err)
 			return
 		}
 
-		w.log.Printf("Successfully defragmented wallet. %v outputs used, %vH coins defragmented. Defragment transaction size: %vB.\n", len(defragOutputs), totalOutputValue, len(encoding.Marshal(txns)))
+		tbuilder.AddMinerFee(fee)
+
+		// here we leverage an implementation detail of the transaction builder.
+		// Calling FundSiacoins with the exact value of an existing output will
+		// choose that output for use in the transaction. So, here we call
+		// FundSiacoins with the value of each output we're consolidating.
+		for _, output := range defragOutputs {
+			err := tbuilder.FundSiacoins(output.Value)
+			if err != nil {
+				w.log.Println("Error funding output in defrag transaction: ", err)
+				return
+			}
+		}
+
+		// consolidate the outputs into one output.
+		tbuilder.AddSiacoinOutput(types.SiacoinOutput{
+			Value:      totalOutputValue,
+			UnlockHash: addr.UnlockHash(),
+		})
+
+		// sign the transaction set
+		txns, err := tbuilder.Sign(true)
+		if err != nil {
+			w.log.Println("Error signing transaction set in defrag transaction: ", err)
+			return
+		}
+
+		// accept the transaction set
+		err = w.tpool.AcceptTransactionSet(txns)
+		if err != nil {
+			w.log.Println("Error accepting transaction set in defrag transaction: ", err)
+		}
 	}()
 }
