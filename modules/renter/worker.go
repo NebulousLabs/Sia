@@ -80,7 +80,8 @@ type (
 
 		// recentUploadFailure documents the most recent time that an upload
 		// has failed.
-		recentUploadFailure time.Time // Only modified by primary repair loop.
+		consecutiveUploadFailures time.Duration
+		recentUploadFailure       time.Time // Only modified by primary repair loop.
 
 		// recentDownloadFailure documents the most recent time that a download
 		// has failed.
@@ -115,6 +116,7 @@ func (w *worker) upload(uw uploadWork) {
 	e, err := w.renter.hostContractor.Editor(w.contractID)
 	if err != nil {
 		w.recentUploadFailure = time.Now()
+		w.consecutiveUploadFailures++
 		select {
 		case uw.resultChan <- finishedUpload{uw.chunkID, crypto.Hash{}, err, uw.pieceIndex, w.contractID}:
 		case <-w.renter.tg.StopChan():
@@ -126,12 +128,16 @@ func (w *worker) upload(uw uploadWork) {
 	root, err := e.Upload(uw.data)
 	if err != nil {
 		w.recentUploadFailure = time.Now()
+		w.consecutiveUploadFailures++
 		select {
 		case uw.resultChan <- finishedUpload{uw.chunkID, root, err, uw.pieceIndex, w.contractID}:
 		case <-w.renter.tg.StopChan():
 		}
 		return
 	}
+
+	// Success - reset the consecutive upload failures count.
+	w.consecutiveUploadFailures = 0
 
 	// Update the renter metadata.
 	id := w.renter.mu.Lock()

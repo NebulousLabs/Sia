@@ -16,7 +16,8 @@ import (
 )
 
 // TODO: Move to a consts file.
-const uploadFailureCooldown = time.Hour
+const uploadFailureCooldown = time.Second * 61 // Prime to avoid intersecting with regular events.
+const maxConsecutivePenalty = 10               // Limit the number of doublings to prevent overflows.
 const minPiecesRepair = 5
 
 var (
@@ -192,8 +193,14 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 			continue
 		}
 
-		// Ignore workers that have had an upload failure recently.
-		if time.Since(worker.recentUploadFailure) < uploadFailureCooldown {
+		// Ignore workers that have had an upload failure recently. The cooldown
+		// time scales exponentially as the number of consecutive failures grow,
+		// stopping at 10 doublings, or about 17 hours total cooldown.
+		penalty := uint64(worker.consecutiveUploadFailures)
+		if worker.consecutiveUploadFailures > maxConsecutivePenalty {
+			penalty = uint64(maxConsecutivePenalty)
+		}
+		if time.Since(worker.recentUploadFailure) < uploadFailureCooldown*(1<<penalty) {
 			continue
 		}
 
