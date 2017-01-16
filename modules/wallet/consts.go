@@ -4,9 +4,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-var (
-	// DustValue is the value below which a types.Currency is considered Dust.
-	dustValue = func() types.Currency {
-		return types.SiacoinPrecision
-	}()
-)
+// dustValue is the quantity below which a Currency is considered to be Dust.
+func dustValue() types.Currency {
+	return types.SiacoinPrecision
+}
