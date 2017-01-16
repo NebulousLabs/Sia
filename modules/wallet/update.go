@@ -222,7 +222,7 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	w.revertHistory(cc)
 	w.applyHistory(cc)
 
-	if cc.Synced && w.unlocked {
+	if cc.Synced {
 		w.defragWallet()
 	}
 }

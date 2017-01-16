@@ -21,10 +21,15 @@ const (
 // operation is only performed if the wallet has greater than defragThreshold
 // outputs.
 func (w *Wallet) defragWallet() {
+	// only defrag if the wallet is unlocked
+	if !w.unlocked {
+		return
+	}
+
 	// accumulate a map of non-dust outputs
 	nonDustOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	for id, output := range w.siacoinOutputs {
-		if output.Value.Cmp(types.SiacoinPrecision) > 0 {
+		if output.Value.Cmp(dustValue) > 0 {
 			nonDustOutputs[id] = output
 		}
 	}
