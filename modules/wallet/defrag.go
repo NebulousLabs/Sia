@@ -13,7 +13,7 @@ const (
 	defragThreshold = 50
 
 	// defragBatchSize defines how many outputs are combined during one defrag.
-	defragBatchSize = 40
+	defragBatchSize = 35
 
 	// defragStartIndex is the number of outputs to skip over when performing a
 	// defrag.

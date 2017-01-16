@@ -104,3 +104,44 @@ func TestDefragWalletDust(t *testing.T) {
 		t.Fatal("defrag consolidated dust outputs")
 	}
 }
+
+// TestDefragOutputExhaustion verifies that a malicious actor cannot use the
+// defragger to prevent a wallet from sending coins.
+func TestDefragOutputExhaustion(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	wt, err := createWalletTester("TestDefragOutputExhaustion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// mine a bunch of blocks continuously at a high enough rate to keep the
+	// defragger running.
+	closechan := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-closechan:
+				return
+			case <-time.After(time.Millisecond * 500):
+				_, err := wt.miner.AddBlock()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}()
+
+	time.Sleep(time.Second * 5)
+
+	sendAmount := types.SiacoinPrecision.Mul64(2000)
+	_, err = wt.wallet.SendSiacoins(sendAmount, types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	close(closechan)
+}
