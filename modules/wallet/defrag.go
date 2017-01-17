@@ -29,12 +29,13 @@ func (w *Wallet) defragWallet() {
 		return
 	}
 
-	// accumulate a map of non-dust outputs
+	// accumulate a map of valid non-dust outputs
 	nonDustOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	for id, output := range w.siacoinOutputs {
-		if output.Value.Cmp(dustValue()) > 0 {
-			nonDustOutputs[id] = output
+		if err := w.checkOutput(id, output); err != nil {
+			continue
 		}
+		nonDustOutputs[id] = output
 	}
 
 	// only defrag if there are >defragThreshold non-dust outputs

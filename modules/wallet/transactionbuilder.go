@@ -23,6 +23,9 @@ var (
 
 	// errOutputTimelock indicates an output's timelock is still active.
 	errOutputTimelock = errors.New("wallet consensus set height is lower than the output timelock")
+
+	// errDustOutput indicates an output is not spendable because it is dust.
+	errDustOutput = errors.New("output is too small")
 )
 
 // transactionBuilder allows transactions to be manually constructed, including
@@ -90,19 +93,23 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 }
 
 // checkOutput is a helper function used to determine if an output is usable.
-func (tb *transactionBuilder) checkOutput(id types.SiacoinOutputID, output types.SiacoinOutput) error {
+func (w *Wallet) checkOutput(id types.SiacoinOutputID, output types.SiacoinOutput) error {
+	// Check that an output is not dust
+	if output.Value.Cmp(dustValue()) < 0 {
+		return errDustOutput
+	}
 	// Check that this output has not recently been spent by the wallet.
-	spendHeight := tb.wallet.spentOutputs[types.OutputID(id)]
+	spendHeight := w.spentOutputs[types.OutputID(id)]
 	// Prevent an underflow error.
-	allowedHeight := tb.wallet.consensusSetHeight - RespendTimeout
-	if tb.wallet.consensusSetHeight < RespendTimeout {
+	allowedHeight := w.consensusSetHeight - RespendTimeout
+	if w.consensusSetHeight < RespendTimeout {
 		allowedHeight = 0
 	}
 	if spendHeight > allowedHeight {
 		return errSpendHeightTooHigh
 	}
-	outputUnlockConditions := tb.wallet.keys[output.UnlockHash].UnlockConditions
-	if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
+	outputUnlockConditions := w.keys[output.UnlockHash].UnlockConditions
+	if w.consensusSetHeight < outputUnlockConditions.Timelock {
 		return errOutputTimelock
 	}
 
@@ -153,7 +160,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		sco := so.outputs[i]
 
 		// Check that this output has not recently been spent by the wallet.
-		if err := tb.checkOutput(scoid, sco); err != nil {
+		if err := tb.wallet.checkOutput(scoid, sco); err != nil {
 			if err == errSpendHeightTooHigh {
 				potentialFund = potentialFund.Add(sco.Value)
 			}
@@ -165,7 +172,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		if i != len(so.outputs)-1 {
 			nextOutput := so.outputs[i+1]
 			nextOutputID := so.ids[i+1]
-			if err := tb.checkOutput(nextOutputID, nextOutput); err == nil && nextOutput.Value.Cmp(amount) > 0 {
+			if err := tb.wallet.checkOutput(nextOutputID, nextOutput); err == nil && nextOutput.Value.Cmp(amount) > 0 {
 				continue
 			}
 		}

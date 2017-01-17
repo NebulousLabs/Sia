@@ -125,7 +125,6 @@ func TestDefragOutputExhaustion(t *testing.T) {
 	}
 
 	wt.miner.AddBlock()
-	time.Sleep(time.Second)
 
 	// concurrently make a bunch of transactions with lots of outputs to keep the
 	// defragger running
@@ -140,17 +139,20 @@ func TestDefragOutputExhaustion(t *testing.T) {
 			case <-time.After(time.Millisecond * 200):
 				wt.miner.AddBlock()
 				txnValue := types.SiacoinPrecision.Mul64(1000)
-				noutputs := defragThreshold + 1
+				fee := types.SiacoinPrecision.Mul64(10)
+				numOutputs := defragThreshold + 1
 
 				tbuilder := wt.wallet.StartTransaction()
-				tbuilder.FundSiacoins(txnValue.Mul64(uint64(noutputs)))
+				tbuilder.FundSiacoins(txnValue.Mul64(uint64(numOutputs)).Add(fee))
 
-				for i := 0; i < noutputs; i++ {
+				for i := 0; i < numOutputs; i++ {
 					tbuilder.AddSiacoinOutput(types.SiacoinOutput{
 						Value:      txnValue,
 						UnlockHash: dest,
 					})
 				}
+
+				tbuilder.AddMinerFee(fee)
 
 				txns, _ := tbuilder.Sign(true)
 				wt.tpool.AcceptTransactionSet(txns)
@@ -159,7 +161,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 3)
 
 	// ensure we can still send transactions while receiving aggressively
 	// fragmented outputs
@@ -167,6 +169,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 		sendAmount := types.SiacoinPrecision.Mul64(2000)
 		_, err = wt.wallet.SendSiacoins(sendAmount, types.UnlockHash{})
 		if err != nil {
+			t.Log(i)
 			t.Error(err)
 		}
 		time.Sleep(time.Millisecond * 500)
