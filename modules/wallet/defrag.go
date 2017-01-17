@@ -68,6 +68,9 @@ func (w *Wallet) defragWallet() {
 	// send the sum of the outputs to this wallet. This operation is done in a
 	// goroutine since defragWallet() is called under lock.
 	go func() {
+		w.tg.Add()
+		defer w.tg.Done()
+
 		tbuilder := w.StartTransaction()
 		fee := types.SiacoinPrecision.Mul64(10)
 
