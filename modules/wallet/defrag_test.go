@@ -118,11 +118,13 @@ func TestDefragOutputExhaustion(t *testing.T) {
 	}
 	defer wt.closeWt()
 
+	wt.wallet.mu.Lock()
 	var dest types.UnlockHash
 	for k := range wt.wallet.keys {
 		dest = k
 		break
 	}
+	wt.wallet.mu.Unlock()
 
 	wt.miner.AddBlock()
 
