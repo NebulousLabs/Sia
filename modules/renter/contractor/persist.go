@@ -62,9 +62,6 @@ func (c *Contractor) load() error {
 	for _, rev := range data.CachedRevisions {
 		c.cachedRevisions[rev.Revision.ParentID] = rev
 	}
-	for _, contract := range data.Contracts {
-		c.contracts[contract.ID] = contract
-	}
 	c.currentPeriod = data.CurrentPeriod
 	if c.currentPeriod == 0 {
 		// COMPATv1.0.4-lts
@@ -77,6 +74,16 @@ func (c *Contractor) load() error {
 			}
 		}
 		c.currentPeriod = highestEnd - c.allowance.Period
+	}
+	for _, contract := range data.Contracts {
+		// COMPATv1.0.4-lts
+		// If loading old persist, start height of contract is unknown. Give
+		// the contract a fake startheight so that it will included with the
+		// other contracts in the current period.
+		if contract.StartHeight == 0 {
+			contract.StartHeight = c.currentPeriod + 1
+		}
+		c.contracts[contract.ID] = contract
 	}
 	c.lastChange = data.LastChange
 	for _, contract := range data.OldContracts {
