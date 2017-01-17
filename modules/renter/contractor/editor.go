@@ -227,7 +227,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 		_, exists := c.cachedRevisions[contract.ID]
 		c.mu.RUnlock()
 		if !exists {
-			c.log.Critical("Cached revision does not exist for contract.")
+			c.log.Println("WARN: cached revision does not exist for contract", contract.ID)
 		}
 	}
 
