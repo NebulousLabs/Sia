@@ -119,7 +119,10 @@ func (tb *transactionBuilder) fundDefragger(fee types.Currency) (types.Currency,
 // operation is only performed if the wallet has greater than defragThreshold
 // outputs.
 func (w *Wallet) threadedDefragWallet() {
-	w.tg.Add()
+	err := w.tg.Add()
+	if err != nil {
+		return
+	}
 	defer w.tg.Done()
 
 	// grab a new address from the wallet
