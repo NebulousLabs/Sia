@@ -138,6 +138,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 			case <-closechan:
 				return
 			case <-time.After(time.Millisecond * 200):
+				wt.miner.AddBlock()
 				txnValue := types.SiacoinPrecision.Mul64(1000)
 				noutputs := defragThreshold + 1
 
@@ -162,11 +163,13 @@ func TestDefragOutputExhaustion(t *testing.T) {
 
 	// ensure we can still send transactions while receiving aggressively
 	// fragmented outputs
-	sendAmount := types.SiacoinPrecision.Mul64(2000)
-	_, err = wt.wallet.SendSiacoins(sendAmount, types.UnlockHash{})
-	if err != nil {
-
-		t.Error(err)
+	for i := 0; i < 15; i++ {
+		sendAmount := types.SiacoinPrecision.Mul64(2000)
+		_, err = wt.wallet.SendSiacoins(sendAmount, types.UnlockHash{})
+		if err != nil {
+			t.Error(err)
+		}
+		time.Sleep(time.Millisecond * 500)
 	}
 
 	close(closechan)
