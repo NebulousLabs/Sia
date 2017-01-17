@@ -105,8 +105,8 @@ func TestDefragWalletDust(t *testing.T) {
 	}
 }
 
-// TestDefragOutputExhaustion verifies that a malicious actor cannot use the
-// defragger to prevent a wallet from sending coins.
+// TestDefragOutputExhaustion verifies that sending transactions still succeeds
+// even when the defragger is under heavy stress.
 func TestDefragOutputExhaustion(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -118,30 +118,57 @@ func TestDefragOutputExhaustion(t *testing.T) {
 	}
 	defer wt.closeWt()
 
-	// mine a bunch of blocks continuously at a high enough rate to keep the
-	// defragger running.
+	var dest types.UnlockHash
+	for k := range wt.wallet.keys {
+		dest = k
+		break
+	}
+
+	wt.miner.AddBlock()
+	time.Sleep(time.Second)
+
+	// concurrently make a bunch of transactions with lots of outputs to keep the
+	// defragger running
 	closechan := make(chan struct{})
+	donechan := make(chan struct{})
 	go func() {
+		defer close(donechan)
 		for {
 			select {
 			case <-closechan:
 				return
-			case <-time.After(time.Millisecond * 500):
-				_, err := wt.miner.AddBlock()
-				if err != nil {
-					t.Fatal(err)
+			case <-time.After(time.Millisecond * 200):
+				txnValue := types.SiacoinPrecision.Mul64(1000)
+				noutputs := defragThreshold + 1
+
+				tbuilder := wt.wallet.StartTransaction()
+				tbuilder.FundSiacoins(txnValue.Mul64(uint64(noutputs)))
+
+				for i := 0; i < noutputs; i++ {
+					tbuilder.AddSiacoinOutput(types.SiacoinOutput{
+						Value:      txnValue,
+						UnlockHash: dest,
+					})
 				}
+
+				txns, _ := tbuilder.Sign(true)
+				wt.tpool.AcceptTransactionSet(txns)
+				wt.miner.AddBlock()
 			}
 		}
 	}()
 
 	time.Sleep(time.Second * 5)
 
+	// ensure we can still send transactions while receiving aggressively
+	// fragmented outputs
 	sendAmount := types.SiacoinPrecision.Mul64(2000)
 	_, err = wt.wallet.SendSiacoins(sendAmount, types.UnlockHash{})
 	if err != nil {
-		t.Fatal(err)
+
+		t.Error(err)
 	}
 
 	close(closechan)
+	<-donechan
 }

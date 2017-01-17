@@ -16,6 +16,13 @@ var (
 	// already added at least one successful signature to the transaction,
 	// meaning that future calls to Sign will result in an invalid transaction.
 	errBuilderAlreadySigned = errors.New("sign has already been called on this transaction builder, multiple calls can cause issues")
+
+	// errSpendHeightTooHigh indicates an output's spend height is greater than
+	// the allowed height.
+	errSpendHeightTooHigh = errors.New("output spend height exceeds the allowed height")
+
+	// errOutputTimelock indicates an output's timelock is still active.
+	errOutputTimelock = errors.New("wallet consensus set height is lower than the output timelock")
 )
 
 // transactionBuilder allows transactions to be manually constructed, including
@@ -82,6 +89,26 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 	return newSigIndices, nil
 }
 
+// checkOutput is a helper function used to determine if an output is usable.
+func (tb *transactionBuilder) checkOutput(id types.SiacoinOutputID, output types.SiacoinOutput) error {
+	// Check that this output has not recently been spent by the wallet.
+	spendHeight := tb.wallet.spentOutputs[types.OutputID(id)]
+	// Prevent an underflow error.
+	allowedHeight := tb.wallet.consensusSetHeight - RespendTimeout
+	if tb.wallet.consensusSetHeight < RespendTimeout {
+		allowedHeight = 0
+	}
+	if spendHeight > allowedHeight {
+		return errSpendHeightTooHigh
+	}
+	outputUnlockConditions := tb.wallet.keys[output.UnlockHash].UnlockConditions
+	if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
+		return errOutputTimelock
+	}
+
+	return nil
+}
+
 // FundSiacoins will add a siacoin input of exactly 'amount' to the
 // transaction. A parent transaction may be needed to achieve an input with the
 // correct value. The siacoin input will not be signed until 'Sign' is called
@@ -118,26 +145,32 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	// provide the user with a more useful error message in the event that they
 	// are overspending.
 	var potentialFund types.Currency
+
 	parentTxn := types.Transaction{}
 	var spentScoids []types.SiacoinOutputID
 	for i := range so.ids {
 		scoid := so.ids[i]
 		sco := so.outputs[i]
+
 		// Check that this output has not recently been spent by the wallet.
-		spendHeight := tb.wallet.spentOutputs[types.OutputID(scoid)]
-		// Prevent an underflow error.
-		allowedHeight := tb.wallet.consensusSetHeight - RespendTimeout
-		if tb.wallet.consensusSetHeight < RespendTimeout {
-			allowedHeight = 0
-		}
-		if spendHeight > allowedHeight {
-			potentialFund = potentialFund.Add(sco.Value)
+		if err := tb.checkOutput(scoid, sco); err != nil {
+			if err == errSpendHeightTooHigh {
+				potentialFund = potentialFund.Add(sco.Value)
+			}
 			continue
 		}
+
+		// If the next output is large enough to cover the amount requested and it
+		// is valid, skip to it.
+		if i != len(so.outputs)-1 {
+			nextOutput := so.outputs[i+1]
+			nextOutputID := so.ids[i+1]
+			if err := tb.checkOutput(nextOutputID, nextOutput); err == nil && nextOutput.Value.Cmp(amount) > 0 {
+				continue
+			}
+		}
+
 		outputUnlockConditions := tb.wallet.keys[sco.UnlockHash].UnlockConditions
-		if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
-			continue
-		}
 
 		// Add a siacoin input for this output.
 		sci := types.SiacoinInput{

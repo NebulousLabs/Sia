@@ -3,7 +3,6 @@ package wallet
 import (
 	"sort"
 
-	//"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
