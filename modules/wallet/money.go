@@ -19,7 +19,9 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 	defer w.mu.Unlock()
 
 	for _, sco := range w.siacoinOutputs {
-		siacoinBalance = siacoinBalance.Add(sco.Value)
+		if sco.Value.Cmp(dustValue()) > 0 {
+			siacoinBalance = siacoinBalance.Add(sco.Value)
+		}
 	}
 	for _, sfo := range w.siafundOutputs {
 		siafundBalance = siafundBalance.Add(sfo.Value)
