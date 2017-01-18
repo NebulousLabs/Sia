@@ -205,7 +205,7 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 	// Check that the transaction set is valid.
 	cc, err := tp.consensusSet.TryTransactionSet(superset)
 	if err != nil {
-		return modules.NewConsensusConflict("provided transaction set has prereqs, but is still invalid: "+err.Error())
+		return modules.NewConsensusConflict("provided transaction set has prereqs, but is still invalid: " + err.Error())
 	}
 
 	// Remove the conflicts from the transaction pool.
@@ -282,7 +282,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 	}
 	cc, err := tp.consensusSet.TryTransactionSet(ts)
 	if err != nil {
-		return modules.NewConsensusConflict("provided transaction set is standalone and invalid: "+err.Error())
+		return modules.NewConsensusConflict("provided transaction set is standalone and invalid: " + err.Error())
 	}
 
 	// Add the transaction set to the pool.

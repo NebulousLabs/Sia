@@ -112,6 +112,8 @@ func TestDefragOutputExhaustion(t *testing.T) {
 		t.SkipNow()
 	}
 
+	t.Skip("skipping until consensus consistency bug is fixed")
+
 	wt, err := createWalletTester("TestDefragOutputExhaustion")
 	if err != nil {
 		t.Fatal(err)
