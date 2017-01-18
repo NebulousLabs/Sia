@@ -138,9 +138,9 @@ func TestDefragOutputExhaustion(t *testing.T) {
 			select {
 			case <-closechan:
 				return
-			case <-time.After(time.Millisecond * 200):
+			case <-time.After(time.Millisecond * 100):
 				wt.miner.AddBlock()
-				txnValue := types.SiacoinPrecision.Mul64(1000)
+				txnValue := types.SiacoinPrecision.Mul64(3000)
 				fee := types.SiacoinPrecision.Mul64(10)
 				numOutputs := defragThreshold + 1
 
@@ -156,25 +156,30 @@ func TestDefragOutputExhaustion(t *testing.T) {
 
 				tbuilder.AddMinerFee(fee)
 
-				txns, _ := tbuilder.Sign(true)
-				wt.tpool.AcceptTransactionSet(txns)
+				txns, err := tbuilder.Sign(true)
+				if err != nil {
+					t.Error("Error signing fragmenting transaction:", err)
+				}
+				err = wt.tpool.AcceptTransactionSet(txns)
+				if err != nil {
+					t.Error("Error accepting fragmenting transaction:", err)
+				}
 				wt.miner.AddBlock()
 			}
 		}
 	}()
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 1)
 
 	// ensure we can still send transactions while receiving aggressively
 	// fragmented outputs
-	for i := 0; i < 15; i++ {
+	for i := 0; i < 30; i++ {
 		sendAmount := types.SiacoinPrecision.Mul64(2000)
 		_, err = wt.wallet.SendSiacoins(sendAmount, types.UnlockHash{})
 		if err != nil {
-			t.Log(i)
-			t.Error(err)
+			t.Errorf("%v: %v", i, err)
 		}
-		time.Sleep(time.Millisecond * 500)
+		time.Sleep(time.Millisecond * 50)
 	}
 
 	close(closechan)
