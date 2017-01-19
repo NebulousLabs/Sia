@@ -1,4 +1,4 @@
-# [![Sia Logo](http://sia.tech/img/svg/sia-green-logo.svg)](http://sia.tech) v1.1.0
+# [![Sia Logo](http://sia.tech/img/svg/sia-green-logo.svg)](http://sia.tech) v1.1.0 (Andromeda)
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -54,7 +54,7 @@ authority. To acquire siacoins, use an exchange such as [Poloniex](https://polon
 
 To get started with Sia, check out the guides below:
 
-- [How to Store Data on Sia](tbd)
+- [How to Store Data on Sia](https://medium.com/@jhowell1337/getting-started-with-private-decentralized-cloud-storage-c9565dc8c854)
 - [How to Become a Sia Host](http://blog.sia.tech/2016/05/26/how-to-run-a-host-on-sia)
 - [Using the Sia API](http://blog.sia.tech/2016/10/20/api-quickstart-guide)
 
