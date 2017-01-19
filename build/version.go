@@ -7,7 +7,7 @@ import (
 
 const (
 	// Version is the current version of siad.
-	Version = "1.0.4"
+	Version = "1.1.0"
 
 	// MaxEncodedVersionLength is the maximum length of a version string encoded
 	// with the encode package. 100 is much larger than any version number we send
