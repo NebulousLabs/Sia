@@ -86,6 +86,10 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 	if cs.synced && recentBlock == currentBlock {
 		cc.Synced = true
 	}
+
+	// Add the unexported tryTransactionSet function.
+	cc.TryTransactionSet = cs.tryTransactionSet
+
 	return cc, nil
 }
 

@@ -123,6 +123,12 @@ type (
 		// Synced indicates whether or not the ConsensusSet is synced with its
 		// peers.
 		Synced bool
+
+		// TryTransactionSet is an unlocked version of
+		// ConsensusSet.TryTransactionSet. This allows the TryTransactionSet
+		// function to be called by a subscriber during
+		// ProcessConsensusChange.
+		TryTransactionSet func([]types.Transaction) (ConsensusChange, error)
 	}
 
 	// A SiacoinOutputDiff indicates the addition or removal of a SiacoinOutput in

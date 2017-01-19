@@ -283,11 +283,10 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	}
 
 	// Updates complete, demote the lock.
-	cs.mu.Demote()
-	defer cs.mu.DemotedUnlock()
 	if len(changeEntry.AppliedBlocks) > 0 {
 		cs.readlockUpdateSubscribers(changeEntry)
 	}
+	cs.mu.Unlock()
 	return nil
 }
 
