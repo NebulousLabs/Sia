@@ -108,7 +108,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// processing consensus changes. Overall, the locking is pretty fragile and
 	// more rules need to be put in place.
 	for _, set := range unconfirmedSets {
-		tp.acceptTransactionSet(set) // Error is not checked.
+		tp.acceptTransactionSet(set, cc.TryTransactionSet) // Error is not checked.
 	}
 
 	// Inform subscribers that an update has executed.

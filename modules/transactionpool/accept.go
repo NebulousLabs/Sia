@@ -136,7 +136,7 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 
 // handleConflicts detects whether the conflicts in the transaction pool are
 // legal children of the new transaction pool set or not.
-func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []TransactionSetID) error {
+func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []TransactionSetID, txnFn func([]types.Transaction) (modules.ConsensusChange, error)) error {
 	// Create a list of all the transaction ids that compose the set of
 	// conflicts.
 	conflictMap := make(map[types.TransactionID]TransactionSetID)
@@ -176,7 +176,7 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 				conflicts = append(conflicts, conflict)
 			}
 		}
-		return tp.handleConflicts(dedupSet, conflicts)
+		return tp.handleConflicts(dedupSet, conflicts, txnFn)
 	}
 
 	// Merge all of the conflict sets with the input set (input set goes last
@@ -203,7 +203,7 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 	}
 
 	// Check that the transaction set is valid.
-	cc, err := tp.consensusSet.TryTransactionSet(superset)
+	cc, err := txnFn(superset)
 	if err != nil {
 		return modules.NewConsensusConflict("provided transaction set has prereqs, but is still invalid: " + err.Error())
 	}
@@ -235,7 +235,7 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 
 // acceptTransactionSet verifies that a transaction set is allowed to be in the
 // transaction pool, and then adds it to the transaction pool.
-func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
+func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn func([]types.Transaction) (modules.ConsensusChange, error)) error {
 	if len(ts) == 0 {
 		return errEmptySet
 	}
@@ -278,9 +278,9 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 		}
 	}
 	if len(conflicts) > 0 {
-		return tp.handleConflicts(ts, conflicts)
+		return tp.handleConflicts(ts, conflicts, txnFn)
 	}
-	cc, err := tp.consensusSet.TryTransactionSet(ts)
+	cc, err := txnFn(ts)
 	if err != nil {
 		return modules.NewConsensusConflict("provided transaction set is standalone and invalid: " + err.Error())
 	}
@@ -300,18 +300,26 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 // transactions. If the transaction is accepted, it will be relayed to
 // connected peers.
 func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
-	tp.mu.Lock()
-	defer tp.mu.Unlock()
-
-	err := tp.acceptTransactionSet(ts)
-	if err != nil {
-		return err
+	// assert on consensus set to get special method
+	cs, ok := tp.consensusSet.(interface {
+		LockedTryTransactionSet(fn func(func(txns []types.Transaction) (modules.ConsensusChange, error)) error) error
+	})
+	if !ok {
+		return errors.New("consensus set does not support LockedTryTransactionSet method")
 	}
 
-	// Notify subscribers and broadcast the transaction set.
-	go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
-	tp.updateSubscribersTransactions()
-	return nil
+	return cs.LockedTryTransactionSet(func(txnFn func(txns []types.Transaction) (modules.ConsensusChange, error)) error {
+		tp.mu.Lock()
+		defer tp.mu.Unlock()
+		err := tp.acceptTransactionSet(ts, txnFn)
+		if err != nil {
+			return err
+		}
+		// Notify subscribers and broadcast the transaction set.
+		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
+		tp.updateSubscribersTransactions()
+		return nil
+	})
 }
 
 // relayTransactionSet is an RPC that accepts a transaction set from a peer. If
