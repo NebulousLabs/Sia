@@ -185,14 +185,32 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 	defer close(closeChan)
 
 	for {
-		// Start by sleeping for 10 minutes. This means that no nodes will be
-		// purged for the first 10 minutes that Sia is running, and that any
-		// failures to get nodes will be met by 10 minutes of waiting.
+		// Choose an amount of time to wait before attempting to prune a node.
+		// Nodes will occasionally go offline for some time, which can even be
+		// days. We don't want to too aggressivley prune nodes with low-moderate
+		// uptime, as they are still useful to the network.
 		//
-		// At most one node will be contacted every 10 minutes. This minimizes
-		// the total amount of keepalive traffic on the network.
+		// But if there are a lot of nodes, we want to make sure that the node
+		// list does not become saturated with inaccessible / offline nodes.
+		// Pruning happens a lot faster when there are a lot of nodes in the
+		// gateway.
+		//
+		// This value is a ratelimit which tries to keep the nodes list in the
+		// gateawy healthy. A more complex algorithm might adjust this number
+		// according to the percentage of prune attemtps that are successful
+		// (decrease prune frequency if most nodes in the database are online,
+		// increase prune frequency if more nodes in the database are offline).
+		waitTime := nodePurgeDelay
+		g.mu.RLock()
+		nodeCount := len(g.nodes)
+		g.mu.RUnlock()
+		if nodeCount > quickPruneListLen {
+			waitTime = fastNodePurgeDelay
+		}
+
+		// Sleep as a purge ratelimit.
 		select {
-		case <-time.After(nodePurgeDelay):
+		case <-time.After(waitTime):
 		case <-g.threads.StopChan():
 			// The gateway is shutting down, close out the thread.
 			return
