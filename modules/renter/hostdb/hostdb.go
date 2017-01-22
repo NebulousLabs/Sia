@@ -113,6 +113,7 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 	}
 
+	// The host tree is used to manage hosts and query them at random.
 	hdb.hostTree = hosttree.New(hdb.calculateHostWeight)
 
 	// Load the prior persistence structures.
@@ -123,11 +124,12 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 
 	err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	if err == modules.ErrInvalidConsensusChangeID {
-		hdb.lastChange = modules.ConsensusChangeBeginning
 		// clear the host sets
 		hdb.activeHosts = make(map[modules.NetAddress]*hostEntry)
 		hdb.allHosts = make(map[modules.NetAddress]*hostEntry)
+
 		// subscribe again using the new ID
+		hdb.lastChange = modules.ConsensusChangeBeginning
 		err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	}
 	if err != nil {
