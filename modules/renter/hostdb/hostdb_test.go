@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb/hosttree"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // bareHostDB returns a HostDB with its fields initialized, but without any
@@ -107,5 +108,19 @@ func TestRandomHosts(t *testing.T) {
 				t.Fatal("RandomHosts returned an excluded host!")
 			}
 		}
+	}
+}
+
+// TestRemoveNonexistingHostFromHostTree checks that the host tree interface
+// correctly responds to having a nonexisting host removed from the host tree.
+func TestRemoveNonexistingHostFromHostTree(t *testing.T) {
+	// Create a host tree.
+	hdb := bareHostDB()
+	ht := hosttree.New(hdb.calculateHostWeight)
+
+	// Remove a host that doesn't exist from the tree.
+	err := ht.Remove(types.SiaPublicKey{})
+	if err == nil {
+		t.Fatal("There should be an error, but not a panic:", err)
 	}
 }
