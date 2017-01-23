@@ -67,16 +67,16 @@ type (
 	// but transactions cannot spend outputs that they create or otherwise be
 	// self-dependent.
 	Transaction struct {
-		SiacoinInputs         []SiacoinInput         `json:"siacoininputs,omitempty"`
-		SiacoinOutputs        []SiacoinOutput        `json:"siacoinoutputs,omitempty"`
-		FileContracts         []FileContract         `json:"filecontracts,omitempty"`
-		FileContractRevisions []FileContractRevision `json:"filecontractrevisions,omitempty"`
-		StorageProofs         []StorageProof         `json:"storageproofs,omitempty"`
-		SiafundInputs         []SiafundInput         `json:"siafundinputs,omitempty"`
-		SiafundOutputs        []SiafundOutput        `json:"siafundoutputs,omitempty"`
-		MinerFees             []Currency             `json:"minerfees,omitempty"`
-		ArbitraryData         [][]byte               `json:"arbitrarydata,omitempty"`
-		TransactionSignatures []TransactionSignature `json:"transactionsignatures,omitempty"`
+		SiacoinInputs         []SiacoinInput         `json:"siacoininputs"`
+		SiacoinOutputs        []SiacoinOutput        `json:"siacoinoutputs"`
+		FileContracts         []FileContract         `json:"filecontracts"`
+		FileContractRevisions []FileContractRevision `json:"filecontractrevisions"`
+		StorageProofs         []StorageProof         `json:"storageproofs"`
+		SiafundInputs         []SiafundInput         `json:"siafundinputs"`
+		SiafundOutputs        []SiafundOutput        `json:"siafundoutputs"`
+		MinerFees             []Currency             `json:"minerfees"`
+		ArbitraryData         [][]byte               `json:"arbitrarydata"`
+		TransactionSignatures []TransactionSignature `json:"transactionsignatures"`
 	}
 
 	// A SiacoinInput consumes a SiacoinOutput and adds the siacoins to the set of
