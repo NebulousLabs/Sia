@@ -155,9 +155,10 @@ returns the version of the Sia daemon currently running.
 Consensus
 ---------
 
-| Route                        | HTTP verb |
-| ---------------------------- | --------- |
-| [/consensus](#consensus-get) | GET       |
+| Route                                                                       | HTTP verb |
+| --------------------------------------------------------------------------- | --------- |
+| [/consensus](#consensus-get)                                                | GET       |
+| [/consensus/validate/transactionset](#consensusvalidatetransactionset-post) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Consensus.md](/doc/api/Consensus.md).
@@ -175,6 +176,19 @@ returns information about the consensus set, such as the current block height.
   "target":       [0,0,0,0,0,0,11,48,125,79,116,89,136,74,42,27,5,14,10,31,23,53,226,238,202,219,5,204,38,32,59,165]
 }
 ```
+
+#### /consensus/validate/transactionset [POST]
+
+validates a set of transactions using the current utxo set.
+
+###### Request Body Bytes
+
+Since transactions may be large, the transaction set is supplied in the POST
+body, encoded in JSON format.
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 Gateway
 -------
