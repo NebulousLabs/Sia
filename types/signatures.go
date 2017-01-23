@@ -53,16 +53,16 @@ type (
 	// cannot sign itself).
 	CoveredFields struct {
 		WholeTransaction      bool     `json:"wholetransaction"`
-		SiacoinInputs         []uint64 `json:"siacoininputs"`
-		SiacoinOutputs        []uint64 `json:"siacoinoutputs"`
-		FileContracts         []uint64 `json:"filecontracts"`
-		FileContractRevisions []uint64 `json:"filecontractrevisions"`
-		StorageProofs         []uint64 `json:"storageproofs"`
-		SiafundInputs         []uint64 `json:"siafundinputs"`
-		SiafundOutputs        []uint64 `json:"siafundoutputs"`
-		MinerFees             []uint64 `json:"minerfees"`
-		ArbitraryData         []uint64 `json:"arbitrarydata"`
-		TransactionSignatures []uint64 `json:"transactionsignatures"`
+		SiacoinInputs         []uint64 `json:"siacoininputs,omitempty"`
+		SiacoinOutputs        []uint64 `json:"siacoinoutputs,omitempty"`
+		FileContracts         []uint64 `json:"filecontracts,omitempty"`
+		FileContractRevisions []uint64 `json:"filecontractrevisions,omitempty"`
+		StorageProofs         []uint64 `json:"storageproofs,omitempty"`
+		SiafundInputs         []uint64 `json:"siafundinputs,omitempty"`
+		SiafundOutputs        []uint64 `json:"siafundoutputs,omitempty"`
+		MinerFees             []uint64 `json:"minerfees,omitempty"`
+		ArbitraryData         []uint64 `json:"arbitrarydata,omitempty"`
+		TransactionSignatures []uint64 `json:"transactionsignatures,omitempty"`
 	}
 
 	// A SiaPublicKey is a public key prefixed by a Specifier. The Specifier
