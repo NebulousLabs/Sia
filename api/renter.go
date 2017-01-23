@@ -89,11 +89,12 @@ type (
 
 	// RenterContract represents a contract formed by the renter.
 	RenterContract struct {
-		EndHeight   types.BlockHeight    `json:"endheight"`
-		ID          types.FileContractID `json:"id"`
-		NetAddress  modules.NetAddress   `json:"netaddress"`
-		RenterFunds types.Currency       `json:"renterfunds"`
-		Size        uint64               `json:"size"`
+		EndHeight       types.BlockHeight    `json:"endheight"`
+		ID              types.FileContractID `json:"id"`
+		LastTransaction types.Transaction    `json:"lasttransaction"`
+		NetAddress      modules.NetAddress   `json:"netaddress"`
+		RenterFunds     types.Currency       `json:"renterfunds"`
+		Size            uint64               `json:"size"`
 	}
 
 	// RenterContracts contains the renter's contracts.
@@ -235,11 +236,12 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 	contracts := []RenterContract{}
 	for _, c := range api.renter.Contracts() {
 		contracts = append(contracts, RenterContract{
-			EndHeight:   c.EndHeight(),
-			ID:          c.ID,
-			NetAddress:  c.NetAddress,
-			RenterFunds: c.RenterFunds(),
-			Size:        modules.SectorSize * uint64(len(c.MerkleRoots)),
+			EndHeight:       c.EndHeight(),
+			ID:              c.ID,
+			NetAddress:      c.NetAddress,
+			LastTransaction: c.LastRevisionTxn,
+			RenterFunds:     c.RenterFunds(),
+			Size:            modules.SectorSize * uint64(len(c.MerkleRoots)),
 		})
 	}
 	WriteJSON(w, RenterContracts{
