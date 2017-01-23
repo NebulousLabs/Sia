@@ -13,6 +13,11 @@ import (
 
 // TestDecrementReliability tests the decrementReliability method.
 func TestDecrementReliability(t *testing.T) {
+	// Skip during short tests because if another test fails this test will
+	// print the stack.
+	if testing.Short() {
+		t.SkipNow()
+	}
 	hdb := bareHostDB()
 
 	// Decrementing a non-existent host should be a no-op, and should build.Critical.
