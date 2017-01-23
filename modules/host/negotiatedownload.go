@@ -107,7 +107,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		return extendErr("failed to write acceptance for renter revision: ", ErrorConnection(err.Error()))
 	}
 
-	// Renter will send a transaction siganture for the file contract revision.
+	// Renter will send a transaction signature for the file contract revision.
 	var renterSignature types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterSignature, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {

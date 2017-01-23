@@ -143,7 +143,7 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// The renter will now send a negotiation response, followed by transaction
 	// signatures for the file contract transaction in the case of acceptance.
 	// The transaction signatures will be followed by another transaction
-	// siganture, to sign a no-op file contract revision.
+	// signature, to sign a no-op file contract revision.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
 		return extendErr("renter did not accept updated transactions: ", ErrorCommunication(err.Error()))
@@ -166,7 +166,7 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// send the signatures so that the renter can immediately have the
 	// completed file contract.
 	//
-	// During finalization, the siganture for the revision is also checked, and
+	// During finalization, the signature for the revision is also checked, and
 	// signatures for the revision transaction are created.
 	h.mu.RLock()
 	hostCollateral := contractCollateral(h.settings, txnSet[len(txnSet)-1].FileContracts[0])

@@ -23,7 +23,7 @@ var (
 	SignatureEd25519 = Specifier{'e', 'd', '2', '5', '5', '1', '9'}
 
 	ErrEntropyKey                = errors.New("transaction tries to sign an entproy public key")
-	ErrFrivilousSignature        = errors.New("transaction contains a frivilous siganture")
+	ErrFrivolousSignature        = errors.New("transaction contains a frivolous signature")
 	ErrInvalidPubKeyIndex        = errors.New("transaction contains a signature that points to a nonexistent public key")
 	ErrInvalidUnlockHashChecksum = errors.New("provided unlock hash has an invalid checksum")
 	ErrMissingSignatures         = errors.New("transaction has inputs with missing signatures")
@@ -327,7 +327,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		// Check that sig corresponds to an entry in sigMap.
 		inSig, exists := sigMap[crypto.Hash(sig.ParentID)]
 		if !exists || inSig.remainingSignatures == 0 {
-			return ErrFrivilousSignature
+			return ErrFrivolousSignature
 		}
 		// Check that sig's key hasn't already been used.
 		_, exists = inSig.usedKeys[sig.PublicKeyIndex]

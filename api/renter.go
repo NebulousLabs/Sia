@@ -241,7 +241,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			NetAddress:      c.NetAddress,
 			LastTransaction: c.LastRevisionTxn,
 			RenterFunds:     c.RenterFunds(),
-			Size:            modules.SectorSize * uint64(len(c.MerkleRoots)),
+			Size:            c.LastRevision.NewFileSize,
 		})
 	}
 	WriteJSON(w, RenterContracts{
