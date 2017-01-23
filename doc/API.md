@@ -672,11 +672,12 @@ returns active contracts. Expired contracts are not included.
 {
   "contracts": [
     {
-      "endheight":   50000, // block height
-      "id":          "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-      "netaddress":  "12.34.56.78:9",
-      "renterfunds": "1234", // hastings
-      "size":        8192    // bytes
+      "endheight":       50000, // block height
+      "id":              "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "lasttransaction": {}, // types.Transaction
+      "netaddress":      "12.34.56.78:9",
+      "renterfunds":     "1234", // hastings
+      "size":            8192    // bytes
     }
   ]
 }
