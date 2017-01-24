@@ -30,9 +30,9 @@ func (api *API) consensusHandler(w http.ResponseWriter, req *http.Request, _ htt
 	})
 }
 
-// consensusValidateTransactionSetHandler handles the API calls to
+// consensusValidateTransactionsetHandler handles the API calls to
 // /consensus/validate/transactionset.
-func (api *API) consensusValidateTransactionSetHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (api *API) consensusValidateTransactionsetHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var txnset []types.Transaction
 	err := json.NewDecoder(req.Body).Decode(&txnset)
 	if err != nil {

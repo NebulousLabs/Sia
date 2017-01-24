@@ -161,7 +161,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	// Consensus API Calls
 	if api.cs != nil {
 		router.GET("/consensus", api.consensusHandler)
-		router.POST("/consensus/validate/transactionset", api.consensusValidateTransactionSetHandler)
+		router.POST("/consensus/validate/transactionset", api.consensusValidateTransactionsetHandler)
 	}
 
 	// Explorer API Calls
