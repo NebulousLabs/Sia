@@ -260,7 +260,7 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	var consecutiveDowntime time.Duration
 	scanLen := len(entry.ScanHistory)
 	startTime := time.Now()
-	for i := scanLen-1; i >= 0; i-- {
+	for i := scanLen - 1; i >= 0; i-- {
 		if entry.ScanHistory[i].Success {
 			break
 		}
@@ -270,7 +270,7 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	// including penalizing by a factor of 2 for any leftover downtime.
 	for i := 0; consecutiveDowntime > 0 && i < 15; i++ {
 		uptimePenalty = uptimePenalty / 2
-		consecutiveDowntime -= time.Hour*24
+		consecutiveDowntime -= time.Hour * 24
 	}
 	return uptimePenalty
 }
