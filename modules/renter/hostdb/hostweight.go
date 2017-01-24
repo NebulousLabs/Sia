@@ -11,7 +11,7 @@ import (
 var (
 	// Because most weights would otherwise be fractional, we set the base
 	// weight to be very large.
-	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(20), nil))
+	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(50), nil))
 
 	// collateralExponentiation is the number of times that the collateral is
 	// multiplied into the price.
@@ -196,6 +196,21 @@ func (hdb *HostDB) lifetimeAdjustments(entry modules.HostDBEntry, weight types.C
 	return weight
 }
 
+// uptimeAdjustments penalizes the host for having poor uptime, and for being
+// offline.
+func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry, weight types.Currency) types.Currency {
+	// Special case: if we have scanned the host twice or fewer,
+
+	// Compute the total measured uptime and total measured downtime for this
+	// host.
+	var uptime time.Duration
+	var downtime time.Duration
+	for _, scan := range entry.ScanHistory[1:] {
+	}
+
+	return weight
+}
+
 // calculateHostWeight returns the weight of a host according to the settings of
 // the host database entry. Currently, only the price is considered.
 func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency {
@@ -205,6 +220,7 @@ func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency
 	weight = storageRemainingAdjustments(entry, weight)
 	weight = versionAdjustments(entry, weight)
 	weight = hdb.lifetimeAdjustments(entry, weight)
+	weight = uptimeAdjustments(entry, weight)
 
 	// A weight of zero is problematic for for the host tree.
 	if weight.IsZero() {
