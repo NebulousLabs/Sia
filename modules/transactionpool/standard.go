@@ -71,7 +71,7 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 	// of the UnlockConditions, which currently can appear in 3 separate fields
 	// of the transaction. Unrecognized types are ignored because a softfork
 	// may make certain unrecognized signatures invalid, and this node cannot
-	// tell which sigantures are the invalid ones.
+	// tell which signatures are the invalid ones.
 	for _, sci := range t.SiacoinInputs {
 		err := tp.checkUnlockConditions(sci.UnlockConditions)
 		if err != nil {

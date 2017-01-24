@@ -250,7 +250,7 @@ func TestTransactionValidSignatures(t *testing.T) {
 		t.Error(err)
 	}
 
-	// Corrupt one of the sigantures.
+	// Corrupt one of the signatures.
 	sig0[0]++
 	txn.TransactionSignatures[0].Signature = sig0[:]
 	err = txn.validSignatures(10)
@@ -288,10 +288,10 @@ func TestTransactionValidSignatures(t *testing.T) {
 	}
 	txn.SiafundInputs = txn.SiafundInputs[:len(txn.SiafundInputs)-1]
 
-	// Add a frivilous signature
+	// Add a frivolous signature
 	txn.TransactionSignatures = append(txn.TransactionSignatures, TransactionSignature{})
 	err = txn.validSignatures(10)
-	if err != ErrFrivilousSignature {
+	if err != ErrFrivolousSignature {
 		t.Error(err)
 	}
 	txn.TransactionSignatures = txn.TransactionSignatures[:len(txn.TransactionSignatures)-1]

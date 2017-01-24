@@ -129,6 +129,9 @@ returns active contracts. Expired contracts are not included.
       // Address of the host the file contract was formed with.
       "netaddress": "12.34.56.78:9",
 
+      // A signed transaction containing the most recent contract revision.
+      "lasttransaction": {},
+
       // Remaining funds left for the renter to spend on uploads & downloads.
       "renterfunds": "1234", // hastings
 
