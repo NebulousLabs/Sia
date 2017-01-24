@@ -3,6 +3,7 @@ package hosttree
 import (
 	"crypto/rand"
 	"errors"
+	"sort"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -179,6 +180,24 @@ func (n *node) remove() {
 		current.weight = current.weight.Sub(n.entry.weight)
 		current = current.parent
 	}
+}
+
+// All returns all of the hosts in the host tree, sorted by weight.
+func (ht *HostTree) All() []modules.HostDBEntry {
+	ht.mu.Lock()
+	defer ht.mu.Unlock()
+
+	var he hostEntries
+	for _, node := range ht.hosts {
+		he = append(he, *node.entry)
+	}
+	sort.Sort(he)
+
+	var entries []modules.HostDBEntry
+	for _, entry := range he {
+		entries = append(entries, entry.HostDBEntry)
+	}
+	return entries
 }
 
 // Insert inserts the entry provided to `entry` into the host tree. Insert will
