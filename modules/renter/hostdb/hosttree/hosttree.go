@@ -260,6 +260,18 @@ func (ht *HostTree) Modify(hdbe modules.HostDBEntry) error {
 	return nil
 }
 
+// Select returns the host with the provided public key, should the host exist.
+func (ht *HostTree) Select(spk types.SiaPublicKey) (modules.HostDBEntry, error) {
+	ht.mu.Lock()
+	defer ht.mu.Unlock()
+
+	node, exists := ht.hosts[string(spk.Key)]
+	if !exists {
+		return modules.HostDBEntry{}, errNoSuchHost
+	}
+	return node.entry.HostDBEntry, nil
+}
+
 // SelectRandom grabs a random n hosts from the tree. There will be no repeats, but
 // the length of the slice returned may be less than n, and may even be zero.
 // The hosts that are returned first have the higher priority. Hosts passed to

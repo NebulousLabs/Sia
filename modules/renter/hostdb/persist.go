@@ -2,7 +2,17 @@ package hostdb
 
 import (
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
+
+// hostEntry is kept for compatibility purposes, so that earlier versions of
+// the host persist can be read.
+type hostEntry struct {
+	modules.HostDBEntry
+
+	Weight types.Currency
+	Reliability types.Currency
+}
 
 // hdbPersist defines what HostDB data persists across sessions.
 type hdbPersist struct {

@@ -4,15 +4,19 @@
 // set of hosts it has found and updates who is online.
 package hostdb
 
-// TODO: There should be some mechanism that detects if the number of active
-// hosts is low. Then either the user can be informed, or the hostdb can start
-// scanning hosts that have been offline for a while and are no longer
-// prioritized by the scan loop.
-
 // TODO: There should be some mechanism for detecting if the hostdb cannot
 // connect to the internet. If it cannot, hosts should not be penalized for
 // appearing to be offline, because they may not actually be offline and it'll
 // unfairly over-penalize the hosts with the highest uptime.
+//
+// Do this by adding a gateway and checking for non-local nodes.
+
+// TODO: Need to distinguish between scans that were triggered by a fresh
+// blockchain announcement and scans that were triggered by cycle selection
+// (makes a difference in how the uptime stats should be counted)
+
+// TODO: Proper upgrade for hostdb from prior persist. Also, need default
+// settings for hosts that fail the first scan.
 
 import (
 	"errors"
@@ -52,16 +56,8 @@ type HostDB struct {
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
-	// random. 'activeHosts' provides a lookup from hostname to the the
-	// corresponding node, as the hostTree is unsorted. A host is active if
-	// it is currently responding to queries about price and other
-	// settings.
+	// random.
 	hostTree    *hosttree.HostTree
-	activeHosts map[modules.NetAddress]*hostEntry
-
-	// allHosts is a simple list of all known hosts by their network address,
-	// including hosts that are currently offline.
-	allHosts map[modules.NetAddress]*hostEntry
 
 	// the scanPool is a set of hosts that need to be scanned. There are a
 	// handful of goroutines constantly waiting on the channel for hosts to
@@ -107,9 +103,6 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 		persist: p,
 		log:     l,
 
-		// TODO: should index by pubkey, not ip
-		activeHosts: make(map[modules.NetAddress]*hostEntry),
-		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 	}
 
@@ -124,11 +117,8 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 
 	err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	if err == modules.ErrInvalidConsensusChangeID {
-		// clear the host sets
-		hdb.activeHosts = make(map[modules.NetAddress]*hostEntry)
-		hdb.allHosts = make(map[modules.NetAddress]*hostEntry)
-
-		// subscribe again using the new ID
+		// Subscribe again using the new ID. This will cause a triggered scan
+		// on all of the hosts, but that should be acceptable.
 		hdb.lastChange = modules.ConsensusChangeBeginning
 		err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	}
@@ -145,26 +135,72 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 	return hdb, nil
 }
 
+// ActiveHosts returns the hosts that can be randomly selected out of the
+// hostdb, sorted by preference.
+func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostDBEntry) {
+	hdb.mu.RLock()
+	numHosts := len(hdb.activeHosts)
+	hdb.mu.RUnlock()
+
+	// Get the hosts using RandomHosts so that they are in sorted order.
+	sortedHosts, err := hdb.hostTree.SelectRandom(numHosts, nil)
+	if err != nil {
+		hdb.log.Severe("error selecting random hosts in ActiveHosts() call: ", err)
+	}
+	return sortedHosts
+}
+
+// AllHosts returns all of the hosts known to the hostdb, including the
+// inactive ones.
+func (hdb *HostDB) AllHosts() (allHosts []modules.HostDBEntry) {
+	hdb.mu.RLock()
+	defer hdb.mu.RUnlock()
+
+	for _, entry := range hdb.allHosts {
+		allHosts = append(allHosts, entry.HostDBEntry)
+	}
+	return
+}
+
+// AverageContractPrice returns the average price of a host.
+func (hdb *HostDB) AverageContractPrice() types.Currency {
+	// maybe a more sophisticated way of doing this
+	var totalPrice types.Currency
+	sampleSize := 32
+	hosts, err := hdb.hostTree.SelectRandom(sampleSize, nil)
+	if err != nil {
+		hdb.log.Severe("error selecting random hosts in AverageContractPrice() call: ", err)
+	}
+	if len(hosts) == 0 {
+		return totalPrice
+	}
+	for _, host := range hosts {
+		totalPrice = totalPrice.Add(host.ContractPrice)
+	}
+	return totalPrice.Div64(uint64(len(hosts)))
+}
+
 // Close closes the hostdb, terminating its scanning threads
 func (hdb *HostDB) Close() error {
 	return hdb.tg.Stop()
 }
 
+// Host returns the HostSettings associated with the specified NetAddress. If
+// no matching host is found, Host returns false.
+func (hdb *HostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+	entry, ok := hdb.allHosts[addr]
+	if !ok || entry == nil {
+		return modules.HostDBEntry{}, false
+	}
+	return entry.HostDBEntry, true
+}
+
 // RandomHosts implements the HostDB interface's RandomHosts() method. It takes
 // a number of hosts to return, and a slice of netaddresses to ignore, and
 // returns a slice of entries.
-func (hdb *HostDB) RandomHosts(n int, exclude []modules.NetAddress) []modules.HostDBEntry {
-	// The HostTree uses public keys: we have to convert the exclusion netaddress
-	// to keys using activeHosts first. This will go away once the HostDB is
-	// transitioned to using public keys.
-	var excludeKeys []types.SiaPublicKey
-	for _, addr := range exclude {
-		entry, exists := hdb.activeHosts[addr]
-		if exists {
-			excludeKeys = append(excludeKeys, entry.PublicKey)
-		}
-	}
-
+func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) []modules.HostDBEntry {
 	hosts, err := hdb.hostTree.SelectRandom(n, excludeKeys)
 	if err != nil {
 		hdb.log.Debugln("error selecting random hosts from the tree: ", err)

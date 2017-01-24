@@ -28,6 +28,30 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostDBEntry) 
 	return
 }
 
+// insertScannedHost adds a host entry to the state. The host will be inserted
+// into the set of all hosts, and if it is online and responding to requests it
+// will be put into the list of active hosts.
+func (hdb *HostDB) insertScannedHost(host modules.HostDBEntry) {
+	// Remove garbage hosts and local hosts (but allow local hosts in testing).
+	if err := host.NetAddress.IsValid(); err != nil {
+		hdb.log.Debugf("WARN: host '%v' has an invalid NetAddress: %v", host.NetAddress, err)
+		return
+	}
+
+	// See if the host is already in the host tree.
+	existingEntry, err := hdb.hostTree.Select(host.PublicKey)
+	if err != nil {
+		// Host has not been seen before, provide a FirstSeen height.
+		host.FirstSeen = hdb.blockHeight
+	} else {
+		host = existingEntry
+	}
+
+	// Add the host to the scan queue, marked as a triggered scan because it
+	// was triggered by a blockchain announcement.
+	hdb.queueScan(h, true)
+}
+
 // ProcessConsensusChange will be called by the consensus set every time there
 // is a change in the blockchain. Updates will always be called in order.
 func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
@@ -64,7 +88,7 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, block := range cc.AppliedBlocks {
 		for _, host := range findHostAnnouncements(block) {
 			hdb.log.Debugln("Found a host in a host announcement:", host.NetAddress, host.PublicKey)
-			hdb.insertHost(host)
+			hdb.insertScannedHost(host)
 		}
 	}
 
