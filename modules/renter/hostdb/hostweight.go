@@ -2,6 +2,7 @@ package hostdb
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -55,6 +56,10 @@ var (
 			panic("incorrect/missing value for requiredStorage constant")
 		}
 	}()
+
+	// uptimeExponentiation is the number of times the uptime percentage is
+	// multiplied by itself when determining host uptime penalty.
+	uptimeExponentiation = 18
 )
 
 // collateralAdjustments improves the host's weight according to the amount of
@@ -131,99 +136,165 @@ func priceAdjustments(entry modules.HostDBEntry, weight types.Currency) types.Cu
 
 // storageRemainingAdjustments adjusts the weight of the entry according to how
 // much storage it has remaining.
-func storageRemainingAdjustments(entry modules.HostDBEntry, weight types.Currency) types.Currency {
+func storageRemainingAdjustments(entry modules.HostDBEntry) float64 {
+	base := float64(1)
 	if entry.RemainingStorage < 200*requiredStorage {
-		weight = weight.Div64(2) // 2x total penalty
+		base = base / 2 // 2x total penalty
 	}
 	if entry.RemainingStorage < 100*requiredStorage {
-		weight = weight.Div64(3) // 6x total penalty
+		base = base / 3 // 6x total penalty
 	}
 	if entry.RemainingStorage < 50*requiredStorage {
-		weight = weight.Div64(4) // 24x total penalty
+		base = base / 4 // 24x total penalty
 	}
 	if entry.RemainingStorage < 25*requiredStorage {
-		weight = weight.Div64(5) // 95x total penalty
+		base = base / 5 // 95x total penalty
 	}
 	if entry.RemainingStorage < 10*requiredStorage {
-		weight = weight.Div64(6) // 570x total penalty
+		base = base / 6 // 570x total penalty
 	}
 	if entry.RemainingStorage < 5*requiredStorage {
-		weight = weight.Div64(10) // 5,700x total penalty
+		base = base / 10 // 5,700x total penalty
 	}
 	if entry.RemainingStorage < requiredStorage {
-		weight = weight.Div64(100) // 570,000x total penalty
+		base = base / 100 // 570,000x total penalty
 	}
-	return weight
+	return base
 }
 
 // versionAdjustments will adjust the weight of the entry according to the siad
 // version reported by the host.
-func versionAdjustments(entry modules.HostDBEntry, weight types.Currency) types.Currency {
+func versionAdjustments(entry modules.HostDBEntry) float64 {
+	base := float64(1)
 	if build.VersionCmp(entry.Version, "1.0.3") < 0 {
-		weight = weight.Div64(5) // 5x total penalty.
+		base = base / 5 // 5x total penalty.
 	}
 	if build.VersionCmp(entry.Version, "1.0.0") < 0 {
-		weight = weight.Div64(20) // 100x total penalty.
+		base = base / 20 // 100x total penalty.
 	}
-	return weight
+	return base
 }
 
 // lifetimeAdjustments will adjust the weight of the host according to the total
 // amount of time that has passed since the host's original announcement.
-func (hdb *HostDB) lifetimeAdjustments(entry modules.HostDBEntry, weight types.Currency) types.Currency {
+func (hdb *HostDB) lifetimeAdjustments(entry modules.HostDBEntry) float64 {
+	base := float64(1)
 	if hdb.blockHeight >= entry.FirstSeen {
 		age := hdb.blockHeight - entry.FirstSeen
 		if age < 6000 {
-			weight = weight.Div64(2) // 2x total
+			base = base / 2 // 2x total
 		}
 		if age < 4000 {
-			weight = weight.Div64(2) // 4x total
+			base = base / 2 // 4x total
 		}
 		if age < 2000 {
-			weight = weight.Div64(4) // 16x total
+			base = base / 4 // 16x total
 		}
 		if age < 1000 {
-			weight = weight.Div64(4) // 64x total
+			base = base / 4 // 64x total
 		}
 		if age < 288 {
-			weight = weight.Div64(10) // 640x total
+			base = base / 2 // 128x total
 		}
 	} else {
 		// Shouldn't happen, but the usecase is covered anyway.
-		weight = weight.Div64(1000) // Because something weird is happening, don't trust this host very much.
+		base = base / 1000 // Because something weird is happening, don't trust this host very much.
 		hdb.log.Critical("Hostdb has witnessed a host where the FirstSeen height is higher than the current block height.")
 	}
-	return weight
+	return base
 }
 
 // uptimeAdjustments penalizes the host for having poor uptime, and for being
 // offline.
-func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry, weight types.Currency) types.Currency {
-	// Special case: if we have scanned the host twice or fewer,
+func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
+	// Special case: if we have scanned the host twice or fewer, don't perform
+	// uptime math.
+	if len(entry.ScanHistory) == 0 {
+		return 0.001 // Shouldn't happen.
+	}
+	if len(entry.ScanHistory) == 1 {
+		if entry.ScanHistory[0].Success {
+			return 0.75
+		}
+		return 0.25
+	}
+	if len(entry.ScanHistory) == 2 {
+		if entry.ScanHistory[0].Success && entry.ScanHistory[1].Success {
+			return 0.85
+		}
+		if entry.ScanHistory[0].Success || entry.ScanHistory[1].Success {
+			return 0.50
+		}
+		return 0.05
+	}
 
 	// Compute the total measured uptime and total measured downtime for this
 	// host.
 	var uptime time.Duration
 	var downtime time.Duration
+	recentTime := entry.ScanHistory[0].Timestamp
 	for _, scan := range entry.ScanHistory[1:] {
+		if recentTime.After(scan.Timestamp) {
+			hdb.log.Critical("Host entry scan history not sorted.")
+		}
+		if scan.Success {
+			uptime += recentTime.Sub(scan.Timestamp)
+		} else {
+			downtime += recentTime.Sub(scan.Timestamp)
+		}
+		recentTime = scan.Timestamp
 	}
 
-	return weight
+	// Calculate the penalty for low uptime.
+	uptimePenalty := float64(1)
+	uptimeRatio := float64(uptime) / float64(uptime+downtime)
+	if uptimeRatio > 0.97 {
+		uptimeRatio = 0.97
+	}
+	uptimeRatio += 0.03
+	for i := 0; i < uptimeExponentiation; i++ {
+		uptimePenalty *= uptimeRatio
+	}
+
+	// Calculate the penalty for consecutive downtime.
+	var consecutiveDowntime time.Duration
+	scanLen := len(entry.ScanHistory)
+	startTime := time.Now()
+	for i := scanLen-1; i >= 0; i-- {
+		if entry.ScanHistory[i].Success {
+			break
+		}
+		consecutiveDowntime = startTime.Sub(entry.ScanHistory[i].Timestamp)
+	}
+	// Penalize by a factor of 2 for each consecutive day of downtime,
+	// including penalizing by a factor of 2 for any leftover downtime.
+	for i := 0; consecutiveDowntime > 0 && i < 15; i++ {
+		uptimePenalty = uptimePenalty / 2
+		consecutiveDowntime -= time.Hour*24
+	}
+	return uptimePenalty
 }
 
 // calculateHostWeight returns the weight of a host according to the settings of
 // the host database entry. Currently, only the price is considered.
 func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency {
+	// Perform the high resolution adjustments.
 	weight := baseWeight
 	weight = collateralAdjustments(entry, weight)
 	weight = priceAdjustments(entry, weight)
-	weight = storageRemainingAdjustments(entry, weight)
-	weight = versionAdjustments(entry, weight)
-	weight = hdb.lifetimeAdjustments(entry, weight)
-	weight = uptimeAdjustments(entry, weight)
 
-	// A weight of zero is problematic for for the host tree.
+	// Perform the lower resolution adjustments.
+	storageRemainingPenalty := storageRemainingAdjustments(entry)
+	versionPenalty := versionAdjustments(entry)
+	lifetimePenalty := hdb.lifetimeAdjustments(entry)
+	uptimePenalty := hdb.uptimeAdjustments(entry)
+
+	// Combine the adjustments.
+	fullPenalty := storageRemainingPenalty * versionPenalty * lifetimePenalty * uptimePenalty
+	weight = weight.MulFloat(fullPenalty)
+
 	if weight.IsZero() {
+		// A weight of zero is problematic for for the host tree.
 		return types.NewCurrency64(1)
 	}
 	return weight
