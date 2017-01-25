@@ -12,19 +12,24 @@ import (
 var (
 	// Because most weights would otherwise be fractional, we set the base
 	// weight to be very large.
-	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(50), nil))
+	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(75), nil))
 
 	// collateralExponentiation is the number of times that the collateral is
 	// multiplied into the price.
 	//
 	// NOTE: Changing this value downwards needs that the baseWeight will need
 	// to be increased.
-	collateralExponentiation = 2
+	collateralExponentiation = 1
 
 	// priceDiveNormalization reduces the raw value of the price so that not so
 	// many digits are needed when operating on the weight. This also allows the
 	// base weight to be a lot lower.
 	priceDivNormalization = types.SiacoinPrecision.Div64(100)
+
+	// minCollateral is the amount of collateral we weight all hosts as having,
+	// even if they do not have any collateral. This is to temporarily prop up
+	// weak / cheap hosts on the network while the network is bootstrapping.
+	minCollateral = types.SiacoinPrecision.Mul64(25)
 
 	// Set a mimimum price, below which setting lower prices will no longer put
 	// this host at an advatnage. This price is considered the bar for
@@ -69,14 +74,12 @@ var (
 // allowing for the base weight to be a lot lower, as the collateral is
 // accounted for before anything else.
 func collateralAdjustments(entry modules.HostDBEntry, weight types.Currency) types.Currency {
-	if entry.Collateral.IsZero() {
-		// Instead of zeroing out the weight, just return the weight as though
-		// the collateral is 1 hasting. Competitively speaking, this is
-		// effectively zero.
-		return weight
+	usedCollateral := entry.Collateral
+	if entry.Collateral.Cmp(minCollateral) < 0 {
+		usedCollateral = minCollateral
 	}
 	for i := 0; i < collateralExponentiation; i++ {
-		weight = weight.Mul(entry.Collateral)
+		weight = weight.Mul(usedCollateral)
 	}
 	return weight
 }
@@ -233,16 +236,22 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	var uptime time.Duration
 	var downtime time.Duration
 	recentTime := entry.ScanHistory[0].Timestamp
+	recentSuccess := entry.ScanHistory[0].Success
 	for _, scan := range entry.ScanHistory[1:] {
 		if recentTime.After(scan.Timestamp) {
 			hdb.log.Critical("Host entry scan history not sorted.")
 		}
-		if scan.Success {
-			uptime += recentTime.Sub(scan.Timestamp)
+		if recentSuccess {
+			uptime += scan.Timestamp.Sub(recentTime)
 		} else {
-			downtime += recentTime.Sub(scan.Timestamp)
+			downtime += scan.Timestamp.Sub(recentTime)
 		}
 		recentTime = scan.Timestamp
+		recentSuccess = scan.Success
+	}
+	// Sanity check against 0 total time.
+	if uptime == 0 && downtime == 0 {
+		return 0.001 // Shouldn't happen.
 	}
 
 	// Calculate the penalty for low uptime.
@@ -256,21 +265,13 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 		uptimePenalty *= uptimeRatio
 	}
 
-	// Calculate the penalty for consecutive downtime.
-	var consecutiveDowntime time.Duration
+	// Calculate the penalty for downtime across consecutive scans.
 	scanLen := len(entry.ScanHistory)
-	startTime := time.Now()
 	for i := scanLen - 1; i >= 0; i-- {
 		if entry.ScanHistory[i].Success {
 			break
 		}
-		consecutiveDowntime = startTime.Sub(entry.ScanHistory[i].Timestamp)
-	}
-	// Penalize by a factor of 2 for each consecutive day of downtime,
-	// including penalizing by a factor of 2 for any leftover downtime.
-	for i := 0; consecutiveDowntime > 0 && i < 15; i++ {
 		uptimePenalty = uptimePenalty / 2
-		consecutiveDowntime -= time.Hour * 24
 	}
 	return uptimePenalty
 }
