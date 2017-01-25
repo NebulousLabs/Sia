@@ -2,34 +2,17 @@ package hostdb
 
 import (
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
-
-// hostEntry is kept for compatibility purposes, so that earlier versions of
-// the host persist can be read.
-type hostEntry struct {
-	modules.HostDBEntry
-
-	Weight types.Currency
-	Reliability types.Currency
-}
 
 // hdbPersist defines what HostDB data persists across sessions.
 type hdbPersist struct {
-	AllHosts    []hostEntry
-	ActiveHosts []hostEntry
-	LastChange  modules.ConsensusChangeID
+	AllHosts   []modules.HostDBEntry
+	LastChange modules.ConsensusChangeID
 }
 
 // persistData returns the data in the hostdb that will be saved to disk.
-func (hdb *HostDB) persistData() hdbPersist {
-	var data hdbPersist
-	for _, entry := range hdb.allHosts {
-		data.AllHosts = append(data.AllHosts, *entry)
-	}
-	for _, entry := range hdb.activeHosts {
-		data.ActiveHosts = append(data.ActiveHosts, *entry)
-	}
+func (hdb *HostDB) persistData() (data hdbPersist) {
+	data.AllHosts = hdb.hostTree.All()
 	data.LastChange = hdb.lastChange
 	return data
 }
@@ -51,13 +34,11 @@ func (hdb *HostDB) load() error {
 	if err != nil {
 		return err
 	}
-	for i := range data.AllHosts {
-		hdb.allHosts[data.AllHosts[i].NetAddress] = &data.AllHosts[i]
-	}
-	for i := range data.ActiveHosts {
-		host := data.AllHosts[i]
-		hdb.activeHosts[host.NetAddress] = &host
-		hdb.hostTree.Insert(host.HostDBEntry)
+	for _, host := range data.AllHosts {
+		err := hdb.hostTree.Insert(host)
+		if err != nil {
+			hdb.log.Debugln("ERROR: could not insert host while loading:", host.NetAddress)
+		}
 	}
 	hdb.lastChange = data.LastChange
 	return nil

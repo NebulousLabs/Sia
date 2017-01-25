@@ -18,6 +18,12 @@ package hostdb
 // TODO: Proper upgrade for hostdb from prior persist. Also, need default
 // settings for hosts that fail the first scan.
 
+// TODO: Do not add a host pk to the scan pool if a host with that pk is
+// already in the scan pool.
+
+// TODO: Change the uptimes to be forward looking in the weight func instead of
+// backward looking, and add duplicate scan as first scan at firs seen height.
+
 import (
 	"errors"
 	"os"
@@ -57,13 +63,13 @@ type HostDB struct {
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
 	// random.
-	hostTree    *hosttree.HostTree
+	hostTree *hosttree.HostTree
 
 	// the scanPool is a set of hosts that need to be scanned. There are a
 	// handful of goroutines constantly waiting on the channel for hosts to
 	// scan.
-	scanList []*hostEntry
-	scanPool chan *hostEntry
+	scanList []modules.HostDBEntry
+	scanPool chan modules.HostDBEntry
 	scanWait bool
 
 	blockHeight types.BlockHeight
@@ -103,7 +109,7 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 		persist: p,
 		log:     l,
 
-		scanPool:    make(chan *hostEntry, scanPoolSize),
+		scanPool: make(chan modules.HostDBEntry, scanPoolSize),
 	}
 
 	// The host tree is used to manage hosts and query them at random.
@@ -135,42 +141,32 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 	return hdb, nil
 }
 
-// ActiveHosts returns the hosts that can be randomly selected out of the
-// hostdb, sorted by preference.
+// ActiveHosts returns a list of hosts that are currently online, sorted by
+// weight.
 func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostDBEntry) {
-	hdb.mu.RLock()
-	numHosts := len(hdb.activeHosts)
-	hdb.mu.RUnlock()
-
-	// Get the hosts using RandomHosts so that they are in sorted order.
-	sortedHosts, err := hdb.hostTree.SelectRandom(numHosts, nil)
-	if err != nil {
-		hdb.log.Severe("error selecting random hosts in ActiveHosts() call: ", err)
+	allHosts := hdb.hostTree.All()
+	for _, entry := range allHosts {
+		if len(entry.ScanHistory) == 0 {
+			continue
+		}
+		if !entry.ScanHistory[len(entry.ScanHistory)-1].Success {
+			continue
+		}
+		activeHosts = append(activeHosts, entry)
 	}
-	return sortedHosts
+	return activeHosts
 }
 
 // AllHosts returns all of the hosts known to the hostdb, including the
 // inactive ones.
 func (hdb *HostDB) AllHosts() (allHosts []modules.HostDBEntry) {
-	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
-
-	for _, entry := range hdb.allHosts {
-		allHosts = append(allHosts, entry.HostDBEntry)
-	}
-	return
+	return hdb.hostTree.All()
 }
 
 // AverageContractPrice returns the average price of a host.
-func (hdb *HostDB) AverageContractPrice() types.Currency {
-	// maybe a more sophisticated way of doing this
-	var totalPrice types.Currency
+func (hdb *HostDB) AverageContractPrice() (totalPrice types.Currency) {
 	sampleSize := 32
-	hosts, err := hdb.hostTree.SelectRandom(sampleSize, nil)
-	if err != nil {
-		hdb.log.Severe("error selecting random hosts in AverageContractPrice() call: ", err)
-	}
+	hosts := hdb.hostTree.SelectRandom(sampleSize, nil)
 	if len(hosts) == 0 {
 		return totalPrice
 	}
@@ -187,23 +183,13 @@ func (hdb *HostDB) Close() error {
 
 // Host returns the HostSettings associated with the specified NetAddress. If
 // no matching host is found, Host returns false.
-func (hdb *HostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-	entry, ok := hdb.allHosts[addr]
-	if !ok || entry == nil {
-		return modules.HostDBEntry{}, false
-	}
-	return entry.HostDBEntry, true
+func (hdb *HostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
+	return hdb.hostTree.Select(spk)
 }
 
 // RandomHosts implements the HostDB interface's RandomHosts() method. It takes
 // a number of hosts to return, and a slice of netaddresses to ignore, and
 // returns a slice of entries.
 func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) []modules.HostDBEntry {
-	hosts, err := hdb.hostTree.SelectRandom(n, excludeKeys)
-	if err != nil {
-		hdb.log.Debugln("error selecting random hosts from the tree: ", err)
-	}
-	return hosts
+	return hdb.hostTree.SelectRandom(n, excludeKeys)
 }

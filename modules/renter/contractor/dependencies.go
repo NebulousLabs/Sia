@@ -46,8 +46,8 @@ type (
 	}
 
 	hostDB interface {
-		Host(modules.NetAddress) (modules.HostDBEntry, bool)
-		RandomHosts(n int, exclude []modules.NetAddress) []modules.HostDBEntry
+		Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
+		RandomHosts(n int, exclude []types.SiaPublicKey) []modules.HostDBEntry
 	}
 
 	persister interface {

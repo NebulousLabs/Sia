@@ -38,18 +38,8 @@ func (hdb *HostDB) insertScannedHost(host modules.HostDBEntry) {
 		return
 	}
 
-	// See if the host is already in the host tree.
-	existingEntry, err := hdb.hostTree.Select(host.PublicKey)
-	if err != nil {
-		// Host has not been seen before, provide a FirstSeen height.
-		host.FirstSeen = hdb.blockHeight
-	} else {
-		host = existingEntry
-	}
-
-	// Add the host to the scan queue, marked as a triggered scan because it
-	// was triggered by a blockchain announcement.
-	hdb.queueScan(h, true)
+	// Add the host to the scan queue.
+	hdb.queueScan(host)
 }
 
 // ProcessConsensusChange will be called by the consensus set every time there

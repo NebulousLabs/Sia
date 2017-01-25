@@ -32,8 +32,8 @@ func (newStub) AcceptTransactionSet([]types.Transaction) error      { return nil
 func (newStub) FeeEstimation() (a types.Currency, b types.Currency) { return }
 
 // hdb stubs
-func (newStub) Host(modules.NetAddress) (settings modules.HostDBEntry, ok bool) { return }
-func (newStub) RandomHosts(int, []modules.NetAddress) []modules.HostDBEntry     { return nil }
+func (newStub) Host(types.SiaPublicKey) (settings modules.HostDBEntry, ok bool) { return }
+func (newStub) RandomHosts(int, []types.SiaPubilcKey) []modules.HostDBEntry     { return nil }
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {

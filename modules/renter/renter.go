@@ -43,7 +43,7 @@ type hostDB interface {
 	Close() error
 
 	// Host returns the HostDBEntry for a given host.
-	Host(modules.NetAddress) (modules.HostDBEntry, bool)
+	Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
 }
 
 // A hostContractor negotiates, revises, renews, and provides access to file

@@ -5,18 +5,15 @@ package hostdb
 // settings of the hosts.
 
 import (
-	"bytes"
 	"crypto/rand"
 	"math/big"
 	"net"
-	"sort"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -24,31 +21,20 @@ const (
 	maxScanSleep     = 4 * time.Hour
 	minScanSleep     = 1*time.Hour + 20*time.Minute
 
-	maxActiveHosts              = 500
-	inactiveHostCheckupQuantity = 1000
+	hostCheckupQuantity = 250
 
-	maxSettingsLen = 2e3
+	maxSettingsLen = 4e3
 
 	hostRequestTimeout = 60 * time.Second
 	hostScanDeadline   = 60 * time.Second
 
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
-	scanningThreads = 50
+	scanningThreads = 20
 )
 
-// Reliability is a measure of a host's uptime.
-var (
-	MaxReliability     = types.NewCurrency64(500) // Given the scanning defaults, about 6 weeks of survival.
-	DefaultReliability = types.NewCurrency64(150) // Given the scanning defaults, about 2 week of survival.
-	UnreachablePenalty = types.NewCurrency64(1)
-)
-
-// queueHostEntry will add a host entry to the list of entries waiting to be
-// scanned. If there is no thread that is currently walking through the scan
-// list, one will be created and it will persist until shutdown or until the
-// scan list is empty.
-func (hdb *HostDB) queueHostEntry(entry *hostEntry) {
+// queueScan will add a host to the queue to be scanned.
+func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 	// Add the entry to a waitlist, then check if any thread is currently
 	// emptying the waitlist. If not, spawn a thread to empty the waitlist.
 	hdb.scanList = append(hdb.scanList, entry)
@@ -92,114 +78,64 @@ func (hdb *HostDB) queueHostEntry(entry *hostEntry) {
 	}()
 }
 
-// decrementReliability reduces the reliability of a node, moving it out of the
-// set of active hosts or deleting it entirely if necessary.
-func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.Currency) {
-	hdb.log.Debugln("reliability decrement issued for", addr)
-
-	// Look up the entry and decrement the reliability.
-	entry, exists := hdb.allHosts[addr]
-	if !exists {
-		build.Critical("host to be decremented did not exist in hostdb")
-		return
-	}
-	entry.Reliability = entry.Reliability.Sub(penalty)
-
-	// If the entry is in the active database, remove it from the active
-	// database.
-	existingEntry, exists := hdb.activeHosts[addr]
-	if exists {
-		hdb.log.Debugln("host is being pulled from list of active hosts", addr)
-		hdb.hostTree.Remove(existingEntry.PublicKey)
-		delete(hdb.activeHosts, entry.NetAddress)
-	}
-
-	// If the reliability has fallen to 0, remove the host from the
-	// database entirely.
-	if entry.Reliability.IsZero() {
-		hdb.log.Debugln("host is being dropped from hostdb", addr)
-		delete(hdb.allHosts, addr)
-	}
-}
-
 // managedUpdateEntry updates an entry in the hostdb after a scan has taken
 // place.
-func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.HostExternalSettings, netErr error) {
+//
+// TODO: The operation of this function is highly dependent on the structure of
+// the host weight function, changing the host weight function necessetates
+// tuning of this function. This may stab us in the back.
+func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, newSettings modules.HostExternalSettings, netErr error) {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 
-	// Add a data point for the scan.
-	entry.ScanHistory = append(entry.ScanHistory, modules.HostDBScan{
-		Timestamp: time.Now(),
-		Success:   netErr == nil,
-	})
-	// Ensure the scans are sorted.
-	if !sort.IsSorted(entry.ScanHistory) {
-		sort.Sort(entry.ScanHistory)
-	}
-
-	// Add the host to allHosts.
-	priorHost, exists := hdb.allHosts[entry.NetAddress]
+	// Grab the host from the host tree.
+	newEntry, exists := hdb.hostTree.Select(entry.PublicKey)
 	if !exists {
-		hdb.allHosts[entry.NetAddress] = entry
+		newEntry = entry
 	}
 
-	// If the scan was unsuccessful, decrement the host's reliability.
-	if netErr != nil {
-		if exists && bytes.Equal(priorHost.PublicKey.Key, entry.PublicKey.Key) {
-			// Only decrement the reliability if the public key in the
-			// hostdb matches the public key in the host announcement -
-			// the failure may just be a failed signature, indicating
-			// the wrong public key.
-			hdb.decrementReliability(entry.NetAddress, UnreachablePenalty)
+	// Add the datapoints for the scan.
+	if len(newEntry.ScanHistory) < 2 {
+		// Add two scans to the scan history. Two are needed because the scans
+		// are forward looking, but we want this first scan to represent as
+		// much as one week of uptime or downtime.
+		earliestStartTime := time.Now().Add(time.Hour * 7 * 24 * -1)
+		suggestedStartTime := time.Now().Add(time.Minute * 10 * time.Duration(hdb.blockHeight-entry.FirstSeen) * -1)
+		if suggestedStartTime.Before(earliestStartTime) {
+			suggestedStartTime = earliestStartTime
 		}
-		return
+		newEntry.ScanHistory = modules.HostDBScans{
+			{Timestamp: suggestedStartTime, Success: netErr == nil},
+			{Timestamp: time.Now(), Success: netErr == nil},
+		}
+	} else {
+		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: time.Now(), Success: netErr == nil})
 	}
 
-	// The host entry should be updated to reflect the new weight. The safety
-	// properties of the tree require that the weight does not change while the
-	// node is in the tree, so the node must be removed before the settings and
-	// weight are changed.
-	existingEntry, exists := hdb.activeHosts[entry.NetAddress]
-	if !exists && len(hdb.activeHosts) > maxActiveHosts {
-		return
-	}
-
-	// Update the host settings, reliability, and weight. The old NetAddress
-	// must be preserved.
-	newSettings.NetAddress = entry.HostExternalSettings.NetAddress
-	entry.HostExternalSettings = newSettings
-	entry.Reliability = MaxReliability
-
-	if exists {
-		hdb.hostTree.Remove(existingEntry.PublicKey)
-		delete(hdb.activeHosts, entry.NetAddress)
-	}
-	err := hdb.hostTree.Insert(entry.HostDBEntry)
-	hdb.activeHosts[entry.NetAddress] = entry
-	if err != nil {
-		hdb.log.Println("errorinserting entry into tree: ", err)
-	}
-
-	// Sanity check - the node should be in the hostdb now.
-	_, exists = hdb.activeHosts[entry.NetAddress]
+	// Add the updated entry
 	if !exists {
-		hdb.log.Critical("Host was not added to the list of active hosts after the entry was updated.")
+		err := hdb.hostTree.Insert(newEntry)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to insert entry which is was thought to be new:", err)
+		}
+	} else {
+		err := hdb.hostTree.Modify(newEntry)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to modify entry which is thought to exist:", err)
+		}
 	}
+
 	hdb.save()
 }
 
 // managedScanHost will connect to a host and grab the settings, verifying
 // uptime and updating to the host's preferences.
-func (hdb *HostDB) managedScanHost(hostEntry *hostEntry) {
+func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	// Request settings from the queued host entry.
-	//
-	// A readlock is necessary when viewing the elements of the host entry.
-	hdb.mu.RLock()
-	netAddr := hostEntry.NetAddress
-	pubKey := hostEntry.PublicKey
-	hdb.mu.RUnlock()
-	hdb.log.Debugln("Scanning", netAddr, pubKey)
+	netAddr := entry.NetAddress
+	pubKey := entry.PublicKey
+	hdb.log.Debugf("Scanning host at %v: key %v", netAddr, pubKey)
+
 	var settings modules.HostExternalSettings
 	err := func() error {
 		dialer := &net.Dialer{
@@ -230,18 +166,15 @@ func (hdb *HostDB) managedScanHost(hostEntry *hostEntry) {
 		return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 	}()
 	if err != nil {
-		hdb.log.Debugln("Scanning", netAddr, pubKey, "failed:", err)
+		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
 	} else {
-		hdb.log.Debugln("Scanning", netAddr, pubKey, "succeeded")
+		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 	}
-
-	// Update the host tree to have a new entry.
-	hdb.managedUpdateEntry(hostEntry, settings, err)
+	// Update the host tree to have a new entry, including the new error.
+	hdb.managedUpdateEntry(entry, settings, err)
 }
 
-// threadedProbeHosts tries to fetch the settings of a host. If successful, the
-// host is put in the set of active hosts. If unsuccessful, the host id deleted
-// from the set of active hosts.
+// threadedProbeHosts pulls hosts from the thread pool and runs a scan on them.
 func (hdb *HostDB) threadedProbeHosts() {
 	err := hdb.tg.Add()
 	if err != nil {
@@ -276,30 +209,11 @@ func (hdb *HostDB) threadedScan() {
 			hdb.mu.Lock()
 			defer hdb.mu.Unlock()
 
-			// Scan all active hosts.
-			for _, host := range hdb.activeHosts {
-				hdb.queueHostEntry(host)
-			}
-
-			// Assemble all of the inactive hosts into a single array.
-			var entries []*hostEntry
-			for _, entry := range hdb.allHosts {
-				_, exists := hdb.activeHosts[entry.NetAddress]
-				if !exists {
-					entries = append(entries, entry)
-				}
-			}
-
-			// Generate a random ordering of up to inactiveHostCheckupQuantity
-			// hosts.
-			hostOrder, err := crypto.Perm(len(entries))
-			if err != nil {
-				hdb.log.Println("ERR: could not generate random permutation:", err)
-			}
-
-			// Scan each host.
-			for i := 0; i < len(hostOrder) && i < inactiveHostCheckupQuantity; i++ {
-				hdb.queueHostEntry(entries[hostOrder[i]])
+			// Introduce a scan for the most valuable hosts.
+			checkups := hdb.hostTree.SelectRandom(hostCheckupQuantity, nil)
+			hdb.log.Println("Performing scan on", len(checkups), "hosts")
+			for _, host := range checkups {
+				hdb.queueScan(host)
 			}
 		}()
 

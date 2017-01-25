@@ -6,6 +6,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -144,10 +145,11 @@ func (n *node) recursiveInsert(entry *hostEntry) (nodesAdded int, newnode *node)
 // nodeAtWeight grabs an element in the tree that appears at the given weight.
 // Though the tree has an arbitrary sorting, a sufficiently random weight will
 // pull a random element. The tree is searched through in a post-ordered way.
-func (n *node) nodeAtWeight(weight types.Currency) (*node, error) {
+func (n *node) nodeAtWeight(weight types.Currency) *node {
 	// Sanity check - weight must be less than the total weight of the tree.
 	if weight.Cmp(n.weight) > 0 {
-		return nil, errWeightTooHeavy
+		build.Critical("Node weight corruption!")
+		return nil
 	}
 
 	// Check if the left or right child should be returned.
@@ -163,11 +165,12 @@ func (n *node) nodeAtWeight(weight types.Currency) (*node, error) {
 
 	// Should we panic here instead?
 	if !n.taken {
-		return nil, errNilEntry
+		build.Critical("Node tree structure corruption!")
+		return nil
 	}
 
 	// Return the root entry.
-	return n, nil
+	return n
 }
 
 // remove takes a node and removes it from the tree by climbing through the
@@ -261,22 +264,22 @@ func (ht *HostTree) Modify(hdbe modules.HostDBEntry) error {
 }
 
 // Select returns the host with the provided public key, should the host exist.
-func (ht *HostTree) Select(spk types.SiaPublicKey) (modules.HostDBEntry, error) {
+func (ht *HostTree) Select(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
 	ht.mu.Lock()
 	defer ht.mu.Unlock()
 
 	node, exists := ht.hosts[string(spk.Key)]
 	if !exists {
-		return modules.HostDBEntry{}, errNoSuchHost
+		return modules.HostDBEntry{}, false
 	}
-	return node.entry.HostDBEntry, nil
+	return node.entry.HostDBEntry, true
 }
 
 // SelectRandom grabs a random n hosts from the tree. There will be no repeats, but
 // the length of the slice returned may be less than n, and may even be zero.
 // The hosts that are returned first have the higher priority. Hosts passed to
 // 'ignore' will not be considered; pass `nil` if no blacklist is desired.
-func (ht *HostTree) SelectRandom(n int, ignore []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
+func (ht *HostTree) SelectRandom(n int, ignore []types.SiaPublicKey) []modules.HostDBEntry {
 	ht.mu.Lock()
 	defer ht.mu.Unlock()
 
@@ -294,14 +297,8 @@ func (ht *HostTree) SelectRandom(n int, ignore []types.SiaPublicKey) ([]modules.
 	}
 
 	for len(hosts) < n && len(ht.hosts) > 0 {
-		randWeight, err := rand.Int(rand.Reader, ht.root.weight.Big())
-		if err != nil {
-			return hosts, err
-		}
-		node, err := ht.root.nodeAtWeight(types.NewCurrency(randWeight))
-		if err != nil {
-			return hosts, err
-		}
+		randWeight, _ := rand.Int(rand.Reader, ht.root.weight.Big())
+		node := ht.root.nodeAtWeight(types.NewCurrency(randWeight))
 
 		if node.entry.HostDBEntry.AcceptingContracts {
 			hosts = append(hosts, node.entry.HostDBEntry)
@@ -318,5 +315,5 @@ func (ht *HostTree) SelectRandom(n int, ignore []types.SiaPublicKey) ([]modules.
 		ht.hosts[string(entry.PublicKey.Key)] = node
 	}
 
-	return hosts, nil
+	return hosts
 }

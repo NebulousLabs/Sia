@@ -18,9 +18,7 @@ func bareHostDB() *HostDB {
 	hdb := &HostDB{
 		log: persist.NewLogger(ioutil.Discard),
 
-		activeHosts: make(map[modules.NetAddress]*hostEntry),
-		allHosts:    make(map[modules.NetAddress]*hostEntry),
-		scanPool:    make(chan *hostEntry, scanPoolSize),
+		scanPool: make(chan modules.HostDBEntry, scanPoolSize),
 	}
 	hdb.hostTree = hosttree.New(hdb.calculateHostWeight)
 	return hdb
@@ -71,7 +69,6 @@ func TestRandomHosts(t *testing.T) {
 		entry := makeHostDBEntry()
 		entry.NetAddress = fakeAddr(uint8(i))
 		entries = append(entries, entry)
-		hdb.activeHosts[entry.NetAddress] = &hostEntry{HostDBEntry: entry}
 		hdb.hostTree.Insert(entry)
 	}
 
@@ -93,9 +90,9 @@ func TestRandomHosts(t *testing.T) {
 		}
 	}
 
-	var exclusionAddresses []modules.NetAddress
+	var exclusionAddresses []types.SiaPublicKey
 	for _, exclusionHost := range exclude {
-		exclusionAddresses = append(exclusionAddresses, exclusionHost.NetAddress)
+		exclusionAddresses = append(exclusionAddresses, exclusionHost.PublicKey)
 	}
 
 	hosts = hdb.RandomHosts(nentries, exclusionAddresses)
