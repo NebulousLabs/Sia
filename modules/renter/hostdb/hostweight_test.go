@@ -206,6 +206,7 @@ func TestHostWeightUptimeDifferences2(t *testing.T) {
 		{Timestamp: time.Now().Add(time.Hour * -60), Success: true},
 		{Timestamp: time.Now().Add(time.Hour * -40), Success: true},
 		{Timestamp: time.Now().Add(time.Hour * -20), Success: false},
+		{Timestamp: time.Now().Add(time.Hour * -1), Success: false},
 	}
 	w1 := hdb.calculateHostWeight(entry)
 	w2 := hdb.calculateHostWeight(entry2)
