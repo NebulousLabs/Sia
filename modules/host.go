@@ -104,6 +104,9 @@ type (
 		// have been made to the host.
 		NetworkMetrics() HostNetworkMetrics
 
+		// PublicKey returns the public key of the host.
+		PublicKey() types.SiaPublicKey
+
 		// SetInternalSettings sets the hosting parameters of the host.
 		SetInternalSettings(HostInternalSettings) error
 

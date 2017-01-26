@@ -189,19 +189,15 @@ func TestIntegrationFormContract(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	_, err = c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if contract.NetAddress != h.ExternalSettings().NetAddress {
-		t.Fatal("bad contract")
 	}
 }
 
@@ -220,7 +216,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -268,7 +264,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -333,7 +329,7 @@ func TestIntegrationDelete(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -398,7 +394,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -458,7 +454,7 @@ func TestIntegrationModify(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -525,7 +521,7 @@ func TestIntegrationRenew(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -652,7 +648,7 @@ func TestIntegrationResync(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -790,7 +786,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -883,7 +879,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}

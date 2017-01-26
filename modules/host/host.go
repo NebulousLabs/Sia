@@ -345,6 +345,14 @@ func (h *Host) FinancialMetrics() modules.HostFinancialMetrics {
 	return h.financialMetrics
 }
 
+// PublicKey returns the public key of the host that is used to facilitate
+// relationships between the host and renter.
+func (h *Host) PublicKey() types.SiaPublicKey {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.publicKey
+}
+
 // SetInternalSettings updates the host's internal HostInternalSettings object.
 func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error {
 	h.mu.Lock()
