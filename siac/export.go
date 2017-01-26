@@ -39,7 +39,7 @@ func renterexportcontractscmd(destination string) {
 	for _, c := range cs.Contracts {
 		contractTxns = append(contractTxns, c.LastTransaction)
 	}
-	// NOTE: don't need to use abs() here, since path is not passed to siad
+	destination = abs(destination)
 	file, err := os.Create(destination)
 	if err != nil {
 		die("Could not export to file:", err)
