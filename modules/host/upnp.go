@@ -23,9 +23,18 @@ func (h *Host) managedLearnHostname() {
 	if build.Release == "testing" {
 		return
 	}
+
+	// Fetch a group of host vars that will be used to dictate the logic of the
+	// function.
 	h.mu.RLock()
 	netAddr := h.settings.NetAddress
+	hPort := h.port
+	hAuto := h.autoAddress
+	hAnn := h.announced
+	hAcc := h.settings.AcceptingContracts
+	hCC := h.financialMetrics.ContractCount
 	h.mu.RUnlock()
+
 	// If the settings indicate that an address has been manually set, there is
 	// no reason to learn the hostname.
 	if netAddr != "" {
@@ -46,21 +55,21 @@ func (h *Host) managedLearnHostname() {
 		return
 	}
 
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	autoAddress := modules.NetAddress(net.JoinHostPort(hostname, h.port))
+	autoAddress := modules.NetAddress(net.JoinHostPort(hostname, hPort))
 	if err := autoAddress.IsValid(); err != nil {
 		h.log.Printf("WARN: discovered hostname %q is invalid: %v", autoAddress, err)
 		return
 	}
-	if autoAddress == h.autoAddress && h.announced {
+	if autoAddress == hAuto && hAnn {
 		// Nothing to do - the auto address has not changed and the previous
 		// annoucement was successful.
 		return
 	}
 
+	h.mu.Lock()
 	h.autoAddress = autoAddress
 	err = h.save()
+	h.mu.Unlock()
 	if err != nil {
 		h.log.Println(err)
 	}
@@ -69,12 +78,14 @@ func (h *Host) managedLearnHostname() {
 	// has a storage obligation. If the host is not accepting contracts and has
 	// no open contracts, there is no reason to notify anyone that the host's
 	// address has changed.
-	if h.settings.AcceptingContracts || h.financialMetrics.ContractCount > 0 {
-		err = h.announce(autoAddress)
+	if hAcc || hCC > 0 {
+		err = h.managedAnnounce(autoAddress)
 		if err != nil {
 			// Set h.announced to false, as the address has changed yet the
 			// renewed annoucement has failed.
+			h.mu.Lock()
 			h.announced = false
+			h.mu.Unlock()
 			h.log.Debugln("unable to announce address after upnp-detected address change:", err)
 		}
 	}
