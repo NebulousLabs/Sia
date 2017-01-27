@@ -202,7 +202,7 @@ func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a m
 		return err
 	}
 
-	// Set the allowance and replace the contract set
+	// Set the allowance and update the contract set
 	c.mu.Lock()
 	c.allowance = a
 	for i, contract := range formed {

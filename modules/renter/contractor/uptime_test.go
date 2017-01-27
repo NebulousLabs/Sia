@@ -20,7 +20,7 @@ type offlineHostDB struct {
 // host's scan history will be modified to make the host appear offline.
 func (hdb offlineHostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
 	host, ok := hdb.hostDB.Host(spk)
-	if ok {
+	if ok && string(spk.Key) == string(hdb.spk.Key) {
 		// fake three scans over the past uptimeWindow, all of which failed
 		badScan1 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow * 2), Success: false}
 		badScan2 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow), Success: false}
