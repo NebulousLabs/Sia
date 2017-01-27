@@ -93,6 +93,7 @@ func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, newSettings mod
 	if !exists {
 		newEntry = entry
 	}
+	newEntry.HostExternalSettings = newSettings
 
 	// Add the datapoints for the scan.
 	if len(newEntry.ScanHistory) < 2 {

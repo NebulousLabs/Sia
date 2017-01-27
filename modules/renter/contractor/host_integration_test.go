@@ -148,7 +148,7 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	// create host and contractor, using same consensus set and gateway
 	h, err := newTestingHost(filepath.Join(testdir, "Host"), cs, tp)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, build.ExtendErr("error creating testing host", err)
 	}
 	c, err := newTestingContractor(filepath.Join(testdir, "Contractor"), cs, tp)
 	if err != nil {
@@ -158,15 +158,15 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	// announce the host
 	err = h.Announce()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, build.ExtendErr("error announcing host", err)
 	}
 
 	// mine a block, processing the announcement
 	m.AddBlock()
 
 	// wait for hostdb to scan host
-	for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
-		time.Sleep(time.Millisecond * 50)
+	for i := 0; i < 25 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
+		time.Sleep(time.Millisecond * 250)
 	}
 	if len(c.hdb.RandomHosts(1, nil)) == 0 {
 		return nil, nil, nil, errors.New("host did not make it into the contractor hostdb in time")

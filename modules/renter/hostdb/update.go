@@ -28,10 +28,10 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostDBEntry) 
 	return
 }
 
-// insertScannedHost adds a host entry to the state. The host will be inserted
+// insertBlockchainHost adds a host entry to the state. The host will be inserted
 // into the set of all hosts, and if it is online and responding to requests it
 // will be put into the list of active hosts.
-func (hdb *HostDB) insertScannedHost(host modules.HostDBEntry) {
+func (hdb *HostDB) insertBlockchainHost(host modules.HostDBEntry) {
 	// Remove garbage hosts and local hosts (but allow local hosts in testing).
 	if err := host.NetAddress.IsValid(); err != nil {
 		hdb.log.Debugf("WARN: host '%v' has an invalid NetAddress: %v", host.NetAddress, err)
@@ -78,7 +78,7 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, block := range cc.AppliedBlocks {
 		for _, host := range findHostAnnouncements(block) {
 			hdb.log.Debugln("Found a host in a host announcement:", host.NetAddress, host.PublicKey)
-			hdb.insertScannedHost(host)
+			hdb.insertBlockchainHost(host)
 		}
 	}
 

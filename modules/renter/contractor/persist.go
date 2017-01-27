@@ -15,6 +15,7 @@ type contractorPersist struct {
 	CurrentPeriod   types.BlockHeight
 	LastChange      modules.ConsensusChangeID
 	OldContracts    []modules.RenterContract
+	Relationships   map[string]string
 	RenewedIDs      map[string]string
 
 	// COMPATv1.0.4-lts
@@ -33,6 +34,7 @@ func (c *Contractor) persistData() contractorPersist {
 		BlockHeight:   c.blockHeight,
 		CurrentPeriod: c.currentPeriod,
 		LastChange:    c.lastChange,
+		Relationships: make(map[string]string),
 		RenewedIDs:    make(map[string]string),
 	}
 	for _, rev := range c.cachedRevisions {
@@ -43,6 +45,9 @@ func (c *Contractor) persistData() contractorPersist {
 	}
 	for _, contract := range c.oldContracts {
 		data.OldContracts = append(data.OldContracts, contract)
+	}
+	for id, hpk := range c.relationships {
+		data.Relationships[id.String()] = hpk.String()
 	}
 	for oldID, newID := range c.renewedIDs {
 		data.RenewedIDs[oldID.String()] = newID.String()
@@ -88,6 +93,13 @@ func (c *Contractor) load() error {
 	c.lastChange = data.LastChange
 	for _, contract := range data.OldContracts {
 		c.oldContracts[contract.ID] = contract
+	}
+	for idString, keyString := range data.Relationships {
+		var idHash crypto.Hash
+		var spk types.SiaPublicKey
+		idHash.LoadString(idString)
+		spk.LoadString(keyString)
+		c.relationships[types.FileContractID(idHash)] = spk
 	}
 	for oldString, newString := range data.RenewedIDs {
 		var oldHash, newHash crypto.Hash
