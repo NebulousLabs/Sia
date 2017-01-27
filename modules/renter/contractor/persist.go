@@ -109,6 +109,7 @@ func (c *Contractor) load() error {
 	}
 
 	// COMPATv1.0.4-lts
+	//
 	// If loading old persist, only aggregate metrics are known. Store these
 	// in a special contract under a special identifier.
 	if fm := data.FinancialMetrics; !fm.ContractSpending.Add(fm.DownloadSpending).Add(fm.StorageSpending).Add(fm.UploadSpending).IsZero() {
@@ -129,6 +130,26 @@ func (c *Contractor) load() error {
 			LastRevision: types.FileContractRevision{
 				NewValidProofOutputs: make([]types.SiacoinOutput, 2),
 			},
+		}
+	}
+
+	// COMPATv1.1.0
+	//
+	// Wwhen loading old contracts, the corresponding relationships may not be
+	// known. Use the hostdb to make sure the relationship set is fully filled
+	// out.
+	allHosts := c.hdb.AllHosts()
+	hmap := make(map[modules.NetAddress]modules.HostDBEntry)
+	// Iterate backwards (lowest score to highest) so that in the event of
+	// duplicate hosts for a netaddress, the highest score host is the one in
+	// the map.
+	for i := len(allHosts) - 1; i >= 0; i-- {
+		hmap[allHosts[i].NetAddress] = allHosts[i]
+	}
+	for _, contract := range c.contracts {
+		host, exists := hmap[contract.NetAddress]
+		if exists {
+			c.relationships[contract.ID] = host.PublicKey
 		}
 	}
 

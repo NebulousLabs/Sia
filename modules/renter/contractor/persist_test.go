@@ -50,6 +50,7 @@ func TestSaveLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.hdb = stubHostDB{}
 	c.contracts = make(map[types.FileContractID]modules.RenterContract)
 	c.renewedIDs = make(map[types.FileContractID]types.FileContractID)
 	c.cachedRevisions = make(map[types.FileContractID]cachedRevision)
