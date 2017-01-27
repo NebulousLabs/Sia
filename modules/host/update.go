@@ -73,15 +73,20 @@ func (h *Host) initRescan() error {
 	// Re-queue all of the action items for the storage obligations.
 	for _, so := range allObligations {
 		soid := so.id()
-		err0 := h.tpool.AcceptTransactionSet(so.OriginTransactionSet)
 		err1 := h.queueActionItem(h.blockHeight+resubmissionTimeout, soid)
 		err2 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer, soid)
 		err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
-		err = composeErrors(err0, err1, err2, err3)
+		err = composeErrors(err1, err2, err3)
 		if err != nil {
 			h.log.Println("dropping storage obligation during rescan, id", so.id())
-			return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
 		}
+
+		go func() {
+			err := h.tpool.AcceptTransactionSet(so.OriginTransactionSet)
+			if err != nil {
+				h.log.Println("Unable to submit contract transaction set after rescan:", soid)
+			}
+		}()
 	}
 	return nil
 }
