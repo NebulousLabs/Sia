@@ -163,6 +163,7 @@ func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight ty
 	}
 	// If we couldn't form any contracts, return an error. Otherwise, just log
 	// the failures.
+	//
 	// TODO: is there a better way to handle failure here? Should we prefer an
 	// all-or-nothing approach? We can't pick new hosts to negotiate with
 	// because they'll probably be more expensive than we can afford.

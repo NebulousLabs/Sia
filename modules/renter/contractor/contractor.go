@@ -170,6 +170,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		downloaders:     make(map[types.FileContractID]*hostDownloader),
 		editors:         make(map[types.FileContractID]*hostEditor),
 		oldContracts:    make(map[types.FileContractID]modules.RenterContract),
+		relationships:   make(map[types.FileContractID]types.SiaPublicKey),
 		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
 		renewing:        make(map[types.FileContractID]bool),
 		revising:        make(map[types.FileContractID]bool),

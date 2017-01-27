@@ -228,6 +228,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -276,6 +277,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -341,6 +343,7 @@ func TestIntegrationDelete(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -406,6 +409,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -466,6 +470,7 @@ func TestIntegrationModify(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -533,6 +538,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -562,6 +568,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = c.relationships[oldContract.ID]
 	c.mu.Unlock()
 
 	// check renewed contract
@@ -611,6 +618,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -660,6 +668,7 @@ func TestIntegrationResync(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -798,6 +807,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// create a downloader
@@ -891,6 +901,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// create an editor

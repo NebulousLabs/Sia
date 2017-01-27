@@ -94,7 +94,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	if len(c.Contracts()) != 1 {
-		t.Fatal("contract was not replaced")
+		t.Fatal("contract was not replaced:", len(c.Contracts()))
 	}
 	if c.Contracts()[0].NetAddress != h2.ExternalSettings().NetAddress {
 		t.Fatal("contractor formed replacement contract with wrong host")

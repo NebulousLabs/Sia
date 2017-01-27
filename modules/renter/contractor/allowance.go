@@ -168,6 +168,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	}
 	// replace the current contract set with new contracts
 	c.contracts = newContracts
+	c.relationships = newRelationships
 	// if the currentPeriod was previously unset, set it now
 	if c.currentPeriod == 0 {
 		c.currentPeriod = periodStart
