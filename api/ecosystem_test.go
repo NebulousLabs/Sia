@@ -96,7 +96,7 @@ func announceAllHosts(sts []*serverTester) error {
 	// Block until every node has completed the scan of every other node, so
 	// that each node has a full hostdb.
 	for _, st := range sts {
-		var ah ActiveHosts
+		var ah HostdbActiveGET
 		for i := 0; i < 50; i++ {
 			err = st.getAPI("/hostdb/active", &ah)
 			if err != nil {

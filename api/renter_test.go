@@ -150,7 +150,7 @@ func TestRenterHostsActiveHandler(t *testing.T) {
 	defer st.server.Close()
 
 	// Try the call with numhosts unset, and set to -1, 0, and 1.
-	var ah ActiveHosts
+	var ah HostdbActiveGET
 	err = st.getAPI("/hostdb/active", &ah)
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +240,7 @@ func TestRenterHostsAllHandler(t *testing.T) {
 	defer st.server.Close()
 
 	// Try the call before any hosts have been declared.
-	var ah AllHosts
+	var ah HostdbAllGET
 	if err = st.getAPI("/hostdb/all", &ah); err != nil {
 		t.Fatal(err)
 	}

@@ -536,7 +536,7 @@ func (st *serverTester) announceHost() error {
 		return err
 	}
 	// wait for announcement
-	var hosts ActiveHosts
+	var hosts HostdbActiveGET
 	err = st.getAPI("/hostdb/active", &hosts)
 	if err != nil {
 		return err
