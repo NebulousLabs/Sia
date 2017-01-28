@@ -66,7 +66,7 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			hdb.scanList = hdb.scanList[1:]
 			hdb.mu.Unlock()
 
-			// Block while we wait for an opening in the scan pool.
+			// Block while waiting for an opening in the scan pool.
 			select {
 			case hdb.scanPool <- entry:
 				// iterate again
@@ -81,12 +81,18 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 // managedUpdateEntry updates an entry in the hostdb after a scan has taken
 // place.
 //
-// TODO: The operation of this function is highly dependent on the structure of
-// the host weight function, changing the host weight function necessetates
-// tuning of this function. This may stab us in the back.
+// CAUTION: This function will automatically add multiple entries to a new host
+// to give that host some base uptime. This makes this function co-dependent
+// with the host weight functions. Adjustment of the host weight functions need
+// to keep this function in mind, and vice-versa.
 func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, newSettings modules.HostExternalSettings, netErr error) {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
+
+	// If the host is not online, toss out this update.
+	if !hdb.online {
+		return
+	}
 
 	// Grab the host from the host tree.
 	newEntry, exists := hdb.hostTree.Select(entry.PublicKey)
@@ -100,7 +106,7 @@ func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, newSettings mod
 		// Add two scans to the scan history. Two are needed because the scans
 		// are forward looking, but we want this first scan to represent as
 		// much as one week of uptime or downtime.
-		earliestStartTime := time.Now().Add(time.Hour * 7 * 24 * -1)
+		earliestStartTime := time.Now().Add(time.Hour * 7 * 24 * -1) // Permit up to a week of starting uptime or downtime.
 		suggestedStartTime := time.Now().Add(time.Minute * 10 * time.Duration(hdb.blockHeight-entry.FirstSeen) * -1)
 		if suggestedStartTime.Before(earliestStartTime) {
 			suggestedStartTime = earliestStartTime
@@ -188,6 +194,26 @@ func (hdb *HostDB) threadedProbeHosts() {
 		case <-hdb.tg.StopChan():
 			return
 		case hostEntry := <-hdb.scanPool:
+			// Block the scan until the host is online.
+			for {
+				hdb.mu.RLock()
+				online := hdb.online
+				hdb.mu.RUnlock()
+				if online {
+					break
+				}
+
+				// Check again in 30 seconds.
+				select {
+				case <-time.After(time.Second * 30):
+					continue
+				case <-hdb.tg.StopChan():
+					return
+				}
+			}
+
+			// There appears to be internet connectivity, continue with the
+			// scan.
 			hdb.managedScanHost(hostEntry)
 		}
 	}
@@ -203,20 +229,18 @@ func (hdb *HostDB) threadedScan() {
 	defer hdb.tg.Done()
 
 	for {
-		// Determine who to scan. At most 'maxActiveHosts' will be scanned,
-		// starting with the active hosts followed by a random selection of the
-		// inactive hosts.
-		func() {
-			hdb.mu.Lock()
-			defer hdb.mu.Unlock()
-
-			// Introduce a scan for the most valuable hosts.
-			checkups := hdb.hostTree.SelectRandom(hostCheckupQuantity, nil)
-			hdb.log.Println("Performing scan on", len(checkups), "hosts")
-			for _, host := range checkups {
-				hdb.queueScan(host)
-			}
-		}()
+		// Set up a scan for the hostCheckupQuanity most valuable hosts in the
+		// hostdb. Hosts that fail their scans will be docked significantly,
+		// pushing them further back in the hierarchy, ensuring that for the
+		// most part only online hosts are getting scanned unless there are
+		// fewer than hostCheckupQuantity of them.
+		hdb.mu.Lock()
+		checkups := hdb.hostTree.SelectRandom(hostCheckupQuantity, nil)
+		hdb.log.Println("Performing scan on", len(checkups), "hosts")
+		for _, host := range checkups {
+			hdb.queueScan(host)
+		}
+		hdb.mu.Unlock()
 
 		// Sleep for a random amount of time before doing another round of
 		// scanning. The minimums and maximums keep the scan time reasonable,

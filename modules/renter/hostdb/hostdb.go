@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb/hosttree"
 	"github.com/NebulousLabs/Sia/persist"
@@ -73,6 +74,7 @@ type HostDB struct {
 	scanList []modules.HostDBEntry
 	scanPool chan modules.HostDBEntry
 	scanWait bool
+	online   bool
 
 	blockHeight types.BlockHeight
 	lastChange  modules.ConsensusChangeID
@@ -139,6 +141,13 @@ func newHostDB(g modules.Gateway, cs consensusSet, d dialer, s sleeper, p persis
 	}
 
 	// Spin up the host scanning processes.
+	if build.Release != "testing" {
+		go hdb.threadedOnlineCheck()
+	} else {
+		// During testing, the hostdb is just always assumed to be online, since
+		// the online check of having nonlocal peers will always fail.
+		hdb.online = true
+	}
 	for i := 0; i < scanningThreads; i++ {
 		go hdb.threadedProbeHosts()
 	}
