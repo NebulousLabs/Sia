@@ -38,6 +38,16 @@ func (hdb *HostDB) insertBlockchainHost(host modules.HostDBEntry) {
 		return
 	}
 
+	// Make sure the host gets into the host tree so it does not get dropped if
+	// shutdown occurs before a scan can be performed.
+	_, exists := hdb.hostTree.Select(host.PublicKey)
+	if !exists {
+		err := hdb.hostTree.Insert(host)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to insert host entry into host tree after a blockchain scan:", err)
+		}
+	}
+
 	// Add the host to the scan queue.
 	hdb.queueScan(host)
 }

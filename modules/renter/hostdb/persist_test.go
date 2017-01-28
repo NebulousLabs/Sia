@@ -95,7 +95,7 @@ func (cs *rescanCS) ConsensusSetSubscribe(s modules.ConsensusSetSubscriber, last
 // TestRescan tests that the hostdb will rescan the blockchain properly.
 func TestRescan(t *testing.T) {
 	if testing.Short() {
-		t.SkipNow()
+		t.Skip("this test doesn't make any sense")
 	}
 	// create hostdb with mocked persist dependency
 	hdb := bareHostDB()
@@ -144,6 +144,6 @@ func TestRescan(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(hdb.hostTree.All()) != 1 {
-		t.Fatal("hostdb rescan resulted in wrong host set")
+		t.Fatal("hostdb rescan resulted in wrong host set", len(hdb.hostTree.All()))
 	}
 }
