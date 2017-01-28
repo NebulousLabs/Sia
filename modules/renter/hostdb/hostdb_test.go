@@ -3,14 +3,26 @@ package hostdb
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb/hosttree"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+type hdbTester struct {
+	cs      modules.ConsensusSet
+	gateway modules.Gateway
+
+	hdb *HostDB
+
+	persistDir string
+}
 
 // bareHostDB returns a HostDB with its fields initialized, but without any
 // dependencies or scanning threads. It is only intended for use in unit tests.
@@ -26,34 +38,80 @@ func bareHostDB() *HostDB {
 
 // newStub is used to test the New function. It implements all of the hostdb's
 // dependencies.
-type newStub struct{}
+type newStub struct {
+	*gateway.Gateway
+}
 
 // consensus set stubs
 func (newStub) ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error {
 	return nil
 }
 
-// TestNew tests the New function.
-func TestNew(t *testing.T) {
-	// Using a stub implementation of the dependencies is fine, as long as its
-	// non-nil.
-	var stub newStub
-	dir := build.TempDir("hostdb", "TestNew")
+// newHDBTester returns a tester object wrapping a HostDB and some extra
+// information for testing.
+func newHDBTester(name string) (*hdbTester, error) {
+	if testing.Short() {
+		panic("should not be calling newHDBTester during short tests")
+	}
+	testDir := build.TempDir("HostDB", name)
 
-	// Sane values.
-	_, err := New(stub, dir)
+	g, err := gateway.New("localhost:0", false, filepath.Join(testDir, modules.GatewayDir))
 	if err != nil {
-		t.Fatalf("expected nil, got %v", err)
+		return nil, err
+	}
+	cs, err := consensus.New(g, false, filepath.Join(testDir, modules.ConsensusDir))
+	if err != nil {
+		return nil, err
+	}
+	hdb, err := New(g, cs, filepath.Join(testDir, modules.RenterDir))
+	if err != nil {
+		return nil, err
 	}
 
+	hdbt := &hdbTester{
+		cs:      cs,
+		gateway: g,
+
+		hdb: hdb,
+
+		persistDir: name,
+	}
+	return hdbt, nil
+}
+
+// TestNew tests the New function.
+func TestNew(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	testDir := build.TempDir("HostDB", "TestNew")
+	g, err := gateway.New("localhost:0", false, filepath.Join(testDir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := consensus.New(g, false, filepath.Join(testDir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Vanilla HDB, nothing should go wrong.
+	hdbName := filepath.Join(testDir, modules.RenterDir)
+	_, err = New(g, cs, hdbName+"1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Nil gateway.
+	_, err = New(nil, cs, hdbName+"2")
+	if err != errNilGateway {
+		t.Fatalf("expected %v, got %v", errNilGateway, err)
+	}
 	// Nil consensus set.
-	_, err = New(nil, dir)
+	_, err = New(g, nil, hdbName+"3")
 	if err != errNilCS {
 		t.Fatalf("expected %v, got %v", errNilCS, err)
 	}
-
 	// Bad persistDir.
-	_, err = New(stub, "")
+	_, err = New(g, cs, "")
 	if !os.IsNotExist(err) {
 		t.Fatalf("expected invalid directory, got %v", err)
 	}

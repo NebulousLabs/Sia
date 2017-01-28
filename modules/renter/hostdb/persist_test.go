@@ -2,9 +2,12 @@ package hostdb
 
 import (
 	"crypto/rand"
+	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -91,6 +94,9 @@ func (cs *rescanCS) ConsensusSetSubscribe(s modules.ConsensusSetSubscriber, last
 
 // TestRescan tests that the hostdb will rescan the blockchain properly.
 func TestRescan(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// create hostdb with mocked persist dependency
 	hdb := bareHostDB()
 	hdb.persist = new(memPersist)
@@ -124,10 +130,16 @@ func TestRescan(t *testing.T) {
 	cs := new(rescanCS)
 	cs.addBlock(announceBlock)
 
+	testDir := build.TempDir("HostDB", "TestRescan")
+	g, err := gateway.New("localhost:0", false, filepath.Join(testDir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Reload the hostdb using the same persist and the mocked consensus set.
 	// The old change ID will be rejected, causing a rescan, which should
 	// discover the new announcement.
-	hdb, err = newHostDB(cs, stdDialer{}, stdSleeper{}, hdb.persist, hdb.log)
+	hdb, err = newHostDB(g, cs, stdDialer{}, stdSleeper{}, hdb.persist, hdb.log)
 	if err != nil {
 		t.Fatal(err)
 	}

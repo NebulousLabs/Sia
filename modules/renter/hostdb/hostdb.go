@@ -45,7 +45,8 @@ const (
 )
 
 var (
-	errNilCS = errors.New("cannot create hostdb with nil consensus set")
+	errNilCS      = errors.New("cannot create hostdb with nil consensus set")
+	errNilGateway = errors.New("cannot create hostdb with nil gateway")
 )
 
 // The HostDB is a database of potential hosts. It assigns a weight to each
@@ -54,6 +55,7 @@ var (
 type HostDB struct {
 	// dependencies
 	dialer  dialer
+	gateway modules.Gateway
 	log     *persist.Logger
 	mu      sync.RWMutex
 	persist persister
@@ -77,8 +79,11 @@ type HostDB struct {
 }
 
 // New returns a new HostDB.
-func New(cs consensusSet, persistDir string) (*HostDB, error) {
+func New(g modules.Gateway, cs consensusSet, persistDir string) (*HostDB, error) {
 	// Check for nil inputs.
+	if g == nil {
+		return nil, errNilGateway
+	}
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -95,16 +100,17 @@ func New(cs consensusSet, persistDir string) (*HostDB, error) {
 	}
 
 	// Create HostDB using production dependencies.
-	return newHostDB(cs, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
+	return newHostDB(g, cs, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
 }
 
 // newHostDB creates a HostDB using the provided dependencies. It loads the old
 // persistence data, spawns the HostDB's scanning threads, and subscribes it to
 // the consensusSet.
-func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Logger) (*HostDB, error) {
+func newHostDB(g modules.Gateway, cs consensusSet, d dialer, s sleeper, p persister, l *persist.Logger) (*HostDB, error) {
 	// Create the HostDB object.
 	hdb := &HostDB{
 		dialer:  d,
+		gateway: g,
 		sleeper: s,
 		persist: p,
 		log:     l,

@@ -124,8 +124,8 @@ type Renter struct {
 }
 
 // New returns an initialized renter.
-func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
-	hdb, err := hostdb.New(cs, persistDir)
+func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
+	hdb, err := hostdb.New(g, cs, persistDir)
 	if err != nil {
 		return nil, err
 	}
