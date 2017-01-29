@@ -192,6 +192,7 @@ func (r *Renter) Close() error {
 // operations.
 //
 // TODO: Make this function line up with the actual settings in the renter.
+// Perhaps even make it so it uses the renter's actual contracts if it has any.
 func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 	// Grab 50 hosts to perform the estimation.
 	hosts := r.hostDB.RandomHosts(50, nil) // TODO: follow allowance
@@ -215,7 +216,7 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 
 	// Factor in redundancy.
 	totalStorageCost = totalStorageCost.Mul64(3) // TODO: follow file settings?
-	totalUploadCost = totalUploadCost.Mul64(3) // TODO: follow file settings?
+	totalUploadCost = totalUploadCost.Mul64(3)   // TODO: follow file settings?
 
 	// Perform averages.
 	totalContractCost = totalContractCost.Div64(uint64(len(hosts)))
@@ -228,10 +229,10 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 	totalContractCost = totalContractCost.Mul64(50)
 
 	return modules.RenterPriceEstimation{
-		ContractPrice: totalContractCost,
-		DownloadTerabyte: totalDownloadCost,
+		FormContracts:        totalContractCost,
+		DownloadTerabyte:     totalDownloadCost,
 		StorageTerabyteMonth: totalStorageCost,
-		UploadTerabyte: totalUploadCost,
+		UploadTerabyte:       totalUploadCost,
 	}
 }
 

@@ -304,6 +304,12 @@ func (api *API) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ h
 	})
 }
 
+// renterPricesHandler reports the expected costs of various actions given the
+// renter settings and the set of available hosts.
+func (api *API) renterPricesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	WriteJSON(w, api.renter.PriceEstimation())
+}
+
 // renterDeleteHandler handles the API call to delete a file entry from the
 // renter.
 func (api *API) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {

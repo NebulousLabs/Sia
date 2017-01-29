@@ -96,18 +96,18 @@ type HostDBScan struct {
 // RenterPriceEstimation contains a bunch of fileds estimating the costs of
 // various operations on the network.
 type RenterPriceEstimation struct {
-	// The cost of forming a set of contracts using the defaults.
-	ContractPrice types.Currency
-
 	// The cost of downloading 1 TB of data.
-	DownloadTerabyte types.Currency
+	DownloadTerabyte types.Currency `json:"downloadterabyte"`
+
+	// The cost of forming a set of contracts using the defaults.
+	FormContracts types.Currency `json:"formcontracts"`
 
 	// The cost of storing 1 TB for a month, including redundancy.
-	StorageTerabyteMonth types.Currency
+	StorageTerabyteMonth types.Currency `json:"storageterabyte"`
 
 	// The cost of consuming 1 TB of upload bandwidth from the host, including
 	// redundancy.
-	UploadTerabyte types.Currency
+	UploadTerabyte types.Currency `json:"uploadterabyte"`
 }
 
 // RenterSettings control the behavior of the Renter.
@@ -199,6 +199,10 @@ type Renter interface {
 	// LoadSharedFilesAscii loads an ASCII-encoded '.sia' file into the
 	// renter.
 	LoadSharedFilesAscii(asciiSia string) ([]string, error)
+
+	// PriceEstimation estimates the cost in siacoins of performing various
+	// network operations.
+	PriceEstimation() RenterPriceEstimation
 
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error

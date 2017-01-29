@@ -628,6 +628,7 @@ Renter
 | [/renter/contracts](#rentercontracts-get)                     | GET       |
 | [/renter/downloads](#renterdownloads-get)                     | GET       |
 | [/renter/files](#renterfiles-get)                             | GET       |
+| [/renter/prices](#renter-prices-get)                          | GET       |
 | [/renter/delete/___*siapath___](#renterdeletesiapath-post)    | POST      |
 | [/renter/download/___*siapath___](#renterdownloadsiapath-get) | GET       |
 | [/renter/rename/___*siapath___](#renterrenamesiapath-post)    | POST      |
@@ -736,6 +737,21 @@ lists the status of all files.
   ]
 }
 ```
+
+#### /renter/prices [GET]
+
+lists the estimated prices of performing various network operations.
+
+###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-4)
+```javascript
+{
+  "downloadterabyte": "1234", // hastings
+  "formcontracts":    "1234", // hastings
+  "storageterabyte":  "1234", // hastings
+  "uploadterabyte":   "1234", // hastings
+}
+```
+
 
 #### /renter/delete/___*siapath___ [POST]
 
