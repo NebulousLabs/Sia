@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -28,9 +30,12 @@ func hostdbcmd() {
 		fmt.Println("No known active hosts")
 		return
 	}
-	fmt.Println("Active hosts:")
+	fmt.Println(len(info.Hosts), "active hosts:")
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Address\tPrice")
 	for _, host := range info.Hosts {
 		price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
-		fmt.Printf("\t%v - %v / TB / Month\n", host.NetAddress, currencyUnits(price))
+		fmt.Fprintf(w, "%v\t%v / TB / Month\n", host.NetAddress, currencyUnits(price))
 	}
+	w.Flush()
 }
