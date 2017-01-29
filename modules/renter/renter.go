@@ -44,6 +44,8 @@ type hostDB interface {
 
 	// Host returns the HostDBEntry for a given host.
 	Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
+
+	RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry
 }
 
 // A hostContractor negotiates, revises, renews, and provides access to file
@@ -184,6 +186,53 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 func (r *Renter) Close() error {
 	r.tg.Stop()
 	return r.hostDB.Close()
+}
+
+// PriceEstimation estimates the cost in siacoins of performing various network
+// operations.
+//
+// TODO: Make this function line up with the actual settings in the renter.
+func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
+	// Grab 50 hosts to perform the estimation.
+	hosts := r.hostDB.RandomHosts(50, nil) // TODO: follow allowance
+
+	// Add up the costs for each host.
+	var totalContractCost types.Currency
+	var totalDownloadCost types.Currency
+	var totalStorageCost types.Currency
+	var totalUploadCost types.Currency
+	for _, host := range hosts {
+		totalContractCost = totalContractCost.Add(host.ContractPrice)
+		totalDownloadCost = totalDownloadCost.Add(host.DownloadBandwidthPrice)
+		totalStorageCost = totalStorageCost.Add(host.StoragePrice)
+		totalUploadCost = totalUploadCost.Add(host.UploadBandwidthPrice)
+	}
+
+	// Convert values to being human-scale.
+	totalDownloadCost = totalDownloadCost.Mul(modules.BytesPerTerabyte)
+	totalStorageCost = totalStorageCost.Mul(modules.BlockBytesPerMonthTerabyte)
+	totalUploadCost = totalUploadCost.Mul(modules.BytesPerTerabyte)
+
+	// Factor in redundancy.
+	totalStorageCost = totalStorageCost.Mul64(3) // TODO: follow file settings?
+	totalUploadCost = totalUploadCost.Mul64(3) // TODO: follow file settings?
+
+	// Perform averages.
+	totalContractCost = totalContractCost.Div64(uint64(len(hosts)))
+	totalDownloadCost = totalDownloadCost.Div64(uint64(len(hosts)))
+	totalStorageCost = totalStorageCost.Div64(uint64(len(hosts)))
+	totalUploadCost = totalUploadCost.Div64(uint64(len(hosts)))
+
+	// We have to form 50 contracts, so multiply again. We may not have 50
+	// hosts, so this step is necessary.
+	totalContractCost = totalContractCost.Mul64(50)
+
+	return modules.RenterPriceEstimation{
+		ContractPrice: totalContractCost,
+		DownloadTerabyte: totalDownloadCost,
+		StorageTerabyteMonth: totalStorageCost,
+		UploadTerabyte: totalUploadCost,
+	}
 }
 
 // SetSettings will update the settings for the renter.

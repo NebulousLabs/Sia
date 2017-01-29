@@ -37,6 +37,25 @@ type ErasureCoder interface {
 	Recover(pieces [][]byte, n uint64, w io.Writer) error
 }
 
+// An Allowance dictates how much the Renter is allowed to spend in a given
+// period. Note that funds are spent on both storage and bandwidth.
+type Allowance struct {
+	Funds       types.Currency    `json:"funds"`
+	Hosts       uint64            `json:"hosts"`
+	Period      types.BlockHeight `json:"period"`
+	RenewWindow types.BlockHeight `json:"renewwindow"`
+}
+
+// DownloadInfo provides information about a file that has been requested for
+// download.
+type DownloadInfo struct {
+	SiaPath     string    `json:"siapath"`
+	Destination string    `json:"destination"`
+	Filesize    uint64    `json:"filesize"`
+	Received    uint64    `json:"received"`
+	StartTime   time.Time `json:"starttime"`
+}
+
 // FileUploadParams contains the information used by the Renter to upload a
 // file.
 type FileUploadParams struct {
@@ -56,30 +75,6 @@ type FileInfo struct {
 	Expiration     types.BlockHeight `json:"expiration"`
 }
 
-// DownloadInfo provides information about a file that has been requested for
-// download.
-type DownloadInfo struct {
-	SiaPath     string    `json:"siapath"`
-	Destination string    `json:"destination"`
-	Filesize    uint64    `json:"filesize"`
-	Received    uint64    `json:"received"`
-	StartTime   time.Time `json:"starttime"`
-}
-
-// An Allowance dictates how much the Renter is allowed to spend in a given
-// period. Note that funds are spent on both storage and bandwidth.
-type Allowance struct {
-	Funds       types.Currency    `json:"funds"`
-	Hosts       uint64            `json:"hosts"`
-	Period      types.BlockHeight `json:"period"`
-	RenewWindow types.BlockHeight `json:"renewwindow"`
-}
-
-// RenterSettings control the behavior of the Renter.
-type RenterSettings struct {
-	Allowance Allowance `json:"allowance"`
-}
-
 // A HostDBEntry represents one host entry in the Renter's host DB. It
 // aggregates the host's external settings and metrics with its public key.
 type HostDBEntry struct {
@@ -96,6 +91,28 @@ type HostDBEntry struct {
 type HostDBScan struct {
 	Timestamp time.Time
 	Success   bool
+}
+
+// RenterPriceEstimation contains a bunch of fileds estimating the costs of
+// various operations on the network.
+type RenterPriceEstimation struct {
+	// The cost of forming a set of contracts using the defaults.
+	ContractPrice types.Currency
+
+	// The cost of downloading 1 TB of data.
+	DownloadTerabyte types.Currency
+
+	// The cost of storing 1 TB for a month, including redundancy.
+	StorageTerabyteMonth types.Currency
+
+	// The cost of consuming 1 TB of upload bandwidth from the host, including
+	// redundancy.
+	UploadTerabyte types.Currency
+}
+
+// RenterSettings control the behavior of the Renter.
+type RenterSettings struct {
+	Allowance Allowance `json:"allowance"`
 }
 
 // HostDBScans represents a sortable slice of scans.

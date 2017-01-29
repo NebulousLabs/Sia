@@ -22,7 +22,7 @@ var (
 	// contracts with if the value is not specified explicity in the call to
 	// SetSettings.
 	recommendedHosts = build.Select(build.Var{
-		Standard: uint64(42),
+		Standard: uint64(50),
 		Dev:      uint64(2),
 		Testing:  uint64(1),
 	}).(uint64)
@@ -49,7 +49,7 @@ var (
 	// accepted by the renter when uploading a file. This minimum exists to
 	// prevent users from shooting themselves in the foot.
 	requiredRedundancy = build.Select(build.Var{
-		Standard: float64(2.5),
+		Standard: float64(2),
 		Dev:      float64(1),
 		Testing:  float64(1),
 	}).(float64)
