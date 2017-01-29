@@ -4,25 +4,11 @@
 // set of hosts it has found and updates who is online.
 package hostdb
 
-// TODO: There should be some mechanism for detecting if the hostdb cannot
-// connect to the internet. If it cannot, hosts should not be penalized for
-// appearing to be offline, because they may not actually be offline and it'll
-// unfairly over-penalize the hosts with the highest uptime.
-//
-// Do this by adding a gateway and checking for non-local nodes.
-
-// TODO: Need to distinguish between scans that were triggered by a fresh
-// blockchain announcement and scans that were triggered by cycle selection
-// (makes a difference in how the uptime stats should be counted)
-
-// TODO: Proper upgrade for hostdb from prior persist. Also, need default
-// settings for hosts that fail the first scan.
+// TODO: Not sure what happens with hosts that fail their first scan. Is it
+// possible for them to get scored inappropriately?
 
 // TODO: Do not add a host pk to the scan pool if a host with that pk is
 // already in the scan pool.
-
-// TODO: Change the uptimes to be forward looking in the weight func instead of
-// backward looking, and add duplicate scan as first scan at firs seen height.
 
 import (
 	"errors"
