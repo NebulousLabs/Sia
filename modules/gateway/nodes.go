@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
@@ -53,14 +54,9 @@ func (g *Gateway) managedAddUntrustedNode(addr modules.NetAddress) error {
 	//
 	// NOTE: this is a somewhat clunky way of specifying that you didn't
 	// actually want a connection.
-	encoding.WriteObject(conn, "0.0.0")
-	var reject string
-	err = encoding.ReadObject(conn, &reject, build.MaxEncodedVersionLength)
-	if err != nil {
-		g.log.Debugln("ERROR: version handshake ping terminated unexpectedly:", err)
-	}
-	if reject != "reject" {
-		g.log.Debugln("WARN: peer does not seem to have correctly rejected our ping:", reject)
+	_, err = connectVersionHandshake(conn, "0.0.0")
+	if err != errPeerRejectedConn {
+		g.log.Debugln("ERROR: version handshake should have resulted in rejection; got", err)
 	}
 	conn.Close()
 
@@ -229,35 +225,33 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 
 		// Try connecting to the random node. If the node is not reachable,
 		// remove them from the node list.
-		conn, err := g.dial(node)
+		err = func() error {
+			conn, err := g.dial(node)
+			if err != nil {
+				// NOTE: an error may be returned if the dial is canceled
+				// partway through, which would cause the node to be pruned
+				// even though it may be a good node. Because nodes are
+				// plentiful, this is an acceptable bug.
+				return err
+			}
+			// If connection succeeds, supply an unacceptable version so that we
+			// will not be added as a peer.
+			//
+			// NOTE: this is a somewhat clunky way of specifying that you didn't
+			// actually want a connection.
+			_, err = connectVersionHandshake(conn, "0.0.0")
+			if err != errPeerRejectedConn {
+				return fmt.Errorf("expected version rejection, got %v", err)
+			}
+			return nil
+		}()
 		if err != nil {
-			// NOTE: an error may be returned if the dial is cancelled
-			// partway through, which would cause the node to be pruned
-			// even though it may be a good node. Because nodes are
-			// plentiful, that's not a huge problem.
 			g.mu.Lock()
 			g.removeNode(node)
 			g.save()
 			g.mu.Unlock()
-			g.log.Debugf("INFO: removing node %q because dialing it failed: %v", node, err)
-			continue
+			g.log.Debugf("INFO: removing node %q because it could not be reached during a random scan: %v", node, err)
 		}
-
-		// If connection succeeds, supply an unacceptable version so that we
-		// will not be added as a peer.
-		//
-		// NOTE: this is a somewhat clunky way of specifying that you didn't
-		// actually want a connection.
-		encoding.WriteObject(conn, "0.0.0")
-		var reject string
-		err = encoding.ReadObject(conn, &reject, build.MaxEncodedVersionLength)
-		if err != nil {
-			g.log.Debugln("ERROR: version handshake ping terminated unexpectedly:", err)
-		}
-		if reject != "reject" {
-			g.log.Debugln("WARN: peer does not seem to have correctly rejected our ping:", reject)
-		}
-		conn.Close()
 	}
 }
 
