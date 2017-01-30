@@ -299,11 +299,7 @@ func (ht *HostTree) SelectRandom(n int, ignore []types.SiaPublicKey) []modules.H
 	for len(hosts) < n && len(ht.hosts) > 0 {
 		randWeight, _ := rand.Int(rand.Reader, ht.root.weight.Big())
 		node := ht.root.nodeAtWeight(types.NewCurrency(randWeight))
-
-		if node.entry.HostDBEntry.AcceptingContracts {
-			hosts = append(hosts, node.entry.HostDBEntry)
-		}
-
+		hosts = append(hosts, node.entry.HostDBEntry)
 		removedEntries = append(removedEntries, node.entry)
 		node.remove()
 		delete(ht.hosts, string(node.entry.PublicKey.Key))
@@ -311,7 +307,6 @@ func (ht *HostTree) SelectRandom(n int, ignore []types.SiaPublicKey) []modules.H
 
 	for _, entry := range removedEntries {
 		_, node := ht.root.recursiveInsert(entry)
-
 		ht.hosts[string(entry.PublicKey.Key)] = node
 	}
 

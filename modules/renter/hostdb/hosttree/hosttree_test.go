@@ -502,19 +502,4 @@ func TestRandomHosts(t *testing.T) {
 	if randHosts[0].PublicKey.String() == randHosts[1].PublicKey.String() || randHosts[0].PublicKey.String() == randHosts[2].PublicKey.String() || randHosts[1].PublicKey.String() == randHosts[2].PublicKey.String() {
 		t.Error("doubled up")
 	}
-
-	// entry4 should not every be returned by RandomHosts because it is not
-	// accepting contracts.
-	entry4 := makeHostDBEntry()
-	entry4.AcceptingContracts = false
-	tree.Insert(entry4)
-
-	// Grab 4 random hosts. 3 should be returned.
-	randHosts = tree.SelectRandom(4, nil)
-	if len(randHosts) != 3 {
-		t.Error("didn't get 3 hosts")
-	}
-	if randHosts[0].PublicKey.String() == randHosts[1].PublicKey.String() || randHosts[0].PublicKey.String() == randHosts[2].PublicKey.String() || randHosts[1].PublicKey.String() == randHosts[2].PublicKey.String() {
-		t.Error("doubled up")
-	}
 }

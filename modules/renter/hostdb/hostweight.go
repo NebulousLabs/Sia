@@ -61,10 +61,6 @@ var (
 			panic("incorrect/missing value for requiredStorage constant")
 		}
 	}()
-
-	// uptimeExponentiation is the number of times the uptime percentage is
-	// multiplied by itself when determining host uptime penalty.
-	uptimeExponentiation = 18
 )
 
 // collateralAdjustments improves the host's weight according to the amount of
@@ -218,7 +214,7 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	// Special case: if we have scanned the host twice or fewer, don't perform
 	// uptime math.
 	if len(entry.ScanHistory) == 0 {
-		return 0.001 // Shouldn't happen.
+		return 0.25
 	}
 	if len(entry.ScanHistory) == 1 {
 		if entry.ScanHistory[0].Success {
@@ -259,24 +255,29 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 		return 0.001 // Shouldn't happen.
 	}
 
-	// Calculate the penalty for low uptime.
-	uptimePenalty := float64(1)
+	// Compute the uptime ratio, but shift by 0.02 to acknowledge fully that
+	// 98% uptime and 100% uptime is valued the same.
 	uptimeRatio := float64(uptime) / float64(uptime+downtime)
-	if uptimeRatio > 0.97 {
-		uptimeRatio = 0.97
+	if uptimeRatio > 0.98 {
+		uptimeRatio = 0.98
 	}
-	uptimeRatio += 0.03
-	for i := 0; i < uptimeExponentiation; i++ {
-		uptimePenalty *= uptimeRatio
-	}
+	uptimeRatio += 0.02
 
-	// Calculate the penalty for downtime across consecutive scans.
-	scanLen := len(entry.ScanHistory)
-	for i := scanLen - 1; i >= 0; i-- {
-		if entry.ScanHistory[i].Success {
-			break
-		}
-		uptimePenalty = uptimePenalty / 2
+	// Calculate the penalty for low uptime. Penalties increase extremely
+	// quickly as uptime falls away from 95%.
+	//
+	// 100% uptime = 1
+	// 98%  uptime = 1
+	// 95%  uptime = 0.91
+	// 90%  uptime = 0.51
+	// 85%  uptime = 0.16
+	// 80%  uptime = 0.03
+	// 75%  uptime = 0.002
+	// 70%  uptime = 0.0003
+	// 50%  uptime = 0.00000008
+	uptimePenalty := float64(1)
+	for i := float64(1); i > uptimeRatio && i > 0.75; i -= 0.01 {
+		uptimePenalty *= uptimeRatio
 	}
 	return uptimePenalty
 }

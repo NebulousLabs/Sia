@@ -10,6 +10,8 @@ package hostdb
 // TODO: Do not add a host pk to the scan pool if a host with that pk is
 // already in the scan pool.
 
+// TODO: Scan history should be truncated, perhaps to the past year.
+
 import (
 	"errors"
 	"os"
