@@ -184,11 +184,8 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 
 	// Attempt to add the peer to the node list. If the add is successful and
 	// the address is a local address, mark the peer as a local peer.
-	local := false
 	err = g.managedAddUntrustedNode(remoteAddr)
-	if err != nil && remoteAddr.IsLocal() {
-		local = true
-	}
+	local := err == nil && remoteAddr.IsLocal()
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -352,11 +349,8 @@ func acceptConnVersionHandshake(conn net.Conn, version string) (remoteVersion st
 func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
 	// Attempt to add the peer to the node list. If the add is successful and
 	// the address is a local address, mark the peer as a local peer.
-	local := false
 	err := g.managedAddUntrustedNode(remoteAddr)
-	if err != nil && remoteAddr.IsLocal() {
-		local = true
-	}
+	local := err == nil && remoteAddr.IsLocal()
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -387,11 +381,8 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 
 	// Attempt to add the peer to the node list. If the add is successful and
 	// the address is a local address, mark the peer as a local peer.
-	local := false
 	err = g.managedAddUntrustedNode(remoteAddr)
-	if err != nil && remoteAddr.IsLocal() {
-		local = true
-	}
+	local := err == nil && remoteAddr.IsLocal()
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
