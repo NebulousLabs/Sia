@@ -201,6 +201,16 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	go r.threadedRepairLoop()
 	go r.threadedDownloadLoop()
 	go r.threadedQueueRepairs()
+
+	// Kill workers on shutdown.
+	r.tg.OnStop(func() {
+		id := r.mu.RLock()
+		for _, worker := range r.workerPool {
+			close(worker.killChan)
+		}
+		r.mu.RUnlock(id)
+	})
+
 	return r, nil
 }
 
