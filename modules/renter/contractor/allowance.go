@@ -83,6 +83,8 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return ErrInsufficientAllowance
 	}
 
+	c.log.Println("INFO: setting allowance to", a)
+
 	c.mu.RLock()
 	shouldRenew := a.Period != c.allowance.Period || !a.Funds.Equals(c.allowance.Funds)
 	shouldWait := c.blockHeight+a.Period < c.contractEndHeight()
@@ -125,7 +127,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	for _, contract := range renewSet {
 		newContract, err := c.managedRenew(contract, numSectors, endHeight)
 		if err != nil {
-			c.log.Printf("WARN: failed to renew contract with %v; a new contract will be formed in its place", contract.NetAddress)
+			c.log.Printf("WARN: failed to renew contract with %v (error: %v); a new contract will be formed in its place", contract.NetAddress, err)
 			remaining++
 			continue
 		}
@@ -211,6 +213,7 @@ func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a m
 
 // managedCancelAllowance handles the special case where the allowance is empty.
 func (c *Contractor) managedCancelAllowance(a modules.Allowance) error {
+	c.log.Println("INFO: canceling allowance")
 	// first need to invalidate any active editors/downloaders
 	// NOTE: this code is the same as in managedRenewContracts
 	var ids []types.FileContractID
