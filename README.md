@@ -56,9 +56,9 @@ authority. To acquire siacoins, use an exchange such as [Poloniex](https://polon
 
 To get started with Sia, check out the guides below:
 
-- [How to Store Data on Sia](https://medium.com/@jhowell1337/getting-started-with-private-decentralized-cloud-storage-c9565dc8c854)
-- [How to Become a Sia Host](http://blog.sia.tech/2016/05/26/how-to-run-a-host-on-sia)
-- [Using the Sia API](http://blog.sia.tech/2016/10/20/api-quickstart-guide)
+- [How to Store Data on Sia](https://blog.sia.tech/getting-started-with-private-decentralized-cloud-storage-c9565dc8c854)
+- [How to Become a Sia Host](https://blog.sia.tech/how-to-run-a-host-on-sia-2159ebc4725)
+- [Using the Sia API](https://blog.sia.tech/api-quickstart-guide-f1d160c05235)
 
 
 Usage
