@@ -140,7 +140,7 @@ func TestRescan(t *testing.T) {
 	// Reload the hostdb using the same persist and the mocked consensus set.
 	// The old change ID will be rejected, causing a rescan, which should
 	// discover the new announcement.
-	hdb, err = newHostDB(g, cs, stdDialer{}, stdSleeper{}, hdb.persist, hdb.log)
+	hdb, err = newHostDB(g, cs, stdDisrupter{}, stdDialer{}, stdSleeper{}, hdb.persist, hdb.log)
 	if err != nil {
 		t.Fatal(err)
 	}

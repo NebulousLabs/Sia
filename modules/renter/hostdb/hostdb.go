@@ -46,13 +46,14 @@ var (
 // for uploading files.
 type HostDB struct {
 	// dependencies
-	dialer  dialer
-	gateway modules.Gateway
-	log     *persist.Logger
-	mu      sync.RWMutex
-	persist persister
-	sleeper sleeper
-	tg      siasync.ThreadGroup
+	dialer    dialer
+	gateway   modules.Gateway
+	disrupter disrupter
+	log       *persist.Logger
+	mu        sync.RWMutex
+	persist   persister
+	sleeper   sleeper
+	tg        siasync.ThreadGroup
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -93,20 +94,21 @@ func New(g modules.Gateway, cs consensusSet, persistDir string) (*HostDB, error)
 	}
 
 	// Create HostDB using production dependencies.
-	return newHostDB(g, cs, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
+	return newHostDB(g, cs, stdDisrupter{}, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
 }
 
 // newHostDB creates a HostDB using the provided dependencies. It loads the old
 // persistence data, spawns the HostDB's scanning threads, and subscribes it to
 // the consensusSet.
-func newHostDB(g modules.Gateway, cs consensusSet, d dialer, s sleeper, p persister, l *persist.Logger) (*HostDB, error) {
+func newHostDB(g modules.Gateway, cs consensusSet, dis disrupter, d dialer, s sleeper, p persister, l *persist.Logger) (*HostDB, error) {
 	// Create the HostDB object.
 	hdb := &HostDB{
-		dialer:  d,
-		gateway: g,
-		sleeper: s,
-		persist: p,
-		log:     l,
+		dialer:    d,
+		disrupter: dis,
+		gateway:   g,
+		sleeper:   s,
+		persist:   p,
+		log:       l,
 
 		scanPool: make(chan modules.HostDBEntry, scanPoolSize),
 	}
@@ -142,7 +144,10 @@ func newHostDB(g modules.Gateway, cs consensusSet, d dialer, s sleeper, p persis
 	for i := 0; i < scanningThreads; i++ {
 		go hdb.threadedProbeHosts()
 	}
-	go hdb.threadedScan()
+
+	if !hdb.disrupter.disrupt("spawnScanLoop") {
+		go hdb.threadedScan()
+	}
 
 	return hdb, nil
 }

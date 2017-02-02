@@ -20,6 +20,10 @@ type (
 		DialTimeout(modules.NetAddress, time.Duration) (net.Conn, error)
 	}
 
+	disrupter interface {
+		disrupt(string) bool
+	}
+
 	sleeper interface {
 		Sleep(time.Duration)
 	}
@@ -71,4 +75,10 @@ func newPersist(dir string) *stdPersist {
 		},
 		filename: filepath.Join(dir, "hostdb.json"),
 	}
+}
+
+type stdDisrupter struct{}
+
+func (stdDisrupter) disrupt(string) bool {
+	return false
 }
