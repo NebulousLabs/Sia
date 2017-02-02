@@ -299,7 +299,15 @@ func (ht *HostTree) SelectRandom(n int, ignore []types.SiaPublicKey) []modules.H
 	for len(hosts) < n && len(ht.hosts) > 0 {
 		randWeight, _ := rand.Int(rand.Reader, ht.root.weight.Big())
 		node := ht.root.nodeAtWeight(types.NewCurrency(randWeight))
-		hosts = append(hosts, node.entry.HostDBEntry)
+
+		if node.entry.AcceptingContracts &&
+			len(node.entry.ScanHistory) > 0 &&
+			node.entry.ScanHistory[len(node.entry.ScanHistory)-1].Success {
+			// The host must be online and accepting contracts to be returned
+			// by the random function.
+			hosts = append(hosts, node.entry.HostDBEntry)
+		}
+
 		removedEntries = append(removedEntries, node.entry)
 		node.remove()
 		delete(ht.hosts, string(node.entry.PublicKey.Key))

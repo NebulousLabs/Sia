@@ -1,6 +1,7 @@
 package hostdb
 
 import (
+	"math"
 	"math/big"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 var (
 	// Because most weights would otherwise be fractional, we set the base
 	// weight to be very large.
-	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(75), nil))
+	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(12), nil))
 
 	// collateralExponentiation is the number of times that the collateral is
 	// multiplied into the price.
@@ -24,7 +25,7 @@ var (
 	// priceDiveNormalization reduces the raw value of the price so that not so
 	// many digits are needed when operating on the weight. This also allows the
 	// base weight to be a lot lower.
-	priceDivNormalization = types.SiacoinPrecision.Div64(100)
+	priceDivNormalization = types.SiacoinPrecision.Div64(10e3)
 
 	// minCollateral is the amount of collateral we weight all hosts as having,
 	// even if they do not have any collateral. This is to temporarily prop up
@@ -65,31 +66,54 @@ var (
 
 // collateralAdjustments improves the host's weight according to the amount of
 // collateral that they have provided.
-//
-// NOTE: For any reasonable value of collateral, there will be a huge blowup,
-// allowing for the base weight to be a lot lower, as the collateral is
-// accounted for before anything else.
-func collateralAdjustments(entry modules.HostDBEntry, weight types.Currency) types.Currency {
-	usedCollateral := entry.Collateral
-	if entry.Collateral.Cmp(minCollateral) < 0 {
-		usedCollateral = minCollateral
-	}
-	for i := 0; i < collateralExponentiation; i++ {
-		weight = weight.Mul(usedCollateral)
-	}
-	return weight
-}
-
-// priceAdjustments will adjust the weight of the entry according to the prices
-// that it has set.
-func priceAdjustments(entry modules.HostDBEntry, weight types.Currency) types.Currency {
+func (hdb *HostDB) collateralAdjustments(entry modules.HostDBEntry) float64 {
 	// Sanity checks - the constants values need to have certain relationships
 	// to eachother
 	if build.DEBUG {
 		// If the minDivPrice is not much larger than the divNormalization,
 		// there will be problems with granularity after the divNormalization is
 		// applied.
-		if minDivPrice.Div64(100).Cmp(priceDivNormalization) < 0 {
+		if minCollateral.Div64(1e3).Cmp(priceDivNormalization) < 0 {
+			build.Critical("Maladjusted minCollateral and divNormalization constants in hostdb package")
+		}
+	}
+
+	// Set a minimum on the collateral, then normalize to a sane precision.
+	usedCollateral := entry.Collateral
+	if entry.Collateral.Cmp(minCollateral) < 0 {
+		usedCollateral = minCollateral
+	}
+	baseU64, err := minCollateral.Div(priceDivNormalization).Uint64()
+	if err != nil {
+		hdb.log.Critical("collateral adjustments are overflowing")
+		baseU64 = math.MaxUint64
+	}
+	actualU64, err := usedCollateral.Div(priceDivNormalization).Uint64()
+	if err != nil {
+		hdb.log.Critical("collateral adjustments are overflowing")
+		actualU64 = math.MaxUint64
+	}
+	base := float64(baseU64)
+	actual := float64(actualU64)
+
+	// Exponentiate the results.
+	weight := float64(1)
+	for i := 0; i < collateralExponentiation; i++ {
+		weight *= actual / base
+	}
+	return weight
+}
+
+// priceAdjustments will adjust the weight of the entry according to the prices
+// that it has set.
+func (hdb *HostDB) priceAdjustments(entry modules.HostDBEntry) float64 {
+	// Sanity checks - the constants values need to have certain relationships
+	// to eachother
+	if build.DEBUG {
+		// If the minDivPrice is not much larger than the divNormalization,
+		// there will be problems with granularity after the divNormalization is
+		// applied.
+		if minDivPrice.Div64(1e3).Cmp(priceDivNormalization) < 0 {
 			build.Critical("Maladjusted minDivePrice and divNormalization constants in hostdb package")
 		}
 	}
@@ -114,21 +138,26 @@ func priceAdjustments(entry modules.HostDBEntry, weight types.Currency) types.Cu
 	siafundFee := adjustedContractPrice.Add(adjustedUploadPrice).Add(adjustedDownloadPrice).Add(entry.Collateral).MulTax()
 	totalPrice := entry.StoragePrice.Add(adjustedContractPrice).Add(adjustedUploadPrice).Add(adjustedDownloadPrice).Add(siafundFee)
 
-	// Set the divPrice, which is closely related to the totalPrice, but
-	// adjusted both to make the math more computationally friendly and also
-	// given a hard minimum to prevent certain classes of Sybil attacks -
-	// attacks where the attacker tries to esacpe the need to burn coins by
-	// setting an extremely low price.
-	divPrice := totalPrice
-	if divPrice.Cmp(minDivPrice) < 0 {
-		divPrice = minDivPrice
+	// Set a minimum on the price, then normalize to a sane precision.
+	if totalPrice.Cmp(minDivPrice) < 0 {
+		totalPrice = minDivPrice
 	}
-	// Shrink the div price so that the math can be a lot less intense. Without
-	// this step, the base price would need to be closer to 10e150 as opposed to
-	// 10e50.
-	divPrice = divPrice.Div(priceDivNormalization)
+	baseU64, err := minDivPrice.Div(priceDivNormalization).Uint64()
+	if err != nil {
+		hdb.log.Critical("collateral adjustments are overflowing")
+		baseU64 = math.MaxUint64
+	}
+	actualU64, err := totalPrice.Div(priceDivNormalization).Uint64()
+	if err != nil {
+		hdb.log.Critical("collateral adjustments are overflowing")
+		actualU64 = math.MaxUint64
+	}
+	base := float64(baseU64)
+	actual := float64(actualU64)
+
+	weight := float64(1)
 	for i := 0; i < priceExponentiation; i++ {
-		weight = weight.Div(divPrice)
+		weight *= base / actual
 	}
 	return weight
 }
@@ -165,11 +194,14 @@ func storageRemainingAdjustments(entry modules.HostDBEntry) float64 {
 // version reported by the host.
 func versionAdjustments(entry modules.HostDBEntry) float64 {
 	base := float64(1)
-	if build.VersionCmp(entry.Version, "1.0.3") < 0 {
+	if build.VersionCmp(entry.Version, "1.1.1") < 0 {
 		base = base / 5 // 5x total penalty.
 	}
+	if build.VersionCmp(entry.Version, "1.0.3") < 0 {
+		base = base / 5 // 25x total penalty.
+	}
 	if build.VersionCmp(entry.Version, "1.0.0") < 0 {
-		base = base / 20 // 100x total penalty.
+		base = base / 20 // 500x total penalty.
 	}
 	return base
 }
@@ -187,13 +219,16 @@ func (hdb *HostDB) lifetimeAdjustments(entry modules.HostDBEntry) float64 {
 			base = base / 2 // 4x total
 		}
 		if age < 2000 {
-			base = base / 4 // 16x total
+			base = base / 2 // 8x total
 		}
 		if age < 1000 {
-			base = base / 4 // 64x total
+			base = base / 8 // 64x total
+		}
+		if age < 576 {
+			base = base / 2 // 128x total
 		}
 		if age < 288 {
-			base = base / 2 // 128x total
+			base = base / 2 // 256x total
 		}
 	} else {
 		// Shouldn't happen, but the usecase is covered anyway.
@@ -263,6 +298,13 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	}
 	uptimeRatio += 0.02
 
+	// Cap the total amount of downtime allowed based on the total number of
+	// scans that have happened.
+	allowedDowntime := 0.03 * float64(len(entry.ScanHistory))
+	if uptimeRatio < 1-allowedDowntime {
+		uptimeRatio = 1 - allowedDowntime
+	}
+
 	// Calculate the penalty for low uptime. Penalties increase extremely
 	// quickly as uptime falls away from 95%.
 	//
@@ -272,11 +314,11 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	// 90%  uptime = 0.51
 	// 85%  uptime = 0.16
 	// 80%  uptime = 0.03
-	// 75%  uptime = 0.002
-	// 70%  uptime = 0.0003
-	// 50%  uptime = 0.00000008
+	// 75%  uptime = 0.005
+	// 70%  uptime = 0.001
+	// 50%  uptime = 0.000002
 	uptimePenalty := float64(1)
-	for i := float64(1); i > uptimeRatio && i > 0.75; i -= 0.01 {
+	for i := float64(1); i > uptimeRatio && i > 0.80; i -= 0.01 {
 		uptimePenalty *= uptimeRatio
 	}
 	return uptimePenalty
@@ -285,24 +327,35 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 // calculateHostWeight returns the weight of a host according to the settings of
 // the host database entry. Currently, only the price is considered.
 func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency {
-	// Perform the high resolution adjustments.
-	weight := baseWeight
-	weight = collateralAdjustments(entry, weight)
-	weight = priceAdjustments(entry, weight)
-
-	// Perform the lower resolution adjustments.
+	collateralReward := hdb.collateralAdjustments(entry)
+	pricePenalty := hdb.priceAdjustments(entry)
 	storageRemainingPenalty := storageRemainingAdjustments(entry)
 	versionPenalty := versionAdjustments(entry)
 	lifetimePenalty := hdb.lifetimeAdjustments(entry)
 	uptimePenalty := hdb.uptimeAdjustments(entry)
 
 	// Combine the adjustments.
-	fullPenalty := storageRemainingPenalty * versionPenalty * lifetimePenalty * uptimePenalty
-	weight = weight.MulFloat(fullPenalty)
+	fullPenalty := collateralReward * pricePenalty * storageRemainingPenalty * versionPenalty * lifetimePenalty * uptimePenalty
 
+	// Return a types.Currency.
+	weight := baseWeight.MulFloat(fullPenalty)
 	if weight.IsZero() {
 		// A weight of zero is problematic for for the host tree.
 		return types.NewCurrency64(1)
 	}
 	return weight
+}
+
+// ScoreBreakdown provdes a detailed set of scalars and bools indicating
+// elements of the host's overall score.
+func (hdb *HostDB) ScoreBreakdown(entry modules.HostDBEntry) modules.HostScoreBreakdown {
+	return modules.HostScoreBreakdown{
+		AgeAdjustment:              hdb.lifetimeAdjustments(entry),
+		BurnAdjustment:             1,
+		CollateralAdjustment:       hdb.collateralAdjustments(entry),
+		PriceAdjustment:            hdb.priceAdjustments(entry),
+		StorageRemainingAdjustment: storageRemainingAdjustments(entry),
+		UptimeAdjustment:           hdb.uptimeAdjustments(entry),
+		VersionAdjustment:          versionAdjustments(entry),
+	}
 }

@@ -45,7 +45,14 @@ type hostDB interface {
 	// Host returns the HostDBEntry for a given host.
 	Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
 
+	// RandomHosts returns a set of random hosts, weighted by their estimated
+	// usefulness / attractiveness to the renter. RandomHosts will not return
+	// any offline or inactive hosts.
 	RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry
+
+	// ScoreBreakdown returns a detailed explanation of the various properties
+	// of the host.
+	ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
 }
 
 // A hostContractor negotiates, revises, renews, and provides access to file
@@ -250,8 +257,12 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 }
 
 // hostdb passthroughs
-func (r *Renter) ActiveHosts() []modules.HostDBEntry { return r.hostDB.ActiveHosts() }
-func (r *Renter) AllHosts() []modules.HostDBEntry    { return r.hostDB.AllHosts() }
+func (r *Renter) ActiveHosts() []modules.HostDBEntry                      { return r.hostDB.ActiveHosts() }
+func (r *Renter) AllHosts() []modules.HostDBEntry                         { return r.hostDB.AllHosts() }
+func (r *Renter) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) { return r.hostDB.Host(spk) }
+func (r *Renter) ScoreBreakdown(e modules.HostDBEntry) modules.HostScoreBreakdown {
+	return r.hostDB.ScoreBreakdown(e)
+}
 
 // contractor passthroughs
 func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }

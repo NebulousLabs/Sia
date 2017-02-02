@@ -92,6 +92,10 @@ func makeHostDBEntry() modules.HostDBEntry {
 
 	dbe.AcceptingContracts = true
 	dbe.PublicKey = pk
+	dbe.ScanHistory = modules.HostDBScans{{
+		Timestamp: time.Now(),
+		Success:   true,
+	}}
 
 	return dbe
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -55,6 +56,10 @@ func makeHostDBEntry() modules.HostDBEntry {
 
 	dbe.AcceptingContracts = true
 	dbe.PublicKey = pk
+	dbe.ScanHistory = modules.HostDBScans{{
+		Timestamp: time.Now(),
+		Success:   true,
+	}}
 	return dbe
 }
 

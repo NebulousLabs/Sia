@@ -165,10 +165,10 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	m.AddBlock()
 
 	// wait for hostdb to scan host
-	for i := 0; i < 25 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
-		time.Sleep(time.Millisecond * 250)
+	for i := 0; i < 50 && len(c.hdb.ActiveHosts()) == 0; i++ {
+		time.Sleep(time.Millisecond * 100)
 	}
-	if len(c.hdb.RandomHosts(1, nil)) == 0 {
+	if len(c.hdb.ActiveHosts()) == 0 {
 		return nil, nil, nil, errors.New("host did not make it into the contractor hostdb in time")
 	}
 

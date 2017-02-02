@@ -12,6 +12,9 @@ package hostdb
 
 // TODO: Scan history should be truncated, perhaps to the past year.
 
+// TODO: Write tests to see that a host which is initally scanned as offline
+// can eventually fight their way back through the ranks.
+
 import (
 	"errors"
 	"os"

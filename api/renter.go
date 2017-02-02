@@ -121,16 +121,6 @@ type (
 	RenterShareASCII struct {
 		ASCIIsia string `json:"asciisia"`
 	}
-
-	// HostdbActiveGET lists active hosts on the network.
-	HostdbActiveGET struct {
-		Hosts []modules.HostDBEntry `json:"hosts"`
-	}
-
-	// HostdbAllGET lists all hosts that the renter is aware of.
-	HostdbAllGET struct {
-		Hosts []modules.HostDBEntry `json:"hosts"`
-	}
 )
 
 // renterHandlerGET handles the API call to /renter.
@@ -433,39 +423,4 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 		return
 	}
 	WriteSuccess(w)
-}
-
-// hostdbActive handles the API call asking for the list of active
-// hosts.
-func (api *API) hostdbActive(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	var numHosts uint64
-	hosts := api.renter.ActiveHosts()
-
-	if req.FormValue("numhosts") == "" {
-		// Default value for 'numhosts' is all of them.
-		numHosts = uint64(len(hosts))
-	} else {
-		// Parse the value for 'numhosts'.
-		_, err := fmt.Sscan(req.FormValue("numhosts"), &numHosts)
-		if err != nil {
-			WriteError(w, Error{err.Error()}, http.StatusBadRequest)
-			return
-		}
-
-		// Catch any boundary errors.
-		if numHosts > uint64(len(hosts)) {
-			numHosts = uint64(len(hosts))
-		}
-	}
-
-	WriteJSON(w, HostdbActiveGET{
-		Hosts: hosts[:numHosts],
-	})
-}
-
-// hostdbAll handles the API call asking for the list of all hosts.
-func (api *API) hostdbAll(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	WriteJSON(w, HostdbAllGET{
-		Hosts: api.renter.AllHosts(),
-	})
 }

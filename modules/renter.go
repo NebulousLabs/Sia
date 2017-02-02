@@ -77,20 +77,40 @@ type FileInfo struct {
 
 // A HostDBEntry represents one host entry in the Renter's host DB. It
 // aggregates the host's external settings and metrics with its public key.
+//
+// TODO: WE FORGOT THE JSON STRINGS FOR SOME OF THE ELEMENTS! It's used in both
+// persist and over the API.
 type HostDBEntry struct {
 	HostExternalSettings
 	PublicKey types.SiaPublicKey `json:"publickey"`
 	// ScanHistory is the set of scans performed on the host. It should always
 	// be ordered according to the scan's Timestamp, oldest to newest.
-	ScanHistory HostDBScans
+	ScanHistory HostDBScans `json:"scanhistory"`
 	// FirstSeen is the last block height at which this host was announced.
-	FirstSeen types.BlockHeight
+	FirstSeen types.BlockHeight `json:"firstseen"`
 }
 
 // HostDBScan represents a single scan event.
 type HostDBScan struct {
-	Timestamp time.Time
-	Success   bool
+	Timestamp time.Time `json:"timestamp"`
+	Success   bool      `json:"success"`
+}
+
+// HostScoreBreakdown provides a piece-by-piece explanation of why a host has
+// the score that they do.
+//
+// NOTE: Renters are free to use whatever scoring they feel appropriate for
+// hosts. Some renters will outright blacklist or whitelist sets of hosts. The
+// results provided by this struct can only be used as a guide, and may vary
+// significantly from machine to machine.
+type HostScoreBreakdown struct {
+	AgeAdjustment              float64 `json:"ageadjustment"`
+	BurnAdjustment             float64 `json:"burnadjustment"`
+	CollateralAdjustment       float64 `json:"collateraladjustment"`
+	PriceAdjustment            float64 `json:"pricesmultiplier"`
+	StorageRemainingAdjustment float64 `json:"storageremainingadjustment"`
+	UptimeAdjustment           float64 `json:"uptimeadjustment"`
+	VersionAdjustment          float64 `json:"versionadjustment"`
 }
 
 // RenterPriceEstimation contains a bunch of fileds estimating the costs of
@@ -192,6 +212,9 @@ type Renter interface {
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
 
+	// Host provides the DB entry and score breakdown for the requested host.
+	Host(pk types.SiaPublicKey) (HostDBEntry, bool)
+
 	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
 	// contain multiple files. The paths of the added files are returned.
 	LoadSharedFiles(source string) ([]string, error)
@@ -206,6 +229,10 @@ type Renter interface {
 
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error
+
+	// ScoreBreakdown will return the score for a host db entry using the
+	// hostdb's weighting algorithm.
+	ScoreBreakdown(entry HostDBEntry) HostScoreBreakdown
 
 	// Settings returns the Renter's current settings.
 	Settings() RenterSettings

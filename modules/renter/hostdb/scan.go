@@ -16,23 +16,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-const (
-	defaultScanSleep = 1*time.Hour + 37*time.Minute
-	maxScanSleep     = 4 * time.Hour
-	minScanSleep     = 1*time.Hour + 20*time.Minute
-
-	hostCheckupQuantity = 250
-
-	maxSettingsLen = 4e3
-
-	hostRequestTimeout = 60 * time.Second
-	hostScanDeadline   = 60 * time.Second
-
-	// scanningThreads is the number of threads that will be probing hosts for
-	// their settings and checking for reliability.
-	scanningThreads = 20
-)
-
 // queueScan will add a host to the queue to be scanned.
 func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 	// Add the entry to a waitlist, then check if any thread is currently
@@ -236,8 +219,16 @@ func (hdb *HostDB) threadedScan() {
 		// pushing them further back in the hierarchy, ensuring that for the
 		// most part only online hosts are getting scanned unless there are
 		// fewer than hostCheckupQuantity of them.
+		//
+		// TODO: Cannot use SelectRandom (despite it being faster) because
+		// SelectRandom only returns active/online hosts. Need to be scanning
+		// the offline ones as well, otherwise a little bit of downtime is a
+		// death sentence for a host.
 		hdb.mu.Lock()
-		checkups := hdb.hostTree.SelectRandom(hostCheckupQuantity, nil)
+		checkups := hdb.hostTree.All()
+		if len(checkups) > hostCheckupQuantity {
+			checkups = checkups[:hostCheckupQuantity]
+		}
 		hdb.log.Println("Performing scan on", len(checkups), "hosts")
 		for _, host := range checkups {
 			hdb.queueScan(host)

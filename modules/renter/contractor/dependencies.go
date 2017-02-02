@@ -47,6 +47,7 @@ type (
 
 	hostDB interface {
 		AllHosts() []modules.HostDBEntry
+		ActiveHosts() []modules.HostDBEntry
 		Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
 		RandomHosts(n int, exclude []types.SiaPublicKey) []modules.HostDBEntry
 	}
