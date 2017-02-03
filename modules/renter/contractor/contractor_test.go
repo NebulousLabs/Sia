@@ -141,7 +141,7 @@ func TestContracts(t *testing.T) {
 	}
 }
 
-// TestResolveID tests the resolveID method.
+// TestResolveID tests the ResolveID method.
 func TestResolveID(t *testing.T) {
 	c := &Contractor{
 		renewedIDs: map[types.FileContractID]types.FileContractID{
@@ -163,7 +163,7 @@ func TestResolveID(t *testing.T) {
 		{types.FileContractID{5}, types.FileContractID{6}},
 	}
 	for _, test := range tests {
-		if r := c.resolveID(test.id); r != test.resolved {
+		if r := c.ResolveID(test.id); r != test.resolved {
 			t.Errorf("expected %v -> %v, got %v", test.id, test.resolved, r)
 		}
 	}

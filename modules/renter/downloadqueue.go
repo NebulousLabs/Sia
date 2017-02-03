@@ -26,7 +26,7 @@ func (r *Renter) Download(path, destination string) error {
 	}
 
 	// Create the download object and add it to the queue.
-	d := newDownload(file, destination, currentContracts)
+	d := r.newDownload(file, destination, currentContracts)
 	lockID = r.mu.Lock()
 	r.downloadQueue = append(r.downloadQueue, d)
 	r.mu.Unlock(lockID)

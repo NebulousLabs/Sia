@@ -100,6 +100,9 @@ type hostContractor interface {
 	// Downloader creates a Downloader from the specified contract ID,
 	// allowing the retrieval of sectors.
 	Downloader(types.FileContractID) (contractor.Downloader, error)
+
+	// ResolveID returns the most recent renewal of the specified ID.
+	ResolveID(types.FileContractID) types.FileContractID
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.

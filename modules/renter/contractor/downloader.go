@@ -107,7 +107,7 @@ func (hd *hostDownloader) Close() error {
 // from a host.
 func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err error) {
 	c.mu.RLock()
-	id = c.resolveID(id)
+	id = c.ResolveID(id)
 	cachedDownloader, haveDownloader := c.downloaders[id]
 	height := c.blockHeight
 	contract, haveContract := c.contracts[id]

@@ -117,10 +117,10 @@ func (c *Contractor) CurrentPeriod() types.BlockHeight {
 	return c.currentPeriod
 }
 
-// resolveID returns the ID of the most recent renewal of id.
-func (c *Contractor) resolveID(id types.FileContractID) types.FileContractID {
+// ResolveID returns the ID of the most recent renewal of id.
+func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	if newID, ok := c.renewedIDs[id]; ok && newID != id {
-		return c.resolveID(newID)
+		return c.ResolveID(newID)
 	}
 	return id
 }
