@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -124,5 +125,64 @@ func TestHostDBHostsAllHandler(t *testing.T) {
 	}
 	if len(ah.Hosts) != 1 {
 		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
+	}
+}
+
+// TestHostDBHostsHandler checks that the hosts handler is easily able to return
+func TestHostDBHostsHandler(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester("TestHostDBHostsAllHandler")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and then get the list of hosts.
+	var ah HostdbActiveGET
+	if err = st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.getAPI("/hostdb/active", &ah); err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 1 {
+		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
+	}
+
+	// Parse the pubkey from the returned list of hosts and use it to form a
+	// request regarding the specific host.
+	keyString := ah.Hosts[0].PublicKey.String()
+	query := fmt.Sprintf("/hostdb/hosts/%s", keyString)
+
+	// Get the detailed info for the host.
+	var hh HostdbHostsGET
+	if err = st.getAPI(query, &hh); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that none of the values equal zero.
+	if hh.ScoreBreakdown.AgeAdjustment == 0 {
+		t.Error("Zero value in host score breakdown")
+	}
+	if hh.ScoreBreakdown.BurnAdjustment == 0 {
+		t.Error("Zero value in host score breakdown")
+	}
+	if hh.ScoreBreakdown.CollateralAdjustment == 0 {
+		t.Error("Zero value in host score breakdown")
+	}
+	if hh.ScoreBreakdown.PriceAdjustment == 0 {
+		t.Error("Zero value in host score breakdown")
+	}
+	if hh.ScoreBreakdown.StorageRemainingAdjustment == 0 {
+		t.Error("Zero value in host score breakdown")
+	}
+	if hh.ScoreBreakdown.UptimeAdjustment == 0 {
+		t.Error("Zero value in host score breakdown")
+	}
+	if hh.ScoreBreakdown.VersionAdjustment == 0 {
+		t.Error("Zero value in host score breakdown")
 	}
 }
