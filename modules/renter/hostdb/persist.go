@@ -1,7 +1,23 @@
 package hostdb
 
 import (
+	"path/filepath"
+
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
+)
+
+var (
+	// persistFilename defines the name of the file that holds the hostdb's
+	// persistence.
+	persistFilename = "hostdb.json"
+
+	// persistMetadata defines the metadata that tags along with the most recent
+	// version of the hostdb persistence file.
+	persistMetadata = persist.Metadata{
+		Header:  "HostDB Persistence",
+		Version: "0.5",
+	}
 )
 
 // hdbPersist defines what HostDB data persists across sessions.
@@ -19,21 +35,24 @@ func (hdb *HostDB) persistData() (data hdbPersist) {
 
 // save saves the hostdb persistence data to disk.
 func (hdb *HostDB) save() error {
-	return hdb.persist.save(hdb.persistData())
+	return hdb.deps.saveFile(persistMetadata, hdb.persistData(), filepath.Join(hdb.persistDir, persistFilename))
 }
 
 // saveSync saves the hostdb persistence data to disk and then syncs to disk.
 func (hdb *HostDB) saveSync() error {
-	return hdb.persist.saveSync(hdb.persistData())
+	return hdb.deps.saveFileSync(persistMetadata, hdb.persistData(), filepath.Join(hdb.persistDir, persistFilename))
 }
 
 // load loads the hostdb persistence data from disk.
 func (hdb *HostDB) load() error {
+	// Fetch the data from the file.
 	var data hdbPersist
-	err := hdb.persist.load(&data)
+	err := hdb.deps.loadFile(persistMetadata, &data, filepath.Join(hdb.persistDir, persistFilename))
 	if err != nil {
 		return err
 	}
+
+	// Load each of the hosts into the host tree.
 	for _, host := range data.AllHosts {
 		err := hdb.hostTree.Insert(host)
 		if err != nil {

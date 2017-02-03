@@ -66,6 +66,12 @@ func makeHostDBEntry() modules.HostDBEntry {
 // newHDBTester returns a tester object wrapping a HostDB and some extra
 // information for testing.
 func newHDBTester(name string) (*hdbTester, error) {
+	return newHDBTesterDeps(name, prodDependencies{})
+}
+
+// newHDBTesterDeps returns a tester object wrapping a HostDB and some extra
+// information for testing, using the provided dependencies for the hostdb.
+func newHDBTesterDeps(name string, deps dependencies) (*hdbTester, error) {
 	if testing.Short() {
 		panic("should not be calling newHDBTester during short tests")
 	}
@@ -79,7 +85,7 @@ func newHDBTester(name string) (*hdbTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	hdb, err := New(g, cs, filepath.Join(testDir, modules.RenterDir))
+	hdb, err := newHostDB(g, cs, filepath.Join(testDir, modules.RenterDir), deps)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +96,7 @@ func newHDBTester(name string) (*hdbTester, error) {
 
 		hdb: hdb,
 
-		persistDir: name,
+		persistDir: testDir,
 	}
 	return hdbt, nil
 }
@@ -161,12 +167,25 @@ func TestNew(t *testing.T) {
 	}
 }
 
+// quitAfterLoadDeps will quit startup in newHostDB
+type disableScanLoopDeps struct {
+	prodDependencies
+}
+
+// Send a disrupt signal to the quitAfterLoad codebreak.
+func (disableScanLoopDeps) disrupt(s string) bool {
+	if s == "disableScanLoop" {
+		return true
+	}
+	return false
+}
+
 // TestRandomHosts tests the hostdb's exported RandomHosts method.
 func TestRandomHosts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt, err := newHDBTester("TestRandomHosts")
+	hdbt, err := newHDBTesterDeps("TestRandomHosts", disableScanLoopDeps{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,150 +1,95 @@
 package hostdb
 
 import (
-	"crypto/rand"
+	// "crypto/rand"
 	"path/filepath"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/build"
+	// "github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/types"
+	// "github.com/NebulousLabs/Sia/modules/gateway"
+	// "github.com/NebulousLabs/Sia/types"
 )
 
-// memPersist implements the persister interface in-memory.
-type memPersist hdbPersist
+// quitAfterLoadDeps will quit startup in newHostDB
+type quitAfterLoadDeps struct {
+	prodDependencies
+}
 
-func (m *memPersist) save(data hdbPersist) error     { *m = memPersist(data); return nil }
-func (m *memPersist) saveSync(data hdbPersist) error { *m = memPersist(data); return nil }
-func (m memPersist) load(data *hdbPersist) error     { *data = hdbPersist(m); return nil }
+// Send a disrupt signal to the quitAfterLoad codebreak.
+func (quitAfterLoadDeps) disrupt(s string) bool {
+	if s == "quitAfterLoad" {
+		return true
+	}
+	return false
+}
 
 // TestSaveLoad tests that the hostdb can save and load itself.
+//
+// TODO: By extending the hdbTester and adding some helper functions, we can
+// eliminate the necessary disruption by adding real hosts + blocks instead of
+// fake ones.
 func TestSaveLoad(t *testing.T) {
-	// create hostdb with mocked persist dependency
-	hdb := bareHostDB()
-	hdb.persist = new(memPersist)
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	hdbt, err := newHDBTester("TestSaveLoad")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// add some fake hosts
+	// Add fake hosts and a fake consensus change. The fake consensus change
+	// would normally be detected and routed around, but we stunt the loading
+	// process to only load the persistent fields.
 	var host1, host2, host3 modules.HostDBEntry
 	host1.PublicKey.Key = []byte("foo")
 	host2.PublicKey.Key = []byte("bar")
 	host3.PublicKey.Key = []byte("baz")
-	hdb.hostTree.Insert(host1)
-	hdb.hostTree.Insert(host2)
-	hdb.hostTree.Insert(host3)
-	hdb.lastChange = modules.ConsensusChangeID{1, 2, 3}
+	hdbt.hdb.hostTree.Insert(host1)
+	hdbt.hdb.hostTree.Insert(host2)
+	hdbt.hdb.hostTree.Insert(host3)
+	hdbt.hdb.lastChange = modules.ConsensusChangeID{1, 2, 3}
+	stashedLC := hdbt.hdb.lastChange
 
-	// save and reload
-	err := hdb.save()
+	// Save, close, and reload.
+	err = hdbt.hdb.save()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = hdb.load()
+	err = hdbt.hdb.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hdbt.hdb, err = newHostDB(hdbt.gateway, hdbt.cs, filepath.Join(hdbt.persistDir, modules.RenterDir), quitAfterLoadDeps{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// check that LastChange was loaded
-	if hdb.lastChange != (modules.ConsensusChangeID{1, 2, 3}) {
-		t.Error("wrong consensus change ID was loaded:", hdb.lastChange)
+	// Last change should have been reloaded.
+	if hdbt.hdb.lastChange != stashedLC {
+		t.Error("wrong consensus change ID was loaded:", hdbt.hdb.lastChange)
 	}
 
-	// check that AllHosts was loaded
-	_, ok0 := hdb.hostTree.Select(host1.PublicKey)
-	_, ok1 := hdb.hostTree.Select(host2.PublicKey)
-	_, ok2 := hdb.hostTree.Select(host3.PublicKey)
-	if !ok0 || !ok1 || !ok2 || len(hdb.hostTree.All()) != 3 {
-		t.Fatal("allHosts was not restored properly", ok0, ok1, ok2, len(hdb.hostTree.All()))
+	// Check that AllHosts was loaded.
+	_, ok0 := hdbt.hdb.hostTree.Select(host1.PublicKey)
+	_, ok1 := hdbt.hdb.hostTree.Select(host2.PublicKey)
+	_, ok2 := hdbt.hdb.hostTree.Select(host3.PublicKey)
+	if !ok0 || !ok1 || !ok2 || len(hdbt.hdb.hostTree.All()) != 3 {
+		t.Error("allHosts was not restored properly", ok0, ok1, ok2, len(hdbt.hdb.hostTree.All()))
 	}
 }
 
-// rescanCS is a barebones implementation of a consensus set that can be
-// subscribed to.
-type rescanCS struct {
-	changes []modules.ConsensusChange
-}
-
-func (cs *rescanCS) addBlock(b types.Block) {
-	cc := modules.ConsensusChange{
-		AppliedBlocks: []types.Block{b},
-	}
-	rand.Read(cc.ID[:])
-	cs.changes = append(cs.changes, cc)
-}
-
-func (cs *rescanCS) ConsensusSetSubscribe(s modules.ConsensusSetSubscriber, lastChange modules.ConsensusChangeID) error {
-	var start int
-	if lastChange != (modules.ConsensusChangeID{}) {
-		start = -1
-		for i, cc := range cs.changes {
-			if cc.ID == lastChange {
-				start = i
-				break
-			}
-		}
-		if start == -1 {
-			return modules.ErrInvalidConsensusChangeID
-		}
-	}
-	for _, cc := range cs.changes[start:] {
-		s.ProcessConsensusChange(cc)
-	}
-	return nil
-}
-
-// TestRescan tests that the hostdb will rescan the blockchain properly.
+// TestRescan tests that the hostdb will rescan the blockchain properly, picking
+// up new hosts which appear in an alternate past.
 func TestRescan(t *testing.T) {
-	t.Skip("this test doesn't make any sense")
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// create hostdb with mocked persist dependency
-	hdb := bareHostDB()
-	hdb.persist = new(memPersist)
-
-	// add some fake hosts
-	var host1, host2, host3 modules.HostDBEntry
-	host1.NetAddress = "foo"
-	host2.NetAddress = "bar"
-	host3.NetAddress = "baz"
-	hdb.hostTree.Insert(host1)
-	hdb.hostTree.Insert(host2)
-	hdb.hostTree.Insert(host3)
-	hdb.lastChange = modules.ConsensusChangeID{1, 2, 3}
-
-	// save the hostdb
-	err := hdb.save()
+	_, err := newHDBTester("TestRescan")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// create a mocked consensus set with a different host announcement
-	annBytes, err := makeSignedAnnouncement("quux.com:1234")
-	if err != nil {
-		t.Fatal(err)
-	}
-	announceBlock := types.Block{
-		Transactions: []types.Transaction{{
-			ArbitraryData: [][]byte{annBytes},
-		}},
-	}
-	cs := new(rescanCS)
-	cs.addBlock(announceBlock)
-
-	testDir := build.TempDir("HostDB", "TestRescan")
-	g, err := gateway.New("localhost:0", false, filepath.Join(testDir, modules.GatewayDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Reload the hostdb using the same persist and the mocked consensus set.
-	// The old change ID will be rejected, causing a rescan, which should
-	// discover the new announcement.
-	hdb, err = newHostDB(g, cs, stdDisrupter{}, stdDialer{}, stdSleeper{}, hdb.persist, hdb.log)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(hdb.hostTree.All()) != 1 {
-		t.Fatal("hostdb rescan resulted in wrong host set", len(hdb.hostTree.All()))
-	}
+	t.Skip("create two consensus sets with blocks + announcements")
 }
