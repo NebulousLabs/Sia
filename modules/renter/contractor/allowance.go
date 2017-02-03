@@ -124,6 +124,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 	// renew existing contracts with new allowance parameters
 	newContracts := make(map[types.FileContractID]modules.RenterContract)
+	renewedIDs := make(map[types.FileContractID]types.FileContractID)
 	for _, contract := range renewSet {
 		newContract, err := c.managedRenew(contract, numSectors, endHeight)
 		if err != nil {
@@ -132,6 +133,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 			continue
 		}
 		newContracts[newContract.ID] = newContract
+		renewedIDs[contract.ID] = newContract.ID
 		if len(newContracts) >= int(a.Hosts) {
 			break
 		}
@@ -166,6 +168,10 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	}
 	// replace the current contract set with new contracts
 	c.contracts = newContracts
+	// link the contracts that were renewed
+	for oldID, newID := range renewedIDs {
+		c.renewedIDs[oldID] = newID
+	}
 	// if the currentPeriod was previously unset, set it now
 	if c.currentPeriod == 0 {
 		c.currentPeriod = periodStart
