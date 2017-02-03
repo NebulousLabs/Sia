@@ -479,10 +479,11 @@ standard success or error response. See
 Host DB
 -------
 
-| Request                                     | HTTP Verb |
-| ------------------------------------------- | --------- |
-| [/hostdb/active](#hostdbactive-get-example) | GET       |
-| [/hostdb/all](#hostdball-get-example)       | GET       |
+| Request                                                 | HTTP Verb |
+| ------------------------------------------------------- | --------- |
+| [/hostdb/active](#hostdbactive-get-example)             | GET       |
+| [/hostdb/all](#hostdball-get-example)                   | GET       |
+| [/hostdb/hosts/___:pubkey___](#hostdbhosts-get-example) | GET       |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [HostDB.md](/doc/api/HostDB.md).
@@ -548,6 +549,51 @@ any particular order, and the order may change in subsequent calls.
   ]
 }
 ```
+
+#### /hostdb/hosts/___:pubkey___ [GET] [(example)](/doc/api/HostDB.md#host-details)
+
+fetches detailed information about a particular host, including metrics
+regarding the score of the host within the database. It should be noted that
+each renter uses different metrics for selecting hosts, and that a good score on
+in one hostdb does not mean that the host will be successful on the network
+overall.
+
+###### Path Parameters [(with comments)](/doc/api/HostDB.md#path-parameters)
+```
+:pubkey
+```
+
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-2)
+```javascript
+{
+  "entry": {
+    "acceptingcontracts":   true,
+    "maxdownloadbatchsize": 17825792, // bytes
+    "maxduration":          25920,    // blocks
+    "maxrevisebatchsize":   17825792, // bytes
+    "netaddress":           "123.456.789.0:9982",
+    "remainingstorage":     35000000000, // bytes
+    "sectorsize":           4194304,     // bytes
+    "totalstorage":         35000000000, // bytes
+    "unlockhash":           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+    "windowsize":           144, // blocks
+    "publickey": {
+      "algorithm": "ed25519",
+      "key":       "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+    }
+  },
+  "scorebreakdown": {
+    "ageadjustment":              0.1234,
+    "burnadjustment":             0.1234,
+    "collateraladjustment":       23.456,
+    "priceadjustment":            0.1234,
+    "storageremainingadjustment": 0.1234,
+    "uptimeadjustment":           0.1234,
+    "versionadjustment":          0.1234,
+  }
+}
+```
+
 
 Miner
 -----

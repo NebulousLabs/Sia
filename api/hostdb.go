@@ -25,7 +25,7 @@ type (
 	// by pubkey.
 	HostdbHostsGET struct {
 		Entry          modules.HostDBEntry        `json:"entry"`
-		ScoreBreakdown modules.HostScoreBreakdown `json:"HostScoreBreakdown"`
+		ScoreBreakdown modules.HostScoreBreakdown `json:"scorebreakdown"`
 	}
 )
 
