@@ -163,7 +163,9 @@ func TestHostDBHostsHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Check that none of the values equal zero.
+	// Check that none of the values equal zero. A value of zero indicates that
+	// the field is no longer being tracked/reported, which could break
+	// compatibility for some apps. The default needs to be '1', not zero.
 	if hh.ScoreBreakdown.AgeAdjustment == 0 {
 		t.Error("Zero value in host score breakdown")
 	}
@@ -184,5 +186,32 @@ func TestHostDBHostsHandler(t *testing.T) {
 	}
 	if hh.ScoreBreakdown.VersionAdjustment == 0 {
 		t.Error("Zero value in host score breakdown")
+	}
+
+	// Check that none of the supported values equals 1. A value of 1 indicates
+	// that the hostdb is not performing any penalties or rewards for that
+	// field, meaning that the calibration for that field is probably incorrect.
+	if hh.ScoreBreakdown.AgeAdjustment == 1 {
+		t.Error("One value in host score breakdown")
+	}
+	// Burn adjustment is not yet supported.
+	//
+	// if hh.ScoreBreakdown.BurnAdjustment == 1 {
+	//	t.Error("One value in host score breakdown")
+	// }
+	if hh.ScoreBreakdown.CollateralAdjustment == 1 {
+		t.Error("One value in host score breakdown")
+	}
+	if hh.ScoreBreakdown.PriceAdjustment == 1 {
+		t.Error("One value in host score breakdown")
+	}
+	if hh.ScoreBreakdown.StorageRemainingAdjustment == 1 {
+		t.Error("One value in host score breakdown")
+	}
+	if hh.ScoreBreakdown.UptimeAdjustment == 1 {
+		t.Error("One value in host score breakdown")
+	}
+	if hh.ScoreBreakdown.VersionAdjustment == 1 {
+		t.Error("One value in host score breakdown")
 	}
 }
