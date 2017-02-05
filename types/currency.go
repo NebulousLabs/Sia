@@ -236,7 +236,9 @@ func (c *Currency) UnmarshalSia(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	c.i.SetBytes(b)
+	var dec Currency
+	dec.i.SetBytes(b)
+	*c = dec
 	return nil
 }
 
@@ -248,12 +250,14 @@ func (c Currency) String() string {
 // Scan implements the fmt.Scanner interface, allowing Currency values to be
 // scanned from text.
 func (c *Currency) Scan(s fmt.ScanState, ch rune) error {
-	err := c.i.Scan(s, ch)
+	var dec Currency
+	err := dec.i.Scan(s, ch)
 	if err != nil {
 		return err
 	}
-	if c.i.Sign() < 0 {
+	if dec.i.Sign() < 0 {
 		return ErrNegativeCurrency
 	}
+	*c = dec
 	return nil
 }

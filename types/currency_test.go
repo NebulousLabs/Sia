@@ -447,3 +447,26 @@ func TestCurrencyUint64(t *testing.T) {
 		t.Error("result is not being zeroed in the event of an error")
 	}
 }
+
+// TestCurrencyUnsafeDecode tests that decoding into an existing Currency
+// value does not overwrite its contents.
+func TestCurrencyUnsafeDecode(t *testing.T) {
+	// Scan
+	backup := SiacoinPrecision.Mul64(1)
+	c := SiacoinPrecision
+	_, err := fmt.Sscan("7", &c)
+	if err != nil {
+		t.Error(err)
+	} else if !SiacoinPrecision.Equals(backup) {
+		t.Errorf("Scan changed value of SiacoinPrecision: %v -> %v", backup, SiacoinPrecision)
+	}
+
+	// UnmarshalSia
+	c = SiacoinPrecision
+	err = encoding.Unmarshal(encoding.Marshal(NewCurrency64(7)), &c)
+	if err != nil {
+		t.Error(err)
+	} else if !SiacoinPrecision.Equals(backup) {
+		t.Errorf("UnmarshalSia changed value of SiacoinPrecision: %v -> %v", backup, SiacoinPrecision)
+	}
+}
