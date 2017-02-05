@@ -134,7 +134,7 @@ func TestHostDBHostsHandler(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostDBHostsAllHandler")
+	st, err := createServerTester("TestHostDBHostsHandler")
 	if err != nil {
 		t.Fatal(err)
 	}

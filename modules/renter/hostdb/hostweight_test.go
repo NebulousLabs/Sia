@@ -13,7 +13,7 @@ func calculateWeightFromUInt64Price(price uint64) (weight types.Currency) {
 	hdb.blockHeight = 0
 	var entry modules.HostDBEntry
 	entry.RemainingStorage = 250e3
-	entry.StoragePrice = types.NewCurrency64(price * 1000).Mul(types.SiacoinPrecision)
+	entry.StoragePrice = types.NewCurrency64(price).Mul(types.SiacoinPrecision).Div64(4032).Div64(1e9)
 	return hdb.calculateHostWeight(entry)
 }
 
@@ -21,10 +21,11 @@ func TestHostWeightDistinctPrices(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	weight1 := calculateWeightFromUInt64Price(3)
-	weight2 := calculateWeightFromUInt64Price(6)
-	expectedWeight := weight1.Div64(16)
-	if weight2.Cmp(expectedWeight) != 0 {
+	weight1 := calculateWeightFromUInt64Price(300)
+	weight2 := calculateWeightFromUInt64Price(301)
+	if weight1.Cmp(weight2) <= 0 {
+		t.Log(weight1)
+		t.Log(weight2)
 		t.Error("Weight of expensive host is not the correct value.")
 	}
 }

@@ -10,6 +10,7 @@ package renter
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
@@ -23,6 +24,18 @@ var (
 	errNilCS         = errors.New("cannot create renter with nil consensus set")
 	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
 	errNilHdb        = errors.New("cannot create renter with nil hostdb")
+)
+
+var (
+	// priceEstimationScope is the number of hosts that get queried by the
+	// renter when providing price estimates. Especially for the 'Standard'
+	// variable, there should be congruence with the number of contracts being
+	// used in the renter allowance.
+	priceEstimationScope = build.Select(build.Var{
+		Standard: int(50),
+		Dev:      int(12),
+		Testing:  int(4),
+	}).(int)
 )
 
 // A hostDB is a database of hosts that the renter can use for figuring out who
@@ -201,8 +214,13 @@ func (r *Renter) Close() error {
 // TODO: Make this function line up with the actual settings in the renter.
 // Perhaps even make it so it uses the renter's actual contracts if it has any.
 func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
-	// Grab 50 hosts to perform the estimation.
-	hosts := r.hostDB.RandomHosts(50, nil) // TODO: follow allowance
+	// Grab hosts to perform the estimation.
+	hosts := r.hostDB.RandomHosts(priceEstimationScope, nil)
+
+	// Check if there are zero hosts, which means no estimation can be made.
+	if len(hosts) == 0 {
+		return modules.RenterPriceEstimation{}
+	}
 
 	// Add up the costs for each host.
 	var totalContractCost types.Currency
@@ -231,9 +249,9 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 	totalStorageCost = totalStorageCost.Div64(uint64(len(hosts)))
 	totalUploadCost = totalUploadCost.Div64(uint64(len(hosts)))
 
-	// We have to form 50 contracts, so multiply again. We may not have 50
-	// hosts, so this step is necessary.
-	totalContractCost = totalContractCost.Mul64(50)
+	// Take the average of the host set to estimate the overall cost of the
+	// contract forming.
+	totalContractCost = totalContractCost.Mul64(uint64(priceEstimationScope))
 
 	return modules.RenterPriceEstimation{
 		FormContracts:        totalContractCost,

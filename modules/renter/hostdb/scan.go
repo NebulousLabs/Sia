@@ -68,7 +68,7 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 // to give that host some base uptime. This makes this function co-dependent
 // with the host weight functions. Adjustment of the host weight functions need
 // to keep this function in mind, and vice-versa.
-func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, newSettings modules.HostExternalSettings, netErr error) {
+func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, netErr error) {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 
@@ -79,11 +79,10 @@ func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, newSettings mod
 
 	// Grab the host from the host tree.
 	newEntry, exists := hdb.hostTree.Select(entry.PublicKey)
-	if !exists {
+	if exists {
+		newEntry.HostExternalSettings = entry.HostExternalSettings
+	} else {
 		newEntry = entry
-	}
-	if netErr == nil {
-		newEntry.HostExternalSettings = newSettings
 	}
 
 	// Add the datapoints for the scan.
@@ -161,9 +160,10 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
 	} else {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
+		entry.HostExternalSettings = settings
 	}
 	// Update the host tree to have a new entry, including the new error.
-	hdb.managedUpdateEntry(entry, settings, err)
+	hdb.managedUpdateEntry(entry, err)
 }
 
 // threadedProbeHosts pulls hosts from the thread pool and runs a scan on them.

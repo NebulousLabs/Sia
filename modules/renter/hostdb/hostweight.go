@@ -13,11 +13,11 @@ import (
 var (
 	// Because most weights would otherwise be fractional, we set the base
 	// weight to be very large.
-	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(12), nil))
+	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(50), nil))
 
 	// tbMonth is the number of bytes in a terabyte times the number of blocks
 	// in a month.
-	tbMonth = uint64(4032)*uint64(1e12)
+	tbMonth = uint64(4032) * uint64(1e12)
 
 	// collateralExponentiation is the number of times that the collateral is
 	// multiplied into the price.
@@ -89,12 +89,10 @@ func (hdb *HostDB) collateralAdjustments(entry modules.HostDBEntry) float64 {
 	}
 	baseU64, err := minCollateral.Div(priceDivNormalization).Uint64()
 	if err != nil {
-		hdb.log.Critical("collateral adjustments are overflowing")
 		baseU64 = math.MaxUint64
 	}
 	actualU64, err := usedCollateral.Div(priceDivNormalization).Uint64()
 	if err != nil {
-		hdb.log.Critical("collateral adjustments are overflowing")
 		actualU64 = math.MaxUint64
 	}
 	base := float64(baseU64)
@@ -141,7 +139,6 @@ func (hdb *HostDB) priceAdjustments(entry modules.HostDBEntry) float64 {
 	adjustedDownloadPrice := entry.DownloadBandwidthPrice.Div64(12096)   // Adjust download price to match one download over 12 weeks.
 	siafundFee := adjustedContractPrice.Add(adjustedUploadPrice).Add(adjustedDownloadPrice).Add(entry.Collateral).MulTax()
 	totalPrice := entry.StoragePrice.Add(adjustedContractPrice).Add(adjustedUploadPrice).Add(adjustedDownloadPrice).Add(siafundFee)
-	println(totalPrice.String())
 
 	// Set a minimum on the price, then normalize to a sane precision.
 	if totalPrice.Cmp(minTotalPrice) < 0 {
@@ -149,12 +146,10 @@ func (hdb *HostDB) priceAdjustments(entry modules.HostDBEntry) float64 {
 	}
 	baseU64, err := minTotalPrice.Div(priceDivNormalization).Uint64()
 	if err != nil {
-		hdb.log.Critical("collateral adjustments are overflowing")
 		baseU64 = math.MaxUint64
 	}
 	actualU64, err := totalPrice.Div(priceDivNormalization).Uint64()
 	if err != nil {
-		hdb.log.Critical("collateral adjustments are overflowing")
 		actualU64 = math.MaxUint64
 	}
 	base := float64(baseU64)
