@@ -338,6 +338,20 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 	WriteSuccess(w)
 }
 
+// renterDownloadAsyncHandler handles the API call to download a file asynchronously.
+func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	destination := req.FormValue("destination")
+	// Check that the destination path is absolute.
+	if !filepath.IsAbs(destination) {
+		WriteError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
+		return
+	}
+
+	go api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
+
+	WriteSuccess(w)
+}
+
 // renterShareHandler handles the API call to create a '.sia' file that
 // shares a set of file.
 func (api *API) renterShareHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
