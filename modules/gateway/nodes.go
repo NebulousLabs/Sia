@@ -5,7 +5,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -35,11 +34,6 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 // pingNode verifies that there is a reachable node at the provided address
 // by performing the Sia gateway handshake protocol.
 func (g *Gateway) pingNode(addr modules.NetAddress) error {
-	// Performing the ping during testing does not work.
-	if build.Release == "testing" {
-		return nil
-	}
-
 	// Ping the untrusted node to see whether or not there's actually a
 	// reachable node at the provided address.
 	conn, err := g.dial(addr)
