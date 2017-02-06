@@ -155,7 +155,10 @@ func TestHostDBHostsHandler(t *testing.T) {
 	// Parse the pubkey from the returned list of hosts and use it to form a
 	// request regarding the specific host.
 	keyString := ah.Hosts[0].PublicKey.String()
-	query := fmt.Sprintf("/hostdb/hosts/%s", keyString)
+	if keyString != ah.Hosts[0].PublicKeyString {
+		t.Error("actual key string and provided string do not match")
+	}
+	query := fmt.Sprintf("/hostdb/hosts/%s", ah.Hosts[0].PublicKeyString)
 
 	// Get the detailed info for the host.
 	var hh HostdbHostsGET

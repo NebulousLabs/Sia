@@ -240,7 +240,11 @@ overall.
 
       // Key used to verify signed host messages.
       "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
-    }
+    },
+
+	// The string representation of the full public key, used when calling
+	// /hostdb/hosts.
+	"publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
   },
   "scorebreakdown": {
     // The multiplier that gets applied to the host based on how long it has
@@ -275,7 +279,7 @@ overall.
 	// that they are running. Versions get penalties if there are known bugs,
 	// scaling limitations, performance limitations, etc. Generally, the most
 	// recent version is always the one with the highest score.
-    "versionadjustment":          0.1234,
+    "versionadjustment":          0.1234
   }
 }
 ```
@@ -314,6 +318,7 @@ Examples
         "algorithm": "ed25519",
         "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
+	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     },
     {
       "acceptingcontracts": true,
@@ -330,6 +335,7 @@ Examples
         "algorithm": "ed25519",
         "key": "WWVzIEJydWNlIFNjaG5laWVyIGNhbiByZWFkIHRoaXM="
       }
+	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     }
   ]
 }
@@ -366,6 +372,7 @@ Examples
         "algorithm": "ed25519",
         "key": "SSByYW4gb3V0IG9mIDMyIGNoYXIgbG9uZyBqb2tlcy4="
       }
+	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     },
     {
       "acceptingcontracts": true,
@@ -382,6 +389,7 @@ Examples
         "algorithm": "ed25519",
         "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
+	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     },
     {
       "acceptingcontracts": true,
@@ -398,6 +406,7 @@ Examples
         "algorithm": "ed25519",
         "key": "WWVzIEJydWNlIFNjaG5laWVyIGNhbiByZWFkIHRoaXM="
       }
+	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     }
   ]
 }
@@ -433,6 +442,7 @@ Examples
       "algorithm": "ed25519",
       "key": "SSByYW4gb3V0IG9mIDMyIGNoYXIgbG9uZyBqb2tlcy4="
     }
+	"publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
   },
   "scorebreakdown": {
     "ageadjustment": 0.1234,
