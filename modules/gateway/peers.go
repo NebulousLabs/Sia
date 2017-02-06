@@ -182,10 +182,9 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 		return err
 	}
 
-	// Attempt to add the peer to the node list. If the add is successful and
-	// the address is a local address, mark the peer as a local peer.
-	err = g.managedAddUntrustedNode(remoteAddr)
-	local := err == nil && remoteAddr.IsLocal()
+	// Attempt to ping the supplied address. If successful, we will add
+	// remoteAddr to our node list after accepting the peer.
+	pingSucceeded := g.pingNode(remoteAddr) == nil
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -197,13 +196,19 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 	// Accept the peer.
 	g.acceptPeer(&peer{
 		Peer: modules.Peer{
-			Inbound:    true,
-			Local:      local,
+			Inbound: true,
+			// NOTE: local may be true even if the supplied remoteAddr is not
+			// actually reachable.
+			Local:      remoteAddr.IsLocal(),
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
 		sess: muxado.Server(conn),
 	})
+	if pingSucceeded {
+		g.addNode(remoteAddr)
+		return g.save()
+	}
 	return nil
 }
 
