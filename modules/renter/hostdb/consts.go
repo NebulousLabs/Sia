@@ -22,7 +22,7 @@ var (
 	// time there is a regular scanning operation.
 	hostCheckupQuantity = build.Select(build.Var{
 		Standard: int(250),
-		Dev:      int(4),
+		Dev:      int(6),
 		Testing:  int(5),
 	}).(int)
 
@@ -30,7 +30,7 @@ var (
 	// their settings and checking for reliability.
 	scanningThreads = build.Select(build.Var{
 		Standard: int(25),
-		Dev:      int(6),
+		Dev:      int(4),
 		Testing:  int(3),
 	}).(int)
 )
