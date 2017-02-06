@@ -246,6 +246,13 @@ overall.
 	// /hostdb/hosts.
 	"publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
   },
+
+  // A set of scores as determined by the renter. Generally, the host's final
+  // final score is all of the values multiplied together. Modified renters may
+  // have additional criteria that they use to judge a host, or may ignore
+  // certin criteia. In general, these fields should only be used as a loose
+  // guide for the score of a host, as every renter sees the world differently
+  // and uses different metrics to evaluate hosts.
   "scorebreakdown": {
     // The multiplier that gets applied to the host based on how long it has
 	// been a host. Older hosts typically have a lower penalty.
