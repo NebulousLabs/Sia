@@ -794,10 +794,10 @@ lists the estimated prices of performing various network operations.
 ###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-4)
 ```javascript
 {
-  "downloadterabyte": "1234", // hastings
-  "formcontracts":    "1234", // hastings
-  "storageterabyte":  "1234", // hastings
-  "uploadterabyte":   "1234", // hastings
+  "downloadterabyte":      "1234", // hastings
+  "formcontracts":         "1234", // hastings
+  "storageterabytemonth":  "1234", // hastings
+  "uploadterabyte":        "1234", // hastings
 }
 ```
 

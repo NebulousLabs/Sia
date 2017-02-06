@@ -638,6 +638,8 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 	}
 
 	// This should fail.
+	//
+	// TODO: NDF failures here. What is supposed to be happening?
 	downloadPath = filepath.Join(st.dir, "test1.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
 	if err == nil {

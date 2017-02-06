@@ -123,7 +123,7 @@ type RenterPriceEstimation struct {
 	FormContracts types.Currency `json:"formcontracts"`
 
 	// The cost of storing 1 TB for a month, including redundancy.
-	StorageTerabyteMonth types.Currency `json:"storageterabyte"`
+	StorageTerabyteMonth types.Currency `json:"storageterabytemonth"`
 
 	// The cost of consuming 1 TB of upload bandwidth from the host, including
 	// redundancy.
