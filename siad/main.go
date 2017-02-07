@@ -132,6 +132,9 @@ Explorer (e):
 
 // main establishes a set of commands and flags using the cobra package.
 func main() {
+	if build.DEBUG {
+		fmt.Println("Running with debugging enabled")
+	}
 	root := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Sia Daemon v" + build.Version,
