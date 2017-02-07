@@ -670,18 +670,19 @@ description of the byte encoding.
 Renter
 ------
 
-| Route                                                         | HTTP verb |
-| ------------------------------------------------------------- | --------- |
-| [/renter](#renter-get)                                        | GET       |
-| [/renter](#renter-post)                                       | POST      |
-| [/renter/contracts](#rentercontracts-get)                     | GET       |
-| [/renter/downloads](#renterdownloads-get)                     | GET       |
-| [/renter/files](#renterfiles-get)                             | GET       |
-| [/renter/prices](#renter-prices-get)                          | GET       |
-| [/renter/delete/___*siapath___](#renterdeletesiapath-post)    | POST      |
-| [/renter/download/___*siapath___](#renterdownloadsiapath-get) | GET       |
-| [/renter/rename/___*siapath___](#renterrenamesiapath-post)    | POST      |
-| [/renter/upload/___*siapath___](#renteruploadsiapath-post)    | POST      |
+| Route                                                                   | HTTP verb |
+| ----------------------------------------------------------------------- | --------- |
+| [/renter](#renter-get)                                                  | GET       |
+| [/renter](#renter-post)                                                 | POST      |
+| [/renter/contracts](#rentercontracts-get)                               | GET       |
+| [/renter/downloads](#renterdownloads-get)                               | GET       |
+| [/renter/prices](#renter-prices-get)                                    | GET       |
+| [/renter/files](#renterfiles-get)                                       | GET       |
+| [/renter/delete/___*siapath___](#renterdeletesiapath-post)              | POST      |
+| [/renter/download/___*siapath___](#renterdownloadsiapath-get)           | GET       |
+| [/renter/downloadasync/___*siapath___](#renterdownloadasyncsiapath-get) | GET       |
+| [/renter/rename/___*siapath___](#renterrenamesiapath-post)              | POST      |
+| [/renter/upload/___*siapath___](#renteruploadsiapath-post)              | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Renter.md](/doc/api/Renter.md).
@@ -820,6 +821,24 @@ standard success or error response. See
 
 downloads a file to the local filesystem. The call will block until the file
 has been downloaded.
+
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-1)
+```
+*siapath
+```
+
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-1)
+```
+destination
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /renter/downloadasync/___*siapath___ [GET]
+
+downloads a file to the local filesystem. The call will return immediately.
 
 ###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-1)
 ```
