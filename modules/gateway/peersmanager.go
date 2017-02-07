@@ -35,6 +35,9 @@ func (g *Gateway) managedPeerManagerConnect(addr modules.NetAddress) {
 		g.mu.Unlock()
 	} else if err != nil {
 		g.log.Debugf("[PMC] [ERROR] [%v] WARN: removing peer because automatic connect failed: %v\n", addr, err)
+		g.mu.Lock()
+		g.removeNode(addr)
+		g.mu.Unlock()
 	} else {
 		g.log.Debugf("[PMC] [SUCCESS] [%v] peer successfully added", addr)
 	}
