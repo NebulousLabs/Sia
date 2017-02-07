@@ -72,7 +72,7 @@ func TestRenterAsyncDownload(t *testing.T) {
 
 	// Create a file.
 	path := filepath.Join(build.SiaTestingDir, "api", "TestRenterAsyncDownload", "test.dat")
-	err = createRandFile(path, 1024)
+	err = createRandFile(path, 1e5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,13 +86,13 @@ func TestRenterAsyncDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Only one piece will be uploaded (10% at current redundancy).
+	// wait for the file to become available
 	var rf RenterFiles
-	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+	for i := 0; i < 200 && (len(rf.Files) != 1 || !rf.Files[0].Available); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(100 * time.Millisecond)
 	}
-	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+	if len(rf.Files) != 1 || !rf.Files[0].Available {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
 	}
 
@@ -103,10 +103,21 @@ func TestRenterAsyncDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// verify the file is not currently downloaded
+	var rdq RenterDownloadQueue
+	err = st.getAPI("/renter/downloads", &rdq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, download := range rdq.Downloads {
+		if download.SiaPath == "test.dat" && download.Received == download.Filesize {
+			t.Fatal("download finished prematurely")
+		}
+	}
+
 	// download should eventually complete
 	success := false
 	for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
-		var rdq RenterDownloadQueue
 		err = st.getAPI("/renter/downloads", &rdq)
 		if err != nil {
 			t.Fatal(err)
