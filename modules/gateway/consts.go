@@ -29,12 +29,21 @@ const (
 )
 
 var (
+	// fastNodePurgeDelay defines the amount of time that is waited between each
+	// iteration of the purge loop when the gateway has enough nodes to be
+	// needing to purge quickly.
+	fastNodePurgeDelay = build.Select(build.Var{
+		Standard: 1 * time.Minute,
+		Dev:      5 * time.Second,
+		Testing:  200 * time.Millisecond,
+	}).(time.Duration)
+
 	// healthyNodeListLen defines the number of nodes that the gateway must
 	// have in the node list before it will stop asking peers for more nodes.
 	healthyNodeListLen = build.Select(build.Var{
-		Standard: 200,
-		Dev:      30,
-		Testing:  15,
+		Standard: int(200),
+		Dev:      int(30),
+		Testing:  int(15),
 	}).(int)
 
 	// maxSharedNodes defines the number of nodes that will be shared between
@@ -64,9 +73,17 @@ var (
 	// pruneNodeListLen defines the number of nodes that the gateway must have
 	// to be pruning nodes from the node list.
 	pruneNodeListLen = build.Select(build.Var{
-		Standard: 50,
-		Dev:      15,
-		Testing:  10,
+		Standard: int(50),
+		Dev:      int(15),
+		Testing:  int(10),
+	}).(int)
+
+	// quickPruneListLen defines the number of nodes that the gateway must have
+	// to be pruning nodes quickly from the node list.
+	quickPruneListLen = build.Select(build.Var{
+		Standard: int(250),
+		Dev:      int(40),
+		Testing:  int(20),
 	}).(int)
 )
 
