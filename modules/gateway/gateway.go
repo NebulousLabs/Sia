@@ -250,6 +250,7 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 			fmt.Println("Failed to close the gateway logger:", err)
 		}
 	})
+	g.log.Println("INFO: gateway created, started logging")
 
 	// Establish that the peerTG must complete shutdown before the primary
 	// thread group completes shutdown.
@@ -336,7 +337,6 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 	go g.threadedForwardPort(g.port)
 	go g.threadedLearnHostname()
 
-	g.log.Println("INFO: gateway created, started logging")
 	return g, nil
 }
 
