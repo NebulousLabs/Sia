@@ -227,7 +227,7 @@ func (hdb *HostDB) threadedScan() {
 		hdb.mu.Lock()
 		checkups := hdb.hostTree.All()
 		if len(checkups) > hostCheckupQuantity {
-			checkups = checkups[:hostCheckupQuantity]
+			checkups = checkups[len(checkups)-hostCheckupQuantity:]
 		}
 		hdb.log.Println("Performing scan on", len(checkups), "hosts")
 		for _, host := range checkups {
