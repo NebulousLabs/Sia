@@ -47,10 +47,10 @@ func (g *Gateway) pingNode(addr modules.NetAddress) error {
 	// NOTE: this is a somewhat clunky way of specifying that you didn't
 	// actually want a connection.
 	_, err = connectVersionHandshake(conn, "0.0.0")
-	if err != errPeerRejectedConn {
-		g.log.Debugln("ERROR: version handshake should have resulted in rejection; got", err)
+	if err == errPeerRejectedConn {
+		err = nil // we expect this error
 	}
-	return nil
+	return err
 }
 
 // removeNode will remove a node from the gateway.
