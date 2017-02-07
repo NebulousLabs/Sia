@@ -126,10 +126,20 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		return hdb, nil
 	}
 
+	// COMPATv1.1.0
+	//
+	// If the block height has loaded as zero, the most recent consensus change
+	// needs to be set to perform a full rescan. This will also help the hostdb
+	// to pick up any hosts that it has incorrectly dropped in the past.
+	if hdb.blockHeight == 0 {
+		hdb.lastChange = modules.ConsensusChangeBeginning
+	}
+
 	err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Subscribe again using the new ID. This will cause a triggered scan
 		// on all of the hosts, but that should be acceptable.
+		hdb.blockHeight = 0
 		hdb.lastChange = modules.ConsensusChangeBeginning
 		err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	}

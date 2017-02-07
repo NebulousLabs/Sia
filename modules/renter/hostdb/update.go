@@ -42,6 +42,7 @@ func (hdb *HostDB) insertBlockchainHost(host modules.HostDBEntry) {
 	// shutdown occurs before a scan can be performed.
 	_, exists := hdb.hostTree.Select(host.PublicKey)
 	if !exists {
+		host.FirstSeen = hdb.blockHeight
 		err := hdb.hostTree.Insert(host)
 		if err != nil {
 			hdb.log.Println("ERROR: unable to insert host entry into host tree after a blockchain scan:", err)
@@ -79,7 +80,7 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 		} else if hdb.blockHeight != 0 {
 			// Sanity check - if the current block is the genesis block, the
 			// hostdb height should be set to zero.
-			hdb.log.Critical("Hostdb has detected a genesis block, but the height of the hostdbhostdb  is set to ", hdb.blockHeight)
+			hdb.log.Critical("Hostdb has detected a genesis block, but the height of the hostdb is set to ", hdb.blockHeight)
 			hdb.blockHeight = 0
 		}
 	}

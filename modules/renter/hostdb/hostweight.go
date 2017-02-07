@@ -230,10 +230,6 @@ func (hdb *HostDB) lifetimeAdjustments(entry modules.HostDBEntry) float64 {
 		if age < 288 {
 			base = base / 2 // 256x total
 		}
-	} else {
-		// Shouldn't happen, but the usecase is covered anyway.
-		base = base / 1000 // Because something weird is happening, don't trust this host very much.
-		hdb.log.Critical("Hostdb has witnessed a host where the FirstSeen height is higher than the current block height.")
 	}
 	return base
 }
