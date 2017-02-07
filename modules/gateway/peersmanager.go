@@ -8,7 +8,7 @@ import (
 // managedPeerManagerConnect is a blocking function which tries to connect to
 // the input addreess as a peer.
 func (g *Gateway) managedPeerManagerConnect(addr modules.NetAddress) {
-	g.log.Debugln("[PMC] Attempting connection to", addr)
+	g.log.Debugf("[PMC] [%v] Attempting connection", addr)
 	err := g.managedConnect(addr)
 	if err == errPeerExists {
 		// This peer is already connected to us. Safety around the
@@ -30,15 +30,13 @@ func (g *Gateway) managedPeerManagerConnect(addr modules.NetAddress) {
 			// race condition could mean that the peer was disconnected
 			// before this code block was reached.
 			p.Inbound = false
-			g.log.Debugln("[PMC] [SUCCESS] existing peer has been converted to outbound peer:", addr)
-		} else {
-			g.log.Debugln("[PMC] errPeerExists was returned, but by the time the peer was to be set to 'outbound', it no longer existed.")
+			g.log.Debugf("[PMC] [SUCCESS] [%v] existing peer has been converted to outbound peer", addr)
 		}
 		g.mu.Unlock()
 	} else if err != nil {
-		g.log.Debugf("[PMC] WARN: automatic connect to %v failed: %v\n", addr, err)
+		g.log.Debugf("[PMC] [ERROR] [%v] WARN: removing peer because automatic connect failed: %v\n", addr, err)
 	} else {
-		g.log.Debugln("[PMC] [SUCCESS] addr has been successfully added to the gateway:", addr)
+		g.log.Debugf("[PMC] [SUCCESS] [%v] peer successfully added", addr)
 	}
 }
 
@@ -60,17 +58,20 @@ func (g *Gateway) numOutboundPeers() (numOutboundPeers int) {
 func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 	// Send a signal upon shutdown.
 	defer close(closedChan)
+	defer g.log.Debugln("INFO: [PPM] Permanent peer manager is shutting down")
 
 	// permanentPeerManager will attempt to connect to peers asynchronously,
 	// such that multiple connection attempts can be open at once, but a
 	// limited number.
 	connectionLimiterChan := make(chan struct{}, maxConcurrentOutboundPeerRequests)
 
+	g.log.Debugln("INFO: [PPM] Permanent peer manager has started")
 	for {
 		// If the gateway is well connected, sleep for a while and then try
 		// again.
 		numOutboundPeers := g.numOutboundPeers()
 		if numOutboundPeers >= wellConnectedThreshold {
+			g.log.Debugln("INFO: [PPM] Gateway has enough peers, sleeping.")
 			if !g.managedSleep(wellConnectedDelay) {
 				return
 			}
@@ -83,6 +84,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		g.mu.RUnlock()
 		// If there was an error, log the error and then wait a while before
 		// trying again.
+		g.log.Debugln("[PPM] Fetched a random node:", addr)
 		if err != nil {
 			g.log.Debugln("[PPM] Unable to acquire selected peer:", err)
 			if !g.managedSleep(noNodesDelay) {
@@ -102,12 +104,12 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 			}
 			continue
 		}
-		g.log.Debugln("[PPM] Gateway does not have enough peers, attempting to acquire a new one:", addr)
 
 		// Try connecting to that peer in a goroutine. Do not block unless
 		// there are currently 3 or more peer connection attempts open at once.
 		// Before spawning the thread, make sure that there is enough room by
 		// throwing a struct into the buffered channel.
+		g.log.Debugln("[PPM] Trying to connect to a node:", addr)
 		connectionLimiterChan <- struct{}{}
 		go func(addr modules.NetAddress) {
 			// After completion, take the struct out of the channel so that the
