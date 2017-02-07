@@ -32,8 +32,9 @@ func TestExportedMethodsErrAfterClose(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	g := newTestingGateway("TestCloseErrsSecondTime", t)
+
 	if err := g.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -52,9 +53,10 @@ func TestAddress(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	g := newTestingGateway("TestAddress", t)
 	defer g.Close()
+
 	if g.Address() != g.myAddr {
 		t.Fatal("Address does not return g.myAddr")
 	}
@@ -79,11 +81,12 @@ func TestPeers(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	g1 := newTestingGateway("TestRPC1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestRPC2", t)
 	defer g2.Close()
+
 	err := g1.Connect(g2.Address())
 	if err != nil {
 		t.Fatal("failed to connect:", err)
@@ -107,6 +110,8 @@ func TestNew(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
+
 	if _, err := New("", false, ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
 	}
