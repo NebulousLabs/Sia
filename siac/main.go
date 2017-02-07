@@ -241,6 +241,8 @@ func main() {
 	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
 
 	root.AddCommand(hostdbCmd)
+	hostdbCmd.AddCommand(hostdbAllCmd)
+	hostdbCmd.AddCommand(hostdbViewCmd)
 
 	root.AddCommand(minerCmd)
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd)
