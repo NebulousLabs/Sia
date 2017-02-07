@@ -92,10 +92,6 @@ import (
 // is no public key exhcange, so communications cannot be effectively encrypted
 // or authenticated. The nodes must have some way to share keys.
 //
-// TODO: There is currently no way for a user to choose the bootstrap nodes
-// that the gateway uses, short of modifying the source code. A method for
-// manipulating the bootstrap node list (before startup) is desired.
-//
 // TODO: Gateway hostname discovery currently has significant centralization,
 // namely the fallback is a single third-party website that can easily form any
 // response it wants. Instead, multiple TLS-protected third party websites
