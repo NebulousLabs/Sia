@@ -134,9 +134,9 @@ func (hdb *HostDB) priceAdjustments(entry modules.HostDBEntry) float64 {
 	//
 	// In the future, the renter should be able to track average user behavior
 	// and adjust accordingly. This flexibility will be added later.
-	adjustedContractPrice := entry.ContractPrice.Div64(6048).Div64(25e9) // Adjust contract price to match 25GB for 6 weeks.
-	adjustedUploadPrice := entry.UploadBandwidthPrice.Div64(12096)       // Adjust upload price to match a single upload over 24 weeks.
-	adjustedDownloadPrice := entry.DownloadBandwidthPrice.Div64(12096)   // Adjust download price to match one download over 12 weeks.
+	adjustedContractPrice := entry.ContractPrice.Div64(6048).Div64(25e9)        // Adjust contract price to match 25GB for 6 weeks.
+	adjustedUploadPrice := entry.UploadBandwidthPrice.Div64(24192)              // Adjust upload price to match a single upload over 24 weeks.
+	adjustedDownloadPrice := entry.DownloadBandwidthPrice.Div64(12096).Div64(3) // Adjust download price to match one download over 12 weeks, 1 redundancy.
 	siafundFee := adjustedContractPrice.Add(adjustedUploadPrice).Add(adjustedDownloadPrice).Add(entry.Collateral).MulTax()
 	totalPrice := entry.StoragePrice.Add(adjustedContractPrice).Add(adjustedUploadPrice).Add(adjustedDownloadPrice).Add(siafundFee)
 
