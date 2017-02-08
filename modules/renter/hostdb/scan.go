@@ -26,13 +26,15 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 		return
 	}
 
-	// Nobody is emptying the scan list, volunteer.
-	if hdb.tg.Add() != nil {
-		// Hostdb is shutting down, don't spin up another thread.
-		return
-	}
 	hdb.scanWait = true
 	go func() {
+		// Nobody is emptying the scan list, volunteer.
+		if hdb.tg.Add() != nil {
+			// Hostdb is shutting down, don't spin up another thread.  It is
+			// okay to leave scanWait set to true as that will not affect
+			// shutdown.
+			return
+		}
 		defer hdb.tg.Done()
 
 		for {
