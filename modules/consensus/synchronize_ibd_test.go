@@ -411,7 +411,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 	select {
 	case <-doneChan:
-	case <-time.After(minIBDWaitTime + ibdLoopDelay*2):
+	case <-time.After(minIBDWaitTime*2 + ibdLoopDelay*2):
 		t.Fatal("threadedInitialBlockchainDownload never finished with 2 synced peers and 1 non-synced peer")
 	}
 
