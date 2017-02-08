@@ -224,7 +224,7 @@ type Renter interface {
 	LoadSharedFilesAscii(asciiSia string) ([]string, error)
 
 	// PriceEstimation estimates the cost in siacoins of performing various
-	// network operations.
+	// storage and data operations.
 	PriceEstimation() RenterPriceEstimation
 
 	// RenameFile changes the path of a file.

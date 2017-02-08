@@ -789,7 +789,7 @@ lists the status of all files.
 
 #### /renter/prices [GET]
 
-lists the estimated prices of performing various network operations.
+lists the estimated prices of performing various storage and data operations.
 
 ###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-4)
 ```javascript

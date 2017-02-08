@@ -208,8 +208,8 @@ func (r *Renter) Close() error {
 	return r.hostDB.Close()
 }
 
-// PriceEstimation estimates the cost in siacoins of performing various network
-// operations.
+// PriceEstimation estimates the cost in siacoins of performing various storage
+// and data operations.
 //
 // TODO: Make this function line up with the actual settings in the renter.
 // Perhaps even make it so it uses the renter's actual contracts if it has any.
