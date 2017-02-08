@@ -128,13 +128,13 @@ func (hdb *HostDB) priceAdjustments(entry modules.HostDBEntry) float64 {
 	//
 	// The hostdb will naively assume the following for now:
 	//    - each contract covers 6 weeks of storage (default is 12 weeks, but
-	//      renewals occur at midpoint) - 6048 blocks - and 10GB of storage.
+	//      renewals occur at midpoint) - 6048 blocks - and 25GB of storage.
 	//    - uploads happen once per 12 weeks (average lifetime of a file is 12 weeks)
 	//    - downloads happen once per 12 weeks (files are on average downloaded once throughout lifetime)
 	//
 	// In the future, the renter should be able to track average user behavior
 	// and adjust accordingly. This flexibility will be added later.
-	adjustedContractPrice := entry.ContractPrice.Div64(6048).Div64(10e9) // Adjust contract price to match 10GB for 6 weeks.
+	adjustedContractPrice := entry.ContractPrice.Div64(6048).Div64(25e9) // Adjust contract price to match 25GB for 6 weeks.
 	adjustedUploadPrice := entry.UploadBandwidthPrice.Div64(12096)       // Adjust upload price to match a single upload over 24 weeks.
 	adjustedDownloadPrice := entry.DownloadBandwidthPrice.Div64(12096)   // Adjust download price to match one download over 12 weeks.
 	siafundFee := adjustedContractPrice.Add(adjustedUploadPrice).Add(adjustedDownloadPrice).Add(entry.Collateral).MulTax()
@@ -169,23 +169,20 @@ func storageRemainingAdjustments(entry modules.HostDBEntry) float64 {
 	if entry.RemainingStorage < 200*requiredStorage {
 		base = base / 2 // 2x total penalty
 	}
-	if entry.RemainingStorage < 100*requiredStorage {
+	if entry.RemainingStorage < 50*requiredStorage {
 		base = base / 3 // 6x total penalty
 	}
-	if entry.RemainingStorage < 50*requiredStorage {
+	if entry.RemainingStorage < 25*requiredStorage {
 		base = base / 4 // 24x total penalty
 	}
-	if entry.RemainingStorage < 25*requiredStorage {
-		base = base / 5 // 95x total penalty
-	}
 	if entry.RemainingStorage < 10*requiredStorage {
-		base = base / 6 // 570x total penalty
+		base = base / 5 // 96x total penalty
 	}
 	if entry.RemainingStorage < 5*requiredStorage {
-		base = base / 10 // 5,700x total penalty
+		base = base / 10 // 960x total penalty
 	}
 	if entry.RemainingStorage < requiredStorage {
-		base = base / 100 // 570,000x total penalty
+		base = base / 10 // 9600x total penalty
 	}
 	return base
 }
