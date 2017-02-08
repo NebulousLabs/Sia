@@ -70,11 +70,13 @@ func TestDefragWalletDust(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	wt.wallet.mu.Lock()
 	var dest types.UnlockHash
 	for k := range wt.wallet.keys {
 		dest = k
 		break
 	}
+	wt.wallet.mu.Unlock()
 
 	for i := 0; i < noutputs; i++ {
 		tbuilder.AddSiacoinOutput(types.SiacoinOutput{

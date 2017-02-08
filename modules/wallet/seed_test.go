@@ -54,7 +54,7 @@ func TestPrimarySeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	if progress != 1 {
-		t.Error("primary seed is returning the wrong progress")
+		t.Error("primary seed is returning the wrong progress", progress)
 	}
 
 	// Lock then unlock the wallet and check the responses.
@@ -78,7 +78,7 @@ func TestPrimarySeed(t *testing.T) {
 		t.Error("PrimarySeed is returning a value inconsitent with the seed returned by Encrypt")
 	}
 	if progress != 1 {
-		t.Error("progress reporting an unexpected value")
+		t.Error("progress reporting an unexpected value", progress)
 	}
 }
 
