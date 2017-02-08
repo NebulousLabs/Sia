@@ -368,7 +368,7 @@ func TestRemoveNonexistingHostFromHostTree(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt, err := newHDBTester("TestRandomHosts")
+	hdbt, err := newHDBTester("TestRemoveNonexistingHostFromHostTree")
 	if err != nil {
 		t.Fatal(err)
 	}
