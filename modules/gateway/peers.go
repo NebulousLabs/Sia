@@ -203,7 +203,8 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 	})
 
 	// Attempt to ping the supplied address. If successful, we will add
-	// remoteAddr to our node list after accepting the peer.
+	// remoteAddr to our node list after accepting the peer. We do this in a
+	// goroutine so that we can start communicating with the peer immediately.
 	go func() {
 		err := g.pingNode(remoteAddr)
 		if err == nil {
