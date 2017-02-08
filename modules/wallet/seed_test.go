@@ -16,6 +16,7 @@ func TestPrimarySeed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// Start with a blank wallet tester.
 	wt, err := createBlankWalletTester("TestPrimarySeed")
 	if err != nil {
@@ -87,6 +88,7 @@ func TestLoadSeed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	wt, err := createWalletTester("TestLoadSeed")
 	if err != nil {
 		t.Fatal(err)
