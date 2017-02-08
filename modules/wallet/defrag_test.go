@@ -13,7 +13,7 @@ func TestDefragWallet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	wt, err := createWalletTester("TestDefragWallet")
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func TestDefragWalletDust(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	wt, err := createWalletTester("TestDefragWalletDust")
 	if err != nil {
 		t.Fatal(err)
@@ -70,11 +70,13 @@ func TestDefragWalletDust(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	wt.wallet.mu.Lock()
 	var dest types.UnlockHash
 	for k := range wt.wallet.keys {
 		dest = k
 		break
 	}
+	wt.wallet.mu.Unlock()
 
 	for i := 0; i < noutputs; i++ {
 		tbuilder.AddSiacoinOutput(types.SiacoinOutput{
@@ -111,7 +113,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	wt, err := createWalletTester("TestDefragOutputExhaustion")
 	if err != nil {
 		t.Fatal(err)
