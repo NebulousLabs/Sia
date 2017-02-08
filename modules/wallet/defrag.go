@@ -18,22 +18,11 @@ var (
 // throughout scanning the outputs to determine if defragmentation is necessary
 // and then proceeding to actually defrag.
 func (tb *transactionBuilder) fundDefragger(fee types.Currency) (types.Currency, error) {
-	// Sanity check
-	if build.DEBUG && defragThreshold <= defragBatchSize+defragStartIndex {
-		panic("constants are incorrect, defragThreshold needs to be larger than the sum of defragBatchSize and defragStartIndex")
-	}
-
 	tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock()
 
-	// Only defrag if the wallet is unlocked.
-	if !tb.wallet.unlocked {
-		return types.Currency{}, errDefragNotNeeded
-	}
-
 	// Collect a set of outputs for defragging.
 	var so sortedOutputs
-	var num int
 	for scoid, sco := range tb.wallet.siacoinOutputs {
 		// Skip over any outputs that aren't actually spendable.
 		if err := tb.wallet.checkOutput(scoid, sco); err != nil {
@@ -41,19 +30,23 @@ func (tb *transactionBuilder) fundDefragger(fee types.Currency) (types.Currency,
 		}
 		so.ids = append(so.ids, scoid)
 		so.outputs = append(so.outputs, sco)
-		num++
 	}
 
 	// Only defrag if there are enough outputs to merit defragging.
-	if num <= defragThreshold {
+	if len(so.ids) <= defragThreshold {
 		return types.Currency{}, errDefragNotNeeded
+	}
+	// Sanity check - the defrag threshold needs to be higher than the batch
+	// size plus the start index.
+	if build.DEBUG && defragThreshold <= defragBatchSize+defragStartIndex {
+		panic("constants are incorrect, defragThreshold needs to be larger than the sum of defragBatchSize and defragStartIndex")
 	}
 
 	// Sort the outputs by size.
 	sort.Sort(sort.Reverse(so))
 
-	// Use all of the smaller outputs to fund the transaction, tracking the
-	// total number of coins used to fund the transaction.
+	// Skip over the 'defragStartIndex' largest outputs, so that the user can
+	// still reasonably use their wallet while the defrag is happening.
 	var amount types.Currency
 	parentTxn := types.Transaction{}
 	var spentScoids []types.SiacoinOutputID
@@ -125,12 +118,35 @@ func (w *Wallet) threadedDefragWallet() {
 	}
 	defer w.tg.Done()
 
+	// Check that a defrag makes sense.
+	w.mu.Lock()
+	unlocked := w.unlocked
+	var usableOutputs int
+	for scoid, sco := range w.siacoinOutputs {
+		// Only count the output if it's usable.
+		if err := w.checkOutput(scoid, sco); err == nil {
+			usableOutputs++
+		}
+	}
+	w.mu.Unlock()
+
+	// Can't defrag if the wallet is locked.
+	if !unlocked {
+		return
+	}
+	// No need to defrag if the number of outputs is below the defrag limit.
+	if usableOutputs < defragThreshold {
+		return
+	}
+
 	// grab a new address from the wallet
 	w.mu.Lock()
 	addr, err := w.nextPrimarySeedAddress()
 	w.mu.Unlock()
 	if err != nil {
-		w.log.Println("Error getting an address for defragmentation: ", err)
+		// User may have locekd the wallet between the above check and the
+		// request for the address.
+		w.log.Debugln("Error getting an address for defragmentation: ", err)
 		return
 	}
 
