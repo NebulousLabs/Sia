@@ -49,11 +49,13 @@ func TestSaveLoad(t *testing.T) {
 	hdbt.hdb.hostTree.Insert(host1)
 	hdbt.hdb.hostTree.Insert(host2)
 	hdbt.hdb.hostTree.Insert(host3)
-	hdbt.hdb.lastChange = modules.ConsensusChangeID{1, 2, 3}
-	stashedLC := hdbt.hdb.lastChange
 
 	// Save, close, and reload.
+	hdbt.hdb.mu.Lock()
+	hdbt.hdb.lastChange = modules.ConsensusChangeID{1, 2, 3}
+	stashedLC := hdbt.hdb.lastChange
 	err = hdbt.hdb.save()
+	hdbt.hdb.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +69,10 @@ func TestSaveLoad(t *testing.T) {
 	}
 
 	// Last change should have been reloaded.
-	if hdbt.hdb.lastChange != stashedLC {
+	hdbt.hdb.mu.Lock()
+	lastChange := hdbt.hdb.lastChange
+	hdbt.hdb.mu.Unlock()
+	if lastChange != stashedLC {
 		t.Error("wrong consensus change ID was loaded:", hdbt.hdb.lastChange)
 	}
 
