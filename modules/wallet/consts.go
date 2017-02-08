@@ -25,7 +25,7 @@ func dustValue() types.Currency {
 // defragFee is the miner fee paid to miners when performing a defrag
 // transaction.
 func defragFee() types.Currency {
-	fee := types.SiacoinPrecision.Mul64(10)
+	fee := types.SiacoinPrecision.Mul64(5)
 	if dustValue().Mul64(defragBatchSize).Cmp(fee) <= 0 {
 		return dustValue().Mul64(defragBatchSize)
 	}
