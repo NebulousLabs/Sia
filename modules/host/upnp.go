@@ -28,11 +28,11 @@ func (h *Host) managedLearnHostname() {
 	// function.
 	h.mu.RLock()
 	netAddr := h.settings.NetAddress
-	hPort := h.port
-	hAuto := h.autoAddress
-	hAnn := h.announced
-	hAcc := h.settings.AcceptingContracts
-	hCC := h.financialMetrics.ContractCount
+	hostPort := h.port
+	hostAutoAddress := h.autoAddress
+	hostAnnounced := h.announced
+	hostAcceptingContracts := h.settings.AcceptingContracts
+	hostContractCount := h.financialMetrics.ContractCount
 	h.mu.RUnlock()
 
 	// If the settings indicate that an address has been manually set, there is
@@ -55,12 +55,12 @@ func (h *Host) managedLearnHostname() {
 		return
 	}
 
-	autoAddress := modules.NetAddress(net.JoinHostPort(hostname, hPort))
+	autoAddress := modules.NetAddress(net.JoinHostPort(hostname, hostPort))
 	if err := autoAddress.IsValid(); err != nil {
 		h.log.Printf("WARN: discovered hostname %q is invalid: %v", autoAddress, err)
 		return
 	}
-	if autoAddress == hAuto && hAnn {
+	if autoAddress == hostAutoAddress && hostAnnounced {
 		// Nothing to do - the auto address has not changed and the previous
 		// annoucement was successful.
 		return
@@ -78,7 +78,7 @@ func (h *Host) managedLearnHostname() {
 	// has a storage obligation. If the host is not accepting contracts and has
 	// no open contracts, there is no reason to notify anyone that the host's
 	// address has changed.
-	if hAcc || hCC > 0 {
+	if hostAcceptingContracts || hostContractCount > 0 {
 		err = h.managedAnnounce(autoAddress)
 		if err != nil {
 			// Set h.announced to false, as the address has changed yet the
