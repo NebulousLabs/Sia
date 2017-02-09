@@ -80,6 +80,17 @@ func (c *Contractor) load() error {
 		}
 		c.currentPeriod = highestEnd - c.allowance.Period
 	}
+
+	// Old perist may need information from the hostdb to fill in missing
+	// fields.
+	allHosts := c.hdb.AllHosts()
+	hmap := make(map[modules.NetAddress]modules.HostDBEntry)
+	// Iterate so that in the event of duplicate hosts for a netaddress, the
+	// highest score host is the one in the map.
+	for _, host := range allHosts {
+		hmap[host.NetAddress] = host
+	}
+
 	for _, contract := range data.Contracts {
 		// COMPATv1.0.4-lts
 		// If loading old persist, start height of contract is unknown. Give
@@ -88,6 +99,17 @@ func (c *Contractor) load() error {
 		if contract.StartHeight == 0 {
 			contract.StartHeight = c.currentPeriod + 1
 		}
+
+		// COMPATv1.1.0
+		//
+		// If loading old persist, the host's public key is unknown. Use the
+		// hostdb to fill out the field.
+		if len(contract.HostPublicKey.Key) == 0 {
+			if entry, ok := hmap[contract.NetAddress]; ok {
+				contract.HostPublicKey = entry.PublicKey
+			}
+		}
+
 		c.contracts[contract.ID] = contract
 	}
 	c.lastChange = data.LastChange
@@ -135,16 +157,9 @@ func (c *Contractor) load() error {
 
 	// COMPATv1.1.0
 	//
-	// Wwhen loading old contracts, the corresponding relationships may not be
+	// When loading old contracts, the corresponding relationships may not be
 	// known. Use the hostdb to make sure the relationship set is fully filled
 	// out.
-	allHosts := c.hdb.AllHosts()
-	hmap := make(map[modules.NetAddress]modules.HostDBEntry)
-	// Iterate so that in the event of duplicate hosts for a netaddress, the
-	// highest score host is the one in the map.
-	for _, host := range allHosts {
-		hmap[host.NetAddress] = host
-	}
 	for _, contract := range c.contracts {
 		host, exists := hmap[contract.NetAddress]
 		if exists {

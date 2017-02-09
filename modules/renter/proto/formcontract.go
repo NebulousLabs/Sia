@@ -255,6 +255,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 
 	return modules.RenterContract{
 		FileContract:    fc,
+		HostPublicKey:   host.PublicKey,
 		ID:              fcid,
 		LastRevision:    initRevision,
 		LastRevisionTxn: revisionTxn,

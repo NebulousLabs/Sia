@@ -143,6 +143,7 @@ func (s HostDBScans) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // file contract.
 type RenterContract struct {
 	FileContract    types.FileContract         `json:"filecontract"`
+	HostPublicKey   types.SiaPublicKey         `json:"hostpublickey"`
 	ID              types.FileContractID       `json:"id"`
 	LastRevision    types.FileContractRevision `json:"lastrevision"`
 	LastRevisionTxn types.Transaction          `json:"lastrevisiontxn"`
