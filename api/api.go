@@ -209,6 +209,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.GET("/renter/contracts", api.renterContractsHandler)
 		router.GET("/renter/downloads", api.renterDownloadsHandler)
 		router.GET("/renter/files", api.renterFilesHandler)
+		router.GET("/renter/prices", api.renterPricesHandler)
 
 		// TODO: re-enable these routes once the new .sia format has been
 		// standardized and implemented.
@@ -223,8 +224,9 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.POST("/renter/upload/*siapath", RequirePassword(api.renterUploadHandler, requiredPassword))
 
 		// HostDB endpoints.
-		router.GET("/hostdb/active", api.renterHostsActiveHandler)
-		router.GET("/hostdb/all", api.renterHostsAllHandler)
+		router.GET("/hostdb/active", api.hostdbActiveHandler)
+		router.GET("/hostdb/all", api.hostdbAllHandler)
+		router.GET("/hostdb/hosts/:pubkey", api.hostdbHostsHandler)
 	}
 
 	// TransactionPool API Calls

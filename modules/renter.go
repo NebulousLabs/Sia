@@ -37,6 +37,25 @@ type ErasureCoder interface {
 	Recover(pieces [][]byte, n uint64, w io.Writer) error
 }
 
+// An Allowance dictates how much the Renter is allowed to spend in a given
+// period. Note that funds are spent on both storage and bandwidth.
+type Allowance struct {
+	Funds       types.Currency    `json:"funds"`
+	Hosts       uint64            `json:"hosts"`
+	Period      types.BlockHeight `json:"period"`
+	RenewWindow types.BlockHeight `json:"renewwindow"`
+}
+
+// DownloadInfo provides information about a file that has been requested for
+// download.
+type DownloadInfo struct {
+	SiaPath     string    `json:"siapath"`
+	Destination string    `json:"destination"`
+	Filesize    uint64    `json:"filesize"`
+	Received    uint64    `json:"received"`
+	StartTime   time.Time `json:"starttime"`
+}
+
 // FileUploadParams contains the information used by the Renter to upload a
 // file.
 type FileUploadParams struct {
@@ -56,30 +75,6 @@ type FileInfo struct {
 	Expiration     types.BlockHeight `json:"expiration"`
 }
 
-// DownloadInfo provides information about a file that has been requested for
-// download.
-type DownloadInfo struct {
-	SiaPath     string    `json:"siapath"`
-	Destination string    `json:"destination"`
-	Filesize    uint64    `json:"filesize"`
-	Received    uint64    `json:"received"`
-	StartTime   time.Time `json:"starttime"`
-}
-
-// An Allowance dictates how much the Renter is allowed to spend in a given
-// period. Note that funds are spent on both storage and bandwidth.
-type Allowance struct {
-	Funds       types.Currency    `json:"funds"`
-	Hosts       uint64            `json:"hosts"`
-	Period      types.BlockHeight `json:"period"`
-	RenewWindow types.BlockHeight `json:"renewwindow"`
-}
-
-// RenterSettings control the behavior of the Renter.
-type RenterSettings struct {
-	Allowance Allowance `json:"allowance"`
-}
-
 // A HostDBEntry represents one host entry in the Renter's host DB. It
 // aggregates the host's external settings and metrics with its public key.
 type HostDBEntry struct {
@@ -87,15 +82,54 @@ type HostDBEntry struct {
 	PublicKey types.SiaPublicKey `json:"publickey"`
 	// ScanHistory is the set of scans performed on the host. It should always
 	// be ordered according to the scan's Timestamp, oldest to newest.
-	ScanHistory HostDBScans
+	ScanHistory HostDBScans `json:"scanhistory"`
 	// FirstSeen is the last block height at which this host was announced.
-	FirstSeen types.BlockHeight
+	FirstSeen types.BlockHeight `json:"firstseen"`
 }
 
 // HostDBScan represents a single scan event.
 type HostDBScan struct {
-	Timestamp time.Time
-	Success   bool
+	Timestamp time.Time `json:"timestamp"`
+	Success   bool      `json:"success"`
+}
+
+// HostScoreBreakdown provides a piece-by-piece explanation of why a host has
+// the score that they do.
+//
+// NOTE: Renters are free to use whatever scoring they feel appropriate for
+// hosts. Some renters will outright blacklist or whitelist sets of hosts. The
+// results provided by this struct can only be used as a guide, and may vary
+// significantly from machine to machine.
+type HostScoreBreakdown struct {
+	AgeAdjustment              float64 `json:"ageadjustment"`
+	BurnAdjustment             float64 `json:"burnadjustment"`
+	CollateralAdjustment       float64 `json:"collateraladjustment"`
+	PriceAdjustment            float64 `json:"pricesmultiplier"`
+	StorageRemainingAdjustment float64 `json:"storageremainingadjustment"`
+	UptimeAdjustment           float64 `json:"uptimeadjustment"`
+	VersionAdjustment          float64 `json:"versionadjustment"`
+}
+
+// RenterPriceEstimation contains a bunch of fileds estimating the costs of
+// various operations on the network.
+type RenterPriceEstimation struct {
+	// The cost of downloading 1 TB of data.
+	DownloadTerabyte types.Currency `json:"downloadterabyte"`
+
+	// The cost of forming a set of contracts using the defaults.
+	FormContracts types.Currency `json:"formcontracts"`
+
+	// The cost of storing 1 TB for a month, including redundancy.
+	StorageTerabyteMonth types.Currency `json:"storageterabytemonth"`
+
+	// The cost of consuming 1 TB of upload bandwidth from the host, including
+	// redundancy.
+	UploadTerabyte types.Currency `json:"uploadterabyte"`
+}
+
+// RenterSettings control the behavior of the Renter.
+type RenterSettings struct {
+	Allowance Allowance `json:"allowance"`
 }
 
 // HostDBScans represents a sortable slice of scans.
@@ -175,6 +209,9 @@ type Renter interface {
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
 
+	// Host provides the DB entry and score breakdown for the requested host.
+	Host(pk types.SiaPublicKey) (HostDBEntry, bool)
+
 	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
 	// contain multiple files. The paths of the added files are returned.
 	LoadSharedFiles(source string) ([]string, error)
@@ -183,8 +220,16 @@ type Renter interface {
 	// renter.
 	LoadSharedFilesAscii(asciiSia string) ([]string, error)
 
+	// PriceEstimation estimates the cost in siacoins of performing various
+	// storage and data operations.
+	PriceEstimation() RenterPriceEstimation
+
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error
+
+	// ScoreBreakdown will return the score for a host db entry using the
+	// hostdb's weighting algorithm.
+	ScoreBreakdown(entry HostDBEntry) HostScoreBreakdown
 
 	// Settings returns the Renter's current settings.
 	Settings() RenterSettings

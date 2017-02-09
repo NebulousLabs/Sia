@@ -1,6 +1,7 @@
 package contractor
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -13,14 +14,14 @@ import (
 // scan history for a specific host.
 type offlineHostDB struct {
 	hostDB
-	addr modules.NetAddress
+	spk types.SiaPublicKey
 }
 
 // Host returns the host with address addr. If addr matches hdb.addr, the
 // host's scan history will be modified to make the host appear offline.
-func (hdb offlineHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
-	host, ok := hdb.hostDB.Host(addr)
-	if ok && addr == hdb.addr {
+func (hdb offlineHostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
+	host, ok := hdb.hostDB.Host(spk)
+	if ok && bytes.Equal(spk.Key, hdb.spk.Key) {
 		// fake three scans over the past uptimeWindow, all of which failed
 		badScan1 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow * 2), Success: false}
 		badScan2 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow), Success: false}
@@ -44,7 +45,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	defer h.Close()
 
 	// override IsOffline to always return true for h
-	c.hdb = offlineHostDB{c.hdb, h.ExternalSettings().NetAddress}
+	c.hdb = offlineHostDB{c.hdb, h.PublicKey()}
 
 	// create another host
 	dir := build.TempDir("contractor", "TestIntegrationMonitorUptime", "Host2")
@@ -94,7 +95,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	if len(c.Contracts()) != 1 {
-		t.Fatal("contract was not replaced")
+		t.Fatal("contract was not replaced:", len(c.Contracts()))
 	}
 	if c.Contracts()[0].NetAddress != h2.ExternalSettings().NetAddress {
 		t.Fatal("contractor formed replacement contract with wrong host")
@@ -104,11 +105,11 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 // mapHostDB is a hostDB that implements the Host method via a simple map.
 type mapHostDB struct {
 	stubHostDB
-	hosts map[modules.NetAddress]modules.HostDBEntry
+	hosts map[string]modules.HostDBEntry
 }
 
-func (m mapHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
-	h, e := m.hosts[addr]
+func (m mapHostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
+	h, e := m.hosts[string(spk.Key)]
 	return h, e
 }
 
@@ -149,8 +150,11 @@ func TestIsOffline(t *testing.T) {
 			contracts: map[types.FileContractID]modules.RenterContract{
 				types.FileContractID{1}: {NetAddress: "foo"},
 			},
+			relationships: map[types.FileContractID]types.SiaPublicKey{
+				types.FileContractID{1}: {Key: []byte("foo")},
+			},
 			hdb: mapHostDB{
-				hosts: map[modules.NetAddress]modules.HostDBEntry{
+				hosts: map[string]modules.HostDBEntry{
 					"foo": {ScanHistory: test.scans},
 				},
 			},

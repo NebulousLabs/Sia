@@ -92,12 +92,12 @@ func newTestingHost(testdir string, cs modules.ConsensusSet, tp modules.Transact
 
 // newTestingContractor is a helper function that creates a ready-to-use
 // contractor.
-func newTestingContractor(testdir string, cs modules.ConsensusSet, tp modules.TransactionPool) (*Contractor, error) {
+func newTestingContractor(testdir string, g modules.Gateway, cs modules.ConsensusSet, tp modules.TransactionPool) (*Contractor, error) {
 	w, err := newTestingWallet(testdir, cs, tp)
 	if err != nil {
 		return nil, err
 	}
-	hdb, err := hostdb.New(cs, filepath.Join(testdir, "hostdb"))
+	hdb, err := hostdb.New(g, cs, filepath.Join(testdir, "hostdb"))
 	if err != nil {
 		return nil, err
 	}
@@ -148,9 +148,9 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	// create host and contractor, using same consensus set and gateway
 	h, err := newTestingHost(filepath.Join(testdir, "Host"), cs, tp)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, build.ExtendErr("error creating testing host", err)
 	}
-	c, err := newTestingContractor(filepath.Join(testdir, "Contractor"), cs, tp)
+	c, err := newTestingContractor(filepath.Join(testdir, "Contractor"), g, cs, tp)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -158,17 +158,17 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	// announce the host
 	err = h.Announce()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, build.ExtendErr("error announcing host", err)
 	}
 
 	// mine a block, processing the announcement
 	m.AddBlock()
 
 	// wait for hostdb to scan host
-	for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
-		time.Sleep(time.Millisecond * 50)
+	for i := 0; i < 50 && len(c.hdb.ActiveHosts()) == 0; i++ {
+		time.Sleep(time.Millisecond * 100)
 	}
-	if len(c.hdb.RandomHosts(1, nil)) == 0 {
+	if len(c.hdb.ActiveHosts()) == 0 {
 		return nil, nil, nil, errors.New("host did not make it into the contractor hostdb in time")
 	}
 
@@ -189,19 +189,15 @@ func TestIntegrationFormContract(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	_, err = c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if contract.NetAddress != h.ExternalSettings().NetAddress {
-		t.Fatal("bad contract")
 	}
 }
 
@@ -220,7 +216,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -232,6 +228,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -268,7 +265,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -280,6 +277,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -333,7 +331,7 @@ func TestIntegrationDelete(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -345,6 +343,7 @@ func TestIntegrationDelete(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -398,7 +397,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -410,6 +409,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -458,7 +458,7 @@ func TestIntegrationModify(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -470,6 +470,7 @@ func TestIntegrationModify(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -525,7 +526,7 @@ func TestIntegrationRenew(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -537,6 +538,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -566,6 +568,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = c.relationships[oldContract.ID]
 	c.mu.Unlock()
 
 	// check renewed contract
@@ -615,6 +618,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -652,7 +656,7 @@ func TestIntegrationResync(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -664,6 +668,7 @@ func TestIntegrationResync(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// revise the contract
@@ -790,7 +795,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -802,6 +807,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// create a downloader
@@ -883,7 +889,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	defer h.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -895,6 +901,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	}
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.relationships[contract.ID] = hostEntry.PublicKey
 	c.mu.Unlock()
 
 	// create an editor

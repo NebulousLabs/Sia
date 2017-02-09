@@ -126,7 +126,8 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 		return cachedDownloader, nil
 	}
 
-	host, haveHost := c.hdb.Host(contract.NetAddress)
+	hpk := c.relationships[contract.ID]
+	host, haveHost := c.hdb.Host(hpk)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
 	} else if height > contract.EndHeight() {

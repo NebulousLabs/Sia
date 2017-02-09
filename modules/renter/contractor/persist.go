@@ -15,6 +15,7 @@ type contractorPersist struct {
 	CurrentPeriod   types.BlockHeight
 	LastChange      modules.ConsensusChangeID
 	OldContracts    []modules.RenterContract
+	Relationships   map[string]string
 	RenewedIDs      map[string]string
 
 	// COMPATv1.0.4-lts
@@ -33,6 +34,7 @@ func (c *Contractor) persistData() contractorPersist {
 		BlockHeight:   c.blockHeight,
 		CurrentPeriod: c.currentPeriod,
 		LastChange:    c.lastChange,
+		Relationships: make(map[string]string),
 		RenewedIDs:    make(map[string]string),
 	}
 	for _, rev := range c.cachedRevisions {
@@ -43,6 +45,9 @@ func (c *Contractor) persistData() contractorPersist {
 	}
 	for _, contract := range c.oldContracts {
 		data.OldContracts = append(data.OldContracts, contract)
+	}
+	for id, hpk := range c.relationships {
+		data.Relationships[id.String()] = hpk.String()
 	}
 	for oldID, newID := range c.renewedIDs {
 		data.RenewedIDs[oldID.String()] = newID.String()
@@ -89,6 +94,13 @@ func (c *Contractor) load() error {
 	for _, contract := range data.OldContracts {
 		c.oldContracts[contract.ID] = contract
 	}
+	for idString, keyString := range data.Relationships {
+		var idHash crypto.Hash
+		var spk types.SiaPublicKey
+		idHash.LoadString(idString)
+		spk.LoadString(keyString)
+		c.relationships[types.FileContractID(idHash)] = spk
+	}
 	for oldString, newString := range data.RenewedIDs {
 		var oldHash, newHash crypto.Hash
 		oldHash.LoadString(oldString)
@@ -97,6 +109,7 @@ func (c *Contractor) load() error {
 	}
 
 	// COMPATv1.0.4-lts
+	//
 	// If loading old persist, only aggregate metrics are known. Store these
 	// in a special contract under a special identifier.
 	if fm := data.FinancialMetrics; !fm.ContractSpending.Add(fm.DownloadSpending).Add(fm.StorageSpending).Add(fm.UploadSpending).IsZero() {
@@ -117,6 +130,25 @@ func (c *Contractor) load() error {
 			LastRevision: types.FileContractRevision{
 				NewValidProofOutputs: make([]types.SiacoinOutput, 2),
 			},
+		}
+	}
+
+	// COMPATv1.1.0
+	//
+	// Wwhen loading old contracts, the corresponding relationships may not be
+	// known. Use the hostdb to make sure the relationship set is fully filled
+	// out.
+	allHosts := c.hdb.AllHosts()
+	hmap := make(map[modules.NetAddress]modules.HostDBEntry)
+	// Iterate so that in the event of duplicate hosts for a netaddress, the
+	// highest score host is the one in the map.
+	for _, host := range allHosts {
+		hmap[host.NetAddress] = host
+	}
+	for _, contract := range c.contracts {
+		host, exists := hmap[contract.NetAddress]
+		if exists {
+			c.relationships[contract.ID] = host.PublicKey
 		}
 	}
 

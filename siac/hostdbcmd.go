@@ -21,7 +21,7 @@ var (
 )
 
 func hostdbcmd() {
-	info := new(api.ActiveHosts)
+	info := new(api.HostdbActiveGET)
 	err := getAPI("/hostdb/active", info)
 	if err != nil {
 		die("Could not fetch host list:", err)

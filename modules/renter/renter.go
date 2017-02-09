@@ -10,6 +10,7 @@ package renter
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
@@ -23,6 +24,18 @@ var (
 	errNilCS         = errors.New("cannot create renter with nil consensus set")
 	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
 	errNilHdb        = errors.New("cannot create renter with nil hostdb")
+)
+
+var (
+	// priceEstimationScope is the number of hosts that get queried by the
+	// renter when providing price estimates. Especially for the 'Standard'
+	// variable, there should be congruence with the number of contracts being
+	// used in the renter allowance.
+	priceEstimationScope = build.Select(build.Var{
+		Standard: int(50),
+		Dev:      int(12),
+		Testing:  int(4),
+	}).(int)
 )
 
 // A hostDB is a database of hosts that the renter can use for figuring out who
@@ -43,7 +56,16 @@ type hostDB interface {
 	Close() error
 
 	// Host returns the HostDBEntry for a given host.
-	Host(modules.NetAddress) (modules.HostDBEntry, bool)
+	Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
+
+	// RandomHosts returns a set of random hosts, weighted by their estimated
+	// usefulness / attractiveness to the renter. RandomHosts will not return
+	// any offline or inactive hosts.
+	RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry
+
+	// ScoreBreakdown returns a detailed explanation of the various properties
+	// of the host.
+	ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
 }
 
 // A hostContractor negotiates, revises, renews, and provides access to file
@@ -124,8 +146,8 @@ type Renter struct {
 }
 
 // New returns an initialized renter.
-func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
-	hdb, err := hostdb.New(cs, persistDir)
+func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
+	hdb, err := hostdb.New(g, cs, persistDir)
 	if err != nil {
 		return nil, err
 	}
@@ -186,6 +208,59 @@ func (r *Renter) Close() error {
 	return r.hostDB.Close()
 }
 
+// PriceEstimation estimates the cost in siacoins of performing various storage
+// and data operations.
+//
+// TODO: Make this function line up with the actual settings in the renter.
+// Perhaps even make it so it uses the renter's actual contracts if it has any.
+func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
+	// Grab hosts to perform the estimation.
+	hosts := r.hostDB.RandomHosts(priceEstimationScope, nil)
+
+	// Check if there are zero hosts, which means no estimation can be made.
+	if len(hosts) == 0 {
+		return modules.RenterPriceEstimation{}
+	}
+
+	// Add up the costs for each host.
+	var totalContractCost types.Currency
+	var totalDownloadCost types.Currency
+	var totalStorageCost types.Currency
+	var totalUploadCost types.Currency
+	for _, host := range hosts {
+		totalContractCost = totalContractCost.Add(host.ContractPrice)
+		totalDownloadCost = totalDownloadCost.Add(host.DownloadBandwidthPrice)
+		totalStorageCost = totalStorageCost.Add(host.StoragePrice)
+		totalUploadCost = totalUploadCost.Add(host.UploadBandwidthPrice)
+	}
+
+	// Convert values to being human-scale.
+	totalDownloadCost = totalDownloadCost.Mul(modules.BytesPerTerabyte)
+	totalStorageCost = totalStorageCost.Mul(modules.BlockBytesPerMonthTerabyte)
+	totalUploadCost = totalUploadCost.Mul(modules.BytesPerTerabyte)
+
+	// Factor in redundancy.
+	totalStorageCost = totalStorageCost.Mul64(3) // TODO: follow file settings?
+	totalUploadCost = totalUploadCost.Mul64(3)   // TODO: follow file settings?
+
+	// Perform averages.
+	totalContractCost = totalContractCost.Div64(uint64(len(hosts)))
+	totalDownloadCost = totalDownloadCost.Div64(uint64(len(hosts)))
+	totalStorageCost = totalStorageCost.Div64(uint64(len(hosts)))
+	totalUploadCost = totalUploadCost.Div64(uint64(len(hosts)))
+
+	// Take the average of the host set to estimate the overall cost of the
+	// contract forming.
+	totalContractCost = totalContractCost.Mul64(uint64(priceEstimationScope))
+
+	return modules.RenterPriceEstimation{
+		FormContracts:        totalContractCost,
+		DownloadTerabyte:     totalDownloadCost,
+		StorageTerabyteMonth: totalStorageCost,
+		UploadTerabyte:       totalUploadCost,
+	}
+}
+
 // SetSettings will update the settings for the renter.
 func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	err := r.hostContractor.SetAllowance(s.Allowance)
@@ -200,8 +275,12 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 }
 
 // hostdb passthroughs
-func (r *Renter) ActiveHosts() []modules.HostDBEntry { return r.hostDB.ActiveHosts() }
-func (r *Renter) AllHosts() []modules.HostDBEntry    { return r.hostDB.AllHosts() }
+func (r *Renter) ActiveHosts() []modules.HostDBEntry                      { return r.hostDB.ActiveHosts() }
+func (r *Renter) AllHosts() []modules.HostDBEntry                         { return r.hostDB.AllHosts() }
+func (r *Renter) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) { return r.hostDB.Host(spk) }
+func (r *Renter) ScoreBreakdown(e modules.HostDBEntry) modules.HostScoreBreakdown {
+	return r.hostDB.ScoreBreakdown(e)
+}
 
 // contractor passthroughs
 func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }

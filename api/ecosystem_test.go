@@ -96,7 +96,7 @@ func announceAllHosts(sts []*serverTester) error {
 	// Block until every node has completed the scan of every other node, so
 	// that each node has a full hostdb.
 	for _, st := range sts {
-		var ah ActiveHosts
+		var ah HostdbActiveGET
 		for i := 0; i < 50; i++ {
 			err = st.getAPI("/hostdb/active", &ah)
 			if err != nil {
@@ -130,8 +130,11 @@ func fullyConnectNodes(sts []*serverTester) error {
 
 		// Connect this node to every other node.
 		for _, stb := range sts[i+1:] {
+			// NOTE: this check depends on string-matching an error in the
+			// gateway. If that error changes at all, this string will need to
+			// be updated.
 			err := stb.stdPostAPI("/gateway/connect/"+string(gg.NetAddress), nil)
-			if err != nil {
+			if err != nil && err.Error() != "already connected to this peer" {
 				return err
 			}
 		}

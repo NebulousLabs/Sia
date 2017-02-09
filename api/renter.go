@@ -22,7 +22,7 @@ var (
 	// contracts with if the value is not specified explicity in the call to
 	// SetSettings.
 	recommendedHosts = build.Select(build.Var{
-		Standard: uint64(42),
+		Standard: uint64(50),
 		Dev:      uint64(2),
 		Testing:  uint64(1),
 	}).(uint64)
@@ -49,7 +49,7 @@ var (
 	// accepted by the renter when uploading a file. This minimum exists to
 	// prevent users from shooting themselves in the foot.
 	requiredRedundancy = build.Select(build.Var{
-		Standard: float64(2.5),
+		Standard: float64(2),
 		Dev:      float64(1),
 		Testing:  float64(1),
 	}).(float64)
@@ -117,19 +117,15 @@ type (
 		FilesAdded []string `json:"filesadded"`
 	}
 
+	// RenterPricesGET lists the data that is returned when a GET call is made
+	// to /renter/prices.
+	RenterPricesGET struct {
+		modules.RenterPriceEstimation
+	}
+
 	// RenterShareASCII contains an ASCII-encoded .sia file.
 	RenterShareASCII struct {
 		ASCIIsia string `json:"asciisia"`
-	}
-
-	// ActiveHosts lists active hosts on the network.
-	ActiveHosts struct {
-		Hosts []modules.HostDBEntry `json:"hosts"`
-	}
-
-	// AllHosts lists all hosts that the renter is aware of.
-	AllHosts struct {
-		Hosts []modules.HostDBEntry `json:"hosts"`
 	}
 )
 
@@ -304,6 +300,14 @@ func (api *API) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ h
 	})
 }
 
+// renterPricesHandler reports the expected costs of various actions given the
+// renter settings and the set of available hosts.
+func (api *API) renterPricesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	WriteJSON(w, RenterPricesGET{
+		RenterPriceEstimation: api.renter.PriceEstimation(),
+	})
+}
+
 // renterDeleteHandler handles the API call to delete a file entry from the
 // renter.
 func (api *API) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
@@ -427,39 +431,4 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 		return
 	}
 	WriteSuccess(w)
-}
-
-// renterHostsActiveHandler handles the API call asking for the list of active
-// hosts.
-func (api *API) renterHostsActiveHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	var numHosts uint64
-	hosts := api.renter.ActiveHosts()
-
-	if req.FormValue("numhosts") == "" {
-		// Default value for 'numhosts' is all of them.
-		numHosts = uint64(len(hosts))
-	} else {
-		// Parse the value for 'numhosts'.
-		_, err := fmt.Sscan(req.FormValue("numhosts"), &numHosts)
-		if err != nil {
-			WriteError(w, Error{err.Error()}, http.StatusBadRequest)
-			return
-		}
-
-		// Catch any boundary errors.
-		if numHosts > uint64(len(hosts)) {
-			numHosts = uint64(len(hosts))
-		}
-	}
-
-	WriteJSON(w, ActiveHosts{
-		Hosts: hosts[:numHosts],
-	})
-}
-
-// renterHostsAllHandler handles the API call asking for the list of all hosts.
-func (api *API) renterHostsAllHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	WriteJSON(w, AllHosts{
-		Hosts: api.renter.AllHosts(),
-	})
 }

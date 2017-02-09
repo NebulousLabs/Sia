@@ -32,8 +32,10 @@ func (newStub) AcceptTransactionSet([]types.Transaction) error      { return nil
 func (newStub) FeeEstimation() (a types.Currency, b types.Currency) { return }
 
 // hdb stubs
-func (newStub) Host(modules.NetAddress) (settings modules.HostDBEntry, ok bool) { return }
-func (newStub) RandomHosts(int, []modules.NetAddress) []modules.HostDBEntry     { return nil }
+func (newStub) AllHosts() []modules.HostDBEntry                                 { return nil }
+func (newStub) ActiveHosts() []modules.HostDBEntry                              { return nil }
+func (newStub) Host(types.SiaPublicKey) (settings modules.HostDBEntry, ok bool) { return }
+func (newStub) RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry     { return nil }
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
@@ -188,8 +190,11 @@ func TestAllowance(t *testing.T) {
 // its methods.
 type stubHostDB struct{}
 
-func (stubHostDB) Host(modules.NetAddress) (h modules.HostDBEntry, ok bool)         { return }
-func (stubHostDB) RandomHosts(int, []modules.NetAddress) (hs []modules.HostDBEntry) { return }
+func (stubHostDB) AllHosts() (hs []modules.HostDBEntry)                             { return }
+func (stubHostDB) ActiveHosts() (hs []modules.HostDBEntry)                          { return }
+func (stubHostDB) Host(types.SiaPublicKey) (h modules.HostDBEntry, ok bool)         { return }
+func (stubHostDB) PublicKey() (spk types.SiaPublicKey)                              { return }
+func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) (hs []modules.HostDBEntry) { return }
 
 // TestIntegrationSetAllowance tests the SetAllowance method.
 func TestIntegrationSetAllowance(t *testing.T) {

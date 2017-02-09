@@ -68,7 +68,7 @@ func newRenterTester(name string) (*renterTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, err := New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	r, err := New(g, cs, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}

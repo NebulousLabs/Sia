@@ -186,7 +186,7 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	if err != nil {
 		return nil, err
 	}
-	r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	r, err := renter.New(g, cs, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func assembleAuthenticatedServerTester(requiredPassword string, key crypto.Twofi
 	if err != nil {
 		return nil, err
 	}
-	r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	r, err := renter.New(g, cs, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +536,7 @@ func (st *serverTester) announceHost() error {
 		return err
 	}
 	// wait for announcement
-	var hosts ActiveHosts
+	var hosts HostdbActiveGET
 	err = st.getAPI("/hostdb/active", &hosts)
 	if err != nil {
 		return err

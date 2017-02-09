@@ -37,18 +37,8 @@ func (c *Contractor) IsOffline(id types.FileContractID) bool {
 // isOffline indicates whether a contract's host should be considered offline,
 // based on its scan metrics.
 func (c *Contractor) isOffline(id types.FileContractID) bool {
-	// Get the net address associated with the contract.
-	//
-	// TODO: This should eventually be updated to query the host by public key.
-	contract, exists := c.contracts[id]
-	if !exists {
-		return false
-	}
-	addr := contract.NetAddress
-	// Look up the host by address.
-	//
-	// TODO: Eventually the host should be getting queried by public key.
-	host, ok := c.hdb.Host(addr)
+	hpk := c.relationships[id]
+	host, ok := c.hdb.Host(hpk)
 	if !ok {
 		return false
 	}

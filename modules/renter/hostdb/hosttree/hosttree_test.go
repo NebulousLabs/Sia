@@ -36,10 +36,7 @@ func verifyTree(tree *HostTree, nentries int) error {
 		selectionMap := make(map[string]int)
 		expected := 100
 		for i := 0; i < expected*nentries; i++ {
-			entries, err := tree.SelectRandom(1, nil)
-			if err != nil {
-				return err
-			}
+			entries := tree.SelectRandom(1, nil)
 			if len(entries) == 0 {
 				return errors.New("no hosts")
 			}
@@ -65,10 +62,7 @@ func verifyTree(tree *HostTree, nentries int) error {
 		if err != nil {
 			break
 		}
-		node, err := tree.root.nodeAtWeight(types.NewCurrency(randWeight))
-		if err != nil {
-			break
-		}
+		node := tree.root.nodeAtWeight(types.NewCurrency(randWeight))
 		node.remove()
 		delete(tree.hosts, string(node.entry.PublicKey.Key))
 
@@ -98,6 +92,10 @@ func makeHostDBEntry() modules.HostDBEntry {
 
 	dbe.AcceptingContracts = true
 	dbe.PublicKey = pk
+	dbe.ScanHistory = modules.HostDBScans{{
+		Timestamp: time.Now(),
+		Success:   true,
+	}}
 
 	return dbe
 }
@@ -253,10 +251,7 @@ func TestHostTreeParallel(t *testing.T) {
 
 					// FETCH
 					if randInt.Uint64() == 3 {
-						_, err := tree.SelectRandom(3, nil)
-						if err != nil {
-							t.Error(err)
-						}
+						tree.SelectRandom(3, nil)
 					}
 				}
 			}
@@ -349,10 +344,7 @@ func TestVariedWeights(t *testing.T) {
 	// time.
 	selectionMap := make(map[string]int)
 	for i := 0; i < selections; i++ {
-		randEntry, err := tree.SelectRandom(1, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		randEntry := tree.SelectRandom(1, nil)
 		if len(randEntry) == 0 {
 			t.Fatal("no hosts!")
 		}
@@ -415,16 +407,8 @@ func TestNodeAtWeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// overweight
-	_, err = tree.root.nodeAtWeight(weight.Mul64(2))
-	if err != errWeightTooHeavy {
-		t.Errorf("expected %v, got %v", errWeightTooHeavy, err)
-	}
-
-	h, err := tree.root.nodeAtWeight(weight)
-	if err != nil {
-		t.Error(err)
-	} else if string(h.entry.HostDBEntry.PublicKey.Key) != string(entry.PublicKey.Key) {
+	h := tree.root.nodeAtWeight(weight)
+	if string(h.entry.HostDBEntry.PublicKey.Key) != string(entry.PublicKey.Key) {
 		t.Errorf("nodeAtWeight returned wrong node: expected %v, got %v", entry, h.entry)
 	}
 }
@@ -439,12 +423,9 @@ func TestRandomHosts(t *testing.T) {
 	})
 
 	// Empty.
-	hosts, err := tree.SelectRandom(1, nil)
+	hosts := tree.SelectRandom(1, nil)
 	if len(hosts) != 0 {
 		t.Errorf("empty hostdb returns %v hosts: %v", len(hosts), hosts)
-	}
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	// Insert 3 hosts to be selected.
@@ -452,13 +433,13 @@ func TestRandomHosts(t *testing.T) {
 	entry2 := makeHostDBEntry()
 	entry3 := makeHostDBEntry()
 
-	if err = tree.Insert(entry1); err != nil {
+	if err := tree.Insert(entry1); err != nil {
 		t.Fatal(err)
 	}
-	if err = tree.Insert(entry2); err != nil {
+	if err := tree.Insert(entry2); err != nil {
 		t.Fatal(err)
 	}
-	if err = tree.Insert(entry3); err != nil {
+	if err := tree.Insert(entry3); err != nil {
 		t.Fatal(err)
 	}
 
@@ -471,33 +452,24 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 1 random host.
-	randHosts, err := tree.SelectRandom(1, nil)
+	randHosts := tree.SelectRandom(1, nil)
 	if len(randHosts) != 1 {
 		t.Error("didn't get 1 hosts")
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// Grab 2 random hosts.
-	randHosts, err = tree.SelectRandom(2, nil)
+	randHosts = tree.SelectRandom(2, nil)
 	if len(randHosts) != 2 {
 		t.Error("didn't get 2 hosts")
-	}
-	if err != nil {
-		t.Fatal(err)
 	}
 	if randHosts[0].PublicKey.String() == randHosts[1].PublicKey.String() {
 		t.Error("doubled up")
 	}
 
 	// Grab 3 random hosts.
-	randHosts, err = tree.SelectRandom(3, nil)
+	randHosts = tree.SelectRandom(3, nil)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
-	}
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	if randHosts[0].PublicKey.String() == randHosts[1].PublicKey.String() || randHosts[0].PublicKey.String() == randHosts[2].PublicKey.String() || randHosts[1].PublicKey.String() == randHosts[2].PublicKey.String() {
@@ -505,12 +477,9 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 4 random hosts. 3 should be returned.
-	randHosts, err = tree.SelectRandom(4, nil)
+	randHosts = tree.SelectRandom(4, nil)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
-	}
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	if randHosts[0].PublicKey.String() == randHosts[1].PublicKey.String() || randHosts[0].PublicKey.String() == randHosts[2].PublicKey.String() || randHosts[1].PublicKey.String() == randHosts[2].PublicKey.String() {
@@ -519,7 +488,7 @@ func TestRandomHosts(t *testing.T) {
 
 	// Ask for 3 hosts that are not in randHosts. No hosts should be
 	// returned.
-	uniqueHosts, err := tree.SelectRandom(3, []types.SiaPublicKey{
+	uniqueHosts := tree.SelectRandom(3, []types.SiaPublicKey{
 		randHosts[0].PublicKey,
 		randHosts[1].PublicKey,
 		randHosts[2].PublicKey,
@@ -527,37 +496,13 @@ func TestRandomHosts(t *testing.T) {
 	if len(uniqueHosts) != 0 {
 		t.Error("didn't get 0 hosts")
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// Ask for 3 hosts, blacklisting non-existent hosts. 3 should be returned.
-	randHosts, err = tree.SelectRandom(3, []types.SiaPublicKey{{}, {}, {}})
+	randHosts = tree.SelectRandom(3, []types.SiaPublicKey{{}, {}, {}})
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	if randHosts[0].PublicKey.String() == randHosts[1].PublicKey.String() || randHosts[0].PublicKey.String() == randHosts[2].PublicKey.String() || randHosts[1].PublicKey.String() == randHosts[2].PublicKey.String() {
-		t.Error("doubled up")
-	}
-
-	// entry4 should not every be returned by RandomHosts because it is not
-	// accepting contracts.
-	entry4 := makeHostDBEntry()
-	entry4.AcceptingContracts = false
-	tree.Insert(entry4)
-
-	// Grab 4 random hosts. 3 should be returned.
-	randHosts, err = tree.SelectRandom(4, nil)
-	if len(randHosts) != 3 {
-		t.Error("didn't get 3 hosts")
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
 	if randHosts[0].PublicKey.String() == randHosts[1].PublicKey.String() || randHosts[0].PublicKey.String() == randHosts[2].PublicKey.String() || randHosts[1].PublicKey.String() == randHosts[2].PublicKey.String() {
 		t.Error("doubled up")
 	}

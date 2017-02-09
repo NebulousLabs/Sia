@@ -247,7 +247,7 @@ func startDaemon(config Config) (err error) {
 	if strings.Contains(config.Siad.Modules, "r") {
 		i++
 		fmt.Printf("(%d/%d) Loading renter...\n", i, len(config.Siad.Modules))
-		r, err = renter.New(cs, w, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
+		r, err = renter.New(g, cs, w, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
 		if err != nil {
 			return err
 		}

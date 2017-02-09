@@ -41,27 +41,29 @@ type Contractor struct {
 	hdb     hostDB
 	log     *persist.Logger
 	persist persister
+	mu      sync.RWMutex
 	tpool   transactionPool
 	wallet  wallet
-
-	allowance       modules.Allowance
-	blockHeight     types.BlockHeight
-	cachedRevisions map[types.FileContractID]cachedRevision
-	contracts       map[types.FileContractID]modules.RenterContract
-	currentPeriod   types.BlockHeight
-	downloaders     map[types.FileContractID]*hostDownloader
-	editors         map[types.FileContractID]*hostEditor
-	lastChange      modules.ConsensusChangeID
-	oldContracts    map[types.FileContractID]modules.RenterContract
-	renewedIDs      map[types.FileContractID]types.FileContractID
-	renewing        map[types.FileContractID]bool // prevent revising during renewal
-	revising        map[types.FileContractID]bool // prevent overlapping revisions
-
-	mu sync.RWMutex
 
 	// in addition to mu, a separate lock enforces that multiple goroutines
 	// won't try to simultaneously edit the contract set.
 	editLock siasync.TryMutex
+
+	allowance     modules.Allowance
+	blockHeight   types.BlockHeight
+	currentPeriod types.BlockHeight
+	lastChange    modules.ConsensusChangeID
+
+	downloaders map[types.FileContractID]*hostDownloader
+	editors     map[types.FileContractID]*hostEditor
+	renewing    map[types.FileContractID]bool // prevent revising during renewal
+	revising    map[types.FileContractID]bool // prevent overlapping revisions
+
+	cachedRevisions map[types.FileContractID]cachedRevision
+	contracts       map[types.FileContractID]modules.RenterContract
+	oldContracts    map[types.FileContractID]modules.RenterContract
+	relationships   map[types.FileContractID]types.SiaPublicKey
+	renewedIDs      map[types.FileContractID]types.FileContractID
 }
 
 // Allowance returns the current allowance.
@@ -168,6 +170,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		downloaders:     make(map[types.FileContractID]*hostDownloader),
 		editors:         make(map[types.FileContractID]*hostEditor),
 		oldContracts:    make(map[types.FileContractID]modules.RenterContract),
+		relationships:   make(map[types.FileContractID]types.SiaPublicKey),
 		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
 		renewing:        make(map[types.FileContractID]bool),
 		revising:        make(map[types.FileContractID]bool),
