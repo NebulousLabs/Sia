@@ -223,20 +223,20 @@ lists the estimated prices of performing various storage and data operations.
 ```javascript
 {
       // The estimated cost of downloading one terabyte of data from the
-	  // network.
+      // network.
       "downloadterabyte": "1234", // hastings
 
-	  // The estimated cost of forming a set of contracts on the network. This
-	  // cost also applies to the estimated cost of renewing the renter's set of
-	  // contracts.
+      // The estimated cost of forming a set of contracts on the network. This
+      // cost also applies to the estimated cost of renewing the renter's set of
+      // contracts.
       "formcontracts": "1234", // hastings
 
       // The estimated cost of storing one terabyte of data on the network for
-	  // a month, including accounting for redundancy.
+      // a month, including accounting for redundancy.
       "storageterabytemonth": "1234", // hastings
 
-	  // The estimated cost of uploading one terabyte of data to the network,
-	  // including accounting for redundancy.
+      // The estimated cost of uploading one terabyte of data to the network,
+      // including accounting for redundancy.
       "uploadterabyte": "1234", // hastings
 }
 ```

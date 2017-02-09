@@ -242,9 +242,9 @@ overall.
       "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
     },
 
-	// The string representation of the full public key, used when calling
-	// /hostdb/hosts.
-	"publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+    // The string representation of the full public key, used when calling
+    // /hostdb/hosts.
+    "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
   },
 
   // A set of scores as determined by the renter. Generally, the host's final
@@ -255,37 +255,37 @@ overall.
   // and uses different metrics to evaluate hosts.
   "scorebreakdown": {
     // The multiplier that gets applied to the host based on how long it has
-	// been a host. Older hosts typically have a lower penalty.
+    // been a host. Older hosts typically have a lower penalty.
     "ageadjustment":              0.1234,
 
-	// The multiplier that gets applied to the host based on how much
-	// proof-of-burn the host has performed. More burn causes a linear increase
-	// in score.
+    // The multiplier that gets applied to the host based on how much
+    // proof-of-burn the host has performed. More burn causes a linear increase
+    // in score.
     "burnadjustment":             23.456,
 
-	// The multiplier that gets applied to a host based on how much collateral
-	// the host is offering. More collateral is typically better, though above
-	// a point it can be detrimental.
+    // The multiplier that gets applied to a host based on how much collateral
+    // the host is offering. More collateral is typically better, though above
+    // a point it can be detrimental.
     "collateraladjustment":       23.456,
 
-	// The multiplier that gets applied to a host based on the host's price.
-	// Lower prices are almost always better. Below a certain, very low price,
-	// there is no advantage.
+    // The multiplier that gets applied to a host based on the host's price.
+    // Lower prices are almost always better. Below a certain, very low price,
+    // there is no advantage.
     "priceadjustment":            0.1234,
 
-	// The multiplier that gets applied to a host based on how much storage is
-	// remaining for the host. More storage remaining is better, to a point.
+    // The multiplier that gets applied to a host based on how much storage is
+    // remaining for the host. More storage remaining is better, to a point.
     "storageremainingadjustment": 0.1234,
 
-	// The multiplier that gets applied to a host based on the uptime percentage
-	// of the host. The penalty increases extremely quickly as uptime drops
-	// below 90%.
+    // The multiplier that gets applied to a host based on the uptime percentage
+    // of the host. The penalty increases extremely quickly as uptime drops
+    // below 90%.
     "uptimeadjustment":           0.1234,
 
-	// The multiplier that gets applied to a host based on the version of Sia
-	// that they are running. Versions get penalties if there are known bugs,
-	// scaling limitations, performance limitations, etc. Generally, the most
-	// recent version is always the one with the highest score.
+    // The multiplier that gets applied to a host based on the version of Sia
+    // that they are running. Versions get penalties if there are known bugs,
+    // scaling limitations, performance limitations, etc. Generally, the most
+    // recent version is always the one with the highest score.
     "versionadjustment":          0.1234
   }
 }
@@ -325,7 +325,7 @@ Examples
         "algorithm": "ed25519",
         "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
-	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     },
     {
       "acceptingcontracts": true,
@@ -342,7 +342,7 @@ Examples
         "algorithm": "ed25519",
         "key": "WWVzIEJydWNlIFNjaG5laWVyIGNhbiByZWFkIHRoaXM="
       }
-	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     }
   ]
 }
@@ -379,7 +379,7 @@ Examples
         "algorithm": "ed25519",
         "key": "SSByYW4gb3V0IG9mIDMyIGNoYXIgbG9uZyBqb2tlcy4="
       }
-	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     },
     {
       "acceptingcontracts": true,
@@ -396,7 +396,7 @@ Examples
         "algorithm": "ed25519",
         "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
-	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     },
     {
       "acceptingcontracts": true,
@@ -413,7 +413,7 @@ Examples
         "algorithm": "ed25519",
         "key": "WWVzIEJydWNlIFNjaG5laWVyIGNhbiByZWFkIHRoaXM="
       }
-	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     }
   ]
 }
@@ -449,7 +449,7 @@ Examples
       "algorithm": "ed25519",
       "key": "SSByYW4gb3V0IG9mIDMyIGNoYXIgbG9uZyBqb2tlcy4="
     }
-	"publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
   },
   "scorebreakdown": {
     "ageadjustment": 0.1234,

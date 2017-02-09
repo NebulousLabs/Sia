@@ -516,7 +516,7 @@ numhosts // Optional
         "algorithm": "ed25519",
         "key":        "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
-	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     }
   ]
 }
@@ -546,7 +546,7 @@ any particular order, and the order may change in subsequent calls.
         "algorithm": "ed25519",
         "key":       "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
-	  "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     }
   ]
 }
@@ -583,7 +583,7 @@ overall.
       "algorithm": "ed25519",
       "key":       "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
     }
-	"publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
   },
   "scorebreakdown": {
     "ageadjustment":              0.1234,
