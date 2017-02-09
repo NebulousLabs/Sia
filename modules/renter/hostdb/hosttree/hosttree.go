@@ -148,7 +148,7 @@ func (n *node) recursiveInsert(entry *hostEntry) (nodesAdded int, newnode *node)
 func (n *node) nodeAtWeight(weight types.Currency) *node {
 	// Sanity check - weight must be less than the total weight of the tree.
 	if weight.Cmp(n.weight) > 0 {
-		build.Critical("Node weight corruption!")
+		build.Critical("Node weight corruption")
 		return nil
 	}
 
@@ -165,7 +165,7 @@ func (n *node) nodeAtWeight(weight types.Currency) *node {
 
 	// Should we panic here instead?
 	if !n.taken {
-		build.Critical("Node tree structure corruption!")
+		build.Critical("Node tree structure corruption")
 		return nil
 	}
 
