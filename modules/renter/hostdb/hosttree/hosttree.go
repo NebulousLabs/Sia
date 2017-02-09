@@ -190,11 +190,11 @@ func (ht *HostTree) All() []modules.HostDBEntry {
 	ht.mu.Lock()
 	defer ht.mu.Unlock()
 
-	var he hostEntries
+	var he []hostEntry
 	for _, node := range ht.hosts {
 		he = append(he, *node.entry)
 	}
-	sort.Sort(he)
+	sort.Sort(byWeight(he))
 
 	var entries []modules.HostDBEntry
 	for _, entry := range he {
