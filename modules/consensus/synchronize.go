@@ -550,7 +550,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 				// the Timeout() method. Once muxado issue #14 is resolved change the below
 				// condition to:
 				//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
-				if err.Error() != "Read timeout" && err.Error() != "Write timeout" {
+				if err.Error() != "Read timeout" && err.Error() != "Write timeout" && err.Error() != "Session closed" {
 					cs.log.Printf("WARN: disconnecting from peer %v because IBD failed: %v", p.NetAddress, err)
 					// Disconnect if there is an unexpected error (not a timeout). This
 					// includes errSendBlocksStalled.
