@@ -286,6 +286,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDoneRules")
 
 	// Create a gateway that can be forced to return errors when its RPC method
