@@ -310,11 +310,8 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	// 75%  uptime = 0.005
 	// 70%  uptime = 0.001
 	// 50%  uptime = 0.000002
-	uptimePenalty := float64(1)
-	for i := float64(1); i > uptimeRatio && i > 0.80; i -= 0.01 {
-		uptimePenalty *= uptimeRatio
-	}
-	return uptimePenalty
+	exp := 100 * math.Min(1-uptimeRatio, 0.20)
+	return math.Pow(uptimeRatio, exp)
 }
 
 // calculateHostWeight returns the weight of a host according to the settings of
