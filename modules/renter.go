@@ -77,9 +77,6 @@ type FileInfo struct {
 
 // A HostDBEntry represents one host entry in the Renter's host DB. It
 // aggregates the host's external settings and metrics with its public key.
-//
-// TODO: WE FORGOT THE JSON STRINGS FOR SOME OF THE ELEMENTS! It's used in both
-// persist and over the API.
 type HostDBEntry struct {
 	HostExternalSettings
 	PublicKey types.SiaPublicKey `json:"publickey"`
