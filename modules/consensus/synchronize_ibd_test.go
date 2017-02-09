@@ -286,16 +286,10 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	// Set minIBDWaitTime to 1s for just this test because no blocks are
-	// transferred between peers so the wait time can be very short.
-	actualMinIBDWaitTime := minIBDWaitTime
-	defer func() {
-		minIBDWaitTime = actualMinIBDWaitTime
-	}()
-	minIBDWaitTime = 1 * time.Second
-
 	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDoneRules")
+
+	// Create a gateway that can be forced to return errors when its RPC method
+	// is called, then create a consensus set using that gateway.
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, "local", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -311,9 +305,9 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 	defer cs.Close()
 
+	// Verify that the consensus set will not signal IBD completion when it has
+	// zero peers.
 	doneChan := make(chan struct{})
-
-	// Test when there are 0 peers.
 	go func() {
 		cs.threadedInitialBlockchainDownload()
 		doneChan <- struct{}{}
@@ -325,8 +319,14 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	case <-time.After(minIBDWaitTime + ibdLoopDelay):
 	}
 
-	// Test when there are only inbound peers. Wrap the peers in a function so
-	// that they are closed when the test is finished.
+	// threadedInitialBlockchainDownload is already running. Feed some inbound
+	// peers to the consensus set. The gateway, through its own process of
+	// trying to find outbound peers, will eventually convert one of the
+	// inbound peers to an outbound peer. IBD should not complete until there
+	// is at least one outbound peer.
+	//
+	// After this function has completed, all of the peers will be shutdown,
+	// leaving the consensus set once again with zero peers.
 	func() {
 		inboundCSTs := make([]*consensusSetTester, 8)
 		for i := 0; i < len(inboundCSTs); i++ {
@@ -351,7 +351,11 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		}
 	}()
 
-	// Test when there is 1 outbound peer that isn't synced.
+	// Try another initial blockchain download, this time with an outbound peer
+	// who is not synced. The consensus set should not determine itself to have
+	// completed IBD with only unsynced peers.
+	//
+	// 'NotSynced' is simulated in this peer by having all RPCs return errors.
 	go func() {
 		cs.threadedInitialBlockchainDownload()
 		doneChan <- struct{}{}
@@ -377,7 +381,9 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	case <-time.After(minIBDWaitTime + ibdLoopDelay):
 	}
 
-	// Test when there is 1 peer that is synced and one that is not synced.
+	// Add a peer that is synced to the peer that is not synced. IBD should not
+	// be considered completed when there is a tie between synced and
+	// not-synced peers.
 	gatewayNoTimeout, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -397,6 +403,8 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 
 	// Test when there is 2 peers that are synced and one that is not synced.
+	// There is now a majority synced peers and the minIBDWaitTime has passed,
+	// so the IBD function should finish.
 	gatewayNoTimeout2, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -411,7 +419,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 	select {
 	case <-doneChan:
-	case <-time.After(minIBDWaitTime*2 + ibdLoopDelay*2):
+	case <-time.After(minIBDWaitTime + ibdLoopDelay):
 		t.Fatal("threadedInitialBlockchainDownload never finished with 2 synced peers and 1 non-synced peer")
 	}
 
