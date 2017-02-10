@@ -13,11 +13,11 @@ const (
 
 	// maxScanSleep is the maximum amount of time that the hostdb will sleep
 	// between performing scans of the hosts.
-	maxScanSleep     = 4 * time.Hour
+	maxScanSleep = 4 * time.Hour
 
 	// minScanSleep is the minimum amount of time that the hostdb will sleep
 	// between performing scans of the hosts.
-	minScanSleep     = 1*time.Hour + 20*time.Minute
+	minScanSleep = 1*time.Hour + 20*time.Minute
 
 	// maxSettingsLen indicates how long in bytes the host settings field is
 	// allowed to be before being ignored as a DoS attempt.
@@ -28,7 +28,7 @@ const (
 
 	// hostScanDeadline indicates how long a host has to complete an entire
 	// scan.
-	hostScanDeadline   = 4 * time.Minute
+	hostScanDeadline = 4 * time.Minute
 
 	// saveFrequency defines how frequently the hostdb will save to disk. Hostdb
 	// will also save immediately prior to shutdown.
