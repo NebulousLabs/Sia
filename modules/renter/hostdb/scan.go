@@ -117,8 +117,6 @@ func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, netErr error) {
 			hdb.log.Println("ERROR: unable to modify entry which is thought to exist:", err)
 		}
 	}
-
-	hdb.save()
 }
 
 // managedScanHost will connect to a host and grab the settings, verifying

@@ -94,8 +94,4 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 
 	hdb.lastChange = cc.ID
-	err := hdb.save()
-	if err != nil {
-		hdb.log.Println("Error saving hostdb:", err)
-	}
 }

@@ -54,7 +54,7 @@ func TestSaveLoad(t *testing.T) {
 	hdbt.hdb.mu.Lock()
 	hdbt.hdb.lastChange = modules.ConsensusChangeID{1, 2, 3}
 	stashedLC := hdbt.hdb.lastChange
-	err = hdbt.hdb.save()
+	err = hdbt.hdb.saveSync()
 	hdbt.hdb.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)

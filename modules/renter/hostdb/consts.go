@@ -14,7 +14,11 @@ const (
 	maxSettingsLen = 4e3
 
 	hostRequestTimeout = 60 * time.Second
-	hostScanDeadline   = 60 * time.Second
+	hostScanDeadline   = 240 * time.Second
+
+	// saveFrequency defines how frequently the hostdb will save to disk. Hostdb
+	// will also save immediately prior to shutdown.
+	saveFrequency = 2 * time.Minute
 )
 
 var (
@@ -29,7 +33,7 @@ var (
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
 	scanningThreads = build.Select(build.Var{
-		Standard: int(25),
+		Standard: int(40),
 		Dev:      int(4),
 		Testing:  int(3),
 	}).(int)

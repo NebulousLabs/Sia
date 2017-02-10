@@ -17,6 +17,7 @@ package hostdb
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -110,6 +111,12 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		return nil, err
 	}
 	hdb.log = logger
+	hdb.tg.AfterStop(func() {
+		if err := hdb.log.Close(); err != nil {
+			// Resort to println as the logger is in an uncertain state.
+			fmt.Println("Failed to close the hostdb logger:", err)
+		}
+	})
 
 	// The host tree is used to manage hosts and query them at random.
 	hdb.hostTree = hosttree.New(hdb.calculateHostWeight)
@@ -119,6 +126,13 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
+
+	// Loading is complete, establish the save loop.
+	saveLoopShutdown := make(chan struct{})
+	go hdb.threadedSaveLoop(saveLoopShutdown)
+	hdb.tg.OnStop(func() {
+		close(saveLoopShutdown)
+	})
 
 	// Don't perform the remaining startup in the presence of a quitAfterLoad
 	// disruption.
