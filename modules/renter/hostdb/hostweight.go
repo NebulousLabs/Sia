@@ -234,9 +234,9 @@ func (hdb *HostDB) lifetimeAdjustments(entry modules.HostDBEntry) float64 {
 // uptimeAdjustments penalizes the host for having poor uptime, and for being
 // offline.
 //
-// CAUTION: The function 'managedUpdateEntry' will manually fill out two scans
-// for a new host to give the host some initial uptime or downtime. Modification
-// of this function needs to be made paying attention to the structure of that
+// CAUTION: The function 'updateEntry' will manually fill out two scans for a
+// new host to give the host some initial uptime or downtime. Modification of
+// this function needs to be made paying attention to the structure of that
 // function.
 func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	// Special case: if we have scanned the host twice or fewer, don't perform

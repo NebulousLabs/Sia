@@ -62,8 +62,10 @@ type HostDB struct {
 
 	// the scanPool is a set of hosts that need to be scanned. There are a
 	// handful of goroutines constantly waiting on the channel for hosts to
-	// scan.
+	// scan. The scan map is used to prevent duplicates from entering the scan
+	// pool.
 	scanList []modules.HostDBEntry
+	scanMap  map[string]struct{}
 	scanPool chan modules.HostDBEntry
 	scanWait bool
 	online   bool
@@ -96,6 +98,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		gateway:    g,
 		persistDir: persistDir,
 
+		scanMap:  make(map[string]struct{}),
 		scanPool: make(chan modules.HostDBEntry, scanPoolSize),
 	}
 

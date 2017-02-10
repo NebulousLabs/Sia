@@ -18,12 +18,25 @@ import (
 
 // queueScan will add a host to the queue to be scanned.
 func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
+	// If this entry is already in the scan pool, can return immediately.
+	_, exists := hdb.scanMap[entry.PublicKey.String()]
+	if exists {
+		return
+	}
+
 	// Add the entry to a waitlist, then check if any thread is currently
 	// emptying the waitlist. If not, spawn a thread to empty the waitlist.
+	hdb.scanMap[entry.PublicKey.String()] = struct{}{}
 	hdb.scanList = append(hdb.scanList, entry)
 	if hdb.scanWait {
 		// Another thread is emptying the scan list, nothing to worry about.
 		return
+	}
+
+	// Sanity check - the length of the scan pool and the length of the scan map
+	// should be within 'scanningThreads' of eachother.
+	if build.DEBUG && len(hdb.scanMap) > len(hdb.scanList) {
+		hdb.log.Critical("The hostdb scan map has seemingly grown too large:", len(hdb.scanMap), len(hdb.scanList), scanningThreads)
 	}
 
 	hdb.scanWait = true
@@ -49,6 +62,7 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			// Get the next host, shrink the scan list.
 			entry := hdb.scanList[0]
 			hdb.scanList = hdb.scanList[1:]
+			delete(hdb.scanMap, entry.PublicKey.String())
 			scansRemaining := len(hdb.scanList)
 			hdb.mu.Unlock()
 
@@ -65,17 +79,13 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 	}()
 }
 
-// managedUpdateEntry updates an entry in the hostdb after a scan has taken
-// place.
+// updateEntry updates an entry in the hostdb after a scan has taken place.
 //
 // CAUTION: This function will automatically add multiple entries to a new host
 // to give that host some base uptime. This makes this function co-dependent
 // with the host weight functions. Adjustment of the host weight functions need
 // to keep this function in mind, and vice-versa.
-func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, netErr error) {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-
+func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 	// If the host is not online, toss out this update.
 	if !hdb.online {
 		return
@@ -171,8 +181,12 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 		entry.HostExternalSettings = settings
 	}
-	// Update the host tree to have a new entry, including the new error.
-	hdb.managedUpdateEntry(entry, err)
+
+	// Update the host tree to have a new entry, including the new error. Then
+	// delete the entry from the scan map as the scan has been successful.
+	hdb.mu.Lock()
+	hdb.updateEntry(entry, err)
+	hdb.mu.Unlock()
 }
 
 // threadedProbeHosts pulls hosts from the thread pool and runs a scan on them.
