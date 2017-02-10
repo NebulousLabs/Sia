@@ -13,6 +13,9 @@ package hostdb
 // TODO: Investigate why hosts that seem to be online can fail scans, and figure
 // out a more robust way to not miss hosts.
 
+// TODO: Refine the method by which the hostdb selects which hosts to scan
+// during its regular scanning period.
+
 import (
 	"errors"
 	"fmt"

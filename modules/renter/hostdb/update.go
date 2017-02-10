@@ -40,8 +40,14 @@ func (hdb *HostDB) insertBlockchainHost(host modules.HostDBEntry) {
 
 	// Make sure the host gets into the host tree so it does not get dropped if
 	// shutdown occurs before a scan can be performed.
-	_, exists := hdb.hostTree.Select(host.PublicKey)
-	if !exists {
+	oldEntry, exists := hdb.hostTree.Select(host.PublicKey)
+	if exists {
+		oldEntry.NetAddress = host.NetAddress
+		err := hdb.hostTree.Modify(oldEntry)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to modify host entry of host tree after a blockchain scan:", err)
+		}
+	} else {
 		host.FirstSeen = hdb.blockHeight
 		err := hdb.hostTree.Insert(host)
 		if err != nil {

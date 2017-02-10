@@ -13,7 +13,7 @@ import (
 var (
 	// Because most weights would otherwise be fractional, we set the base
 	// weight to be very large.
-	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(50), nil))
+	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(80), nil))
 
 	// tbMonth is the number of bytes in a terabyte times the number of blocks
 	// in a month.
@@ -21,9 +21,6 @@ var (
 
 	// collateralExponentiation is the number of times that the collateral is
 	// multiplied into the price.
-	//
-	// NOTE: Changing this value downwards needs that the baseWeight will need
-	// to be increased.
 	collateralExponentiation = 1
 
 	// priceDiveNormalization reduces the raw value of the price so that not so
@@ -47,10 +44,7 @@ var (
 
 	// priceExponentiation is the number of times that the weight is divided by
 	// the price.
-	//
-	// NOTE: Changing this value upwards means that the baseWeight will need to
-	// be increased.
-	priceExponentiation = 4
+	priceExponentiation = 5
 
 	// requiredStorage indicates the amount of storage that the host must be
 	// offering in order to be considered a valuable/worthwhile host.
