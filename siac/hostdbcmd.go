@@ -14,6 +14,10 @@ import (
 )
 
 var (
+	hostdbNumActiveHosts int
+)
+
+var (
 	hostdbCmd = &cobra.Command{
 		Use:   "hostdb",
 		Short: "Interact with the renter's host database.",
@@ -46,6 +50,11 @@ func hostdbcmd() {
 		fmt.Println("No known active hosts")
 		return
 	}
+
+	if hostdbNumActiveHosts != 0 && hostdbNumActiveHosts < len(info.Hosts) {
+		info.Hosts = info.Hosts[len(info.Hosts)-hostdbNumActiveHosts:]
+	}
+
 	fmt.Println(len(info.Hosts), "Active Hosts:")
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "\tAddress\tPrice\tPubkey")
@@ -103,12 +112,12 @@ func hostdbviewcmd(pubkey string) {
 
 	fmt.Println("\n  Score Breakdown:")
 	w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	total := info.ScoreBreakdown.AgeAdjustment * info.ScoreBreakdown.BurnAdjustment * info.ScoreBreakdown.CollateralAdjustment * info.ScoreBreakdown.PriceAdjustment * info.ScoreBreakdown.StorageRemainingAdjustment * info.ScoreBreakdown.UptimeAdjustment * info.ScoreBreakdown.VersionAdjustment * 1e9
-	fmt.Fprintf(w, "\t\tTotal Score:\t %.0f\n", total)
+	total := info.ScoreBreakdown.AgeAdjustment * info.ScoreBreakdown.BurnAdjustment * info.ScoreBreakdown.CollateralAdjustment * info.ScoreBreakdown.PriceAdjustment * info.ScoreBreakdown.StorageRemainingAdjustment * info.ScoreBreakdown.UptimeAdjustment * info.ScoreBreakdown.VersionAdjustment * 1e12
+	fmt.Fprintf(w, "\t\tTotal Score:\t %.0f\n\n", total)
 	fmt.Fprintf(w, "\t\tAge:\t %.3f\n", info.ScoreBreakdown.AgeAdjustment)
 	fmt.Fprintf(w, "\t\tBurn:\t %.3f\n", info.ScoreBreakdown.BurnAdjustment)
 	fmt.Fprintf(w, "\t\tCollateral:\t %.3f\n", info.ScoreBreakdown.CollateralAdjustment)
-	fmt.Fprintf(w, "\t\tPrice:\t %.3f\n", info.ScoreBreakdown.PriceAdjustment*1e3)
+	fmt.Fprintf(w, "\t\tPrice:\t %.3f\n", info.ScoreBreakdown.PriceAdjustment*1e6)
 	fmt.Fprintf(w, "\t\tStorage:\t %.3f\n", info.ScoreBreakdown.StorageRemainingAdjustment)
 	fmt.Fprintf(w, "\t\tUptime:\t %.3f\n", info.ScoreBreakdown.UptimeAdjustment)
 	fmt.Fprintf(w, "\t\tVersion:\t %.3f\n", info.ScoreBreakdown.VersionAdjustment)

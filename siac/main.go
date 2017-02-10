@@ -243,6 +243,7 @@ func main() {
 	root.AddCommand(hostdbCmd)
 	hostdbCmd.AddCommand(hostdbAllCmd)
 	hostdbCmd.AddCommand(hostdbViewCmd)
+	hostdbCmd.Flags().IntVarP(&hostdbNumActiveHosts, "numhosts", "n", 0, "Number of hosts to display from the hostdb")
 
 	root.AddCommand(minerCmd)
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd)
@@ -259,7 +260,8 @@ func main() {
 	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd,
 		renterDownloadsCmd, renterAllowanceCmd, renterSetAllowanceCmd,
 		renterContractsCmd, renterFilesListCmd, renterFilesRenameCmd,
-		renterFilesUploadCmd, renterUploadsCmd, renterExportCmd)
+		renterFilesUploadCmd, renterUploadsCmd, renterExportCmd,
+		renterPricesCmd)
 	renterCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
 	renterFilesListCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")

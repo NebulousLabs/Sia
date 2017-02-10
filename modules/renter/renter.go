@@ -143,6 +143,7 @@ type Renter struct {
 	persistDir     string
 	mu             *sync.RWMutex
 	tg             *sync.ThreadGroup
+	tpool          modules.TransactionPool
 }
 
 // New returns an initialized renter.
@@ -189,6 +190,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		persistDir:     persistDir,
 		mu:             sync.New(modules.SafeMutexDelay, 1),
 		tg:             new(sync.ThreadGroup),
+		tpool:          tpool,
 	}
 	if err := r.initPersist(); err != nil {
 		return nil, err
@@ -252,6 +254,10 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 	// Take the average of the host set to estimate the overall cost of the
 	// contract forming.
 	totalContractCost = totalContractCost.Mul64(uint64(priceEstimationScope))
+
+	// Add the cost of paying the transaction fees for the first contract.
+	_, feePerByte := r.tpool.FeeEstimation()
+	totalContractCost = totalContractCost.Add(feePerByte.Mul64(1000).Mul64(uint64(priceEstimationScope)))
 
 	return modules.RenterPriceEstimation{
 		FormContracts:        totalContractCost,

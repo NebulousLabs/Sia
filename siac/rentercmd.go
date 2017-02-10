@@ -12,6 +12,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -98,6 +99,13 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Short: "Upload a file",
 		Long:  "Upload a file to [path] on the Sia network.",
 		Run:   wrap(renterfilesuploadcmd),
+	}
+
+	renterPricesCmd = &cobra.Command{
+		Use:   "prices",
+		Short: "Display the price of storage and bandwidth",
+		Long:  "Display the estimated prices of storing files, retrieving files, and creating a set of contracts",
+		Run:   wrap(renterpricescmd),
 	}
 )
 
@@ -410,4 +418,22 @@ func renterfilesuploadcmd(source, path string) {
 		die("Could not upload file:", err)
 	}
 	fmt.Printf("Uploaded '%s' as %s.\n", abs(source), path)
+}
+
+// renterpricescmd is the handler for the command `siac renter prices`, which
+// displays the pirces of various storage operations.
+func renterpricescmd() {
+	var rpg api.RenterPricesGET
+	err := getAPI("/renter/prices", &rpg)
+	if err != nil {
+		die("Could not read the renter prices:", err)
+	}
+
+	fmt.Println("Renter Prices (estimated):")
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "\tFees for Creating a Set of Contracts:\t", rpg.FormContracts.Div(types.SiacoinPrecision))
+	fmt.Fprintln(w, "\tDownload 1 TB:\t", rpg.DownloadTerabyte.Div(types.SiacoinPrecision))
+	fmt.Fprintln(w, "\tStore 1 TB for 1 Month:\t", rpg.StorageTerabyteMonth.Div(types.SiacoinPrecision))
+	fmt.Fprintln(w, "\tUpload 1 TB:\t", rpg.UploadTerabyte.Div(types.SiacoinPrecision))
+	w.Flush()
 }
