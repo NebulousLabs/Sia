@@ -49,9 +49,11 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			// Get the next host, shrink the scan list.
 			entry := hdb.scanList[0]
 			hdb.scanList = hdb.scanList[1:]
+			scansRemaining := len(hdb.scanList)
 			hdb.mu.Unlock()
 
 			// Block while waiting for an opening in the scan pool.
+			hdb.log.Debugf("Sending host %v for scan, %v hosts remain", entry.PublicKey.String(), scansRemaining)
 			select {
 			case hdb.scanPool <- entry:
 				// iterate again
@@ -102,6 +104,9 @@ func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, netErr error) {
 			{Timestamp: time.Now(), Success: netErr == nil},
 		}
 	} else {
+		if newEntry.ScanHistory[len(newEntry.ScanHistory)-1].Success && netErr != nil {
+			hdb.log.Printf("Host %v is being downgraded from an online host to an offline host: %v\n", newEntry.PublicKey.String(), netErr)
+		}
 		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: time.Now(), Success: netErr == nil})
 	}
 
@@ -110,11 +115,15 @@ func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, netErr error) {
 		err := hdb.hostTree.Insert(newEntry)
 		if err != nil {
 			hdb.log.Println("ERROR: unable to insert entry which is was thought to be new:", err)
+		} else {
+			hdb.log.Debugf("Adding host %v to the hostdb. Net error: %v\n", newEntry.PublicKey.String(), netErr)
 		}
 	} else {
 		err := hdb.hostTree.Modify(newEntry)
 		if err != nil {
 			hdb.log.Println("ERROR: unable to modify entry which is thought to exist:", err)
+		} else {
+			hdb.log.Debugf("Adding host %v to the hostdb. Net error: %v\n", newEntry.PublicKey.String(), netErr)
 		}
 	}
 }
@@ -125,7 +134,7 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	// Request settings from the queued host entry.
 	netAddr := entry.NetAddress
 	pubKey := entry.PublicKey
-	hdb.log.Debugf("Scanning host at %v: key %v", netAddr, pubKey)
+	hdb.log.Debugf("Scanning host %v at %v", pubKey, netAddr)
 
 	var settings modules.HostExternalSettings
 	err := func() error {
