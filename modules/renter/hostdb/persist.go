@@ -2,6 +2,7 @@ package hostdb
 
 import (
 	"path/filepath"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -34,11 +35,6 @@ func (hdb *HostDB) persistData() (data hdbPersist) {
 	data.BlockHeight = hdb.blockHeight
 	data.LastChange = hdb.lastChange
 	return data
-}
-
-// save saves the hostdb persistence data to disk.
-func (hdb *HostDB) save() error {
-	return hdb.deps.saveFile(persistMetadata, hdb.persistData(), filepath.Join(hdb.persistDir, persistFilename))
 }
 
 // saveSync saves the hostdb persistence data to disk and then syncs to disk.
@@ -74,4 +70,22 @@ func (hdb *HostDB) load() error {
 	hdb.blockHeight = data.BlockHeight
 	hdb.lastChange = data.LastChange
 	return nil
+}
+
+// threadedSaveLoop saves the hostdb to disk every 2 minutes, also saving when
+// given the shutdown signal.
+func (hdb *HostDB) threadedSaveLoop() {
+	for {
+		select {
+		case <-hdb.tg.StopChan():
+			return
+		case <-time.After(saveFrequency):
+			hdb.mu.Lock()
+			err := hdb.saveSync()
+			hdb.mu.Unlock()
+			if err != nil {
+				hdb.log.Println("Difficulties saving the hostdb:", err)
+			}
+		}
+	}
 }

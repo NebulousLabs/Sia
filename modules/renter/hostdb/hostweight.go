@@ -13,7 +13,7 @@ import (
 var (
 	// Because most weights would otherwise be fractional, we set the base
 	// weight to be very large.
-	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(50), nil))
+	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(80), nil))
 
 	// tbMonth is the number of bytes in a terabyte times the number of blocks
 	// in a month.
@@ -21,9 +21,6 @@ var (
 
 	// collateralExponentiation is the number of times that the collateral is
 	// multiplied into the price.
-	//
-	// NOTE: Changing this value downwards needs that the baseWeight will need
-	// to be increased.
 	collateralExponentiation = 1
 
 	// priceDiveNormalization reduces the raw value of the price so that not so
@@ -47,10 +44,7 @@ var (
 
 	// priceExponentiation is the number of times that the weight is divided by
 	// the price.
-	//
-	// NOTE: Changing this value upwards means that the baseWeight will need to
-	// be increased.
-	priceExponentiation = 4
+	priceExponentiation = 5
 
 	// requiredStorage indicates the amount of storage that the host must be
 	// offering in order to be considered a valuable/worthwhile host.
@@ -234,9 +228,9 @@ func (hdb *HostDB) lifetimeAdjustments(entry modules.HostDBEntry) float64 {
 // uptimeAdjustments penalizes the host for having poor uptime, and for being
 // offline.
 //
-// CAUTION: The function 'managedUpdateEntry' will manually fill out two scans
-// for a new host to give the host some initial uptime or downtime. Modification
-// of this function needs to be made paying attention to the structure of that
+// CAUTION: The function 'updateEntry' will manually fill out two scans for a
+// new host to give the host some initial uptime or downtime. Modification of
+// this function needs to be made paying attention to the structure of that
 // function.
 func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	// Special case: if we have scanned the host twice or fewer, don't perform

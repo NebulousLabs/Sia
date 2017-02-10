@@ -18,12 +18,25 @@ import (
 
 // queueScan will add a host to the queue to be scanned.
 func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
+	// If this entry is already in the scan pool, can return immediately.
+	_, exists := hdb.scanMap[entry.PublicKey.String()]
+	if exists {
+		return
+	}
+
 	// Add the entry to a waitlist, then check if any thread is currently
 	// emptying the waitlist. If not, spawn a thread to empty the waitlist.
+	hdb.scanMap[entry.PublicKey.String()] = struct{}{}
 	hdb.scanList = append(hdb.scanList, entry)
 	if hdb.scanWait {
 		// Another thread is emptying the scan list, nothing to worry about.
 		return
+	}
+
+	// Sanity check - the scan map and the scan list should have the same
+	// length.
+	if build.DEBUG && len(hdb.scanMap) > len(hdb.scanList)+scanningThreads {
+		hdb.log.Critical("The hostdb scan map has seemingly grown too large:", len(hdb.scanMap), len(hdb.scanList), scanningThreads)
 	}
 
 	hdb.scanWait = true
@@ -49,9 +62,18 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			// Get the next host, shrink the scan list.
 			entry := hdb.scanList[0]
 			hdb.scanList = hdb.scanList[1:]
+			delete(hdb.scanMap, entry.PublicKey.String())
+			scansRemaining := len(hdb.scanList)
+
+			// Grab the most recent entry for this host.
+			recentEntry, exists := hdb.hostTree.Select(entry.PublicKey)
+			if exists {
+				entry = recentEntry
+			}
 			hdb.mu.Unlock()
 
 			// Block while waiting for an opening in the scan pool.
+			hdb.log.Debugf("Sending host %v for scan, %v hosts remain", entry.PublicKey.String(), scansRemaining)
 			select {
 			case hdb.scanPool <- entry:
 				// iterate again
@@ -63,17 +85,13 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 	}()
 }
 
-// managedUpdateEntry updates an entry in the hostdb after a scan has taken
-// place.
+// updateEntry updates an entry in the hostdb after a scan has taken place.
 //
 // CAUTION: This function will automatically add multiple entries to a new host
 // to give that host some base uptime. This makes this function co-dependent
 // with the host weight functions. Adjustment of the host weight functions need
 // to keep this function in mind, and vice-versa.
-func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, netErr error) {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-
+func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 	// If the host is not online, toss out this update.
 	if !hdb.online {
 		return
@@ -102,6 +120,9 @@ func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, netErr error) {
 			{Timestamp: time.Now(), Success: netErr == nil},
 		}
 	} else {
+		if newEntry.ScanHistory[len(newEntry.ScanHistory)-1].Success && netErr != nil {
+			hdb.log.Debugf("Host %v is being downgraded from an online host to an offline host: %v\n", newEntry.PublicKey.String(), netErr)
+		}
 		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: time.Now(), Success: netErr == nil})
 	}
 
@@ -110,15 +131,17 @@ func (hdb *HostDB) managedUpdateEntry(entry modules.HostDBEntry, netErr error) {
 		err := hdb.hostTree.Insert(newEntry)
 		if err != nil {
 			hdb.log.Println("ERROR: unable to insert entry which is was thought to be new:", err)
+		} else {
+			hdb.log.Debugf("Adding host %v to the hostdb. Net error: %v\n", newEntry.PublicKey.String(), netErr)
 		}
 	} else {
 		err := hdb.hostTree.Modify(newEntry)
 		if err != nil {
 			hdb.log.Println("ERROR: unable to modify entry which is thought to exist:", err)
+		} else {
+			hdb.log.Debugf("Adding host %v to the hostdb. Net error: %v\n", newEntry.PublicKey.String(), netErr)
 		}
 	}
-
-	hdb.save()
 }
 
 // managedScanHost will connect to a host and grab the settings, verifying
@@ -127,7 +150,7 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	// Request settings from the queued host entry.
 	netAddr := entry.NetAddress
 	pubKey := entry.PublicKey
-	hdb.log.Debugf("Scanning host at %v: key %v", netAddr, pubKey)
+	hdb.log.Debugf("Scanning host %v at %v", pubKey, netAddr)
 
 	var settings modules.HostExternalSettings
 	err := func() error {
@@ -164,8 +187,12 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 		entry.HostExternalSettings = settings
 	}
-	// Update the host tree to have a new entry, including the new error.
-	hdb.managedUpdateEntry(entry, err)
+
+	// Update the host tree to have a new entry, including the new error. Then
+	// delete the entry from the scan map as the scan has been successful.
+	hdb.mu.Lock()
+	hdb.updateEntry(entry, err)
+	hdb.mu.Unlock()
 }
 
 // threadedProbeHosts pulls hosts from the thread pool and runs a scan on them.
