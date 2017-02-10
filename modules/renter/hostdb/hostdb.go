@@ -5,15 +5,13 @@
 package hostdb
 
 // TODO: Not sure what happens with hosts that fail their first scan. Is it
-// possible for them to get scored inappropriately?
+// possible for them to get scored inappropriately? If they start behind, can
+// they scan back into the set of good hosts?
 
-// TODO: Do not add a host pk to the scan pool if a host with that pk is
-// already in the scan pool.
+// TODO: Scan history should be truncated.
 
-// TODO: Scan history should be truncated, perhaps to the past year.
-
-// TODO: Write tests to see that a host which is initally scanned as offline
-// can eventually fight their way back through the ranks.
+// TODO: Investigate why hosts that seem to be online can fail scans, and figure
+// out a more robust way to not miss hosts.
 
 import (
 	"errors"
@@ -28,13 +26,6 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-const (
-	// scanPoolSize sets the buffer size of the channel that holds hosts which
-	// need to be scanned. A thread pool pulls from the scan pool to query
-	// hosts that are due for an update.
-	scanPoolSize = 1000
 )
 
 var (
@@ -99,7 +90,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		persistDir: persistDir,
 
 		scanMap:  make(map[string]struct{}),
-		scanPool: make(chan modules.HostDBEntry, scanPoolSize),
+		scanPool: make(chan modules.HostDBEntry),
 	}
 
 	// Create the persist directory if it does not yet exist.

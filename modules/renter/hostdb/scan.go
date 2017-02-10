@@ -35,7 +35,7 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 
 	// Sanity check - the length of the scan pool and the length of the scan map
 	// should be within 'scanningThreads' of eachother.
-	if build.DEBUG && len(hdb.scanMap) > len(hdb.scanList) {
+	if build.DEBUG && len(hdb.scanMap) > len(hdb.scanList)+scanningThreads {
 		hdb.log.Critical("The hostdb scan map has seemingly grown too large:", len(hdb.scanMap), len(hdb.scanList), scanningThreads)
 	}
 
@@ -62,7 +62,6 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			// Get the next host, shrink the scan list.
 			entry := hdb.scanList[0]
 			hdb.scanList = hdb.scanList[1:]
-			delete(hdb.scanMap, entry.PublicKey.String())
 			scansRemaining := len(hdb.scanList)
 			hdb.mu.Unlock()
 
@@ -185,6 +184,7 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	// Update the host tree to have a new entry, including the new error. Then
 	// delete the entry from the scan map as the scan has been successful.
 	hdb.mu.Lock()
+	delete(hdb.scanMap, entry.PublicKey.String())
 	hdb.updateEntry(entry, err)
 	hdb.mu.Unlock()
 }
