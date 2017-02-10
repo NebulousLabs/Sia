@@ -123,13 +123,17 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
+	hdb.tg.AfterStop(func() {
+		hdb.mu.Lock()
+		err := hdb.saveSync()
+		hdb.mu.Unlock()
+		if err != nil {
+			hdb.log.Println("Unable to save the hostdb:", err)
+		}
+	})
 
 	// Loading is complete, establish the save loop.
-	saveLoopShutdown := make(chan struct{})
-	go hdb.threadedSaveLoop(saveLoopShutdown)
-	hdb.tg.OnStop(func() {
-		close(saveLoopShutdown)
-	})
+	go hdb.threadedSaveLoop()
 
 	// Don't perform the remaining startup in the presence of a quitAfterLoad
 	// disruption.
