@@ -119,9 +119,9 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 
 // managedFormContracts forms contracts with n hosts using the allowance
 // parameters.
-func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight types.BlockHeight) ([]modules.RenterContract, []types.SiaPublicKey, error) {
+func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight types.BlockHeight) ([]modules.RenterContract, error) {
 	if n <= 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	// Sample at least 10 hosts.
@@ -133,17 +133,15 @@ func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight ty
 	c.mu.RLock()
 	var exclude []types.SiaPublicKey
 	for _, contract := range c.contracts {
-		pubKey := c.relationships[contract.ID]
-		exclude = append(exclude, pubKey)
+		exclude = append(exclude, contract.HostPublicKey)
 	}
 	c.mu.RUnlock()
 	hosts := c.hdb.RandomHosts(nRandomHosts, exclude)
 	if len(hosts) < n {
-		return nil, nil, fmt.Errorf("not enough hosts in hostdb for contract formation, got %v but needed %v", len(hosts), n)
+		return nil, fmt.Errorf("not enough hosts in hostdb for contract formation, got %v but needed %v", len(hosts), n)
 	}
 
 	var contracts []modules.RenterContract
-	var hostPubKeys []types.SiaPublicKey
 	var errs []string
 	for _, h := range hosts {
 		contract, err := c.managedNewContract(h, numSectors, endHeight)
@@ -152,7 +150,6 @@ func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight ty
 			continue
 		}
 		contracts = append(contracts, contract)
-		hostPubKeys = append(hostPubKeys, h.PublicKey)
 		if len(contracts) >= n {
 			break
 		}
@@ -168,10 +165,10 @@ func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight ty
 	// all-or-nothing approach? We can't pick new hosts to negotiate with
 	// because they'll probably be more expensive than we can afford.
 	if len(contracts) == 0 {
-		return nil, nil, errors.New("could not form any contracts:\n" + strings.Join(errs, "\n"))
+		return nil, errors.New("could not form any contracts:\n" + strings.Join(errs, "\n"))
 	} else if len(contracts) < n {
 		c.log.Printf("WARN: failed to form desired number of contracts (wanted %v, got %v):\n%v", n, len(contracts), strings.Join(errs, "\n"))
 	}
 
-	return contracts, hostPubKeys, nil
+	return contracts, nil
 }
