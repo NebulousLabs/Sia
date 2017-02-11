@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	hostdbNumActiveHosts int
+	hostdbNumHosts int
+	hostdbVerbose  bool
 )
 
 var (
@@ -22,13 +23,6 @@ var (
 		Short: "Interact with the renter's host database.",
 		Long:  "View the list of active hosts, the list of all hosts, or query specific hosts.",
 		Run:   wrap(hostdbcmd),
-	}
-
-	hostdbAllCmd = &cobra.Command{
-		Use:   "all",
-		Short: "View the full set of hosts known to the hostdb.",
-		Long:  "View the full set of hosts known to the hostdb.",
-		Run:   wrap(hostdballcmd),
 	}
 
 	hostdbViewCmd = &cobra.Command{
@@ -40,48 +34,154 @@ var (
 )
 
 func hostdbcmd() {
-	info := new(api.HostdbActiveGET)
-	err := getAPI("/hostdb/active", info)
-	if err != nil {
-		die("Could not fetch host list:", err)
-	}
-	if len(info.Hosts) == 0 {
-		fmt.Println("No known active hosts")
-		return
-	}
+	if !hostdbVerbose {
+		info := new(api.HostdbActiveGET)
+		err := getAPI("/hostdb/active", info)
+		if err != nil {
+			die("Could not fetch host list:", err)
+		}
+		if len(info.Hosts) == 0 {
+			fmt.Println("No known active hosts")
+			return
+		}
 
-	if hostdbNumActiveHosts != 0 && hostdbNumActiveHosts < len(info.Hosts) {
-		info.Hosts = info.Hosts[len(info.Hosts)-hostdbNumActiveHosts:]
-	}
+		// Strip down to the number of requested hosts.
+		if hostdbNumHosts != 0 && hostdbNumHosts < len(info.Hosts) {
+			info.Hosts = info.Hosts[len(info.Hosts)-hostdbNumHosts:]
+		}
 
-	fmt.Println(len(info.Hosts), "Active Hosts:")
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "\tAddress\tPrice\tPubkey")
-	for _, host := range info.Hosts {
-		price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
-		fmt.Fprintf(w, "\t%v\t%v / TB / Month\t%v\n", host.NetAddress, currencyUnits(price), host.PublicKeyString)
-	}
-	w.Flush()
-}
+		fmt.Println(len(info.Hosts), "Active Hosts:")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "\t\tAddress\tPrice\t")
+		for i, host := range info.Hosts {
+			price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
+			fmt.Fprintf(w, "\t%v:\t%v\t%v \t (per TB per Month)\n", len(info.Hosts)-i, host.NetAddress, currencyUnits(price))
+		}
+		w.Flush()
+	} else {
+		info := new(api.HostdbAllGET)
+		err := getAPI("/hostdb/all", info)
+		if err != nil {
+			die("Could not fetch host list:", err)
+		}
+		if len(info.Hosts) == 0 {
+			fmt.Println("No known hosts")
+			return
+		}
 
-func hostdballcmd() {
-	info := new(api.HostdbAllGET)
-	err := getAPI("/hostdb/all", info)
-	if err != nil {
-		die("Could not fetch host list:", err)
+		// Iterate through the hosts and divide by category.
+		var activeHosts, inactiveHosts, offlineHosts []api.ExtendedHostDBEntry
+		for _, host := range info.Hosts {
+			if host.AcceptingContracts && len(host.ScanHistory) > 0 && host.ScanHistory[len(host.ScanHistory)-1].Success {
+				activeHosts = append(activeHosts, host)
+				continue
+			}
+			if len(host.ScanHistory) > 0 && host.ScanHistory[len(host.ScanHistory)-1].Success {
+				inactiveHosts = append(inactiveHosts, host)
+				continue
+			}
+			offlineHosts = append(offlineHosts, host)
+		}
+
+		if hostdbNumHosts > 0 && len(offlineHosts) > hostdbNumHosts {
+			offlineHosts = offlineHosts[len(offlineHosts)-hostdbNumHosts:]
+		}
+		if hostdbNumHosts > 0 && len(inactiveHosts) > hostdbNumHosts {
+			inactiveHosts = inactiveHosts[len(inactiveHosts)-hostdbNumHosts:]
+		}
+		if hostdbNumHosts > 0 && len(activeHosts) > hostdbNumHosts {
+			activeHosts = activeHosts[len(activeHosts)-hostdbNumHosts:]
+		}
+
+		fmt.Println(len(offlineHosts), "Offline Hosts:")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "\t\tPubkey\tAddress\tPrice\t\tUptime")
+		for i, host := range offlineHosts {
+			// Compute the total measured uptime and total measured downtime for this
+			// host.
+			uptimeRatio := float64(0)
+			if len(host.ScanHistory) > 1 {
+				var uptime time.Duration
+				var downtime time.Duration
+				recentTime := host.ScanHistory[0].Timestamp
+				recentSuccess := host.ScanHistory[0].Success
+				for _, scan := range host.ScanHistory[1:] {
+					if recentSuccess {
+						uptime += scan.Timestamp.Sub(recentTime)
+					} else {
+						downtime += scan.Timestamp.Sub(recentTime)
+					}
+					recentTime = scan.Timestamp
+					recentSuccess = scan.Success
+				}
+				uptimeRatio = float64(uptime) / float64(uptime+downtime)
+			}
+
+			price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
+			fmt.Fprintf(w, "\t%v:\t%v\t%v \t(per TB per Month)\t%v\t%.3f\n", len(offlineHosts)-i, host.PublicKeyString, host.NetAddress, currencyUnits(price), uptimeRatio)
+		}
+		w.Flush()
+
+		fmt.Println()
+		fmt.Println(len(inactiveHosts), "Inactive Hosts:")
+		w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "\t\tPubkey\tAddress\tPrice\t\tUptime")
+		for i, host := range inactiveHosts {
+			// Compute the total measured uptime and total measured downtime for this
+			// host.
+			uptimeRatio := float64(0)
+			if len(host.ScanHistory) > 1 {
+				var uptime time.Duration
+				var downtime time.Duration
+				recentTime := host.ScanHistory[0].Timestamp
+				recentSuccess := host.ScanHistory[0].Success
+				for _, scan := range host.ScanHistory[1:] {
+					if recentSuccess {
+						uptime += scan.Timestamp.Sub(recentTime)
+					} else {
+						downtime += scan.Timestamp.Sub(recentTime)
+					}
+					recentTime = scan.Timestamp
+					recentSuccess = scan.Success
+				}
+				uptimeRatio = float64(uptime) / float64(uptime+downtime)
+			}
+
+			price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
+			fmt.Fprintf(w, "\t%v:\t%v\t%v \t(per TB per Month)\t%v\t%.3f\n", len(inactiveHosts)-i, host.PublicKeyString, host.NetAddress, currencyUnits(price), uptimeRatio)
+		}
+		w.Flush()
+
+		fmt.Println()
+		fmt.Println(len(activeHosts), "Active Hosts:")
+		w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "\t\tPubkey\tAddress\tPrice\t\tUptime")
+		for i, host := range activeHosts {
+			// Compute the total measured uptime and total measured downtime for this
+			// host.
+			uptimeRatio := float64(0)
+			if len(host.ScanHistory) > 1 {
+				var uptime time.Duration
+				var downtime time.Duration
+				recentTime := host.ScanHistory[0].Timestamp
+				recentSuccess := host.ScanHistory[0].Success
+				for _, scan := range host.ScanHistory[1:] {
+					if recentSuccess {
+						uptime += scan.Timestamp.Sub(recentTime)
+					} else {
+						downtime += scan.Timestamp.Sub(recentTime)
+					}
+					recentTime = scan.Timestamp
+					recentSuccess = scan.Success
+				}
+				uptimeRatio = float64(uptime) / float64(uptime+downtime)
+			}
+
+			price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
+			fmt.Fprintf(w, "\t%v:\t%v\t%v \t(per TB per Month)\t%v\t%.3f\n", len(activeHosts)-i, host.PublicKeyString, host.NetAddress, currencyUnits(price), uptimeRatio)
+		}
+		w.Flush()
 	}
-	if len(info.Hosts) == 0 {
-		fmt.Println("No known hosts")
-		return
-	}
-	fmt.Println(len(info.Hosts), "Hosts Total:")
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "\tAddress\tPrice\tPubkey")
-	for _, host := range info.Hosts {
-		price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
-		fmt.Fprintf(w, "\t%v\t%v / TB / Month\t%v\n", host.NetAddress, currencyUnits(price), host.PublicKeyString)
-	}
-	w.Flush()
 }
 
 func hostdbviewcmd(pubkey string) {
