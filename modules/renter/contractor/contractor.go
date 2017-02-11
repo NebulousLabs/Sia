@@ -191,5 +191,12 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		return nil, errors.New("contractor subscription failed: " + err.Error())
 	}
 
+	// We may have upgraded persist or resubscribed. Save now so that we don't
+	// lose our work.
+	err = c.save()
+	if err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
