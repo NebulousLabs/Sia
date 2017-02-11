@@ -185,8 +185,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 		return cachedEditor, nil
 	}
 
-	hpk := c.relationships[contract.ID]
-	host, haveHost := c.hdb.Host(hpk)
+	host, haveHost := c.hdb.Host(contract.HostPublicKey)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
 	} else if height > contract.EndHeight() {

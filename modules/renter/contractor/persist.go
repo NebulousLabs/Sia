@@ -15,7 +15,6 @@ type contractorPersist struct {
 	CurrentPeriod   types.BlockHeight
 	LastChange      modules.ConsensusChangeID
 	OldContracts    []modules.RenterContract
-	Relationships   map[string]string
 	RenewedIDs      map[string]string
 
 	// COMPATv1.0.4-lts
@@ -34,7 +33,6 @@ func (c *Contractor) persistData() contractorPersist {
 		BlockHeight:   c.blockHeight,
 		CurrentPeriod: c.currentPeriod,
 		LastChange:    c.lastChange,
-		Relationships: make(map[string]string),
 		RenewedIDs:    make(map[string]string),
 	}
 	for _, rev := range c.cachedRevisions {
@@ -45,9 +43,6 @@ func (c *Contractor) persistData() contractorPersist {
 	}
 	for _, contract := range c.oldContracts {
 		data.OldContracts = append(data.OldContracts, contract)
-	}
-	for id, hpk := range c.relationships {
-		data.Relationships[id.String()] = hpk.String()
 	}
 	for oldID, newID := range c.renewedIDs {
 		data.RenewedIDs[oldID.String()] = newID.String()
@@ -80,6 +75,19 @@ func (c *Contractor) load() error {
 		}
 		c.currentPeriod = highestEnd - c.allowance.Period
 	}
+
+	// COMPATv1.1.0
+	//
+	// If loading old persist, the host's public key is unknown. We must
+	// rescan the blockchain for a host announcement corresponding to the
+	// contract's NetAddress.
+	for _, contract := range data.Contracts {
+		if len(contract.HostPublicKey.Key) == 0 {
+			data.Contracts = addPubKeys(c.cs, data.Contracts)
+			break // only need to rescan once
+		}
+	}
+
 	for _, contract := range data.Contracts {
 		// COMPATv1.0.4-lts
 		// If loading old persist, start height of contract is unknown. Give
@@ -90,16 +98,10 @@ func (c *Contractor) load() error {
 		}
 		c.contracts[contract.ID] = contract
 	}
+
 	c.lastChange = data.LastChange
 	for _, contract := range data.OldContracts {
 		c.oldContracts[contract.ID] = contract
-	}
-	for idString, keyString := range data.Relationships {
-		var idHash crypto.Hash
-		var spk types.SiaPublicKey
-		idHash.LoadString(idString)
-		spk.LoadString(keyString)
-		c.relationships[types.FileContractID(idHash)] = spk
 	}
 	for oldString, newString := range data.RenewedIDs {
 		var oldHash, newHash crypto.Hash
@@ -133,25 +135,6 @@ func (c *Contractor) load() error {
 		}
 	}
 
-	// COMPATv1.1.0
-	//
-	// Wwhen loading old contracts, the corresponding relationships may not be
-	// known. Use the hostdb to make sure the relationship set is fully filled
-	// out.
-	allHosts := c.hdb.AllHosts()
-	hmap := make(map[modules.NetAddress]modules.HostDBEntry)
-	// Iterate so that in the event of duplicate hosts for a netaddress, the
-	// highest score host is the one in the map.
-	for _, host := range allHosts {
-		hmap[host.NetAddress] = host
-	}
-	for _, contract := range c.contracts {
-		host, exists := hmap[contract.NetAddress]
-		if exists {
-			c.relationships[contract.ID] = host.PublicKey
-		}
-	}
-
 	return nil
 }
 
@@ -173,5 +156,43 @@ func (c *Contractor) saveRevision(id types.FileContractID) func(types.FileContra
 		defer c.mu.Unlock()
 		c.cachedRevisions[id] = cachedRevision{rev, newRoots}
 		return c.saveSync()
+	}
+}
+
+// addPubKeys rescans the blockchain to fill in the HostPublicKey of
+// contracts, identified by their NetAddress.
+func addPubKeys(cs consensusSet, contracts []modules.RenterContract) []modules.RenterContract {
+	pubkeys := make(pubkeyScanner)
+	for _, c := range contracts {
+		pubkeys[c.NetAddress] = types.SiaPublicKey{}
+	}
+	cs.ConsensusSetSubscribe(pubkeys, modules.ConsensusChangeBeginning)
+	for i, c := range contracts {
+		contracts[i].HostPublicKey = pubkeys[c.NetAddress]
+	}
+	return contracts
+}
+
+type pubkeyScanner map[modules.NetAddress]types.SiaPublicKey
+
+func (pubkeys pubkeyScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
+	// find announcements
+	for _, block := range cc.AppliedBlocks {
+		for _, txn := range block.Transactions {
+			for _, arb := range txn.ArbitraryData {
+				// decode announcement
+				addr, pubKey, err := modules.DecodeAnnouncement(arb)
+				if err != nil {
+					continue
+				}
+
+				// For each announcement, if we recognize the addr, map it
+				// to the announced pubkey. Note that we will overwrite
+				// the pubkey if two announcements have the same addr.
+				if _, relevant := pubkeys[addr]; relevant {
+					pubkeys[addr] = pubKey
+				}
+			}
+		}
 	}
 }

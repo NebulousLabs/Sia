@@ -62,7 +62,6 @@ type Contractor struct {
 	cachedRevisions map[types.FileContractID]cachedRevision
 	contracts       map[types.FileContractID]modules.RenterContract
 	oldContracts    map[types.FileContractID]modules.RenterContract
-	relationships   map[types.FileContractID]types.SiaPublicKey
 	renewedIDs      map[types.FileContractID]types.FileContractID
 }
 
@@ -170,7 +169,6 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		downloaders:     make(map[types.FileContractID]*hostDownloader),
 		editors:         make(map[types.FileContractID]*hostEditor),
 		oldContracts:    make(map[types.FileContractID]modules.RenterContract),
-		relationships:   make(map[types.FileContractID]types.SiaPublicKey),
 		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
 		renewing:        make(map[types.FileContractID]bool),
 		revising:        make(map[types.FileContractID]bool),
@@ -191,6 +189,13 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 	}
 	if err != nil {
 		return nil, errors.New("contractor subscription failed: " + err.Error())
+	}
+
+	// We may have upgraded persist or resubscribed. Save now so that we don't
+	// lose our work.
+	err = c.save()
+	if err != nil {
+		return nil, err
 	}
 
 	return c, nil

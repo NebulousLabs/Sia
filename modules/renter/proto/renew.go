@@ -249,6 +249,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 
 	return modules.RenterContract{
 		FileContract:    fc,
+		HostPublicKey:   host.PublicKey,
 		ID:              fcid,
 		LastRevision:    initRevision,
 		LastRevisionTxn: revisionTxn,

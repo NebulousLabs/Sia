@@ -14,8 +14,7 @@ import (
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
 func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
-	hpk := c.relationships[contract.ID]
-	host, ok := c.hdb.Host(hpk)
+	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
 		return modules.RenterContract{}, errors.New("no record of that host")
 	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
@@ -159,8 +158,6 @@ func (c *Contractor) managedRenewContracts() error {
 		}
 		// insert the new contract
 		c.contracts[contract.ID] = contract
-		hpk := c.relationships[oldID]
-		c.relationships[contract.ID] = hpk
 		// add a mapping from old->new contract
 		c.renewedIDs[oldID] = contract.ID
 	}

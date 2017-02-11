@@ -122,9 +122,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 	// renew existing contracts with new allowance parameters
 	newContracts := make(map[types.FileContractID]modules.RenterContract)
-	newRelationships := make(map[types.FileContractID]types.SiaPublicKey)
 	for _, contract := range renewSet {
-		hostPubKey := c.relationships[contract.ID]
 		newContract, err := c.managedRenew(contract, numSectors, endHeight)
 		if err != nil {
 			c.log.Printf("WARN: failed to renew contract with %v; a new contract will be formed in its place", contract.NetAddress)
@@ -132,7 +130,6 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 			continue
 		}
 		newContracts[newContract.ID] = newContract
-		newRelationships[newContract.ID] = hostPubKey
 		if len(newContracts) >= int(a.Hosts) {
 			break
 		}
@@ -144,13 +141,12 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 	// if we did not renew enough contracts, form new ones
 	if remaining > 0 {
-		formed, hostPubKeys, err := c.managedFormContracts(remaining, numSectors, endHeight)
+		formed, err := c.managedFormContracts(remaining, numSectors, endHeight)
 		if err != nil {
 			return err
 		}
-		for i, contract := range formed {
+		for _, contract := range formed {
 			newContracts[contract.ID] = contract
-			newRelationships[contract.ID] = hostPubKeys[i]
 		}
 	}
 
@@ -168,7 +164,6 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	}
 	// replace the current contract set with new contracts
 	c.contracts = newContracts
-	c.relationships = newRelationships
 	// if the currentPeriod was previously unset, set it now
 	if c.currentPeriod == 0 {
 		c.currentPeriod = periodStart
@@ -197,7 +192,7 @@ func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a m
 	c.mu.RUnlock()
 
 	// form the contracts
-	formed, hostPubKeys, err := c.managedFormContracts(n, numSectors, endHeight)
+	formed, err := c.managedFormContracts(n, numSectors, endHeight)
 	if err != nil {
 		return err
 	}
@@ -205,9 +200,8 @@ func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a m
 	// Set the allowance and update the contract set
 	c.mu.Lock()
 	c.allowance = a
-	for i, contract := range formed {
+	for _, contract := range formed {
 		c.contracts[contract.ID] = contract
-		c.relationships[contract.ID] = hostPubKeys[i]
 	}
 	err = c.saveSync()
 	c.mu.Unlock()
@@ -256,7 +250,6 @@ func (c *Contractor) managedCancelAllowance(a modules.Allowance) error {
 		c.oldContracts[id] = contract
 	}
 	c.contracts = make(map[types.FileContractID]modules.RenterContract)
-	c.relationships = make(map[types.FileContractID]types.SiaPublicKey)
 	err := c.saveSync()
 	c.mu.Unlock()
 	return err

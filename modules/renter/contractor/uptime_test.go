@@ -38,7 +38,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	h, c, m, err := newTestingTrio("TestIntegrationMonitorUptime")
+	h, c, m, err := newTestingTrio("TestIntegrationReplaceOffline")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	c.hdb = offlineHostDB{c.hdb, h.PublicKey()}
 
 	// create another host
-	dir := build.TempDir("contractor", "TestIntegrationMonitorUptime", "Host2")
+	dir := build.TempDir("contractor", "TestIntegrationReplaceOffline", "Host2")
 	h2, err := newTestingHost(dir, c.cs.(modules.ConsensusSet), c.tpool.(modules.TransactionPool))
 	if err != nil {
 		t.Fatal(err)
@@ -148,10 +148,7 @@ func TestIsOffline(t *testing.T) {
 		// construct a contractor with a hostdb containing the scans
 		c := &Contractor{
 			contracts: map[types.FileContractID]modules.RenterContract{
-				types.FileContractID{1}: {NetAddress: "foo"},
-			},
-			relationships: map[types.FileContractID]types.SiaPublicKey{
-				types.FileContractID{1}: {Key: []byte("foo")},
+				types.FileContractID{1}: {HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
 			},
 			hdb: mapHostDB{
 				hosts: map[string]modules.HostDBEntry{
