@@ -12,7 +12,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -431,9 +430,9 @@ func renterpricescmd() {
 
 	fmt.Println("Renter Prices (estimated):")
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "\tFees for Creating a Set of Contracts:\t", rpg.FormContracts.Div(types.SiacoinPrecision))
-	fmt.Fprintln(w, "\tDownload 1 TB:\t", rpg.DownloadTerabyte.Div(types.SiacoinPrecision))
-	fmt.Fprintln(w, "\tStore 1 TB for 1 Month:\t", rpg.StorageTerabyteMonth.Div(types.SiacoinPrecision))
-	fmt.Fprintln(w, "\tUpload 1 TB:\t", rpg.UploadTerabyte.Div(types.SiacoinPrecision))
+	fmt.Fprintln(w, "\tFees for Creating a Set of Contracts:\t", currencyUnits(rpg.FormContracts))
+	fmt.Fprintln(w, "\tDownload 1 TB:\t", currencyUnits(rpg.DownloadTerabyte))
+	fmt.Fprintln(w, "\tStore 1 TB for 1 Month:\t", currencyUnits(rpg.StorageTerabyteMonth))
+	fmt.Fprintln(w, "\tUpload 1 TB:\t", currencyUnits(rpg.UploadTerabyte))
 	w.Flush()
 }
