@@ -10,7 +10,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -102,11 +101,11 @@ func hostdbviewcmd(pubkey string) {
 	fmt.Fprintln(w, "\t\tAccepting Contracts:\t", info.Entry.AcceptingContracts)
 	fmt.Fprintln(w, "\t\tTotal Storage:\t", info.Entry.TotalStorage/1e9, "GB")
 	fmt.Fprintln(w, "\t\tRemaining Storage:\t", info.Entry.RemainingStorage/1e9, "GB")
-	fmt.Fprintln(w, "\t\tOffered Collateral (TB / Mo):\t", info.Entry.Collateral.Mul(modules.BlockBytesPerMonthTerabyte).Div(types.SiacoinPrecision), "SC")
-	fmt.Fprintln(w, "\n\t\tContract Price:\t", info.Entry.ContractPrice.Div(types.SiacoinPrecision), "SC")
-	fmt.Fprintln(w, "\t\tStorage Price (TB / Mo):\t", info.Entry.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte).Div(types.SiacoinPrecision), "SC")
-	fmt.Fprintln(w, "\t\tDownload Price (1 TB):\t", info.Entry.DownloadBandwidthPrice.Mul(modules.BytesPerTerabyte).Div(types.SiacoinPrecision), "SC")
-	fmt.Fprintln(w, "\t\tUpload Price (1 TB):\t", info.Entry.UploadBandwidthPrice.Mul(modules.BytesPerTerabyte).Div(types.SiacoinPrecision), "SC")
+	fmt.Fprintln(w, "\t\tOffered Collateral (TB / Mo):\t", currencyUnits(info.Entry.Collateral.Mul(modules.BlockBytesPerMonthTerabyte)))
+	fmt.Fprintln(w, "\n\t\tContract Price:\t", currencyUnits(info.Entry.ContractPrice))
+	fmt.Fprintln(w, "\t\tStorage Price (TB / Mo):\t", currencyUnits(info.Entry.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)))
+	fmt.Fprintln(w, "\t\tDownload Price (1 TB):\t", currencyUnits(info.Entry.DownloadBandwidthPrice.Mul(modules.BytesPerTerabyte)))
+	fmt.Fprintln(w, "\t\tUpload Price (1 TB):\t", currencyUnits(info.Entry.UploadBandwidthPrice.Mul(modules.BytesPerTerabyte)))
 	fmt.Fprintln(w, "\t\tVersion:\t", info.Entry.Version)
 	w.Flush()
 
