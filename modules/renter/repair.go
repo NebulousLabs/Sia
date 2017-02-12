@@ -177,6 +177,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		case <-r.tg.StopChan():
 			return
 		case file := <-r.newRepairs:
+			// TODO: This seems to be happening out of lock, investigate.
 			r.addFileToRepairState(rs, file)
 			return
 		}

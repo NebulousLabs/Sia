@@ -195,6 +195,9 @@ func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostDBEntry) {
 		if !entry.ScanHistory[len(entry.ScanHistory)-1].Success {
 			continue
 		}
+		if !entry.AcceptingContracts {
+			continue
+		}
 		activeHosts = append(activeHosts, entry)
 	}
 	return activeHosts
