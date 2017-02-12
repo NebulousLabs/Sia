@@ -81,6 +81,8 @@ func (h *Host) initRescan() error {
 			h.log.Println("dropping storage obligation during rescan, id", so.id())
 		}
 
+		// AcceptTransactionSet needs to be called in a goroutine to avoid a
+		// deadlock.
 		go func(i int) {
 			err := h.tpool.AcceptTransactionSet(allObligations[i].OriginTransactionSet)
 			if err != nil {
