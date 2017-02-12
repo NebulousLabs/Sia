@@ -609,6 +609,8 @@ func (w *Wallet) registerTransaction(t types.Transaction, parents []types.Transa
 // most typical call is 'RegisterTransaction(types.Transaction{}, nil)', which
 // registers a new transaction without parents.
 func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transaction) modules.TransactionBuilder {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	return w.registerTransaction(t, parents)
 }
 
