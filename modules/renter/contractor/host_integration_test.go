@@ -955,3 +955,99 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	}
 	d4.Close()
 }
+
+// TestIntegrationCachedRenew tests that the contractor can renew with a host
+// after being interrupted during contract revision.
+func TestIntegrationCachedRenew(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// create testing trio
+	h, c, _, err := newTestingTrio("TestIntegrationCachedRenew")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Close()
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
+
+	// revise the contract
+	editor, err := c.Editor(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := crypto.RandBytes(int(modules.SectorSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := editor.Upload(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// download the data
+	downloader, err := c.Downloader(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retrieved, err := downloader.Sector(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, retrieved) {
+		t.Fatal("downloaded data does not match original")
+	}
+	err = downloader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract = c.contracts[contract.ID]
+
+	// corrupt the contract and cachedRevision
+	badContract := contract
+	badContract.LastRevision.NewRevisionNumber--
+	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
+	c.mu.Lock()
+	cr := c.cachedRevisions[contract.ID]
+	cr.Revision.NewRevisionNumber = 0
+	cr.Revision.NewRevisionNumber--
+	c.cachedRevisions[contract.ID] = cr
+	c.contracts[badContract.ID] = badContract
+	c.mu.Unlock()
+
+	// Renew should fail with the bad contract + cachedRevision
+	_, err = c.managedRenew(badContract, 20, c.blockHeight+200)
+	if !proto.IsRevisionMismatch(err) {
+		t.Fatal("expected revision mismatch, got", err)
+	}
+
+	// add cachedRevision
+	cachedRev := cachedRevision{contract.LastRevision, contract.MerkleRoots}
+	c.mu.Lock()
+	c.cachedRevisions[contract.ID] = cachedRev
+	c.mu.Unlock()
+
+	// Renew should now succeed after loading the cachedRevision
+	_, err = c.managedRenew(badContract, 20, c.blockHeight+200)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

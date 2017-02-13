@@ -46,6 +46,24 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 
 	// execute negotiation protocol
 	newContract, err := proto.Renew(contract, params, txnBuilder, c.tpool)
+	if proto.IsRevisionMismatch(err) {
+		// return unused outputs to wallet
+		txnBuilder.Drop()
+		// try again with the cached revision
+		c.mu.RLock()
+		cached, ok := c.cachedRevisions[contract.ID]
+		c.mu.RUnlock()
+		if !ok {
+			// nothing we can do; return original error
+			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
+			return modules.RenterContract{}, err
+		}
+		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
+		contract.LastRevision = cached.Revision
+		// need to start a new transaction
+		txnBuilder = c.wallet.StartTransaction()
+		newContract, err = proto.Renew(contract, params, txnBuilder, c.tpool)
+	}
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return modules.RenterContract{}, err
