@@ -248,18 +248,33 @@ func (hdb *HostDB) threadedScan() {
 		// pushing them further back in the hierarchy, ensuring that for the
 		// most part only online hosts are getting scanned unless there are
 		// fewer than hostCheckupQuantity of them.
-		//
-		// TODO: Cannot use SelectRandom (despite it being faster) because
-		// SelectRandom only returns active/online hosts. Need to be scanning
-		// the offline ones as well, otherwise a little bit of downtime is a
-		// death sentence for a host.
-		hdb.mu.Lock()
-		checkups := hdb.hostTree.All()
-		if len(checkups) > hostCheckupQuantity {
-			checkups = checkups[len(checkups)-hostCheckupQuantity:]
+
+		// Grab a set of hosts to scan, grab hosts that are active, inactive,
+		// and offline to get high diversity.
+		var onlineHosts, offlineHosts []modules.HostDBEntry
+		hosts := hdb.hostTree.All()
+		for i := 0; i < len(hosts) && (len(onlineHosts) < hostCheckupQuantity || len(offlineHosts) < hostCheckupQuantity); i++ {
+			// Figure out if the host is online or offline.
+			online := false
+			scanLen := len(hosts[i].ScanHistory)
+			if scanLen > 0 && hosts[i].ScanHistory[scanLen-1].Success {
+				online = true
+			}
+
+			if online && len(onlineHosts) < hostCheckupQuantity {
+				onlineHosts = append(onlineHosts, hosts[i])
+			} else if !online && len(offlineHosts) < hostCheckupQuantity {
+				offlineHosts = append(onlineHosts, hosts[i])
+			}
 		}
-		hdb.log.Println("Performing scan on", len(checkups), "hosts")
-		for _, host := range checkups {
+
+		// Queue the scans for each host.
+		hdb.log.Println("Performing scan on", len(onlineHosts), "online hosts and", len(offlineHosts), "offline hosts.")
+		hdb.mu.Lock()
+		for _, host := range onlineHosts {
+			hdb.queueScan(host)
+		}
+		for _, host := range offlineHosts {
 			hdb.queueScan(host)
 		}
 		hdb.mu.Unlock()

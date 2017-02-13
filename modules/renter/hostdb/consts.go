@@ -39,7 +39,7 @@ var (
 	// hostCheckupQuantity specifies the number of hosts that get scanned every
 	// time there is a regular scanning operation.
 	hostCheckupQuantity = build.Select(build.Var{
-		Standard: int(250),
+		Standard: int(200),
 		Dev:      int(6),
 		Testing:  int(5),
 	}).(int)
