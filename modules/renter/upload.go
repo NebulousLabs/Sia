@@ -45,15 +45,31 @@ var (
 	}()
 )
 
+// validateSiapath checks that a Siapath is a legal filename.
+// ../ is disallowed to prevent directory traversal,
+// and paths must not begin with / or be empty.
+func validateSiapath(siapath string) error {
+	if strings.HasPrefix(siapath, "/") {
+		return errors.New("nicknames cannot begin with /")
+	}
+
+	if siapath == "" {
+		return ErrEmptyFilename
+	}
+
+	if strings.Contains(siapath, "../") {
+		return errors.New("directory traversal is not allowed")
+	}
+
+	return nil
+}
+
 // Upload instructs the renter to start tracking a file. The renter will
 // automatically upload and repair tracked files using a background loop.
 func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Enforce nickname rules.
-	if strings.HasPrefix(up.SiaPath, "/") {
-		return errors.New("nicknames cannot begin with /")
-	}
-	if up.SiaPath == "" {
-		return ErrEmptyFilename
+	if err := validateSiapath(up.SiaPath); err != nil {
+		return err
 	}
 
 	// Check for a nickname conflict.
