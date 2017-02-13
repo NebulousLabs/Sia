@@ -79,12 +79,21 @@ type FileInfo struct {
 // aggregates the host's external settings and metrics with its public key.
 type HostDBEntry struct {
 	HostExternalSettings
-	PublicKey types.SiaPublicKey `json:"publickey"`
-	// ScanHistory is the set of scans performed on the host. It should always
-	// be ordered according to the scan's Timestamp, oldest to newest.
-	ScanHistory HostDBScans `json:"scanhistory"`
+
 	// FirstSeen is the last block height at which this host was announced.
 	FirstSeen types.BlockHeight `json:"firstseen"`
+
+	// Measurements that have been taken on the host. The most recent
+	// measurements are kept in full detail, historic ones are compressed into
+	// the historic values.
+	HistoricDowntime time.Duration `json:"historicdowntime"`
+	HistoricUptime time.Duration `json:"historicuptime"`
+	ScanHistory HostDBScans `json:"scanhistory"`
+
+	// The public key of the host, stored separately to minimize risk of certain
+	// MitM based vulnerabilities.
+	PublicKey types.SiaPublicKey `json:"publickey"`
+
 }
 
 // HostDBScan represents a single scan event.

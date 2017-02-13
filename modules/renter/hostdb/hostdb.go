@@ -4,9 +4,6 @@
 // set of hosts it has found and updates who is online.
 package hostdb
 
-// TODO: Scan history should be truncated. Further, if a host hasn't been around
-// in long enough, they should just be removed (1 month).
-
 import (
 	"errors"
 	"fmt"

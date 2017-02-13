@@ -126,6 +126,38 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: time.Now(), Success: netErr == nil})
 	}
 
+	// If the host's earliest scan is more than a month old and there is no
+	// recent uptime, mark the host for deletion.
+	var recentUptime bool
+	for _, scan := range entry.ScanHistory {
+		if scan.Success {
+			recentUptime = true
+		}
+	}
+
+	// If the host has been offline for too long, delete the host from the
+	// hostdb.
+	if time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime && !recentUptime && len(newEntry.ScanHistory) >= minScans {
+		err := hdb.hostTree.Remove(newEntry.PublicKey)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to remove host newEntry which has had a ton of downtime:", err)
+		}
+
+		// The function should terminate here as no more interaction is needed
+		// with this host.
+		return
+	}
+
+	// Compress any old scans into the historic values.
+	for len(newEntry.ScanHistory) > minScans && time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime {
+		timePassed := newEntry.ScanHistory[1].Timestamp.Sub(newEntry.ScanHistory[0].Timestamp)
+		if newEntry.ScanHistory[1].Success {
+			newEntry.HistoricUptime += timePassed
+		} else {
+			newEntry.HistoricDowntime += timePassed
+		}
+	}
+
 	// Add the updated entry
 	if !exists {
 		err := hdb.hostTree.Insert(newEntry)
