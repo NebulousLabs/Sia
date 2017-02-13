@@ -104,7 +104,9 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	}
 	// verify that both parties are renewing the same contract
 	if err = verifyRecentRevision(conn, contract); err != nil {
-		return modules.RenterContract{}, errors.New("revision exchange failed: " + err.Error())
+		// don't add context; want to preserve the original error type so that
+		// callers can check using IsRevisionMismatch
+		return modules.RenterContract{}, err
 	}
 	// verify the host's settings and confirm its identity
 	host, err = verifySettings(conn, host)
