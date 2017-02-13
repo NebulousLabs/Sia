@@ -35,7 +35,7 @@ func TestDefragWallet(t *testing.T) {
 	}
 
 	// allow some time for the defrag transaction to occur, then mine another block
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 5)
 
 	_, err = wt.miner.AddBlock()
 	if err != nil {

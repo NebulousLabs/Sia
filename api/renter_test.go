@@ -614,7 +614,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 
 	renterDownloadAbsoluteError := "destination must be an absolute path"
 
-	// Create a file.
+	// Create a file, and upload it.
 	path := filepath.Join(st.dir, "test.dat")
 	if err = createRandFile(path, 1024); err != nil {
 		t.Fatal(err)
@@ -624,26 +624,38 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 	if err = st.stdPostAPI("/renter/upload/test", uploadValues); err != nil {
 		t.Fatal(err)
 	}
+	var rf RenterFiles
+	for i := 0; i < 100 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(200 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
+	}
 
-	// This should fail.
+	// Use a relative destination, which should fail.
 	downloadPath := "test1.dat"
 	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); err.Error() != renterDownloadAbsoluteError {
 		t.Fatal(err)
 	}
 
-	// This should fail.
+	// Relative destination stepping backwards should also fail.
 	downloadPath = "../test1.dat"
 	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); err.Error() != renterDownloadAbsoluteError {
 		t.Fatal(err)
 	}
 
-	// This should fail.
-	//
-	// TODO: NDF failures here. What is supposed to be happening?
-	downloadPath = filepath.Join(st.dir, "test1.dat")
+	// Long relative destination should also fail (just missing leading slash).
+	downloadPath = filepath.Join(st.dir[1:], "test1.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
 	if err == nil {
-		t.Log(downloadPath)
+		t.Fatal("expecting an error")
+	}
+
+	// Full destination should succeed.
+	downloadPath = filepath.Join(st.dir, "test1.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err != nil {
 		t.Fatal("expecting an error")
 	}
 }

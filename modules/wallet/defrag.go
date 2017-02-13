@@ -18,9 +18,6 @@ var (
 // throughout scanning the outputs to determine if defragmentation is necessary
 // and then proceeding to actually defrag.
 func (tb *transactionBuilder) fundDefragger(fee types.Currency) (types.Currency, error) {
-	tb.wallet.mu.Lock()
-	defer tb.wallet.mu.Unlock()
-
 	// Collect a set of outputs for defragging.
 	var so sortedOutputs
 	for scoid, sco := range tb.wallet.siacoinOutputs {
@@ -150,17 +147,20 @@ func (w *Wallet) threadedDefragWallet() {
 		return
 	}
 
-	// Create a transaction builder.
+	// Create a transaction builder and fund it with the outputs to be
+	// defragged.
 	fee := defragFee()
+	w.mu.Lock()
 	tbuilder := w.registerTransaction(types.Transaction{}, nil)
-	// Fund it using a defragging specific method.
 	amount, err := tbuilder.fundDefragger(fee)
+	w.mu.Unlock()
 	if err != nil {
 		if err != errDefragNotNeeded {
 			w.log.Println("Error while trying to fund the defragging transaction", err)
 		}
 		return
 	}
+
 	// Add the miner fee.
 	tbuilder.AddMinerFee(fee)
 	// Add the refund.
