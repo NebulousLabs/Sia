@@ -226,8 +226,8 @@ func hostdbviewcmd(pubkey string) {
 	// host.
 	uptimeRatio := float64(0)
 	if len(info.Entry.ScanHistory) > 1 {
-		var uptime time.Duration
-		var downtime time.Duration
+		downtime := info.Entry.HistoricDowntime
+		uptime := info.Entry.HistoricUptime
 		recentTime := info.Entry.ScanHistory[0].Timestamp
 		recentSuccess := info.Entry.ScanHistory[0].Success
 		for _, scan := range info.Entry.ScanHistory[1:] {

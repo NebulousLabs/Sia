@@ -126,6 +126,39 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: time.Now(), Success: netErr == nil})
 	}
 
+	// If the host's earliest scan is more than a month old and there is no
+	// recent uptime, mark the host for deletion.
+	var recentUptime bool
+	for _, scan := range entry.ScanHistory {
+		if scan.Success {
+			recentUptime = true
+		}
+	}
+
+	// If the host has been offline for too long, delete the host from the
+	// hostdb.
+	if time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime && !recentUptime && len(newEntry.ScanHistory) >= minScans {
+		err := hdb.hostTree.Remove(newEntry.PublicKey)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to remove host newEntry which has had a ton of downtime:", err)
+		}
+
+		// The function should terminate here as no more interaction is needed
+		// with this host.
+		return
+	}
+
+	// Compress any old scans into the historic values.
+	for len(newEntry.ScanHistory) > minScans && time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime {
+		timePassed := newEntry.ScanHistory[1].Timestamp.Sub(newEntry.ScanHistory[0].Timestamp)
+		if newEntry.ScanHistory[1].Success {
+			newEntry.HistoricUptime += timePassed
+		} else {
+			newEntry.HistoricDowntime += timePassed
+		}
+		newEntry.ScanHistory = newEntry.ScanHistory[1:]
+	}
+
 	// Add the updated entry
 	if !exists {
 		err := hdb.hostTree.Insert(newEntry)
@@ -248,18 +281,31 @@ func (hdb *HostDB) threadedScan() {
 		// pushing them further back in the hierarchy, ensuring that for the
 		// most part only online hosts are getting scanned unless there are
 		// fewer than hostCheckupQuantity of them.
-		//
-		// TODO: Cannot use SelectRandom (despite it being faster) because
-		// SelectRandom only returns active/online hosts. Need to be scanning
-		// the offline ones as well, otherwise a little bit of downtime is a
-		// death sentence for a host.
-		hdb.mu.Lock()
-		checkups := hdb.hostTree.All()
-		if len(checkups) > hostCheckupQuantity {
-			checkups = checkups[len(checkups)-hostCheckupQuantity:]
+
+		// Grab a set of hosts to scan, grab hosts that are active, inactive,
+		// and offline to get high diversity.
+		var onlineHosts, offlineHosts []modules.HostDBEntry
+		for _, host := range hdb.hostTree.All() {
+			if len(onlineHosts) >= hostCheckupQuantity && len(offlineHosts) >= hostCheckupQuantity {
+				break
+			}
+
+			// Figure out if the host is online or offline.
+			online := len(host.ScanHistory) > 0 && host.ScanHistory[len(host.ScanHistory)-1].Success
+			if online && len(onlineHosts) < hostCheckupQuantity {
+				onlineHosts = append(onlineHosts, host)
+			} else if !online && len(offlineHosts) < hostCheckupQuantity {
+				offlineHosts = append(onlineHosts, host)
+			}
 		}
-		hdb.log.Println("Performing scan on", len(checkups), "hosts")
-		for _, host := range checkups {
+
+		// Queue the scans for each host.
+		hdb.log.Println("Performing scan on", len(onlineHosts), "online hosts and", len(offlineHosts), "offline hosts.")
+		hdb.mu.Lock()
+		for _, host := range onlineHosts {
+			hdb.queueScan(host)
+		}
+		for _, host := range offlineHosts {
 			hdb.queueScan(host)
 		}
 		hdb.mu.Unlock()

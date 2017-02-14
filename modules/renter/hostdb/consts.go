@@ -11,9 +11,17 @@ const (
 	// cannot successfully get a random number.
 	defaultScanSleep = 1*time.Hour + 37*time.Minute
 
+	// maxHostDowntime specifies the maximum amount of time that a host is
+	// allowed to be offline while still being in the hostdb.
+	maxHostDowntime = 30 * 24 * time.Hour
+
 	// maxScanSleep is the maximum amount of time that the hostdb will sleep
 	// between performing scans of the hosts.
 	maxScanSleep = 4 * time.Hour
+
+	// minScans specifies the number of scans that a host should have before the
+	// scans start getting compressed.
+	minScans = 20
 
 	// minScanSleep is the minimum amount of time that the hostdb will sleep
 	// between performing scans of the hosts.
@@ -39,7 +47,7 @@ var (
 	// hostCheckupQuantity specifies the number of hosts that get scanned every
 	// time there is a regular scanning operation.
 	hostCheckupQuantity = build.Select(build.Var{
-		Standard: int(250),
+		Standard: int(200),
 		Dev:      int(6),
 		Testing:  int(5),
 	}).(int)

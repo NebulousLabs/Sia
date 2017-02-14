@@ -3,7 +3,6 @@ package hostdb
 import (
 	"math"
 	"math/big"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -256,8 +255,8 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 
 	// Compute the total measured uptime and total measured downtime for this
 	// host.
-	var uptime time.Duration
-	var downtime time.Duration
+	downtime := entry.HistoricDowntime
+	uptime := entry.HistoricUptime
 	recentTime := entry.ScanHistory[0].Timestamp
 	recentSuccess := entry.ScanHistory[0].Success
 	for _, scan := range entry.ScanHistory[1:] {

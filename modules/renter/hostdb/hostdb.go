@@ -4,18 +4,6 @@
 // set of hosts it has found and updates who is online.
 package hostdb
 
-// TODO: Not sure what happens with hosts that fail their first scan. Is it
-// possible for them to get scored inappropriately? If they start behind, can
-// they scan back into the set of good hosts?
-
-// TODO: Scan history should be truncated.
-
-// TODO: Investigate why hosts that seem to be online can fail scans, and figure
-// out a more robust way to not miss hosts.
-
-// TODO: Refine the method by which the hostdb selects which hosts to scan
-// during its regular scanning period.
-
 import (
 	"errors"
 	"fmt"
