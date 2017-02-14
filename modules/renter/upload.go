@@ -61,6 +61,10 @@ func validateSiapath(siapath string) error {
 		return errors.New("directory traversal is not allowed")
 	}
 
+	if strings.Contains(siapath, "./") {
+		return errors.New("siapath contains invalid characters")
+	}
+
 	return nil
 }
 
