@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // TestHostDBHostsActiveHandler checks the behavior of the call to
@@ -224,18 +226,18 @@ func TestHostDBHostsHandler(t *testing.T) {
 	}
 }
 
-// TestHostDBAndRenterDynamicIPs checks that the hostdb and the renter are
+// TestHostDBAndRenterDownloadDynamicIPs checks that the hostdb and the renter are
 // successfully able to follow a host that has changed IP addresses and then
 // re-announced.
-func TestHostDBAndRenterDynamicIPs(t *testing.T) {
+func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestHostDBAndRenterDynamicIPs")
+	st, err := createServerTester("TestHostDBAndRenterDownloadDynamicIPs")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost, err := blankServerTester("TestHostDBAndRenterDynamicIPs-Host")
+	stHost, err := blankServerTester("TestHostDBAndRenterDownloadDynamicIPs-Host")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,6 +372,164 @@ func TestHostDBAndRenterDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	if bytes.Compare(orig, download) != 0 {
+		t.Fatal("data mismatch when downloading a file")
+	}
+}
+
+// TestHostDBAndRenterUploadDynamicIPs checks that the hostdb and the renter are
+// successfully able to follow a host that has changed IP addresses and then
+// re-announced.
+func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestHostDBAndRenterUploadDynamicIPs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost, err := blankServerTester("TestHostDBAndRenterUploadDynamicIPs-Host")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sts := []*serverTester{st, stHost}
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fundAllNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Announce the host.
+	err = stHost.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Pull the host's net address and pubkey from the hostdb.
+	var ah HostdbActiveGET
+	if err = st.getAPI("/hostdb/active", &ah); err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 1 {
+		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
+	}
+	addr := ah.Hosts[0].NetAddress
+	pks := ah.Hosts[0].PublicKeyString
+
+	// Upload a file to the host.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "10"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Upload the file to the renter.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only one piece will be uploaded (10% at current redundancy).
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+	}
+
+	// Close and re-open the host. This should reset the host's address, as the
+	// host should now be on a new port.
+	err = stHost.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost, err = assembleServerTester(stHost.walletKey, stHost.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sts[1] = stHost
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Pull the host's net address and pubkey from the hostdb.
+	if err = st.getAPI("/hostdb/active", &ah); err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 1 {
+		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
+	}
+	if ah.Hosts[0].PublicKeyString != pks {
+		t.Error("public key appears to have changed for host")
+	}
+	if ah.Hosts[0].NetAddress == addr {
+		t.Log("NetAddress did not change for the new host")
+	}
+
+	// Try uploading a second file.
+	path2 := filepath.Join(st.dir, "test2.dat")
+	test2Size := modules.SectorSize*2 + 1
+	err = createRandFile(path2, int(test2Size))
+	if err != nil {
+		t.Fatal(err)
+	}
+	uploadValues = url.Values{}
+	uploadValues.Set("source", path2)
+	err = st.stdPostAPI("/renter/upload/test2", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only one piece will be uploaded (10% at current redundancy).
+	for i := 0; i < 200 && (len(rf.Files) != 2 || rf.Files[0].UploadProgress < 10 || rf.Files[1].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 2 || rf.Files[0].UploadProgress < 10 || rf.Files[1].UploadProgress < 10 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
+	}
+
+	// Try downloading the second file.
+	downpath2 := filepath.Join(st.dir, "testdown2.dat")
+	err = st.stdGetAPI("/renter/download/test2?destination=" + downpath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the download has the right contents.
+	orig2, err := ioutil.ReadFile(path2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	download2, err := ioutil.ReadFile(downpath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(orig2, download2) != 0 {
 		t.Fatal("data mismatch when downloading a file")
 	}
 }

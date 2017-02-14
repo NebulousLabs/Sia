@@ -231,6 +231,13 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 		}
 	}
 
+	// Make sure that we have the most recent net address for this host.
+	host, exists := c.hdb.Host(contract.HostPublicKey)
+	if !exists {
+		return nil, errors.New("unable to find the host in the hostdb")
+	}
+	contract.NetAddress = host.NetAddress
+
 	// create editor
 	e, err := proto.NewEditor(host, contract, height)
 	if proto.IsRevisionMismatch(err) {
