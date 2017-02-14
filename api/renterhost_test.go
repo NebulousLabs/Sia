@@ -8,12 +8,14 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestHostAndRentVanilla sets up an integration test where a host and renter
@@ -830,9 +832,9 @@ func TestRenterRenew(t *testing.T) {
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
-	testPeriod := "10"
+	testPeriod := 10
 	allowanceValues.Set("funds", testFunds)
-	allowanceValues.Set("period", testPeriod)
+	allowanceValues.Set("period", strconv.Itoa(testPeriod))
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -870,8 +872,8 @@ func TestRenterRenew(t *testing.T) {
 	}
 	contractID := rc.Contracts[0].ID
 
-	// Mine 5 blocks so that we enter the renewal window.
-	for i := 0; i < 5; i++ {
+	// Mine enough blocks to enter the renewal window.
+	for i := 0; i < testPeriod/2; i++ {
 		st.miner.AddBlock()
 	}
 	// Wait for the contract to be renewed.
@@ -901,5 +903,111 @@ func TestRenterRenew(t *testing.T) {
 	if bytes.Compare(orig, download) != 0 {
 		t.Fatal("data mismatch when downloading a file")
 	}
+}
 
+// TestRenterAllowance sets up an integration test where a renter attempts to
+// download a file after changing the allowance.
+func TestRenterAllowance(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester("TestRenterAllowance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and start accepting contracts.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testFunds := types.SiacoinPrecision.Mul64(10000) // 10k SC
+	testPeriod := 20
+	allowanceValues.Set("funds", testFunds.String())
+	allowanceValues.Set("period", strconv.Itoa(testPeriod))
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload the file to the renter.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only one piece will be uploaded (10% at current redundancy).
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+	}
+
+	// Try downloading the file after modifying the allowance in various ways.
+	allowances := []struct {
+		funds  types.Currency
+		period int
+	}{
+		{testFunds.Mul64(10), testPeriod / 2},
+		{testFunds, testPeriod / 2},
+		{testFunds.Div64(10), testPeriod / 2},
+		{testFunds.Mul64(10), testPeriod},
+		{testFunds, testPeriod},
+		{testFunds.Div64(10), testPeriod},
+		{testFunds.Mul64(10), testPeriod * 2},
+		{testFunds, testPeriod * 2},
+		{testFunds.Div64(10), testPeriod * 2},
+	}
+
+	for _, a := range allowances {
+		allowanceValues.Set("funds", a.funds.String())
+		allowanceValues.Set("period", strconv.Itoa(a.period))
+		err = st.stdPostAPI("/renter", allowanceValues)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Try downloading the file.
+		downpath := filepath.Join(st.dir, "testdown.dat")
+		err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Check that the download has the right contents.
+		orig, err := ioutil.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		download, err := ioutil.ReadFile(downpath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Compare(orig, download) != 0 {
+			t.Fatal("data mismatch when downloading a file")
+		}
+	}
 }
