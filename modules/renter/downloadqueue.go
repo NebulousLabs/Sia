@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // Download downloads a file, identified by its path, to the destination
@@ -18,8 +19,14 @@ func (r *Renter) Download(path, destination string) error {
 		return errors.New("no file with that path")
 	}
 
+	// Build current contracts map.
+	currentContracts := make(map[modules.NetAddress]types.FileContractID)
+	for _, contract := range r.hostContractor.Contracts() {
+		currentContracts[contract.NetAddress] = contract.ID
+	}
+
 	// Create the download object and add it to the queue.
-	d := newDownload(file, destination)
+	d := r.newDownload(file, destination, currentContracts)
 	lockID = r.mu.Lock()
 	r.downloadQueue = append(r.downloadQueue, d)
 	r.mu.Unlock(lockID)

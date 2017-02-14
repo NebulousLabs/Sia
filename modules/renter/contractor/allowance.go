@@ -83,6 +83,8 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return ErrInsufficientAllowance
 	}
 
+	c.log.Println("INFO: setting allowance to", a)
+
 	c.mu.RLock()
 	shouldRenew := a.Period != c.allowance.Period || !a.Funds.Equals(c.allowance.Funds)
 	shouldWait := c.blockHeight+a.Period < c.contractEndHeight()
@@ -122,14 +124,16 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 	// renew existing contracts with new allowance parameters
 	newContracts := make(map[types.FileContractID]modules.RenterContract)
+	renewedIDs := make(map[types.FileContractID]types.FileContractID)
 	for _, contract := range renewSet {
 		newContract, err := c.managedRenew(contract, numSectors, endHeight)
 		if err != nil {
-			c.log.Printf("WARN: failed to renew contract with %v; a new contract will be formed in its place", contract.NetAddress)
+			c.log.Printf("WARN: failed to renew contract with %v (error: %v); a new contract will be formed in its place", contract.NetAddress, err)
 			remaining++
 			continue
 		}
 		newContracts[newContract.ID] = newContract
+		renewedIDs[contract.ID] = newContract.ID
 		if len(newContracts) >= int(a.Hosts) {
 			break
 		}
@@ -164,6 +168,10 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	}
 	// replace the current contract set with new contracts
 	c.contracts = newContracts
+	// link the contracts that were renewed
+	for oldID, newID := range renewedIDs {
+		c.renewedIDs[oldID] = newID
+	}
 	// if the currentPeriod was previously unset, set it now
 	if c.currentPeriod == 0 {
 		c.currentPeriod = periodStart
@@ -211,6 +219,7 @@ func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a m
 
 // managedCancelAllowance handles the special case where the allowance is empty.
 func (c *Contractor) managedCancelAllowance(a modules.Allowance) error {
+	c.log.Println("INFO: canceling allowance")
 	// first need to invalidate any active editors/downloaders
 	// NOTE: this code is the same as in managedRenewContracts
 	var ids []types.FileContractID

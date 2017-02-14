@@ -100,6 +100,9 @@ type hostContractor interface {
 	// Downloader creates a Downloader from the specified contract ID,
 	// allowing the retrieval of sectors.
 	Downloader(types.FileContractID) (contractor.Downloader, error)
+
+	// ResolveID returns the most recent renewal of the specified ID.
+	ResolveID(types.FileContractID) types.FileContractID
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
@@ -201,6 +204,16 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	go r.threadedRepairLoop()
 	go r.threadedDownloadLoop()
 	go r.threadedQueueRepairs()
+
+	// Kill workers on shutdown.
+	r.tg.OnStop(func() {
+		id := r.mu.RLock()
+		for _, worker := range r.workerPool {
+			close(worker.killChan)
+		}
+		r.mu.RUnlock(id)
+	})
+
 	return r, nil
 }
 

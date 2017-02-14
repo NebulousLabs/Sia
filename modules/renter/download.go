@@ -117,7 +117,7 @@ type (
 )
 
 // newDownload initializes and returns a download object.
-func newDownload(f *file, destination string) *download {
+func (r *Renter) newDownload(f *file, destination string, currentContracts map[modules.NetAddress]types.FileContractID) *download {
 	d := &download{
 		finishedChunks: make([]bool, f.numChunks()),
 
@@ -147,8 +147,17 @@ func newDownload(f *file, destination string) *download {
 	}
 	f.mu.RLock()
 	for _, contract := range f.contracts {
+		// get latest contract ID
+		id, ok := currentContracts[contract.IP]
+		if !ok {
+			// no matching NetAddress; try using a revised ID
+			id = r.hostContractor.ResolveID(contract.ID)
+			if id == contract.ID {
+				continue
+			}
+		}
 		for i := range contract.Pieces {
-			d.pieceSet[contract.Pieces[i].Chunk][contract.ID] = contract.Pieces[i]
+			d.pieceSet[contract.Pieces[i].Chunk][id] = contract.Pieces[i]
 		}
 	}
 	f.mu.RUnlock()
