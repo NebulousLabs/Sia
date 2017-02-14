@@ -521,7 +521,7 @@ func (st *serverTester) announceHost() error {
 	acceptingContractsValues.Set("acceptingcontracts", "true")
 	err := st.stdPostAPI("/host", acceptingContractsValues)
 	if err != nil {
-		return err
+		return build.ExtendErr("couldn't make an api call to the host:", err)
 	}
 
 	announceValues := url.Values{}

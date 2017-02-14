@@ -167,6 +167,13 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 		}
 	}
 
+	// Update the contract to the most recent net address for the host.
+	host, exists := c.hdb.Host(contract.HostPublicKey)
+	if !exists {
+		return nil, errors.New("unable to find the contract's host in the host database")
+	}
+	contract.NetAddress = host.NetAddress
+
 	// create downloader
 	d, err := proto.NewDownloader(host, contract)
 	if proto.IsRevisionMismatch(err) {

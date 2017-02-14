@@ -25,10 +25,6 @@ func (quitAfterLoadDeps) disrupt(s string) bool {
 }
 
 // TestSaveLoad tests that the hostdb can save and load itself.
-//
-// TODO: By extending the hdbTester and adding some helper functions, we can
-// eliminate the necessary disruption by adding real hosts + blocks instead of
-// fake ones.
 func TestSaveLoad(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

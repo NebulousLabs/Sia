@@ -30,8 +30,6 @@ type hdbTester struct {
 
 // bareHostDB returns a HostDB with its fields initialized, but without any
 // dependencies or scanning threads. It is only intended for use in unit tests.
-//
-// TODO: purge
 func bareHostDB() *HostDB {
 	hdb := &HostDB{
 		log: persist.NewLogger(ioutil.Discard),
