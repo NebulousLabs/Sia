@@ -156,6 +156,7 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 		} else {
 			newEntry.HistoricDowntime += timePassed
 		}
+		newEntry.ScanHistory = newEntry.ScanHistory[1:]
 	}
 
 	// Add the updated entry
@@ -284,19 +285,17 @@ func (hdb *HostDB) threadedScan() {
 		// Grab a set of hosts to scan, grab hosts that are active, inactive,
 		// and offline to get high diversity.
 		var onlineHosts, offlineHosts []modules.HostDBEntry
-		hosts := hdb.hostTree.All()
-		for i := 0; i < len(hosts) && (len(onlineHosts) < hostCheckupQuantity || len(offlineHosts) < hostCheckupQuantity); i++ {
-			// Figure out if the host is online or offline.
-			online := false
-			scanLen := len(hosts[i].ScanHistory)
-			if scanLen > 0 && hosts[i].ScanHistory[scanLen-1].Success {
-				online = true
+		for _, host := range hdb.hostTree.All() {
+			if len(onlineHosts) >= hostCheckupQuantity && len(offlineHosts) >= hostCheckupQuantity {
+				break
 			}
 
+			// Figure out if the host is online or offline.
+			online := len(host.ScanHistory) > 0 && host.ScanHistory[len(host.ScanHistory)-1].Success
 			if online && len(onlineHosts) < hostCheckupQuantity {
-				onlineHosts = append(onlineHosts, hosts[i])
+				onlineHosts = append(onlineHosts, host)
 			} else if !online && len(offlineHosts) < hostCheckupQuantity {
-				offlineHosts = append(onlineHosts, hosts[i])
+				offlineHosts = append(onlineHosts, host)
 			}
 		}
 

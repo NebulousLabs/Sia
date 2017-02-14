@@ -87,13 +87,12 @@ type HostDBEntry struct {
 	// measurements are kept in full detail, historic ones are compressed into
 	// the historic values.
 	HistoricDowntime time.Duration `json:"historicdowntime"`
-	HistoricUptime time.Duration `json:"historicuptime"`
-	ScanHistory HostDBScans `json:"scanhistory"`
+	HistoricUptime   time.Duration `json:"historicuptime"`
+	ScanHistory      HostDBScans   `json:"scanhistory"`
 
 	// The public key of the host, stored separately to minimize risk of certain
 	// MitM based vulnerabilities.
 	PublicKey types.SiaPublicKey `json:"publickey"`
-
 }
 
 // HostDBScan represents a single scan event.
