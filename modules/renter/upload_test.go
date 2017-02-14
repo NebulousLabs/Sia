@@ -16,7 +16,7 @@ func TestRenterSiapathValidate(t *testing.T) {
 		{"valid/siapath/../with/directory/traversal", false},
 		{"validpath/test", true},
 		{"..validpath/..test", true},
-		{"./valid/path", true},
+		{"./invalid/path", false},
 		{"test/path", true},
 		{"/leading/slash", false},
 		{"", false},
