@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -233,6 +234,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestHostDBAndRenterDownloadDynamicIPs")
 	if err != nil {
 		t.Fatal(err)
@@ -354,11 +356,28 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Pull the host's net address and pubkey from the hostdb.
-	if err = st.getAPI("/hostdb/active", &ah); err != nil {
+	err = retry(50, time.Millisecond*100, func() error {
+		// Get the hostdb internals.
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			return err
+		}
+
+		// Get the host's internals.
+		var hg HostGET
+		if err = stHost.getAPI("/host", &hg); err != nil {
+			return err
+		}
+
+		if len(ah.Hosts) != 1 {
+			return fmt.Errorf("expected 1 host, got %v", len(ah.Hosts))
+		}
+		if ah.Hosts[0].NetAddress != hg.ExternalSettings.NetAddress {
+			return fmt.Errorf("hostdb net address doesn't match host net address: %v : %v", ah.Hosts[0].NetAddress, hg.ExternalSettings.NetAddress)
+		}
+		return nil
+	})
+	if err != nil {
 		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 1 {
-		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
 	}
 	if ah.Hosts[0].PublicKeyString != pks {
 		t.Error("public key appears to have changed for host")
@@ -389,6 +408,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestHostDBAndRenterUploadDynamicIPs")
 	if err != nil {
 		t.Fatal(err)
@@ -491,11 +511,28 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Pull the host's net address and pubkey from the hostdb.
-	if err = st.getAPI("/hostdb/active", &ah); err != nil {
+	err = retry(50, time.Millisecond*100, func() error {
+		// Get the hostdb internals.
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			return err
+		}
+
+		// Get the host's internals.
+		var hg HostGET
+		if err = stHost.getAPI("/host", &hg); err != nil {
+			return err
+		}
+
+		if len(ah.Hosts) != 1 {
+			return fmt.Errorf("expected 1 host, got %v", len(ah.Hosts))
+		}
+		if ah.Hosts[0].NetAddress != hg.ExternalSettings.NetAddress {
+			return fmt.Errorf("hostdb net address doesn't match host net address: %v : %v", ah.Hosts[0].NetAddress, hg.ExternalSettings.NetAddress)
+		}
+		return nil
+	})
+	if err != nil {
 		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 1 {
-		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
 	}
 	if ah.Hosts[0].PublicKeyString != pks {
 		t.Error("public key appears to have changed for host")
@@ -553,6 +590,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestHostDBAndRenterFormDynamicIPs")
 	if err != nil {
 		t.Fatal(err)
@@ -622,11 +660,28 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Pull the host's net address and pubkey from the hostdb.
-	if err = st.getAPI("/hostdb/active", &ah); err != nil {
+	err = retry(50, time.Millisecond*100, func() error {
+		// Get the hostdb internals.
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			return err
+		}
+
+		// Get the host's internals.
+		var hg HostGET
+		if err = stHost.getAPI("/host", &hg); err != nil {
+			return err
+		}
+
+		if len(ah.Hosts) != 1 {
+			return fmt.Errorf("expected 1 host, got %v", len(ah.Hosts))
+		}
+		if ah.Hosts[0].NetAddress != hg.ExternalSettings.NetAddress {
+			return fmt.Errorf("hostdb net address doesn't match host net address: %v : %v", ah.Hosts[0].NetAddress, hg.ExternalSettings.NetAddress)
+		}
+		return nil
+	})
+	if err != nil {
 		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 1 {
-		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
 	}
 	if ah.Hosts[0].PublicKeyString != pks {
 		t.Error("public key appears to have changed for host")
@@ -692,10 +747,10 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 // successfully able to follow a host that has changed IP addresses and then
 // re-announced.
 func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
-	t.Skip("Test is failing even when the NetAddress is static?")
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestHostDBAndRenterRenewDynamicIPs")
 	if err != nil {
 		t.Fatal(err)
@@ -727,6 +782,16 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var ah HostdbActiveGET
+	err = retry(50, 100*time.Millisecond, func() error {
+		if err := st.getAPI("/hostdb/active", &ah); err != nil {
+			return err
+		}
+		if len(ah.Hosts) != 1 {
+			return errors.New("host not found in hostdb")
+		}
+		return nil
+	})
 
 	// Upload a file to the host.
 	allowanceValues := url.Values{}
@@ -781,9 +846,9 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
+	// Close and re-open the host. This should reset the host's address, as the
+	// host should now be on a new port.
 	/*
-		// Close and re-open the host. This should reset the host's address, as the
-		// host should now be on a new port.
 		err = stHost.server.Close()
 		if err != nil {
 			t.Fatal(err)
@@ -802,6 +867,30 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 			t.Fatal(err)
 		}
 	*/
+	// Pull the host's net address and pubkey from the hostdb.
+	err = retry(50, time.Millisecond*100, func() error {
+		// Get the hostdb internals.
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			return err
+		}
+
+		// Get the host's internals.
+		var hg HostGET
+		if err = stHost.getAPI("/host", &hg); err != nil {
+			return err
+		}
+
+		if len(ah.Hosts) != 1 {
+			return fmt.Errorf("expected 1 host, got %v", len(ah.Hosts))
+		}
+		if ah.Hosts[0].NetAddress != hg.ExternalSettings.NetAddress {
+			return fmt.Errorf("hostdb net address doesn't match host net address: %v : %v", ah.Hosts[0].NetAddress, hg.ExternalSettings.NetAddress)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Mine enough blocks that multiple renew cylces happen. After the renewing
 	// happens, the file should still be downloadable.
@@ -814,6 +903,8 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Give time for the upgrade to happen.
+		time.Sleep(time.Second * 3)
 	}
 
 	// Try downloading the file.
