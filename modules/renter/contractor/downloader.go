@@ -136,6 +136,8 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 	} else if host.DownloadBandwidthPrice.Cmp(maxDownloadPrice) > 0 {
 		return nil, errTooExpensive
 	}
+	// Update the contract to the most recent net address for the host.
+	contract.NetAddress = host.NetAddress
 
 	// acquire revising lock
 	c.mu.Lock()
@@ -166,13 +168,6 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 			c.log.Critical("Cached revision does not exist for contract.")
 		}
 	}
-
-	// Update the contract to the most recent net address for the host.
-	host, exists := c.hdb.Host(contract.HostPublicKey)
-	if !exists {
-		return nil, errors.New("unable to find the contract's host in the host database")
-	}
-	contract.NetAddress = host.NetAddress
 
 	// create downloader
 	d, err := proto.NewDownloader(host, contract)

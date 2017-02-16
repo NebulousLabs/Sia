@@ -200,6 +200,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 			host.Collateral = maxUploadCollateral
 		}
 	}
+	contract.NetAddress = host.NetAddress
 
 	// acquire revising lock
 	c.mu.Lock()
@@ -230,13 +231,6 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 			c.log.Critical("Cached revision does not exist for contract.")
 		}
 	}
-
-	// Make sure that we have the most recent net address for this host.
-	host, exists := c.hdb.Host(contract.HostPublicKey)
-	if !exists {
-		return nil, errors.New("unable to find the host in the hostdb")
-	}
-	contract.NetAddress = host.NetAddress
 
 	// create editor
 	e, err := proto.NewEditor(host, contract, height)

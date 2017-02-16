@@ -288,6 +288,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
 	testPeriod := "10"
+	testPeriodInt := 10
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
@@ -335,6 +336,19 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if bytes.Compare(orig, download) != 0 {
 		t.Fatal("data mismatch when downloading a file")
 	}
+
+	// Mine a block before resetting the host, so that the host doesn't lose
+	// it's contracts when the transaction pool resets.
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Give time for the upgrade to happen.
+	time.Sleep(time.Second * 3)
 
 	// Close and re-open the host. This should reset the host's address, as the
 	// host should now be on a new port.
@@ -384,6 +398,36 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	}
 	if ah.Hosts[0].NetAddress == addr {
 		t.Log("NetAddress did not change for the new host")
+	}
+
+	// Try downloading the file.
+	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the download has the right contents.
+	download, err = ioutil.ReadFile(downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(orig, download) != 0 {
+		t.Fatal("data mismatch when downloading a file")
+	}
+
+	// Mine enough blocks that multiple renew cylces happen. After the renewing
+	// happens, the file should still be downloadable. This is to check that the
+	// renewal doesn't throw things off.
+	for i := 0; i < testPeriodInt; i++ {
+		_, err = st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = synchronizationCheck(sts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Give time for the upgrade to happen.
+		time.Sleep(time.Second * 3)
 	}
 
 	// Try downloading the file.
@@ -462,6 +506,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
 	testPeriod := "10"
+	testPeriodInt := 10
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
@@ -490,6 +535,19 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
 	}
+
+	// Mine a block before resetting the host, so that the host doesn't lose
+	// it's contracts when the transaction pool resets.
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Give time for the upgrade to happen.
+	time.Sleep(time.Second * 3)
 
 	// Close and re-open the host. This should reset the host's address, as the
 	// host should now be on a new port.
@@ -581,6 +639,59 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if bytes.Compare(orig2, download2) != 0 {
 		t.Fatal("data mismatch when downloading a file")
 	}
+
+	// Mine enough blocks that multiple renew cylces happen. After the renewing
+	// happens, the file should still be downloadable. This is to check that the
+	// renewal doesn't throw things off.
+	for i := 0; i < testPeriodInt; i++ {
+		_, err = st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = synchronizationCheck(sts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Give time for the upgrade to happen.
+		time.Sleep(time.Second * 3)
+	}
+
+	// Try downloading the file.
+	downpath := filepath.Join(st.dir, "testdown.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the download has the right contents.
+	download, err := ioutil.ReadFile(downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orig, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(orig, download) != 0 {
+		t.Fatal("data mismatch when downloading a file")
+	}
+
+	// Try downloading the second file.
+	err = st.stdGetAPI("/renter/download/test2?destination=" + downpath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the download has the right contents.
+	orig2, err = ioutil.ReadFile(path2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	download2, err = ioutil.ReadFile(downpath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(orig2, download2) != 0 {
+		t.Fatal("data mismatch when downloading a file")
+	}
 }
 
 // TestHostDBAndRenterFormDynamicIPs checks that the hostdb and the renter are
@@ -640,6 +751,19 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	addr := ah.Hosts[0].NetAddress
 	pks := ah.Hosts[0].PublicKeyString
 
+	// Mine a block before resetting the host, so that the host doesn't lose
+	// it's contracts when the transaction pool resets.
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Give time for the upgrade to happen.
+	time.Sleep(time.Second * 3)
+
 	// Close and re-open the host. This should reset the host's address, as the
 	// host should now be on a new port.
 	err = stHost.server.Close()
@@ -694,6 +818,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
 	testPeriod := "10"
+	testPeriodInt := 10
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
@@ -735,6 +860,36 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	download, err := ioutil.ReadFile(downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(orig, download) != 0 {
+		t.Fatal("data mismatch when downloading a file")
+	}
+
+	// Mine enough blocks that multiple renew cylces happen. After the renewing
+	// happens, the file should still be downloadable. This is to check that the
+	// renewal doesn't throw things off.
+	for i := 0; i < testPeriodInt; i++ {
+		_, err = st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = synchronizationCheck(sts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Give time for the upgrade to happen.
+		time.Sleep(time.Second * 3)
+	}
+
+	// Try downloading the file.
+	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the download has the right contents.
+	download, err = ioutil.ReadFile(downpath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -846,6 +1001,19 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
+	// Mine a block before resetting the host, so that the host doesn't lose
+	// it's contracts when the transaction pool resets.
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Give time for the upgrade to happen.
+	time.Sleep(time.Second * 3)
+
 	// Close and re-open the host. This should reset the host's address, as the
 	// host should now be on a new port.
 	err = stHost.server.Close()
@@ -892,8 +1060,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 
 	// Mine enough blocks that multiple renew cylces happen. After the renewing
 	// happens, the file should still be downloadable.
-	println("mining blocks")
-	for i := 0; i < testPeriodInt*2; i++ {
+	for i := 0; i < testPeriodInt; i++ {
 		_, err = st.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)

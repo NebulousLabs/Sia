@@ -14,13 +14,10 @@ import (
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
 func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
-	println("performing renew")
 	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
-		println("a")
 		return modules.RenterContract{}, errors.New("no record of that host")
 	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
-		println("b")
 		return modules.RenterContract{}, errTooExpensive
 	}
 	// cap host.MaxCollateral
@@ -34,7 +31,6 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 	// get an address to use for negotiation
 	uc, err := c.wallet.NextAddress()
 	if err != nil {
-		println("c")
 		return modules.RenterContract{}, err
 	}
 
@@ -62,7 +58,6 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 		if !ok {
 			// nothing we can do; return original error
 			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
-			println("d")
 			return modules.RenterContract{}, err
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
@@ -73,11 +68,9 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 	}
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
-		println("e")
 		return modules.RenterContract{}, err
 	}
 
-	println("renew successful")
 	return newContract, nil
 }
 
