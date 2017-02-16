@@ -848,25 +848,23 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 
 	// Close and re-open the host. This should reset the host's address, as the
 	// host should now be on a new port.
-	/*
-		err = stHost.server.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-		stHost, err = assembleServerTester(stHost.walletKey, stHost.dir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sts[1] = stHost
-		err = fullyConnectNodes(sts)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = stHost.announceHost()
-		if err != nil {
-			t.Fatal(err)
-		}
-	*/
+	err = stHost.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost, err = assembleServerTester(stHost.walletKey, stHost.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sts[1] = stHost
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Pull the host's net address and pubkey from the hostdb.
 	err = retry(50, time.Millisecond*100, func() error {
 		// Get the hostdb internals.
@@ -894,6 +892,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 
 	// Mine enough blocks that multiple renew cylces happen. After the renewing
 	// happens, the file should still be downloadable.
+	println("mining blocks")
 	for i := 0; i < testPeriodInt*2; i++ {
 		_, err = st.miner.AddBlock()
 		if err != nil {
