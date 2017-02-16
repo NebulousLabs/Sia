@@ -2,6 +2,7 @@ package modules
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -22,7 +23,7 @@ func TestMerkleRootSetCompatibility(t *testing.T) {
 	// Create some fake headers for the files.
 	meta := persist.Metadata{
 		Header:  "Test Header",
-		Version: "0.1.2",
+		Version: "1.1.1",
 	}
 
 	// Try multiple sizes of array.
@@ -42,7 +43,7 @@ func TestMerkleRootSetCompatibility(t *testing.T) {
 		}
 
 		// Save and load, check that they are the same.
-		dir := build.TempDir("modules", "testMerkleRootSetCompatibility")
+		dir := build.TempDir("modules", "TestMerkleRootSetCompatibility")
 		err := os.MkdirAll(dir, 0700)
 		if err != nil {
 			t.Fatal(err)
@@ -104,6 +105,138 @@ func TestMerkleRootSetCompatibility(t *testing.T) {
 			if mrs.Hashes[j] != loadMRS.Hashes[j] {
 				t.Error("loading failed", i, j)
 			}
+		}
+	}
+}
+
+// BenchmarkMerkleRootSetEncode clocks how fast large MerkleRootSets can be
+// encoded and written to disk.
+func BenchmarkMerkleRootSetEncode(b *testing.B) {
+	// Create a []crypto.Hash of length i.
+	type chStruct struct {
+		Hashes MerkleRootSet
+	}
+	var chs chStruct
+	for i := 0; i < 1e3; i++ {
+		var ch crypto.Hash
+		_, err := rand.Read(ch[:])
+		if err != nil {
+			b.Fatal(err)
+		}
+		chs.Hashes = append(chs.Hashes, ch)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := json.Marshal(chs)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkSliceCryptoHashEncode clocks how fast large []crypto.Hashes can be
+// encoded and written to disk.
+func BenchmarkSliceCryptoHashEncode(b *testing.B) {
+	// Create a []crypto.Hash of length i.
+	type chStruct struct {
+		Hashes []crypto.Hash
+	}
+	var chs chStruct
+	for i := 0; i < 1e3; i++ {
+		var ch crypto.Hash
+		_, err := rand.Read(ch[:])
+		if err != nil {
+			b.Fatal(err)
+		}
+		chs.Hashes = append(chs.Hashes, ch)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := json.Marshal(chs)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkMerkleRootSetSave clocks how fast large MerkleRootSets can be
+// encoded and written to disk.
+func BenchmarkMerkleRootSetSave(b *testing.B) {
+	// Create some fake headers for the files.
+	meta := persist.Metadata{
+		Header:  "Bench Header",
+		Version: "1.1.1",
+	}
+
+	// Create a []crypto.Hash of length i.
+	type chStruct struct {
+		Hashes MerkleRootSet
+	}
+	var chs chStruct
+	for i := 0; i < 1e3; i++ {
+		var ch crypto.Hash
+		_, err := rand.Read(ch[:])
+		if err != nil {
+			b.Fatal(err)
+		}
+		chs.Hashes = append(chs.Hashes, ch)
+	}
+
+	// Save through the persist.
+	dir := build.TempDir("modules", "BenchmarkSliceCryptoHashSave")
+	err := os.MkdirAll(dir, 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	filename := filepath.Join(dir, "file")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err = persist.SaveFileSync(meta, chs, filename)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkSliceCryptoHashSave clocks how fast large []crypto.Hashes can be
+// encoded and written to disk.
+func BenchmarkSliceCryptoHashSave(b *testing.B) {
+	// Create some fake headers for the files.
+	meta := persist.Metadata{
+		Header:  "Bench Header",
+		Version: "1.1.1",
+	}
+
+	// Create a []crypto.Hash of length i.
+	type chStruct struct {
+		Hashes []crypto.Hash
+	}
+	var chs chStruct
+	for i := 0; i < 1e3; i++ {
+		var ch crypto.Hash
+		_, err := rand.Read(ch[:])
+		if err != nil {
+			b.Fatal(err)
+		}
+		chs.Hashes = append(chs.Hashes, ch)
+	}
+
+	// Save through the persist.
+	dir := build.TempDir("modules", "BenchmarkSliceCryptoHashSave")
+	err := os.MkdirAll(dir, 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	filename := filepath.Join(dir, "file")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err = persist.SaveFileSync(meta, chs, filename)
+		if err != nil {
+			b.Fatal(err)
 		}
 	}
 }
