@@ -448,11 +448,6 @@ func createExplorerServerTester(name string) (*serverTester, error) {
 	return st, nil
 }
 
-// non2xx returns true for non-success HTTP status codes.
-func non2xx(code int) bool {
-	return code < 200 || code > 299
-}
-
 // decodeError returns the api.Error from a API response. This method should
 // only be called if the response's status code is non-2xx. The error returned
 // may not be of type api.Error in the event of an error unmarshalling the
@@ -464,6 +459,25 @@ func decodeError(resp *http.Response) error {
 		return err
 	}
 	return apiErr
+}
+
+// non2xx returns true for non-success HTTP status codes.
+func non2xx(code int) bool {
+	return code < 200 || code > 299
+}
+
+// retry will retry a function multiple times until it returns 'nil'. It will
+// sleep the specified duration between tries. If success is not achieved in the
+// specified number of attempts, the final error is returned.
+func retry(tries int, durationBetweenAttempts time.Duration, fn func() error) (err error) {
+	for i := 0; i < tries-1; i++ {
+		err = fn()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(durationBetweenAttempts)
+	}
+	return fn()
 }
 
 // reloadedServerTester creates a server tester where all of the persistent
@@ -521,7 +535,7 @@ func (st *serverTester) announceHost() error {
 	acceptingContractsValues.Set("acceptingcontracts", "true")
 	err := st.stdPostAPI("/host", acceptingContractsValues)
 	if err != nil {
-		return err
+		return build.ExtendErr("couldn't make an api call to the host:", err)
 	}
 
 	announceValues := url.Values{}

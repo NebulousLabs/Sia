@@ -24,6 +24,9 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 	if host.MaxCollateral.Cmp(maxCollateral) > 0 {
 		host.MaxCollateral = maxCollateral
 	}
+	// Set the net address of the contract to the most recent net address for
+	// the host.
+	contract.NetAddress = host.NetAddress
 
 	// get an address to use for negotiation
 	uc, err := c.wallet.NextAddress()
@@ -42,9 +45,8 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 	}
 	c.mu.RUnlock()
 
-	txnBuilder := c.wallet.StartTransaction()
-
 	// execute negotiation protocol
+	txnBuilder := c.wallet.StartTransaction()
 	newContract, err := proto.Renew(contract, params, txnBuilder, c.tpool)
 	if proto.IsRevisionMismatch(err) {
 		// return unused outputs to wallet

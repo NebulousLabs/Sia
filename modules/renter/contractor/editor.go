@@ -200,6 +200,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 			host.Collateral = maxUploadCollateral
 		}
 	}
+	contract.NetAddress = host.NetAddress
 
 	// acquire revising lock
 	c.mu.Lock()

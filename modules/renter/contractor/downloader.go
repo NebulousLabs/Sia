@@ -136,6 +136,8 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 	} else if host.DownloadBandwidthPrice.Cmp(maxDownloadPrice) > 0 {
 		return nil, errTooExpensive
 	}
+	// Update the contract to the most recent net address for the host.
+	contract.NetAddress = host.NetAddress
 
 	// acquire revising lock
 	c.mu.Lock()
