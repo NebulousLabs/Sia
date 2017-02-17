@@ -261,7 +261,7 @@ func shareFiles(files []*file, w io.Writer) error {
 	}
 
 	// Create compressor.
-	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
+	zip, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
 	enc := encoding.NewEncoder(zip)
 
 	// Encode each file.
