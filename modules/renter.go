@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"encoding/json"
 	"io"
 	"time"
 
@@ -147,6 +148,44 @@ func (s HostDBScans) Len() int           { return len(s) }
 func (s HostDBScans) Less(i, j int) bool { return s[i].Timestamp.Before(s[j].Timestamp) }
 func (s HostDBScans) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
+// MerkleRootSet is a set of Merkle roots, and gets encoded more efficiently.
+type MerkleRootSet []crypto.Hash
+
+// MarshalJSON defines a JSON encoding for a MerkleRootSet.
+func (mrs MerkleRootSet) MarshalJSON() ([]byte, error) {
+	// Copy the whole array into a giant byte slice and then encode that.
+	fullBytes := make([]byte, crypto.HashSize*len(mrs))
+	for i := range mrs {
+		copy(fullBytes[i*crypto.HashSize:(i+1)*crypto.HashSize], mrs[i][:])
+	}
+	return json.Marshal(fullBytes)
+}
+
+// UnmarshalJSON attempts to decode a MerkleRootSet, falling back on the legacy
+// decoding of a []crypto.Hash if that fails.
+func (mrs *MerkleRootSet) UnmarshalJSON(b []byte) error {
+	// Decode the giant byte slice, and then split it into separate arrays.
+	var fullBytes []byte
+	err := json.Unmarshal(b, &fullBytes)
+	if err != nil {
+		// Encoding the byte slice has failed, try decoding it as a []crypto.Hash.
+		var hashes []crypto.Hash
+		err := json.Unmarshal(b, &hashes)
+		if err != nil {
+			return err
+		}
+		*mrs = MerkleRootSet(hashes)
+		return nil
+	}
+
+	umrs := make(MerkleRootSet, len(fullBytes)/32)
+	for i := range umrs {
+		copy(umrs[i][:], fullBytes[i*crypto.HashSize:(i+1)*crypto.HashSize])
+	}
+	*mrs = umrs
+	return nil
+}
+
 // A RenterContract contains all the metadata necessary to revise or renew a
 // file contract.
 type RenterContract struct {
@@ -155,7 +194,7 @@ type RenterContract struct {
 	ID              types.FileContractID       `json:"id"`
 	LastRevision    types.FileContractRevision `json:"lastrevision"`
 	LastRevisionTxn types.Transaction          `json:"lastrevisiontxn"`
-	MerkleRoots     []crypto.Hash              `json:"merkleroots"`
+	MerkleRoots     MerkleRootSet              `json:"merkleroots"`
 	NetAddress      NetAddress                 `json:"netaddress"`
 	SecretKey       crypto.SecretKey           `json:"secretkey"`
 	StartHeight     types.BlockHeight          `json:"startheight"`

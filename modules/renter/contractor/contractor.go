@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
@@ -30,7 +29,7 @@ var (
 // TODO: save a diff of the Merkle roots instead of all of them.
 type cachedRevision struct {
 	Revision    types.FileContractRevision
-	MerkleRoots []crypto.Hash
+	MerkleRoots modules.MerkleRootSet
 }
 
 // A Contractor negotiates, revises, renews, and provides access to file

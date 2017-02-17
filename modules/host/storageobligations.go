@@ -424,7 +424,6 @@ func (h *Host) modifyStorageObligation(so storageObligation, sectorsRemoved []cr
 	// Sanity check - there needs to be enough time to submit the file contract
 	// revision to the blockchain.
 	if so.expiration()-revisionSubmissionBuffer <= h.blockHeight {
-		h.log.Critical("revision submission window was not verified before trying to modify a storage obligation")
 		return errNoBuffer
 	}
 	// Sanity check - sectorsGained and gainedSectorData need to have the same length.
