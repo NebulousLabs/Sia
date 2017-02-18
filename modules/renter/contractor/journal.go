@@ -85,15 +85,19 @@ func (j *journal) checkpoint(obj interface{}) error {
 	}
 
 	// atomically replace the old file with the new one
+	if err := tmp.Close(); err != nil {
+		return err
+	}
 	if err := j.f.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(j.filename+"_tmp", j.filename); err != nil {
+	if err := os.Rename(tmp.Name(), j.filename); err != nil {
 		return err
 	}
 
-	j.f = tmp
-	return nil
+	// reopen the journal
+	j.f, err = os.OpenFile(j.filename, os.O_RDWR|os.O_APPEND, 0)
+	return err
 }
 
 // Close closes the underlying file.
@@ -118,7 +122,10 @@ func openJournal(filename string, obj interface{}) (*journal, error) {
 			f:        f,
 			filename: filename,
 		}
-		if err := j.checkpoint(obj); err != nil {
+		if err := json.NewEncoder(f).Encode(obj); err != nil {
+			return nil, err
+		}
+		if err := f.Sync(); err != nil {
 			return nil, err
 		}
 		return j, nil

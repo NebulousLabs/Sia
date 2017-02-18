@@ -114,7 +114,7 @@ func TestContract(t *testing.T) {
 // TestContracts tests the Contracts method.
 func TestContracts(t *testing.T) {
 	var stub newStub
-	dir := build.TempDir("contractor", "TestNew")
+	dir := build.TempDir("contractor", "TestContracts")
 	c, err := New(stub, stub, stub, stub, dir)
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)

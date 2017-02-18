@@ -1,15 +1,17 @@
 package contractor
 
 import (
-	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
 func tempFile(t interface {
 	Fatal(...interface{})
 }, name string) (*os.File, func()) {
-	f, err := ioutil.TempFile("", name)
+	f, err := os.Create(filepath.Join(build.TempDir("contractor", name)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,18 +24,13 @@ func tempFile(t interface {
 func tempJournal(t interface {
 	Fatal(...interface{})
 }, obj interface{}, name string) (*journal, func()) {
-	f, err := ioutil.TempFile("", name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
-	j, err := openJournal(f.Name(), obj)
+	j, err := openJournal(filepath.Join(build.TempDir("contractor", name)), obj)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return j, func() {
 		j.Close()
-		os.RemoveAll(f.Name())
+		os.RemoveAll(j.filename)
 	}
 }
 
@@ -69,6 +66,36 @@ func TestJournal(t *testing.T) {
 	j2.Close()
 	if f.X != 7 || len(f.Y) != 1 || f.Y[0].Z != 3 {
 		t.Fatal("openJournal applied updates incorrectly:", f)
+	}
+}
+
+func TestJournalCheckpoint(t *testing.T) {
+	type bar struct {
+		Z int `json:"z"`
+	}
+	type foo struct {
+		X int   `json:"x"`
+		Y []bar `json:"y"`
+	}
+
+	j, cleanup := tempJournal(t, foo{Y: []bar{}}, "TestJournalCheckpoint")
+	defer cleanup()
+
+	if err := j.checkpoint(bar{3}); err != nil {
+		t.Fatal(err)
+	}
+	if err := j.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var b bar
+	j2, err := openJournal(j.filename, &b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	j2.Close()
+	if b.Z != 3 {
+		t.Fatal("checkpoint failed:", b.Z)
 	}
 }
 
