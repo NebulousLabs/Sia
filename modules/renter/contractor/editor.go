@@ -116,18 +116,8 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	he.contractor.contracts[contract.ID] = contract
 	cpath := fmt.Sprintf("contracts.%s", contract.ID.String())
 	he.contractor.persist.update(
-		cpath+".lastrevision.newrevisionnumber", contract.LastRevision.NewRevisionNumber,
-		cpath+".lastrevision.newfilesize", contract.LastRevision.NewFileSize,
-		cpath+".lastrevision.newfilemerkleroot", contract.LastRevision.NewFileMerkleRoot,
-		cpath+".lastrevision.newvalidproofoutputs", contract.LastRevision.NewValidProofOutputs,
-		cpath+".lastrevision.newmissedproofoutputs", contract.LastRevision.NewMissedProofOutputs,
-		cpath+".lastrevisiontxn.filecontractrevisions.0.newrevisionnumber", contract.LastRevisionTxn.FileContractRevisions[0].NewRevisionNumber,
-		cpath+".lastrevisiontxn.filecontractrevisions.0.newfilesize", contract.LastRevision.NewFileSize,
-		cpath+".lastrevisiontxn.filecontractrevisions.0.newfilemerkleroot", contract.LastRevision.NewFileMerkleRoot,
-		cpath+".lastrevisiontxn.filecontractrevisions.0.newvalidproofoutputs", contract.LastRevisionTxn.FileContractRevisions[0].NewValidProofOutputs,
-		cpath+".lastrevisiontxn.filecontractrevisions.0.newmissedproofoutputs", contract.LastRevisionTxn.FileContractRevisions[0].NewMissedProofOutputs,
-		cpath+".lastrevisiontxn.transactionsignatures.0.signature", contract.LastRevisionTxn.TransactionSignatures[0].Signature,
-		cpath+".lastrevisiontxn.transactionsignatures.1.signature", contract.LastRevisionTxn.TransactionSignatures[1].Signature,
+		cpath+".lastrevision", contract.LastRevision,
+		cpath+".lastrevisiontxn", contract.LastRevisionTxn,
 		cpath+".merkleroots."+fmt.Sprint(len(contract.MerkleRoots)-1), sectorRoot,
 		cpath+".uploadspending", contract.UploadSpending,
 		cpath+".storagespending", contract.StorageSpending,
