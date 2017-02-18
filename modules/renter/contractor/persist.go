@@ -40,6 +40,7 @@ func (c *Contractor) persistData() contractorPersist {
 		data.Contracts[contract.ID.String()] = contract
 	}
 	for _, contract := range c.oldContracts {
+		contract.MerkleRoots = []crypto.Hash{} // prevent roots from being saved to disk twice
 		data.OldContracts = append(data.OldContracts, contract)
 	}
 	for oldID, newID := range c.renewedIDs {
