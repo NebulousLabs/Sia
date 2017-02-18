@@ -1011,3 +1011,126 @@ func TestRenterAllowance(t *testing.T) {
 		}
 	}
 }
+
+// TestHostAndRentReload sets up an integration test where a host and renter
+// do basic uploads and downloads, with an intervening shutdown+startup.
+func TestHostAndRentReload(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester("TestHostAndRentReload")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Announce the host and start accepting contracts.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "10"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload the file to the renter.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only one piece will be uploaded (10% at current redundancy).
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+	}
+
+	// Try downloading the file.
+	downpath := filepath.Join(st.dir, "testdown.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the download has the right contents.
+	orig, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	download, err := ioutil.ReadFile(downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(orig, download) != 0 {
+		t.Fatal("data mismatch when downloading a file")
+	}
+
+	// The renter's downloads queue should have 1 entry now.
+	var queue RenterDownloadQueue
+	if err = st.getAPI("/renter/downloads", &queue); err != nil {
+		t.Fatal(err)
+	}
+	if len(queue.Downloads) != 1 {
+		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
+	}
+
+	// close and reopen the server
+	err = st.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err = assembleServerTester(st.walletKey, st.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Try downloading the file.
+	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the download has the right contents.
+	orig, err = ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	download, err = ioutil.ReadFile(downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(orig, download) != 0 {
+		t.Fatal("data mismatch when downloading a file")
+	}
+}
