@@ -1,45 +1,42 @@
 package contractor
 
 import (
+	"path/filepath"
+
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 // contractorPersist defines what Contractor data persists across sessions.
 type contractorPersist struct {
-	Allowance       modules.Allowance
-	BlockHeight     types.BlockHeight
-	CachedRevisions []cachedRevision
-	Contracts       []modules.RenterContract
-	CurrentPeriod   types.BlockHeight
-	LastChange      modules.ConsensusChangeID
-	OldContracts    []modules.RenterContract
-	RenewedIDs      map[string]string
-
-	// COMPATv1.0.4-lts
-	FinancialMetrics struct {
-		ContractSpending types.Currency `json:"contractspending"`
-		DownloadSpending types.Currency `json:"downloadspending"`
-		StorageSpending  types.Currency `json:"storagespending"`
-		UploadSpending   types.Currency `json:"uploadspending"`
-	} `json:",omitempty"`
+	Allowance       modules.Allowance                 `json:"allowance"`
+	BlockHeight     types.BlockHeight                 `json:"blockheight"`
+	CachedRevisions map[string]cachedRevision         `json:"cachedrevisions"`
+	Contracts       map[string]modules.RenterContract `json:"contracts"`
+	CurrentPeriod   types.BlockHeight                 `json:"currentperiod"`
+	LastChange      modules.ConsensusChangeID         `json:"lastchange"`
+	OldContracts    []modules.RenterContract          `json:"oldcontracts"`
+	RenewedIDs      map[string]string                 `json:"renewedids"`
 }
 
 // persistData returns the data in the Contractor that will be saved to disk.
 func (c *Contractor) persistData() contractorPersist {
 	data := contractorPersist{
-		Allowance:     c.allowance,
-		BlockHeight:   c.blockHeight,
-		CurrentPeriod: c.currentPeriod,
-		LastChange:    c.lastChange,
-		RenewedIDs:    make(map[string]string),
+		Allowance:       c.allowance,
+		BlockHeight:     c.blockHeight,
+		CachedRevisions: make(map[string]cachedRevision),
+		Contracts:       make(map[string]modules.RenterContract),
+		CurrentPeriod:   c.currentPeriod,
+		LastChange:      c.lastChange,
+		RenewedIDs:      make(map[string]string),
 	}
 	for _, rev := range c.cachedRevisions {
-		data.CachedRevisions = append(data.CachedRevisions, rev)
+		data.CachedRevisions[rev.Revision.ParentID.String()] = rev
 	}
 	for _, contract := range c.contracts {
-		data.Contracts = append(data.Contracts, contract)
+		data.Contracts[contract.ID.String()] = contract
 	}
 	for _, contract := range c.oldContracts {
 		data.OldContracts = append(data.OldContracts, contract)
@@ -110,31 +107,6 @@ func (c *Contractor) load() error {
 		c.renewedIDs[types.FileContractID(oldHash)] = types.FileContractID(newHash)
 	}
 
-	// COMPATv1.0.4-lts
-	//
-	// If loading old persist, only aggregate metrics are known. Store these
-	// in a special contract under a special identifier.
-	if fm := data.FinancialMetrics; !fm.ContractSpending.Add(fm.DownloadSpending).Add(fm.StorageSpending).Add(fm.UploadSpending).IsZero() {
-		c.oldContracts[metricsContractID] = modules.RenterContract{
-			ID:               metricsContractID,
-			TotalCost:        fm.ContractSpending,
-			DownloadSpending: fm.DownloadSpending,
-			StorageSpending:  fm.StorageSpending,
-			UploadSpending:   fm.UploadSpending,
-			// Give the contract a fake startheight so that it will included
-			// with the other contracts in the current period. Note that in
-			// update.go, the special contract is specifically deleted when a
-			// new period begins.
-			StartHeight: c.currentPeriod + 1,
-			// We also need to add a ValidProofOutput so that the RenterFunds
-			// method will not panic. The value should be 0, i.e. "all funds
-			// were spent."
-			LastRevision: types.FileContractRevision{
-				NewValidProofOutputs: make([]types.SiacoinOutput, 2),
-			},
-		}
-	}
-
 	return nil
 }
 
@@ -145,7 +117,7 @@ func (c *Contractor) save() error {
 
 // saveSync saves the Contractor persistence data to disk and then syncs to disk.
 func (c *Contractor) saveSync() error {
-	return c.persist.saveSync(c.persistData())
+	return c.persist.save(c.persistData())
 }
 
 // saveRevision returns a function that saves a revision. It is used by the
@@ -155,20 +127,22 @@ func (c *Contractor) saveRevision(id types.FileContractID) func(types.FileContra
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		c.cachedRevisions[id] = cachedRevision{rev, newRoots}
-		return c.saveSync()
+		revPath := "cachedRevisions." + id.String()
+		return c.persist.update(revPath, cachedRevision{rev, newRoots})
 	}
 }
 
 // addPubKeys rescans the blockchain to fill in the HostPublicKey of
 // contracts, identified by their NetAddress.
-func addPubKeys(cs consensusSet, contracts []modules.RenterContract) []modules.RenterContract {
+func addPubKeys(cs consensusSet, contracts map[string]modules.RenterContract) map[string]modules.RenterContract {
 	pubkeys := make(pubkeyScanner)
 	for _, c := range contracts {
 		pubkeys[c.NetAddress] = types.SiaPublicKey{}
 	}
 	cs.ConsensusSetSubscribe(pubkeys, modules.ConsensusChangeBeginning)
-	for i, c := range contracts {
-		contracts[i].HostPublicKey = pubkeys[c.NetAddress]
+	for id, c := range contracts {
+		c.HostPublicKey = pubkeys[c.NetAddress]
+		contracts[id] = c
 	}
 	return contracts
 }
@@ -195,4 +169,76 @@ func (pubkeys pubkeyScanner) ProcessConsensusChange(cc modules.ConsensusChange) 
 			}
 		}
 	}
+}
+
+// COMPATv1.1.0
+func loadv110persist(dir string, data *contractorPersist) error {
+	var oldPersist struct {
+		Allowance        modules.Allowance
+		BlockHeight      types.BlockHeight
+		CachedRevisions  []cachedRevision
+		Contracts        []modules.RenterContract
+		CurrentPeriod    types.BlockHeight
+		LastChange       modules.ConsensusChangeID
+		OldContracts     []modules.RenterContract
+		RenewedIDs       map[string]string
+		FinancialMetrics struct {
+			ContractSpending types.Currency
+			DownloadSpending types.Currency
+			StorageSpending  types.Currency
+			UploadSpending   types.Currency
+		}
+	}
+	err := persist.LoadFile(persist.Metadata{
+		Header:  "Contractor Persistence",
+		Version: "0.5.2",
+	}, &oldPersist, filepath.Join(dir, "contractor.json"))
+	if err != nil {
+		return err
+	}
+	cachedRevisions := make(map[string]cachedRevision)
+	for _, rev := range oldPersist.CachedRevisions {
+		cachedRevisions[rev.Revision.ParentID.String()] = rev
+	}
+	contracts := make(map[string]modules.RenterContract)
+	for _, c := range oldPersist.Contracts {
+		contracts[c.ID.String()] = c
+	}
+
+	// COMPATv1.0.4-lts
+	//
+	// If loading old persist, only aggregate metrics are known. Store these
+	// in a special contract under a special identifier.
+	if fm := oldPersist.FinancialMetrics; !fm.ContractSpending.Add(fm.DownloadSpending).Add(fm.StorageSpending).Add(fm.UploadSpending).IsZero() {
+		oldPersist.OldContracts = append(oldPersist.OldContracts, modules.RenterContract{
+			ID:               metricsContractID,
+			TotalCost:        fm.ContractSpending,
+			DownloadSpending: fm.DownloadSpending,
+			StorageSpending:  fm.StorageSpending,
+			UploadSpending:   fm.UploadSpending,
+			// Give the contract a fake startheight so that it will included
+			// with the other contracts in the current period. Note that in
+			// update.go, the special contract is specifically deleted when a
+			// new period begins.
+			StartHeight: oldPersist.CurrentPeriod + 1,
+			// We also need to add a ValidProofOutput so that the RenterFunds
+			// method will not panic. The value should be 0, i.e. "all funds
+			// were spent."
+			LastRevision: types.FileContractRevision{
+				NewValidProofOutputs: make([]types.SiacoinOutput, 2),
+			},
+		})
+	}
+
+	*data = contractorPersist{
+		Allowance:       oldPersist.Allowance,
+		BlockHeight:     oldPersist.BlockHeight,
+		CachedRevisions: cachedRevisions,
+		Contracts:       contracts,
+		CurrentPeriod:   oldPersist.CurrentPeriod,
+		LastChange:      oldPersist.LastChange,
+		OldContracts:    oldPersist.OldContracts,
+		RenewedIDs:      oldPersist.RenewedIDs,
+	}
+	return nil
 }

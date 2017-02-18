@@ -15,9 +15,9 @@ import (
 // memPersist implements the persister interface in-memory.
 type memPersist contractorPersist
 
-func (m *memPersist) save(data contractorPersist) error     { *m = memPersist(data); return nil }
-func (m *memPersist) saveSync(data contractorPersist) error { *m = memPersist(data); return nil }
-func (m memPersist) load(data *contractorPersist) error     { *data = contractorPersist(m); return nil }
+func (m *memPersist) save(data contractorPersist) error { *m = memPersist(data); return nil }
+func (m *memPersist) update(...interface{}) error       { return nil }
+func (m memPersist) load(data *contractorPersist) error { *data = contractorPersist(m); return nil }
 
 // TestSaveLoad tests that the contractor can save and load itself.
 func TestSaveLoad(t *testing.T) {

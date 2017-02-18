@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -54,7 +53,7 @@ type (
 
 	persister interface {
 		save(contractorPersist) error
-		saveSync(contractorPersist) error
+		update(...interface{}) error
 		load(*contractorPersist) error
 	}
 )
@@ -68,32 +67,43 @@ type walletBridge struct {
 func (ws *walletBridge) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
 func (ws *walletBridge) StartTransaction() transactionBuilder         { return ws.w.StartTransaction() }
 
-// stdPersist implements the persister interface via persist.SaveFile and
-// persist.LoadFile. The metadata and filename required by these functions is
-// internal to stdPersist.
+// stdPersist implements the persister interface via jj.OpenJournal and
+// jj.CheckPoint. The filename required by these functions is internal to
+// stdPersist.
 type stdPersist struct {
-	meta     persist.Metadata
+	journal  *journal
 	filename string
 }
 
-func (p *stdPersist) save(data contractorPersist) error {
-	return persist.SaveFile(p.meta, data, p.filename)
+func (p stdPersist) save(data contractorPersist) error {
+	if p.journal == nil {
+		var err error
+		p.journal, err = openJournal(p.filename, data)
+		return err
+	}
+	return p.journal.checkpoint(data)
 }
 
-func (p *stdPersist) saveSync(data contractorPersist) error {
-	return persist.SaveFileSync(p.meta, data, p.filename)
+func (p *stdPersist) update(us ...interface{}) error {
+	var updates []journalUpdate
+	for i := 0; i < len(us); i += 2 {
+		updates = append(updates, newJournalUpdate(us[i].(string), us[i+1].(interface{})))
+	}
+	return p.journal.update(updates)
 }
 
 func (p *stdPersist) load(data *contractorPersist) error {
-	return persist.LoadFile(p.meta, data, p.filename)
+	var err error
+	p.journal, err = openJournal(p.filename, data)
+	if err != nil {
+		// try loading old persist
+		return loadv110persist(filepath.Dir(p.filename), data)
+	}
+	return err
 }
 
 func newPersist(dir string) *stdPersist {
 	return &stdPersist{
-		meta: persist.Metadata{
-			Header:  "Contractor Persistence",
-			Version: "0.5.2",
-		},
-		filename: filepath.Join(dir, "contractor.json"),
+		filename: filepath.Join(dir, "contractor.journal"),
 	}
 }
