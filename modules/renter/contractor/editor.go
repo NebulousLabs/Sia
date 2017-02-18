@@ -272,7 +272,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 	}
 	// supply a SaveFn that saves the revision to the contractor's persist
 	// (the existing revision will be overwritten when SaveFn is called)
-	e.SaveFn = c.saveRevision(contract.ID)
+	e.SaveFn = c.saveUploadRevision(contract.ID)
 
 	// cache editor
 	he := &hostEditor{

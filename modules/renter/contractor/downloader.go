@@ -202,7 +202,7 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 	}
 	// supply a SaveFn that saves the revision to the contractor's persist
 	// (the existing revision will be overwritten when SaveFn is called)
-	d.SaveFn = c.saveRevision(contract.ID)
+	d.SaveFn = c.saveDownloadRevision(contract.ID)
 
 	// cache downloader
 	hd := &hostDownloader{
