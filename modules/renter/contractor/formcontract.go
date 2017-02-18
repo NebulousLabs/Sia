@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
@@ -113,7 +114,8 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 
 	contractValue := contract.RenterFunds()
 	c.log.Printf("Formed contract with %v for %v SC", host.NetAddress, contractValue.Div(types.SiacoinPrecision))
-
+	contract.MerkleRoots = []crypto.Hash{}
+	c.cachedRevisions[contract.ID] = cachedRevision{contract.LastRevision, contract.MerkleRoots}
 	return contract, nil
 }
 
