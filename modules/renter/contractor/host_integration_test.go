@@ -317,10 +317,8 @@ func TestIntegrationUploadDownload(t *testing.T) {
 // TestIntegrationDelete tests that the contractor can delete a sector from a
 // contract previously formed with a host.
 func TestIntegrationDelete(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
+	t.Skip("deletion is deprecated")
+
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationDelete")
 	if err != nil {
@@ -382,10 +380,8 @@ func TestIntegrationDelete(t *testing.T) {
 // TestIntegrationInsertDelete tests that the contractor can insert and delete
 // a sector during the same revision.
 func TestIntegrationInsertDelete(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
+	t.Skip("deletion is deprecated")
+
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationInsertDelete")
 	if err != nil {
