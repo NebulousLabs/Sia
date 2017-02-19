@@ -5,8 +5,6 @@ package hostdb
 // settings of the hosts.
 
 import (
-	"crypto/rand"
-	"math/big"
 	"net"
 	"time"
 
@@ -295,7 +293,7 @@ func (hdb *HostDB) threadedScan() {
 			if online && len(onlineHosts) < hostCheckupQuantity {
 				onlineHosts = append(onlineHosts, host)
 			} else if !online && len(offlineHosts) < hostCheckupQuantity {
-				offlineHosts = append(onlineHosts, host)
+				offlineHosts = append(offlineHosts, host)
 			}
 		}
 
@@ -314,21 +312,20 @@ func (hdb *HostDB) threadedScan() {
 		// scanning. The minimums and maximums keep the scan time reasonable,
 		// while the randomness prevents the scanning from always happening at
 		// the same time of day or week.
-		maxBig := big.NewInt(int64(maxScanSleep))
-		minBig := big.NewInt(int64(minScanSleep))
-		randSleep, err := rand.Int(rand.Reader, maxBig.Sub(maxBig, minBig))
+		sleepTime := defaultScanSleep
+		sleepRange := int(maxScanSleep - minScanSleep)
+		sleepRand, err := crypto.RandIntn(sleepRange)
 		if err != nil {
 			build.Critical(err)
-			// If there's an error, sleep for the default amount of time.
-			defaultBig := big.NewInt(int64(defaultScanSleep))
-			randSleep = defaultBig.Sub(defaultBig, minBig)
+		} else {
+			sleepTime = minScanSleep + time.Duration(sleepRand)
 		}
 
 		// Sleep until it's time for the next scan cycle.
 		select {
 		case <-hdb.tg.StopChan():
 			return
-		case <-time.After(time.Duration(randSleep.Int64()) + minScanSleep):
+		case <-time.After(sleepTime):
 		}
 	}
 }
