@@ -10,7 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/host"
+	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/renter"
+	"github.com/NebulousLabs/Sia/modules/transactionpool"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 )
 
 // TestHostDBHostsActiveHandler checks the behavior of the call to
@@ -224,6 +232,183 @@ func TestHostDBHostsHandler(t *testing.T) {
 	}
 	if hh.ScoreBreakdown.VersionAdjustment == 1 {
 		t.Error("One value in host score breakdown")
+	}
+}
+
+// assembleHostHostname is assembleServerTester but you can specify which
+// hostname the host should use.
+func assembleHostPort(key crypto.TwofishKey, hostHostname string, testdir string) (*serverTester, error) {
+	// assembleServerTester should not get called during short tests, as it
+	// takes a long time to run.
+	if testing.Short() {
+		panic("assembleServerTester called during short tests")
+	}
+
+	// Create the modules.
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		return nil, err
+	}
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		return nil, err
+	}
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
+	if err != nil {
+		return nil, err
+	}
+	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	if err != nil {
+		return nil, err
+	}
+	if !w.Encrypted() {
+		_, err = w.Encrypt(key)
+		if err != nil {
+			return nil, err
+		}
+	}
+	err = w.Unlock(key)
+	if err != nil {
+		return nil, err
+	}
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
+	if err != nil {
+		return nil, err
+	}
+	h, err := host.New(cs, tp, w, hostHostname, filepath.Join(testdir, modules.HostDir))
+	if err != nil {
+		return nil, err
+	}
+	r, err := renter.New(g, cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	if err != nil {
+		return nil, err
+	}
+	srv, err := NewServer("localhost:0", "Sia-Agent", "", cs, nil, g, h, m, r, tp, w)
+	if err != nil {
+		return nil, err
+	}
+
+	// Assemble the serverTester.
+	st := &serverTester{
+		cs:        cs,
+		gateway:   g,
+		host:      h,
+		miner:     m,
+		renter:    r,
+		tpool:     tp,
+		wallet:    w,
+		walletKey: key,
+
+		server: srv,
+
+		dir: testdir,
+	}
+
+	// TODO: A more reasonable way of listening for server errors.
+	go func() {
+		listenErr := srv.Serve()
+		if listenErr != nil {
+			panic(listenErr)
+		}
+	}()
+	return st, nil
+}
+
+// TestHostDBScanOnlineOffline checks that both online and offline hosts get
+// scanned in the hostdb.
+func TestHostDBScanOnlineOffline(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestHostDBScanOnlineOffline")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost, err := blankServerTester("TestHostDBScanOnlineAndOffline-Host")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sts := []*serverTester{st, stHost}
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fundAllNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Announce the host.
+	err = stHost.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the host is visible.
+	var ah HostdbActiveGET
+	for i := 0; i < 50; i++ {
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			t.Fatal(err)
+		}
+		if len(ah.Hosts) == 1 {
+			break
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	if len(ah.Hosts) != 1 {
+		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
+	}
+	hostAddr := ah.Hosts[0].NetAddress
+
+	// Close the host and wait for a scan to knock the host out of the hostdb.
+	err = stHost.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = retry(60, time.Second, func() error {
+		if err := st.getAPI("/hostdb/active", &ah); err != nil {
+			return err
+		}
+		if len(ah.Hosts) == 0 {
+			return nil
+		}
+		return errors.New("host still in hostdb")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Reopen the host and wait for a scan to bring the host back into the
+	// hostdb.
+	stHost, err = assembleHostPort(stHost.walletKey, string(hostAddr), stHost.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sts[1] = stHost
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = retry(60, time.Second, func() error {
+		// Get the hostdb internals.
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			return err
+		}
+		if len(ah.Hosts) != 1 {
+			return fmt.Errorf("expected 1 host, got %v", len(ah.Hosts))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

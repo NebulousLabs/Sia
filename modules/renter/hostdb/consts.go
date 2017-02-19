@@ -7,25 +7,13 @@ import (
 )
 
 const (
-	// defaultScanSleep is the amount of time that the hostdb will sleep if it
-	// cannot successfully get a random number.
-	defaultScanSleep = 1*time.Hour + 37*time.Minute
-
 	// maxHostDowntime specifies the maximum amount of time that a host is
 	// allowed to be offline while still being in the hostdb.
 	maxHostDowntime = 30 * 24 * time.Hour
 
-	// maxScanSleep is the maximum amount of time that the hostdb will sleep
-	// between performing scans of the hosts.
-	maxScanSleep = 4 * time.Hour
-
 	// minScans specifies the number of scans that a host should have before the
 	// scans start getting compressed.
 	minScans = 20
-
-	// minScanSleep is the minimum amount of time that the hostdb will sleep
-	// between performing scans of the hosts.
-	minScanSleep = 1*time.Hour + 20*time.Minute
 
 	// maxSettingsLen indicates how long in bytes the host settings field is
 	// allowed to be before being ignored as a DoS attempt.
@@ -59,4 +47,30 @@ var (
 		Dev:      int(4),
 		Testing:  int(3),
 	}).(int)
+)
+
+var (
+	// defaultScanSleep is the amount of time that the hostdb will sleep if it
+	// cannot successfully get a random number.
+	defaultScanSleep = build.Select(build.Var{
+		Standard: time.Hour + time.Minute*37,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 15,
+	}).(time.Duration)
+
+	// maxScanSleep is the maximum amount of time that the hostdb will sleep
+	// between performing scans of the hosts.
+	maxScanSleep = build.Select(build.Var{
+		Standard: time.Hour * 4,
+		Dev:      time.Minute * 10,
+		Testing:  time.Second * 15,
+	}).(time.Duration)
+
+	// minScanSleep is the minimum amount of time that the hostdb will sleep
+	// between performing scans of the hosts.
+	minScanSleep = build.Select(build.Var{
+		Standard: time.Hour + time.Minute*20,
+		Dev:      time.Minute * 3,
+		Testing:  time.Second * 14,
+	}).(time.Duration)
 )
