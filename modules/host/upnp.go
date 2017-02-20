@@ -79,6 +79,7 @@ func (h *Host) managedLearnHostname() {
 	// no open contracts, there is no reason to notify anyone that the host's
 	// address has changed.
 	if hostAcceptingContracts || hostContractCount > 0 {
+		h.log.Println("Discovered that the external IP address has changed from", hostAutoAddress, "to", autoAddress, "- making a host new host announcement with the change.")
 		err = h.managedAnnounce(autoAddress)
 		if err != nil {
 			// Set h.announced to false, as the address has changed yet the
@@ -86,7 +87,7 @@ func (h *Host) managedLearnHostname() {
 			h.mu.Lock()
 			h.announced = false
 			h.mu.Unlock()
-			h.log.Debugln("unable to announce address after upnp-detected address change:", err)
+			h.log.Println("unable to announce address after upnp-detected address change:", err)
 		}
 	}
 }
