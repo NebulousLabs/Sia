@@ -53,7 +53,7 @@ type (
 
 	persister interface {
 		save(contractorPersist) error
-		update(...interface{}) error
+		update(...journalUpdate) error
 		load(*contractorPersist) error
 	}
 )
@@ -75,21 +75,19 @@ type stdPersist struct {
 	filename string
 }
 
-func (p stdPersist) save(data contractorPersist) error {
+func (p *stdPersist) save(data contractorPersist) error {
 	if p.journal == nil {
 		var err error
-		p.journal, err = openJournal(p.filename, data)
-		return err
+		p.journal, err = newJournal(p.filename)
+		if err != nil {
+			return err
+		}
 	}
 	return p.journal.checkpoint(data)
 }
 
-func (p *stdPersist) update(us ...interface{}) error {
-	var updates []journalUpdate
-	for i := 0; i < len(us); i += 2 {
-		updates = append(updates, newJournalUpdate(us[i].(string), us[i+1].(interface{})))
-	}
-	return p.journal.update(updates)
+func (p *stdPersist) update(us ...journalUpdate) error {
+	return p.journal.update(us)
 }
 
 func (p *stdPersist) load(data *contractorPersist) error {

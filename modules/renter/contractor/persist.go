@@ -1,7 +1,6 @@
 package contractor
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -129,12 +128,11 @@ func (c *Contractor) saveUploadRevision(id types.FileContractID) func(types.File
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		c.cachedRevisions[id] = cachedRevision{rev, newRoots}
-		path := "cachedRevisions." + id.String()
-		return c.persist.update(
-			path+".revision", rev,
+		return c.persist.update(updateCachedUploadRevision{
+			Revision: rev,
 			// only the last root is new
-			path+".merkleroots."+fmt.Sprint(len(newRoots)-1), newRoots[len(newRoots)-1],
-		)
+			SectorRoot: newRoots[len(newRoots)-1],
+		})
 	}
 }
 
@@ -146,7 +144,9 @@ func (c *Contractor) saveDownloadRevision(id types.FileContractID) func(types.Fi
 		defer c.mu.Unlock()
 		c.cachedRevisions[id] = cachedRevision{rev, newRoots}
 		// roots have not changed
-		return c.persist.update("cachedRevisions."+id.String()+".revision", rev)
+		return c.persist.update(updateCachedDownloadRevision{
+			Revision: rev,
+		})
 	}
 }
 
@@ -258,5 +258,6 @@ func loadv110persist(dir string, data *contractorPersist) error {
 		OldContracts:    oldPersist.OldContracts,
 		RenewedIDs:      oldPersist.RenewedIDs,
 	}
+
 	return nil
 }

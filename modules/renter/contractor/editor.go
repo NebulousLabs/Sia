@@ -2,7 +2,6 @@ package contractor
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -114,14 +113,12 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	}
 	he.contractor.mu.Lock()
 	he.contractor.contracts[contract.ID] = contract
-	cpath := fmt.Sprintf("contracts.%s", contract.ID.String())
-	he.contractor.persist.update(
-		cpath+".lastrevision", contract.LastRevision,
-		cpath+".lastrevisiontxn", contract.LastRevisionTxn,
-		cpath+".merkleroots."+fmt.Sprint(len(contract.MerkleRoots)-1), sectorRoot,
-		cpath+".uploadspending", contract.UploadSpending,
-		cpath+".storagespending", contract.StorageSpending,
-	)
+	he.contractor.persist.update(updateUploadRevision{
+		NewRevisionTxn:     contract.LastRevisionTxn,
+		NewSectorRoot:      sectorRoot,
+		NewUploadSpending:  contract.UploadSpending,
+		NewStorageSpending: contract.StorageSpending,
+	})
 	he.contractor.mu.Unlock()
 	he.contract = contract
 

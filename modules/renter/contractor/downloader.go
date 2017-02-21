@@ -2,7 +2,6 @@ package contractor
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -80,12 +79,10 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 
 	hd.contractor.mu.Lock()
 	hd.contractor.contracts[contract.ID] = contract
-	cpath := fmt.Sprintf("contracts.%s", contract.ID.String())
-	hd.contractor.persist.update(
-		cpath+".lastrevision", contract.LastRevision,
-		cpath+".lastrevisiontxn", contract.LastRevisionTxn,
-		cpath+".downloadspending", contract.DownloadSpending,
-	)
+	hd.contractor.persist.update(updateDownloadRevision{
+		NewRevisionTxn:      contract.LastRevisionTxn,
+		NewDownloadSpending: contract.DownloadSpending,
+	})
 	hd.contractor.mu.Unlock()
 
 	return sector, nil
