@@ -27,7 +27,6 @@ func TestHostDBHostsActiveHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestHostDBHostsActiveHandler")
 	if err != nil {
 		t.Fatal(err)
@@ -117,7 +116,6 @@ func TestHostDBHostsAllHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestHostDBHostsAllHandler")
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +147,6 @@ func TestHostDBHostsHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestHostDBHostsHandler")
 	if err != nil {
 		t.Fatal(err)
@@ -320,6 +317,7 @@ func TestHostDBScanOnlineOffline(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestHostDBScanOnlineOffline")
 	if err != nil {
 		t.Fatal(err)
