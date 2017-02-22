@@ -283,12 +283,14 @@ func (hdb *HostDB) threadedScan() {
 		// Grab a set of hosts to scan, grab hosts that are active, inactive,
 		// and offline to get high diversity.
 		var onlineHosts, offlineHosts []modules.HostDBEntry
-		for _, host := range hdb.hostTree.All() {
+		allHosts := hdb.hostTree.All()
+		for i := len(allHosts) - 1; i >= 0; i-- {
 			if len(onlineHosts) >= hostCheckupQuantity && len(offlineHosts) >= hostCheckupQuantity {
 				break
 			}
 
 			// Figure out if the host is online or offline.
+			host := allHosts[i]
 			online := len(host.ScanHistory) > 0 && host.ScanHistory[len(host.ScanHistory)-1].Success
 			if online && len(onlineHosts) < hostCheckupQuantity {
 				onlineHosts = append(onlineHosts, host)
