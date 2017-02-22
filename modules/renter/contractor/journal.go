@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -55,6 +56,35 @@ func (j *journal) update(us updateSet) error {
 // Checkpoint refreshes the journal with a new initial object. It syncs the
 // underlying file before returning.
 func (j *journal) checkpoint(data contractorPersist) error {
+	if build.DEBUG {
+		// Sanity check - applying the updates to the initial object should
+		// result in a contractorPersist that matches data.
+		var data2 contractorPersist
+		j2, err := openJournal(j.filename, &data2)
+		if err != nil {
+			panic("could not open journal for sanity check: " + err.Error())
+		}
+		for id, c := range data.CachedRevisions {
+			if c2, ok := data2.CachedRevisions[id]; !ok {
+				continue
+			} else if !reflect.DeepEqual(c.Revision, c2.Revision) {
+				panic("CachedRevision Revisions mismatch: " + fmt.Sprint(c.Revision, c2.Revision))
+			} else if !reflect.DeepEqual(c.MerkleRoots, c2.MerkleRoots) && (c.MerkleRoots == nil) == (c2.MerkleRoots == nil) {
+				panic("CachedRevision Merkle roots mismatch: " + fmt.Sprint(len(c.MerkleRoots), len(c2.MerkleRoots)))
+			}
+		}
+		for id, c := range data.Contracts {
+			if c2, ok := data2.Contracts[id]; !ok {
+				continue
+			} else if !reflect.DeepEqual(c.LastRevisionTxn, c2.LastRevisionTxn) {
+				panic("Contract Txns mismatch: " + fmt.Sprint(c.LastRevisionTxn, c2.LastRevisionTxn))
+			} else if !reflect.DeepEqual(c.MerkleRoots, c2.MerkleRoots) && (c.MerkleRoots == nil) == (c2.MerkleRoots == nil) {
+				panic("Contract Merkle roots mismatch: " + fmt.Sprint(len(c.MerkleRoots), len(c2.MerkleRoots)))
+			}
+		}
+		j2.Close()
+	}
+
 	// write to a new temp file
 	tmp, err := os.Create(j.filename + "_tmp")
 	if err != nil {
