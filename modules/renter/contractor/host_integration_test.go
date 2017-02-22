@@ -187,6 +187,7 @@ func TestIntegrationFormContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -214,6 +215,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -262,6 +264,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -325,6 +328,7 @@ func TestIntegrationDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -388,6 +392,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -448,6 +453,7 @@ func TestIntegrationModify(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -515,6 +521,7 @@ func TestIntegrationRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -642,6 +649,7 @@ func TestIntegrationResync(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -780,6 +788,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -873,6 +882,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -965,6 +975,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())

@@ -124,6 +124,12 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	return id
 }
 
+// Close closes the Contractor.
+func (c *Contractor) Close() error {
+	c.log.Close()
+	return c.persist.Close()
+}
+
 // New returns a new Contractor.
 func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, persistDir string) (*Contractor, error) {
 	// Check for nil inputs.

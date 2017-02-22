@@ -80,6 +80,9 @@ type hostContractor interface {
 	// Allowance returns the current allowance
 	Allowance() modules.Allowance
 
+	// Close closes the hostContractor.
+	Close() error
+
 	// Contract returns the latest contract formed with the specified host.
 	Contract(modules.NetAddress) (modules.RenterContract, bool)
 
@@ -220,7 +223,8 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 // Close closes the Renter and its dependencies
 func (r *Renter) Close() error {
 	r.tg.Stop()
-	return r.hostDB.Close()
+	r.hostDB.Close()
+	return r.hostContractor.Close()
 }
 
 // PriceEstimation estimates the cost in siacoins of performing various storage

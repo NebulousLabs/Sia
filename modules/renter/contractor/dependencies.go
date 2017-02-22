@@ -55,6 +55,7 @@ type (
 		save(contractorPersist) error
 		update(...journalUpdate) error
 		load(*contractorPersist) error
+		Close() error
 	}
 )
 
@@ -98,6 +99,10 @@ func (p *stdPersist) load(data *contractorPersist) error {
 		return loadv110persist(filepath.Dir(p.filename), data)
 	}
 	return err
+}
+
+func (p stdPersist) Close() error {
+	return p.journal.Close()
 }
 
 func newPersist(dir string) *stdPersist {
