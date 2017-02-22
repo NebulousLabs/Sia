@@ -290,13 +290,15 @@ func (u updateUploadRevision) apply(data *contractorPersist) {
 	}
 	rev := u.NewRevisionTxn.FileContractRevisions[0]
 	c := data.Contracts[rev.ParentID.String()]
-	if u.NewSectorIndex != len(c.MerkleRoots) {
-		build.Critical(fmt.Sprintf("bad sector index for %v: expected %v, got %v", rev.ParentID, len(c.MerkleRoots), u.NewSectorIndex))
-		return
-	}
 	c.LastRevisionTxn = u.NewRevisionTxn
 	c.LastRevision = rev
-	c.MerkleRoots = append(c.MerkleRoots, u.NewSectorRoot) // TODO: make this idempotent
+	if u.NewSectorIndex == len(c.MerkleRoots) {
+		c.MerkleRoots = append(c.MerkleRoots, u.NewSectorRoot)
+	} else if u.NewSectorIndex < len(c.MerkleRoots) {
+		c.MerkleRoots[u.NewSectorIndex] = u.NewSectorRoot
+	} else {
+		// shouldn't happen
+	}
 	c.UploadSpending = u.NewUploadSpending
 	c.StorageSpending = u.NewStorageSpending
 	data.Contracts[rev.ParentID.String()] = c
@@ -337,12 +339,14 @@ type updateCachedUploadRevision struct {
 // contract being revised, as well as the Merkle root of the new sector.
 func (u updateCachedUploadRevision) apply(data *contractorPersist) {
 	c := data.CachedRevisions[u.Revision.ParentID.String()]
-	if u.SectorIndex != len(c.MerkleRoots) {
-		build.Critical(fmt.Sprintf("bad sector index for %v: expected %v, got %v", u.Revision.ParentID, len(c.MerkleRoots), u.SectorIndex))
-		return
-	}
 	c.Revision = u.Revision
-	c.MerkleRoots = append(c.MerkleRoots, u.SectorRoot)
+	if u.SectorIndex == len(c.MerkleRoots) {
+		c.MerkleRoots = append(c.MerkleRoots, u.SectorRoot)
+	} else if u.SectorIndex < len(c.MerkleRoots) {
+		c.MerkleRoots[u.SectorIndex] = u.SectorRoot
+	} else {
+		// shouldn't happen
+	}
 	data.CachedRevisions[u.Revision.ParentID.String()] = c
 }
 
