@@ -68,9 +68,8 @@ type walletBridge struct {
 func (ws *walletBridge) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
 func (ws *walletBridge) StartTransaction() transactionBuilder         { return ws.w.StartTransaction() }
 
-// stdPersist implements the persister interface via jj.OpenJournal and
-// jj.CheckPoint. The filename required by these functions is internal to
-// stdPersist.
+// stdPersist implements the persister interface via the journal type. The
+// filename required by these functions is internal to stdPersist.
 type stdPersist struct {
 	journal  *journal
 	filename string

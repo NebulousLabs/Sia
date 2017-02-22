@@ -71,8 +71,6 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 		return modules.RenterContract{}, err
 	}
 
-	c.cachedRevisions[newContract.ID] = cachedRevision{newContract.LastRevision, newContract.MerkleRoots}
-
 	return newContract, nil
 }
 

@@ -34,7 +34,7 @@ import (
 
 var journalMeta = persist.Metadata{
 	Header:  "Contractor Journal",
-	Version: "1.0.0",
+	Version: "1.1.1",
 }
 
 // A journal is a log of updates to a JSON object.
@@ -105,7 +105,12 @@ func newJournal(filename string) (*journal, error) {
 		return nil, err
 	}
 	// write empty contractorPersist
-	if err := enc.Encode(contractorPersist{}); err != nil {
+	initObj := contractorPersist{
+		CachedRevisions: map[string]cachedRevision{},
+		Contracts:       map[string]modules.RenterContract{},
+		RenewedIDs:      map[string]string{},
+	}
+	if err := enc.Encode(initObj); err != nil {
 		return nil, err
 	}
 	if err := f.Sync(); err != nil {
@@ -128,8 +133,10 @@ func openJournal(filename string, data *contractorPersist) (*journal, error) {
 	var meta persist.Metadata
 	if err = dec.Decode(&meta); err != nil {
 		return nil, err
+	} else if meta.Header != journalMeta.Header {
+		return nil, fmt.Errorf("expected header %q, got %q", journalMeta.Header, meta.Header)
 	} else if meta.Version != journalMeta.Version {
-		return nil, errors.New("incompatible version")
+		return nil, fmt.Errorf("journal version (%s) is incompatible with the current version (%s)", meta.Version, journalMeta.Version)
 	}
 
 	// decode the initial object
@@ -174,9 +181,9 @@ type journalUpdate interface {
 }
 
 type marshaledUpdate struct {
-	Type     string      `json:"t"`
-	Data     rawJSON     `json:"d"`
-	Checksum crypto.Hash `json:"c"`
+	Type     string      `json:"type"`
+	Data     rawJSON     `json:"data"`
+	Checksum crypto.Hash `json:"checksum"`
 }
 
 // TODO: replace with json.RawMessage after upgrading to Go 1.8
@@ -201,6 +208,8 @@ func (r *rawJSON) UnmarshalJSON(data []byte) error {
 
 type updateSet []journalUpdate
 
+// MarshalJSON marshals a set of journalUpdates as an array of
+// marshaledUpdates.
 func (set updateSet) MarshalJSON() ([]byte, error) {
 	marshaledSet := make([]marshaledUpdate, len(set))
 	for i, u := range set {
@@ -224,6 +233,8 @@ func (set updateSet) MarshalJSON() ([]byte, error) {
 	return json.Marshal(marshaledSet)
 }
 
+// UnmarshalJSON unmarshals an array of marshaledUpdates as a set of
+// journalUpdates.
 func (set *updateSet) UnmarshalJSON(b []byte) error {
 	var marshaledSet []marshaledUpdate
 	if err := json.Unmarshal(b, &marshaledSet); err != nil {
@@ -259,6 +270,8 @@ func (set *updateSet) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// updateUploadRevision is a journalUpdate that records the new data
+// associated with uploading a sector to a host.
 type updateUploadRevision struct {
 	NewRevisionTxn     types.Transaction `json:"newrevisiontxn"`
 	NewSectorRoot      crypto.Hash       `json:"newsectorroot"`
@@ -267,6 +280,9 @@ type updateUploadRevision struct {
 	NewStorageSpending types.Currency    `json:"newstoragespending"`
 }
 
+// apply sets the LastRevision, LastRevisionTxn, UploadSpending, and
+// DownloadSpending fields of the contract being revised. It also adds the new
+// Merkle root to the contract's Merkle root set.
 func (u updateUploadRevision) apply(data *contractorPersist) {
 	if len(u.NewRevisionTxn.FileContractRevisions) == 0 {
 		build.Critical("updateUploadRevision is missing its FileContractRevision")
@@ -286,11 +302,15 @@ func (u updateUploadRevision) apply(data *contractorPersist) {
 	data.Contracts[rev.ParentID.String()] = c
 }
 
+// updateUploadRevision is a journalUpdate that records the new data
+// associated with downloading a sector from a host.
 type updateDownloadRevision struct {
 	NewRevisionTxn      types.Transaction `json:"newrevisiontxn"`
 	NewDownloadSpending types.Currency    `json:"newdownloadspending"`
 }
 
+// apply sets the LastRevision, LastRevisionTxn, and DownloadSpending fields
+// of the contract being revised.
 func (u updateDownloadRevision) apply(data *contractorPersist) {
 	if len(u.NewRevisionTxn.FileContractRevisions) == 0 {
 		build.Critical("updateDownloadRevision is missing its FileContractRevision")
@@ -304,12 +324,17 @@ func (u updateDownloadRevision) apply(data *contractorPersist) {
 	data.Contracts[rev.ParentID.String()] = c
 }
 
+// updateCachedUploadRevision is a journalUpdate that records the unsigned
+// revision sent to the host during a sector upload, along with the Merkle
+// root of the new sector.
 type updateCachedUploadRevision struct {
 	Revision    types.FileContractRevision `json:"revision"`
 	SectorRoot  crypto.Hash                `json:"sectorroot"`
 	SectorIndex int                        `json:"sectorindex"`
 }
 
+// apply sets the Revision field of the cachedRevision associated with the
+// contract being revised, as well as the Merkle root of the new sector.
 func (u updateCachedUploadRevision) apply(data *contractorPersist) {
 	c := data.CachedRevisions[u.Revision.ParentID.String()]
 	if u.SectorIndex != len(c.MerkleRoots) {
@@ -321,10 +346,14 @@ func (u updateCachedUploadRevision) apply(data *contractorPersist) {
 	data.CachedRevisions[u.Revision.ParentID.String()] = c
 }
 
+// updateCachedDownloadRevision is a journalUpdate that records the unsigned
+// revision sent to the host during a sector download.
 type updateCachedDownloadRevision struct {
 	Revision types.FileContractRevision `json:"revision"`
 }
 
+// apply sets the Revision field of the cachedRevision associated with the
+// contract being revised.
 func (u updateCachedDownloadRevision) apply(data *contractorPersist) {
 	c := data.CachedRevisions[u.Revision.ParentID.String()]
 	c.Revision = u.Revision
