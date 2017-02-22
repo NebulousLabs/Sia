@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -42,11 +43,14 @@ var journalMeta = persist.Metadata{
 type journal struct {
 	f        *os.File
 	filename string
+	mu       sync.Mutex
 }
 
 // update applies the updateSet atomically to j. It syncs the underlying file
 // before returning.
 func (j *journal) update(us updateSet) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
 	if err := json.NewEncoder(j.f).Encode(us); err != nil {
 		return err
 	}
@@ -56,6 +60,8 @@ func (j *journal) update(us updateSet) error {
 // Checkpoint refreshes the journal with a new initial object. It syncs the
 // underlying file before returning.
 func (j *journal) checkpoint(data contractorPersist) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
 	if build.DEBUG {
 		// Sanity check - applying the updates to the initial object should
 		// result in a contractorPersist that matches data.
@@ -119,6 +125,8 @@ func (j *journal) checkpoint(data contractorPersist) error {
 
 // Close closes the underlying file.
 func (j *journal) Close() error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
 	return j.f.Close()
 }
 
