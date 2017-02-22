@@ -128,13 +128,11 @@ func openJournal(filename string, data *contractorPersist) (*journal, error) {
 	for {
 		var set updateSet
 		if err = dec.Decode(&set); err == io.EOF || err == io.ErrUnexpectedEOF {
-			// unexpected EOF means the last update was corrupted
+			// unexpected EOF means the last update was corrupted; skip it
 			break
-		} else if _, ok := err.(*json.SyntaxError); ok {
-			// skip malformed update sets
-			continue
 		} else if err != nil {
-			return nil, err
+			// skip corrupted update sets
+			continue
 		}
 		for _, u := range set {
 			u.apply(data)
@@ -152,8 +150,9 @@ type journalUpdate interface {
 }
 
 type marshaledUpdate struct {
-	Type string  `json:"t"`
-	Data rawJSON `json:"d"`
+	Type     string      `json:"t"`
+	Data     rawJSON     `json:"d"`
+	Checksum crypto.Hash `json:"c"`
 }
 
 // TODO: replace with json.RawMessage after upgrading to Go 1.8
@@ -172,7 +171,7 @@ func (r *rawJSON) UnmarshalJSON(data []byte) error {
 	if r == nil {
 		return errors.New("rawJSON: UnmarshalJSON on nil pointer")
 	}
-	*r = append((*r)[0:0], data...)
+	*r = append((*r)[:0], data...)
 	return nil
 }
 
@@ -186,6 +185,7 @@ func (set updateSet) MarshalJSON() ([]byte, error) {
 			build.Critical("failed to marshal known type:", err)
 		}
 		marshaledSet[i].Data = data
+		marshaledSet[i].Checksum = crypto.HashBytes(data)
 		switch u.(type) {
 		case updateUploadRevision:
 			marshaledSet[i].Type = "uploadRevision"
@@ -206,6 +206,9 @@ func (set *updateSet) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	for _, u := range marshaledSet {
+		if crypto.HashBytes(u.Data) != u.Checksum {
+			return errors.New("bad checksum")
+		}
 		var err error
 		switch u.Type {
 		case "uploadRevision":

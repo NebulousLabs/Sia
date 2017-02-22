@@ -92,7 +92,7 @@ func TestJournalMalformed(t *testing.T) {
 
 	// write a partially-malformed log
 	f.WriteString(`{"cachedrevisions":{}}
-[{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"1000000000000000000000000000000000000000000000000000000000000000"}}}]
+[{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"1000000000000000000000000000000000000000000000000000000000000000"}},"c":"24cf20c26569ade37fc8948532bbcb113f8550d00ee01ab530026f44f4d6f1b4"}]
 [{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"2000000000000000000000000000000000000000000000000000000000000000"
 `)
 	f.Close()
@@ -109,13 +109,36 @@ func TestJournalMalformed(t *testing.T) {
 	if _, ok := data.CachedRevisions["1000000000000000000000000000000000000000000000000000000000000000"]; !ok {
 		t.Fatal("log was not applied correctly:", data)
 	}
+
+	// write a log with a bad checksum
+	f, cleanup = tempFile(t, "TestJournalMalformed2")
+	defer cleanup()
+
+	// write a partially-malformed log
+	f.WriteString(`{"cachedrevisions":{}}
+[{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"1000000000000000000000000000000000000000000000000000000000000000"}},"c":"24cf20c26569ade37fc8948532bbcb113f8550d00ee01ab530026f44f4d6f1b4"}]
+[{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"2000000000000000000000000000000000000000000000000000000000000000"}},"c":"bad checksum"}]
+`)
+	f.Close()
+
+	// load log
+	j, err = openJournal(f.Name(), &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	j.Close()
+
+	// the last update set should have been discarded
+	if _, ok := data.CachedRevisions["1000000000000000000000000000000000000000000000000000000000000000"]; !ok {
+		t.Fatal("log was not applied correctly:", data)
+	}
+
 }
 
 func BenchmarkUpdateJournal(b *testing.B) {
-	f, cleanup := tempFile(b, "BenchmarkUpdateJournal")
+	j, cleanup := tempJournal(b, "BenchmarkUpdateJournal")
 	defer cleanup()
 
-	j := &journal{f: f}
 	us := updateSet{
 		updateCachedUploadRevision{
 			Revision: types.FileContractRevision{
