@@ -21,6 +21,7 @@ package contractor
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -261,16 +262,22 @@ func (set *updateSet) UnmarshalJSON(b []byte) error {
 type updateUploadRevision struct {
 	NewRevisionTxn     types.Transaction `json:"newrevisiontxn"`
 	NewSectorRoot      crypto.Hash       `json:"newsectorroot"`
+	NewSectorIndex     int               `json:"newsectorindex"`
 	NewUploadSpending  types.Currency    `json:"newuploadspending"`
 	NewStorageSpending types.Currency    `json:"newstoragespending"`
 }
 
 func (u updateUploadRevision) apply(data *contractorPersist) {
 	if len(u.NewRevisionTxn.FileContractRevisions) == 0 {
-		return // shouldn't happen
+		build.Critical("updateUploadRevision is missing its FileContractRevision")
+		return
 	}
 	rev := u.NewRevisionTxn.FileContractRevisions[0]
 	c := data.Contracts[rev.ParentID.String()]
+	if u.NewSectorIndex != len(c.MerkleRoots) {
+		build.Critical(fmt.Sprintf("bad sector index for %v: expected %v, got %v", rev.ParentID, len(c.MerkleRoots), u.NewSectorIndex))
+		return
+	}
 	c.LastRevisionTxn = u.NewRevisionTxn
 	c.LastRevision = rev
 	c.MerkleRoots = append(c.MerkleRoots, u.NewSectorRoot) // TODO: make this idempotent
@@ -286,7 +293,8 @@ type updateDownloadRevision struct {
 
 func (u updateDownloadRevision) apply(data *contractorPersist) {
 	if len(u.NewRevisionTxn.FileContractRevisions) == 0 {
-		return // shouldn't happen
+		build.Critical("updateDownloadRevision is missing its FileContractRevision")
+		return
 	}
 	rev := u.NewRevisionTxn.FileContractRevisions[0]
 	c := data.Contracts[rev.ParentID.String()]
@@ -297,14 +305,19 @@ func (u updateDownloadRevision) apply(data *contractorPersist) {
 }
 
 type updateCachedUploadRevision struct {
-	Revision   types.FileContractRevision `json:"revision"`
-	SectorRoot crypto.Hash                `json:"sectorroot"`
+	Revision    types.FileContractRevision `json:"revision"`
+	SectorRoot  crypto.Hash                `json:"sectorroot"`
+	SectorIndex int                        `json:"sectorindex"`
 }
 
 func (u updateCachedUploadRevision) apply(data *contractorPersist) {
 	c := data.CachedRevisions[u.Revision.ParentID.String()]
+	if u.SectorIndex != len(c.MerkleRoots) {
+		build.Critical(fmt.Sprintf("bad sector index for %v: expected %v, got %v", u.Revision.ParentID, len(c.MerkleRoots), u.SectorIndex))
+		return
+	}
 	c.Revision = u.Revision
-	c.MerkleRoots = append(c.MerkleRoots, u.SectorRoot) // TODO: make this idempotent
+	c.MerkleRoots = append(c.MerkleRoots, u.SectorRoot)
 	data.CachedRevisions[u.Revision.ParentID.String()] = c
 }
 

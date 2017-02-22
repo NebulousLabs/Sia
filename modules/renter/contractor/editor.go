@@ -116,6 +116,7 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	he.contractor.persist.update(updateUploadRevision{
 		NewRevisionTxn:     contract.LastRevisionTxn,
 		NewSectorRoot:      sectorRoot,
+		NewSectorIndex:     len(contract.MerkleRoots) - 1,
 		NewUploadSpending:  contract.UploadSpending,
 		NewStorageSpending: contract.StorageSpending,
 	})

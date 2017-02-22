@@ -131,7 +131,8 @@ func (c *Contractor) saveUploadRevision(id types.FileContractID) func(types.File
 		return c.persist.update(updateCachedUploadRevision{
 			Revision: rev,
 			// only the last root is new
-			SectorRoot: newRoots[len(newRoots)-1],
+			SectorRoot:  newRoots[len(newRoots)-1],
+			SectorIndex: len(newRoots) - 1,
 		})
 	}
 }
