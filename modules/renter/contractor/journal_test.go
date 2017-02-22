@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -86,53 +87,59 @@ func TestJournalCheckpoint(t *testing.T) {
 	}
 }
 
-func TestJournalMalformed(t *testing.T) {
-	f, cleanup := tempFile(t, "TestJournalMalformed")
+func TestJournalMalformedJSON(t *testing.T) {
+	j, cleanup := tempJournal(t, "TestJournalMalformed")
 	defer cleanup()
 
-	// write a partially-malformed log
-	f.WriteString(`{"cachedrevisions":{}}
-[{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"1000000000000000000000000000000000000000000000000000000000000000"}},"c":"24cf20c26569ade37fc8948532bbcb113f8550d00ee01ab530026f44f4d6f1b4"}]
-[{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"2000000000000000000000000000000000000000000000000000000000000000"
-`)
-	f.Close()
+	// write a valid update
+	err := j.update(updateSet{updateCachedDownloadRevision{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// write a partially-malformed update
+	j.f.WriteString(`[{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"1000000000000000000000000000000000000000000000000000000000000000"`)
 
 	// load log
 	var data contractorPersist
-	j, err := openJournal(f.Name(), &data)
+	j, err = openJournal(j.filename, &data)
 	if err != nil {
 		t.Fatal(err)
 	}
 	j.Close()
 
 	// the last update set should have been discarded
-	if _, ok := data.CachedRevisions["1000000000000000000000000000000000000000000000000000000000000000"]; !ok {
-		t.Fatal("log was not applied correctly:", data)
+	if _, ok := data.CachedRevisions[crypto.Hash{}.String()]; !ok {
+		t.Fatal("log was not applied correctly:", data.CachedRevisions)
 	}
+}
 
-	// write a log with a bad checksum
-	f, cleanup = tempFile(t, "TestJournalMalformed2")
+func TestJournalBadChecksum(t *testing.T) {
+	// test bad checksum
+	j, cleanup := tempJournal(t, "TestJournalMalformed2")
 	defer cleanup()
 
-	// write a partially-malformed log
-	f.WriteString(`{"cachedrevisions":{}}
-[{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"1000000000000000000000000000000000000000000000000000000000000000"}},"c":"24cf20c26569ade37fc8948532bbcb113f8550d00ee01ab530026f44f4d6f1b4"}]
-[{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"2000000000000000000000000000000000000000000000000000000000000000"}},"c":"bad checksum"}]
-`)
-	f.Close()
+	// write a valid update
+	err := j.update(updateSet{updateCachedDownloadRevision{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// write an update with a bad checksum
+	j.f.WriteString(`[{"t":"cachedDownloadRevision","d":{"revision":{"parentid":"2000000000000000000000000000000000000000000000000000000000000000"}},"c":"bad checksum"}]`)
 
 	// load log
-	j, err = openJournal(f.Name(), &data)
+	var data contractorPersist
+	j, err = openJournal(j.filename, &data)
 	if err != nil {
 		t.Fatal(err)
 	}
 	j.Close()
 
 	// the last update set should have been discarded
-	if _, ok := data.CachedRevisions["1000000000000000000000000000000000000000000000000000000000000000"]; !ok {
+	if _, ok := data.CachedRevisions[crypto.Hash{}.String()]; !ok {
 		t.Fatal("log was not applied correctly:", data)
 	}
-
 }
 
 func BenchmarkUpdateJournal(b *testing.B) {

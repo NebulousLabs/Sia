@@ -27,8 +27,14 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+var journalMeta = persist.Metadata{
+	Header:  "Contractor Journal",
+	Version: "1.0.0",
+}
 
 // A journal is a log of updates to a JSON object.
 type journal struct {
@@ -53,7 +59,11 @@ func (j *journal) checkpoint(data contractorPersist) error {
 	if err != nil {
 		return err
 	}
-	if err := json.NewEncoder(tmp).Encode(data); err != nil {
+	enc := json.NewEncoder(tmp)
+	if err := enc.Encode(journalMeta); err != nil {
+		return err
+	}
+	if err := enc.Encode(data); err != nil {
 		return err
 	}
 	if err := tmp.Sync(); err != nil {
@@ -88,8 +98,13 @@ func newJournal(filename string) (*journal, error) {
 	if err != nil {
 		return nil, err
 	}
-	var initObj contractorPersist
-	if err := json.NewEncoder(f).Encode(initObj); err != nil {
+	// write metadata
+	enc := json.NewEncoder(f)
+	if err := enc.Encode(journalMeta); err != nil {
+		return nil, err
+	}
+	// write empty contractorPersist
+	if err := enc.Encode(contractorPersist{}); err != nil {
 		return nil, err
 	}
 	if err := f.Sync(); err != nil {
@@ -107,8 +122,16 @@ func openJournal(filename string, data *contractorPersist) (*journal, error) {
 		return nil, err
 	}
 
-	// decode the initial object
+	// decode metadata
 	dec := json.NewDecoder(f)
+	var meta persist.Metadata
+	if err = dec.Decode(&meta); err != nil {
+		return nil, err
+	} else if meta.Version != journalMeta.Version {
+		return nil, errors.New("incompatible version")
+	}
+
+	// decode the initial object
 	if err = dec.Decode(data); err != nil {
 		return nil, err
 	}
