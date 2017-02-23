@@ -151,7 +151,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	}
 
 	// Spin up the host scanning processes.
-	if build.Release != "testing" {
+	if build.Release == "standard" {
 		go hdb.threadedOnlineCheck()
 	} else {
 		// During testing, the hostdb is just always assumed to be online, since
