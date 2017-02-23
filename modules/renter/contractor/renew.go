@@ -180,6 +180,9 @@ func (c *Contractor) managedRenewContracts() error {
 		c.contracts[contract.ID] = contract
 		// add a mapping from old->new contract
 		c.renewedIDs[oldID] = contract.ID
+		// move the cachedRevision entry to the new ID
+		c.cachedRevisions[contract.ID] = c.cachedRevisions[oldID]
+		delete(c.cachedRevisions, oldID)
 	}
 	err = c.saveSync()
 	c.mu.Unlock()
