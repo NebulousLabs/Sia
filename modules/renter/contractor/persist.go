@@ -140,11 +140,13 @@ func (c *Contractor) saveUploadRevision(id types.FileContractID) func(types.File
 // saveDownloadRevision returns a function that saves an upload revision. It
 // is used by the Downloader type to prevent desynchronizing with the host.
 func (c *Contractor) saveDownloadRevision(id types.FileContractID) func(types.FileContractRevision, []crypto.Hash) error {
-	return func(rev types.FileContractRevision, newRoots []crypto.Hash) error {
+	return func(rev types.FileContractRevision, _ []crypto.Hash) error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		c.cachedRevisions[id] = cachedRevision{rev, newRoots}
 		// roots have not changed
+		cr := c.cachedRevisions[id]
+		cr.Revision = rev
+		c.cachedRevisions[id] = cr
 		return c.persist.update(updateCachedDownloadRevision{
 			Revision: rev,
 		})
