@@ -12,6 +12,12 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var hostPriceLeeway = build.Select(build.Var{
+	Dev:      0.05,
+	Standard: 0.002,
+	Testing:  0.002,
+}).(float64)
+
 var (
 	// sectorHeight is the height of a Merkle tree that covers a single
 	// sector. It is log2(modules.SectorSize / crypto.SegmentSize)
@@ -115,9 +121,9 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 	// price and collateral by 0.2%. This is only applied to hosts above
 	// v1.0.1; older hosts use stricter math.
 	if build.VersionCmp(he.host.Version, "1.0.1") > 0 {
-		sectorStoragePrice = sectorStoragePrice.MulFloat(1.002)
-		sectorBandwidthPrice = sectorBandwidthPrice.MulFloat(1.002)
-		sectorCollateral = sectorCollateral.MulFloat(0.998)
+		sectorStoragePrice = sectorStoragePrice.MulFloat(1 + hostPriceLeeway)
+		sectorBandwidthPrice = sectorBandwidthPrice.MulFloat(1 + hostPriceLeeway)
+		sectorCollateral = sectorCollateral.MulFloat(1 - hostPriceLeeway)
 	}
 
 	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)

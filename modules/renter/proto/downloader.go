@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -31,6 +32,12 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	sectorPrice := hd.host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
 	if hd.contract.RenterFunds().Cmp(sectorPrice) < 0 {
 		return modules.RenterContract{}, nil, errors.New("contract has insufficient funds to support download")
+	}
+	// to mitigate small errors (e.g. differing block heights), fudge the
+	// price and collateral by 0.2%. This is only applied to hosts above
+	// v1.0.1; older hosts use stricter math.
+	if build.VersionCmp(hd.host.Version, "1.0.1") > 0 {
+		sectorPrice = sectorPrice.MulFloat(1 + hostPriceLeeway)
 	}
 
 	// create the download revision
