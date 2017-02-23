@@ -130,9 +130,8 @@ func (j *journal) Close() error {
 	return j.f.Close()
 }
 
-// newJournal creates a new journal, using an empty contractorPersist as the
-// initial object.
-func newJournal(filename string) (*journal, error) {
+// newJournal creates a new journal, using data as the initial object.
+func newJournal(filename string, data contractorPersist) (*journal, error) {
 	f, err := os.Create(filename)
 	if err != nil {
 		return nil, err
@@ -142,13 +141,8 @@ func newJournal(filename string) (*journal, error) {
 	if err := enc.Encode(journalMeta); err != nil {
 		return nil, err
 	}
-	// write empty contractorPersist
-	initObj := contractorPersist{
-		CachedRevisions: map[string]cachedRevision{},
-		Contracts:       map[string]modules.RenterContract{},
-		RenewedIDs:      map[string]string{},
-	}
-	if err := enc.Encode(initObj); err != nil {
+	// write initial object
+	if err := enc.Encode(data); err != nil {
 		return nil, err
 	}
 	if err := f.Sync(); err != nil {

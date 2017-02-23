@@ -28,7 +28,7 @@ func tempFile(t interface {
 func tempJournal(t interface {
 	Fatal(...interface{})
 }, name string) (*journal, func()) {
-	j, err := newJournal(filepath.Join(build.TempDir("contractor", name)))
+	j, err := newJournal(filepath.Join(build.TempDir("contractor", name)), contractorPersist{})
 	if err != nil {
 		t.Fatal(err)
 	}

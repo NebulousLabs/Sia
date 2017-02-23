@@ -78,10 +78,8 @@ type stdPersist struct {
 func (p *stdPersist) save(data contractorPersist) error {
 	if p.journal == nil {
 		var err error
-		p.journal, err = newJournal(p.filename)
-		if err != nil {
-			return err
-		}
+		p.journal, err = newJournal(p.filename, data)
+		return err
 	}
 	return p.journal.checkpoint(data)
 }
@@ -95,7 +93,11 @@ func (p *stdPersist) load(data *contractorPersist) error {
 	p.journal, err = openJournal(p.filename, data)
 	if err != nil {
 		// try loading old persist
-		return loadv110persist(filepath.Dir(p.filename), data)
+		err = loadv110persist(filepath.Dir(p.filename), data)
+		if err != nil {
+			return err
+		}
+		p.journal, err = newJournal(p.filename, *data)
 	}
 	return err
 }
