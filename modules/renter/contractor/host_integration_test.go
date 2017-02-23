@@ -443,10 +443,8 @@ func TestIntegrationInsertDelete(t *testing.T) {
 // TestIntegrationModify tests that the contractor can modify a previously-
 // uploaded sector.
 func TestIntegrationModify(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
+	t.Skip("modification is deprecated")
+
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationModify")
 	if err != nil {
