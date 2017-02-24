@@ -98,6 +98,15 @@ func (cs *chunkStatus) numGaps(rs *repairState) int {
 // addFileToRepairState will take a file and add each of the incomplete chunks
 // to the repair state, along with data about which pieces need attention.
 func (r *Renter) addFileToRepairState(rs *repairState, file *file) {
+	// Check that the file is being tracked, and therefor candidate for repair.
+	file.mu.Lock()
+	_, exists := r.tracking[file.name]
+	file.mu.Unlock()
+	if !exists {
+		// File is not being tracked, don't add it to the repair state.
+		return
+	}
+
 	// Fetch the list of potential contracts from the repair state.
 	contracts := make([]types.FileContractID, 0)
 	for contract := range rs.activeWorkers {
@@ -449,7 +458,7 @@ func (r *Renter) threadedQueueRepairs() {
 		}
 		r.mu.RUnlock(id)
 
-		// Add files one at a time.
+		// Add files.
 		for _, file := range files {
 			// Send the file down the repair channel.
 			select {
@@ -457,19 +466,12 @@ func (r *Renter) threadedQueueRepairs() {
 			case <-r.tg.StopChan():
 				return
 			}
-
-			// Wait 5 seconds before going to the next file.
-			select {
-			case <-time.After(time.Second * 5):
-			case <-r.tg.StopChan():
-				return
-			}
 		}
 
-		// Chill out for an extra 5 minutes before going through the files
+		// Chill out for an extra 15 minutes before going through the files
 		// again.
 		select {
-		case <-time.After(time.Minute * 5):
+		case <-time.After(time.Minute * 15):
 		case <-r.tg.StopChan():
 			return
 		}
