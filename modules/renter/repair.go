@@ -458,7 +458,7 @@ func (r *Renter) threadedQueueRepairs() {
 		}
 		r.mu.RUnlock(id)
 
-		// Add files one at a time.
+		// Add files.
 		for _, file := range files {
 			// Send the file down the repair channel.
 			select {
@@ -466,19 +466,12 @@ func (r *Renter) threadedQueueRepairs() {
 			case <-r.tg.StopChan():
 				return
 			}
-
-			// Wait 5 seconds before going to the next file.
-			select {
-			case <-time.After(time.Second * 5):
-			case <-r.tg.StopChan():
-				return
-			}
 		}
 
-		// Chill out for an extra 5 minutes before going through the files
+		// Chill out for an extra 15 minutes before going through the files
 		// again.
 		select {
-		case <-time.After(time.Minute * 5):
+		case <-time.After(time.Minute * 15):
 		case <-r.tg.StopChan():
 			return
 		}
