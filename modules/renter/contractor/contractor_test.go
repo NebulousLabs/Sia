@@ -1,10 +1,7 @@
 package contractor
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -73,13 +70,6 @@ func TestNew(t *testing.T) {
 	if !os.IsNotExist(err) {
 		t.Fatalf("expected invalid directory, got %v", err)
 	}
-
-	// Corrupted persist file.
-	ioutil.WriteFile(filepath.Join(dir, "contractor.json"), []byte{1, 2, 3}, 0666)
-	_, err = New(stub, stub, stub, stub, dir)
-	if _, ok := err.(*json.SyntaxError); !ok {
-		t.Fatalf("expected invalid json, got %v", err)
-	}
 }
 
 // TestContract tests the Contract method.
@@ -124,7 +114,7 @@ func TestContract(t *testing.T) {
 // TestContracts tests the Contracts method.
 func TestContracts(t *testing.T) {
 	var stub newStub
-	dir := build.TempDir("contractor", "TestNew")
+	dir := build.TempDir("contractor", "TestContracts")
 	c, err := New(stub, stub, stub, stub, dir)
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)

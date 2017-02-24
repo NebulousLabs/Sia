@@ -113,7 +113,13 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	}
 	he.contractor.mu.Lock()
 	he.contractor.contracts[contract.ID] = contract
-	he.contractor.saveSync()
+	he.contractor.persist.update(updateUploadRevision{
+		NewRevisionTxn:     contract.LastRevisionTxn,
+		NewSectorRoot:      sectorRoot,
+		NewSectorIndex:     len(contract.MerkleRoots) - 1,
+		NewUploadSpending:  contract.UploadSpending,
+		NewStorageSpending: contract.StorageSpending,
+	})
 	he.contractor.mu.Unlock()
 	he.contract = contract
 
@@ -254,7 +260,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 	}
 	// supply a SaveFn that saves the revision to the contractor's persist
 	// (the existing revision will be overwritten when SaveFn is called)
-	e.SaveFn = c.saveRevision(contract.ID)
+	e.SaveFn = c.saveUploadRevision(contract.ID)
 
 	// cache editor
 	he := &hostEditor{

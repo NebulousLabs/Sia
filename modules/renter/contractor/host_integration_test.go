@@ -187,6 +187,7 @@ func TestIntegrationFormContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -214,6 +215,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -262,6 +264,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -317,16 +320,15 @@ func TestIntegrationUploadDownload(t *testing.T) {
 // TestIntegrationDelete tests that the contractor can delete a sector from a
 // contract previously formed with a host.
 func TestIntegrationDelete(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
+	t.Skip("deletion is deprecated")
+
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationDelete")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -382,16 +384,15 @@ func TestIntegrationDelete(t *testing.T) {
 // TestIntegrationInsertDelete tests that the contractor can insert and delete
 // a sector during the same revision.
 func TestIntegrationInsertDelete(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
+	t.Skip("deletion is deprecated")
+
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationInsertDelete")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -442,16 +443,15 @@ func TestIntegrationInsertDelete(t *testing.T) {
 // TestIntegrationModify tests that the contractor can modify a previously-
 // uploaded sector.
 func TestIntegrationModify(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
+	t.Skip("modification is deprecated")
+
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationModify")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -519,6 +519,7 @@ func TestIntegrationRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -646,6 +647,7 @@ func TestIntegrationResync(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -784,6 +786,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -877,6 +880,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())
@@ -969,6 +973,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.PublicKey())

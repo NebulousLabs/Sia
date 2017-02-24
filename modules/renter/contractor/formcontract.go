@@ -113,7 +113,6 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 
 	contractValue := contract.RenterFunds()
 	c.log.Printf("Formed contract with %v for %v SC", host.NetAddress, contractValue.Div(types.SiacoinPrecision))
-
 	return contract, nil
 }
 

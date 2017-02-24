@@ -79,7 +79,10 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 
 	hd.contractor.mu.Lock()
 	hd.contractor.contracts[contract.ID] = contract
-	hd.contractor.saveSync()
+	hd.contractor.persist.update(updateDownloadRevision{
+		NewRevisionTxn:      contract.LastRevisionTxn,
+		NewDownloadSpending: contract.DownloadSpending,
+	})
 	hd.contractor.mu.Unlock()
 
 	return sector, nil
@@ -190,7 +193,7 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 	}
 	// supply a SaveFn that saves the revision to the contractor's persist
 	// (the existing revision will be overwritten when SaveFn is called)
-	d.SaveFn = c.saveRevision(contract.ID)
+	d.SaveFn = c.saveDownloadRevision(contract.ID)
 
 	// cache downloader
 	hd := &hostDownloader{

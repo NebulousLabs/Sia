@@ -28,8 +28,8 @@ var (
 // as a safeguard against desynchronizing with the host.
 // TODO: save a diff of the Merkle roots instead of all of them.
 type cachedRevision struct {
-	Revision    types.FileContractRevision
-	MerkleRoots modules.MerkleRootSet
+	Revision    types.FileContractRevision `json:"revision"`
+	MerkleRoots modules.MerkleRootSet      `json:"merkleroots"`
 }
 
 // A Contractor negotiates, revises, renews, and provides access to file
@@ -122,6 +122,12 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 		return c.ResolveID(newID)
 	}
 	return id
+}
+
+// Close closes the Contractor.
+func (c *Contractor) Close() error {
+	c.log.Close()
+	return c.persist.Close()
 }
 
 // New returns a new Contractor.

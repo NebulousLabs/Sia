@@ -148,7 +148,7 @@ func TestIsOffline(t *testing.T) {
 		// construct a contractor with a hostdb containing the scans
 		c := &Contractor{
 			contracts: map[types.FileContractID]modules.RenterContract{
-				types.FileContractID{1}: {HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
+				{1}: {HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
 			},
 			hdb: mapHostDB{
 				hosts: map[string]modules.HostDBEntry{

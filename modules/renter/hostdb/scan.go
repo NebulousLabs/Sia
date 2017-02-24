@@ -90,8 +90,8 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 // with the host weight functions. Adjustment of the host weight functions need
 // to keep this function in mind, and vice-versa.
 func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
-	// If the host is not online, toss out this update.
-	if !hdb.online {
+	// If the scan failed because we don't have Internet access, toss out this update.
+	if netErr != nil && !hdb.online {
 		return
 	}
 
