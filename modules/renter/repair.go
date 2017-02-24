@@ -187,7 +187,9 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 			return
 		case file := <-r.newRepairs:
 			// TODO: This seems to be happening out of lock, investigate.
+			id := r.mu.Lock()
 			r.addFileToRepairState(rs, file)
+			r.mu.Unlock(id)
 			return
 		}
 	}
@@ -407,7 +409,9 @@ func (r *Renter) managedWaitOnRepairWork(rs *repairState) {
 	select {
 	case finishedUpload = <-rs.resultChan:
 	case file := <-r.newRepairs:
+		id := r.mu.Lock()
 		r.addFileToRepairState(rs, file)
+		r.mu.Unlock(id)
 		return
 	case <-r.tg.StopChan():
 		return
