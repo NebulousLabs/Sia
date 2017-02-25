@@ -12,6 +12,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+const scanHistoryLen = 20
+
 var (
 	hostdbNumHosts int
 	hostdbVerbose  bool
@@ -52,10 +54,10 @@ func hostdbcmd() {
 
 		fmt.Println(len(info.Hosts), "Active Hosts:")
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "\t\tAddress\tPrice\t")
+		fmt.Fprintln(w, "\t\tAddress\tPrice (per TB per Mo)")
 		for i, host := range info.Hosts {
 			price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
-			fmt.Fprintf(w, "\t%v:\t%v\t%v \t (per TB per Month)\n", len(info.Hosts)-i, host.NetAddress, currencyUnits(price))
+			fmt.Fprintf(w, "\t%v:\t%v\t%v\n", len(info.Hosts)-i, host.NetAddress, currencyUnits(price))
 		}
 		w.Flush()
 	} else {
@@ -93,9 +95,10 @@ func hostdbcmd() {
 			activeHosts = activeHosts[len(activeHosts)-hostdbNumHosts:]
 		}
 
+		fmt.Println()
 		fmt.Println(len(offlineHosts), "Offline Hosts:")
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "\t\tPubkey\tAddress\tPrice\t\tUptime")
+		fmt.Fprintln(w, "\t\tPubkey\tAddress\tPrice (/ TB / Month)\tUptime\tRecent Scans")
 		for i, host := range offlineHosts {
 			// Compute the total measured uptime and total measured downtime for this
 			// host.
@@ -117,15 +120,30 @@ func hostdbcmd() {
 				uptimeRatio = float64(uptime) / float64(uptime+downtime)
 			}
 
+			scanHistStr := ""
+			displayScans := host.ScanHistory
+			if len(host.ScanHistory) > scanHistoryLen {
+				displayScans = host.ScanHistory[len(host.ScanHistory)-scanHistoryLen:]
+			}
+			for _, scan := range displayScans {
+				if scan.Success {
+					scanHistStr += "1"
+				} else {
+					scanHistStr += "0"
+				}
+			}
+
+			// Get a string representation of the historic outcomes of the most
+			// recent scans.
 			price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
-			fmt.Fprintf(w, "\t%v:\t%v\t%v \t(per TB per Month)\t%v\t%.3f\n", len(offlineHosts)-i, host.PublicKeyString, host.NetAddress, currencyUnits(price), uptimeRatio)
+			fmt.Fprintf(w, "\t%v:\t%v\t%v \t%v\t%.3f\t%s\n", len(offlineHosts)-i, host.PublicKeyString, host.NetAddress, currencyUnits(price), uptimeRatio, scanHistStr)
 		}
 		w.Flush()
 
 		fmt.Println()
 		fmt.Println(len(inactiveHosts), "Inactive Hosts:")
 		w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "\t\tPubkey\tAddress\tPrice\t\tUptime")
+		fmt.Fprintln(w, "\t\tPubkey\tAddress\tPrice (/ TB / Month)\tUptime\tRecent Scans")
 		for i, host := range inactiveHosts {
 			// Compute the total measured uptime and total measured downtime for this
 			// host.
@@ -147,15 +165,30 @@ func hostdbcmd() {
 				uptimeRatio = float64(uptime) / float64(uptime+downtime)
 			}
 
+			// Get a string representation of the historic outcomes of the most
+			// recent scans.
+			scanHistStr := ""
+			displayScans := host.ScanHistory
+			if len(host.ScanHistory) > scanHistoryLen {
+				displayScans = host.ScanHistory[len(host.ScanHistory)-scanHistoryLen:]
+			}
+			for _, scan := range displayScans {
+				if scan.Success {
+					scanHistStr += "1"
+				} else {
+					scanHistStr += "0"
+				}
+			}
+
 			price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
-			fmt.Fprintf(w, "\t%v:\t%v\t%v \t(per TB per Month)\t%v\t%.3f\n", len(inactiveHosts)-i, host.PublicKeyString, host.NetAddress, currencyUnits(price), uptimeRatio)
+			fmt.Fprintf(w, "\t%v:\t%v\t%v \t%v\t%.3f\t%s\n", len(inactiveHosts)-i, host.PublicKeyString, host.NetAddress, currencyUnits(price), uptimeRatio, scanHistStr)
 		}
 		w.Flush()
 
 		fmt.Println()
 		fmt.Println(len(activeHosts), "Active Hosts:")
 		w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "\t\tPubkey\tAddress\tPrice\t\tUptime")
+		fmt.Fprintln(w, "\t\tPubkey\tAddress\tPrice (/ TB / Month)\tUptime\tRecent Scans")
 		for i, host := range activeHosts {
 			// Compute the total measured uptime and total measured downtime for this
 			// host.
@@ -177,8 +210,23 @@ func hostdbcmd() {
 				uptimeRatio = float64(uptime) / float64(uptime+downtime)
 			}
 
+			// Get a string representation of the historic outcomes of the most
+			// recent scans.
+			scanHistStr := ""
+			displayScans := host.ScanHistory
+			if len(host.ScanHistory) > scanHistoryLen {
+				displayScans = host.ScanHistory[len(host.ScanHistory)-scanHistoryLen:]
+			}
+			for _, scan := range displayScans {
+				if scan.Success {
+					scanHistStr += "1"
+				} else {
+					scanHistStr += "0"
+				}
+			}
+
 			price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
-			fmt.Fprintf(w, "\t%v:\t%v\t%v \t(per TB per Month)\t%v\t%.3f\n", len(activeHosts)-i, host.PublicKeyString, host.NetAddress, currencyUnits(price), uptimeRatio)
+			fmt.Fprintf(w, "\t%v:\t%v\t%v \t%v\t%.3f\t%s\n", len(activeHosts)-i, host.PublicKeyString, host.NetAddress, currencyUnits(price), uptimeRatio, scanHistStr)
 		}
 		w.Flush()
 	}
