@@ -11,9 +11,9 @@ import (
 
 func TestRPCID(t *testing.T) {
 	cases := map[rpcID]string{
-		rpcID{}:                                       "        ",
-		rpcID{'f', 'o', 'o'}:                          "foo     ",
-		rpcID{'f', 'o', 'o', 'b', 'a', 'r', 'b', 'a'}: "foobarba",
+		{}:                                       "        ",
+		{'f', 'o', 'o'}:                          "foo     ",
+		{'f', 'o', 'o', 'b', 'a', 'r', 'b', 'a'}: "foobarba",
 	}
 	for id, s := range cases {
 		if id.String() != s {

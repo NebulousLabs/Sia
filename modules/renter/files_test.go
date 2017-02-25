@@ -52,7 +52,7 @@ func TestFileAvailable(t *testing.T) {
 	for i := uint64(0); i < f.numChunks(); i++ {
 		fc.Pieces = append(fc.Pieces, pieceData{Chunk: i, Piece: 0})
 	}
-	f.contracts = map[types.FileContractID]fileContract{types.FileContractID{}: fc}
+	f.contracts = map[types.FileContractID]fileContract{{}: fc}
 
 	if !f.available() {
 		t.Error("file should be available")

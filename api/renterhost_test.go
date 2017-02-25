@@ -24,7 +24,6 @@ func TestHostAndRentVanilla(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestHostAndRentVanilla")
 	if err != nil {
 		t.Fatal(err)
@@ -164,7 +163,6 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestHostAndRentMultiHost-Host1andRenter")
 	if err != nil {
 		t.Fatal(err)
@@ -280,7 +278,6 @@ func TestHostAndRentManyFiles(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestHostAndRentManyFiles-Host1andRenter")
 	if err != nil {
 		t.Fatal(err)
@@ -490,7 +487,6 @@ func TestRenterUploadDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestRenterUploadDownload")
 	if err != nil {
 		t.Fatal(err)
@@ -617,7 +613,6 @@ func TestRenterCancelAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestRenterCancelAllowance")
 	if err != nil {
 		t.Fatal(err)
@@ -698,7 +693,6 @@ func TestRenterParallelDelete(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestRenterParallelDelete")
 	if err != nil {
 		t.Fatal(err)
@@ -808,7 +802,6 @@ func TestRenterRenew(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestRenterRenew")
 	if err != nil {
 		t.Fatal(err)
@@ -827,6 +820,19 @@ func TestRenterRenew(t *testing.T) {
 	err = st.setHostStorage()
 	if err != nil {
 		t.Fatal(err)
+	}
+	var ah HostdbActiveGET
+	for i := 0; i < 50; i++ {
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			t.Fatal(err)
+		}
+		if len(ah.Hosts) == 1 {
+			break
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	if len(ah.Hosts) != 1 {
+		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
 	}
 
 	// Set an allowance for the renter, allowing a contract to be formed.
@@ -873,7 +879,7 @@ func TestRenterRenew(t *testing.T) {
 	contractID := rc.Contracts[0].ID
 
 	// Mine enough blocks to enter the renewal window.
-	for i := 0; i < testPeriod/2; i++ {
+	for i := 0; i < testPeriod; i++ {
 		st.miner.AddBlock()
 	}
 	// Wait for the contract to be renewed.
@@ -911,7 +917,6 @@ func TestRenterAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester("TestRenterAllowance")
 	if err != nil {
 		t.Fatal(err)
