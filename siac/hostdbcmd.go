@@ -23,7 +23,7 @@ var (
 	hostdbCmd = &cobra.Command{
 		Use:   "hostdb",
 		Short: "Interact with the renter's host database.",
-		Long:  "View the list of active hosts, the list of all hosts, or query specific hosts.",
+		Long:  "View the list of active hosts, the list of all hosts, or query specific hosts.\nIf the '-v' flag is set, a list of recent scans will be provided, with the most\nrecent scan on the right. a '0' indicates that the host was offline, and a '1'\nindicates that the host was online.",
 		Run:   wrap(hostdbcmd),
 	}
 
