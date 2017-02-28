@@ -286,7 +286,6 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDoneRules")
 
 	// Create a gateway that can be forced to return errors when its RPC method
@@ -420,7 +419,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 	select {
 	case <-doneChan:
-	case <-time.After(minIBDWaitTime + ibdLoopDelay):
+	case <-time.After(2 * (minIBDWaitTime + ibdLoopDelay)):
 		t.Fatal("threadedInitialBlockchainDownload never finished with 2 synced peers and 1 non-synced peer")
 	}
 

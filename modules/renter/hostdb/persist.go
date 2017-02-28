@@ -66,6 +66,11 @@ func (hdb *HostDB) load() error {
 		if err != nil {
 			hdb.log.Debugln("ERROR: could not insert host while loading:", host.NetAddress)
 		}
+
+		// Make sure that all hosts have gone through the initial scanning.
+		if len(host.ScanHistory) < 2 {
+			hdb.queueScan(host)
+		}
 	}
 	hdb.blockHeight = data.BlockHeight
 	hdb.lastChange = data.LastChange

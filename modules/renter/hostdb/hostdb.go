@@ -107,7 +107,9 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	hdb.hostTree = hosttree.New(hdb.calculateHostWeight)
 
 	// Load the prior persistence structures.
+	hdb.mu.Lock()
 	err = hdb.load()
+	hdb.mu.Unlock()
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
@@ -134,16 +136,20 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	// If the block height has loaded as zero, the most recent consensus change
 	// needs to be set to perform a full rescan. This will also help the hostdb
 	// to pick up any hosts that it has incorrectly dropped in the past.
+	hdb.mu.Lock()
 	if hdb.blockHeight == 0 {
 		hdb.lastChange = modules.ConsensusChangeBeginning
 	}
+	hdb.mu.Unlock()
 
 	err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Subscribe again using the new ID. This will cause a triggered scan
 		// on all of the hosts, but that should be acceptable.
+		hdb.mu.Lock()
 		hdb.blockHeight = 0
 		hdb.lastChange = modules.ConsensusChangeBeginning
+		hdb.mu.Unlock()
 		err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	}
 	if err != nil {
@@ -156,7 +162,9 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	} else {
 		// During testing, the hostdb is just always assumed to be online, since
 		// the online check of having nonlocal peers will always fail.
+		hdb.mu.Lock()
 		hdb.online = true
+		hdb.mu.Unlock()
 	}
 	for i := 0; i < scanningThreads; i++ {
 		go hdb.threadedProbeHosts()

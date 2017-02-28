@@ -47,18 +47,11 @@ var (
 
 	// requiredStorage indicates the amount of storage that the host must be
 	// offering in order to be considered a valuable/worthwhile host.
-	requiredStorage = func() uint64 {
-		switch build.Release {
-		case "dev":
-			return 1e6
-		case "standard":
-			return 5e9
-		case "testing":
-			return 1e3
-		default:
-			panic("incorrect/missing value for requiredStorage constant")
-		}
-	}()
+	requiredStorage = build.Select(build.Var{
+		Standard: uint64(20e9),
+		Dev:      uint64(1e6),
+		Testing:  uint64(1e3),
+	}).(uint64)
 )
 
 // collateralAdjustments improves the host's weight according to the amount of
@@ -162,20 +155,29 @@ func storageRemainingAdjustments(entry modules.HostDBEntry) float64 {
 	if entry.RemainingStorage < 200*requiredStorage {
 		base = base / 2 // 2x total penalty
 	}
-	if entry.RemainingStorage < 50*requiredStorage {
-		base = base / 3 // 6x total penalty
+	if entry.RemainingStorage < 150*requiredStorage {
+		base = base / 2 // 4x total penalty
 	}
-	if entry.RemainingStorage < 25*requiredStorage {
-		base = base / 4 // 24x total penalty
+	if entry.RemainingStorage < 100*requiredStorage {
+		base = base / 3 // 12x total penalty
+	}
+	if entry.RemainingStorage < 80*requiredStorage {
+		base = base / 3 // 36x total penalty
+	}
+	if entry.RemainingStorage < 40*requiredStorage {
+		base = base / 4 // 144x total penalty
+	}
+	if entry.RemainingStorage < 20*requiredStorage {
+		base = base / 5 // 720x total penalty
 	}
 	if entry.RemainingStorage < 10*requiredStorage {
-		base = base / 5 // 96x total penalty
+		base = base / 5 // 3,600x total penalty
 	}
 	if entry.RemainingStorage < 5*requiredStorage {
-		base = base / 10 // 960x total penalty
+		base = base / 5 // 14,400x total penalty
 	}
 	if entry.RemainingStorage < requiredStorage {
-		base = base / 10 // 9600x total penalty
+		base = base / 5 // 72,000x total penalty
 	}
 	return base
 }
