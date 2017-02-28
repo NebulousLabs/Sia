@@ -9,11 +9,11 @@ import (
 const (
 	// maxHostDowntime specifies the maximum amount of time that a host is
 	// allowed to be offline while still being in the hostdb.
-	maxHostDowntime = 30 * 24 * time.Hour
+	maxHostDowntime = 10 * 24 * time.Hour
 
 	// minScans specifies the number of scans that a host should have before the
 	// scans start getting compressed.
-	minScans = 20
+	minScans = 12
 
 	// maxSettingsLen indicates how long in bytes the host settings field is
 	// allowed to be before being ignored as a DoS attempt.
@@ -43,7 +43,7 @@ var (
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
 	scanningThreads = build.Select(build.Var{
-		Standard: int(40),
+		Standard: int(20),
 		Dev:      int(4),
 		Testing:  int(3),
 	}).(int)
@@ -61,7 +61,7 @@ var (
 	// maxScanSleep is the maximum amount of time that the hostdb will sleep
 	// between performing scans of the hosts.
 	maxScanSleep = build.Select(build.Var{
-		Standard: time.Hour * 4,
+		Standard: time.Hour * 8,
 		Dev:      time.Minute * 10,
 		Testing:  time.Second * 15,
 	}).(time.Duration)
