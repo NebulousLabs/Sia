@@ -1,6 +1,13 @@
 Version History
 ---------------
 
+February 2017:
+
+v1.1.1 (patch release)
+- Renter now performs much better at scale
+- HostDB improvements
+- Add API call to support storage leaderboard
+
 January 2017:
 
 v1.1.0 (minor release)
