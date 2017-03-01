@@ -86,13 +86,87 @@ func TestRenterDownloadError(t *testing.T) {
 	}
 
 	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
+	downpath := filepath.Join(st.dir, "down.dat")
+	expectedErr := st.getAPI("/renter/download/test.dat?destination="+downpath, nil)
+	if expectedErr == nil {
+		t.Fatal("download unexpectedly succeeded")
+	}
+
+	// verify the file has the expected error
+	var rdq RenterDownloadQueue
+	err = st.getAPI("/renter/downloads", &rdq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, download := range rdq.Downloads {
+		if download.SiaPath == "test.dat" && download.Received == download.Filesize && download.Error == expectedErr.Error() {
+			t.Fatal("download had unexpected error: ", download.Error)
+		}
+	}
+}
+
+// TestRenterAsyncDownloadError tests that the /renter/asyncdownload route sets the download's error field if it fails.
+func TestRenterAsyncDownloadError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester("TestRenterAsyncDownloadError")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and start accepting contracts.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "10"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(build.SiaTestingDir, "api", "TestRenterAsyncDownloadError", "test.dat")
+	err = createRandFile(path, 1e5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("renew", "true")
+	err = st.stdPostAPI("/renter/upload/test.dat", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
 	downpath := filepath.Join(st.dir, "asyncdown.dat")
 	err = st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// verify the file is not currently downloaded
+	// verify the file has an error
 	var rdq RenterDownloadQueue
 	err = st.getAPI("/renter/downloads", &rdq)
 	if err != nil {
