@@ -31,6 +31,80 @@ func createRandFile(path string, size int) error {
 	return ioutil.WriteFile(path, data, 0600)
 }
 
+// TestRenterDownloadError tests that the /renter/download route sets the download's error field if it fails.
+func TestRenterDownloadError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester("TestRenterDownloadError")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and start accepting contracts.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "10"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(build.SiaTestingDir, "api", "TestRenterDownloadError", "test.dat")
+	err = createRandFile(path, 1e5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("renew", "true")
+	err = st.stdPostAPI("/renter/upload/test.dat", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
+	downpath := filepath.Join(st.dir, "asyncdown.dat")
+	err = st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify the file is not currently downloaded
+	var rdq RenterDownloadQueue
+	err = st.getAPI("/renter/downloads", &rdq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, download := range rdq.Downloads {
+		if download.SiaPath == "test.dat" && download.Received == download.Filesize && download.Error == "" {
+			t.Fatal("download had nil error")
+		}
+	}
+}
+
 // TestRenterAsyncDownload tests that the /renter/downloadasync route works
 // correctly.
 func TestRenterAsyncDownload(t *testing.T) {

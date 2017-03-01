@@ -60,6 +60,9 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 			StartTime:   d.startTime,
 		}
 		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)
+		if d.downloadErr != nil {
+			downloads[i].Error = d.downloadErr.Error()
+		}
 	}
 	return downloads
 }
