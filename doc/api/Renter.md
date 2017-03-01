@@ -167,7 +167,10 @@ lists all files in the download queue.
       "received": 4096, // bytes
 
       // Time at which the download was initiated.
-      "starttime": "2009-11-10T23:00:00Z" // RFC 3339 time
+      "starttime": "2009-11-10T23:00:00Z", // RFC 3339 time
+
+      // Error encountered while downloading, if it exists.
+      "error": ""
     }   
   ]
 }

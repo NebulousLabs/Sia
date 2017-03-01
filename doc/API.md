@@ -761,7 +761,8 @@ lists all files in the download queue.
       "destination": "/home/users/alice/bar.txt",
       "filesize":    8192,                  // bytes
       "received":    4096,                  // bytes
-      "starttime":   "2009-11-10T23:00:00Z" // RFC 3339 time
+      "starttime":   "2009-11-10T23:00:00Z", // RFC 3339 time
+      "error": ""
     }
   ]
 }
