@@ -840,12 +840,12 @@ standard success or error response. See
 
 downloads a file to the local filesystem. The call will return immediately.
 
-###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-1)
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-2)
 ```
 *siapath
 ```
 
-###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-1)
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
 ```
 destination
 ```
@@ -860,12 +860,12 @@ renames a file. Does not rename any downloads or source files, only renames the
 entry in the renter. An error is returned if `siapath` does not exist or
 `newsiapath` already exists.
 
-###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-2)
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-3)
 ```
 *siapath
 ```
 
-###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-3)
 ```
 newsiapath
 ```
@@ -878,12 +878,12 @@ standard success or error response. See
 
 uploads a file to the network from the local filesystem.
 
-###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-3)
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-4)
 ```
 *siapath
 ```
 
-###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-4)
 ```
 datapieces   // int
 paritypieces // int

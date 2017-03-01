@@ -282,12 +282,12 @@ standard success or error response. See
 
 downloads a file to the local filesystem. The call will return immediately.
 
-###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-1)
+###### Path Parameters
 ```
 *siapath
 ```
 
-###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-1)
+###### Query String Parameters
 ```
 destination
 ```
