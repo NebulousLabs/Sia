@@ -2,7 +2,6 @@ package hostdb
 
 import (
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -54,41 +53,5 @@ func TestFindHostAnnouncements(t *testing.T) {
 	announcements = findHostAnnouncements(b)
 	if len(announcements) != 0 {
 		t.Error("host announcement found when there was an invalid encoding of a host announcement")
-	}
-}
-
-// TestReceiveConsensusSetUpdate probes the ReveiveConsensusSetUpdate method of
-// the hostdb type.
-func TestReceiveConsensusSetUpdate(t *testing.T) {
-	// create hostdb
-	hdb := bareHostDB()
-	hdb.persist = &memPersist{}
-
-	// Put a host announcement into a block.
-	annBytes, err := makeSignedAnnouncement("foo.com:1234")
-	if err != nil {
-		t.Fatal(err)
-	}
-	cc := modules.ConsensusChange{
-		AppliedBlocks: []types.Block{{
-			Transactions: []types.Transaction{{
-				ArbitraryData: [][]byte{annBytes},
-			}},
-		}},
-	}
-
-	// call ProcessConsensusChange
-	hdb.ProcessConsensusChange(cc)
-
-	// host should be sent to scanPool
-	select {
-	case <-time.After(time.Second):
-		t.Fatal("announcement not seen")
-	case <-hdb.scanPool:
-	}
-
-	// Check that there is now a host in the hostdb.
-	if len(hdb.AllHosts()) != 1 {
-		t.Fatal("hostdb should have a host after getting a host announcement transcation")
 	}
 }

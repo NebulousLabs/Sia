@@ -71,7 +71,7 @@ Units
 
 Unless otherwise specified, all parameters should be specified in their
 smallest possible unit. For example, size should always be specified in bytes
-and SiaCoins should be specified in hastings. JSON values returned by the API
+and Siacoins should be specified in hastings. JSON values returned by the API
 will also use the smallest possible unit, unless otherwise specified.
 
 If a numbers is returned as a string in JSON, it should be treated as an
@@ -120,8 +120,8 @@ returns the set of constants in use.
   "siafundportion":        "39/1000",
   "maturitydelay":         144,        // blocks
 
-  "initialcoinbase": 300000, // SiaCoins (see note in Daemon.md)
-  "minimumcoinbase": 30000,  // SiaCoins (see note in Daemon.md)
+  "initialcoinbase": 300000, // Siacoins (see note in Daemon.md)
+  "minimumcoinbase": 30000,  // Siacoins (see note in Daemon.md)
 
   "roottarget": [0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   "rootdepth":  [255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255],
@@ -155,9 +155,10 @@ returns the version of the Sia daemon currently running.
 Consensus
 ---------
 
-| Route                        | HTTP verb |
-| ---------------------------- | --------- |
-| [/consensus](#consensus-get) | GET       |
+| Route                                                                       | HTTP verb |
+| --------------------------------------------------------------------------- | --------- |
+| [/consensus](#consensus-get)                                                | GET       |
+| [/consensus/validate/transactionset](#consensusvalidatetransactionset-post) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Consensus.md](/doc/api/Consensus.md).
@@ -175,6 +176,19 @@ returns information about the consensus set, such as the current block height.
   "target":       [0,0,0,0,0,0,11,48,125,79,116,89,136,74,42,27,5,14,10,31,23,53,226,238,202,219,5,204,38,32,59,165]
 }
 ```
+
+#### /consensus/validate/transactionset [POST]
+
+validates a set of transactions using the current utxo set.
+
+###### Request Body Bytes
+
+Since transactions may be large, the transaction set is supplied in the POST
+body, encoded in JSON format.
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 Gateway
 -------
@@ -465,10 +479,11 @@ standard success or error response. See
 Host DB
 -------
 
-| Request                                     | HTTP Verb |
-| ------------------------------------------- | --------- |
-| [/hostdb/active](#hostdbactive-get-example) | GET       |
-| [/hostdb/all](#hostdball-get-example)       | GET       |
+| Request                                                 | HTTP Verb |
+| ------------------------------------------------------- | --------- |
+| [/hostdb/active](#hostdbactive-get-example)             | GET       |
+| [/hostdb/all](#hostdball-get-example)                   | GET       |
+| [/hostdb/hosts/___:pubkey___](#hostdbhosts-get-example) | GET       |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [HostDB.md](/doc/api/HostDB.md).
@@ -501,6 +516,7 @@ numhosts // Optional
         "algorithm": "ed25519",
         "key":        "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
+      "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     }
   ]
 }
@@ -530,10 +546,57 @@ any particular order, and the order may change in subsequent calls.
         "algorithm": "ed25519",
         "key":       "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
+      "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     }
   ]
 }
 ```
+
+#### /hostdb/hosts/___:pubkey___ [GET] [(example)](/doc/api/HostDB.md#host-details)
+
+fetches detailed information about a particular host, including metrics
+regarding the score of the host within the database. It should be noted that
+each renter uses different metrics for selecting hosts, and that a good score on
+in one hostdb does not mean that the host will be successful on the network
+overall.
+
+###### Path Parameters [(with comments)](/doc/api/HostDB.md#path-parameters)
+```
+:pubkey
+```
+
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-2)
+```javascript
+{
+  "entry": {
+    "acceptingcontracts":   true,
+    "maxdownloadbatchsize": 17825792, // bytes
+    "maxduration":          25920,    // blocks
+    "maxrevisebatchsize":   17825792, // bytes
+    "netaddress":           "123.456.789.0:9982",
+    "remainingstorage":     35000000000, // bytes
+    "sectorsize":           4194304,     // bytes
+    "totalstorage":         35000000000, // bytes
+    "unlockhash":           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+    "windowsize":           144, // blocks
+    "publickey": {
+      "algorithm": "ed25519",
+      "key":       "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+    }
+    "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  },
+  "scorebreakdown": {
+    "ageadjustment":              0.1234,
+    "burnadjustment":             0.1234,
+    "collateraladjustment":       23.456,
+    "priceadjustment":            0.1234,
+    "storageremainingadjustment": 0.1234,
+    "uptimeadjustment":           0.1234,
+    "versionadjustment":          0.1234,
+  }
+}
+```
+
 
 Miner
 -----
@@ -614,6 +677,7 @@ Renter
 | [/renter/contracts](#rentercontracts-get)                     | GET       |
 | [/renter/downloads](#renterdownloads-get)                     | GET       |
 | [/renter/files](#renterfiles-get)                             | GET       |
+| [/renter/prices](#renter-prices-get)                          | GET       |
 | [/renter/delete/___*siapath___](#renterdeletesiapath-post)    | POST      |
 | [/renter/download/___*siapath___](#renterdownloadsiapath-get) | GET       |
 | [/renter/rename/___*siapath___](#renterrenamesiapath-post)    | POST      |
@@ -641,7 +705,8 @@ returns the current settings along with metrics on the renter's spending.
     "contractspending": "1234", // hastings
     "downloadspending": "5678", // hastings
     "storagespending":  "1234", // hastings
-    "uploadspending":   "5678"  // hastings
+    "uploadspending":   "5678", // hastings
+    "unspent":          "1234"  // hastings
   }
 }
 ```
@@ -652,8 +717,10 @@ modify settings that control the renter's behavior.
 
 ###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters)
 ```
-funds  // hastings
-period // block height
+funds // hastings
+hosts
+period      // block height
+renewwindow // block height
 ```
 
 ###### Response
@@ -669,11 +736,12 @@ returns active contracts. Expired contracts are not included.
 {
   "contracts": [
     {
-      "endheight":   50000, // block height
-      "id":          "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-      "netaddress":  "12.34.56.78:9",
-      "renterfunds": "1234", // hastings
-      "size":        8192    // bytes
+      "endheight":       50000, // block height
+      "id":              "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "lasttransaction": {}, // types.Transaction
+      "netaddress":      "12.34.56.78:9",
+      "renterfunds":     "1234", // hastings
+      "size":            8192    // bytes
     }
   ]
 }
@@ -718,6 +786,21 @@ lists the status of all files.
   ]
 }
 ```
+
+#### /renter/prices [GET]
+
+lists the estimated prices of performing various storage and data operations.
+
+###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-4)
+```javascript
+{
+  "downloadterabyte":      "1234", // hastings
+  "formcontracts":         "1234", // hastings
+  "storageterabytemonth":  "1234", // hastings
+  "uploadterabyte":        "1234", // hastings
+}
+```
+
 
 #### /renter/delete/___*siapath___ [POST]
 
@@ -783,7 +866,9 @@ uploads a file to the network from the local filesystem.
 
 ###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
 ```
-source
+datapieces   // int
+paritypieces // int
+source       // string - a filepath
 ```
 
 ###### Response

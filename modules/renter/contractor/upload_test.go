@@ -11,11 +11,11 @@ import (
 // editorHostDB is used to test the Editor method.
 type editorHostDB struct {
 	stubHostDB
-	hosts map[modules.NetAddress]modules.HostDBEntry
+	hosts map[string]modules.HostDBEntry
 }
 
-func (hdb editorHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
-	h, ok := hdb.hosts[addr]
+func (hdb editorHostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
+	h, ok := hdb.hosts[string(spk.Key)]
 	return h, ok
 }
 
@@ -24,7 +24,7 @@ func (hdb editorHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool
 func TestEditor(t *testing.T) {
 	// use a mock hostdb to supply hosts
 	hdb := &editorHostDB{
-		hosts: make(map[modules.NetAddress]modules.HostDBEntry),
+		hosts: make(map[string]modules.HostDBEntry),
 	}
 	c := &Contractor{
 		hdb:       hdb,

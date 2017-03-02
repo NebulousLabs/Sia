@@ -167,8 +167,8 @@ func (g *Gateway) managedAcceptConnOldPeer(conn net.Conn, remoteVersion string) 
 		},
 		sess: muxado.Server(conn),
 	})
-
-	return nil
+	g.addNode(addr)
+	return g.save()
 }
 
 // managedAcceptConnNewPeer accepts connection requests from peers >= v1.0.0.
@@ -182,14 +182,6 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 		return err
 	}
 
-	// Attempt to add the peer to the node list. If the add is successful and
-	// the address is a local address, mark the peer as a local peer.
-	local := false
-	err = g.managedAddUntrustedNode(remoteAddr)
-	if err != nil && remoteAddr.IsLocal() {
-		local = true
-	}
-
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
@@ -200,13 +192,29 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 	// Accept the peer.
 	g.acceptPeer(&peer{
 		Peer: modules.Peer{
-			Inbound:    true,
-			Local:      local,
+			Inbound: true,
+			// NOTE: local may be true even if the supplied remoteAddr is not
+			// actually reachable.
+			Local:      remoteAddr.IsLocal(),
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
 		sess: muxado.Server(conn),
 	})
+
+	// Attempt to ping the supplied address. If successful, we will add
+	// remoteAddr to our node list after accepting the peer. We do this in a
+	// goroutine so that we can start communicating with the peer immediately.
+	go func() {
+		err := g.pingNode(remoteAddr)
+		if err == nil {
+			g.mu.Lock()
+			g.addNode(remoteAddr)
+			g.save()
+			g.mu.Unlock()
+		}
+	}()
+
 	return nil
 }
 
@@ -350,26 +358,23 @@ func acceptConnVersionHandshake(conn net.Conn, version string) (remoteVersion st
 // managedConnectOldPeer connects to peers < v1.0.0. The peer is added as a
 // node and a peer. The peer is only added if a nil error is returned.
 func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
-	// Attempt to add the peer to the node list. If the add is successful and
-	// the address is a local address, mark the peer as a local peer.
-	local := false
-	err := g.managedAddUntrustedNode(remoteAddr)
-	if err != nil && remoteAddr.IsLocal() {
-		local = true
-	}
-
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			Inbound:    false,
-			Local:      local,
+			Local:      remoteAddr.IsLocal(),
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
 		sess: muxado.Client(conn),
 	})
-	return nil
+	// Add the peer to the node list. We can ignore the error: addNode
+	// validates the address and checks for duplicates, but we don't care
+	// about duplicates and we have already validated the address by
+	// connecting to it.
+	g.addNode(remoteAddr)
+	return g.save()
 }
 
 // managedConnectNewPeer connects to peers >= v1.0.0. The peer is added as a
@@ -385,26 +390,23 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 		return err
 	}
 
-	// Attempt to add the peer to the node list. If the add is successful and
-	// the address is a local address, mark the peer as a local peer.
-	local := false
-	err = g.managedAddUntrustedNode(remoteAddr)
-	if err != nil && remoteAddr.IsLocal() {
-		local = true
-	}
-
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			Inbound:    false,
-			Local:      local,
+			Local:      remoteAddr.IsLocal(),
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
 		sess: muxado.Client(conn),
 	})
-	return nil
+	// Add the peer to the node list. We can ignore the error: addNode
+	// validates the address and checks for duplicates, but we don't care
+	// about duplicates and we have already validated the address by
+	// connecting to it.
+	g.addNode(remoteAddr)
+	return g.save()
 }
 
 // managedConnect establishes a persistent connection to a peer, and adds it to

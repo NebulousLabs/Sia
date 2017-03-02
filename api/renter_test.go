@@ -7,9 +7,11 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
@@ -35,6 +37,7 @@ func TestRenterPaths(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestRenterPaths")
 	if err != nil {
 		t.Fatal(err)
@@ -79,6 +82,7 @@ func TestRenterConflicts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester("TestRenterConflicts")
 	if err != nil {
 		t.Fatal(err)
@@ -121,9 +125,9 @@ func TestRenterConflicts(t *testing.T) {
 
 	// Upload using the same nickname.
 	err = st.stdPostAPI("/renter/upload/foo/bar.sia/test", uploadValues)
-	expectedErr := Error{"Upload failed: " + renter.ErrPathOverload.Error()}
+	expectedErr := Error{"upload failed: " + renter.ErrPathOverload.Error()}
 	if err != expectedErr {
-		t.Fatalf("expected %v, got %v", Error{"Upload failed: " + renter.ErrPathOverload.Error()}, err)
+		t.Fatalf("expected %v, got %v", Error{"upload failed: " + renter.ErrPathOverload.Error()}, err)
 	}
 
 	// Upload using nickname that conflicts with folder.
@@ -133,134 +137,13 @@ func TestRenterConflicts(t *testing.T) {
 	}
 }
 
-// TestRenterHostsActiveHandler checks the behavior of the call to
-// /hostdb/active.
-func TestRenterHostsActiveHandler(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	st, err := createServerTester("TestRenterHostsActiveHandler")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.server.Close()
-
-	// Try the call with numhosts unset, and set to -1, 0, and 1.
-	var ah ActiveHosts
-	err = st.getAPI("/hostdb/active", &ah)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 0 {
-		t.Fatal(len(ah.Hosts))
-	}
-	err = st.getAPI("/hostdb/active?numhosts=-1", &ah)
-	if err == nil {
-		t.Fatal("expecting an error, got:", err)
-	}
-	err = st.getAPI("/hostdb/active?numhosts=0", &ah)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 0 {
-		t.Fatal(len(ah.Hosts))
-	}
-	err = st.getAPI("/hostdb/active?numhosts=1", &ah)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 0 {
-		t.Fatal(len(ah.Hosts))
-	}
-
-	// announce the host and start accepting contracts
-	err = st.announceHost()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = st.acceptContracts()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = st.setHostStorage()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Try the call with with numhosts unset, and set to -1, 0, 1, and 2.
-	err = st.getAPI("/hostdb/active", &ah)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 1 {
-		t.Fatal(len(ah.Hosts))
-	}
-	err = st.getAPI("/hostdb/active?numhosts=-1", &ah)
-	if err == nil {
-		t.Fatal("expecting an error, got:", err)
-	}
-	err = st.getAPI("/hostdb/active?numhosts=0", &ah)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 0 {
-		t.Fatal(len(ah.Hosts))
-	}
-	err = st.getAPI("/hostdb/active?numhosts=1", &ah)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 1 {
-		t.Fatal(len(ah.Hosts))
-	}
-	err = st.getAPI("/hostdb/active?numhosts=2", &ah)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 1 {
-		t.Fatal(len(ah.Hosts))
-	}
-}
-
-// TestRenterHostsAllHandler checks that announcing a host adds it to the list
-// of all hosts.
-func TestRenterHostsAllHandler(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	st, err := createServerTester("TestRenterHostsAllHandler")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.server.Close()
-
-	// Try the call before any hosts have been declared.
-	var ah AllHosts
-	if err = st.getAPI("/hostdb/all", &ah); err != nil {
-		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 0 {
-		t.Fatalf("expected 0 hosts, got %v", len(ah.Hosts))
-	}
-	// Announce the host and try the call again.
-	if err = st.announceHost(); err != nil {
-		t.Fatal(err)
-	}
-	if err = st.getAPI("/hostdb/all", &ah); err != nil {
-		t.Fatal(err)
-	}
-	if len(ah.Hosts) != 1 {
-		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
-	}
-}
-
 // TestRenterHandlerContracts checks that contract formation between a host and
 // renter behaves as expected, and that contract spending is the right amount.
 func TestRenterHandlerContracts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterHandlerContracts")
 	if err != nil {
 		t.Fatal(err)
@@ -308,14 +191,13 @@ func TestRenterHandlerContracts(t *testing.T) {
 	if err = st.getAPI("/renter", &get); err != nil {
 		t.Fatal(err)
 	}
-	var expectedContractSpending types.Currency
+	expectedContractSpending := get.Settings.Allowance.Funds.Sub(get.FinancialMetrics.Unspent)
 	for _, contract := range contracts.Contracts {
 		expectedContractSpending = expectedContractSpending.Add(contract.RenterFunds)
 	}
 	if got := get.FinancialMetrics.ContractSpending; got.Cmp(expectedContractSpending) != 0 {
 		t.Fatalf("expected contract spending to be %v; got %v", expectedContractSpending, got)
 	}
-
 }
 
 // TestRenterHandlerGetAndPost checks that valid /renter calls successfully set
@@ -325,7 +207,7 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterHandlerGetAndPost")
 	if err != nil {
 		t.Fatal(err)
@@ -384,8 +266,8 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	allowanceValues.Set("funds", "")
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err == nil || err.Error() != "Couldn't parse funds" {
-		t.Errorf("expected error to be 'Couldn't parse funds'; got %v", err)
+	if err == nil || err.Error() != "unable to parse funds" {
+		t.Errorf("expected error to be 'unable to parse funds'; got %v", err)
 	}
 	// Try an invalid funds string. Can't test a negative value since
 	// ErrNegativeCurrency triggers a build.Critical, which calls a panic in
@@ -399,14 +281,14 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", "")
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err == nil || !strings.HasPrefix(err.Error(), "Couldn't parse period: ") {
-		t.Errorf("expected error to begin with 'Couldn't parse period: '; got %v", err)
+	if err == nil || !strings.HasPrefix(err.Error(), "unable to parse period: ") {
+		t.Errorf("expected error to begin with 'unable to parse period: '; got %v", err)
 	}
 	// Try an invalid period string.
 	allowanceValues.Set("period", "-1")
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err == nil || err.Error()[:23] != "Couldn't parse period: " {
-		t.Errorf("expected error to begin with 'Couldn't parse period: '; got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "unable to parse period") {
+		t.Errorf("expected error to begin with 'unable to parse period'; got %v", err)
 	}
 	// Try a period that will lead to a length-zero RenewWindow.
 	allowanceValues.Set("period", "1")
@@ -422,7 +304,7 @@ func TestRenterLoadNonexistent(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterLoadNonexistent")
 	if err != nil {
 		t.Fatal(err)
@@ -460,8 +342,8 @@ func TestRenterLoadNonexistent(t *testing.T) {
 	// Try downloading a nonexistent file.
 	downpath := filepath.Join(st.dir, "dnedown.dat")
 	err = st.stdGetAPI("/renter/download/dne?destination=" + downpath)
-	if err == nil || err.Error() != "Download failed: no file with that path" {
-		t.Errorf("expected error to be 'Download failed: no file with that path'; got %v instead", err)
+	if err == nil || err.Error() != "download failed: no file with that path" {
+		t.Errorf("expected error to be 'download failed: no file with that path'; got %v instead", err)
 	}
 
 	// The renter's downloads queue should be empty.
@@ -475,12 +357,12 @@ func TestRenterLoadNonexistent(t *testing.T) {
 }
 
 // TestRenterHandlerRename checks that valid /renter/rename calls are
-// successful, and that invalid  calls fail with the appropriate error.
+// successful, and that invalid calls fail with the appropriate error.
 func TestRenterHandlerRename(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterHandlerRename")
 	if err != nil {
 		t.Fatal(err)
@@ -498,6 +380,14 @@ func TestRenterHandlerRename(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Try renaming a nonexistent file.
+	renameValues := url.Values{}
+	renameValues.Set("newsiapath", "newdne")
+	err = st.stdPostAPI("/renter/rename/dne", renameValues)
+	if err == nil || err.Error() != renter.ErrUnknownPath.Error() {
+		t.Errorf("expected error to be %v; got %v", renter.ErrUnknownPath, err)
+	}
+
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
 	allowanceValues.Set("funds", testFunds)
@@ -506,13 +396,9 @@ func TestRenterHandlerRename(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create two files.
+	// Create a file.
 	path1 := filepath.Join(st.dir, "test1.dat")
 	if err = createRandFile(path1, 512); err != nil {
-		t.Fatal(err)
-	}
-	path2 := filepath.Join(st.dir, "test2.dat")
-	if err = createRandFile(path2, 512); err != nil {
 		t.Fatal(err)
 	}
 
@@ -522,18 +408,6 @@ func TestRenterHandlerRename(t *testing.T) {
 	if err = st.stdPostAPI("/renter/upload/test1", uploadValues); err != nil {
 		t.Fatal(err)
 	}
-	uploadValues.Set("source", path2)
-	if err = st.stdPostAPI("/renter/upload/test2", uploadValues); err != nil {
-		t.Fatal(err)
-	}
-
-	// Try renaming to a name that's already taken.
-	renameValues := url.Values{}
-	renameValues.Set("newsiapath", "test1")
-	err = st.stdPostAPI("/renter/rename/test2", renameValues)
-	if err == nil || err.Error() != renter.ErrPathOverload.Error() {
-		t.Errorf("expected error to be %v; got %v", renter.ErrPathOverload, err)
-	}
 
 	// Try renaming to an empty string.
 	renameValues.Set("newsiapath", "")
@@ -542,17 +416,40 @@ func TestRenterHandlerRename(t *testing.T) {
 		t.Fatalf("expected error to be %v; got %v", renter.ErrEmptyFilename, err)
 	}
 
-	// Rename the first file.
+	// Rename the file.
 	renameValues.Set("newsiapath", "newtest1")
 	if err = st.stdPostAPI("/renter/rename/test1", renameValues); err != nil {
 		t.Fatal(err)
 	}
 
-	// Try renaming a nonexistent file.
-	renameValues.Set("newsiapath", "newdne")
-	err = st.stdPostAPI("/renter/rename/dne", renameValues)
-	if err == nil || err.Error() != renter.ErrUnknownPath.Error() {
-		t.Errorf("expected error to be %v; got %v", renter.ErrUnknownPath, err)
+	// Should be able to continue uploading and downloading using the new name.
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("upload is not succeeding:", rf.Files[0])
+	}
+	err = st.stdGetAPI("/renter/download/newtest1?destination=" + filepath.Join(st.dir, "testdown2.dat"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create and upload another file.
+	path2 := filepath.Join(st.dir, "test2.dat")
+	if err = createRandFile(path2, 512); err != nil {
+		t.Fatal(err)
+	}
+	uploadValues.Set("source", path2)
+	if err = st.stdPostAPI("/renter/upload/test2", uploadValues); err != nil {
+		t.Fatal(err)
+	}
+	// Try renaming to a name that's already taken.
+	renameValues.Set("newsiapath", "newtest1")
+	err = st.stdPostAPI("/renter/rename/test2", renameValues)
+	if err == nil || err.Error() != renter.ErrPathOverload.Error() {
+		t.Errorf("expected error to be %v; got %v", renter.ErrPathOverload, err)
 	}
 }
 
@@ -563,7 +460,7 @@ func TestRenterHandlerDelete(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterHandlerDelete")
 	if err != nil {
 		t.Fatal(err)
@@ -628,7 +525,7 @@ func TestRenterRelativePathErrorUpload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	st, err := createServerTester("TestRenterRelativePathErrorUpload")
 	if err != nil {
 		t.Fatal(err)
@@ -689,8 +586,8 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	st, err := createServerTester("TestRenterRelativePathErrorUpload")
+	t.Parallel()
+	st, err := createServerTester("TestRenterRelativePathErrorDownload")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -717,7 +614,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 
 	renterDownloadAbsoluteError := "destination must be an absolute path"
 
-	// Create a file.
+	// Create a file, and upload it.
 	path := filepath.Join(st.dir, "test.dat")
 	if err = createRandFile(path, 1024); err != nil {
 		t.Fatal(err)
@@ -727,22 +624,412 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 	if err = st.stdPostAPI("/renter/upload/test", uploadValues); err != nil {
 		t.Fatal(err)
 	}
+	var rf RenterFiles
+	for i := 0; i < 100 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(200 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
+	}
 
-	// This should fail.
+	// Use a relative destination, which should fail.
 	downloadPath := "test1.dat"
 	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); err.Error() != renterDownloadAbsoluteError {
 		t.Fatal(err)
 	}
 
-	// This should fail.
+	// Relative destination stepping backwards should also fail.
 	downloadPath = "../test1.dat"
 	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); err.Error() != renterDownloadAbsoluteError {
 		t.Fatal(err)
 	}
 
-	// This should fail.
+	// Long relative destination should also fail (just missing leading slash).
+	downloadPath = filepath.Join(st.dir[1:], "test1.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err == nil {
+		t.Fatal("expecting an error")
+	}
+
+	// Full destination should succeed.
 	downloadPath = filepath.Join(st.dir, "test1.dat")
-	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); !strings.Contains(err.Error(), "contract") {
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err != nil {
+		t.Fatal("expecting an error")
+	}
+}
+
+// TestRenterPricesHandler checks that the prices command returns reasonable
+// values given the settings of the hosts.
+func TestRenterPricesHandler(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester("TestHostDBHostsAllHandler")
+	if err != nil {
 		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and then get the calculated prices for when there is a
+	// single host.
+	var rpeSingle modules.RenterPriceEstimation
+	if err = st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.getAPI("/renter/prices", &rpeSingle); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create several more hosts all using the default settings.
+	stHost1, err := blankServerTester("TestRenterPricesHandler - Host 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost2, err := blankServerTester("TestRenterPricesHandler - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Connect all the nodes and announce all of the hosts.
+	sts := []*serverTester{st, stHost1, stHost2}
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fundAllNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = announceAllHosts(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Grab the price estimates for when there are a bunch of hosts with the
+	// same stats.
+	var rpeMulti modules.RenterPriceEstimation
+	if err = st.getAPI("/renter/prices", &rpeMulti); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the aggregate is the same.
+	if !rpeMulti.DownloadTerabyte.Equals(rpeSingle.DownloadTerabyte) {
+		t.Log(rpeMulti.DownloadTerabyte)
+		t.Log(rpeSingle.DownloadTerabyte)
+		t.Error("price changed from single to multi")
+	}
+	if !rpeMulti.FormContracts.Equals(rpeSingle.FormContracts) {
+		t.Error("price changed from single to multi")
+	}
+	if !rpeMulti.StorageTerabyteMonth.Equals(rpeSingle.StorageTerabyteMonth) {
+		t.Error("price changed from single to multi")
+	}
+	if !rpeMulti.UploadTerabyte.Equals(rpeSingle.UploadTerabyte) {
+		t.Error("price changed from single to multi")
+	}
+}
+
+// TestRenterPricesHandlerCheap checks that the prices command returns
+// reasonable values given the settings of the hosts.
+func TestRenterPricesHandlerCheap(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester("TestHostDBHostsAllHandlerCheap")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and then get the calculated prices for when there is a
+	// single host.
+	var rpeSingle modules.RenterPriceEstimation
+	if err = st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.getAPI("/renter/prices", &rpeSingle); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create several more hosts all using the default settings.
+	stHost1, err := blankServerTester("TestRenterPricesHandlerCheap - Host 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost2, err := blankServerTester("TestRenterPricesHandlerCheap - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var hg HostGET
+	err = st.getAPI("/host", &hg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost1.getAPI("/host", &hg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost2.getAPI("/host", &hg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set host 5 to be cheaper than the rest by a substantial amount. This
+	// should result in a reduction for the price estimation.
+	vals := url.Values{}
+	vals.Set("mincontractprice", "1")
+	vals.Set("mindownloadbandwidthprice", "1")
+	vals.Set("minstorageprice", "1")
+	vals.Set("minuploadbandwidthprice", "1")
+	err = stHost2.stdPostAPI("/host", vals)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Connect all the nodes and announce all of the hosts.
+	sts := []*serverTester{st, stHost1, stHost2}
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fundAllNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = announceAllHosts(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Grab the price estimates for when there are a bunch of hosts with the
+	// same stats.
+	var rpeMulti modules.RenterPriceEstimation
+	if err = st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.getAPI("/renter/prices", &rpeMulti); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the aggregate is the same.
+	if !(rpeMulti.DownloadTerabyte.Cmp(rpeSingle.DownloadTerabyte) < 0) {
+		t.Log(rpeMulti.DownloadTerabyte)
+		t.Log(rpeSingle.DownloadTerabyte)
+		t.Error("price did not drop from single to multi")
+	}
+	if !(rpeMulti.FormContracts.Cmp(rpeSingle.FormContracts) < 0) {
+		t.Error("price did not drop from single to multi")
+	}
+	if !(rpeMulti.StorageTerabyteMonth.Cmp(rpeSingle.StorageTerabyteMonth) < 0) {
+		t.Error("price did not drop from single to multi")
+	}
+	if !(rpeMulti.UploadTerabyte.Cmp(rpeSingle.UploadTerabyte) < 0) {
+		t.Error("price did not drop from single to multi")
+	}
+}
+
+// TestRenterPricesHandlerIgnorePricey checks that the prices command returns
+// reasonable values given the settings of the hosts.
+func TestRenterPricesHandlerIgnorePricey(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester("TestHostDBHostsAllHandlerIgnorePricey")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and then get the calculated prices for when there is a
+	// single host.
+	var rpeSingle modules.RenterPriceEstimation
+	if err = st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.getAPI("/renter/prices", &rpeSingle); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create several more hosts all using the default settings.
+	stHost1, err := blankServerTester("TestRenterPricesHandlerIgnorePricey - Host 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost2, err := blankServerTester("TestRenterPricesHandlerIgnorePricey - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost3, err := blankServerTester("TestRenterPricesHandlerIgnorePricey - Host 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost4, err := blankServerTester("TestRenterPricesHandlerIgnorePricey - Host 4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost5, err := blankServerTester("TestRenterPricesHandlerIgnorePricey - Host 5")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set host 5 to be cheaper than the rest by a substantial amount. This
+	// should result in a reduction for the price estimation.
+	vals := url.Values{}
+	vals.Set("mindownloadbandwidthprice", "100000000000000000000")
+	vals.Set("mincontractprice", "1000000000000000000000000000")
+	vals.Set("minstorageprice", "100000000000000000000")
+	vals.Set("minuploadbandwidthprice", "100000000000000000000")
+	err = stHost5.stdPostAPI("/host", vals)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Connect all the nodes and announce all of the hosts.
+	sts := []*serverTester{st, stHost1, stHost2, stHost3, stHost4, stHost5}
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fundAllNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = announceAllHosts(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Grab the price estimates for when there are a bunch of hosts with the
+	// same stats.
+	var rpeMulti modules.RenterPriceEstimation
+	if err = st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.getAPI("/renter/prices", &rpeMulti); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the aggregate is the same - price should not have moved
+	// because the expensive host will be ignored as there is only one.
+	if !rpeMulti.DownloadTerabyte.Equals(rpeSingle.DownloadTerabyte) {
+		t.Log(rpeMulti.DownloadTerabyte)
+		t.Log(rpeSingle.DownloadTerabyte)
+		t.Error("price changed from single to multi")
+	}
+	if !rpeMulti.FormContracts.Equals(rpeSingle.FormContracts) {
+		t.Error("price changed from single to multi")
+	}
+	if !rpeMulti.StorageTerabyteMonth.Equals(rpeSingle.StorageTerabyteMonth) {
+		t.Error("price changed from single to multi")
+	}
+	if !rpeMulti.UploadTerabyte.Equals(rpeSingle.UploadTerabyte) {
+		t.Error("price changed from single to multi")
+	}
+}
+
+// TestRenterPricesHandlerPricey checks that the prices command returns
+// reasonable values given the settings of the hosts.
+func TestRenterPricesHandlerPricey(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester("TestHostDBHostsAllHandlerPricey")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and then get the calculated prices for when there is a
+	// single host.
+	var rpeSingle modules.RenterPriceEstimation
+	if err = st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.getAPI("/renter/prices", &rpeSingle); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create several more hosts all using the default settings.
+	stHost1, err := blankServerTester("TestRenterPricesHandlerPricey - Host 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost2, err := blankServerTester("TestRenterPricesHandlerPricey - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var hg HostGET
+	err = st.getAPI("/host", &hg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost1.getAPI("/host", &hg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost2.getAPI("/host", &hg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set host 5 to be cheaper than the rest by a substantial amount. This
+	// should result in a reduction for the price estimation.
+	vals := url.Values{}
+	vals.Set("mindownloadbandwidthprice", "100000000000000000000")
+	vals.Set("mincontractprice", "1000000000000000000000000000")
+	vals.Set("minstorageprice", "100000000000000000000")
+	vals.Set("minuploadbandwidthprice", "100000000000000000000")
+	err = stHost2.stdPostAPI("/host", vals)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Connect all the nodes and announce all of the hosts.
+	sts := []*serverTester{st, stHost1, stHost2}
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fundAllNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = announceAllHosts(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Grab the price estimates for when there are a bunch of hosts with the
+	// same stats.
+	var rpeMulti modules.RenterPriceEstimation
+	if err = st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.getAPI("/renter/prices", &rpeMulti); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the aggregate is the same.
+	if !(rpeMulti.DownloadTerabyte.Cmp(rpeSingle.DownloadTerabyte) > 0) {
+		t.Error("price did not drop from single to multi")
+	}
+	if !(rpeMulti.FormContracts.Cmp(rpeSingle.FormContracts) > 0) {
+		t.Log(rpeMulti.FormContracts)
+		t.Log(rpeSingle.FormContracts)
+		t.Error("price did not drop from single to multi")
+	}
+	if !(rpeMulti.StorageTerabyteMonth.Cmp(rpeSingle.StorageTerabyteMonth) > 0) {
+		t.Error("price did not drop from single to multi")
+	}
+	if !(rpeMulti.UploadTerabyte.Cmp(rpeSingle.UploadTerabyte) > 0) {
+		t.Error("price did not drop from single to multi")
 	}
 }

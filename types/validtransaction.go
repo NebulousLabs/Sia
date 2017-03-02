@@ -184,9 +184,9 @@ func (t Transaction) followsStorageProofRules() error {
 
 // noRepeats checks that a transaction does not spend multiple outputs twice,
 // submit two valid storage proofs for the same file contract, etc. We
-// frivilously check that a file contract termination and storage proof don't
+// frivolously check that a file contract termination and storage proof don't
 // act on the same file contract. There is very little overhead for doing so,
-// and the check is only frivilous because of the current rule that file
+// and the check is only frivolous because of the current rule that file
 // contract terminations are not valid after the proof window opens.
 func (t Transaction) noRepeats() error {
 	// Check that there are no repeat instances of siacoin outputs, storage

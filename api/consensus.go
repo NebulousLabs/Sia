@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/types"
@@ -27,4 +28,21 @@ func (api *API) consensusHandler(w http.ResponseWriter, req *http.Request, _ htt
 		CurrentBlock: cbid,
 		Target:       currentTarget,
 	})
+}
+
+// consensusValidateTransactionsetHandler handles the API calls to
+// /consensus/validate/transactionset.
+func (api *API) consensusValidateTransactionsetHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var txnset []types.Transaction
+	err := json.NewDecoder(req.Body).Decode(&txnset)
+	if err != nil {
+		WriteError(w, Error{"could not decode transaction set: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	_, err = api.cs.TryTransactionSet(txnset)
+	if err != nil {
+		WriteError(w, Error{"transaction set validation failed: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteSuccess(w)
 }

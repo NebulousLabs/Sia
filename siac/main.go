@@ -241,6 +241,9 @@ func main() {
 	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
 
 	root.AddCommand(hostdbCmd)
+	hostdbCmd.AddCommand(hostdbViewCmd)
+	hostdbCmd.Flags().IntVarP(&hostdbNumHosts, "numhosts", "n", 0, "Number of hosts to display from the hostdb")
+	hostdbCmd.Flags().BoolVarP(&hostdbVerbose, "verbose", "v", false, "Display full hostdb information")
 
 	root.AddCommand(minerCmd)
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd)
@@ -257,10 +260,12 @@ func main() {
 	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd,
 		renterDownloadsCmd, renterAllowanceCmd, renterSetAllowanceCmd,
 		renterContractsCmd, renterFilesListCmd, renterFilesRenameCmd,
-		renterFilesUploadCmd, renterUploadsCmd)
+		renterFilesUploadCmd, renterUploadsCmd, renterExportCmd,
+		renterPricesCmd)
 	renterCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
 	renterFilesListCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
+	renterExportCmd.AddCommand(renterExportContractsCmd)
 
 	root.AddCommand(gatewayCmd)
 	gatewayCmd.AddCommand(gatewayConnectCmd, gatewayDisconnectCmd, gatewayAddressCmd, gatewayListCmd)

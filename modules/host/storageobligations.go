@@ -296,85 +296,99 @@ func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID
 	})
 }
 
-// addStorageObligation adds a storage obligation to the host. Because this
-// operation can return errors, the transactions should not be submitted to the
-// blockchain until after this function has indicated success. All of the
-// sectors that are present in the storage obligation should already be on
-// disk, which means that addStorageObligation should be exclusively called
-// when creating a new, empty file contract or when renewing an existing file
+// managedAddStorageObligation adds a storage obligation to the host. Because
+// this operation can return errors, the transactions should not be submitted to
+// the blockchain until after this function has indicated success. All of the
+// sectors that are present in the storage obligation should already be on disk,
+// which means that addStorageObligation should be exclusively called when
+// creating a new, empty file contract or when renewing an existing file
 // contract.
-func (h *Host) addStorageObligation(so storageObligation) error {
-	// Sanity check - obligation should be under lock while being added.
-	soid := so.id()
-	_, exists := h.lockedStorageObligations[soid]
-	if !exists {
-		h.log.Critical("addStorageObligation called with an obligation that is not locked")
-	}
-	// Sanity check - There needs to be enough time left on the file contract
-	// for the host to safely submit the file contract revision.
-	if h.blockHeight+revisionSubmissionBuffer >= so.expiration() {
-		h.log.Critical("submission window was not verified before trying to submit a storage obligation")
-		return errNoBuffer
-	}
-	// Sanity check - the resubmission timeout needs to be smaller than storage
-	// proof window.
-	if so.expiration()+resubmissionTimeout >= so.proofDeadline() {
-		h.log.Critical("host is misconfigured - the storage proof window needs to be long enough to resubmit if needed")
-		return errors.New("fill me in")
-	}
+func (h *Host) managedAddStorageObligation(so storageObligation) error {
+	var soid types.FileContractID
+	err := func() error {
+		h.mu.Lock()
+		defer h.mu.Unlock()
 
-	// Add the storage obligation information to the database.
-	err := h.db.Update(func(tx *bolt.Tx) error {
-		// Sanity check - a storage obligation using the same file contract id
-		// should not already exist. This situation can happen if the
-		// transaction pool ejects a file contract and then a new one is
-		// created. Though the file contract will have the same terms, some
-		// other conditions might cause problems. The check for duplicate file
-		// contract ids should happen during the negotiation phase, and not
-		// during the 'addStorageObligation' phase.
-		bso := tx.Bucket(bucketStorageObligations)
+		// Sanity check - obligation should be under lock while being added.
+		soid = so.id()
+		_, exists := h.lockedStorageObligations[soid]
+		if !exists {
+			h.log.Critical("addStorageObligation called with an obligation that is not locked")
+		}
+		// Sanity check - There needs to be enough time left on the file contract
+		// for the host to safely submit the file contract revision.
+		if h.blockHeight+revisionSubmissionBuffer >= so.expiration() {
+			h.log.Critical("submission window was not verified before trying to submit a storage obligation")
+			return errNoBuffer
+		}
+		// Sanity check - the resubmission timeout needs to be smaller than storage
+		// proof window.
+		if so.expiration()+resubmissionTimeout >= so.proofDeadline() {
+			h.log.Critical("host is misconfigured - the storage proof window needs to be long enough to resubmit if needed")
+			return errors.New("fill me in")
+		}
 
-		// If the storage obligation already has sectors, it means that the
-		// file contract is being renewed, and that the sector should be
-		// re-added with a new expriation height. If there is an error at any
-		// point, all of the sectors should be removed.
-		if len(so.SectorRoots) != 0 {
-			err := h.AddSectorBatch(so.SectorRoots, so.expiration())
+		// Add the storage obligation information to the database.
+		err := h.db.Update(func(tx *bolt.Tx) error {
+			// Sanity check - a storage obligation using the same file contract id
+			// should not already exist. This situation can happen if the
+			// transaction pool ejects a file contract and then a new one is
+			// created. Though the file contract will have the same terms, some
+			// other conditions might cause problems. The check for duplicate file
+			// contract ids should happen during the negotiation phase, and not
+			// during the 'addStorageObligation' phase.
+			bso := tx.Bucket(bucketStorageObligations)
+
+			// If the storage obligation already has sectors, it means that the
+			// file contract is being renewed, and that the sector should be
+			// re-added with a new expriation height. If there is an error at any
+			// point, all of the sectors should be removed.
+			if len(so.SectorRoots) != 0 {
+				err := h.AddSectorBatch(so.SectorRoots, so.expiration())
+				if err != nil {
+					return err
+				}
+			}
+
+			// Add the storage obligation to the database.
+			soBytes, err := json.Marshal(so)
 			if err != nil {
 				return err
 			}
-		}
-
-		// Add the storage obligation to the database.
-		soBytes, err := json.Marshal(so)
+			return bso.Put(soid[:], soBytes)
+		})
 		if err != nil {
 			return err
 		}
-		return bso.Put(soid[:], soBytes)
-	})
+
+		// Update the host financial metrics with regards to this storage
+		// obligation.
+		h.financialMetrics.ContractCount++
+		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Add(so.ContractCost)
+		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Add(so.LockedCollateral)
+		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Add(so.PotentialStorageRevenue)
+		h.financialMetrics.PotentialDownloadBandwidthRevenue = h.financialMetrics.PotentialDownloadBandwidthRevenue.Add(so.PotentialDownloadRevenue)
+		h.financialMetrics.PotentialUploadBandwidthRevenue = h.financialMetrics.PotentialUploadBandwidthRevenue.Add(so.PotentialUploadRevenue)
+		h.financialMetrics.RiskedStorageCollateral = h.financialMetrics.RiskedStorageCollateral.Add(so.RiskedCollateral)
+		h.financialMetrics.TransactionFeeExpenses = h.financialMetrics.TransactionFeeExpenses.Add(so.TransactionFeesAdded)
+		return nil
+	}()
 	if err != nil {
 		return err
 	}
 
-	// Update the host financial metrics with regards to this storage
-	// obligation.
-	h.financialMetrics.ContractCount++
-	h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Add(so.ContractCost)
-	h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Add(so.LockedCollateral)
-	h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Add(so.PotentialStorageRevenue)
-	h.financialMetrics.PotentialDownloadBandwidthRevenue = h.financialMetrics.PotentialDownloadBandwidthRevenue.Add(so.PotentialDownloadRevenue)
-	h.financialMetrics.PotentialUploadBandwidthRevenue = h.financialMetrics.PotentialUploadBandwidthRevenue.Add(so.PotentialUploadRevenue)
-	h.financialMetrics.RiskedStorageCollateral = h.financialMetrics.RiskedStorageCollateral.Add(so.RiskedCollateral)
-	h.financialMetrics.TransactionFeeExpenses = h.financialMetrics.TransactionFeeExpenses.Add(so.TransactionFeesAdded)
-
-	// Set an action item that will have the host verify that the file contract
-	// has been submitted to the blockchain, then another to submit the file
-	// contract revision to the blockchain, and another to submit the storage
-	// proof.
-	err0 := h.tpool.AcceptTransactionSet(so.OriginTransactionSet)
-	if err0 != nil {
-		h.log.Println("Failed to add storage obligation, transaction set was not accepted:", err0)
+	// Check that the transaction is fully valid and submit it to the
+	// transaction pool.
+	err = h.tpool.AcceptTransactionSet(so.OriginTransactionSet)
+	if err != nil {
+		h.log.Println("Failed to add storage obligation, transaction set was not accepted:", err)
+		return err
 	}
+
+	// Queue the action items.
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	// The file contract was already submitted to the blockchain, need to check
 	// after the resubmission timeout that it was submitted successfully.
 	err1 := h.queueActionItem(h.blockHeight+resubmissionTimeout, soid)
@@ -384,7 +398,7 @@ func (h *Host) addStorageObligation(so storageObligation) error {
 	err2 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer, soid)
 	// The storage proof should be submitted
 	err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
-	err = composeErrors(err0, err1, err2, err3)
+	err = composeErrors(err1, err2, err3)
 	if err != nil {
 		h.log.Println("Error with transaction set, redacting obligation, id", so.id())
 		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
@@ -410,7 +424,6 @@ func (h *Host) modifyStorageObligation(so storageObligation, sectorsRemoved []cr
 	// Sanity check - there needs to be enough time to submit the file contract
 	// revision to the blockchain.
 	if so.expiration()-revisionSubmissionBuffer <= h.blockHeight {
-		h.log.Critical("revision submission window was not verified before trying to modify a storage obligation")
 		return errNoBuffer
 	}
 	// Sanity check - sectorsGained and gainedSectorData need to have the same length.

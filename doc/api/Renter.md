@@ -26,6 +26,7 @@ Index
 | [/renter/contracts](#rentercontracts-get)                     | GET       |
 | [/renter/downloads](#renterdownloads-get)                     | GET       |
 | [/renter/files](#renterfiles-get)                             | GET       |
+| [/renter/prices](#renter-prices-get)                          | GET       |
 | [/renter/delete/___*siapath___](#renterdeletesiapath-post)    | POST      |
 | [/renter/download/___*siapath___](#renterdownloadsiapath-get) | GET       |
 | [/renter/rename/___*siapath___](#renterrenamesiapath-post)    | POST      |
@@ -63,11 +64,8 @@ returns the current settings along with metrics on the renter's spending.
   // Metrics about how much the Renter has spent on storage, uploads, and
   // downloads.
   "financialmetrics": {
-    // How much money, in hastings, the Renter has paid into file contracts
-    // formed with hosts. Note that some of this money may be returned to the
-    // Renter when the contract ends. To calculate how much will be returned,
-    // subtract the storage, upload, and download metrics from
-    // ContractSpending.
+    // How much money, in hastings, the Renter has spent on file contracts,
+    // including fees.
     "contractspending": "1234", // hastings
 
     // Amount of money spent on downloads.
@@ -77,7 +75,10 @@ returns the current settings along with metrics on the renter's spending.
     "storagespending": "1234", // hastings
 
     // Amount of money spent on uploads.
-    "uploadspending": "5678" // hastings
+    "uploadspending": "5678", // hastings
+
+    // Amount of money in the allowance that has not been spent.
+    "unspent": "1234" // hastings
   }
 }
 ```
@@ -91,8 +92,20 @@ modify settings that control the renter's behavior.
 // Number of hastings allocated for file contracts in the given period.
 funds // hastings
 
+// Number of hosts that contracts should be formed with. Files cannot be
+// uploaded to more hosts than you have contracts with, and it's generally good
+// to form a few more contracts than you need.
+hosts
+
 // Duration of contracts formed. Must be nonzero.
 period // block height
+
+// Renew window specifies how many blocks before the expriation of the current
+// contracts the renter will wait before renewing the contracts. A smaller
+// renew window means that Sia must be run more frequently, but also means
+// fewer total transaction fees. Storage spending is not affected by the renew
+// window size.
+renewwindow // block height
 ```
 
 ###### Response
@@ -116,6 +129,9 @@ returns active contracts. Expired contracts are not included.
 
       // Address of the host the file contract was formed with.
       "netaddress": "12.34.56.78:9",
+
+      // A signed transaction containing the most recent contract revision.
+      "lasttransaction": {},
 
       // Remaining funds left for the renter to spend on uploads & downloads.
       "renterfunds": "1234", // hastings
@@ -199,6 +215,32 @@ lists the status of all files.
 }
 ```
 
+#### /renter/prices [GET]
+
+lists the estimated prices of performing various storage and data operations.
+
+###### JSON Response
+```javascript
+{
+      // The estimated cost of downloading one terabyte of data from the
+      // network.
+      "downloadterabyte": "1234", // hastings
+
+      // The estimated cost of forming a set of contracts on the network. This
+      // cost also applies to the estimated cost of renewing the renter's set of
+      // contracts.
+      "formcontracts": "1234", // hastings
+
+      // The estimated cost of storing one terabyte of data on the network for
+      // a month, including accounting for redundancy.
+      "storageterabytemonth": "1234", // hastings
+
+      // The estimated cost of uploading one terabyte of data to the network,
+      // including accounting for redundancy.
+      "uploadterabyte": "1234", // hastings
+}
+```
+
 #### /renter/delete/___*siapath___ [POST]
 
 deletes a renter file entry. Does not delete any downloads or original files,
@@ -269,8 +311,15 @@ uploads a file to the network from the local filesystem.
 
 ###### Query String Parameters
 ```
+// The number of data pieces to use when erasure coding the file.
+datapieces // int
+
+// The number of parity pieces to use when erasure coding the file. Total
+// redundancy of the file is (datapieces+paritypieces)/datapieces.
+paritypieces // int
+
 // Location on disk of the file being uploaded.
-source
+source // string - a filepath
 ```
 
 ###### Response

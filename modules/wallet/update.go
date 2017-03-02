@@ -299,6 +299,10 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if err != nil {
 		w.log.Println("ERROR: failed to add consensus change:", err)
 	}
+
+	if cc.Synced {
+		go w.threadedDefragWallet()
+	}
 }
 
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed

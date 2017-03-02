@@ -52,7 +52,7 @@ func TestFileAvailable(t *testing.T) {
 	for i := uint64(0); i < f.numChunks(); i++ {
 		fc.Pieces = append(fc.Pieces, pieceData{Chunk: i, Piece: 0})
 	}
-	f.contracts = map[types.FileContractID]fileContract{types.FileContractID{}: fc}
+	f.contracts = map[types.FileContractID]fileContract{{}: fc}
 
 	if !f.available() {
 		t.Error("file should be available")
@@ -337,5 +337,17 @@ func TestRenterRenameFile(t *testing.T) {
 	err = rt.renter.RenameFile("1", "1")
 	if err != ErrPathOverload {
 		t.Error("Expecting ErrPathOverload, got", err)
+	}
+
+	// Renaming should also update the tracking set
+	rt.renter.tracking["1"] = trackedFile{"foo"}
+	err = rt.renter.RenameFile("1", "1b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, oldexists := rt.renter.tracking["1"]
+	_, newexists := rt.renter.tracking["1b"]
+	if oldexists || !newexists {
+		t.Error("renaming should have updated the entry in the tracking set")
 	}
 }

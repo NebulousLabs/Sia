@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/julienschmidt/httprouter"
 )
@@ -71,35 +72,127 @@ func (api *API) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httpr
 func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Map each query string to a field in the host settings.
 	settings := api.host.InternalSettings()
-	qsVars := map[string]interface{}{
-		"acceptingcontracts":   &settings.AcceptingContracts,
-		"maxduration":          &settings.MaxDuration,
-		"maxdownloadbatchsize": &settings.MaxDownloadBatchSize,
-		"maxrevisebatchsize":   &settings.MaxReviseBatchSize,
-		"netaddress":           &settings.NetAddress,
-		"windowsize":           &settings.WindowSize,
 
-		"collateral":       &settings.Collateral,
-		"collateralbudget": &settings.CollateralBudget,
-		"maxcollateral":    &settings.MaxCollateral,
-
-		"mincontractprice":          &settings.MinContractPrice,
-		"mindownloadbandwidthprice": &settings.MinDownloadBandwidthPrice,
-		"minstorageprice":           &settings.MinStoragePrice,
-		"minuploadbandwidthprice":   &settings.MinUploadBandwidthPrice,
-	}
-
-	// Iterate through the query string and replace any fields that have been
-	// altered.
-	for qs := range qsVars {
-		if req.FormValue(qs) != "" { // skip empty values
-			_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
-			if err != nil {
-				WriteError(w, Error{"Malformed " + qs}, http.StatusBadRequest)
-				return
-			}
+	if req.FormValue("acceptingcontracts") != "" {
+		var x bool
+		_, err := fmt.Sscan(req.FormValue("acceptingcontracts"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed acceptingcontracts"}, http.StatusBadRequest)
+			return
 		}
+		settings.AcceptingContracts = x
 	}
+	if req.FormValue("maxdownloadbatchsize") != "" {
+		var x uint64
+		_, err := fmt.Sscan(req.FormValue("maxdownloadbatchsize"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed maxdownloadbatchsize"}, http.StatusBadRequest)
+			return
+		}
+		settings.MaxDownloadBatchSize = x
+	}
+	if req.FormValue("maxduration") != "" {
+		var x types.BlockHeight
+		_, err := fmt.Sscan(req.FormValue("maxduration"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed maxduration"}, http.StatusBadRequest)
+			return
+		}
+		settings.MaxDuration = x
+	}
+	if req.FormValue("maxrevisebatchsize") != "" {
+		var x uint64
+		_, err := fmt.Sscan(req.FormValue("maxrevisebatchsize"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed maxrevisebatchsize"}, http.StatusBadRequest)
+			return
+		}
+		settings.MaxReviseBatchSize = x
+	}
+	if req.FormValue("netaddress") != "" {
+		var x modules.NetAddress
+		_, err := fmt.Sscan(req.FormValue("netaddress"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed netaddress"}, http.StatusBadRequest)
+			return
+		}
+		settings.NetAddress = x
+	}
+	if req.FormValue("windowsize") != "" {
+		var x types.BlockHeight
+		_, err := fmt.Sscan(req.FormValue("windowsize"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed windowsize"}, http.StatusBadRequest)
+			return
+		}
+		settings.WindowSize = x
+	}
+
+	if req.FormValue("collateral") != "" {
+		var x types.Currency
+		_, err := fmt.Sscan(req.FormValue("collateral"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed collateral"}, http.StatusBadRequest)
+			return
+		}
+		settings.Collateral = x
+	}
+	if req.FormValue("collateralbudget") != "" {
+		var x types.Currency
+		_, err := fmt.Sscan(req.FormValue("collateralbudget"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed collateralbudget"}, http.StatusBadRequest)
+			return
+		}
+		settings.CollateralBudget = x
+	}
+	if req.FormValue("maxcollateral") != "" {
+		var x types.Currency
+		_, err := fmt.Sscan(req.FormValue("maxcollateral"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed maxcollateral"}, http.StatusBadRequest)
+			return
+		}
+		settings.MaxCollateral = x
+	}
+
+	if req.FormValue("mincontractprice") != "" {
+		var x types.Currency
+		_, err := fmt.Sscan(req.FormValue("mincontractprice"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed mincontractprice"}, http.StatusBadRequest)
+			return
+		}
+		settings.MinContractPrice = x
+	}
+	if req.FormValue("mindownloadbandwidthprice") != "" {
+		var x types.Currency
+		_, err := fmt.Sscan(req.FormValue("mindownloadbandwidthprice"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed mindownloadbandwidthprice"}, http.StatusBadRequest)
+			return
+		}
+		settings.MinDownloadBandwidthPrice = x
+	}
+	if req.FormValue("minstorageprice") != "" {
+		var x types.Currency
+		_, err := fmt.Sscan(req.FormValue("minstorageprice"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed minstorageprice"}, http.StatusBadRequest)
+			return
+		}
+		settings.MinStoragePrice = x
+	}
+	if req.FormValue("minuploadbandwidthprice") != "" {
+		var x types.Currency
+		_, err := fmt.Sscan(req.FormValue("minuploadbandwidthprice"), &x)
+		if err != nil {
+			WriteError(w, Error{"Malformed minuploadbandwidthprice"}, http.StatusBadRequest)
+			return
+		}
+		settings.MinUploadBandwidthPrice = x
+	}
+
 	err := api.host.SetInternalSettings(settings)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)

@@ -25,8 +25,9 @@ func TestProcessConsensusUpdate(t *testing.T) {
 		contracts: map[types.FileContractID]modules.RenterContract{
 			rc.ID: rc,
 		},
-		persist: new(memPersist),
-		log:     persist.NewLogger(ioutil.Discard),
+		oldContracts: make(map[types.FileContractID]modules.RenterContract),
+		persist:      new(memPersist),
+		log:          persist.NewLogger(ioutil.Discard),
 	}
 
 	// process 20 blocks; contract should remain

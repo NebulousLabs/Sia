@@ -32,9 +32,10 @@ func TestAddPeer(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	g := newTestingGateway("TestAddPeer", t)
 	defer g.Close()
+
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.addPeer(&peer{
@@ -54,11 +55,12 @@ func TestRandomOutboundPeer(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	g := newTestingGateway("TestRandomInboundPeer", t)
 	defer g.Close()
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
 	_, err := g.randomOutboundPeer()
 	if err != errNoPeers {
 		t.Fatal("expected errNoPeers, got", err)
@@ -85,7 +87,7 @@ func TestListen(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	g := newTestingGateway("TestListen", t)
 	defer g.Close()
 
@@ -200,6 +202,7 @@ func TestConnect(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// create bootstrap peer
 	bootstrap := newTestingGateway("TestConnect1", t)
 	defer bootstrap.Close()
@@ -353,6 +356,7 @@ func TestConnectRejectsInvalidAddrs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	g := newTestingGateway("TestConnectRejectsInvalidAddrs", t)
 	defer g.Close()
 
@@ -538,6 +542,7 @@ func TestAcceptConnRejectsVersions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	g := newTestingGateway("TestAcceptConnRejectsVersions", t)
 	defer g.Close()
 
@@ -650,7 +655,7 @@ func TestDisconnect(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	g := newTestingGateway("TestDisconnect", t)
 	defer g.Close()
 
@@ -694,7 +699,6 @@ func TestPeerManager(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-
 	g1 := newTestingGateway("TestPeerManager1", t)
 	defer g1.Close()
 

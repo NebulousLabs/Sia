@@ -92,12 +92,12 @@ func newTestingHost(testdir string, cs modules.ConsensusSet, tp modules.Transact
 
 // newTestingContractor is a helper function that creates a ready-to-use
 // contractor.
-func newTestingContractor(testdir string, cs modules.ConsensusSet, tp modules.TransactionPool) (*Contractor, error) {
+func newTestingContractor(testdir string, g modules.Gateway, cs modules.ConsensusSet, tp modules.TransactionPool) (*Contractor, error) {
 	w, err := newTestingWallet(testdir, cs, tp)
 	if err != nil {
 		return nil, err
 	}
-	hdb, err := hostdb.New(cs, filepath.Join(testdir, "hostdb"))
+	hdb, err := hostdb.New(g, cs, filepath.Join(testdir, "hostdb"))
 	if err != nil {
 		return nil, err
 	}
@@ -148,9 +148,9 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	// create host and contractor, using same consensus set and gateway
 	h, err := newTestingHost(filepath.Join(testdir, "Host"), cs, tp)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, build.ExtendErr("error creating testing host", err)
 	}
-	c, err := newTestingContractor(filepath.Join(testdir, "Contractor"), cs, tp)
+	c, err := newTestingContractor(filepath.Join(testdir, "Contractor"), g, cs, tp)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -158,17 +158,17 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	// announce the host
 	err = h.Announce()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, build.ExtendErr("error announcing host", err)
 	}
 
 	// mine a block, processing the announcement
 	m.AddBlock()
 
 	// wait for hostdb to scan host
-	for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
-		time.Sleep(time.Millisecond * 50)
+	for i := 0; i < 50 && len(c.hdb.ActiveHosts()) == 0; i++ {
+		time.Sleep(time.Millisecond * 100)
 	}
-	if len(c.hdb.RandomHosts(1, nil)) == 0 {
+	if len(c.hdb.ActiveHosts()) == 0 {
 		return nil, nil, nil, errors.New("host did not make it into the contractor hostdb in time")
 	}
 
@@ -187,21 +187,18 @@ func TestIntegrationFormContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	_, err = c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if contract.NetAddress != h.ExternalSettings().NetAddress {
-		t.Fatal("bad contract")
 	}
 }
 
@@ -218,9 +215,10 @@ func TestIntegrationReviseContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -266,9 +264,10 @@ func TestIntegrationUploadDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -321,19 +320,18 @@ func TestIntegrationUploadDownload(t *testing.T) {
 // TestIntegrationDelete tests that the contractor can delete a sector from a
 // contract previously formed with a host.
 func TestIntegrationDelete(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
+	t.Skip("deletion is deprecated")
+
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationDelete")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -386,19 +384,18 @@ func TestIntegrationDelete(t *testing.T) {
 // TestIntegrationInsertDelete tests that the contractor can insert and delete
 // a sector during the same revision.
 func TestIntegrationInsertDelete(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
+	t.Skip("deletion is deprecated")
+
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationInsertDelete")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -446,19 +443,18 @@ func TestIntegrationInsertDelete(t *testing.T) {
 // TestIntegrationModify tests that the contractor can modify a previously-
 // uploaded sector.
 func TestIntegrationModify(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
+	t.Skip("modification is deprecated")
+
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationModify")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -523,9 +519,10 @@ func TestIntegrationRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -650,9 +647,10 @@ func TestIntegrationResync(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -702,15 +700,15 @@ func TestIntegrationResync(t *testing.T) {
 	}
 	contract = c.contracts[contract.ID]
 
-	// corrupt contract and delete its cachedRevision
+	// Add some corruption to the set of cached revisions.
 	badContract := contract
 	badContract.LastRevision.NewRevisionNumber--
 	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
-
 	c.mu.Lock()
-	delete(c.cachedRevisions, contract.ID)
-	c.mu.Unlock()
-	c.mu.Lock()
+	cr := c.cachedRevisions[contract.ID]
+	cr.Revision.NewRevisionNumber = 0
+	cr.Revision.NewRevisionNumber--
+	c.cachedRevisions[contract.ID] = cr
 	c.contracts[badContract.ID] = badContract
 	c.mu.Unlock()
 
@@ -739,14 +737,16 @@ func TestIntegrationResync(t *testing.T) {
 	}
 	downloader.Close()
 
-	// corrupt contract and delete its cachedRevision
+	// Add some corruption to the set of cached revisions.
 	badContract = contract
 	badContract.LastRevision.NewRevisionNumber--
-	badContract.MerkleRoots = nil // delete Merkle roots
-
+	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
 	c.mu.Lock()
+	cr = c.cachedRevisions[contract.ID]
+	cr.Revision.NewRevisionNumber = 0
+	cr.Revision.NewRevisionNumber--
+	c.cachedRevisions[contract.ID] = cr
 	c.contracts[badContract.ID] = badContract
-	delete(c.cachedRevisions, contract.ID)
 	c.mu.Unlock()
 
 	// Editor should fail with the bad contract
@@ -786,9 +786,10 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -879,9 +880,10 @@ func TestIntegrationEditorCaching(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
+	defer c.Close()
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -956,4 +958,101 @@ func TestIntegrationEditorCaching(t *testing.T) {
 		t.Fatal("editor should not have been cached after all clients were closed")
 	}
 	d4.Close()
+}
+
+// TestIntegrationCachedRenew tests that the contractor can renew with a host
+// after being interrupted during contract revision.
+func TestIntegrationCachedRenew(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// create testing trio
+	h, c, _, err := newTestingTrio("TestIntegrationCachedRenew")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Close()
+	defer c.Close()
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
+
+	// revise the contract
+	editor, err := c.Editor(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := crypto.RandBytes(int(modules.SectorSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := editor.Upload(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// download the data
+	downloader, err := c.Downloader(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retrieved, err := downloader.Sector(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, retrieved) {
+		t.Fatal("downloaded data does not match original")
+	}
+	err = downloader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract = c.contracts[contract.ID]
+
+	// corrupt the contract and cachedRevision
+	badContract := contract
+	badContract.LastRevision.NewRevisionNumber--
+	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
+	c.mu.Lock()
+	cr := c.cachedRevisions[contract.ID]
+	cr.Revision.NewRevisionNumber = 0
+	cr.Revision.NewRevisionNumber--
+	c.cachedRevisions[contract.ID] = cr
+	c.contracts[badContract.ID] = badContract
+	c.mu.Unlock()
+
+	// Renew should fail with the bad contract + cachedRevision
+	_, err = c.managedRenew(badContract, 20, c.blockHeight+200)
+	if !proto.IsRevisionMismatch(err) {
+		t.Fatal("expected revision mismatch, got", err)
+	}
+
+	// add cachedRevision
+	cachedRev := cachedRevision{contract.LastRevision, contract.MerkleRoots}
+	c.mu.Lock()
+	c.cachedRevisions[contract.ID] = cachedRev
+	c.mu.Unlock()
+
+	// Renew should now succeed after loading the cachedRevision
+	_, err = c.managedRenew(badContract, 20, c.blockHeight+200)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

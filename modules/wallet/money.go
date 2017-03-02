@@ -22,7 +22,9 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 
 	w.db.View(func(tx *bolt.Tx) error {
 		dbForEachSiacoinOutput(tx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
-			siacoinBalance = siacoinBalance.Add(sco.Value)
+			if sco.Value.Cmp(dustValue()) > 0 {
+				siacoinBalance = siacoinBalance.Add(sco.Value)
+			}
 		})
 		return dbForEachSiafundOutput(tx, func(_ types.SiafundOutputID, sfo types.SiafundOutput) {
 			siafundBalance = siafundBalance.Add(sfo.Value)
@@ -46,7 +48,7 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 			}
 		}
 		for _, output := range upt.Outputs {
-			if output.FundType == types.SpecifierSiacoinOutput && output.WalletAddress {
+			if output.FundType == types.SpecifierSiacoinOutput && output.WalletAddress && output.Value.Cmp(dustValue()) > 0 {
 				incomingSiacoins = incomingSiacoins.Add(output.Value)
 			}
 		}
@@ -71,17 +73,17 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 	txnBuilder := w.StartTransaction()
 	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
 	if err != nil {
-		return nil, err
+		return nil, build.ExtendErr("unable to fund transaction", err)
 	}
 	txnBuilder.AddMinerFee(tpoolFee)
 	txnBuilder.AddSiacoinOutput(output)
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
-		return nil, err
+		return nil, build.ExtendErr("unable to sign transaction", err)
 	}
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
-		return nil, err
+		return nil, build.ExtendErr("unable to get transaction accepted", err)
 	}
 	return txnSet, nil
 }

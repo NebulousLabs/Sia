@@ -107,21 +107,19 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	if he.invalid {
 		return crypto.Hash{}, errInvalidEditor
 	}
-
-	oldUploadSpending := he.editor.UploadSpending
-	oldStorageSpending := he.editor.StorageSpending
 	contract, sectorRoot, err := he.editor.Upload(data)
 	if err != nil {
 		return crypto.Hash{}, err
 	}
-	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
-	storageDelta := he.editor.StorageSpending.Sub(oldStorageSpending)
-
 	he.contractor.mu.Lock()
-	he.contractor.financialMetrics.UploadSpending = he.contractor.financialMetrics.UploadSpending.Add(uploadDelta)
-	he.contractor.financialMetrics.StorageSpending = he.contractor.financialMetrics.StorageSpending.Add(storageDelta)
 	he.contractor.contracts[contract.ID] = contract
-	he.contractor.saveSync()
+	he.contractor.persist.update(updateUploadRevision{
+		NewRevisionTxn:     contract.LastRevisionTxn,
+		NewSectorRoot:      sectorRoot,
+		NewSectorIndex:     len(contract.MerkleRoots) - 1,
+		NewUploadSpending:  contract.UploadSpending,
+		NewStorageSpending: contract.StorageSpending,
+	})
 	he.contractor.mu.Unlock()
 	he.contract = contract
 
@@ -157,16 +155,11 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 	if he.invalid {
 		return errInvalidEditor
 	}
-
-	oldUploadSpending := he.editor.UploadSpending
 	contract, err := he.editor.Modify(oldRoot, newRoot, offset, newData)
 	if err != nil {
 		return err
 	}
-	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
-
 	he.contractor.mu.Lock()
-	he.contractor.financialMetrics.UploadSpending = he.contractor.financialMetrics.UploadSpending.Add(uploadDelta)
 	he.contractor.contracts[contract.ID] = contract
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
@@ -179,7 +172,7 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 // delete sectors on a host.
 func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 	c.mu.RLock()
-	id = c.resolveID(id)
+	id = c.ResolveID(id)
 	cachedEditor, haveEditor := c.editors[id]
 	height := c.blockHeight
 	contract, haveContract := c.contracts[id]
@@ -198,7 +191,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 		return cachedEditor, nil
 	}
 
-	host, haveHost := c.hdb.Host(contract.NetAddress)
+	host, haveHost := c.hdb.Host(contract.HostPublicKey)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
 	} else if height > contract.EndHeight() {
@@ -213,6 +206,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 			host.Collateral = maxUploadCollateral
 		}
 	}
+	contract.NetAddress = host.NetAddress
 
 	// acquire revising lock
 	c.mu.Lock()
@@ -233,6 +227,17 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 		}
 	}()
 
+	// Sanity check, unless this is a brand new contract, a cached revision
+	// should exist.
+	if build.DEBUG && contract.LastRevision.NewRevisionNumber > 1 {
+		c.mu.RLock()
+		_, exists := c.cachedRevisions[contract.ID]
+		c.mu.RUnlock()
+		if !exists {
+			c.log.Critical("Cached revision does not exist for contract.")
+		}
+	}
+
 	// create editor
 	e, err := proto.NewEditor(host, contract, height)
 	if proto.IsRevisionMismatch(err) {
@@ -246,8 +251,8 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 			return nil, err
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
-		contract.LastRevision = cached.revision
-		contract.MerkleRoots = cached.merkleRoots
+		contract.LastRevision = cached.Revision
+		contract.MerkleRoots = cached.MerkleRoots
 		e, err = proto.NewEditor(host, contract, height)
 	}
 	if err != nil {
@@ -255,7 +260,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 	}
 	// supply a SaveFn that saves the revision to the contractor's persist
 	// (the existing revision will be overwritten when SaveFn is called)
-	e.SaveFn = c.saveRevision(contract.ID)
+	e.SaveFn = c.saveUploadRevision(contract.ID)
 
 	// cache editor
 	he := &hostEditor{

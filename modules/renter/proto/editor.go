@@ -12,6 +12,12 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var hostPriceLeeway = build.Select(build.Var{
+	Dev:      0.05,
+	Standard: 0.002,
+	Testing:  0.002,
+}).(float64)
+
 var (
 	// sectorHeight is the height of a Merkle tree that covers a single
 	// sector. It is log2(modules.SectorSize / crypto.SegmentSize)
@@ -43,10 +49,6 @@ type Editor struct {
 	contract modules.RenterContract // updated after each revision
 
 	SaveFn revisionSaver
-
-	// metrics
-	StorageSpending types.Currency
-	UploadSpending  types.Currency
 }
 
 // Close cleanly terminates the revision loop with the host and closes the
@@ -113,20 +115,23 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowEnd-he.height))
 	sectorStoragePrice := he.host.StoragePrice.Mul(blockBytes)
 	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(modules.SectorSize)
-	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
-	if he.contract.RenterFunds().Cmp(sectorPrice) < 0 {
-		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
-	}
 	sectorCollateral := he.host.Collateral.Mul(blockBytes)
-	if he.contract.LastRevision.NewMissedProofOutputs[1].Value.Cmp(sectorCollateral) < 0 {
-		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient collateral to support upload")
-	}
+
 	// to mitigate small errors (e.g. differing block heights), fudge the
 	// price and collateral by 0.2%. This is only applied to hosts above
 	// v1.0.1; older hosts use stricter math.
 	if build.VersionCmp(he.host.Version, "1.0.1") > 0 {
-		sectorPrice = sectorPrice.MulFloat(1.002)
-		sectorCollateral = sectorCollateral.MulFloat(0.998)
+		sectorStoragePrice = sectorStoragePrice.MulFloat(1 + hostPriceLeeway)
+		sectorBandwidthPrice = sectorBandwidthPrice.MulFloat(1 + hostPriceLeeway)
+		sectorCollateral = sectorCollateral.MulFloat(1 - hostPriceLeeway)
+	}
+
+	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
+	if he.contract.RenterFunds().Cmp(sectorPrice) < 0 {
+		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
+	}
+	if he.contract.LastRevision.NewMissedProofOutputs[1].Value.Cmp(sectorCollateral) < 0 {
+		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient collateral to support upload")
 	}
 
 	// calculate the new Merkle root
@@ -148,8 +153,8 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 	}
 
 	// update metrics
-	he.StorageSpending = he.StorageSpending.Add(sectorStoragePrice)
-	he.UploadSpending = he.UploadSpending.Add(sectorBandwidthPrice)
+	he.contract.StorageSpending = he.contract.StorageSpending.Add(sectorStoragePrice)
+	he.contract.UploadSpending = he.contract.UploadSpending.Add(sectorBandwidthPrice)
 
 	return he.contract, sectorRoot, nil
 }
@@ -232,7 +237,7 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 	}
 
 	// update metrics
-	he.UploadSpending = he.UploadSpending.Add(sectorBandwidthPrice)
+	he.contract.UploadSpending = he.contract.UploadSpending.Add(sectorBandwidthPrice)
 
 	return he.contract, nil
 }

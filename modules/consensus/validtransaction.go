@@ -313,20 +313,12 @@ func validTransaction(tx *bolt.Tx, t types.Transaction) error {
 	return nil
 }
 
-// TryTransactionSet applies the input transactions to the consensus set to
+// tryTransactionSet applies the input transactions to the consensus set to
 // determine if they are valid. An error is returned IFF they are not a valid
 // set in the current consensus set. The size of the transactions and the set
 // is not checked. After the transactions have been validated, a consensus
 // change is returned detailing the diffs that the transaciton set would have.
-func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
-	err := cs.tg.Add()
-	if err != nil {
-		return modules.ConsensusChange{}, err
-	}
-	defer cs.tg.Done()
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-
+func (cs *ConsensusSet) tryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the
@@ -339,7 +331,7 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	// manually manage the tx instead of using 'Update', but that has safety
 	// concerns and is more difficult to implement correctly.
 	errSuccess := errors.New("success")
-	err = cs.db.Update(func(tx *bolt.Tx) error {
+	err := cs.db.Update(func(tx *bolt.Tx) error {
 		diffHolder.Height = blockHeight(tx)
 		for _, txn := range txns {
 			err := validTransaction(tx, txn)
@@ -361,4 +353,34 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 		SiafundPoolDiffs:          diffHolder.SiafundPoolDiffs,
 	}
 	return cc, nil
+}
+
+// TryTransactionSet applies the input transactions to the consensus set to
+// determine if they are valid. An error is returned IFF they are not a valid
+// set in the current consensus set. The size of the transactions and the set
+// is not checked. After the transactions have been validated, a consensus
+// change is returned detailing the diffs that the transaciton set would have.
+func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
+	err := cs.tg.Add()
+	if err != nil {
+		return modules.ConsensusChange{}, err
+	}
+	defer cs.tg.Done()
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.tryTransactionSet(txns)
+}
+
+// LockedTryTransactionSet calls fn while under read-lock, passing it a
+// version of TryTransactionSet that can be called under read-lock. This fixes
+// an edge case in the transaction pool.
+func (cs *ConsensusSet) LockedTryTransactionSet(fn func(func(txns []types.Transaction) (modules.ConsensusChange, error)) error) error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return fn(cs.tryTransactionSet)
 }
