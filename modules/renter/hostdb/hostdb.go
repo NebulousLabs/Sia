@@ -155,6 +155,9 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	if err != nil {
 		return nil, errors.New("hostdb subscription failed: " + err.Error())
 	}
+	hdb.tg.OnStop(func() {
+		cs.Unsubscribe(hdb)
+	})
 
 	// Spin up the host scanning processes.
 	if build.Release == "standard" {

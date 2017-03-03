@@ -165,6 +165,7 @@ func addPubKeys(cs consensusSet, contracts map[string]modules.RenterContract) ma
 		c.HostPublicKey = pubkeys[c.NetAddress]
 		contracts[id] = c
 	}
+	cs.Unsubscribe(&pubkeys)
 	return contracts
 }
 
