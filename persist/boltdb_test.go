@@ -86,7 +86,7 @@ func TestOpenDatabase(t *testing.T) {
 	}
 	// Create a folder for the database file. If a folder by that name exists
 	// already, it will be replaced by an empty folder.
-	testDir := build.TempDir(persistDir, "TestOpenNewDatabase")
+	testDir := build.TempDir(persistDir, t.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -212,7 +212,7 @@ func TestErrPermissionOpenDatabase(t *testing.T) {
 		dbVersion  = "0.0.0"
 		dbFilename = "Fake Filename"
 	)
-	testDir := build.TempDir(persistDir, "TestErrPermissionOpenDatabase")
+	testDir := build.TempDir(persistDir, t.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -248,7 +248,7 @@ func TestErrTxNotWritable(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testDir := build.TempDir(persistDir, "TestErrTxNotWritable")
+	testDir := build.TempDir(persistDir, t.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -287,7 +287,7 @@ func TestErrDatabaseNotOpen(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testDir := build.TempDir(persistDir, "TestErrDatabaseNotOpen")
+	testDir := build.TempDir(persistDir, t.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -323,7 +323,7 @@ func TestErrCheckMetadata(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testDir := build.TempDir(persistDir, "TestErrCheckMetadata")
+	testDir := build.TempDir(persistDir, t.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -382,7 +382,7 @@ func TestErrIntegratedCheckMetadata(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testDir := build.TempDir(persistDir, "TestErrIntegratedCheckMetadata")
+	testDir := build.TempDir(persistDir, t.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)

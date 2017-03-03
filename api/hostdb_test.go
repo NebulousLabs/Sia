@@ -27,7 +27,7 @@ func TestHostDBHostsActiveHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestHostDBHostsActiveHandler")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestHostDBHostsAllHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestHostDBHostsAllHandler")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestHostDBHostsHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestHostDBHostsHandler")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,11 +318,11 @@ func TestHostDBScanOnlineOffline(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostDBScanOnlineOffline")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost, err := blankServerTester("TestHostDBScanOnlineAndOffline-Host")
+	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,11 +418,11 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostDBAndRenterDownloadDynamicIPs")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost, err := blankServerTester("TestHostDBAndRenterDownloadDynamicIPs-Host")
+	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -636,11 +636,11 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostDBAndRenterUploadDynamicIPs")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost, err := blankServerTester("TestHostDBAndRenterUploadDynamicIPs-Host")
+	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -885,11 +885,11 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostDBAndRenterFormDynamicIPs")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost, err := blankServerTester("TestHostDBAndRenterFormDynamicIPs-Host")
+	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1089,11 +1089,11 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostDBAndRenterRenewDynamicIPs")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost, err := blankServerTester("TestHostDBAndRenterRenewDynamicIPs-Host")
+	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
 	}

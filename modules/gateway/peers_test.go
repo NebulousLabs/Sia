@@ -33,7 +33,7 @@ func TestAddPeer(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestAddPeer", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 
 	g.mu.Lock()
@@ -56,7 +56,7 @@ func TestRandomOutboundPeer(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestRandomInboundPeer", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -88,7 +88,7 @@ func TestListen(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestListen", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 
 	// compliant connect with old version
@@ -204,7 +204,7 @@ func TestConnect(t *testing.T) {
 	}
 	t.Parallel()
 	// create bootstrap peer
-	bootstrap := newTestingGateway("TestConnect1", t)
+	bootstrap := newNamedTestingGateway(t, "1")
 	defer bootstrap.Close()
 
 	// give it a node
@@ -213,7 +213,7 @@ func TestConnect(t *testing.T) {
 	bootstrap.mu.Unlock()
 
 	// create peer who will connect to bootstrap
-	g := newTestingGateway("TestConnect2", t)
+	g := newNamedTestingGateway(t, "2")
 	defer g.Close()
 
 	// first simulate a "bad" connect, where bootstrap won't share its nodes
@@ -357,10 +357,10 @@ func TestConnectRejectsInvalidAddrs(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestConnectRejectsInvalidAddrs", t)
+	g := newNamedTestingGateway(t, "1")
 	defer g.Close()
 
-	g2 := newTestingGateway("TestConnectRejectsInvalidAddrs2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
 	_, g2Port, err := net.SplitHostPort(string(g2.Address()))
@@ -412,7 +412,7 @@ func TestConnectRejectsVersions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	g := newTestingGateway("TestConnectRejectsVersions", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 	// Setup a listener that mocks Gateway.acceptConn, but sends the
 	// version sent over mockVersionChan instead of build.Version.
@@ -543,7 +543,7 @@ func TestAcceptConnRejectsVersions(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestAcceptConnRejectsVersions", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 
 	tests := []struct {
@@ -656,7 +656,7 @@ func TestDisconnect(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestDisconnect", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 
 	if err := g.Disconnect("bar.com:123"); err == nil {
@@ -699,11 +699,11 @@ func TestPeerManager(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestPeerManager1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
 
 	// create a valid node to connect to
-	g2 := newTestingGateway("TestPeerManager2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
 	// g1's node list should only contain g2
@@ -737,8 +737,7 @@ func TestOverloadedBootstrap(t *testing.T) {
 	// first node.
 	var gs []*Gateway
 	for i := 0; i < fullyConnectedThreshold*2; i++ {
-		gname := "TestOverloadedBootstrap" + strconv.Itoa(i)
-		gs = append(gs, newTestingGateway(gname, t))
+		gs = append(gs, newNamedTestingGateway(t, strconv.Itoa(i)))
 		// Connect this gateway to the first gateway.
 		if i == 0 {
 			continue

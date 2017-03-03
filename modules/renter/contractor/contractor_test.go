@@ -40,7 +40,7 @@ func TestNew(t *testing.T) {
 	// Using a stub implementation of the dependencies is fine, as long as its
 	// non-nil.
 	var stub newStub
-	dir := build.TempDir("contractor", "TestNew")
+	dir := build.TempDir("contractor", t.Name())
 
 	// Sane values.
 	_, err := New(stub, stub, stub, stub, dir)
@@ -115,7 +115,7 @@ func TestContract(t *testing.T) {
 // TestContracts tests the Contracts method.
 func TestContracts(t *testing.T) {
 	var stub newStub
-	dir := build.TempDir("contractor", "TestContracts")
+	dir := build.TempDir("contractor", t.Name())
 	c, err := New(stub, stub, stub, stub, dir)
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
@@ -193,7 +193,7 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.SkipNow()
 	}
 	// create testing trio
-	_, c, m, err := newTestingTrio("TestIntegrationSetAllowance")
+	_, c, m, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

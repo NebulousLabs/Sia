@@ -15,7 +15,7 @@ func TestIntegrationLargeTransactions(t *testing.T) {
 		t.SkipNow()
 	}
 
-	tpt, err := createTpoolTester("TestIntegrationLargeTransaction")
+	tpt, err := createTpoolTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

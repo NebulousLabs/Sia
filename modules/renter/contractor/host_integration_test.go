@@ -182,7 +182,7 @@ func TestIntegrationFormContract(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	h, c, _, err := newTestingTrio("TestIntegrationFormContract")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestIntegrationReviseContract")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestIntegrationUploadDownload")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +323,7 @@ func TestIntegrationDelete(t *testing.T) {
 	t.Skip("deletion is deprecated")
 
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestIntegrationDelete")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,7 +387,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	t.Skip("deletion is deprecated")
 
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestIntegrationInsertDelete")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,7 +446,7 @@ func TestIntegrationModify(t *testing.T) {
 	t.Skip("modification is deprecated")
 
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestIntegrationModify")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,7 +514,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestIntegrationRenew")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -642,7 +642,7 @@ func TestIntegrationResync(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestIntegrationResync")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -781,7 +781,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestIntegrationDownloaderCaching")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -875,7 +875,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestIntegrationEditorCaching")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -968,7 +968,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestIntegrationCachedRenew")
+	h, c, _, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

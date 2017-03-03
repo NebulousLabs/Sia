@@ -15,7 +15,7 @@ import (
 //
 // i7-4770, 1d60d69: 1.356 ms / op
 func BenchmarkAcceptEmptyBlocks(b *testing.B) {
-	cst, err := createConsensusSetTester("BenchmarkEmptyBlocks")
+	cst, err := createConsensusSetTester(b.Name())
 	if err != nil {
 		b.Fatal("Error creating tester: " + err.Error())
 	}
@@ -77,7 +77,7 @@ func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 //
 // i7-4770, 1d60d69: 3.579 ms / op
 func BenchmarkAcceptSmallBlocks(b *testing.B) {
-	cst, err := createConsensusSetTester("BenchmarkAcceptSmallBlocks")
+	cst, err := createConsensusSetTester(b.Name())
 	if err != nil {
 		b.Fatal(err)
 	}

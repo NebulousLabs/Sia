@@ -11,7 +11,7 @@ func TestApiClient(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestApiClient")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestAuthenticatedApiClient(t *testing.T) {
 	}
 	t.Parallel()
 	testpass := "testPassword"
-	st, err := createAuthenticatedServerTester("TestAuthenticatedApiClient", testpass)
+	st, err := createAuthenticatedServerTester(t.Name(), testpass)
 	if err != nil {
 		t.Fatal(err)
 	}

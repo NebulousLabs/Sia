@@ -12,7 +12,7 @@ func TestImmediateBlockFacts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	et, err := createExplorerTester("TestImmediateBlockFacts")
+	et, err := createExplorerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestBlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	et, err := createExplorerTester("TestBlock")
+	et, err := createExplorerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestBlockFacts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	et, err := createExplorerTester("TestBlockFacts")
+	et, err := createExplorerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -43,7 +43,7 @@ func TestMerkleRootSetCompatibility(t *testing.T) {
 		}
 
 		// Save and load, check that they are the same.
-		dir := build.TempDir("modules", "TestMerkleRootSetCompatibility")
+		dir := build.TempDir("modules", t.Name())
 		err := os.MkdirAll(dir, 0700)
 		if err != nil {
 			t.Fatal(err)
