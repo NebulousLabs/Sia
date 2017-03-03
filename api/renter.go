@@ -329,7 +329,7 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 		return
 	}
 
-	err := api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
+	err := <-api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
 	if err != nil {
 		WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
 		return
@@ -347,7 +347,7 @@ func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	go api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
+	api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
 
 	WriteSuccess(w)
 }

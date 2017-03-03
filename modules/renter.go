@@ -250,7 +250,7 @@ type Renter interface {
 	DeleteFile(path string) error
 
 	// Download downloads a file to the given destination.
-	Download(path, destination string) error
+	Download(path, destination string) chan error
 
 	// DownloadQueue lists all the files that have been scheduled for download.
 	DownloadQueue() []DownloadInfo
