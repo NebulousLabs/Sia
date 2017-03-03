@@ -18,7 +18,8 @@ type newStub struct{}
 func (newStub) ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error {
 	return nil
 }
-func (newStub) Synced() bool { return true }
+func (newStub) Synced() bool                               { return true }
+func (newStub) Unsubscribe(modules.ConsensusSetSubscriber) { return }
 
 // wallet stubs
 func (newStub) NextAddress() (uc types.UnlockConditions, err error) { return }

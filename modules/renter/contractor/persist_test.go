@@ -147,6 +147,8 @@ func (cs blockCS) ConsensusSetSubscribe(s modules.ConsensusSetSubscriber, _ modu
 
 func (blockCS) Synced() bool { return true }
 
+func (blockCS) Unsubscribe(modules.ConsensusSetSubscriber) { return }
+
 // TestPubKeyScanner tests that the pubkeyScanner type correctly identifies
 // public keys in the blockchain.
 func TestPubKeyScanner(t *testing.T) {
