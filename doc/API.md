@@ -670,18 +670,19 @@ description of the byte encoding.
 Renter
 ------
 
-| Route                                                         | HTTP verb |
-| ------------------------------------------------------------- | --------- |
-| [/renter](#renter-get)                                        | GET       |
-| [/renter](#renter-post)                                       | POST      |
-| [/renter/contracts](#rentercontracts-get)                     | GET       |
-| [/renter/downloads](#renterdownloads-get)                     | GET       |
-| [/renter/files](#renterfiles-get)                             | GET       |
-| [/renter/prices](#renter-prices-get)                          | GET       |
-| [/renter/delete/___*siapath___](#renterdeletesiapath-post)    | POST      |
-| [/renter/download/___*siapath___](#renterdownloadsiapath-get) | GET       |
-| [/renter/rename/___*siapath___](#renterrenamesiapath-post)    | POST      |
-| [/renter/upload/___*siapath___](#renteruploadsiapath-post)    | POST      |
+| Route                                                                   | HTTP verb |
+| ----------------------------------------------------------------------- | --------- |
+| [/renter](#renter-get)                                                  | GET       |
+| [/renter](#renter-post)                                                 | POST      |
+| [/renter/contracts](#rentercontracts-get)                               | GET       |
+| [/renter/downloads](#renterdownloads-get)                               | GET       |
+| [/renter/prices](#renter-prices-get)                                    | GET       |
+| [/renter/files](#renterfiles-get)                                       | GET       |
+| [/renter/delete/___*siapath___](#renterdeletesiapath-post)              | POST      |
+| [/renter/download/___*siapath___](#renterdownloadsiapath-get)           | GET       |
+| [/renter/downloadasync/___*siapath___](#renterdownloadasyncsiapath-get) | GET       |
+| [/renter/rename/___*siapath___](#renterrenamesiapath-post)              | POST      |
+| [/renter/upload/___*siapath___](#renteruploadsiapath-post)              | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Renter.md](/doc/api/Renter.md).
@@ -760,7 +761,8 @@ lists all files in the download queue.
       "destination": "/home/users/alice/bar.txt",
       "filesize":    8192,                  // bytes
       "received":    4096,                  // bytes
-      "starttime":   "2009-11-10T23:00:00Z" // RFC 3339 time
+      "starttime":   "2009-11-10T23:00:00Z", // RFC 3339 time
+      "error": ""
     }
   ]
 }
@@ -835,11 +837,9 @@ destination
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /renter/rename/___*siapath___ [POST]
+#### /renter/downloadasync/___*siapath___ [GET]
 
-renames a file. Does not rename any downloads or source files, only renames the
-entry in the renter. An error is returned if `siapath` does not exist or
-`newsiapath` already exists.
+downloads a file to the local filesystem. The call will return immediately.
 
 ###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-2)
 ```
@@ -847,6 +847,26 @@ entry in the renter. An error is returned if `siapath` does not exist or
 ```
 
 ###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
+```
+destination
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /renter/rename/___*siapath___ [POST]
+
+renames a file. Does not rename any downloads or source files, only renames the
+entry in the renter. An error is returned if `siapath` does not exist or
+`newsiapath` already exists.
+
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-3)
+```
+*siapath
+```
+
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-3)
 ```
 newsiapath
 ```
@@ -859,12 +879,12 @@ standard success or error response. See
 
 uploads a file to the network from the local filesystem.
 
-###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-3)
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-4)
 ```
 *siapath
 ```
 
-###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-4)
 ```
 datapieces   // int
 paritypieces // int

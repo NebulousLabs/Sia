@@ -81,7 +81,7 @@ type (
 		siapath           string
 
 		// Syncrhonization tools.
-		downloadFinished chan error
+		downloadFinished chan struct{}
 		mu               sync.Mutex
 	}
 
@@ -131,7 +131,7 @@ func (r *Renter) newDownload(f *file, destination string, currentContracts map[m
 		numChunks:   f.numChunks(),
 		siapath:     f.name,
 
-		downloadFinished: make(chan error),
+		downloadFinished: make(chan struct{}),
 	}
 	// Allocate the piece size and progress bar so that the download will
 	// finish at exactly 100%. Due to rounding error and padding, there is not
@@ -165,6 +165,14 @@ func (r *Renter) newDownload(f *file, destination string, currentContracts map[m
 	return d
 }
 
+// Err returns the error encountered by a download, if it exists.
+func (d *download) Err() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.downloadErr
+}
+
 // fail will mark the download as complete, but with the provided error.
 func (d *download) fail(err error) {
 	if d.downloadComplete {
@@ -174,7 +182,7 @@ func (d *download) fail(err error) {
 
 	d.downloadComplete = true
 	d.downloadErr = err
-	d.downloadFinished <- err
+	close(d.downloadFinished)
 }
 
 // recoverChunk takes a chunk that has had a sufficient number of pieces
@@ -263,7 +271,7 @@ func (cd *chunkDownload) recoverChunk() error {
 	if nowComplete {
 		// Signal that the download is complete.
 		cd.download.downloadComplete = true
-		cd.download.downloadFinished <- nil
+		close(cd.download.downloadFinished)
 	}
 	return nil
 }
