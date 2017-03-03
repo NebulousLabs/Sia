@@ -879,7 +879,8 @@ func TestRenterRenew(t *testing.T) {
 	contractID := rc.Contracts[0].ID
 
 	// Mine enough blocks to enter the renewal window.
-	for i := 0; i < testPeriod; i++ {
+	testWindow := testPeriod / 2
+	for i := 0; i < testWindow+1; i++ {
 		st.miner.AddBlock()
 	}
 	// Wait for the contract to be renewed.
