@@ -10,17 +10,13 @@ import (
 
 // Download downloads a file, identified by its path, to the destination
 // specified.
-func (r *Renter) Download(path, destination string) chan error {
+func (r *Renter) Download(path, destination string) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
 	file, exists := r.files[path]
 	r.mu.RUnlock(lockID)
-
-	errchan := make(chan error, 1)
-
 	if !exists {
-		errchan <- errors.New("no file with that path")
-		return errchan
+		return errors.New("no file with that path")
 	}
 
 	// Build current contracts map.
@@ -36,11 +32,16 @@ func (r *Renter) Download(path, destination string) chan error {
 	r.mu.Unlock(lockID)
 	r.newDownloads <- d
 
-	go func() {
-		errchan <- <-d.downloadFinished
-	}()
-
-	return errchan
+	// Block until the download has completed.
+	//
+	// TODO: Eventually just return the channel to the error instead of the
+	// error itself.
+	select {
+	case <-d.downloadFinished:
+		return d.Err()
+	case <-r.tg.StopChan():
+		return errors.New("download interrupted by shutdown")
+	}
 }
 
 // DownloadQueue returns the list of downloads in the queue.
@@ -52,7 +53,6 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
 	for i := range r.downloadQueue {
 		d := r.downloadQueue[len(r.downloadQueue)-i-1]
-
 		downloads[i] = modules.DownloadInfo{
 			SiaPath:     d.siapath,
 			Destination: d.destination,
@@ -60,14 +60,9 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 			StartTime:   d.startTime,
 		}
 		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)
-
-		// set the DownloadInfo's Error field if an error has occured.
-		select {
-		case err := <-d.downloadFinished:
-			if err != nil {
-				downloads[i].Error = err.Error()
-			}
-		default:
+		err := d.Err()
+		if err != nil {
+			downloads[i].Error = err.Error()
 		}
 	}
 	return downloads
