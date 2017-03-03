@@ -82,7 +82,7 @@ type (
 
 		// Syncrhonization tools.
 		downloadFinished chan struct{}
-		mu               sync.RWMutex
+		mu               sync.Mutex
 	}
 
 	// downloadState tracks all of the stateful information within the download
@@ -167,8 +167,8 @@ func (r *Renter) newDownload(f *file, destination string, currentContracts map[m
 
 // Err returns the error encountered by a download, if it exists.
 func (d *download) Err() error {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
 	return d.downloadErr
 }
@@ -182,7 +182,7 @@ func (d *download) fail(err error) {
 
 	d.downloadComplete = true
 	d.downloadErr = err
-	d.downloadFinished <- struct{}{}
+	close(d.downloadFinished)
 }
 
 // recoverChunk takes a chunk that has had a sufficient number of pieces
@@ -271,7 +271,7 @@ func (cd *chunkDownload) recoverChunk() error {
 	if nowComplete {
 		// Signal that the download is complete.
 		cd.download.downloadComplete = true
-		cd.download.downloadFinished <- struct{}{}
+		close(cd.download.downloadFinished)
 	}
 	return nil
 }
