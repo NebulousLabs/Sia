@@ -71,7 +71,7 @@ func TestRenterDownloadError(t *testing.T) {
 
 	// Create a file.
 	path := filepath.Join(build.SiaTestingDir, "api", "TestRenterDownloadError", "test.dat")
-	err = createRandFile(path, 1e5)
+	err = createRandFile(path, 1e4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestRenterAsyncDownloadError(t *testing.T) {
 
 	// Create a file.
 	path := filepath.Join(build.SiaTestingDir, "api", "TestRenterAsyncDownloadError", "test.dat")
-	err = createRandFile(path, 1e5)
+	err = createRandFile(path, 1e4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestRenterAsyncDownload(t *testing.T) {
 
 	// Create a file.
 	path := filepath.Join(build.SiaTestingDir, "api", "TestRenterAsyncDownload", "test.dat")
-	err = createRandFile(path, 1e5)
+	err = createRandFile(path, 1e4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +236,7 @@ func TestRenterAsyncDownload(t *testing.T) {
 
 	// wait for the file to become available
 	var rf RenterFiles
-	for i := 0; i < 200 && (len(rf.Files) != 1 || !rf.Files[0].Available); i++ {
+	for i := 0; i < 100 && (len(rf.Files) != 1 || !rf.Files[0].Available); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(100 * time.Millisecond)
 	}
