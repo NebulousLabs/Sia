@@ -84,11 +84,11 @@ type (
 	StorageObligation struct {
 		NegotiationHeight types.BlockHeight `json:"negotiationheight"`
 
-		OriginConfirmed     bool `json:"originconfirmed"`
-		RevisionConstructed bool `json:"revisionconstructed"`
-		RevisionConfirmed   bool `json:"revisionconfirmed"`
-		ProofConstructed    bool `json:"proofconstructed"`
-		ProofConfirmed      bool `json:"proofconfirmed"`
+		OriginConfirmed     bool   `json:"originconfirmed"`
+		RevisionConstructed bool   `json:"revisionconstructed"`
+		RevisionConfirmed   bool   `json:"revisionconfirmed"`
+		ProofConstructed    bool   `json:"proofconstructed"`
+		ProofConfirmed      bool   `json:"proofconfirmed"`
 		ObligationStatus    uint64 `json:"obligationstatus"`
 	}
 

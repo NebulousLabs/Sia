@@ -672,7 +672,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 	}
 
 	// Check if the file contract revision is ready for submission. Check for death.
-	if !so.RevisionConfirmed && len(so.RevisionTransactionSet) > 0 && blockHeight > so.expiration()-revisionSubmissionBuffer {
+	if !so.RevisionConfirmed && len(so.RevisionTransactionSet) > 0 && blockHeight >= so.expiration()-revisionSubmissionBuffer {
 		// Sanity check - there should be a file contract revision.
 		rtsLen := len(so.RevisionTransactionSet)
 		if rtsLen < 1 || len(so.RevisionTransactionSet[rtsLen-1].FileContractRevisions) != 1 {
