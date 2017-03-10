@@ -128,15 +128,24 @@ type storageObligation struct {
 	RiskedCollateral         types.Currency
 	TransactionFeesAdded     types.Currency
 
+	// The negotiation height specifies the block height at which the file
+	// contract was negotiated. If the origin transaction set is not accepted
+	// onto the blockchain quickly enough, the contract is pruned from the
+	// host. The origin and revision transaction set contain the contracts +
+	// revisions as well as all parent transactions. The parents are necessary
+	// because after a restart the transaction pool may be emptied out.
+	NegotiationHeight      types.BlockHeight
 	OriginTransactionSet   []types.Transaction
 	RevisionTransactionSet []types.Transaction
 
 	// Variables indicating whether the critical transactions in a storage
 	// obligation have been confirmed on the blockchain.
-	OriginConfirmed   bool
-	RevisionConfirmed bool
-	ProofConfirmed    bool
-	ObligationStatus  storageObligationStatus
+	OriginConfirmed     bool
+	RevisionConstructed bool
+	RevisionConfirmed   bool
+	ProofConstructed    bool
+	ProofConfirmed      bool
+	ObligationStatus    storageObligationStatus
 }
 
 // getStorageObligation fetches a storage obligation from the database tx.
@@ -601,7 +610,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 		h.managedUnlockStorageObligation(soid)
 	}()
 
-	// Convert the storage obligation id into a storage obligation.
+	// Fetch the storage obligation associated with the storage obligation id.
 	var err error
 	var so storageObligation
 	h.mu.RLock()
@@ -844,4 +853,43 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 		h.removeStorageObligation(so, obligationSucceeded)
 		h.mu.Unlock()
 	}
+}
+
+// StorageObligations fetches the set of storage obligations in the host and
+// returns metadata on them.
+func (h *Host) StorageObligations() (sos []modules.StorageObligation) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	err := h.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketStorageObligations)
+		err := b.ForEach(func(idBytes, soBytes []byte) error {
+			var so storageObligation
+			err := json.Unmarshal(soBytes, &so)
+			if err != nil {
+				return build.ExtendErr("unable to unmarshal storage obligation:", err)
+			}
+			mso := modules.StorageObligation{
+				NegotiationHeight: so.NegotiationHeight,
+
+				OriginConfirmed:     so.OriginConfirmed,
+				RevisionConstructed: so.RevisionConstructed,
+				RevisionConfirmed:   so.RevisionConfirmed,
+				ProofConstructed:    so.ProofConstructed,
+				ProofConfirmed:      so.ProofConfirmed,
+				ObligationStatus:    uint64(so.ObligationStatus),
+			}
+			sos = append(sos, mso)
+			return nil
+		})
+		if err != nil {
+			return build.ExtendErr("ForEach failed to get next storage obligation:", err)
+		}
+		return nil
+	})
+	if err != nil {
+		h.log.Println(build.ExtendErr("database failed to provide storage obligations:", err))
+	}
+
+	return sos
 }
