@@ -118,7 +118,7 @@ func TestStorageHandler(t *testing.T) {
 // no path was provided.
 func TestAddFolderNoPath(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 	t.Parallel()
 	st, err := createServerTester(t.Name())
