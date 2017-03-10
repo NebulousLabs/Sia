@@ -16,13 +16,14 @@ var (
 		Use:   "export",
 		Short: "export renter data to various formats",
 		Long:  "Export renter data in various formats.",
-		// Run field not provided; export requires a subcommand
+		// Run field not provided; export requires a subcommand.
 	}
 
 	renterExportContractsCmd = &cobra.Command{
-		Use:   "contracts [destination]",
-		Short: "export the renter's contracts",
-		Long:  "Export the renter's current contract set in JSON format to the specified file.",
+		Use:   "rankings-data [destination]",
+		Short: "export the renter's contracts for import to `https://rankings.sia.tech/`",
+		Long:  "Export the renter's current contract set in JSON format to the specified " +
+			"file. Intended for upload to `https://rankings.sia.tech/`.",
 		Run:   wrap(renterexportcontractscmd),
 	}
 )
