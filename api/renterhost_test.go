@@ -259,7 +259,7 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	allowanceValues := url.Values{}
 	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
 	allowanceValues.Set("hosts", "3")
-	allowanceValues.Set("period", "5")
+	allowanceValues.Set("period", "10")
 	allowanceValues.Set("renewwindow", "2")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {

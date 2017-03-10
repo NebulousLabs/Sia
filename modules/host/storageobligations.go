@@ -401,13 +401,16 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 	// The file contract was already submitted to the blockchain, need to check
 	// after the resubmission timeout that it was submitted successfully.
 	err1 := h.queueActionItem(h.blockHeight+resubmissionTimeout, soid)
+	err2 := h.queueActionItem(h.blockHeight+resubmissionTimeout*2, soid) // Paranoia
 	// Queue an action item to submit the file contract revision - if there is
 	// never a file contract revision, the handling of this action item will be
 	// a no-op.
-	err2 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer, soid)
+	err3 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer, soid)
+	err4 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer+resubmissionTimeout, soid) // Paranoia
 	// The storage proof should be submitted
-	err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
-	err = composeErrors(err1, err2, err3)
+	err5 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
+	err6 := h.queueActionItem(so.expiration()+resubmissionTimeout*2, soid) // Paranoia
+	err = composeErrors(err1, err2, err3, err4, err5, err6)
 	if err != nil {
 		h.log.Println("Error with transaction set, redacting obligation, id", so.id())
 		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
