@@ -1,9 +1,10 @@
 package transactionpool
 
 import (
+	"testing"
+
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-	"testing"
 )
 
 // mockSubscriber receives transactions from the transaction pool it is
@@ -28,7 +29,7 @@ func TestSubscription(t *testing.T) {
 		t.Skip()
 	}
 
-	tpt, err := createTpoolTester("TestUnsubscribe")
+	tpt, err := createTpoolTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

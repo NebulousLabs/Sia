@@ -24,7 +24,7 @@ func TestHostAndRentVanilla(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestHostAndRentVanilla")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,17 +163,17 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestHostAndRentMultiHost-Host1andRenter")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.server.Close()
-	stH1, err := blankServerTester("TestHostAndRentMultiHost - Host 2")
+	stH1, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stH1.server.Close()
-	stH2, err := blankServerTester("TestHostAndRentMultiHost - Host 3")
+	stH2, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,22 +278,22 @@ func TestHostAndRentManyFiles(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestHostAndRentManyFiles-Host1andRenter")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.server.Close()
-	stH1, err := blankServerTester("TestHostAndRentManyFiles - Host 2")
+	stH1, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stH1.server.Close()
-	stH2, err := blankServerTester("TestHostAndRentManyFiles - Host 3")
+	stH2, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stH2.server.Close()
-	stH3, err := blankServerTester("TestHostAndRentManyFiles - Host 4")
+	stH3, err := blankServerTester(t.Name() + " - Host 4")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -487,7 +487,7 @@ func TestRenterUploadDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestRenterUploadDownload")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,7 +613,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestRenterCancelAllowance")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -693,7 +693,7 @@ func TestRenterParallelDelete(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestRenterParallelDelete")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -802,7 +802,7 @@ func TestRenterRenew(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestRenterRenew")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -879,7 +879,8 @@ func TestRenterRenew(t *testing.T) {
 	contractID := rc.Contracts[0].ID
 
 	// Mine enough blocks to enter the renewal window.
-	for i := 0; i < testPeriod; i++ {
+	testWindow := testPeriod / 2
+	for i := 0; i < testWindow+1; i++ {
 		st.miner.AddBlock()
 	}
 	// Wait for the contract to be renewed.
@@ -917,7 +918,7 @@ func TestRenterAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestRenterAllowance")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1024,7 +1025,7 @@ func TestHostAndRentReload(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostAndRentReload")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

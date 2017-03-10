@@ -177,7 +177,7 @@ func TestNilInputs(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	testdir := build.TempDir(modules.ConsensusDir, "TestNilInputs")
+	testdir := build.TempDir(modules.ConsensusDir, t.Name())
 	_, err := New(nil, false, testdir)
 	if err != errNilGateway {
 		t.Fatal(err)
@@ -190,7 +190,7 @@ func TestDatabaseClosing(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	testdir := build.TempDir(modules.ConsensusDir, "TestClosing")
+	testdir := build.TempDir(modules.ConsensusDir, t.Name())
 
 	// Create the gateway.
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))

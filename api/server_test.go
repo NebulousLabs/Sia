@@ -12,7 +12,7 @@ func TestExplorerPreset(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createExplorerServerTester("TestExplorerPreset")
+	st, err := createExplorerServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestReloading(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestReloading")
+	st, err := createServerTester(t.Name())
 
 	height := st.server.api.cs.Height()
 	if err != nil {
@@ -69,7 +69,7 @@ func TestAuthentication(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createAuthenticatedServerTester("TestAuthentication", "password")
+	st, err := createAuthenticatedServerTester(t.Name(), "password")
 	if err != nil {
 		t.Fatal(err)
 	}

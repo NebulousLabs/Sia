@@ -185,7 +185,7 @@ func TestRenterDeleteFile(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterDeleteFile")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestRenterFileList(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterFileList")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +296,7 @@ func TestRenterFileList(t *testing.T) {
 
 // TestRenterRenameFile probes the rename method of the renter.
 func TestRenterRenameFile(t *testing.T) {
-	rt, err := newRenterTester("TestRenterRenameFile")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

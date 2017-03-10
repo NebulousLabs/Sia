@@ -146,7 +146,7 @@ func (wt *walletTester) closeWt() {
 
 // TestNilInputs tries starting the wallet using nil inputs.
 func TestNilInputs(t *testing.T) {
-	testdir := build.TempDir(modules.WalletDir, "TestNilInputs")
+	testdir := build.TempDir(modules.WalletDir, t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -178,7 +178,7 @@ func TestNilInputs(t *testing.T) {
 // TestAllAddresses checks that AllAddresses returns all of the wallet's
 // addresses in sorted order.
 func TestAllAddresses(t *testing.T) {
-	wt, err := createBlankWalletTester("TestAllAddresses")
+	wt, err := createBlankWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestCloseWallet(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-	testdir := build.TempDir(modules.WalletDir, "TestCloseWallet")
+	testdir := build.TempDir(modules.WalletDir, t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)

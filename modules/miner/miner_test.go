@@ -101,7 +101,7 @@ func TestIntegrationMiner(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestMiner")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestIntegrationNilMinerDependencies(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationNilMinerDependencies")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestIntegrationBlocksMined(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationBlocksMined")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestIntegrationAutoRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationAutoRescan")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestIntegrationStartupRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationStartupRescan")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +323,7 @@ func TestIntegrationStartupRescan(t *testing.T) {
 // TestMinerCloseDeadlock checks that the miner can cleanly close even if the
 // CPU miner is running.
 func TestMinerCloseDeadlock(t *testing.T) {
-	mt, err := createMinerTester("TestMinerCloseDeadlock")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

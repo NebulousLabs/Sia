@@ -31,7 +31,7 @@ func TestIntegrationHeaderForWork(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegreationHeaderForWork")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestIntegrationHeaderForWorkUpdates(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationHeaderForWorkUpdates")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestIntegrationManyHeaders(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationManyHeaders")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestIntegrationHeaderBlockOverflow(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationHeaderBlockOverflow")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestIntegrationHeaderRequestOverflow(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationHeaderRequestOverflow")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

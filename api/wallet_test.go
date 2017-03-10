@@ -24,7 +24,7 @@ func TestWalletGETEncrypted(t *testing.T) {
 	}
 	t.Parallel()
 	// Check a wallet that has never been encrypted.
-	testdir := build.TempDir("api", "TestWalletGETEncrypted")
+	testdir := build.TempDir("api", t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal("Failed to create gateway:", err)
@@ -90,7 +90,7 @@ func TestWalletBlankEncrypt(t *testing.T) {
 	}
 	t.Parallel()
 	// Create a server object without encrypting or unlocking the wallet.
-	testdir := build.TempDir("api", "TestWalletBlankEncrypt")
+	testdir := build.TempDir("api", t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestWalletGETSiacoins(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestWalletGETSiacoins")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +249,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestWalletTransactionGETid")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func TestWalletRelativePathErrorBackup(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestWalletRelativePathErrorBackup")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestWalletRelativePathError033x(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestWalletRelativePathError033x")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -417,7 +417,7 @@ func TestWalletRelativePathErrorSiag(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestWalletRelativePathErrorSiag")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

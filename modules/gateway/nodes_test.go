@@ -20,7 +20,7 @@ func TestAddNode(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestAddNode", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 
 	g.mu.Lock()
@@ -50,7 +50,7 @@ func TestRemoveNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	g := newTestingGateway("TestRemoveNode", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 	t.Parallel()
 
@@ -74,7 +74,7 @@ func TestRandomNode(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestRandomNode", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 
 	// Test with 0 nodes.
@@ -152,9 +152,9 @@ func TestShareNodes(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestShareNodes1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
-	g2 := newTestingGateway("TestShareNodes2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
 	// add a node to g2
@@ -228,11 +228,11 @@ func TestNodesAreSharedOnConnect(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestNodesAreSharedOnConnect1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
-	g2 := newTestingGateway("TestNodesAreSharedOnConnect2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
-	g3 := newTestingGateway("TestNodesAreSharedOnConnect3", t)
+	g3 := newNamedTestingGateway(t, "3")
 	defer g3.Close()
 
 	// connect g2 to g1
@@ -273,8 +273,7 @@ func TestPruneNodeThreshold(t *testing.T) {
 	// Create and connect pruneNodeListLen gateways.
 	var gs []*Gateway
 	for i := 0; i < pruneNodeListLen; i++ {
-		gname := "TestPruneNodeThreshold" + strconv.Itoa(i)
-		gs = append(gs, newTestingGateway(gname, t))
+		gs = append(gs, newNamedTestingGateway(t, strconv.Itoa(i)))
 
 		// Connect this gateway to the previous gateway.
 		if i != 0 {
@@ -361,8 +360,7 @@ func TestHealthyNodeListPruning(t *testing.T) {
 	// Create and connect healthyNodeListLen*2 gateways.
 	var gs []*Gateway
 	for i := 0; i < healthyNodeListLen*2; i++ {
-		gname := "TestHealthyNodeListPruning" + strconv.Itoa(i)
-		gs = append(gs, newTestingGateway(gname, t))
+		gs = append(gs, newNamedTestingGateway(t, strconv.Itoa(i)))
 
 		// Connect this gateway to the previous gateway.
 		if i != 0 {
