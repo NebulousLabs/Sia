@@ -79,6 +79,19 @@ type (
 		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
 	}
 
+	// StorageObligation contains information about a storage obligation that
+	// the host has accepted.
+	StorageObligation struct {
+		NegotiationHeight types.BlockHeight `json:"negotiationheight"`
+
+		OriginConfirmed     bool   `json:"originconfirmed"`
+		RevisionConstructed bool   `json:"revisionconstructed"`
+		RevisionConfirmed   bool   `json:"revisionconfirmed"`
+		ProofConstructed    bool   `json:"proofconstructed"`
+		ProofConfirmed      bool   `json:"proofconfirmed"`
+		ObligationStatus    uint64 `json:"obligationstatus"`
+	}
+
 	// A Host can take storage from disk and offer it to the network, managing
 	// things such as announcements, settings, and implementing all of the RPCs
 	// of the host protocol.
@@ -109,6 +122,10 @@ type (
 
 		// SetInternalSettings sets the hosting parameters of the host.
 		SetInternalSettings(HostInternalSettings) error
+
+		// StorageObligations returns the set of storage obligations held by
+		// the host.
+		StorageObligations() []StorageObligation
 
 		// The storage manager provides an interface for adding and removing
 		// storage folders and data sectors to the host.
