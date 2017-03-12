@@ -240,8 +240,12 @@ func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
 		return types.Block{}
 	}
 	defer cs.tg.Done()
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
+
+	// Block until a lock can be grabbed on the consensus set, indicating that
+	// all modules have received the most recent block. The lock is held so that
+	// there are no race conditions when trying to synchronize nodes.
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
 
 	_ = cs.db.View(func(tx *bolt.Tx) error {
 		pb := currentProcessedBlock(tx)
@@ -265,6 +269,12 @@ func (cs *ConsensusSet) Height() (height types.BlockHeight) {
 		return 0
 	}
 	defer cs.tg.Done()
+
+	// Block until a lock can be grabbed on the consensus set, indicating that
+	// all modules have received the most recent block. The lock is held so that
+	// there are no race conditions when trying to synchronize nodes.
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
 
 	_ = cs.db.View(func(tx *bolt.Tx) error {
 		height = blockHeight(tx)

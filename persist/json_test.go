@@ -10,7 +10,7 @@ import (
 
 // TestSaveLoad checks that saving and loading data behaves as expected.
 func TestSaveLoad(t *testing.T) {
-	var meta = Metadata{"TestSaveLoad", "0.1"}
+	var meta = Metadata{t.Name(), "0.1"}
 	var saveData int = 3
 	buf := new(bytes.Buffer)
 
@@ -32,11 +32,11 @@ func TestSaveLoad(t *testing.T) {
 	}
 
 	// load with bad metadata
-	err = Load(Metadata{"BadTestSaveLoad", "0.1"}, &loadData, bytes.NewReader(data))
+	err = Load(Metadata{t.Name() + "Bad", "0.1"}, &loadData, bytes.NewReader(data))
 	if err != ErrBadHeader {
 		t.Fatal("expected ErrBadHeader, got", err)
 	}
-	err = Load(Metadata{"TestSaveLoad", "-1"}, &loadData, bytes.NewReader(data))
+	err = Load(Metadata{t.Name(), "-1"}, &loadData, bytes.NewReader(data))
 	if err != ErrBadVersion {
 		t.Fatal("expected ErrBadVersion, got", err)
 	}
@@ -62,11 +62,11 @@ func TestSaveLoad(t *testing.T) {
 // TestSaveLoadFile tests that saving and loading a file without fsync properly
 // stores and fetches data.
 func TestSaveLoadFile(t *testing.T) {
-	var meta = Metadata{"TestSaveLoadFile", "0.1"}
+	var meta = Metadata{t.Name(), "0.1"}
 	var saveData int = 3
 
 	os.MkdirAll(build.TempDir("persist"), 0777)
-	filename := build.TempDir("persist", "TestSaveLoadFile")
+	filename := build.TempDir("persist", t.Name())
 	err := SaveFile(meta, saveData, filename)
 	if err != nil {
 		t.Fatal(err)
@@ -85,11 +85,11 @@ func TestSaveLoadFile(t *testing.T) {
 // TestSaveLoadFileSync test that saving and loading a file with fsync properly
 // stores and fetches data.
 func TestSaveLoadFileSync(t *testing.T) {
-	var meta = Metadata{"TestSaveLoadFileFsync", "0.1"}
+	var meta = Metadata{t.Name(), "0.1"}
 	var saveData int = 3
 
 	os.MkdirAll(build.TempDir("persist"), 0777)
-	filename := build.TempDir("persist", "TestSaveLoadFile")
+	filename := build.TempDir("persist", t.Name())
 	err := SaveFileSync(meta, saveData, filename)
 	if err != nil {
 		t.Fatal(err)

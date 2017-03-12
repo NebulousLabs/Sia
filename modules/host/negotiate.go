@@ -255,9 +255,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		// just when the actual modification is happening.
 		i := 0
 		for {
-			h.mu.Lock()
-			err = h.addStorageObligation(so)
-			h.mu.Unlock()
+			err = h.managedAddStorageObligation(so)
 			if err == nil {
 				return nil
 			}

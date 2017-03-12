@@ -1,10 +1,7 @@
 package contractor
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -21,7 +18,8 @@ type newStub struct{}
 func (newStub) ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error {
 	return nil
 }
-func (newStub) Synced() bool { return true }
+func (newStub) Synced() bool                               { return true }
+func (newStub) Unsubscribe(modules.ConsensusSetSubscriber) { return }
 
 // wallet stubs
 func (newStub) NextAddress() (uc types.UnlockConditions, err error) { return }
@@ -32,15 +30,17 @@ func (newStub) AcceptTransactionSet([]types.Transaction) error      { return nil
 func (newStub) FeeEstimation() (a types.Currency, b types.Currency) { return }
 
 // hdb stubs
-func (newStub) Host(modules.NetAddress) (settings modules.HostDBEntry, ok bool) { return }
-func (newStub) RandomHosts(int, []modules.NetAddress) []modules.HostDBEntry     { return nil }
+func (newStub) AllHosts() []modules.HostDBEntry                                 { return nil }
+func (newStub) ActiveHosts() []modules.HostDBEntry                              { return nil }
+func (newStub) Host(types.SiaPublicKey) (settings modules.HostDBEntry, ok bool) { return }
+func (newStub) RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry     { return nil }
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
 	// Using a stub implementation of the dependencies is fine, as long as its
 	// non-nil.
 	var stub newStub
-	dir := build.TempDir("contractor", "TestNew")
+	dir := build.TempDir("contractor", t.Name())
 
 	// Sane values.
 	_, err := New(stub, stub, stub, stub, dir)
@@ -70,13 +70,6 @@ func TestNew(t *testing.T) {
 	_, err = New(stub, stub, stub, stub, "")
 	if !os.IsNotExist(err) {
 		t.Fatalf("expected invalid directory, got %v", err)
-	}
-
-	// Corrupted persist file.
-	ioutil.WriteFile(filepath.Join(dir, "contractor.json"), []byte{1, 2, 3}, 0666)
-	_, err = New(stub, stub, stub, stub, dir)
-	if _, ok := err.(*json.SyntaxError); !ok {
-		t.Fatalf("expected invalid json, got %v", err)
 	}
 }
 
@@ -121,12 +114,16 @@ func TestContract(t *testing.T) {
 
 // TestContracts tests the Contracts method.
 func TestContracts(t *testing.T) {
-	c := &Contractor{
-		contracts: map[types.FileContractID]modules.RenterContract{
-			{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
-			{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
-			{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},
-		},
+	var stub newStub
+	dir := build.TempDir("contractor", t.Name())
+	c, err := New(stub, stub, stub, stub, dir)
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+	c.contracts = map[types.FileContractID]modules.RenterContract{
+		{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
+		{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
+		{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},
 	}
 	for _, contract := range c.Contracts() {
 		if exp := c.contracts[contract.ID]; exp.NetAddress != contract.NetAddress {
@@ -135,7 +132,7 @@ func TestContracts(t *testing.T) {
 	}
 }
 
-// TestResolveID tests the resolveID method.
+// TestResolveID tests the ResolveID method.
 func TestResolveID(t *testing.T) {
 	c := &Contractor{
 		renewedIDs: map[types.FileContractID]types.FileContractID{
@@ -157,7 +154,7 @@ func TestResolveID(t *testing.T) {
 		{types.FileContractID{5}, types.FileContractID{6}},
 	}
 	for _, test := range tests {
-		if r := c.resolveID(test.id); r != test.resolved {
+		if r := c.ResolveID(test.id); r != test.resolved {
 			t.Errorf("expected %v -> %v, got %v", test.id, test.resolved, r)
 		}
 	}
@@ -184,8 +181,11 @@ func TestAllowance(t *testing.T) {
 // its methods.
 type stubHostDB struct{}
 
-func (stubHostDB) Host(modules.NetAddress) (h modules.HostDBEntry, ok bool)         { return }
-func (stubHostDB) RandomHosts(int, []modules.NetAddress) (hs []modules.HostDBEntry) { return }
+func (stubHostDB) AllHosts() (hs []modules.HostDBEntry)                             { return }
+func (stubHostDB) ActiveHosts() (hs []modules.HostDBEntry)                          { return }
+func (stubHostDB) Host(types.SiaPublicKey) (h modules.HostDBEntry, ok bool)         { return }
+func (stubHostDB) PublicKey() (spk types.SiaPublicKey)                              { return }
+func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) (hs []modules.HostDBEntry) { return }
 
 // TestIntegrationSetAllowance tests the SetAllowance method.
 func TestIntegrationSetAllowance(t *testing.T) {
@@ -193,17 +193,39 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.SkipNow()
 	}
 	// create testing trio
-	h, c, m, err := newTestingTrio("TestIntegrationSetAllowance")
+	_, c, m, err := newTestingTrio(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// this test requires two hosts: create another one
+	h, err := newTestingHost(build.TempDir("hostdata", ""), c.cs.(modules.ConsensusSet), c.tpool.(modules.TransactionPool))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// announce the extra host
+	err = h.Announce()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mine a block, processing the announcement
+	m.AddBlock()
+
+	// wait for hostdb to scan host
+	for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
+		time.Sleep(time.Millisecond * 50)
+	}
+
+	// cancel allowance
+	var a modules.Allowance
+	err = c.SetAllowance(a)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// bad args
-	var a modules.Allowance
-	err = c.SetAllowance(a)
-	if err != errAllowanceNoHosts {
-		t.Errorf("expected %q, got %q", errAllowanceNoHosts, err)
-	}
 	a.Hosts = 1
 	err = c.SetAllowance(a)
 	if err != errAllowanceZeroPeriod {
@@ -240,18 +262,7 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal("expected 1 contract, got", len(c.contracts))
 	}
 
-	// reannounce host on different IP (easier than creating a new host)
-	addr := modules.NetAddress("127.0.0.1:" + c.Contracts()[0].NetAddress.Port())
-	err = h.AnnounceAddress(addr)
-	if err != nil {
-		t.Fatal(err)
-	}
 	m.AddBlock()
-
-	// wait for hostdb to scan host
-	for i := 0; i < 500 && len(c.hdb.RandomHosts(2, nil)) != 2; i++ {
-		time.Sleep(time.Millisecond)
-	}
 
 	// set allowance with Hosts = 2; should only form one new contract
 	a.Hosts = 2
@@ -269,6 +280,7 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(c.contracts) != 2 {
 		t.Fatal("expected 2 contracts, got", len(c.contracts))
 	}
@@ -276,12 +288,11 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	// delete one of the contracts and set allowance with Funds*2; should
 	// trigger 1 renewal and 1 new contract
 	c.mu.Lock()
-	for id, contract := range c.contracts {
-		if contract.NetAddress == addr {
-			delete(c.contracts, id)
-			break
-		}
+	for id := range c.contracts {
+		delete(c.contracts, id)
+		break
 	}
+
 	c.mu.Unlock()
 	a.Funds = a.Funds.Mul64(2)
 	err = c.SetAllowance(a)

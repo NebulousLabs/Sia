@@ -132,6 +132,9 @@ Explorer (e):
 
 // main establishes a set of commands and flags using the cobra package.
 func main() {
+	if build.DEBUG {
+		fmt.Println("Running with debugging enabled")
+	}
 	root := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Sia Daemon v" + build.Version,
@@ -162,7 +165,7 @@ func main() {
 	root.Flags().BoolVarP(&globalConfig.Siad.NoBootstrap, "no-bootstrap", "", false, "disable bootstrapping on this run")
 	root.Flags().BoolVarP(&globalConfig.Siad.Profile, "profile", "", false, "enable profiling")
 	root.Flags().StringVarP(&globalConfig.Siad.RPCaddr, "rpc-addr", "", ":9981", "which port the gateway listens on")
-	root.Flags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghmrtw", "enabled modules, see 'siad modules' for more info")
+	root.Flags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghrtw", "enabled modules, see 'siad modules' for more info")
 	root.Flags().BoolVarP(&globalConfig.Siad.AuthenticateAPI, "authenticate-api", "", false, "enable API password protection")
 	root.Flags().BoolVarP(&globalConfig.Siad.AllowAPIBind, "disable-api-security", "", false, "allow siad to listen on a non-localhost address (DANGEROUS)")
 

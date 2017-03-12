@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/julienschmidt/httprouter"
@@ -155,10 +156,12 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	// Register API handlers
 	router := httprouter.New()
 	router.NotFound = http.HandlerFunc(UnrecognizedCallHandler)
+	router.RedirectTrailingSlash = false
 
 	// Consensus API Calls
 	if api.cs != nil {
 		router.GET("/consensus", api.consensusHandler)
+		router.POST("/consensus/validate/transactionset", api.consensusValidateTransactionsetHandler)
 	}
 
 	// Explorer API Calls
@@ -206,6 +209,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.GET("/renter/contracts", api.renterContractsHandler)
 		router.GET("/renter/downloads", api.renterDownloadsHandler)
 		router.GET("/renter/files", api.renterFilesHandler)
+		router.GET("/renter/prices", api.renterPricesHandler)
 
 		// TODO: re-enable these routes once the new .sia format has been
 		// standardized and implemented.
@@ -216,12 +220,14 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 
 		router.POST("/renter/delete/*siapath", RequirePassword(api.renterDeleteHandler, requiredPassword))
 		router.GET("/renter/download/*siapath", RequirePassword(api.renterDownloadHandler, requiredPassword))
+		router.GET("/renter/downloadasync/*siapath", RequirePassword(api.renterDownloadAsyncHandler, requiredPassword))
 		router.POST("/renter/rename/*siapath", RequirePassword(api.renterRenameHandler, requiredPassword))
 		router.POST("/renter/upload/*siapath", RequirePassword(api.renterUploadHandler, requiredPassword))
 
 		// HostDB endpoints.
-		router.GET("/hostdb/active", api.renterHostsActiveHandler)
-		router.GET("/hostdb/all", api.renterHostsAllHandler)
+		router.GET("/hostdb/active", api.hostdbActiveHandler)
+		router.GET("/hostdb/all", api.hostdbAllHandler)
+		router.GET("/hostdb/hosts/:pubkey", api.hostdbHostsHandler)
 	}
 
 	// TransactionPool API Calls
@@ -264,8 +270,11 @@ func UnrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
 func WriteError(w http.ResponseWriter, err Error, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
-	if json.NewEncoder(w).Encode(err) != nil {
-		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
+	encodingErr := json.NewEncoder(w).Encode(err)
+	if _, isJsonErr := encodingErr.(*json.SyntaxError); isJsonErr {
+		// Marshalling should only fail in the event of a developer error.
+		// Specifically, only non-marshallable types should cause an error here.
+		build.Critical("failed to encode API error response:", encodingErr)
 	}
 }
 
@@ -274,8 +283,11 @@ func WriteError(w http.ResponseWriter, err Error, code int) {
 // accordingly.
 func WriteJSON(w http.ResponseWriter, obj interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if json.NewEncoder(w).Encode(obj) != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	err := json.NewEncoder(w).Encode(obj)
+	if _, isJsonErr := err.(*json.SyntaxError); isJsonErr {
+		// Marshalling should only fail in the event of a developer error.
+		// Specifically, only non-marshallable types should cause an error here.
+		build.Critical("failed to encode API response:", err)
 	}
 }
 

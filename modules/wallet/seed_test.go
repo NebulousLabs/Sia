@@ -8,7 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestPrimarySeed checks that the correct seed is returned when calling
@@ -17,8 +16,9 @@ func TestPrimarySeed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// Start with a blank wallet tester.
-	wt, err := createBlankWalletTester("TestPrimarySeed")
+	wt, err := createBlankWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestPrimarySeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	if progress != 1 {
-		t.Error("primary seed is returning the wrong progress")
+		t.Error("primary seed is returning the wrong progress", progress)
 	}
 
 	// Lock then unlock the wallet and check the responses.
@@ -78,7 +78,7 @@ func TestPrimarySeed(t *testing.T) {
 		t.Error("PrimarySeed is returning a value inconsitent with the seed returned by Encrypt")
 	}
 	if progress != 1 {
-		t.Error("progress reporting an unexpected value")
+		t.Error("progress reporting an unexpected value", progress)
 	}
 }
 
@@ -88,7 +88,8 @@ func TestLoadSeed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestLoadSeed")
+	t.Parallel()
+	wt, err := createWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +109,7 @@ func TestLoadSeed(t *testing.T) {
 		t.Error("AllSeeds returned the wrong seed")
 	}
 
-	dir := filepath.Join(build.TempDir(modules.WalletDir, "TestLoadSeed - 0"), modules.WalletDir)
+	dir := filepath.Join(build.TempDir(modules.WalletDir, t.Name()+"1"), modules.WalletDir)
 	w, err := New(wt.cs, wt.tpool, dir)
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +124,7 @@ func TestLoadSeed(t *testing.T) {
 	}
 	// Balance of wallet should be 0.
 	siacoinBal, _, _ := w.ConfirmedBalance()
-	if siacoinBal.Cmp(types.NewCurrency64(0)) != 0 {
+	if !siacoinBal.Equals64(0) {
 		t.Error("fresh wallet should not have a balance")
 	}
 	err = w.LoadSeed(crypto.TwofishKey(crypto.HashObject(newSeed)), seed)
@@ -156,7 +157,7 @@ func TestLoadSeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	siacoinBal2, _, _ := w2.ConfirmedBalance()
-	if siacoinBal2.Cmp(types.NewCurrency64(0)) <= 0 {
+	if siacoinBal2.Cmp64(0) <= 0 {
 		t.Error("wallet failed to load a seed with money in it")
 	}
 	allSeeds, err = w2.AllSeeds()

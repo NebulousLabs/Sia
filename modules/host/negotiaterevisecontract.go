@@ -278,7 +278,7 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 	}
 	toHost := revision.NewValidProofOutputs[1].Value.Sub(oldFCR.NewValidProofOutputs[1].Value)
 	// Verify that enough money was transferred.
-	if toHost.Cmp(fromRenter) != 0 {
+	if !toHost.Equals(fromRenter) {
 		s := fmt.Sprintf("expected exactly %v to be transferred to the host, but %v was transferred: ", fromRenter, toHost)
 		return extendErr(s, errLowHostValidOutput)
 	}

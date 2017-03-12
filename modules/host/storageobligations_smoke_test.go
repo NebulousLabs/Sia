@@ -109,7 +109,7 @@ func TestBlankStorageObligation(t *testing.T) {
 		t.Fatal(err)
 	}
 	ht.host.managedLockStorageObligation(so.id())
-	err = ht.host.addStorageObligation(so)
+	err = ht.host.managedAddStorageObligation(so)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	ht.host.managedLockStorageObligation(so.id())
-	err = ht.host.addStorageObligation(so)
+	err = ht.host.managedAddStorageObligation(so)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +345,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ht.host.financialMetrics.StorageRevenue.Cmp(sectorCost) != 0 {
+	if !ht.host.financialMetrics.StorageRevenue.Equals(sectorCost) {
 		t.Fatal("the host should be reporting revenue after a successful storage proof")
 	}
 }
@@ -375,7 +375,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	ht.host.managedLockStorageObligation(so.id())
-	err = ht.host.addStorageObligation(so)
+	err = ht.host.managedAddStorageObligation(so)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -587,7 +587,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ht.host.financialMetrics.StorageRevenue.Cmp(sectorCost.Add(sectorCost2)) != 0 {
+	if !ht.host.financialMetrics.StorageRevenue.Equals(sectorCost.Add(sectorCost2)) {
 		t.Fatal("the host should be reporting revenue after a successful storage proof")
 	}
 }
@@ -613,7 +613,7 @@ func TestAutoRevisionSubmission(t *testing.T) {
 		t.Fatal(err)
 	}
 	ht.host.managedLockStorageObligation(so.id())
-	err = ht.host.addStorageObligation(so)
+	err = ht.host.managedAddStorageObligation(so)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -741,7 +741,7 @@ func TestAutoRevisionSubmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ht.host.financialMetrics.StorageRevenue.Cmp(sectorCost) != 0 {
+	if !ht.host.financialMetrics.StorageRevenue.Equals(sectorCost) {
 		t.Fatal("the host should be reporting revenue after a successful storage proof")
 	}
 }

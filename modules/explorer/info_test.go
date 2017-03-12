@@ -12,7 +12,7 @@ func TestImmediateBlockFacts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	et, err := createExplorerTester("TestImmediateBlockFacts")
+	et, err := createExplorerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestImmediateBlockFacts(t *testing.T) {
 	if facts.Height != explorerHeight || explorerHeight == 0 {
 		t.Error("wrong height reported in facts object")
 	}
-	if facts.TotalCoins.Cmp(types.CalculateNumSiacoins(et.cs.Height())) != 0 {
+	if !facts.TotalCoins.Equals(types.CalculateNumSiacoins(et.cs.Height())) {
 		t.Error("wrong number of total coins:", facts.TotalCoins, et.cs.Height())
 	}
 }
@@ -36,7 +36,7 @@ func TestBlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	et, err := createExplorerTester("TestBlock")
+	et, err := createExplorerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestBlockFacts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	et, err := createExplorerTester("TestBlockFacts")
+	et, err := createExplorerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

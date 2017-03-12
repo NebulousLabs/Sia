@@ -106,6 +106,9 @@ func StartContinuousProfile(profileDir string) {
 			// Sleep for an exponential amount of time each iteration, this
 			// keeps the size of the log small while still providing lots of
 			// information.
+			StopCPUProfile()
+			SaveMemProfile(profileDir, "continuousProfilingMem")
+			StartCPUProfile(profileDir, "continuousProfilingCPU")
 			time.Sleep(sleepTime)
 			sleepTime = time.Duration(1.5 * float64(sleepTime))
 

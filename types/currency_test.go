@@ -41,6 +41,53 @@ func TestCurrencyToBig(t *testing.T) {
 	}
 }
 
+// TestCurrencyCmp tests the Cmp method for the currency type
+func TestCurrencyCmp(t *testing.T) {
+	tests := []struct {
+		x, y Currency
+		exp  int
+	}{
+		{NewCurrency64(0), NewCurrency64(0), 0},
+		{NewCurrency64(0), NewCurrency64(1), -1},
+		{NewCurrency64(1), NewCurrency64(0), 1},
+		{NewCurrency64(100), NewCurrency64(7), 1},
+		{NewCurrency64(777), NewCurrency(big.NewInt(777)), 0},
+		{NewCurrency(big.NewInt(7)), NewCurrency(big.NewInt(8)), -1},
+	}
+
+	for _, test := range tests {
+		if c := test.x.Cmp(test.y); c != test.exp {
+			t.Errorf("expected %v.Cmp(%v) == %v, got %v", test.x, test.y, test.exp, c)
+		} else if bc := test.x.Big().Cmp(test.y.Big()); c != bc {
+			t.Errorf("Currency.Cmp (%v) does not match big.Int.Cmp (%v) for %v.Cmp(%v)", c, bc, test.x, test.y)
+		}
+	}
+}
+
+// TestCurrencyCmp64 tests the Cmp64 method for the currency type
+func TestCurrencyCmp64(t *testing.T) {
+	tests := []struct {
+		x   Currency
+		y   uint64
+		exp int
+	}{
+		{NewCurrency64(0), 0, 0},
+		{NewCurrency64(0), 1, -1},
+		{NewCurrency64(1), 0, 1},
+		{NewCurrency64(100), 7, 1},
+		{NewCurrency64(777), 777, 0},
+		{NewCurrency(big.NewInt(7)), 8, -1},
+	}
+
+	for _, test := range tests {
+		if c := test.x.Cmp64(test.y); c != test.exp {
+			t.Errorf("expected %v.Cmp64(%v) == %v, got %v", test.x, test.y, test.exp, c)
+		} else if bc := test.x.Big().Cmp(big.NewInt(int64(test.y))); c != bc {
+			t.Errorf("Currency.Cmp64 (%v) does not match big.Int.Cmp (%v) for %v.Cmp64(%v)", c, bc, test.x, test.y)
+		}
+	}
+}
+
 // TestCurrencyDiv checks that the div function has been correctly implemented.
 func TestCurrencyDiv(t *testing.T) {
 	c9 := NewCurrency64(9)
@@ -72,6 +119,53 @@ func TestCurrencyDiv64(t *testing.T) {
 	c97D10 := c97.Div64(u10)
 	if c97D10.Cmp(c9) != 0 {
 		t.Error("Dividing 97 by 10 should produce 9")
+	}
+}
+
+// TestCurrencyEquals tests the Equals method for the currency type
+func TestCurrencyEquals(t *testing.T) {
+	tests := []struct {
+		x, y Currency
+		exp  bool
+	}{
+		{NewCurrency64(0), NewCurrency64(0), true},
+		{NewCurrency64(0), NewCurrency64(1), false},
+		{NewCurrency64(1), NewCurrency64(0), false},
+		{NewCurrency64(100), NewCurrency64(7), false},
+		{NewCurrency64(777), NewCurrency(big.NewInt(777)), true},
+		{NewCurrency(big.NewInt(7)), NewCurrency(big.NewInt(8)), false},
+	}
+
+	for _, test := range tests {
+		if eq := test.x.Equals(test.y); eq != test.exp {
+			t.Errorf("expected %v.Equals(%v) == %v, got %v", test.x, test.y, test.exp, eq)
+		} else if bc := test.x.Big().Cmp(test.y.Big()); (bc == 0) != eq {
+			t.Errorf("Currency.Equals (%v) does not match big.Int.Cmp (%v) for %v.Equals(%v)", eq, bc, test.x, test.y)
+		}
+	}
+}
+
+// TestCurrencyEquals64 tests the Equals64 method for the currency type
+func TestCurrencyEquals64(t *testing.T) {
+	tests := []struct {
+		x   Currency
+		y   uint64
+		exp bool
+	}{
+		{NewCurrency64(0), 0, true},
+		{NewCurrency64(0), 1, false},
+		{NewCurrency64(1), 0, false},
+		{NewCurrency64(100), 7, false},
+		{NewCurrency64(777), 777, true},
+		{NewCurrency(big.NewInt(7)), 8, false},
+	}
+
+	for _, test := range tests {
+		if eq := test.x.Equals64(test.y); eq != test.exp {
+			t.Errorf("expected %v.Equals64(%v) == %v, got %v", test.x, test.y, test.exp, eq)
+		} else if bc := test.x.Big().Cmp(big.NewInt(int64(test.y))); (bc == 0) != eq {
+			t.Errorf("Currency.Equals64 (%v) does not match big.Int.Cmp (%v) for %v.Equals64(%v)", eq, bc, test.x, test.y)
+		}
 	}
 }
 
@@ -351,5 +445,28 @@ func TestCurrencyUint64(t *testing.T) {
 	}
 	if result != 0 {
 		t.Error("result is not being zeroed in the event of an error")
+	}
+}
+
+// TestCurrencyUnsafeDecode tests that decoding into an existing Currency
+// value does not overwrite its contents.
+func TestCurrencyUnsafeDecode(t *testing.T) {
+	// Scan
+	backup := SiacoinPrecision.Mul64(1)
+	c := SiacoinPrecision
+	_, err := fmt.Sscan("7", &c)
+	if err != nil {
+		t.Error(err)
+	} else if !SiacoinPrecision.Equals(backup) {
+		t.Errorf("Scan changed value of SiacoinPrecision: %v -> %v", backup, SiacoinPrecision)
+	}
+
+	// UnmarshalSia
+	c = SiacoinPrecision
+	err = encoding.Unmarshal(encoding.Marshal(NewCurrency64(7)), &c)
+	if err != nil {
+		t.Error(err)
+	} else if !SiacoinPrecision.Equals(backup) {
+		t.Errorf("UnmarshalSia changed value of SiacoinPrecision: %v -> %v", backup, SiacoinPrecision)
 	}
 }

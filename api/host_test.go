@@ -52,7 +52,8 @@ func TestStorageHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestStorageHandler")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,9 +122,10 @@ func TestStorageHandler(t *testing.T) {
 // no path was provided.
 func TestAddFolderNoPath(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
-	st, err := createServerTester("TestAddFolderNoPath")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +153,8 @@ func TestAddFolderNoSize(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestAddFolderNoSize")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +175,8 @@ func TestAddSameFolderTwice(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestAddSameFolderTwice")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +202,8 @@ func TestResizeEmptyStorageFolder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestResizeEmptyStorageFolder")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +284,8 @@ func TestResizeNonemptyStorageFolder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestResizeNonemptyStorageFolder")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -391,7 +397,8 @@ func TestResizeNonexistentFolder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestResizeNonexistentFolder")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,7 +421,8 @@ func TestResizeFolderNoPath(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestResizeFolderNoPath")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,8 +443,8 @@ func TestRemoveEmptyStorageFolder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	st, err := createServerTester("TestRemoveEmptyStorageFolder")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -461,8 +469,8 @@ func TestRemoveStorageFolderError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	st, err := createServerTester("TestRemoveStorageFolderErr")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -496,8 +504,8 @@ func TestRemoveStorageFolderForced(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	st, err := createServerTester("TestRemoveStorageFolderForced")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -567,7 +575,8 @@ func TestDeleteSector(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestDeleteSector")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -634,7 +643,8 @@ func TestDeleteNonexistentSector(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestDeleteNonexistentSector")
+	t.Parallel()
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -656,64 +666,3 @@ func TestDeleteNonexistentSector(t *testing.T) {
 		t.Fatalf("expected error to be %v; got %v", crypto.ErrHashWrongLen, err)
 	}
 }
-
-/*
-// TestIntegrationRenewing tests that the renter and host manage contract
-// renewals properly.
-func TestIntegrationRenewing(t *testing.T) {
-	st, err := createServerTester("TestIntegrationRenewing")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.server.Close()
-
-	// Announce the host.
-	err = st.announceHost()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// create a file
-	path := filepath.Join(build.SiaTestingDir, "api", "TestIntegrationRenewing", "test.dat")
-	err = createRandFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// upload to host, specifying that the file should be renewed
-	uploadValues := url.Values{}
-	uploadValues.Set("source", path)
-	err = st.stdPostAPI("/renter/upload/test", uploadValues)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// only one piece will be uploaded (10% at current redundancy)
-	var rf RenterFiles
-	for i := 0; i < 150 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10); i++ {
-		st.getAPI("/renter/files", &rf)
-		time.Sleep(50 * time.Millisecond)
-	}
-	if len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
-		t.Error(rf.Files[0].UploadProgress)
-		t.Fatal("uploading has failed")
-	}
-
-	// default expiration is 20 blocks
-	expExpiration := st.cs.Height() + 20
-	if rf.Files[0].Expiration != expExpiration {
-		t.Fatalf("expected expiration of %v, got %v", expExpiration, rf.Files[0].Expiration)
-	}
-
-	// mine blocks until we hit the renew threshold (default 10 blocks)
-	for st.cs.Height() < expExpiration-10 {
-		st.miner.AddBlock()
-	}
-
-	// renter should now renew the contract for another 20 blocks
-	newExpiration := st.cs.Height() + 20
-	for i := 0; i < 5 && rf.Files[0].Expiration != newExpiration; i++ {
-		time.Sleep(1 * time.Second)
-		st.getAPI("/renter/files", &rf)
-	}
-}
-*/

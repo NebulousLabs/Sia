@@ -27,12 +27,12 @@ func TestSynchronize(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst1, err := createConsensusSetTester("TestSynchronize1")
+	cst1, err := createConsensusSetTester(t.Name() + "1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst1.Close()
-	cst2, err := createConsensusSetTester("TestSynchronize2")
+	cst2, err := createConsensusSetTester(t.Name() + "2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestBlockHistory(t *testing.T) {
 		t.SkipNow()
 	}
 
-	cst, err := createConsensusSetTester("TestBlockHistory")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,12 +208,12 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 	}
 
 	// Setup consensus sets.
-	cst1, err := blankConsensusSetTester("TestSendBlocksBroadcastsOnce1")
+	cst1, err := blankConsensusSetTester(t.Name() + "1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst1.Close()
-	cst2, err := blankConsensusSetTester("TestSendBlocksBroadcastsOnce2")
+	cst2, err := blankConsensusSetTester(t.Name() + "2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,12 +436,12 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 
 	for i, tt := range tests {
 		// Create the "remote" peer.
-		remoteCST, err := blankConsensusSetTester(filepath.Join("TestIntegrationRPCSendBlocks - remote", strconv.Itoa(i)))
+		remoteCST, err := blankConsensusSetTester(filepath.Join(t.Name()+" - remote", strconv.Itoa(i)))
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Create the "local" peer.
-		localCST, err := blankConsensusSetTester(filepath.Join("TestIntegrationRPCSendBlocks - local", strconv.Itoa(i)))
+		localCST, err := blankConsensusSetTester(filepath.Join(t.Name()+" - local", strconv.Itoa(i)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -536,7 +536,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 	}
 
 	// Create the "remote" peer.
-	cst, err := blankConsensusSetTester("TestRPCSendBlockSendsOnlyNecessaryBlocks - remote")
+	cst, err := blankConsensusSetTester(t.Name() + "- remote")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -546,7 +546,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 	// We create this peer manually (not using blankConsensusSetTester) so that we
 	// can connect it to the remote peer before calling consensus.New so as to
 	// prevent SendBlocks from triggering on Connect.
-	testdir := build.TempDir(modules.ConsensusDir, "TestRPCSendBlockSendsOnlyNecessaryBlocks - local")
+	testdir := build.TempDir(modules.ConsensusDir, t.Name()+" - local")
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -686,7 +686,7 @@ func TestSendBlk(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := blankConsensusSetTester("TestSendBlk")
+	cst, err := blankConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -777,7 +777,7 @@ func TestThreadedReceiveBlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := blankConsensusSetTester("TestThreadedReceiveBlock")
+	cst, err := blankConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -898,12 +898,12 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst1, err := blankConsensusSetTester("TestIntegrationSendBlkRPC1")
+	cst1, err := blankConsensusSetTester(t.Name() + "1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst1.Close()
-	cst2, err := blankConsensusSetTester("TestIntegrationSendBlkRPC2")
+	cst2, err := blankConsensusSetTester(t.Name() + "2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -997,7 +997,7 @@ func TestRelayHeader(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := blankConsensusSetTester("TestRelayHeader")
+	cst, err := blankConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1104,12 +1104,12 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 		t.SkipNow()
 	}
 	// Setup consensus sets.
-	cst1, err := blankConsensusSetTester("TestIntegrationBroadcastRelayHeader1")
+	cst1, err := blankConsensusSetTester(t.Name() + "1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst1.Close()
-	cst2, err := blankConsensusSetTester("TestIntegrationBroadcastRelayHeader2")
+	cst2, err := blankConsensusSetTester(t.Name() + "2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1165,17 +1165,17 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst1, err := blankConsensusSetTester("TestRelaySynchronize1")
+	cst1, err := blankConsensusSetTester(t.Name() + "1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst1.Close()
-	cst2, err := blankConsensusSetTester("TestRelaySynchronize2")
+	cst2, err := blankConsensusSetTester(t.Name() + "2")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst2.Close()
-	cst3, err := blankConsensusSetTester("TestRelaySynchronize3")
+	cst3, err := blankConsensusSetTester(t.Name() + "3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1361,7 +1361,7 @@ func TestThreadedReceiveBlocksStalls(t *testing.T) {
 		t.SkipNow()
 	}
 
-	cst, err := blankConsensusSetTester("TestThreadedReceiveBlocksStalls")
+	cst, err := blankConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1480,12 +1480,12 @@ func TestIntegrationSendBlocksStalls(t *testing.T) {
 		t.SkipNow()
 	}
 
-	cstLocal, err := blankConsensusSetTester("TestThreadedReceiveBlocksTimesout - local")
+	cstLocal, err := blankConsensusSetTester(t.Name() + "- local")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cstLocal.Close()
-	cstRemote, err := blankConsensusSetTester("TestThreadedReceiveBlocksTimesout - remote")
+	cstRemote, err := blankConsensusSetTester(t.Name() + "- remote")
 	if err != nil {
 		t.Fatal(err)
 	}

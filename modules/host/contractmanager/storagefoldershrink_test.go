@@ -129,7 +129,7 @@ func TestShrinkStorageFolderWithSectors(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cmt, err := newContractManagerTester("TestShrinkStorageFolderWithSectors")
+	cmt, err := newContractManagerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1150,12 +1150,19 @@ func TestShrinkStorageFolderWAL(t *testing.T) {
 
 // TestShrinkSingleStorageFolder verifies that it's possible to shirnk a single
 // storage folder with no destination for the sectors.
-func TestShirnkSingleStorageFolder (t *testing.T) {
+func TestShrinkSingleStorageFolder(t *testing.T) {
+	// TODO: Supporting in-place storage folder shrinking requires the
+	// move-sector function to be able to recognize the storage folder that it
+	// is currently using - right now it needs a storage folder lock to migrate
+	// a sector in, and a storage folder lock to migrate a sector out, and
+	// these locks are independent, so it cannot move a sector into the folder
+	// that the sector is being moved out of.
+	t.Skip("In-place shrinking not currently supported")
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cmt, err := newContractManagerTester("TestShrinkStorageFolderWithSectors")
+	cmt, err := newContractManagerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1163,6 +1170,8 @@ func TestShirnkSingleStorageFolder (t *testing.T) {
 
 	// Add a storage folder.
 	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	mfn := filepath.Join(storageFolderOne, metadataFile)
+	sfn := filepath.Join(storageFolderOne, sectorFile)
 	// Create the storage folder dir.
 	err = os.MkdirAll(storageFolderOne, 0700)
 	if err != nil {
@@ -1214,14 +1223,14 @@ func TestShirnkSingleStorageFolder (t *testing.T) {
 	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*4 {
 		t.Error("new storage folder is reporting the wrong capacity")
 	}
-	if capacityRemaining != modules.SectorSize*storageFolderGranularity*1 {
+	if sfs[0].CapacityRemaining != modules.SectorSize*storageFolderGranularity*1 {
 		t.Error("new storage folder capacity remaining is reporting the wrong remaining capacity")
 	}
-	mfi, err = os.Stat(mfn)
+	mfi, err := os.Stat(mfn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sfi, err = os.Stat(sfn)
+	sfi, err := os.Stat(sfn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1234,7 +1243,7 @@ func TestShirnkSingleStorageFolder (t *testing.T) {
 
 	// Verify that every single sector is readable and has the correct data.
 	wg.Add(len(roots))
-	misses = 0
+	misses := uint64(0)
 	for i := 0; i < len(roots); i++ {
 		go func(i int) {
 			data, err := cmt.cm.ReadSector(roots[i])

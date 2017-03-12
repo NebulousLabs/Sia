@@ -355,25 +355,25 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 	if settings.WindowSize != defaultWindowSize {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.Collateral.Cmp(defaultCollateral) != 0 {
+	if !settings.Collateral.Equals(defaultCollateral) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.CollateralBudget.Cmp(defaultCollateralBudget) != 0 {
+	if !settings.CollateralBudget.Equals(defaultCollateralBudget) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MaxCollateral.Cmp(defaultMaxCollateral) != 0 {
+	if !settings.MaxCollateral.Equals(defaultMaxCollateral) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MinContractPrice.Cmp(defaultContractPrice) != 0 {
+	if !settings.MinContractPrice.Equals(defaultContractPrice) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MinDownloadBandwidthPrice.Cmp(defaultDownloadBandwidthPrice) != 0 {
+	if !settings.MinDownloadBandwidthPrice.Equals(defaultDownloadBandwidthPrice) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MinStoragePrice.Cmp(defaultStoragePrice) != 0 {
+	if !settings.MinStoragePrice.Equals(defaultStoragePrice) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MinUploadBandwidthPrice.Cmp(defaultUploadBandwidthPrice) != 0 {
+	if !settings.MinUploadBandwidthPrice.Equals(defaultUploadBandwidthPrice) {
 		t.Error("settings retrieval did not return default value")
 	}
 

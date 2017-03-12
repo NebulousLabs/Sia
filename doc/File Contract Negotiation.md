@@ -190,7 +190,7 @@ File Contract Revision
 
 8. The renter signs the revision and sends the signature to the host.
 
-9. The host signs the revision and sends the siganture to the renter. Both
+9. The host signs the revision and sends the signature to the renter. Both
    parties submit the new revision to the transaction pool. The connection
    deadline is reset to 600 seconds (unless the maximum deadline has been
    reached), and the loop restarts.

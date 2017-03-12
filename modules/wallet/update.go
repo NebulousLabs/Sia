@@ -221,6 +221,10 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	w.updateConfirmedSet(cc)
 	w.revertHistory(cc)
 	w.applyHistory(cc)
+
+	if cc.Synced {
+		go w.threadedDefragWallet()
+	}
 }
 
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed

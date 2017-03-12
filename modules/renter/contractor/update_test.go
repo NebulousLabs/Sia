@@ -25,8 +25,9 @@ func TestProcessConsensusUpdate(t *testing.T) {
 		contracts: map[types.FileContractID]modules.RenterContract{
 			rc.ID: rc,
 		},
-		persist: new(memPersist),
-		log:     persist.NewLogger(ioutil.Discard),
+		oldContracts: make(map[types.FileContractID]modules.RenterContract),
+		persist:      new(memPersist),
+		log:          persist.NewLogger(ioutil.Discard),
 	}
 
 	// process 20 blocks; contract should remain
@@ -56,7 +57,7 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	_, c, m, err := newTestingTrio("TestIntegrationAutoRenew")
+	_, c, m, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +128,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	}
 	t.Parallel()
 	// create testing trio
-	_, c, m, err := newTestingTrio("TestIntegrationRenewInvalidate")
+	_, c, m, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

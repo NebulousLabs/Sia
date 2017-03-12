@@ -4,7 +4,7 @@ os:
   - linux
 
 go:
-  - 1.6
+  - 1.8
 
 install:
   - make dependencies

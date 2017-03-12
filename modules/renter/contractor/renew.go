@@ -11,10 +11,10 @@ import (
 )
 
 // managedRenew negotiates a new contract for data already stored with a host.
-// It returns the new contract. This is a blocking call that
-// performs network I/O.
+// It returns the new contract. This is a blocking call that performs network
+// I/O.
 func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
-	host, ok := c.hdb.Host(contract.NetAddress)
+	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
 		return modules.RenterContract{}, errors.New("no record of that host")
 	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
@@ -24,6 +24,9 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 	if host.MaxCollateral.Cmp(maxCollateral) > 0 {
 		host.MaxCollateral = maxCollateral
 	}
+	// Set the net address of the contract to the most recent net address for
+	// the host.
+	contract.NetAddress = host.NetAddress
 
 	// get an address to use for negotiation
 	uc, err := c.wallet.NextAddress()
@@ -42,10 +45,27 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 	}
 	c.mu.RUnlock()
 
-	txnBuilder := c.wallet.StartTransaction()
-
 	// execute negotiation protocol
+	txnBuilder := c.wallet.StartTransaction()
 	newContract, err := proto.Renew(contract, params, txnBuilder, c.tpool)
+	if proto.IsRevisionMismatch(err) {
+		// return unused outputs to wallet
+		txnBuilder.Drop()
+		// try again with the cached revision
+		c.mu.RLock()
+		cached, ok := c.cachedRevisions[contract.ID]
+		c.mu.RUnlock()
+		if !ok {
+			// nothing we can do; return original error
+			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
+			return modules.RenterContract{}, err
+		}
+		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
+		contract.LastRevision = cached.Revision
+		// need to start a new transaction
+		txnBuilder = c.wallet.StartTransaction()
+		newContract, err = proto.Renew(contract, params, txnBuilder, c.tpool)
+	}
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return modules.RenterContract{}, err
@@ -59,8 +79,11 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 func (c *Contractor) managedRenewContracts() error {
 	c.mu.RLock()
 	// Renew contracts when they enter the renew window.
+	// NOTE: offline contracts are not considered here, since we may have
+	// replaced them (and we probably won't be able to connect to their host
+	// anyway)
 	var renewSet []types.FileContractID
-	for _, contract := range c.contracts {
+	for _, contract := range c.onlineContracts() {
 		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
 			renewSet = append(renewSet, contract.ID)
 		}
@@ -75,12 +98,17 @@ func (c *Contractor) managedRenewContracts() error {
 
 	c.mu.RLock()
 	endHeight := c.blockHeight + c.allowance.Period
-	numSectors, err := maxSectors(c.allowance, c.hdb, c.tpool)
+	max, err := maxSectors(c.allowance, c.hdb, c.tpool)
 	c.mu.RUnlock()
 	if err != nil {
 		return err
-	} else if numSectors == 0 {
-		return errors.New("allowance is too small")
+	}
+	// Only allocate half as many sectors as the max. This leaves some leeway
+	// for replacing contracts, transaction fees, etc.
+	numSectors := max / 2
+	// check that this is sufficient to store at least one sector
+	if numSectors == 0 {
+		return ErrInsufficientAllowance
 	}
 
 	// invalidate all active editors/downloaders for the contracts we want to
@@ -142,10 +170,19 @@ func (c *Contractor) managedRenewContracts() error {
 
 	// replace old contracts with renewed ones
 	c.mu.Lock()
-	for id, contract := range newContracts {
-		delete(c.contracts, id)
+	for oldID, contract := range newContracts {
+		// archive the old contract
+		if oldContract, ok := c.contracts[oldID]; ok {
+			c.oldContracts[oldID] = oldContract
+			delete(c.contracts, oldID)
+		}
+		// insert the new contract
 		c.contracts[contract.ID] = contract
-		c.renewedIDs[id] = contract.ID
+		// add a mapping from old->new contract
+		c.renewedIDs[oldID] = contract.ID
+		// move the cachedRevision entry to the new ID
+		c.cachedRevisions[contract.ID] = c.cachedRevisions[oldID]
+		delete(c.cachedRevisions, oldID)
 	}
 	err = c.saveSync()
 	c.mu.Unlock()

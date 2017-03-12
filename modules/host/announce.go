@@ -16,22 +16,27 @@ var (
 	errUnknownAddress = errors.New("host cannot announce, does not seem to have a valid address.")
 )
 
-// announce creates an announcement transaction and submits it to the network.
-func (h *Host) announce(addr modules.NetAddress) error {
+// managedAnnounce creates an announcement transaction and submits it to the network.
+func (h *Host) managedAnnounce(addr modules.NetAddress) error {
 	// The wallet needs to be unlocked to add fees to the transaction, and the
 	// host needs to have an active unlock hash that renters can make payment
 	// to.
 	if !h.wallet.Unlocked() {
 		return errAnnWalletLocked
 	}
+
+	h.mu.Lock()
+	pubKey := h.publicKey
+	secKey := h.secretKey
 	err := h.checkUnlockHash()
+	h.mu.Unlock()
 	if err != nil {
 		return err
 	}
 
 	// Create the announcement that's going to be added to the arbitrary data
 	// field of the transaction.
-	signedAnnouncement, err := modules.CreateAnnouncement(addr, h.publicKey, h.secretKey)
+	signedAnnouncement, err := modules.CreateAnnouncement(addr, pubKey, secKey)
 	if err != nil {
 		return err
 	}
@@ -59,7 +64,10 @@ func (h *Host) announce(addr modules.NetAddress) error {
 		txnBuilder.Drop()
 		return err
 	}
+
+	h.mu.Lock()
 	h.announced = true
+	h.mu.Unlock()
 	h.log.Printf("INFO: Successfully announced as %v", addr)
 	return nil
 }
@@ -68,8 +76,6 @@ func (h *Host) announce(addr modules.NetAddress) error {
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
 func (h *Host) Announce() error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	err := h.tg.Add()
 	if err != nil {
 		return err
@@ -77,25 +83,26 @@ func (h *Host) Announce() error {
 	defer h.tg.Done()
 
 	// Determine whether to use the settings.NetAddress or autoAddress.
-	if h.settings.NetAddress != "" {
-		return h.announce(h.settings.NetAddress)
+	h.mu.RLock()
+	na := h.settings.NetAddress
+	aa := h.autoAddress
+	h.mu.RUnlock()
+	if na != "" {
+		return h.managedAnnounce(na)
 	}
-	if h.autoAddress == "" {
+	if aa == "" {
 		return errUnknownAddress
 	}
-	return h.announce(h.autoAddress)
+	return h.managedAnnounce(aa)
 }
 
 // AnnounceAddress submits a host announcement to the blockchain to announce a
 // specific address. No checks for validity are performed on the address.
 func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	err := h.tg.Add()
 	if err != nil {
 		return err
 	}
 	defer h.tg.Done()
-
-	return h.announce(addr)
+	return h.managedAnnounce(addr)
 }

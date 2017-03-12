@@ -25,63 +25,38 @@ var (
 	// MaxCatchUpBlocks is the maxiumum number of blocks that can be given to
 	// the consensus set in a single iteration during the initial blockchain
 	// download.
-	MaxCatchUpBlocks = func() types.BlockHeight {
-		switch build.Release {
-		case "dev":
-			return 50
-		case "standard":
-			return 10
-		case "testing":
-			return 3
-		default:
-			panic("unrecognized build.Release")
-		}
-	}()
+	MaxCatchUpBlocks = build.Select(build.Var{
+		Standard: types.BlockHeight(10),
+		Dev:      types.BlockHeight(50),
+		Testing:  types.BlockHeight(3),
+	}).(types.BlockHeight)
+
 	// sendBlocksTimeout is the timeout for the SendBlocks RPC.
-	sendBlocksTimeout = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 40 * time.Second
-		case "standard":
-			return 5 * time.Minute
-		case "testing":
-			return 5 * time.Second
-		default:
-			panic("unrecognized build.Release")
-		}
-	}()
+	sendBlocksTimeout = build.Select(build.Var{
+		Standard: 5 * time.Minute,
+		Dev:      40 * time.Second,
+		Testing:  5 * time.Second,
+	}).(time.Duration)
+
 	// minIBDWaitTime is the time threadedInitialBlockchainDownload waits before
 	// exiting if there are >= 1 and <= minNumOutbound peers synced. This timeout
 	// will primarily affect miners who have multiple nodes daisy chained off each
 	// other. Those nodes will likely have to wait minIBDWaitTime on every startup
 	// before IBD is done.
-	minIBDWaitTime = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 80 * time.Second
-		case "standard":
-			return 90 * time.Minute
-		case "testing":
-			return 10 * time.Second
-		default:
-			panic("unrecognized build.Release")
-		}
-	}()
+	minIBDWaitTime = build.Select(build.Var{
+		Standard: 90 * time.Minute,
+		Dev:      80 * time.Second,
+		Testing:  10 * time.Second,
+	}).(time.Duration)
+
 	// ibdLoopDelay is the time that threadedInitialBlockchainDownload waits
 	// between attempts to synchronize with the network if the last attempt
 	// failed.
-	ibdLoopDelay = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 1 * time.Second
-		case "standard":
-			return 10 * time.Second
-		case "testing":
-			return 100 * time.Millisecond
-		default:
-			panic("unrecognized build.Release")
-		}
-	}()
+	ibdLoopDelay = build.Select(build.Var{
+		Standard: 10 * time.Second,
+		Dev:      1 * time.Second,
+		Testing:  100 * time.Millisecond,
+	}).(time.Duration)
 
 	errEarlyStop         = errors.New("initial blockchain download did not complete by the time shutdown was issued")
 	errSendBlocksStalled = errors.New("SendBlocks RPC timed and never received any blocks")
@@ -575,7 +550,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 				// the Timeout() method. Once muxado issue #14 is resolved change the below
 				// condition to:
 				//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
-				if err.Error() != "Read timeout" && err.Error() != "Write timeout" {
+				if err.Error() != "Read timeout" && err.Error() != "Write timeout" && err.Error() != "Session closed" {
 					cs.log.Printf("WARN: disconnecting from peer %v because IBD failed: %v", p.NetAddress, err)
 					// Disconnect if there is an unexpected error (not a timeout). This
 					// includes errSendBlocksStalled.
