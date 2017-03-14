@@ -20,7 +20,7 @@ var (
 	}
 
 	renterExportContractsCmd = &cobra.Command{
-		Use:   "rankings-data [destination]",
+		Use:   "contract-txns [destination]",
 		Short: "export the renter's contracts for import to `https://rankings.sia.tech/`",
 		Long: "Export the renter's current contract set in JSON format to the specified " +
 			"file. Intended for upload to `https://rankings.sia.tech/`.",
