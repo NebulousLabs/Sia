@@ -90,8 +90,8 @@ func TestSaveLoad(t *testing.T) {
 	}
 
 	// use stdPersist instead of mock
-	c.persist = newPersist(build.TempDir("contractor", "TestSaveLoad"))
-	os.MkdirAll(build.TempDir("contractor", "TestSaveLoad"), 0700)
+	c.persist = newPersist(build.TempDir("contractor", t.Name()))
+	os.MkdirAll(build.TempDir("contractor", t.Name()), 0700)
 
 	// save, clear, and reload
 	err = c.save()
@@ -146,6 +146,8 @@ func (cs blockCS) ConsensusSetSubscribe(s modules.ConsensusSetSubscriber, _ modu
 }
 
 func (blockCS) Synced() bool { return true }
+
+func (blockCS) Unsubscribe(modules.ConsensusSetSubscriber) { return }
 
 // TestPubKeyScanner tests that the pubkeyScanner type correctly identifies
 // public keys in the blockchain.

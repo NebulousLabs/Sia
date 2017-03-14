@@ -268,31 +268,31 @@ func TestHostPoorConnectivity(t *testing.T) {
 
 	// Create the various nodes that will be forming the simulated ecosystem of
 	// this test.
-	stLeader, err := createServerTester("TestHostPoorConnectivity - Leader")
+	stLeader, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost1, err := blankServerTester("TestHostPoorConnectivity - Host 1")
+	stHost1, err := blankServerTester(t.Name() + " - Host 1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost2, err := blankServerTester("TestHostPoorConnectivity - Host 2")
+	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost3, err := blankServerTester("TestHostPoorConnectivity - Host 3")
+	stHost3, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost4, err := blankServerTester("TestHostPoorConnectivity - Host 4")
+	stHost4, err := blankServerTester(t.Name() + " - Host 4")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stRenter1, err := blankServerTester("TestHostPoorConnectivity - Renter 1")
+	stRenter1, err := blankServerTester(t.Name() + " - Renter 1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stRenter2, err := blankServerTester("TestHostPoorConnectivity - Renter 2")
+	stRenter2, err := blankServerTester(t.Name() + " - Renter 2")
 	if err != nil {
 		t.Fatal(err)
 	}

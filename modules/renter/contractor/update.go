@@ -63,6 +63,13 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// but very slow)
 	if cc.Synced {
 		go func() {
+			// Add the goroutine to the thread group.
+			err := c.tg.Add()
+			if err != nil {
+				return
+			}
+			defer c.tg.Done()
+
 			// only one goroutine should be editing contracts at a time
 			if !c.editLock.TryLock() {
 				return
@@ -70,7 +77,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 			defer c.editLock.Unlock()
 
 			// renew any (online) contracts that have entered the renew window
-			err := c.managedRenewContracts()
+			err = c.managedRenewContracts()
 			if err != nil {
 				c.log.Debugln("WARN: failed to renew contracts after processing a consensus chage:", err)
 			}

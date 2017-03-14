@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -41,6 +42,7 @@ type Contractor struct {
 	log     *persist.Logger
 	persist persister
 	mu      sync.RWMutex
+	tg      siasync.ThreadGroup
 	tpool   transactionPool
 	wallet  wallet
 
@@ -126,8 +128,7 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 
 // Close closes the Contractor.
 func (c *Contractor) Close() error {
-	c.log.Close()
-	return c.persist.Close()
+	return c.tg.Stop()
 }
 
 // New returns a new Contractor.
@@ -179,12 +180,26 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		revising:        make(map[types.FileContractID]bool),
 	}
 
+	// Close the logger (provided as a dependency) upon shutdown.
+	c.tg.AfterStop(func() {
+		if err := c.log.Close(); err != nil {
+			fmt.Println("Failed to close the contractor logger:", err)
+		}
+	})
+
 	// Load the prior persistence structures.
 	err := c.load()
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
+	// Close the persist (provided as a dependency) upong shutdown.
+	c.tg.AfterStop(func() {
+		if err := c.persist.Close(); err != nil {
+			c.log.Println("Failed to close contractor persist:", err)
+		}
+	})
 
+	// Subscribe to the consensus set.
 	err = cs.ConsensusSetSubscribe(c, c.lastChange)
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Reset the contractor consensus variables and try rescanning.
@@ -195,6 +210,10 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 	if err != nil {
 		return nil, errors.New("contractor subscription failed: " + err.Error())
 	}
+	// Unsubscribe from the consensus set upon shutdown.
+	c.tg.OnStop(func() {
+		cs.Unsubscribe(c)
+	})
 
 	// We may have upgraded persist or resubscribed. Save now so that we don't
 	// lose our work.

@@ -15,7 +15,7 @@ func TestArbDataOnly(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	tpt, err := createTpoolTester("TestArbDataOnly")
+	tpt, err := createTpoolTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

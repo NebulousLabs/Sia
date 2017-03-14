@@ -131,7 +131,7 @@ func TestNew(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testDir := build.TempDir("HostDB", "TestNew")
+	testDir := build.TempDir("HostDB", t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testDir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -183,7 +183,7 @@ func TestRandomHosts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt, err := newHDBTesterDeps("TestRandomHosts", disableScanLoopDeps{})
+	hdbt, err := newHDBTesterDeps(t.Name(), disableScanLoopDeps{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,7 +366,7 @@ func TestRemoveNonexistingHostFromHostTree(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt, err := newHDBTester("TestRemoveNonexistingHostFromHostTree")
+	hdbt, err := newHDBTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -30,7 +30,7 @@ func TestSaveLoad(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	hdbt, err := newHDBTester("TestSaveLoad")
+	hdbt, err := newHDBTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	_, err := newHDBTester("TestRescan")
+	_, err := newHDBTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

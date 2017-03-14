@@ -19,18 +19,19 @@ allocated funds.
 Index
 -----
 
-| Route                                                         | HTTP verb |
-| ------------------------------------------------------------- | --------- |
-| [/renter](#renter-get)                                        | GET       |
-| [/renter](#renter-post)                                       | POST      |
-| [/renter/contracts](#rentercontracts-get)                     | GET       |
-| [/renter/downloads](#renterdownloads-get)                     | GET       |
-| [/renter/files](#renterfiles-get)                             | GET       |
-| [/renter/prices](#renter-prices-get)                          | GET       |
-| [/renter/delete/___*siapath___](#renterdeletesiapath-post)    | POST      |
-| [/renter/download/___*siapath___](#renterdownloadsiapath-get) | GET       |
-| [/renter/rename/___*siapath___](#renterrenamesiapath-post)    | POST      |
-| [/renter/upload/___*siapath___](#renteruploadsiapath-post)    | POST      |
+| Route                                                                   | HTTP verb |
+| ----------------------------------------------------------------------- | --------- |
+| [/renter](#renter-get)                                                  | GET       |
+| [/renter](#renter-post)                                                 | POST      |
+| [/renter/contracts](#rentercontracts-get)                               | GET       |
+| [/renter/downloads](#renterdownloads-get)                               | GET       |
+| [/renter/files](#renterfiles-get)                                       | GET       |
+| [/renter/prices](#renter-prices-get)                                    | GET       |
+| [/renter/delete/___*siapath___](#renterdeletesiapath-post)              | POST      |
+| [/renter/download/___*siapath___](#renterdownloadsiapath-get)           | GET       |
+| [/renter/downloadasync/___*siapath___](#renterdownloadasyncsiapath-get) | GET       |
+| [/renter/rename/___*siapath___](#renterrenamesiapath-post)              | POST      |
+| [/renter/upload/___*siapath___](#renteruploadsiapath-post)              | POST      |
 
 #### /renter [GET]
 
@@ -166,7 +167,10 @@ lists all files in the download queue.
       "received": 4096, // bytes
 
       // Time at which the download was initiated.
-      "starttime": "2009-11-10T23:00:00Z" // RFC 3339 time
+      "starttime": "2009-11-10T23:00:00Z", // RFC 3339 time
+
+      // Error encountered while downloading, if it exists.
+      "error": ""
     }   
   ]
 }
@@ -271,6 +275,24 @@ has been downloaded.
 ```
 // Location on disk that the file will be downloaded to.
 destination 
+```
+
+###### Response
+standard success or error response. See
+[API.md#standard-responses](/doc/API.md#standard-responses).
+
+#### /renter/downloadasync/___*siapath___ [GET]
+
+downloads a file to the local filesystem. The call will return immediately.
+
+###### Path Parameters
+```
+*siapath
+```
+
+###### Query String Parameters
+```
+destination
 ```
 
 ###### Response

@@ -31,6 +31,259 @@ func createRandFile(path string, size int) error {
 	return ioutil.WriteFile(path, data, 0600)
 }
 
+// TestRenterDownloadError tests that the /renter/download route sets the download's error field if it fails.
+func TestRenterDownloadError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and start accepting contracts.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "10"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(build.SiaTestingDir, "api", t.Name(), "test.dat")
+	err = createRandFile(path, 1e4)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("renew", "true")
+	err = st.stdPostAPI("/renter/upload/test.dat", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
+	downpath := filepath.Join(st.dir, "down.dat")
+	expectedErr := st.getAPI("/renter/download/test.dat?destination="+downpath, nil)
+	if expectedErr == nil {
+		t.Fatal("download unexpectedly succeeded")
+	}
+
+	// verify the file has the expected error
+	var rdq RenterDownloadQueue
+	err = st.getAPI("/renter/downloads", &rdq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, download := range rdq.Downloads {
+		if download.SiaPath == "test.dat" && download.Received == download.Filesize && download.Error == expectedErr.Error() {
+			t.Fatal("download had unexpected error: ", download.Error)
+		}
+	}
+}
+
+// TestRenterAsyncDownloadError tests that the /renter/asyncdownload route sets the download's error field if it fails.
+func TestRenterAsyncDownloadError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and start accepting contracts.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "10"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(build.SiaTestingDir, "api", t.Name(), "test.dat")
+	err = createRandFile(path, 1e4)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("renew", "true")
+	err = st.stdPostAPI("/renter/upload/test.dat", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
+	downpath := filepath.Join(st.dir, "asyncdown.dat")
+	err = st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify the file has an error
+	var rdq RenterDownloadQueue
+	err = st.getAPI("/renter/downloads", &rdq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, download := range rdq.Downloads {
+		if download.SiaPath == "test.dat" && download.Received == download.Filesize && download.Error == "" {
+			t.Fatal("download had nil error")
+		}
+	}
+}
+
+// TestRenterAsyncDownload tests that the /renter/downloadasync route works
+// correctly.
+func TestRenterAsyncDownload(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and start accepting contracts.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "10"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(build.SiaTestingDir, "api", t.Name(), "test.dat")
+	err = createRandFile(path, 1e4)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("renew", "true")
+	err = st.stdPostAPI("/renter/upload/test.dat", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the file to become available
+	var rf RenterFiles
+	for i := 0; i < 100 && (len(rf.Files) != 1 || !rf.Files[0].Available); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || !rf.Files[0].Available {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+	}
+
+	// download the file asynchronously
+	downpath := filepath.Join(st.dir, "asyncdown.dat")
+	err = st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify the file is not currently downloaded
+	var rdq RenterDownloadQueue
+	err = st.getAPI("/renter/downloads", &rdq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, download := range rdq.Downloads {
+		if download.SiaPath == "test.dat" && download.Received == download.Filesize {
+			t.Fatal("download finished prematurely")
+		}
+	}
+
+	// download should eventually complete
+	success := false
+	for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
+		err = st.getAPI("/renter/downloads", &rdq)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, download := range rdq.Downloads {
+			if download.Received == download.Filesize && download.SiaPath == "test.dat" {
+				success = true
+			}
+		}
+		if success {
+			break
+		}
+	}
+	if !success {
+		t.Fatal("/renter/downloadasync did not download our test file")
+	}
+}
+
 // TestRenterPaths tests that the /renter routes handle path parameters
 // properly.
 func TestRenterPaths(t *testing.T) {
@@ -38,7 +291,7 @@ func TestRenterPaths(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestRenterPaths")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +304,7 @@ func TestRenterPaths(t *testing.T) {
 	}
 
 	// Create a file.
-	path := filepath.Join(build.SiaTestingDir, "api", "TestRenterPaths", "test.dat")
+	path := filepath.Join(build.SiaTestingDir, "api", t.Name(), "test.dat")
 	err = createRandFile(path, 1024)
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +336,7 @@ func TestRenterConflicts(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestRenterConflicts")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +349,7 @@ func TestRenterConflicts(t *testing.T) {
 	}
 
 	// Create a file.
-	path := filepath.Join(build.SiaTestingDir, "api", "TestRenterConflicts", "test.dat")
+	path := filepath.Join(build.SiaTestingDir, "api", t.Name(), "test.dat")
 	err = createRandFile(path, 1024)
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +397,7 @@ func TestRenterHandlerContracts(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestRenterHandlerContracts")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +461,7 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestRenterHandlerGetAndPost")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +558,7 @@ func TestRenterLoadNonexistent(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestRenterLoadNonexistent")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +616,7 @@ func TestRenterHandlerRename(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestRenterHandlerRename")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -461,7 +714,7 @@ func TestRenterHandlerDelete(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestRenterHandlerDelete")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -526,7 +779,7 @@ func TestRenterRelativePathErrorUpload(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestRenterRelativePathErrorUpload")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -587,7 +840,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestRenterRelativePathErrorDownload")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -667,7 +920,7 @@ func TestRenterPricesHandler(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostDBHostsAllHandler")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -684,11 +937,11 @@ func TestRenterPricesHandler(t *testing.T) {
 	}
 
 	// Create several more hosts all using the default settings.
-	stHost1, err := blankServerTester("TestRenterPricesHandler - Host 1")
+	stHost1, err := blankServerTester(t.Name() + " - Host 1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost2, err := blankServerTester("TestRenterPricesHandler - Host 2")
+	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -739,7 +992,7 @@ func TestRenterPricesHandlerCheap(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostDBHostsAllHandlerCheap")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -756,11 +1009,11 @@ func TestRenterPricesHandlerCheap(t *testing.T) {
 	}
 
 	// Create several more hosts all using the default settings.
-	stHost1, err := blankServerTester("TestRenterPricesHandlerCheap - Host 1")
+	stHost1, err := blankServerTester(t.Name() + " - Host 1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost2, err := blankServerTester("TestRenterPricesHandlerCheap - Host 2")
+	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -840,7 +1093,7 @@ func TestRenterPricesHandlerIgnorePricey(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostDBHostsAllHandlerIgnorePricey")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -857,23 +1110,23 @@ func TestRenterPricesHandlerIgnorePricey(t *testing.T) {
 	}
 
 	// Create several more hosts all using the default settings.
-	stHost1, err := blankServerTester("TestRenterPricesHandlerIgnorePricey - Host 1")
+	stHost1, err := blankServerTester(t.Name() + " - Host 1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost2, err := blankServerTester("TestRenterPricesHandlerIgnorePricey - Host 2")
+	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost3, err := blankServerTester("TestRenterPricesHandlerIgnorePricey - Host 3")
+	stHost3, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost4, err := blankServerTester("TestRenterPricesHandlerIgnorePricey - Host 4")
+	stHost4, err := blankServerTester(t.Name() + " - Host 4")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost5, err := blankServerTester("TestRenterPricesHandlerIgnorePricey - Host 5")
+	stHost5, err := blankServerTester(t.Name() + " - Host 5")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -940,7 +1193,7 @@ func TestRenterPricesHandlerPricey(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostDBHostsAllHandlerPricey")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -957,11 +1210,11 @@ func TestRenterPricesHandlerPricey(t *testing.T) {
 	}
 
 	// Create several more hosts all using the default settings.
-	stHost1, err := blankServerTester("TestRenterPricesHandlerPricey - Host 1")
+	stHost1, err := blankServerTester(t.Name() + " - Host 1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stHost2, err := blankServerTester("TestRenterPricesHandlerPricey - Host 2")
+	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}

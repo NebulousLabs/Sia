@@ -24,7 +24,7 @@ func TestHostAndRentVanilla(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestHostAndRentVanilla")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,11 +35,11 @@ func TestHostAndRentVanilla(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = st.acceptContracts()
+	err = st.setHostStorage()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = st.setHostStorage()
+	err = st.acceptContracts()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,11 +48,20 @@ func TestHostAndRentVanilla(t *testing.T) {
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
 	testPeriod := "10"
+	testPeriodInt := 10
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Check the host, who should now be reporting file contracts.
+	//
+	// TODO: Switch to using an API call.
+	obligations := st.host.StorageObligations()
+	if len(obligations) != 1 {
+		t.Error("Host has wrong number of obligations:", len(obligations))
 	}
 
 	// Create a file.
@@ -155,6 +164,47 @@ func TestHostAndRentVanilla(t *testing.T) {
 	if len(queue.Downloads) != 2 {
 		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
 	}
+
+	// Mine two blocks, which should cause the host to submit the storage
+	// obligation to the blockchain.
+	for i := 0; i < 2; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+
+	// Check that the host was able to get the file contract confirmed on the
+	// blockchain.
+	obligations = st.host.StorageObligations()
+	if len(obligations) != 1 {
+		t.Error("Host has wrong number of obligations:", len(obligations))
+	}
+	if !obligations[0].OriginConfirmed {
+		t.Error("host has not seen the file contract on the blockchain")
+	}
+
+	// Mine blocks until the host should have submitted a storage proof.
+	for i := 0; i <= testPeriodInt+5; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+
+	success := false
+	obligations = st.host.StorageObligations()
+	for _, obligation := range obligations {
+		if obligation.ProofConfirmed {
+			success = true
+			break
+		}
+	}
+	if !success {
+		t.Error("does not seem like the host has submitted a storage proof successfully to the network")
+	}
 }
 
 // TestHostAndRentMultiHost sets up an integration test where three hosts and a
@@ -163,17 +213,17 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestHostAndRentMultiHost-Host1andRenter")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.server.Close()
-	stH1, err := blankServerTester("TestHostAndRentMultiHost - Host 2")
+	stH1, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stH1.server.Close()
-	stH2, err := blankServerTester("TestHostAndRentMultiHost - Host 3")
+	stH2, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +259,7 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	allowanceValues := url.Values{}
 	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
 	allowanceValues.Set("hosts", "3")
-	allowanceValues.Set("period", "5")
+	allowanceValues.Set("period", "10")
 	allowanceValues.Set("renewwindow", "2")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
@@ -278,22 +328,22 @@ func TestHostAndRentManyFiles(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestHostAndRentManyFiles-Host1andRenter")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.server.Close()
-	stH1, err := blankServerTester("TestHostAndRentManyFiles - Host 2")
+	stH1, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stH1.server.Close()
-	stH2, err := blankServerTester("TestHostAndRentManyFiles - Host 3")
+	stH2, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stH2.server.Close()
-	stH3, err := blankServerTester("TestHostAndRentManyFiles - Host 4")
+	stH3, err := blankServerTester(t.Name() + " - Host 4")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -487,7 +537,7 @@ func TestRenterUploadDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestRenterUploadDownload")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,7 +663,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestRenterCancelAllowance")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -693,7 +743,7 @@ func TestRenterParallelDelete(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestRenterParallelDelete")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -802,7 +852,7 @@ func TestRenterRenew(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestRenterRenew")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -879,7 +929,8 @@ func TestRenterRenew(t *testing.T) {
 	contractID := rc.Contracts[0].ID
 
 	// Mine enough blocks to enter the renewal window.
-	for i := 0; i < testPeriod; i++ {
+	testWindow := testPeriod / 2
+	for i := 0; i < testWindow+1; i++ {
 		st.miner.AddBlock()
 	}
 	// Wait for the contract to be renewed.
@@ -917,7 +968,7 @@ func TestRenterAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestRenterAllowance")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1024,7 +1075,7 @@ func TestHostAndRentReload(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	st, err := createServerTester("TestHostAndRentReload")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,15 +14,15 @@ func TestIntegrationBlockHeightReorg(t *testing.T) {
 	}
 
 	// Create 3 miner testers that will be used to cause each other to reorg.
-	mt1, err := createMinerTester("TestIntegrationBlockHeightReorg - 1")
+	mt1, err := createMinerTester(t.Name() + "1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	mt2, err := createMinerTester("TestIntegrationBlockHeightReorg - 2")
+	mt2, err := createMinerTester(t.Name() + "2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	mt3, err := createMinerTester("TestIntegrationBlockHeightReorg - 3")
+	mt3, err := createMinerTester(t.Name() + "3")
 	if err != nil {
 		t.Fatal(err)
 	}

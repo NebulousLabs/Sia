@@ -41,7 +41,7 @@ func TestRegisterRPC(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestRegisterRPC", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 
 	g.RegisterRPC("Foo", func(conn modules.PeerConn) error { return nil })
@@ -60,9 +60,9 @@ func TestUnregisterRPC(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestUnregisterRPC1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
-	g2 := newTestingGateway("TestUnregisterRPC2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
 	err := g2.Connect(g1.Address())
@@ -106,7 +106,7 @@ func TestRegisterConnectCall(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestRegisterConnectCall", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 
 	// Register an on-connect call.
@@ -126,9 +126,9 @@ func TestUnregisterConnectCallPanics(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestUnregisterConnectCall1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
-	g2 := newTestingGateway("TestUnregisterConnectCall2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
 	rpcChan := make(chan struct{})
@@ -176,14 +176,14 @@ func TestRPC(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestRPC1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
 
 	if err := g1.RPC("foo.com:123", "", nil); err == nil {
 		t.Fatal("RPC on unconnected peer succeeded")
 	}
 
-	g2 := newTestingGateway("TestRPC2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
 	err := g1.Connect(g2.Address())
@@ -252,9 +252,9 @@ func TestThreadedHandleConn(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestThreadedHandleConn1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
-	g2 := newTestingGateway("TestThreadedHandleConn2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
 	err := g1.Connect(g2.Address())
@@ -316,11 +316,11 @@ func TestBroadcast(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestBroadcast1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
-	g2 := newTestingGateway("TestBroadcast2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
-	g3 := newTestingGateway("TestBroadcast3", t)
+	g3 := newNamedTestingGateway(t, "3")
 	defer g3.Close()
 
 	err := g1.Connect(g2.Address())
@@ -440,9 +440,9 @@ func TestOutboundAndInboundRPCs(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestRPC1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
-	g2 := newTestingGateway("TestRPC2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
 	rpcChanG1 := make(chan struct{})
@@ -489,9 +489,9 @@ func TestCallingRPCFromRPC(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestCallingRPCFromRPC1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
-	g2 := newTestingGateway("TestCallingRPCFromRPC2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
 	errChan := make(chan error)

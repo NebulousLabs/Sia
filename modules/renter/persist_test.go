@@ -74,7 +74,7 @@ func TestFileShareLoad(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterShareLoad")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestFileShareLoad(t *testing.T) {
 	rt.renter.mu.Unlock(id)
 
 	// Share .sia file to disk.
-	path := filepath.Join(build.SiaTestingDir, "renter", "TestRenterShareLoad", "test.sia")
+	path := filepath.Join(build.SiaTestingDir, "renter", t.Name(), "test.sia")
 	err = rt.renter.ShareFiles([]string{savedFile.name}, path)
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +112,7 @@ func TestFileShareLoad(t *testing.T) {
 	// Share and load multiple files.
 	savedFile2 := newTestingFile()
 	rt.renter.files[savedFile2.name] = savedFile2
-	path = filepath.Join(build.SiaTestingDir, "renter", "TestRenterShareLoad", "test2.sia")
+	path = filepath.Join(build.SiaTestingDir, "renter", t.Name(), "test2.sia")
 	err = rt.renter.ShareFiles([]string{savedFile.name, savedFile2.name}, path)
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +144,7 @@ func TestFileShareLoadASCII(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterShareLoadASCII")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestRenterSaveLoad(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterSaveLoad")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestRenterPaths(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterPaths")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +299,7 @@ func TestSiafileCompatibility(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestSiafileCompatibility")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -55,6 +55,7 @@ type DownloadInfo struct {
 	Filesize    uint64    `json:"filesize"`
 	Received    uint64    `json:"received"`
 	StartTime   time.Time `json:"starttime"`
+	Error       string    `json:"error"`
 }
 
 // FileUploadParams contains the information used by the Renter to upload a

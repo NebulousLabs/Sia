@@ -27,7 +27,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 	// Create 8 remote peers.
 	remoteCSTs := make([]*consensusSetTester, 8)
 	for i := range remoteCSTs {
-		cst, err := blankConsensusSetTester(fmt.Sprintf("TestSimpleInitialBlockchainDownload - %v", i))
+		cst, err := blankConsensusSetTester(t.Name() + strconv.Itoa(i))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -35,7 +35,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		remoteCSTs[i] = cst
 	}
 	// Create the "local" peer.
-	localCST, err := blankConsensusSetTester("TestSimpleInitialBlockchainDownload - local")
+	localCST, err := blankConsensusSetTester(t.Name() + "- local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 		t.SkipNow()
 	}
 
-	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDisconnects")
+	testdir := build.TempDir(modules.ConsensusDir, t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, "local", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -286,7 +286,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDoneRules")
+	testdir := build.TempDir(modules.ConsensusDir, t.Name())
 
 	// Create a gateway that can be forced to return errors when its RPC method
 	// is called, then create a consensus set using that gateway.
@@ -330,7 +330,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	func() {
 		inboundCSTs := make([]*consensusSetTester, 8)
 		for i := 0; i < len(inboundCSTs); i++ {
-			inboundCST, err := blankConsensusSetTester(filepath.Join("TestInitialBlockchainDownloadDoneRules", fmt.Sprintf("remote - inbound %v", i)))
+			inboundCST, err := blankConsensusSetTester(filepath.Join(t.Name(), " - inbound "+strconv.Itoa(i)))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -463,11 +463,11 @@ func TestGenesisBlockSync(t *testing.T) {
 
 	// Create two consensus sets that have zero blocks each (except for the
 	// genesis block).
-	cst1, err := blankConsensusSetTester("TestGenesisBlockSync1")
+	cst1, err := blankConsensusSetTester(t.Name() + "1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst2, err := blankConsensusSetTester("TestGenesisBlockSync2")
+	cst2, err := blankConsensusSetTester(t.Name() + "2")
 	if err != nil {
 		t.Fatal(err)
 	}

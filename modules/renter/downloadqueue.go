@@ -37,8 +37,8 @@ func (r *Renter) Download(path, destination string) error {
 	// TODO: Eventually just return the channel to the error instead of the
 	// error itself.
 	select {
-	case err := <-d.downloadFinished:
-		return err
+	case <-d.downloadFinished:
+		return d.Err()
 	case <-r.tg.StopChan():
 		return errors.New("download interrupted by shutdown")
 	}
@@ -60,6 +60,10 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 			StartTime:   d.startTime,
 		}
 		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)
+		err := d.Err()
+		if err != nil {
+			downloads[i].Error = err.Error()
+		}
 	}
 	return downloads
 }

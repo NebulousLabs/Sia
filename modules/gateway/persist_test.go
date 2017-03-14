@@ -9,7 +9,7 @@ func TestLoad(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestLoad", t)
+	g := newTestingGateway(t)
 
 	g.mu.Lock()
 	g.addNode(dummyNode)

@@ -24,7 +24,7 @@ func TestIntegrationExplorerFileContractMetrics(t *testing.T) {
 		t.Skip()
 	}
 
-	et, err := createExplorerTester("TestIntegrationExporerFileContractMetrics")
+	et, err := createExplorerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

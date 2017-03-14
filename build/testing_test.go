@@ -13,7 +13,7 @@ import (
 func TestCopyDir(t *testing.T) {
 	// Create some nested folders to copy.
 	os.MkdirAll(TempDir("build"), 0700)
-	root := TempDir("build", "TestCopyDir")
+	root := TempDir("build", t.Name())
 	os.MkdirAll(root, 0700)
 
 	data := make([][]byte, 2)

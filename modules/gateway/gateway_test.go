@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -13,13 +14,27 @@ import (
 	siasync "github.com/NebulousLabs/Sia/sync"
 )
 
-// newTestingGateway returns a gateway read to use in a testing environment.
-func newTestingGateway(name string, t *testing.T) *Gateway {
+// newTestingGateway returns a gateway ready to use in a testing environment.
+func newTestingGateway(t *testing.T) *Gateway {
 	if testing.Short() {
 		panic("newTestingGateway called during short test")
 	}
 
-	g, err := New("localhost:0", false, build.TempDir("gateway", name))
+	g, err := New("localhost:0", false, build.TempDir("gateway", t.Name()))
+	if err != nil {
+		panic(err)
+	}
+	return g
+}
+
+// newNamedTestingGateway returns a gateway ready to use in a testing
+// environment. The gateway's persist folder will have the specified suffix.
+func newNamedTestingGateway(t *testing.T, suffix string) *Gateway {
+	if testing.Short() {
+		panic("newTestingGateway called during short test")
+	}
+
+	g, err := New("localhost:0", false, build.TempDir("gateway", t.Name()+suffix))
 	if err != nil {
 		panic(err)
 	}
@@ -33,7 +48,7 @@ func TestExportedMethodsErrAfterClose(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestCloseErrsSecondTime", t)
+	g := newTestingGateway(t)
 
 	if err := g.Close(); err != nil {
 		t.Fatal(err)
@@ -54,7 +69,7 @@ func TestAddress(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g := newTestingGateway("TestAddress", t)
+	g := newTestingGateway(t)
 	defer g.Close()
 
 	if g.Address() != g.myAddr {
@@ -82,9 +97,9 @@ func TestPeers(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	g1 := newTestingGateway("TestRPC1", t)
+	g1 := newNamedTestingGateway(t, "1")
 	defer g1.Close()
-	g2 := newTestingGateway("TestRPC2", t)
+	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
 	err := g1.Connect(g2.Address())
@@ -118,11 +133,11 @@ func TestNew(t *testing.T) {
 	if _, err := New("localhost:0", false, ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
 	}
-	if g, err := New("foo", false, build.TempDir("gateway", "TestNew1")); err == nil {
+	if g, err := New("foo", false, build.TempDir("gateway", t.Name()+"1")); err == nil {
 		t.Fatal("expecting listener error, got nil", g.myAddr)
 	}
 	// create corrupted nodes.json
-	dir := build.TempDir("gateway", "TestNew2")
+	dir := build.TempDir("gateway", t.Name()+"2")
 	os.MkdirAll(dir, 0700)
 	err := ioutil.WriteFile(filepath.Join(dir, "nodes.json"), []byte{1, 2, 3}, 0660)
 	if err != nil {
@@ -140,7 +155,7 @@ func TestClose(t *testing.T) {
 	}
 	t.Parallel()
 
-	g := newTestingGateway("TestClose", t)
+	g := newTestingGateway(t)
 	err := g.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -157,63 +172,40 @@ func TestParallelClose(t *testing.T) {
 	t.Parallel()
 
 	// Spin up three gateways in parallel.
-	var g1, g2, g3 *Gateway
+	var gs [3]*Gateway
 	var wg sync.WaitGroup
 	wg.Add(3)
-	go func() {
-		g1 = newTestingGateway("TestParallelClose - 1", t)
-		wg.Done()
-	}()
-	go func() {
-		g2 = newTestingGateway("TestParallelClose - 2", t)
-		wg.Done()
-	}()
-	go func() {
-		g3 = newTestingGateway("TestParallelClose - 3", t)
-		wg.Done()
-	}()
+	for i := range gs {
+		go func(i int) {
+			gs[i] = newNamedTestingGateway(t, strconv.Itoa(i))
+			wg.Done()
+		}(i)
+	}
 	wg.Wait()
 
 	// Connect g1 to g2, g2 to g3. They may connect to eachother further.
 	wg.Add(2)
-	go func() {
-		err := g1.Connect(g2.myAddr)
-		if err != nil {
-			panic(err)
-		}
-		wg.Done()
-	}()
-	go func() {
-		err := g2.Connect(g3.myAddr)
-		if err != nil {
-			panic(err)
-		}
-		wg.Done()
-	}()
+	for i := range gs[:2] {
+		go func(i int) {
+			err := gs[i].Connect(gs[i+1].myAddr)
+			if err != nil {
+				panic(err)
+			}
+			wg.Done()
+		}(i)
+	}
 	wg.Wait()
 
 	// Close all three gateways in parallel.
 	wg.Add(3)
-	go func() {
-		err := g1.Close()
-		if err != nil {
-			panic(err)
-		}
-		wg.Done()
-	}()
-	go func() {
-		err := g2.Close()
-		if err != nil {
-			panic(err)
-		}
-		wg.Done()
-	}()
-	go func() {
-		err := g3.Close()
-		if err != nil {
-			panic(err)
-		}
-		wg.Done()
-	}()
+	for i := range gs {
+		go func(i int) {
+			err := gs[i].Close()
+			if err != nil {
+				panic(err)
+			}
+			wg.Done()
+		}(i)
+	}
 	wg.Wait()
 }

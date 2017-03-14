@@ -19,7 +19,7 @@ func TestRescan(t *testing.T) {
 		t.SkipNow()
 	}
 
-	tpt, err := createTpoolTester("TestRescan")
+	tpt, err := createTpoolTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

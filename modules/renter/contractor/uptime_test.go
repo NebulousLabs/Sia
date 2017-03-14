@@ -38,7 +38,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	h, c, m, err := newTestingTrio("TestIntegrationReplaceOffline")
+	h, c, m, err := newTestingTrio(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	c.hdb = offlineHostDB{c.hdb, h.PublicKey()}
 
 	// create another host
-	dir := build.TempDir("contractor", "TestIntegrationReplaceOffline", "Host2")
+	dir := build.TempDir("contractor", t.Name(), "Host2")
 	h2, err := newTestingHost(dir, c.cs.(modules.ConsensusSet), c.tpool.(modules.TransactionPool))
 	if err != nil {
 		t.Fatal(err)

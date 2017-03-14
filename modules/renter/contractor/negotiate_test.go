@@ -110,7 +110,7 @@ func TestNegotiateContract(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ct, err := newContractorTester("TestNegotiateContract")
+	ct, err := newContractorTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestReviseContract(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ct, err := newContractorTester("TestReviseContract")
+	ct, err := newContractorTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

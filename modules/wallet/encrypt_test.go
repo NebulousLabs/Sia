@@ -92,7 +92,7 @@ func TestIntegrationPreEncryption(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createBlankWalletTester("TestIntegrationPreEncryption")
+	wt, err := createBlankWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestIntegrationUserSuppliedEncryption(t *testing.T) {
 
 	// Create and wallet and user-specified key, then encrypt the wallet and
 	// run post-encryption tests on it.
-	wt, err := createBlankWalletTester("TestIntegrationUserSuppliedEncryption")
+	wt, err := createBlankWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestIntegrationBlankEncryption(t *testing.T) {
 	}
 
 	// Create the wallet.
-	wt, err := createBlankWalletTester("TestIntegrationBlankEncryption")
+	wt, err := createBlankWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestLock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestLock")
+	wt, err := createWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,9 +15,10 @@ import (
 )
 
 func tempFile(t interface {
+	Name() string
 	Fatal(...interface{})
-}, name string) (*os.File, func()) {
-	f, err := os.Create(filepath.Join(build.TempDir("contractor", name)))
+}) (*os.File, func()) {
+	f, err := os.Create(filepath.Join(build.TempDir("contractor", t.Name())))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,9 +29,10 @@ func tempFile(t interface {
 }
 
 func tempJournal(t interface {
+	Name() string
 	Fatal(...interface{})
-}, name string) (*journal, func()) {
-	j, err := newJournal(filepath.Join(build.TempDir("contractor", name)), contractorPersist{})
+}) (*journal, func()) {
+	j, err := newJournal(filepath.Join(build.TempDir("contractor", t.Name())), contractorPersist{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +43,7 @@ func tempJournal(t interface {
 }
 
 func TestJournal(t *testing.T) {
-	j, cleanup := tempJournal(t, "TestJournal")
+	j, cleanup := tempJournal(t)
 	defer cleanup()
 
 	us := []journalUpdate{
@@ -66,7 +68,7 @@ func TestJournal(t *testing.T) {
 }
 
 func TestJournalCheckpoint(t *testing.T) {
-	j, cleanup := tempJournal(t, "TestJournalCheckpoint")
+	j, cleanup := tempJournal(t)
 	defer cleanup()
 
 	var data contractorPersist
@@ -90,7 +92,7 @@ func TestJournalCheckpoint(t *testing.T) {
 }
 
 func TestJournalMalformedJSON(t *testing.T) {
-	j, cleanup := tempJournal(t, "TestJournalMalformed")
+	j, cleanup := tempJournal(t)
 	defer cleanup()
 
 	// write a valid update
@@ -118,7 +120,7 @@ func TestJournalMalformedJSON(t *testing.T) {
 
 func TestJournalBadChecksum(t *testing.T) {
 	// test bad checksum
-	j, cleanup := tempJournal(t, "TestJournalMalformed2")
+	j, cleanup := tempJournal(t)
 	defer cleanup()
 
 	// write a valid update
@@ -148,7 +150,7 @@ func TestJournalBadChecksum(t *testing.T) {
 // persist file to a journal.
 func TestJournalLoadCompat(t *testing.T) {
 	// create old persist file
-	dir := build.TempDir("contractor", "TestJournalLoadCompat")
+	dir := build.TempDir("contractor", t.Name())
 	os.MkdirAll(dir, 0700)
 	err := ioutil.WriteFile(filepath.Join(dir, "contractor.json"), []byte(`"Contractor Persistence"
 "0.5.2"
@@ -346,7 +348,7 @@ func TestJournalLoadCompat(t *testing.T) {
 }
 
 func BenchmarkUpdateJournal(b *testing.B) {
-	j, cleanup := tempJournal(b, "BenchmarkUpdateJournal")
+	j, cleanup := tempJournal(b)
 	defer cleanup()
 
 	us := updateSet{
