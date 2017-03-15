@@ -19,18 +19,18 @@ var (
 		// Run field not provided; export requires a subcommand.
 	}
 
-	renterExportContractsCmd = &cobra.Command{
+	renterExportContractTxnsCmd = &cobra.Command{
 		Use:   "contract-txns [destination]",
 		Short: "export the renter's contracts for import to `https://rankings.sia.tech/`",
 		Long: "Export the renter's current contract set in JSON format to the specified " +
 			"file. Intended for upload to `https://rankings.sia.tech/`.",
-		Run: wrap(renterexportcontractscmd),
+		Run: wrap(renterexportcontracttxnscmd),
 	}
 )
 
-// renterexportcontractscmd is the handler for the command `siac renter export contracts`.
+// renterexportcontracttxnscmd is the handler for the command `siac renter export contract-txns`.
 // Exports the current contract set to JSON.
-func renterexportcontractscmd(destination string) {
+func renterexportcontracttxnscmd(destination string) {
 	var cs api.RenterContracts
 	err := getAPI("/renter/contracts", &cs)
 	if err != nil {
