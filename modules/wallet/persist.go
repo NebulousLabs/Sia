@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 
@@ -15,8 +16,9 @@ import (
 )
 
 const (
-	logFile = modules.WalletDir + ".log"
-	dbFile  = modules.WalletDir + ".db"
+	logFile    = modules.WalletDir + ".log"
+	dbFile     = modules.WalletDir + ".db"
+	compatFile = modules.WalletDir + ".json"
 )
 
 var (
@@ -84,7 +86,17 @@ func (w *Wallet) initPersist() error {
 	}
 
 	// Open the database.
-	err = w.openDB(filepath.Join(w.persistDir, dbFile))
+	dbFilename := filepath.Join(w.persistDir, dbFile)
+	compatFilename := filepath.Join(w.persistDir, compatFile)
+	_, dbErr := os.Stat(dbFilename)
+	_, compatErr := os.Stat(compatFilename)
+	if dbErr != nil && compatErr == nil {
+		// database does not exist, but old persist does; convert it
+		err = w.convertPersist(dbFilename, compatFilename)
+	} else {
+		// either database exists or neither exists; open/create the database
+		err = w.openDB(filepath.Join(w.persistDir, dbFile))
+	}
 	if err != nil {
 		return err
 	}
@@ -115,6 +127,58 @@ func (w *Wallet) CreateBackup(backupFilepath string) error {
 	}
 	defer f.Close()
 	return w.createBackup(f)
+}
+
+type compatPersist struct {
+	UID                    uniqueID
+	EncryptionVerification crypto.Ciphertext
+	PrimarySeedFile        seedFile
+	PrimarySeedProgress    uint64
+	AuxiliarySeedFiles     []seedFile
+	UnseededKeys           []spendableKeyFile
+}
+
+var compatMeta = persist.Metadata{
+	Header:  "Wallet Settings",
+	Version: "0.4.0",
+}
+
+// convertPersist converts an old wallet.json file to a wallet.db database.
+func (w *Wallet) convertPersist(dbFilename, compatFilename string) error {
+	var data compatPersist
+	err := persist.LoadFile(compatMeta, &data, compatFilename)
+	if err != nil {
+		return err
+	}
+
+	w.db, err = persist.OpenDatabase(dbMetadata, dbFilename)
+	if err != nil {
+		return err
+	}
+	// initialize the database
+	err = w.db.Update(func(tx *bolt.Tx) error {
+		for _, b := range dbBuckets {
+			_, err := tx.CreateBucket(b)
+			if err != nil {
+				return fmt.Errorf("could not create bucket %v: %v", string(b), err)
+			}
+		}
+		// set UID, verification, seeds, and seed progress
+		tx.Bucket(bucketWallet).Put(keyUID, data.UID[:])
+		tx.Bucket(bucketWallet).Put(keyEncryptionVerification, data.EncryptionVerification)
+		tx.Bucket(bucketWallet).Put(keyPrimarySeedFile, encoding.Marshal(data.PrimarySeedFile))
+		dbPutPrimarySeedProgress(tx, data.PrimarySeedProgress)
+		tx.Bucket(bucketWallet).Put(keyAuxiliarySeedFiles, encoding.Marshal(data.AuxiliarySeedFiles))
+		tx.Bucket(bucketWallet).Put(keySpendableKeyFiles, encoding.Marshal(data.UnseededKeys))
+
+		// set consensus height and CCID to zero so that a full rescan is
+		// triggered
+		dbPutConsensusHeight(tx, 0)
+		dbPutConsensusChangeID(tx, modules.ConsensusChangeBeginning)
+		return nil
+	})
+	w.encrypted = true
+	return err
 }
 
 /*
