@@ -28,8 +28,6 @@ var (
 	// chronological order. Only transactions relevant to the wallet are
 	// stored. The key of this bucket is an autoincrementing integer.
 	bucketProcessedTransactions = []byte("bucketProcessedTransactions")
-	// bucketSeedFiles stores the (encrypted) auxiliary seeds of the wallet.
-	bucketSeedFiles = []byte("bucketSeedFiles")
 	// bucketSiacoinOutputs maps a SiacoinOutputID to its SiacoinOutput. Only
 	// outputs that the wallet controls are stored. The wallet uses these
 	// outputs to fund transactions.
@@ -38,10 +36,6 @@ var (
 	// outputs that the wallet controls are stored. The wallet uses these
 	// outputs to fund transactions.
 	bucketSiafundOutputs = []byte("bucketSiafundOutputs")
-	// bucketSpendableKeyFiles stores the (encrypted) spendableKeys of the
-	// wallet that were not generated via seed. In practice, this means keys
-	// that were imported from a 0.3.3.x wallet or from a siag file.
-	bucketSpendableKeyFiles = []byte("bucketSpendableKeyFiles")
 	// bucketSpentOutputs maps an OutputID to the height at which it was
 	// spent. Only outputs spent by the wallet are stored. The wallet tracks
 	// these outputs so that it can reuse them if they are not confirmed on
@@ -55,10 +49,8 @@ var (
 		bucketHistoricClaimStarts,
 		bucketHistoricOutputs,
 		bucketProcessedTransactions,
-		bucketSeedFiles,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
-		bucketSpendableKeyFiles,
 		bucketSpentOutputs,
 		bucketWallet,
 	}
@@ -70,6 +62,8 @@ var (
 	keyPrimarySeedProgress    = []byte("keyPrimarySeedProgress")
 	keyConsensusChange        = []byte("keyConsensusChange")
 	keyConsensusHeight        = []byte("keyConsensusHeight")
+	keySpendableKeyFiles      = []byte("keySpendableKeyFiles")
+	keyAuxiliarySeedFiles     = []byte("keyAuxiliarySeedFiles")
 )
 
 // dbPut is a helper function for storing a marshalled key/value pair.

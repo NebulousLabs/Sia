@@ -111,7 +111,12 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 		if err != nil {
 			return err
 		}
-		return tx.Bucket(bucketSpendableKeyFiles).Put(skf.UID[:], encoding.Marshal(skf))
+		var current []spendableKeyFile
+		err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keySpendableKeyFiles), &current)
+		if err != nil {
+			return err
+		}
+		return tx.Bucket(bucketWallet).Put(keySpendableKeyFiles, encoding.Marshal(append(current, skf)))
 	})
 
 	// w.keys[sk.UnlockConditions.UnlockHash()] = sk -> aids with duplicate

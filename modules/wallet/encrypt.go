@@ -141,29 +141,13 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 		}
 
 		// auxiliarySeedFiles
-		err = tx.Bucket(bucketSeedFiles).ForEach(func(_, sfBytes []byte) error {
-			var sf seedFile
-			err := encoding.Unmarshal(sfBytes, &sf)
-			if err != nil {
-				return err
-			}
-			auxiliarySeedFiles = append(auxiliarySeedFiles, sf)
-			return nil
-		})
+		err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyAuxiliarySeedFiles), &auxiliarySeedFiles)
 		if err != nil {
 			return err
 		}
 
 		// unseededKeyFiles
-		err = tx.Bucket(bucketSpendableKeyFiles).ForEach(func(_, ukfBytes []byte) error {
-			var ukf spendableKeyFile
-			err := encoding.Unmarshal(ukfBytes, &ukf)
-			if err != nil {
-				return err
-			}
-			unseededKeyFiles = append(unseededKeyFiles, ukf)
-			return nil
-		})
+		err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keySpendableKeyFiles), &unseededKeyFiles)
 		if err != nil {
 			return err
 		}
