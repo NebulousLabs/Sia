@@ -1,6 +1,12 @@
 Version History
 ---------------
 
+March 2017:
+
+v1.1.2 (patch release)
+- Add async download endpoint
+- Fix host storage proof bug
+
 February 2017:
 
 v1.1.1 (patch release)
