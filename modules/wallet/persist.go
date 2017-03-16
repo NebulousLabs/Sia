@@ -167,9 +167,10 @@ func (w *Wallet) convertPersist(dbFilename, compatFilename string) error {
 		tx.Bucket(bucketWallet).Put(keyUID, data.UID[:])
 		tx.Bucket(bucketWallet).Put(keyEncryptionVerification, data.EncryptionVerification)
 		tx.Bucket(bucketWallet).Put(keyPrimarySeedFile, encoding.Marshal(data.PrimarySeedFile))
-		dbPutPrimarySeedProgress(tx, data.PrimarySeedProgress)
 		tx.Bucket(bucketWallet).Put(keyAuxiliarySeedFiles, encoding.Marshal(data.AuxiliarySeedFiles))
 		tx.Bucket(bucketWallet).Put(keySpendableKeyFiles, encoding.Marshal(data.UnseededKeys))
+		// old wallets had a "preload depth" of 25
+		dbPutPrimarySeedProgress(tx, data.PrimarySeedProgress+25)
 
 		// set consensus height and CCID to zero so that a full rescan is
 		// triggered
