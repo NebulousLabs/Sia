@@ -201,32 +201,16 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 	subscribed := w.subscribed
 	w.mu.RUnlock()
 	if !subscribed {
+		// Subscription can take a while, so spawn a goroutine to print the
+		// wallet height every few seconds. (If subscription completes
+		// quickly, nothing will be printed.)
+		done := make(chan struct{})
+		go w.rescanMessage(done)
+		defer close(done)
+
 		err = w.cs.ConsensusSetSubscribe(w, lastChange)
 		if err == modules.ErrInvalidConsensusChangeID {
-			// something went wrong; resubscribe from the beginning and spawn a
-			// goroutine to display rescan progress
-			if build.Release != "testing" {
-				go func() {
-					println("Rescanning consensus set...")
-					for range time.Tick(time.Second * 3) {
-						w.mu.RLock()
-						var height types.BlockHeight
-						w.db.View(func(tx *bolt.Tx) error {
-							var err error
-							height, err = dbGetConsensusHeight(tx)
-							return err
-						})
-						done := w.subscribed
-						w.mu.RUnlock()
-						if done {
-							println("\nDone!")
-							break
-						}
-						print("\rScanned to height ", height, "...")
-					}
-				}()
-			}
-			// set the db entries for consensus change and consensus height
+			// something went wrong; resubscribe from the beginning
 			err = w.db.Update(func(tx *bolt.Tx) error {
 				err := dbPutConsensusChangeID(tx, modules.ConsensusChangeBeginning)
 				if err != nil {
@@ -243,15 +227,47 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 			return errors.New("wallet subscription failed: " + err.Error())
 		}
 		w.tpool.TransactionPoolSubscribe(w)
-		w.mu.Lock()
-		w.subscribed = true
-		w.mu.Unlock()
 	}
 
 	w.mu.Lock()
 	w.unlocked = true
+	w.subscribed = true
 	w.mu.Unlock()
 	return nil
+}
+
+// rescanMessage prints the blockheight every 3 seconds until done is closed.
+func (w *Wallet) rescanMessage(done chan struct{}) {
+	if build.Release == "testing" {
+		return
+	}
+
+	// sleep first because we may not need to print a message at all if
+	// done is closed quickly.
+	select {
+	case <-done:
+		return
+	case <-time.After(3 * time.Second):
+	}
+
+	for {
+		w.mu.RLock()
+		var height types.BlockHeight
+		w.db.View(func(tx *bolt.Tx) error {
+			var err error
+			height, err = dbGetConsensusHeight(tx)
+			return err
+		})
+		w.mu.RUnlock()
+		print("\rWallet: scanned to height ", height, "...")
+
+		select {
+		case <-done:
+			println("\nDone!")
+			return
+		case <-time.After(3 * time.Second):
+		}
+	}
 }
 
 // wipeSecrets erases all of the seeds and secret keys in the wallet.
