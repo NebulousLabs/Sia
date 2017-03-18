@@ -11,8 +11,8 @@ package host
 
 // TODO: Test the safety of the builder, it should be okay to have multiple
 // builders open for up to 600 seconds, which means multiple blocks could be
-// received in that time period. Should also check what happens if a prent gets
-// confirmed on the blockchain before the builder is finished.
+// received in that time period. Should also check what happens if a parent
+// gets confirmed on the blockchain before the builder is finished.
 
 // TODO: Double check that any network connection has a finite deadline -
 // handling action items properly requires that the locks held on the
@@ -91,14 +91,14 @@ var (
 	// version and indicate that the database holds host information.
 	dbMetadata = persist.Metadata{
 		Header:  "Sia Host DB",
-		Version: "0.5.2",
+		Version: "1.2.0",
 	}
 
 	// persistMetadata is the header that gets written to the persist file, and is
 	// used to recognize other persist files.
 	persistMetadata = persist.Metadata{
 		Header:  "Sia Host",
-		Version: "0.5",
+		Version: "1.2.0",
 	}
 
 	// errHostClosed gets returned when a call is rejected due to the host

@@ -60,14 +60,14 @@ var (
 	// manager's settings to disk.
 	settingsMetadata = persist.Metadata{
 		Header:  "Sia Contract Manager",
-		Version: "1.1.0",
+		Version: "1.2.0",
 	}
 
 	// walMetadata is the header that is used when writing the write ahead log
 	// to disk, so that it may be identified at startup.
 	walMetadata = persist.Metadata{
 		Header:  "Sia Contract Manager WAL",
-		Version: "1.1.0",
+		Version: "1.2.0",
 	}
 )
 
@@ -105,25 +105,13 @@ var (
 	}()
 
 	// MinimumSectorsPerStorageFolder defines the minimum number of sectors
-	// that a storage folder is allowed to have. The minimum has been set as a
-	// guide to assist with network health, and to help discourage spammy hosts
-	// with very little storage. Even if the spammy hosts were allowed, they
-	// would be ignored, but the blockchain would still clutter with their
-	// announcements and users may fall into the trap of thinking that such
-	// small volumes of storage are worthwhile.
-	//
-	// There are plans to continue raising the minimum storage requirements as
-	// the network gains maturity.
+	// that a storage folder is allowed to have.
 	MinimumSectorsPerStorageFolder = func() uint64 {
 		if build.Release == "dev" {
-			return 1 << 6 // 256 MiB
+			return 1 << 6 // 16 MiB
 		}
 		if build.Release == "standard" {
-			// We are at a stage of Sia where we have plenty of hosts. It's
-			// time to start increasing the requirements to encourage hosts to
-			// be stable. It's problematic if hosts run out of space while
-			// multiple actively uploading renters are connecting to them.
-			return 1 << 15 // 256 GiB
+			return 1 << 6 // 512 MiB
 		}
 		if build.Release == "testing" {
 			return 1 << 6 // 256 KiB

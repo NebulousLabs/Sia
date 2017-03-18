@@ -17,6 +17,9 @@ package contractmanager
 // TODO: emptyStorageFolder should be able to move sectors into folders that
 // are being resized, into the sectors that are not affected by the resize.
 
+// TODO: Re-write the WAL to not need to do group syncing, and also to not need
+// to use the rename call at all.
+
 import (
 	"errors"
 	"path/filepath"
