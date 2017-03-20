@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -88,6 +89,32 @@ func (h *Host) establishDefaults() error {
 	return nil
 }
 
+// loadPersistObject will take a persist object and copy the data into the
+// host.
+func (h *Host) loadPersistObject(p *persistence) {
+	// Copy over consensus tracking.
+	h.blockHeight = p.BlockHeight
+	h.recentChange = p.RecentChange
+
+	// Copy over host identity.
+	h.announced = p.Announced
+	h.autoAddress = p.AutoAddress
+	if err := p.AutoAddress.IsValid(); err != nil {
+		h.log.Printf("WARN: AutoAddress '%v' loaded from persist is invalid: %v", p.AutoAddress, err)
+		h.autoAddress = ""
+	}
+	h.financialMetrics = p.FinancialMetrics
+	h.publicKey = p.PublicKey
+	h.revisionNumber = p.RevisionNumber
+	h.secretKey = p.SecretKey
+	h.settings = p.Settings
+	if err := p.Settings.NetAddress.IsValid(); err != nil {
+		h.log.Printf("WARN: NetAddress '%v' loaded from persist is invalid: %v", p.Settings.NetAddress, err)
+		h.settings.NetAddress = ""
+	}
+	h.unlockHash = p.UnlockHash
+}
+
 // initDB will check that the database has been initialized and if not, will
 // initialize the database.
 func (h *Host) initDB() (err error) {
@@ -122,43 +149,40 @@ func (h *Host) initDB() (err error) {
 
 // load loads the Hosts's persistent data from disk.
 func (h *Host) load() error {
-	p := new(persistence)
-	err := h.dependencies.loadFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
-	if os.IsNotExist(err) {
-		// There is no host.json file, set up sane defaults.
-		return h.establishDefaults()
-	} else if err != nil {
+	// Initialize the host database.
+	err := h.initDB()
+	if err != nil {
+		err = build.ExtendErr("Could not initialize database:", err)
+		h.log.Println(err)
 		return err
 	}
 
-	// Copy over consensus tracking.
-	h.blockHeight = p.BlockHeight
-	h.recentChange = p.RecentChange
-
-	// Copy over host identity.
-	h.announced = p.Announced
-	h.autoAddress = p.AutoAddress
-	if err := p.AutoAddress.IsValid(); err != nil {
-		h.log.Printf("WARN: AutoAddress '%v' loaded from persist is invalid: %v", p.AutoAddress, err)
-		h.autoAddress = ""
+	// Load the old persistence object from disk. Simple task if the version is
+	// the most recent version, but older versions need to be updated to the
+	// more recent structures.
+	p := new(persistence)
+	err = h.dependencies.loadFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
+	if err == nil {
+		// Copy in the persistence.
+		h.loadPersistObject(p)
+	} else if os.IsNotExist(err) {
+		// There is no host.json file, set up sane defaults.
+		return h.establishDefaults()
+	} else if err == persist.ErrBadVersion {
+		// Attempt an upgrade from V112 to V120.
+		err = h.upgradeFromV112ToV120()
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
 	}
-	h.financialMetrics = p.FinancialMetrics
-	h.publicKey = p.PublicKey
-	h.revisionNumber = p.RevisionNumber
-	h.secretKey = p.SecretKey
-	h.settings = p.Settings
-	if err := p.Settings.NetAddress.IsValid(); err != nil {
-		h.log.Printf("WARN: NetAddress '%v' loaded from persist is invalid: %v", p.Settings.NetAddress, err)
-		h.settings.NetAddress = ""
-	}
-	h.unlockHash = p.UnlockHash
 
 	// Get the contract count by observing all of the incomplete storage
 	// obligations in the database.
 	err = h.db.View(func(tx *bolt.Tx) error {
 		cursor := tx.Bucket(bucketStorageObligations).Cursor()
 		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
-			// Decode the storage obligation.
 			var so storageObligation
 			err := json.Unmarshal(v, &so)
 			if err != nil {
@@ -174,63 +198,9 @@ func (h *Host) load() error {
 		return err
 	}
 
-	// COMPAT v1.0.0
-	//
-	// Load compatibility fields which may have data leftover. This call should
-	// only be relevant the first time the user loads the host after upgrading
-	// from v0.6.0 to v1.0.0.
-	err = h.loadCompat(p)
-	if err != nil {
-		return err
-	}
-
 	err = h.initConsensusSubscription()
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-// loadCompat loads fields that have changed names or otherwise broken
-// compatibility with previous versions, enabling users to upgrade without
-// unexpected loss of data.
-//
-// COMPAT v1.0.0
-//
-// A spelling error in pre-1.0 versions means that, if this is the first time
-// running after an upgrade, the misspelled field needs to be transfered over.
-func (h *Host) loadCompat(p *persistence) error {
-	var compatPersistence struct {
-		FinancialMetrics struct {
-			PotentialStorageRevenue types.Currency `json:"potentialerevenue"`
-		}
-		Settings struct {
-			MinContractPrice          types.Currency `json:"contractprice"`
-			MinDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
-			MinStoragePrice           types.Currency `json:"storageprice"`
-			MinUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
-		}
-	}
-	err := h.dependencies.loadFile(persistMetadata, &compatPersistence, filepath.Join(h.persistDir, settingsFile))
-	if err != nil {
-		return err
-	}
-	// Load the compat values, but only if the compat values are non-zero and
-	// the real values are zero.
-	if !compatPersistence.FinancialMetrics.PotentialStorageRevenue.IsZero() && p.FinancialMetrics.PotentialStorageRevenue.IsZero() {
-		h.financialMetrics.PotentialStorageRevenue = compatPersistence.FinancialMetrics.PotentialStorageRevenue
-	}
-	if !compatPersistence.Settings.MinContractPrice.IsZero() && p.Settings.MinContractPrice.IsZero() {
-		h.settings.MinContractPrice = compatPersistence.Settings.MinContractPrice
-	}
-	if !compatPersistence.Settings.MinDownloadBandwidthPrice.IsZero() && p.Settings.MinDownloadBandwidthPrice.IsZero() {
-		h.settings.MinDownloadBandwidthPrice = compatPersistence.Settings.MinDownloadBandwidthPrice
-	}
-	if !compatPersistence.Settings.MinStoragePrice.IsZero() && p.Settings.MinStoragePrice.IsZero() {
-		h.settings.MinStoragePrice = compatPersistence.Settings.MinStoragePrice
-	}
-	if !compatPersistence.Settings.MinUploadBandwidthPrice.IsZero() && p.Settings.MinUploadBandwidthPrice.IsZero() {
-		h.settings.MinUploadBandwidthPrice = compatPersistence.Settings.MinUploadBandwidthPrice
 	}
 	return nil
 }

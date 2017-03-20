@@ -1,13 +1,13 @@
 package host
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/NebulousLabs/bolt"
 
@@ -26,9 +26,9 @@ const (
 	contractManagerStorageFolderGranularity = 64
 
 	// The directory names and filenames of legacy storage manager files.
-	v100StorageManagerDir             = "storagemanager"
-	v100StorageManagerDBFilename      = "storagemanager.db"
-	v100StorageManagerPersistFilename = "storagemanager.json"
+	v112StorageManagerDir             = "storagemanager"
+	v112StorageManagerDBFilename      = "storagemanager.db"
+	v112StorageManagerPersistFilename = "storagemanager.json"
 )
 
 var (
@@ -40,90 +40,133 @@ var (
 	// synchronization would be lost.
 	minimumStorageFolderSize = contractManagerStorageFolderGranularity * modules.SectorSize
 
-	// v100StorageManagerBucketSectorUsage is the name of the bucket that
+	// v112PersistMetadata is the header of the v112 host persist file.
+	v112PersistMetadata = persist.Metadata{
+		Header:  "Sia Host",
+		Version: "0.5",
+	}
+
+	// v112StorageManagerBucketSectorUsage is the name of the bucket that
 	// contains all of the sector usage information in the v1.0.0 storage
 	// manager.
-	v100StorageManagerBucketSectorUsage = []byte("BucketSectorUsage")
+	v112StorageManagerBucketSectorUsage = []byte("BucketSectorUsage")
 
-	// v100StorageManagerDBMetadata contains the legacy metadata for the v1.0.0
+	// v112StorageManagerDBMetadata contains the legacy metadata for the v1.0.0
 	// storage manager database. The version is v0.6.0, as that is the last
 	// time that compatibility was broken with the storage manager persist.
-	v100StorageManagerDBMetadata = persist.Metadata{
+	v112StorageManagerDBMetadata = persist.Metadata{
 		Header:  "Sia Storage Manager DB",
 		Version: "0.6.0",
 	}
 
-	// v100StorageManagerMetadata contains the legacy metadata for the v1.0.0
+	// v112StorageManagerMetadata contains the legacy metadata for the v1.0.0
 	// storage manager persistence. The version is v0.6.0, as that is the last time
 	// that compatibility was broken with the storage manager persist.
-	v100StorageManagerMetadata = persist.Metadata{
+	v112StorageManagerMetadata = persist.Metadata{
 		Header:  "Sia Storage Manager",
 		Version: "0.6.0",
 	}
 )
 
 type (
-	// v100StorageManagerPersist contains the legacy fields necessary to load the
+	// v112StorageManagerPersist contains the legacy fields necessary to load the
 	// v1.0.0 storage manager persistence.
-	v100StorageManagerPersist struct {
+	v112StorageManagerPersist struct {
 		SectorSalt     crypto.Hash
-		StorageFolders []*v100StorageManagerStorageFolder
+		StorageFolders []*v112StorageManagerStorageFolder
 	}
 
-	// v100StorageManagerSector defines a sector held by the v1.0.0 storage
+	// v112StorageManagerSector defines a sector held by the v1.0.0 storage
 	// manager, which includes the data itself as well as all of the associated
 	// metadata.
-	v100StorageManagerSector struct {
+	v112StorageManagerSector struct {
 		Count int
 		Data  []byte
+		Key   []byte
 		Root  crypto.Hash
 	}
 
-	// v100StorageManagerSectorUsage defines the sectorUsage struct for the
+	// v112StorageManagerSectorUsage defines the sectorUsage struct for the
 	// v1.0.0 storage manager, the data loaded from the sector database.
-	v100StorageManagerSectorUsage struct {
+	v112StorageManagerSectorUsage struct {
 		Corrupted     bool
 		Expiry        []types.BlockHeight
 		StorageFolder []byte
 	}
 
-	// v100StorageManagerStorageFolder contains the legacy fields necessary to load
+	// v112StorageManagerStorageFolder contains the legacy fields necessary to load
 	// the v1.0.0 storage manager persistence.
-	v100StorageManagerStorageFolder struct {
-		Path string
-		Size uint64
-		UID  []byte
+	v112StorageManagerStorageFolder struct {
+		Path          string
+		Size          uint64
+		SizeRemaining uint64
+		UID           []byte
 	}
 )
 
-// v100StorageManagerSectorID transforms a sector id in to a sector key.
-func (h *Host) v100StorageManagerSectorID(sectorSalt crypto.Hash, sectorRoot []byte) []byte {
-	saltedRoot := crypto.HashAll(sectorRoot, sectorSalt)
-	id := make([]byte, base64.RawURLEncoding.EncodedLen(12))
-	base64.RawURLEncoding.Encode(id, saltedRoot[:12])
-	return id
+// loadCompatV100 loads fields that have changed names or otherwise broken
+// compatibility with previous versions, enabling users to upgrade without
+// unexpected loss of data.
+//
+// COMPAT v1.0.0
+//
+// A spelling error in pre-1.0 versions means that, if this is the first time
+// running after an upgrade, the misspelled field needs to be transfered over.
+func (h *Host) loadCompatV100(p *persistence) error {
+	var compatPersistence struct {
+		FinancialMetrics struct {
+			PotentialStorageRevenue types.Currency `json:"potentialerevenue"`
+		}
+		Settings struct {
+			MinContractPrice          types.Currency `json:"contractprice"`
+			MinDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
+			MinStoragePrice           types.Currency `json:"storageprice"`
+			MinUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
+		}
+	}
+	err := h.dependencies.loadFile(v112PersistMetadata, &compatPersistence, filepath.Join(h.persistDir, settingsFile))
+	if err != nil {
+		return err
+	}
+	// Load the compat values, but only if the compat values are non-zero and
+	// the real values are zero.
+	if !compatPersistence.FinancialMetrics.PotentialStorageRevenue.IsZero() && p.FinancialMetrics.PotentialStorageRevenue.IsZero() {
+		h.financialMetrics.PotentialStorageRevenue = compatPersistence.FinancialMetrics.PotentialStorageRevenue
+	}
+	if !compatPersistence.Settings.MinContractPrice.IsZero() && p.Settings.MinContractPrice.IsZero() {
+		h.settings.MinContractPrice = compatPersistence.Settings.MinContractPrice
+	}
+	if !compatPersistence.Settings.MinDownloadBandwidthPrice.IsZero() && p.Settings.MinDownloadBandwidthPrice.IsZero() {
+		h.settings.MinDownloadBandwidthPrice = compatPersistence.Settings.MinDownloadBandwidthPrice
+	}
+	if !compatPersistence.Settings.MinStoragePrice.IsZero() && p.Settings.MinStoragePrice.IsZero() {
+		h.settings.MinStoragePrice = compatPersistence.Settings.MinStoragePrice
+	}
+	if !compatPersistence.Settings.MinUploadBandwidthPrice.IsZero() && p.Settings.MinUploadBandwidthPrice.IsZero() {
+		h.settings.MinUploadBandwidthPrice = compatPersistence.Settings.MinUploadBandwidthPrice
+	}
+	return nil
 }
 
-// readAndDeleteV100Sectors reads some sectors from the v1.0.0 storage
+// readAndDeleteV112Sectors reads some sectors from the v1.0.0 storage
 // manager, deleting them from disk and returning. This clears up disk space
 // for the new contract manager, though puts the data at risk of loss in the
 // event of a power interruption. Risk window is small, amount of data at risk
 // is small, so this is acceptable.
-func (h *Host) readAndDeleteV100Sectors(oldPersist *v100StorageManagerPersist, oldDB *persist.BoltDatabase, numToFetch int) (sectors []v100StorageManagerSector, err error) {
+func (h *Host) readAndDeleteV112Sectors(oldPersist *v112StorageManagerPersist, oldDB *persist.BoltDatabase, numToFetch int) (sectors []v112StorageManagerSector, err error) {
 	err = oldDB.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(v100StorageManagerBucketSectorUsage)
+		bucket := tx.Bucket(v112StorageManagerBucketSectorUsage)
 		i := 0
 		c := bucket.Cursor()
-		for sectorRoot, sectorUsageBytes := c.First(); sectorUsageBytes != nil && i < numToFetch; sectorRoot, sectorUsageBytes = c.Next() {
-			var usage v100StorageManagerSectorUsage
+		for sectorKey, sectorUsageBytes := c.First(); sectorUsageBytes != nil && i < numToFetch; sectorKey, sectorUsageBytes = c.Next() {
+			var usage v112StorageManagerSectorUsage
 			err := json.Unmarshal(sectorUsageBytes, &usage)
 			if err != nil {
 				return err
 			}
 
 			// Read the sector from disk.
-			sectorKey := h.v100StorageManagerSectorID(oldPersist.SectorSalt, sectorRoot)
-			sectorFilename := filepath.Join(h.persistDir, v100StorageManagerDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
+			sectorFilename := filepath.Join(h.persistDir, v112StorageManagerDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
 			sectorData, err := ioutil.ReadFile(sectorFilename)
 			if err != nil {
 				h.log.Println("Unable to read a sector from the legacy storage manager during host upgrade:", err)
@@ -135,28 +178,32 @@ func (h *Host) readAndDeleteV100Sectors(oldPersist *v100StorageManagerPersist, o
 				h.log.Println("unable to remove sector from the legacy storage manager, be sure to remove manually:", err)
 			}
 
-			sector := v100StorageManagerSector{
+			sector := v112StorageManagerSector{
 				Count: len(usage.Expiry),
 				Data:  sectorData,
+				Key:   sectorKey,
+				Root:  crypto.MerkleRoot(sectorData),
 			}
-			copy(sector.Root[:], sectorRoot)
 			sectors = append(sectors, sector)
 		}
 
 		// Delete the usage data from the storage manager db for each of the
 		// sectors.
 		for _, sector := range sectors {
-			bucket.Delete(sector.Root[:]) // Error is ignored.
+			err := bucket.Delete(sector.Key)
+			if err != nil {
+				h.log.Println("Unable to delete a sector from the bucket, the sector could not be found:", err)
+			}
 		}
 		return nil
 	})
 	return sectors, err
 }
 
-// upgradeFromV100toV120 is an upgrade layer that migrates the host from
+// upgradeFromV112toV120 is an upgrade layer that migrates the host from
 // the old storage manager to the new contract manager. This particular upgrade
 // only handles migrating the sectors.
-func (h *Host) upgradeFromV100toV120() error {
+func (h *Host) upgradeFromV112ToV120() error {
 	h.log.Println("Attempting an upgrade for the host from v1.0.0 to v1.2.0")
 
 	// Sanity check - the upgrade will not work if the contract manager has not
@@ -167,16 +214,16 @@ func (h *Host) upgradeFromV100toV120() error {
 
 	// Fetch the old set of storage folders, and create analagous storage
 	// folders in the contract manager. But create them to have sizes of zero,
-	// and grow them 100 sectors at a time. This is to make sure the user does
+	// and grow them 112 sectors at a time. This is to make sure the user does
 	// not run out of disk space during the upgrade.
-	oldPersist := new(v100StorageManagerPersist)
-	err := persist.LoadFile(v100StorageManagerMetadata, oldPersist, filepath.Join(h.persistDir, v100StorageManagerDir, v100StorageManagerPersistFilename))
+	oldPersist := new(v112StorageManagerPersist)
+	err := persist.LoadFile(v112StorageManagerMetadata, oldPersist, filepath.Join(h.persistDir, v112StorageManagerDir, v112StorageManagerPersistFilename))
 	if err != nil {
 		return build.ExtendErr("unable to load the legacy storage manager persist", err)
 	}
 
 	// Open the old storagemanager database.
-	oldDB, err := persist.OpenDatabase(v100StorageManagerDBMetadata, filepath.Join(h.persistDir, v100StorageManagerDir, v100StorageManagerDBFilename))
+	oldDB, err := persist.OpenDatabase(v112StorageManagerDBMetadata, filepath.Join(h.persistDir, v112StorageManagerDir, v112StorageManagerDBFilename))
 	if err != nil {
 		return build.ExtendErr("unable to open the legacy storage manager database", err)
 	}
@@ -212,7 +259,7 @@ func (h *Host) upgradeFromV100toV120() error {
 	//
 	// NOTE: The sectorData returned for the sectors may be 'nil' if there
 	// were disk I/O errors.
-	sectors, err := h.readAndDeleteV100Sectors(oldPersist, oldDB, contractManagerStorageFolderGranularity*newFoldersNeeded)
+	sectors, err := h.readAndDeleteV112Sectors(oldPersist, oldDB, contractManagerStorageFolderGranularity*newFoldersNeeded)
 	if err != nil {
 		h.log.Println("Error reading sectors from legacy storage manager:", err)
 		return err
@@ -225,7 +272,7 @@ func (h *Host) upgradeFromV100toV120() error {
 		// Nothing to do if the contract manager already has this storage
 		// folder (unusualy situation though).
 		_, exists := currentPaths[sf.Path]
-		if !exists {
+		if exists {
 			continue
 		}
 
@@ -269,7 +316,7 @@ func (h *Host) upgradeFromV100toV120() error {
 		//
 		// NOTE: The sectorData returned for the sectors may be 'nil' if there
 		// were disk I/O errors.
-		sectors, err := h.readAndDeleteV100Sectors(oldPersist, oldDB, contractManagerStorageFolderGranularity*canGrow)
+		sectors, err := h.readAndDeleteV112Sectors(oldPersist, oldDB, contractManagerStorageFolderGranularity*canGrow)
 		if err != nil {
 			h.log.Println("Error reading sectors from legacy storage manager:", err)
 			return err
@@ -294,18 +341,23 @@ func (h *Host) upgradeFromV100toV120() error {
 		}
 
 		// Add the sectors to the contract manager.
+		var wg sync.WaitGroup
 		for _, sector := range sectors {
 			for i := 0; i < sector.Count; i++ {
 				if uint64(len(sector.Data)) == modules.SectorSize {
-					err = h.AddSector(sector.Root, sector.Data)
-					if err != nil {
-						err = build.ExtendErr("Unable to add legacy sector to the upgraded contract manager:", err)
-						h.log.Println(err)
-						return err
-					}
+					wg.Add(1)
+					go func(sector v112StorageManagerSector) {
+						err := h.AddSector(sector.Root, sector.Data)
+						if err != nil {
+							err = build.ExtendErr("Unable to add legacy sector to the upgraded contract manager:", err)
+							h.log.Println(err)
+						}
+						wg.Done()
+					}(sector)
 				}
 			}
 		}
+		wg.Wait()
 	}
 
 	// Resize any remaining folders to their full size.
@@ -323,10 +375,43 @@ func (h *Host) upgradeFromV100toV120() error {
 		}
 	}
 
-	// Clean up by deleting all the previous storage manager files.
-	err = os.RemoveAll(filepath.Join(h.persistDir, v100StorageManagerDir))
+	// Try loading the persist again.
+	p := new(persistence)
+	err = h.dependencies.loadFile(v112PersistMetadata, p, filepath.Join(h.persistDir, settingsFile))
 	if err != nil {
-		return build.ExtendErr("unable to remove the legacy storage manager folder", err)
+		return err
 	}
+	h.loadPersistObject(p)
+
+	// Apply the v100 compat upgrade in case the host is loading from a
+	// version between v1.0.0 and v1.1.2.
+	err = h.loadCompatV100(p)
+	if err != nil {
+		return err
+	}
+
+	// Save the updated persist so that the upgrade is not triggered again.
+	err = h.saveSync()
+	if err != nil {
+		return err
+	}
+
+	// Delete the storage manager files. Note that this must happen after the
+	// complete upgrade, including a finishing call to saveSync().
+	for _, sf := range oldPersist.StorageFolders {
+		err = os.Remove(filepath.Join(h.persistDir, v112StorageManagerDir, hex.EncodeToString(sf.UID)))
+		if err != nil {
+			return err
+		}
+	}
+	err = os.Remove(filepath.Join(h.persistDir, v112StorageManagerDir, v112StorageManagerPersistFilename))
+	if err != nil {
+		return err
+	}
+	err = os.Remove(filepath.Join(h.persistDir, v112StorageManagerDir, v112StorageManagerDBFilename))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
