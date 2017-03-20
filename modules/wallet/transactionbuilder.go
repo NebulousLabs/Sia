@@ -102,17 +102,10 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 	}
 	// Check that this output has not recently been spent by the wallet.
 	spendHeight, err := dbGetSpentOutput(tx, types.OutputID(id))
-	if err != nil {
-		// mimic map behavior: no entry means zero value
-		spendHeight = 0
-	}
-	// Prevent an underflow error.
-	allowedHeight := currentHeight - RespendTimeout
-	if currentHeight < RespendTimeout {
-		allowedHeight = 0
-	}
-	if spendHeight > allowedHeight {
-		return errSpendHeightTooHigh
+	if err == nil {
+		if spendHeight+RespendTimeout > currentHeight {
+			return errSpendHeightTooHigh
+		}
 	}
 	outputUnlockConditions := w.keys[output.UnlockHash].UnlockConditions
 	if currentHeight < outputUnlockConditions.Timelock {
