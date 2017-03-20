@@ -91,7 +91,7 @@ var (
 	// version and indicate that the database holds host information.
 	dbMetadata = persist.Metadata{
 		Header:  "Sia Host DB",
-		Version: "1.2.0",
+		Version: "0.5.2",
 	}
 
 	// persistMetadata is the header that gets written to the persist file, and is
@@ -268,15 +268,6 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 			h.log.Println("Could not close storage manager:", err)
 		}
 	})
-
-	// After opening the database, it must be initialized. Most commonly,
-	// nothing happens. But for new databases, a set of buckets must be
-	// created. Initialization is also a good time to run sanity checks.
-	err = h.initDB()
-	if err != nil {
-		h.log.Println("Could not initalize database:", err)
-		return nil, err
-	}
 
 	// Load the prior persistence structures, and configure the host to save
 	// before shutting down.

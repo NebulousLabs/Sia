@@ -4,6 +4,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -118,7 +119,7 @@ func TestHostFailedOpenDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	ht.host, err = newHost(dependencyErrOpenDatabase{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
-	if err != mockErrOpenDatabase {
+	if !strings.Contains(err.Error(), "simulated OpenDatabase failure") {
 		t.Fatal(err)
 	}
 	// Set ht.host to something non-nil - nil was returned because startup was
