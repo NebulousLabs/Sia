@@ -155,6 +155,10 @@ func (h *Host) loadCompatV100(p *persistence) error {
 // is small, so this is acceptable.
 func (h *Host) readAndDeleteV112Sectors(oldPersist *v112StorageManagerPersist, oldDB *persist.BoltDatabase, numToFetch int) (sectors []v112StorageManagerSector, err error) {
 	err = oldDB.Update(func(tx *bolt.Tx) error {
+		// Read at most contractManagerStorageFolderGranularity sectors per
+		// storage folder.
+		sectorsPerStorageFolder := make(map[string]int)
+
 		bucket := tx.Bucket(v112StorageManagerBucketSectorUsage)
 		i := 0
 		c := bucket.Cursor()
@@ -164,6 +168,14 @@ func (h *Host) readAndDeleteV112Sectors(oldPersist *v112StorageManagerPersist, o
 			if err != nil {
 				return err
 			}
+
+			// Don't read more than contractManagerStorageFolderGranularity
+			// sectors per storage folder.
+			readSoFar := sectorsPerStorageFolder[string(usage.StorageFolder)]
+			if readSoFar >= contractManagerStorageFolderGranularity {
+				continue
+			}
+			sectorsPerStorageFolder[string(usage.StorageFolder)]++
 
 			// Read the sector from disk.
 			sectorFilename := filepath.Join(h.persistDir, v112StorageManagerDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
@@ -185,6 +197,7 @@ func (h *Host) readAndDeleteV112Sectors(oldPersist *v112StorageManagerPersist, o
 				Root:  crypto.MerkleRoot(sectorData),
 			}
 			sectors = append(sectors, sector)
+			i++
 		}
 
 		// Delete the usage data from the storage manager db for each of the
@@ -249,7 +262,7 @@ func (h *Host) upgradeFromV112ToV120() error {
 	var newFoldersNeeded int
 	for _, sf := range oldPersist.StorageFolders {
 		_, exists := currentPaths[sf.Path]
-		if exists {
+		if !exists {
 			newFoldersNeeded++
 		}
 	}
@@ -286,18 +299,23 @@ func (h *Host) upgradeFromV112ToV120() error {
 	}
 
 	// Add all of the preloaded sectors to the contract manager.
+	var wg sync.WaitGroup
 	for _, sector := range sectors {
 		for i := 0; i < sector.Count; i++ {
 			if uint64(len(sector.Data)) == modules.SectorSize {
-				err = h.AddSector(sector.Root, sector.Data)
-				if err != nil {
-					err = build.ExtendErr("Unable to add legacy sector to the upgraded contract manager:", err)
-					h.log.Println(err)
-					return err
-				}
+				wg.Add(1)
+				go func(sector v112StorageManagerSector) {
+					err := h.AddSector(sector.Root, sector.Data)
+					if err != nil {
+						err = build.ExtendErr("Unable to add legacy sector to the upgraded contract manager:", err)
+						h.log.Println(err)
+					}
+					wg.Done()
+				}(sector)
 			}
 		}
 	}
+	wg.Wait()
 
 	// Read sectors from the storage manager database until all of the sectors
 	// have been read.
