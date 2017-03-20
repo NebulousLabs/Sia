@@ -426,6 +426,7 @@ func (cm *ContractManager) AddSectorBatch(sectorRoots []crypto.Hash) error {
 			}
 		}(root)
 	}
+	wg.Wait()
 	return nil
 }
 
