@@ -93,12 +93,12 @@ type (
 )
 
 type (
-	// productionDependencies is an empty struct that implements all of the
-	// dependencies using full featured libraries.
+	// productionDependencies implements all of the dependencies using full
+	// featured libraries.
 	productionDependencies struct {
-		initB     bool
-		openFiles map[string]int
-		mu        *sync.Mutex
+		shouldInit bool
+		openFiles  map[string]int
+		mu         *sync.Mutex
 	}
 
 	// productionFile allows the production dependencies to track
@@ -179,8 +179,8 @@ func (pd *productionDependencies) init() {
 		return
 	}
 
-	if !pd.initB {
-		pd.initB = true
+	if !pd.shouldInit {
+		pd.shouldInit = true
 		pd.openFiles = make(map[string]int)
 		pd.mu = new(sync.Mutex)
 	}
