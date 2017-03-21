@@ -28,7 +28,7 @@ dependencies:
 
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
-run = Test
+run = .
 pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus                                  \
        ./modules/explorer ./modules/gateway ./modules/host ./modules/host/contractmanager                               \
        ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb ./modules/renter/hostdb/hosttree            \
