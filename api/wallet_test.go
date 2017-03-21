@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -78,6 +79,78 @@ func TestWalletGETEncrypted(t *testing.T) {
 	}
 	if wg.Unlocked {
 		t.Error("Wallet has never been unlocked")
+	}
+}
+
+// TestWalletEncrypt tries to encrypt and unlock the wallet through the api
+// using a provided encryption key.
+func TestWalletEncrypt(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	testdir := build.TempDir("api", t.Name())
+
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv, err := NewServer("localhost:0", "Sia-Agent", "", cs, nil, g, nil, nil, nil, tp, w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Assemble the serverTester.
+	st := &serverTester{
+		walletKey: crypto.TwofishKey(crypto.HashObject("testpass")),
+		dir:       testdir,
+		cs:        cs,
+		gateway:   g,
+		tpool:     tp,
+		wallet:    w,
+		server:    srv,
+	}
+	go srv.Serve()
+	defer st.server.Close()
+
+	walletPassword := "testpass"
+	walletParams := url.Values{}
+	walletParams.Set("encryptionpassword", "testpass")
+	var wip WalletInitPOST
+	err = st.postAPI("/wallet/init", walletParams, &wip)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the password to call /wallet/unlock.
+	unlockValues := url.Values{}
+	unlockValues.Set("encryptionpassword", walletPassword)
+	err = st.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !w.Unlocked() {
+		t.Error("wallet is not unlocked")
+	}
+
+	// reload the server and verify unlocking still works, reloadedServerTester()
+	// closes and reinitializes the server and unlocks the wallet.
+	_, err = st.reloadedServerTester()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
