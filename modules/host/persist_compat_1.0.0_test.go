@@ -28,6 +28,12 @@ func TestHostPersistCompat100(t *testing.T) {
 	// Close the host and then swap out the persist file for the one that is
 	// being used for testing.
 	ht.host.Close()
+	// Copy the .tar containing all the persist data.
+	err = build.CopyFile(filepath.Join("testdata", "v100Host.tar"), filepath.Join(ht.host.persistDir, settingsFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Extract the .tar into the host's persist folder.
 	err = build.CopyFile(filepath.Join("testdata", "v100Host", "persist_compat_1.0.0.json"), filepath.Join(ht.host.persistDir, settingsFile))
 	if err != nil {
 		t.Fatal(err)
