@@ -17,7 +17,7 @@ import (
 const (
 	// v112StorageManagerOne names the first legacy storage manager that can be
 	// used to test upgrades.
-	v112Host = "v112Host"
+	v112Host = "v112Host.tar.gz"
 )
 
 // loadExistingHostWithNewDeps will create all of the depedencies for a host, then load
@@ -61,7 +61,7 @@ func TestV112StorageManagerUpgrade(t *testing.T) {
 	// Copy the testdir legacy storage manager to the temp directory.
 	source := filepath.Join("testdata", v112Host)
 	legacyHost := build.TempDir(modules.HostDir, t.Name(), modules.HostDir)
-	err := build.CopyDir(source, legacyHost)
+	err := build.ExtractTarGz(source, legacyHost)
 	if err != nil {
 		t.Fatal(err)
 	}
