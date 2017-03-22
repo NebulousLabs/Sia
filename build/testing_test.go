@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -61,5 +63,27 @@ func TestCopyDir(t *testing.T) {
 	}
 	if !bytes.Equal(d1f1, data[1]) {
 		t.Error("f1 did not match")
+	}
+}
+
+// TestExtractTarGz tests that ExtractTarGz can extract a valid .tar.gz file.
+func TestExtractTarGz(t *testing.T) {
+	dir := TempDir("build", t.Name())
+	os.MkdirAll(dir, 0700)
+	if err := ExtractTarGz("testdata/test.tar.gz", dir); err != nil {
+		t.Fatal(err)
+	}
+	folder, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err := folder.Readdirnames(-1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(files)
+	exp := []string{"1", "2", "3"}
+	if !reflect.DeepEqual(files, exp) {
+		t.Fatal("filenames do not match:", files, exp)
 	}
 }
