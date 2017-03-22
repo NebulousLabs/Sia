@@ -12,6 +12,7 @@ environment:
 branches:
   only:
     - master
+    - staging
 
 install:
   - go version
