@@ -92,44 +92,16 @@ func TestWalletEncrypt(t *testing.T) {
 
 	testdir := build.TempDir("api", t.Name())
 
-	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv, err := NewServer("localhost:0", "Sia-Agent", "", cs, nil, g, nil, nil, nil, tp, w)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Assemble the serverTester.
-	st := &serverTester{
-		walletKey: crypto.TwofishKey(crypto.HashObject("testpass")),
-		dir:       testdir,
-		cs:        cs,
-		gateway:   g,
-		tpool:     tp,
-		wallet:    w,
-		server:    srv,
-	}
-	go srv.Serve()
-	defer st.server.Close()
-
 	walletPassword := "testpass"
-	walletParams := url.Values{}
-	walletParams.Set("encryptionpassword", "testpass")
-	var wip WalletInitPOST
-	err = st.postAPI("/wallet/init", walletParams, &wip)
+	key := crypto.TwofishKey(crypto.HashObject(walletPassword))
+
+	st, err := assembleServerTester(key, testdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// lock the wallet
+	err = st.stdPostAPI("/wallet/lock", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,15 +114,36 @@ func TestWalletEncrypt(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Check that the wallet actually unlocked.
-	if !w.Unlocked() {
+	if !st.wallet.Unlocked() {
 		t.Error("wallet is not unlocked")
 	}
 
-	// reload the server and verify unlocking still works, reloadedServerTester()
-	// closes and reinitializes the server and unlocks the wallet.
-	_, err = st.reloadedServerTester()
+	// reload the server and verify unlocking still works
+	err = st.server.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	st2, err := assembleServerTester(st.walletKey, st.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.server.Close()
+
+	// lock the wallet
+	err = st2.stdPostAPI("/wallet/lock", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the password to call /wallet/unlock.
+	err = st2.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !st2.wallet.Unlocked() {
+		t.Error("wallet is not unlocked")
 	}
 }
 
