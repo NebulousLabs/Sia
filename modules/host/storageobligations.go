@@ -353,7 +353,7 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 			// re-added with a new expriation height. If there is an error at any
 			// point, all of the sectors should be removed.
 			if len(so.SectorRoots) != 0 {
-				err := h.AddSectorBatch(so.SectorRoots, so.expiration())
+				err := h.AddSectorBatch(so.SectorRoots)
 				if err != nil {
 					return err
 				}
@@ -461,7 +461,7 @@ func (h *Host) modifyStorageObligation(so storageObligation, sectorsRemoved []cr
 	var i int
 	var err error
 	for i = range sectorsGained {
-		err = h.AddSector(sectorsGained[i], so.expiration(), gainedSectorData[i])
+		err = h.AddSector(sectorsGained[i], gainedSectorData[i])
 		if err != nil {
 			break
 		}
@@ -472,7 +472,7 @@ func (h *Host) modifyStorageObligation(so storageObligation, sectorsRemoved []cr
 		for j := 0; j < i; j++ {
 			// Error is not checked because there's nothing useful that can be
 			// done about an error.
-			_ = h.RemoveSector(sectorsGained[j], so.expiration())
+			_ = h.RemoveSector(sectorsGained[j])
 		}
 		return err
 	}
@@ -495,7 +495,7 @@ func (h *Host) modifyStorageObligation(so storageObligation, sectorsRemoved []cr
 		for i := range sectorsGained {
 			// Error is not checked because there's nothing useful that can be
 			// done about an error.
-			_ = h.RemoveSector(sectorsGained[i], so.expiration())
+			_ = h.RemoveSector(sectorsGained[i])
 		}
 		return err
 	}
@@ -504,7 +504,7 @@ func (h *Host) modifyStorageObligation(so storageObligation, sectorsRemoved []cr
 		// Error is not checkeed because there's nothing useful that can be
 		// done about an error. Failing to remove a sector is not a terrible
 		// place to be, especially if the host can run consistency checks.
-		_ = h.RemoveSector(sectorsRemoved[k], so.expiration())
+		_ = h.RemoveSector(sectorsRemoved[k])
 	}
 
 	// Update the financial information for the storage obligation - remove the
@@ -537,7 +537,7 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 	for _, root := range so.SectorRoots {
 		// Error is not checked, we want to call remove on every sector even if
 		// there are problems - disk health information will be updated.
-		_ = h.RemoveSector(root, so.expiration())
+		_ = h.RemoveSector(root)
 	}
 
 	// Update the host revenue metrics based on the status of the obligation.

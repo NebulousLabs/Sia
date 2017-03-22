@@ -1,5 +1,19 @@
 package host
 
+// TODO: seems like there would be problems with the negotiation protocols if
+// the renter tried something like 'form' or 'renew' but then the conncetion
+// dropped after the host completed the transaction but before the host was
+// able to send the host signatures for the transaction.
+//
+// Especially on a renew, the host choosing to hold the renter signatures
+// hostage could be a pretty significant problem, and would require the renter
+// to attempt a double-spend to either force the transaction onto the
+// blockchain or to make sure that the host cannot abscond with the funds
+// without commitment.
+//
+// Incentive for the host to do such a thing is pretty low - they will still
+// have to keep all the files following a renew in order to get the money.
+
 import (
 	"net"
 	"sync/atomic"

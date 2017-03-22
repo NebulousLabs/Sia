@@ -54,12 +54,3 @@ func TestPerm(t *testing.T) {
 		}
 	}
 }
-
-func BenchmarkRandIntn(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		_, err := RandIntn(4500)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}

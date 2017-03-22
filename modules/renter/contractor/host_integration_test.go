@@ -82,7 +82,7 @@ func newTestingHost(testdir string, cs modules.ConsensusSet, tp modules.Transact
 	if err != nil {
 		return nil, err
 	}
-	err = h.AddStorageFolder(storageFolder, 1e6)
+	err = h.AddStorageFolder(storageFolder, modules.SectorSize*64)
 	if err != nil {
 		return nil, err
 	}
