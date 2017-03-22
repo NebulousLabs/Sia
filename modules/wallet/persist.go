@@ -100,7 +100,7 @@ func (w *Wallet) initPersist() error {
 	_, compatErr := os.Stat(compatFilename)
 	if dbErr != nil && compatErr == nil {
 		// database does not exist, but old persist does; convert it
-		err = w.convertPersist(dbFilename, compatFilename)
+		err = w.convertPersistFrom112To120(dbFilename, compatFilename)
 	} else {
 		// either database exists or neither exists; open/create the database
 		err = w.openDB(filepath.Join(w.persistDir, dbFile))
@@ -137,7 +137,8 @@ func (w *Wallet) CreateBackup(backupFilepath string) error {
 	return w.createBackup(f)
 }
 
-type compatPersist struct {
+// compat112Persist is the structure of the wallet.json file used in v1.1.2
+type compat112Persist struct {
 	UID                    uniqueID
 	EncryptionVerification crypto.Ciphertext
 	PrimarySeedFile        seedFile
@@ -146,15 +147,17 @@ type compatPersist struct {
 	UnseededKeys           []spendableKeyFile
 }
 
-var compatMeta = persist.Metadata{
+// compat112Meta is the metadata of the wallet.json file used in v1.1.2
+var compat112Meta = persist.Metadata{
 	Header:  "Wallet Settings",
 	Version: "0.4.0",
 }
 
-// convertPersist converts an old wallet.json file to a wallet.db database.
-func (w *Wallet) convertPersist(dbFilename, compatFilename string) error {
-	var data compatPersist
-	err := persist.LoadFile(compatMeta, &data, compatFilename)
+// convertPersistFrom112To120 converts an old (pre-v1.2.0) wallet.json file to
+// a wallet.db database.
+func (w *Wallet) convertPersistFrom112To120(dbFilename, compatFilename string) error {
+	var data compat112Persist
+	err := persist.LoadFile(compat112Meta, &data, compatFilename)
 	if err != nil {
 		return err
 	}
