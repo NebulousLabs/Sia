@@ -426,6 +426,7 @@ func (h *Host) upgradeFromV112ToV120() error {
 	if err != nil {
 		return err
 	}
+	oldDB.Close()
 	err = os.Remove(filepath.Join(h.persistDir, v112StorageManagerDir, v112StorageManagerDBFilename))
 	if err != nil {
 		return err
