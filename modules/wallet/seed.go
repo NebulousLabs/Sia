@@ -140,7 +140,12 @@ func (w *Wallet) loadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 		}
 
 		// add the seedFile
-		return tx.Bucket(bucketSeedFiles).Put(sf.UID[:], encoding.Marshal(sf))
+		var current []seedFile
+		err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyAuxiliarySeedFiles), &current)
+		if err != nil {
+			return err
+		}
+		return tx.Bucket(bucketWallet).Put(keyAuxiliarySeedFiles, encoding.Marshal(append(current, sf)))
 	})
 	if err != nil {
 		return err
