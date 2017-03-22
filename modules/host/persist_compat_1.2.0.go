@@ -393,6 +393,12 @@ func (h *Host) upgradeFromV112ToV120() error {
 		}
 	}
 
+	// Close the database that was opened.
+	err = oldDB.Close()
+	if err != nil {
+		return err
+	}
+
 	// Try loading the persist again.
 	p := new(persistence)
 	err = h.dependencies.loadFile(v112PersistMetadata, p, filepath.Join(h.persistDir, settingsFile))
