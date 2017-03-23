@@ -2,7 +2,6 @@ package miner
 
 import (
 	"bytes"
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 	"time"
@@ -53,10 +52,7 @@ func createMinerTester(name string) (*minerTester, error) {
 		return nil, err
 	}
 	var key crypto.TwofishKey
-	_, err = rand.Read(key[:])
-	if err != nil {
-		return nil, err
-	}
+	crypto.Read(key[:])
 	_, err = w.Encrypt(key)
 	if err != nil {
 		return nil, err

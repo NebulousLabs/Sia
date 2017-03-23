@@ -1,12 +1,12 @@
 package host
 
 import (
-	"crypto/rand"
 	"errors"
 	"io/ioutil"
 	"net"
 	"os"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/persist"
 )
 
@@ -113,7 +113,7 @@ func (productionDependencies) openDatabase(m persist.Metadata, s string) (*persi
 
 // randRead fills the input bytes with random data.
 func (productionDependencies) randRead(b []byte) (int, error) {
-	return rand.Read(b)
+	return crypto.Reader.Read(b)
 }
 
 // readFile reads a file from the filesystem.

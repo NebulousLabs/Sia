@@ -4,13 +4,13 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -58,7 +58,7 @@ func verifyTree(tree *HostTree, nentries int) error {
 		if tree.root.weight.IsZero() {
 			break
 		}
-		randWeight, err := rand.Int(rand.Reader, tree.root.weight.Big())
+		randWeight, err := rand.Int(crypto.Reader, tree.root.weight.Big())
 		if err != nil {
 			break
 		}
@@ -81,17 +81,9 @@ func verifyTree(tree *HostTree, nentries int) error {
 func makeHostDBEntry() modules.HostDBEntry {
 	dbe := modules.HostDBEntry{}
 
-	pk := types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       make([]byte, 32),
-	}
-	_, err := io.ReadFull(rand.Reader, pk.Key)
-	if err != nil {
-		panic(err)
-	}
-
+	_, pk := crypto.GenerateKeyPair()
 	dbe.AcceptingContracts = true
-	dbe.PublicKey = pk
+	dbe.PublicKey = types.Ed25519PublicKey(pk)
 	dbe.ScanHistory = modules.HostDBScans{{
 		Timestamp: time.Now(),
 		Success:   true,
@@ -125,7 +117,7 @@ func TestHostTree(t *testing.T) {
 	// Randomly remove hosts from the tree and check that it is still in order.
 	for _, key := range keys {
 		shouldRemove := func() bool {
-			n, err := rand.Int(rand.Reader, big.NewInt(1))
+			n, err := rand.Int(crypto.Reader, big.NewInt(1))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -196,7 +188,7 @@ func TestHostTreeParallel(t *testing.T) {
 				case <-tg.StopChan():
 					return
 				default:
-					randInt, err := rand.Int(rand.Reader, big.NewInt(4))
+					randInt, err := rand.Int(crypto.Reader, big.NewInt(4))
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -287,7 +279,7 @@ func TestHostTreeModify(t *testing.T) {
 		}
 	}
 
-	randIndex, err := rand.Int(rand.Reader, big.NewInt(int64(treeSize)))
+	randIndex, err := rand.Int(crypto.Reader, big.NewInt(int64(treeSize)))
 	if err != nil {
 		t.Fatal(err)
 	}

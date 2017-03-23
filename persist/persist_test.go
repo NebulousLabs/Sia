@@ -2,13 +2,13 @@ package persist
 
 import (
 	"bytes"
-	"crypto/rand"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // TestIntegrationRandomSuffix checks that the random suffix creator creates
@@ -54,8 +54,7 @@ func TestAbsolutePathSafeFile(t *testing.T) {
 	}
 
 	// Write random data to the file and commit.
-	data := make([]byte, 10)
-	rand.Read(data)
+	data := crypto.RandBytes(10)
 	_, err = sf.Write(data)
 	if err != nil {
 		t.Fatal(err)
@@ -106,8 +105,7 @@ func TestRelativePathSafeFile(t *testing.T) {
 	}
 
 	// Write random data to the file.
-	data := make([]byte, 10)
-	rand.Read(data)
+	data := crypto.RandBytes(10)
 	_, err = sf.Write(data)
 	if err != nil {
 		t.Fatal(err)

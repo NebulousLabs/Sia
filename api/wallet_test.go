@@ -1,7 +1,6 @@
 package api
 
 import (
-	"crypto/rand"
 	"fmt"
 	"net/url"
 	"os"
@@ -269,7 +268,7 @@ func TestIntegrationWalletInitSeed(t *testing.T) {
 	// Make a call to /wallet/init/seed. Provide no encryption key so that the
 	// encryption key is the seed.
 	var seed modules.Seed
-	rand.Read(seed[:])
+	crypto.Read(seed[:])
 	seedStr, _ := modules.SeedToString(seed, "english")
 	qs.Set("seed", seedStr)
 	err = st.stdPostAPI("/wallet/init/seed", qs)
@@ -405,8 +404,7 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 	defer st.server.Close()
 
 	// send coins to a new wallet, then sweep them back
-	var key crypto.TwofishKey
-	rand.Read(key[:])
+	key := crypto.GenerateTwofishKey()
 	w, err := wallet.New(st.cs, st.tpool, filepath.Join(st.dir, "wallet2"))
 	if err != nil {
 		t.Fatal(err)

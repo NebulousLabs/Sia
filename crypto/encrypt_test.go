@@ -3,7 +3,6 @@ package crypto
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/rand"
 	"testing"
 )
 
@@ -25,11 +24,7 @@ func TestTwofishEncryption(t *testing.T) {
 	}
 
 	// Try again with a nonzero plaintext.
-	plaintext = make([]byte, 600)
-	_, err = rand.Read(plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
+	plaintext = RandBytes(600)
 	ciphertext = key.EncryptBytes(plaintext)
 	decryptedPlaintext, err = key.DecryptBytes(ciphertext)
 	if err != nil {

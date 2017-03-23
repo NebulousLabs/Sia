@@ -1,8 +1,6 @@
 package hostdb
 
 import (
-	"crypto/rand"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -10,6 +8,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -43,17 +42,10 @@ func bareHostDB() *HostDB {
 // makeHostDBEntry makes a new host entry with a random public key
 func makeHostDBEntry() modules.HostDBEntry {
 	dbe := modules.HostDBEntry{}
-	pk := types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       make([]byte, 32),
-	}
-	_, err := io.ReadFull(rand.Reader, pk.Key)
-	if err != nil {
-		panic(err)
-	}
+	_, pk := crypto.GenerateKeyPair()
 
 	dbe.AcceptingContracts = true
-	dbe.PublicKey = pk
+	dbe.PublicKey = types.Ed25519PublicKey(pk)
 	dbe.ScanHistory = modules.HostDBScans{{
 		Timestamp: time.Now(),
 		Success:   true,

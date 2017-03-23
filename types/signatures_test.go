@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"crypto/rand"
 	"strings"
 	"testing"
 
@@ -363,11 +362,7 @@ func TestTransactionValidSignatures(t *testing.T) {
 func TestSiaPublicKeyLoadString(t *testing.T) {
 	spk := SiaPublicKey{
 		Algorithm: SignatureEd25519,
-		Key:       make([]byte, 32),
-	}
-	_, err := rand.Read(spk.Key)
-	if err != nil {
-		t.Fatal(err)
+		Key:       crypto.RandBytes(32),
 	}
 
 	spkString := spk.String()

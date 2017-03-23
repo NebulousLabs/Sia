@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"crypto/rand"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -22,10 +21,7 @@ func TestScanLargeIndex(t *testing.T) {
 	}
 	defer wt.closeWt()
 	var masterKey crypto.TwofishKey
-	_, err = rand.Read(masterKey[:])
-	if err != nil {
-		t.Fatal(err)
-	}
+	crypto.Read(masterKey[:])
 	_, err = wt.wallet.Encrypt(masterKey)
 	if err != nil {
 		t.Fatal(err)

@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 
@@ -50,10 +49,7 @@ func createWalletTester(name string) (*walletTester, error) {
 		return nil, err
 	}
 	var masterKey crypto.TwofishKey
-	_, err = rand.Read(masterKey[:])
-	if err != nil {
-		return nil, err
-	}
+	crypto.Read(masterKey[:])
 	_, err = w.Encrypt(masterKey)
 	if err != nil {
 		return nil, err

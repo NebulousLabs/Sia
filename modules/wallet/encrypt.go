@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"bytes"
-	"crypto/rand"
 	"errors"
 	"time"
 
@@ -307,10 +306,7 @@ func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 
 	// Create a random seed.
 	var seed modules.Seed
-	_, err := rand.Read(seed[:])
-	if err != nil {
-		return modules.Seed{}, err
-	}
+	crypto.Read(seed[:])
 
 	// If masterKey is blank, use the hash of the seed.
 	if masterKey == (crypto.TwofishKey{}) {

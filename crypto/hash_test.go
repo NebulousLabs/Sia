@@ -2,7 +2,6 @@ package crypto
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
 	"sort"
 	"strings"
@@ -50,9 +49,7 @@ func TestHashing(t *testing.T) {
 	}
 
 	// Call HashBytes on a random byte slice.
-	data := make([]byte, 435)
-	rand.Read(data)
-	h2 := HashBytes(data)
+	h2 := HashBytes(RandBytes(435))
 	if h2 == emptyHash {
 		t.Error("HashObject returned the zero hash!")
 	}

@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"crypto/rand"
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -91,10 +90,7 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 
 	// Create a UID and encryption verification.
 	var skf spendableKeyFile
-	_, err := rand.Read(skf.UID[:])
-	if err != nil {
-		return err
-	}
+	crypto.Read(skf.UID[:])
 	encryptionKey := uidEncryptionKey(masterKey, skf.UID)
 	skf.EncryptionVerification = encryptionKey.EncryptBytes(verificationPlaintext)
 

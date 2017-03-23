@@ -1,7 +1,6 @@
 package persist
 
 import (
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -9,6 +8,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/bolt"
 )
 
@@ -141,13 +141,9 @@ func TestOpenDatabase(t *testing.T) {
 		err = db.Update(func(tx *bolt.Tx) error {
 			for _, testBucket := range testBuckets {
 				b := tx.Bucket(testBucket)
-				x := rand.Intn(10)
+				x := crypto.RandIntn(10)
 				for i := 0; i <= x; i++ {
-					k := make([]byte, 10)
-					rand.Read(k)
-					v := make([]byte, 1e3)
-					rand.Read(v)
-					err := b.Put(k, v)
+					err := b.Put(crypto.RandBytes(10), crypto.RandBytes(1e3))
 					if err != nil {
 						t.Errorf("db.Update failed to fill bucket %v for metadata %v, filename %v; error was %v", testBucket, in.md, dbFilename, err)
 						return err

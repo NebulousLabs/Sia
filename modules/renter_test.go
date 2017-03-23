@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -35,10 +34,7 @@ func TestMerkleRootSetCompatibility(t *testing.T) {
 		var chs chStruct
 		for j := 0; j < i; j++ {
 			var ch crypto.Hash
-			_, err := rand.Read(ch[:])
-			if err != nil {
-				t.Fatal(err)
-			}
+			crypto.Read(ch[:])
 			chs.Hashes = append(chs.Hashes, ch)
 		}
 
@@ -119,10 +115,7 @@ func BenchmarkMerkleRootSetEncode(b *testing.B) {
 	var chs chStruct
 	for i := 0; i < 1e3; i++ {
 		var ch crypto.Hash
-		_, err := rand.Read(ch[:])
-		if err != nil {
-			b.Fatal(err)
-		}
+		crypto.Read(ch[:])
 		chs.Hashes = append(chs.Hashes, ch)
 	}
 
@@ -145,10 +138,7 @@ func BenchmarkSliceCryptoHashEncode(b *testing.B) {
 	var chs chStruct
 	for i := 0; i < 1e3; i++ {
 		var ch crypto.Hash
-		_, err := rand.Read(ch[:])
-		if err != nil {
-			b.Fatal(err)
-		}
+		crypto.Read(ch[:])
 		chs.Hashes = append(chs.Hashes, ch)
 	}
 
@@ -177,10 +167,7 @@ func BenchmarkMerkleRootSetSave(b *testing.B) {
 	var chs chStruct
 	for i := 0; i < 1e3; i++ {
 		var ch crypto.Hash
-		_, err := rand.Read(ch[:])
-		if err != nil {
-			b.Fatal(err)
-		}
+		crypto.Read(ch[:])
 		chs.Hashes = append(chs.Hashes, ch)
 	}
 
@@ -217,10 +204,7 @@ func BenchmarkSliceCryptoHashSave(b *testing.B) {
 	var chs chStruct
 	for i := 0; i < 1e3; i++ {
 		var ch crypto.Hash
-		_, err := rand.Read(ch[:])
-		if err != nil {
-			b.Fatal(err)
-		}
+		crypto.Read(ch[:])
 		chs.Hashes = append(chs.Hashes, ch)
 	}
 

@@ -1,7 +1,6 @@
 package transactionpool
 
 import (
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 
@@ -50,10 +49,7 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 		return nil, err
 	}
 	var key crypto.TwofishKey
-	_, err = rand.Read(key[:])
-	if err != nil {
-		return nil, err
-	}
+	crypto.Read(key[:])
 	_, err = w.Encrypt(key)
 	if err != nil {
 		return nil, err

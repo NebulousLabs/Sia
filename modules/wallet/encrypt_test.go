@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"bytes"
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 
@@ -141,10 +140,7 @@ func TestIntegrationUserSuppliedEncryption(t *testing.T) {
 	}
 	defer wt.closeWt()
 	var masterKey crypto.TwofishKey
-	_, err = rand.Read(masterKey[:])
-	if err != nil {
-		t.Fatal(err)
-	}
+	crypto.Read(masterKey[:])
 	_, err = wt.wallet.Encrypt(masterKey)
 	if err != nil {
 		t.Error(err)

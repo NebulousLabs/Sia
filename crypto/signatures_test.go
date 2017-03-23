@@ -2,7 +2,6 @@ package crypto
 
 import (
 	"bytes"
-	"crypto/rand"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -32,7 +31,7 @@ func TestUnitSignatureEncoding(t *testing.T) {
 
 	// Create a signature using the secret key.
 	var signedData Hash
-	rand.Read(signedData[:])
+	Read(signedData[:])
 	sig := SignHash(signedData, sk)
 
 	// Marshal and unmarshal the signature.
@@ -67,7 +66,7 @@ func TestUnitSigning(t *testing.T) {
 
 		// Generate and sign the data.
 		var randData Hash
-		rand.Read(randData[:])
+		Read(randData[:])
 		sig := SignHash(randData, sk)
 
 		// Verify the signature.

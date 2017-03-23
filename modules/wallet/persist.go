@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -52,10 +51,7 @@ func (w *Wallet) openDB(filename string) (err error) {
 		// if the wallet does not have a UID, create one
 		if tx.Bucket(bucketWallet).Get(keyUID) == nil {
 			uid := make([]byte, len(uniqueID{}))
-			_, err = rand.Read(uid[:])
-			if err != nil {
-				return fmt.Errorf("could not generate UID: %v", err)
-			}
+			crypto.Read(uid[:])
 			tx.Bucket(bucketWallet).Put(keyUID, uid)
 		}
 		// if fields in bucketWallet are nil, set them to zero to prevent unmarshal errors

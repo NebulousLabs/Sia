@@ -1,7 +1,6 @@
 package miner
 
 import (
-	"crypto/rand"
 	"errors"
 	"time"
 
@@ -104,10 +103,7 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	// but I don't think so (underlying slice may be shared with other blocks
 	// accessible outside the miner).
 	var arbData [crypto.EntropySize]byte
-	_, err = rand.Read(arbData[:])
-	if err != nil {
-		return types.BlockHeader{}, types.Target{}, err
-	}
+	crypto.Read(arbData[:])
 	copy(m.sourceBlock.Transactions[0].ArbitraryData[0], arbData[:])
 	header := m.sourceBlock.Header()
 

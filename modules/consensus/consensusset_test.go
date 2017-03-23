@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 
@@ -31,13 +30,9 @@ type consensusSetTester struct {
 }
 
 // randAddress returns a random address that is not spendable.
-func randAddress() types.UnlockHash {
-	var uh types.UnlockHash
-	_, err := rand.Read(uh[:])
-	if err != nil {
-		panic(err)
-	}
-	return uh
+func randAddress() (uh types.UnlockHash) {
+	crypto.Read(uh[:])
+	return
 }
 
 // addSiafunds makes a transaction that moves some testing genesis siafunds

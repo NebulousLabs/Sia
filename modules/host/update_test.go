@@ -1,7 +1,6 @@
 package host
 
 import (
-	"crypto/rand"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
@@ -46,11 +45,7 @@ func TestStorageProof(t *testing.T) {
 
 	// generate data
 	const dataSize = 777
-	data := make([]byte, dataSize)
-	_, err = rand.Read(data)
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(dataSize)
 	root := crypto.MerkleRoot(data)
 	err = ioutil.WriteFile(filepath.Join(ht.host.persistDir, "foo"), data, 0777)
 	if err != nil {
