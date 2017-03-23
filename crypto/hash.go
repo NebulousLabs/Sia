@@ -15,7 +15,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/encoding"
 
-	"github.com/dchest/blake2b"
+	"golang.org/x/crypto/blake2b"
 )
 
 const (
@@ -35,7 +35,8 @@ var (
 
 // NewHash returns a blake2b 256bit hasher.
 func NewHash() hash.Hash {
-	return blake2b.New256()
+	h, _ := blake2b.New256(nil) // cannot fail with nil argument
+	return h
 }
 
 // HashAll takes a set of objects as input, encodes them all using the encoding
