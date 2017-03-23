@@ -15,7 +15,6 @@ import (
 
 // newTestingFile initializes a file object with random parameters.
 func newTestingFile() *file {
-	key, _ := crypto.GenerateTwofishKey()
 	data := crypto.RandBytes(8)
 	nData := crypto.RandIntn(10)
 	nParity := crypto.RandIntn(10)
@@ -24,7 +23,7 @@ func newTestingFile() *file {
 	return &file{
 		name:        "testfile-" + strconv.Itoa(int(data[0])),
 		size:        encoding.DecUint64(data[1:5]),
-		masterKey:   key,
+		masterKey:   crypto.GenerateTwofishKey(),
 		erasureCode: rsc,
 		pieceSize:   encoding.DecUint64(data[6:8]),
 	}

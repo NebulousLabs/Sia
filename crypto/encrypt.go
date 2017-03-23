@@ -5,7 +5,6 @@ package crypto
 
 import (
 	"crypto/cipher"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"io"
@@ -28,9 +27,9 @@ type (
 
 // GenerateEncryptionKey produces a key that can be used for encrypting and
 // decrypting files.
-func GenerateTwofishKey() (key TwofishKey, err error) {
-	_, err = rand.Read(key[:])
-	return key, err
+func GenerateTwofishKey() (key TwofishKey) {
+	Read(key[:])
+	return
 }
 
 // NewCipher creates a new Twofish cipher from the key.
