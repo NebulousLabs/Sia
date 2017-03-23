@@ -50,7 +50,7 @@ type transactionBuilder struct {
 // addSignatures will sign a transaction using a spendable key, with support
 // for multisig spendable keys. Because of the restricted input, the function
 // is compatible with both siacoin inputs and siafund inputs.
-func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.UnlockConditions, parentID crypto.Hash, spendKey spendableKey) (newSigIndices []int, err error) {
+func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.UnlockConditions, parentID crypto.Hash, spendKey spendableKey) (newSigIndices []int) {
 	// Try to find the matching secret key for each public key - some public
 	// keys may not have a match. Some secret keys may be used multiple times,
 	// which is why public keys are used as the outer loop.
@@ -73,10 +73,7 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 			txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
 			sigIndex := len(txn.TransactionSignatures) - 1
 			sigHash := txn.SigHash(sigIndex)
-			encodedSig, err := crypto.SignHash(sigHash, spendKey.SecretKeys[j])
-			if err != nil {
-				return nil, err
-			}
+			encodedSig := crypto.SignHash(sigHash, spendKey.SecretKeys[j])
 			txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
 
 			// Count that the signature has been added, and break out of the
@@ -91,7 +88,7 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 			break
 		}
 	}
-	return newSigIndices, nil
+	return newSigIndices
 }
 
 // checkOutput is a helper function used to determine if an output is usable.
@@ -223,10 +220,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 
 		// Sign all of the inputs to the parent trancstion.
 		for _, sci := range parentTxn.SiacoinInputs {
-			_, err := addSignatures(&parentTxn, types.FullCoveredFields, sci.UnlockConditions, crypto.Hash(sci.ParentID), tb.wallet.keys[sci.UnlockConditions.UnlockHash()])
-			if err != nil {
-				return err
-			}
+			addSignatures(&parentTxn, types.FullCoveredFields, sci.UnlockConditions, crypto.Hash(sci.ParentID), tb.wallet.keys[sci.UnlockConditions.UnlockHash()])
 		}
 		// Mark the parent output as spent. Must be done after the transaction is
 		// finished because otherwise the txid and output id will change.
@@ -360,10 +354,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 
 		// Sign all of the inputs to the parent trancstion.
 		for _, sfi := range parentTxn.SiafundInputs {
-			_, err := addSignatures(&parentTxn, types.FullCoveredFields, sfi.UnlockConditions, crypto.Hash(sfi.ParentID), tb.wallet.keys[sfi.UnlockConditions.UnlockHash()])
-			if err != nil {
-				return err
-			}
+			addSignatures(&parentTxn, types.FullCoveredFields, sfi.UnlockConditions, crypto.Hash(sfi.ParentID), tb.wallet.keys[sfi.UnlockConditions.UnlockHash()])
 		}
 
 		// Add the exact output.
@@ -568,10 +559,7 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 		if !ok {
 			return nil, errors.New("transaction builder added an input that it cannot sign")
 		}
-		newSigIndices, err := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
-		if err != nil {
-			return nil, err
-		}
+		newSigIndices := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
 		tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
 		tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
 	}
@@ -581,10 +569,7 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 		if !ok {
 			return nil, errors.New("transaction builder added an input that it cannot sign")
 		}
-		newSigIndices, err := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
-		if err != nil {
-			return nil, err
-		}
+		newSigIndices := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
 		tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
 		tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
 	}

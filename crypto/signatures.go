@@ -81,13 +81,10 @@ func ReadSignedObject(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey)
 	return encoding.Unmarshal(encObj, obj)
 }
 
-// SignHash signs a message using a secret key. Though the current
-// implementation will never return an error, switching libraries in the future
-// may result in errors that can be returned.
-func SignHash(data Hash, sk SecretKey) (sig Signature, err error) {
+// SignHash signs a message using a secret key.
+func SignHash(data Hash, sk SecretKey) Signature {
 	skNorm := [SecretKeySize]byte(sk)
-	sig = *ed25519.Sign(&skNorm, data[:])
-	return sig, nil
+	return *ed25519.Sign(&skNorm, data[:])
 }
 
 // VerifyHash uses a public key and input data to verify a signature.
@@ -104,9 +101,6 @@ func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
 // WriteSignedObject writes a length-prefixed object prefixed by its signature.
 func WriteSignedObject(w io.Writer, obj interface{}, sk SecretKey) error {
 	objBytes := encoding.Marshal(obj)
-	sig, err := SignHash(HashBytes(objBytes), sk)
-	if err != nil {
-		return err
-	}
+	sig := SignHash(HashBytes(objBytes), sk)
 	return encoding.NewEncoder(w).EncodeAll(sig, objBytes)
 }

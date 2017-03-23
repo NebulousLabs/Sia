@@ -246,18 +246,9 @@ func TestTransactionValidSignatures(t *testing.T) {
 	sigHash0 := txn.SigHash(0)
 	sigHash1 := txn.SigHash(1)
 	sigHash2 := txn.SigHash(2)
-	sig0, err := crypto.SignHash(sigHash0, sk)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sig1, err := crypto.SignHash(sigHash1, sk)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sig2, err := crypto.SignHash(sigHash2, sk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sig0 := crypto.SignHash(sigHash0, sk)
+	sig1 := crypto.SignHash(sigHash1, sk)
+	sig2 := crypto.SignHash(sigHash2, sk)
 	txn.TransactionSignatures[0].Signature = sig0[:]
 	txn.TransactionSignatures[1].Signature = sig1[:]
 	txn.TransactionSignatures[2].Signature = sig2[:]

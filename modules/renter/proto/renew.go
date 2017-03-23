@@ -197,10 +197,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 		FileContractRevisions: []types.FileContractRevision{initRevision},
 		TransactionSignatures: []types.TransactionSignature{renterRevisionSig},
 	}
-	encodedSig, err := crypto.SignHash(revisionTxn.SigHash(0), ourSK)
-	if err != nil {
-		return modules.RenterContract{}, modules.WriteNegotiationRejection(conn, errors.New("failed to sign revision transaction: "+err.Error()))
-	}
+	encodedSig := crypto.SignHash(revisionTxn.SigHash(0), ourSK)
 	revisionTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
 	// Send acceptance and signatures

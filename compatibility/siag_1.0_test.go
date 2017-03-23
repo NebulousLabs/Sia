@@ -59,10 +59,7 @@ func verifyKeysSiag_1_0(uc types.UnlockConditions, folder string, keyname string
 				CoveredFields:  types.CoveredFields{WholeTransaction: true},
 			})
 			sigHash := txn.SigHash(int(j))
-			sig, err := crypto.SignHash(sigHash, loadedKeys[i].SecretKey)
-			if err != nil {
-				return err
-			}
+			sig := crypto.SignHash(sigHash, loadedKeys[i].SecretKey)
 			txn.TransactionSignatures[j].Signature = sig[:]
 			i++
 			j++

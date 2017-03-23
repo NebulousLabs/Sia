@@ -154,10 +154,7 @@ func TestUnitSignatureEncoding(t *testing.T) {
 	// Create a signature using the secret key.
 	var signedData Hash
 	rand.Read(signedData[:])
-	sig, err := SignHash(signedData, sk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sig := SignHash(signedData, sk)
 
 	// Marshal and unmarshal the signature.
 	marshalledSig := encoding.Marshal(sig)
@@ -195,10 +192,7 @@ func TestUnitSigning(t *testing.T) {
 		// Generate and sign the data.
 		var randData Hash
 		rand.Read(randData[:])
-		sig, err := SignHash(randData, sk)
-		if err != nil {
-			t.Fatal(err)
-		}
+		sig := SignHash(randData, sk)
 
 		// Verify the signature.
 		err = VerifyHash(randData, pk, sig)
@@ -242,10 +236,7 @@ func TestIntegrationSigKeyGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sig, err := SignHash(message, randSecKey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sig := SignHash(message, randSecKey)
 	err = VerifyHash(message, randPubKey, sig)
 	if err != nil {
 		t.Error(err)
@@ -261,10 +252,7 @@ func TestIntegrationSigKeyGeneration(t *testing.T) {
 	var detEntropy [EntropySize]byte
 	detEntropy[0] = 35
 	detSecKey, detPubKey := GenerateKeyPairDeterministic(detEntropy)
-	sig, err = SignHash(message, detSecKey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sig = SignHash(message, detSecKey)
 	err = VerifyHash(message, detPubKey, sig)
 	if err != nil {
 		t.Error(err)
