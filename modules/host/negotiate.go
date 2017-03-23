@@ -189,10 +189,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		ParentID: contractTxn.FileContractID(0),
 		UnlockConditions: types.UnlockConditions{
 			PublicKeys: []types.SiaPublicKey{
-				{
-					Algorithm: types.SignatureEd25519,
-					Key:       renterPK[:],
-				},
+				types.Ed25519PublicKey(renterPK),
 				hostSPK,
 			},
 			SignaturesRequired: 2,

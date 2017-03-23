@@ -1093,6 +1093,11 @@ func TestHostAndRentReload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Mine a block so that the wallet reclaims refund outputs
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}

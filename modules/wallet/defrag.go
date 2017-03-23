@@ -4,104 +4,117 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/bolt"
 )
 
 var (
 	errDefragNotNeeded = errors.New("defragging not needed, wallet is already sufficiently defragged")
 )
 
-// fundDefragger is a private function which funds the defragger transaction.
-// This helper func is needed because the lock on the wallet cannot be dropped
-// throughout scanning the outputs to determine if defragmentation is necessary
-// and then proceeding to actually defrag.
-func (tb *transactionBuilder) fundDefragger(fee types.Currency) (types.Currency, error) {
-	// Collect a set of outputs for defragging.
-	var so sortedOutputs
-	for scoid, sco := range tb.wallet.siacoinOutputs {
-		// Skip over any outputs that aren't actually spendable.
-		if err := tb.wallet.checkOutput(scoid, sco); err != nil {
-			continue
-		}
-		so.ids = append(so.ids, scoid)
-		so.outputs = append(so.outputs, sco)
-	}
-
-	// Only defrag if there are enough outputs to merit defragging.
-	if len(so.ids) <= defragThreshold {
-		return types.Currency{}, errDefragNotNeeded
-	}
-	// Sanity check - the defrag threshold needs to be higher than the batch
-	// size plus the start index.
-	if build.DEBUG && defragThreshold <= defragBatchSize+defragStartIndex {
-		panic("constants are incorrect, defragThreshold needs to be larger than the sum of defragBatchSize and defragStartIndex")
-	}
-
-	// Sort the outputs by size.
-	sort.Sort(sort.Reverse(so))
-
-	// Skip over the 'defragStartIndex' largest outputs, so that the user can
-	// still reasonably use their wallet while the defrag is happening.
-	var amount types.Currency
-	parentTxn := types.Transaction{}
-	var spentScoids []types.SiacoinOutputID
-	for i := defragStartIndex; i < defragStartIndex+defragBatchSize; i++ {
-		scoid := so.ids[i]
-		sco := so.outputs[i]
-
-		// Add a siacoin input for this output.
-		outputUnlockConditions := tb.wallet.keys[sco.UnlockHash].UnlockConditions
-		sci := types.SiacoinInput{
-			ParentID:         scoid,
-			UnlockConditions: outputUnlockConditions,
-		}
-		parentTxn.SiacoinInputs = append(parentTxn.SiacoinInputs, sci)
-		spentScoids = append(spentScoids, scoid)
-
-		// Add the output to the total fund
-		amount = amount.Add(sco.Value)
-	}
-
-	// Create and add the output that will be used to fund the standard
-	// transaction.
-	parentUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
-	if err != nil {
-		return types.Currency{}, err
-	}
-	exactOutput := types.SiacoinOutput{
-		Value:      amount,
-		UnlockHash: parentUnlockConditions.UnlockHash(),
-	}
-	parentTxn.SiacoinOutputs = append(parentTxn.SiacoinOutputs, exactOutput)
-
-	// Sign all of the inputs to the parent trancstion.
-	for _, sci := range parentTxn.SiacoinInputs {
-		_, err := addSignatures(&parentTxn, types.FullCoveredFields, sci.UnlockConditions, crypto.Hash(sci.ParentID), tb.wallet.keys[sci.UnlockConditions.UnlockHash()])
+// createDefragTransaction creates a transaction that spends multiple existing
+// wallet outputs into a single new address.
+func (w *Wallet) createDefragTransaction() (txnSet []types.Transaction, err error) {
+	err = w.db.Update(func(tx *bolt.Tx) error {
+		consensusHeight, err := dbGetConsensusHeight(tx)
 		if err != nil {
-			return types.Currency{}, err
+			return err
 		}
-	}
-	// Mark the parent output as spent. Must be done after the transaction is
-	// finished because otherwise the txid and output id will change.
-	tb.wallet.spentOutputs[types.OutputID(parentTxn.SiacoinOutputID(0))] = tb.wallet.consensusSetHeight
 
-	// Add the exact output.
-	newInput := types.SiacoinInput{
-		ParentID:         parentTxn.SiacoinOutputID(0),
-		UnlockConditions: parentUnlockConditions,
-	}
-	tb.newParents = append(tb.newParents, len(tb.parents))
-	tb.parents = append(tb.parents, parentTxn)
-	tb.siacoinInputs = append(tb.siacoinInputs, len(tb.transaction.SiacoinInputs))
-	tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, newInput)
+		// Collect a value-sorted set of siacoin outputs.
+		var so sortedOutputs
+		err = dbForEachSiacoinOutput(tx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
+			if w.checkOutput(tx, consensusHeight, scoid, sco) == nil {
+				so.ids = append(so.ids, scoid)
+				so.outputs = append(so.outputs, sco)
+			}
+		})
+		if err != nil {
+			return err
+		}
+		sort.Sort(sort.Reverse(so))
 
-	// Mark all outputs that were spent as spent.
-	for _, scoid := range spentScoids {
-		tb.wallet.spentOutputs[types.OutputID(scoid)] = tb.wallet.consensusSetHeight
-	}
-	return amount, nil
+		// Only defrag if there are enough outputs to merit defragging.
+		if len(so.ids) <= defragThreshold {
+			return errDefragNotNeeded
+		}
+
+		// Skip over the 'defragStartIndex' largest outputs, so that the user can
+		// still reasonably use their wallet while the defrag is happening.
+		var amount types.Currency
+		var parentTxn types.Transaction
+		var spentScoids []types.SiacoinOutputID
+		for i := defragStartIndex; i < defragStartIndex+defragBatchSize; i++ {
+			scoid := so.ids[i]
+			sco := so.outputs[i]
+
+			// Add a siacoin input for this output.
+			outputUnlockConditions := w.keys[sco.UnlockHash].UnlockConditions
+			sci := types.SiacoinInput{
+				ParentID:         scoid,
+				UnlockConditions: outputUnlockConditions,
+			}
+			parentTxn.SiacoinInputs = append(parentTxn.SiacoinInputs, sci)
+			spentScoids = append(spentScoids, scoid)
+
+			// Add the output to the total fund
+			amount = amount.Add(sco.Value)
+		}
+
+		// Create and add the output that will be used to fund the defrag
+		// transaction.
+		parentUnlockConditions, err := w.nextPrimarySeedAddress(tx)
+		if err != nil {
+			return err
+		}
+		exactOutput := types.SiacoinOutput{
+			Value:      amount,
+			UnlockHash: parentUnlockConditions.UnlockHash(),
+		}
+		parentTxn.SiacoinOutputs = append(parentTxn.SiacoinOutputs, exactOutput)
+
+		// Sign all of the inputs to the parent transaction.
+		for _, sci := range parentTxn.SiacoinInputs {
+			addSignatures(&parentTxn, types.FullCoveredFields, sci.UnlockConditions, crypto.Hash(sci.ParentID), w.keys[sci.UnlockConditions.UnlockHash()])
+		}
+
+		// Create the defrag transaction.
+		fee := defragFee()
+		refundAddr, err := w.nextPrimarySeedAddress(tx)
+		if err != nil {
+			return err
+		}
+		txn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         parentTxn.SiacoinOutputID(0),
+				UnlockConditions: parentUnlockConditions,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      amount.Sub(fee),
+				UnlockHash: refundAddr.UnlockHash(),
+			}},
+			MinerFees: []types.Currency{fee},
+		}
+		addSignatures(&txn, types.FullCoveredFields, parentUnlockConditions, crypto.Hash(parentTxn.SiacoinOutputID(0)), w.keys[parentUnlockConditions.UnlockHash()])
+
+		// Mark all outputs that were spent as spent.
+		for _, scoid := range spentScoids {
+			if err := dbPutSpentOutput(tx, types.OutputID(scoid), consensusHeight); err != nil {
+				return err
+			}
+		}
+		// Mark the parent output as spent. Must be done after the transaction is
+		// finished because otherwise the txid and output id will change.
+		if err := dbPutSpentOutput(tx, types.OutputID(parentTxn.SiacoinOutputID(0)), consensusHeight); err != nil {
+			return err
+		}
+
+		// Construct the final transaction set
+		txnSet = []types.Transaction{parentTxn, txn}
+		return nil
+	})
+	return
 }
 
 // threadedDefragWallet computes the sum of the 15 largest outputs in the wallet and
@@ -116,67 +129,39 @@ func (w *Wallet) threadedDefragWallet() {
 	defer w.tg.Done()
 
 	// Check that a defrag makes sense.
-	w.mu.Lock()
-	unlocked := w.unlocked
-	var usableOutputs int
-	for scoid, sco := range w.siacoinOutputs {
-		// Only count the output if it's usable.
-		if err := w.checkOutput(scoid, sco); err == nil {
-			usableOutputs++
-		}
-	}
-	w.mu.Unlock()
-
+	w.mu.RLock()
 	// Can't defrag if the wallet is locked.
-	if !unlocked {
+	if !w.unlocked {
+		w.mu.RUnlock()
 		return
 	}
 	// No need to defrag if the number of outputs is below the defrag limit.
-	if usableOutputs < defragThreshold {
-		return
-	}
-
-	// grab a new address from the wallet
-	w.mu.Lock()
-	addr, err := w.nextPrimarySeedAddress()
-	w.mu.Unlock()
-	if err != nil {
-		// User may have locekd the wallet between the above check and the
-		// request for the address.
-		w.log.Debugln("Error getting an address for defragmentation: ", err)
-		return
-	}
-
-	// Create a transaction builder and fund it with the outputs to be
-	// defragged.
-	fee := defragFee()
-	w.mu.Lock()
-	tbuilder := w.registerTransaction(types.Transaction{}, nil)
-	amount, err := tbuilder.fundDefragger(fee)
-	w.mu.Unlock()
-	if err != nil {
-		if err != errDefragNotNeeded {
-			w.log.Println("Error while trying to fund the defragging transaction", err)
-		}
-		return
-	}
-
-	// Add the miner fee.
-	tbuilder.AddMinerFee(fee)
-	// Add the refund.
-	tbuilder.AddSiacoinOutput(types.SiacoinOutput{
-		Value:      amount.Sub(fee),
-		UnlockHash: addr.UnlockHash(),
+	// NOTE: some outputs may be invalid (e.g. dust), but it's still more
+	// efficient to count them naively as a first pass.
+	var totalOutputs int
+	w.db.View(func(tx *bolt.Tx) error {
+		totalOutputs = tx.Bucket(bucketSiacoinOutputs).Stats().KeyN
+		return nil
 	})
-	// Sign the transaction.
-	txns, err := tbuilder.Sign(true)
-	if err != nil {
-		w.log.Println("Error signing transaction set in defrag transaction: ", err)
+	w.mu.RUnlock()
+	if totalOutputs < defragThreshold {
+		return
+	}
+
+	// Create the defrag transaction.
+	w.mu.Lock()
+	txnSet, err := w.createDefragTransaction()
+	w.mu.Unlock()
+	if err == errDefragNotNeeded {
+		// benign
+		return
+	} else if err != nil {
+		w.log.Println("WARN: couldn't create defrag transaction:", err)
 		return
 	}
 	// Submit the defrag to the transaction pool.
-	err = w.tpool.AcceptTransactionSet(txns)
+	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
-		w.log.Println("Error accepting transaction set in defrag transaction: ", err)
+		w.log.Println("WARN: defrag transaction was rejected:", err)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/bolt"
 )
 
 // TestDefragWallet mines many blocks and checks that the wallet's outputs are
@@ -43,8 +44,13 @@ func TestDefragWallet(t *testing.T) {
 	}
 
 	// defrag should keep the outputs below the threshold
-	if len(wt.wallet.siacoinOutputs) > defragThreshold {
-		t.Fatalf("defrag should result in fewer than defragThreshold outputs, got %v wanted %v\n", len(wt.wallet.siacoinOutputs), defragThreshold)
+	var siacoinOutputs int
+	wt.wallet.db.View(func(tx *bolt.Tx) error {
+		siacoinOutputs = tx.Bucket(bucketSiacoinOutputs).Stats().KeyN
+		return nil
+	})
+	if siacoinOutputs > defragThreshold {
+		t.Fatalf("defrag should result in fewer than defragThreshold outputs, got %v wanted %v\n", siacoinOutputs, defragThreshold)
 	}
 }
 
@@ -102,7 +108,12 @@ func TestDefragWalletDust(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	if len(wt.wallet.siacoinOutputs) < defragThreshold {
+	var siacoinOutputs int
+	wt.wallet.db.View(func(tx *bolt.Tx) error {
+		siacoinOutputs = tx.Bucket(bucketSiacoinOutputs).Stats().KeyN
+		return nil
+	})
+	if siacoinOutputs < defragThreshold {
 		t.Fatal("defrag consolidated dust outputs")
 	}
 }

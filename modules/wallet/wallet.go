@@ -43,24 +43,25 @@ type spendableKey struct {
 // Wallet is an object that tracks balances, creates keys and addresses,
 // manages building and sending transactions.
 type Wallet struct {
-	// unlocked indicates whether the wallet is currently storing secret keys
-	// in memory. subscribed indicates whether the wallet has subscribed to the
-	// consensus set yet - the wallet is unable to subscribe to the consensus
-	// set until it has been unlocked for the first time. The primary seed is
-	// used to generate new addresses for the wallet.
+	// encrypted indicates whether the wallet has been encrypted (i.e.
+	// initialized). unlocked indicates whether the wallet is currently
+	// storing secret keys in memory. subscribed indicates whether the wallet
+	// has subscribed to the consensus set yet - the wallet is unable to
+	// subscribe to the consensus set until it has been unlocked for the first
+	// time. The primary seed is used to generate new addresses for the
+	// wallet.
+	encrypted   bool
 	unlocked    bool
 	subscribed  bool
-	persist     WalletPersist
 	primarySeed modules.Seed
 
-	// The wallet's dependencies. The items 'consensusSetHeight' and
-	// 'siafundPool' are tracked separately from the consensus set to minimize
-	// the number of queries that the wallet needs to make to the consensus
-	// set; queries to the consensus set are very slow.
-	cs                 modules.ConsensusSet
-	tpool              modules.TransactionPool
-	consensusSetHeight types.BlockHeight
-	siafundPool        types.Currency
+	// The wallet's dependencies. siafundPool is tracked separately from the
+	// consensus set to minimize the number of queries that the wallet needs
+	// to make to the consensus set; queries to the consensus set are very
+	// slow.
+	cs          modules.ConsensusSet
+	tpool       modules.TransactionPool
+	siafundPool types.Currency
 
 	// The following set of fields are responsible for tracking the confirmed
 	// outputs, and for being able to spend them. The seeds are used to derive
@@ -68,35 +69,15 @@ type Wallet struct {
 	// from the seeds, when checking new outputs or spending outputs, the seeds
 	// are not referenced at all. The seeds are only stored so that the user
 	// may access them.
-	//
-	// siacoinOutptus, siafundOutputs, and spentOutputs are kept so that they
-	// can be scanned when trying to fund transactions.
-	seeds          []modules.Seed
-	keys           map[types.UnlockHash]spendableKey
-	siacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
-	siafundOutputs map[types.SiafundOutputID]types.SiafundOutput
-	spentOutputs   map[types.OutputID]types.BlockHeight
+	seeds []modules.Seed
+	keys  map[types.UnlockHash]spendableKey
 
-	// The following fields are kept to track transaction history.
-	// processedTransactions are stored in chronological order, and have a map for
-	// constant time random access. The set of full transactions is kept as
-	// well, ordering can be determined by the processedTransactions slice.
-	//
-	// The unconfirmed transactions are kept the same way, except without the
-	// random access. It is assumed that the list of unconfirmed transactions
-	// will be small enough that this will not be a problem.
-	//
-	// historicOutputs is kept so that the values of transaction inputs can be
-	// determined. historicOutputs is never cleared, but in general should be
-	// small compared to the list of transactions.
-	processedTransactions            []modules.ProcessedTransaction
-	processedTransactionMap          map[types.TransactionID]*modules.ProcessedTransaction
+	// unconfirmedProcessedTransactions tracks unconfirmed transactions.
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
 
-	// TODO: Storing the whole set of historic outputs is expensive and
-	// unnecessary. There's a better way to do it.
-	historicOutputs     map[types.OutputID]types.Currency
-	historicClaimStarts map[types.SiafundOutputID]types.Currency
+	// The wallet's database tracks its seeds, keys, outputs, and
+	// transactions.
+	db *persist.BoltDatabase
 
 	persistDir string
 	log        *persist.Logger
@@ -124,15 +105,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		cs:    cs,
 		tpool: tpool,
 
-		keys:           make(map[types.UnlockHash]spendableKey),
-		siacoinOutputs: make(map[types.SiacoinOutputID]types.SiacoinOutput),
-		siafundOutputs: make(map[types.SiafundOutputID]types.SiafundOutput),
-		spentOutputs:   make(map[types.OutputID]types.BlockHeight),
-
-		processedTransactionMap: make(map[types.TransactionID]*modules.ProcessedTransaction),
-
-		historicOutputs:     make(map[types.OutputID]types.Currency),
-		historicClaimStarts: make(map[types.SiafundOutputID]types.Currency),
+		keys: make(map[types.UnlockHash]spendableKey),
 
 		persistDir: persistDir,
 	}
@@ -159,9 +132,6 @@ func (w *Wallet) Close() error {
 			errs = append(errs, err)
 		}
 	}
-
-	w.mu.Lock()
-	defer w.mu.Unlock()
 
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)

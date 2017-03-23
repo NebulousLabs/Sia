@@ -53,6 +53,13 @@ By default the wallet encryption / unlock password is the same as the generated 
 		Run: wrap(walletinitcmd),
 	}
 
+	walletInitSeedCmd = &cobra.Command{
+		Use:   "init-seed",
+		Short: "Initialize and encrypt a new wallet using a pre-existing seed",
+		Long:  `Initialize and encrypt a new wallet using a pre-existing seed.`,
+		Run:   wrap(walletinitseedcmd),
+	}
+
 	walletLoadCmd = &cobra.Command{
 		Use:   "load",
 		Short: "Load a wallet seed, v0.3.3.x wallet, or siag keyset",
@@ -70,7 +77,7 @@ By default the wallet encryption / unlock password is the same as the generated 
 	walletLoadSeedCmd = &cobra.Command{
 		Use:   `seed`,
 		Short: "Add a seed to the wallet",
-		Long:  "Uses the given password to create a new wallet with that as the primary seed",
+		Long:  "Loads an auxiliary seed into the wallet.",
 		Run:   wrap(walletloadseedcmd),
 	}
 
@@ -91,8 +98,8 @@ By default the wallet encryption / unlock password is the same as the generated 
 
 	walletSeedsCmd = &cobra.Command{
 		Use:   "seeds",
-		Short: "Retrieve information about your seeds",
-		Long:  "Retrieves the current seed, how many addresses are remaining, and the rest of your seeds from the wallet",
+		Short: "View information about your seeds",
+		Long:  "View your primary and auxiliary wallet seeds.",
 		Run:   wrap(walletseedscmd),
 	}
 
@@ -100,7 +107,7 @@ By default the wallet encryption / unlock password is the same as the generated 
 		Use:   "send",
 		Short: "Send either siacoins or siafunds to an address",
 		Long:  "Send either siacoins or siafunds to an address",
-		// Run field is not set, as the load command itself is not a valid command.
+		// Run field is not set, as the send command itself is not a valid command.
 		// A subcommand must be provided.
 	}
 
@@ -121,6 +128,14 @@ A miner fee of 10 SC is levied on all transactions.`,
 		Long: `Send siafunds to an address, and transfer the claim siacoins to your wallet.
 Run 'wallet send --help' to see a list of available units.`,
 		Run: wrap(walletsendsiafundscmd),
+	}
+
+	walletSweepCmd = &cobra.Command{
+		Use:   "sweep",
+		Short: "Sweep siacoins and siafunds from a seed.",
+		Long: `Sweep siacoins and siafunds from a seed. The outputs belonging to the seed
+will be sent to your wallet.`,
+		Run: wrap(walletsweepcmd),
 	}
 
 	walletBalanceCmd = &cobra.Command{
@@ -193,6 +208,31 @@ func walletinitcmd() {
 	}
 }
 
+// walletinitseedcmd initializes the wallet from a preexisting seed.
+func walletinitseedcmd() {
+	seed, err := speakeasy.Ask("Seed: ")
+	if err != nil {
+		die("Reading seed failed:", err)
+	}
+	qs := fmt.Sprintf("&seed=%s&dictionary=%s", seed, "english")
+	if initPassword {
+		password, err := speakeasy.Ask("Wallet password: ")
+		if err != nil {
+			die("Reading password failed:", err)
+		}
+		qs += fmt.Sprintf("&encryptionpassword=%s", password)
+	}
+	err = post("/wallet/init", qs)
+	if err != nil {
+		die("Could not initialize wallet from seed:", err)
+	}
+	if initPassword {
+		fmt.Println("Wallet initialized and encrypted with given password.")
+	} else {
+		fmt.Println("Wallet initialized and encrypted with seed.")
+	}
+}
+
 // walletload033xcmd loads a v0.3.3.x wallet into the current wallet.
 func walletload033xcmd(source string) {
 	password, err := speakeasy.Ask(askPasswordText)
@@ -254,10 +294,17 @@ func walletseedscmd() {
 	if err != nil {
 		die("Error retrieving the current seed:", err)
 	}
-	fmt.Printf("Primary Seed: %s\n"+
-		"Addresses Remaining %d\n"+
-		"All Seeds:\n", seedInfo.PrimarySeed, seedInfo.AddressesRemaining)
+	fmt.Println("Primary Seed:")
+	fmt.Println(seedInfo.PrimarySeed)
+	if len(seedInfo.AllSeeds) == 1 {
+		// AllSeeds includes the primary seed
+		return
+	}
+	fmt.Println("Auxilliary Seeds:")
 	for _, seed := range seedInfo.AllSeeds {
+		if seed == seedInfo.PrimarySeed {
+			continue
+		}
 		fmt.Println(seed)
 	}
 }
@@ -320,6 +367,21 @@ Siafunds:            %v SF
 Siafund Claims:      %v H
 `, encStatus, currencyUnits(status.ConfirmedSiacoinBalance), delta,
 		status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
+}
+
+// walletsweepcmd sweeps coins and funds from a seed.
+func walletsweepcmd() {
+	seed, err := speakeasy.Ask("Seed: ")
+	if err != nil {
+		die("Reading seed failed:", err)
+	}
+
+	var swept api.WalletSweepPOST
+	err = postResp("/wallet/sweep/seed", fmt.Sprintf("seed=%s&dictionary=%s", seed, "english"), &swept)
+	if err != nil {
+		die("Could not sweep seed:", err)
+	}
+	fmt.Printf("Swept %v and %v SF from seed.\n", currencyUnits(swept.Coins), swept.Funds)
 }
 
 // wallettransactionscmd lists all of the transactions related to the wallet,
@@ -387,7 +449,6 @@ func walletunlockcmd() {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	fmt.Println("Unlocking the wallet. This may take several minutes...")
 	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
 	err = post("/wallet/unlock", qs)
 	if err != nil {

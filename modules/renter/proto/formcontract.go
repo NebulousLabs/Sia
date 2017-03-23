@@ -28,13 +28,12 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
-	ourPublicKey := types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       ourPK[:],
-	}
 	// create unlock conditions
 	uc := types.UnlockConditions{
-		PublicKeys:         []types.SiaPublicKey{ourPublicKey, host.PublicKey},
+		PublicKeys: []types.SiaPublicKey{
+			types.Ed25519PublicKey(ourPK),
+			host.PublicKey,
+		},
 		SignaturesRequired: 2,
 	}
 

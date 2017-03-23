@@ -280,10 +280,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	// the host knows how to spend.
 	expectedUH := types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{
-			{
-				Algorithm: types.SignatureEd25519,
-				Key:       renterPK[:],
-			},
+			types.Ed25519PublicKey(renterPK),
 			publicKey,
 		},
 		SignaturesRequired: 2,
