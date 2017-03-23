@@ -18,10 +18,7 @@ func TestTwofishEncryption(t *testing.T) {
 	// Encrypt and decrypt a zero plaintext, and compare the decrypted to the
 	// original.
 	plaintext := make([]byte, 600)
-	ciphertext, err := key.EncryptBytes(plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ciphertext := key.EncryptBytes(plaintext)
 	decryptedPlaintext, err := key.DecryptBytes(ciphertext)
 	if err != nil {
 		t.Fatal(err)
@@ -36,10 +33,7 @@ func TestTwofishEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ciphertext, err = key.EncryptBytes(plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ciphertext = key.EncryptBytes(plaintext)
 	decryptedPlaintext, err = key.DecryptBytes(ciphertext)
 	if err != nil {
 		t.Fatal(err)
@@ -70,10 +64,7 @@ func TestTwofishEncryption(t *testing.T) {
 	}
 
 	// Try to trigger a panic or error with nil values.
-	_, err = key.EncryptBytes(nil)
-	if err != nil {
-		t.Error(err)
-	}
+	key.EncryptBytes(nil)
 	_, err = key.DecryptBytes(nil)
 	if err != ErrInsufficientLen {
 		t.Error("Expecting ErrInsufficientLen:", err)
@@ -130,10 +121,7 @@ func TestTwofishEntropy(t *testing.T) {
 		t.Fatal(err)
 	}
 	plaintext := make([]byte, cipherSize)
-	ciphertext, err := key.EncryptBytes(plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ciphertext := key.EncryptBytes(plaintext)
 
 	// Gzip the ciphertext
 	var b bytes.Buffer

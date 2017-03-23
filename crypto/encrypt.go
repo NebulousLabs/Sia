@@ -42,20 +42,17 @@ func (key TwofishKey) NewCipher() cipher.Block {
 
 // EncryptBytes encrypts a []byte using the key. EncryptBytes uses GCM and
 // prepends the nonce (12 bytes) to the ciphertext.
-func (key TwofishKey) EncryptBytes(plaintext []byte) (Ciphertext, error) {
+func (key TwofishKey) EncryptBytes(plaintext []byte) Ciphertext {
 	// Create the cipher.
 	// NOTE: NewGCM only returns an error if twofishCipher.BlockSize != 16.
 	aead, _ := cipher.NewGCM(key.NewCipher())
 
 	// Create the nonce.
-	nonce, err := RandBytes(aead.NonceSize())
-	if err != nil {
-		return nil, err
-	}
+	nonce := RandBytes(aead.NonceSize())
 
 	// Encrypt the data. No authenticated data is provided, as EncryptBytes is
 	// meant for file encryption.
-	return aead.Seal(nonce, nonce, plaintext, nil), nil
+	return aead.Seal(nonce, nonce, plaintext, nil)
 }
 
 // DecryptBytes decrypts the ciphertext created by EncryptBytes. The nonce is

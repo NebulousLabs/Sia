@@ -2,109 +2,96 @@ package crypto
 
 import (
 	"crypto/rand"
-	"math/big"
-	"sync/atomic"
+	"hash"
+	"io"
+	"math"
+	"sync"
+	"unsafe"
 )
 
-var (
-	// Two counters is used in case the first overflows. The first is not at
-	// risk of overflowing, but we're paranoid.
-	counter     uint64
-	counter2    uint64
-	entropyBase Hash
-)
+// A randReader produces random values via repeated hashing. The entropy field
+// is the concatenation of an initial seed and a 128-bit counter. Each time
+// the entropy is hashed, the counter is incremented.
+type randReader struct {
+	entropy [16 + HashSize]byte
+	h       hash.Hash
+	buf     [32]byte
+	mu      sync.Mutex
+}
 
-// init will create an entropy pool that the RNG will draw from. On most
-// systems, hashing out of a preset RNG pool will be substantially faster than
-// using crypto/rand, which relies on syscalls.
-func init() {
+// Read fills b with random data. It always returns len(b), nil.
+func (r *randReader) Read(b []byte) (int, error) {
+	r.mu.Lock()
+	n := 0
+	for n < len(b) {
+		// Increment counter.
+		*(*uint64)(unsafe.Pointer(&r.entropy[0]))++
+		if *(*uint64)(unsafe.Pointer(&r.entropy[0])) == 0 {
+			*(*uint64)(unsafe.Pointer(&r.entropy[8]))++
+		}
+		// Hash the counter + initial seed.
+		r.h.Reset()
+		r.h.Write(r.entropy[:])
+		r.h.Sum(r.buf[:0])
+
+		// Fill out 'b'.
+		n += copy(b[n:], r.buf[:])
+	}
+	r.mu.Unlock()
+	return n, nil
+}
+
+// Reader is a global, shared instance of a cryptographically strong pseudo-
+// random generator. Reader is safe for concurrent use by multiple goroutines.
+var Reader = func() *randReader {
+	r := &randReader{h: NewHash()}
 	// Use 64 bytes in case the first 32 aren't completely random.
-	base := make([]byte, 64)
-	_, err := rand.Read(base)
+	_, err := io.CopyN(r.h, rand.Reader, 64)
 	if err != nil {
-		panic("unable to set entropy for the crypto package")
+		panic("crypto: no entropy available")
 	}
-	entropyBase = HashObject(base)
-}
+	r.h.Sum(r.entropy[16:])
+	return r
+}()
 
-// RandBytes returns n bytes of random data.
-func RandBytes(n int) ([]byte, error) {
+// Read is a helper function that calls Reader.Read on b. It always fills b
+// completely.
+func Read(b []byte) { Reader.Read(b) }
+
+// Bytes is a helper function that returns n bytes of random data.
+func RandBytes(n int) []byte {
 	b := make([]byte, n)
-	for i := 0; i < n; i += HashSize {
-		// Fetch and update the counter values before executing the hash.
-		var newCounter, newCounter2 uint64
-		newCounter = atomic.AddUint64(&counter, 1)
-		if newCounter == 0 {
-			newCounter2 = atomic.AddUint64(&counter2, 1)
-		} else {
-			newCounter2 = atomic.LoadUint64(&counter2)
-		}
-		// Grab some entropy using the unique counter set.
-		entropy := HashAll(newCounter, newCounter2, entropyBase)
-
-		// Fill out 'b'.
-		copy(b[i:], entropy[:])
-	}
-	return b, nil
+	Read(b)
+	return b
 }
 
-// RandIntn returns a non-negative random integer in the range [0,n). It panics
-// if n <= 0.
-func RandIntn(n int) (int, error) {
+// RandIntn returns a uniform random value in [0,n). It panics if n <= 0.
+func RandIntn(n int) int {
 	if n <= 0 {
-		panic("RandIntn must be called with a positive, nonzero number")
+		panic("crypto: argument to Intn is <= 0")
 	}
-
-	// Fetch and update the counter values before executing the hash.
-	var newCounter, newCounter2 uint64
-	newCounter = atomic.AddUint64(&counter, 1)
-	if newCounter == 0 {
-		newCounter2 = atomic.AddUint64(&counter2, 1)
-	} else {
-		newCounter2 = atomic.LoadUint64(&counter2)
+	// To eliminate modulo bias, keep selecting at random until we fall within
+	// a range that is evenly divisible by n.
+	// NOTE: since n is at most math.MaxUint64/2, max is minimized when:
+	//    n = math.MaxUint64/4 + 1 -> max = math.MaxUint64 - math.MaxUint64/4
+	// This gives an expected 1.333 tries before choosing a value < max.
+	max := math.MaxUint64 - math.MaxUint64%uint64(n)
+	b := RandBytes(8)
+	r := *(*uint64)(unsafe.Pointer(&b[0]))
+	for r >= max {
+		Read(b)
+		r = *(*uint64)(unsafe.Pointer(&b[0]))
 	}
-	// Grab some entropy using the unique counter set.
-	entropy := HashAll(newCounter, newCounter2, entropyBase)
-
-	// Convert the first 24 bytes into a big.Int, then grab the modulus of n.
-	// 24 bytes means that there is at least 16 bytes of overflow, which means
-	// early numbers are favored by less than 1-in-2^128 - a cryptographically
-	// safe preference.
-	b := new(big.Int)
-	b.SetBytes(entropy[:24])
-
-	// Take the modules of 'b'  and 'n' and return the result as an int.
-	return int(b.Mod(b, big.NewInt(int64(n))).Int64()), nil
+	return int(r % uint64(n))
 }
 
-// Read will fill 'b' with completely random data.
-func Read(b []byte) {
-	n := len(b)
-	for i := 0; i < n; i += HashSize {
-		// Fetch and update the counter values before executing the hash.
-		var newCounter, newCounter2 uint64
-		newCounter = atomic.AddUint64(&counter, 1)
-		if newCounter == 0 {
-			newCounter2 = atomic.AddUint64(&counter2, 1)
-		} else {
-			newCounter2 = atomic.LoadUint64(&counter2)
-		}
-		// Grab some entropy using the unique counter set.
-		entropy := HashAll(newCounter, newCounter2, entropyBase)
-
-		// Fill out 'b'.
-		copy(b[i:], entropy[:])
-	}
-}
-
-// Perm returns, as a slice of n ints, a random permutation of the integers
-// [0,n).
-func Perm(n int) ([]int, error) {
+// Perm returns a random permutation of the integers [0,n).
+func Perm(n int) []int {
 	m := make([]int, n)
-	for i := 0; i < n; i++ {
-		j, _ := RandIntn(i + 1)
+	for i := 1; i < n; i++ {
+		j := RandIntn(i + 1)
 		m[i] = m[j]
 		m[j] = i
 	}
-	return m, nil
+	return m
 }
