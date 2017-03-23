@@ -30,21 +30,11 @@ func BenchmarkSectorLocations(b *testing.B) {
 
 			for j := i * 3e6; j < i*3e6+3e6; j++ {
 				crypto.Read(ids[j][:])
-				index, err := crypto.RandIntn(1 << 32)
-				if err != nil {
-					b.Fatal(err)
+				sectorLocations[j] = sectorLocation{
+					index:         uint32(crypto.RandIntn(1 << 32)),
+					storageFolder: uint16(crypto.RandIntn(1 << 16)),
+					count:         uint16(crypto.RandIntn(1 << 16)),
 				}
-				sectorLocations[j].index = uint32(index)
-				storageFolder, err := crypto.RandIntn(1 << 16)
-				if err != nil {
-					b.Fatal(err)
-				}
-				sectorLocations[j].storageFolder = uint16(storageFolder)
-				count, err := crypto.RandIntn(1 << 16)
-				if err != nil {
-					b.Fatal(err)
-				}
-				sectorLocations[j].count = uint16(count)
 			}
 		}(i)
 	}

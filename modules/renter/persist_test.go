@@ -16,9 +16,9 @@ import (
 // newTestingFile initializes a file object with random parameters.
 func newTestingFile() *file {
 	key, _ := crypto.GenerateTwofishKey()
-	data, _ := crypto.RandBytes(8)
-	nData, _ := crypto.RandIntn(10)
-	nParity, _ := crypto.RandIntn(10)
+	data := crypto.RandBytes(8)
+	nData := crypto.RandIntn(10)
+	nParity := crypto.RandIntn(10)
 	rsc, _ := NewRSCode(nData+1, nParity+1)
 
 	return &file{

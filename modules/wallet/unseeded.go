@@ -96,16 +96,10 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 		return err
 	}
 	encryptionKey := uidEncryptionKey(masterKey, skf.UID)
-	skf.EncryptionVerification, err = encryptionKey.EncryptBytes(verificationPlaintext)
-	if err != nil {
-		return err
-	}
+	skf.EncryptionVerification = encryptionKey.EncryptBytes(verificationPlaintext)
 
 	// Encrypt and save the key.
-	skf.SpendableKey, err = encryptionKey.EncryptBytes(encoding.Marshal(sk))
-	if err != nil {
-		return err
-	}
+	skf.SpendableKey = encryptionKey.EncryptBytes(encoding.Marshal(sk))
 	return w.db.Update(func(tx *bolt.Tx) error {
 		err := checkMasterKey(tx, masterKey)
 		if err != nil {

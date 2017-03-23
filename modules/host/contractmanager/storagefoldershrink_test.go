@@ -179,10 +179,7 @@ func TestShrinkStorageFolderWithSectors(t *testing.T) {
 	roots := make([]crypto.Hash, storageFolderGranularity*3)
 	datas := make([][]byte, storageFolderGranularity*3)
 	for i := 0; i < storageFolderGranularity*3; i++ {
-		root, data, err := randSector()
-		if err != nil {
-			t.Fatal(err)
-		}
+		root, data := randSector()
 		roots[i] = root
 		datas[i] = data
 	}
@@ -367,10 +364,7 @@ func TestShrinkStorageFolderIncompleteWrite(t *testing.T) {
 	roots := make([]crypto.Hash, storageFolderGranularity*3)
 	datas := make([][]byte, storageFolderGranularity*3)
 	for i := 0; i < storageFolderGranularity*3; i++ {
-		root, data, err := randSector()
-		if err != nil {
-			t.Fatal(err)
-		}
+		root, data := randSector()
 		roots[i] = root
 		datas[i] = data
 	}
@@ -548,10 +542,7 @@ func TestShrinkStorageFolderIncompleteWriteForce(t *testing.T) {
 	roots := make([]crypto.Hash, 6)
 	datas := make([][]byte, 6)
 	for i := 0; i < len(roots); i++ {
-		root, data, err := randSector()
-		if err != nil {
-			t.Fatal(err)
-		}
+		root, data := randSector()
 		roots[i] = root
 		datas[i] = data
 	}
@@ -785,10 +776,7 @@ func TestShrinkStorageFolderShutdownAfterMove(t *testing.T) {
 	roots := make([]crypto.Hash, storageFolderGranularity*3)
 	datas := make([][]byte, storageFolderGranularity*3)
 	for i := 0; i < storageFolderGranularity*3; i++ {
-		root, data, err := randSector()
-		if err != nil {
-			t.Fatal(err)
-		}
+		root, data := randSector()
 		roots[i] = root
 		datas[i] = data
 	}
@@ -997,10 +985,7 @@ func TestShrinkStorageFolderWAL(t *testing.T) {
 	roots := make([]crypto.Hash, storageFolderGranularity*3)
 	datas := make([][]byte, storageFolderGranularity*3)
 	for i := 0; i < storageFolderGranularity*3; i++ {
-		root, data, err := randSector()
-		if err != nil {
-			t.Fatal(err)
-		}
+		root, data := randSector()
 		roots[i] = root
 		datas[i] = data
 	}
@@ -1192,10 +1177,7 @@ func TestShrinkSingleStorageFolder(t *testing.T) {
 	roots := make([]crypto.Hash, storageFolderGranularity*3)
 	datas := make([][]byte, storageFolderGranularity*3)
 	for i := 0; i < storageFolderGranularity*3; i++ {
-		root, data, err := randSector()
-		if err != nil {
-			t.Fatal(err)
-		}
+		root, data := randSector()
 		roots[i] = root
 		datas[i] = data
 	}

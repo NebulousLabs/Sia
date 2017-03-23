@@ -172,10 +172,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
-	file, err := crypto.RandBytes(int(filesize))
-	if err != nil {
-		panic(err)
-	}
+	file := crypto.RandBytes(int(filesize))
 	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a file contract that will be successful.
@@ -200,7 +197,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	// Submit a transaction with the file contract.
 	oldSiafundPool := cst.cs.dbGetSiafundPool()
 	txnBuilder := cst.wallet.StartTransaction()
-	err = txnBuilder.FundSiacoins(payout)
+	err := txnBuilder.FundSiacoins(payout)
 	if err != nil {
 		panic(err)
 	}
@@ -420,10 +417,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
-	file, err := crypto.RandBytes(int(filesize))
-	if err != nil {
-		panic(err)
-	}
+	file := crypto.RandBytes(int(filesize))
 	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a spendable unlock hash for the file contract.

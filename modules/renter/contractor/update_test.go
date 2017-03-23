@@ -80,10 +80,7 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(int(modules.SectorSize))
 	// insert the sector
 	root, err := editor.Upload(data)
 	if err != nil {
@@ -151,10 +148,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(int(modules.SectorSize))
 	// insert the sector
 	root, err := editor.Upload(data)
 	if err != nil {

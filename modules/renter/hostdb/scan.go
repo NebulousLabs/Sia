@@ -316,12 +316,7 @@ func (hdb *HostDB) threadedScan() {
 		// the same time of day or week.
 		sleepTime := defaultScanSleep
 		sleepRange := int(maxScanSleep - minScanSleep)
-		sleepRand, err := crypto.RandIntn(sleepRange)
-		if err != nil {
-			build.Critical(err)
-		} else {
-			sleepTime = minScanSleep + time.Duration(sleepRand)
-		}
+		sleepTime = minScanSleep + time.Duration(crypto.RandIntn(sleepRange))
 
 		// Sleep until it's time for the next scan cycle.
 		select {

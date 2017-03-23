@@ -62,13 +62,10 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey, seed modules.Seed) 
 		}
 
 		// create a seedFile for the seed
-		sf, err := createSeedFile(masterKey, seed)
-		if err != nil {
-			return err
-		}
+		sf := createSeedFile(masterKey, seed)
 
 		// set this as the primary seedFile
-		err = wb.Put(keyPrimarySeedFile, encoding.Marshal(sf))
+		err := wb.Put(keyPrimarySeedFile, encoding.Marshal(sf))
 		if err != nil {
 			return err
 		}
@@ -80,11 +77,7 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey, seed modules.Seed) 
 		// Establish the encryption verification using the masterKey. After this
 		// point, the wallet is encrypted.
 		uk := uidEncryptionKey(masterKey, dbGetWalletUID(tx))
-		verification, err := uk.EncryptBytes(verificationPlaintext)
-		if err != nil {
-			return err
-		}
-		err = wb.Put(keyEncryptionVerification, verification[:])
+		err = wb.Put(keyEncryptionVerification, uk.EncryptBytes(verificationPlaintext))
 		if err != nil {
 			return err
 		}

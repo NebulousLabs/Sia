@@ -120,11 +120,7 @@ func TestIntegrationManyHeaders(t *testing.T) {
 	}
 
 	// Submit the headers randomly and make sure they are all considered valid.
-	selectionOrder, err := crypto.Perm(len(solvedHeaders))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, selection := range selectionOrder {
+	for _, selection := range crypto.Perm(len(solvedHeaders)) {
 		err = mt.miner.SubmitHeader(solvedHeaders[selection])
 		if err != nil && err != modules.ErrNonExtendingBlock {
 			t.Error(err)

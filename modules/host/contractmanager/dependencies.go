@@ -119,10 +119,7 @@ func (productionDependencies) atLeastOne() uint64 {
 	var val uint64
 	for {
 		val++
-		coin, err := crypto.RandIntn(2)
-		if err != nil {
-			panic(err)
-		}
+		coin := crypto.RandIntn(2)
 		if coin == 0 {
 			break
 		}

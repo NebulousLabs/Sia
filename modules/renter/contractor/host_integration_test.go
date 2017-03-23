@@ -237,10 +237,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(int(modules.SectorSize))
 	_, err = editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -286,10 +283,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(int(modules.SectorSize))
 	root, err := editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -350,10 +344,7 @@ func TestIntegrationDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(int(modules.SectorSize))
 	_, err = editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -414,10 +405,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(int(modules.SectorSize))
 	// insert the sector
 	_, err = editor.Upload(data)
 	if err != nil {
@@ -473,10 +461,7 @@ func TestIntegrationModify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(int(modules.SectorSize))
 	// insert the sector
 	_, err = editor.Upload(data)
 	if err != nil {
@@ -541,10 +526,7 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(int(modules.SectorSize))
 	// insert the sector
 	root, err := editor.Upload(data)
 	if err != nil {
@@ -619,10 +601,7 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err = crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data = crypto.RandBytes(int(modules.SectorSize))
 	// insert the sector
 	_, err = editor.Upload(data)
 	if err != nil {
@@ -669,10 +648,7 @@ func TestIntegrationResync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(int(modules.SectorSize))
 	root, err := editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -995,10 +971,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := crypto.RandBytes(int(modules.SectorSize))
 	root, err := editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)

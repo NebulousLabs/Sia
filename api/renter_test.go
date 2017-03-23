@@ -24,11 +24,7 @@ const (
 
 // createRandFile creates a file on disk and fills it with random bytes.
 func createRandFile(path string, size int) error {
-	data, err := crypto.RandBytes(size)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(path, data, 0600)
+	return ioutil.WriteFile(path, crypto.RandBytes(size), 0600)
 }
 
 // TestRenterDownloadError tests that the /renter/download route sets the download's error field if it fails.

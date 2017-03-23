@@ -380,11 +380,7 @@ func TestHealthyNodeListPruning(t *testing.T) {
 		// To help speed the test up, also connect this gateway to a random
 		// previous peer.
 		if i > 2 {
-			choice, err := crypto.RandIntn(i - 2)
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = gs[i].Connect(gs[choice].myAddr)
+			err := gs[i].Connect(gs[crypto.RandIntn(i-2)].myAddr)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -31,10 +31,13 @@ func (m *Miner) blockForWork() types.Block {
 	if err != nil {
 		m.log.Println(err)
 	}
-	b.MinerPayouts = []types.SiacoinOutput{{Value: b.CalculateSubsidy(m.persist.Height + 1), UnlockHash: m.persist.Address}}
+	b.MinerPayouts = []types.SiacoinOutput{{
+		Value:      b.CalculateSubsidy(m.persist.Height + 1),
+		UnlockHash: m.persist.Address,
+	}}
 
 	// Add an arb-data txn to the block to create a unique merkle root.
-	randBytes, _ := crypto.RandBytes(types.SpecifierLen)
+	randBytes := crypto.RandBytes(types.SpecifierLen)
 	randTxn := types.Transaction{
 		ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], randBytes...)},
 	}

@@ -151,10 +151,7 @@ func mostSignificantBit(i uint64) uint64 {
 func randFreeSector(usage []uint64) (uint32, error) {
 	// Pick a random starting location. Scanning the sector in a short amount
 	// of time requires starting from a random place.
-	start, err := crypto.RandIntn(len(usage))
-	if err != nil {
-		panic(err)
-	}
+	start := crypto.RandIntn(len(usage))
 
 	// Find the first element of the array that is not completely full.
 	var i int
@@ -209,11 +206,7 @@ func vacancyStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 	var winningIndex int
 
 	// Go through the folders in random order.
-	ordering, err := crypto.Perm(len(sfs))
-	if err != nil {
-		panic(err)
-	}
-	for _, index := range ordering {
+	for _, index := range crypto.Perm(len(sfs)) {
 		sf := sfs[index]
 
 		// Skip past this storage folder if there is not enough room for at

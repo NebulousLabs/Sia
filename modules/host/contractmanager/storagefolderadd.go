@@ -133,12 +133,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		// spot in the folderLocations map. A random starting place is chosen
 		// to keep good average and worst-case runtime.
 		var iterator int
-		var index uint16
-		rand, err := crypto.RandIntn(65536)
-		if err != nil {
-			wal.cm.log.Critical("no entropy for random iteration when adding a storage folder")
-		}
-		index = uint16(rand)
+		index := uint16(crypto.RandIntn(65536))
 		for iterator = 0; iterator < 65536; iterator++ {
 			// check the list of unique folders we created earlier.
 			_, exists := wal.cm.storageFolders[index]
@@ -155,6 +150,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		sf.index = index
 
 		// Create the file that is used with the storage folder.
+		var err error
 		sf.metadataFile, err = wal.cm.dependencies.createFile(sectorLookupName)
 		if err != nil {
 			return build.ExtendErr("could not create storage folder file", err)

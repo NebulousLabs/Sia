@@ -330,11 +330,7 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
 // through the extremely slow process of running a consistency check every
 // block.
 func (cs *ConsensusSet) maybeCheckConsistency(tx *bolt.Tx) {
-	n, err := crypto.RandIntn(1000)
-	if err != nil {
-		manageErr(tx, err)
-	}
-	if n == 0 {
+	if crypto.RandIntn(1000) == 0 {
 		cs.checkConsistency(tx)
 	}
 }
