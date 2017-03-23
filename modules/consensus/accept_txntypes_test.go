@@ -421,10 +421,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a spendable unlock hash for the file contract.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		panic(err)
-	}
+	sk, pk := crypto.GenerateKeyPair()
 	uc := types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{{
 			Algorithm: types.SignatureEd25519,
@@ -455,7 +452,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 
 	// Submit a transaction with the file contract.
 	txnBuilder := cst.wallet.StartTransaction()
-	err = txnBuilder.FundSiacoins(payout)
+	err := txnBuilder.FundSiacoins(payout)
 	if err != nil {
 		panic(err)
 	}

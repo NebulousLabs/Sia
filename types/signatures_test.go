@@ -11,10 +11,7 @@ import (
 
 // TestEd25519PublicKey tests the Ed25519PublicKey function.
 func TestEd25519PublicKey(t *testing.T) {
-	_, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, pk := crypto.GenerateKeyPair()
 	spk := Ed25519PublicKey(pk)
 	if spk.Algorithm != SignatureEd25519 {
 		t.Error("Ed25519PublicKey created key with wrong algorithm specifier:", spk.Algorithm)
@@ -186,10 +183,7 @@ func TestTransactionValidCoveredFields(t *testing.T) {
 // Transaction type.
 func TestTransactionValidSignatures(t *testing.T) {
 	// Create keys for use in signing and verifying.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		t.Fatal(err)
-	}
+	sk, pk := crypto.GenerateKeyPair()
 
 	// Create UnlockConditions with 3 keys, 2 of which are required. The first
 	// possible key is a standard signature. The second key is an unknown
@@ -254,7 +248,7 @@ func TestTransactionValidSignatures(t *testing.T) {
 	txn.TransactionSignatures[2].Signature = sig2[:]
 
 	// Check that the signing was successful.
-	err = txn.validSignatures(10)
+	err := txn.validSignatures(10)
 	if err != nil {
 		t.Error(err)
 	}

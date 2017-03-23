@@ -49,14 +49,17 @@ func (sk SecretKey) PublicKey() (pk PublicKey) {
 
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and verify
 // messages.
-func GenerateKeyPair() (sk SecretKey, pk PublicKey, err error) {
-	return stdKeyGen.generate()
+func GenerateKeyPair() (sk SecretKey, pk PublicKey) {
+	var entropy [EntropySize]byte
+	Read(entropy[:])
+	return GenerateKeyPairDeterministic(entropy)
 }
 
 // GenerateKeyPairDeterministic generates keys deterministically using the input
 // entropy. The input entropy must be 32 bytes in length.
 func GenerateKeyPairDeterministic(entropy [EntropySize]byte) (SecretKey, PublicKey) {
-	return stdKeyGen.generateDeterministic(entropy)
+	sk, pk := ed25519.GenerateKey(entropy)
+	return *sk, *pk
 }
 
 // ReadSignedObject reads a length-prefixed object prefixed by its signature,

@@ -172,10 +172,7 @@ func TestReviseContract(t *testing.T) {
 	}
 
 	// generate keys
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		t.Fatal(err)
-	}
+	sk, pk := crypto.GenerateKeyPair()
 	renterPubKey := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       pk[:],

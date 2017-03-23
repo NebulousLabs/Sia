@@ -24,10 +24,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
 
 	// create our key
-	ourSK, ourPK, err := crypto.GenerateKeyPair()
-	if err != nil {
-		return modules.RenterContract{}, err
-	}
+	ourSK, ourPK := crypto.GenerateKeyPair()
 	// create unlock conditions
 	uc := types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{
@@ -85,7 +82,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	txnFee := maxFee.Mul64(estTxnSize)
 
 	// build transaction containing fc
-	err = txnBuilder.FundSiacoins(renterCost.Add(txnFee))
+	err := txnBuilder.FundSiacoins(renterCost.Add(txnFee))
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
