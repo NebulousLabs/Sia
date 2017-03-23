@@ -1,14 +1,10 @@
 package hostdb
 
 import (
-	// "crypto/rand"
 	"path/filepath"
 	"testing"
 
-	// "github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	// "github.com/NebulousLabs/Sia/modules/gateway"
-	// "github.com/NebulousLabs/Sia/types"
 )
 
 // quitAfterLoadDeps will quit startup in newHostDB

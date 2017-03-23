@@ -1,7 +1,6 @@
 package hosttree
 
 import (
-	"crypto/rand"
 	"errors"
 	"sort"
 	"sync"
@@ -298,7 +297,7 @@ func (ht *HostTree) SelectRandom(n int, ignore []types.SiaPublicKey) []modules.H
 	}
 
 	for len(hosts) < n && len(ht.hosts) > 0 {
-		randWeight, _ := rand.Int(crypto.Reader, ht.root.weight.Big())
+		randWeight := crypto.RandBigIntn(ht.root.weight.Big())
 		node := ht.root.nodeAtWeight(types.NewCurrency(randWeight))
 
 		if node.entry.AcceptingContracts &&

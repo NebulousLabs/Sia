@@ -5,6 +5,7 @@ import (
 	"hash"
 	"io"
 	"math"
+	"math/big"
 	"sync"
 	"unsafe"
 )
@@ -83,6 +84,12 @@ func RandIntn(n int) int {
 		r = *(*uint64)(unsafe.Pointer(&b[0]))
 	}
 	return int(r % uint64(n))
+}
+
+// RandBigIntn returns a uniform random value in [0,n). It panics if n <= 0.
+func RandBigIntn(n *big.Int) *big.Int {
+	i, _ := rand.Int(Reader, n)
+	return i
 }
 
 // Perm returns a random permutation of the integers [0,n).
