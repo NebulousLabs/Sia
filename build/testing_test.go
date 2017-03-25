@@ -2,13 +2,14 @@ package build
 
 import (
 	"bytes"
-	"crypto/rand"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestCopyDir checks that CopyDir copies directories as expected.
@@ -20,11 +21,7 @@ func TestCopyDir(t *testing.T) {
 
 	data := make([][]byte, 2)
 	for i := range data {
-		data[i] = make([]byte, 4e3)
-		_, err := rand.Read(data[i])
-		if err != nil {
-			t.Fatal(err)
-		}
+		data[i] = fastrand.Bytes(4e3)
 	}
 
 	// Create a file and a directory.

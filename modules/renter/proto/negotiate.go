@@ -79,10 +79,8 @@ func verifyRecentRevision(conn net.Conn, contract modules.RenterContract) error 
 		return errors.New("couldn't read challenge: " + err.Error())
 	}
 	// sign and return
-	sig, err := crypto.SignHash(challenge, contract.SecretKey)
-	if err != nil {
-		return err
-	} else if err := encoding.WriteObject(conn, sig); err != nil {
+	sig := crypto.SignHash(challenge, contract.SecretKey)
+	if err := encoding.WriteObject(conn, sig); err != nil {
 		return errors.New("couldn't send challenge response: " + err.Error())
 	}
 	// read acceptance
@@ -124,7 +122,7 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 		}},
 	}
 	// sign the transaction
-	encodedSig, _ := crypto.SignHash(signedTxn.SigHash(0), secretKey) // no error possible
+	encodedSig := crypto.SignHash(signedTxn.SigHash(0), secretKey)
 	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
 	// send the revision

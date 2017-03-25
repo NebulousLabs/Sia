@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -146,31 +146,25 @@ func (h *Host) managedLogError(err error) {
 	// If we've seen less than logAllLimit of that type of error before, log
 	// the error as a normal logging statement. Otherwise, probabilistically
 	// log the statement. In debugging mode, log all statements.
-	logged := false
-	rand, randErr := crypto.RandIntn(probability + 1)
-	if randErr != nil {
-		h.log.Critical("random number generation failed")
-	}
-	if num < logAllLimit || rand == probability {
-		logged = true
+	shouldLog := num < logAllLimit || fastrand.Intn(probability+1) == probability
+	if shouldLog {
 		h.log.Println(err)
 	} else {
 		h.log.Debugln(err)
+		return
 	}
 
-	// If the error was logged, increment the log counter.
-	if logged {
-		switch err.(type) {
-		case ErrorCommunication:
-			atomic.AddUint64(&h.atomicCommunicationErrors, 1)
-		case ErrorConnection:
-			atomic.AddUint64(&h.atomicConnectionErrors, 1)
-		case ErrorConsensus:
-			atomic.AddUint64(&h.atomicConsensusErrors, 1)
-		case ErrorInternal:
-			atomic.AddUint64(&h.atomicInternalErrors, 1)
-		default:
-			atomic.AddUint64(&h.atomicNormalErrors, 1)
-		}
+	// Increment the log counter.
+	switch err.(type) {
+	case ErrorCommunication:
+		atomic.AddUint64(&h.atomicCommunicationErrors, 1)
+	case ErrorConnection:
+		atomic.AddUint64(&h.atomicConnectionErrors, 1)
+	case ErrorConsensus:
+		atomic.AddUint64(&h.atomicConsensusErrors, 1)
+	case ErrorInternal:
+		atomic.AddUint64(&h.atomicInternalErrors, 1)
+	default:
+		atomic.AddUint64(&h.atomicNormalErrors, 1)
 	}
 }

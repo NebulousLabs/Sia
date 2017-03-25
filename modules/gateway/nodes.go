@@ -5,9 +5,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/fastrand"
 )
 
 var (
@@ -74,10 +74,7 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 	// every node on the network. If the network gets large, this algorithm
 	// will either need to be refactored, or more likely a cap on the size of
 	// g.nodes will need to be added.
-	r, err := crypto.RandIntn(len(g.nodes))
-	if err != nil {
-		return "", err
-	}
+	r := fastrand.Intn(len(g.nodes))
 	for node := range g.nodes {
 		if r <= 0 {
 			return node, nil
@@ -91,6 +88,7 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 // randomly selected nodes to the caller.
 func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 	conn.SetDeadline(time.Now().Add(connStdDeadline))
+	remoteNA := modules.NetAddress(conn.RemoteAddr().String())
 
 	// Assemble a list of nodes to send to the peer.
 	var nodes []modules.NetAddress
@@ -98,34 +96,26 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 		g.mu.RLock()
 		defer g.mu.RUnlock()
 
-		// Create a random permutation of nodes from the gateway to iterate
-		// through.
+		// Gather candidates for sharing.
 		gnodes := make([]modules.NetAddress, 0, len(g.nodes))
 		for node := range g.nodes {
-			gnodes = append(gnodes, node)
-		}
-		perm, err := crypto.Perm(len(g.nodes))
-		if err != nil {
-			g.log.Severe("Unable to get random permutation for sharing nodes")
-		}
-
-		// Iterate through the random permutation of nodes and select the
-		// desirable ones.
-		remoteNA := modules.NetAddress(conn.RemoteAddr().String())
-		for _, i := range perm {
 			// Don't share local peers with remote peers. That means that if 'node'
 			// is loopback, it will only be shared if the remote peer is also
 			// loopback. And if 'node' is private, it will only be shared if the
 			// remote peer is either the loopback or is also private.
-			node := gnodes[i]
 			if node.IsLoopback() && !remoteNA.IsLoopback() {
 				continue
 			}
 			if node.IsLocal() && !remoteNA.IsLocal() {
 				continue
 			}
+			gnodes = append(gnodes, node)
+		}
 
-			nodes = append(nodes, node)
+		// Iterate through the random permutation of nodes and select the
+		// desirable ones.
+		for _, i := range fastrand.Perm(len(gnodes)) {
+			nodes = append(nodes, gnodes[i])
 			if uint64(len(nodes)) == maxSharedNodes {
 				break
 			}

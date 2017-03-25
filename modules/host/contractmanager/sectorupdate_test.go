@@ -20,15 +20,13 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // randSector creates a random sector that can be added to the contract
 // manager.
-func randSector() (root crypto.Hash, data []byte, err error) {
-	data, err = crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		return
-	}
+func randSector() (root crypto.Hash, data []byte) {
+	data = fastrand.Bytes(int(modules.SectorSize))
 	root = crypto.MerkleRoot(data)
 	return
 }
@@ -59,10 +57,7 @@ func TestAddSector(t *testing.T) {
 	}
 
 	// Fabricate a sector and add it to the contract manager.
-	root, data, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, data := randSector()
 	err = cmt.cm.AddSector(root, data)
 	if err != nil {
 		t.Fatal(err)
@@ -214,10 +209,7 @@ func TestAddSectorFillFolder(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			root, data, err := randSector()
-			if err != nil {
-				t.Fatal(err)
-			}
+			root, data := randSector()
 			roots[i] = root
 			datas[i] = data
 		}(i)
@@ -298,10 +290,7 @@ func TestAddSectorFillLargerFolder(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			root, data, err := randSector()
-			if err != nil {
-				t.Fatal(err)
-			}
+			root, data := randSector()
 			roots[i] = root
 			datas[i] = data
 		}(i)
@@ -406,10 +395,7 @@ func TestAddSectorRecovery(t *testing.T) {
 	}
 
 	// Fabricate a sector and add it to the contract manager.
-	root, data, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, data := randSector()
 	// Disrupt the sync loop before adding the sector, such that the add sector
 	// call makes it into the WAL but not into the saved settings.
 	err = cmt.cm.AddSector(root, data)
@@ -551,10 +537,7 @@ func TestAddVirtualSectorSerial(t *testing.T) {
 	}
 
 	// Fabricate a sector and add it to the contract manager.
-	root, data, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, data := randSector()
 	// Add the sector twice in serial to verify that virtual sector adding is
 	// working correctly.
 	err = cmt.cm.AddSector(root, data)
@@ -691,10 +674,7 @@ func TestAddVirtualSectorParallel(t *testing.T) {
 	}
 
 	// Fabricate a sector and add it to the contract manager.
-	root, data, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, data := randSector()
 	// Add the sector twice in serial to verify that virtual sector adding is
 	// working correctly.
 	var wg sync.WaitGroup
@@ -840,10 +820,7 @@ func TestAddVirtualSectorMassiveParallel(t *testing.T) {
 	}
 
 	// Fabricate a sector and add it to the contract manager.
-	root, data, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, data := randSector()
 	// Add the sector many times in parallel to make sure it is handled
 	// gracefully.
 	var wg sync.WaitGroup
@@ -984,18 +961,12 @@ func TestRemoveSector(t *testing.T) {
 	}
 
 	// Add two sectors, and then remove one of them.
-	root, data, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, data := randSector()
 	err = cmt.cm.AddSector(root, data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	root2, data2, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root2, data2 := randSector()
 	err = cmt.cm.AddSector(root2, data2)
 	if err != nil {
 		t.Fatal(err)
@@ -1131,10 +1102,7 @@ func TestRemoveSectorVirtual(t *testing.T) {
 
 	// Add a physical sector, then a virtual sector, and then remove the
 	// virtual one.
-	root, data, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, data := randSector()
 	err = cmt.cm.AddSector(root, data)
 	if err != nil {
 		t.Fatal(err)
@@ -1272,18 +1240,12 @@ func TestDeleteSector(t *testing.T) {
 	}
 
 	// Add two sectors, and then delete one of them.
-	root, data, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, data := randSector()
 	err = cmt.cm.AddSector(root, data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	root2, data2, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root2, data2 := randSector()
 	err = cmt.cm.AddSector(root2, data2)
 	if err != nil {
 		t.Fatal(err)
@@ -1418,18 +1380,12 @@ func TestDeleteSectorVirtual(t *testing.T) {
 	}
 
 	// Add two sectors, and then delete one of them.
-	root, data, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, data := randSector()
 	err = cmt.cm.AddSector(root, data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	root2, data2, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root2, data2 := randSector()
 	err = cmt.cm.AddSector(root2, data2)
 	if err != nil {
 		t.Fatal(err)
@@ -1592,11 +1548,7 @@ func TestSectorBalancing(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			root, data, err := randSector()
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = cmt.cm.AddSector(root, data)
+			err := cmt.cm.AddSector(randSector())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1775,11 +1727,7 @@ func TestFailingStorageFolder(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			root, data, err := randSector()
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = cmt.cm.AddSector(root, data)
+			err := cmt.cm.AddSector(randSector())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1832,11 +1780,7 @@ func TestFailingStorageFolder(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			root, data, err := randSector()
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = cmt.cm.AddSector(root, data)
+			err := cmt.cm.AddSector(randSector())
 			if err != nil {
 				t.Fatal(err)
 			}

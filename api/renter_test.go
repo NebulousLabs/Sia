@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -24,11 +24,7 @@ const (
 
 // createRandFile creates a file on disk and fills it with random bytes.
 func createRandFile(path string, size int) error {
-	data, err := crypto.RandBytes(size)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(path, data, 0600)
+	return ioutil.WriteFile(path, fastrand.Bytes(size), 0600)
 }
 
 // TestRenterDownloadError tests that the /renter/download route sets the download's error field if it fails.

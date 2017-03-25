@@ -1,12 +1,12 @@
 package wallet
 
 import (
-	"crypto/rand"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestScanLargeIndex tests the limits of the seedScanner.scan function.
@@ -22,10 +22,7 @@ func TestScanLargeIndex(t *testing.T) {
 	}
 	defer wt.closeWt()
 	var masterKey crypto.TwofishKey
-	_, err = rand.Read(masterKey[:])
-	if err != nil {
-		t.Fatal(err)
-	}
+	fastrand.Read(masterKey[:])
 	_, err = wt.wallet.Encrypt(masterKey)
 	if err != nil {
 		t.Fatal(err)

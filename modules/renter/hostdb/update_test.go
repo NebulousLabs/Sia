@@ -11,10 +11,7 @@ import (
 // makeSignedAnnouncement creates a []byte that contains an encoded and signed
 // host announcement for the given net address.
 func makeSignedAnnouncement(na modules.NetAddress) ([]byte, error) {
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		return nil, err
-	}
+	sk, pk := crypto.GenerateKeyPair()
 	spk := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       pk[:],

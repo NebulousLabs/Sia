@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/fastrand"
 	"github.com/NebulousLabs/muxado"
 )
 
@@ -77,11 +77,7 @@ func (g *Gateway) randomOutboundPeer() (modules.NetAddress, error) {
 	}
 
 	// Of the remaining options, select one at random.
-	r, err := crypto.RandIntn(len(addrs))
-	if err != nil {
-		g.log.Severe("Random number generation failure:", err)
-	}
-	return addrs[r], nil
+	return addrs[fastrand.Intn(len(addrs))], nil
 }
 
 // permanentListen handles incoming connection requests. If the connection is
@@ -250,11 +246,8 @@ func (g *Gateway) acceptPeer(p *peer) {
 	}
 
 	// Of the remaining options, select one at random.
-	r, err := crypto.RandIntn(len(addrs))
-	if err != nil {
-		g.log.Severe("random number generation failure:", err)
-	}
-	kick := addrs[r]
+	kick := addrs[fastrand.Intn(len(addrs))]
+
 	g.peers[kick].sess.Close()
 	delete(g.peers, kick)
 	g.log.Printf("INFO: disconnected from %v to make room for %v\n", kick, p.NetAddress)

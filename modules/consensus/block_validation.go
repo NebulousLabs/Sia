@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -30,14 +29,14 @@ type stdBlockValidator struct {
 	clock types.Clock
 
 	// marshaler encodes and decodes between objects and byte slices.
-	marshaler encoding.GenericMarshaler
+	marshaler marshaler
 }
 
 // NewBlockValidator creates a new stdBlockValidator with default settings.
 func NewBlockValidator() stdBlockValidator {
 	return stdBlockValidator{
 		clock:     types.StdClock{},
-		marshaler: encoding.StdGenericMarshaler{},
+		marshaler: stdMarshaler{},
 	}
 }
 

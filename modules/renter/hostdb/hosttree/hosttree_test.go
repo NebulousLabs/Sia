@@ -1,19 +1,18 @@
 package hosttree
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
-	"math/big"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 func verifyTree(tree *HostTree, nentries int) error {
@@ -58,10 +57,7 @@ func verifyTree(tree *HostTree, nentries int) error {
 		if tree.root.weight.IsZero() {
 			break
 		}
-		randWeight, err := rand.Int(rand.Reader, tree.root.weight.Big())
-		if err != nil {
-			break
-		}
+		randWeight := fastrand.BigIntn(tree.root.weight.Big())
 		node := tree.root.nodeAtWeight(types.NewCurrency(randWeight))
 		node.remove()
 		delete(tree.hosts, string(node.entry.PublicKey.Key))
@@ -81,17 +77,9 @@ func verifyTree(tree *HostTree, nentries int) error {
 func makeHostDBEntry() modules.HostDBEntry {
 	dbe := modules.HostDBEntry{}
 
-	pk := types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       make([]byte, 32),
-	}
-	_, err := io.ReadFull(rand.Reader, pk.Key)
-	if err != nil {
-		panic(err)
-	}
-
+	_, pk := crypto.GenerateKeyPair()
 	dbe.AcceptingContracts = true
-	dbe.PublicKey = pk
+	dbe.PublicKey = types.Ed25519PublicKey(pk)
 	dbe.ScanHistory = modules.HostDBScans{{
 		Timestamp: time.Now(),
 		Success:   true,
@@ -124,18 +112,7 @@ func TestHostTree(t *testing.T) {
 	var removed []types.SiaPublicKey
 	// Randomly remove hosts from the tree and check that it is still in order.
 	for _, key := range keys {
-		shouldRemove := func() bool {
-			n, err := rand.Int(rand.Reader, big.NewInt(1))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if n.Cmp(big.NewInt(0)) == 0 {
-				return true
-			}
-			return false
-		}()
-
-		if shouldRemove {
+		if fastrand.Intn(1) == 0 {
 			err := tree.Remove(key)
 			if err != nil {
 				t.Fatal(err)
@@ -196,13 +173,10 @@ func TestHostTreeParallel(t *testing.T) {
 				case <-tg.StopChan():
 					return
 				default:
-					randInt, err := rand.Int(rand.Reader, big.NewInt(4))
-					if err != nil {
-						t.Fatal(err)
-					}
+					switch fastrand.Intn(4) {
 
 					// INSERT
-					if randInt.Uint64() == 0 {
+					case 0:
 						entry := makeHostDBEntry()
 						err := tree.Insert(entry)
 						if err != nil {
@@ -213,10 +187,9 @@ func TestHostTreeParallel(t *testing.T) {
 						mu.Lock()
 						nelements++
 						mu.Unlock()
-					}
 
 					// REMOVE
-					if randInt.Uint64() == 1 {
+					case 1:
 						entry := randEntry()
 						if entry == nil {
 							continue
@@ -230,10 +203,9 @@ func TestHostTreeParallel(t *testing.T) {
 						mu.Lock()
 						nelements--
 						mu.Unlock()
-					}
 
 					// MODIFY
-					if randInt.Uint64() == 2 {
+					case 2:
 						entry := randEntry()
 						if entry == nil {
 							continue
@@ -247,10 +219,9 @@ func TestHostTreeParallel(t *testing.T) {
 							t.Error(err)
 						}
 						inserted[string(entry.PublicKey.Key)] = newentry
-					}
 
 					// FETCH
-					if randInt.Uint64() == 3 {
+					case 3:
 						tree.SelectRandom(3, nil)
 					}
 				}
@@ -287,18 +258,13 @@ func TestHostTreeModify(t *testing.T) {
 		}
 	}
 
-	randIndex, err := rand.Int(rand.Reader, big.NewInt(int64(treeSize)))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// should fail with a nonexistent key
-	err = tree.Modify(modules.HostDBEntry{})
+	err := tree.Modify(modules.HostDBEntry{})
 	if err != errNoSuchHost {
 		t.Fatalf("modify should fail with ErrNoSuchHost when provided a nonexistent public key. Got error: %v\n", err)
 	}
 
-	targetKey := keys[randIndex.Uint64()]
+	targetKey := keys[fastrand.Intn(treeSize)]
 
 	oldEntry := tree.hosts[string(targetKey.Key)].entry
 	newEntry := makeHostDBEntry()

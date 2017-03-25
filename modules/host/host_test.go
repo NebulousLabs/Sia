@@ -84,12 +84,9 @@ func (ht *hostTester) initRenting() error {
 // and then stores the key in the host tester.
 func (ht *hostTester) initWallet() error {
 	// Create the keys for the wallet and unlock it.
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return err
-	}
+	key := crypto.GenerateTwofishKey()
 	ht.walletKey = key
-	_, err = ht.wallet.Encrypt(key)
+	_, err := ht.wallet.Encrypt(key)
 	if err != nil {
 		return err
 	}

@@ -14,10 +14,7 @@ func TestAnnouncementHandling(t *testing.T) {
 	t.Parallel()
 
 	// Create the keys that will be used to generate the announcement.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		t.Fatal(err)
-	}
+	sk, pk := crypto.GenerateKeyPair()
 	spk := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       pk[:],

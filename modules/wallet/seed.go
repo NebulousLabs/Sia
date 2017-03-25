@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"crypto/rand"
 	"errors"
 	"runtime"
 	"sync"
@@ -11,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/fastrand"
 )
 
 var (
@@ -66,22 +66,13 @@ func generateKeys(seed modules.Seed, start, n uint64) []spendableKey {
 }
 
 // createSeedFile creates and encrypts a seedFile.
-func createSeedFile(masterKey crypto.TwofishKey, seed modules.Seed) (seedFile, error) {
+func createSeedFile(masterKey crypto.TwofishKey, seed modules.Seed) seedFile {
 	var sf seedFile
-	_, err := rand.Read(sf.UID[:])
-	if err != nil {
-		return seedFile{}, err
-	}
+	fastrand.Read(sf.UID[:])
 	sek := uidEncryptionKey(masterKey, sf.UID)
-	sf.EncryptionVerification, err = sek.EncryptBytes(verificationPlaintext)
-	if err != nil {
-		return seedFile{}, err
-	}
-	sf.Seed, err = sek.EncryptBytes(seed[:])
-	if err != nil {
-		return seedFile{}, err
-	}
-	return sf, nil
+	sf.EncryptionVerification = sek.EncryptBytes(verificationPlaintext)
+	sf.Seed = sek.EncryptBytes(seed[:])
+	return sf
 }
 
 // decryptSeedFile decrypts a seed file using the encryption key.
@@ -134,10 +125,7 @@ func (w *Wallet) loadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 		}
 
 		// create a seedFile for the seed
-		sf, err := createSeedFile(masterKey, seed)
-		if err != nil {
-			return err
-		}
+		sf := createSeedFile(masterKey, seed)
 
 		// add the seedFile
 		var current []seedFile
