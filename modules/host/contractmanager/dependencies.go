@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // Fake errors that get returned when a simulated failure of a dependency is
@@ -119,7 +119,7 @@ func (productionDependencies) atLeastOne() uint64 {
 	var val uint64
 	for {
 		val++
-		coin := crypto.RandIntn(2)
+		coin := fastrand.Intn(2)
 		if coin == 0 {
 			break
 		}

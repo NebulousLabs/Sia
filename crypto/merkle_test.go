@@ -1,6 +1,10 @@
 package crypto
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/NebulousLabs/fastrand"
+)
 
 // TestTreeBuilder builds a tree and gets the merkle root.
 func TestTreeBuilder(t *testing.T) {
@@ -39,7 +43,7 @@ func TestCalculateLeaves(t *testing.T) {
 func TestStorageProof(t *testing.T) {
 	// Generate proof data.
 	numSegments := uint64(7)
-	data := RandBytes(int(numSegments * SegmentSize))
+	data := fastrand.Bytes(int(numSegments * SegmentSize))
 	rootHash := MerkleRoot(data)
 
 	// Create and verify proofs for all indices.
@@ -61,7 +65,7 @@ func TestStorageProof(t *testing.T) {
 // a last leaf of size less than SegmentSize.
 func TestNonMultipleLeafSizeStorageProof(t *testing.T) {
 	// Generate proof data.
-	data := RandBytes((2 * SegmentSize) + 10)
+	data := fastrand.Bytes((2 * SegmentSize) + 10)
 	rootHash := MerkleRoot(data)
 
 	// Create and verify a proof for the last index.
@@ -79,10 +83,10 @@ func TestCachedTree(t *testing.T) {
 
 	// Build a cached tree out of 4 subtrees, each subtree of height 2 (4
 	// elements).
-	tree1Bytes := RandBytes(SegmentSize * 4)
-	tree2Bytes := RandBytes(SegmentSize * 4)
-	tree3Bytes := RandBytes(SegmentSize * 4)
-	tree4Bytes := RandBytes(SegmentSize * 4)
+	tree1Bytes := fastrand.Bytes(SegmentSize * 4)
+	tree2Bytes := fastrand.Bytes(SegmentSize * 4)
+	tree3Bytes := fastrand.Bytes(SegmentSize * 4)
+	tree4Bytes := fastrand.Bytes(SegmentSize * 4)
 	tree1Root := MerkleRoot(tree1Bytes)
 	tree2Root := MerkleRoot(tree2Bytes)
 	tree3Root := MerkleRoot(tree3Bytes)
@@ -138,10 +142,10 @@ func TestOddDataSize(t *testing.T) {
 
 	// Create some random data that's not evenly padded.
 	for i := 0; i < 25; i++ {
-		randFullSegments := RandIntn(65)
-		randOverflow := RandIntn(63) + 1
-		randProofIndex := RandIntn(randFullSegments + 1)
-		data := RandBytes(SegmentSize*randFullSegments + randOverflow)
+		randFullSegments := fastrand.Intn(65)
+		randOverflow := fastrand.Intn(63) + 1
+		randProofIndex := fastrand.Intn(randFullSegments + 1)
+		data := fastrand.Bytes(SegmentSize*randFullSegments + randOverflow)
 		root := MerkleRoot(data)
 		base, hashSet := MerkleProof(data, uint64(randProofIndex))
 		if !VerifySegment(base, hashSet, uint64(randFullSegments)+1, uint64(randProofIndex), root) {

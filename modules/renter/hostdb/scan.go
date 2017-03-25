@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // queueScan will add a host to the queue to be scanned.
@@ -316,7 +317,7 @@ func (hdb *HostDB) threadedScan() {
 		// the same time of day or week.
 		sleepTime := defaultScanSleep
 		sleepRange := int(maxScanSleep - minScanSleep)
-		sleepTime = minScanSleep + time.Duration(crypto.RandIntn(sleepRange))
+		sleepTime = minScanSleep + time.Duration(fastrand.Intn(sleepRange))
 
 		// Sleep until it's time for the next scan cycle.
 		select {

@@ -7,6 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 var (
@@ -36,7 +37,7 @@ func (m *Miner) blockForWork() types.Block {
 	}}
 
 	// Add an arb-data txn to the block to create a unique merkle root.
-	randBytes := crypto.RandBytes(types.SpecifierLen)
+	randBytes := fastrand.Bytes(types.SpecifierLen)
 	randTxn := types.Transaction{
 		ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], randBytes...)},
 	}
@@ -103,7 +104,7 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	// but I don't think so (underlying slice may be shared with other blocks
 	// accessible outside the miner).
 	var arbData [crypto.EntropySize]byte
-	crypto.Read(arbData[:])
+	fastrand.Read(arbData[:])
 	copy(m.sourceBlock.Transactions[0].ArbitraryData[0], arbData[:])
 	header := m.sourceBlock.Header()
 

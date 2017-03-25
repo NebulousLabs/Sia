@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/fastrand"
 )
 
 var (
@@ -67,7 +68,7 @@ func generateKeys(seed modules.Seed, start, n uint64) []spendableKey {
 // createSeedFile creates and encrypts a seedFile.
 func createSeedFile(masterKey crypto.TwofishKey, seed modules.Seed) seedFile {
 	var sf seedFile
-	crypto.Read(sf.UID[:])
+	fastrand.Read(sf.UID[:])
 	sek := uidEncryptionKey(masterKey, sf.UID)
 	sf.EncryptionVerification = sek.EncryptBytes(verificationPlaintext)
 	sf.Seed = sek.EncryptBytes(seed[:])

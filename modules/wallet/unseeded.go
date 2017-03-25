@@ -8,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -90,7 +91,7 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 
 	// Create a UID and encryption verification.
 	var skf spendableKeyFile
-	crypto.Read(skf.UID[:])
+	fastrand.Read(skf.UID[:])
 	encryptionKey := uidEncryptionKey(masterKey, skf.UID)
 	skf.EncryptionVerification = encryptionKey.EncryptBytes(verificationPlaintext)
 

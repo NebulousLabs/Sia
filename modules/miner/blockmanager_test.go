@@ -7,6 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // solveHeader takes a block header as input and returns a solved block header
@@ -120,7 +121,7 @@ func TestIntegrationManyHeaders(t *testing.T) {
 	}
 
 	// Submit the headers randomly and make sure they are all considered valid.
-	for _, selection := range crypto.Perm(len(solvedHeaders)) {
+	for _, selection := range fastrand.Perm(len(solvedHeaders)) {
 		err = mt.miner.SubmitHeader(solvedHeaders[selection])
 		if err != nil && err != modules.ErrNonExtendingBlock {
 			t.Error(err)

@@ -9,6 +9,8 @@ import (
 	"errors"
 	"io"
 
+	"github.com/NebulousLabs/fastrand"
+
 	"golang.org/x/crypto/twofish"
 )
 
@@ -28,7 +30,7 @@ type (
 // GenerateEncryptionKey produces a key that can be used for encrypting and
 // decrypting files.
 func GenerateTwofishKey() (key TwofishKey) {
-	Read(key[:])
+	fastrand.Read(key[:])
 	return
 }
 
@@ -47,7 +49,7 @@ func (key TwofishKey) EncryptBytes(plaintext []byte) Ciphertext {
 	aead, _ := cipher.NewGCM(key.NewCipher())
 
 	// Create the nonce.
-	nonce := RandBytes(aead.NonceSize())
+	nonce := fastrand.Bytes(aead.NonceSize())
 
 	// Encrypt the data. No authenticated data is provided, as EncryptBytes is
 	// meant for file encryption.

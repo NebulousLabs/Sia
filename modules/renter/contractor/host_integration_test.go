@@ -20,6 +20,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	modWallet "github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // newTestingWallet is a helper function that creates a ready-to-use wallet
@@ -231,7 +232,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := crypto.RandBytes(int(modules.SectorSize))
+	data := fastrand.Bytes(int(modules.SectorSize))
 	_, err = editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -277,7 +278,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := crypto.RandBytes(int(modules.SectorSize))
+	data := fastrand.Bytes(int(modules.SectorSize))
 	root, err := editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -338,7 +339,7 @@ func TestIntegrationDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := crypto.RandBytes(int(modules.SectorSize))
+	data := fastrand.Bytes(int(modules.SectorSize))
 	_, err = editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -399,7 +400,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := crypto.RandBytes(int(modules.SectorSize))
+	data := fastrand.Bytes(int(modules.SectorSize))
 	// insert the sector
 	_, err = editor.Upload(data)
 	if err != nil {
@@ -455,7 +456,7 @@ func TestIntegrationModify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := crypto.RandBytes(int(modules.SectorSize))
+	data := fastrand.Bytes(int(modules.SectorSize))
 	// insert the sector
 	_, err = editor.Upload(data)
 	if err != nil {
@@ -520,7 +521,7 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := crypto.RandBytes(int(modules.SectorSize))
+	data := fastrand.Bytes(int(modules.SectorSize))
 	// insert the sector
 	root, err := editor.Upload(data)
 	if err != nil {
@@ -595,7 +596,7 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data = crypto.RandBytes(int(modules.SectorSize))
+	data = fastrand.Bytes(int(modules.SectorSize))
 	// insert the sector
 	_, err = editor.Upload(data)
 	if err != nil {
@@ -642,7 +643,7 @@ func TestIntegrationResync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := crypto.RandBytes(int(modules.SectorSize))
+	data := fastrand.Bytes(int(modules.SectorSize))
 	root, err := editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -965,7 +966,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := crypto.RandBytes(int(modules.SectorSize))
+	data := fastrand.Bytes(int(modules.SectorSize))
 	root, err := editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)

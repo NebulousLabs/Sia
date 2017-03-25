@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -18,7 +19,7 @@ import (
 // randSector creates a random sector, returning the sector along with the
 // Merkle root of the sector.
 func randSector() (crypto.Hash, []byte) {
-	sectorData := crypto.RandBytes(int(modules.SectorSize))
+	sectorData := fastrand.Bytes(int(modules.SectorSize))
 	sectorRoot := crypto.MerkleRoot(sectorData)
 	return sectorRoot, sectorData
 }

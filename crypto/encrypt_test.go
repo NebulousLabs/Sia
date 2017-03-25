@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"testing"
+
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestTwofishEncryption checks that encryption and decryption works correctly.
@@ -24,7 +26,7 @@ func TestTwofishEncryption(t *testing.T) {
 	}
 
 	// Try again with a nonzero plaintext.
-	plaintext = RandBytes(600)
+	plaintext = fastrand.Bytes(600)
 	ciphertext = key.EncryptBytes(plaintext)
 	decryptedPlaintext, err = key.DecryptBytes(ciphertext)
 	if err != nil {
@@ -67,7 +69,7 @@ func TestReaderWriter(t *testing.T) {
 
 	// Generate plaintext.
 	const plaintextSize = 600
-	plaintext := RandBytes(plaintextSize)
+	plaintext := fastrand.Bytes(plaintextSize)
 
 	// Create writer and encrypt plaintext.
 	buf := new(bytes.Buffer)

@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -51,7 +52,7 @@ func (w *Wallet) openDB(filename string) (err error) {
 		// if the wallet does not have a UID, create one
 		if tx.Bucket(bucketWallet).Get(keyUID) == nil {
 			uid := make([]byte, len(uniqueID{}))
-			crypto.Read(uid[:])
+			fastrand.Read(uid[:])
 			tx.Bucket(bucketWallet).Put(keyUID, uid)
 		}
 		// if fields in bucketWallet are nil, set them to zero to prevent unmarshal errors

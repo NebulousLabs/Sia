@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // postEncryptionTesting runs a series of checks on the wallet after it has
@@ -140,7 +141,7 @@ func TestIntegrationUserSuppliedEncryption(t *testing.T) {
 	}
 	defer wt.closeWt()
 	var masterKey crypto.TwofishKey
-	crypto.Read(masterKey[:])
+	fastrand.Read(masterKey[:])
 	_, err = wt.wallet.Encrypt(masterKey)
 	if err != nil {
 		t.Error(err)

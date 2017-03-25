@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -34,7 +34,7 @@ type Metadata struct {
 // 100 bits of entropy, and a very low probability of colliding with existing
 // files unintentionally.
 func RandomSuffix() string {
-	str := base32.StdEncoding.EncodeToString(crypto.RandBytes(20))
+	str := base32.StdEncoding.EncodeToString(fastrand.Bytes(20))
 	return str[:20]
 }
 

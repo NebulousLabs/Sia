@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/fastrand"
 	"github.com/NebulousLabs/muxado"
 )
 
@@ -794,7 +794,7 @@ func TestOverloadedBootstrap(t *testing.T) {
 	// below the well connected threshold, but there are still enough nodes on
 	// the network that no partitions should occur.
 	var newGS []*Gateway
-	for _, i := range crypto.Perm(len(gs)) {
+	for _, i := range fastrand.Perm(len(gs)) {
 		newGS = append(newGS, gs[i])
 	}
 	cutSize := len(newGS) / 4

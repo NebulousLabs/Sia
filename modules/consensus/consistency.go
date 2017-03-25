@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -330,7 +331,7 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
 // through the extremely slow process of running a consistency check every
 // block.
 func (cs *ConsensusSet) maybeCheckConsistency(tx *bolt.Tx) {
-	if crypto.RandIntn(1000) == 0 {
+	if fastrand.Intn(1000) == 0 {
 		cs.checkConsistency(tx)
 	}
 }

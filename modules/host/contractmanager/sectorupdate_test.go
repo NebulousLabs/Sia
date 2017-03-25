@@ -20,12 +20,13 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // randSector creates a random sector that can be added to the contract
 // manager.
 func randSector() (root crypto.Hash, data []byte) {
-	data = crypto.RandBytes(int(modules.SectorSize))
+	data = fastrand.Bytes(int(modules.SectorSize))
 	root = crypto.MerkleRoot(data)
 	return
 }

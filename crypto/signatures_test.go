@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestUnitSignatureEncoding creates and encodes a public key, and verifies
@@ -31,7 +32,7 @@ func TestUnitSignatureEncoding(t *testing.T) {
 
 	// Create a signature using the secret key.
 	var signedData Hash
-	Read(signedData[:])
+	fastrand.Read(signedData[:])
 	sig := SignHash(signedData, sk)
 
 	// Marshal and unmarshal the signature.
@@ -66,7 +67,7 @@ func TestUnitSigning(t *testing.T) {
 
 		// Generate and sign the data.
 		var randData Hash
-		Read(randData[:])
+		fastrand.Read(randData[:])
 		sig := SignHash(randData, sk)
 
 		// Verify the signature.

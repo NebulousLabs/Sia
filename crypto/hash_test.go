@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/NebulousLabs/fastrand"
 )
 
 type (
@@ -49,7 +51,7 @@ func TestHashing(t *testing.T) {
 	}
 
 	// Call HashBytes on a random byte slice.
-	h2 := HashBytes(RandBytes(435))
+	h2 := HashBytes(fastrand.Bytes(435))
 	if h2 == emptyHash {
 		t.Error("HashObject returned the zero hash!")
 	}

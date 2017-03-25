@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -104,7 +105,7 @@ func TestStorageProofBoundaries(t *testing.T) {
 	// which segment gets selected - it is randomly decided by the block.
 	segmentRange := []int{0, 1, 2, 3, 4, 5, 15, 25, 30, 32, 62, 63, 64, 65, 66, 70, 81, 89, 90, 126, 127, 128, 129}
 	for i := 0; i < 3; i++ {
-		randData := crypto.RandBytes(140)
+		randData := fastrand.Bytes(140)
 
 		// Create a file contract for all sizes of the data between 0 and 2
 		// segments and put them in the transaction pool.
@@ -233,7 +234,7 @@ func TestEmptyStorageProof(t *testing.T) {
 	// which segment gets selected - it is randomly decided by the block.
 	segmentRange := []int{0, 1, 2, 3, 4, 5, 15, 25, 30, 32, 62, 63, 64, 65, 66, 70, 81, 89, 90, 126, 127, 128, 129}
 	for i := 0; i < 3; i++ {
-		randData := crypto.RandBytes(140)
+		randData := fastrand.Bytes(140)
 
 		// Create a file contract for all sizes of the data between 0 and 2
 		// segments and put them in the transaction pool.
@@ -441,7 +442,7 @@ func TestValidStorageProofs(t *testing.T) {
 	// Create a file contract for which a storage proof can be created.
 	var fcid types.FileContractID
 	fcid[0] = 12
-	simFile := crypto.RandBytes(64 * 1024)
+	simFile := fastrand.Bytes(64 * 1024)
 	root := crypto.MerkleRoot(simFile)
 	fc := types.FileContract{
 		FileSize:       64 * 1024,
@@ -492,7 +493,7 @@ func TestValidStorageProofs(t *testing.T) {
 	}
 
 	// Try a proof set where there is padding on the last segment in the file.
-	file := crypto.RandBytes(100)
+	file := fastrand.Bytes(100)
 	root = crypto.MerkleRoot(file)
 	fc = types.FileContract{
 		FileSize:       100,
@@ -545,7 +546,7 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 	defer cst.Close()
 
 	// Try a proof set where there is padding on the last segment in the file.
-	file := crypto.RandBytes(100)
+	file := fastrand.Bytes(100)
 	root := crypto.MerkleRoot(file)
 	fc := types.FileContract{
 		FileSize:       100,
@@ -606,7 +607,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 	// Create a file contract for which a storage proof can be created.
 	var fcid types.FileContractID
 	fcid[0] = 12
-	simFile := crypto.RandBytes(64 * 1024)
+	simFile := fastrand.Bytes(64 * 1024)
 	root := crypto.MerkleRoot(simFile)
 	fc := types.FileContract{
 		FileSize:       64 * 1024,

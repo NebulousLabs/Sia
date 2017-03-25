@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestMerkleRootSetCompatibility checks that the persist encoding for the
@@ -34,7 +35,7 @@ func TestMerkleRootSetCompatibility(t *testing.T) {
 		var chs chStruct
 		for j := 0; j < i; j++ {
 			var ch crypto.Hash
-			crypto.Read(ch[:])
+			fastrand.Read(ch[:])
 			chs.Hashes = append(chs.Hashes, ch)
 		}
 
@@ -115,7 +116,7 @@ func BenchmarkMerkleRootSetEncode(b *testing.B) {
 	var chs chStruct
 	for i := 0; i < 1e3; i++ {
 		var ch crypto.Hash
-		crypto.Read(ch[:])
+		fastrand.Read(ch[:])
 		chs.Hashes = append(chs.Hashes, ch)
 	}
 
@@ -138,7 +139,7 @@ func BenchmarkSliceCryptoHashEncode(b *testing.B) {
 	var chs chStruct
 	for i := 0; i < 1e3; i++ {
 		var ch crypto.Hash
-		crypto.Read(ch[:])
+		fastrand.Read(ch[:])
 		chs.Hashes = append(chs.Hashes, ch)
 	}
 
@@ -167,7 +168,7 @@ func BenchmarkMerkleRootSetSave(b *testing.B) {
 	var chs chStruct
 	for i := 0; i < 1e3; i++ {
 		var ch crypto.Hash
-		crypto.Read(ch[:])
+		fastrand.Read(ch[:])
 		chs.Hashes = append(chs.Hashes, ch)
 	}
 
@@ -204,7 +205,7 @@ func BenchmarkSliceCryptoHashSave(b *testing.B) {
 	var chs chStruct
 	for i := 0; i < 1e3; i++ {
 		var ch crypto.Hash
-		crypto.Read(ch[:])
+		fastrand.Read(ch[:])
 		chs.Hashes = append(chs.Hashes, ch)
 	}
 

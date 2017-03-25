@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // A Wallet tester contains a ConsensusTester and has a bunch of helpful
@@ -49,7 +50,7 @@ func createWalletTester(name string) (*walletTester, error) {
 		return nil, err
 	}
 	var masterKey crypto.TwofishKey
-	crypto.Read(masterKey[:])
+	fastrand.Read(masterKey[:])
 	_, err = w.Encrypt(masterKey)
 	if err != nil {
 		return nil, err

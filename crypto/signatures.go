@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/ed25519"
+	"github.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -51,7 +52,7 @@ func (sk SecretKey) PublicKey() (pk PublicKey) {
 // messages.
 func GenerateKeyPair() (sk SecretKey, pk PublicKey) {
 	var entropy [EntropySize]byte
-	Read(entropy[:])
+	fastrand.Read(entropy[:])
 	return GenerateKeyPairDeterministic(entropy)
 }
 

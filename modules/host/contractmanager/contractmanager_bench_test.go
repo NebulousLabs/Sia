@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // BenchmarkSectorLocations explores the cost of creating the sectorLocations
@@ -29,11 +29,11 @@ func BenchmarkSectorLocations(b *testing.B) {
 			defer wg.Done()
 
 			for j := i * 3e6; j < i*3e6+3e6; j++ {
-				crypto.Read(ids[j][:])
+				fastrand.Read(ids[j][:])
 				sectorLocations[j] = sectorLocation{
-					index:         uint32(crypto.RandIntn(1 << 32)),
-					storageFolder: uint16(crypto.RandIntn(1 << 16)),
-					count:         uint16(crypto.RandIntn(1 << 16)),
+					index:         uint32(fastrand.Intn(1 << 32)),
+					storageFolder: uint16(fastrand.Intn(1 << 16)),
+					count:         uint16(fastrand.Intn(1 << 16)),
 				}
 			}
 		}(i)

@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // findUnfinishedStorageFolderAdditions will scroll through a set of state
@@ -133,7 +133,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		// spot in the folderLocations map. A random starting place is chosen
 		// to keep good average and worst-case runtime.
 		var iterator int
-		index := uint16(crypto.RandIntn(65536))
+		index := uint16(fastrand.Intn(65536))
 		for iterator = 0; iterator < 65536; iterator++ {
 			// check the list of unique folders we created earlier.
 			_, exists := wal.cm.storageFolders[index]

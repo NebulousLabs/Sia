@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // testInputs and testFilenames are global variables because most tests require
@@ -141,9 +141,9 @@ func TestOpenDatabase(t *testing.T) {
 		err = db.Update(func(tx *bolt.Tx) error {
 			for _, testBucket := range testBuckets {
 				b := tx.Bucket(testBucket)
-				x := crypto.RandIntn(10)
+				x := fastrand.Intn(10)
 				for i := 0; i <= x; i++ {
-					err := b.Put(crypto.RandBytes(10), crypto.RandBytes(1e3))
+					err := b.Put(fastrand.Bytes(10), fastrand.Bytes(1e3))
 					if err != nil {
 						t.Errorf("db.Update failed to fill bucket %v for metadata %v, filename %v; error was %v", testBucket, in.md, dbFilename, err)
 						return err

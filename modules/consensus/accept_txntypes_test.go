@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // testBlockSuite tests a wide variety of blocks.
@@ -172,7 +173,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
-	file := crypto.RandBytes(int(filesize))
+	file := fastrand.Bytes(int(filesize))
 	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a file contract that will be successful.
@@ -417,7 +418,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
-	file := crypto.RandBytes(int(filesize))
+	file := fastrand.Bytes(int(filesize))
 	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a spendable unlock hash for the file contract.

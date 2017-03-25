@@ -8,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestStorageProof checks that the host can create and submit a storage proof.
@@ -45,7 +46,7 @@ func TestStorageProof(t *testing.T) {
 
 	// generate data
 	const dataSize = 777
-	data := crypto.RandBytes(dataSize)
+	data := fastrand.Bytes(dataSize)
 	root := crypto.MerkleRoot(data)
 	err = ioutil.WriteFile(filepath.Join(ht.host.persistDir, "foo"), data, 0777)
 	if err != nil {

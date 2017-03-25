@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/fastrand"
 )
 
 var (
@@ -306,7 +307,7 @@ func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 
 	// Create a random seed.
 	var seed modules.Seed
-	crypto.Read(seed[:])
+	fastrand.Read(seed[:])
 
 	// If masterKey is blank, use the hash of the seed.
 	if masterKey == (crypto.TwofishKey{}) {

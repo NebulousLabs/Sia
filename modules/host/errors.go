@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -146,7 +146,7 @@ func (h *Host) managedLogError(err error) {
 	// If we've seen less than logAllLimit of that type of error before, log
 	// the error as a normal logging statement. Otherwise, probabilistically
 	// log the statement. In debugging mode, log all statements.
-	shouldLog := num < logAllLimit || crypto.RandIntn(probability+1) == probability
+	shouldLog := num < logAllLimit || fastrand.Intn(probability+1) == probability
 	if shouldLog {
 		h.log.Println(err)
 	} else {

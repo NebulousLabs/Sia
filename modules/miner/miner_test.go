@@ -14,6 +14,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // A minerTester is the helper object for miner testing.
@@ -52,7 +53,7 @@ func createMinerTester(name string) (*minerTester, error) {
 		return nil, err
 	}
 	var key crypto.TwofishKey
-	crypto.Read(key[:])
+	fastrand.Read(key[:])
 	_, err = w.Encrypt(key)
 	if err != nil {
 		return nil, err

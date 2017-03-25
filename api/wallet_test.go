@@ -15,6 +15,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestWalletGETEncrypted probes the GET call to /wallet when the
@@ -268,7 +269,7 @@ func TestIntegrationWalletInitSeed(t *testing.T) {
 	// Make a call to /wallet/init/seed. Provide no encryption key so that the
 	// encryption key is the seed.
 	var seed modules.Seed
-	crypto.Read(seed[:])
+	fastrand.Read(seed[:])
 	seedStr, _ := modules.SeedToString(seed, "english")
 	qs.Set("seed", seedStr)
 	err = st.stdPostAPI("/wallet/init/seed", qs)

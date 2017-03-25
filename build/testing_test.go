@@ -9,7 +9,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestCopyDir checks that CopyDir copies directories as expected.
@@ -21,7 +21,7 @@ func TestCopyDir(t *testing.T) {
 
 	data := make([][]byte, 2)
 	for i := range data {
-		data[i] = crypto.RandBytes(4e3)
+		data[i] = fastrand.Bytes(4e3)
 	}
 
 	// Create a file and a directory.

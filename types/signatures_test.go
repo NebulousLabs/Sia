@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestEd25519PublicKey tests the Ed25519PublicKey function.
@@ -362,7 +363,7 @@ func TestTransactionValidSignatures(t *testing.T) {
 func TestSiaPublicKeyLoadString(t *testing.T) {
 	spk := SiaPublicKey{
 		Algorithm: SignatureEd25519,
-		Key:       crypto.RandBytes(32),
+		Key:       fastrand.Bytes(32),
 	}
 
 	spkString := spk.String()

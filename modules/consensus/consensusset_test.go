@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // A consensusSetTester is the helper object for consensus set testing,
@@ -31,7 +32,7 @@ type consensusSetTester struct {
 
 // randAddress returns a random address that is not spendable.
 func randAddress() (uh types.UnlockHash) {
-	crypto.Read(uh[:])
+	fastrand.Read(uh[:])
 	return
 }
 

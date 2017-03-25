@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestProcessConsensusUpdate tests that contracts are removed at the expected
@@ -80,7 +81,7 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := crypto.RandBytes(int(modules.SectorSize))
+	data := fastrand.Bytes(int(modules.SectorSize))
 	// insert the sector
 	root, err := editor.Upload(data)
 	if err != nil {
@@ -148,7 +149,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := crypto.RandBytes(int(modules.SectorSize))
+	data := fastrand.Bytes(int(modules.SectorSize))
 	// insert the sector
 	root, err := editor.Upload(data)
 	if err != nil {

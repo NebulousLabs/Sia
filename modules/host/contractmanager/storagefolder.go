@@ -6,9 +6,9 @@ import (
 	"math"
 	"sync/atomic"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/fastrand"
 )
 
 var (
@@ -151,7 +151,7 @@ func mostSignificantBit(i uint64) uint64 {
 func randFreeSector(usage []uint64) (uint32, error) {
 	// Pick a random starting location. Scanning the sector in a short amount
 	// of time requires starting from a random place.
-	start := crypto.RandIntn(len(usage))
+	start := fastrand.Intn(len(usage))
 
 	// Find the first element of the array that is not completely full.
 	var i int
@@ -206,7 +206,7 @@ func vacancyStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 	var winningIndex int
 
 	// Go through the folders in random order.
-	for _, index := range crypto.Perm(len(sfs)) {
+	for _, index := range fastrand.Perm(len(sfs)) {
 		sf := sfs[index]
 
 		// Skip past this storage folder if there is not enough room for at

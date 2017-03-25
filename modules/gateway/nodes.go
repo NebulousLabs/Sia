@@ -5,9 +5,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/fastrand"
 )
 
 var (
@@ -74,7 +74,7 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 	// every node on the network. If the network gets large, this algorithm
 	// will either need to be refactored, or more likely a cap on the size of
 	// g.nodes will need to be added.
-	r := crypto.RandIntn(len(g.nodes))
+	r := fastrand.Intn(len(g.nodes))
 	for node := range g.nodes {
 		if r <= 0 {
 			return node, nil
@@ -114,7 +114,7 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 
 		// Iterate through the random permutation of nodes and select the
 		// desirable ones.
-		for _, i := range crypto.Perm(len(gnodes)) {
+		for _, i := range fastrand.Perm(len(gnodes)) {
 			nodes = append(nodes, gnodes[i])
 			if uint64(len(nodes)) == maxSharedNodes {
 				break

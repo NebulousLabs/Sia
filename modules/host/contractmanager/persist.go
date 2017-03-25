@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/fastrand"
 )
 
 type (
@@ -43,7 +44,7 @@ func (sf *storageFolder) savedStorageFolder() savedStorageFolder {
 // initSettings should only be run for brand new contract maangers.
 func (cm *ContractManager) initSettings() error {
 	// Initialize the sector salt to a random value.
-	crypto.Read(cm.sectorSalt[:])
+	fastrand.Read(cm.sectorSalt[:])
 
 	// Ensure that the initialized defaults have stuck by doing a SaveFileSync
 	// with the new settings values.

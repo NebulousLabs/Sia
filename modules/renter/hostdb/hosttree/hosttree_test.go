@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 func verifyTree(tree *HostTree, nentries int) error {
@@ -56,7 +57,7 @@ func verifyTree(tree *HostTree, nentries int) error {
 		if tree.root.weight.IsZero() {
 			break
 		}
-		randWeight := crypto.RandBigIntn(tree.root.weight.Big())
+		randWeight := fastrand.BigIntn(tree.root.weight.Big())
 		node := tree.root.nodeAtWeight(types.NewCurrency(randWeight))
 		node.remove()
 		delete(tree.hosts, string(node.entry.PublicKey.Key))
@@ -111,7 +112,7 @@ func TestHostTree(t *testing.T) {
 	var removed []types.SiaPublicKey
 	// Randomly remove hosts from the tree and check that it is still in order.
 	for _, key := range keys {
-		if crypto.RandIntn(1) == 0 {
+		if fastrand.Intn(1) == 0 {
 			err := tree.Remove(key)
 			if err != nil {
 				t.Fatal(err)
@@ -172,7 +173,7 @@ func TestHostTreeParallel(t *testing.T) {
 				case <-tg.StopChan():
 					return
 				default:
-					switch crypto.RandIntn(4) {
+					switch fastrand.Intn(4) {
 
 					// INSERT
 					case 0:
@@ -263,7 +264,7 @@ func TestHostTreeModify(t *testing.T) {
 		t.Fatalf("modify should fail with ErrNoSuchHost when provided a nonexistent public key. Got error: %v\n", err)
 	}
 
-	targetKey := keys[crypto.RandIntn(treeSize)]
+	targetKey := keys[fastrand.Intn(treeSize)]
 
 	oldEntry := tree.hosts[string(targetKey.Key)].entry
 	newEntry := makeHostDBEntry()
