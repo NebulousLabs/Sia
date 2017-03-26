@@ -16,16 +16,19 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
-// flags
 var (
+	// Flags.
 	addr              string // override default API address
 	initPassword      bool   // supply a custom password when creating a wallet
 	hostVerbose       bool   // display additional host info
 	renterShowHistory bool   // Show download history in addition to download queue.
 	renterListVerbose bool   // Show additional info about uploaded files.
+
+	// Globals.
+	rootCmd *cobra.Command // Root command cobra object, used by bash completion cmd.
 )
 
-// exit codes
+// Exit codes.
 // inspired by sysexits.h
 const (
 	exitCodeGeneral = 1  // Not in sysexits.h, but is standard practice.
@@ -227,6 +230,8 @@ func main() {
 		Run:   wrap(consensuscmd),
 	}
 
+	rootCmd = root
+
 	// create command tree
 	root.AddCommand(versionCmd)
 	root.AddCommand(stopCmd)
@@ -271,6 +276,8 @@ func main() {
 	gatewayCmd.AddCommand(gatewayConnectCmd, gatewayDisconnectCmd, gatewayAddressCmd, gatewayListCmd)
 
 	root.AddCommand(consensusCmd)
+
+	root.AddCommand(bashcomplCmd)
 
 	// parse flags
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
