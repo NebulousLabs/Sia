@@ -94,6 +94,14 @@ func (c *Contractor) load() error {
 		if contract.StartHeight == 0 {
 			contract.StartHeight = c.currentPeriod + 1
 		}
+		// COMPATv1.1.2
+		// Old versions calculated the TotalCost field incorrectly, omitting
+		// the transaction fee. Recompute the TotalCost from scratch using the
+		// original allocated funds and fees.
+		if len(contract.FileContract.ValidProofOutputs) > 0 {
+			contract.TotalCost = contract.FileContract.ValidProofOutputs[0].Value.
+				Add(contract.TxnFee).Add(contract.SiafundFee).Add(contract.ContractFee)
+		}
 		c.contracts[contract.ID] = contract
 	}
 

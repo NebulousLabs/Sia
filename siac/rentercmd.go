@@ -62,6 +62,13 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Run:   wrap(rentercontractscmd),
 	}
 
+	renterContractsViewCmd = &cobra.Command{
+		Use:   "view [contract-id]",
+		Short: "View details of the specified contract",
+		Long:  "View all details available of the specified contract.",
+		Run:   wrap(rentercontractsviewcmd),
+	}
+
 	renterFilesDeleteCmd = &cobra.Command{
 		Use:     "delete [path]",
 		Aliases: []string{"rm"},
@@ -292,6 +299,48 @@ func rentercontractscmd() {
 			c.ID)
 	}
 	w.Flush()
+}
+
+// rentercontractsviewcmd is the handler for the command `siac renter contracts <id>`.
+// It lists details of a specific contract.
+func rentercontractsviewcmd(cid string) {
+	var rc api.RenterContracts
+	err := getAPI("/renter/contracts", &rc)
+	if err != nil {
+		die("Could not get contract details: ", err)
+	}
+
+	for _, rc := range rc.Contracts {
+		if rc.ID.String() == cid {
+			fmt.Printf(`
+Contract %v
+Host: %v (Public Key: %v)
+
+Start Height: %v
+End Height:   %v
+
+Total cost:        %v (Fees: %v)
+Funds Allocated:   %v
+Upload Spending:   %v
+Storage Spending:  %v
+Download Spending: %v
+Remaining Funds:   %v
+
+File Size: %v
+`, rc.ID, rc.NetAddress, rc.HostPublicKey, rc.StartHeight, rc.EndHeight,
+				currencyUnits(rc.TotalCost),
+				currencyUnits(rc.Fees),
+				currencyUnits(rc.TotalCost.Sub(rc.Fees)),
+				currencyUnits(rc.UploadSpending),
+				currencyUnits(rc.StorageSpending),
+				currencyUnits(rc.DownloadSpending),
+				currencyUnits(rc.RenterFunds),
+				filesizeUnits(int64(rc.Size)))
+			return
+		}
+	}
+
+	fmt.Println("Contract not found")
 }
 
 // renterfilesdeletecmd is the handler for the command `siac renter delete [path]`.
