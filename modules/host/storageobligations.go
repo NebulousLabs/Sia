@@ -826,7 +826,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)
 
-		// Queue another action item to check whether there the storage proof
+		// Queue another action item to check whether the storage proof
 		// got confirmed.
 		h.mu.Lock()
 		err = h.queueActionItem(so.proofDeadline(), so.id())

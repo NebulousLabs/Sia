@@ -192,7 +192,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	// Close the persist (provided as a dependency) upong shutdown.
+	// Close the persist (provided as a dependency) upon shutdown.
 	c.tg.AfterStop(func() {
 		if err := c.persist.Close(); err != nil {
 			c.log.Println("Failed to close contractor persist:", err)

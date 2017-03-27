@@ -147,10 +147,10 @@ func (r *Renter) newDownload(f *file, destination string, currentContracts map[m
 	}
 	f.mu.RLock()
 	for _, contract := range f.contracts {
-		// get latest contract ID
+		// Get latest contract ID.
 		id, ok := currentContracts[contract.IP]
 		if !ok {
-			// no matching NetAddress; try using a revised ID
+			// No matching NetAddress; try using a revised ID.
 			id = r.hostContractor.ResolveID(contract.ID)
 			if id == contract.ID {
 				continue
@@ -186,7 +186,7 @@ func (d *download) fail(err error) {
 }
 
 // recoverChunk takes a chunk that has had a sufficient number of pieces
-// downloaded and verified and decryptps + decodes them into the file.
+// downloaded and verifies, decrypts and decodes them into the file.
 func (cd *chunkDownload) recoverChunk() error {
 	// Assemble the chunk from the download.
 	cd.download.mu.Lock()
@@ -380,8 +380,9 @@ loop:
 		if downloadComplete {
 			// The download has most likely failed. No need to complete this
 			// chunk.
-			ds.activePieces--                                       // for the current incomplete chunk
-			ds.activePieces -= len(incompleteChunk.completedPieces) // for all completed pieces
+			ds.activePieces--                                       // For the current incomplete chunk.
+			ds.activePieces -= len(incompleteChunk.completedPieces) // For all completed pieces.
+
 			// Clear the set of completed pieces so that we do not
 			// over-subtract if the above code is run multiple times.
 			incompleteChunk.completedPieces = make(map[uint64][]byte)

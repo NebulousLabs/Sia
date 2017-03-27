@@ -19,7 +19,7 @@ var uptimeWindow = func() time.Duration {
 	case "dev":
 		return 30 * time.Minute
 	case "standard":
-		return 7 * 24 * time.Hour // 1 week
+		return 7 * 24 * time.Hour // 1 week.
 	case "testing":
 		return 15 * time.Second
 	}
@@ -53,26 +53,26 @@ func (c *Contractor) isOffline(id types.FileContractID) bool {
 		build.Critical("host's scan history was not sorted")
 	}
 
-	// consider a host offline if:
+	// Consider a host offline if:
 	// 1) The host has been scanned at least three times, and
 	// 2) The three most recent scans have all failed, and
 	// 3) The time between the most recent scan and the last successful scan
 	//    (or first scan) is at least uptimeWindow
 	numScans := len(host.ScanHistory)
 	if numScans < uptimeMinScans {
-		// not enough data to make a fair judgment
+		// Not enough data to make a fair judgment.
 		return false
 	}
 	recent := host.ScanHistory[numScans-uptimeMinScans:]
 	for _, scan := range recent {
 		if scan.Success {
-			// one of the scans succeeded
+			// One of the scans succeeded.
 			return false
 		}
 	}
-	// initialize window bounds
+	// Initialize window bounds.
 	windowStart, windowEnd := host.ScanHistory[0].Timestamp, host.ScanHistory[numScans-1].Timestamp
-	// iterate from newest-oldest, seeking to last successful scan
+	// Iterate from newest-oldest, seeking to last successful scan.
 	for i := numScans - 1; i >= 0; i-- {
 		if scan := host.ScanHistory[i]; scan.Success {
 			windowStart = scan.Timestamp

@@ -38,10 +38,10 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 		c.log.Println("INFO: archived expired contract", id)
 	}
 
-	// if we have entered the next period, update currentPeriod
+	// If we have entered the next period, update currentPeriod
 	// NOTE: "period" refers to the duration of contracts, whereas "cycle"
-	// refers to how frequently the period metrics are reset. Should think
-	// about how to make this more explicit.
+	// refers to how frequently the period metrics are reset.
+	// TODO: How to make this more explicit.
 	cycleLen := c.allowance.Period - c.allowance.RenewWindow
 	if c.blockHeight > c.currentPeriod+cycleLen {
 		c.currentPeriod += cycleLen
@@ -58,9 +58,9 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 	c.mu.Unlock()
 
-	// only attempt contract formation/renewal if we are synced
+	// Only attempt contract formation/renewal if we are synced
 	// (harmless if not synced, since hosts will reject our renewal attempts,
-	// but very slow)
+	// but very slow).
 	if cc.Synced {
 		go func() {
 			// Add the goroutine to the thread group.
@@ -70,19 +70,19 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			defer c.tg.Done()
 
-			// only one goroutine should be editing contracts at a time
+			// Only one goroutine should be editing contracts at a time.
 			if !c.editLock.TryLock() {
 				return
 			}
 			defer c.editLock.Unlock()
 
-			// renew any (online) contracts that have entered the renew window
+			// Renew any (online) contracts that have entered the renew window.
 			err = c.managedRenewContracts()
 			if err != nil {
 				c.log.Debugln("WARN: failed to renew contracts after processing a consensus chage:", err)
 			}
 
-			// if we don't have enough (online) contracts, form new ones
+			// If we don't have enough (online) contracts, form new ones.
 			c.mu.RLock()
 			a := c.allowance
 			remaining := int(a.Hosts) - len(c.onlineContracts())
