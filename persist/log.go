@@ -97,9 +97,13 @@ func (cf *closeableFile) Close() error {
 		build.Critical("cannot close the file; already closed")
 	}
 
-	// Ensure that all data has actually hit the disk.
-	if err := cf.Sync(); err != nil {
-		return err
+	// Ensure that all data has actually hit the disk. Don't sync during testing
+	// as it can take too long and causes tests to fail.
+	// TODO: mock the os package so that Sync() is a no-op during testing.
+	if build.Release != "testing" {
+		if err := cf.Sync(); err != nil {
+			return err
+		}
 	}
 	cf.closed = true
 	return cf.File.Close()
