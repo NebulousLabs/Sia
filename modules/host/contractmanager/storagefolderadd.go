@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -94,7 +93,6 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	numSectors := uint64(len(sf.usage)) * 64
 	sectorLookupSize := numSectors * sectorMetadataDiskSize
 	sectorHousingSize := numSectors * modules.SectorSize
-	totalSize := sectorLookupSize + sectorHousingSize
 	sectorLookupName := filepath.Join(sf.path, metadataFile)
 	sectorHousingName := filepath.Join(sf.path, sectorFile)
 

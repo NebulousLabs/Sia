@@ -3,7 +3,6 @@ package contractmanager
 import (
 	"errors"
 	"sync"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -135,7 +134,6 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 		wal.cm.log.Critical("growStorageFolder called without size increase", newHousingSize, currentHousingSize, newMetadataSize, currentMetadataSize)
 		return errors.New("unable to make the requested change, please notify the devs that there is a bug")
 	}
-	housingWriteSize := newHousingSize - currentHousingSize
 	metadataWriteSize := newMetadataSize - currentMetadataSize
 
 	// If there's an error in the rest of the function, reset the storage
@@ -158,24 +156,12 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 		}
 	}(sf, currentMetadataSize, currentHousingSize)
 
-	// Extend the sector file and metadata file on disk.
-	atomic.StoreUint64(&sf.atomicProgressDenominator, uint64(housingWriteSize+metadataWriteSize))
-
-	writeCount := housingWriteSize / 4e6
-	finalWriteSize := housingWriteSize % 4e6
-	writeData := make([]byte, 4e6)
-	for i := int64(0); i < writeCount; i++ {
-		_, err = sf.sectorFile.WriteAt(writeData, currentHousingSize+int64(len(writeData))*i)
-		if err != nil {
-			return build.ExtendErr("could not allocate storage folder", err)
-		}
-		// After each iteration, update the progress numerator.
-		atomic.AddUint64(&sf.atomicProgressNumerator, 4e6)
-	}
-	writeData = writeData[:finalWriteSize]
-	_, err = sf.sectorFile.WriteAt(writeData, currentHousingSize+writeCount*4e6)
+	writeSize := int64(64e3)
+	writeData := make([]byte, writeSize)
+	writeLocation := newHousingSize - writeSize
+	_, err = sf.sectorFile.WriteAt(writeData, writeLocation)
 	if err != nil {
-		return build.ExtendErr("could not allocate sector data file", err)
+		return build.ExtendErr("could not allocate storage folder housing", err)
 	}
 
 	// Write the metadata file.
@@ -184,10 +170,6 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 	if err != nil {
 		return build.ExtendErr("could not allocate sector metadata file", err)
 	}
-
-	// The file creation process is essentially complete at this point, report
-	// complete progress.
-	atomic.StoreUint64(&sf.atomicProgressNumerator, uint64(housingWriteSize+metadataWriteSize))
 
 	// Sync the files.
 	var err1, err2 error
@@ -235,9 +217,5 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 	// Wait to confirm the storage folder addition has completed until the WAL
 	// entry has synced.
 	<-syncChan
-
-	// Set the progress back to '0'.
-	atomic.StoreUint64(&sf.atomicProgressNumerator, 0)
-	atomic.StoreUint64(&sf.atomicProgressDenominator, 0)
 	return nil
 }
