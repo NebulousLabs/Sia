@@ -112,4 +112,4 @@ whitepaper:
 	@pdflatex -output-directory=doc whitepaper.tex > /dev/null
 	pdflatex -output-directory=doc whitepaper.tex
 
-.PHONY: all dependencies fmt install release release-std xc clean test test-v test-long cover cover-integration cover-unit whitepaper
+.PHONY: all dependencies fmt install release release-std clean test test-v test-long cover cover-integration cover-unit whitepaper

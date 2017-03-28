@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
@@ -112,6 +113,13 @@ deleting a sector may impact host revenue.`,
 		Long: `Delete a sector, identified by its Merkle root. Note that deleting a
 sector may impact host revenue.`,
 		Run: wrap(hostsectordeletecmd),
+	}
+
+	hostXcontractsCmd = &cobra.Command{
+		Use:   "xcontracts",
+		Short: "Don't use this command in scripts.",
+		Long:  "Don't use this command in scripts.",
+		Run:   wrap(hostxcontractscmd),
 	}
 )
 
@@ -422,4 +430,27 @@ func hostsectordeletecmd(root string) {
 		die("Could not delete sector:", err)
 	}
 	fmt.Println("Deleted sector", root)
+}
+
+// hostxcontractscmd displays the contracts in the host.
+func hostxcontractscmd() {
+	xcGET := new(api.HostXcontractsGET)
+	err := getAPI("/host/xcontracts", xcGET)
+	if err != nil {
+		die("Could not fetch host contracts:", err)
+	}
+
+	// Print all the stuff?
+	fmt.Println("Experimental: don't use this command in scripts.")
+	fmt.Println()
+
+	for _, contract := range xcGET.Contracts {
+		fmt.Printf("Contract %v:\n", contract.ID)
+		jsonBytes, err := json.MarshalIndent(contract, "\t", "\t")
+		if err != nil {
+			die("Could not fetch the contracts", err)
+		}
+		fmt.Println("\t" + string(jsonBytes))
+		fmt.Println()
+	}
 }

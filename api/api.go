@@ -185,6 +185,9 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.POST("/host", RequirePassword(api.hostHandlerPOST, requiredPassword))              // Change the settings of the host.
 		router.POST("/host/announce", RequirePassword(api.hostAnnounceHandler, requiredPassword)) // Announce the host to the network.
 
+		// A call to view all of the contracts.
+		router.GET("/host/xcontracts", RequirePassword(api.hostXcontractsHandler, requiredPassword)) // X - experimental, not supported
+
 		// Calls pertaining to the storage manager that the host uses.
 		router.GET("/host/storage", api.storageHandler)
 		router.POST("/host/storage/folders/add", RequirePassword(api.storageFoldersAddHandler, requiredPassword))
