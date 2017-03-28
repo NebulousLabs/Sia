@@ -91,7 +91,7 @@ func (j *journal) checkpoint(data contractorPersist) error {
 		j2.Close()
 	}
 
-	// write to a new temp file
+	// Write to a new temp file.
 	tmp, err := os.Create(j.filename + "_tmp")
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ func (j *journal) checkpoint(data contractorPersist) error {
 		return err
 	}
 
-	// atomically replace the old file with the new one
+	// Atomically replace the old file with the new one.
 	if err := tmp.Close(); err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func (j *journal) checkpoint(data contractorPersist) error {
 		return err
 	}
 
-	// reopen the journal
+	// Reopen the journal.
 	j.f, err = os.OpenFile(j.filename, os.O_RDWR|os.O_APPEND, 0)
 	return err
 }
@@ -136,12 +136,12 @@ func newJournal(filename string, data contractorPersist) (*journal, error) {
 	if err != nil {
 		return nil, err
 	}
-	// write metadata
+	// Write metadata.
 	enc := json.NewEncoder(f)
 	if err := enc.Encode(journalMeta); err != nil {
 		return nil, err
 	}
-	// write initial object
+	// Write initial object.
 	if err := enc.Encode(data); err != nil {
 		return nil, err
 	}
@@ -154,13 +154,13 @@ func newJournal(filename string, data contractorPersist) (*journal, error) {
 // openJournal opens the supplied journal and decodes the reconstructed
 // contractorPersist into data.
 func openJournal(filename string, data *contractorPersist) (*journal, error) {
-	// open file handle for reading and writing
+	// Open file handle for reading and writing.
 	f, err := os.OpenFile(filename, os.O_RDWR, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	// decode metadata
+	// Decode the metadata.
 	dec := json.NewDecoder(f)
 	var meta persist.Metadata
 	if err = dec.Decode(&meta); err != nil {
@@ -171,12 +171,12 @@ func openJournal(filename string, data *contractorPersist) (*journal, error) {
 		return nil, fmt.Errorf("journal version (%s) is incompatible with the current version (%s)", meta.Version, journalMeta.Version)
 	}
 
-	// decode the initial object
+	// Decode the initial object.
 	if err = dec.Decode(data); err != nil {
 		return nil, err
 	}
 
-	// make sure all maps are properly initialized
+	// Make sure all maps are properly initialized.
 	if data.CachedRevisions == nil {
 		data.CachedRevisions = map[string]cachedRevision{}
 	}
@@ -187,7 +187,7 @@ func openJournal(filename string, data *contractorPersist) (*journal, error) {
 		data.RenewedIDs = map[string]string{}
 	}
 
-	// decode each set of updates and apply them to data
+	// Decode each set of updates and apply them to data.
 	for {
 		var set updateSet
 		if err = dec.Decode(&set); err == io.EOF || err == io.ErrUnexpectedEOF {
@@ -320,17 +320,20 @@ func (u updateUploadRevision) apply(data *contractorPersist) {
 		build.Critical("updateUploadRevision is missing its FileContractRevision")
 		return
 	}
+
 	rev := u.NewRevisionTxn.FileContractRevisions[0]
 	c := data.Contracts[rev.ParentID.String()]
 	c.LastRevisionTxn = u.NewRevisionTxn
 	c.LastRevision = rev
+
 	if u.NewSectorIndex == len(c.MerkleRoots) {
 		c.MerkleRoots = append(c.MerkleRoots, u.NewSectorRoot)
 	} else if u.NewSectorIndex < len(c.MerkleRoots) {
 		c.MerkleRoots[u.NewSectorIndex] = u.NewSectorRoot
 	} else {
-		// shouldn't happen
+		// Shouldn't happen. TODO: Correctly handle error.
 	}
+
 	c.UploadSpending = u.NewUploadSpending
 	c.StorageSpending = u.NewStorageSpending
 	data.Contracts[rev.ParentID.String()] = c
@@ -377,7 +380,7 @@ func (u updateCachedUploadRevision) apply(data *contractorPersist) {
 	} else if u.SectorIndex < len(c.MerkleRoots) {
 		c.MerkleRoots[u.SectorIndex] = u.SectorRoot
 	} else {
-		// shouldn't happen
+		// Shouldn't happen. TODO: Add correct error handling.
 	}
 	data.CachedRevisions[u.Revision.ParentID.String()] = c
 }

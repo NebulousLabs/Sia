@@ -15,7 +15,7 @@ type (
 		Synced() bool
 		Unsubscribe(modules.ConsensusSetSubscriber)
 	}
-	// in order to restrict the modules.TransactionBuilder interface, we must
+	// In order to restrict the modules.TransactionBuilder interface, we must
 	// provide a shim to bridge the gap between modules.Wallet and
 	// transactionBuilder.
 	walletShim interface {
@@ -60,7 +60,7 @@ type (
 	}
 )
 
-// because wallet is not directly compatible with modules.Wallet (wrong
+// Because wallet is not directly compatible with modules.Wallet (wrong
 // type signature for StartTransaction), we must provide a bridge type.
 type walletBridge struct {
 	w walletShim
@@ -93,7 +93,7 @@ func (p *stdPersist) load(data *contractorPersist) error {
 	var err error
 	p.journal, err = openJournal(p.filename, data)
 	if err != nil {
-		// try loading old persist
+		// Try loading old persist.
 		err = loadv110persist(filepath.Dir(p.filename), data)
 		if err != nil {
 			return err

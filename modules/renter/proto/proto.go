@@ -8,7 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// dependencies
+// Dependencies.
 type (
 	transactionBuilder interface {
 		AddFileContract(types.FileContract) uint64

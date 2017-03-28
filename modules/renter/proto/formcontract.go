@@ -20,12 +20,12 @@ const (
 // FormContract forms a contract with a host and submits the contract
 // transaction to tpool.
 func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool) (modules.RenterContract, error) {
-	// extract vars from params, for convenience
+	// Extract vars from params, for convenience.
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
 
-	// create our key
+	// Create our key.
 	ourSK, ourPK := crypto.GenerateKeyPair()
-	// create unlock conditions
+	// Create unlock conditions.
 	uc := types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{
 			types.Ed25519PublicKey(ourPK),
@@ -34,7 +34,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		SignaturesRequired: 2,
 	}
 
-	// calculate cost to renter and cost to host
+	// Calculate cost to renter and cost to host.
 	// TODO: clarify/abstract this math
 	storageAllocation := host.StoragePrice.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
 	hostCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
@@ -47,12 +47,12 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	payout := storageAllocation.Add(hostPayout).Mul64(10406).Div64(10000) // renter pays for siafund fee
 	renterCost := payout.Sub(hostCollateral)
 
-	// check for negative currency
+	// Check for negative currency.
 	if types.PostTax(startHeight, payout).Cmp(hostPayout) < 0 {
 		return modules.RenterContract{}, errors.New("payout smaller than host payout")
 	}
 
-	// create file contract
+	// Create file contract.
 	fc := types.FileContract{
 		FileSize:       0,
 		FileMerkleRoot: crypto.Hash{}, // no proof possible without data
@@ -62,53 +62,53 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		UnlockHash:     uc.UnlockHash(),
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
-			// outputs need to account for tax
+			// Outputs need to account for tax.
 			{Value: types.PostTax(startHeight, payout).Sub(hostPayout), UnlockHash: refundAddress},
-			// collateral is returned to host
+			// Collateral is returned to host.
 			{Value: hostPayout, UnlockHash: host.UnlockHash},
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
-			// same as above
+			// Same as above.
 			{Value: types.PostTax(startHeight, payout).Sub(hostPayout), UnlockHash: refundAddress},
-			// same as above
+			// Same as above.
 			{Value: hostPayout, UnlockHash: host.UnlockHash},
-			// once we start doing revisions, we'll move some coins to the host and some to the void
+			// Once we start doing revisions, we'll move some coins to the host and some to the void.
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
 	}
 
-	// calculate transaction fee
+	// Calculate transaction fee.
 	_, maxFee := tpool.FeeEstimation()
 	txnFee := maxFee.Mul64(estTxnSize)
 
-	// build transaction containing fc
+	// Build transaction containing fc, e.g. the File Contract.
 	err := txnBuilder.FundSiacoins(renterCost.Add(txnFee))
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
 	txnBuilder.AddFileContract(fc)
 
-	// add miner fee
+	// Add miner fee.
 	txnBuilder.AddMinerFee(txnFee)
 
-	// create initial transaction set
+	// Create initial transaction set.
 	txn, parentTxns := txnBuilder.View()
 	txnSet := append(parentTxns, txn)
 
-	// initiate connection
+	// Initiate connection.
 	conn, err := net.DialTimeout("tcp", string(host.NetAddress), 15*time.Second)
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
 	defer func() { _ = conn.Close() }()
 
-	// allot time for sending RPC ID + verifySettings
+	// Allot time for sending RPC ID + verifySettings.
 	extendDeadline(conn, modules.NegotiateSettingsTime)
 	if err = encoding.WriteObject(conn, modules.RPCFormContract); err != nil {
 		return modules.RenterContract{}, err
 	}
 
-	// verify the host's settings and confirm its identity
+	// Verify the host's settings and confirm its identity.
 	host, err = verifySettings(conn, host)
 	if err != nil {
 		return modules.RenterContract{}, err
@@ -117,10 +117,10 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		return modules.RenterContract{}, errors.New("host is not accepting contracts")
 	}
 
-	// allot time for negotiation
+	// Allot time for negotiation.
 	extendDeadline(conn, modules.NegotiateFileContractTime)
 
-	// send acceptance, txn signed by us, and pubkey
+	// Send acceptance, txn signed by us, and pubkey.
 	if err = modules.WriteNegotiationAcceptance(conn); err != nil {
 		return modules.RenterContract{}, errors.New("couldn't send initial acceptance: " + err.Error())
 	}
@@ -131,12 +131,12 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		return modules.RenterContract{}, errors.New("couldn't send our public key: " + err.Error())
 	}
 
-	// read acceptance and txn signed by host
+	// Read acceptance and txn signed by host.
 	if err = modules.ReadNegotiationAcceptance(conn); err != nil {
 		return modules.RenterContract{}, errors.New("host did not accept our proposed contract: " + err.Error())
 	}
-	// host now sends any new parent transactions, inputs and outputs that
-	// were added to the transaction
+	// Host now sends any new parent transactions, inputs and outputs that
+	// were added to the transaction.
 	var newParents []types.Transaction
 	var newInputs []types.SiacoinInput
 	var newOutputs []types.SiacoinOutput
@@ -150,7 +150,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		return modules.RenterContract{}, errors.New("couldn't read the host's added outputs: " + err.Error())
 	}
 
-	// merge txnAdditions with txnSet
+	// Merge txnAdditions with txnSet.
 	txnBuilder.AddParents(newParents)
 	for _, input := range newInputs {
 		txnBuilder.AddSiacoinInput(input)
@@ -159,13 +159,13 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		txnBuilder.AddSiacoinOutput(output)
 	}
 
-	// sign the txn
+	// Sign the txn.
 	signedTxnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		return modules.RenterContract{}, modules.WriteNegotiationRejection(conn, errors.New("failed to sign transaction: "+err.Error()))
 	}
 
-	// calculate signatures added by the transaction builder
+	// Calculate signatures added by the transaction builder.
 	var addedSignatures []types.TransactionSignature
 	_, _, _, addedSignatureIndices := txnBuilder.ViewAdded()
 	for _, i := range addedSignatureIndices {
@@ -200,7 +200,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	encodedSig := crypto.SignHash(revisionTxn.SigHash(0), ourSK)
 	revisionTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
-	// Send acceptance and signatures
+	// Send acceptance and signatures.
 	if err = modules.WriteNegotiationAcceptance(conn); err != nil {
 		return modules.RenterContract{}, errors.New("couldn't send transaction acceptance: " + err.Error())
 	}
@@ -236,14 +236,14 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	// Submit to blockchain.
 	err = tpool.AcceptTransactionSet(txnSet)
 	if err == modules.ErrDuplicateTransactionSet {
-		// as long as it made it into the transaction pool, we're good
+		// As long as it made it into the transaction pool, we're good.
 		err = nil
 	}
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
 
-	// calculate contract ID
+	// Calculate contract ID.
 	fcid := txn.FileContractID(0)
 
 	return modules.RenterContract{
