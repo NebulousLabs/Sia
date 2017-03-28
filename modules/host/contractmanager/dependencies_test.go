@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestParallelFileAccess using a single file handle + ReadAt and WriteAt to
@@ -41,7 +41,7 @@ func TestParallelFileAccess(t *testing.T) {
 	datas := make([][]byte, numThreads*writesPerThread)
 	for i := 0; i < numThreads*writesPerThread; i++ {
 		datas[i] = make([]byte, dataSize)
-		crypto.Read(datas[i])
+		fastrand.Read(datas[i])
 	}
 
 	// Spin up threads to make concurrent writes to the file in different

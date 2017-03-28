@@ -1,13 +1,13 @@
 package miner
 
 import (
-	"crypto/rand"
 	"errors"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 var (
@@ -31,10 +31,13 @@ func (m *Miner) blockForWork() types.Block {
 	if err != nil {
 		m.log.Println(err)
 	}
-	b.MinerPayouts = []types.SiacoinOutput{{Value: b.CalculateSubsidy(m.persist.Height + 1), UnlockHash: m.persist.Address}}
+	b.MinerPayouts = []types.SiacoinOutput{{
+		Value:      b.CalculateSubsidy(m.persist.Height + 1),
+		UnlockHash: m.persist.Address,
+	}}
 
 	// Add an arb-data txn to the block to create a unique merkle root.
-	randBytes, _ := crypto.RandBytes(types.SpecifierLen)
+	randBytes := fastrand.Bytes(types.SpecifierLen)
 	randTxn := types.Transaction{
 		ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], randBytes...)},
 	}
@@ -101,10 +104,7 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	// but I don't think so (underlying slice may be shared with other blocks
 	// accessible outside the miner).
 	var arbData [crypto.EntropySize]byte
-	_, err = rand.Read(arbData[:])
-	if err != nil {
-		return types.BlockHeader{}, types.Target{}, err
-	}
+	fastrand.Read(arbData[:])
 	copy(m.sourceBlock.Transactions[0].ArbitraryData[0], arbData[:])
 	header := m.sourceBlock.Header()
 

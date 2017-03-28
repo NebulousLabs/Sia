@@ -54,10 +54,7 @@ func createExplorerTester(name string) (*explorerTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return nil, err
-	}
+	key := crypto.GenerateTwofishKey()
 	_, err = w.Encrypt(key)
 	if err != nil {
 		return nil, err
@@ -121,10 +118,7 @@ func (et *explorerTester) reorgToBlank() error {
 	if err != nil {
 		return err
 	}
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return err
-	}
+	key := crypto.GenerateTwofishKey()
 	_, err = w.Encrypt(key)
 	if err != nil {
 		return err

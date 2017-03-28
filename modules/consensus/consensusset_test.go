@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // A consensusSetTester is the helper object for consensus set testing,
@@ -31,13 +31,9 @@ type consensusSetTester struct {
 }
 
 // randAddress returns a random address that is not spendable.
-func randAddress() types.UnlockHash {
-	var uh types.UnlockHash
-	_, err := rand.Read(uh[:])
-	if err != nil {
-		panic(err)
-	}
-	return uh
+func randAddress() (uh types.UnlockHash) {
+	fastrand.Read(uh[:])
+	return
 }
 
 // addSiafunds makes a transaction that moves some testing genesis siafunds
@@ -112,10 +108,7 @@ func blankConsensusSetTester(name string) (*consensusSetTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return nil, err
-	}
+	key := crypto.GenerateTwofishKey()
 	_, err = w.Encrypt(key)
 	if err != nil {
 		return nil, err

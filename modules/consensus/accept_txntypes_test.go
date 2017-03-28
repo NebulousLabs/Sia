@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // testBlockSuite tests a wide variety of blocks.
@@ -172,10 +173,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
-	file, err := crypto.RandBytes(int(filesize))
-	if err != nil {
-		panic(err)
-	}
+	file := fastrand.Bytes(int(filesize))
 	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a file contract that will be successful.
@@ -200,7 +198,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	// Submit a transaction with the file contract.
 	oldSiafundPool := cst.cs.dbGetSiafundPool()
 	txnBuilder := cst.wallet.StartTransaction()
-	err = txnBuilder.FundSiacoins(payout)
+	err := txnBuilder.FundSiacoins(payout)
 	if err != nil {
 		panic(err)
 	}
@@ -420,17 +418,11 @@ func (cst *consensusSetTester) testFileContractRevision() {
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
-	file, err := crypto.RandBytes(int(filesize))
-	if err != nil {
-		panic(err)
-	}
+	file := fastrand.Bytes(int(filesize))
 	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a spendable unlock hash for the file contract.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		panic(err)
-	}
+	sk, pk := crypto.GenerateKeyPair()
 	uc := types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{{
 			Algorithm: types.SignatureEd25519,
@@ -461,7 +453,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 
 	// Submit a transaction with the file contract.
 	txnBuilder := cst.wallet.StartTransaction()
-	err = txnBuilder.FundSiacoins(payout)
+	err := txnBuilder.FundSiacoins(payout)
 	if err != nil {
 		panic(err)
 	}
@@ -504,10 +496,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 		FileContractRevisions: []types.FileContractRevision{fcr},
 		TransactionSignatures: []types.TransactionSignature{ts},
 	}
-	encodedSig, err := crypto.SignHash(txn.SigHash(0), sk)
-	if err != nil {
-		panic(err)
-	}
+	encodedSig := crypto.SignHash(txn.SigHash(0), sk)
 	txn.TransactionSignatures[0].Signature = encodedSig[:]
 	err = cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
 	if err != nil {

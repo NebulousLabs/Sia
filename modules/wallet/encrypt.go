@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"bytes"
-	"crypto/rand"
 	"errors"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/fastrand"
 )
 
 var (
@@ -62,13 +62,10 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey, seed modules.Seed) 
 		}
 
 		// create a seedFile for the seed
-		sf, err := createSeedFile(masterKey, seed)
-		if err != nil {
-			return err
-		}
+		sf := createSeedFile(masterKey, seed)
 
 		// set this as the primary seedFile
-		err = wb.Put(keyPrimarySeedFile, encoding.Marshal(sf))
+		err := wb.Put(keyPrimarySeedFile, encoding.Marshal(sf))
 		if err != nil {
 			return err
 		}
@@ -80,11 +77,7 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey, seed modules.Seed) 
 		// Establish the encryption verification using the masterKey. After this
 		// point, the wallet is encrypted.
 		uk := uidEncryptionKey(masterKey, dbGetWalletUID(tx))
-		verification, err := uk.EncryptBytes(verificationPlaintext)
-		if err != nil {
-			return err
-		}
-		err = wb.Put(keyEncryptionVerification, verification[:])
+		err = wb.Put(keyEncryptionVerification, uk.EncryptBytes(verificationPlaintext))
 		if err != nil {
 			return err
 		}
@@ -314,10 +307,7 @@ func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 
 	// Create a random seed.
 	var seed modules.Seed
-	_, err := rand.Read(seed[:])
-	if err != nil {
-		return modules.Seed{}, err
-	}
+	fastrand.Read(seed[:])
 
 	// If masterKey is blank, use the hash of the seed.
 	if masterKey == (crypto.TwofishKey{}) {

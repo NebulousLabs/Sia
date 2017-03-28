@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"crypto/rand"
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -9,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -91,21 +91,12 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 
 	// Create a UID and encryption verification.
 	var skf spendableKeyFile
-	_, err := rand.Read(skf.UID[:])
-	if err != nil {
-		return err
-	}
+	fastrand.Read(skf.UID[:])
 	encryptionKey := uidEncryptionKey(masterKey, skf.UID)
-	skf.EncryptionVerification, err = encryptionKey.EncryptBytes(verificationPlaintext)
-	if err != nil {
-		return err
-	}
+	skf.EncryptionVerification = encryptionKey.EncryptBytes(verificationPlaintext)
 
 	// Encrypt and save the key.
-	skf.SpendableKey, err = encryptionKey.EncryptBytes(encoding.Marshal(sk))
-	if err != nil {
-		return err
-	}
+	skf.SpendableKey = encryptionKey.EncryptBytes(encoding.Marshal(sk))
 	return w.db.Update(func(tx *bolt.Tx) error {
 		err := checkMasterKey(tx, masterKey)
 		if err != nil {

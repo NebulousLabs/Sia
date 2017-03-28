@@ -1,7 +1,6 @@
 package hosttree
 
 import (
-	"crypto/rand"
 	"errors"
 	"sort"
 	"sync"
@@ -9,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 var (
@@ -297,7 +297,7 @@ func (ht *HostTree) SelectRandom(n int, ignore []types.SiaPublicKey) []modules.H
 	}
 
 	for len(hosts) < n && len(ht.hosts) > 0 {
-		randWeight, _ := rand.Int(rand.Reader, ht.root.weight.Big())
+		randWeight := fastrand.BigIntn(ht.root.weight.Big())
 		node := ht.root.nodeAtWeight(types.NewCurrency(randWeight))
 
 		if node.entry.AcceptingContracts &&

@@ -24,10 +24,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
 
 	// create our key
-	ourSK, ourPK, err := crypto.GenerateKeyPair()
-	if err != nil {
-		return modules.RenterContract{}, err
-	}
+	ourSK, ourPK := crypto.GenerateKeyPair()
 	// create unlock conditions
 	uc := types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{
@@ -85,7 +82,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	txnFee := maxFee.Mul64(estTxnSize)
 
 	// build transaction containing fc
-	err = txnBuilder.FundSiacoins(renterCost.Add(txnFee))
+	err := txnBuilder.FundSiacoins(renterCost.Add(txnFee))
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
@@ -200,10 +197,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		FileContractRevisions: []types.FileContractRevision{initRevision},
 		TransactionSignatures: []types.TransactionSignature{renterRevisionSig},
 	}
-	encodedSig, err := crypto.SignHash(revisionTxn.SigHash(0), ourSK)
-	if err != nil {
-		return modules.RenterContract{}, modules.WriteNegotiationRejection(conn, errors.New("failed to sign revision transaction: "+err.Error()))
-	}
+	encodedSig := crypto.SignHash(revisionTxn.SigHash(0), ourSK)
 	revisionTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
 	// Send acceptance and signatures

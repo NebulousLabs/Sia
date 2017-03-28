@@ -104,10 +104,7 @@ func TestRemoveStorageFolderWithSector(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Give the storage folder a sector.
-	root, data, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, data := randSector()
 	err = cmt.cm.AddSector(root, data)
 	if err != nil {
 		t.Fatal(err)
@@ -259,11 +256,8 @@ func TestRemoveStorageFolderConcurrentAddSector(t *testing.T) {
 		adderWG.Add(1)
 		go func() {
 			for {
-				root, data, err := randSector()
-				if err != nil {
-					t.Error(err)
-				}
-				err = cmt.cm.AddSector(root, data)
+				root, data := randSector()
+				err := cmt.cm.AddSector(root, data)
 				if err != nil {
 					t.Error(err)
 				}

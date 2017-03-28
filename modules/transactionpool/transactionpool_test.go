@@ -1,7 +1,6 @@
 package transactionpool
 
 import (
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // A tpoolTester is used during testing to initialize a transaction pool and
@@ -50,10 +50,7 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 		return nil, err
 	}
 	var key crypto.TwofishKey
-	_, err = rand.Read(key[:])
-	if err != nil {
-		return nil, err
-	}
+	fastrand.Read(key[:])
 	_, err = w.Encrypt(key)
 	if err != nil {
 		return nil, err

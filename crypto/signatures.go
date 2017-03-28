@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/ed25519"
+	"github.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -49,14 +50,17 @@ func (sk SecretKey) PublicKey() (pk PublicKey) {
 
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and verify
 // messages.
-func GenerateKeyPair() (sk SecretKey, pk PublicKey, err error) {
-	return stdKeyGen.generate()
+func GenerateKeyPair() (sk SecretKey, pk PublicKey) {
+	var entropy [EntropySize]byte
+	fastrand.Read(entropy[:])
+	return GenerateKeyPairDeterministic(entropy)
 }
 
 // GenerateKeyPairDeterministic generates keys deterministically using the input
 // entropy. The input entropy must be 32 bytes in length.
 func GenerateKeyPairDeterministic(entropy [EntropySize]byte) (SecretKey, PublicKey) {
-	return stdKeyGen.generateDeterministic(entropy)
+	sk, pk := ed25519.GenerateKey(entropy)
+	return *sk, *pk
 }
 
 // ReadSignedObject reads a length-prefixed object prefixed by its signature,
@@ -81,13 +85,10 @@ func ReadSignedObject(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey)
 	return encoding.Unmarshal(encObj, obj)
 }
 
-// SignHash signs a message using a secret key. Though the current
-// implementation will never return an error, switching libraries in the future
-// may result in errors that can be returned.
-func SignHash(data Hash, sk SecretKey) (sig Signature, err error) {
+// SignHash signs a message using a secret key.
+func SignHash(data Hash, sk SecretKey) Signature {
 	skNorm := [SecretKeySize]byte(sk)
-	sig = *ed25519.Sign(&skNorm, data[:])
-	return sig, nil
+	return *ed25519.Sign(&skNorm, data[:])
 }
 
 // VerifyHash uses a public key and input data to verify a signature.
@@ -104,9 +105,6 @@ func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
 // WriteSignedObject writes a length-prefixed object prefixed by its signature.
 func WriteSignedObject(w io.Writer, obj interface{}, sk SecretKey) error {
 	objBytes := encoding.Marshal(obj)
-	sig, err := SignHash(HashBytes(objBytes), sk)
-	if err != nil {
-		return err
-	}
+	sig := SignHash(HashBytes(objBytes), sk)
 	return encoding.NewEncoder(w).EncodeAll(sig, objBytes)
 }

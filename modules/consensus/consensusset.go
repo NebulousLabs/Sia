@@ -23,6 +23,17 @@ var (
 	errNilGateway = errors.New("cannot have a nil gateway as input")
 )
 
+// marshaler marshals objects into byte slices and unmarshals byte
+// slices into objects.
+type marshaler interface {
+	Marshal(interface{}) []byte
+	Unmarshal([]byte, interface{}) error
+}
+type stdMarshaler struct{}
+
+func (stdMarshaler) Marshal(v interface{}) []byte            { return encoding.Marshal(v) }
+func (stdMarshaler) Unmarshal(b []byte, v interface{}) error { return encoding.Unmarshal(b, v) }
+
 // The ConsensusSet is the object responsible for tracking the current status
 // of the blockchain. Broadly speaking, it is responsible for maintaining
 // consensus.  It accepts blocks and constructs a blockchain, forking when
@@ -71,7 +82,7 @@ type ConsensusSet struct {
 	synced bool
 
 	// Interfaces to abstract the dependencies of the ConsensusSet.
-	marshaler       encoding.GenericMarshaler
+	marshaler       marshaler
 	blockRuleHelper blockRuleHelper
 	blockValidator  blockValidator
 
@@ -106,7 +117,7 @@ func New(gateway modules.Gateway, bootstrap bool, persistDir string) (*Consensus
 
 		dosBlocks: make(map[types.BlockID]struct{}),
 
-		marshaler:       encoding.StdGenericMarshaler{},
+		marshaler:       stdMarshaler{},
 		blockRuleHelper: stdBlockRuleHelper{},
 		blockValidator:  NewBlockValidator(),
 

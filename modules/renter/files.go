@@ -155,12 +155,11 @@ func (f *file) expiration() types.BlockHeight {
 
 // newFile creates a new file object.
 func newFile(name string, code modules.ErasureCoder, pieceSize, fileSize uint64) *file {
-	key, _ := crypto.GenerateTwofishKey()
 	return &file{
 		name:        name,
 		size:        fileSize,
 		contracts:   make(map[types.FileContractID]fileContract),
-		masterKey:   key,
+		masterKey:   crypto.GenerateTwofishKey(),
 		erasureCode: code,
 		pieceSize:   pieceSize,
 	}

@@ -71,15 +71,12 @@ func (h *Host) establishDefaults() error {
 	}
 
 	// Generate signing key, for revising contracts.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		return err
-	}
+	sk, pk := crypto.GenerateKeyPair()
 	h.secretKey = sk
 	h.publicKey = types.Ed25519PublicKey(pk)
 
 	// Subscribe to the consensus set.
-	err = h.initConsensusSubscription()
+	err := h.initConsensusSubscription()
 	if err != nil {
 		return err
 	}

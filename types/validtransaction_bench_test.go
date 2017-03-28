@@ -17,10 +17,7 @@ func BenchmarkStandaloneValid(b *testing.B) {
 	sk := make([]crypto.SecretKey, numSigs)
 	pk := make([]crypto.PublicKey, numSigs)
 	for i := 0; i < numSigs; i++ {
-		s, p, err := crypto.GenerateKeyPair()
-		if err != nil {
-			b.Fatal(err)
-		}
+		s, p := crypto.GenerateKeyPair()
 		sk[i] = s
 		pk[i] = p
 
@@ -42,10 +39,7 @@ func BenchmarkStandaloneValid(b *testing.B) {
 	// Transaction must be constructed before signing
 	for i := 0; i < numSigs; i++ {
 		sigHash := txn.SigHash(i)
-		sig0, err := crypto.SignHash(sigHash, sk[i])
-		if err != nil {
-			b.Fatal(err)
-		}
+		sig0 := crypto.SignHash(sigHash, sk[i])
 		txn.TransactionSignatures[i].Signature = sig0[:]
 	}
 

@@ -22,13 +22,6 @@ var (
 )
 
 type (
-	// GenericMarshaler marshals objects into byte slices and unmarshals byte
-	// slices into objects.
-	GenericMarshaler interface {
-		Marshal(interface{}) []byte
-		Unmarshal([]byte, interface{}) error
-	}
-
 	// A SiaMarshaler can encode and write itself to a stream.
 	SiaMarshaler interface {
 		MarshalSia(io.Writer) error
@@ -38,11 +31,6 @@ type (
 	SiaUnmarshaler interface {
 		UnmarshalSia(io.Reader) error
 	}
-
-	// StdGenericMarshaler is an implementation of GenericMarshaler that uses
-	// the encoding.Marshal and encoding.Unmarshal functions to perform
-	// its marshaling/unmarshaling.
-	StdGenericMarshaler struct{}
 
 	// An Encoder writes objects to an output stream.
 	Encoder struct {
@@ -368,17 +356,4 @@ func ReadFile(filename string, v interface{}) error {
 		return errors.New("error while reading " + filename + ": " + err.Error())
 	}
 	return nil
-}
-
-// Marshal returns the encoding of v. For encoding details, see the package
-// docstring.
-func (m StdGenericMarshaler) Marshal(v interface{}) []byte {
-	return Marshal(v)
-}
-
-// Unmarshal decodes the encoded value b and stores it in v, which must be a
-// pointer. The decoding rules are the inverse of those specified in the
-// package docstring for marshaling.
-func (m StdGenericMarshaler) Unmarshal(b []byte, v interface{}) error {
-	return Unmarshal(b, v)
 }

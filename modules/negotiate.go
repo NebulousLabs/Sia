@@ -342,10 +342,7 @@ func CreateAnnouncement(addr NetAddress, pk types.SiaPublicKey, sk crypto.Secret
 
 	// Create a signature for the announcement.
 	annHash := crypto.HashBytes(annBytes)
-	sig, err := crypto.SignHash(annHash, sk)
-	if err != nil {
-		return nil, err
-	}
+	sig := crypto.SignHash(annHash, sk)
 	// Return the signed announcement.
 	return append(annBytes, sig[:]...), nil
 }

@@ -1,7 +1,6 @@
 package persist
 
 import (
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // testInputs and testFilenames are global variables because most tests require
@@ -141,13 +141,9 @@ func TestOpenDatabase(t *testing.T) {
 		err = db.Update(func(tx *bolt.Tx) error {
 			for _, testBucket := range testBuckets {
 				b := tx.Bucket(testBucket)
-				x := rand.Intn(10)
+				x := fastrand.Intn(10)
 				for i := 0; i <= x; i++ {
-					k := make([]byte, 10)
-					rand.Read(k)
-					v := make([]byte, 1e3)
-					rand.Read(v)
-					err := b.Put(k, v)
+					err := b.Put(fastrand.Bytes(10), fastrand.Bytes(1e3))
 					if err != nil {
 						t.Errorf("db.Update failed to fill bucket %v for metadata %v, filename %v; error was %v", testBucket, in.md, dbFilename, err)
 						return err

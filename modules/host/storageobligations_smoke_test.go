@@ -11,19 +11,17 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
 
 // randSector creates a random sector, returning the sector along with the
 // Merkle root of the sector.
-func randSector() (crypto.Hash, []byte, error) {
-	sectorData, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		return crypto.Hash{}, nil, err
-	}
+func randSector() (crypto.Hash, []byte) {
+	sectorData := fastrand.Bytes(int(modules.SectorSize))
 	sectorRoot := crypto.MerkleRoot(sectorData)
-	return sectorRoot, sectorData, nil
+	return sectorRoot, sectorData
 }
 
 // newTesterStorageObligation uses the wallet to create and fund a file
@@ -215,10 +213,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 
 	// Add a file contract revision, moving over a small amount of money to pay
 	// for the file contract.
-	sectorRoot, sectorData, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	sectorRoot, sectorData := randSector()
 	so.SectorRoots = []crypto.Hash{sectorRoot}
 	sectorCost := types.SiacoinPrecision.Mul64(550)
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost)
@@ -409,10 +404,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 
 	// Add a file contract revision, moving over a small amount of money to pay
 	// for the file contract.
-	sectorRoot, sectorData, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	sectorRoot, sectorData := randSector()
 	so.SectorRoots = []crypto.Hash{sectorRoot}
 	sectorCost := types.SiacoinPrecision.Mul64(550)
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost)
@@ -456,10 +448,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	// the same block cycle. This test will additionally tell us whether or not
 	// the host can correctly handle building storage proofs for files with
 	// multiple sectors.
-	sectorRoot2, sectorData2, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	sectorRoot2, sectorData2 := randSector()
 	so.SectorRoots = []crypto.Hash{sectorRoot, sectorRoot2}
 	sectorCost2 := types.SiacoinPrecision.Mul64(650)
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost2)
@@ -626,10 +615,7 @@ func TestAutoRevisionSubmission(t *testing.T) {
 
 	// Add a file contract revision, moving over a small amount of money to pay
 	// for the file contract.
-	sectorRoot, sectorData, err := randSector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	sectorRoot, sectorData := randSector()
 	so.SectorRoots = []crypto.Hash{sectorRoot}
 	sectorCost := types.SiacoinPrecision.Mul64(550)
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost)

@@ -11,20 +11,20 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // newTestingFile initializes a file object with random parameters.
 func newTestingFile() *file {
-	key, _ := crypto.GenerateTwofishKey()
-	data, _ := crypto.RandBytes(8)
-	nData, _ := crypto.RandIntn(10)
-	nParity, _ := crypto.RandIntn(10)
+	data := fastrand.Bytes(8)
+	nData := fastrand.Intn(10)
+	nParity := fastrand.Intn(10)
 	rsc, _ := NewRSCode(nData+1, nParity+1)
 
 	return &file{
 		name:        "testfile-" + strconv.Itoa(int(data[0])),
 		size:        encoding.DecUint64(data[1:5]),
-		masterKey:   key,
+		masterKey:   crypto.GenerateTwofishKey(),
 		erasureCode: rsc,
 		pieceSize:   encoding.DecUint64(data[6:8]),
 	}
