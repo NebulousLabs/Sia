@@ -45,19 +45,15 @@ func LoadFile(meta Metadata, data interface{}, filename string) error {
 
 // Save saves json data to a writer.
 func Save(meta Metadata, data interface{}, w io.Writer) error {
-	b, err := json.MarshalIndent(data, "", "\t")
-	if err != nil {
-		return err
-	}
-
 	enc := json.NewEncoder(w)
+	enc.SetIndent("", "\t")
 	if err := enc.Encode(meta.Header); err != nil {
 		return err
 	}
 	if err := enc.Encode(meta.Version); err != nil {
 		return err
 	}
-	if _, err = w.Write(b); err != nil {
+	if err := enc.Encode(data); err != nil {
 		return err
 	}
 
