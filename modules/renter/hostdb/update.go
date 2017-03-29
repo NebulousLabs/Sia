@@ -1,6 +1,7 @@
 package hostdb
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -35,6 +36,10 @@ func (hdb *HostDB) insertBlockchainHost(host modules.HostDBEntry) {
 	// Remove garbage hosts and local hosts (but allow local hosts in testing).
 	if err := host.NetAddress.IsValid(); err != nil {
 		hdb.log.Debugf("WARN: host '%v' has an invalid NetAddress: %v", host.NetAddress, err)
+		return
+	}
+	// Ignore all local hosts announced through the blockchain.
+	if build.Release == "standard" && host.NetAddress.IsLocal() {
 		return
 	}
 
