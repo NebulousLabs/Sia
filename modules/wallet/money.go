@@ -3,8 +3,6 @@ package wallet
 import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/NebulousLabs/bolt"
 )
 
 // sortedOutputs is a struct containing a slice of siacoin outputs and their
@@ -17,19 +15,19 @@ type sortedOutputs struct {
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
 func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
+	// ensure durability of reported balance
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.syncDB()
 
-	w.db.View(func(tx *bolt.Tx) error {
-		dbForEachSiacoinOutput(tx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
-			if sco.Value.Cmp(dustValue()) > 0 {
-				siacoinBalance = siacoinBalance.Add(sco.Value)
-			}
-		})
-		return dbForEachSiafundOutput(tx, func(_ types.SiafundOutputID, sfo types.SiafundOutput) {
-			siafundBalance = siafundBalance.Add(sfo.Value)
-			siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
-		})
+	dbForEachSiacoinOutput(w.dbTx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
+		if sco.Value.Cmp(dustValue()) > 0 {
+			siacoinBalance = siacoinBalance.Add(sco.Value)
+		}
+	})
+	dbForEachSiafundOutput(w.dbTx, func(_ types.SiafundOutputID, sfo types.SiafundOutput) {
+		siafundBalance = siafundBalance.Add(sfo.Value)
+		siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
 	})
 	return
 }

@@ -5,7 +5,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
-	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -33,9 +32,9 @@ func TestScanLargeIndex(t *testing.T) {
 	}
 
 	// set the wallet's seed progress to a high number and then mine some coins.
-	err = wt.wallet.db.Update(func(tx *bolt.Tx) error {
-		return dbPutPrimarySeedProgress(tx, numInitialKeys+1)
-	})
+	wt.wallet.mu.Lock()
+	dbPutPrimarySeedProgress(wt.wallet.dbTx, numInitialKeys+1)
+	wt.wallet.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,9 +92,9 @@ func TestScanLoop(t *testing.T) {
 	// scanner to loop exactly three times.
 	indices := []uint64{500, 2500, 8000, 100000}
 	for _, index := range indices {
-		err = wt.wallet.db.Update(func(tx *bolt.Tx) error {
-			return dbPutPrimarySeedProgress(tx, index)
-		})
+		wt.wallet.mu.Lock()
+		dbPutPrimarySeedProgress(wt.wallet.dbTx, index)
+		wt.wallet.mu.Unlock()
 		if err != nil {
 			t.Fatal(err)
 		}

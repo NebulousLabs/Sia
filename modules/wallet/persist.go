@@ -112,10 +112,8 @@ func (w *Wallet) initPersist() error {
 
 // createBackup copies the wallet database to dst.
 func (w *Wallet) createBackup(dst io.Writer) error {
-	return w.db.View(func(tx *bolt.Tx) error {
-		_, err := tx.WriteTo(dst)
-		return err
-	})
+	_, err := w.dbTx.WriteTo(dst)
+	return err
 }
 
 // CreateBackup creates a backup file at the desired filepath.

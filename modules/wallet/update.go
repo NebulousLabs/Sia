@@ -271,6 +271,9 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 	return nil
 }
 
+// next: make global txn implicit everywhere
+// also need exclusivity wrt consistency (can't report anything that isn't synced to disk)
+
 // ProcessConsensusChange parses a consensus change to update the set of
 // confirmed outputs known to the wallet.
 func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
@@ -283,21 +286,18 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	err := w.db.Update(func(tx *bolt.Tx) error {
-		if err := w.updateConfirmedSet(tx, cc); err != nil {
-			return err
-		}
-		if err := w.revertHistory(tx, cc.RevertedBlocks); err != nil {
-			return err
-		}
-		if err := w.applyHistory(tx, cc.AppliedBlocks); err != nil {
-			return err
-		}
-		// update the ConsensusChangeID
-		return dbPutConsensusChangeID(tx, cc.ID)
-	})
-	if err != nil {
-		w.log.Println("ERROR: failed to add consensus change:", err)
+
+	if err := w.updateConfirmedSet(w.dbTx, cc); err != nil {
+		w.log.Println("ERROR: failed to update confirmed set:", err)
+	}
+	if err := w.revertHistory(w.dbTx, cc.RevertedBlocks); err != nil {
+		w.log.Println("ERROR: failed to revert consensus change:", err)
+	}
+	if err := w.applyHistory(w.dbTx, cc.AppliedBlocks); err != nil {
+		w.log.Println("ERROR: failed to apply consensus change:", err)
+	}
+	if err := dbPutConsensusChangeID(w.dbTx, cc.ID); err != nil {
+		w.log.Println("ERROR: failed to update consensus change ID:", err)
 	}
 
 	if cc.Synced {
@@ -317,65 +317,60 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	err := w.db.Update(func(tx *bolt.Tx) error {
-		w.unconfirmedProcessedTransactions = nil
-		for _, txn := range txns {
-			// determine whether transaction is relevant to the wallet
-			relevant := false
-			for _, sci := range txn.SiacoinInputs {
-				relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
-			}
-			for i, sco := range txn.SiacoinOutputs {
-				relevant = relevant || w.isWalletAddress(sco.UnlockHash)
-				err := dbPutHistoricOutput(tx, types.OutputID(txn.SiacoinOutputID(uint64(i))), sco.Value)
-				if err != nil {
-					return fmt.Errorf("could not put historic output: %v", err)
-				}
-			}
 
-			// only create a ProcessedTransaction if txn is relevant
-			if !relevant {
-				continue
-			}
-
-			pt := modules.ProcessedTransaction{
-				Transaction:           txn,
-				TransactionID:         txn.ID(),
-				ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
-				ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
-			}
-			for _, sci := range txn.SiacoinInputs {
-				val, err := dbGetHistoricOutput(tx, types.OutputID(sci.ParentID))
-				if err != nil {
-					return fmt.Errorf("could not get historic output: %v", err)
-				}
-				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
-					FundType:       types.SpecifierSiacoinInput,
-					WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
-					RelatedAddress: sci.UnlockConditions.UnlockHash(),
-					Value:          val,
-				})
-			}
-			for _, sco := range txn.SiacoinOutputs {
-				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
-					FundType:       types.SpecifierSiacoinOutput,
-					MaturityHeight: types.BlockHeight(math.MaxUint64),
-					WalletAddress:  w.isWalletAddress(sco.UnlockHash),
-					RelatedAddress: sco.UnlockHash,
-					Value:          sco.Value,
-				})
-			}
-			for _, fee := range txn.MinerFees {
-				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
-					FundType: types.SpecifierMinerFee,
-					Value:    fee,
-				})
-			}
-			w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
+	w.unconfirmedProcessedTransactions = nil
+	for _, txn := range txns {
+		// determine whether transaction is relevant to the wallet
+		relevant := false
+		for _, sci := range txn.SiacoinInputs {
+			relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
 		}
-		return nil
-	})
-	if err != nil {
-		w.log.Println("ERROR: failed to add unconfirmed transactions:", err)
+		for i, sco := range txn.SiacoinOutputs {
+			relevant = relevant || w.isWalletAddress(sco.UnlockHash)
+			err := dbPutHistoricOutput(w.dbTx, types.OutputID(txn.SiacoinOutputID(uint64(i))), sco.Value)
+			if err != nil {
+				w.log.Println("ERROR: could not put historic output:", err)
+			}
+		}
+
+		// only create a ProcessedTransaction if txn is relevant
+		if !relevant {
+			continue
+		}
+
+		pt := modules.ProcessedTransaction{
+			Transaction:           txn,
+			TransactionID:         txn.ID(),
+			ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
+			ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
+		}
+		for _, sci := range txn.SiacoinInputs {
+			val, err := dbGetHistoricOutput(w.dbTx, types.OutputID(sci.ParentID))
+			if err != nil {
+				w.log.Println("ERROR: could not get historic output:", err)
+			}
+			pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+				FundType:       types.SpecifierSiacoinInput,
+				WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
+				RelatedAddress: sci.UnlockConditions.UnlockHash(),
+				Value:          val,
+			})
+		}
+		for _, sco := range txn.SiacoinOutputs {
+			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+				FundType:       types.SpecifierSiacoinOutput,
+				MaturityHeight: types.BlockHeight(math.MaxUint64),
+				WalletAddress:  w.isWalletAddress(sco.UnlockHash),
+				RelatedAddress: sco.UnlockHash,
+				Value:          sco.Value,
+			})
+		}
+		for _, fee := range txn.MinerFees {
+			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+				FundType: types.SpecifierMinerFee,
+				Value:    fee,
+			})
+		}
+		w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
 	}
 }

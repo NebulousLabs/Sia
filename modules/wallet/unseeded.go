@@ -7,7 +7,6 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -97,18 +96,17 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 
 	// Encrypt and save the key.
 	skf.SpendableKey = encryptionKey.EncryptBytes(encoding.Marshal(sk))
-	return w.db.Update(func(tx *bolt.Tx) error {
-		err := checkMasterKey(tx, masterKey)
-		if err != nil {
-			return err
-		}
-		var current []spendableKeyFile
-		err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keySpendableKeyFiles), &current)
-		if err != nil {
-			return err
-		}
-		return tx.Bucket(bucketWallet).Put(keySpendableKeyFiles, encoding.Marshal(append(current, skf)))
-	})
+
+	err := checkMasterKey(w.dbTx, masterKey)
+	if err != nil {
+		return err
+	}
+	var current []spendableKeyFile
+	err = encoding.Unmarshal(w.dbTx.Bucket(bucketWallet).Get(keySpendableKeyFiles), &current)
+	if err != nil {
+		return err
+	}
+	return w.dbTx.Bucket(bucketWallet).Put(keySpendableKeyFiles, encoding.Marshal(append(current, skf)))
 
 	// w.keys[sk.UnlockConditions.UnlockHash()] = sk -> aids with duplicate
 	// detection, but causes db inconsistency. Rescanning is probably the
