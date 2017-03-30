@@ -125,16 +125,8 @@ func (w *Wallet) threadedDefragWallet() {
 
 	// Check that a defrag makes sense.
 	w.mu.Lock()
-	// Can't defrag if the wallet is locked.
 	if !w.unlocked {
-		w.mu.Unlock()
-		return
-	}
-	// No need to defrag if the number of outputs is below the defrag limit.
-	// NOTE: some outputs may be invalid (e.g. dust), but it's still more
-	// efficient to count them naively as a first pass.
-	totalOutputs := w.dbTx.Bucket(bucketSiacoinOutputs).Stats().KeyN
-	if totalOutputs < defragThreshold {
+		// Can't defrag if the wallet is locked.
 		w.mu.Unlock()
 		return
 	}
