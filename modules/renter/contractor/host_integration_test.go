@@ -20,6 +20,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	modWallet "github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // newTestingWallet is a helper function that creates a ready-to-use wallet
@@ -29,10 +30,7 @@ func newTestingWallet(testdir string, cs modules.ConsensusSet, tp modules.Transa
 	if err != nil {
 		return nil, err
 	}
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return nil, err
-	}
+	key := crypto.GenerateTwofishKey()
 	if !w.Encrypted() {
 		_, err = w.Encrypt(key)
 		if err != nil {
@@ -82,7 +80,7 @@ func newTestingHost(testdir string, cs modules.ConsensusSet, tp modules.Transact
 	if err != nil {
 		return nil, err
 	}
-	err = h.AddStorageFolder(storageFolder, 1e6)
+	err = h.AddStorageFolder(storageFolder, modules.SectorSize*64)
 	if err != nil {
 		return nil, err
 	}
@@ -126,10 +124,7 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	key := crypto.GenerateTwofishKey()
 	if !w.Encrypted() {
 		_, err = w.Encrypt(key)
 		if err != nil {
@@ -237,10 +232,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := fastrand.Bytes(int(modules.SectorSize))
 	_, err = editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -286,10 +278,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := fastrand.Bytes(int(modules.SectorSize))
 	root, err := editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -350,10 +339,7 @@ func TestIntegrationDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := fastrand.Bytes(int(modules.SectorSize))
 	_, err = editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -414,10 +400,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := fastrand.Bytes(int(modules.SectorSize))
 	// insert the sector
 	_, err = editor.Upload(data)
 	if err != nil {
@@ -473,10 +456,7 @@ func TestIntegrationModify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := fastrand.Bytes(int(modules.SectorSize))
 	// insert the sector
 	_, err = editor.Upload(data)
 	if err != nil {
@@ -541,10 +521,7 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := fastrand.Bytes(int(modules.SectorSize))
 	// insert the sector
 	root, err := editor.Upload(data)
 	if err != nil {
@@ -619,10 +596,7 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err = crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data = fastrand.Bytes(int(modules.SectorSize))
 	// insert the sector
 	_, err = editor.Upload(data)
 	if err != nil {
@@ -669,10 +643,7 @@ func TestIntegrationResync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := fastrand.Bytes(int(modules.SectorSize))
 	root, err := editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
@@ -995,10 +966,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := fastrand.Bytes(int(modules.SectorSize))
 	root, err := editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)

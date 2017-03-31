@@ -319,5 +319,5 @@ func (r *Renter) AllContracts() []modules.RenterContract {
 	}).AllContracts()
 }
 
-// enforce that Renter satisfies the modules.Renter interface
+// Enforce that Renter satisfies the modules.Renter interface.
 var _ modules.Renter = (*Renter)(nil)

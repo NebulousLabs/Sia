@@ -15,18 +15,20 @@ type sortedOutputs struct {
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
 func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
+	// ensure durability of reported balance
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.syncDB()
 
-	for _, sco := range w.siacoinOutputs {
+	dbForEachSiacoinOutput(w.dbTx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
 		if sco.Value.Cmp(dustValue()) > 0 {
 			siacoinBalance = siacoinBalance.Add(sco.Value)
 		}
-	}
-	for _, sfo := range w.siafundOutputs {
+	})
+	dbForEachSiafundOutput(w.dbTx, func(_ types.SiafundOutputID, sfo types.SiafundOutput) {
 		siafundBalance = siafundBalance.Add(sfo.Value)
 		siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
-	}
+	})
 	return
 }
 

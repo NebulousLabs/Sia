@@ -49,7 +49,7 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
-	// order from most recent to least recent
+	// Order from most recent to least recent.
 	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
 	for i := range r.downloadQueue {
 		d := r.downloadQueue[len(r.downloadQueue)-i-1]
@@ -60,8 +60,8 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 			StartTime:   d.startTime,
 		}
 		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)
-		err := d.Err()
-		if err != nil {
+
+		if err := d.Err(); err != nil {
 			downloads[i].Error = err.Error()
 		}
 	}

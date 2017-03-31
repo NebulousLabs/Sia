@@ -350,10 +350,7 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 	// Encrypt the missing pieces.
 	for _, missingPiece := range missingPieces {
 		key := deriveKey(file.masterKey, chunkIndex, uint64(missingPiece))
-		pieces[missingPiece], err = key.EncryptBytes(pieces[missingPiece])
-		if err != nil {
-			return build.ExtendErr("unable to encrypt chunk pieces", err)
-		}
+		pieces[missingPiece] = key.EncryptBytes(pieces[missingPiece])
 	}
 
 	// Give each piece to a worker in the set of useful workers.

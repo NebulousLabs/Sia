@@ -158,10 +158,7 @@ func TestPubKeyScanner(t *testing.T) {
 	var pubkeys []types.SiaPublicKey
 	for i := 0; i < 3; i++ {
 		// generate a keypair
-		sk, pk, err := crypto.GenerateKeyPair()
-		if err != nil {
-			t.Fatal(err)
-		}
+		sk, pk := crypto.GenerateKeyPair()
 		spk := types.SiaPublicKey{
 			Algorithm: types.SignatureEd25519,
 			Key:       pk[:],
@@ -185,10 +182,7 @@ func TestPubKeyScanner(t *testing.T) {
 	}
 	// overwrite the first pubkey with a new one, using the same netaddress.
 	// The contractor should use the newer pubkey.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		t.Fatal(err)
-	}
+	sk, pk := crypto.GenerateKeyPair()
 	spk := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       pk[:],

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NebulousLabs/go-upnp"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+
+	"github.com/NebulousLabs/go-upnp"
 )
 
 // managedLearnHostname discovers the external IP of the Host. If the host's
@@ -40,6 +40,7 @@ func (h *Host) managedLearnHostname() {
 	if netAddr != "" {
 		return
 	}
+	h.log.Println("No manually set net address. Scanning to automatically determine address.")
 
 	// try UPnP first, then fallback to myexternalip.com
 	var hostname string
@@ -79,7 +80,7 @@ func (h *Host) managedLearnHostname() {
 	// no open contracts, there is no reason to notify anyone that the host's
 	// address has changed.
 	if hostAcceptingContracts || hostContractCount > 0 {
-		h.log.Println("Discovered that the external IP address has changed from", hostAutoAddress, "to", autoAddress, "- making a host new host announcement with the change.")
+		h.log.Println("Host external IP address changed from", hostAutoAddress, "to", autoAddress, "- performing host announcement.")
 		err = h.managedAnnounce(autoAddress)
 		if err != nil {
 			// Set h.announced to false, as the address has changed yet the

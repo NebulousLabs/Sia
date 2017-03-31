@@ -84,12 +84,9 @@ func (ht *hostTester) initRenting() error {
 // and then stores the key in the host tester.
 func (ht *hostTester) initWallet() error {
 	// Create the keys for the wallet and unlock it.
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return err
-	}
+	key := crypto.GenerateTwofishKey()
 	ht.walletKey = key
-	_, err = ht.wallet.Encrypt(key)
+	_, err := ht.wallet.Encrypt(key)
 	if err != nil {
 		return err
 	}
@@ -196,7 +193,7 @@ func newMockHostTester(d dependencies, name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ht.host.AddStorageFolder(storageFolderOne, modules.SectorSize*8)
+	err = ht.host.AddStorageFolder(storageFolderOne, modules.SectorSize*64)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +202,7 @@ func newMockHostTester(d dependencies, name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ht.host.AddStorageFolder(storageFolderTwo, modules.SectorSize*8*2)
+	err = ht.host.AddStorageFolder(storageFolderTwo, modules.SectorSize*64*2)
 	if err != nil {
 		return nil, err
 	}

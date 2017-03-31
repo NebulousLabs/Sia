@@ -2,13 +2,14 @@ package wallet
 
 import (
 	"bytes"
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // postEncryptionTesting runs a series of checks on the wallet after it has
@@ -44,7 +45,7 @@ func postEncryptionTesting(m modules.TestMiner, w *Wallet, masterKey crypto.Twof
 		}
 	}
 	siacoinBal, _, _ := w.ConfirmedBalance()
-	if siacoinBal.Cmp64(0) <= 0 {
+	if siacoinBal.IsZero() {
 		panic("wallet balance reported as 0 after maturing some mined blocks")
 	}
 	err = w.Unlock(masterKey)
@@ -95,7 +96,7 @@ func TestIntegrationPreEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer wt.closeWt()
+
 	// Check that the wallet knows it's not encrypted.
 	if wt.wallet.Encrypted() {
 		t.Error("wallet is reporting that it has been encrypted")
@@ -108,6 +109,7 @@ func TestIntegrationPreEncryption(t *testing.T) {
 	if err != errUnencryptedWallet {
 		t.Fatal(err)
 	}
+	wt.closeWt()
 
 	// Create a second wallet using the same directory - make sure that if any
 	// files have been created, the wallet is still being treated as new.
@@ -121,7 +123,7 @@ func TestIntegrationPreEncryption(t *testing.T) {
 	if w1.Unlocked() {
 		t.Error("new wallet is not being treated as locked")
 	}
-
+	w1.Close()
 }
 
 // TestIntegrationUserSuppliedEncryption probes the encryption process when the
@@ -139,10 +141,7 @@ func TestIntegrationUserSuppliedEncryption(t *testing.T) {
 	}
 	defer wt.closeWt()
 	var masterKey crypto.TwofishKey
-	_, err = rand.Read(masterKey[:])
-	if err != nil {
-		t.Fatal(err)
-	}
+	fastrand.Read(masterKey[:])
 	_, err = wt.wallet.Encrypt(masterKey)
 	if err != nil {
 		t.Error(err)
@@ -244,5 +243,44 @@ func TestLock(t *testing.T) {
 	siacoinBalance3, _, _ := wt.wallet.ConfirmedBalance()
 	if siacoinBalance3.Cmp(siacoinBalance2) <= 0 {
 		t.Error("balance should increase after a block was mined")
+	}
+}
+
+// TestInitFromSeed tests creating a wallet from a preexisting seed.
+func TestInitFromSeed(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create a wallet with some money
+	wt, err := createWalletTester("TestInitFromSeed0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+	seed, _, err := wt.wallet.PrimarySeed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	origBal, _, _ := wt.wallet.ConfirmedBalance()
+
+	// create a blank wallet
+	dir := filepath.Join(build.TempDir(modules.WalletDir, "TestInitFromSeed1"), modules.WalletDir)
+	w, err := New(wt.cs, wt.tpool, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.InitFromSeed(crypto.TwofishKey{}, seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// starting balance should match the original wallet
+	newBal, _, _ := w.ConfirmedBalance()
+	if newBal.Cmp(origBal) != 0 {
+		t.Log(w.UnconfirmedBalance())
+		t.Fatalf("wallet should have correct balance after loading seed: wanted %v, got %v", origBal, newBal)
 	}
 }

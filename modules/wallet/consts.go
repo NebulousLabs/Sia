@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -35,4 +36,12 @@ func defragFee() types.Currency {
 	// total transaction, much larger than your average transaction. So you need
 	// a lot of fees.
 	return types.SiacoinPrecision.Mul64(20)
+}
+
+func init() {
+	// Sanity check - the defrag threshold needs to be higher than the batch
+	// size plus the start index.
+	if build.DEBUG && defragThreshold <= defragBatchSize+defragStartIndex {
+		panic("constants are incorrect, defragThreshold needs to be larger than the sum of defragBatchSize and defragStartIndex")
+	}
 }

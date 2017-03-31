@@ -1,11 +1,11 @@
 package transactionpool
 
 import (
-	"crypto/rand"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestIntegrationAcceptTransactionSet probes the AcceptTransactionSet method
@@ -131,10 +131,7 @@ func TestIntegrationCheckMinerFees(t *testing.T) {
 	for i := 0; i < TransactionPoolSizeForFee/10e3; i++ {
 		arbData := make([]byte, 10e3)
 		copy(arbData, modules.PrefixNonSia[:])
-		_, err = rand.Read(arbData[100:116]) // prevents collisions with other transacitons in the loop.
-		if err != nil {
-			t.Fatal(err)
-		}
+		fastrand.Read(arbData[100:116]) // prevents collisions with other transacitons in the loop.
 		txn := types.Transaction{ArbitraryData: [][]byte{arbData}}
 		err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
 		if err != nil {

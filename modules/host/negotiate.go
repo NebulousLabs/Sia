@@ -151,12 +151,9 @@ func createRevisionSignature(fcr types.FileContractRevision, renterSig types.Tra
 		TransactionSignatures: []types.TransactionSignature{renterSig, hostSig},
 	}
 	sigHash := txn.SigHash(1)
-	encodedSig, err := crypto.SignHash(sigHash, secretKey)
-	if err != nil {
-		return types.Transaction{}, err
-	}
+	encodedSig := crypto.SignHash(sigHash, secretKey)
 	txn.TransactionSignatures[1].Signature = encodedSig[:]
-	err = modules.VerifyFileContractRevisionTransactionSignatures(fcr, txn.TransactionSignatures, blockHeight)
+	err := modules.VerifyFileContractRevisionTransactionSignatures(fcr, txn.TransactionSignatures, blockHeight)
 	if err != nil {
 		return types.Transaction{}, err
 	}
@@ -189,10 +186,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		ParentID: contractTxn.FileContractID(0),
 		UnlockConditions: types.UnlockConditions{
 			PublicKeys: []types.SiaPublicKey{
-				{
-					Algorithm: types.SignatureEd25519,
-					Key:       renterPK[:],
-				},
+				types.Ed25519PublicKey(renterPK),
 				hostSPK,
 			},
 			SignaturesRequired: 2,

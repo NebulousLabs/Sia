@@ -2,10 +2,13 @@ package modules
 
 import (
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
+	// ContractManagerDir is the standard name used for the directory that
+	// contains all files directly related to the contract manager.
+	ContractManagerDir = "contractmanager"
+
 	// StorageManagerDir is standard name used for the directory that contains
 	// all of the storage manager files.
 	StorageManagerDir = "storagemanager"
@@ -17,6 +20,7 @@ type (
 	StorageFolderMetadata struct {
 		Capacity          uint64 `json:"capacity"`          // bytes
 		CapacityRemaining uint64 `json:"capacityremaining"` // bytes
+		Index             uint16 `json:"index"`
 		Path              string `json:"path"`
 
 		// Below are statistics about the filesystem. FailedReads and
@@ -29,6 +33,13 @@ type (
 		FailedWrites     uint64 `json:"failedwrites"`
 		SuccessfulReads  uint64 `json:"successfulreads"`
 		SuccessfulWrites uint64 `json:"successfulwrites"`
+
+		// Certain operations on a storage folder can take a long time (Add,
+		// Remove, and Resize). The fields below indicate the progress of any
+		// long running operations that might be under way in the storage
+		// folder. Progress is always reported in bytes.
+		ProgressNumerator   uint64
+		ProgressDenominator uint64
 	}
 
 	// A StorageManager is responsible for managing storage folders and
@@ -43,14 +54,14 @@ type (
 		// the sector before the expiry height. The same sector can be added
 		// multiple times at different expiry heights, and the storage manager
 		// is expected to only store the data once.
-		AddSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sectorData []byte) error
+		AddSector(sectorRoot crypto.Hash, sectorData []byte) error
 
 		// AddSectorBatch is a performance optimization over AddSector when
 		// adding a bunch of virtual sectors. It is necessary because otherwise
 		// potentially thousands or even tens-of-thousands of fsync calls would
 		// need to be made in serial, which would prevent renters from ever
 		// successfully renewing.
-		AddSectorBatch(sectorRoots []crypto.Hash, expiryHeight types.BlockHeight) error
+		AddSectorBatch(sectorRoots []crypto.Hash) error
 
 		// AddStorageFolder adds a storage folder to the manager. The manager
 		// may not check that there is enough space available on-disk to
@@ -76,17 +87,17 @@ type (
 		// RemoveSector will remove a sector from the storage manager. The
 		// height at which the sector expires should be provided, so that the
 		// auto-expiry information for that sector can be properly updated.
-		RemoveSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight) error
+		RemoveSector(sectorRoot crypto.Hash) error
 
 		// RemoveStorageFolder will remove a storage folder from the manager.
 		// All storage on the folder will be moved to other storage folders,
 		// meaning that no data will be lost. If the manager is unable to save
 		// data, an error will be returned and the operation will be stopped.
-		RemoveStorageFolder(index int, force bool) error
+		RemoveStorageFolder(index uint16, force bool) error
 
 		// ResetStorageFolderHealth will reset the health statistics on a
 		// storage folder.
-		ResetStorageFolderHealth(index int) error
+		ResetStorageFolderHealth(index uint16) error
 
 		// ResizeStorageFolder will grow or shrink a storage folder in the
 		// manager. The manager may not check that there is enough space
@@ -95,8 +106,10 @@ type (
 		// folder, any data in the folder that needs to be moved will be placed
 		// into other storage folders, meaning that no data will be lost. If
 		// the manager is unable to migrate the data, an error will be returned
-		// and the operation will be stopped.
-		ResizeStorageFolder(index int, newSize uint64) error
+		// and the operation will be stopped. If the force flag is set to true,
+		// errors will be ignored and the resize operation completed, meaning
+		// that data will be lost.
+		ResizeStorageFolder(index uint16, newSize uint64, force bool) error
 
 		// StorageFolders will return a list of storage folders tracked by the
 		// manager.

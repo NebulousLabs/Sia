@@ -1,11 +1,12 @@
 package persist
 
 import (
-	"crypto/rand"
 	"encoding/base32"
 	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -33,9 +34,7 @@ type Metadata struct {
 // 100 bits of entropy, and a very low probability of colliding with existing
 // files unintentionally.
 func RandomSuffix() string {
-	randBytes := make([]byte, 20)
-	rand.Read(randBytes)
-	str := base32.StdEncoding.EncodeToString(randBytes)
+	str := base32.StdEncoding.EncodeToString(fastrand.Bytes(20))
 	return str[:20]
 }
 

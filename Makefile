@@ -8,9 +8,10 @@ dependencies:
 	# Consensus Dependencies
 	go get -u github.com/NebulousLabs/demotemutex
 	go get -u github.com/NebulousLabs/ed25519
+	go get -u github.com/NebulousLabs/fastrand
 	go get -u github.com/NebulousLabs/merkletree
 	go get -u github.com/NebulousLabs/bolt
-	go get -u github.com/dchest/blake2b
+	go get -u golang.org/x/crypto/blake2b
 	# Module + Daemon Dependencies
 	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/NebulousLabs/go-upnp
@@ -28,13 +29,12 @@ dependencies:
 
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
-run = Test
-pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules \
-       ./modules/consensus ./modules/explorer ./modules/gateway ./modules/host \
-       ./modules/host/storagemanager ./modules/renter ./modules/renter/contractor \
-       ./modules/renter/hostdb ./modules/renter/hostdb/hosttree ./modules/renter/proto \
-       ./modules/miner ./modules/wallet ./modules/transactionpool ./persist ./siac \
-       ./siad ./sync ./types 
+run = .
+pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus                                  \
+       ./modules/explorer ./modules/gateway ./modules/host ./modules/host/contractmanager                               \
+       ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb ./modules/renter/hostdb/hosttree            \
+       ./modules/renter/proto ./modules/miner ./modules/wallet ./modules/transactionpool ./persist ./siac               \
+       ./siad ./sync ./types
 
 # fmt calls go fmt on all packages.
 fmt:
@@ -77,33 +77,15 @@ test-v:
 test-long: clean fmt vet lint
 	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
 bench: clean fmt
-	go test -tags='testing' -timeout=500s -run=XXX -bench=. $(pkgs)
+	go test -tags='debug testing' -timeout=500s -run=XXX -bench=$(run) $(pkgs)
 cover: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@mkdir -p cover/modules/host
-	@for package in $(pkgs); do                                                                                     \
-		go test -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
-		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
-		&& rm cover/$$package.out ;                                                                                 \
-	done
-cover-integration: clean
-	@mkdir -p cover/modules
-	@mkdir -p cover/modules/renter
-	@mkdir -p cover/modules/host
-	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestIntegration -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
-		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
-		&& rm cover/$$package.out ;                                                                                 \
-	done
-cover-unit: clean
-	@mkdir -p cover/modules
-	@mkdir -p cover/modules/renter
-	@mkdir -p cover/modules/host
-	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestUnit -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
-		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
-		&& rm cover/$$package.out ;                                                                                 \
+	@for package in $(pkgs); do                                                                                                 \
+		go test -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package -run=$(run) \
+		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                                      \
+		&& rm cover/$$package.out ;                                                                                             \
 	done
 
 # whitepaper builds the whitepaper from whitepaper.tex. pdflatex has to be

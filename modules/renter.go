@@ -120,7 +120,7 @@ type HostScoreBreakdown struct {
 	VersionAdjustment          float64 `json:"versionadjustment"`
 }
 
-// RenterPriceEstimation contains a bunch of fileds estimating the costs of
+// RenterPriceEstimation contains a bunch of files estimating the costs of
 // various operations on the network.
 type RenterPriceEstimation struct {
 	// The cost of downloading 1 TB of data.

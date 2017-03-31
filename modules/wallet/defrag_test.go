@@ -43,8 +43,13 @@ func TestDefragWallet(t *testing.T) {
 	}
 
 	// defrag should keep the outputs below the threshold
-	if len(wt.wallet.siacoinOutputs) > defragThreshold {
-		t.Fatalf("defrag should result in fewer than defragThreshold outputs, got %v wanted %v\n", len(wt.wallet.siacoinOutputs), defragThreshold)
+	wt.wallet.mu.Lock()
+	// force a sync because bucket stats may not be reliable until commit
+	wt.wallet.syncDB()
+	siacoinOutputs := wt.wallet.dbTx.Bucket(bucketSiacoinOutputs).Stats().KeyN
+	wt.wallet.mu.Unlock()
+	if siacoinOutputs > defragThreshold {
+		t.Fatalf("defrag should result in fewer than defragThreshold outputs, got %v wanted %v\n", siacoinOutputs, defragThreshold)
 	}
 }
 
@@ -102,7 +107,12 @@ func TestDefragWalletDust(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	if len(wt.wallet.siacoinOutputs) < defragThreshold {
+	wt.wallet.mu.Lock()
+	// force a sync because bucket stats may not be reliable until commit
+	wt.wallet.syncDB()
+	siacoinOutputs := wt.wallet.dbTx.Bucket(bucketSiacoinOutputs).Stats().KeyN
+	wt.wallet.mu.Unlock()
+	if siacoinOutputs < defragThreshold {
 		t.Fatal("defrag consolidated dust outputs")
 	}
 }

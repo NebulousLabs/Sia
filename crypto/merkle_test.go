@@ -1,8 +1,9 @@
 package crypto
 
 import (
-	"crypto/rand"
 	"testing"
+
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestTreeBuilder builds a tree and gets the merkle root.
@@ -42,8 +43,7 @@ func TestCalculateLeaves(t *testing.T) {
 func TestStorageProof(t *testing.T) {
 	// Generate proof data.
 	numSegments := uint64(7)
-	data := make([]byte, numSegments*SegmentSize)
-	rand.Read(data)
+	data := fastrand.Bytes(int(numSegments * SegmentSize))
 	rootHash := MerkleRoot(data)
 
 	// Create and verify proofs for all indices.
@@ -65,8 +65,7 @@ func TestStorageProof(t *testing.T) {
 // a last leaf of size less than SegmentSize.
 func TestNonMultipleLeafSizeStorageProof(t *testing.T) {
 	// Generate proof data.
-	data := make([]byte, (2*SegmentSize)+10)
-	rand.Read(data)
+	data := fastrand.Bytes((2 * SegmentSize) + 10)
 	rootHash := MerkleRoot(data)
 
 	// Create and verify a proof for the last index.
@@ -84,22 +83,10 @@ func TestCachedTree(t *testing.T) {
 
 	// Build a cached tree out of 4 subtrees, each subtree of height 2 (4
 	// elements).
-	tree1Bytes, err := RandBytes(SegmentSize * 4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tree2Bytes, err := RandBytes(SegmentSize * 4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tree3Bytes, err := RandBytes(SegmentSize * 4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tree4Bytes, err := RandBytes(SegmentSize * 4)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tree1Bytes := fastrand.Bytes(SegmentSize * 4)
+	tree2Bytes := fastrand.Bytes(SegmentSize * 4)
+	tree3Bytes := fastrand.Bytes(SegmentSize * 4)
+	tree4Bytes := fastrand.Bytes(SegmentSize * 4)
 	tree1Root := MerkleRoot(tree1Bytes)
 	tree2Root := MerkleRoot(tree2Bytes)
 	tree3Root := MerkleRoot(tree3Bytes)
@@ -155,23 +142,10 @@ func TestOddDataSize(t *testing.T) {
 
 	// Create some random data that's not evenly padded.
 	for i := 0; i < 25; i++ {
-		randFullSegments, err := RandIntn(65)
-		if err != nil {
-			t.Fatal(err)
-		}
-		randOverflow, err := RandIntn(63)
-		if err != nil {
-			t.Fatal(err)
-		}
-		randOverflow++ // Range is [1, 63] instead of [0, 62]
-		randProofIndex, err := RandIntn(randFullSegments + 1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		data, err := RandBytes(SegmentSize*randFullSegments + randOverflow)
-		if err != nil {
-			t.Fatal(err)
-		}
+		randFullSegments := fastrand.Intn(65)
+		randOverflow := fastrand.Intn(63) + 1
+		randProofIndex := fastrand.Intn(randFullSegments + 1)
+		data := fastrand.Bytes(SegmentSize*randFullSegments + randOverflow)
 		root := MerkleRoot(data)
 		base, hashSet := MerkleProof(data, uint64(randProofIndex))
 		if !VerifySegment(base, hashSet, uint64(randFullSegments)+1, uint64(randProofIndex), root) {

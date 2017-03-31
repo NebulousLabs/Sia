@@ -11,8 +11,8 @@ package host
 
 // TODO: Test the safety of the builder, it should be okay to have multiple
 // builders open for up to 600 seconds, which means multiple blocks could be
-// received in that time period. Should also check what happens if a prent gets
-// confirmed on the blockchain before the builder is finished.
+// received in that time period. Should also check what happens if a parent
+// gets confirmed on the blockchain before the builder is finished.
 
 // TODO: Double check that any network connection has a finite deadline -
 // handling action items properly requires that the locks held on the
@@ -73,7 +73,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/host/storagemanager"
+	"github.com/NebulousLabs/Sia/modules/host/contractmanager"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -98,7 +98,7 @@ var (
 	// used to recognize other persist files.
 	persistMetadata = persist.Metadata{
 		Header:  "Sia Host",
-		Version: "0.5",
+		Version: "1.2.0",
 	}
 
 	// errHostClosed gets returned when a call is rejected due to the host
@@ -115,7 +115,7 @@ var (
 // performing the storage proofs on the received files.
 type Host struct {
 	// RPC Metrics - atomic variables need to be placed at the top to preserve
-	// compatibility with 32bit systems.
+	// compatibility with 32bit systems. These values are not persistent.
 	atomicDownloadCalls       uint64
 	atomicErroredCalls        uint64
 	atomicFormContractCalls   uint64
@@ -128,6 +128,7 @@ type Host struct {
 	// Error management. There are a few different types of errors returned by
 	// the host. These errors intentionally not persistent, so that the logging
 	// limits of each error type will be reset each time the host is reset.
+	// These values are not persistent.
 	atomicCommunicationErrors uint64
 	atomicConnectionErrors    uint64
 	atomicConsensusErrors     uint64
@@ -141,31 +142,22 @@ type Host struct {
 	dependencies
 	modules.StorageManager
 
-	// Consensus Tracking.
-	blockHeight  types.BlockHeight
-	recentChange modules.ConsensusChangeID
+	// Host ACID fields - these fields need to be updated in serial, ACID
+	// transactions.
+	announced         bool
+	announceConfirmed bool
+	blockHeight       types.BlockHeight
+	publicKey         types.SiaPublicKey
+	secretKey         crypto.SecretKey
+	recentChange      modules.ConsensusChangeID
+	unlockHash        types.UnlockHash // A wallet address that can receive coins.
 
-	// Host Identity
-	//
-	// The revision number keeps track of the current revision number on the
-	// host external settingse
-	//
-	// The auto address is the address that is fetched automatically by the
-	// host. The host will ignore the automatic address if settings.NetAddress
-	// has been set by the user. If settings.NetAddress is blank, then the host
-	// will track its own ip address and make an announcement on the blockchain
-	// every time that the address changes.
-	//
-	// The announced bool indicates whether the host remembers having a
-	// successful announcement with the current address.
-	announced        bool
-	autoAddress      modules.NetAddress
+	// Host transient fields - these fields are either determined at startup or
+	// otherwise are not critical to always be correct.
+	autoAddress      modules.NetAddress // Determined using automatic tooling in network.go
 	financialMetrics modules.HostFinancialMetrics
-	publicKey        types.SiaPublicKey
-	revisionNumber   uint64
-	secretKey        crypto.SecretKey
 	settings         modules.HostInternalSettings
-	unlockHash       types.UnlockHash // A wallet address that can receive coins.
+	revisionNumber   uint64
 
 	// A map of storage obligations that are currently being modified. Locks on
 	// storage obligations can be long-running, and each storage obligation can
@@ -265,7 +257,7 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 
 	// Add the storage manager to the host, and set up the stop call that will
 	// close the storage manager.
-	h.StorageManager, err = storagemanager.New(filepath.Join(persistDir, "storagemanager"))
+	h.StorageManager, err = contractmanager.New(filepath.Join(persistDir, "contractmanager"))
 	if err != nil {
 		h.log.Println("Could not open the storage manager:", err)
 		return nil, err
@@ -276,15 +268,6 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 			h.log.Println("Could not close storage manager:", err)
 		}
 	})
-
-	// After opening the database, it must be initialized. Most commonly,
-	// nothing happens. But for new databases, a set of buckets must be
-	// created. Initialization is also a good time to run sanity checks.
-	err = h.initDB()
-	if err != nil {
-		h.log.Println("Could not initalize database:", err)
-		return nil, err
-	}
 
 	// Load the prior persistence structures, and configure the host to save
 	// before shutting down.
