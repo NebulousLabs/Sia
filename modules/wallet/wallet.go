@@ -79,7 +79,8 @@ type Wallet struct {
 
 	// The wallet's database tracks its seeds, keys, outputs, and
 	// transactions. A global db transaction is maintained in memory to avoid
-	// excessive disk writes.
+	// excessive disk writes. Any operations involving dbTx must hold an
+	// exclusive lock.
 	db   *persist.BoltDatabase
 	dbTx *bolt.Tx
 
