@@ -3,6 +3,7 @@ package wallet
 import (
 	"encoding/binary"
 	"reflect"
+	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -65,6 +66,42 @@ var (
 	keySpendableKeyFiles      = []byte("keySpendableKeyFiles")
 	keyAuxiliarySeedFiles     = []byte("keyAuxiliarySeedFiles")
 )
+
+// threadedDBUpdate commits the active database transaction and starts a new
+// transaction.
+func (w *Wallet) threadedDBUpdate() {
+	if err := w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
+	for {
+		select {
+		case <-time.After(2 * time.Minute):
+		case <-w.tg.StopChan():
+			return
+		}
+		w.mu.Lock()
+		w.syncDB()
+		w.mu.Unlock()
+	}
+}
+
+// syncDB commits the current global transaction and immediately begins a
+// new one. It must be called with a write-lock.
+func (w *Wallet) syncDB() {
+	// commit the current tx
+	err := w.dbTx.Commit()
+	if err != nil {
+		w.log.Severe("ERROR: failed to apply database update:", err)
+		w.dbTx.Rollback()
+	}
+	// begin a new tx
+	w.dbTx, err = w.db.Begin(true)
+	if err != nil {
+		w.log.Severe("ERROR: failed to start database update:", err)
+	}
+}
 
 // dbPut is a helper function for storing a marshalled key/value pair.
 func dbPut(b *bolt.Bucket, key, val interface{}) error {

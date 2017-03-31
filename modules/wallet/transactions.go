@@ -6,8 +6,6 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/NebulousLabs/bolt"
 )
 
 var (
@@ -17,26 +15,23 @@ var (
 // AddressTransactions returns all of the wallet transactions associated with a
 // single unlock hash.
 func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction) {
+	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.syncDB()
 
-	err := w.db.View(func(tx *bolt.Tx) error {
-		return dbForEachProcessedTransaction(tx, func(pt modules.ProcessedTransaction) {
-			relevant := false
-			for _, input := range pt.Inputs {
-				relevant = relevant || input.RelatedAddress == uh
-			}
-			for _, output := range pt.Outputs {
-				relevant = relevant || output.RelatedAddress == uh
-			}
-			if relevant {
-				pts = append(pts, pt)
-			}
-		})
+	dbForEachProcessedTransaction(w.dbTx, func(pt modules.ProcessedTransaction) {
+		relevant := false
+		for _, input := range pt.Inputs {
+			relevant = relevant || input.RelatedAddress == uh
+		}
+		for _, output := range pt.Outputs {
+			relevant = relevant || output.RelatedAddress == uh
+		}
+		if relevant {
+			pts = append(pts, pt)
+		}
 	})
-	if err != nil {
-		panic(err)
-	}
 
 	return pts
 }
@@ -44,8 +39,10 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 // AddressUnconfirmedHistory returns all of the unconfirmed wallet transactions
 // related to a specific address.
 func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction) {
+	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.syncDB()
 
 	// Scan the full list of unconfirmed transactions to see if there are any
 	// related transactions.
@@ -72,67 +69,66 @@ func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modu
 
 // Transaction returns the transaction with the given id. 'False' is returned
 // if the transaction does not exist.
-func (w *Wallet) Transaction(txid types.TransactionID) (modules.ProcessedTransaction, bool) {
+func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTransaction, found bool) {
+	// ensure durability of reported transaction
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.syncDB()
 
-	var pt modules.ProcessedTransaction
-	found := false
-	w.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(bucketProcessedTransactions).Cursor()
-		for key, val := c.First(); key != nil; key, val = c.Next() {
-			if err := encoding.Unmarshal(val, &pt); err != nil {
-				return err
+	c := w.dbTx.Bucket(bucketProcessedTransactions).Cursor()
+	for key, val := c.First(); key != nil; key, val = c.Next() {
+		if err := encoding.Unmarshal(val, &pt); err != nil {
+			if err != nil {
+				w.log.Severe("ERROR: failed to decode database entry:", err)
 			}
-			if pt.TransactionID == txid {
-				found = true
-				break
-			}
+			return
 		}
-		return nil
-	})
-	return pt, found
+		if pt.TransactionID == txid {
+			return pt, true
+		}
+	}
+
+	return
 }
 
 // Transactions returns all transactions relevant to the wallet that were
 // confirmed in the range [startHeight, endHeight].
 func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []modules.ProcessedTransaction, err error) {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+	// ensure durability of reported transactions
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.syncDB()
 
-	err = w.db.View(func(tx *bolt.Tx) error {
-		height, err := dbGetConsensusHeight(tx)
-		if err != nil {
-			return err
-		} else if startHeight > height || startHeight > endHeight {
-			return errOutOfBounds
-		}
+	height, err := dbGetConsensusHeight(w.dbTx)
+	if err != nil {
+		return
+	} else if startHeight > height || startHeight > endHeight {
+		return nil, errOutOfBounds
+	}
 
-		c := tx.Bucket(bucketProcessedTransactions).Cursor()
-		for key, val := c.First(); key != nil; key, val = c.Next() {
-			var pt modules.ProcessedTransaction
-			if err := encoding.Unmarshal(val, &pt); err != nil {
-				return err
-			}
-			if pt.ConfirmationHeight < startHeight {
-				continue
-			} else if pt.ConfirmationHeight > endHeight {
-				// transactions are stored in chronological order, so we can
-				// break as soon as we are above endHeight
-				break
-			} else {
-				pts = append(pts, pt)
-			}
+	c := w.dbTx.Bucket(bucketProcessedTransactions).Cursor()
+	for key, val := c.First(); key != nil; key, val = c.Next() {
+		var pt modules.ProcessedTransaction
+		if err = encoding.Unmarshal(val, &pt); err != nil {
+			return
 		}
-		return nil
-	})
+		if pt.ConfirmationHeight < startHeight {
+			continue
+		} else if pt.ConfirmationHeight > endHeight {
+			// transactions are stored in chronological order, so we can
+			// break as soon as we are above endHeight
+			break
+		} else {
+			pts = append(pts, pt)
+		}
+	}
 	return
 }
 
 // UnconfirmedTransactions returns the set of unconfirmed transactions that are
 // relevant to the wallet.
 func (w *Wallet) UnconfirmedTransactions() []modules.ProcessedTransaction {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	return w.unconfirmedProcessedTransactions
 }

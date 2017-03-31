@@ -118,23 +118,21 @@ func (w *Wallet) loadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 		}
 	}
 
-	err := w.db.Update(func(tx *bolt.Tx) error {
-		err := checkMasterKey(tx, masterKey)
-		if err != nil {
-			return err
-		}
+	err := checkMasterKey(w.dbTx, masterKey)
+	if err != nil {
+		return err
+	}
 
-		// create a seedFile for the seed
-		sf := createSeedFile(masterKey, seed)
+	// create a seedFile for the seed
+	sf := createSeedFile(masterKey, seed)
 
-		// add the seedFile
-		var current []seedFile
-		err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyAuxiliarySeedFiles), &current)
-		if err != nil {
-			return err
-		}
-		return tx.Bucket(bucketWallet).Put(keyAuxiliarySeedFiles, encoding.Marshal(append(current, sf)))
-	})
+	// add the seedFile
+	var current []seedFile
+	err = encoding.Unmarshal(w.dbTx.Bucket(bucketWallet).Get(keyAuxiliarySeedFiles), &current)
+	if err != nil {
+		return err
+	}
+	err = w.dbTx.Bucket(bucketWallet).Put(keyAuxiliarySeedFiles, encoding.Marshal(append(current, sf)))
 	if err != nil {
 		return err
 	}
@@ -185,15 +183,7 @@ func (w *Wallet) PrimarySeed() (modules.Seed, uint64, error) {
 	if !w.unlocked {
 		return modules.Seed{}, 0, modules.ErrLockedWallet
 	}
-	// TODO: going to the db is slow; consider caching progress. On the other
-	// hand, PrimarySeed isn't a frequently called method, so caching may be
-	// overkill.
-	var progress uint64
-	err := w.db.View(func(tx *bolt.Tx) error {
-		var err error
-		progress, err = dbGetPrimarySeedProgress(tx)
-		return err
-	})
+	progress, err := dbGetPrimarySeedProgress(w.dbTx)
 	if err != nil {
 		return modules.Seed{}, 0, err
 	}
@@ -215,17 +205,17 @@ func (w *Wallet) NextAddress() (types.UnlockConditions, error) {
 		return types.UnlockConditions{}, err
 	}
 	defer w.tg.Done()
-	w.mu.Lock()
-	defer w.mu.Unlock()
 
 	// TODO: going to the db is slow; consider creating 100 addresses at a
 	// time.
-	var uc types.UnlockConditions
-	err := w.db.Update(func(tx *bolt.Tx) error {
-		var err error
-		uc, err = w.nextPrimarySeedAddress(tx)
-		return err
-	})
+	w.mu.Lock()
+	uc, err := w.nextPrimarySeedAddress(w.dbTx)
+	w.syncDB() // ensure durability of reported address
+	w.mu.Unlock()
+	if err != nil {
+		return types.UnlockConditions{}, err
+	}
+
 	return uc, err
 }
 
@@ -265,12 +255,9 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 	}
 
 	// get an address to spend into
-	var uc types.UnlockConditions
-	err = w.db.Update(func(tx *bolt.Tx) error {
-		var err error
-		uc, err = w.nextPrimarySeedAddress(tx)
-		return err
-	})
+	w.mu.Lock()
+	uc, err := w.nextPrimarySeedAddress(w.dbTx)
+	w.mu.Unlock()
 	if err != nil {
 		return
 	}

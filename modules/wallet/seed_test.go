@@ -10,19 +10,14 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/NebulousLabs/bolt"
 )
 
 // resetChangeID clears the wallet's ConsensusChangeID. When Unlock is called,
 // the wallet will rescan from the genesis block.
 func resetChangeID(w *Wallet) {
-	err := w.db.Update(func(tx *bolt.Tx) error {
-		return dbPutConsensusChangeID(tx, modules.ConsensusChangeBeginning)
-	})
-	if err != nil {
-		panic(err)
-	}
+	w.mu.Lock()
+	dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
+	w.mu.Unlock()
 }
 
 // TestPrimarySeed checks that the correct seed is returned when calling

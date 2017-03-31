@@ -9,6 +9,8 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/NebulousLabs/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -76,8 +78,10 @@ type Wallet struct {
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
 
 	// The wallet's database tracks its seeds, keys, outputs, and
-	// transactions.
-	db *persist.BoltDatabase
+	// transactions. A global db transaction is maintained in memory to avoid
+	// excessive disk writes.
+	db   *persist.BoltDatabase
+	dbTx *bolt.Tx
 
 	persistDir string
 	log        *persist.Logger
@@ -113,6 +117,23 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 	if err != nil {
 		return nil, err
 	}
+
+	// begin the initial transaction
+	w.dbTx, err = w.db.Begin(true)
+	if err != nil {
+		w.log.Critical("ERROR: failed to start database update:", err)
+	}
+
+	// make sure we commit on shutdown
+	w.tg.AfterStop(func() {
+		err := w.dbTx.Commit()
+		if err != nil {
+			w.log.Println("ERROR: failed to apply database update:", err)
+			w.dbTx.Rollback()
+		}
+	})
+	go w.threadedDBUpdate()
+
 	return w, nil
 }
 
