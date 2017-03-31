@@ -108,8 +108,8 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 	var auxiliarySeedFiles []seedFile
 	var unseededKeyFiles []spendableKeyFile
 	err := func() error {
-		w.mu.RLock()
-		defer w.mu.RUnlock()
+		w.mu.Lock()
+		defer w.mu.Unlock()
 
 		// verify masterKey
 		err := checkMasterKey(w.dbTx, masterKey)
@@ -240,9 +240,9 @@ func (w *Wallet) rescanMessage(done chan struct{}) {
 	}
 
 	for {
-		w.mu.RLock()
+		w.mu.Lock()
 		height, _ := dbGetConsensusHeight(w.dbTx)
-		w.mu.RUnlock()
+		w.mu.Unlock()
 		print("\rWallet: scanned to height ", height, "...")
 
 		select {
