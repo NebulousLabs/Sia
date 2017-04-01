@@ -668,6 +668,11 @@ func (pc mockPeerConn) RPCAddr() modules.NetAddress {
 	return "mockPeerConn dialback addr"
 }
 
+// SetDeadline returns 'nil', and does nothing behind the scenes.
+func (pc mockPeerConn) SetDeadline(time.Time) error {
+	return nil
+}
+
 // Read is a mock implementation of modules.PeerConn.Read that always returns
 // an error.
 func (mockPeerConnFailingReader) Read([]byte) (int, error) {

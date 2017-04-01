@@ -5,7 +5,9 @@ package transactionpool
 
 import (
 	"errors"
+	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -37,6 +39,14 @@ var (
 	errEmptySet            = errors.New("transaction set is empty")
 
 	TransactionMinFee = types.SiacoinPrecision.Mul64(2)
+
+	// relayTransactionSetTimeout establishes the timeout for a relay
+	// transaction set call.
+	relayTransactionSetTimeout = build.Select(build.Var{
+		Standard: 3 * time.Minute,
+		Dev:      20 * time.Second,
+		Testing:  3 * time.Second,
+	}).(time.Duration)
 )
 
 // relatedObjectIDs determines all of the object ids related to a transaction.
@@ -326,8 +336,12 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 // the accept is successful, the transaction will be relayed to the gateway's
 // other peers.
 func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
+	err := conn.SetDeadline(time.Now().Add(relayTransactionSetTimeout))
+	if err != nil {
+		return err
+	}
 	var ts []types.Transaction
-	err := encoding.ReadObject(conn, &ts, types.BlockSizeLimit)
+	err = encoding.ReadObject(conn, &ts, types.BlockSizeLimit)
 	if err != nil {
 		return err
 	}

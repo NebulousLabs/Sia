@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	"net"
 	"sync"
 	"time"
 
@@ -31,11 +30,27 @@ var (
 		Testing:  types.BlockHeight(3),
 	}).(types.BlockHeight)
 
-	// sendBlocksTimeout is the timeout for the SendBlocks RPC.
+	// sendBlocksTimeout is the timeout for the SendBlocks RPC, and for the
+	// depricated RelayBlock RPC.
 	sendBlocksTimeout = build.Select(build.Var{
 		Standard: 5 * time.Minute,
 		Dev:      40 * time.Second,
 		Testing:  5 * time.Second,
+	}).(time.Duration)
+
+	// sendBlkTimeout is the timeout for the SendBlocks RPC, and for the
+	// depricated RelayBlock RPC.
+	sendBlkTimeout = build.Select(build.Var{
+		Standard: 4 * time.Minute,
+		Dev:      30 * time.Second,
+		Testing:  4 * time.Second,
+	}).(time.Duration)
+
+	// relayHeaderTimeout is the timeout for the RelayHeader RPC.
+	relayHeaderTimeout = build.Select(build.Var{
+		Standard: 3 * time.Minute,
+		Dev:      20 * time.Second,
+		Testing:  3 * time.Second,
 	}).(time.Duration)
 
 	// minIBDWaitTime is the time threadedInitialBlockchainDownload waits before
@@ -111,12 +126,6 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 	// SendBlocks will timeout. This is by design so that IBD switches peers to
 	// prevent any one peer from stalling IBD.
 	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
-	// Ignore errors returned by SetDeadline if the conn is a pipe in testing.
-	// Pipes do not support Set{,Read,Write}Deadline and should only be used in
-	// testing.
-	if opErr, ok := err.(*net.OpError); ok && opErr.Op == "set" && opErr.Net == "pipe" && build.Release == "testing" {
-		err = nil
-	}
 	if err != nil {
 		return err
 	}
@@ -214,7 +223,11 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 
 // threadedReceiveBlocks is the calling end of the SendBlocks RPC.
 func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
-	err := cs.tg.Add()
+	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
+	if err != nil {
+		return err
+	}
+	err = cs.tg.Add()
 	if err != nil {
 		return err
 	}
@@ -228,7 +241,11 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
-	err := cs.tg.Add()
+	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
+	if err != nil {
+		return err
+	}
+	err = cs.tg.Add()
 	if err != nil {
 		return err
 	}
@@ -332,7 +349,11 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 // rpcRelayBlock is an RPC that accepts a block from a peer.
 // COMPATv0.5.1
 func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
-	err := cs.tg.Add()
+	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
+	if err != nil {
+		return err
+	}
+	err = cs.tg.Add()
 	if err != nil {
 		return err
 	}
@@ -367,7 +388,11 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 
 // threadedRPCRelayHeader is an RPC that accepts a block header from a peer.
 func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
-	err := cs.tg.Add()
+	err := conn.SetDeadline(time.Now().Add(relayHeaderTimeout))
+	if err != nil {
+		return err
+	}
+	err = cs.tg.Add()
 	if err != nil {
 		return err
 	}
@@ -440,7 +465,11 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 
 // rpcSendBlk is an RPC that sends the requested block to the requesting peer.
 func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
-	err := cs.tg.Add()
+	err := conn.SetDeadline(time.Now().Add(sendBlkTimeout))
+	if err != nil {
+		return err
+	}
+	err = cs.tg.Add()
 	if err != nil {
 		return err
 	}
