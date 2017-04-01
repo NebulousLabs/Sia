@@ -181,4 +181,12 @@ var (
 		Dev:      20 * time.Second,
 		Testing:  500 * time.Millisecond,
 	}).(time.Duration)
+
+	// rpcStdDeadline defines the standard deadline that should be used for all
+	// incoming RPC calls.
+	rpcStdDeadline = build.Select(build.Var{
+		Standard: 10 * time.Minute,
+		Dev:      5 * time.Minute,
+		Testing:  90 * time.Second,
+	}).(time.Duration)
 )

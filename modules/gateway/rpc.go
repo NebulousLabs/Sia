@@ -162,7 +162,16 @@ func (g *Gateway) threadedListenPeer(p *peer) {
 			break
 		}
 
-		// it is the handler's responsibility to close the connection
+		// Set a standard deadline on the conn. The handler may set a new
+		// deadline, this is fine.
+		err = conn.SetDeadline(time.Now().Add(rpcStdDeadline))
+		if err != nil {
+			g.log.Printf("Peer connection (%v) deadline could not be set: %v\n", p.NetAddress, err)
+			continue
+		}
+
+		// The handler is responsible for closing the connection, though a
+		// default deadline has been set.
 		go g.threadedHandleConn(conn)
 	}
 	// Signal that the goroutine can shutdown.
