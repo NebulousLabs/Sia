@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	"net"
 	"sync"
 	"time"
 
@@ -127,12 +126,6 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 	// SendBlocks will timeout. This is by design so that IBD switches peers to
 	// prevent any one peer from stalling IBD.
 	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
-	// Ignore errors returned by SetDeadline if the conn is a pipe in testing.
-	// Pipes do not support Set{,Read,Write}Deadline and should only be used in
-	// testing.
-	if opErr, ok := err.(*net.OpError); ok && opErr.Op == "set" && opErr.Net == "pipe" && build.Release == "testing" {
-		err = nil
-	}
 	if err != nil {
 		return err
 	}
@@ -231,12 +224,6 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 // threadedReceiveBlocks is the calling end of the SendBlocks RPC.
 func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
-	// Ignore errors returned by SetDeadline if the conn is a pipe in testing.
-	// Pipes do not support Set{,Read,Write}Deadline and should only be used in
-	// testing.
-	if opErr, ok := err.(*net.OpError); ok && opErr.Op == "set" && opErr.Net == "pipe" && build.Release == "testing" {
-		err = nil
-	}
 	if err != nil {
 		return err
 	}
@@ -402,12 +389,6 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 // threadedRPCRelayHeader is an RPC that accepts a block header from a peer.
 func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 	err := conn.SetDeadline(time.Now().Add(relayHeaderTimeout))
-	// Ignore errors returned by SetDeadline if the conn is a pipe in testing.
-	// Pipes do not support Set{,Read,Write}Deadline and should only be used in
-	// testing.
-	if opErr, ok := err.(*net.OpError); ok && opErr.Op == "set" && opErr.Net == "pipe" && build.Release == "testing" {
-		err = nil
-	}
 	if err != nil {
 		return err
 	}
@@ -485,12 +466,6 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 // rpcSendBlk is an RPC that sends the requested block to the requesting peer.
 func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 	err := conn.SetDeadline(time.Now().Add(sendBlkTimeout))
-	// Ignore errors returned by SetDeadline if the conn is a pipe in testing.
-	// Pipes do not support Set{,Read,Write}Deadline and should only be used in
-	// testing.
-	if opErr, ok := err.(*net.OpError); ok && opErr.Op == "set" && opErr.Net == "pipe" && build.Release == "testing" {
-		err = nil
-	}
 	if err != nil {
 		return err
 	}
