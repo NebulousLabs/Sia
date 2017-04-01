@@ -10,7 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/fastrand"
-	"github.com/NebulousLabs/muxado"
+	"github.com/xtaci/smux"
 )
 
 var (
@@ -36,11 +36,11 @@ func (s invalidVersionError) Error() string {
 
 type peer struct {
 	modules.Peer
-	sess muxado.Session
+	sess *smux.Session
 }
 
 func (p *peer) open() (modules.PeerConn, error) {
-	conn, err := p.sess.Open()
+	conn, err := p.sess.OpenStream()
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (p *peer) open() (modules.PeerConn, error) {
 }
 
 func (p *peer) accept() (modules.PeerConn, error) {
-	conn, err := p.sess.Accept()
+	conn, err := p.sess.AcceptStream()
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +152,14 @@ func (g *Gateway) managedAcceptConnOldPeer(conn net.Conn, remoteVersion string) 
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
+	// create smux session, with default config
+	sess, err := smux.Server(conn, nil)
+	if err != nil {
+		g.log.Debugf("INFO: %v wanted to accept old peer, "+
+			"but failed to create smux server: %v", addr, err)
+		return err
+	}
+
 	// Old peers are unable to give us a dialback port, so we can't verify
 	// whether or not they are local peers.
 	g.acceptPeer(&peer{
@@ -161,7 +169,7 @@ func (g *Gateway) managedAcceptConnOldPeer(conn net.Conn, remoteVersion string) 
 			NetAddress: addr,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Server(conn),
+		sess: sess,
 	})
 	g.addNode(addr)
 	return g.save()
@@ -185,6 +193,15 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 	if _, exists := g.peers[remoteAddr]; exists {
 		return fmt.Errorf("already connected to a peer on that address: %v", remoteAddr)
 	}
+
+	// Create smux session, with default config
+	sess, err := smux.Server(conn, nil)
+	if err != nil {
+		g.log.Debugf("INFO: %v wanted to accept new peer, "+
+			"but failed to create smux server: %v", remoteAddr, err)
+		return err
+	}
+
 	// Accept the peer.
 	g.acceptPeer(&peer{
 		Peer: modules.Peer{
@@ -195,7 +212,7 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Server(conn),
+		sess: sess,
 	})
 
 	// Attempt to ping the supplied address. If successful, we will add
@@ -353,6 +370,15 @@ func acceptConnVersionHandshake(conn net.Conn, version string) (remoteVersion st
 func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
+	// create smux client session, using default config
+	sess, err := smux.Client(conn, nil)
+	if err != nil {
+		g.log.Debugf("INFO: %v wanted to connect to old peer, "+
+			"but failed to create smux server: %v", remoteAddr, err)
+		return err
+	}
+
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			Inbound:    false,
@@ -360,7 +386,7 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Client(conn),
+		sess: sess,
 	})
 	// Add the peer to the node list. We can ignore the error: addNode
 	// validates the address and checks for duplicates, but we don't care
@@ -385,6 +411,15 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
+	// create smux client session, using default config
+	sess, err := smux.Client(conn, nil)
+	if err != nil {
+		g.log.Debugf("INFO: %v wanted to connect to new peer, "+
+			"but failed to create smux server: %v", remoteAddr, err)
+		return err
+	}
+
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			Inbound:    false,
@@ -392,7 +427,7 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Client(conn),
+		sess: sess,
 	})
 	// Add the peer to the node list. We can ignore the error: addNode
 	// validates the address and checks for duplicates, but we don't care
