@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 	"github.com/NebulousLabs/muxado"
 )
@@ -160,6 +162,19 @@ func TestListen(t *testing.T) {
 	if ack != build.Version {
 		t.Fatal("gateway should have given ack")
 	}
+
+	if build.VersionCmp(build.Version, sessionHandshakeUpgradeVersion) >= 0 {
+		// generate fake ID
+		var gID gatewayID
+		fastrand.Read(gID[:])
+		wantConnect := true
+		// continue handshake protocol, this time exchanging the session header
+		err = connectSessionHandshake(conn, gID, wantConnect)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	err = connectPortHandshake(conn, addr.Port())
 	if err != nil {
 		t.Fatal(err)
@@ -425,9 +440,15 @@ func TestConnectRejectsVersions(t *testing.T) {
 	tests := []struct {
 		version             string
 		errWant             error
+		localErrWant        error
 		invalidVersion      bool
 		insufficientVersion bool
 		msg                 string
+		// version required for this test
+		versionRequired string
+		// 1.2.0 sessionHeader extension to handshake protocol
+		genesisID types.BlockID
+		uniqueID  gatewayID
 	}{
 		// Test that Connect fails when the remote peer's version is "reject".
 		{
@@ -485,32 +506,55 @@ func TestConnectRejectsVersions(t *testing.T) {
 		},
 		// Test that Connect succeeds when the remote peer's version is > 0.4.0.
 		{
-			version: "9",
-			msg:     "Connect should succeed when the remote peer's version is 9",
+			version: "0.9.0",
+			msg:     "Connect should succeed when the remote peer's version is 0.9.0",
+		},
+		// Test that Connect /could/ succeed when the remote peer's version is >= 1.2.0.
+		{
+			version:         sessionHandshakeUpgradeVersion,
+			msg:             "Connect should succeed when the remote peer's version is 1.2.0 and sessionHeader checks out",
+			uniqueID:        func() (id gatewayID) { fastrand.Read(id[:]); return }(),
+			genesisID:       types.GenesisID,
+			versionRequired: sessionHandshakeUpgradeVersion,
 		},
 		{
-			version: "9.9.9",
-			msg:     "Connect should succeed when the remote peer's version is 9.9.9",
-		},
-		{
-			version: "9999.9999.9999",
-			msg:     "Connect should succeed when the remote peer's version is 9999.9999.9999",
+			version:         sessionHandshakeUpgradeVersion,
+			msg:             "Connect should not succeed when peer is connecting to itself",
+			uniqueID:        g.id,
+			genesisID:       types.GenesisID,
+			errWant:         errOurAddress,
+			localErrWant:    errOurAddress,
+			versionRequired: sessionHandshakeUpgradeVersion,
 		},
 	}
-	for _, tt := range tests {
+	for testIndex, tt := range tests {
+		if tt.versionRequired != "" && build.VersionCmp(build.Version, tt.versionRequired) < 0 {
+			continue // skip, as we do not meed the required version
+		}
+
 		doneChan := make(chan struct{})
 		go func() {
 			defer close(doneChan)
 			conn, err := listener.Accept()
 			if err != nil {
-				panic(err)
+				panic(fmt.Sprintf("test #%d failed: %s", testIndex, err))
 			}
 			remoteVersion, err := acceptConnVersionHandshake(conn, tt.version)
 			if err != nil {
-				panic(err)
+				panic(fmt.Sprintf("test #%d failed: %s", testIndex, err))
 			}
 			if remoteVersion != build.Version {
-				panic("remoteVersion != build.Version")
+				panic(fmt.Sprintf("test #%d failed: remoteVersion != build.Version", testIndex))
+			}
+			if !build.IsVersion(tt.version) || build.VersionCmp(tt.version, sessionHandshakeUpgradeVersion) < 0 {
+				return // in case test version is gibrish or < 1.2.0
+			}
+
+			if build.VersionCmp(remoteVersion, sessionHandshakeUpgradeVersion) >= 0 &&
+				build.VersionCmp(build.Version, sessionHandshakeUpgradeVersion) >= 0 {
+				if err := acceptConnSessionHandshake(conn, tt.uniqueID); err != tt.localErrWant {
+					panic(fmt.Sprintf("test #%d failed: %v != %v", testIndex, tt.localErrWant, err))
+				}
 			}
 		}()
 		err = g.Connect(modules.NetAddress(listener.Addr().String()))
