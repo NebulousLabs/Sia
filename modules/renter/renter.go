@@ -95,14 +95,14 @@ type hostContractor interface {
 
 	// Editor creates an Editor from the specified contract ID, allowing the
 	// insertion, deletion, and modification of sectors.
-	Editor(types.FileContractID) (contractor.Editor, error)
+	Editor(types.FileContractID, <-chan struct{}) (contractor.Editor, error)
 
 	// IsOffline reports whether the specified host is considered offline.
 	IsOffline(types.FileContractID) bool
 
 	// Downloader creates a Downloader from the specified contract ID,
 	// allowing the retrieval of sectors.
-	Downloader(types.FileContractID) (contractor.Downloader, error)
+	Downloader(types.FileContractID, <-chan struct{}) (contractor.Downloader, error)
 
 	// ResolveID returns the most recent renewal of the specified ID.
 	ResolveID(types.FileContractID) types.FileContractID

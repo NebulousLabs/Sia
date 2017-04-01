@@ -170,7 +170,7 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 
 // Editor returns a Editor object that can be used to upload, modify, and
 // delete sectors on a host.
-func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
+func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ Editor, err error) {
 	c.mu.RLock()
 	id = c.ResolveID(id)
 	cachedEditor, haveEditor := c.editors[id]
@@ -239,7 +239,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 	}
 
 	// create editor
-	e, err := proto.NewEditor(host, contract, height)
+	e, err := proto.NewEditor(host, contract, height, cancel)
 	if proto.IsRevisionMismatch(err) {
 		// try again with the cached revision
 		c.mu.RLock()
@@ -253,7 +253,7 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
 		contract.LastRevision = cached.Revision
 		contract.MerkleRoots = cached.MerkleRoots
-		e, err = proto.NewEditor(host, contract, height)
+		e, err = proto.NewEditor(host, contract, height, cancel)
 	}
 	if err != nil {
 		return nil, err

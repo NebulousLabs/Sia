@@ -42,8 +42,9 @@ func cachedMerkleRoot(roots []crypto.Hash) crypto.Hash {
 // A Editor modifies a Contract by calling the revise RPC on a host. It
 // Editors are NOT thread-safe; calls to Upload must happen in serial.
 type Editor struct {
-	conn net.Conn
-	host modules.HostDBEntry
+	conn      net.Conn
+	closeChan chan struct{}
+	host      modules.HostDBEntry
 
 	height   types.BlockHeight
 	contract modules.RenterContract // updated after each revision
@@ -58,6 +59,7 @@ func (he *Editor) Close() error {
 	// don't care about these errors
 	_, _ = verifySettings(he.conn, he.host)
 	_ = modules.WriteNegotiationStop(he.conn)
+	close(he.closeChan)
 	return he.conn.Close()
 }
 
@@ -244,17 +246,30 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 
 // NewEditor initiates the contract revision process with a host, and returns
 // an Editor.
-func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, currentHeight types.BlockHeight) (*Editor, error) {
+func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, currentHeight types.BlockHeight, cancel <-chan struct{}) (*Editor, error) {
 	// check that contract has enough value to support an upload
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
 	}
 
 	// initiate revision loop
-	conn, err := net.DialTimeout("tcp", string(contract.NetAddress), 15*time.Second)
+	conn, err := (&net.Dialer{
+		Cancel:  cancel,
+		Timeout: 15 * time.Second,
+	}).Dial("tcp", string(contract.NetAddress))
 	if err != nil {
 		return nil, err
 	}
+
+	closeChan := make(chan struct{})
+	go func() {
+		select {
+		case <-cancel:
+			conn.Close()
+		case <-closeChan:
+		}
+	}()
+
 	// allot 2 minutes for RPC request + revision exchange
 	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
 	defer extendDeadline(conn, time.Hour)
@@ -269,9 +284,10 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 
 	// the host is now ready to accept revisions
 	return &Editor{
-		host:     host,
-		height:   currentHeight,
-		contract: contract,
-		conn:     conn,
+		host:      host,
+		height:    currentHeight,
+		contract:  contract,
+		conn:      conn,
+		closeChan: closeChan,
 	}, nil
 }
