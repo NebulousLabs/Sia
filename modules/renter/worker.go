@@ -94,7 +94,7 @@ type (
 
 // download will perform some download work.
 func (w *worker) download(dw downloadWork) {
-	d, err := w.renter.hostContractor.Downloader(w.contractID)
+	d, err := w.renter.hostContractor.Downloader(w.contractID, w.renter.tg.StopChan())
 	if err != nil {
 		select {
 		case dw.resultChan <- finishedDownload{dw.chunkDownload, nil, err, dw.pieceIndex, w.contractID}:
@@ -113,7 +113,7 @@ func (w *worker) download(dw downloadWork) {
 
 // upload will perform some upload work.
 func (w *worker) upload(uw uploadWork) {
-	e, err := w.renter.hostContractor.Editor(w.contractID)
+	e, err := w.renter.hostContractor.Editor(w.contractID, w.renter.tg.StopChan())
 	if err != nil {
 		w.recentUploadFailure = time.Now()
 		w.consecutiveUploadFailures++
