@@ -3,6 +3,7 @@ package encoding
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -104,27 +105,13 @@ func TestEncode(t *testing.T) {
 		}
 	}
 
-	// badWriter should fail on every encode
-	enc := NewEncoder(new(badWriter))
-	for i := range testStructs {
-		err := enc.Encode(testStructs[i])
-		if err != io.ErrShortWrite {
-			t.Errorf("testStructs[%d]: expected ErrShortWrite, got %v", i, err)
-		}
-	}
-	// special case, not covered by testStructs
-	err := enc.Encode(struct{ U [3]uint16 }{[3]uint16{1, 2, 3}})
-	if err != io.ErrShortWrite {
-		t.Error("expected ErrShortWrite, got", err)
-	}
-
 	// bad type
 	defer func() {
 		if recover() == nil {
 			t.Error("expected panic, got nil")
 		}
 	}()
-	enc.Encode(map[int]int{})
+	NewEncoder(ioutil.Discard).Encode(map[int]int{})
 }
 
 // TestDecode tests the Decode function.

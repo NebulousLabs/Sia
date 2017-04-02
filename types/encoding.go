@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/binary"
 	"io"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -9,57 +8,44 @@ import (
 
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (t Transaction) MarshalSia(w io.Writer) error {
-	length := make([]byte, 8)
 	enc := encoding.NewEncoder(w)
-	binary.LittleEndian.PutUint64(length, uint64(len((t.SiacoinInputs))))
-	w.Write(length)
+	encoding.WriteInt(w, len((t.SiacoinInputs)))
 	for i := range t.SiacoinInputs {
 		t.SiacoinInputs[i].MarshalSia(w)
 	}
-	binary.LittleEndian.PutUint64(length, uint64(len((t.SiacoinOutputs))))
-	w.Write(length)
+	encoding.WriteInt(w, len((t.SiacoinOutputs)))
 	for i := range t.SiacoinOutputs {
 		t.SiacoinOutputs[i].MarshalSia(w)
 	}
-	binary.LittleEndian.PutUint64(length, uint64(len((t.FileContracts))))
-	w.Write(length)
+	encoding.WriteInt(w, len((t.FileContracts)))
 	for i := range t.FileContracts {
 		enc.Encode(t.FileContracts[i])
 	}
-	binary.LittleEndian.PutUint64(length, uint64(len((t.FileContractRevisions))))
-	w.Write(length)
+	encoding.WriteInt(w, len((t.FileContractRevisions)))
 	for i := range t.FileContractRevisions {
 		enc.Encode(t.FileContractRevisions[i])
 	}
-	binary.LittleEndian.PutUint64(length, uint64(len((t.StorageProofs))))
-	w.Write(length)
+	encoding.WriteInt(w, len((t.StorageProofs)))
 	for i := range t.StorageProofs {
 		enc.Encode(t.StorageProofs[i])
 	}
-	binary.LittleEndian.PutUint64(length, uint64(len((t.SiafundInputs))))
-	w.Write(length)
+	encoding.WriteInt(w, len((t.SiafundInputs)))
 	for i := range t.SiafundInputs {
 		enc.Encode(t.SiafundInputs[i])
 	}
-	binary.LittleEndian.PutUint64(length, uint64(len((t.SiafundOutputs))))
-	w.Write(length)
+	encoding.WriteInt(w, len((t.SiafundOutputs)))
 	for i := range t.SiafundOutputs {
 		t.SiafundOutputs[i].MarshalSia(w)
 	}
-	binary.LittleEndian.PutUint64(length, uint64(len((t.MinerFees))))
-	w.Write(length)
+	encoding.WriteInt(w, len((t.MinerFees)))
 	for i := range t.MinerFees {
 		t.MinerFees[i].MarshalSia(w)
 	}
-	binary.LittleEndian.PutUint64(length, uint64(len((t.ArbitraryData))))
-	w.Write(length)
+	encoding.WriteInt(w, len((t.ArbitraryData)))
 	for i := range t.ArbitraryData {
-		binary.LittleEndian.PutUint64(length, uint64(len((t.ArbitraryData[i]))))
-		w.Write(length)
-		w.Write(t.ArbitraryData[i])
+		encoding.WritePrefix(w, t.ArbitraryData[i])
 	}
-	binary.LittleEndian.PutUint64(length, uint64(len((t.TransactionSignatures))))
-	w.Write(length)
+	encoding.WriteInt(w, len((t.TransactionSignatures)))
 	for i := range t.TransactionSignatures {
 		err := t.TransactionSignatures[i].MarshalSia(w)
 		if err != nil {
@@ -112,13 +98,10 @@ func (cf CoveredFields) MarshalSia(w io.Writer) error {
 		cf.ArbitraryData,
 		cf.TransactionSignatures,
 	}
-	b := make([]byte, 8)
 	for _, f := range fields {
-		binary.LittleEndian.PutUint64(b, uint64(len(f)))
-		w.Write(b)
+		encoding.WriteInt(w, len(f))
 		for _, u := range f {
-			binary.LittleEndian.PutUint64(b, u)
-			if _, err := w.Write(b); err != nil {
+			if err := encoding.WriteUint64(w, u); err != nil {
 				return err
 			}
 		}
@@ -135,19 +118,18 @@ func (spk SiaPublicKey) MarshalSia(w io.Writer) error {
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (ts TransactionSignature) MarshalSia(w io.Writer) error {
 	w.Write(ts.ParentID[:])
-	w.Write(encoding.EncUint64(ts.PublicKeyIndex))
-	w.Write(encoding.EncUint64(uint64(ts.Timelock)))
+	encoding.WriteUint64(w, ts.PublicKeyIndex)
+	encoding.WriteUint64(w, uint64(ts.Timelock))
 	ts.CoveredFields.MarshalSia(w)
 	return encoding.WritePrefix(w, ts.Signature)
 }
 
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (uc UnlockConditions) MarshalSia(w io.Writer) error {
-	w.Write(encoding.EncUint64(uint64(uc.Timelock)))
-	w.Write(encoding.EncUint64(uint64(len(uc.PublicKeys))))
+	encoding.WriteUint64(w, uint64(uc.Timelock))
+	encoding.WriteInt(w, len(uc.PublicKeys))
 	for _, spk := range uc.PublicKeys {
 		spk.MarshalSia(w)
 	}
-	_, err := w.Write(encoding.EncUint64(uc.SignaturesRequired))
-	return err
+	return encoding.WriteUint64(w, uc.SignaturesRequired)
 }

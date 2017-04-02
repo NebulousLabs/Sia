@@ -137,7 +137,7 @@ func (b Block) MinerPayoutID(i uint64) SiacoinOutputID {
 func (b Block) MarshalSia(w io.Writer) error {
 	w.Write(b.ParentID[:])
 	w.Write(b.Nonce[:])
-	w.Write(encoding.EncUint64(uint64(b.Timestamp)))
+	encoding.WriteUint64(w, uint64(b.Timestamp))
 	return encoding.NewEncoder(w).EncodeAll(b.MinerPayouts, b.Transactions)
 }
 
