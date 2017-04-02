@@ -3,6 +3,7 @@ package proto
 import (
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -18,6 +19,7 @@ type Downloader struct {
 	contract  modules.RenterContract // updated after each revision
 	conn      net.Conn
 	closeChan chan struct{}
+	once      sync.Once
 
 	SaveFn revisionSaver
 }
@@ -103,14 +105,21 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	return hd.contract, sector, nil
 }
 
-// Close cleanly terminates the download loop with the host and closes the
-// connection.
-func (hd *Downloader) Close() error {
+// shutdown terminates the revision loop and signals the goroutine spawned in
+// NewDownloader to return.
+func (hd *Downloader) shutdown() {
 	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
 	// don't care about these errors
 	_, _ = verifySettings(hd.conn, hd.host)
 	_ = modules.WriteNegotiationStop(hd.conn)
 	close(hd.closeChan)
+}
+
+// Close cleanly terminates the download loop with the host and closes the
+// connection.
+func (hd *Downloader) Close() error {
+	// using once ensures that Close is idempotent
+	hd.once.Do(hd.shutdown)
 	return hd.conn.Close()
 }
 

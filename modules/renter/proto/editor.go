@@ -3,6 +3,7 @@ package proto
 import (
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -44,6 +45,7 @@ func cachedMerkleRoot(roots []crypto.Hash) crypto.Hash {
 type Editor struct {
 	conn      net.Conn
 	closeChan chan struct{}
+	once      sync.Once
 	host      modules.HostDBEntry
 
 	height   types.BlockHeight
@@ -52,14 +54,21 @@ type Editor struct {
 	SaveFn revisionSaver
 }
 
-// Close cleanly terminates the revision loop with the host and closes the
-// connection.
-func (he *Editor) Close() error {
+// shutdown terminates the revision loop and signals the goroutine spawned in
+// NewEditor to return.
+func (he *Editor) shutdown() {
 	extendDeadline(he.conn, modules.NegotiateSettingsTime)
 	// don't care about these errors
 	_, _ = verifySettings(he.conn, he.host)
 	_ = modules.WriteNegotiationStop(he.conn)
 	close(he.closeChan)
+}
+
+// Close cleanly terminates the revision loop with the host and closes the
+// connection.
+func (he *Editor) Close() error {
+	// using once ensures that Close is idempotent
+	he.once.Do(he.shutdown)
 	return he.conn.Close()
 }
 
