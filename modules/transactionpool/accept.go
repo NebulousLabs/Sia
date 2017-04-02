@@ -340,6 +340,17 @@ func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+	// Automatically close the channel when tg.Stop() is called.
+	finishedChan := make(chan struct{})
+	defer close(finishedChan)
+	go func() {
+		select {
+		case <-tp.tg.StopChan():
+		case <-finishedChan:
+		}
+		conn.Close()
+	}()
+
 	var ts []types.Transaction
 	err = encoding.ReadObject(conn, &ts, types.BlockSizeLimit)
 	if err != nil {
