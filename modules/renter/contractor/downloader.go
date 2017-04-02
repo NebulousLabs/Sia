@@ -47,8 +47,10 @@ type hostDownloader struct {
 func (hd *hostDownloader) invalidate() {
 	hd.mu.Lock()
 	defer hd.mu.Unlock()
-	hd.downloader.Close()
-	hd.invalid = true
+	if !hd.invalid {
+		hd.downloader.Close()
+		hd.invalid = true
+	}
 	hd.contractor.mu.Lock()
 	delete(hd.contractor.downloaders, hd.contractID)
 	delete(hd.contractor.revising, hd.contractID)
@@ -99,6 +101,7 @@ func (hd *hostDownloader) Close() error {
 	if hd.invalid || hd.clients > 0 {
 		return nil
 	}
+	hd.invalid = true
 	hd.contractor.mu.Lock()
 	delete(hd.contractor.downloaders, hd.contractID)
 	delete(hd.contractor.revising, hd.contractID)

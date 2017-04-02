@@ -64,8 +64,10 @@ type hostEditor struct {
 func (he *hostEditor) invalidate() {
 	he.mu.Lock()
 	defer he.mu.Unlock()
-	he.editor.Close()
-	he.invalid = true
+	if !he.invalid {
+		he.editor.Close()
+		he.invalid = true
+	}
 	he.contractor.mu.Lock()
 	delete(he.contractor.editors, he.contract.ID)
 	delete(he.contractor.revising, he.contract.ID)
@@ -93,6 +95,7 @@ func (he *hostEditor) Close() error {
 	if he.invalid || he.clients > 0 {
 		return nil
 	}
+	he.invalid = true
 	he.contractor.mu.Lock()
 	delete(he.contractor.editors, he.contract.ID)
 	delete(he.contractor.revising, he.contract.ID)
