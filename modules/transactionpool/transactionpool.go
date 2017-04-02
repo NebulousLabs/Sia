@@ -8,11 +8,13 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
 	dbFilename = "transactionpool.db"
+	logFile    = "transactionpool.log"
 )
 
 var (
@@ -70,7 +72,9 @@ type (
 
 		// Utilities.
 		db         *persist.BoltDatabase
+		log        *persist.Logger
 		mu         demotemutex.DemoteMutex
+		tg         sync.ThreadGroup
 		persistDir string
 	}
 )
@@ -105,13 +109,14 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 
 	// Register RPCs
 	g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
+	tp.tg.OnStop(func() {
+		tp.gateway.UnregisterRPC("RelayTransactionSet")
+	})
 	return tp, nil
 }
 
 func (tp *TransactionPool) Close() error {
-	tp.gateway.UnregisterRPC("RelayTransactionSet")
-	tp.consensusSet.Unsubscribe(tp)
-	return tp.db.Close()
+	return tp.tg.Stop()
 }
 
 // FeeEstimation returns an estimation for what fee should be applied to

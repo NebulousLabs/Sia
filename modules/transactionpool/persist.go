@@ -2,9 +2,11 @@ package transactionpool
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
@@ -52,11 +54,29 @@ func (tp *TransactionPool) initPersist() error {
 		return err
 	}
 
+	// Create the tpool logger.
+	tp.log, err = persist.NewFileLogger(filepath.Join(tp.persistDir, logFile))
+	if err != nil {
+		return build.ExtendErr("unable to initialize the transaction pool logger", err)
+	}
+	tp.tg.AfterStop(func() {
+		err := tp.log.Close()
+		if err != nil {
+			fmt.Println("Unable to close the transaction pool logger:", err)
+		}
+	})
+
 	// Open the database file.
 	tp.db, err = persist.OpenDatabase(dbMetadata, filepath.Join(tp.persistDir, dbFilename))
 	if err != nil {
 		return err
 	}
+	tp.tg.AfterStop(func() {
+		err := tp.db.Close()
+		if err != nil {
+			tp.log.Println("Error while closing transaction pool database:", err)
+		}
+	})
 
 	// Create the database and get the most recent consensus change.
 	var cc modules.ConsensusChangeID
@@ -95,9 +115,22 @@ func (tp *TransactionPool) initPersist() error {
 		if resetErr != nil {
 			return resetErr
 		}
-		return tp.consensusSet.ConsensusSetSubscribe(tp, modules.ConsensusChangeBeginning)
+		freshScanErr := tp.consensusSet.ConsensusSetSubscribe(tp, modules.ConsensusChangeBeginning)
+		if freshScanErr != nil {
+			return freshScanErr
+		}
+		tp.tg.OnStop(func() {
+			tp.consensusSet.Unsubscribe(tp)
+		})
+		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	tp.tg.OnStop(func() {
+		tp.consensusSet.Unsubscribe(tp)
+	})
+	return nil
 }
 
 // getRecentConsensusChange returns the most recent consensus change from the
