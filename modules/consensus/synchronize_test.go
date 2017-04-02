@@ -663,6 +663,13 @@ var (
 	errFailingWriter = errors.New("failing writer")
 )
 
+// Close returns 'nil', and does nothing behind the scenes. This is because the
+// testing reuses pipes, but the consensus code now correctly closes conns after
+// handling them.
+func (pc mockPeerConn) Close() error {
+	return nil
+}
+
 // RPCAddr implements this method of the modules.PeerConn interface.
 func (pc mockPeerConn) RPCAddr() modules.NetAddress {
 	return "mockPeerConn dialback addr"

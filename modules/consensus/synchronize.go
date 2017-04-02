@@ -227,6 +227,14 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+	finishedChan := make(chan struct{})
+	go func() {
+		select {
+		case <-cs.tg.StopChan():
+		case <-finishedChan:
+		}
+		conn.Close()
+	}()
 	err = cs.tg.Add()
 	if err != nil {
 		return err
@@ -245,6 +253,15 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+	finishedChan := make(chan struct{})
+	defer close(finishedChan)
+	go func() {
+		select {
+		case <-cs.tg.StopChan():
+		case <-finishedChan:
+		}
+		conn.Close()
+	}()
 	err = cs.tg.Add()
 	if err != nil {
 		return err
@@ -353,6 +370,15 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+	finishedChan := make(chan struct{})
+	defer close(finishedChan)
+	go func() {
+		select {
+		case <-cs.tg.StopChan():
+		case <-finishedChan:
+		}
+		conn.Close()
+	}()
 	err = cs.tg.Add()
 	if err != nil {
 		return err
@@ -392,6 +418,15 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+	finishedChan := make(chan struct{})
+	defer close(finishedChan)
+	go func() {
+		select {
+		case <-cs.tg.StopChan():
+		case <-finishedChan:
+		}
+		conn.Close()
+	}()
 	err = cs.tg.Add()
 	if err != nil {
 		return err
@@ -469,6 +504,15 @@ func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+	finishedChan := make(chan struct{})
+	defer close(finishedChan)
+	go func() {
+		select {
+		case <-cs.tg.StopChan():
+		case <-finishedChan:
+		}
+		conn.Close()
+	}()
 	err = cs.tg.Add()
 	if err != nil {
 		return err
