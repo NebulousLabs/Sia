@@ -3,6 +3,7 @@ package host
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -72,9 +73,7 @@ func (h *Host) managedAnnounce(addr modules.NetAddress) error {
 	return nil
 }
 
-// Announce creates a host announcement transaction, adding information to the
-// arbitrary data, signing the transaction, and submitting it to the
-// transaction pool.
+// Announce creates a host announcement transaction.
 func (h *Host) Announce() error {
 	err := h.tg.Add()
 	if err != nil {
@@ -82,27 +81,67 @@ func (h *Host) Announce() error {
 	}
 	defer h.tg.Done()
 
-	// Determine whether to use the settings.NetAddress or autoAddress.
+	// Grab the internal net address and internal auto address, and compare
+	// them.
 	h.mu.RLock()
-	na := h.settings.NetAddress
-	aa := h.autoAddress
+	userSet := h.settings.NetAddress
+	autoSet := h.autoAddress
 	h.mu.RUnlock()
-	if na != "" {
-		return h.managedAnnounce(na)
+
+	// Check that we have at least one address to work with.
+	if userSet == "" && autoSet == "" {
+		return build.ExtendErr("cannot announce because address could not be determined", err)
 	}
-	if aa == "" {
-		return errUnknownAddress
+
+	// Prefer using the userSet address, otherwise use the automatic address.
+	var annAddr modules.NetAddress
+	if userSet != "" {
+		annAddr = userSet
+	} else {
+		annAddr = autoSet
 	}
-	return h.managedAnnounce(aa)
+
+	// Check that the address is sane, and that the address is also not local.
+	err = annAddr.IsStdValid()
+	if err != nil {
+		return build.ExtendErr("announcement requested with bad net address", err)
+	}
+	if annAddr.IsLocal() && build.Release != "testing" {
+		return errors.New("announcement requested with local net address")
+	}
+
+	// Address has cleared inspection, perform the announcement.
+	return h.managedAnnounce(annAddr)
 }
 
 // AnnounceAddress submits a host announcement to the blockchain to announce a
-// specific address. No checks for validity are performed on the address.
+// specific address.
 func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 	err := h.tg.Add()
 	if err != nil {
 		return err
 	}
 	defer h.tg.Done()
-	return h.managedAnnounce(addr)
+
+	// Check that the address is sane, and that the address is also not local.
+	err = addr.IsStdValid()
+	if err != nil {
+		return build.ExtendErr("announcement requested with bad net address", err)
+	}
+	if addr.IsLocal() {
+		return errors.New("announcement requested with local net address")
+	}
+
+	// Address is valid, update the host's internal net address to match the
+	// specified addr.
+	h.mu.Lock()
+	h.settings.NetAddress = addr
+	h.mu.Unlock()
+
+	// Attempt the actual announcement.
+	err = h.managedAnnounce(addr)
+	if err != nil {
+		return build.ExtendErr("unable to perform manual host announcement", err)
+	}
+	return nil
 }
