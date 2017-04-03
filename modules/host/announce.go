@@ -115,7 +115,8 @@ func (h *Host) Announce() error {
 }
 
 // AnnounceAddress submits a host announcement to the blockchain to announce a
-// specific address.
+// specific address. If there is no error, the host's address will be updated
+// to the supplied address.
 func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 	err := h.tg.Add()
 	if err != nil {
@@ -132,16 +133,16 @@ func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 		return errors.New("announcement requested with local net address")
 	}
 
-	// Address is valid, update the host's internal net address to match the
-	// specified addr.
-	h.mu.Lock()
-	h.settings.NetAddress = addr
-	h.mu.Unlock()
-
 	// Attempt the actual announcement.
 	err = h.managedAnnounce(addr)
 	if err != nil {
 		return build.ExtendErr("unable to perform manual host announcement", err)
 	}
+
+	// Address is valid, update the host's internal net address to match the
+	// specified addr.
+	h.mu.Lock()
+	h.settings.NetAddress = addr
+	h.mu.Unlock()
 	return nil
 }
