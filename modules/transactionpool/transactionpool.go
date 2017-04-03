@@ -3,6 +3,7 @@ package transactionpool
 import (
 	"errors"
 
+	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/demotemutex"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -72,6 +73,7 @@ type (
 
 		// Utilities.
 		db         *persist.BoltDatabase
+		dbTx       *bolt.Tx
 		log        *persist.Logger
 		mu         demotemutex.DemoteMutex
 		tg         sync.ThreadGroup

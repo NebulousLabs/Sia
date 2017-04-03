@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/NebulousLabs/bolt"
 )
+
+const tpoolSyncRate = time.Minute * 2
 
 var (
 	// bucketRecentConsensusChange holds the most recent consensus change seen
@@ -31,6 +34,37 @@ var (
 	// that holds the value of the most recent consensus change.
 	fieldRecentConsensusChange = []byte("RecentConsensusChange")
 )
+
+// threadedRegularSync will make sure that sync gets called on the database
+// every once in a while.
+func (tp *TransactionPool) threadedRegularSync() {
+	for {
+		select {
+		case <-tp.tg.StopChan():
+			// A queued AfterStop will close out the db properly.
+			return
+		case <-time.After(tpoolSyncRate):
+			tp.mu.Lock()
+			tp.syncDB()
+			tp.mu.Unlock()
+		}
+	}
+}
+
+// syncDB commits the current global transaction and immediately begins a new
+// one.
+func (tp *TransactionPool) syncDB() {
+	// Commit the existing tx.
+	err := tp.dbTx.Commit()
+	if err != nil {
+		tp.log.Severe("ERROR: failed to apply database update:", err)
+		tp.dbTx.Rollback()
+	}
+	tp.dbTx, err = tp.db.Begin(true)
+	if err != nil {
+		tp.log.Severe("ERROR: failed to initialize a db transaction:", err)
+	}
+}
 
 // resetDB deletes all consensus related persistence from the transaction pool.
 func (tp *TransactionPool) resetDB(tx *bolt.Tx) error {
@@ -77,31 +111,41 @@ func (tp *TransactionPool) initPersist() error {
 			tp.log.Println("Error while closing transaction pool database:", err)
 		}
 	})
+	// Create the global tpool tx that will be used for most persist actions.
+	tp.dbTx, err = tp.db.Begin(true)
+	if err != nil {
+		return build.ExtendErr("unable to begin tpool dbTx", err)
+	}
+	tp.tg.AfterStop(func() {
+		err := tp.dbTx.Commit()
+		if err != nil {
+			tp.log.Println("Unable to close transaction properly during shutdown:", err)
+		}
+	})
+	// Spin up the thread that occasionally syncrhonizes the database.
+	go tp.threadedRegularSync()
 
 	// Create the database and get the most recent consensus change.
 	var cc modules.ConsensusChangeID
-	err = tp.db.Update(func(tx *bolt.Tx) error {
-		// Create the database buckets.
-		buckets := [][]byte{
-			bucketRecentConsensusChange,
-			bucketConfirmedTransactions,
+	// Create the database buckets.
+	buckets := [][]byte{
+		bucketRecentConsensusChange,
+		bucketConfirmedTransactions,
+	}
+	for _, bucket := range buckets {
+		_, err := tp.dbTx.CreateBucketIfNotExists(bucket)
+		if err != nil {
+			return build.ExtendErr("unable to create the tpool buckets", err)
 		}
-		for _, bucket := range buckets {
-			_, err := tx.CreateBucketIfNotExists(bucket)
-			if err != nil {
-				return err
-			}
-		}
+	}
 
-		// Get the recent consensus change.
-		cc, err = tp.getRecentConsensusChange(tx)
-		if err == errNilConsensusChange {
-			return tp.putRecentConsensusChange(tx, modules.ConsensusChangeBeginning)
-		}
-		return err
-	})
+	// Get the recent consensus change.
+	cc, err = tp.getRecentConsensusChange(tp.dbTx)
+	if err == errNilConsensusChange {
+		err = tp.putRecentConsensusChange(tp.dbTx, modules.ConsensusChangeBeginning)
+	}
 	if err != nil {
-		return err
+		return build.ExtendErr("unable to initialize the recent consensus change in the tpool", err)
 	}
 
 	// Subscribe to the consensus set using the most recent consensus change.
@@ -109,9 +153,7 @@ func (tp *TransactionPool) initPersist() error {
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Reset and rescan because the consensus set does not recognize the
 		// provided consensus change id.
-		resetErr := tp.db.Update(func(tx *bolt.Tx) error {
-			return tp.resetDB(tx)
-		})
+		resetErr := tp.resetDB(tp.dbTx)
 		if resetErr != nil {
 			return resetErr
 		}
