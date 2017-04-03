@@ -165,13 +165,11 @@ func New(gateway modules.Gateway, bootstrap bool, persistDir string) (*Consensus
 
 		// Register RPCs
 		gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)
-		gateway.RegisterRPC("RelayBlock", cs.rpcRelayBlock) // COMPATv0.5.1
 		gateway.RegisterRPC("RelayHeader", cs.threadedRPCRelayHeader)
 		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
 		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
 		cs.tg.OnStop(func() {
 			cs.gateway.UnregisterRPC("SendBlocks")
-			cs.gateway.UnregisterRPC("RelayBlock")
 			cs.gateway.UnregisterRPC("RelayHeader")
 			cs.gateway.UnregisterRPC("SendBlk")
 			cs.gateway.UnregisterConnectCall("SendBlocks")

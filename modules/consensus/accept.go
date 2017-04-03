@@ -21,17 +21,8 @@ var (
 
 // managedBroadcastBlock will broadcast a block to the consensus set's peers.
 func (cs *ConsensusSet) managedBroadcastBlock(b types.Block) {
-	// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1.
-	var relayBlockPeers, relayHeaderPeers []modules.Peer
-	for _, p := range cs.gateway.Peers() {
-		if build.VersionCmp(p.Version, "0.5.1") <= 0 {
-			relayBlockPeers = append(relayBlockPeers, p)
-		} else {
-			relayHeaderPeers = append(relayHeaderPeers, p)
-		}
-	}
-	go cs.gateway.Broadcast("RelayBlock", b, relayBlockPeers)
-	go cs.gateway.Broadcast("RelayHeader", b.Header(), relayHeaderPeers)
+	// broadcast the block header to all peers
+	go cs.gateway.Broadcast("RelayHeader", b.Header(), cs.gateway.Peers())
 }
 
 // validateHeaderAndBlock does some early, low computation verification on the

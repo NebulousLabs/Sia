@@ -30,16 +30,14 @@ var (
 		Testing:  types.BlockHeight(3),
 	}).(types.BlockHeight)
 
-	// sendBlocksTimeout is the timeout for the SendBlocks RPC, and for the
-	// depricated RelayBlock RPC.
+	// sendBlocksTimeout is the timeout for the SendBlocks RPC.
 	sendBlocksTimeout = build.Select(build.Var{
 		Standard: 5 * time.Minute,
 		Dev:      40 * time.Second,
 		Testing:  5 * time.Second,
 	}).(time.Duration)
 
-	// sendBlkTimeout is the timeout for the SendBlocks RPC, and for the
-	// depricated RelayBlock RPC.
+	// sendBlkTimeout is the timeout for the SendBlocks RPC.
 	sendBlkTimeout = build.Select(build.Var{
 		Standard: 4 * time.Minute,
 		Dev:      30 * time.Second,
@@ -170,17 +168,8 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 			// The last block received will be the current block since
 			// managedAcceptBlock only returns nil if a block extends the longest chain.
 			currentBlock := cs.managedCurrentBlock()
-			// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1
-			var relayBlockPeers, relayHeaderPeers []modules.Peer
-			for _, p := range cs.gateway.Peers() {
-				if build.VersionCmp(p.Version, "0.5.1") <= 0 {
-					relayBlockPeers = append(relayBlockPeers, p)
-				} else {
-					relayHeaderPeers = append(relayHeaderPeers, p)
-				}
-			}
-			go cs.gateway.Broadcast("RelayBlock", currentBlock, relayBlockPeers)
-			go cs.gateway.Broadcast("RelayHeader", currentBlock.Header(), relayHeaderPeers)
+			// broadcast the block header to all peers
+			go cs.gateway.Broadcast("RelayHeader", currentBlock.Header(), cs.gateway.Peers())
 		}
 	}()
 
@@ -360,55 +349,6 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 		}
 	}
 
-	return nil
-}
-
-// rpcRelayBlock is an RPC that accepts a block from a peer.
-// COMPATv0.5.1
-func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
-	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
-	if err != nil {
-		return err
-	}
-	finishedChan := make(chan struct{})
-	defer close(finishedChan)
-	go func() {
-		select {
-		case <-cs.tg.StopChan():
-		case <-finishedChan:
-		}
-		conn.Close()
-	}()
-	err = cs.tg.Add()
-	if err != nil {
-		return err
-	}
-	defer cs.tg.Done()
-
-	// Decode the block from the connection.
-	var b types.Block
-	err = encoding.ReadObject(conn, &b, types.BlockSizeLimit)
-	if err != nil {
-		return err
-	}
-
-	// Submit the block to the consensus set and broadcast it.
-	err = cs.managedAcceptBlock(b)
-	if err == errOrphan {
-		// If the block is an orphan, try to find the parents. The block
-		// received from the peer is discarded and will be downloaded again if
-		// the parent is found.
-		go func() {
-			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.managedReceiveBlocks)
-			if err != nil {
-				cs.log.Debugln("WARN: failed to get parents of orphan block:", err)
-			}
-		}()
-	}
-	if err != nil {
-		return err
-	}
-	cs.managedBroadcastBlock(b)
 	return nil
 }
 
