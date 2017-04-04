@@ -190,13 +190,15 @@ func (mrs *MerkleRootSet) UnmarshalJSON(b []byte) error {
 // A RenterContract contains all the metadata necessary to revise or renew a
 // file contract.
 type RenterContract struct {
-	FileContract    types.FileContract         `json:"filecontract"`
 	HostPublicKey   types.SiaPublicKey         `json:"hostpublickey"`
 	ID              types.FileContractID       `json:"id"`
+	NetAddress      NetAddress                 `json:"netaddress"`
+	InGoodStanding  bool                       `json:"valuable"` // if false, host is due for replacement
+
+	FileContract    types.FileContract         `json:"filecontract"`
 	LastRevision    types.FileContractRevision `json:"lastrevision"`
 	LastRevisionTxn types.Transaction          `json:"lastrevisiontxn"`
 	MerkleRoots     MerkleRootSet              `json:"merkleroots"`
-	NetAddress      NetAddress                 `json:"netaddress"`
 	SecretKey       crypto.SecretKey           `json:"secretkey"`
 	StartHeight     types.BlockHeight          `json:"startheight"`
 

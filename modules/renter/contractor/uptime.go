@@ -9,23 +9,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// uptimeMinScans is the minimum number of scans required to judge whether a
-// host is offline or not.
-const uptimeMinScans = 3
-
-// uptimeWindow specifies the duration in which host uptime is checked.
-var uptimeWindow = func() time.Duration {
-	switch build.Release {
-	case "dev":
-		return 30 * time.Minute
-	case "standard":
-		return 7 * 24 * time.Hour // 1 week.
-	case "testing":
-		return 15 * time.Second
-	}
-	panic("undefined uptimeWindow")
-}()
-
 // IsOffline indicates whether a contract's host should be considered offline,
 // based on its scan metrics.
 func (c *Contractor) IsOffline(id types.FileContractID) bool {

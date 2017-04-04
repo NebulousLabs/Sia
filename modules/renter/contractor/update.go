@@ -62,6 +62,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// (harmless if not synced, since hosts will reject our renewal attempts,
 	// but very slow).
 	if cc.Synced {
+		go c.threadedRepairContracts()
 		go func() {
 			// Add the goroutine to the thread group.
 			err := c.tg.Add()
