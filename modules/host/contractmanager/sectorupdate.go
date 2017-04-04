@@ -457,3 +457,31 @@ func (cm *ContractManager) RemoveSector(root crypto.Hash) error {
 
 	return cm.wal.managedRemoveSector(id)
 }
+
+// RemoveSectorBatch is a non-ACID call to remove a bunch of sectors at once.
+// Necessary for compatibility with old renters.
+//
+// TODO: Make ACID, and definitely improve the performance as well.
+func (cm *ContractManager) RemoveSectorBatch(sectorRoots []crypto.Hash) error {
+	// Prevent shutdown until this function completes.
+	err := cm.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cm.tg.Done()
+
+	// Add each sector in a separate goroutine.
+	var wg sync.WaitGroup
+	for _, root := range sectorRoots {
+		wg.Add(1)
+		go func(root crypto.Hash) {
+			id := cm.managedSectorID(root)
+			cm.wal.managedLockSector(id)
+			cm.wal.managedRemoveSector(id) // Error is ignored.
+			cm.wal.managedUnlockSector(id)
+			wg.Done()
+		}(root)
+	}
+	wg.Wait()
+	return nil
+}
