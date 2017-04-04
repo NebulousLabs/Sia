@@ -23,24 +23,26 @@ func TestAddNode(t *testing.T) {
 	g := newTestingGateway(t)
 	defer g.Close()
 
+	const inbound = false
+
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if err := g.addNode(dummyNode); err != nil {
+	if err := g.addNode(dummyNode, inbound); err != nil {
 		t.Fatal("addNode failed:", err)
 	}
-	if err := g.addNode(dummyNode); err != errNodeExists {
+	if err := g.addNode(dummyNode, inbound); err != errNodeExists {
 		t.Error("addNode added duplicate node")
 	}
-	if err := g.addNode("foo"); err == nil {
+	if err := g.addNode("foo", inbound); err == nil {
 		t.Error("addNode added unroutable address")
 	}
-	if err := g.addNode("foo:9981"); err == nil {
+	if err := g.addNode("foo:9981", inbound); err == nil {
 		t.Error("addNode added a non-IP address")
 	}
-	if err := g.addNode("[::]:9981"); err == nil {
+	if err := g.addNode("[::]:9981", inbound); err == nil {
 		t.Error("addNode added unspecified address")
 	}
-	if err := g.addNode(g.myAddr); err != errOurAddress {
+	if err := g.addNode(g.myAddr, inbound); err != errOurAddress {
 		t.Error("addNode added our own address")
 	}
 }
@@ -54,9 +56,11 @@ func TestRemoveNode(t *testing.T) {
 	defer g.Close()
 	t.Parallel()
 
+	const inbound = false
+
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if err := g.addNode(dummyNode); err != nil {
+	if err := g.addNode(dummyNode, inbound); err != nil {
 		t.Fatal("addNode failed:", err)
 	}
 	if err := g.removeNode(dummyNode); err != nil {
@@ -85,9 +89,11 @@ func TestRandomNode(t *testing.T) {
 		t.Fatal("randomNode should fail when the gateway has 0 nodes")
 	}
 
+	const inbound = false
+
 	// Test with 1 node.
 	g.mu.Lock()
-	if err = g.addNode(dummyNode); err != nil {
+	if err = g.addNode(dummyNode, inbound); err != nil {
 		t.Fatal(err)
 	}
 	g.mu.Unlock()
@@ -122,7 +128,7 @@ func TestRandomNode(t *testing.T) {
 	}
 	g.mu.Lock()
 	for addr := range nodes {
-		err := g.addNode(addr)
+		err := g.addNode(addr, inbound)
 		if err != nil {
 			t.Error(err)
 		}
@@ -157,9 +163,11 @@ func TestShareNodes(t *testing.T) {
 	g2 := newNamedTestingGateway(t, "2")
 	defer g2.Close()
 
+	const inbound = false
+
 	// add a node to g2
 	g2.mu.Lock()
-	err := g2.addNode(dummyNode)
+	err := g2.addNode(dummyNode, inbound)
 	g2.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)
@@ -174,7 +182,7 @@ func TestShareNodes(t *testing.T) {
 	// g1 should have received the node
 	time.Sleep(100 * time.Millisecond)
 	g1.mu.Lock()
-	err = g1.addNode(dummyNode)
+	err = g1.addNode(dummyNode, inbound)
 	g1.mu.Unlock()
 	if err == nil {
 		t.Fatal("gateway did not receive nodes during Connect:", g1.nodes)
@@ -182,10 +190,10 @@ func TestShareNodes(t *testing.T) {
 
 	// remove all nodes from both peers
 	g1.mu.Lock()
-	g1.nodes = map[modules.NetAddress]struct{}{}
+	g1.nodes = make(map[modules.NetAddress]*node)
 	g1.mu.Unlock()
 	g2.mu.Lock()
-	g2.nodes = map[modules.NetAddress]struct{}{}
+	g2.nodes = make(map[modules.NetAddress]*node)
 	g2.mu.Unlock()
 
 	// SharePeers should now return no peers
@@ -203,7 +211,7 @@ func TestShareNodes(t *testing.T) {
 	// sharing should be capped at maxSharedNodes
 	for i := 1; i < int(maxSharedNodes)+11; i++ {
 		g2.mu.Lock()
-		err := g2.addNode(modules.NetAddress("111.111.111.111:" + strconv.Itoa(i)))
+		err := g2.addNode(modules.NetAddress("111.111.111.111:"+strconv.Itoa(i)), inbound)
 		g2.mu.Unlock()
 		if err != nil {
 			t.Fatal(err)
