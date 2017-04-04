@@ -16,7 +16,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplyMinerPayouts")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dsco.Value.Cmp(types.NewCurrency64(12)) != 0 {
+	if dsco.Value.Cmp64(12) != 0 {
 		t.Error("miner payout created with wrong currency value")
 	}
 	exists = cst.cs.db.inSiacoinOutputs(mpid0)
@@ -119,7 +119,7 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplyMaturedSiacoinOutputs")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplyMissedStorageProof")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplyMissedStorageProof")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

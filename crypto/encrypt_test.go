@@ -3,25 +3,20 @@ package crypto
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/rand"
 	"testing"
+
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestTwofishEncryption checks that encryption and decryption works correctly.
 func TestTwofishEncryption(t *testing.T) {
 	// Get a key for encryption.
-	key, err := GenerateTwofishKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := GenerateTwofishKey()
 
 	// Encrypt and decrypt a zero plaintext, and compare the decrypted to the
 	// original.
 	plaintext := make([]byte, 600)
-	ciphertext, err := key.EncryptBytes(plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ciphertext := key.EncryptBytes(plaintext)
 	decryptedPlaintext, err := key.DecryptBytes(ciphertext)
 	if err != nil {
 		t.Fatal(err)
@@ -31,15 +26,8 @@ func TestTwofishEncryption(t *testing.T) {
 	}
 
 	// Try again with a nonzero plaintext.
-	plaintext = make([]byte, 600)
-	_, err = rand.Read(plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ciphertext, err = key.EncryptBytes(plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
+	plaintext = fastrand.Bytes(600)
+	ciphertext = key.EncryptBytes(plaintext)
 	decryptedPlaintext, err = key.DecryptBytes(ciphertext)
 	if err != nil {
 		t.Fatal(err)
@@ -49,10 +37,7 @@ func TestTwofishEncryption(t *testing.T) {
 	}
 
 	// Try to decrypt using a different key
-	key2, err := GenerateTwofishKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	key2 := GenerateTwofishKey()
 	_, err = key2.DecryptBytes(ciphertext)
 	if err == nil {
 		t.Fatal("Expecting failed authentication err", err)
@@ -70,10 +55,7 @@ func TestTwofishEncryption(t *testing.T) {
 	}
 
 	// Try to trigger a panic or error with nil values.
-	_, err = key.EncryptBytes(nil)
-	if err != nil {
-		t.Error(err)
-	}
+	key.EncryptBytes(nil)
 	_, err = key.DecryptBytes(nil)
 	if err != ErrInsufficientLen {
 		t.Error("Expecting ErrInsufficientLen:", err)
@@ -83,18 +65,11 @@ func TestTwofishEncryption(t *testing.T) {
 // TestReaderWriter probes the NewReader and NewWriter methods of the key type.
 func TestReaderWriter(t *testing.T) {
 	// Get a key for encryption.
-	key, err := GenerateTwofishKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := GenerateTwofishKey()
 
 	// Generate plaintext.
 	const plaintextSize = 600
-	plaintext := make([]byte, plaintextSize)
-	_, err = rand.Read(plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
+	plaintext := fastrand.Bytes(plaintextSize)
 
 	// Create writer and encrypt plaintext.
 	buf := new(bytes.Buffer)
@@ -125,20 +100,14 @@ func TestTwofishEntropy(t *testing.T) {
 	// entropy. Entropy is measured by compressing the ciphertext with gzip.
 	// 10 * 1000 bytes was chosen to minimize the impact of gzip overhead.
 	const cipherSize = 10e3
-	key, err := GenerateTwofishKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := GenerateTwofishKey()
 	plaintext := make([]byte, cipherSize)
-	ciphertext, err := key.EncryptBytes(plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ciphertext := key.EncryptBytes(plaintext)
 
 	// Gzip the ciphertext
 	var b bytes.Buffer
 	zip := gzip.NewWriter(&b)
-	_, err = zip.Write(ciphertext)
+	_, err := zip.Write(ciphertext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,10 +193,7 @@ func TestCiphertextMarshalling(t *testing.T) {
 // doesn't return an error.
 func TestTwofishNewCipherAssumption(t *testing.T) {
 	// Generate key.
-	key, err := GenerateTwofishKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := GenerateTwofishKey()
 	// Test key length.
 	keyLen := len(key)
 	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
@@ -239,10 +205,7 @@ func TestTwofishNewCipherAssumption(t *testing.T) {
 // as this is the only case where cipher.NewGCM(block) doesn't return an error.
 func TestCipherNewGCMAssumption(t *testing.T) {
 	// Generate a key and then cipher block from key.
-	key, err := GenerateTwofishKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := GenerateTwofishKey()
 	// Test block size.
 	block := key.NewCipher()
 	if block.BlockSize() != 16 {

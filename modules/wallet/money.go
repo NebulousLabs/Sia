@@ -15,16 +15,20 @@ type sortedOutputs struct {
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
 func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
+	// ensure durability of reported balance
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.syncDB()
 
-	for _, sco := range w.siacoinOutputs {
-		siacoinBalance = siacoinBalance.Add(sco.Value)
-	}
-	for _, sfo := range w.siafundOutputs {
+	dbForEachSiacoinOutput(w.dbTx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
+		if sco.Value.Cmp(dustValue()) > 0 {
+			siacoinBalance = siacoinBalance.Add(sco.Value)
+		}
+	})
+	dbForEachSiafundOutput(w.dbTx, func(_ types.SiafundOutputID, sfo types.SiafundOutput) {
 		siafundBalance = siafundBalance.Add(sfo.Value)
 		siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
-	}
+	})
 	return
 }
 
@@ -42,7 +46,7 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 			}
 		}
 		for _, output := range upt.Outputs {
-			if output.FundType == types.SpecifierSiacoinOutput && output.WalletAddress {
+			if output.FundType == types.SpecifierSiacoinOutput && output.WalletAddress && output.Value.Cmp(dustValue()) > 0 {
 				incomingSiacoins = incomingSiacoins.Add(output.Value)
 			}
 		}
@@ -67,17 +71,17 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 	txnBuilder := w.StartTransaction()
 	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
 	if err != nil {
-		return nil, err
+		return nil, build.ExtendErr("unable to fund transaction", err)
 	}
 	txnBuilder.AddMinerFee(tpoolFee)
 	txnBuilder.AddSiacoinOutput(output)
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
-		return nil, err
+		return nil, build.ExtendErr("unable to sign transaction", err)
 	}
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
-		return nil, err
+		return nil, build.ExtendErr("unable to get transaction accepted", err)
 	}
 	return txnSet, nil
 }

@@ -2,9 +2,10 @@ package renter
 
 import (
 	"bytes"
-	"crypto/rand"
 	"io/ioutil"
 	"testing"
+
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestRSEncode tests the rsCode type.
@@ -30,8 +31,7 @@ func TestRSEncode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data := make([]byte, 777)
-	rand.Read(data)
+	data := fastrand.Bytes(777)
 
 	pieces, err := rsc.Encode(data)
 	if err != nil {
@@ -62,8 +62,7 @@ func BenchmarkRSEncode(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	data := make([]byte, 1<<20)
-	rand.Read(data)
+	data := fastrand.Bytes(1 << 20)
 
 	b.SetBytes(1 << 20)
 	b.ResetTimer()
@@ -77,8 +76,7 @@ func BenchmarkRSRecover(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	data := make([]byte, 1<<20)
-	rand.Read(data)
+	data := fastrand.Bytes(1 << 20)
 	pieces, err := rsc.Encode(data)
 	if err != nil {
 		b.Fatal(err)

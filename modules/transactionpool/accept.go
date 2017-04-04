@@ -5,13 +5,13 @@ package transactionpool
 
 import (
 	"errors"
+	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/NebulousLabs/bolt"
 )
 
 const (
@@ -37,6 +37,14 @@ var (
 	errEmptySet            = errors.New("transaction set is empty")
 
 	TransactionMinFee = types.SiacoinPrecision.Mul64(2)
+
+	// relayTransactionSetTimeout establishes the timeout for a relay
+	// transaction set call.
+	relayTransactionSetTimeout = build.Select(build.Var{
+		Standard: 3 * time.Minute,
+		Dev:      20 * time.Second,
+		Testing:  3 * time.Second,
+	}).(time.Duration)
 )
 
 // relatedObjectIDs determines all of the object ids related to a transaction.
@@ -136,7 +144,7 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 
 // handleConflicts detects whether the conflicts in the transaction pool are
 // legal children of the new transaction pool set or not.
-func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []TransactionSetID) error {
+func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []TransactionSetID, txnFn func([]types.Transaction) (modules.ConsensusChange, error)) error {
 	// Create a list of all the transaction ids that compose the set of
 	// conflicts.
 	conflictMap := make(map[types.TransactionID]TransactionSetID)
@@ -176,7 +184,7 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 				conflicts = append(conflicts, conflict)
 			}
 		}
-		return tp.handleConflicts(dedupSet, conflicts)
+		return tp.handleConflicts(dedupSet, conflicts, txnFn)
 	}
 
 	// Merge all of the conflict sets with the input set (input set goes last
@@ -203,13 +211,12 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 	}
 
 	// Check that the transaction set is valid.
-	cc, err := tp.consensusSet.TryTransactionSet(superset)
+	cc, err := txnFn(superset)
 	if err != nil {
-		return modules.NewConsensusConflict(err.Error())
+		return modules.NewConsensusConflict("provided transaction set has prereqs, but is still invalid: " + err.Error())
 	}
 
-	// Remove the conflicts from the transaction pool. The diffs do not need to
-	// be removed, they will be overwritten later in the function.
+	// Remove the conflicts from the transaction pool.
 	for _, conflict := range conflictMap {
 		conflictSet := tp.transactionSets[conflict]
 		tp.transactionListSize -= len(encoding.Marshal(conflictSet))
@@ -236,24 +243,18 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 
 // acceptTransactionSet verifies that a transaction set is allowed to be in the
 // transaction pool, and then adds it to the transaction pool.
-func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
+func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn func([]types.Transaction) (modules.ConsensusChange, error)) error {
 	if len(ts) == 0 {
 		return errEmptySet
 	}
 
 	// Remove all transactions that have been confirmed in the transaction set.
-	err := tp.db.Update(func(tx *bolt.Tx) error {
-		oldTS := ts
-		ts = []types.Transaction{}
-		for _, txn := range oldTS {
-			if !tp.transactionConfirmed(tx, txn.ID()) {
-				ts = append(ts, txn)
-			}
+	oldTS := ts
+	ts = []types.Transaction{}
+	for _, txn := range oldTS {
+		if !tp.transactionConfirmed(tp.dbTx, txn.ID()) {
+			ts = append(ts, txn)
 		}
-		return nil
-	})
-	if err != nil {
-		return err
 	}
 	// If no transactions remain, return a dublicate error.
 	if len(ts) == 0 {
@@ -262,7 +263,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 
 	// Check the composition of the transaction set, including fees and
 	// IsStandard rules.
-	err = tp.checkTransactionSetComposition(ts)
+	err := tp.checkTransactionSetComposition(ts)
 	if err != nil {
 		return err
 	}
@@ -279,11 +280,11 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 		}
 	}
 	if len(conflicts) > 0 {
-		return tp.handleConflicts(ts, conflicts)
+		return tp.handleConflicts(ts, conflicts, txnFn)
 	}
-	cc, err := tp.consensusSet.TryTransactionSet(ts)
+	cc, err := txnFn(ts)
 	if err != nil {
-		return modules.NewConsensusConflict(err.Error())
+		return modules.NewConsensusConflict("provided transaction set is standalone and invalid: " + err.Error())
 	}
 
 	// Add the transaction set to the pool.
@@ -301,26 +302,49 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 // transactions. If the transaction is accepted, it will be relayed to
 // connected peers.
 func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
-	tp.mu.Lock()
-	defer tp.mu.Unlock()
-
-	err := tp.acceptTransactionSet(ts)
-	if err != nil {
-		return err
+	// assert on consensus set to get special method
+	cs, ok := tp.consensusSet.(interface {
+		LockedTryTransactionSet(fn func(func(txns []types.Transaction) (modules.ConsensusChange, error)) error) error
+	})
+	if !ok {
+		return errors.New("consensus set does not support LockedTryTransactionSet method")
 	}
 
-	// Notify subscribers and broadcast the transaction set.
-	go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
-	tp.updateSubscribersTransactions()
-	return nil
+	return cs.LockedTryTransactionSet(func(txnFn func(txns []types.Transaction) (modules.ConsensusChange, error)) error {
+		tp.mu.Lock()
+		defer tp.mu.Unlock()
+		err := tp.acceptTransactionSet(ts, txnFn)
+		if err != nil {
+			return err
+		}
+		// Notify subscribers and broadcast the transaction set.
+		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
+		tp.updateSubscribersTransactions()
+		return nil
+	})
 }
 
 // relayTransactionSet is an RPC that accepts a transaction set from a peer. If
 // the accept is successful, the transaction will be relayed to the gateway's
 // other peers.
 func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
+	err := conn.SetDeadline(time.Now().Add(relayTransactionSetTimeout))
+	if err != nil {
+		return err
+	}
+	// Automatically close the channel when tg.Stop() is called.
+	finishedChan := make(chan struct{})
+	defer close(finishedChan)
+	go func() {
+		select {
+		case <-tp.tg.StopChan():
+		case <-finishedChan:
+		}
+		conn.Close()
+	}()
+
 	var ts []types.Transaction
-	err := encoding.ReadObject(conn, &ts, types.BlockSizeLimit)
+	err = encoding.ReadObject(conn, &ts, types.BlockSizeLimit)
 	if err != nil {
 		return err
 	}

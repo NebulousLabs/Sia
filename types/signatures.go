@@ -7,8 +7,10 @@ package types
 // called 'UnlockConditions'.
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -23,7 +25,7 @@ var (
 	SignatureEd25519 = Specifier{'e', 'd', '2', '5', '5', '1', '9'}
 
 	ErrEntropyKey                = errors.New("transaction tries to sign an entproy public key")
-	ErrFrivilousSignature        = errors.New("transaction contains a frivilous siganture")
+	ErrFrivolousSignature        = errors.New("transaction contains a frivolous signature")
 	ErrInvalidPubKeyIndex        = errors.New("transaction contains a signature that points to a nonexistent public key")
 	ErrInvalidUnlockHashChecksum = errors.New("provided unlock hash has an invalid checksum")
 	ErrMissingSignatures         = errors.New("transaction has inputs with missing signatures")
@@ -124,6 +126,15 @@ type (
 		index               int
 	}
 )
+
+// Ed25519PublicKey returns pk as a SiaPublicKey, denoting its algorithm as
+// Ed25519.
+func Ed25519PublicKey(pk crypto.PublicKey) SiaPublicKey {
+	return SiaPublicKey{
+		Algorithm: SignatureEd25519,
+		Key:       pk[:],
+	}
+}
 
 // UnlockHash calculates the root hash of a Merkle tree of the
 // UnlockConditions object. The leaves of this tree are formed by taking the
@@ -327,7 +338,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		// Check that sig corresponds to an entry in sigMap.
 		inSig, exists := sigMap[crypto.Hash(sig.ParentID)]
 		if !exists || inSig.remainingSignatures == 0 {
-			return ErrFrivilousSignature
+			return ErrFrivolousSignature
 		}
 		// Check that sig's key hasn't already been used.
 		_, exists = inSig.usedKeys[sig.PublicKeyIndex]
@@ -389,6 +400,21 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 	}
 
 	return nil
+}
+
+// LoadString is the inverse of SiaPublicKey.String().
+func (spk *SiaPublicKey) LoadString(s string) {
+	parts := strings.Split(s, ":")
+	if len(parts) != 2 {
+		return
+	}
+	var err error
+	spk.Key, err = hex.DecodeString(parts[1])
+	if err != nil {
+		spk.Key = nil
+		return
+	}
+	copy(spk.Algorithm[:], []byte(parts[0]))
 }
 
 // String defines how to print a SiaPublicKey - hex is used to keep things

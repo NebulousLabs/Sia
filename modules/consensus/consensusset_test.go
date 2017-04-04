@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // A consensusSetTester is the helper object for consensus set testing,
@@ -31,13 +31,9 @@ type consensusSetTester struct {
 }
 
 // randAddress returns a random address that is not spendable.
-func randAddress() types.UnlockHash {
-	var uh types.UnlockHash
-	_, err := rand.Read(uh[:])
-	if err != nil {
-		panic(err)
-	}
-	return uh
+func randAddress() (uh types.UnlockHash) {
+	fastrand.Read(uh[:])
+	return
 }
 
 // addSiafunds makes a transaction that moves some testing genesis siafunds
@@ -74,7 +70,7 @@ func (cst *consensusSetTester) addSiafunds() {
 
 	// Check that the siafunds made it to the wallet.
 	_, siafundBalance, _ := cst.wallet.ConfirmedBalance()
-	if siafundBalance.Cmp(types.NewCurrency64(1e3)) != 0 {
+	if !siafundBalance.Equals64(1e3) {
 		panic("wallet does not have the siafunds")
 	}
 }
@@ -112,10 +108,7 @@ func blankConsensusSetTester(name string) (*consensusSetTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return nil, err
-	}
+	key := crypto.GenerateTwofishKey()
 	_, err = w.Encrypt(key)
 	if err != nil {
 		return nil, err
@@ -177,7 +170,7 @@ func TestNilInputs(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	testdir := build.TempDir(modules.ConsensusDir, "TestNilInputs")
+	testdir := build.TempDir(modules.ConsensusDir, t.Name())
 	_, err := New(nil, false, testdir)
 	if err != errNilGateway {
 		t.Fatal(err)
@@ -190,7 +183,7 @@ func TestDatabaseClosing(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	testdir := build.TempDir(modules.ConsensusDir, "TestClosing")
+	testdir := build.TempDir(modules.ConsensusDir, t.Name())
 
 	// Create the gateway.
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))

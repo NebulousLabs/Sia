@@ -2,11 +2,12 @@ package crypto
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/NebulousLabs/fastrand"
 )
 
 type (
@@ -50,9 +51,7 @@ func TestHashing(t *testing.T) {
 	}
 
 	// Call HashBytes on a random byte slice.
-	data := make([]byte, 435)
-	rand.Read(data)
-	h2 := HashBytes(data)
+	h2 := HashBytes(fastrand.Bytes(435))
 	if h2 == emptyHash {
 		t.Error("HashObject returned the zero hash!")
 	}

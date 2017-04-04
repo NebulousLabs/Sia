@@ -186,7 +186,7 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	if err != nil {
 		return nil, err
 	}
-	r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	r, err := renter.New(g, cs, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func assembleAuthenticatedServerTester(requiredPassword string, key crypto.Twofi
 	if err != nil {
 		return nil, err
 	}
-	r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	r, err := renter.New(g, cs, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +351,7 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 }
 
 // blankServerTester creates a server tester object that is ready for testing,
-// without any money in the wallet.
+// without mining any blocks.
 func blankServerTester(name string) (*serverTester, error) {
 	// createServerTester is expensive, and therefore should not be called
 	// during short tests.
@@ -361,10 +361,7 @@ func blankServerTester(name string) (*serverTester, error) {
 
 	// Create the server tester with key.
 	testdir := build.TempDir("api", name)
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return nil, err
-	}
+	key := crypto.GenerateTwofishKey()
 	st, err := assembleServerTester(key, testdir)
 	if err != nil {
 		return nil, err
@@ -384,10 +381,7 @@ func createServerTester(name string) (*serverTester, error) {
 	// Create the testing directory.
 	testdir := build.TempDir("api", name)
 
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return nil, err
-	}
+	key := crypto.GenerateTwofishKey()
 	st, err := assembleServerTester(key, testdir)
 	if err != nil {
 		return nil, err
@@ -417,10 +411,7 @@ func createAuthenticatedServerTester(name string, password string) (*serverTeste
 	// Create the testing directory.
 	testdir := build.TempDir("authenticated-api", name)
 
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return nil, err
-	}
+	key := crypto.GenerateTwofishKey()
 	st, err := assembleAuthenticatedServerTester(password, key, testdir)
 	if err != nil {
 		return nil, err
@@ -448,11 +439,6 @@ func createExplorerServerTester(name string) (*serverTester, error) {
 	return st, nil
 }
 
-// non2xx returns true for non-success HTTP status codes.
-func non2xx(code int) bool {
-	return code < 200 || code > 299
-}
-
 // decodeError returns the api.Error from a API response. This method should
 // only be called if the response's status code is non-2xx. The error returned
 // may not be of type api.Error in the event of an error unmarshalling the
@@ -464,6 +450,25 @@ func decodeError(resp *http.Response) error {
 		return err
 	}
 	return apiErr
+}
+
+// non2xx returns true for non-success HTTP status codes.
+func non2xx(code int) bool {
+	return code < 200 || code > 299
+}
+
+// retry will retry a function multiple times until it returns 'nil'. It will
+// sleep the specified duration between tries. If success is not achieved in the
+// specified number of attempts, the final error is returned.
+func retry(tries int, durationBetweenAttempts time.Duration, fn func() error) (err error) {
+	for i := 0; i < tries-1; i++ {
+		err = fn()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(durationBetweenAttempts)
+	}
+	return fn()
 }
 
 // reloadedServerTester creates a server tester where all of the persistent
@@ -505,7 +510,7 @@ func (st *serverTester) acceptContracts() error {
 	return st.stdPostAPI("/host", settingsValues)
 }
 
-// setHostStorage adds a 1 GB folder to the host.
+// setHostStorage adds a storage folder to the host.
 func (st *serverTester) setHostStorage() error {
 	values := url.Values{}
 	values.Set("path", st.dir)
@@ -521,7 +526,7 @@ func (st *serverTester) announceHost() error {
 	acceptingContractsValues.Set("acceptingcontracts", "true")
 	err := st.stdPostAPI("/host", acceptingContractsValues)
 	if err != nil {
-		return err
+		return build.ExtendErr("couldn't make an api call to the host:", err)
 	}
 
 	announceValues := url.Values{}
@@ -536,12 +541,12 @@ func (st *serverTester) announceHost() error {
 		return err
 	}
 	// wait for announcement
-	var hosts ActiveHosts
+	var hosts HostdbActiveGET
 	err = st.getAPI("/hostdb/active", &hosts)
 	if err != nil {
 		return err
 	}
-	for i := 0; i < 20 && len(hosts.Hosts) == 0; i++ {
+	for i := 0; i < 50 && len(hosts.Hosts) == 0; i++ {
 		time.Sleep(100 * time.Millisecond)
 		err = st.getAPI("/hostdb/active", &hosts)
 		if err != nil {

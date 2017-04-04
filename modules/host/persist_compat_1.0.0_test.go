@@ -2,7 +2,6 @@ package host
 
 import (
 	"path/filepath"
-	"sync/atomic"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -29,8 +28,10 @@ func TestHostPersistCompat100(t *testing.T) {
 	// Close the host and then swap out the persist file for the one that is
 	// being used for testing.
 	ht.host.Close()
-	err = build.CopyFile(filepath.Join("testdata", "persist_compat_1.0.0.json"), filepath.Join(ht.host.persistDir, settingsFile))
+	source := filepath.Join("testdata", "v100Host.tar.gz")
+	err = build.ExtractTarGz(source, filepath.Join(ht.host.persistDir))
 	if err != nil {
+		t.Log(filepath.Abs(source))
 		t.Fatal(err)
 	}
 	h, err := New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
@@ -41,10 +42,6 @@ func TestHostPersistCompat100(t *testing.T) {
 	// Check that, after loading the compatibility file, all of the values are
 	// still correct. The file that was transplanted had no zero-value fields.
 	ht.host.mu.Lock()
-	errCalls := atomic.LoadUint64(&h.atomicErroredCalls)
-	if errCalls == 0 {
-		t.Error("error calls incorrectly loaded after compatibility loading")
-	}
 	if h.financialMetrics.PotentialStorageRevenue.IsZero() {
 		t.Error("potential storage revenue not loaded correctly")
 	}

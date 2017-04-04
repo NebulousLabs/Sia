@@ -15,7 +15,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/encoding"
 
-	"github.com/dchest/blake2b"
+	"golang.org/x/crypto/blake2b"
 )
 
 const (
@@ -35,7 +35,8 @@ var (
 
 // NewHash returns a blake2b 256bit hasher.
 func NewHash() hash.Hash {
-	return blake2b.New256()
+	h, _ := blake2b.New256(nil) // cannot fail with nil argument
+	return h
 }
 
 // HashAll takes a set of objects as input, encodes them all using the encoding
@@ -69,7 +70,7 @@ func (h *Hash) LoadString(s string) error {
 	}
 	hBytes, err := hex.DecodeString(s)
 	if err != nil {
-		return errors.New("could not unmarshal crypto.Hash: " + err.Error())
+		return errors.New("could not unmarshal hash: " + err.Error())
 	}
 	copy(h[:], hBytes)
 	return nil
@@ -96,7 +97,7 @@ func (h *Hash) UnmarshalJSON(b []byte) error {
 	// b[1 : len(b)-1] cuts off the leading and trailing `"` in the JSON string.
 	hBytes, err := hex.DecodeString(string(b[1 : len(b)-1]))
 	if err != nil {
-		return errors.New("could not unmarshal crypto.Hash: " + err.Error())
+		return errors.New("could not unmarshal hash: " + err.Error())
 	}
 	copy(h[:], hBytes)
 	return nil

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NebulousLabs/go-upnp"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+
+	"github.com/NebulousLabs/go-upnp"
 )
 
 // managedLearnHostname discovers the external IP of the Host. If the host's
@@ -23,14 +23,24 @@ func (h *Host) managedLearnHostname() {
 	if build.Release == "testing" {
 		return
 	}
+
+	// Fetch a group of host vars that will be used to dictate the logic of the
+	// function.
 	h.mu.RLock()
 	netAddr := h.settings.NetAddress
+	hostPort := h.port
+	hostAutoAddress := h.autoAddress
+	hostAnnounced := h.announced
+	hostAcceptingContracts := h.settings.AcceptingContracts
+	hostContractCount := h.financialMetrics.ContractCount
 	h.mu.RUnlock()
+
 	// If the settings indicate that an address has been manually set, there is
 	// no reason to learn the hostname.
 	if netAddr != "" {
 		return
 	}
+	h.log.Println("No manually set net address. Scanning to automatically determine address.")
 
 	// try UPnP first, then fallback to myexternalip.com
 	var hostname string
@@ -46,21 +56,21 @@ func (h *Host) managedLearnHostname() {
 		return
 	}
 
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	autoAddress := modules.NetAddress(net.JoinHostPort(hostname, h.port))
+	autoAddress := modules.NetAddress(net.JoinHostPort(hostname, hostPort))
 	if err := autoAddress.IsValid(); err != nil {
 		h.log.Printf("WARN: discovered hostname %q is invalid: %v", autoAddress, err)
 		return
 	}
-	if autoAddress == h.autoAddress && h.announced {
+	if autoAddress == hostAutoAddress && hostAnnounced {
 		// Nothing to do - the auto address has not changed and the previous
 		// annoucement was successful.
 		return
 	}
 
+	h.mu.Lock()
 	h.autoAddress = autoAddress
 	err = h.save()
+	h.mu.Unlock()
 	if err != nil {
 		h.log.Println(err)
 	}
@@ -69,13 +79,16 @@ func (h *Host) managedLearnHostname() {
 	// has a storage obligation. If the host is not accepting contracts and has
 	// no open contracts, there is no reason to notify anyone that the host's
 	// address has changed.
-	if h.settings.AcceptingContracts || h.financialMetrics.ContractCount > 0 {
-		err = h.announce(autoAddress)
+	if hostAcceptingContracts || hostContractCount > 0 {
+		h.log.Println("Host external IP address changed from", hostAutoAddress, "to", autoAddress, "- performing host announcement.")
+		err = h.managedAnnounce(autoAddress)
 		if err != nil {
 			// Set h.announced to false, as the address has changed yet the
 			// renewed annoucement has failed.
+			h.mu.Lock()
 			h.announced = false
-			h.log.Debugln("unable to announce address after upnp-detected address change:", err)
+			h.mu.Unlock()
+			h.log.Println("unable to announce address after upnp-detected address change:", err)
 		}
 	}
 }

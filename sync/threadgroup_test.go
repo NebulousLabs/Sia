@@ -329,7 +329,7 @@ func TestThreadGroupSiaExample(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	testDir := build.TempDir("sync", "TestThreadGroupSiaExample")
+	testDir := build.TempDir("sync", t.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -417,7 +417,7 @@ func TestThreadGroupSiaExample(t *testing.T) {
 		tg.Done()
 	}()
 	tg.Stop()
-	if !threadFinished || !listenerCleanedUp || !fileClosed {
+	if !threadFinished2 || !listenerCleanedUp || !fileClosed {
 		t.Error("stop did not block until all running resources had closed")
 	}
 }

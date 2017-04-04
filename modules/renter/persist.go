@@ -98,7 +98,7 @@ func (f *file) UnmarshalSia(r io.Reader) error {
 	// COMPATv0.4.3 - decode bytesUploaded and chunksUploaded into dummy vars.
 	var bytesUploaded, chunksUploaded uint64
 
-	// decode easy fields
+	// Decode easy fields.
 	err := dec.DecodeAll(
 		&f.name,
 		&f.size,
@@ -112,7 +112,7 @@ func (f *file) UnmarshalSia(r io.Reader) error {
 		return err
 	}
 
-	// decode erasure coder
+	// Decode erasure coder.
 	var codeType string
 	if err := dec.Decode(&codeType); err != nil {
 		return err
@@ -136,7 +136,7 @@ func (f *file) UnmarshalSia(r io.Reader) error {
 		return errors.New("unrecognized erasure code type: " + codeType)
 	}
 
-	// decode contracts
+	// Decode contracts.
 	var nContracts uint64
 	if err := dec.Decode(&nContracts); err != nil {
 		return err
@@ -200,9 +200,10 @@ func (r *Renter) load() error {
 	// encountered during loading are logged, but are not considered fatal.
 	err := filepath.Walk(r.persistDir, func(path string, info os.FileInfo, err error) error {
 		// This error is non-nil if filepath.Walk couldn't stat a file or
-		// folder. This generally indicates a serious error.
+		// folder.
 		if err != nil {
-			return err
+			r.log.Println("WARN: could not stat file or folder during walk:", err)
+			return nil
 		}
 
 		// Skip folders and non-sia files.
@@ -260,7 +261,7 @@ func shareFiles(files []*file, w io.Writer) error {
 	}
 
 	// Create compressor.
-	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
+	zip, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
 	enc := encoding.NewEncoder(zip)
 
 	// Encode each file.

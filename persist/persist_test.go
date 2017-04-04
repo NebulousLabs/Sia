@@ -2,19 +2,19 @@ package persist
 
 import (
 	"bytes"
-	"crypto/rand"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestIntegrationRandomSuffix checks that the random suffix creator creates
 // valid files.
 func TestIntegrationRandomSuffix(t *testing.T) {
-	tmpDir := build.TempDir(persistDir, "TestIntegrationRandomSuffix")
+	tmpDir := build.TempDir(persistDir, t.Name())
 	err := os.MkdirAll(tmpDir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +33,7 @@ func TestIntegrationRandomSuffix(t *testing.T) {
 // TestAbsolutePathSafeFile tests creating and committing safe files with
 // absolute paths.
 func TestAbsolutePathSafeFile(t *testing.T) {
-	tmpDir := build.TempDir(persistDir, "TestAbsolutePathSafeFile")
+	tmpDir := build.TempDir(persistDir, t.Name())
 	err := os.MkdirAll(tmpDir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -54,8 +54,7 @@ func TestAbsolutePathSafeFile(t *testing.T) {
 	}
 
 	// Write random data to the file and commit.
-	data := make([]byte, 10)
-	rand.Read(data)
+	data := fastrand.Bytes(10)
 	_, err = sf.Write(data)
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +79,7 @@ func TestAbsolutePathSafeFile(t *testing.T) {
 // and committing a safe file doesn't affect the safe file's final path. The
 // relative path tested is relative to the working directory.
 func TestRelativePathSafeFile(t *testing.T) {
-	tmpDir := build.TempDir(persistDir, "TestRelativePathSafeFile")
+	tmpDir := build.TempDir(persistDir, t.Name())
 	err := os.MkdirAll(tmpDir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -106,15 +105,14 @@ func TestRelativePathSafeFile(t *testing.T) {
 	}
 
 	// Write random data to the file.
-	data := make([]byte, 10)
-	rand.Read(data)
+	data := fastrand.Bytes(10)
 	_, err = sf.Write(data)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Change directories and commit.
-	tmpChdir := build.TempDir(persistDir, "TestRelativePathSafeFileTmpChdir")
+	tmpChdir := build.TempDir(persistDir, t.Name()+"2")
 	err = os.MkdirAll(tmpChdir, 0700)
 	if err != nil {
 		t.Fatal(err)

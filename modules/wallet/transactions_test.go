@@ -12,7 +12,7 @@ func TestIntegrationTransactions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestIntegrationTransactions")
+	wt, err := createWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestIntegrationTransactions(t *testing.T) {
 	}
 
 	// Try getting a partial history for just the previous block.
-	txns, err = wt.wallet.Transactions(types.MaturityDelay+3, types.MaturityDelay+3)
+	txns, err = wt.wallet.Transactions(types.MaturityDelay+2, types.MaturityDelay+2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestIntegrationAddressTransactions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestTransactionHistory")
+	wt, err := createWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

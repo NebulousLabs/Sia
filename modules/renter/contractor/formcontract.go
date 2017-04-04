@@ -113,7 +113,6 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 
 	contractValue := contract.RenterFunds()
 	c.log.Printf("Formed contract with %v for %v SC", host.NetAddress, contractValue.Div(types.SiacoinPrecision))
-
 	return contract, nil
 }
 
@@ -131,9 +130,9 @@ func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight ty
 	}
 	// Don't select from hosts we've already formed contracts with
 	c.mu.RLock()
-	var exclude []modules.NetAddress
+	var exclude []types.SiaPublicKey
 	for _, contract := range c.contracts {
-		exclude = append(exclude, contract.NetAddress)
+		exclude = append(exclude, contract.HostPublicKey)
 	}
 	c.mu.RUnlock()
 	hosts := c.hdb.RandomHosts(nRandomHosts, exclude)
@@ -160,6 +159,7 @@ func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight ty
 	}
 	// If we couldn't form any contracts, return an error. Otherwise, just log
 	// the failures.
+	//
 	// TODO: is there a better way to handle failure here? Should we prefer an
 	// all-or-nothing approach? We can't pick new hosts to negotiate with
 	// because they'll probably be more expensive than we can afford.

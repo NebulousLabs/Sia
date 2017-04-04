@@ -4,20 +4,21 @@ os:
   - linux
 
 go:
-  - 1.6
+  - 1.8
 
 install:
   - make dependencies
   - test -z "$(go fmt ./...)"
   - make
 
-script: make test && make test-long && make cover && make bench
+script: make test && make test-long && make cover
 
 sudo: false
 
 branches:
   only:
     - master
+    - staging
 
 notifications:
   email: false

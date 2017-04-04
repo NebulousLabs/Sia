@@ -11,20 +11,20 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // newTestingFile initializes a file object with random parameters.
 func newTestingFile() *file {
-	key, _ := crypto.GenerateTwofishKey()
-	data, _ := crypto.RandBytes(8)
-	nData, _ := crypto.RandIntn(10)
-	nParity, _ := crypto.RandIntn(10)
+	data := fastrand.Bytes(8)
+	nData := fastrand.Intn(10)
+	nParity := fastrand.Intn(10)
 	rsc, _ := NewRSCode(nData+1, nParity+1)
 
 	return &file{
 		name:        "testfile-" + strconv.Itoa(int(data[0])),
 		size:        encoding.DecUint64(data[1:5]),
-		masterKey:   key,
+		masterKey:   crypto.GenerateTwofishKey(),
 		erasureCode: rsc,
 		pieceSize:   encoding.DecUint64(data[6:8]),
 	}
@@ -74,7 +74,7 @@ func TestFileShareLoad(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterShareLoad")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,10 +82,12 @@ func TestFileShareLoad(t *testing.T) {
 
 	// Create a file and add it to the renter.
 	savedFile := newTestingFile()
+	id := rt.renter.mu.Lock()
 	rt.renter.files[savedFile.name] = savedFile
+	rt.renter.mu.Unlock(id)
 
 	// Share .sia file to disk.
-	path := filepath.Join(build.SiaTestingDir, "renter", "TestRenterShareLoad", "test.sia")
+	path := filepath.Join(build.SiaTestingDir, "renter", t.Name(), "test.sia")
 	err = rt.renter.ShareFiles([]string{savedFile.name}, path)
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +112,7 @@ func TestFileShareLoad(t *testing.T) {
 	// Share and load multiple files.
 	savedFile2 := newTestingFile()
 	rt.renter.files[savedFile2.name] = savedFile2
-	path = filepath.Join(build.SiaTestingDir, "renter", "TestRenterShareLoad", "test2.sia")
+	path = filepath.Join(build.SiaTestingDir, "renter", t.Name(), "test2.sia")
 	err = rt.renter.ShareFiles([]string{savedFile.name, savedFile2.name}, path)
 	if err != nil {
 		t.Fatal(err)
@@ -142,7 +144,7 @@ func TestFileShareLoadASCII(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterShareLoadASCII")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +152,9 @@ func TestFileShareLoadASCII(t *testing.T) {
 
 	// Create a file and add it to the renter.
 	savedFile := newTestingFile()
+	id := rt.renter.mu.Lock()
 	rt.renter.files[savedFile.name] = savedFile
+	rt.renter.mu.Unlock(id)
 
 	ascii, err := rt.renter.ShareFilesAscii([]string{savedFile.name})
 	if err != nil {
@@ -179,7 +183,7 @@ func TestRenterSaveLoad(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterSaveLoad")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +235,7 @@ func TestRenterPaths(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterPaths")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +299,7 @@ func TestSiafileCompatibility(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestSiafileCompatibility")
+	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

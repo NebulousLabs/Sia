@@ -84,12 +84,9 @@ func (ht *hostTester) initRenting() error {
 // and then stores the key in the host tester.
 func (ht *hostTester) initWallet() error {
 	// Create the keys for the wallet and unlock it.
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return err
-	}
+	key := crypto.GenerateTwofishKey()
 	ht.walletKey = key
-	_, err = ht.wallet.Encrypt(key)
+	_, err := ht.wallet.Encrypt(key)
 	if err != nil {
 		return err
 	}
@@ -196,7 +193,7 @@ func newMockHostTester(d dependencies, name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ht.host.AddStorageFolder(storageFolderOne, modules.SectorSize*8)
+	err = ht.host.AddStorageFolder(storageFolderOne, modules.SectorSize*64)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +202,7 @@ func newMockHostTester(d dependencies, name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ht.host.AddStorageFolder(storageFolderTwo, modules.SectorSize*8*2)
+	err = ht.host.AddStorageFolder(storageFolderTwo, modules.SectorSize*64*2)
 	if err != nil {
 		return nil, err
 	}
@@ -355,25 +352,25 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 	if settings.WindowSize != defaultWindowSize {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.Collateral.Cmp(defaultCollateral) != 0 {
+	if !settings.Collateral.Equals(defaultCollateral) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.CollateralBudget.Cmp(defaultCollateralBudget) != 0 {
+	if !settings.CollateralBudget.Equals(defaultCollateralBudget) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MaxCollateral.Cmp(defaultMaxCollateral) != 0 {
+	if !settings.MaxCollateral.Equals(defaultMaxCollateral) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MinContractPrice.Cmp(defaultContractPrice) != 0 {
+	if !settings.MinContractPrice.Equals(defaultContractPrice) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MinDownloadBandwidthPrice.Cmp(defaultDownloadBandwidthPrice) != 0 {
+	if !settings.MinDownloadBandwidthPrice.Equals(defaultDownloadBandwidthPrice) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MinStoragePrice.Cmp(defaultStoragePrice) != 0 {
+	if !settings.MinStoragePrice.Equals(defaultStoragePrice) {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MinUploadBandwidthPrice.Cmp(defaultUploadBandwidthPrice) != 0 {
+	if !settings.MinUploadBandwidthPrice.Equals(defaultUploadBandwidthPrice) {
 		t.Error("settings retrieval did not return default value")
 	}
 

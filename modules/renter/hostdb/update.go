@@ -1,6 +1,7 @@
 package hostdb
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -26,6 +27,49 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostDBEntry) 
 		}
 	}
 	return
+}
+
+// insertBlockchainHost adds a host entry to the state. The host will be inserted
+// into the set of all hosts, and if it is online and responding to requests it
+// will be put into the list of active hosts.
+func (hdb *HostDB) insertBlockchainHost(host modules.HostDBEntry) {
+	// Remove garbage hosts and local hosts (but allow local hosts in testing).
+	if err := host.NetAddress.IsValid(); err != nil {
+		hdb.log.Debugf("WARN: host '%v' has an invalid NetAddress: %v", host.NetAddress, err)
+		return
+	}
+	// Ignore all local hosts announced through the blockchain.
+	if build.Release == "standard" && host.NetAddress.IsLocal() {
+		return
+	}
+
+	// Make sure the host gets into the host tree so it does not get dropped if
+	// shutdown occurs before a scan can be performed.
+	oldEntry, exists := hdb.hostTree.Select(host.PublicKey)
+	if exists {
+		// Replace the netaddress with the most recently announced netaddress.
+		// Also replace the FirstSeen value with the current block height if
+		// the first seen value has been set to zero (no hosts actually have a
+		// first seen height of zero, but due to rescans hosts can end up with
+		// a zero-value FirstSeen field.
+		oldEntry.NetAddress = host.NetAddress
+		if oldEntry.FirstSeen == 0 {
+			oldEntry.FirstSeen = hdb.blockHeight
+		}
+		err := hdb.hostTree.Modify(oldEntry)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to modify host entry of host tree after a blockchain scan:", err)
+		}
+	} else {
+		host.FirstSeen = hdb.blockHeight
+		err := hdb.hostTree.Insert(host)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to insert host entry into host tree after a blockchain scan:", err)
+		}
+	}
+
+	// Add the host to the scan queue.
+	hdb.queueScan(host)
 }
 
 // ProcessConsensusChange will be called by the consensus set every time there
@@ -55,7 +99,7 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 		} else if hdb.blockHeight != 0 {
 			// Sanity check - if the current block is the genesis block, the
 			// hostdb height should be set to zero.
-			hdb.log.Critical("Hostdb has detected a genesis block, but the height of the hostdbhostdb  is set to ", hdb.blockHeight)
+			hdb.log.Critical("Hostdb has detected a genesis block, but the height of the hostdb is set to ", hdb.blockHeight)
 			hdb.blockHeight = 0
 		}
 	}
@@ -64,13 +108,9 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, block := range cc.AppliedBlocks {
 		for _, host := range findHostAnnouncements(block) {
 			hdb.log.Debugln("Found a host in a host announcement:", host.NetAddress, host.PublicKey)
-			hdb.insertHost(host)
+			hdb.insertBlockchainHost(host)
 		}
 	}
 
 	hdb.lastChange = cc.ID
-	err := hdb.save()
-	if err != nil {
-		hdb.log.Println("Error saving hostdb:", err)
-	}
 }

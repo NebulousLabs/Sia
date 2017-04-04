@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // A Wallet tester contains a ConsensusTester and has a bunch of helpful
@@ -50,10 +50,7 @@ func createWalletTester(name string) (*walletTester, error) {
 		return nil, err
 	}
 	var masterKey crypto.TwofishKey
-	_, err = rand.Read(masterKey[:])
-	if err != nil {
-		return nil, err
-	}
+	fastrand.Read(masterKey[:])
 	_, err = w.Encrypt(masterKey)
 	if err != nil {
 		return nil, err
@@ -112,7 +109,7 @@ func createBlankWalletTester(name string) (*walletTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.WalletDir))
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +128,7 @@ func createBlankWalletTester(name string) (*walletTester, error) {
 }
 
 // closeWt closes all of the modules in the wallet tester.
-func (wt *walletTester) closeWt() {
+func (wt *walletTester) closeWt() error {
 	errs := []error{
 		wt.gateway.Close(),
 		wt.cs.Close(),
@@ -139,14 +136,12 @@ func (wt *walletTester) closeWt() {
 		wt.miner.Close(),
 		wt.wallet.Close(),
 	}
-	if err := build.JoinErrors(errs, "; "); err != nil {
-		panic(err)
-	}
+	return build.JoinErrors(errs, "; ")
 }
 
 // TestNilInputs tries starting the wallet using nil inputs.
 func TestNilInputs(t *testing.T) {
-	testdir := build.TempDir(modules.WalletDir, "TestNilInputs")
+	testdir := build.TempDir(modules.WalletDir, t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -178,7 +173,7 @@ func TestNilInputs(t *testing.T) {
 // TestAllAddresses checks that AllAddresses returns all of the wallet's
 // addresses in sorted order.
 func TestAllAddresses(t *testing.T) {
-	wt, err := createBlankWalletTester("TestAllAddresses")
+	wt, err := createBlankWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +198,7 @@ func TestCloseWallet(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-	testdir := build.TempDir(modules.WalletDir, "TestCloseWallet")
+	testdir := build.TempDir(modules.WalletDir, t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)

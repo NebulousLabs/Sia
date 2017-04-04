@@ -35,12 +35,14 @@ Index
 | [/wallet/addresses](#walletaddresses-get)                       | GET       |
 | [/wallet/backup](#walletbackup-get)                             | GET       |
 | [/wallet/init](#walletinit-post)                                | POST      |
+| [/wallet/init/seed](#walletinitseed-post)                       | POST      |
 | [/wallet/lock](#walletlock-post)                                | POST      |
 | [/wallet/seed](#walletseed-post)                                | POST      |
 | [/wallet/seeds](#walletseeds-get)                               | GET       |
 | [/wallet/siacoins](#walletsiacoins-post)                        | POST      |
 | [/wallet/siafunds](#walletsiafunds-post)                        | POST      |
 | [/wallet/siagkey](#walletsiagkey-post)                          | POST      |
+| [/wallet/sweep/seed](#walletsweepseed-post)                     | POST      |
 | [/wallet/transaction/___:id___](#wallettransactionid-get)       | GET       |
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
@@ -166,10 +168,10 @@ standard success or error response. See
 
 #### /wallet/init [POST]
 
-initializes the wallet. After the wallet has been initialized once, it does not
-need to be initialized again, and future calls to /wallet/init will return an
-error. The encryption password is provided by the api call. If the password is
-blank, then the password will be set to the same as the seed.
+initializes the wallet. After the wallet has been initialized once, it does
+not need to be initialized again, and future calls to /wallet/init will return
+an error. The encryption password is provided by the api call. If the password
+is blank, then the password will be set to the same as the seed.
 
 ###### Query String Parameters
 ```
@@ -190,6 +192,37 @@ dictionary // Optional, default is english.
   "primaryseed": "hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello"
 }
 ```
+
+#### /wallet/init/seed [POST]
+
+initializes the wallet using a preexisting seed. After the wallet has been
+initialized once, it does not need to be initialized again, and future calls
+to /wallet/init/seed will return an error. The encryption password is provided
+by the api call. If the password is blank, then the password will be set to
+the same as the seed. Note that loading a preexisting seed requires scanning
+the blockchain to determine how many keys have been generated from the seed.
+For this reason, /wallet/init/seed can only be called if the blockchain is
+synced.
+
+###### Query String Parameters
+```
+// Password that will be used to encrypt the wallet. All subsequent calls
+// should use this password. If left blank, the seed that gets returned will
+// also be the encryption password.
+encryptionpassword
+
+// Name of the dictionary that should be used when encoding the seed. 'english'
+// is the most common choice when picking a dictionary.
+dictionary // Optional, default is english.
+
+// Dictionary-encoded phrase that corresponds to the seed being used to
+// initialize the wallet.
+seed
+```
+
+###### Response
+standard success or error response. See
+[API.md#standard-responses](/doc/API.md#standard-responses).
 
 #### /wallet/seed [POST]
 
@@ -343,6 +376,34 @@ keyfiles
 ###### Response
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
+
+#### /wallet/sweep/seed [POST]
+
+Function: Scan the blockchain for outputs belonging to a seed and send them to
+an address owned by the wallet.
+
+###### Query String Parameters
+```
+// Name of the dictionary that should be used when decoding the seed. 'english'
+// is the most common choice when picking a dictionary.
+dictionary // Optional, default is english.
+
+// Dictionary-encoded phrase that corresponds to the seed being added to the
+// wallet.
+seed
+```
+
+###### JSON Response
+```javascript
+{
+  // Number of siacoins, in hastings, transferred to the wallet as a result of
+  // the sweep.
+  "coins": "123456", // hastings, big int
+
+  // Number of siafunds transferred to the wallet as a result of the sweep.
+  "funds": "1", // siafunds, big int
+}
+```
 
 #### /wallet/lock [POST]
 

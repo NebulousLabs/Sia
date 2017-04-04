@@ -23,6 +23,17 @@ var (
 	errNilGateway = errors.New("cannot have a nil gateway as input")
 )
 
+// marshaler marshals objects into byte slices and unmarshals byte
+// slices into objects.
+type marshaler interface {
+	Marshal(interface{}) []byte
+	Unmarshal([]byte, interface{}) error
+}
+type stdMarshaler struct{}
+
+func (stdMarshaler) Marshal(v interface{}) []byte            { return encoding.Marshal(v) }
+func (stdMarshaler) Unmarshal(b []byte, v interface{}) error { return encoding.Unmarshal(b, v) }
+
 // The ConsensusSet is the object responsible for tracking the current status
 // of the blockchain. Broadly speaking, it is responsible for maintaining
 // consensus.  It accepts blocks and constructs a blockchain, forking when
@@ -71,7 +82,7 @@ type ConsensusSet struct {
 	synced bool
 
 	// Interfaces to abstract the dependencies of the ConsensusSet.
-	marshaler       encoding.GenericMarshaler
+	marshaler       marshaler
 	blockRuleHelper blockRuleHelper
 	blockValidator  blockValidator
 
@@ -106,7 +117,7 @@ func New(gateway modules.Gateway, bootstrap bool, persistDir string) (*Consensus
 
 		dosBlocks: make(map[types.BlockID]struct{}),
 
-		marshaler:       encoding.StdGenericMarshaler{},
+		marshaler:       stdMarshaler{},
 		blockRuleHelper: stdBlockRuleHelper{},
 		blockValidator:  NewBlockValidator(),
 
@@ -154,13 +165,11 @@ func New(gateway modules.Gateway, bootstrap bool, persistDir string) (*Consensus
 
 		// Register RPCs
 		gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)
-		gateway.RegisterRPC("RelayBlock", cs.rpcRelayBlock) // COMPATv0.5.1
 		gateway.RegisterRPC("RelayHeader", cs.threadedRPCRelayHeader)
 		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
 		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
 		cs.tg.OnStop(func() {
 			cs.gateway.UnregisterRPC("SendBlocks")
-			cs.gateway.UnregisterRPC("RelayBlock")
 			cs.gateway.UnregisterRPC("RelayHeader")
 			cs.gateway.UnregisterRPC("SendBlk")
 			cs.gateway.UnregisterConnectCall("SendBlocks")
@@ -240,8 +249,12 @@ func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
 		return types.Block{}
 	}
 	defer cs.tg.Done()
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
+
+	// Block until a lock can be grabbed on the consensus set, indicating that
+	// all modules have received the most recent block. The lock is held so that
+	// there are no race conditions when trying to synchronize nodes.
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
 
 	_ = cs.db.View(func(tx *bolt.Tx) error {
 		pb := currentProcessedBlock(tx)
@@ -265,6 +278,12 @@ func (cs *ConsensusSet) Height() (height types.BlockHeight) {
 		return 0
 	}
 	defer cs.tg.Done()
+
+	// Block until a lock can be grabbed on the consensus set, indicating that
+	// all modules have received the most recent block. The lock is held so that
+	// there are no race conditions when trying to synchronize nodes.
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
 
 	_ = cs.db.View(func(tx *bolt.Tx) error {
 		height = blockHeight(tx)

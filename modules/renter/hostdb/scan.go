@@ -5,9 +5,6 @@ package hostdb
 // settings of the hosts.
 
 import (
-	"bytes"
-	"crypto/rand"
-	"math/big"
 	"net"
 	"time"
 
@@ -15,54 +12,41 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
-const (
-	defaultScanSleep = 1*time.Hour + 37*time.Minute
-	maxScanSleep     = 4 * time.Hour
-	minScanSleep     = 1*time.Hour + 20*time.Minute
+// queueScan will add a host to the queue to be scanned.
+func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
+	// If this entry is already in the scan pool, can return immediately.
+	_, exists := hdb.scanMap[entry.PublicKey.String()]
+	if exists {
+		return
+	}
 
-	maxActiveHosts              = 500
-	inactiveHostCheckupQuantity = 1000
-
-	maxSettingsLen = 2e3
-
-	hostRequestTimeout = 60 * time.Second
-	hostScanDeadline   = 60 * time.Second
-
-	// scanningThreads is the number of threads that will be probing hosts for
-	// their settings and checking for reliability.
-	scanningThreads = 50
-)
-
-// Reliability is a measure of a host's uptime.
-var (
-	MaxReliability     = types.NewCurrency64(500) // Given the scanning defaults, about 6 weeks of survival.
-	DefaultReliability = types.NewCurrency64(150) // Given the scanning defaults, about 2 week of survival.
-	UnreachablePenalty = types.NewCurrency64(1)
-)
-
-// queueHostEntry will add a host entry to the list of entries waiting to be
-// scanned. If there is no thread that is currently walking through the scan
-// list, one will be created and it will persist until shutdown or until the
-// scan list is empty.
-func (hdb *HostDB) queueHostEntry(entry *hostEntry) {
 	// Add the entry to a waitlist, then check if any thread is currently
 	// emptying the waitlist. If not, spawn a thread to empty the waitlist.
+	hdb.scanMap[entry.PublicKey.String()] = struct{}{}
 	hdb.scanList = append(hdb.scanList, entry)
 	if hdb.scanWait {
 		// Another thread is emptying the scan list, nothing to worry about.
 		return
 	}
 
-	// Nobody is emptying the scan list, volunteer.
-	if hdb.tg.Add() != nil {
-		// Hostdb is shutting down, don't spin up another thread.
-		return
+	// Sanity check - the scan map and the scan list should have the same
+	// length.
+	if build.DEBUG && len(hdb.scanMap) > len(hdb.scanList)+scanningThreads {
+		hdb.log.Critical("The hostdb scan map has seemingly grown too large:", len(hdb.scanMap), len(hdb.scanList), scanningThreads)
 	}
+
 	hdb.scanWait = true
 	go func() {
+		// Nobody is emptying the scan list, volunteer.
+		if hdb.tg.Add() != nil {
+			// Hostdb is shutting down, don't spin up another thread.  It is
+			// okay to leave scanWait set to true as that will not affect
+			// shutdown.
+			return
+		}
 		defer hdb.tg.Done()
 
 		for {
@@ -77,9 +61,18 @@ func (hdb *HostDB) queueHostEntry(entry *hostEntry) {
 			// Get the next host, shrink the scan list.
 			entry := hdb.scanList[0]
 			hdb.scanList = hdb.scanList[1:]
+			delete(hdb.scanMap, entry.PublicKey.String())
+			scansRemaining := len(hdb.scanList)
+
+			// Grab the most recent entry for this host.
+			recentEntry, exists := hdb.hostTree.Select(entry.PublicKey)
+			if exists {
+				entry = recentEntry
+			}
 			hdb.mu.Unlock()
 
-			// Block while we wait for an opening in the scan pool.
+			// Block while waiting for an opening in the scan pool.
+			hdb.log.Debugf("Sending host %v for scan, %v hosts remain", entry.PublicKey.String(), scansRemaining)
 			select {
 			case hdb.scanPool <- entry:
 				// iterate again
@@ -91,102 +84,106 @@ func (hdb *HostDB) queueHostEntry(entry *hostEntry) {
 	}()
 }
 
-// decrementReliability reduces the reliability of a node, moving it out of the
-// set of active hosts or deleting it entirely if necessary.
-func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.Currency) {
-	hdb.log.Debugln("reliability decrement issued for", addr)
-
-	// Look up the entry and decrement the reliability.
-	entry, exists := hdb.allHosts[addr]
-	if !exists {
-		// TODO: should panic here
+// updateEntry updates an entry in the hostdb after a scan has taken place.
+//
+// CAUTION: This function will automatically add multiple entries to a new host
+// to give that host some base uptime. This makes this function co-dependent
+// with the host weight functions. Adjustment of the host weight functions need
+// to keep this function in mind, and vice-versa.
+func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
+	// If the scan failed because we don't have Internet access, toss out this update.
+	if netErr != nil && !hdb.online {
 		return
 	}
-	entry.Reliability = entry.Reliability.Sub(penalty)
-	entry.Online = false
 
-	// If the entry is in the active database, remove it from the active
-	// database.
-	node, exists := hdb.activeHosts[addr]
+	// Grab the host from the host tree.
+	newEntry, exists := hdb.hostTree.Select(entry.PublicKey)
 	if exists {
-		hdb.log.Debugln("host is being pulled from list of active hosts", addr)
-		node.removeNode()
-		delete(hdb.activeHosts, entry.NetAddress)
+		newEntry.HostExternalSettings = entry.HostExternalSettings
+	} else {
+		newEntry = entry
 	}
 
-	// If the reliability has fallen to 0, remove the host from the
-	// database entirely.
-	if entry.Reliability.IsZero() {
-		hdb.log.Debugln("host is being dropped from hostdb", addr)
-		delete(hdb.allHosts, addr)
-	}
-}
-
-// managedUpdateEntry updates an entry in the hostdb after a scan has taken
-// place.
-func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.HostExternalSettings, netErr error) {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-
-	// Regardless of whether the host responded, add it to allHosts.
-	priorHost, exists := hdb.allHosts[entry.NetAddress]
-	if !exists {
-		hdb.allHosts[entry.NetAddress] = entry
-	}
-
-	// If the scan was unsuccessful, decrement the host's reliability.
-	if netErr != nil {
-		if exists && bytes.Equal(priorHost.PublicKey.Key, entry.PublicKey.Key) {
-			// Only decrement the reliability if the public key in the
-			// hostdb matches the public key in the host announcement -
-			// the failure may just be a failed signature, indicating
-			// the wrong public key.
-			hdb.decrementReliability(entry.NetAddress, UnreachablePenalty)
+	// Add the datapoints for the scan.
+	if len(newEntry.ScanHistory) < 2 {
+		// Add two scans to the scan history. Two are needed because the scans
+		// are forward looking, but we want this first scan to represent as
+		// much as one week of uptime or downtime.
+		earliestStartTime := time.Now().Add(time.Hour * 7 * 24 * -1) // Permit up to a week of starting uptime or downtime.
+		suggestedStartTime := time.Now().Add(time.Minute * 10 * time.Duration(hdb.blockHeight-entry.FirstSeen) * -1)
+		if suggestedStartTime.Before(earliestStartTime) {
+			suggestedStartTime = earliestStartTime
 		}
+		newEntry.ScanHistory = modules.HostDBScans{
+			{Timestamp: suggestedStartTime, Success: netErr == nil},
+			{Timestamp: time.Now(), Success: netErr == nil},
+		}
+	} else {
+		if newEntry.ScanHistory[len(newEntry.ScanHistory)-1].Success && netErr != nil {
+			hdb.log.Debugf("Host %v is being downgraded from an online host to an offline host: %v\n", newEntry.PublicKey.String(), netErr)
+		}
+		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: time.Now(), Success: netErr == nil})
+	}
+
+	// If the host's earliest scan is more than a month old and there is no
+	// recent uptime, mark the host for deletion.
+	var recentUptime bool
+	for _, scan := range entry.ScanHistory {
+		if scan.Success {
+			recentUptime = true
+		}
+	}
+
+	// If the host has been offline for too long, delete the host from the
+	// hostdb.
+	if time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime && !recentUptime && len(newEntry.ScanHistory) >= minScans {
+		err := hdb.hostTree.Remove(newEntry.PublicKey)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to remove host newEntry which has had a ton of downtime:", err)
+		}
+
+		// The function should terminate here as no more interaction is needed
+		// with this host.
 		return
 	}
 
-	// The host entry should be updated to reflect the new weight. The safety
-	// properties of the tree require that the weight does not change while the
-	// node is in the tree, so the node must be removed before the settings and
-	// weight are changed.
-	existingNode, exists := hdb.activeHosts[entry.NetAddress]
-	if exists {
-		existingNode.removeNode()
-		delete(hdb.activeHosts, entry.NetAddress)
-	} else if len(hdb.activeHosts) > maxActiveHosts {
-		// We already have the maximum number of active hosts, do not add more.
-		return
+	// Compress any old scans into the historic values.
+	for len(newEntry.ScanHistory) > minScans && time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime {
+		timePassed := newEntry.ScanHistory[1].Timestamp.Sub(newEntry.ScanHistory[0].Timestamp)
+		if newEntry.ScanHistory[1].Success {
+			newEntry.HistoricUptime += timePassed
+		} else {
+			newEntry.HistoricDowntime += timePassed
+		}
+		newEntry.ScanHistory = newEntry.ScanHistory[1:]
 	}
 
-	// Update the host settings, reliability, and weight. The old NetAddress
-	// must be preserved.
-	newSettings.NetAddress = entry.HostExternalSettings.NetAddress
-	entry.HostExternalSettings = newSettings
-	entry.Reliability = MaxReliability
-	entry.Online = true
-	entry.Weight = calculateHostWeight(*entry)
-	hdb.insertNode(entry)
-
-	// Sanity check - the node should be in the hostdb now.
-	_, exists = hdb.activeHosts[entry.NetAddress]
+	// Add the updated entry
 	if !exists {
-		hdb.log.Critical("Host was not added to the list of active hosts after the entry was updated.")
+		err := hdb.hostTree.Insert(newEntry)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to insert entry which is was thought to be new:", err)
+		} else {
+			hdb.log.Debugf("Adding host %v to the hostdb. Net error: %v\n", newEntry.PublicKey.String(), netErr)
+		}
+	} else {
+		err := hdb.hostTree.Modify(newEntry)
+		if err != nil {
+			hdb.log.Println("ERROR: unable to modify entry which is thought to exist:", err)
+		} else {
+			hdb.log.Debugf("Adding host %v to the hostdb. Net error: %v\n", newEntry.PublicKey.String(), netErr)
+		}
 	}
-	hdb.save()
 }
 
 // managedScanHost will connect to a host and grab the settings, verifying
 // uptime and updating to the host's preferences.
-func (hdb *HostDB) managedScanHost(hostEntry *hostEntry) {
+func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	// Request settings from the queued host entry.
-	//
-	// A readlock is necessary when viewing the elements of the host entry.
-	hdb.mu.RLock()
-	netAddr := hostEntry.NetAddress
-	pubKey := hostEntry.PublicKey
-	hdb.mu.RUnlock()
-	hdb.log.Debugln("Scanning", netAddr, pubKey)
+	netAddr := entry.NetAddress
+	pubKey := entry.PublicKey
+	hdb.log.Debugf("Scanning host %v at %v", pubKey, netAddr)
+
 	var settings modules.HostExternalSettings
 	err := func() error {
 		dialer := &net.Dialer{
@@ -217,18 +214,20 @@ func (hdb *HostDB) managedScanHost(hostEntry *hostEntry) {
 		return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 	}()
 	if err != nil {
-		hdb.log.Debugln("Scanning", netAddr, pubKey, "failed:", err)
+		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
 	} else {
-		hdb.log.Debugln("Scanning", netAddr, pubKey, "succeeded")
+		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
+		entry.HostExternalSettings = settings
 	}
 
-	// Update the host tree to have a new entry.
-	hdb.managedUpdateEntry(hostEntry, settings, err)
+	// Update the host tree to have a new entry, including the new error. Then
+	// delete the entry from the scan map as the scan has been successful.
+	hdb.mu.Lock()
+	hdb.updateEntry(entry, err)
+	hdb.mu.Unlock()
 }
 
-// threadedProbeHosts tries to fetch the settings of a host. If successful, the
-// host is put in the set of active hosts. If unsuccessful, the host id deleted
-// from the set of active hosts.
+// threadedProbeHosts pulls hosts from the thread pool and runs a scan on them.
 func (hdb *HostDB) threadedProbeHosts() {
 	err := hdb.tg.Add()
 	if err != nil {
@@ -241,6 +240,26 @@ func (hdb *HostDB) threadedProbeHosts() {
 		case <-hdb.tg.StopChan():
 			return
 		case hostEntry := <-hdb.scanPool:
+			// Block the scan until the host is online.
+			for {
+				hdb.mu.RLock()
+				online := hdb.online
+				hdb.mu.RUnlock()
+				if online {
+					break
+				}
+
+				// Check again in 30 seconds.
+				select {
+				case <-time.After(time.Second * 30):
+					continue
+				case <-hdb.tg.StopChan():
+					return
+				}
+			}
+
+			// There appears to be internet connectivity, continue with the
+			// scan.
 			hdb.managedScanHost(hostEntry)
 		}
 	}
@@ -256,59 +275,55 @@ func (hdb *HostDB) threadedScan() {
 	defer hdb.tg.Done()
 
 	for {
-		// Determine who to scan. At most 'maxActiveHosts' will be scanned,
-		// starting with the active hosts followed by a random selection of the
-		// inactive hosts.
-		func() {
-			hdb.mu.Lock()
-			defer hdb.mu.Unlock()
+		// Set up a scan for the hostCheckupQuanity most valuable hosts in the
+		// hostdb. Hosts that fail their scans will be docked significantly,
+		// pushing them further back in the hierarchy, ensuring that for the
+		// most part only online hosts are getting scanned unless there are
+		// fewer than hostCheckupQuantity of them.
 
-			// Scan all active hosts.
-			for _, host := range hdb.activeHosts {
-				hdb.queueHostEntry(host.hostEntry)
+		// Grab a set of hosts to scan, grab hosts that are active, inactive,
+		// and offline to get high diversity.
+		var onlineHosts, offlineHosts []modules.HostDBEntry
+		allHosts := hdb.hostTree.All()
+		for i := len(allHosts) - 1; i >= 0; i-- {
+			if len(onlineHosts) >= hostCheckupQuantity && len(offlineHosts) >= hostCheckupQuantity {
+				break
 			}
 
-			// Assemble all of the inactive hosts into a single array.
-			var entries []*hostEntry
-			for _, entry := range hdb.allHosts {
-				_, exists := hdb.activeHosts[entry.NetAddress]
-				if !exists {
-					entries = append(entries, entry)
-				}
+			// Figure out if the host is online or offline.
+			host := allHosts[i]
+			online := len(host.ScanHistory) > 0 && host.ScanHistory[len(host.ScanHistory)-1].Success
+			if online && len(onlineHosts) < hostCheckupQuantity {
+				onlineHosts = append(onlineHosts, host)
+			} else if !online && len(offlineHosts) < hostCheckupQuantity {
+				offlineHosts = append(offlineHosts, host)
 			}
+		}
 
-			// Generate a random ordering of up to inactiveHostCheckupQuantity
-			// hosts.
-			hostOrder, err := crypto.Perm(len(entries))
-			if err != nil {
-				hdb.log.Println("ERR: could not generate random permutation:", err)
-			}
-
-			// Scan each host.
-			for i := 0; i < len(hostOrder) && i < inactiveHostCheckupQuantity; i++ {
-				hdb.queueHostEntry(entries[hostOrder[i]])
-			}
-		}()
+		// Queue the scans for each host.
+		hdb.log.Println("Performing scan on", len(onlineHosts), "online hosts and", len(offlineHosts), "offline hosts.")
+		hdb.mu.Lock()
+		for _, host := range onlineHosts {
+			hdb.queueScan(host)
+		}
+		for _, host := range offlineHosts {
+			hdb.queueScan(host)
+		}
+		hdb.mu.Unlock()
 
 		// Sleep for a random amount of time before doing another round of
 		// scanning. The minimums and maximums keep the scan time reasonable,
 		// while the randomness prevents the scanning from always happening at
 		// the same time of day or week.
-		maxBig := big.NewInt(int64(maxScanSleep))
-		minBig := big.NewInt(int64(minScanSleep))
-		randSleep, err := rand.Int(rand.Reader, maxBig.Sub(maxBig, minBig))
-		if err != nil {
-			build.Critical(err)
-			// If there's an error, sleep for the default amount of time.
-			defaultBig := big.NewInt(int64(defaultScanSleep))
-			randSleep = defaultBig.Sub(defaultBig, minBig)
-		}
+		sleepTime := defaultScanSleep
+		sleepRange := int(maxScanSleep - minScanSleep)
+		sleepTime = minScanSleep + time.Duration(fastrand.Intn(sleepRange))
 
 		// Sleep until it's time for the next scan cycle.
 		select {
 		case <-hdb.tg.StopChan():
 			return
-		case <-time.After(time.Duration(randSleep.Int64()) + minScanSleep):
+		case <-time.After(sleepTime):
 		}
 	}
 }

@@ -2,7 +2,6 @@ package hostdb
 
 import (
 	"net"
-	"path/filepath"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -12,63 +11,34 @@ import (
 // These interfaces define the HostDB's dependencies. Using the smallest
 // interface possible makes it easier to mock these dependencies in testing.
 type (
-	consensusSet interface {
-		ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error
-	}
-
-	dialer interface {
-		DialTimeout(modules.NetAddress, time.Duration) (net.Conn, error)
-	}
-
-	sleeper interface {
-		Sleep(time.Duration)
-	}
-
-	persister interface {
-		save(hdbPersist) error
-		saveSync(hdbPersist) error
-		load(*hdbPersist) error
+	dependencies interface {
+		dialTimeout(modules.NetAddress, time.Duration) (net.Conn, error)
+		disrupt(string) bool
+		loadFile(persist.Metadata, interface{}, string) error
+		saveFile(persist.Metadata, interface{}, string) error
+		saveFileSync(persist.Metadata, interface{}, string) error
+		sleep(time.Duration)
 	}
 )
 
-// stdDialer implements the dialer interface via net.DialTimeout.
-type stdDialer struct{}
+type prodDependencies struct{}
 
-func (d stdDialer) DialTimeout(addr modules.NetAddress, timeout time.Duration) (net.Conn, error) {
+func (prodDependencies) dialTimeout(addr modules.NetAddress, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout("tcp", string(addr), timeout)
 }
 
-// stdSleeper implements the sleeper interface via time.Sleep.
-type stdSleeper struct{}
+func (prodDependencies) disrupt(string) bool { return false }
 
-func (s stdSleeper) Sleep(d time.Duration) { time.Sleep(d) }
-
-// stdPersist implements the persister interface via persist.SaveFile and
-// persist.LoadFile. The metadata and filename required by these functions is
-// internal to stdPersist.
-type stdPersist struct {
-	meta     persist.Metadata
-	filename string
+func (prodDependencies) loadFile(meta persist.Metadata, data interface{}, filename string) error {
+	return persist.LoadFile(meta, data, filename)
 }
 
-func (p *stdPersist) save(data hdbPersist) error {
-	return persist.SaveFile(p.meta, data, p.filename)
+func (prodDependencies) saveFile(meta persist.Metadata, data interface{}, filename string) error {
+	return persist.SaveFile(meta, data, filename)
 }
 
-func (p *stdPersist) saveSync(data hdbPersist) error {
-	return persist.SaveFileSync(p.meta, data, p.filename)
+func (prodDependencies) saveFileSync(meta persist.Metadata, data interface{}, filename string) error {
+	return persist.SaveFileSync(meta, data, filename)
 }
 
-func (p *stdPersist) load(data *hdbPersist) error {
-	return persist.LoadFile(p.meta, data, p.filename)
-}
-
-func newPersist(dir string) *stdPersist {
-	return &stdPersist{
-		meta: persist.Metadata{
-			Header:  "HostDB Persistence",
-			Version: "0.5",
-		},
-		filename: filepath.Join(dir, "hostdb.json"),
-	}
-}
+func (prodDependencies) sleep(d time.Duration) { time.Sleep(d) }

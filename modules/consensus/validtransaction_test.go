@@ -1,11 +1,11 @@
 package consensus
 
 import (
-	"crypto/rand"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -17,7 +17,7 @@ func TestTryValidTransactionSet(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestTryValidTransactionSet")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestTryInvalidTransactionSet(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestTryInvalidTransactionSet")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestStorageProofBoundaries(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestStorageProofBoundaries")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,10 +105,7 @@ func TestStorageProofBoundaries(t *testing.T) {
 	// which segment gets selected - it is randomly decided by the block.
 	segmentRange := []int{0, 1, 2, 3, 4, 5, 15, 25, 30, 32, 62, 63, 64, 65, 66, 70, 81, 89, 90, 126, 127, 128, 129}
 	for i := 0; i < 3; i++ {
-		randData, err := crypto.RandBytes(140)
-		if err != nil {
-			t.Fatal(err)
-		}
+		randData := fastrand.Bytes(140)
 
 		// Create a file contract for all sizes of the data between 0 and 2
 		// segments and put them in the transaction pool.
@@ -218,7 +215,7 @@ func TestEmptyStorageProof(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestEmptyStorageProof")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,10 +234,7 @@ func TestEmptyStorageProof(t *testing.T) {
 	// which segment gets selected - it is randomly decided by the block.
 	segmentRange := []int{0, 1, 2, 3, 4, 5, 15, 25, 30, 32, 62, 63, 64, 65, 66, 70, 81, 89, 90, 126, 127, 128, 129}
 	for i := 0; i < 3; i++ {
-		randData, err := crypto.RandBytes(140)
-		if err != nil {
-			t.Fatal(err)
-		}
+		randData := fastrand.Bytes(140)
 
 		// Create a file contract for all sizes of the data between 0 and 2
 		// segments and put them in the transaction pool.
@@ -331,7 +325,7 @@ func TestValidSiacoins(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestValidSiacoins")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +392,7 @@ func TestStorageProofSegment(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestStorageProofSegment")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +422,7 @@ func TestValidStorageProofs(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestValidStorageProofs")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,11 +442,7 @@ func TestValidStorageProofs(t *testing.T) {
 	// Create a file contract for which a storage proof can be created.
 	var fcid types.FileContractID
 	fcid[0] = 12
-	simFile := make([]byte, 64*1024)
-	_, err = rand.Read(simFile)
-	if err != nil {
-		t.Fatal(err)
-	}
+	simFile := fastrand.Bytes(64 * 1024)
 	root := crypto.MerkleRoot(simFile)
 	fc := types.FileContract{
 		FileSize:       64 * 1024,
@@ -503,11 +493,7 @@ func TestValidStorageProofs(t *testing.T) {
 	}
 
 	// Try a proof set where there is padding on the last segment in the file.
-	file := make([]byte, 100)
-	_, err = rand.Read(file)
-	if err != nil {
-		t.Fatal(err)
-	}
+	file := fastrand.Bytes(100)
 	root = crypto.MerkleRoot(file)
 	fc = types.FileContract{
 		FileSize:       100,
@@ -553,18 +539,14 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestPreForkValidStorageProofs")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst.Close()
 
 	// Try a proof set where there is padding on the last segment in the file.
-	file := make([]byte, 100)
-	_, err = rand.Read(file)
-	if err != nil {
-		t.Fatal(err)
-	}
+	file := fastrand.Bytes(100)
 	root := crypto.MerkleRoot(file)
 	fc := types.FileContract{
 		FileSize:       100,
@@ -610,7 +592,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestValidFileContractRevisions")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -625,8 +607,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 	// Create a file contract for which a storage proof can be created.
 	var fcid types.FileContractID
 	fcid[0] = 12
-	simFile := make([]byte, 64*1024)
-	rand.Read(simFile)
+	simFile := fastrand.Bytes(64 * 1024)
 	root := crypto.MerkleRoot(simFile)
 	fc := types.FileContract{
 		FileSize:       64 * 1024,
@@ -748,7 +729,7 @@ func TestValidSiafunds(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestValidSiafunds")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -798,7 +779,7 @@ func TestValidTransaction(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestValidTransaction")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

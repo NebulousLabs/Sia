@@ -168,18 +168,11 @@ var (
 	// merkletree. 4MB has been chosen for the live network because large
 	// sectors significantly reduce the tracking overhead experienced by the
 	// renter and the host.
-	SectorSize = func() uint64 {
-		if build.Release == "dev" {
-			return 1 << 18 // 256 KiB
-		}
-		if build.Release == "standard" {
-			return 1 << 22 // 4 MiB
-		}
-		if build.Release == "testing" {
-			return 1 << 12 // 4 KiB
-		}
-		panic("unrecognized release constant in host - sectorSize")
-	}()
+	SectorSize = build.Select(build.Var{
+		Dev:      uint64(1 << 18), // 256 KiB
+		Standard: uint64(1 << 22), // 4 MiB
+		Testing:  uint64(1 << 12), // 4 KiB
+	}).(uint64)
 )
 
 type (
@@ -349,10 +342,7 @@ func CreateAnnouncement(addr NetAddress, pk types.SiaPublicKey, sk crypto.Secret
 
 	// Create a signature for the announcement.
 	annHash := crypto.HashBytes(annBytes)
-	sig, err := crypto.SignHash(annHash, sk)
-	if err != nil {
-		return nil, err
-	}
+	sig := crypto.SignHash(annHash, sk)
 	// Return the signed announcement.
 	return append(annBytes, sig[:]...), nil
 }

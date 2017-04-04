@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // testBlockSuite tests a wide variety of blocks.
@@ -90,7 +91,7 @@ func TestIntegrationSimpleBlock(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestIntegrationSimpleBlock")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +134,7 @@ func (cst *consensusSetTester) testSpendSiacoinsBlock() {
 	if err != nil {
 		panic(err)
 	}
-	if sco.Value.Cmp(txnValue) != 0 {
+	if !sco.Value.Equals(txnValue) {
 		panic("output added with wrong value")
 	}
 	if sco.UnlockHash != destAddr {
@@ -148,7 +149,7 @@ func TestIntegrationSpendSiacoinsBlock(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestSpendSiacoinsBlock")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,10 +173,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
-	file, err := crypto.RandBytes(int(filesize))
-	if err != nil {
-		panic(err)
-	}
+	file := fastrand.Bytes(int(filesize))
 	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a file contract that will be successful.
@@ -200,7 +198,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	// Submit a transaction with the file contract.
 	oldSiafundPool := cst.cs.dbGetSiafundPool()
 	txnBuilder := cst.wallet.StartTransaction()
-	err = txnBuilder.FundSiacoins(payout)
+	err := txnBuilder.FundSiacoins(payout)
 	if err != nil {
 		panic(err)
 	}
@@ -220,7 +218,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 
 	// Check that the siafund pool was increased by the tax on the payout.
 	siafundPool := cst.cs.dbGetSiafundPool()
-	if siafundPool.Cmp(oldSiafundPool.Add(types.Tax(cst.cs.dbBlockHeight()-1, payout))) != 0 {
+	if !siafundPool.Equals(oldSiafundPool.Add(types.Tax(cst.cs.dbBlockHeight()-1, payout))) {
 		panic("siafund pool was not increased correctly")
 	}
 
@@ -266,7 +264,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 
 	// Check that the siafund pool has not changed.
 	postProofPool := cst.cs.dbGetSiafundPool()
-	if postProofPool.Cmp(siafundPool) != 0 {
+	if !postProofPool.Equals(siafundPool) {
 		panic("siafund pool should not change after submitting a storage proof")
 	}
 
@@ -279,7 +277,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	if dsco.UnlockHash != fc.ValidProofOutputs[0].UnlockHash {
 		panic("wrong unlock hash in dsco")
 	}
-	if dsco.Value.Cmp(fc.ValidProofOutputs[0].Value) != 0 {
+	if !dsco.Value.Equals(fc.ValidProofOutputs[0].Value) {
 		panic("wrong sco value in dsco")
 	}
 }
@@ -291,7 +289,7 @@ func TestIntegrationValidStorageProofBlocks(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestIntegrationValidStorageProofBlocks")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +343,7 @@ func (cst *consensusSetTester) testMissedStorageProofBlocks() {
 
 	// Check that the siafund pool was increased by the tax on the payout.
 	siafundPool := cst.cs.dbGetSiafundPool()
-	if siafundPool.Cmp(oldSiafundPool.Add(types.Tax(cst.cs.dbBlockHeight()-1, payout))) != 0 {
+	if !siafundPool.Equals(oldSiafundPool.Add(types.Tax(cst.cs.dbBlockHeight()-1, payout))) {
 		panic("siafund pool was not increased correctly")
 	}
 
@@ -371,7 +369,7 @@ func (cst *consensusSetTester) testMissedStorageProofBlocks() {
 
 	// Check that the siafund pool has not changed.
 	postProofPool := cst.cs.dbGetSiafundPool()
-	if postProofPool.Cmp(siafundPool) != 0 {
+	if !postProofPool.Equals(siafundPool) {
 		panic("siafund pool should not change after submitting a storage proof")
 	}
 
@@ -384,7 +382,7 @@ func (cst *consensusSetTester) testMissedStorageProofBlocks() {
 	if dsco.UnlockHash != fc.MissedProofOutputs[0].UnlockHash {
 		panic("wrong unlock hash in dsco")
 	}
-	if dsco.Value.Cmp(fc.MissedProofOutputs[0].Value) != 0 {
+	if !dsco.Value.Equals(fc.MissedProofOutputs[0].Value) {
 		panic("wrong sco value in dsco")
 	}
 }
@@ -396,7 +394,7 @@ func TestIntegrationMissedStorageProofBlocks(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestIntegrationMissedStorageProofBlocks")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,17 +418,11 @@ func (cst *consensusSetTester) testFileContractRevision() {
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
-	file, err := crypto.RandBytes(int(filesize))
-	if err != nil {
-		panic(err)
-	}
+	file := fastrand.Bytes(int(filesize))
 	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a spendable unlock hash for the file contract.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		panic(err)
-	}
+	sk, pk := crypto.GenerateKeyPair()
 	uc := types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{{
 			Algorithm: types.SignatureEd25519,
@@ -461,7 +453,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 
 	// Submit a transaction with the file contract.
 	txnBuilder := cst.wallet.StartTransaction()
-	err = txnBuilder.FundSiacoins(payout)
+	err := txnBuilder.FundSiacoins(payout)
 	if err != nil {
 		panic(err)
 	}
@@ -504,10 +496,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 		FileContractRevisions: []types.FileContractRevision{fcr},
 		TransactionSignatures: []types.TransactionSignature{ts},
 	}
-	encodedSig, err := crypto.SignHash(txn.SigHash(0), sk)
-	if err != nil {
-		panic(err)
-	}
+	encodedSig := crypto.SignHash(txn.SigHash(0), sk)
 	txn.TransactionSignatures[0].Signature = encodedSig[:]
 	err = cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
 	if err != nil {
@@ -558,7 +547,7 @@ func TestIntegrationFileContractRevision(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestIntegrationFileContractRevision")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -622,13 +611,13 @@ func (cst *consensusSetTester) testSpendSiafunds() {
 	if err != nil {
 		panic(err)
 	}
-	if sfo.Value.Cmp(txnValue) != 0 {
+	if !sfo.Value.Equals(txnValue) {
 		panic("output added with wrong value")
 	}
 	if sfo.UnlockHash != destAddr {
 		panic("output sent to the wrong address")
 	}
-	if sfo.ClaimStart.Cmp(cst.cs.dbGetSiafundPool()) != 0 {
+	if !sfo.ClaimStart.Equals(cst.cs.dbGetSiafundPool()) {
 		panic("ClaimStart is not being set correctly")
 	}
 
@@ -639,7 +628,7 @@ func (cst *consensusSetTester) testSpendSiafunds() {
 		if err != nil {
 			panic(err)
 		}
-		if dsco.Value.Cmp(claimValues[i]) != 0 {
+		if !dsco.Value.Equals(claimValues[i]) {
 			panic("expected a different claim value on the siaclaim")
 		}
 	}
@@ -652,7 +641,7 @@ func (cst *consensusSetTester) TestIntegrationSpendSiafunds(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestIntegtrationSpendSiafunds")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1201,7 +1190,7 @@ func TestPaymentChannelBlocks(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestPaymentChannelBlocks")
+	cst, err := createConsensusSetTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

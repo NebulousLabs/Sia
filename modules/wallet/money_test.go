@@ -4,7 +4,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -13,7 +12,7 @@ func TestSendSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestSendSiacoins")
+	wt, err := createWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,13 +22,13 @@ func TestSendSiacoins(t *testing.T) {
 	// should be 0.
 	confirmedBal, _, _ := wt.wallet.ConfirmedBalance()
 	unconfirmedOut, unconfirmedIn := wt.wallet.UnconfirmedBalance()
-	if confirmedBal.Cmp(types.CalculateCoinbase(1)) != 0 {
+	if !confirmedBal.Equals(types.CalculateCoinbase(1)) {
 		t.Error("unexpected confirmed balance")
 	}
-	if unconfirmedOut.Cmp(types.ZeroCurrency) != 0 {
+	if !unconfirmedOut.Equals(types.ZeroCurrency) {
 		t.Error("unconfirmed balance should be 0")
 	}
-	if unconfirmedIn.Cmp(types.ZeroCurrency) != 0 {
+	if !unconfirmedIn.Equals(types.ZeroCurrency) {
 		t.Error("unconfirmed balance should be 0")
 	}
 
@@ -43,10 +42,10 @@ func TestSendSiacoins(t *testing.T) {
 	}
 	confirmedBal2, _, _ := wt.wallet.ConfirmedBalance()
 	unconfirmedOut2, unconfirmedIn2 := wt.wallet.UnconfirmedBalance()
-	if confirmedBal2.Cmp(confirmedBal) != 0 {
+	if !confirmedBal2.Equals(confirmedBal) {
 		t.Error("confirmed balance changed without introduction of blocks")
 	}
-	if unconfirmedOut2.Cmp(unconfirmedIn2.Add(types.NewCurrency64(5000)).Add(tpoolFee)) != 0 {
+	if !unconfirmedOut2.Equals(unconfirmedIn2.Add(types.NewCurrency64(5000)).Add(tpoolFee)) {
 		t.Error("sending siacoins appears to be ineffective")
 	}
 
@@ -58,13 +57,13 @@ func TestSendSiacoins(t *testing.T) {
 	}
 	confirmedBal3, _, _ := wt.wallet.ConfirmedBalance()
 	unconfirmedOut3, unconfirmedIn3 := wt.wallet.UnconfirmedBalance()
-	if confirmedBal3.Cmp(confirmedBal2.Add(types.CalculateCoinbase(2)).Sub(types.NewCurrency64(5000)).Sub(tpoolFee)) != 0 {
+	if !confirmedBal3.Equals(confirmedBal2.Add(types.CalculateCoinbase(2)).Sub(types.NewCurrency64(5000)).Sub(tpoolFee)) {
 		t.Error("confirmed balance did not adjust to the expected value")
 	}
-	if unconfirmedOut3.Cmp(types.ZeroCurrency) != 0 {
+	if !unconfirmedOut3.Equals(types.ZeroCurrency) {
 		t.Error("unconfirmed balance should be 0")
 	}
-	if unconfirmedIn3.Cmp(types.ZeroCurrency) != 0 {
+	if !unconfirmedIn3.Equals(types.ZeroCurrency) {
 		t.Error("unconfirmed balance should be 0")
 	}
 }
@@ -81,7 +80,7 @@ func TestIntegrationSendOverUnder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestIntegrationSpendOverUnder")
+	wt, err := createWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,8 +89,8 @@ func TestIntegrationSendOverUnder(t *testing.T) {
 	// Spend too many siacoins.
 	tooManyCoins := types.SiacoinPrecision.Mul64(1e12)
 	_, err = wt.wallet.SendSiacoins(tooManyCoins, types.UnlockHash{})
-	if err != modules.ErrLowBalance {
-		t.Error("low balance err not returned after attempting to send too many coins")
+	if err == nil {
+		t.Error("low balance err not returned after attempting to send too many coins:", err)
 	}
 
 	// Spend a reasonable amount of siacoins.
@@ -109,7 +108,7 @@ func TestIntegrationSpendHalfHalf(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestIntegrationSpendHalfHalf")
+	wt, err := createWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +121,7 @@ func TestIntegrationSpendHalfHalf(t *testing.T) {
 		t.Error("unexpected error: ", err)
 	}
 	_, err = wt.wallet.SendSiacoins(halfPlus, types.UnlockHash{1})
-	if err != modules.ErrIncompleteTransactions {
+	if err == nil {
 		t.Error("wallet appears to be reusing outputs when building transactions: ", err)
 	}
 }
@@ -132,7 +131,7 @@ func TestIntegrationSpendUnconfirmed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestIntegrationSpendUnconfirmed")
+	wt, err := createWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +176,7 @@ func TestIntegrationSortedOutputsSorting(t *testing.T) {
 		if so.ids[i] != expectedIDSorting[i] {
 			t.Error("an id is out of place: ", i)
 		}
-		if so.outputs[i].Value.Cmp(types.NewCurrency64(i)) != 0 {
+		if !so.outputs[i].Value.Equals64(i) {
 			t.Error("a value is out of place: ", i)
 		}
 	}

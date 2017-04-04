@@ -58,10 +58,7 @@ func newContractorTester(name string) (*contractorTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return nil, err
-	}
+	key := crypto.GenerateTwofishKey()
 	_, err = w.Encrypt(key)
 	if err != nil {
 		return nil, err
@@ -70,7 +67,7 @@ func newContractorTester(name string) (*contractorTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	hdb, err := hostdb.New(cs, filepath.Join(testdir, modules.RenterDir))
+	hdb, err := hostdb.New(g, cs, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +107,7 @@ func TestNegotiateContract(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ct, err := newContractorTester("TestNegotiateContract")
+	ct, err := newContractorTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +157,7 @@ func TestReviseContract(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ct, err := newContractorTester("TestReviseContract")
+	ct, err := newContractorTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,10 +169,7 @@ func TestReviseContract(t *testing.T) {
 	}
 
 	// generate keys
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		t.Fatal(err)
-	}
+	sk, pk := crypto.GenerateKeyPair()
 	renterPubKey := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       pk[:],
@@ -251,10 +245,7 @@ func TestReviseContract(t *testing.T) {
 	}
 
 	// sign the transaction
-	encodedSig, err := crypto.SignHash(signedTxn.SigHash(0), sk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	encodedSig := crypto.SignHash(signedTxn.SigHash(0), sk)
 	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
 	err = signedTxn.StandaloneValid(ct.contractor.blockHeight)

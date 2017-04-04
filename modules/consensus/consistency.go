@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -160,7 +161,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 
 	expectedSiacoins := types.CalculateNumSiacoins(blockHeight(tx))
 	totalSiacoins := dscoSiacoins.Add(scoSiacoins).Add(fcSiacoins).Add(claimSiacoins)
-	if totalSiacoins.Cmp(expectedSiacoins) != 0 {
+	if !totalSiacoins.Equals(expectedSiacoins) {
 		diagnostics := fmt.Sprintf("Wrong number of siacoins\nDsco: %v\nSco: %v\nFc: %v\nClaim: %v\n", dscoSiacoins, scoSiacoins, fcSiacoins, claimSiacoins)
 		if totalSiacoins.Cmp(expectedSiacoins) < 0 {
 			diagnostics += fmt.Sprintf("total: %v\nexpected: %v\n expected is bigger: %v", totalSiacoins, expectedSiacoins, expectedSiacoins.Sub(totalSiacoins))
@@ -187,7 +188,7 @@ func checkSiafundCount(tx *bolt.Tx) {
 	if err != nil {
 		manageErr(tx, err)
 	}
-	if total.Cmp(types.SiafundCount) != 0 {
+	if !total.Equals(types.SiafundCount) {
 		manageErr(tx, errors.New("wrong number if siafunds in the consensus set"))
 	}
 }
@@ -330,11 +331,7 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
 // through the extremely slow process of running a consistency check every
 // block.
 func (cs *ConsensusSet) maybeCheckConsistency(tx *bolt.Tx) {
-	n, err := crypto.RandIntn(1000)
-	if err != nil {
-		manageErr(tx, err)
-	}
-	if n == 0 {
+	if fastrand.Intn(1000) == 0 {
 		cs.checkConsistency(tx)
 	}
 }

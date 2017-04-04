@@ -3,8 +3,6 @@ package transactionpool
 import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/NebulousLabs/bolt"
 )
 
 // purge removes all transactions from the transaction pool.
@@ -21,27 +19,25 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	tp.mu.Lock()
 
 	// Update the database of confirmed transactions.
-	err := tp.db.Update(func(tx *bolt.Tx) error {
-		for _, block := range cc.RevertedBlocks {
-			for _, txn := range block.Transactions {
-				err := tp.deleteTransaction(tx, txn.ID())
-				if err != nil {
-					return err
-				}
+	for _, block := range cc.RevertedBlocks {
+		for _, txn := range block.Transactions {
+			err := tp.deleteTransaction(tp.dbTx, txn.ID())
+			if err != nil {
+				tp.log.Println("ERROR: could not delete a transaction:", err)
 			}
 		}
-		for _, block := range cc.AppliedBlocks {
-			for _, txn := range block.Transactions {
-				err := tp.addTransaction(tx, txn.ID())
-				if err != nil {
-					return err
-				}
+	}
+	for _, block := range cc.AppliedBlocks {
+		for _, txn := range block.Transactions {
+			err := tp.addTransaction(tp.dbTx, txn.ID())
+			if err != nil {
+				tp.log.Println("ERROR: could not add a transaction:", err)
 			}
 		}
-		return tp.putRecentConsensusChange(tx, cc.ID)
-	})
+	}
+	err := tp.putRecentConsensusChange(tp.dbTx, cc.ID)
 	if err != nil {
-		// TODO: Handle error
+		tp.log.Println("ERROR: could not update the recent consensus change:", err)
 	}
 
 	// Scan the applied blocks for transactions that got accepted. This will
@@ -108,7 +104,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// processing consensus changes. Overall, the locking is pretty fragile and
 	// more rules need to be put in place.
 	for _, set := range unconfirmedSets {
-		tp.acceptTransactionSet(set) // Error is not checked.
+		tp.acceptTransactionSet(set, cc.TryTransactionSet) // Error is not checked.
 	}
 
 	// Inform subscribers that an update has executed.

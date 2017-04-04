@@ -2,7 +2,6 @@ package miner
 
 import (
 	"bytes"
-	"crypto/rand"
 	"path/filepath"
 	"testing"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // A minerTester is the helper object for miner testing.
@@ -53,10 +53,7 @@ func createMinerTester(name string) (*minerTester, error) {
 		return nil, err
 	}
 	var key crypto.TwofishKey
-	_, err = rand.Read(key[:])
-	if err != nil {
-		return nil, err
-	}
+	fastrand.Read(key[:])
 	_, err = w.Encrypt(key)
 	if err != nil {
 		return nil, err
@@ -101,7 +98,7 @@ func TestIntegrationMiner(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestMiner")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +129,7 @@ func TestIntegrationNilMinerDependencies(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationNilMinerDependencies")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +157,7 @@ func TestIntegrationBlocksMined(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationBlocksMined")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +236,7 @@ func TestIntegrationAutoRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationAutoRescan")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +283,7 @@ func TestIntegrationStartupRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationStartupRescan")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +320,7 @@ func TestIntegrationStartupRescan(t *testing.T) {
 // TestMinerCloseDeadlock checks that the miner can cleanly close even if the
 // CPU miner is running.
 func TestMinerCloseDeadlock(t *testing.T) {
-	mt, err := createMinerTester("TestMinerCloseDeadlock")
+	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,25 +3,25 @@ package proto
 import (
 	"errors"
 	"net"
+	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // A Downloader retrieves sectors by calling the download RPC on a host.
 // Downloaders are NOT thread- safe; calls to Sector must be serialized.
 type Downloader struct {
-	host     modules.HostDBEntry
-	contract modules.RenterContract // updated after each revision
-	conn     net.Conn
+	host      modules.HostDBEntry
+	contract  modules.RenterContract // updated after each revision
+	conn      net.Conn
+	closeChan chan struct{}
+	once      sync.Once
 
 	SaveFn revisionSaver
-
-	// metrics
-	DownloadSpending types.Currency
 }
 
 // Sector retrieves the sector with the specified Merkle root, and revises
@@ -35,6 +35,12 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	sectorPrice := hd.host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
 	if hd.contract.RenterFunds().Cmp(sectorPrice) < 0 {
 		return modules.RenterContract{}, nil, errors.New("contract has insufficient funds to support download")
+	}
+	// to mitigate small errors (e.g. differing block heights), fudge the
+	// price and collateral by 0.2%. This is only applied to hosts above
+	// v1.0.1; older hosts use stricter math.
+	if build.VersionCmp(hd.host.Version, "1.0.1") > 0 {
+		sectorPrice = sectorPrice.MulFloat(1 + hostPriceLeeway)
 	}
 
 	// create the download revision
@@ -94,24 +100,32 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	// update contract and metrics
 	hd.contract.LastRevision = rev
 	hd.contract.LastRevisionTxn = signedTxn
-	hd.DownloadSpending = hd.DownloadSpending.Add(sectorPrice)
+	hd.contract.DownloadSpending = hd.contract.DownloadSpending.Add(sectorPrice)
 
 	return hd.contract, sector, nil
+}
+
+// shutdown terminates the revision loop and signals the goroutine spawned in
+// NewDownloader to return.
+func (hd *Downloader) shutdown() {
+	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
+	// don't care about these errors
+	_, _ = verifySettings(hd.conn, hd.host)
+	_ = modules.WriteNegotiationStop(hd.conn)
+	close(hd.closeChan)
 }
 
 // Close cleanly terminates the download loop with the host and closes the
 // connection.
 func (hd *Downloader) Close() error {
-	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
-	// don't care about these errors
-	_, _ = verifySettings(hd.conn, hd.host)
-	_ = modules.WriteNegotiationStop(hd.conn)
+	// using once ensures that Close is idempotent
+	hd.once.Do(hd.shutdown)
 	return hd.conn.Close()
 }
 
 // NewDownloader initiates the download request loop with a host, and returns a
 // Downloader.
-func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract) (*Downloader, error) {
+func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, cancel <-chan struct{}) (*Downloader, error) {
 	// check that contract has enough value to support a download
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
@@ -122,10 +136,23 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract) (*
 	}
 
 	// initiate download loop
-	conn, err := net.DialTimeout("tcp", string(contract.NetAddress), 15*time.Second)
+	conn, err := (&net.Dialer{
+		Cancel:  cancel,
+		Timeout: 15 * time.Second,
+	}).Dial("tcp", string(contract.NetAddress))
 	if err != nil {
 		return nil, err
 	}
+
+	closeChan := make(chan struct{})
+	go func() {
+		select {
+		case <-cancel:
+			conn.Close()
+		case <-closeChan:
+		}
+	}()
+
 	// allot 2 minutes for RPC request + revision exchange
 	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
 	defer extendDeadline(conn, time.Hour)
@@ -140,8 +167,9 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract) (*
 
 	// the host is now ready to accept revisions
 	return &Downloader{
-		contract: contract,
-		host:     host,
-		conn:     conn,
+		contract:  contract,
+		host:      host,
+		conn:      conn,
+		closeChan: closeChan,
 	}, nil
 }

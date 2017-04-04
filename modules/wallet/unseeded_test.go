@@ -3,6 +3,7 @@ package wallet
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -13,7 +14,7 @@ func TestIntegrationLoad1of1Siag(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestIntegrationLoad1of1Siag")
+	wt, err := createWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,20 +25,25 @@ func TestIntegrationLoad1of1Siag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	wt.wallet.Close()
 
 	// Create a second wallet that loads the persist structures of the existing
 	// wallet. This wallet should have a siafund balance.
+	//
+	// TODO: when proper seed loading is implemented, this will be unnecessary.
 	w, err := New(wt.cs, wt.tpool, wt.wallet.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
+	// reset the changeID
+	resetChangeID(w)
 	err = w.Unlock(wt.walletMasterKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, siafundBal, _ := w.ConfirmedBalance()
-	if siafundBal.Cmp(types.NewCurrency64(2000)) != 0 {
+	if !siafundBal.Equals64(2000) {
 		t.Error("expecting a siafund balance of 2000 from the 1of1 key")
 	}
 
@@ -46,12 +52,16 @@ func TestIntegrationLoad1of1Siag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = wt.miner.AddBlock()
+	m, err := miner.New(wt.cs, wt.tpool, w, w.persistDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = m.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, siafundBal, _ = w.ConfirmedBalance()
-	if siafundBal.Cmp(types.NewCurrency64(1988)) != 0 {
+	if !siafundBal.Equals64(1988) {
 		t.Error("expecting balance of 1988 after sending siafunds to the void")
 	}
 }
@@ -63,7 +73,7 @@ func TestIntegrationLoad2of3Siag(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestIntegrationLoad2of3Siag")
+	wt, err := createWalletTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,20 +84,25 @@ func TestIntegrationLoad2of3Siag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	wt.wallet.Close()
 
 	// Create a second wallet that loads the persist structures of the existing
 	// wallet. This wallet should have a siafund balance.
+	//
+	// TODO: when proper seed loading is implemented, this will be unnecessary.
 	w, err := New(wt.cs, wt.tpool, wt.wallet.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
+	// reset the changeID
+	resetChangeID(w)
 	err = w.Unlock(wt.walletMasterKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, siafundBal, _ := w.ConfirmedBalance()
-	if siafundBal.Cmp(types.NewCurrency64(7000)) != 0 {
+	if !siafundBal.Equals64(7000) {
 		t.Error("expecting a siafund balance of 7000 from the 2of3 key")
 	}
 
@@ -96,12 +111,16 @@ func TestIntegrationLoad2of3Siag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = wt.miner.AddBlock()
+	m, err := miner.New(wt.cs, wt.tpool, w, w.persistDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = m.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, siafundBal, _ = w.ConfirmedBalance()
-	if siafundBal.Cmp(types.NewCurrency64(6988)) != 0 {
+	if !siafundBal.Equals64(6988) {
 		t.Error("expecting balance of 6988 after sending siafunds to the void")
 	}
 }

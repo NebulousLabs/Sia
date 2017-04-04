@@ -3,6 +3,7 @@ package host
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -16,22 +17,27 @@ var (
 	errUnknownAddress = errors.New("host cannot announce, does not seem to have a valid address.")
 )
 
-// announce creates an announcement transaction and submits it to the network.
-func (h *Host) announce(addr modules.NetAddress) error {
+// managedAnnounce creates an announcement transaction and submits it to the network.
+func (h *Host) managedAnnounce(addr modules.NetAddress) error {
 	// The wallet needs to be unlocked to add fees to the transaction, and the
 	// host needs to have an active unlock hash that renters can make payment
 	// to.
 	if !h.wallet.Unlocked() {
 		return errAnnWalletLocked
 	}
+
+	h.mu.Lock()
+	pubKey := h.publicKey
+	secKey := h.secretKey
 	err := h.checkUnlockHash()
+	h.mu.Unlock()
 	if err != nil {
 		return err
 	}
 
 	// Create the announcement that's going to be added to the arbitrary data
 	// field of the transaction.
-	signedAnnouncement, err := modules.CreateAnnouncement(addr, h.publicKey, h.secretKey)
+	signedAnnouncement, err := modules.CreateAnnouncement(addr, pubKey, secKey)
 	if err != nil {
 		return err
 	}
@@ -59,43 +65,84 @@ func (h *Host) announce(addr modules.NetAddress) error {
 		txnBuilder.Drop()
 		return err
 	}
+
+	h.mu.Lock()
 	h.announced = true
+	h.mu.Unlock()
 	h.log.Printf("INFO: Successfully announced as %v", addr)
 	return nil
 }
 
-// Announce creates a host announcement transaction, adding information to the
-// arbitrary data, signing the transaction, and submitting it to the
-// transaction pool.
+// Announce creates a host announcement transaction.
 func (h *Host) Announce() error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	err := h.tg.Add()
 	if err != nil {
 		return err
 	}
 	defer h.tg.Done()
 
-	// Determine whether to use the settings.NetAddress or autoAddress.
-	if h.settings.NetAddress != "" {
-		return h.announce(h.settings.NetAddress)
+	// Grab the internal net address and internal auto address, and compare
+	// them.
+	h.mu.RLock()
+	userSet := h.settings.NetAddress
+	autoSet := h.autoAddress
+	h.mu.RUnlock()
+
+	// Check that we have at least one address to work with.
+	if userSet == "" && autoSet == "" {
+		return build.ExtendErr("cannot announce because address could not be determined", err)
 	}
-	if h.autoAddress == "" {
-		return errUnknownAddress
+
+	// Prefer using the userSet address, otherwise use the automatic address.
+	var annAddr modules.NetAddress
+	if userSet != "" {
+		annAddr = userSet
+	} else {
+		annAddr = autoSet
 	}
-	return h.announce(h.autoAddress)
+
+	// Check that the address is sane, and that the address is also not local.
+	err = annAddr.IsStdValid()
+	if err != nil {
+		return build.ExtendErr("announcement requested with bad net address", err)
+	}
+	if annAddr.IsLocal() && build.Release != "testing" {
+		return errors.New("announcement requested with local net address")
+	}
+
+	// Address has cleared inspection, perform the announcement.
+	return h.managedAnnounce(annAddr)
 }
 
 // AnnounceAddress submits a host announcement to the blockchain to announce a
-// specific address. No checks for validity are performed on the address.
+// specific address. If there is no error, the host's address will be updated
+// to the supplied address.
 func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	err := h.tg.Add()
 	if err != nil {
 		return err
 	}
 	defer h.tg.Done()
 
-	return h.announce(addr)
+	// Check that the address is sane, and that the address is also not local.
+	err = addr.IsStdValid()
+	if err != nil {
+		return build.ExtendErr("announcement requested with bad net address", err)
+	}
+	if addr.IsLocal() {
+		return errors.New("announcement requested with local net address")
+	}
+
+	// Attempt the actual announcement.
+	err = h.managedAnnounce(addr)
+	if err != nil {
+		return build.ExtendErr("unable to perform manual host announcement", err)
+	}
+
+	// Address is valid, update the host's internal net address to match the
+	// specified addr.
+	h.mu.Lock()
+	h.settings.NetAddress = addr
+	h.mu.Unlock()
+	return nil
 }

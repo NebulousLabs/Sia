@@ -107,7 +107,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		return extendErr("failed to write acceptance for renter revision: ", ErrorConnection(err.Error()))
 	}
 
-	// Renter will send a transaction siganture for the file contract revision.
+	// Renter will send a transaction signature for the file contract revision.
 	var renterSignature types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterSignature, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
@@ -177,7 +177,7 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 	}
 	toHost := paymentRevision.NewValidProofOutputs[1].Value.Sub(existingRevision.NewValidProofOutputs[1].Value)
 	// Verify that enough money was transferred.
-	if toHost.Cmp(fromRenter) != 0 {
+	if !toHost.Equals(fromRenter) {
 		s := fmt.Sprintf("expected exactly %v to be transferred to the host, but %v was transferred: ", fromRenter, toHost)
 		return extendErr(s, errLowHostValidOutput)
 	}
@@ -223,7 +223,7 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 	if paymentRevision.NewUnlockHash != existingRevision.NewUnlockHash {
 		return errBadUnlockHash
 	}
-	if paymentRevision.NewMissedProofOutputs[1].Value.Cmp(existingRevision.NewMissedProofOutputs[1].Value) != 0 {
+	if !paymentRevision.NewMissedProofOutputs[1].Value.Equals(existingRevision.NewMissedProofOutputs[1].Value) {
 		return errLowHostMissedOutput
 	}
 	return nil

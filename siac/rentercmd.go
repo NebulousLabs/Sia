@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -97,6 +98,13 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Short: "Upload a file",
 		Long:  "Upload a file to [path] on the Sia network.",
 		Run:   wrap(renterfilesuploadcmd),
+	}
+
+	renterPricesCmd = &cobra.Command{
+		Use:   "prices",
+		Short: "Display the price of storage and bandwidth",
+		Long:  "Display the estimated prices of storing files, retrieving files, and creating a set of contracts",
+		Run:   wrap(renterpricescmd),
 	}
 )
 
@@ -299,11 +307,46 @@ func renterfilesdeletecmd(path string) {
 // renterfilesdownloadcmd is the handler for the comand `siac renter download [path] [destination]`.
 // Downloads a path from the Sia network to the local specified destination.
 func renterfilesdownloadcmd(path, destination string) {
-	err := get("/renter/download/" + path + "?destination=" + abs(destination))
+	destination = abs(destination)
+	done := make(chan struct{})
+	go func() {
+		time.Sleep(time.Second) // give download time to initialize
+		for {
+			select {
+			case <-done:
+				return
+
+			case <-time.Tick(time.Second):
+				// get download progress of file
+				var queue api.RenterDownloadQueue
+				err := getAPI("/renter/downloads", &queue)
+				if err != nil {
+					continue // benign
+				}
+				var d modules.DownloadInfo
+				for _, d = range queue.Downloads {
+					if d.Destination == destination {
+						break
+					}
+				}
+				if d.Filesize == 0 {
+					continue // file hasn't appeared in queue yet
+				}
+				pct := 100 * float64(d.Received) / float64(d.Filesize)
+				elapsed := time.Since(d.StartTime)
+				elapsed -= elapsed % time.Second // round to nearest second
+				mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
+				fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
+			}
+		}
+	}()
+
+	err := get("/renter/download/" + path + "?destination=" + destination)
+	close(done)
 	if err != nil {
 		die("Could not download file:", err)
 	}
-	fmt.Printf("Downloaded '%s' to %s.\n", path, abs(destination))
+	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
 }
 
 // bySiaPath implements sort.Interface for [] modules.FileInfo based on the
@@ -374,4 +417,22 @@ func renterfilesuploadcmd(source, path string) {
 		die("Could not upload file:", err)
 	}
 	fmt.Printf("Uploaded '%s' as %s.\n", abs(source), path)
+}
+
+// renterpricescmd is the handler for the command `siac renter prices`, which
+// displays the pirces of various storage operations.
+func renterpricescmd() {
+	var rpg api.RenterPricesGET
+	err := getAPI("/renter/prices", &rpg)
+	if err != nil {
+		die("Could not read the renter prices:", err)
+	}
+
+	fmt.Println("Renter Prices (estimated):")
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "\tFees for Creating a Set of Contracts:\t", currencyUnits(rpg.FormContracts))
+	fmt.Fprintln(w, "\tDownload 1 TB:\t", currencyUnits(rpg.DownloadTerabyte))
+	fmt.Fprintln(w, "\tStore 1 TB for 1 Month:\t", currencyUnits(rpg.StorageTerabyteMonth))
+	fmt.Fprintln(w, "\tUpload 1 TB:\t", currencyUnits(rpg.UploadTerabyte))
+	w.Flush()
 }

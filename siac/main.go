@@ -16,16 +16,19 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
-// flags
 var (
+	// Flags.
 	addr              string // override default API address
 	initPassword      bool   // supply a custom password when creating a wallet
 	hostVerbose       bool   // display additional host info
 	renterShowHistory bool   // Show download history in addition to download queue.
 	renterListVerbose bool   // Show additional info about uploaded files.
+
+	// Globals.
+	rootCmd *cobra.Command // Root command cobra object, used by bash completion cmd.
 )
 
-// exit codes
+// Exit codes.
 // inspired by sysexits.h
 const (
 	exitCodeGeneral = 1  // Not in sysexits.h, but is standard practice.
@@ -219,10 +222,6 @@ func die(args ...interface{}) {
 	os.Exit(exitCodeGeneral)
 }
 
-func version() {
-	println("Sia Client v" + build.Version)
-}
-
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
@@ -231,14 +230,10 @@ func main() {
 		Run:   wrap(consensuscmd),
 	}
 
-	// create command tree
-	root.AddCommand(&cobra.Command{
-		Use:   "version",
-		Short: "Print version information",
-		Long:  "Print version information.",
-		Run:   wrap(version),
-	})
+	rootCmd = root
 
+	// create command tree
+	root.AddCommand(versionCmd)
 	root.AddCommand(stopCmd)
 
 	root.AddCommand(updateCmd)
@@ -251,13 +246,16 @@ func main() {
 	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
 
 	root.AddCommand(hostdbCmd)
+	hostdbCmd.AddCommand(hostdbViewCmd)
+	hostdbCmd.Flags().IntVarP(&hostdbNumHosts, "numhosts", "n", 0, "Number of hosts to display from the hostdb")
+	hostdbCmd.Flags().BoolVarP(&hostdbVerbose, "verbose", "v", false, "Display full hostdb information")
 
 	root.AddCommand(minerCmd)
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd)
 
 	root.AddCommand(walletCmd)
-	walletCmd.AddCommand(walletAddressCmd, walletAddressesCmd, walletInitCmd,
-		walletLoadCmd, walletLockCmd, walletSeedsCmd, walletSendCmd,
+	walletCmd.AddCommand(walletAddressCmd, walletAddressesCmd, walletInitCmd, walletInitSeedCmd,
+		walletLoadCmd, walletLockCmd, walletSeedsCmd, walletSendCmd, walletSweepCmd,
 		walletBalanceCmd, walletTransactionsCmd, walletUnlockCmd)
 	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Prompt for a custom password")
 	walletLoadCmd.AddCommand(walletLoad033xCmd, walletLoadSeedCmd, walletLoadSiagCmd)
@@ -267,15 +265,19 @@ func main() {
 	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd,
 		renterDownloadsCmd, renterAllowanceCmd, renterSetAllowanceCmd,
 		renterContractsCmd, renterFilesListCmd, renterFilesRenameCmd,
-		renterFilesUploadCmd, renterUploadsCmd)
+		renterFilesUploadCmd, renterUploadsCmd, renterExportCmd,
+		renterPricesCmd)
 	renterCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
 	renterFilesListCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
+	renterExportCmd.AddCommand(renterExportContractTxnsCmd)
 
 	root.AddCommand(gatewayCmd)
 	gatewayCmd.AddCommand(gatewayConnectCmd, gatewayDisconnectCmd, gatewayAddressCmd, gatewayListCmd)
 
 	root.AddCommand(consensusCmd)
+
+	root.AddCommand(bashcomplCmd)
 
 	// parse flags
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")

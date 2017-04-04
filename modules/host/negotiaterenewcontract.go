@@ -176,7 +176,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// transaction and submits it to the blockchain, creating a storage
 	// obligation in the process. The host's part is now complete and the
 	// contract is finalized, but to give confidence to the renter the host
-	// will send the sigantures so that the renter can immediately have the
+	// will send the signatures so that the renter can immediately have the
 	// completed file contract.
 	//
 	// During finalization the signatures sent by the renter are all checked.
@@ -293,10 +293,7 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 	// the host knows how to spend.
 	expectedUH := types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{
-			{
-				Algorithm: types.SignatureEd25519,
-				Key:       renterPK[:],
-			},
+			types.Ed25519PublicKey(renterPK),
 			publicKey,
 		},
 		SignaturesRequired: 2,
