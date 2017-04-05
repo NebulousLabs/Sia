@@ -1046,6 +1046,7 @@ func TestRenterAllowance(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		time.Sleep(100 * time.Millisecond)
 
 		// Try downloading the file.
 		downpath := filepath.Join(st.dir, "testdown.dat")
