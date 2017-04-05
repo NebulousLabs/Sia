@@ -88,7 +88,7 @@ files, and advertise yourself as a host.
 Building From Source
 --------------------
 
-To build from source, [Go 1.7 must be installed](https://golang.org/doc/install)
+To build from source, [Go 1.8 must be installed](https://golang.org/doc/install)
 on the system. Then simply use `go get`:
 
 ```
