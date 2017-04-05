@@ -222,7 +222,7 @@ func walletinitseedcmd() {
 		}
 		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
-	err = post("/wallet/initseed", qs)
+	err = post("/wallet/init/seed", qs)
 	if err != nil {
 		die("Could not initialize wallet from seed:", err)
 	}
