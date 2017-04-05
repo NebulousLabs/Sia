@@ -1196,3 +1196,134 @@ func TestHostAndRentReload(t *testing.T) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 }
+
+// TestHostAndRenterRenewInterrupt
+func TestHostAndRenterRenewInterrupt(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	stHost, err := blankServerTester(t.Name() + "-Host")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sts := []*serverTester{st, stHost}
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fundAllNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Announce the host.
+	err = stHost.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stHost.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for host to be seen in renter's hostdb
+	var ah HostdbActiveGET
+	for i := 0; i < 50; i++ {
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			t.Fatal(err)
+		}
+		if len(ah.Hosts) == 1 {
+			break
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	if len(ah.Hosts) != 1 {
+		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
+	}
+
+	// Upload a file to the host.
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "10"
+	testPeriodInt := 10
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, 10e3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Upload the file to the renter.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get current contract ID.
+	var rc RenterContracts
+	err = st.getAPI("/renter/contracts", &rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contractID := rc.Contracts[0].ID
+
+	// Mine enough blocks to enter the renewal window.
+	testWindow := testPeriodInt / 2
+	for i := 0; i < testWindow+1; i++ {
+		st.miner.AddBlock()
+	}
+	// Wait for the contract to be renewed.
+	for i := 0; i < 200 && (len(rc.Contracts) != 1 || rc.Contracts[0].ID == contractID); i++ {
+		st.getAPI("/renter/contracts", &rc)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if rc.Contracts[0].ID == contractID {
+		t.Fatal("contract was not renewed:", rc.Contracts[0])
+	}
+
+	// Only one piece will be uploaded (10% at current redundancy).
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(1000 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+	}
+
+	// Try downloading the file.
+	downpath := filepath.Join(st.dir, "testdown.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the download has the right contents.
+	orig, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	download, err := ioutil.ReadFile(downpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(orig, download) != 0 {
+		t.Fatal("data mismatch when downloading a file")
+	}
+
+}
