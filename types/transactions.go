@@ -13,6 +13,13 @@ import (
 
 const (
 	SpecifierLen = 16
+
+	// UnlockHashChecksumSize is the size of the checksum used to verify
+	// human-readable addresses. It is not a crypytographically secure
+	// checksum, it's merely intended to prevent typos. 6 is chosen because it
+	// brings the total size of the address to 38 bytes, leaving 2 bytes for
+	// potential version additions in the future.
+	UnlockHashChecksumSize = 6
 )
 
 // These Specifiers are used internally when calculating a type's ID. See
@@ -125,6 +132,12 @@ type (
 		UnlockHash UnlockHash `json:"unlockhash"`
 		ClaimStart Currency   `json:"claimstart"`
 	}
+
+	// An UnlockHash is a specially constructed hash of the UnlockConditions type.
+	// "Locked" values can be unlocked by providing the UnlockConditions that hash
+	// to a given UnlockHash. See UnlockConditions.UnlockHash for details on how the
+	// UnlockHash is constructed.
+	UnlockHash crypto.Hash
 )
 
 // ID returns the id of a transaction, which is taken by marshalling all of the
