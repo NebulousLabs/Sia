@@ -7,10 +7,7 @@ package types
 // called 'UnlockConditions'.
 
 import (
-	"encoding/hex"
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -154,11 +151,12 @@ func (uc UnlockConditions) UnlockHash() UnlockHash {
 
 // SigHash returns the hash of the fields in a transaction covered by a given
 // signature. See CoveredFields for more details.
-func (t Transaction) SigHash(i int) crypto.Hash {
+func (t Transaction) SigHash(i int) (hash crypto.Hash) {
 	cf := t.TransactionSignatures[i].CoveredFields
-	var signedData []byte
+	h := crypto.NewHash()
+	enc := encoding.NewEncoder(h)
 	if cf.WholeTransaction {
-		signedData = encoding.MarshalAll(
+		enc.EncodeAll(
 			t.SiacoinInputs,
 			t.SiacoinOutputs,
 			t.FileContracts,
@@ -174,39 +172,40 @@ func (t Transaction) SigHash(i int) crypto.Hash {
 		)
 	} else {
 		for _, input := range cf.SiacoinInputs {
-			signedData = append(signedData, encoding.Marshal(t.SiacoinInputs[input])...)
+			enc.Encode(t.SiacoinInputs[input])
 		}
 		for _, output := range cf.SiacoinOutputs {
-			signedData = append(signedData, encoding.Marshal(t.SiacoinOutputs[output])...)
+			enc.Encode(t.SiacoinOutputs[output])
 		}
 		for _, contract := range cf.FileContracts {
-			signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)
+			enc.Encode(t.FileContracts[contract])
 		}
 		for _, revision := range cf.FileContractRevisions {
-			signedData = append(signedData, encoding.Marshal(t.FileContractRevisions[revision])...)
+			enc.Encode(t.FileContractRevisions[revision])
 		}
 		for _, storageProof := range cf.StorageProofs {
-			signedData = append(signedData, encoding.Marshal(t.StorageProofs[storageProof])...)
+			enc.Encode(t.StorageProofs[storageProof])
 		}
 		for _, siafundInput := range cf.SiafundInputs {
-			signedData = append(signedData, encoding.Marshal(t.SiafundInputs[siafundInput])...)
+			enc.Encode(t.SiafundInputs[siafundInput])
 		}
 		for _, siafundOutput := range cf.SiafundOutputs {
-			signedData = append(signedData, encoding.Marshal(t.SiafundOutputs[siafundOutput])...)
+			enc.Encode(t.SiafundOutputs[siafundOutput])
 		}
 		for _, minerFee := range cf.MinerFees {
-			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
+			enc.Encode(t.MinerFees[minerFee])
 		}
 		for _, arbData := range cf.ArbitraryData {
-			signedData = append(signedData, encoding.Marshal(t.ArbitraryData[arbData])...)
+			enc.Encode(t.ArbitraryData[arbData])
 		}
 	}
 
 	for _, sig := range cf.TransactionSignatures {
-		signedData = append(signedData, encoding.Marshal(t.TransactionSignatures[sig])...)
+		enc.Encode(t.TransactionSignatures[sig])
 	}
 
-	return crypto.HashBytes(signedData)
+	h.Sum(hash[:0])
+	return
 }
 
 // sortedUnique checks that 'elems' is sorted, contains no repeats, and that no
@@ -400,26 +399,4 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 	}
 
 	return nil
-}
-
-// LoadString is the inverse of SiaPublicKey.String().
-func (spk *SiaPublicKey) LoadString(s string) {
-	parts := strings.Split(s, ":")
-	if len(parts) != 2 {
-		return
-	}
-	var err error
-	spk.Key, err = hex.DecodeString(parts[1])
-	if err != nil {
-		spk.Key = nil
-		return
-	}
-	copy(spk.Algorithm[:], []byte(parts[0]))
-}
-
-// String defines how to print a SiaPublicKey - hex is used to keep things
-// compact during logging. The key type prefix and lack of a checksum help to
-// separate it from a sia address.
-func (spk *SiaPublicKey) String() string {
-	return spk.Algorithm.String() + ":" + fmt.Sprintf("%x", spk.Key)
 }

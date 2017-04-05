@@ -91,12 +91,12 @@ func (e *Encoder) encode(val reflect.Value) error {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return e.write(EncInt64(val.Int()))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return e.write(EncUint64(val.Uint()))
+		return WriteUint64(e.w, val.Uint())
 	case reflect.String:
 		return WritePrefix(e.w, []byte(val.String()))
 	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
-		if err := e.write(EncUint64(uint64(val.Len()))); err != nil {
+		if err := WriteInt(e.w, val.Len()); err != nil {
 			return err
 		}
 		if val.Len() == 0 {

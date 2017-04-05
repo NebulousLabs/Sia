@@ -8,15 +8,11 @@ package types
 // this value will not result in overflow.
 
 import (
-	"bytes"
 	"errors"
-	"fmt"
-	"io"
 	"math"
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 )
 
 type (
@@ -197,67 +193,4 @@ func (c Currency) Uint64() (u uint64, err error) {
 		return 0, ErrUint64Overflow
 	}
 	return c.Big().Uint64(), nil
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (c Currency) MarshalJSON() ([]byte, error) {
-	// Must enclosed the value in quotes; otherwise JS will convert it to a
-	// double and lose precision.
-	return []byte(`"` + c.String() + `"`), nil
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface. An error is
-// returned if a negative number is provided.
-func (c *Currency) UnmarshalJSON(b []byte) error {
-	// UnmarshalJSON does not expect quotes
-	b = bytes.Trim(b, `"`)
-	err := c.i.UnmarshalJSON(b)
-	if err != nil {
-		return err
-	}
-	if c.i.Sign() < 0 {
-		c.i = *big.NewInt(0)
-		return ErrNegativeCurrency
-	}
-	return nil
-}
-
-// MarshalSia implements the encoding.SiaMarshaler interface. It writes the
-// byte-slice representation of the Currency's internal big.Int to w. Note
-// that as the bytes of the big.Int correspond to the absolute value of the
-// integer, there is no way to marshal a negative Currency.
-func (c Currency) MarshalSia(w io.Writer) error {
-	return encoding.WritePrefix(w, c.i.Bytes())
-}
-
-// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
-func (c *Currency) UnmarshalSia(r io.Reader) error {
-	b, err := encoding.ReadPrefix(r, 256)
-	if err != nil {
-		return err
-	}
-	var dec Currency
-	dec.i.SetBytes(b)
-	*c = dec
-	return nil
-}
-
-// String implements the fmt.Stringer interface.
-func (c Currency) String() string {
-	return c.i.String()
-}
-
-// Scan implements the fmt.Scanner interface, allowing Currency values to be
-// scanned from text.
-func (c *Currency) Scan(s fmt.ScanState, ch rune) error {
-	var dec Currency
-	err := dec.i.Scan(s, ch)
-	if err != nil {
-		return err
-	}
-	if dec.i.Sign() < 0 {
-		return ErrNegativeCurrency
-	}
-	*c = dec
-	return nil
 }

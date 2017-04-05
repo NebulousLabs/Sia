@@ -2,11 +2,9 @@ package types
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/fastrand"
 )
 
 // TestEd25519PublicKey tests the Ed25519PublicKey function.
@@ -354,50 +352,5 @@ func TestTransactionValidSignatures(t *testing.T) {
 	err = txn.validSignatures(10)
 	if err != ErrMissingSignatures {
 		t.Error(err)
-	}
-}
-
-// TestSiaPublicKeyLoadString checks that the LoadString method is the proper
-// inverse of the String() method, also checks that there are no stupid panics
-// or severe errors.
-func TestSiaPublicKeyLoadString(t *testing.T) {
-	spk := SiaPublicKey{
-		Algorithm: SignatureEd25519,
-		Key:       fastrand.Bytes(32),
-	}
-
-	spkString := spk.String()
-	var loadedSPK SiaPublicKey
-	loadedSPK.LoadString(spkString)
-	if !bytes.Equal(loadedSPK.Algorithm[:], spk.Algorithm[:]) {
-		t.Error("SiaPublicKey is not loading correctly")
-	}
-	if !bytes.Equal(loadedSPK.Key, spk.Key) {
-		t.Log(loadedSPK.Key, spk.Key)
-		t.Error("SiaPublicKey is not loading correctly")
-	}
-
-	// Try loading crappy strings.
-	parts := strings.Split(spkString, ":")
-	spk.LoadString(parts[0])
-	spk.LoadString(parts[0][1:])
-	spk.LoadString(parts[0][:1])
-	spk.LoadString(parts[1])
-	spk.LoadString(parts[1][1:])
-	spk.LoadString(parts[1][:1])
-	spk.LoadString(parts[0] + parts[1])
-
-}
-
-// TestSiaPublicKeyString does a quick check to verify that the String method
-// on the SiaPublicKey is producing the expected output.
-func TestSiaPublicKeyString(t *testing.T) {
-	spk := SiaPublicKey{
-		Algorithm: SignatureEd25519,
-		Key:       make([]byte, 32),
-	}
-
-	if spk.String() != "ed25519:0000000000000000000000000000000000000000000000000000000000000000" {
-		t.Error("got wrong value for spk.String():", spk.String())
 	}
 }
