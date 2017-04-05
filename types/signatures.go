@@ -7,10 +7,7 @@ package types
 // called 'UnlockConditions'.
 
 import (
-	"encoding/hex"
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -402,26 +399,4 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 	}
 
 	return nil
-}
-
-// LoadString is the inverse of SiaPublicKey.String().
-func (spk *SiaPublicKey) LoadString(s string) {
-	parts := strings.Split(s, ":")
-	if len(parts) != 2 {
-		return
-	}
-	var err error
-	spk.Key, err = hex.DecodeString(parts[1])
-	if err != nil {
-		spk.Key = nil
-		return
-	}
-	copy(spk.Algorithm[:], []byte(parts[0]))
-}
-
-// String defines how to print a SiaPublicKey - hex is used to keep things
-// compact during logging. The key type prefix and lack of a checksum help to
-// separate it from a sia address.
-func (spk *SiaPublicKey) String() string {
-	return spk.Algorithm.String() + ":" + fmt.Sprintf("%x", spk.Key)
 }

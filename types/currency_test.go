@@ -1,13 +1,9 @@
 package types
 
 import (
-	"bytes"
-	"fmt"
 	"math"
 	"math/big"
 	"testing"
-
-	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // TestNewCurrency initializes a standard new currency.
@@ -250,97 +246,6 @@ func TestCurrencySub(t *testing.T) {
 	}
 }
 
-// TestCurrencyMarshalJSON probes the MarshalJSON and UnmarshalJSON functions
-// of the currency type.
-func TestCurrencyMarshalJSON(t *testing.T) {
-	b30 := big.NewInt(30)
-	c30 := NewCurrency64(30)
-
-	bMar30, err := b30.MarshalJSON()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cMar30, err := c30.MarshalJSON()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(bMar30, bytes.Trim(cMar30, `"`)) {
-		t.Error("Currency does not match the marshalling of its math/big equivalent")
-	}
-
-	var cUmar30 Currency
-	err = cUmar30.UnmarshalJSON(cMar30)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c30.Cmp(cUmar30) != 0 {
-		t.Error("Incorrect unmarshalling of currency type.")
-	}
-
-	cMar30[0] = 0
-	err = cUmar30.UnmarshalJSON(cMar30)
-	if err == nil {
-		t.Error("JSON decoded nonsense input")
-	}
-}
-
-// TestCurrencyMarshalSia probes the MarshalSia and UnmarshalSia functions of
-// the currency type.
-func TestCurrencyMarshalSia(t *testing.T) {
-	c := NewCurrency64(1656)
-	buf := new(bytes.Buffer)
-	err := c.MarshalSia(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var cUmar Currency
-	cUmar.UnmarshalSia(buf)
-	if c.Cmp(cUmar) != 0 {
-		t.Error("marshal and unmarshal mismatch for currency type")
-	}
-}
-
-// TestCurrencyString probes the String function of the currency type.
-func TestCurrencyString(t *testing.T) {
-	b := big.NewInt(7135)
-	c := NewCurrency64(7135)
-	if b.String() != c.String() {
-		t.Error("string function not behaving as expected")
-	}
-}
-
-// TestCurrencyScan probes the Scan function of the currency type.
-func TestCurrencyScan(t *testing.T) {
-	var c0 Currency
-	c1 := NewCurrency64(81293)
-	_, err := fmt.Sscan("81293", &c0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c0.Cmp(c1) != 0 {
-		t.Error("scanned number does not equal expected value")
-	}
-	_, err = fmt.Sscan("z", &c0)
-	if err == nil {
-		t.Fatal("scan is accepting garbage input")
-	}
-}
-
-// TestCurrencyEncoding checks that a currency can encode and decode without
-// error.
-func TestCurrencyEncoding(t *testing.T) {
-	c := NewCurrency64(351)
-	cMar := encoding.Marshal(c)
-	var cUmar Currency
-	err := encoding.Unmarshal(cMar, &cUmar)
-	if err != nil {
-		t.Error("Error unmarshalling a currency:", err)
-	}
-	if cUmar.Cmp(c) != 0 {
-		t.Error("Marshalling and Unmarshalling a currency did not work correctly")
-	}
-}
-
 // TestNegativeCurrencyMulRat checks that negative numbers are rejected when
 // calling MulRat on the currency type.
 func TestNegativeCurrencyMulRat(t *testing.T) {
@@ -370,40 +275,6 @@ func TestNegativeCurrencySub(t *testing.T) {
 	c1 := NewCurrency64(1)
 	c2 := NewCurrency64(2)
 	_ = c1.Sub(c2)
-}
-
-// TestNegativeCurrencyUnmarshalJSON tries to unmarshal a negative number from
-// JSON.
-func TestNegativeCurrencyUnmarshalJSON(t *testing.T) {
-	// Marshal a 2 digit number.
-	c := NewCurrency64(35)
-	cMar, err := c.MarshalJSON()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Change the first digit to a negative character.
-	cMar[0] = 45
-
-	// Try unmarshalling the negative currency.
-	var cNeg Currency
-	err = cNeg.UnmarshalJSON(cMar)
-	if err != ErrNegativeCurrency {
-		t.Error("expecting ErrNegativeCurrency:", err)
-	}
-	if cNeg.i.Sign() < 0 {
-		t.Error("negative currency returned")
-	}
-}
-
-// TestNegativeCurrencyScan tries to scan in a negative number and checks for
-// an error.
-func TestNegativeCurrencyScan(t *testing.T) {
-	var c Currency
-	_, err := fmt.Sscan("-23", &c)
-	if err != ErrNegativeCurrency {
-		t.Error("expecting ErrNegativeCurrency:", err)
-	}
 }
 
 // TestNegativeCurrencies tries an array of ways to produce a negative currency.
@@ -445,28 +316,5 @@ func TestCurrencyUint64(t *testing.T) {
 	}
 	if result != 0 {
 		t.Error("result is not being zeroed in the event of an error")
-	}
-}
-
-// TestCurrencyUnsafeDecode tests that decoding into an existing Currency
-// value does not overwrite its contents.
-func TestCurrencyUnsafeDecode(t *testing.T) {
-	// Scan
-	backup := SiacoinPrecision.Mul64(1)
-	c := SiacoinPrecision
-	_, err := fmt.Sscan("7", &c)
-	if err != nil {
-		t.Error(err)
-	} else if !SiacoinPrecision.Equals(backup) {
-		t.Errorf("Scan changed value of SiacoinPrecision: %v -> %v", backup, SiacoinPrecision)
-	}
-
-	// UnmarshalSia
-	c = SiacoinPrecision
-	err = encoding.Unmarshal(encoding.Marshal(NewCurrency64(7)), &c)
-	if err != nil {
-		t.Error(err)
-	} else if !SiacoinPrecision.Equals(backup) {
-		t.Errorf("UnmarshalSia changed value of SiacoinPrecision: %v -> %v", backup, SiacoinPrecision)
 	}
 }

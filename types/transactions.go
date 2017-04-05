@@ -6,9 +6,7 @@ package types
 // it is cryptographically unlikely that any two objects would share an id.
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 )
@@ -233,105 +231,4 @@ func (t Transaction) SiacoinOutputSum() (sum Currency) {
 // the siafund output is spent. The ID is the hash the SiafundOutputID.
 func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashObject(id))
-}
-
-// MarshalJSON marshals a specifier as a string.
-func (s Specifier) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.String())
-}
-
-// String returns the specifier as a string, trimming any trailing zeros.
-func (s Specifier) String() string {
-	var i int
-	for i = range s {
-		if s[i] == 0 {
-			break
-		}
-	}
-	return string(s[:i])
-}
-
-// UnmarshalJSON decodes the json string of the specifier.
-func (s *Specifier) UnmarshalJSON(b []byte) error {
-	var str string
-	if err := json.Unmarshal(b, &str); err != nil {
-		return err
-	}
-	copy(s[:], str)
-	return nil
-}
-
-// MarshalJSON marshals an id as a hex string.
-func (tid TransactionID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(tid.String())
-}
-
-// String prints the id in hex.
-func (tid TransactionID) String() string {
-	return fmt.Sprintf("%x", tid[:])
-}
-
-// UnmarshalJSON decodes the json hex string of the id.
-func (tid *TransactionID) UnmarshalJSON(b []byte) error {
-	return (*crypto.Hash)(tid).UnmarshalJSON(b)
-}
-
-// MarshalJSON marshals an id as a hex string.
-func (oid OutputID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(oid.String())
-}
-
-// String prints the id in hex.
-func (oid OutputID) String() string {
-	return fmt.Sprintf("%x", oid[:])
-}
-
-// UnmarshalJSON decodes the json hex string of the id.
-func (oid *OutputID) UnmarshalJSON(b []byte) error {
-	return (*crypto.Hash)(oid).UnmarshalJSON(b)
-}
-
-// MarshalJSON marshals an id as a hex string.
-func (scoid SiacoinOutputID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(scoid.String())
-}
-
-// String prints the id in hex.
-func (scoid SiacoinOutputID) String() string {
-	return fmt.Sprintf("%x", scoid[:])
-}
-
-// UnmarshalJSON decodes the json hex string of the id.
-func (scoid *SiacoinOutputID) UnmarshalJSON(b []byte) error {
-	return (*crypto.Hash)(scoid).UnmarshalJSON(b)
-}
-
-// MarshalJSON marshals an id as a hex string.
-func (fcid FileContractID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(fcid.String())
-}
-
-// String prints the id in hex.
-func (fcid FileContractID) String() string {
-	return fmt.Sprintf("%x", fcid[:])
-}
-
-// UnmarshalJSON decodes the json hex string of the id.
-func (fcid *FileContractID) UnmarshalJSON(b []byte) error {
-	return (*crypto.Hash)(fcid).UnmarshalJSON(b)
-}
-
-// MarshalJSON marshals an id as a hex string.
-func (sfoid SiafundOutputID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(sfoid.String())
-}
-
-// String prints the id in hex.
-func (sfoid SiafundOutputID) String() string {
-	return fmt.Sprintf("%x", sfoid[:])
-}
-
-// UnmarshalJSON decodes the json hex string of the id.
-func (sfoid *SiafundOutputID) UnmarshalJSON(b []byte) error {
-	return (*crypto.Hash)(sfoid).UnmarshalJSON(b)
 }

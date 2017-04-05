@@ -1,15 +1,190 @@
 package types
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/fastrand"
 )
 
 func hashStr(v interface{}) string {
 	h := crypto.HashObject(v)
 	return fmt.Sprintf("%x", h[:])
+}
+
+// TestBlockEncodes probes the MarshalSia and UnmarshalSia methods of the
+// Block type.
+func TestBlockEncoding(t *testing.T) {
+	b := Block{
+		MinerPayouts: []SiacoinOutput{
+			{Value: CalculateCoinbase(0)},
+			{Value: CalculateCoinbase(0)},
+		},
+	}
+	var decB Block
+	err := encoding.Unmarshal(encoding.Marshal(b), &decB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decB.MinerPayouts) != len(b.MinerPayouts) ||
+		decB.MinerPayouts[0].Value.Cmp(b.MinerPayouts[0].Value) != 0 ||
+		decB.MinerPayouts[1].Value.Cmp(b.MinerPayouts[1].Value) != 0 {
+		t.Fatal("block changed after encode/decode:", b, decB)
+	}
+}
+
+// TestCurrencyMarshalJSON probes the MarshalJSON and UnmarshalJSON functions
+// of the currency type.
+func TestCurrencyMarshalJSON(t *testing.T) {
+	b30 := big.NewInt(30)
+	c30 := NewCurrency64(30)
+
+	bMar30, err := b30.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cMar30, err := c30.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(bMar30, bytes.Trim(cMar30, `"`)) {
+		t.Error("Currency does not match the marshalling of its math/big equivalent")
+	}
+
+	var cUmar30 Currency
+	err = cUmar30.UnmarshalJSON(cMar30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c30.Cmp(cUmar30) != 0 {
+		t.Error("Incorrect unmarshalling of currency type.")
+	}
+
+	cMar30[0] = 0
+	err = cUmar30.UnmarshalJSON(cMar30)
+	if err == nil {
+		t.Error("JSON decoded nonsense input")
+	}
+}
+
+// TestCurrencyMarshalSia probes the MarshalSia and UnmarshalSia functions of
+// the currency type.
+func TestCurrencyMarshalSia(t *testing.T) {
+	c := NewCurrency64(1656)
+	buf := new(bytes.Buffer)
+	err := c.MarshalSia(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cUmar Currency
+	cUmar.UnmarshalSia(buf)
+	if c.Cmp(cUmar) != 0 {
+		t.Error("marshal and unmarshal mismatch for currency type")
+	}
+}
+
+// TestCurrencyString probes the String function of the currency type.
+func TestCurrencyString(t *testing.T) {
+	b := big.NewInt(7135)
+	c := NewCurrency64(7135)
+	if b.String() != c.String() {
+		t.Error("string function not behaving as expected")
+	}
+}
+
+// TestCurrencyScan probes the Scan function of the currency type.
+func TestCurrencyScan(t *testing.T) {
+	var c0 Currency
+	c1 := NewCurrency64(81293)
+	_, err := fmt.Sscan("81293", &c0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c0.Cmp(c1) != 0 {
+		t.Error("scanned number does not equal expected value")
+	}
+	_, err = fmt.Sscan("z", &c0)
+	if err == nil {
+		t.Fatal("scan is accepting garbage input")
+	}
+}
+
+// TestCurrencyEncoding checks that a currency can encode and decode without
+// error.
+func TestCurrencyEncoding(t *testing.T) {
+	c := NewCurrency64(351)
+	cMar := encoding.Marshal(c)
+	var cUmar Currency
+	err := encoding.Unmarshal(cMar, &cUmar)
+	if err != nil {
+		t.Error("Error unmarshalling a currency:", err)
+	}
+	if cUmar.Cmp(c) != 0 {
+		t.Error("Marshalling and Unmarshalling a currency did not work correctly")
+	}
+}
+
+// TestNegativeCurrencyUnmarshalJSON tries to unmarshal a negative number from
+// JSON.
+func TestNegativeCurrencyUnmarshalJSON(t *testing.T) {
+	// Marshal a 2 digit number.
+	c := NewCurrency64(35)
+	cMar, err := c.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Change the first digit to a negative character.
+	cMar[0] = 45
+
+	// Try unmarshalling the negative currency.
+	var cNeg Currency
+	err = cNeg.UnmarshalJSON(cMar)
+	if err != ErrNegativeCurrency {
+		t.Error("expecting ErrNegativeCurrency:", err)
+	}
+	if cNeg.i.Sign() < 0 {
+		t.Error("negative currency returned")
+	}
+}
+
+// TestNegativeCurrencyScan tries to scan in a negative number and checks for
+// an error.
+func TestNegativeCurrencyScan(t *testing.T) {
+	var c Currency
+	_, err := fmt.Sscan("-23", &c)
+	if err != ErrNegativeCurrency {
+		t.Error("expecting ErrNegativeCurrency:", err)
+	}
+}
+
+// TestCurrencyUnsafeDecode tests that decoding into an existing Currency
+// value does not overwrite its contents.
+func TestCurrencyUnsafeDecode(t *testing.T) {
+	// Scan
+	backup := SiacoinPrecision.Mul64(1)
+	c := SiacoinPrecision
+	_, err := fmt.Sscan("7", &c)
+	if err != nil {
+		t.Error(err)
+	} else if !SiacoinPrecision.Equals(backup) {
+		t.Errorf("Scan changed value of SiacoinPrecision: %v -> %v", backup, SiacoinPrecision)
+	}
+
+	// UnmarshalSia
+	c = SiacoinPrecision
+	err = encoding.Unmarshal(encoding.Marshal(NewCurrency64(7)), &c)
+	if err != nil {
+		t.Error(err)
+	} else if !SiacoinPrecision.Equals(backup) {
+		t.Errorf("UnmarshalSia changed value of SiacoinPrecision: %v -> %v", backup, SiacoinPrecision)
+	}
 }
 
 // TestTransactionEncoding tests that optimizations applied to the encoding of
@@ -150,6 +325,76 @@ func TestSiaPublicKeyEncoding(t *testing.T) {
 	}
 }
 
+// TestSiaPublicKeyLoadString checks that the LoadString method is the proper
+// inverse of the String() method, also checks that there are no stupid panics
+// or severe errors.
+func TestSiaPublicKeyLoadString(t *testing.T) {
+	spk := SiaPublicKey{
+		Algorithm: SignatureEd25519,
+		Key:       fastrand.Bytes(32),
+	}
+
+	spkString := spk.String()
+	var loadedSPK SiaPublicKey
+	loadedSPK.LoadString(spkString)
+	if !bytes.Equal(loadedSPK.Algorithm[:], spk.Algorithm[:]) {
+		t.Error("SiaPublicKey is not loading correctly")
+	}
+	if !bytes.Equal(loadedSPK.Key, spk.Key) {
+		t.Log(loadedSPK.Key, spk.Key)
+		t.Error("SiaPublicKey is not loading correctly")
+	}
+
+	// Try loading crappy strings.
+	parts := strings.Split(spkString, ":")
+	spk.LoadString(parts[0])
+	spk.LoadString(parts[0][1:])
+	spk.LoadString(parts[0][:1])
+	spk.LoadString(parts[1])
+	spk.LoadString(parts[1][1:])
+	spk.LoadString(parts[1][:1])
+	spk.LoadString(parts[0] + parts[1])
+
+}
+
+// TestSiaPublicKeyString does a quick check to verify that the String method
+// on the SiaPublicKey is producing the expected output.
+func TestSiaPublicKeyString(t *testing.T) {
+	spk := SiaPublicKey{
+		Algorithm: SignatureEd25519,
+		Key:       make([]byte, 32),
+	}
+
+	if spk.String() != "ed25519:0000000000000000000000000000000000000000000000000000000000000000" {
+		t.Error("got wrong value for spk.String():", spk.String())
+	}
+}
+
+// TestSpecifierMarshaling tests the marshaling methods of the specifier
+// type.
+func TestSpecifierMarshaling(t *testing.T) {
+	s1 := SpecifierClaimOutput
+	b, err := json.Marshal(s1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s2 Specifier
+	err = json.Unmarshal(b, &s2)
+	if err != nil {
+		t.Fatal(err)
+	} else if s2 != s1 {
+		t.Fatal("mismatch:", s1, s2)
+	}
+
+	// invalid json
+	x := 3
+	b, _ = json.Marshal(x)
+	err = json.Unmarshal(b, &s2)
+	if err == nil {
+		t.Fatal("Unmarshal should have failed")
+	}
+}
+
 // TestTransactionSignatureEncoding tests that optimizations applied to the
 // encoding of the TransactionSignature type do not change its encoding.
 func TestTransactionSignatureEncoding(t *testing.T) {
@@ -185,5 +430,102 @@ func TestUnlockConditionsEncoding(t *testing.T) {
 	}
 	if h := hashStr(uc); h != "164d3741bd274d5333ab1fe8ab641b9d25cb0e0bed8e1d7bc466b5fffc956d96" {
 		t.Error("encoding mismatch:", h)
+	}
+}
+
+// TestUnlockHashJSONMarshalling checks that when an unlock hash is marshalled
+// and unmarshalled using JSON, the result is what is expected.
+func TestUnlockHashJSONMarshalling(t *testing.T) {
+	// Create an unlock hash.
+	uc := UnlockConditions{
+		Timelock:           5,
+		SignaturesRequired: 3,
+	}
+	uh := uc.UnlockHash()
+
+	// Marshal the unlock hash.
+	marUH, err := json.Marshal(uh)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Unmarshal the unlock hash and compare to the original.
+	var umarUH UnlockHash
+	err = json.Unmarshal(marUH, &umarUH)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if umarUH != uh {
+		t.Error("Marshalled and unmarshalled unlock hash are not equivalent")
+	}
+
+	// Corrupt the checksum.
+	marUH[36]++
+	err = umarUH.UnmarshalJSON(marUH)
+	if err != ErrInvalidUnlockHashChecksum {
+		t.Error("expecting an invalid checksum:", err)
+	}
+	marUH[36]--
+
+	// Try an input that's not correct hex.
+	marUH[7] += 100
+	err = umarUH.UnmarshalJSON(marUH)
+	if err == nil {
+		t.Error("Expecting error after corrupting input")
+	}
+	marUH[7] -= 100
+
+	// Try an input of the wrong length.
+	err = (&umarUH).UnmarshalJSON(marUH[2:])
+	if err != ErrUnlockHashWrongLen {
+		t.Error("Got wrong error:", err)
+	}
+}
+
+// TestUnlockHashStringMarshalling checks that when an unlock hash is
+// marshalled and unmarshalled using String and LoadString, the result is what
+// is expected.
+func TestUnlockHashStringMarshalling(t *testing.T) {
+	// Create an unlock hash.
+	uc := UnlockConditions{
+		Timelock:           2,
+		SignaturesRequired: 7,
+	}
+	uh := uc.UnlockHash()
+
+	// Marshal the unlock hash.
+	marUH := uh.String()
+
+	// Unmarshal the unlock hash and compare to the original.
+	var umarUH UnlockHash
+	err := umarUH.LoadString(marUH)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if umarUH != uh {
+		t.Error("Marshalled and unmarshalled unlock hash are not equivalent")
+	}
+
+	// Corrupt the checksum.
+	byteMarUH := []byte(marUH)
+	byteMarUH[36]++
+	err = umarUH.LoadString(string(byteMarUH))
+	if err != ErrInvalidUnlockHashChecksum {
+		t.Error("expecting an invalid checksum:", err)
+	}
+	byteMarUH[36]--
+
+	// Try an input that's not correct hex.
+	byteMarUH[7] += 100
+	err = umarUH.LoadString(string(byteMarUH))
+	if err == nil {
+		t.Error("Expecting error after corrupting input")
+	}
+	byteMarUH[7] -= 100
+
+	// Try an input of the wrong length.
+	err = umarUH.LoadString(string(byteMarUH[2:]))
+	if err != ErrUnlockHashWrongLen {
+		t.Error("Got wrong error:", err)
 	}
 }
