@@ -11,7 +11,7 @@ var (
 	uploadFailureCooldown = build.Select(build.Var{
 		Dev:      time.Second * 7,
 		Standard: time.Second * 61,
-		Testing:  time.Second * 61,
+		Testing:  time.Second,
 	}).(time.Duration)
 
 	// Limit the number of doublings to prevent overflows.
