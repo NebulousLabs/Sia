@@ -35,7 +35,7 @@ func TestOSRename(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(3)
 		go func() {
-			file, err := os.Create(f1Name)
+			file, err := os.OpenFile(f1Name, os.O_RDWR|os.O_CREATE, 0700)
 			if err != nil {
 				t.Error("File write failed:", err)
 			}
@@ -59,7 +59,7 @@ func TestOSRename(t *testing.T) {
 			wg.Done()
 		}()
 		go func() {
-			file, err := os.Create(f2Name)
+			file, err := os.OpenFile(f2Name, os.O_RDWR|os.O_CREATE, 0700)
 			if err != nil {
 				t.Error("File write failed:", err)
 			}
@@ -83,7 +83,7 @@ func TestOSRename(t *testing.T) {
 			wg.Done()
 		}()
 		go func() {
-			file, err := os.Create(f3Name)
+			file, err := os.OpenFile(f3Name, os.O_RDWR|os.O_CREATE, 0700)
 			if err != nil {
 				t.Error("File write failed:", err)
 			}
