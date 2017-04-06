@@ -1,0 +1,84 @@
+.\"Created with GNOME Manpages Editor Wizard
+.\"http://sourceforge.net/projects/gmanedit2
+.TH siad 1 "April 6, 2017" "" "siad"
+
+.SH NAME
+
+.B siad
+- The Sia daemon downloads the blockchain, uploads files, manages redundancy, monitors hosts for uptime, to name a few of the many tasks that it performs.
+
+
+.SH SYNOPSIS
+.RI 
+ siad [ options ] 
+ siad version 
+ siad modules 
+.br
+
+.SH DESCRIPTION
+This manual page explains the
+.B siad
+program.
+.B
+siad 
+is composed of modules, and each modules provides a set of primary functions on the network. Here is a list and description of the major modules:
+.br
+.B Gateway: 
+Manages the Sia peer network. Finds and connects to peers. Responsible for propagating blocks and transactions.
+.br
+.B Consensus: 
+Accepts and verifies blocks. Keeps track of the longest chain, and notifies other modules when the longest chain has updated to a new longest chain. New valid blocks are sent to the gateway to be propagated around the network
+.br
+.B Transactionpool: 
+Accepts and verifies new, unconfirmed transactions. The set of unconfirmed transactions can be queried by other modules.
+.br
+.B Wallet: 
+Can create addresses and keys for the user. Keeps track of all money that the user has received, and sends money to other users at the user's request.
+.br
+.B Renter:  
+Responsible for uploading data to the network. Will create contracts with hosts, monitor hosts, and restore file redundancy if hosts go offline or become unreliable.
+.br
+.B Host:  
+Accepts contracts from the renter and stores data locally. Receives payment for keeping other users files.
+.br
+
+
+.SH OPTIONS
+
+.B
+.IP --agent\ <string>               
+ required substring for the user agent (default "Sia-Agent")
+.B
+.IP --api-addr\ <string>            
+ which host:port the API server listens on (default "localhost:9980")
+.B
+.IP --authenticate-api           
+ enable API password protection
+.B
+.IP --disable-api-security       
+ allow siad to listen on a non-localhost address (DANGEROUS someone could control your sia daemon over network). 
+.B
+.IP --host-addr string           
+ which port the host listens on (default ":9982")
+.B
+.IP -M,\ --modules-string             
+ enabled modules, see 'siad modules' for more info (default "cghmrtw")
+.B
+.IP --no-bootstrap               
+ disable bootstrapping on this run
+.B
+.IP --profile                    
+ enable profiling
+.B
+.IP --profile-directory string   
+ location of the profiling directory (default "profiles")
+.B
+.IP --rpc-addr string            
+ which port the gateway listens on (default ":9981")
+.B
+.IP -d,\ --sia-directory string       
+ location of the sia directory
+
+
+.SH "SEE ALSO"
+
