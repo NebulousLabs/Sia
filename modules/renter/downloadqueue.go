@@ -11,6 +11,10 @@ import (
 // Download downloads a file, identified by its path, to the destination
 // specified.
 func (r *Renter) Download(path, destination string) error {
+	return r.DownloadChunk(path, destination, maxUint64)
+}
+
+func (r *Renter) DownloadChunk(path, destination string, cindex uint64) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
 	file, exists := r.files[path]
@@ -26,7 +30,19 @@ func (r *Renter) Download(path, destination string) error {
 	}
 
 	// Create the download object and add it to the queue.
-	d := r.newDownload(file, destination, currentContracts)
+	var d *download
+	if cindex == maxUint64 {
+		d = r.newDownload(file, destination, currentContracts)
+	} else {
+		// Check whether the chunk index is valid.
+		numChunks := file.numChunks()
+		if cindex < 0 && cindex >= numChunks {
+			emsg := "chunk index not in range of stored chunks. Max chunk index = " + string(numChunks-1)
+			return errors.New(emsg)
+		}
+		d = r.newChunkDownload(file, destination, currentContracts, cindex)
+	}
+
 	lockID = r.mu.Lock()
 	r.downloadQueue = append(r.downloadQueue, d)
 	r.mu.Unlock(lockID)
@@ -53,10 +69,15 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
 	for i := range r.downloadQueue {
 		d := r.downloadQueue[len(r.downloadQueue)-i-1]
+
+		// Calculate download size. If single chunk this value equals d.chunkSize, otherwise it is equal to
+		// d.FileSize. TODO: Account for variable-size last chunk. Same in download.go
+		dlsize := d.dlChunks * d.chunkSize
+
 		downloads[i] = modules.DownloadInfo{
 			SiaPath:     d.siapath,
 			Destination: d.destination,
-			Filesize:    d.fileSize,
+			Filesize:    dlsize,
 			StartTime:   d.startTime,
 		}
 		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)

@@ -220,6 +220,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 
 		router.POST("/renter/delete/*siapath", RequirePassword(api.renterDeleteHandler, requiredPassword))
 		router.GET("/renter/download/*siapath", RequirePassword(api.renterDownloadHandler, requiredPassword))
+		router.GET("/renter/downloadchunk/*siapath", RequirePassword(api.renterDownloadchunkHandler, requiredPassword))
 		router.GET("/renter/downloadasync/*siapath", RequirePassword(api.renterDownloadAsyncHandler, requiredPassword))
 		router.POST("/renter/rename/*siapath", RequirePassword(api.renterRenameHandler, requiredPassword))
 		router.POST("/renter/upload/*siapath", RequirePassword(api.renterUploadHandler, requiredPassword))
