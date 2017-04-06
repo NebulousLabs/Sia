@@ -273,7 +273,7 @@ func main() {
 	walletSendCmd.AddCommand(walletSendSiacoinsCmd, walletSendSiafundsCmd)
 
 	root.AddCommand(renterCmd)
-	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd,
+	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd, renterDownloadChunkCmd,
 		renterDownloadsCmd, renterAllowanceCmd, renterSetAllowanceCmd,
 		renterContractsCmd, renterFilesListCmd, renterFilesRenameCmd,
 		renterFilesUploadCmd, renterUploadsCmd, renterExportCmd,

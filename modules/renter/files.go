@@ -66,7 +66,7 @@ func (f *file) chunkSize() uint64 {
 	return f.pieceSize * uint64(f.erasureCode.MinPieces())
 }
 
-// numChunks returns the number of chunks that f was split into.
+// dlChunks returns the number of chunks that f was split into.
 func (f *file) numChunks() uint64 {
 	// empty files still need at least one chunk
 	if f.size == 0 {

@@ -8,7 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestFileNumChunks checks the numChunks method of the file type.
+// TestFileNumChunks checks the dlChunks method of the file type.
 func TestFileNumChunks(t *testing.T) {
 	tests := []struct {
 		size           uint64

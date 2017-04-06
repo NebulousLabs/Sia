@@ -254,6 +254,9 @@ type Renter interface {
 	// Download downloads a file to the given destination.
 	Download(path, destination string) error
 
+	// DownloadChunk downloads a specific chunk from a file to the specified location.
+	DownloadChunk(path, destination string, cindex uint64) error
+
 	// DownloadQueue lists all the files that have been scheduled for download.
 	DownloadQueue() []DownloadInfo
 
