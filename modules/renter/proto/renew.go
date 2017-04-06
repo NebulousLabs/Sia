@@ -38,7 +38,6 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 
 	hostPayout := hostCollateral.Add(host.ContractPrice).Add(basePrice)
 	payout := storageAllocation.Add(hostCollateral.Add(host.ContractPrice)).Mul64(10406).Div64(10000) // renter covers siafund fee
-	renterCost := payout.Sub(hostCollateral)
 
 	// check for negative currency
 	if types.PostTax(startHeight, payout).Cmp(hostPayout) < 0 {
@@ -77,7 +76,8 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	txnFee := maxFee.Mul64(estTxnSize)
 
 	// build transaction containing fc
-	err := txnBuilder.FundSiacoins(renterCost.Add(txnFee))
+	renterCost := payout.Sub(hostCollateral).Add(txnFee)
+	err := txnBuilder.FundSiacoins(renterCost)
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
