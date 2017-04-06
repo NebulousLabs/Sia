@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"encoding/binary"
+	"errors"
 	"reflect"
 	"time"
 
@@ -65,6 +66,8 @@ var (
 	keyConsensusHeight        = []byte("keyConsensusHeight")
 	keySpendableKeyFiles      = []byte("keySpendableKeyFiles")
 	keyAuxiliarySeedFiles     = []byte("keyAuxiliarySeedFiles")
+
+	errNoKey = errors.New("key does not exist")
 )
 
 // threadedDBUpdate commits the active database transaction and starts a new
@@ -111,7 +114,11 @@ func dbPut(b *bolt.Bucket, key, val interface{}) error {
 // dbGet is a helper function for retrieving a marshalled key/value pair. val
 // must be a pointer.
 func dbGet(b *bolt.Bucket, key, val interface{}) error {
-	return encoding.Unmarshal(b.Get(encoding.Marshal(key)), val)
+	valBytes := b.Get(encoding.Marshal(key))
+	if valBytes == nil {
+		return errNoKey
+	}
+	return encoding.Unmarshal(valBytes, val)
 }
 
 // dbDelete is a helper function for deleting a marshalled key/value pair.
