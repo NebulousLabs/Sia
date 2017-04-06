@@ -451,7 +451,7 @@ func TestHostAndRentManyFiles(t *testing.T) {
 	var rf RenterFiles
 	for i := 0; i < 200 && (len(rf.Files) != 3 || rf.Files[0].UploadProgress < 100 || rf.Files[1].UploadProgress < 100 || rf.Files[2].UploadProgress < 100); i++ {
 		st.getAPI("/renter/files", &rf)
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 	if len(rf.Files) != 3 || rf.Files[0].UploadProgress < 100 || rf.Files[1].UploadProgress < 100 || rf.Files[2].UploadProgress < 100 {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1], rf.Files[2])

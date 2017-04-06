@@ -165,7 +165,9 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	so.RiskedCollateral = so.RiskedCollateral.Add(newCollateral)
 	so.PotentialUploadRevenue = so.PotentialUploadRevenue.Add(bandwidthRevenue)
 	so.RevisionTransactionSet = []types.Transaction{txn}
+	h.mu.Lock()
 	err = h.modifyStorageObligation(*so, sectorsRemoved, sectorsGained, gainedSectorData)
+	h.mu.Unlock()
 	if err != nil {
 		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
 		return extendErr("could not modify storage obligation: ", ErrorInternal(err.Error()))
