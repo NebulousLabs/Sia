@@ -24,11 +24,13 @@ func TestOSRename(t *testing.T) {
 
 	// Create two different files, and then rename them in parallel to the same
 	// file.
-	for i := 0; i < 500; i++ {
+	for i := 0; i < 15000; i++ {
 		f1Name := filepath.Join(testDir, "f1")
+		f1Copy := filepath.Join(testDir, "f1c")
 		f2Name := filepath.Join(testDir, "f2")
+		f2Copy := filepath.Join(testDir, "f2c")
 		f3Name := filepath.Join(testDir, "f3")
-		commonName := filepath.Join(testDir, "common")
+		f3Copy := filepath.Join(testDir, "f3c")
 		f1Data := []byte{1, 2, 3, 4, 5}
 		f2Data := []byte{2, 3, 4, 5, 6}
 		f3Data := []byte{4, 5, 1, 2, 3}
@@ -52,7 +54,7 @@ func TestOSRename(t *testing.T) {
 				t.Error("File write failed:", err)
 			}
 
-			err = os.Rename(f1Name, commonName)
+			err = os.Rename(f1Name, f1Copy)
 			if err != nil {
 				t.Error("Rename failed:", err)
 			}
@@ -76,7 +78,7 @@ func TestOSRename(t *testing.T) {
 				t.Error("File write failed:", err)
 			}
 
-			err = os.Rename(f2Name, commonName)
+			err = os.Rename(f2Name, f2Copy)
 			if err != nil {
 				t.Error("Rename failed:", err)
 			}
@@ -100,7 +102,7 @@ func TestOSRename(t *testing.T) {
 				t.Error("File write failed:", err)
 			}
 
-			err = os.Rename(f3Name, commonName)
+			err = os.Rename(f3Name, f3Copy)
 			if err != nil {
 				t.Error("Rename failed:", err)
 			}
