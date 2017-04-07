@@ -336,7 +336,7 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 	// Create a storage folder object and add it to the WAL.
 	newSF := &storageFolder{
 		path:  path,
-		usage: make([]uint64, size/modules.SectorSize/64),
+		usage: make([]uint64, sectors/64),
 
 		availableSectors: make(map[sectorID]uint32),
 	}
