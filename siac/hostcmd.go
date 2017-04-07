@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"os"
 	"sort"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -338,8 +339,17 @@ func hostconfigcmd(param, value string) {
 		c := types.NewCurrency(i).Div(modules.BlockBytesPerMonthTerabyte)
 		value = c.String()
 
+	// bool (allow "yes" and "no")
+	case "acceptingcontracts":
+		switch strings.ToLower(value) {
+		case "yes":
+			value = "true"
+		case "no":
+			value = "false"
+		}
+
 	// other valid settings
-	case "acceptingcontracts", "maxdownloadbatchsize", "maxduration",
+	case "maxdownloadbatchsize", "maxduration",
 		"maxrevisebatchsize", "netaddress", "windowsize":
 
 	// invalid settings
