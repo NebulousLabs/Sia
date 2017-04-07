@@ -316,7 +316,7 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 	if sectors < MinimumSectorsPerStorageFolder {
 		return ErrSmallStorageFolder
 	}
-	if (size/modules.SectorSize)%storageFolderGranularity != 0 {
+	if sectors % storageFolderGranularity != 0 {
 		return errStorageFolderGranularity
 	}
 	// Check that the path is an absolute path.
