@@ -1,24 +1,26 @@
 package crypto
 
 import (
+	"bytes"
 	"errors"
 	"io"
 
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/ed25519"
 	"github.com/NebulousLabs/fastrand"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 const (
 	// EntropySize defines the amount of entropy necessary to do secure
 	// cryptographic operations, in bytes.
-	EntropySize = ed25519.EntropySize
+	EntropySize = 32
 
 	// PublicKeySize defines the size of public keys in bytes.
 	PublicKeySize = ed25519.PublicKeySize
 
 	// SecretKeySize defines the size of secret keys in bytes.
-	SecretKeySize = ed25519.SecretKeySize
+	SecretKeySize = ed25519.PrivateKeySize
 
 	// SignatureSize defines the size of signatures in bytes.
 	SignatureSize = ed25519.SignatureSize
@@ -51,16 +53,21 @@ func (sk SecretKey) PublicKey() (pk PublicKey) {
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and verify
 // messages.
 func GenerateKeyPair() (sk SecretKey, pk PublicKey) {
-	var entropy [EntropySize]byte
-	fastrand.Read(entropy[:])
-	return GenerateKeyPairDeterministic(entropy)
+	// no error possible when using fastrand.Reader
+	epk, esk, _ := ed25519.GenerateKey(fastrand.Reader)
+	copy(sk[:], esk)
+	copy(pk[:], epk)
+	return
 }
 
 // GenerateKeyPairDeterministic generates keys deterministically using the input
 // entropy. The input entropy must be 32 bytes in length.
-func GenerateKeyPairDeterministic(entropy [EntropySize]byte) (SecretKey, PublicKey) {
-	sk, pk := ed25519.GenerateKey(entropy)
-	return *sk, *pk
+func GenerateKeyPairDeterministic(entropy [EntropySize]byte) (sk SecretKey, pk PublicKey) {
+	// no error possible when using bytes.Reader
+	epk, esk, _ := ed25519.GenerateKey(bytes.NewReader(entropy[:]))
+	copy(sk[:], esk)
+	copy(pk[:], epk)
+	return
 }
 
 // ReadSignedObject reads a length-prefixed object prefixed by its signature,
@@ -86,16 +93,14 @@ func ReadSignedObject(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey)
 }
 
 // SignHash signs a message using a secret key.
-func SignHash(data Hash, sk SecretKey) Signature {
-	skNorm := [SecretKeySize]byte(sk)
-	return *ed25519.Sign(&skNorm, data[:])
+func SignHash(data Hash, sk SecretKey) (sig Signature) {
+	copy(sig[:], ed25519.Sign(sk[:], data[:]))
+	return
 }
 
 // VerifyHash uses a public key and input data to verify a signature.
 func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
-	pkNorm := [PublicKeySize]byte(pk)
-	sigNorm := [SignatureSize]byte(sig)
-	verifies := ed25519.Verify(&pkNorm, data[:], &sigNorm)
+	verifies := ed25519.Verify(pk[:], data[:], sig[:])
 	if !verifies {
 		return ErrInvalidSignature
 	}
