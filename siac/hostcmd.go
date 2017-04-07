@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"sort"
 	"text/tabwriter"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -288,6 +289,9 @@ RPC Stats:
 	fmt.Println("\nStorage Folders:")
 
 	// display storage folder info
+	sort.Slice(sg.Folders, func(i, j int) bool {
+		return sg.Folders[i].Path < sg.Folders[j].Path
+	})
 	if len(sg.Folders) == 0 {
 		fmt.Println("No storage folders configured")
 		return
