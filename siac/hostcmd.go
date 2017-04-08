@@ -408,6 +408,13 @@ func hostfolderaddcmd(path, size string) {
 	if err != nil {
 		die("Could not parse size:", err)
 	}
+	// round size down to nearest multiple of 256MiB
+	var sizeUint64 uint64
+	fmt.Sscan(size, &sizeUint64)
+	sizeUint64 /= 64 * modules.SectorSize
+	sizeUint64 *= 64 * modules.SectorSize
+	size = fmt.Sprint(sizeUint64)
+
 	err = post("/host/storage/folders/add", fmt.Sprintf("path=%s&size=%s", abs(path), size))
 	if err != nil {
 		die("Could not add folder:", err)
@@ -430,6 +437,13 @@ func hostfolderresizecmd(path, newsize string) {
 	if err != nil {
 		die("Could not parse size:", err)
 	}
+	// round size down to nearest multiple of 256MiB
+	var sizeUint64 uint64
+	fmt.Sscan(newsize, &sizeUint64)
+	sizeUint64 /= 64 * modules.SectorSize
+	sizeUint64 *= 64 * modules.SectorSize
+	newsize = fmt.Sprint(sizeUint64)
+
 	err = post("/host/storage/folders/resize", fmt.Sprintf("path=%s&newsize=%s", abs(path), newsize))
 	if err != nil {
 		die("Could not resize folder:", err)
