@@ -110,15 +110,16 @@ returns the set of constants in use.
 ###### JSON Response [(with comments)](/doc/api/Daemon.md#json-response)
 ```javascript
 {
-  "genesistimestamp":      1257894000, // Unix time
-  "blocksizelimit":        2000000,    // bytes
-  "blockfrequency":        600,        // seconds per block
-  "targetwindow":          1000,       // blocks
-  "mediantimestampwindow": 11,         // blocks
-  "futurethreshold":       10800,      // seconds
-  "siafundcount":          "10000",
-  "siafundportion":        "39/1000",
-  "maturitydelay":         144,        // blocks
+  "blockfrequency":         600,        // seconds per block
+  "blocksizelimit":         2000000,    // bytes
+  "extremefuturethreshold": 10800,      // seconds
+  "futurethreshold":        10800,      // seconds
+  "genesistimestamp":       1257894000, // Unix time
+  "maturitydelay":          144,        // blocks
+  "mediantimestampwindow":  11,         // blocks
+  "siafundcount":           "10000",
+  "siafundportion":         "39/1000",
+  "targetwindow":           1000,       // blocks
 
   "initialcoinbase": 300000, // Siacoins (see note in Daemon.md)
   "minimumcoinbase": 30000,  // Siacoins (see note in Daemon.md)
