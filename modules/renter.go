@@ -188,7 +188,7 @@ func (mrs *MerkleRootSet) UnmarshalJSON(b []byte) error {
 }
 
 // A RenterContract contains all the metadata necessary to revise or renew a
-// file contract.
+// file contract. See `api.RenterContract` for field information.
 type RenterContract struct {
 	FileContract    types.FileContract         `json:"filecontract"`
 	HostPublicKey   types.SiaPublicKey         `json:"hostpublickey"`
