@@ -43,7 +43,7 @@ var (
 
 	// priceExponentiation is the number of times that the weight is divided by
 	// the price.
-	priceExponentiation = 5
+	priceExponentiation = 4
 
 	// requiredStorage indicates the amount of storage that the host must be
 	// offering in order to be considered a valuable/worthwhile host.
