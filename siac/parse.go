@@ -38,7 +38,6 @@ func parseFilesize(strSize string) (string, error) {
 		{"gib", 1 << 30},
 		{"tib", 1 << 40},
 		{"b", 1}, // must be after others else it'll match on them all
-		{"", 1},  // no suffix is still a valid suffix
 	}
 
 	strSize = strings.ToLower(strSize)
@@ -65,15 +64,41 @@ func periodUnits(blocks types.BlockHeight) string {
 	return fmt.Sprint(blocks / 1008) // 1008 blocks per week
 }
 
-// parsePeriod converts a number of weeks to a number of blocks.
+// parsePeriod converts a duration specified in blocks, hours, or weeks to a
+// number of blocks.
 func parsePeriod(period string) (string, error) {
-	var weeks float64
-	_, err := fmt.Sscan(period, &weeks)
-	if err != nil {
-		return "", errUnableToParseSize
+	units := []struct {
+		suffix     string
+		multiplier float64
+	}{
+		{"b", 1},        // blocks
+		{"block", 1},    // blocks
+		{"blocks", 1},   // blocks
+		{"h", 6},        // hours
+		{"hour", 6},     // hours
+		{"hours", 6},    // hours
+		{"d", 144},      // days
+		{"day", 144},    // days
+		{"days", 144},   // days
+		{"w", 1008},     // weeks
+		{"week", 1008},  // weeks
+		{"weeks", 1008}, // weeks
 	}
-	blocks := int(weeks * 1008) // 1008 blocks per week
-	return fmt.Sprint(blocks), nil
+
+	period = strings.ToLower(period)
+	for _, unit := range units {
+		if strings.HasSuffix(period, unit.suffix) {
+			var base float64
+			_, err := fmt.Sscan(strings.TrimSuffix(period, unit.suffix), &base)
+			if err != nil {
+				return "", errUnableToParseSize
+			}
+			blocks := int(base * unit.multiplier)
+			return fmt.Sprint(blocks), nil
+		}
+	}
+
+	return "", errUnableToParseSize
 }
 
 // currencyUnits converts a types.Currency to a string with human-readable

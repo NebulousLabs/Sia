@@ -29,10 +29,11 @@ func consensuscmd() {
 	}
 	if cg.Synced {
 		fmt.Printf(`Synced: %v
-Block:  %v
-Height: %v
-Target: %v
-`, yesNo(cg.Synced), cg.CurrentBlock, cg.Height, cg.Target)
+Block:      %v
+Height:     %v
+Target:     %v
+Difficulty: %v
+`, yesNo(cg.Synced), cg.CurrentBlock, cg.Height, cg.Target, cg.Difficulty)
 	} else {
 		estimatedHeight := estimatedHeightAt(time.Now())
 		estimatedProgress := float64(cg.Height) / float64(estimatedHeight) * 100

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"sort"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -45,7 +47,9 @@ Available settings:
 
 Currency units can be specified, e.g. 10SC; run 'siac help wallet' for details.
 
-Blocks are approximately 10 minutes each.
+Durations (maxduration and windowsize) must be specified in either blocks (b),
+hours (h), days (d), or weeks (w). A block is approximately 10 minutes, so one
+hour is six blocks, a day is 144 blocks, and a week is 1008 blocks.
 
 For a description of each parameter, see doc/API.md.
 
@@ -288,6 +292,9 @@ RPC Stats:
 	fmt.Println("\nStorage Folders:")
 
 	// display storage folder info
+	sort.Slice(sg.Folders, func(i, j int) bool {
+		return sg.Folders[i].Path < sg.Folders[j].Path
+	})
 	if len(sg.Folders) == 0 {
 		fmt.Println("No storage folders configured")
 		return
@@ -305,14 +312,14 @@ RPC Stats:
 // hostconfigcmd is the handler for the command `siac host config [setting] [value]`.
 // Modifies host settings.
 func hostconfigcmd(param, value string) {
+	var err error
 	switch param {
 	// currency (convert to hastings)
 	case "collateralbudget", "maxcollateral", "mincontractprice":
-		hastings, err := parseCurrency(value)
+		value, err = parseCurrency(value)
 		if err != nil {
 			die("Could not parse "+param+":", err)
 		}
-		value = hastings
 
 	// currency/TB (convert to hastings/byte)
 	case "mindownloadbandwidthprice", "minuploadbandwidthprice":
@@ -334,15 +341,30 @@ func hostconfigcmd(param, value string) {
 		c := types.NewCurrency(i).Div(modules.BlockBytesPerMonthTerabyte)
 		value = c.String()
 
+	// bool (allow "yes" and "no")
+	case "acceptingcontracts":
+		switch strings.ToLower(value) {
+		case "yes":
+			value = "true"
+		case "no":
+			value = "false"
+		}
+
+	// duration (convert to blocks)
+	case "maxduration", "windowsize":
+		value, err = parsePeriod(value)
+		if err != nil {
+			die("Could not parse "+param+":", err)
+		}
+
 	// other valid settings
-	case "acceptingcontracts", "maxdownloadbatchsize", "maxduration",
-		"maxrevisebatchsize", "netaddress", "windowsize":
+	case "maxdownloadbatchsize", "maxrevisebatchsize", "netaddress":
 
 	// invalid settings
 	default:
 		die("\"" + param + "\" is not a host setting")
 	}
-	err := post("/host", param+"="+value)
+	err = post("/host", param+"="+value)
 	if err != nil {
 		die("Could not update host settings:", err)
 	}
@@ -386,6 +408,13 @@ func hostfolderaddcmd(path, size string) {
 	if err != nil {
 		die("Could not parse size:", err)
 	}
+	// round size down to nearest multiple of 256MiB
+	var sizeUint64 uint64
+	fmt.Sscan(size, &sizeUint64)
+	sizeUint64 /= 64 * modules.SectorSize
+	sizeUint64 *= 64 * modules.SectorSize
+	size = fmt.Sprint(sizeUint64)
+
 	err = post("/host/storage/folders/add", fmt.Sprintf("path=%s&size=%s", abs(path), size))
 	if err != nil {
 		die("Could not add folder:", err)
@@ -408,6 +437,13 @@ func hostfolderresizecmd(path, newsize string) {
 	if err != nil {
 		die("Could not parse size:", err)
 	}
+	// round size down to nearest multiple of 256MiB
+	var sizeUint64 uint64
+	fmt.Sscan(newsize, &sizeUint64)
+	sizeUint64 /= 64 * modules.SectorSize
+	sizeUint64 *= 64 * modules.SectorSize
+	newsize = fmt.Sprint(sizeUint64)
+
 	err = post("/host/storage/folders/resize", fmt.Sprintf("path=%s&newsize=%s", abs(path), newsize))
 	if err != nil {
 		die("Could not resize folder:", err)

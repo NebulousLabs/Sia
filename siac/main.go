@@ -26,6 +26,10 @@ var (
 
 	// Globals.
 	rootCmd *cobra.Command // Root command cobra object, used by bash completion cmd.
+
+	// User-supplied password, cached so that we don't need to prompt multiple
+	// times.
+	apiPassword string
 )
 
 // Exit codes.
@@ -66,13 +70,17 @@ func apiGet(call string) (*http.Response, error) {
 	}
 	// check error code
 	if resp.StatusCode == http.StatusUnauthorized {
+		// retry request with authentication.
 		resp.Body.Close()
-		// Prompt for password and retry request with authentication.
-		password, err := speakeasy.Ask("API password: ")
-		if err != nil {
-			return nil, err
+		if apiPassword == "" {
+			// prompt for password and store it in a global var for subsequent
+			// calls
+			apiPassword, err = speakeasy.Ask("API password: ")
+			if err != nil {
+				return nil, err
+			}
 		}
-		resp, err = api.HttpGETAuthenticated("http://"+addr+call, password)
+		resp, err = api.HttpGETAuthenticated("http://"+addr+call, apiPassword)
 		if err != nil {
 			return nil, errors.New("no response from daemon - authentication failed")
 		}

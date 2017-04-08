@@ -110,15 +110,16 @@ returns the set of constants in use.
 ###### JSON Response [(with comments)](/doc/api/Daemon.md#json-response)
 ```javascript
 {
-  "genesistimestamp":      1257894000, // Unix time
-  "blocksizelimit":        2000000,    // bytes
-  "blockfrequency":        600,        // seconds per block
-  "targetwindow":          1000,       // blocks
-  "mediantimestampwindow": 11,         // blocks
-  "futurethreshold":       10800,      // seconds
-  "siafundcount":          "10000",
-  "siafundportion":        "39/1000",
-  "maturitydelay":         144,        // blocks
+  "blockfrequency":         600,        // seconds per block
+  "blocksizelimit":         2000000,    // bytes
+  "extremefuturethreshold": 10800,      // seconds
+  "futurethreshold":        10800,      // seconds
+  "genesistimestamp":       1257894000, // Unix time
+  "maturitydelay":          144,        // blocks
+  "mediantimestampwindow":  11,         // blocks
+  "siafundcount":           "10000",
+  "siafundportion":         "39/1000",
+  "targetwindow":           1000,       // blocks
 
   "initialcoinbase": 300000, // Siacoins (see note in Daemon.md)
   "minimumcoinbase": 30000,  // Siacoins (see note in Daemon.md)
@@ -173,7 +174,8 @@ returns information about the consensus set, such as the current block height.
   "synced":       true,
   "height":       62248,
   "currentblock": "00000000000008a84884ba827bdc868a17ba9c14011de33ff763bd95779a9cf1",
-  "target":       [0,0,0,0,0,0,11,48,125,79,116,89,136,74,42,27,5,14,10,31,23,53,226,238,202,219,5,204,38,32,59,165]
+  "target":       [0,0,0,0,0,0,11,48,125,79,116,89,136,74,42,27,5,14,10,31,23,53,226,238,202,219,5,204,38,32,59,165],
+  "difficulty":   "1234"
 }
 ```
 
