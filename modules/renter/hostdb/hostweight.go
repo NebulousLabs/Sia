@@ -340,6 +340,8 @@ func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency
 // elements of the host's overall score.
 func (hdb *HostDB) ScoreBreakdown(entry modules.HostDBEntry) modules.HostScoreBreakdown {
 	return modules.HostScoreBreakdown{
+		Score: hdb.calculateHostWeight(entry),
+
 		AgeAdjustment:              hdb.lifetimeAdjustments(entry),
 		BurnAdjustment:             1,
 		CollateralAdjustment:       hdb.collateralAdjustments(entry),
