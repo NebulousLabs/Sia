@@ -159,25 +159,34 @@ func storageRemainingAdjustments(entry modules.HostDBEntry) float64 {
 		base = base / 2 // 4x total penalty
 	}
 	if entry.RemainingStorage < 100*requiredStorage {
-		base = base / 3 // 12x total penalty
+		base = base / 2 // 8x total penalty
 	}
 	if entry.RemainingStorage < 80*requiredStorage {
-		base = base / 3 // 36x total penalty
+		base = base / 2 // 16x total penalty
 	}
 	if entry.RemainingStorage < 40*requiredStorage {
-		base = base / 4 // 144x total penalty
+		base = base / 2 // 32x total penalty
 	}
 	if entry.RemainingStorage < 20*requiredStorage {
-		base = base / 5 // 720x total penalty
+		base = base / 2 // 64x total penalty
+	}
+	if entry.RemainingStorage < 15*requiredStorage {
+		base = base / 2 // 128x total penalty
 	}
 	if entry.RemainingStorage < 10*requiredStorage {
-		base = base / 5 // 3,600x total penalty
+		base = base / 2 // 256x total penalty
 	}
 	if entry.RemainingStorage < 5*requiredStorage {
-		base = base / 5 // 14,400x total penalty
+		base = base / 2 // 512x total penalty
+	}
+	if entry.RemainingStorage < 3*requiredStorage {
+		base = base / 2 // 1024x total penalty
+	}
+	if entry.RemainingStorage < 2*requiredStorage {
+		base = base / 2 // 2048x total penalty
 	}
 	if entry.RemainingStorage < requiredStorage {
-		base = base / 5 // 72,000x total penalty
+		base = base / 2 // 4096x total penalty
 	}
 	return base
 }
