@@ -229,13 +229,16 @@ func (hdb *HostDB) lifetimeAdjustments(entry modules.HostDBEntry) float64 {
 			base = base / 2 // 8x total
 		}
 		if age < 1000 {
-			base = base / 8 // 64x total
+			base = base / 2 // 16x total
 		}
 		if age < 576 {
-			base = base / 2 // 128x total
+			base = base / 2 // 32x total
 		}
 		if age < 288 {
-			base = base / 2 // 256x total
+			base = base / 2 // 64x total
+		}
+		if age < 144 {
+			base = base / 2 // 128x total
 		}
 	}
 	return base
