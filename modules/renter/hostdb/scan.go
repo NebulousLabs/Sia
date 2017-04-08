@@ -109,8 +109,8 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 		// Add two scans to the scan history. Two are needed because the scans
 		// are forward looking, but we want this first scan to represent as
 		// much as one week of uptime or downtime.
-		earliestStartTime := time.Now().Add(time.Hour * 7 * 24 * -1) // Permit up to a week of starting uptime or downtime.
-		suggestedStartTime := time.Now().Add(time.Minute * 10 * time.Duration(hdb.blockHeight-entry.FirstSeen) * -1)
+		earliestStartTime := time.Now().Add(time.Hour * 7 * 24 * -1)                                                   // Permit up to a week of starting uptime or downtime.
+		suggestedStartTime := time.Now().Add(time.Minute * 10 * time.Duration(hdb.blockHeight-entry.FirstSeen+1) * -1) // Add one to the FirstSeen in case FirstSeen is this block, guarantees incrementing order.
 		if suggestedStartTime.Before(earliestStartTime) {
 			suggestedStartTime = earliestStartTime
 		}
@@ -128,7 +128,7 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 		// will prevent the sort-check sanity checks from triggering.
 		newTimestamp := time.Now()
 		prevTimestamp := newEntry.ScanHistory[len(newEntry.ScanHistory)-1].Timestamp
-		if newTimestamp.Before(prevTimestamp) {
+		if !newTimestamp.After(prevTimestamp) {
 			newTimestamp = prevTimestamp.Add(time.Second)
 		}
 
@@ -165,7 +165,7 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 	// Compress any old scans into the historic values.
 	for len(newEntry.ScanHistory) > minScans && time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime {
 		timePassed := newEntry.ScanHistory[1].Timestamp.Sub(newEntry.ScanHistory[0].Timestamp)
-		if newEntry.ScanHistory[1].Success {
+		if newEntry.ScanHistory[0].Success {
 			newEntry.HistoricUptime += timePassed
 		} else {
 			newEntry.HistoricDowntime += timePassed
