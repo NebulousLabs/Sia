@@ -48,8 +48,8 @@ Available settings:
 Currency units can be specified, e.g. 10SC; run 'siac help wallet' for details.
 
 Durations (maxduration and windowsize) must be specified in either blocks (b),
-hours (h), or weeks (w). A block is approximately 10 minutes, so one hour is
-six blocks and one week is 1008 blocks.
+hours (h), days (d), or weeks (w). A block is approximately 10 minutes, so one
+hour is six blocks, a day is 144 blocks, and a week is 1008 blocks.
 
 For a description of each parameter, see doc/API.md.
 

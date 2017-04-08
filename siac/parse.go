@@ -72,10 +72,16 @@ func parsePeriod(period string) (string, error) {
 		multiplier float64
 	}{
 		{"b", 1},        // blocks
+		{"block", 1},    // blocks
 		{"blocks", 1},   // blocks
 		{"h", 6},        // hours
+		{"hour", 6},     // hours
 		{"hours", 6},    // hours
+		{"d", 144},      // days
+		{"day", 144},    // days
+		{"days", 144},   // days
 		{"w", 1008},     // weeks
+		{"week", 1008},  // weeks
 		{"weeks", 1008}, // weeks
 	}
 
