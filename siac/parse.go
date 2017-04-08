@@ -38,7 +38,6 @@ func parseFilesize(strSize string) (string, error) {
 		{"gib", 1 << 30},
 		{"tib", 1 << 40},
 		{"b", 1}, // must be after others else it'll match on them all
-		{"", 1},  // no suffix is still a valid suffix
 	}
 
 	strSize = strings.ToLower(strSize)
