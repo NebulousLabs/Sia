@@ -46,8 +46,11 @@ var (
 		Use:   "setallowance [amount] [period]",
 		Short: "Set the allowance",
 		Long: `Set the amount of money that can be spent over a given period.
+
 amount is given in currency units (SC, KS, etc.)
-period is given in weeks; 1 week is roughly 1000 blocks
+
+period is given in either blocks (b), hours (h), or weeks (w); 1 week is
+roughly 1000 blocks.
 
 Note that setting the allowance will cause siad to immediately begin forming
 contracts! You should only set the allowance once you are fully synced and you
