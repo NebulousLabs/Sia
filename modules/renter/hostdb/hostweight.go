@@ -267,6 +267,8 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	for _, scan := range entry.ScanHistory[1:] {
 		if recentTime.After(scan.Timestamp) {
 			hdb.log.Critical("Host entry scan history not sorted.")
+			// Ignore the unsorted scan entry.
+			continue
 		}
 		if recentSuccess {
 			uptime += scan.Timestamp.Sub(recentTime)

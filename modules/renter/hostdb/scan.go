@@ -122,20 +122,35 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 		if newEntry.ScanHistory[len(newEntry.ScanHistory)-1].Success && netErr != nil {
 			hdb.log.Debugf("Host %v is being downgraded from an online host to an offline host: %v\n", newEntry.PublicKey.String(), netErr)
 		}
-		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: time.Now(), Success: netErr == nil})
+
+		// Make sure that the current time is after the timestamp of the
+		// previous scan. It may not be if the system clock has changed. This
+		// will prevent the sort-check sanity checks from triggering.
+		newTimestamp := time.Now()
+		prevTimestamp := newEntry.ScanHistory[len(newEntry.ScanHistory)-1].Timestamp
+		if newTimestamp.Before(prevTimestamp) {
+			newTimestamp = prevTimestamp.Add(time.Second)
+		}
+
+		// Before appending, make sure that the scan we just performed is
+		// timestamped after the previous scan performed. It may not be if the
+		// system clock has changed.
+		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: newTimestamp, Success: netErr == nil})
 	}
 
-	// If the host's earliest scan is more than a month old and there is no
-	// recent uptime, mark the host for deletion.
+	// Check whether any of the recent scans demonstrate uptime. The pruning and
+	// compression of the history ensure that there are only relatively recent
+	// scans represented.
 	var recentUptime bool
-	for _, scan := range entry.ScanHistory {
+	for _, scan := range newEntry.ScanHistory {
 		if scan.Success {
 			recentUptime = true
 		}
 	}
 
 	// If the host has been offline for too long, delete the host from the
-	// hostdb.
+	// hostdb. Only delete if there have been enough scans over a long enough
+	// period to be confident that the host really is offline for good.
 	if time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime && !recentUptime && len(newEntry.ScanHistory) >= minScans {
 		err := hdb.hostTree.Remove(newEntry.PublicKey)
 		if err != nil {
