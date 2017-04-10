@@ -194,7 +194,7 @@ func hostdbcmd() {
 		// point.)
 		referenceScore := float64(1)
 		if len(activeHosts) > 0 {
-			referenceIndex := len(activeHosts)/5
+			referenceIndex := len(activeHosts) / 5
 			hostInfo := new(api.HostdbHostsGET)
 			err := getAPI("/hostdb/hosts/"+activeHosts[referenceIndex].PublicKeyString, hostInfo)
 			if err != nil {
