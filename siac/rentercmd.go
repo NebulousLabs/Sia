@@ -462,14 +462,49 @@ func renterfilesrenamecmd(path, newpath string) {
 	fmt.Printf("Renamed %s to %s\n", path, newpath)
 }
 
-// renterfilesuploadcmd is the handler for the command `siac renter upload [source] [path]`.
-// Uploads the [source] file to [path] on the Sia network.
+// renterfilesuploadcmd is the handler for the command `siac renter upload
+// [source] [path]`. Uploads the [source] file to [path] on the Sia network.
+// If [source] is a directory, all files inside it will be uploaded and named
+// relative to [path].
 func renterfilesuploadcmd(source, path string) {
-	err := post("/renter/upload/"+path, "source="+abs(source))
+	stat, err := os.Stat(source)
 	if err != nil {
-		die("Could not upload file:", err)
+		die("Could not stat file or folder:", err)
 	}
-	fmt.Printf("Uploaded '%s' as %s.\n", abs(source), path)
+
+	if stat.IsDir() {
+		// folder
+		var files []string
+		err := filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				fmt.Println("Warning: skipping file:", err)
+				return nil
+			}
+			files = append(files, path)
+			return nil
+		})
+		if err != nil {
+			die("Could not read folder:", err)
+		} else if len(files) == 0 {
+			die("Nothing to upload.")
+		}
+		for _, file := range files {
+			fpath, _ := filepath.Rel(source, file)
+			fpath = filepath.Join(path, fpath)
+			err = post("/renter/upload/"+fpath, "source="+abs(file))
+			if err != nil {
+				die("Could not upload file:", err)
+			}
+		}
+		fmt.Printf("Uploaded %d files into '%s'.\n", len(files), path)
+	} else {
+		// single file
+		err = post("/renter/upload/"+path, "source="+abs(source))
+		if err != nil {
+			die("Could not upload file:", err)
+		}
+		fmt.Printf("Uploaded '%s' as %s.\n", abs(source), path)
+	}
 }
 
 // renterpricescmd is the handler for the command `siac renter prices`, which
