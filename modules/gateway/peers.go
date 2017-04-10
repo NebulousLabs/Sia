@@ -226,9 +226,9 @@ func (g *Gateway) acceptPeer(p *peer) {
 	// Select a peer to kick. Outbound peers and local peers are not
 	// available to be kicked.
 	var addrs []modules.NetAddress
-	for addr := range g.peers {
+	for addr, peer := range g.peers {
 		// Do not kick outbound peers or local peers.
-		if !p.Inbound || p.Local {
+		if !peer.Inbound || peer.Local {
 			continue
 		}
 
