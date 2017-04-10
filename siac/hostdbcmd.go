@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"os"
 	"text/tabwriter"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -105,8 +104,8 @@ func hostdbcmd() {
 			// host.
 			uptimeRatio := float64(0)
 			if len(host.ScanHistory) > 1 {
-				var uptime time.Duration
-				var downtime time.Duration
+				downtime := host.HistoricDowntime
+				uptime := host.HistoricUptime
 				recentTime := host.ScanHistory[0].Timestamp
 				recentSuccess := host.ScanHistory[0].Success
 				for _, scan := range host.ScanHistory[1:] {
@@ -152,8 +151,8 @@ func hostdbcmd() {
 			// host.
 			uptimeRatio := float64(0)
 			if len(host.ScanHistory) > 1 {
-				var uptime time.Duration
-				var downtime time.Duration
+				downtime := host.HistoricDowntime
+				uptime := host.HistoricUptime
 				recentTime := host.ScanHistory[0].Timestamp
 				recentSuccess := host.ScanHistory[0].Success
 				for _, scan := range host.ScanHistory[1:] {
@@ -212,8 +211,8 @@ func hostdbcmd() {
 			// host.
 			uptimeRatio := float64(0)
 			if len(host.ScanHistory) > 1 {
-				var uptime time.Duration
-				var downtime time.Duration
+				downtime := host.HistoricDowntime
+				uptime := host.HistoricUptime
 				recentTime := host.ScanHistory[0].Timestamp
 				recentSuccess := host.ScanHistory[0].Success
 				for _, scan := range host.ScanHistory[1:] {
