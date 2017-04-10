@@ -33,30 +33,43 @@ returns the set of constants in use.
 {
   // Timestamp of the genesis block.
   "genesistimestamp": 1433600000, // Unix time
+
   // Maximum size, in bytes, of a block. Blocks larger than this will be
   // rejected by peers.
   "blocksizelimit": 2000000, // bytes
+
   // Target for how frequently new blocks should be mined.
   "blockfrequency": 600, // seconds per block
+
+  // Farthest a block's timestamp can be in the future before the block is
+  // rejected outright.
+  "extremefuturethreshold": 10800, // seconds
+
   // Height of the window used to adjust the difficulty.
   "targetwindow": 1000, // blocks
+
   // Duration of the window used to adjust the difficulty.
   "mediantimestampwindow": 11, // blocks
+
   // How far in the future a block can be without being rejected. A block
   // further into the future will not be accepted immediately, but the daemon
   // will attempt to accept the block as soon as it is valid.
   "futurethreshold": 10800, // seconds
+
   // Total number of siafunds.
   "siafundcount": "10000",
+
   // Fraction of each file contract payout given to siafund holders.
   "siafundportion": "39/1000",
+
   // Number of children a block must have before it is considered "mature."
   "maturitydelay": 144, // blocks
 
   // Number of coins given to the miner of the first block. Note that elsewhere
   // in the API currency is typically returned in hastings and as a bignum.
   // This is not the case here.
-  "initialcoinbase": 300000, // Siacoins.
+  "initialcoinbase": 300000, // Siacoins
+
   // Minimum number of coins paid out to the miner of a block (the coinbase
   // decreases with each block). Note that elsewhere in the API currency is
   // typically returned in hastings and as a bignum. This is not the case
@@ -65,11 +78,13 @@ returns the set of constants in use.
 
   // Initial target.
   "roottarget": [0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+
   // Initial depth.
   "rootdepth": [255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255],
 
   // Largest allowed ratio between the old difficulty and the new difficulty.
   "maxadjustmentup": "5/2",
+
   // Smallest allowed ratio between the old difficulty and the new difficulty.
   "maxadjustmentdown": "2/5",
 

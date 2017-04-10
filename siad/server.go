@@ -39,15 +39,16 @@ type (
 
 	// SiaConstants is a struct listing all of the constants in use.
 	SiaConstants struct {
-		GenesisTimestamp      types.Timestamp   `json:"genesistimestamp"`
-		BlockSizeLimit        uint64            `json:"blocksizelimit"`
-		BlockFrequency        types.BlockHeight `json:"blockfrequency"`
-		TargetWindow          types.BlockHeight `json:"targetwindow"`
-		MedianTimestampWindow uint64            `json:"mediantimestampwindow"`
-		FutureThreshold       types.Timestamp   `json:"futurethreshold"`
-		SiafundCount          types.Currency    `json:"siafundcount"`
-		SiafundPortion        *big.Rat          `json:"siafundportion"`
-		MaturityDelay         types.BlockHeight `json:"maturitydelay"`
+		BlockFrequency         types.BlockHeight `json:"blockfrequency"`
+		BlockSizeLimit         uint64            `json:"blocksizelimit"`
+		ExtremeFutureThreshold types.Timestamp   `json:"extremefuturethreshold"`
+		FutureThreshold        types.Timestamp   `json:"futurethreshold"`
+		GenesisTimestamp       types.Timestamp   `json:"genesistimestamp"`
+		MaturityDelay          types.BlockHeight `json:"maturitydelay"`
+		MedianTimestampWindow  uint64            `json:"mediantimestampwindow"`
+		SiafundCount           types.Currency    `json:"siafundcount"`
+		SiafundPortion         *big.Rat          `json:"siafundportion"`
+		TargetWindow           types.BlockHeight `json:"targetwindow"`
 
 		InitialCoinbase uint64 `json:"initialcoinbase"`
 		MinimumCoinbase uint64 `json:"minimumcoinbase"`
@@ -304,15 +305,16 @@ func (srv *Server) daemonUpdateHandlerPOST(w http.ResponseWriter, _ *http.Reques
 // debugConstantsHandler prints a json file containing all of the constants.
 func (srv *Server) daemonConstantsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	sc := SiaConstants{
-		GenesisTimestamp:      types.GenesisTimestamp,
-		BlockSizeLimit:        types.BlockSizeLimit,
-		BlockFrequency:        types.BlockFrequency,
-		TargetWindow:          types.TargetWindow,
-		MedianTimestampWindow: types.MedianTimestampWindow,
-		FutureThreshold:       types.FutureThreshold,
-		SiafundCount:          types.SiafundCount,
-		SiafundPortion:        types.SiafundPortion,
-		MaturityDelay:         types.MaturityDelay,
+		BlockFrequency:         types.BlockFrequency,
+		BlockSizeLimit:         types.BlockSizeLimit,
+		ExtremeFutureThreshold: types.ExtremeFutureThreshold,
+		FutureThreshold:        types.FutureThreshold,
+		GenesisTimestamp:       types.GenesisTimestamp,
+		MaturityDelay:          types.MaturityDelay,
+		MedianTimestampWindow:  types.MedianTimestampWindow,
+		SiafundCount:           types.SiafundCount,
+		SiafundPortion:         types.SiafundPortion,
+		TargetWindow:           types.TargetWindow,
 
 		InitialCoinbase: types.InitialCoinbase,
 		MinimumCoinbase: types.MinimumCoinbase,

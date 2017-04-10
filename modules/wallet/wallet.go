@@ -4,6 +4,7 @@ package wallet
 // multisig, but there are no automated tests to verify that.
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"sort"
@@ -170,10 +171,12 @@ func (w *Wallet) AllAddresses() []types.UnlockHash {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
-	addrs := make(types.UnlockHashSlice, 0, len(w.keys))
+	addrs := make([]types.UnlockHash, 0, len(w.keys))
 	for addr := range w.keys {
 		addrs = append(addrs, addr)
 	}
-	sort.Sort(addrs)
+	sort.Slice(addrs, func(i, j int) bool {
+		return bytes.Compare(addrs[i][:], addrs[j][:]) < 0
+	})
 	return addrs
 }

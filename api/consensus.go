@@ -16,6 +16,7 @@ type ConsensusGET struct {
 	Height       types.BlockHeight `json:"height"`
 	CurrentBlock types.BlockID     `json:"currentblock"`
 	Target       types.Target      `json:"target"`
+	Difficulty   types.Currency    `json:"difficulty"`
 }
 
 // consensusHandler handles the API calls to /consensus.
@@ -27,6 +28,7 @@ func (api *API) consensusHandler(w http.ResponseWriter, req *http.Request, _ htt
 		Height:       api.cs.Height(),
 		CurrentBlock: cbid,
 		Target:       currentTarget,
+		Difficulty:   currentTarget.Difficulty(),
 	})
 }
 

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -137,10 +136,9 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		if len(newContracts) >= int(a.Hosts) {
 			break
 		}
-		if build.Release != "testing" {
-			// sleep for 1 minute to alleviate potential block propagation issues
-			time.Sleep(60 * time.Second)
-		}
+		// sleep between renewing each contract to alleviate potential block
+		// propagation issues
+		time.Sleep(contractFormationInterval)
 	}
 
 	// if we did not renew enough contracts, form new ones

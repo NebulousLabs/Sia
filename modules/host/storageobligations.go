@@ -532,13 +532,9 @@ func (h *Host) modifyStorageObligation(so storageObligation, sectorsRemoved []cr
 // removeStorageObligation will remove a storage obligation from the host,
 // either due to failure or success.
 func (h *Host) removeStorageObligation(so storageObligation, sos storageObligationStatus) error {
-
-	// Call removeSector for every sector in the storage obligation.
-	for _, root := range so.SectorRoots {
-		// Error is not checked, we want to call remove on every sector even if
-		// there are problems - disk health information will be updated.
-		_ = h.RemoveSector(root)
-	}
+	// Error is not checked, we want to call remove on every sector even if
+	// there are problems - disk health information will be updated.
+	_ = h.RemoveSectorBatch(so.SectorRoots)
 
 	// Update the host revenue metrics based on the status of the obligation.
 	if sos == obligationUnresolved {

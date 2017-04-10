@@ -222,7 +222,7 @@ func walletinitseedcmd() {
 		}
 		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
-	err = post("/wallet/initseed", qs)
+	err = post("/wallet/init/seed", qs)
 	if err != nil {
 		die("Could not initialize wallet from seed:", err)
 	}
@@ -300,11 +300,13 @@ func walletseedscmd() {
 		// AllSeeds includes the primary seed
 		return
 	}
+	fmt.Println()
 	fmt.Println("Auxilliary Seeds:")
 	for _, seed := range seedInfo.AllSeeds {
 		if seed == seedInfo.PrimarySeed {
 			continue
 		}
+		fmt.Println() // extra newline for readability
 		fmt.Println(seed)
 	}
 }

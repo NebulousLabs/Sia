@@ -2,7 +2,6 @@ package contractor
 
 import (
 	"sort"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"

@@ -316,7 +316,7 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 	if sectors < MinimumSectorsPerStorageFolder {
 		return ErrSmallStorageFolder
 	}
-	if (size/modules.SectorSize)%storageFolderGranularity != 0 {
+	if sectors%storageFolderGranularity != 0 {
 		return errStorageFolderGranularity
 	}
 	// Check that the path is an absolute path.
@@ -336,7 +336,7 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 	// Create a storage folder object and add it to the WAL.
 	newSF := &storageFolder{
 		path:  path,
-		usage: make([]uint64, size/modules.SectorSize/64),
+		usage: make([]uint64, sectors/64),
 
 		availableSectors: make(map[sectorID]uint32),
 	}

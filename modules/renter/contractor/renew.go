@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
@@ -161,11 +160,11 @@ func (c *Contractor) managedRenewContracts() error {
 			c.log.Printf("WARN: failed to renew contract with %v: %v", contract.NetAddress, err)
 		} else {
 			newContracts[contract.ID] = newContract
+			c.log.Printf("renewed contract %v -> %v", contract.ID, newContract.ID)
 		}
-		if build.Release != "testing" {
-			// sleep for 1 minute to alleviate potential block propagation issues
-			time.Sleep(60 * time.Second)
-		}
+		// sleep between renewing each contract to alleviate potential block
+		// propagation issues
+		time.Sleep(contractFormationInterval)
 	}
 
 	// replace old contracts with renewed ones
