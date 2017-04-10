@@ -43,7 +43,7 @@ var (
 
 	// priceExponentiation is the number of times that the weight is divided by
 	// the price.
-	priceExponentiation = 5
+	priceExponentiation = 4
 
 	// requiredStorage indicates the amount of storage that the host must be
 	// offering in order to be considered a valuable/worthwhile host.
@@ -159,25 +159,34 @@ func storageRemainingAdjustments(entry modules.HostDBEntry) float64 {
 		base = base / 2 // 4x total penalty
 	}
 	if entry.RemainingStorage < 100*requiredStorage {
-		base = base / 3 // 12x total penalty
+		base = base / 2 // 8x total penalty
 	}
 	if entry.RemainingStorage < 80*requiredStorage {
-		base = base / 3 // 36x total penalty
+		base = base / 2 // 16x total penalty
 	}
 	if entry.RemainingStorage < 40*requiredStorage {
-		base = base / 4 // 144x total penalty
+		base = base / 2 // 32x total penalty
 	}
 	if entry.RemainingStorage < 20*requiredStorage {
-		base = base / 5 // 720x total penalty
+		base = base / 2 // 64x total penalty
+	}
+	if entry.RemainingStorage < 15*requiredStorage {
+		base = base / 2 // 128x total penalty
 	}
 	if entry.RemainingStorage < 10*requiredStorage {
-		base = base / 5 // 3,600x total penalty
+		base = base / 2 // 256x total penalty
 	}
 	if entry.RemainingStorage < 5*requiredStorage {
-		base = base / 5 // 14,400x total penalty
+		base = base / 2 // 512x total penalty
+	}
+	if entry.RemainingStorage < 3*requiredStorage {
+		base = base / 2 // 1024x total penalty
+	}
+	if entry.RemainingStorage < 2*requiredStorage {
+		base = base / 2 // 2048x total penalty
 	}
 	if entry.RemainingStorage < requiredStorage {
-		base = base / 5 // 72,000x total penalty
+		base = base / 2 // 4096x total penalty
 	}
 	return base
 }
@@ -186,17 +195,20 @@ func storageRemainingAdjustments(entry modules.HostDBEntry) float64 {
 // version reported by the host.
 func versionAdjustments(entry modules.HostDBEntry) float64 {
 	base := float64(1)
-	if build.VersionCmp(entry.Version, "1.1.2") <= 0 {
+	if build.VersionCmp(entry.Version, "1.2.0") < 0 {
 		base = base * 0.99999 // Safety value to make sure we update the version penalties every time we update the host.
 	}
+	if build.VersionCmp(entry.Version, "1.1.2") < 0 {
+		base = base / 2 // 2x total penalty.
+	}
 	if build.VersionCmp(entry.Version, "1.1.1") < 0 {
-		base = base / 5 // 5x total penalty.
+		base = base / 2 // 4x total penalty.
 	}
 	if build.VersionCmp(entry.Version, "1.0.3") < 0 {
-		base = base / 5 // 25x total penalty.
+		base = base / 2 // 8x total penalty.
 	}
 	if build.VersionCmp(entry.Version, "1.0.0") < 0 {
-		base = base / 20 // 500x total penalty.
+		base = base / 2 // 16x total penalty.
 	}
 	return base
 }
@@ -217,13 +229,16 @@ func (hdb *HostDB) lifetimeAdjustments(entry modules.HostDBEntry) float64 {
 			base = base / 2 // 8x total
 		}
 		if age < 1000 {
-			base = base / 8 // 64x total
+			base = base / 2 // 16x total
 		}
 		if age < 576 {
-			base = base / 2 // 128x total
+			base = base / 2 // 32x total
 		}
 		if age < 288 {
-			base = base / 2 // 256x total
+			base = base / 2 // 64x total
+		}
+		if age < 144 {
+			base = base / 2 // 128x total
 		}
 	}
 	return base
@@ -340,6 +355,8 @@ func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency
 // elements of the host's overall score.
 func (hdb *HostDB) ScoreBreakdown(entry modules.HostDBEntry) modules.HostScoreBreakdown {
 	return modules.HostScoreBreakdown{
+		Score: hdb.calculateHostWeight(entry),
+
 		AgeAdjustment:              hdb.lifetimeAdjustments(entry),
 		BurnAdjustment:             1,
 		CollateralAdjustment:       hdb.collateralAdjustments(entry),

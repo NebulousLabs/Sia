@@ -254,6 +254,15 @@ overall.
   // guide for the score of a host, as every renter sees the world differently
   // and uses different metrics to evaluate hosts.
   "scorebreakdown": {
+	// The overall score for the host. Scores are entriely relative, and are
+	// consistent only within the current hostdb. Between different machines,
+	// different configurations, and different versions the absolute scores for
+	// a given host can be off by many orders of magnitude. When displaying to a
+	// human, some form of normalization with respect to the other hosts (for
+	// example, divide all scores by the median score of the hosts) is
+	// recommended.
+	"score":                      123456,
+
     // The multiplier that gets applied to the host based on how long it has
     // been a host. Older hosts typically have a lower penalty.
     "ageadjustment":              0.1234,
