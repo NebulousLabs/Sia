@@ -588,6 +588,8 @@ overall.
     "publickeystring": "ed25519:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
   },
   "scorebreakdown": {
+    "score": 1,
+
     "ageadjustment":              0.1234,
     "burnadjustment":             0.1234,
     "collateraladjustment":       23.456,
