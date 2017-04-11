@@ -8,16 +8,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// Download downloads a file, identified by its path, to the destination
-// specified.
-func (r *Renter) Download(path, destination string) error {
-	return r.DownloadChunk(path, destination, maxUint64)
-}
-
-func (r *Renter) DownloadChunk(path, destination string, cindex uint64) error {
+func (r *Renter) DownloadSection(p *modules.RenterDownloadParameters) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
-	file, exists := r.files[path]
+	file, exists := r.files[p.Siapath]
 	r.mu.RUnlock(lockID)
 	if !exists {
 		return errors.New("no file with that path")
@@ -31,16 +25,16 @@ func (r *Renter) DownloadChunk(path, destination string, cindex uint64) error {
 
 	// Create the download object and add it to the queue.
 	var d *download
-	if cindex == maxUint64 {
-		d = r.newDownload(file, destination, currentContracts)
+	if p.Offset == maxUint64 {
+		d = r.newDownload(file, p.DlWriter, currentContracts)
 	} else {
 		// Check whether the chunk index is valid.
 		numChunks := file.numChunks()
-		if cindex < 0 && cindex >= numChunks {
+		if p.Offset < 0 && p.Offset >= numChunks {
 			emsg := "chunk index not in range of stored chunks. Max chunk index = " + string(numChunks-1)
 			return errors.New(emsg)
 		}
-		d = r.newChunkDownload(file, destination, currentContracts, cindex)
+		d = r.newSectionDownload(file, p.DlWriter, currentContracts, p.Offset, p.Length)
 	}
 
 	lockID = r.mu.Lock()

@@ -7,7 +7,6 @@ package renter
 import (
 	"bytes"
 	"errors"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -75,7 +74,7 @@ type (
 
 		// Static information about the file - can be read without a lock.
 		chunkSize         uint64
-		destination       string
+		destination       modules.DownloadWriter
 		erasureCode       modules.ErasureCoder
 		fileSize          uint64
 		masterKey         crypto.TwofishKey
@@ -121,7 +120,7 @@ type (
 )
 
 // newDownload initializes and returns a download object for the entire file.
-func (r *Renter) newDownload(f *file, destination string, currentContracts map[modules.NetAddress]types.FileContractID) *download {
+func (r *Renter) newDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID) *download {
 	d := &download{}
 	d.initDownload(f, destination)
 	d.isWholeFileDownload = true
@@ -134,23 +133,23 @@ func (r *Renter) newDownload(f *file, destination string, currentContracts map[m
 	return d
 }
 
-// newChunkDownload initialises and returns a download object for the specified chunk.
-func (r *Renter) newChunkDownload(f *file, destination string, currentContracts map[modules.NetAddress]types.FileContractID, cind uint64) *download {
+// newSectionDownload initialises and returns a download object for the specified chunk.
+func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID, offset, length uint64) *download {
 	r.log.Println("Chunk download called.")
 	d := &download{}
 	d.initDownload(f, destination)
 
 	// Settings specific to a chunk download.
 	d.isWholeFileDownload = false
-	d.chunkIndex = cind
+	d.chunkIndex = offset
 	d.dlChunks = 1
 	d.finishedChunks = make([]bool, d.dlChunks)
 
-	d.initPieceSetChunk(cind, f, currentContracts, r)
+	d.initPieceSetChunk(offset, f, currentContracts, r)
 	return d
 }
 
-func (d *download) initDownload(f *file, destination string) {
+func (d *download) initDownload(f *file, destination modules.DownloadWriter) {
 	d.startTime = time.Now()
 	d.chunkSize = f.chunkSize()
 	d.destination = destination
@@ -294,24 +293,11 @@ func (cd *chunkDownload) recoverChunk() error {
 		return build.ExtendErr("unable to recover chunk", err)
 	}
 
-	// Open a file handle for the download.
-	fileDest, err := os.OpenFile(cd.download.destination, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
-	if err != nil {
-		return build.ExtendErr("unable to open download destination", err)
-	}
-	defer fileDest.Close()
-
 	// Write the bytes to the download file.
 	result := recoverWriter.Bytes()
-	_, err = fileDest.WriteAt(result, int64(index*cd.download.chunkSize))
+	_, err = cd.download.destination.WriteAt(result, int64(index*cd.download.chunkSize))
 	if err != nil {
 		return build.ExtendErr("unable to write to download destination", err)
-	}
-
-	// Sync the write to provide proper durability.
-	err = fileDest.Sync()
-	if err != nil {
-		return build.ExtendErr("unable to sync download destination", err)
 	}
 
 	cd.download.mu.Lock()
