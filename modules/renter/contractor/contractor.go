@@ -49,6 +49,7 @@ type Contractor struct {
 	// in addition to mu, a separate lock enforces that multiple goroutines
 	// won't try to simultaneously edit the contract set.
 	editLock siasync.TryMutex
+	contractRepairLock siasync.TryMutex
 
 	allowance     modules.Allowance
 	blockHeight   types.BlockHeight

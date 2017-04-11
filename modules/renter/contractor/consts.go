@@ -4,9 +4,14 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
+	// badScoreForgiveness is the amount of wiggle room that a host score is
+	// allowed to have before the host is considered to be unacceptable.
+	badScoreForgiveness = 25
+
 	// estimatedFileContractTransactionSize provides the estimated size of
 	// the average file contract in bytes.
 	estimatedFileContractTransactionSize = 1200
@@ -21,6 +26,10 @@ const (
 )
 
 var (
+	// emptiestAcceptableContract indicates the emptiest that a contract is
+	// allowed to get before the renter will renew the contract.
+	emptiestAcceptableContract = types.SiacoinPrecision.Mul64(3)
+
 	// minHostsForEstimations describes the minimum number of hosts that
 	// are needed to make broad estimations such as the number of sectors
 	// that you can store on the network for a given allowance.
