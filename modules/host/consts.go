@@ -31,6 +31,21 @@ const (
 	// Typically, this transaction will contain either a file contract, a file
 	// contract revision, or a storage proof.
 	resubmissionTimeout = 3
+
+	// WorkingStateChecking is returned from WorkingState() if the host is
+	// still determining if it is working, that is, if settings calls are
+	// incrementing.
+	WorkingStateChecking = "checking"
+
+	// WorkingStateNotWorking is returned from WorkingState() if the host has
+	// not received any settings calls over the duration of
+	// workingStatusFrequency.
+	WorkingStateNotWorking = "not working"
+
+	// WorkingStateWorking is returned from WorkingState() if the host has
+	// received more than workingThreshold settings calls over the duration of
+	// workingStatusFrequency.
+	WorkingStateWorking = "working"
 )
 
 var (
@@ -103,6 +118,14 @@ var (
 	// the data, meaning that the host serves to profit from accepting the
 	// data.
 	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(10).Div(modules.BytesPerTerabyte) // 10 SC / TB
+
+	// workingStateFrequency defines how frequently the Host's working status
+	// check runs
+	workingStateFrequency = 15 * time.Minute
+
+	// workingStateThreshold defines how many settings calls must occur over the
+	// workingStateFrequency for the host to be considered working.
+	workingStateThreshold = uint64(3)
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window

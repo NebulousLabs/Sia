@@ -1,6 +1,7 @@
 package host
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -54,4 +55,40 @@ func TestPortForwardBlocking(t *testing.T) {
 	// where the host was not shutting down correctly. Currently, the extra
 	// sleep does nothing, but in the regression a logging panic would occur.
 	time.Sleep(time.Second * 4)
+}
+
+// TestHostWorkingState checks that the host properly updates its working
+// state
+func TestHostWorkingState(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	workingStateFrequency = 5 * time.Second
+
+	ht, err := newHostTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ht.host.WorkingState() != WorkingStateChecking {
+		t.Fatal("expected working status to initially WorkingStateChecking")
+	}
+
+	atomic.StoreUint64(&ht.host.atomicSettingsCalls, workingStateThreshold+1)
+
+	time.Sleep(workingStateFrequency)
+	time.Sleep(time.Second)
+
+	if ht.host.WorkingState() != WorkingStateWorking {
+		t.Fatal("expected host working status to be WorkingStateWorking after incrementing status calls")
+	}
+
+	time.Sleep(workingStateFrequency)
+	time.Sleep(time.Second)
+
+	if ht.host.WorkingState() != WorkingStateNotWorking {
+		t.Fatal("expected host working status to be WorkingStateNotWorking after waiting workingStateFrequency with no settings calls")
+	}
 }

@@ -31,7 +31,7 @@ type (
 		ContractCompensation          types.Currency `json:"contractcompensation"`
 		PotentialContractCompensation types.Currency `json:"potentialcontractcompensation"`
 
-		// Metrics related to storage proofs, collateral, and submitting
+		// Metrics related to storage proofs, collateral, and submitting //
 		// transactions to the blockchain.
 		LockedStorageCollateral types.Currency `json:"lockedstoragecollateral"`
 		LostRevenue             types.Currency `json:"lostrevenue"`
@@ -91,6 +91,9 @@ type (
 		ProofConfirmed      bool   `json:"proofconfirmed"`
 		ObligationStatus    uint64 `json:"obligationstatus"`
 	}
+
+	// HostWorkingState reports the working state of a host.
+	HostWorkingState string
 
 	// A Host can take storage from disk and offer it to the network, managing
 	// things such as announcements, settings, and implementing all of the RPCs

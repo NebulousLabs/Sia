@@ -158,6 +158,7 @@ type Host struct {
 	financialMetrics modules.HostFinancialMetrics
 	settings         modules.HostInternalSettings
 	revisionNumber   uint64
+	workingState     modules.HostWorkingState
 
 	// A map of storage obligations that are currently being modified. Locks on
 	// storage obligations can be long-running, and each storage obligation can
@@ -313,6 +314,15 @@ func (h *Host) ExternalSettings() modules.HostExternalSettings {
 	}
 	defer h.tg.Done()
 	return h.externalSettings()
+}
+
+// WorkingState returns the working state of the host, where working is
+// defined as having received more than workingStatusThreshold settings calls
+// over the period of workingStatusFrequency.
+func (h *Host) WorkingState() modules.HostWorkingState {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.workingState
 }
 
 // FinancialMetrics returns information about the financial commitments,

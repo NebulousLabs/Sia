@@ -49,6 +49,33 @@ func (h *Host) threadedUpdateHostname(closeChan chan struct{}) {
 	}
 }
 
+// threadedTrackHostWorkingState periodically checks if the host is working,
+// where working is defined as having received 3 settings calls in the past 15
+// minutes.
+func (h *Host) threadedTrackHostWorkingState(closeChan chan struct{}) {
+	defer close(closeChan)
+
+	for {
+		prevSettingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
+
+		select {
+		case <-h.tg.StopChan():
+			return
+		case <-time.After(workingStateFrequency):
+		}
+
+		settingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
+
+		h.mu.Lock()
+		if settingsCalls-prevSettingsCalls >= workingStateThreshold {
+			h.workingState = WorkingStateWorking
+		} else {
+			h.workingState = WorkingStateNotWorking
+		}
+		h.mu.Unlock()
+	}
+}
+
 // initNetworking performs actions like port forwarding, and gets the
 // host established on the network.
 func (h *Host) initNetworking(address string) (err error) {
@@ -68,6 +95,9 @@ func (h *Host) initNetworking(address string) (err error) {
 		// Wait until the threadedListener has returned to continue shutdown.
 		<-threadedListenerClosedChan
 	})
+
+	// Set the initial working status of the host
+	h.workingState = WorkingStateChecking
 
 	// Set the port.
 	_, port, err := net.SplitHostPort(h.listener.Addr().String())
@@ -111,6 +141,12 @@ func (h *Host) initNetworking(address string) (err error) {
 		go h.threadedUpdateHostname(threadedUpdateHostnameClosedChan)
 		h.tg.OnStop(func() {
 			<-threadedUpdateHostnameClosedChan
+		})
+
+		threadedTrackHostWorkingState := make(chan struct{})
+		go h.threadedTrackHostWorkingState(threadedTrackHostWorkingState)
+		h.tg.OnStop(func() {
+			<-threadedTrackHostWorkingState
 		})
 	}()
 
