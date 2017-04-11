@@ -63,9 +63,10 @@ func TestHostWorkingState(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 
 	workingStateFrequency = 5 * time.Second
+
+	t.Parallel()
 
 	ht, err := newHostTester(t.Name())
 	if err != nil {
@@ -99,9 +100,10 @@ func TestHostConnectabilityState(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 
 	connectabilityCheckFrequency = 5 * time.Second
+
+	t.Parallel()
 
 	ht, err := newHostTester(t.Name())
 	if err != nil {
