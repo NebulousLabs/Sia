@@ -228,9 +228,41 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 		return err
 	}
 	defer w.tg.Done()
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.loadSeed(masterKey, seed)
+
+	err := func() error {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+
+		err := w.loadSeed(masterKey, seed)
+		if err != nil {
+			return err
+		}
+
+		// reset the consensus change ID and height
+		err = dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
+		if err != nil {
+			return err
+		}
+		return dbPutConsensusHeight(w.dbTx, 0)
+	}()
+	if err != nil {
+		return err
+	}
+
+	// rescan the blockchain
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
+	done := make(chan struct{})
+	go w.rescanMessage(done)
+	defer close(done)
+
+	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	if err != nil {
+		return err
+	}
+	w.tpool.TransactionPoolSubscribe(w)
+	return nil
 }
 
 // SweepSeed scans the blockchain for outputs generated from seed and creates

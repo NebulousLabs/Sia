@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -398,7 +399,7 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationWalletSweepSeedPOST")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -453,6 +454,71 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 	err = st.postAPI("/wallet/sweep/seed", qs, &wsp)
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestIntegrationWalletLoadSeedPOST probes the POST call to
+// /wallet/seed.
+func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a wallet.
+	key := crypto.TwofishKey(crypto.HashObject("password"))
+	st, err := assembleServerTester(key, build.TempDir("api", t.Name()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Mine blocks until the wallet has confirmed money.
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		st.miner.AddBlock()
+	}
+
+	// Create a wallet to load coins from.
+	key2 := crypto.GenerateTwofishKey()
+	w2, err := wallet.New(st.cs, st.tpool, filepath.Join(st.dir, "wallet2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w2.Encrypt(key2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w2.Unlock(key2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Mine coins into the second wallet.
+	m, err := miner.New(st.cs, st.tpool, w2, filepath.Join(st.dir, "miner2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		m.AddBlock()
+	}
+
+	// Record starting balances.
+	oldBal, _, _ := st.wallet.ConfirmedBalance()
+	w2bal, _, _ := w2.ConfirmedBalance()
+	if w2bal.IsZero() {
+		t.Fatal("second wallet's balance should not be zero")
+	}
+
+	// Load the second wallet's seed into the first wallet
+	seed, _, _ := w2.PrimarySeed()
+	seedStr, _ := modules.SeedToString(seed, "english")
+	qs := url.Values{}
+	qs.Set("seed", seedStr)
+	qs.Set("encryptionpassword", "password")
+	err = st.stdPostAPI("/wallet/seed", qs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// First wallet should now have balance of both wallets
+	bal, _, _ := st.wallet.ConfirmedBalance()
+	if exp := oldBal.Add(w2bal); !bal.Equals(exp) {
+		t.Fatalf("wallet did not load seed correctly: expected %v coins, got %v", exp, bal)
 	}
 }
 
