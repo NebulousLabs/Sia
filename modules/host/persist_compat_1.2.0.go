@@ -166,7 +166,7 @@ func (h *Host) readAndDeleteV112Sectors(oldPersist *v112StorageManagerPersist, o
 			var usage v112StorageManagerSectorUsage
 			err := json.Unmarshal(sectorUsageBytes, &usage)
 			if err != nil {
-				return err
+				continue
 			}
 
 			// Don't read more than contractManagerStorageFolderGranularity
@@ -275,7 +275,6 @@ func (h *Host) upgradeFromV112ToV120() error {
 	sectors, err := h.readAndDeleteV112Sectors(oldPersist, oldDB, contractManagerStorageFolderGranularity*newFoldersNeeded)
 	if err != nil {
 		h.log.Println("Error reading sectors from legacy storage manager:", err)
-		return err
 	}
 
 	// Iterate through each storage folder and create analogous storage folders
@@ -294,7 +293,7 @@ func (h *Host) upgradeFromV112ToV120() error {
 		err := h.AddStorageFolder(sf.Path, minimumStorageFolderSize)
 		if err != nil {
 			h.log.Println("Unable to create a storage folder in the contract manager:", err)
-			return err
+			continue
 		}
 	}
 
@@ -337,7 +336,7 @@ func (h *Host) upgradeFromV112ToV120() error {
 		sectors, err := h.readAndDeleteV112Sectors(oldPersist, oldDB, contractManagerStorageFolderGranularity*canGrow)
 		if err != nil {
 			h.log.Println("Error reading sectors from legacy storage manager:", err)
-			return err
+			continue
 		}
 		// Break condition - if no sectors were read, the migration is
 		// complete.
@@ -353,7 +352,7 @@ func (h *Host) upgradeFromV112ToV120() error {
 				if err != nil {
 					err = build.ExtendErr("unable to resize storage folder during host upgrade:", err)
 					h.log.Println(err)
-					return err
+					continue
 				}
 			}
 		}
@@ -386,9 +385,9 @@ func (h *Host) upgradeFromV112ToV120() error {
 		if cmFolder.Capacity < finalCapacity {
 			err := h.ResizeStorageFolder(cmFolder.Index, finalCapacity, false)
 			if err != nil {
-				err = build.ExtendErr("unable to resize storage folder during host upgrade:", err)
+				err = build.ExtendErr("unable to resize storage folder during host upgrade", err)
 				h.log.Println(err)
-				return err
+				continue
 			}
 		}
 	}
@@ -396,14 +395,14 @@ func (h *Host) upgradeFromV112ToV120() error {
 	// Close the database that was opened.
 	err = oldDB.Close()
 	if err != nil {
-		return err
+		h.log.Println("Unable to close old database during v1.2.0 compat upgrade", err)
 	}
 
 	// Try loading the persist again.
 	p := new(persistence)
 	err = h.dependencies.loadFile(v112PersistMetadata, p, filepath.Join(h.persistDir, settingsFile))
 	if err != nil {
-		return err
+		return build.ExtendErr("upgrade appears complete, but having difficulties reloading host after upgrade", err)
 	}
 	h.loadPersistObject(p)
 
@@ -411,13 +410,13 @@ func (h *Host) upgradeFromV112ToV120() error {
 	// version between v1.0.0 and v1.1.2.
 	err = h.loadCompatV100(p)
 	if err != nil {
-		return err
+		return build.ExtendErr("upgrade appears complete, but having trouble relaoding:", err)
 	}
 
 	// Save the updated persist so that the upgrade is not triggered again.
 	err = h.saveSync()
 	if err != nil {
-		return err
+		return build.ExtendErr("upgrade appears complete, but final save has failed (upgrade likely successful", err)
 	}
 
 	// Delete the storage manager files. Note that this must happen after the
@@ -425,18 +424,17 @@ func (h *Host) upgradeFromV112ToV120() error {
 	for _, sf := range oldPersist.StorageFolders {
 		err = os.Remove(filepath.Join(h.persistDir, v112StorageManagerDir, hex.EncodeToString(sf.UID)))
 		if err != nil {
-			return err
+			h.log.Println("Unable to remove legacy contract manager files:", err)
 		}
 	}
 	err = os.Remove(filepath.Join(h.persistDir, v112StorageManagerDir, v112StorageManagerPersistFilename))
 	if err != nil {
-		return err
+		h.log.Println("Unable to remove legacy persist files:", err)
 	}
 	oldDB.Close()
 	err = os.Remove(filepath.Join(h.persistDir, v112StorageManagerDir, v112StorageManagerDBFilename))
 	if err != nil {
-		return err
+		h.log.Println("Unable to close legacy database:", err)
 	}
-
 	return nil
 }
