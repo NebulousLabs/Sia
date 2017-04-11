@@ -49,10 +49,10 @@ func (h *Host) threadedUpdateHostname(closeChan chan struct{}) {
 	}
 }
 
-// threadedTrackHostWorkingState periodically checks if the host is working,
+// threadedTrackWorkingState periodically checks if the host is working,
 // where working is defined as having received 3 settings calls in the past 15
 // minutes.
-func (h *Host) threadedTrackHostWorkingState(closeChan chan struct{}) {
+func (h *Host) threadedTrackWorkingState(closeChan chan struct{}) {
 	defer close(closeChan)
 
 	for {
@@ -76,6 +76,42 @@ func (h *Host) threadedTrackHostWorkingState(closeChan chan struct{}) {
 	}
 }
 
+// threadedTrackConnectabilityState periodically checks if the host is
+// connectable at its netaddress.
+func (h *Host) threadedTrackConnectabilityState(closeChan chan struct{}) {
+	defer close(closeChan)
+
+	for {
+		select {
+		case <-h.tg.StopChan():
+			return
+		case <-time.After(connectabilityCheckFrequency):
+		}
+
+		h.mu.RLock()
+		autoAddr := h.autoAddress
+		userAddr := h.settings.NetAddress
+		h.mu.RUnlock()
+
+		activeAddr := autoAddr
+		if userAddr != "" {
+			activeAddr = userAddr
+		}
+
+		conn, err := net.Dial("tcp", string(activeAddr))
+		if err == nil {
+			h.mu.Lock()
+			h.connectabilityState = ConnectabilityStateConnectable
+			h.mu.Unlock()
+		} else {
+			h.mu.Lock()
+			h.connectabilityState = ConnectabilityStateNotConnectable
+			h.mu.Unlock()
+		}
+		conn.Close()
+	}
+}
+
 // initNetworking performs actions like port forwarding, and gets the
 // host established on the network.
 func (h *Host) initNetworking(address string) (err error) {
@@ -96,8 +132,11 @@ func (h *Host) initNetworking(address string) (err error) {
 		<-threadedListenerClosedChan
 	})
 
-	// Set the initial working status of the host
+	// Set the initial working state of the host
 	h.workingState = WorkingStateChecking
+
+	// Set the initial connectability state of the host
+	h.connectabilityState = ConnectabilityStateChecking
 
 	// Set the port.
 	_, port, err := net.SplitHostPort(h.listener.Addr().String())
@@ -143,10 +182,16 @@ func (h *Host) initNetworking(address string) (err error) {
 			<-threadedUpdateHostnameClosedChan
 		})
 
-		threadedTrackHostWorkingState := make(chan struct{})
-		go h.threadedTrackHostWorkingState(threadedTrackHostWorkingState)
+		threadedTrackWorkingStateClosedChan := make(chan struct{})
+		go h.threadedTrackWorkingState(threadedTrackWorkingStateClosedChan)
 		h.tg.OnStop(func() {
-			<-threadedTrackHostWorkingState
+			<-threadedTrackWorkingStateClosedChan
+		})
+
+		threadedTrackConnectabilityStateClosedChan := make(chan struct{})
+		go h.threadedTrackConnectabilityState(threadedTrackConnectabilityStateClosedChan)
+		h.tg.OnStop(func() {
+			<-threadedTrackConnectabilityStateClosedChan
 		})
 	}()
 

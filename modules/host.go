@@ -95,6 +95,9 @@ type (
 	// HostWorkingState reports the working state of a host.
 	HostWorkingState string
 
+	// HostConnectabilityState reports the connectability state of a host.
+	HostConnectabilityState string
+
 	// A Host can take storage from disk and offer it to the network, managing
 	// things such as announcements, settings, and implementing all of the RPCs
 	// of the host protocol.

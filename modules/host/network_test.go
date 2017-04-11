@@ -73,7 +73,7 @@ func TestHostWorkingState(t *testing.T) {
 	}
 
 	if ht.host.WorkingState() != WorkingStateChecking {
-		t.Fatal("expected working status to initially WorkingStateChecking")
+		t.Fatal("expected working state to initially be WorkingStateChecking")
 	}
 
 	atomic.StoreUint64(&ht.host.atomicSettingsCalls, workingStateThreshold+1)
@@ -90,5 +90,32 @@ func TestHostWorkingState(t *testing.T) {
 
 	if ht.host.WorkingState() != WorkingStateNotWorking {
 		t.Fatal("expected host working status to be WorkingStateNotWorking after waiting workingStateFrequency with no settings calls")
+	}
+}
+
+// TestHostConnectabilityState checks that the host properly updates its connectable
+// state
+func TestHostConnectabilityState(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	connectabilityCheckFrequency = 5 * time.Second
+
+	ht, err := newHostTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ht.host.ConnectabilityState() != ConnectabilityStateChecking {
+		t.Fatal("expected connectability state to initially be ConnectablityStateChecking")
+	}
+
+	time.Sleep(connectabilityCheckFrequency)
+	time.Sleep(time.Second)
+
+	if ht.host.ConnectabilityState() != ConnectabilityStateConnectable {
+		t.Fatal("expected connectability state to be ConnectabilityStateConnectable")
 	}
 }

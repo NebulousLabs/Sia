@@ -46,6 +46,18 @@ const (
 	// received more than workingThreshold settings calls over the duration of
 	// workingStatusFrequency.
 	WorkingStateWorking = "working"
+
+	// ConnectabilityStateChecking is returned from ConnectabilityState() if the
+	// host is still determining if it is connectable.
+	ConnectabilityStateChecking = "checking"
+
+	// ConnectabilityStateConnectable is returned from ConnectabilityState() if
+	// the host is connectable at its configured netaddress.
+	ConnectabilityStateConnectable = "connectable"
+
+	// ConnectabilityStateNotConnectable is returned from ConnectabilityState()
+	// if the host is not connectable at its configured netaddress.
+	ConnectabilityStateNotConnectable = "not connectable"
 )
 
 var (
@@ -126,6 +138,10 @@ var (
 	// workingStateThreshold defines how many settings calls must occur over the
 	// workingStateFrequency for the host to be considered working.
 	workingStateThreshold = uint64(3)
+
+	// connectablityCheckFrequency defines how often the host's connectability
+	// check is run.
+	connectabilityCheckFrequency = 3 * time.Minute
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window
