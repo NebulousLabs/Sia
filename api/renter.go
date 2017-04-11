@@ -18,6 +18,10 @@ import (
 	"strconv"
 )
 
+const (
+	maxUint64 = ^uint64(0)
+)
+
 var (
 	// recommendedHosts is the number of hosts that the renter will form
 	// contracts with if the value is not specified explicitly in the call to
@@ -351,36 +355,19 @@ func (api *API) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps
 
 // renterDownloadHandler handles the API call to download a file.
 func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	destination := req.FormValue("destination")
-	// Check that the destination path is absolute.
-	if !filepath.IsAbs(destination) {
-		WriteError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
-		return
+	p, errmsg := parseDownloadParameters(w, req, ps)
+	if errmsg != nil {
+		WriteError(w, *errmsg, http.StatusBadRequest)
 	}
 
-	err := api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
-	if err != nil {
-		WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
-		return
-	}
-
-	WriteSuccess(w)
-}
-
-// renterDownloadchunkHandler handles the API call to download a specific chunk from a file.
-func (api *API) renterDownloadchunkHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	destination := req.FormValue("destination")
-	cindparam := req.FormValue("chunkindex")
-
-	cindex, err := strconv.ParseUint(cindparam, 10, 64)
-	if err != nil {
-		WriteError(w, Error{"could not decode the chunk index as uint64: " + err.Error()}, http.StatusBadRequest)
-	}
-
-	err = api.renter.DownloadChunk(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination, cindex)
-	if err != nil {
-		WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
-		return
+	if p.Async { // Create goroutine if `async` param set.
+		go api.renter.DownloadSection(p)
+	} else {
+		err := api.renter.DownloadSection(p)
+		if err != nil {
+			WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	WriteSuccess(w)
@@ -388,31 +375,101 @@ func (api *API) renterDownloadchunkHandler(w http.ResponseWriter, req *http.Requ
 
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
 func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	destination := req.FormValue("destination")
-	// Check that the destination path is absolute.
-	if !filepath.IsAbs(destination) {
-		WriteError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
-		return
+	p, errmsg := parseDownloadParameters(w, req, ps)
+	if errmsg != nil {
+		WriteError(w, *errmsg, http.StatusBadRequest)
 	}
 
-	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/")
-	fileExists := false
+	// Set async param to true.
+	// This parameter may be used in the future so it is set for safety reasons,
+	// its intended use is to determine whether to call DownloadSection in a goroutine.
+	p.Async = true
 
-	files := api.renter.FileList()
-	for _, file := range files {
-		if file.SiaPath == siapath {
-			fileExists = true
-		}
-	}
-
-	if !fileExists {
-		WriteError(w, Error{"file at specified siapath does not exist"}, http.StatusBadRequest)
-		return
-	}
-
-	go api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
+	go api.renter.DownloadSection(p)
 
 	WriteSuccess(w)
+}
+
+func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (*modules.RenterDownloadParameters, *Error) {
+	destination := req.FormValue("destination")
+
+	// The offset and length in bytes.
+	offsetparam := req.FormValue("offset")
+	lengthparam := req.FormValue("length")
+
+	// Determines whether the response is written to response body.
+	httprespparam := req.FormValue("httpresp")
+
+	// Determines whether to return on completion of download or straight away.
+	// If httprespparam is present, this parameter is ignored.
+	asyncparam := req.FormValue("httpresp")
+
+	// Parse the offset and length parameters. TODO(rnabel): Handle empty string.
+	offset, err := strconv.ParseUint(offsetparam, 10, 64)
+	if err != nil {
+		return nil, &Error{"could not decode the offset as uint64: " +
+			err.Error()}
+	}
+	length, err := strconv.ParseUint(lengthparam, 10, 64)
+	if err != nil {
+		return nil, &Error{"could not decode the length as uint64: " +
+			err.Error()}
+	}
+	// Verify that if either offset or length have been provided that both were provided.
+	offparampassed := len(offsetparam) > 0
+	lenparampassed := len(lengthparam) > 0
+	if (offparampassed || lenparampassed) &&
+		!(offparampassed && lenparampassed) {
+		var missingfield = "offset"
+		if lenparampassed {
+			missingfield = "length"
+		}
+		return nil, &Error{"either both \"offset\" and " +
+			"\"length\" have to be specified or neither. " +
+			missingfield + " has not been specified."}
+	}
+
+	// Parse the httpresp parameter.
+	httpresp, errmsg := stringToBool(httprespparam)
+	if errmsg != nil {
+		return nil, errmsg
+	}
+
+	// Parse the async parameter.
+	async, errmsg := stringToBool(asyncparam)
+	if errmsg != nil {
+		return nil, errmsg
+	}
+
+	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/") // Sia file name.
+
+	if !offparampassed { // Determine if entire file is to be downloaded.
+		offset = 0
+		length = maxUint64
+	}
+
+	// Instantiate the correct DownloadWriter implementation
+	// (e.g. content written to file or response body).
+	var dw modules.DownloadWriter
+	if httpresp {
+		dw = modules.NewDownloadHttpWriter(w, offset, length)
+	} else {
+		// Ensure that destination is valid beforehands.
+		// Check that the destination path is absolute.
+		if !filepath.IsAbs(destination) {
+			return nil, &Error{"destination must be an absolute path"}
+		}
+		dw = modules.NewDownloadFileWriter(destination)
+	}
+
+	return &modules.RenterDownloadParameters{
+		Async:    async,
+		DlWriter: dw,
+		Httpresp: httpresp,
+		Length:   length,
+		Offset:   offset,
+		Siapath:  siapath,
+	}, nil
 }
 
 // renterShareHandler handles the API call to create a '.sia' file that
@@ -508,4 +565,19 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 		return
 	}
 	WriteSuccess(w)
+}
+
+func stringToBool(param string) (bool, *Error) {
+	// Parse the async parameter.
+	var out bool
+	switch {
+	case param == "true":
+		out = true
+	case len(param) == 0 || param == "false":
+		out = false
+	default:
+		return false, &Error{"asyncparam has to be empty, \"true\" or \"false\""}
+	}
+
+	return out, nil
 }

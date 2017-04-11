@@ -388,7 +388,7 @@ func renterfilesdeletecmd(path string) {
 func renterfilesdownloadcmd(path, destination string) {
 	destination = abs(destination)
 	done := make(chan struct{})
-	go downloadprogress(done, destination)
+	go downloadprogress(done, path)
 
 	err := get("/renter/download/" + path + "?destination=" + destination)
 	close(done)
@@ -417,7 +417,7 @@ func renterfilesdownloadchunkcmd(path string, cind string, destination string) {
 	fmt.Printf("\nDownloaded chunk %s of '%s' to %s.\n", cind, path, abs(destination))
 }
 
-func downloadprogress(done chan struct{}, destination string) {
+func downloadprogress(done chan struct{}, siapath string) {
 	time.Sleep(time.Second) // give download time to initialize
 	for {
 		select {
@@ -433,7 +433,7 @@ func downloadprogress(done chan struct{}, destination string) {
 			}
 			var d modules.DownloadInfo
 			for _, d = range queue.Downloads {
-				if d.Destination == destination {
+				if d.SiaPath == siapath {
 					break
 				}
 			}
