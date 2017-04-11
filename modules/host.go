@@ -31,7 +31,7 @@ type (
 		ContractCompensation          types.Currency `json:"contractcompensation"`
 		PotentialContractCompensation types.Currency `json:"potentialcontractcompensation"`
 
-		// Metrics related to storage proofs, collateral, and submitting //
+		// Metrics related to storage proofs, collateral, and submitting
 		// transactions to the blockchain.
 		LockedStorageCollateral types.Currency `json:"lockedstoragecollateral"`
 		LostRevenue             types.Currency `json:"lostrevenue"`
