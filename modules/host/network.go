@@ -66,6 +66,12 @@ func (h *Host) threadedTrackWorkingState(closeChan chan struct{}) {
 
 		settingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
 
+		// sanity check
+		if prevSettingsCalls > settingsCalls {
+			build.Severe("the host's settings calls decremented")
+			continue
+		}
+
 		h.mu.Lock()
 		if settingsCalls-prevSettingsCalls >= workingStateThreshold {
 			h.workingState = WorkingStateWorking
