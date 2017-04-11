@@ -133,6 +133,14 @@ type (
 		// the host.
 		StorageObligations() []StorageObligation
 
+		// ConnectabilityState returns the connectability status of the host, that
+		// is, if it can connect to itself on the configured NetAddress.
+		ConnectabilityState() HostConnectabilityState
+
+		// WorkingState returns the working state of the host, determined by if
+		// settings calls are increasing.
+		WorkingState() HostWorkingState
+
 		// The storage manager provides an interface for adding and removing
 		// storage folders and data sectors to the host.
 		StorageManager
