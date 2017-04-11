@@ -51,6 +51,10 @@ func (hdb *HostDB) load() error {
 		return err
 	}
 
+	// Set the hostdb internal values.
+	hdb.blockHeight = data.BlockHeight
+	hdb.lastChange = data.LastChange
+
 	// Load each of the hosts into the host tree.
 	for _, host := range data.AllHosts {
 		// COMPATv1.1.0
@@ -72,8 +76,6 @@ func (hdb *HostDB) load() error {
 			hdb.queueScan(host)
 		}
 	}
-	hdb.blockHeight = data.BlockHeight
-	hdb.lastChange = data.LastChange
 	return nil
 }
 
