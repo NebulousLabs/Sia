@@ -99,15 +99,15 @@ func (h *Host) threadedTrackConnectabilityState(closeChan chan struct{}) {
 		}
 
 		conn, err := net.Dial("tcp", string(activeAddr))
+
+		h.mu.Lock()
 		if err == nil {
-			h.mu.Lock()
 			h.connectabilityState = ConnectabilityStateConnectable
-			h.mu.Unlock()
 		} else {
-			h.mu.Lock()
 			h.connectabilityState = ConnectabilityStateNotConnectable
-			h.mu.Unlock()
 		}
+		h.mu.Unlock()
+
 		conn.Close()
 	}
 }
