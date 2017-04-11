@@ -341,7 +341,8 @@ func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) er
 	}
 	// NOTE: each time the wallet generates a key for index n, it sets its
 	// progress to n+1, so the progress should be the largest index seen + 1.
-	// We also add 10% as a buffer because there is little reason not to.
+	// We also add 10% as a buffer because the seed may have addresses in the
+	// wild that have not appeared in the blockchain yet.
 	progress := s.largestIndexSeen + 1
 	progress += progress / 10
 	// set primarySeedProgress
