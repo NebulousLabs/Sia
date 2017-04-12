@@ -56,7 +56,7 @@ func TestScanLargeIndex(t *testing.T) {
 
 	// create seed scanner and scan the block
 	seed, _, _ := wt.wallet.PrimarySeed()
-	ss := newSeedScanner(seed)
+	ss := newSeedScanner(seed, wt.wallet.log)
 	err = ss.scan(wt.cs)
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +112,7 @@ func TestScanLoop(t *testing.T) {
 
 	// create seed scanner and scan the block
 	seed, _, _ := wt.wallet.PrimarySeed()
-	ss := newSeedScanner(seed)
+	ss := newSeedScanner(seed, wt.wallet.log)
 	err = ss.scan(wt.cs)
 	if err != nil {
 		t.Fatal(err)
