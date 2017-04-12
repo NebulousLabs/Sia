@@ -144,8 +144,8 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 		if err := cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
 			return err
 		}
+		cs.Unsubscribe(s)
 		if s.largestIndexSeen < s.numKeys()/2 {
-			cs.Unsubscribe(s)
 			return nil
 		}
 		// increase number of keys generated each iteration, capping so that
@@ -155,7 +155,6 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 			numKeys = maxScanKeys - s.numKeys()
 		}
 	}
-	cs.Unsubscribe(s)
 	return errMaxKeys
 }
 
