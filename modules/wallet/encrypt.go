@@ -53,7 +53,8 @@ func checkMasterKey(tx *bolt.Tx, masterKey crypto.TwofishKey) error {
 	return verifyEncryption(uk, encryptedVerification)
 }
 
-// reinitEncryption re-encrypts a wallet using the given key and seed.
+// reinitEncryption re-encrypts a wallet using the given key and seed. Doing
+// this completely destroys the old wallet.
 func (w *Wallet) reinitEncryption(masterKey crypto.TwofishKey, seed modules.Seed) (modules.Seed, error) {
 	wb := w.dbTx.Bucket(bucketWallet)
 

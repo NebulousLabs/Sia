@@ -196,6 +196,9 @@ func walletinitcmd() {
 		}
 		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
+	if initForce {
+		qs += "&force=true"
+	}
 	err := postResp("/wallet/init", qs, &er)
 	if err != nil {
 		die("Error when encrypting wallet:", err)
