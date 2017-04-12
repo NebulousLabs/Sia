@@ -225,19 +225,20 @@ func (g *Gateway) acceptPeer(p *peer) {
 
 	// Select a peer to kick. Outbound peers and local peers are not
 	// available to be kicked.
+	acceptingHost := p.NetAddress.Host()
 	var addrs []modules.NetAddress
-	for addr, peer := range g.peers {
+	for _, р := range g.peers {
 		// Do not kick outbound peers or local peers.
-		if !peer.Inbound || peer.Local {
+		if !p.Inbound || p.Local {
 			continue
 		}
 
 		// Prefer kicking a peer with the same hostname.
-		if addr.Host() == p.NetAddress.Host() {
-			addrs = []modules.NetAddress{addr}
+		if р.NetAddress.Host() == acceptingHost {
+			addrs = []modules.NetAddress{р.NetAddress}
 			break
 		}
-		addrs = append(addrs, addr)
+		addrs = append(addrs, р.NetAddress)
 	}
 	if len(addrs) == 0 {
 		// There is nobody suitable to kick, therefore do not kick anyone.
