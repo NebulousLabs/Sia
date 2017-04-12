@@ -150,34 +150,46 @@ func (c *Contractor) threadedRepairContracts() {
 
 	// Iterate through the set of contracts and find any that need to be renewed
 	// due to low funds or upcoming expiration.
+	var needsRenew []modules.RenterContract
 	numGoodContracts := 0
-	for i, contract := range c.contracts {
-		// Exit if stop has been called.
-		select {
-			case <-c.tg.StopChan()
-				return
-			default:
+	func () {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		for i, contract := range c.contracts {
+			// Exit if stop has been called.
+			select {
+				case <-c.tg.StopChan()
+					return
+				default:
+			}
+
+			// Skip bad contracts.
+			if !contract.InGoodStanding {
+				continue
+			}
+
+			// Check that the contract is not empty.
+			empty := c.RenterFunds().Cmp(emptiestAcceptableContract) <= 0
+
+			// Check that the contract is not expiring soon.
+			expiring := c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight()
+
+			if empty || expiring {
+				needsRenew = append(needsRenew, contract)
+			}
+			numGoodContracts++
 		}
-
-		// Skip bad contracts.
-		if !contract.InGoodStanding {
-			continue
-		}
-
-		// Check that the contract is not empty.
-		empty := c.RenterFunds().Cmp(emptiestAcceptableContract) <= 0
-
-		// Check that the contract is not expiring soon.
-		expiring := c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight()
-
-		if empty || expiring {
-			// TODO: Call renew on the contract.
-		}
-		numGoodContracts++
+	}()
+	for _, contract := range needsRenew {
+		// TODO: Call renew on the contract.
 	}
 
 	// Form any extra contracts if needed.
-	for numGoodContracts < c.allowance.Hosts {
+	c.mu.Lock()
+	wantedHosts := c.allowance.Hosts
+	c.mu.Unlock()
+	for numGoodContracts < wantedHosts {
 		// Exit if stop has been called.
 		select {
 			case <-c.tg.StopChan()
@@ -186,6 +198,7 @@ func (c *Contractor) threadedRepairContracts() {
 		}
 
 		// TODO: Form a new contract
+
 		numGoodContracts++
 	}
 }
