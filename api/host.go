@@ -26,12 +26,12 @@ type (
 	// HostGET contains the information that is returned after a GET request to
 	// /host - a bunch of information about the status of the host.
 	HostGET struct {
-		ExternalSettings    modules.HostExternalSettings    `json:"externalsettings"`
-		FinancialMetrics    modules.HostFinancialMetrics    `json:"financialmetrics"`
-		InternalSettings    modules.HostInternalSettings    `json:"internalsettings"`
-		NetworkMetrics      modules.HostNetworkMetrics      `json:"networkmetrics"`
-		ConnectabilityState modules.HostConnectabilityState `json:"connectabilitystate"`
-		WorkingState        modules.HostWorkingState        `json:"workingstate"`
+		ExternalSettings     modules.HostExternalSettings     `json:"externalsettings"`
+		FinancialMetrics     modules.HostFinancialMetrics     `json:"financialmetrics"`
+		InternalSettings     modules.HostInternalSettings     `json:"internalsettings"`
+		NetworkMetrics       modules.HostNetworkMetrics       `json:"networkmetrics"`
+		ConnectabilityStatus modules.HostConnectabilityStatus `json:"connectabilitystate"`
+		WorkingStatus        modules.HostWorkingStatus        `json:"workingstate"`
 	}
 
 	// StorageGET contains the information that is returned after a GET request
@@ -60,15 +60,15 @@ func (api *API) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httpr
 	fm := api.host.FinancialMetrics()
 	is := api.host.InternalSettings()
 	nm := api.host.NetworkMetrics()
-	cs := api.host.ConnectabilityState()
-	ws := api.host.WorkingState()
+	cs := api.host.ConnectabilityStatus()
+	ws := api.host.WorkingStatus()
 	hg := HostGET{
-		ExternalSettings:    es,
-		FinancialMetrics:    fm,
-		InternalSettings:    is,
-		NetworkMetrics:      nm,
-		ConnectabilityState: cs,
-		WorkingState:        ws,
+		ExternalSettings:     es,
+		FinancialMetrics:     fm,
+		InternalSettings:     is,
+		NetworkMetrics:       nm,
+		ConnectabilityStatus: cs,
+		WorkingStatus:        ws,
 	}
 	WriteJSON(w, hg)
 }

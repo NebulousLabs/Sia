@@ -268,8 +268,8 @@ Working Status:        %v,
 			nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
 			nm.RenewCalls, nm.ReviseCalls, nm.SettingsCalls,
 			nm.FormContractCalls,
-			hg.ConnectabilityState,
-			hg.WorkingState)
+			hg.ConnectabilityStatus,
+			hg.WorkingStatus)
 	} else {
 		fmt.Printf(`Host info:
 	Estimated Competitive Price: %v
@@ -294,8 +294,8 @@ Working Status:        %v,
 			yesNo(is.AcceptingContracts), currencyUnits(totalPotentialRevenue),
 			currencyUnits(fm.LockedStorageCollateral),
 			currencyUnits(totalRevenue),
-			hg.ConnectabilityState,
-			hg.WorkingState)
+			hg.ConnectabilityStatus,
+			hg.WorkingStatus)
 	}
 
 	fmt.Println("\nStorage Folders:")

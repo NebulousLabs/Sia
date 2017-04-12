@@ -49,10 +49,10 @@ func (h *Host) threadedUpdateHostname(closeChan chan struct{}) {
 	}
 }
 
-// threadedTrackWorkingState periodically checks if the host is working,
+// threadedTrackWorkingStatus periodically checks if the host is working,
 // where working is defined as having received 3 settings calls in the past 15
 // minutes.
-func (h *Host) threadedTrackWorkingState(closeChan chan struct{}) {
+func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 	defer close(closeChan)
 
 	for {
@@ -60,7 +60,7 @@ func (h *Host) threadedTrackWorkingState(closeChan chan struct{}) {
 		select {
 		case <-h.tg.StopChan():
 			return
-		case <-time.After(workingStateFrequency):
+		case <-time.After(workingStatusFrequency):
 		}
 		settingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
 
@@ -71,18 +71,18 @@ func (h *Host) threadedTrackWorkingState(closeChan chan struct{}) {
 		}
 
 		h.mu.Lock()
-		if settingsCalls-prevSettingsCalls >= workingStateThreshold {
-			h.workingState = WorkingStateWorking
+		if settingsCalls-prevSettingsCalls >= workingStatusThreshold {
+			h.workingStatus = WorkingStatusWorking
 		} else {
-			h.workingState = WorkingStateNotWorking
+			h.workingStatus = WorkingStatusNotWorking
 		}
 		h.mu.Unlock()
 	}
 }
 
-// threadedTrackConnectabilityState periodically checks if the host is
+// threadedTrackConnectabilityStatus periodically checks if the host is
 // connectable at its netaddress.
-func (h *Host) threadedTrackConnectabilityState(closeChan chan struct{}) {
+func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 	defer close(closeChan)
 
 	for {
@@ -105,7 +105,7 @@ func (h *Host) threadedTrackConnectabilityState(closeChan chan struct{}) {
 		conn, err := net.Dial("tcp", string(activeAddr))
 		if err != nil {
 			h.mu.Lock()
-			h.connectabilityState = ConnectabilityStateNotConnectable
+			h.connectabilityStatus = ConnectabilityStatusNotConnectable
 			h.mu.Unlock()
 			continue
 		}
@@ -120,7 +120,7 @@ func (h *Host) threadedTrackConnectabilityState(closeChan chan struct{}) {
 		}()
 
 		h.mu.Lock()
-		h.connectabilityState = ConnectabilityStateConnectable
+		h.connectabilityStatus = ConnectabilityStatusConnectable
 		h.mu.Unlock()
 
 		close(connCloseChan)
@@ -148,10 +148,10 @@ func (h *Host) initNetworking(address string) (err error) {
 	})
 
 	// Set the initial working state of the host
-	h.workingState = WorkingStateChecking
+	h.workingStatus = WorkingStatusChecking
 
 	// Set the initial connectability state of the host
-	h.connectabilityState = ConnectabilityStateChecking
+	h.connectabilityStatus = ConnectabilityStatusChecking
 
 	// Set the port.
 	_, port, err := net.SplitHostPort(h.listener.Addr().String())
@@ -197,16 +197,16 @@ func (h *Host) initNetworking(address string) (err error) {
 			<-threadedUpdateHostnameClosedChan
 		})
 
-		threadedTrackWorkingStateClosedChan := make(chan struct{})
-		go h.threadedTrackWorkingState(threadedTrackWorkingStateClosedChan)
+		threadedTrackWorkingStatusClosedChan := make(chan struct{})
+		go h.threadedTrackWorkingStatus(threadedTrackWorkingStatusClosedChan)
 		h.tg.OnStop(func() {
-			<-threadedTrackWorkingStateClosedChan
+			<-threadedTrackWorkingStatusClosedChan
 		})
 
-		threadedTrackConnectabilityStateClosedChan := make(chan struct{})
-		go h.threadedTrackConnectabilityState(threadedTrackConnectabilityStateClosedChan)
+		threadedTrackConnectabilityStatusClosedChan := make(chan struct{})
+		go h.threadedTrackConnectabilityStatus(threadedTrackConnectabilityStatusClosedChan)
 		h.tg.OnStop(func() {
-			<-threadedTrackConnectabilityStateClosedChan
+			<-threadedTrackConnectabilityStatusClosedChan
 		})
 	}()
 

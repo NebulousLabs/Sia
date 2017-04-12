@@ -92,13 +92,13 @@ type (
 		ObligationStatus    uint64 `json:"obligationstatus"`
 	}
 
-	// HostWorkingState reports the working state of a host. Can be one of
+	// HostWorkingStatus reports the working state of a host. Can be one of
 	// "checking", "working", or "not working.
-	HostWorkingState string
+	HostWorkingStatus string
 
-	// HostConnectabilityState reports the connectability state of a host. Can be
+	// HostConnectabilityStatus reports the connectability state of a host. Can be
 	// one of "checking", "connectable", or "not connectable"
-	HostConnectabilityState string
+	HostConnectabilityStatus string
 
 	// A Host can take storage from disk and offer it to the network, managing
 	// things such as announcements, settings, and implementing all of the RPCs
@@ -135,13 +135,13 @@ type (
 		// the host.
 		StorageObligations() []StorageObligation
 
-		// ConnectabilityState returns the connectability status of the host, that
+		// ConnectabilityStatus returns the connectability status of the host, that
 		// is, if it can connect to itself on the configured NetAddress.
-		ConnectabilityState() HostConnectabilityState
+		ConnectabilityStatus() HostConnectabilityStatus
 
-		// WorkingState returns the working state of the host, determined by if
+		// WorkingStatus returns the working state of the host, determined by if
 		// settings calls are increasing.
-		WorkingState() HostWorkingState
+		WorkingStatus() HostWorkingStatus
 
 		// The storage manager provides an interface for adding and removing
 		// storage folders and data sectors to the host.

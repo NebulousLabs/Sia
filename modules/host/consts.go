@@ -32,32 +32,32 @@ const (
 	// contract revision, or a storage proof.
 	resubmissionTimeout = 3
 
-	// WorkingStateChecking is returned from WorkingState() if the host is
+	// WorkingStatusChecking is returned from WorkingStatus() if the host is
 	// still determining if it is working, that is, if settings calls are
 	// incrementing.
-	WorkingStateChecking = "checking"
+	WorkingStatusChecking = "checking"
 
-	// WorkingStateNotWorking is returned from WorkingState() if the host has
+	// WorkingStatusNotWorking is returned from WorkingStatus() if the host has
 	// not received any settings calls over the duration of
 	// workingStatusFrequency.
-	WorkingStateNotWorking = "not working"
+	WorkingStatusNotWorking = "not working"
 
-	// WorkingStateWorking is returned from WorkingState() if the host has
+	// WorkingStatusWorking is returned from WorkingStatus() if the host has
 	// received more than workingThreshold settings calls over the duration of
 	// workingStatusFrequency.
-	WorkingStateWorking = "working"
+	WorkingStatusWorking = "working"
 
-	// ConnectabilityStateChecking is returned from ConnectabilityState() if the
+	// ConnectabilityStatusChecking is returned from ConnectabilityStatus() if the
 	// host is still determining if it is connectable.
-	ConnectabilityStateChecking = "checking"
+	ConnectabilityStatusChecking = "checking"
 
-	// ConnectabilityStateConnectable is returned from ConnectabilityState() if
+	// ConnectabilityStatusConnectable is returned from ConnectabilityStatus() if
 	// the host is connectable at its configured netaddress.
-	ConnectabilityStateConnectable = "connectable"
+	ConnectabilityStatusConnectable = "connectable"
 
-	// ConnectabilityStateNotConnectable is returned from ConnectabilityState()
+	// ConnectabilityStatusNotConnectable is returned from ConnectabilityStatus()
 	// if the host is not connectable at its configured netaddress.
-	ConnectabilityStateNotConnectable = "not connectable"
+	ConnectabilityStatusNotConnectable = "not connectable"
 )
 
 var (
@@ -131,17 +131,17 @@ var (
 	// data.
 	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(10).Div(modules.BytesPerTerabyte) // 10 SC / TB
 
-	// workingStateFrequency defines how frequently the Host's working status
+	// workingStatusFrequency defines how frequently the Host's working status
 	// check runs
-	workingStateFrequency = build.Select(build.Var{
+	workingStatusFrequency = build.Select(build.Var{
 		Standard: time.Minute * 15,
 		Dev:      time.Minute * 5,
 		Testing:  time.Second * 30,
 	}).(time.Duration)
 
-	// workingStateThreshold defines how many settings calls must occur over the
-	// workingStateFrequency for the host to be considered working.
-	workingStateThreshold = build.Select(build.Var{
+	// workingStatusThreshold defines how many settings calls must occur over the
+	// workingStatusFrequency for the host to be considered working.
+	workingStatusThreshold = build.Select(build.Var{
 		Standard: uint64(3),
 		Dev:      uint64(1),
 		Testing:  uint64(1),

@@ -48,8 +48,8 @@ var (
 	}
 )
 
-// TestWorkingState tests that the host's WorkingState field is set correctly.
-func TestWorkingState(t *testing.T) {
+// TestWorkingStatus tests that the host's WorkingStatus field is set correctly.
+func TestWorkingStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -110,14 +110,14 @@ func TestWorkingState(t *testing.T) {
 	var hg HostGET
 	st.getAPI("/host", &hg)
 
-	if hg.WorkingState != host.WorkingStateWorking {
+	if hg.WorkingStatus != host.WorkingStatusWorking {
 		t.Fatal("expected host to be working")
 	}
 }
 
-// TestConnectabilityState tests that the host's ConnectabilityState field is
+// TestConnectabilityStatus tests that the host's ConnectabilityStatus field is
 // set correctly.
-func TestConnectabilityState(t *testing.T) {
+func TestConnectabilityStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -141,7 +141,7 @@ func TestConnectabilityState(t *testing.T) {
 	var hg HostGET
 	st.getAPI("/host", &hg)
 
-	if hg.ConnectabilityState != host.ConnectabilityStateConnectable {
+	if hg.ConnectabilityStatus != host.ConnectabilityStatusConnectable {
 		t.Fatal("expected host to be connectable")
 	}
 }

@@ -57,14 +57,14 @@ func TestPortForwardBlocking(t *testing.T) {
 	time.Sleep(time.Second * 4)
 }
 
-// TestHostWorkingState checks that the host properly updates its working
+// TestHostWorkingStatus checks that the host properly updates its working
 // state
-func TestHostWorkingState(t *testing.T) {
+func TestHostWorkingStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
-	workingStateFrequency = 5 * time.Second
+	workingStatusFrequency = 5 * time.Second
 
 	t.Parallel()
 
@@ -73,30 +73,30 @@ func TestHostWorkingState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if ht.host.WorkingState() != WorkingStateChecking {
-		t.Fatal("expected working state to initially be WorkingStateChecking")
+	if ht.host.WorkingStatus() != WorkingStatusChecking {
+		t.Fatal("expected working state to initially be WorkingStatusChecking")
 	}
 
-	atomic.StoreUint64(&ht.host.atomicSettingsCalls, workingStateThreshold+1)
+	atomic.StoreUint64(&ht.host.atomicSettingsCalls, workingStatusThreshold+1)
 
-	time.Sleep(workingStateFrequency)
+	time.Sleep(workingStatusFrequency)
 	time.Sleep(time.Second)
 
-	if ht.host.WorkingState() != WorkingStateWorking {
-		t.Fatal("expected host working status to be WorkingStateWorking after incrementing status calls")
+	if ht.host.WorkingStatus() != WorkingStatusWorking {
+		t.Fatal("expected host working status to be WorkingStatusWorking after incrementing status calls")
 	}
 
-	time.Sleep(workingStateFrequency)
+	time.Sleep(workingStatusFrequency)
 	time.Sleep(time.Second)
 
-	if ht.host.WorkingState() != WorkingStateNotWorking {
-		t.Fatal("expected host working status to be WorkingStateNotWorking after waiting workingStateFrequency with no settings calls")
+	if ht.host.WorkingStatus() != WorkingStatusNotWorking {
+		t.Fatal("expected host working status to be WorkingStatusNotWorking after waiting workingStatusFrequency with no settings calls")
 	}
 }
 
-// TestHostConnectabilityState checks that the host properly updates its connectable
+// TestHostConnectabilityStatus checks that the host properly updates its connectable
 // state
-func TestHostConnectabilityState(t *testing.T) {
+func TestHostConnectabilityStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -110,14 +110,14 @@ func TestHostConnectabilityState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if ht.host.ConnectabilityState() != ConnectabilityStateChecking {
+	if ht.host.ConnectabilityStatus() != ConnectabilityStatusChecking {
 		t.Fatal("expected connectability state to initially be ConnectablityStateChecking")
 	}
 
 	time.Sleep(connectabilityCheckFrequency)
 	time.Sleep(time.Second)
 
-	if ht.host.ConnectabilityState() != ConnectabilityStateConnectable {
-		t.Fatal("expected connectability state to be ConnectabilityStateConnectable")
+	if ht.host.ConnectabilityStatus() != ConnectabilityStatusConnectable {
+		t.Fatal("expected connectability state to be ConnectabilityStatusConnectable")
 	}
 }
