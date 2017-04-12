@@ -10,6 +10,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/host/contractmanager"
 )
 
@@ -46,6 +47,104 @@ var (
 		// {mediumSizeFolderString, 3 * contractmanager.MinimumSectorsPerStorageFolder * modules.SectorSize, nil},
 	}
 )
+
+// TestWorkingState tests that the host's WorkingState field is set correctly.
+func TestWorkingState(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// announce a host, create an allowance, upload some data.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.acceptContracts(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	if err = st.stdPostAPI("/renter", allowanceValues); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	fileBytes := 1024
+	if err := createRandFile(path, fileBytes); err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	if err := st.stdPostAPI("/renter/upload/test", uploadValues); err != nil {
+		t.Fatal(err)
+	}
+
+	// Only one piece will be uploaded (10% at current redundancy)
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(50 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Error(rf.Files[0].UploadProgress)
+		t.Fatal("uploading has failed")
+	}
+
+	time.Sleep(time.Second * 30)
+
+	var hg HostGET
+	st.getAPI("/host", &hg)
+
+	if hg.WorkingState != host.WorkingStateWorking {
+		t.Fatal("expected host to be working")
+	}
+}
+
+// TestConnectabilityState tests that the host's ConnectabilityState field is
+// set correctly.
+func TestConnectabilityState(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// create and announce a host
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+
+	// wait a bit for the check to run
+	time.Sleep(time.Second * 15)
+
+	// check that the field was set correctly
+	var hg HostGET
+	st.getAPI("/host", &hg)
+
+	if hg.ConnectabilityState != host.ConnectabilityStateConnectable {
+		t.Fatal("expected host to be connectable")
+	}
+}
 
 // TestStorageHandler tests that host storage is being reported correctly.
 func TestStorageHandler(t *testing.T) {

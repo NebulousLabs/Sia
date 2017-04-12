@@ -133,7 +133,11 @@ var (
 
 	// workingStateFrequency defines how frequently the Host's working status
 	// check runs
-	workingStateFrequency = 15 * time.Minute
+	workingStateFrequency = build.Select(build.Var{
+		Standard: time.Minute * 15,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 30,
+	}).(time.Duration)
 
 	// workingStateThreshold defines how many settings calls must occur over the
 	// workingStateFrequency for the host to be considered working.
@@ -141,7 +145,11 @@ var (
 
 	// connectablityCheckFrequency defines how often the host's connectability
 	// check is run.
-	connectabilityCheckFrequency = 3 * time.Minute
+	connectabilityCheckFrequency = build.Select(build.Var{
+		Standard: time.Minute * 3,
+		Dev:      time.Minute,
+		Testing:  time.Second * 10,
+	}).(time.Duration)
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window
