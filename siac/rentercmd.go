@@ -491,6 +491,7 @@ func renterfilesuploadcmd(source, path string) {
 		for _, file := range files {
 			fpath, _ := filepath.Rel(source, file)
 			fpath = filepath.Join(path, fpath)
+			fpath = filepath.ToSlash(fpath)
 			err = post("/renter/upload/"+fpath, "source="+abs(file))
 			if err != nil {
 				die("Could not upload file:", err)
@@ -508,7 +509,7 @@ func renterfilesuploadcmd(source, path string) {
 }
 
 // renterpricescmd is the handler for the command `siac renter prices`, which
-// displays the pirces of various storage operations.
+// displays the prices of various storage operations.
 func renterpricescmd() {
 	var rpg api.RenterPricesGET
 	err := getAPI("/renter/prices", &rpg)
