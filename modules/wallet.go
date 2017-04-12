@@ -225,6 +225,8 @@ type (
 		// a different directory or deleted.
 		Encrypt(masterKey crypto.TwofishKey) (Seed, error)
 
+		Reencrypt(masterKey crypto.TwofishKey) (Seed, error)
+
 		// Encrypted returns whether or not the wallet has been encrypted yet.
 		// After being encrypted for the first time, the wallet can only be
 		// unlocked using the encryption password.

@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/fastrand"
 )
@@ -54,8 +55,6 @@ func checkMasterKey(tx *bolt.Tx, masterKey crypto.TwofishKey) error {
 
 // reinitEncryption re-encrypts a wallet using the given key and seed.
 func (w *Wallet) reinitEncryption(masterKey crypto.TwofishKey, seed modules.Seed) (modules.Seed, error) {
-	w.wipeSecrets()
-
 	wb := w.dbTx.Bucket(bucketWallet)
 
 	if wb.Get(keyEncryptionVerification) == nil {
@@ -66,6 +65,11 @@ func (w *Wallet) reinitEncryption(masterKey crypto.TwofishKey, seed modules.Seed
 	if err != nil {
 		return modules.Seed{}, err
 	}
+
+	w.wipeSecrets()
+	w.unconfirmedProcessedTransactions = []modules.ProcessedTransaction{}
+	w.siafundPool = types.Currency{}
+	w.unlocked = false
 
 	return w.initEncryption(masterKey, seed)
 }

@@ -758,3 +758,78 @@ func TestWalletRelativePathErrorSiag(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestWalletReencrypt(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	testdir := build.TempDir("api", t.Name())
+
+	walletPassword := "testpass"
+	key := crypto.TwofishKey(crypto.HashObject(walletPassword))
+
+	st, err := assembleServerTester(key, testdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// lock the wallet
+	err = st.stdPostAPI("/wallet/lock", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// reencrypt the wallet
+	newPassword := "testpass2"
+	newKey := crypto.TwofishKey(crypto.HashObject(newPassword))
+
+	initValues := url.Values{}
+	initValues.Set("force", "true")
+	initValues.Set("encryptionpassword", newPassword)
+	err = st.stdPostAPI("/wallet/init", initValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the password to call /wallet/unlock.
+	unlockValues := url.Values{}
+	unlockValues.Set("encryptionpassword", newPassword)
+	err = st.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !st.wallet.Unlocked() {
+		t.Error("wallet is not unlocked")
+	}
+
+	// reload the server and verify unlocking still works
+	err = st.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	st2, err := assembleServerTester(newKey, st.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.server.Close()
+
+	// lock the wallet
+	err = st2.stdPostAPI("/wallet/lock", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the password to call /wallet/unlock.
+	err = st2.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !st2.wallet.Unlocked() {
+		t.Error("wallet is not unlocked")
+	}
+}

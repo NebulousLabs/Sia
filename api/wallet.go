@@ -190,7 +190,14 @@ func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ ht
 	if req.FormValue("encryptionpassword") != "" {
 		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionpassword")))
 	}
-	seed, err := api.wallet.Encrypt(encryptionKey)
+
+	var seed modules.Seed
+	var err error
+	if req.FormValue("force") == "true" {
+		seed, err = api.wallet.Reencrypt(encryptionKey)
+	} else {
+		seed, err = api.wallet.Encrypt(encryptionKey)
+	}
 	if err != nil {
 		WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
 		return
