@@ -212,6 +212,7 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	// that have not appeared in the blockchain yet.
 	seedProgress := s.largestIndexSeen + 1
 	seedProgress += seedProgress / 10
+	w.log.Printf("INFO: found key index %v in blockchain. Setting auxiliary seed progress to %v", s.largestIndexSeen, seedProgress)
 
 	err := func() error {
 		w.mu.Lock()

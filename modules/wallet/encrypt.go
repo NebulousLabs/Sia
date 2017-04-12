@@ -345,6 +345,7 @@ func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) er
 	// wild that have not appeared in the blockchain yet.
 	progress := s.largestIndexSeen + 1
 	progress += progress / 10
+	w.log.Printf("INFO: found key index %v in blockchain. Setting primary seed progress to %v", s.largestIndexSeen, progress)
 	// set primarySeedProgress
 	return dbPutPrimarySeedProgress(w.dbTx, uint64(progress))
 }
