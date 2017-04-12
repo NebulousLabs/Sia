@@ -17,6 +17,7 @@ type (
 	ExtendedHostDBEntry struct {
 		modules.HostDBEntry
 		PublicKeyString string `json:"publickeystring"`
+		ScoreBreakdown modules.HostScoreBreakdown `json:"scorebreakdown"`
 	}
 
 	// HostdbActiveGET lists active hosts on the network.
@@ -66,6 +67,7 @@ func (api *API) hostdbActiveHandler(w http.ResponseWriter, req *http.Request, _ 
 		extendedHosts = append(extendedHosts, ExtendedHostDBEntry{
 			HostDBEntry:     host,
 			PublicKeyString: host.PublicKey.String(),
+			ScoreBreakdown:  api.renter.ScoreBreakdown(host),
 		})
 	}
 
@@ -83,6 +85,7 @@ func (api *API) hostdbAllHandler(w http.ResponseWriter, req *http.Request, _ htt
 		extendedHosts = append(extendedHosts, ExtendedHostDBEntry{
 			HostDBEntry:     host,
 			PublicKeyString: host.PublicKey.String(),
+			ScoreBreakdown:  api.renter.ScoreBreakdown(host),
 		})
 	}
 
