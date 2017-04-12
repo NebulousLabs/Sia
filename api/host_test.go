@@ -105,7 +105,7 @@ func TestWorkingState(t *testing.T) {
 		t.Fatal("uploading has failed")
 	}
 
-	time.Sleep(time.Second * 30)
+	time.Sleep(time.Second * 31)
 
 	var hg HostGET
 	st.getAPI("/host", &hg)
@@ -135,7 +135,7 @@ func TestConnectabilityState(t *testing.T) {
 	}
 
 	// wait a bit for the check to run
-	time.Sleep(time.Second * 30)
+	time.Sleep(time.Second * 31)
 
 	// check that the field was set correctly
 	var hg HostGET

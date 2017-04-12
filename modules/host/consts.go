@@ -141,7 +141,11 @@ var (
 
 	// workingStateThreshold defines how many settings calls must occur over the
 	// workingStateFrequency for the host to be considered working.
-	workingStateThreshold = uint64(3)
+	workingStateThreshold = build.Select(build.Var{
+		Standard: uint64(3),
+		Dev:      uint64(1),
+		Testing:  uint64(1),
+	}).(uint64)
 
 	// connectablityCheckFrequency defines how often the host's connectability
 	// check is run.
