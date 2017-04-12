@@ -52,9 +52,28 @@ func checkMasterKey(tx *bolt.Tx, masterKey crypto.TwofishKey) error {
 	return verifyEncryption(uk, encryptedVerification)
 }
 
+// reinitEncryption re-encrypts a wallet using the given key and seed.
+func (w *Wallet) reinitEncryption(masterKey crypto.TwofishKey, seed modules.Seed) (modules.Seed, error) {
+	w.wipeSecrets()
+
+	wb := w.dbTx.Bucket(bucketWallet)
+
+	if wb.Get(keyEncryptionVerification) == nil {
+		return modules.Seed{}, errUnencryptedWallet
+	}
+
+	err := dbReinitialize(w.dbTx)
+	if err != nil {
+		return modules.Seed{}, err
+	}
+
+	return w.initEncryption(masterKey, seed)
+}
+
 // initEncryption initializes and encrypts the primary SeedFile.
 func (w *Wallet) initEncryption(masterKey crypto.TwofishKey, seed modules.Seed) (modules.Seed, error) {
 	wb := w.dbTx.Bucket(bucketWallet)
+
 	// Check if the wallet encryption key has already been set.
 	if wb.Get(keyEncryptionVerification) != nil {
 		return modules.Seed{}, errReencrypt
@@ -308,6 +327,26 @@ func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	return w.initEncryption(masterKey, seed)
 }
 
+func (w *Wallet) Reencrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
+	if err := w.tg.Add(); err != nil {
+		return modules.Seed{}, err
+	}
+	defer w.tg.Done()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Create a random seed.
+	var seed modules.Seed
+	fastrand.Read(seed[:])
+
+	// If masterKey is blank, use the hash of the seed.
+	if masterKey == (crypto.TwofishKey{}) {
+		masterKey = crypto.TwofishKey(crypto.HashObject(seed))
+	}
+
+	return w.reinitEncryption(masterKey, seed)
+}
+
 // InitFromSeed functions like Init, but using a specified seed. Unlike Init,
 // the blockchain will be scanned to determine the seed's progress. For this
 // reason, InitFromSeed should not be called until the blockchain is fully
@@ -369,6 +408,7 @@ func (w *Wallet) Lock() error {
 	// calling 'Unlock' again. Note that since the public keys are not wiped,
 	// we can continue processing blocks.
 	w.wipeSecrets()
+	w.unconfirmedProcessedTransactions = []modules.ProcessedTransaction{}
 	w.unlocked = false
 	return nil
 }

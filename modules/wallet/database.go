@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -204,6 +205,39 @@ func dbGetSpentOutput(tx *bolt.Tx, id types.OutputID) (height types.BlockHeight,
 }
 func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
+}
+
+// dbReinitialize wipes and reinitializes a wallet database.
+func dbReinitialize(tx *bolt.Tx) error {
+	for _, bucket := range dbBuckets {
+		err := tx.DeleteBucket(bucket)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucket(bucket)
+		if err != nil {
+			return err
+		}
+	}
+	// if the wallet does not have a UID, create one
+	if tx.Bucket(bucketWallet).Get(keyUID) == nil {
+		uid := make([]byte, len(uniqueID{}))
+		fastrand.Read(uid[:])
+		tx.Bucket(bucketWallet).Put(keyUID, uid)
+	}
+	// if fields in bucketWallet are nil, set them to zero to prevent unmarshal errors
+	wb := tx.Bucket(bucketWallet)
+	if wb.Get(keyConsensusHeight) == nil {
+		wb.Put(keyConsensusHeight, encoding.Marshal(uint64(0)))
+	}
+	if wb.Get(keyAuxiliarySeedFiles) == nil {
+		wb.Put(keyAuxiliarySeedFiles, encoding.Marshal([]seedFile{}))
+	}
+	if wb.Get(keySpendableKeyFiles) == nil {
+		wb.Put(keySpendableKeyFiles, encoding.Marshal([]spendableKeyFile{}))
+	}
+
+	return nil
 }
 
 // bucketProcessedTransactions works a little differently: the key is

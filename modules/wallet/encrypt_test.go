@@ -284,3 +284,32 @@ func TestInitFromSeed(t *testing.T) {
 		t.Fatalf("wallet should have correct balance after loading seed: wanted %v, got %v", origBal, newBal)
 	}
 }
+
+// TestReencrypt tests that Reencrypt re-encrypts a wallet correctly.
+func TestReencrypt(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	wt, err := createBlankWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	var masterKey crypto.TwofishKey
+	fastrand.Read(masterKey[:])
+	_, err = wt.wallet.Encrypt(masterKey)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var encryptionKey crypto.TwofishKey
+	seed, err := wt.wallet.Reencrypt(encryptionKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	walletKey := crypto.TwofishKey(crypto.HashObject(seed))
+	postEncryptionTesting(wt.miner, wt.wallet, walletKey)
+}
