@@ -92,10 +92,12 @@ type (
 		ObligationStatus    uint64 `json:"obligationstatus"`
 	}
 
-	// HostWorkingState reports the working state of a host.
+	// HostWorkingState reports the working state of a host. Can be one of
+	// "checking", "working", or "not working.
 	HostWorkingState string
 
-	// HostConnectabilityState reports the connectability state of a host.
+	// HostConnectabilityState reports the connectability state of a host. Can be
+	// one of "checking", "connectable", or "not connectable"
 	HostConnectabilityState string
 
 	// A Host can take storage from disk and offer it to the network, managing
