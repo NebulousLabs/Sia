@@ -105,16 +105,27 @@ func (h *Host) threadedTrackConnectabilityState(closeChan chan struct{}) {
 		}
 
 		conn, err := net.Dial("tcp", string(activeAddr))
+		if err != nil {
+			h.mu.Lock()
+			h.connectabilityState = ConnectabilityStateNotConnectable
+			h.mu.Unlock()
+			continue
+		}
+
+		connCloseChan := make(chan struct{})
+		go func() {
+			select {
+			case <-h.tg.StopChan():
+			case <-connCloseChan:
+			}
+			conn.Close()
+		}()
 
 		h.mu.Lock()
-		if err == nil {
-			h.connectabilityState = ConnectabilityStateConnectable
-		} else {
-			h.connectabilityState = ConnectabilityStateNotConnectable
-		}
+		h.connectabilityState = ConnectabilityStateConnectable
 		h.mu.Unlock()
 
-		conn.Close()
+		close(connCloseChan)
 	}
 }
 
