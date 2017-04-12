@@ -146,9 +146,9 @@ var (
 	// connectablityCheckFrequency defines how often the host's connectability
 	// check is run.
 	connectabilityCheckFrequency = build.Select(build.Var{
-		Standard: time.Minute * 3,
-		Dev:      time.Minute,
-		Testing:  time.Second * 10,
+		Standard: time.Minute * 15,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 30,
 	}).(time.Duration)
 
 	// defaultWindowSize is the size of the proof of storage window requested

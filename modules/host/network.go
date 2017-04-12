@@ -57,13 +57,11 @@ func (h *Host) threadedTrackWorkingState(closeChan chan struct{}) {
 
 	for {
 		prevSettingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
-
 		select {
 		case <-h.tg.StopChan():
 			return
 		case <-time.After(workingStateFrequency):
 		}
-
 		settingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
 
 		// sanity check

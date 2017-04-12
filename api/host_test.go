@@ -135,7 +135,7 @@ func TestConnectabilityState(t *testing.T) {
 	}
 
 	// wait a bit for the check to run
-	time.Sleep(time.Second * 15)
+	time.Sleep(time.Second * 30)
 
 	// check that the field was set correctly
 	var hg HostGET
