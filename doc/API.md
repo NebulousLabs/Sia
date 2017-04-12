@@ -343,8 +343,8 @@ fetches status information about the host.
     "unrecognizedcalls": 6
   },
 
-	"connectabilitystate": "checking",
-	"workingstate": "checking"
+  "connectabilitystate": "checking",
+  "workingstate": "checking"
 }
 ```
 
