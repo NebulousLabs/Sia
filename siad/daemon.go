@@ -310,4 +310,7 @@ func startDaemonCmd(cmd *cobra.Command, _ []string) {
 	if err != nil {
 		die(err)
 	}
+
+	// Daemon seems to have closed cleanly. Print a 'closed' mesasge.
+	fmt.Println("Shutdown complete.")
 }
