@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -59,6 +60,8 @@ type seedScanner struct {
 	seed             modules.Seed
 	siacoinOutputs   map[types.SiacoinOutputID]scannedOutput
 	siafundOutputs   map[types.SiafundOutputID]scannedOutput
+
+	log *persist.Logger
 }
 
 func (s *seedScanner) numKeys() uint64 {
@@ -116,13 +119,21 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// update s.largestIndexSeen
 	for _, diff := range cc.SiacoinOutputDiffs {
-		if index, exists := s.keys[diff.SiacoinOutput.UnlockHash]; exists && index > s.largestIndexSeen {
-			s.largestIndexSeen = index
+		index, exists := s.keys[diff.SiacoinOutput.UnlockHash]
+		if exists {
+			s.log.Debugln("Seed scanner found a key used at index", index)
+			if index > s.largestIndexSeen {
+				s.largestIndexSeen = index
+			}
 		}
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
-		if index, exists := s.keys[diff.SiafundOutput.UnlockHash]; exists && index > s.largestIndexSeen {
-			s.largestIndexSeen = index
+		index, exists := s.keys[diff.SiafundOutput.UnlockHash]
+		if exists {
+			s.log.Debugln("Seed scanner found a key used at index", index)
+			if index > s.largestIndexSeen {
+				s.largestIndexSeen = index
+			}
 		}
 	}
 }
@@ -144,8 +155,8 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 		if err := cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
 			return err
 		}
+		cs.Unsubscribe(s)
 		if s.largestIndexSeen < s.numKeys()/2 {
-			cs.Unsubscribe(s)
 			return nil
 		}
 		// increase number of keys generated each iteration, capping so that
@@ -155,16 +166,17 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 			numKeys = maxScanKeys - s.numKeys()
 		}
 	}
-	cs.Unsubscribe(s)
 	return errMaxKeys
 }
 
 // newSeedScanner returns a new seedScanner.
-func newSeedScanner(seed modules.Seed) *seedScanner {
+func newSeedScanner(seed modules.Seed, log *persist.Logger) *seedScanner {
 	return &seedScanner{
 		seed:           seed,
 		keys:           make(map[types.UnlockHash]uint64),
 		siacoinOutputs: make(map[types.SiacoinOutputID]scannedOutput),
 		siafundOutputs: make(map[types.SiafundOutputID]scannedOutput),
+
+		log: log,
 	}
 }
