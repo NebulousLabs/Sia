@@ -199,6 +199,10 @@ func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ ht
 		}
 	}
 	seed, err := api.wallet.Encrypt(encryptionKey)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
 
 	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
 	if dictID == "" {
