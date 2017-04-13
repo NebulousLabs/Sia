@@ -201,6 +201,9 @@ func hostdbcmd() {
 			}
 			referenceScore = big.NewFloat(1).SetInt(hostInfo.ScoreBreakdown.Score.Big())
 		}
+		if referenceScore.Cmp(big.NewFloat(1)) < 0 {
+			referenceScore = big.NewFloat(1)
+		}
 
 		fmt.Println()
 		fmt.Println(len(activeHosts), "Active Hosts:")
