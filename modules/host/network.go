@@ -107,16 +107,16 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 			Timeout: connectabilityCheckTimeout,
 		}
 		conn, err := dialer.Dial("tcp", string(activeAddr))
-		if err != nil {
-			h.mu.Lock()
-			h.connectabilityStatus = ConnectabilityStatusNotConnectable
-			h.mu.Unlock()
-			continue
-		}
-		conn.Close()
 
+		var status modules.HostConnectabilityStatus
+		if err != nil {
+			status = ConnectabilityStatusNotConnectable
+		} else {
+			conn.Close()
+			status = ConnectabilityStatusConnectable
+		}
 		h.mu.Lock()
-		h.connectabilityStatus = ConnectabilityStatusConnectable
+		h.connectabilityStatus = status
 		h.mu.Unlock()
 	}
 }
