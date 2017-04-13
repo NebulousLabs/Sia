@@ -23,7 +23,7 @@ const (
 // TODO: These need to be functions of the wallet that interact with the
 // transaction pool.
 func dustValue() types.Currency {
-	return types.SiacoinPrecision.Mul64(3)
+	return types.SiacoinPrecision
 }
 
 // defragFee is the miner fee paid to miners when performing a defrag
