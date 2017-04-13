@@ -30,8 +30,8 @@ type (
 		FinancialMetrics     modules.HostFinancialMetrics     `json:"financialmetrics"`
 		InternalSettings     modules.HostInternalSettings     `json:"internalsettings"`
 		NetworkMetrics       modules.HostNetworkMetrics       `json:"networkmetrics"`
-		ConnectabilityStatus modules.HostConnectabilityStatus `json:"connectabilitystate"`
-		WorkingStatus        modules.HostWorkingStatus        `json:"workingstate"`
+		ConnectabilityStatus modules.HostConnectabilityStatus `json:"connectabilitystatus"`
+		WorkingStatus        modules.HostWorkingStatus        `json:"workingstatus"`
 	}
 
 	// StorageGET contains the information that is returned after a GET request
