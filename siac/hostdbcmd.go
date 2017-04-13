@@ -191,7 +191,7 @@ func hostdbcmd() {
 		// Grab the host at the 1/5th point and use it as the reference. (it's
 		// like using the median, except at the 1/5th point instead of the 1/2
 		// point.)
-		referenceScore := big.NewFloat(1)
+		referenceScore := big.NewRat(1, 1)
 		if len(activeHosts) > 0 {
 			referenceIndex := len(activeHosts) / 5
 			hostInfo := new(api.HostdbHostsGET)
@@ -199,10 +199,9 @@ func hostdbcmd() {
 			if err != nil {
 				die("Could not fetch provided host:", err)
 			}
-			referenceScore = big.NewFloat(1).SetInt(hostInfo.ScoreBreakdown.Score.Big())
-		}
-		if referenceScore.Cmp(big.NewFloat(1)) < 0 {
-			referenceScore = big.NewFloat(1)
+			if !hostInfo.ScoreBreakdown.Score.IsZero() {
+				referenceScore = new(big.Rat).Inv(new(big.Rat).SetInt(hostInfo.ScoreBreakdown.Score.Big()))
+			}
 		}
 
 		fmt.Println()
@@ -251,7 +250,7 @@ func hostdbcmd() {
 			if err != nil {
 				die("Could not fetch provided host:", err)
 			}
-			score := new(big.Float).Quo(new(big.Float).SetInt(hostInfo.ScoreBreakdown.Score.Big()), referenceScore)
+			score, _ := new(big.Rat).Mul(referenceScore, new(big.Rat).SetInt(hostInfo.ScoreBreakdown.Score.Big())).Float64()
 
 			price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
 			downloadBWPrice := host.DownloadBandwidthPrice.Mul(modules.BytesPerTerabyte)
