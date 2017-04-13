@@ -57,7 +57,6 @@ func checkMasterKey(tx *bolt.Tx, masterKey crypto.TwofishKey) error {
 // this completely destroys the old wallet.
 func (w *Wallet) reinitEncryption(masterKey crypto.TwofishKey, seed modules.Seed) (modules.Seed, error) {
 	wb := w.dbTx.Bucket(bucketWallet)
-
 	if wb.Get(keyEncryptionVerification) == nil {
 		return modules.Seed{}, errUnencryptedWallet
 	}
@@ -78,7 +77,6 @@ func (w *Wallet) reinitEncryption(masterKey crypto.TwofishKey, seed modules.Seed
 // initEncryption initializes and encrypts the primary SeedFile.
 func (w *Wallet) initEncryption(masterKey crypto.TwofishKey, seed modules.Seed) (modules.Seed, error) {
 	wb := w.dbTx.Bucket(bucketWallet)
-
 	// Check if the wallet encryption key has already been set.
 	if wb.Get(keyEncryptionVerification) != nil {
 		return modules.Seed{}, errReencrypt
@@ -332,6 +330,13 @@ func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	return w.initEncryption(masterKey, seed)
 }
 
+// Reencrypt will create a primary seed for the wallet and encrypt it using
+// masterKey. If masterKey is blank, then the hash of the primary seed will be
+// used instead.
+//
+// Reencrypt can only be called on a wallet that has already
+// been encrypted. Calling Reencrypt on an encrypted wallet destroys that
+// wallet and creates a new wallet, encrypted with the supplied masterKey.
 func (w *Wallet) Reencrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	if err := w.tg.Add(); err != nil {
 		return modules.Seed{}, err
@@ -413,7 +418,6 @@ func (w *Wallet) Lock() error {
 	// calling 'Unlock' again. Note that since the public keys are not wiped,
 	// we can continue processing blocks.
 	w.wipeSecrets()
-	w.unconfirmedProcessedTransactions = []modules.ProcessedTransaction{}
 	w.unlocked = false
 	return nil
 }

@@ -225,6 +225,13 @@ type (
 		// a different directory or deleted.
 		Encrypt(masterKey crypto.TwofishKey) (Seed, error)
 
+		// Reencrypt will create a primary seed for the wallet and encrypt it using
+		// masterKey. If masterKey is blank, then the hash of the primary seed will be
+		// used instead.
+		//
+		// Reencrypt can only be called on a wallet that has already
+		// been encrypted. Calling Reencrypt on an encrypted wallet destroys that
+		// wallet and creates a new wallet, encrypted with the supplied masterKey.
 		Reencrypt(masterKey crypto.TwofishKey) (Seed, error)
 
 		// Encrypted returns whether or not the wallet has been encrypted yet.
