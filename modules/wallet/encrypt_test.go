@@ -313,6 +313,10 @@ func TestReset(t *testing.T) {
 	}
 
 	// reinitialize the miner so it mines into the new seed
+	err = wt.miner.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 	minerData := filepath.Join(wt.persistDir, modules.MinerDir)
 	err = os.RemoveAll(minerData)
 	if err != nil {
