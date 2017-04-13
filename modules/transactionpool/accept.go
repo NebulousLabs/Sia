@@ -36,7 +36,10 @@ var (
 	errLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
 	errEmptySet            = errors.New("transaction set is empty")
 
-	TransactionMinFee = types.SiacoinPrecision.Mul64(2)
+	// TransactionMinFee defines the minimum fee required for a transaction in
+	// order for it to be accepted if there is already more than
+	// TransactionPoolSizeForFee transactions in the transaction pool.
+	TransactionMinFee = types.SiacoinPrecision.Div64(3)
 
 	// relayTransactionSetTimeout establishes the timeout for a relay
 	// transaction set call.
