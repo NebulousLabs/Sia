@@ -336,6 +336,7 @@ func (w *Wallet) Reset() error {
 	w.siafundPool = types.Currency{}
 	w.unlocked = false
 	w.encrypted = false
+	w.subscribed = false
 
 	return nil
 }
