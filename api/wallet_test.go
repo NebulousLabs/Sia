@@ -759,7 +759,7 @@ func TestWalletRelativePathErrorSiag(t *testing.T) {
 	}
 }
 
-func TestWalletReencrypt(t *testing.T) {
+func TestWalletReset(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}

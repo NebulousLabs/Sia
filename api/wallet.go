@@ -191,17 +191,14 @@ func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ ht
 		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionpassword")))
 	}
 
-	var seed modules.Seed
-	var err error
 	if req.FormValue("force") == "true" {
-		seed, err = api.wallet.Reencrypt(encryptionKey)
-	} else {
-		seed, err = api.wallet.Encrypt(encryptionKey)
+		err := api.wallet.Reset()
+		if err != nil {
+			WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
 	}
-	if err != nil {
-		WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
-		return
-	}
+	seed, err := api.wallet.Encrypt(encryptionKey)
 
 	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
 	if dictID == "" {

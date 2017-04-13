@@ -207,8 +207,8 @@ func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
 }
 
-// dbReinitialize wipes and reinitializes a wallet database.
-func dbReinitialize(tx *bolt.Tx) error {
+// dbReset wipes and reinitializes a wallet database.
+func dbReset(tx *bolt.Tx) error {
 	for _, bucket := range dbBuckets {
 		err := tx.DeleteBucket(bucket)
 		if err != nil {
@@ -219,23 +219,17 @@ func dbReinitialize(tx *bolt.Tx) error {
 			return err
 		}
 	}
-	// if the wallet does not have a UID, create one
-	if tx.Bucket(bucketWallet).Get(keyUID) == nil {
-		uid := make([]byte, len(uniqueID{}))
-		fastrand.Read(uid[:])
-		tx.Bucket(bucketWallet).Put(keyUID, uid)
-	}
-	// if fields in bucketWallet are nil, set them to zero to prevent unmarshal errors
+
+	// reinitialize the database with default values
 	wb := tx.Bucket(bucketWallet)
-	if wb.Get(keyConsensusHeight) == nil {
-		wb.Put(keyConsensusHeight, encoding.Marshal(uint64(0)))
-	}
-	if wb.Get(keyAuxiliarySeedFiles) == nil {
-		wb.Put(keyAuxiliarySeedFiles, encoding.Marshal([]seedFile{}))
-	}
-	if wb.Get(keySpendableKeyFiles) == nil {
-		wb.Put(keySpendableKeyFiles, encoding.Marshal([]spendableKeyFile{}))
-	}
+	uid := make([]byte, len(uniqueID{}))
+	fastrand.Read(uid[:])
+	wb.Put(keyUID, uid)
+	wb.Put(keyConsensusHeight, encoding.Marshal(uint64(0)))
+	wb.Put(keyAuxiliarySeedFiles, encoding.Marshal([]seedFile{}))
+	wb.Put(keySpendableKeyFiles, encoding.Marshal([]spendableKeyFile{}))
+	dbPutConsensusHeight(tx, 0)
+	dbPutConsensusChangeID(tx, modules.ConsensusChangeBeginning)
 
 	return nil
 }

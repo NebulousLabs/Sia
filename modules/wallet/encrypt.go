@@ -53,27 +53,6 @@ func checkMasterKey(tx *bolt.Tx, masterKey crypto.TwofishKey) error {
 	return verifyEncryption(uk, encryptedVerification)
 }
 
-// reinitEncryption re-encrypts a wallet using the given key and seed. Doing
-// this completely destroys the old wallet.
-func (w *Wallet) reinitEncryption(masterKey crypto.TwofishKey, seed modules.Seed) (modules.Seed, error) {
-	wb := w.dbTx.Bucket(bucketWallet)
-	if wb.Get(keyEncryptionVerification) == nil {
-		return modules.Seed{}, errUnencryptedWallet
-	}
-
-	err := dbReinitialize(w.dbTx)
-	if err != nil {
-		return modules.Seed{}, err
-	}
-
-	w.wipeSecrets()
-	w.unconfirmedProcessedTransactions = []modules.ProcessedTransaction{}
-	w.siafundPool = types.Currency{}
-	w.unlocked = false
-
-	return w.initEncryption(masterKey, seed)
-}
-
 // initEncryption initializes and encrypts the primary SeedFile.
 func (w *Wallet) initEncryption(masterKey crypto.TwofishKey, seed modules.Seed) (modules.Seed, error) {
 	wb := w.dbTx.Bucket(bucketWallet)
@@ -330,31 +309,35 @@ func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	return w.initEncryption(masterKey, seed)
 }
 
-// Reencrypt will create a primary seed for the wallet and encrypt it using
-// masterKey. If masterKey is blank, then the hash of the primary seed will be
-// used instead.
-//
-// Reencrypt can only be called on a wallet that has already
-// been encrypted. Calling Reencrypt on an encrypted wallet destroys that
-// wallet and creates a new wallet, encrypted with the supplied masterKey.
-func (w *Wallet) Reencrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
+// Reset will reset the wallet, clearing the database and returning it to
+// the unencrypted state. Reset can only be called on a wallet that has
+// already been encrypted.
+func (w *Wallet) Reset() error {
 	if err := w.tg.Add(); err != nil {
-		return modules.Seed{}, err
+		return err
 	}
 	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// Create a random seed.
-	var seed modules.Seed
-	fastrand.Read(seed[:])
-
-	// If masterKey is blank, use the hash of the seed.
-	if masterKey == (crypto.TwofishKey{}) {
-		masterKey = crypto.TwofishKey(crypto.HashObject(seed))
+	wb := w.dbTx.Bucket(bucketWallet)
+	if wb.Get(keyEncryptionVerification) == nil {
+		return errUnencryptedWallet
 	}
 
-	return w.reinitEncryption(masterKey, seed)
+	err := dbReset(w.dbTx)
+	if err != nil {
+		return err
+	}
+	w.wipeSecrets()
+	w.keys = make(map[types.UnlockHash]spendableKey)
+	w.seeds = []modules.Seed{}
+	w.unconfirmedProcessedTransactions = []modules.ProcessedTransaction{}
+	w.siafundPool = types.Currency{}
+	w.unlocked = false
+	w.encrypted = false
+
+	return nil
 }
 
 // InitFromSeed functions like Init, but using a specified seed. Unlike Init,
