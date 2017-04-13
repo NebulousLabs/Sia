@@ -102,7 +102,11 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 			activeAddr = userAddr
 		}
 
-		conn, err := net.Dial("tcp", string(activeAddr))
+		dialer := &net.Dialer{
+			Cancel:  h.tg.StopChan(),
+			Timeout: connectabilityCheckTimeout,
+		}
+		conn, err := dialer.Dial("tcp", string(activeAddr))
 		if err != nil {
 			h.mu.Lock()
 			h.connectabilityStatus = ConnectabilityStatusNotConnectable
