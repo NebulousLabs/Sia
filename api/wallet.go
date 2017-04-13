@@ -229,6 +229,15 @@ func (api *API) walletInitSeedHandler(w http.ResponseWriter, req *http.Request, 
 		WriteError(w, Error{"error when calling /wallet/init/seed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
+
+	if req.FormValue("force") == "true" {
+		err = api.wallet.Reset()
+		if err != nil {
+			WriteError(w, Error{"error when calling /wallet/init/seed: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+	}
+
 	err = api.wallet.InitFromSeed(encryptionKey, seed)
 	if err != nil {
 		WriteError(w, Error{"error when calling /wallet/init/seed: " + err.Error()}, http.StatusBadRequest)

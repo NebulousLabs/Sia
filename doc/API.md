@@ -1054,6 +1054,7 @@ is blank, then the password will be set to the same as the seed.
 ```
 encryptionpassword
 dictionary // Optional, default is english.
+force // Optional, when set to true it will destroy an existing wallet and reinitialize a new one.
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-3)
@@ -1079,6 +1080,7 @@ synced.
 encryptionpassword
 dictionary // Optional, default is english.
 seed
+force // Optional, when set to true it will destroy an existing wallet and reinitialize a new one.
 ```
 
 ###### Response
