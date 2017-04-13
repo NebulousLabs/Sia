@@ -341,7 +341,10 @@ fetches status information about the host.
     "revisecalls":       4,
     "settingscalls":     5,
     "unrecognizedcalls": 6
-  }
+  },
+
+  "connectabilitystatus": "checking",
+  "workingstatus":        "checking"
 }
 ```
 

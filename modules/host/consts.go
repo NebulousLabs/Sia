@@ -104,6 +104,38 @@ var (
 	// data.
 	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(10).Div(modules.BytesPerTerabyte) // 10 SC / TB
 
+	// workingStatusFrequency defines how frequently the Host's working status
+	// check runs
+	workingStatusFrequency = build.Select(build.Var{
+		Standard: time.Minute * 15,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 30,
+	}).(time.Duration)
+
+	// workingStatusThreshold defines how many settings calls must occur over the
+	// workingStatusFrequency for the host to be considered working.
+	workingStatusThreshold = build.Select(build.Var{
+		Standard: uint64(3),
+		Dev:      uint64(1),
+		Testing:  uint64(1),
+	}).(uint64)
+
+	// connectablityCheckFrequency defines how often the host's connectability
+	// check is run.
+	connectabilityCheckFrequency = build.Select(build.Var{
+		Standard: time.Minute * 15,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 30,
+	}).(time.Duration)
+
+	// connectabilityCheckTimeout defines how long a connectability check's dial
+	// will be allowed to block before it times out.
+	connectabilityCheckTimeout = build.Select(build.Var{
+		Standard: time.Minute * 2,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 90,
+	}).(time.Duration)
+
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window
 	// has closed and buried under several confirmations. For release builds,
