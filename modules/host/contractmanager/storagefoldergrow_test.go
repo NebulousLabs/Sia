@@ -223,6 +223,7 @@ func TestGrowStorageFolderIncompleteWrite(t *testing.T) {
 	if len(sfs) != 1 {
 		t.Fatal("there should only be one storage folder")
 	}
+	sfIndex := sfs[0].Index
 	// Verify that the storage folder has the correct capacity.
 	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*3 {
 		t.Error("new storage folder is reporting the wrong capacity")
@@ -233,6 +234,13 @@ func TestGrowStorageFolderIncompleteWrite(t *testing.T) {
 	d.threshold = 1 << 20
 	d.triggered = true
 	d.mu.Unlock()
+
+	// Increase the size of the storage folder, to large enough that it will
+	// fail.
+	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*25, false)
+	if err == nil {
+		t.Fatal("expecting error upon resize")
+	}
 
 	// Verify that the storage folder has the correct capacity.
 	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*3 {

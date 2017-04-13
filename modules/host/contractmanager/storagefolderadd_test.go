@@ -338,6 +338,12 @@ func TestAddStorageFolderBlocking(t *testing.T) {
 	if len(sfs) != 1 {
 		t.Fatal("there should be one storage folder reported")
 	}
+	if sfs[0].ProgressNumerator != 0 {
+		t.Error("storage folder is showing progress despite being blocked")
+	}
+	if sfs[0].ProgressDenominator != sfOneSize+sectorMetadataDiskSize*storageFolderGranularity*8 {
+		t.Error("storage folder is not showing that an action is in progress, though one is", sfs[0].ProgressDenominator, sfOneSize)
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(2)
