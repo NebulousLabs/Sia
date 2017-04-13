@@ -35,8 +35,10 @@ func TestSendSiacoins(t *testing.T) {
 	// Send 5000 hastings. The wallet will automatically add a fee. Outgoing
 	// unconfirmed siacoins - incoming unconfirmed siacoins should equal 5000 +
 	// fee.
-	tpoolFee := types.SiacoinPrecision.Mul64(10)
-	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5000), types.UnlockHash{})
+	sendValue := types.SiacoinPrecision.Mul64(3)
+	_, tpoolFee := wt.wallet.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750)
+	_, err = wt.wallet.SendSiacoins(sendValue, types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +47,7 @@ func TestSendSiacoins(t *testing.T) {
 	if !confirmedBal2.Equals(confirmedBal) {
 		t.Error("confirmed balance changed without introduction of blocks")
 	}
-	if !unconfirmedOut2.Equals(unconfirmedIn2.Add(types.NewCurrency64(5000)).Add(tpoolFee)) {
+	if !unconfirmedOut2.Equals(unconfirmedIn2.Add(sendValue).Add(tpoolFee)) {
 		t.Error("sending siacoins appears to be ineffective")
 	}
 
@@ -57,7 +59,7 @@ func TestSendSiacoins(t *testing.T) {
 	}
 	confirmedBal3, _, _ := wt.wallet.ConfirmedBalance()
 	unconfirmedOut3, unconfirmedIn3 := wt.wallet.UnconfirmedBalance()
-	if !confirmedBal3.Equals(confirmedBal2.Add(types.CalculateCoinbase(2)).Sub(types.NewCurrency64(5000)).Sub(tpoolFee)) {
+	if !confirmedBal3.Equals(confirmedBal2.Add(types.CalculateCoinbase(2)).Sub(sendValue).Sub(tpoolFee)) {
 		t.Error("confirmed balance did not adjust to the expected value")
 	}
 	if !unconfirmedOut3.Equals(types.ZeroCurrency) {
