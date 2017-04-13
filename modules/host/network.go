@@ -109,21 +109,11 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 			h.mu.Unlock()
 			continue
 		}
-
-		connCloseChan := make(chan struct{})
-		go func() {
-			select {
-			case <-h.tg.StopChan():
-			case <-connCloseChan:
-			}
-			conn.Close()
-		}()
+		conn.Close()
 
 		h.mu.Lock()
 		h.connectabilityStatus = ConnectabilityStatusConnectable
 		h.mu.Unlock()
-
-		close(connCloseChan)
 	}
 }
 
