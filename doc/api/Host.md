@@ -316,14 +316,14 @@ fetches status information about the host.
 
   // Information about the health of the host.
 
-  // connectabilitystate is one of "checking", "connectable",
+  // connectabilitystatus is one of "checking", "connectable",
   // or "not connectable", and indicates if the host can connect to
   // itself on its configured NetAddress.
-  "connectabilitystate": "checking",
+  "connectabilitystatus": "checking",
 
-  // workingstate is one of "checking", "working", or "not working"
+  // workingstatus is one of "checking", "working", or "not working"
   // and indicates if the host is being actively used by renters.
-  "workingstate": "checking"
+  "workingstatus": "checking"
 }
 ```
 
