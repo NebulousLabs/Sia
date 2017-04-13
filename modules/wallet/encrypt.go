@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/fastrand"
 )
@@ -306,6 +307,38 @@ func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	}
 
 	return w.initEncryption(masterKey, seed)
+}
+
+// Reset will reset the wallet, clearing the database and returning it to
+// the unencrypted state. Reset can only be called on a wallet that has
+// already been encrypted.
+func (w *Wallet) Reset() error {
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	wb := w.dbTx.Bucket(bucketWallet)
+	if wb.Get(keyEncryptionVerification) == nil {
+		return errUnencryptedWallet
+	}
+
+	err := dbReset(w.dbTx)
+	if err != nil {
+		return err
+	}
+	w.wipeSecrets()
+	w.keys = make(map[types.UnlockHash]spendableKey)
+	w.seeds = []modules.Seed{}
+	w.unconfirmedProcessedTransactions = []modules.ProcessedTransaction{}
+	w.siafundPool = types.Currency{}
+	w.unlocked = false
+	w.encrypted = false
+	w.subscribed = false
+
+	return nil
 }
 
 // InitFromSeed functions like Init, but using a specified seed. Unlike Init,

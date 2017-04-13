@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -204,6 +205,33 @@ func dbGetSpentOutput(tx *bolt.Tx, id types.OutputID) (height types.BlockHeight,
 }
 func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
+}
+
+// dbReset wipes and reinitializes a wallet database.
+func dbReset(tx *bolt.Tx) error {
+	for _, bucket := range dbBuckets {
+		err := tx.DeleteBucket(bucket)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucket(bucket)
+		if err != nil {
+			return err
+		}
+	}
+
+	// reinitialize the database with default values
+	wb := tx.Bucket(bucketWallet)
+	uid := make([]byte, len(uniqueID{}))
+	fastrand.Read(uid[:])
+	wb.Put(keyUID, uid)
+	wb.Put(keyConsensusHeight, encoding.Marshal(uint64(0)))
+	wb.Put(keyAuxiliarySeedFiles, encoding.Marshal([]seedFile{}))
+	wb.Put(keySpendableKeyFiles, encoding.Marshal([]spendableKeyFile{}))
+	dbPutConsensusHeight(tx, 0)
+	dbPutConsensusChangeID(tx, modules.ConsensusChangeBeginning)
+
+	return nil
 }
 
 // bucketProcessedTransactions works a little differently: the key is
