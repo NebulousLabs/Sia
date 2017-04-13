@@ -13,15 +13,17 @@ import (
 	"github.com/NebulousLabs/fastrand"
 )
 
-// BenchmarkWrite256MiB checks how long it takes to write 256MiB sequentially.
-func BenchmarkWrite256MiB(b *testing.B) {
+// BenchmarkWrite512MiB checks how long it takes to write 512MiB sequentially.
+func BenchmarkWrite512MiB(b *testing.B) {
 	testDir := build.TempDir("persist", b.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		b.Fatal(err)
 	}
-	b.SetBytes(1 << 28)
-	filename := filepath.Join(testDir, "1gb.file")
+
+	b.SetBytes(1 << 29)
+	filename := filepath.Join(testDir, "512MiB.file")
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Make the file.
 		f, err := os.Create(filename)
@@ -30,7 +32,7 @@ func BenchmarkWrite256MiB(b *testing.B) {
 		}
 
 		// 2^12 writes of 4MiB.
-		for i := 0; i < 1<<6; i++ {
+		for i := 0; i < 1<<7; i++ {
 			// Get the entropy separate from the timer.
 			b.StopTimer()
 			data := fastrand.Bytes(1 << 22)
@@ -59,15 +61,16 @@ func BenchmarkWrite256MiB(b *testing.B) {
 	}
 }
 
-// BenchmarkWrite256MiBRand checks how long it takes to write 256MiB randomly.
-func BenchmarkWrite256MiBRand(b *testing.B) {
+// BenchmarkWrite512MiBRand checks how long it takes to write 512MiB randomly.
+func BenchmarkWrite512MiBRand(b *testing.B) {
 	testDir := build.TempDir("persist", b.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		b.Fatal(err)
 	}
-	b.SetBytes(1 << 28)
-	filename := filepath.Join(testDir, "1gb.file")
+	b.SetBytes(1 << 29)
+	filename := filepath.Join(testDir, "512MiB.file")
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Make the file.
 		f, err := os.Create(filename)
@@ -75,8 +78,8 @@ func BenchmarkWrite256MiBRand(b *testing.B) {
 			b.Fatal(err)
 		}
 
-		// 2^6 writes of 4MiB.
-		for i := 0; i < 1<<6; i++ {
+		// 2^7 writes of 4MiB.
+		for i := 0; i < 1<<7; i++ {
 			// Get the entropy separate from the timer.
 			b.StopTimer()
 			data := fastrand.Bytes(1 << 22)
@@ -107,24 +110,24 @@ func BenchmarkWrite256MiBRand(b *testing.B) {
 	}
 }
 
-// BenchmarkRead256MiB checks how long it takes to read 256MiB sequentially.
-func BenchmarkRead256MiB(b *testing.B) {
+// BenchmarkRead512MiB checks how long it takes to read 512MiB sequentially.
+func BenchmarkRead512MiB(b *testing.B) {
 	testDir := build.TempDir("persist", b.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		b.Fatal(err)
 	}
-	b.SetBytes(1 << 28)
+	b.SetBytes(1 << 29)
 
 	// Make the file.
-	filename := filepath.Join(testDir, "1gb.file")
+	filename := filepath.Join(testDir, "512MiB.file")
 	f, err := os.Create(filename)
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	// 2^6 writes of 4MiB.
-	for i := 0; i < 1<<6; i++ {
+	// 2^7 writes of 4MiB.
+	for i := 0; i < 1<<7; i++ {
 		// Get the entropy separate from the timer.
 		b.StopTimer()
 		data := fastrand.Bytes(1 << 22)
@@ -147,6 +150,7 @@ func BenchmarkRead256MiB(b *testing.B) {
 	}
 
 	// Check the sequential read speed.
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Open the file.
 		f, err := os.Open(filename)
@@ -162,6 +166,11 @@ func BenchmarkRead256MiB(b *testing.B) {
 				b.Fatal(err)
 			}
 		}
+
+		err = f.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	err = os.Remove(filename)
@@ -170,24 +179,24 @@ func BenchmarkRead256MiB(b *testing.B) {
 	}
 }
 
-// BenchmarkRead256MiBRand checks how long it takes to read 256MiB randomly.
-func BenchmarkRead256MiBRand(b *testing.B) {
+// BenchmarkRead512MiBRand checks how long it takes to read 512MiB randomly.
+func BenchmarkRead512MiBRand(b *testing.B) {
 	testDir := build.TempDir("persist", b.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		b.Fatal(err)
 	}
-	b.SetBytes(1 << 28)
+	b.SetBytes(1 << 29)
 
 	// Make the file.
-	filename := filepath.Join(testDir, "1gb.file")
+	filename := filepath.Join(testDir, "512MiB.file")
 	f, err := os.Create(filename)
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	// 2^6 writes of 4MiB.
-	for i := 0; i < 1<<6; i++ {
+	// 2^7 writes of 4MiB.
+	for i := 0; i < 1<<7; i++ {
 		// Get the entropy separate from the timer.
 		b.StopTimer()
 		data := fastrand.Bytes(1 << 22)
@@ -210,6 +219,7 @@ func BenchmarkRead256MiBRand(b *testing.B) {
 	}
 
 	// Check the sequential read speed.
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Open the file.
 		f, err := os.Open(filename)
@@ -227,6 +237,11 @@ func BenchmarkRead256MiBRand(b *testing.B) {
 				b.Fatal(err)
 			}
 		}
+
+		err = f.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	err = os.Remove(filename)
@@ -235,16 +250,17 @@ func BenchmarkRead256MiBRand(b *testing.B) {
 	}
 }
 
-// BenchmarkTruncate256MiB checks how long it takes to truncate a 256 MiB file.
-func BenchmarkTruncate256MiB(b *testing.B) {
+// BenchmarkTruncate512MiB checks how long it takes to truncate a 512 MiB file.
+func BenchmarkTruncate512MiB(b *testing.B) {
 	testDir := build.TempDir("persist", b.Name())
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		b.Fatal(err)
 	}
-	b.SetBytes(1 << 28)
-	filename := filepath.Join(testDir, "1gb.file")
+	b.SetBytes(1 << 29)
+	filename := filepath.Join(testDir, "512MiB.file")
 	// Check the truncate speed.
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Make the file separate from the timer.
 		b.StopTimer()
@@ -253,8 +269,8 @@ func BenchmarkTruncate256MiB(b *testing.B) {
 			b.Fatal(err)
 		}
 
-		// 2^6 writes of 4MiB.
-		for i := 0; i < 1<<6; i++ {
+		// 2^7 writes of 4MiB.
+		for i := 0; i < 1<<7; i++ {
 			// Get the entropy separate from the timer.
 			b.StopTimer()
 			data := fastrand.Bytes(1 << 22)
