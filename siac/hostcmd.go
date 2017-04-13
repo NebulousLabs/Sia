@@ -230,8 +230,8 @@ RPC Stats:
 	Settings Calls:     %v
 	FormContract Calls: %v
 
-Connectability Status: %v,
-Working Status:        %v,
+Connectability Status: %v
+Working Status:        %v
 `,
 			competitivePrice,
 
