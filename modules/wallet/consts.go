@@ -35,7 +35,7 @@ func defragFee() types.Currency {
 	// 35 outputs at an estimated 250 bytes needed per output means about a 10kb
 	// total transaction, much larger than your average transaction. So you need
 	// a lot of fees.
-	return types.SiacoinPrecision.Mul64(20)
+	return types.SiacoinPrecision.Mul64(10)
 }
 
 func init() {
