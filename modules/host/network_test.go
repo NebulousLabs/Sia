@@ -4,6 +4,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // blockingPortForward is a dependency set that causes the host port forward
@@ -73,8 +75,8 @@ func TestHostWorkingStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if ht.host.WorkingStatus() != WorkingStatusChecking {
-		t.Fatal("expected working state to initially be WorkingStatusChecking")
+	if ht.host.WorkingStatus() != modules.HostWorkingStatusChecking {
+		t.Fatal("expected working state to initially be modules.HostWorkingStatusChecking")
 	}
 
 	atomic.StoreUint64(&ht.host.atomicSettingsCalls, workingStatusThreshold+1)
@@ -82,15 +84,15 @@ func TestHostWorkingStatus(t *testing.T) {
 	time.Sleep(workingStatusFrequency)
 	time.Sleep(time.Second)
 
-	if ht.host.WorkingStatus() != WorkingStatusWorking {
-		t.Fatal("expected host working status to be WorkingStatusWorking after incrementing status calls")
+	if ht.host.WorkingStatus() != modules.HostWorkingStatusWorking {
+		t.Fatal("expected host working status to be modules.HostWorkingStatusWorking after incrementing status calls")
 	}
 
 	time.Sleep(workingStatusFrequency)
 	time.Sleep(time.Second)
 
-	if ht.host.WorkingStatus() != WorkingStatusNotWorking {
-		t.Fatal("expected host working status to be WorkingStatusNotWorking after waiting workingStatusFrequency with no settings calls")
+	if ht.host.WorkingStatus() != modules.HostWorkingStatusNotWorking {
+		t.Fatal("expected host working status to be modules.HostWorkingStatusNotWorking after waiting workingStatusFrequency with no settings calls")
 	}
 }
 
@@ -110,14 +112,14 @@ func TestHostConnectabilityStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if ht.host.ConnectabilityStatus() != ConnectabilityStatusChecking {
+	if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusChecking {
 		t.Fatal("expected connectability state to initially be ConnectablityStateChecking")
 	}
 
 	time.Sleep(connectabilityCheckFrequency)
 	time.Sleep(time.Second)
 
-	if ht.host.ConnectabilityStatus() != ConnectabilityStatusConnectable {
-		t.Fatal("expected connectability state to be ConnectabilityStatusConnectable")
+	if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusConnectable {
+		t.Fatal("expected connectability state to be modules.HostConnectabilityStatusConnectable")
 	}
 }

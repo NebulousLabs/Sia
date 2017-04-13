@@ -72,9 +72,9 @@ func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 
 		h.mu.Lock()
 		if settingsCalls-prevSettingsCalls >= workingStatusThreshold {
-			h.workingStatus = WorkingStatusWorking
+			h.workingStatus = modules.HostWorkingStatusWorking
 		} else {
-			h.workingStatus = WorkingStatusNotWorking
+			h.workingStatus = modules.HostWorkingStatusNotWorking
 		}
 		h.mu.Unlock()
 	}
@@ -110,10 +110,10 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 
 		var status modules.HostConnectabilityStatus
 		if err != nil {
-			status = ConnectabilityStatusNotConnectable
+			status = modules.HostConnectabilityStatusNotConnectable
 		} else {
 			conn.Close()
-			status = ConnectabilityStatusConnectable
+			status = modules.HostConnectabilityStatusConnectable
 		}
 		h.mu.Lock()
 		h.connectabilityStatus = status
@@ -142,10 +142,10 @@ func (h *Host) initNetworking(address string) (err error) {
 	})
 
 	// Set the initial working state of the host
-	h.workingStatus = WorkingStatusChecking
+	h.workingStatus = modules.HostWorkingStatusChecking
 
 	// Set the initial connectability state of the host
-	h.connectabilityStatus = ConnectabilityStatusChecking
+	h.connectabilityStatus = modules.HostConnectabilityStatusChecking
 
 	// Set the port.
 	_, port, err := net.SplitHostPort(h.listener.Addr().String())

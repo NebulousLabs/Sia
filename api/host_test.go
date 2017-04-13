@@ -10,7 +10,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/host/contractmanager"
 )
 
@@ -110,7 +109,7 @@ func TestWorkingStatus(t *testing.T) {
 	var hg HostGET
 	st.getAPI("/host", &hg)
 
-	if hg.WorkingStatus != host.WorkingStatusWorking {
+	if hg.WorkingStatus != modules.HostWorkingStatusWorking {
 		t.Fatal("expected host to be working")
 	}
 }
@@ -141,7 +140,7 @@ func TestConnectabilityStatus(t *testing.T) {
 	var hg HostGET
 	st.getAPI("/host", &hg)
 
-	if hg.ConnectabilityStatus != host.ConnectabilityStatusConnectable {
+	if hg.ConnectabilityStatus != modules.HostConnectabilityStatusConnectable {
 		t.Fatal("expected host to be connectable")
 	}
 }

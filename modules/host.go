@@ -15,6 +15,35 @@ var (
 
 	// BlockBytesPerMonthTerabyte is the conversion rate between block-bytes and month-TB.
 	BlockBytesPerMonthTerabyte = BytesPerTerabyte.Mul64(4320)
+
+	// HostWorkingStatusChecking is returned from WorkingStatus() if the host is
+	// still determining if it is working, that is, if settings calls are
+	// incrementing.
+	HostWorkingStatusChecking = HostWorkingStatus("checking")
+
+	// HostWorkingStatusNotWorking is returned from WorkingStatus() if the host
+	// has not received any settings calls over the duration of
+	// workingStatusFrequency.
+	HostWorkingStatusNotWorking = HostWorkingStatus("not working")
+
+	// HostWorkingStatusWorking is returned from WorkingStatus() if the host has
+	// received more than workingThreshold settings calls over the duration of
+	// workingStatusFrequency.
+	HostWorkingStatusWorking = HostWorkingStatus("working")
+
+	// HostConnectabilityStatusChecking is returned from ConnectabilityStatus()
+	// if the host is still determining if it is connectable.
+	HostConnectabilityStatusChecking = HostConnectabilityStatus("checking")
+
+	// HostConnectabilityStatusConnectable is returned from
+	// ConnectabilityStatus() if the host is connectable at its configured
+	// netaddress.
+	HostConnectabilityStatusConnectable = HostConnectabilityStatus("connectable")
+
+	// HostConnectabilityStatusNotConnectable is returned from
+	// ConnectabilityStatus() if the host is not connectable at its configured
+	// netaddress.
+	HostConnectabilityStatusNotConnectable = HostConnectabilityStatus("not connectable")
 )
 
 type (

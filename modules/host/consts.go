@@ -31,33 +31,6 @@ const (
 	// Typically, this transaction will contain either a file contract, a file
 	// contract revision, or a storage proof.
 	resubmissionTimeout = 3
-
-	// WorkingStatusChecking is returned from WorkingStatus() if the host is
-	// still determining if it is working, that is, if settings calls are
-	// incrementing.
-	WorkingStatusChecking = "checking"
-
-	// WorkingStatusNotWorking is returned from WorkingStatus() if the host has
-	// not received any settings calls over the duration of
-	// workingStatusFrequency.
-	WorkingStatusNotWorking = "not working"
-
-	// WorkingStatusWorking is returned from WorkingStatus() if the host has
-	// received more than workingThreshold settings calls over the duration of
-	// workingStatusFrequency.
-	WorkingStatusWorking = "working"
-
-	// ConnectabilityStatusChecking is returned from ConnectabilityStatus() if the
-	// host is still determining if it is connectable.
-	ConnectabilityStatusChecking = "checking"
-
-	// ConnectabilityStatusConnectable is returned from ConnectabilityStatus() if
-	// the host is connectable at its configured netaddress.
-	ConnectabilityStatusConnectable = "connectable"
-
-	// ConnectabilityStatusNotConnectable is returned from ConnectabilityStatus()
-	// if the host is not connectable at its configured netaddress.
-	ConnectabilityStatusNotConnectable = "not connectable"
 )
 
 var (
