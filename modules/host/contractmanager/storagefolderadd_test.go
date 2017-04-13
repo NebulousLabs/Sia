@@ -114,7 +114,6 @@ func (l *limitFile) WriteAt(b []byte, offset int64) (int, error) {
 // fit on disk. This is represented by mocking a file that returns an error
 // after more than 8 MiB have been written.
 func TestAddLargeStorageFolder(t *testing.T) {
-	t.Skip("Uncertain how to measure free disk space in golang in a cross-platform way")
 	if testing.Short() {
 		t.SkipNow()
 	}
