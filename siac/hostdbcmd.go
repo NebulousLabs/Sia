@@ -288,8 +288,6 @@ func hostdbviewcmd(pubkey string) {
 
 	fmt.Println("\n  Score Breakdown:")
 	w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	total := info.ScoreBreakdown.Score
-	fmt.Fprintf(w, "\t\tTotal Score:\t %v\n\n", total)
 	fmt.Fprintf(w, "\t\tAge:\t %.3f\n", info.ScoreBreakdown.AgeAdjustment)
 	fmt.Fprintf(w, "\t\tBurn:\t %.3f\n", info.ScoreBreakdown.BurnAdjustment)
 	fmt.Fprintf(w, "\t\tCollateral:\t %.3f\n", info.ScoreBreakdown.CollateralAdjustment)
