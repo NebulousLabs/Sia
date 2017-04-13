@@ -34,7 +34,7 @@ var (
 	//
 	// TODO: Allow this number to be established in the renter settings.
 	maxActiveDownloadPieces = build.Select(build.Var{
-		Standard: int(40),
+		Standard: int(60),
 		Dev:      int(10),
 		Testing:  int(5),
 	}).(int)
