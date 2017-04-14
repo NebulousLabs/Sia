@@ -61,6 +61,52 @@ func BenchmarkWrite512MiB(b *testing.B) {
 	}
 }
 
+// BenchmarkWrite512MiBTrunc checks how long it takes to write 512MiB using
+// stepwise truncate.
+func BenchmarkWrite512MiBTrunc(b *testing.B) {
+	testDir := build.TempDir("persist", b.Name())
+	err := os.MkdirAll(testDir, 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.SetBytes(1 << 29)
+	filename := filepath.Join(testDir, "512MiB.file")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Make the file.
+		f, err := os.Create(filename)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		// 2^12 writes of 4MiB.
+		for i := 0; i < 1<<7; i++ {
+			// Extend the file through truncation.
+			err = f.Truncate(int64((i + 1) * 1 << 22))
+			if err != nil {
+				b.Fatal(err)
+			}
+			// Sync after every write.
+			err = f.Sync()
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+
+		// Close the file before iterating.
+		err = f.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	err = os.Remove(filename)
+	if err != nil {
+		b.Fatal(err)
+	}
+}
+
 // BenchmarkWrite512MiBRand checks how long it takes to write 512MiB randomly.
 func BenchmarkWrite512MiBRand(b *testing.B) {
 	testDir := build.TempDir("persist", b.Name())
