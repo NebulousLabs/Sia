@@ -5,6 +5,7 @@ package transactionpool
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -242,11 +243,11 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 
 	// debug logging
 	if build.DEBUG {
-		tp.log.Debugf("accepted transaction superset %v, size: %vB\n", setID, tsetSize)
+		txLogs := ""
 		for i, t := range superset {
-			tp.log.Debugf("superset transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
+			txLogs += fmt.Sprintf("superset transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
 		}
-		tp.log.Debugf("tpool size is %vB after accepting transaction superset\n", tp.transactionListSize)
+		tp.log.Debugf("accepted transaction superset %v, size: %vB\ntpool size is %vB after accpeting transaction superset\ntransactions: \n%v\n", setID, tsetSize, tp.transactionListSize, txLogs)
 	}
 
 	return nil
@@ -310,11 +311,11 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 
 	// debug logging
 	if build.DEBUG {
-		tp.log.Debugf("accepted transaction set %v, size: %vB\n", setID, tsetSize)
+		txLogs := ""
 		for i, t := range ts {
-			tp.log.Debugf("transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
+			txLogs += fmt.Sprintf("transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
 		}
-		tp.log.Debugf("tpool size is %vB after accepting transaction set\n", tp.transactionListSize)
+		tp.log.Debugf("accepted transaction set %v, size: %vB\ntpool size is %vB after accpeting transaction set\ntransactions: \n%v\n", setID, tsetSize, tp.transactionListSize, txLogs)
 	}
 	return nil
 }
