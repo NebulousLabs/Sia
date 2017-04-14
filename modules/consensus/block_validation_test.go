@@ -78,7 +78,7 @@ func TestUnitValidateBlock(t *testing.T) {
 				now: tt.now,
 			},
 		}
-		err := blockValidator.ValidateBlock(b, tt.minTimestamp, types.RootDepth, 0)
+		err := blockValidator.ValidateBlock(b, tt.minTimestamp, types.RootDepth, 0, nil)
 		if err != tt.errWant {
 			t.Errorf("%s: got %v, want %v", tt.msg, err, tt.errWant)
 		}
