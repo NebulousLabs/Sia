@@ -237,7 +237,18 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 		tp.knownObjects[ObjectID(diff.ID)] = setID
 	}
 	tp.transactionSetDiffs[setID] = cc
-	tp.transactionListSize += len(encoding.Marshal(superset))
+	tsetSize := len(encoding.Marshal(superset))
+	tp.transactionListSize += tsetSize
+
+	// debug logging
+	if build.DEBUG {
+		tp.log.Debugf("accepted transaction superset %v, size: %vB\n", setID, tsetSize)
+		for i, t := range superset {
+			tp.log.Debugf("superset transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
+		}
+		tp.log.Debugf("tpool size is %vB after accepting transaction superset\n", tp.transactionListSize)
+	}
+
 	return nil
 }
 
@@ -294,7 +305,17 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 		tp.knownObjects[oid] = setID
 	}
 	tp.transactionSetDiffs[setID] = cc
-	tp.transactionListSize += len(encoding.Marshal(ts))
+	tsetSize := len(encoding.Marshal(ts))
+	tp.transactionListSize += tsetSize
+
+	// debug logging
+	if build.DEBUG {
+		tp.log.Debugf("accepted transaction set %v, size: %vB\n", setID, tsetSize)
+		for i, t := range ts {
+			tp.log.Debugf("transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
+		}
+		tp.log.Debugf("tpool size is %vB after accepting transaction set\n", tp.transactionListSize)
+	}
 	return nil
 }
 
