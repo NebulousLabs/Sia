@@ -161,26 +161,22 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 	// Extend the sector file and metadata file on disk.
 	atomic.StoreUint64(&sf.atomicProgressDenominator, uint64(housingWriteSize+metadataWriteSize))
 
-	writeCount := housingWriteSize / 4e6
-	finalWriteSize := housingWriteSize % 4e6
-	writeData := make([]byte, 4e6)
-	for i := int64(0); i < writeCount; i++ {
-		_, err = sf.sectorFile.WriteAt(writeData, currentHousingSize+int64(len(writeData))*i)
+	stepCount := housingWriteSize / folderAllocationStepSize
+	for i := int64(0); i < stepCount; i++ {
+		err = sf.sectorFile.Truncate(currentHousingSize + (folderAllocationStepSize * (i + 1)))
 		if err != nil {
 			return build.ExtendErr("could not allocate storage folder", err)
 		}
 		// After each iteration, update the progress numerator.
-		atomic.AddUint64(&sf.atomicProgressNumerator, 4e6)
+		atomic.AddUint64(&sf.atomicProgressNumerator, folderAllocationStepSize)
 	}
-	writeData = writeData[:finalWriteSize]
-	_, err = sf.sectorFile.WriteAt(writeData, currentHousingSize+writeCount*4e6)
+	err = sf.sectorFile.Truncate(currentHousingSize + housingWriteSize)
 	if err != nil {
 		return build.ExtendErr("could not allocate sector data file", err)
 	}
 
 	// Write the metadata file.
-	writeData = make([]byte, metadataWriteSize)
-	_, err = sf.metadataFile.WriteAt(writeData, currentMetadataSize)
+	err = sf.metadataFile.Truncate(currentMetadataSize + metadataWriteSize)
 	if err != nil {
 		return build.ExtendErr("could not allocate sector metadata file", err)
 	}
