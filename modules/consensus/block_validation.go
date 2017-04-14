@@ -101,6 +101,8 @@ func (bv stdBlockValidator) ValidateBlock(b types.Block, minTimestamp types.Time
 		return errFutureTimestamp
 	}
 
-	log.Debugf("validated block at height %v, block size: %vB", height, blockSize)
+	if log != nil {
+		log.Debugf("validated block at height %v, block size: %vB", height, blockSize)
+	}
 	return nil
 }
