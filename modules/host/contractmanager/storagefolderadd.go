@@ -220,26 +220,22 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	}(sf)
 
 	// Allocate the files on disk for the storage folder.
-	writeCount := sectorHousingSize / 4e6
-	finalWriteSize := sectorHousingSize % 4e6
-	writeData := make([]byte, 4e6)
-	for i := uint64(0); i < writeCount; i++ {
-		_, err = sf.sectorFile.WriteAt(writeData, int64(len(writeData))*int64(i))
+	stepCount := sectorHousingSize / folderAllocationStepSize
+	for i := uint64(0); i < stepCount; i++ {
+		err = sf.sectorFile.Truncate(int64(folderAllocationStepSize * (i + 1)))
 		if err != nil {
 			return build.ExtendErr("could not allocate storage folder", err)
 		}
 		// After each iteration, update the progress numerator.
-		atomic.AddUint64(&sf.atomicProgressNumerator, 4e6)
+		atomic.AddUint64(&sf.atomicProgressNumerator, folderAllocationStepSize)
 	}
-	writeData = writeData[:finalWriteSize]
-	_, err = sf.sectorFile.WriteAt(writeData, int64(writeCount*4e6))
+	err = sf.sectorFile.Truncate(int64(sectorHousingSize))
 	if err != nil {
 		return build.ExtendErr("could not allocate sector data file", err)
 	}
 
 	// Write the metadata file.
-	writeData = make([]byte, sectorLookupSize)
-	_, err = sf.metadataFile.WriteAt(writeData, 0)
+	err = sf.metadataFile.Truncate(int64(sectorLookupSize))
 	if err != nil {
 		return build.ExtendErr("could not allocate sector metadata file", err)
 	}

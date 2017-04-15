@@ -377,27 +377,16 @@ func (h *Host) upgradeFromV112ToV120() error {
 		wg.Wait()
 	}
 
-	// Resize any remaining folders to their full size.
+	// Save the desired storage folder sizes before closing out the old persist.
 	cmFolders := h.StorageFolders()
-	for _, cmFolder := range cmFolders {
-		finalCapacity := smFolderCapacities[cmFolder.Path]
-		finalCapacity -= finalCapacity % (modules.SectorSize * contractManagerStorageFolderGranularity)
-		if cmFolder.Capacity < finalCapacity {
-			err := h.ResizeStorageFolder(cmFolder.Index, finalCapacity, false)
-			if err != nil {
-				err = build.ExtendErr("unable to resize storage folder during host upgrade", err)
-				h.log.Println(err)
-				continue
-			}
-		}
-	}
 
-	// Close the database that was opened.
+	// Clean up up the old storage manager before growing the storage folders.
+	// An interruption during the growing phase should result in storage folders
+	// that are whatever size they were left off at.
 	err = oldDB.Close()
 	if err != nil {
 		h.log.Println("Unable to close old database during v1.2.0 compat upgrade", err)
 	}
-
 	// Try loading the persist again.
 	p := new(persistence)
 	err = h.dependencies.loadFile(v112PersistMetadata, p, filepath.Join(h.persistDir, settingsFile))
@@ -405,20 +394,17 @@ func (h *Host) upgradeFromV112ToV120() error {
 		return build.ExtendErr("upgrade appears complete, but having difficulties reloading host after upgrade", err)
 	}
 	h.loadPersistObject(p)
-
 	// Apply the v100 compat upgrade in case the host is loading from a
 	// version between v1.0.0 and v1.1.2.
 	err = h.loadCompatV100(p)
 	if err != nil {
 		return build.ExtendErr("upgrade appears complete, but having trouble relaoding:", err)
 	}
-
 	// Save the updated persist so that the upgrade is not triggered again.
 	err = h.saveSync()
 	if err != nil {
 		return build.ExtendErr("upgrade appears complete, but final save has failed (upgrade likely successful", err)
 	}
-
 	// Delete the storage manager files. Note that this must happen after the
 	// complete upgrade, including a finishing call to saveSync().
 	for _, sf := range oldPersist.StorageFolders {
@@ -435,6 +421,20 @@ func (h *Host) upgradeFromV112ToV120() error {
 	err = os.Remove(filepath.Join(h.persistDir, v112StorageManagerDir, v112StorageManagerDBFilename))
 	if err != nil {
 		h.log.Println("Unable to close legacy database:", err)
+	}
+
+	// Resize any remaining folders to their full size.
+	for _, cmFolder := range cmFolders {
+		finalCapacity := smFolderCapacities[cmFolder.Path]
+		finalCapacity -= finalCapacity % (modules.SectorSize * contractManagerStorageFolderGranularity)
+		if cmFolder.Capacity < finalCapacity {
+			err := h.ResizeStorageFolder(cmFolder.Index, finalCapacity, false)
+			if err != nil {
+				err = build.ExtendErr("unable to resize storage folder during host upgrade", err)
+				h.log.Println(err)
+				continue
+			}
+		}
 	}
 	return nil
 }
