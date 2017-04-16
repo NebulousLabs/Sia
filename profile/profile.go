@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"sync"
 	"time"
 
@@ -17,10 +18,12 @@ import (
 // happens if multiple threads call each at the same time. This lock might be
 // unnecessary.
 var (
-	cpuActive bool
-	cpuLock   sync.Mutex
-	memActive bool
-	memLock   sync.Mutex
+	cpuActive   bool
+	cpuLock     sync.Mutex
+	memActive   bool
+	memLock     sync.Mutex
+	traceActive bool
+	traceLock   sync.Mutex
 )
 
 // StartCPUProfile starts cpu profiling. An error will be returned if a cpu
@@ -81,34 +84,60 @@ func SaveMemProfile(profileDir, identifier string) error {
 	return nil
 }
 
-// StartContinuousProfiling will continuously print statistics about the cpu
-// usage, memory usage, and runtime stats of the program.
-func StartContinuousProfile(profileDir string) {
+// StartTrace starts trace. An error will be returned if a trace
+// is already running.
+func StartTrace(traceDir, identifier string) error {
+	// Lock the trace lock so that only one profiler is running at a
+	// time.
+	traceLock.Lock()
+	if traceActive {
+		traceLock.Unlock()
+		return errors.New("cannot start trace, it is already running")
+	}
+	traceActive = true
+	traceLock.Unlock()
+
+	// Start trace into the trace dir, using the identifer. The timestamp
+	// of the start time of the trace will be included in the filename.
+	traceFile, err := os.Create(filepath.Join(traceDir, "trace-"+identifier+"-"+time.Now().Format(time.RFC3339Nano)+".trace"))
+	if err != nil {
+		return err
+	}
+	return trace.Start(traceFile)
+}
+
+// StopTrace stops trace.
+func StopTrace() {
+	traceLock.Lock()
+	if traceActive {
+		trace.Stop()
+		traceActive = false
+	}
+	traceLock.Unlock()
+}
+
+func startContinuousLog(dir string, restart func()) {
 	// Create the folder for all of the profiling results.
-	err := os.MkdirAll(profileDir, 0700)
+	err := os.MkdirAll(dir, 0700)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-
 	// Continuously log statistics about the running Sia application.
 	go func() {
 		// Create the logger.
-		log, err := persist.NewFileLogger(filepath.Join(profileDir, "continuousProfiling.log"))
+		log, err := persist.NewFileLogger(filepath.Join(dir, "continuousStats.log"))
 		if err != nil {
-			fmt.Println("Profile logging failed:", err)
+			fmt.Println("Stats logging failed:", err)
 			return
 		}
-
 		// Collect statistics in an infinite loop.
 		sleepTime := time.Second * 20
 		for {
 			// Sleep for an exponential amount of time each iteration, this
 			// keeps the size of the log small while still providing lots of
 			// information.
-			StopCPUProfile()
-			SaveMemProfile(profileDir, "continuousProfilingMem")
-			StartCPUProfile(profileDir, "continuousProfilingCPU")
+			restart()
 			time.Sleep(sleepTime)
 			sleepTime = time.Duration(1.5 * float64(sleepTime))
 
@@ -117,4 +146,22 @@ func StartContinuousProfile(profileDir string) {
 			log.Printf("\n\tGoroutines: %v\n\tAlloc: %v\n\tTotalAlloc: %v\n\tHeapAlloc: %v\n\tHeapSys: %v\n", runtime.NumGoroutine(), m.Alloc, m.TotalAlloc, m.HeapAlloc, m.HeapSys)
 		}
 	}()
+}
+
+// StartContinuousProfiling will continuously print statistics about the cpu
+// usage, memory usage, and runtime stats of the program.
+func StartContinuousProfile(profileDir string) {
+	startContinuousLog(profileDir, func() {
+		StopCPUProfile()
+		SaveMemProfile(profileDir, "continuousProfilingMem")
+		StartCPUProfile(profileDir, "continuousProfilingCPU")
+	})
+}
+
+// StartContinuousTrace will continuously run execution logger.
+func StartContinuousTrace(traceDir string) {
+	startContinuousLog(traceDir, func() {
+		StopTrace()
+		StartTrace(traceDir, "continuousTrace")
+	})
 }

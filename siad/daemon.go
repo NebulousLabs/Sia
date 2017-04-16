@@ -300,9 +300,11 @@ func startDaemon(config Config) (err error) {
 
 // startDaemonCmd is a passthrough function for startDaemon.
 func startDaemonCmd(cmd *cobra.Command, _ []string) {
-	// Create the profiling directory if profiling is enabled.
 	if globalConfig.Siad.Profile || build.DEBUG {
 		go profile.StartContinuousProfile(globalConfig.Siad.ProfileDir)
+	}
+	if globalConfig.Siad.Trace {
+		go profile.StartContinuousTrace(globalConfig.Siad.TraceDir)
 	}
 
 	// Start siad. startDaemon will only return when it is shutting down.
