@@ -32,7 +32,7 @@ var (
 	// weak / cheap hosts on the network while the network is bootstrapping.
 	minCollateral = types.SiacoinPrecision.Mul64(25).Div64(tbMonth)
 
-	// Set a mimimum price, below which setting lower prices will no longer put
+	// Set a minimum price, below which setting lower prices will no longer put
 	// this host at an advatnage. This price is considered the bar for
 	// 'essentially free', and is kept to a minimum to prevent certain Sybil
 	// attack related attack vectors.

@@ -1,7 +1,7 @@
 package host
 
 // TODO: seems like there would be problems with the negotiation protocols if
-// the renter tried something like 'form' or 'renew' but then the conncetion
+// the renter tried something like 'form' or 'renew' but then the connections
 // dropped after the host completed the transaction but before the host was
 // able to send the host signatures for the transaction.
 //

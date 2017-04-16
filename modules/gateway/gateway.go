@@ -54,7 +54,7 @@ import (
 // after they successfully form a connection with the gateway. To limit the
 // attacker's ability to add nodes to the nodelist, connections are
 // ratelimited. An attacker with lots of IP addresses still has the ability to
-// fill up the nodelist, however getting 90% dominance of the nodelist requries
+// fill up the nodelist, however getting 90% dominance of the nodelist requires
 // forming thousands of connections, which will take hours or days. By that
 // time, the attacked node should already have its set of outbound peers,
 // limiting the amount of damage that the attacker can do.
@@ -88,7 +88,7 @@ import (
 // of bootstrap nodes. If there is any cross-polination (which an attacker
 // could do pretty easily), the gateways will not clean up over time, which
 // will degrade the quality of the flood network as the two networks will
-// continously flood eachother with irrelevant information. Additionally, there
+// continuously flood eachother with irrelevant information. Additionally, there
 // is no public key exhcange, so communications cannot be effectively encrypted
 // or authenticated. The nodes must have some way to share keys.
 //

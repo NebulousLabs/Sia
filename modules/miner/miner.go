@@ -90,7 +90,7 @@ type Miner struct {
 }
 
 // startupRescan will rescan the blockchain in the event that the miner
-// persistance layer has become desynchronized from the consensus persistance
+// persistence layer has become desynchronized from the consensus persistence
 // layer. This might happen if a user replaces any of the folders with backups
 // or deletes any of the folders.
 func (m *Miner) startupRescan() error {

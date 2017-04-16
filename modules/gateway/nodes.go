@@ -157,7 +157,7 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 	for {
 		// Choose an amount of time to wait before attempting to prune a node.
 		// Nodes will occasionally go offline for some time, which can even be
-		// days. We don't want to too aggressivley prune nodes with low-moderate
+		// days. We don't want to too aggressively prune nodes with low-moderate
 		// uptime, as they are still useful to the network.
 		//
 		// But if there are a lot of nodes, we want to make sure that the node
@@ -167,7 +167,7 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		//
 		// This value is a ratelimit which tries to keep the nodes list in the
 		// gateawy healthy. A more complex algorithm might adjust this number
-		// according to the percentage of prune attemtps that are successful
+		// according to the percentage of prune attempts that are successful
 		// (decrease prune frequency if most nodes in the database are online,
 		// increase prune frequency if more nodes in the database are offline).
 		waitTime := nodePurgeDelay

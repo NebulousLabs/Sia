@@ -120,7 +120,7 @@ func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock
 }
 
 // newChild creates a blockNode from a block and adds it to the parent's set of
-// children. The new node is also returned. It necessairly modifies the database
+// children. The new node is also returned. It necessarily modifies the database
 func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block) *processedBlock {
 	// Create the child node.
 	childID := b.ID()

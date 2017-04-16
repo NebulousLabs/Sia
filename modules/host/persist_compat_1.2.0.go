@@ -111,7 +111,7 @@ type (
 // COMPAT v1.0.0
 //
 // A spelling error in pre-1.0 versions means that, if this is the first time
-// running after an upgrade, the misspelled field needs to be transfered over.
+// running after an upgrade, the misspelled field needs to be transferred over.
 func (h *Host) loadCompatV100(p *persistence) error {
 	var compatPersistence struct {
 		FinancialMetrics struct {
@@ -225,7 +225,7 @@ func (h *Host) upgradeFromV112ToV120() error {
 		return errors.New("cannot perform host upgrade - the contract manager must not be nil")
 	}
 
-	// Fetch the old set of storage folders, and create analagous storage
+	// Fetch the old set of storage folders, and create analogous storage
 	// folders in the contract manager. But create them to have sizes of zero,
 	// and grow them 112 sectors at a time. This is to make sure the user does
 	// not run out of disk space during the upgrade.
@@ -282,7 +282,7 @@ func (h *Host) upgradeFromV112ToV120() error {
 	// the new contract manager.
 	for _, sf := range oldPersist.StorageFolders {
 		// Nothing to do if the contract manager already has this storage
-		// folder (unusualy situation though).
+		// folder (unusually situation though).
 		_, exists := currentPaths[sf.Path]
 		if exists {
 			continue
@@ -398,7 +398,7 @@ func (h *Host) upgradeFromV112ToV120() error {
 	// version between v1.0.0 and v1.1.2.
 	err = h.loadCompatV100(p)
 	if err != nil {
-		return build.ExtendErr("upgrade appears complete, but having trouble relaoding:", err)
+		return build.ExtendErr("upgrade appears complete, but having trouble reloading:", err)
 	}
 	// Save the updated persist so that the upgrade is not triggered again.
 	err = h.saveSync()

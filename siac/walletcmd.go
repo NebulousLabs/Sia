@@ -304,7 +304,7 @@ func walletseedscmd() {
 		return
 	}
 	fmt.Println()
-	fmt.Println("Auxilliary Seeds:")
+	fmt.Println("Auxiliary Seeds:")
 	for _, seed := range seedInfo.AllSeeds {
 		if seed == seedInfo.PrimarySeed {
 			continue
