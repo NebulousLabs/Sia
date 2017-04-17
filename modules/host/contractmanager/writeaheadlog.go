@@ -251,7 +251,7 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 	return nil
 }
 
-// load will pull any changes from the uncommited WAL into memory, decoding
+// load will pull any changes from the uncommitted WAL into memory, decoding
 // them and doing any necessary preprocessing. In the most common case (any
 // time the previous shutdown was clean), there will not be a WAL file.
 func (wal *writeAheadLog) load() error {

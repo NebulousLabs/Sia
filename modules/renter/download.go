@@ -247,7 +247,7 @@ func (cd *chunkDownload) recoverChunk() error {
 	// Sync the write to provide proper durability.
 	err = fileDest.Sync()
 	if err != nil {
-		return build.ExtendErr("unable to sync downlaod destination", err)
+		return build.ExtendErr("unable to sync download destination", err)
 	}
 
 	cd.download.mu.Lock()

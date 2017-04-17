@@ -520,7 +520,7 @@ func (cs *ConsensusSet) managedReceiveBlock(id types.BlockID) modules.RPCFunc {
 // outbound peers <= v0.5.1 that are stalled in IBD.
 func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 	// The consensus set will not recognize IBD as complete until it has enough
-	// peers. After the deadline though, it will recognize the blochchain
+	// peers. After the deadline though, it will recognize the blockchain
 	// download as complete even with only one peer. This deadline is helpful
 	// to local-net setups, where a machine will frequently only have one peer
 	// (and that peer will be another machine on the same local network, but

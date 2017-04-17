@@ -317,7 +317,7 @@ func validTransaction(tx *bolt.Tx, t types.Transaction) error {
 // determine if they are valid. An error is returned IFF they are not a valid
 // set in the current consensus set. The size of the transactions and the set
 // is not checked. After the transactions have been validated, a consensus
-// change is returned detailing the diffs that the transaciton set would have.
+// change is returned detailing the diffs that the transactions set would have.
 func (cs *ConsensusSet) tryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
@@ -359,7 +359,7 @@ func (cs *ConsensusSet) tryTransactionSet(txns []types.Transaction) (modules.Con
 // determine if they are valid. An error is returned IFF they are not a valid
 // set in the current consensus set. The size of the transactions and the set
 // is not checked. After the transactions have been validated, a consensus
-// change is returned detailing the diffs that the transaciton set would have.
+// change is returned detailing the diffs that the transactions set would have.
 func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
 	err := cs.tg.Add()
 	if err != nil {
