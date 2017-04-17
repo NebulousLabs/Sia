@@ -229,6 +229,9 @@ RPC Stats:
 	Revise Calls:       %v
 	Settings Calls:     %v
 	FormContract Calls: %v
+
+Connectability Status: %v
+Working Status:        %v
 `,
 			competitivePrice,
 
@@ -264,7 +267,9 @@ RPC Stats:
 
 			nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
 			nm.RenewCalls, nm.ReviseCalls, nm.SettingsCalls,
-			nm.FormContractCalls)
+			nm.FormContractCalls,
+			hg.ConnectabilityStatus,
+			hg.WorkingStatus)
 	} else {
 		fmt.Printf(`Host info:
 	Estimated Competitive Price: %v
@@ -273,10 +278,12 @@ RPC Stats:
 	Price:        %v / TB / Month
 	Max Duration: %v Weeks
 
-	Accepting Contracts: %v
-	Anticipated Revenue: %v
-	Locked Collateral:   %v
-	Revenue:             %v
+	Accepting Contracts:  %v
+	Anticipated Revenue:  %v
+	Locked Collateral:    %v
+	Revenue:              %v
+	Connectablity Status: %v
+	Working Status:       %v
 `,
 			competitivePrice,
 
@@ -286,7 +293,9 @@ RPC Stats:
 
 			yesNo(is.AcceptingContracts), currencyUnits(totalPotentialRevenue),
 			currencyUnits(fm.LockedStorageCollateral),
-			currencyUnits(totalRevenue))
+			currencyUnits(totalRevenue),
+			hg.ConnectabilityStatus,
+			hg.WorkingStatus)
 	}
 
 	fmt.Println("\nStorage Folders:")

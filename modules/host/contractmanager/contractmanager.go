@@ -1,7 +1,11 @@
 package contractmanager
 
-// TODO: Empty storage folder operation does not indicate progress, nor
-// indiciate what operation is taking so long.
+// TODO: Need to sync the directory after doing rename and create operations.
+
+// TODO: Use fallocate when adding + growing storage folders.
+
+// TODO: Long-running operations (add, empty) don't tally progress, and don't
+// indicate what operation is running.
 
 // TODO: Add disk failure testing.
 

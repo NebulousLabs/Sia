@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -85,6 +86,12 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 // The parent fucntion, contractmanager.AddStorageFolder, has already performed
 // any error checking that can be performed without accessing the contract
 // manager state.
+//
+// managedAddStorageFolder can take a long time, as it writes a giant, zeroed
+// out file to disk covering the entire range of the storage folder, and
+// failure can occur late in the operation. The WAL is notified that a long
+// running operation is in progress, so that any changes to disk can be
+// reverted in the event of unclean shutdown.
 func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// Lock the storage folder for the duration of the function.
 	sf.mu.Lock()
@@ -93,6 +100,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	numSectors := uint64(len(sf.usage)) * 64
 	sectorLookupSize := numSectors * sectorMetadataDiskSize
 	sectorHousingSize := numSectors * modules.SectorSize
+	totalSize := sectorLookupSize + sectorHousingSize
 	sectorLookupName := filepath.Join(sf.path, metadataFile)
 	sectorHousingName := filepath.Join(sf.path, sectorFile)
 
@@ -153,6 +161,9 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 			err = build.ComposeErrors(err, wal.cm.dependencies.removeFile(sectorLookupName))
 			return build.ExtendErr("could not create storage folder file", err)
 		}
+		// Establish the progress fields for the add operation in the storage
+		// folder.
+		atomic.StoreUint64(&sf.atomicProgressDenominator, totalSize)
 
 		// Add the storage folder to the list of storage folders.
 		wal.cm.storageFolders[index] = sf
@@ -209,20 +220,29 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	}(sf)
 
 	// Allocate the files on disk for the storage folder.
-	writeSize := uint64(64e3)
-	writeData := make([]byte, writeSize)
-	writeLocation := sectorHousingSize - writeSize
-	_, err = sf.sectorFile.WriteAt(writeData, int64(writeLocation))
+	stepCount := sectorHousingSize / folderAllocationStepSize
+	for i := uint64(0); i < stepCount; i++ {
+		err = sf.sectorFile.Truncate(int64(folderAllocationStepSize * (i + 1)))
+		if err != nil {
+			return build.ExtendErr("could not allocate storage folder", err)
+		}
+		// After each iteration, update the progress numerator.
+		atomic.AddUint64(&sf.atomicProgressNumerator, folderAllocationStepSize)
+	}
+	err = sf.sectorFile.Truncate(int64(sectorHousingSize))
 	if err != nil {
 		return build.ExtendErr("could not allocate sector data file", err)
 	}
 
 	// Write the metadata file.
-	writeData = make([]byte, sectorLookupSize)
-	_, err = sf.metadataFile.WriteAt(writeData, 0)
+	err = sf.metadataFile.Truncate(int64(sectorLookupSize))
 	if err != nil {
 		return build.ExtendErr("could not allocate sector metadata file", err)
 	}
+
+	// The file creation process is essentially complete at this point, report
+	// complete progress.
+	atomic.StoreUint64(&sf.atomicProgressNumerator, totalSize)
 
 	// Sync the files.
 	var wg sync.WaitGroup
@@ -243,6 +263,9 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	}()
 	wg.Wait()
 
+	// TODO: Sync the directory as well (directory data changed as new files
+	// were added)
+
 	// Simulate power failure at this point for some testing scenarios.
 	if wal.cm.dependencies.disrupt("incompleteAddStorageFolder") {
 		return nil
@@ -261,6 +284,10 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// Wait to confirm the storage folder addition has completed until the WAL
 	// entry has synced.
 	<-syncChan
+
+	// Set the progress back to '0'.
+	atomic.StoreUint64(&sf.atomicProgressNumerator, 0)
+	atomic.StoreUint64(&sf.atomicProgressDenominator, 0)
 	return nil
 }
 

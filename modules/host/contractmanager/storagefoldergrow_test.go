@@ -191,6 +191,48 @@ func (l *triggerLimitFile) WriteAt(b []byte, offset int64) (int, error) {
 	return written, errors.New("triggerLimitFile throughput limit reached before all input was written to disk")
 }
 
+// Truncate returns an error if the operation will put the total throughput of
+// the file over 8 MiB.
+func (l *triggerLimitFile) Truncate(offset int64) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.dig.mu.Lock()
+	triggered := l.dig.triggered
+	l.dig.mu.Unlock()
+	if !triggered {
+		return l.File.Truncate(offset)
+	}
+
+	// If the limit has already been reached, return an error.
+	if l.throughput >= l.dig.threshold {
+		return errors.New("triggerLimitFile throughput limit reached earlier")
+	}
+
+	// Get the file size, so we know what the throughput is.
+	fi, err := l.Stat()
+	if err != nil {
+		return errors.New("triggerLimitFile unable to get FileInfo: " + err.Error())
+	}
+
+	// Run truncate with 0 throughput if size is larger than offset.
+	if fi.Size() > offset {
+		return l.File.Truncate(offset)
+	}
+
+	writeSize := int(offset - fi.Size())
+
+	// If the limit has not been reached, pass the call through to the
+	// underlying file.
+	if l.throughput+writeSize <= l.dig.threshold {
+		l.throughput += writeSize
+		return l.File.Truncate(offset)
+	}
+
+	// If the limit has been reached, return an error.
+	// return an error.
+	return errors.New("triggerLimitFile throughput limit reached, no ability to allocate more")
+}
+
 // TestGrowStorageFolderIncopmleteWrite checks that growStorageFolder operates
 // as intended when the writing to increase the filesize does not complete all
 // the way.
@@ -223,6 +265,7 @@ func TestGrowStorageFolderIncompleteWrite(t *testing.T) {
 	if len(sfs) != 1 {
 		t.Fatal("there should only be one storage folder")
 	}
+	sfIndex := sfs[0].Index
 	// Verify that the storage folder has the correct capacity.
 	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*3 {
 		t.Error("new storage folder is reporting the wrong capacity")
@@ -233,6 +276,13 @@ func TestGrowStorageFolderIncompleteWrite(t *testing.T) {
 	d.threshold = 1 << 20
 	d.triggered = true
 	d.mu.Unlock()
+
+	// Increase the size of the storage folder, to large enough that it will
+	// fail.
+	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*25, false)
+	if err == nil {
+		t.Fatal("expecting error upon resize")
+	}
 
 	// Verify that the storage folder has the correct capacity.
 	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*3 {
