@@ -217,6 +217,7 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 		return err
 	}
 	finishedChan := make(chan struct{})
+	defer close(finishedChan)
 	go func() {
 		select {
 		case <-cs.tg.StopChan():
