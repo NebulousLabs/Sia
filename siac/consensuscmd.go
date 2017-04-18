@@ -54,6 +54,6 @@ func estimatedHeightAt(t time.Time) types.BlockHeight {
 	block100kTimestamp := time.Date(2017, time.April, 13, 23, 29, 49, 0, time.UTC)
 	blockTime := float64(9) // overestimate block time for better UX
 	diff := t.Sub(block100kTimestamp)
-	estimatedHeight := 1e5 + (diff.Minutes() / blockTime)
+	estimatedHeight := 100e3 + (diff.Minutes() / blockTime)
 	return types.BlockHeight(estimatedHeight + 0.5) // round to the nearest block
 }

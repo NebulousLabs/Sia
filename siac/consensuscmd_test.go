@@ -17,27 +17,27 @@ func TestEstimatedHeightAt(t *testing.T) {
 		// Test on the same block that is used to estimate the height
 		{
 			time.Date(2017, time.April, 13, 23, 29, 49, 0, time.UTC),
-			1e5,
+			100e3,
 		},
 		// 4 minutes later
 		{
 			time.Date(2017, time.April, 13, 23, 33, 49, 0, time.UTC),
-			1e5,
+			100e3,
 		},
 		// 5 minutes later
 		{
 			time.Date(2017, time.April, 13, 23, 34, 49, 0, time.UTC),
-			1e5 + 1,
+			100e3 + 1,
 		},
 		// 15 minutes later
 		{
 			time.Date(2017, time.April, 13, 23, 44, 49, 0, time.UTC),
-			1e5 + 2,
+			100e3 + 2,
 		},
 		// 1 day later
 		{
 			time.Date(2017, time.April, 14, 23, 29, 49, 0, time.UTC),
-			1e5 + 160,
+			100e3 + 160,
 		},
 	}
 	for _, tt := range tests {
