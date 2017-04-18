@@ -15,6 +15,7 @@ package host
 // have to keep all the files following a renew in order to get the money.
 
 import (
+	"errors"
 	"net"
 	"sync/atomic"
 	"time"
@@ -103,8 +104,114 @@ func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 	}
 }
 
+// threadedRPCCheckHost handles a CheckHost RPC cal and informs the caller if
+// it can connected to on the requested NetAddress.
+func (h *Host) threadedRPCCheckHost(conn modules.PeerConn) error {
+	err := conn.SetDeadline(time.Now().Add(checkHostTimeout))
+	if err != nil {
+		return err
+	}
+	closeChan := make(chan struct{})
+	defer close(closeChan)
+	go func() {
+		select {
+		case <-h.tg.StopChan():
+		case <-closeChan:
+		}
+		conn.Close()
+	}()
+	err = h.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer h.tg.Done()
+
+	var checkAddress modules.NetAddress
+	err = encoding.ReadObject(conn, &checkAddress, 128)
+	if err != nil {
+		return err
+	}
+
+	dialer := &net.Dialer{
+		Cancel:  h.tg.StopChan(),
+		Timeout: connectabilityCheckTimeout,
+	}
+	testConn, err := dialer.Dial("tcp", string(checkAddress))
+
+	var status modules.HostConnectabilityStatus
+	if err != nil {
+		status = modules.HostConnectabilityStatusNotConnectable
+	} else {
+		testConn.Close()
+		status = modules.HostConnectabilityStatusConnectable
+	}
+
+	err = encoding.WriteObject(conn, status)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// threadedRPCRequestHostCheck asks the node at conn if the host's NetAddress
+// is connectable, and sets h.connectabilityStatus accordingly.
+func (h *Host) threadedRPCRequestHostCheck(conn modules.PeerConn) error {
+	err := conn.SetDeadline(time.Now().Add(checkHostTimeout))
+	if err != nil {
+		return err
+	}
+	closeChan := make(chan struct{})
+	defer close(closeChan)
+	go func() {
+		select {
+		case <-h.tg.StopChan():
+		case <-closeChan:
+		}
+		conn.Close()
+	}()
+	err = h.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer h.tg.Done()
+
+	// ask the remote to check our NetAddress
+	h.mu.RLock()
+	autoAddr := h.autoAddress
+	userAddr := h.settings.NetAddress
+	h.mu.RUnlock()
+
+	activeAddr := autoAddr
+	if userAddr != "" {
+		activeAddr = userAddr
+	}
+
+	err = encoding.WriteObject(conn, activeAddr)
+	if err != nil {
+		return err
+	}
+
+	var status modules.HostConnectabilityStatus
+	err = encoding.ReadObject(conn, &status, 256)
+	if err != nil {
+		return err
+	}
+
+	if status != modules.HostConnectabilityStatusNotConnectable &&
+		status != modules.HostConnectabilityStatusConnectable {
+		return errors.New("peer responded with invalid connectability status")
+	}
+
+	h.mu.Lock()
+	h.connectabilityStatus = status
+	h.mu.Unlock()
+
+	return nil
+}
+
 // threadedTrackConnectabilityStatus periodically checks if the host is
-// connectable at its netaddress.
+// connectable at its NetAddress.
 func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 	defer close(closeChan)
 
@@ -126,20 +233,20 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 		if userAddr != "" {
 			activeAddr = userAddr
 		}
+		for _, peer := range h.gateway.Peers() {
+			// only trust outbound nodes to perform this check
+			if peer.Inbound {
+				continue
+			}
 
-		dialer := &net.Dialer{
-			Cancel:  h.tg.StopChan(),
-			Timeout: connectabilityCheckTimeout,
-		}
-		conn, err := dialer.Dial("tcp", string(activeAddr))
+			err := h.gateway.RPC(peer.NetAddress, "CheckHost", h.threadedRPCRequestHostCheck)
+			if err != nil {
+				h.log.Debugln("error calling CheckHost RPC: ", err)
+			}
 
-		var status modules.HostConnectabilityStatus
-		if err != nil {
-			status = modules.HostConnectabilityStatusNotConnectable
-		} else {
-			conn.Close()
-			status = modules.HostConnectabilityStatusConnectable
+			break
 		}
+
 		h.mu.Lock()
 		h.connectabilityStatus = status
 		h.mu.Unlock()

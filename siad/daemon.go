@@ -231,7 +231,7 @@ func startDaemon(config Config) (err error) {
 	if strings.Contains(config.Siad.Modules, "h") {
 		i++
 		fmt.Printf("(%d/%d) Loading host...\n", i, len(config.Siad.Modules))
-		h, err = host.New(cs, tpool, w, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
+		h, err = host.New(g, cs, tpool, w, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
 		if err != nil {
 			return err
 		}

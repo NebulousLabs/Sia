@@ -124,14 +124,24 @@ func TestConnectabilityStatus(t *testing.T) {
 	}
 	t.Parallel()
 
-	// create and announce a host
-	st, err := createServerTester(t.Name())
+	host, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.server.panicClose()
 
-	if err := st.announceHost(); err != nil {
+	node, err := blankServerTester(t.Name() + " - node")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer node.server.Close()
+
+	testGroup := []*serverTester{host, node}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -140,7 +150,7 @@ func TestConnectabilityStatus(t *testing.T) {
 
 	// check that the field was set correctly
 	var hg HostGET
-	st.getAPI("/host", &hg)
+	host.getAPI("/host", &hg)
 
 	if hg.ConnectabilityStatus != modules.HostConnectabilityStatusConnectable {
 		t.Fatal("expected host to be connectable")

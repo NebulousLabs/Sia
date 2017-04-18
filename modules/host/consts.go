@@ -16,6 +16,10 @@ const (
 	// support 6 month contracts when Sia leaves beta.
 	defaultMaxDuration = 144 * 30 * 6 // 6 months.
 
+	// checkHostTimeout indicates the amount of time that a peer has to check the
+	// connectability of a host.
+	checkHostTimeout = 2 * time.Minute
+
 	// fileContractNegotiationTimeout indicates the amount of time that a
 	// renter has to negotiate a file contract with the host. A timeout is
 	// necessary to limit the impact of DoS attacks.

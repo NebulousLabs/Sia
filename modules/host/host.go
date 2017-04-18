@@ -106,9 +106,10 @@ var (
 	errHostClosed = errors.New("call is disabled because the host is closed")
 
 	// Nil dependency errors.
-	errNilCS     = errors.New("host cannot use a nil state")
-	errNilTpool  = errors.New("host cannot use a nil transaction pool")
-	errNilWallet = errors.New("host cannot use a nil wallet")
+	errNilCS      = errors.New("host cannot use a nil state")
+	errNilTpool   = errors.New("host cannot use a nil transaction pool")
+	errNilWallet  = errors.New("host cannot use a nil wallet")
+	errNilGateway = errors.New("host cannot use a nil gateway")
 )
 
 // A Host contains all the fields necessary for storing files for clients and
@@ -136,9 +137,10 @@ type Host struct {
 	atomicNormalErrors        uint64
 
 	// Dependencies.
-	cs     modules.ConsensusSet
-	tpool  modules.TransactionPool
-	wallet modules.Wallet
+	cs      modules.ConsensusSet
+	gateway modules.Gateway
+	tpool   modules.TransactionPool
+	wallet  modules.Wallet
 	dependencies
 	modules.StorageManager
 
@@ -204,7 +206,7 @@ func (h *Host) checkUnlockHash() error {
 // mocked such that the dependencies can return unexpected errors or unique
 // behaviors during testing, enabling easier testing of the failure modes of
 // the Host.
-func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, listenerAddress string, persistDir string) (*Host, error) {
+func newHost(dependencies dependencies, g modules.Gateway, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, listenerAddress string, persistDir string) (*Host, error) {
 	// Check that all the dependencies were provided.
 	if cs == nil {
 		return nil, errNilCS
@@ -215,9 +217,13 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 	if wallet == nil {
 		return nil, errNilWallet
 	}
+	if g == nil {
+		return nil, errNilGateway
+	}
 
 	// Create the host object.
 	h := &Host{
+		gateway:      g,
 		cs:           cs,
 		tpool:        tpool,
 		wallet:       wallet,
@@ -284,6 +290,12 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		}
 	})
 
+	// register gateway RPCs
+	g.RegisterRPC("CheckHost", h.threadedRPCCheckHost)
+	h.tg.OnStop(func() {
+		h.gateway.UnregisterRPC("CheckHost")
+	})
+
 	// Initialize the networking.
 	err = h.initNetworking(listenerAddress)
 	if err != nil {
@@ -294,8 +306,8 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 }
 
 // New returns an initialized Host.
-func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
-	return newHost(productionDependencies{}, cs, tpool, wallet, address, persistDir)
+func New(g modules.Gateway, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
+	return newHost(productionDependencies{}, g, cs, tpool, wallet, address, persistDir)
 }
 
 // Close shuts down the host.

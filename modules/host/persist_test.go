@@ -75,7 +75,7 @@ func TestHostAddressPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host, err = New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = New(ht.gateway, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
