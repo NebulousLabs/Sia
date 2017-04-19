@@ -167,6 +167,9 @@ func hostcmd() {
 	if hostVerbose {
 		// describe net address
 		fmt.Printf(`General Info:
+Connectability Status: %v
+Working Status:        %v
+
 Host Internal Settings:
 	acceptingcontracts:   %v
 	maxduration:          %v Weeks
@@ -210,10 +213,10 @@ RPC Stats:
 	Revise Calls:       %v
 	Settings Calls:     %v
 	FormContract Calls: %v
-
-Connectability Status: %v
-Working Status:        %v
 `,
+			hg.ConnectabilityStatus,
+			hg.WorkingStatus,
+
 			yesNo(is.AcceptingContracts), periodUnits(is.MaxDuration),
 			filesizeUnits(int64(is.MaxDownloadBatchSize)),
 			filesizeUnits(int64(is.MaxReviseBatchSize)), netaddr,
@@ -246,11 +249,12 @@ Working Status:        %v
 
 			nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
 			nm.RenewCalls, nm.ReviseCalls, nm.SettingsCalls,
-			nm.FormContractCalls,
-			hg.ConnectabilityStatus,
-			hg.WorkingStatus)
+			nm.FormContractCalls)
 	} else {
 		fmt.Printf(`Host info:
+	Connectablity Status: %v
+	Working Status:       %v
+
 	Storage:      %v (%v used)
 	Price:        %v / TB / Month
 	Max Duration: %v Weeks
@@ -259,18 +263,17 @@ Working Status:        %v
 	Anticipated Revenue:  %v
 	Locked Collateral:    %v
 	Revenue:              %v
-	Connectablity Status: %v
-	Working Status:       %v
 `,
+			hg.ConnectabilityStatus,
+			hg.WorkingStatus,
+
 			filesizeUnits(int64(totalstorage)),
 			filesizeUnits(int64(totalstorage-storageremaining)), price,
 			periodUnits(is.MaxDuration),
 
 			yesNo(is.AcceptingContracts), currencyUnits(totalPotentialRevenue),
 			currencyUnits(fm.LockedStorageCollateral),
-			currencyUnits(totalRevenue),
-			hg.ConnectabilityStatus,
-			hg.WorkingStatus)
+			currencyUnits(totalRevenue))
 	}
 
 	fmt.Println("\nStorage Folders:")
