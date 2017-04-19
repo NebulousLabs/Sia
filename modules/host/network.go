@@ -16,6 +16,7 @@ package host
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"sync/atomic"
 	"time"
@@ -162,7 +163,7 @@ func (h *Host) threadedRPCCheckHost(conn modules.PeerConn) error {
 		}
 	}
 	if !isValid {
-		return errors.New("CheckHost can only be used on your own IP address.")
+		return fmt.Errorf("blocked CheckHost call for %v from %v, requested host does not match ip address of remote host.", checkAddress, conn.RemoteAddr().String())
 	}
 
 	dialer := &net.Dialer{
