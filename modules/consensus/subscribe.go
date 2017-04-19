@@ -120,11 +120,15 @@ func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.
 func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
-	return cs.db.View(func(tx *bolt.Tx) error {
-		// 'exists' and 'entry' are going to be pointed to the first entry that
-		// has not yet been seen by subscriber.
-		var exists bool
-		var entry changeEntry
+	// The code is structured such that no bolt transaction ever covers more
+	// than 50 consensus changes. As of implementation, bolt had some in-memory
+	// optimizations that would cause memory usage to increase substantially if
+	// doing too many operations in a single bolt.Tx. Breaking things apart
+	// keeps memory usage reasonable.
+
+	var exists bool
+	var entry changeEntry
+	err := cs.db.View(func(tx *bolt.Tx) error {
 
 		if start == modules.ConsensusChangeBeginning {
 			// Special case: for modules.ConsensusChangeBeginning, create an
@@ -155,18 +159,33 @@ func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubsc
 			}
 			entry, exists = entry.NextEntry(tx)
 		}
-
-		// Send all remaining consensus changes to the subscriber.
-		for exists {
-			cc, err := cs.computeConsensusChange(tx, entry)
-			if err != nil {
-				return err
-			}
-			subscriber.ProcessConsensusChange(cc)
-			entry, exists = entry.NextEntry(tx)
-		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	for exists {
+		// Break the consensus change reports into several database
+		// transactions. It is safe because a writelock is held over the
+		// consensus set.
+		err = cs.db.View(func(tx *bolt.Tx) error {
+			// Send all remaining consensus changes to the subscriber.
+			for i := 0; i < 50 && exists; i++ {
+				cc, err := cs.computeConsensusChange(tx, entry)
+				if err != nil {
+					return err
+				}
+				subscriber.ProcessConsensusChange(cc)
+				entry, exists = entry.NextEntry(tx)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ConsensusSetSubscribe adds a subscriber to the list of subscribers, and
