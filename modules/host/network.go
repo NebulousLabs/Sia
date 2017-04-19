@@ -133,6 +133,37 @@ func (h *Host) threadedRPCCheckHost(conn modules.PeerConn) error {
 		return err
 	}
 
+	// check that the checkAddress resolves to at least one of the remote's IP
+	// addresses.
+	checkHost, _, err := net.SplitHostPort(string(checkAddress))
+	if err != nil {
+		return err
+	}
+	checkIPs, err := net.LookupIP(checkHost)
+	if err != nil {
+		return err
+	}
+	requestingHost, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		return err
+	}
+	requestingIPs, err := net.LookupIP(requestingHost)
+	if err != nil {
+		return err
+	}
+
+	isValid := false
+	for _, cip := range checkIPs {
+		for _, rip := range requestingIPs {
+			if string(cip) == string(rip) {
+				isValid = true
+			}
+		}
+	}
+	if !isValid {
+		return errors.New("CheckHost can only be used on your own IP address.")
+	}
+
 	dialer := &net.Dialer{
 		Cancel:  h.tg.StopChan(),
 		Timeout: connectabilityCheckTimeout,
@@ -273,6 +304,7 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 			h.mu.Lock()
 			h.connectabilityStatus = modules.HostConnectabilityStatusChecking
 			h.mu.Unlock()
+			continue
 		}
 
 		// if there is disagreement among the peers, set the status to 'checking'
