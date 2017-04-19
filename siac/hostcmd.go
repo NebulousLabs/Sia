@@ -133,23 +133,6 @@ func hostcmd() {
 		die("Could not fetch storage info:", err)
 	}
 
-	// Determine the competitive price string.
-	ah := new(api.HostdbActiveGET)
-	var competitivePrice string
-	err = getAPI("/hostdb/active?numhosts=32", ah)
-	if err != nil || len(ah.Hosts) == 0 {
-		competitivePrice = "Unavailable"
-	} else {
-		var sum types.Currency
-		for _, host := range ah.Hosts {
-			sum = sum.Add(host.StoragePrice)
-		}
-
-		// Divide by the number of hosts to get the average price, and then
-		// trim 5% to present what would be a competitive edge.
-		competitivePrice = currencyUnits(sum.Div64(uint64(len(ah.Hosts))).MulFloat(0.95).Mul(modules.BlockBytesPerMonthTerabyte))
-	}
-
 	es := hg.ExternalSettings
 	fm := hg.FinancialMetrics
 	is := hg.InternalSettings
@@ -184,8 +167,6 @@ func hostcmd() {
 	if hostVerbose {
 		// describe net address
 		fmt.Printf(`General Info:
-	Estimated Competitive Price: %v
-
 Host Internal Settings:
 	acceptingcontracts:   %v
 	maxduration:          %v Weeks
@@ -233,8 +214,6 @@ RPC Stats:
 Connectability Status: %v
 Working Status:        %v
 `,
-			competitivePrice,
-
 			yesNo(is.AcceptingContracts), periodUnits(is.MaxDuration),
 			filesizeUnits(int64(is.MaxDownloadBatchSize)),
 			filesizeUnits(int64(is.MaxReviseBatchSize)), netaddr,
@@ -272,8 +251,6 @@ Working Status:        %v
 			hg.WorkingStatus)
 	} else {
 		fmt.Printf(`Host info:
-	Estimated Competitive Price: %v
-
 	Storage:      %v (%v used)
 	Price:        %v / TB / Month
 	Max Duration: %v Weeks
@@ -285,8 +262,6 @@ Working Status:        %v
 	Connectablity Status: %v
 	Working Status:       %v
 `,
-			competitivePrice,
-
 			filesizeUnits(int64(totalstorage)),
 			filesizeUnits(int64(totalstorage-storageremaining)), price,
 			periodUnits(is.MaxDuration),
