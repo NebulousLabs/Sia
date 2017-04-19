@@ -61,7 +61,11 @@ func newTestingHost(testdir string, cs modules.ConsensusSet, tp modules.Transact
 	if err != nil {
 		return nil, err
 	}
-	h, err := host.New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		return nil, err
+	}
+	h, err := host.New(g, cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		return nil, err
 	}
