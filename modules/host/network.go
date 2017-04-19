@@ -105,7 +105,7 @@ func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 	}
 }
 
-// threadedRPCCheckHost handles a CheckHost RPC cal and informs the caller if
+// threadedRPCCheckHost handles a CheckHost RPC call and informs the caller if
 // it can connected to on the requested NetAddress.
 func (h *Host) threadedRPCCheckHost(conn modules.PeerConn) error {
 	err := conn.SetDeadline(time.Now().Add(checkHostTimeout))
