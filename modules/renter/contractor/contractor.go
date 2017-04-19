@@ -46,9 +46,8 @@ type Contractor struct {
 	tpool   transactionPool
 	wallet  wallet
 
-	// in addition to mu, a separate lock enforces that multiple goroutines
-	// won't try to simultaneously edit the contract set.
-	editLock siasync.TryMutex
+	// Only one thread should be running contract repair at a time.
+	editLock           siasync.TryMutex
 	contractRepairLock siasync.TryMutex
 
 	allowance     modules.Allowance
@@ -62,6 +61,7 @@ type Contractor struct {
 	revising    map[types.FileContractID]bool // prevent overlapping revisions
 
 	cachedRevisions map[types.FileContractID]cachedRevision
+	contractLocks   map[types.FileContractID]*siasync.TryMutex
 	contracts       map[types.FileContractID]modules.RenterContract
 	oldContracts    map[types.FileContractID]modules.RenterContract
 	renewedIDs      map[types.FileContractID]types.FileContractID
