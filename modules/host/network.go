@@ -24,6 +24,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // rpcSettingsDeprecated is a specifier for a deprecated settings request.
@@ -156,58 +157,57 @@ func (h *Host) threadedRPCCheckHost(conn modules.PeerConn) error {
 
 // threadedRPCRequestHostCheck asks the node at conn if the host's NetAddress
 // is connectable, and sets h.connectabilityStatus accordingly.
-func (h *Host) threadedRPCRequestHostCheck(conn modules.PeerConn) error {
-	err := conn.SetDeadline(time.Now().Add(checkHostTimeout))
-	if err != nil {
-		return err
-	}
-	closeChan := make(chan struct{})
-	defer close(closeChan)
-	go func() {
-		select {
-		case <-h.tg.StopChan():
-		case <-closeChan:
+func (h *Host) threadedRPCRequestHostCheck(resultChan chan modules.HostConnectabilityStatus) modules.RPCFunc {
+	return func(conn modules.PeerConn) error {
+		err := conn.SetDeadline(time.Now().Add(checkHostTimeout))
+		if err != nil {
+			return err
 		}
-		conn.Close()
-	}()
-	err = h.tg.Add()
-	if err != nil {
-		return err
+		closeChan := make(chan struct{})
+		defer close(closeChan)
+		go func() {
+			select {
+			case <-h.tg.StopChan():
+			case <-closeChan:
+			}
+			conn.Close()
+		}()
+		err = h.tg.Add()
+		if err != nil {
+			return err
+		}
+		defer h.tg.Done()
+
+		// ask the remote to check our NetAddress
+		h.mu.RLock()
+		autoAddr := h.autoAddress
+		userAddr := h.settings.NetAddress
+		h.mu.RUnlock()
+
+		activeAddr := autoAddr
+		if userAddr != "" {
+			activeAddr = userAddr
+		}
+
+		err = encoding.WriteObject(conn, activeAddr)
+		if err != nil {
+			return err
+		}
+
+		var status modules.HostConnectabilityStatus
+		err = encoding.ReadObject(conn, &status, 256)
+		if err != nil {
+			return err
+		}
+
+		if status != modules.HostConnectabilityStatusNotConnectable &&
+			status != modules.HostConnectabilityStatusConnectable {
+			return errors.New("peer responded with invalid connectability status")
+		}
+
+		resultChan <- status
+		return nil
 	}
-	defer h.tg.Done()
-
-	// ask the remote to check our NetAddress
-	h.mu.RLock()
-	autoAddr := h.autoAddress
-	userAddr := h.settings.NetAddress
-	h.mu.RUnlock()
-
-	activeAddr := autoAddr
-	if userAddr != "" {
-		activeAddr = userAddr
-	}
-
-	err = encoding.WriteObject(conn, activeAddr)
-	if err != nil {
-		return err
-	}
-
-	var status modules.HostConnectabilityStatus
-	err = encoding.ReadObject(conn, &status, 256)
-	if err != nil {
-		return err
-	}
-
-	if status != modules.HostConnectabilityStatusNotConnectable &&
-		status != modules.HostConnectabilityStatusConnectable {
-		return errors.New("peer responded with invalid connectability status")
-	}
-
-	h.mu.Lock()
-	h.connectabilityStatus = status
-	h.mu.Unlock()
-
-	return nil
 }
 
 // threadedTrackConnectabilityStatus periodically checks if the host is
@@ -233,21 +233,65 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 		if userAddr != "" {
 			activeAddr = userAddr
 		}
+<<<<<<< HEAD
+=======
+
+		// collect outbound peers
+		var outboundPeers []modules.Peer
+>>>>>>> more advanced random peer selection algorithm
 		for _, peer := range h.gateway.Peers() {
-			// only trust outbound nodes to perform this check
 			if peer.Inbound {
 				continue
 			}
+			outboundPeers = append(outboundPeers, peer)
+		}
+		if uint64(len(outboundPeers)) < hostCheckNodes {
+			h.log.Debugln("waiting for outbound peers to run connectability check")
+			continue
+		}
 
-			err := h.gateway.RPC(peer.NetAddress, "CheckHost", h.threadedRPCRequestHostCheck)
+		// select hostCheckNodes outbound peers at random to perform the check
+		var askPeers []modules.Peer
+		for i := 0; uint64(i) < hostCheckNodes; i++ {
+			askPeers = append(askPeers, outboundPeers[fastrand.Intn(len(outboundPeers))])
+		}
+
+		// ask each node to connect to our NetAddress and record the results
+		var results []modules.HostConnectabilityStatus
+		for _, peer := range askPeers {
+			resultChan := make(chan modules.HostConnectabilityStatus, 1)
+			err := h.gateway.RPC(peer.NetAddress, "CheckHost", h.threadedRPCRequestHostCheck(resultChan))
 			if err != nil {
 				h.log.Debugln("error calling CheckHost RPC: ", err)
+				continue
 			}
+			results = append(results, <-resultChan)
+		}
 
-			break
+		// if no peers responded, set the status to checking and continue
+		if len(results) == 0 {
+			h.mu.Lock()
+			h.connectabilityStatus = modules.HostConnectabilityStatusChecking
+			h.mu.Unlock()
+		}
+
+		// if there is disagreement among the peers, set the status to 'checking'
+		// and continue
+		hasDisagreement := false
+		for _, result := range results {
+			if result != results[0] {
+				hasDisagreement = true
+			}
+		}
+		if hasDisagreement {
+			h.mu.Lock()
+			h.connectabilityStatus = modules.HostConnectabilityStatusChecking
+			h.mu.Unlock()
+			continue
 		}
 
 		h.mu.Lock()
+<<<<<<< HEAD
 		h.connectabilityStatus = status
 		h.mu.Unlock()
 
@@ -256,6 +300,10 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 			return
 		case <-time.After(connectabilityCheckFrequency):
 		}
+=======
+		h.connectabilityStatus = results[0]
+		h.mu.Unlock()
+>>>>>>> more advanced random peer selection algorithm
 	}
 }
 
