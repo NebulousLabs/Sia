@@ -109,7 +109,7 @@ var (
 	workingStatusFirstCheck = build.Select(build.Var{
 		Standard: time.Minute * 3,
 		Dev:      time.Minute * 1,
-		Testing:  time.Second * 15,
+		Testing:  time.Second * 3,
 	}).(time.Duration)
 
 	// workingStatusFrequency defines how frequently the Host's working status
@@ -117,7 +117,7 @@ var (
 	workingStatusFrequency = build.Select(build.Var{
 		Standard: time.Minute * 10,
 		Dev:      time.Minute * 5,
-		Testing:  time.Second * 30,
+		Testing:  time.Second * 10,
 	}).(time.Duration)
 
 	// workingStatusThreshold defines how many settings calls must occur over the
@@ -133,7 +133,7 @@ var (
 	connectabilityCheckFirstWait = build.Select(build.Var{
 		Standard: time.Minute * 2,
 		Dev:      time.Minute * 1,
-		Testing:  time.Second * 15,
+		Testing:  time.Second * 3,
 	}).(time.Duration)
 
 	// connectablityCheckFrequency defines how often the host's connectability
@@ -141,7 +141,7 @@ var (
 	connectabilityCheckFrequency = build.Select(build.Var{
 		Standard: time.Minute * 10,
 		Dev:      time.Minute * 5,
-		Testing:  time.Second * 30,
+		Testing:  time.Second * 10,
 	}).(time.Duration)
 
 	// connectabilityCheckTimeout defines how long a connectability check's dial
