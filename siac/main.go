@@ -18,12 +18,13 @@ import (
 
 var (
 	// Flags.
-	addr              string // override default API address
-	initPassword      bool   // supply a custom password when creating a wallet
-	initForce         bool   // destroy and reencrypt the wallet on init if it already exists
-	hostVerbose       bool   // display additional host info
-	renterShowHistory bool   // Show download history in addition to download queue.
-	renterListVerbose bool   // Show additional info about uploaded files.
+	addr                  string // override default API address
+	initPassword          bool   // supply a custom password when creating a wallet
+	initForce             bool   // destroy and reencrypt the wallet on init if it already exists
+	hostVerbose           bool   // display additional host info
+	renterShowHistory     bool   // Show download history in addition to download queue.
+	renterListVerbose     bool   // Show additional info about uploaded files.
+	renterCancelAllowance bool   // Cancel the current renter allowance
 
 	// Globals.
 	rootCmd *cobra.Command // Root command cobra object, used by bash completion cmd.
@@ -283,6 +284,7 @@ func main() {
 	renterCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
 	renterFilesListCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
+	renterAllowanceCmd.Flags().BoolVarP(&renterCancelAllowance, "cancel", "c", false, "Cancel the current renter allowance")
 	renterExportCmd.AddCommand(renterExportContractTxnsCmd)
 
 	root.AddCommand(gatewayCmd)

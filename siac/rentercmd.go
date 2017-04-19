@@ -38,10 +38,11 @@ var (
 
 	renterAllowanceCmd = &cobra.Command{
 		Use:   "allowance",
-		Short: "View the current allowance",
-		Long:  "View the current allowance, which controls how much money is spent on file contracts.",
+		Short: "View or cancel the current allowance",
+		Long:  "View or cancel the current allowance, which controls how much money is spent on file contracts.",
 		Run:   wrap(renterallowancecmd),
 	}
+
 	renterSetAllowanceCmd = &cobra.Command{
 		Use:   "setallowance [amount] [period]",
 		Short: "Set the allowance",
@@ -233,6 +234,15 @@ func renterdownloadscmd() {
 
 // renterallowancecmd displays the current allowance.
 func renterallowancecmd() {
+	if renterCancelAllowance {
+		err := post("/renter", "hosts=0&funds=0&period=0&renewwindow=0")
+		if err != nil {
+			die("error cancelling allowance:", err)
+		}
+		fmt.Println("successfully cancelled allowance.")
+		return
+	}
+
 	var rg api.RenterGET
 	err := getAPI("/renter", &rg)
 	if err != nil {
