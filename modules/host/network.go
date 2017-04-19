@@ -187,7 +187,7 @@ func (h *Host) threadedRPCCheckHost(conn modules.PeerConn) error {
 }
 
 // threadedRPCRequestHostCheck asks the node at conn if the host's NetAddress
-// is connectable, and sets h.connectabilityStatus accordingly.
+// is connectable and returns the result on the resultChan.
 func (h *Host) threadedRPCRequestHostCheck(resultChan chan modules.HostConnectabilityStatus) modules.RPCFunc {
 	return func(conn modules.PeerConn) error {
 		err := conn.SetDeadline(time.Now().Add(checkHostTimeout))
