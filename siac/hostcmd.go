@@ -164,11 +164,21 @@ func hostcmd() {
 		netaddr += " (manually specified)"
 	}
 
+	var connectabilityString string
+	if hg.WorkingStatus == "working" {
+		connectabilityString = "Host appears to be working."
+	} else if hg.WorkingStatus == "not working" && hg.ConnectabilityStatus == "connectable" {
+		connectabilityString = "Nobody is connecting to host. Try re-announcing."
+	} else if hg.WorkingStatus == "checking" || hg.ConnectabilityStatus == "checking" {
+		connectabilityString = "Host is checking status (takes a few minues)."
+	} else {
+		connectabilityString = "Host is not connectable (re-checks every few minutes)."
+	}
+
 	if hostVerbose {
 		// describe net address
 		fmt.Printf(`General Info:
-Connectability Status: %v
-Working Status:        %v
+	Connectability Status: %v
 
 Host Internal Settings:
 	acceptingcontracts:   %v
@@ -214,8 +224,7 @@ RPC Stats:
 	Settings Calls:     %v
 	FormContract Calls: %v
 `,
-			hg.ConnectabilityStatus,
-			hg.WorkingStatus,
+			connectabilityString,
 
 			yesNo(is.AcceptingContracts), periodUnits(is.MaxDuration),
 			filesizeUnits(int64(is.MaxDownloadBatchSize)),
@@ -252,8 +261,7 @@ RPC Stats:
 			nm.FormContractCalls)
 	} else {
 		fmt.Printf(`Host info:
-	Connectablity Status: %v
-	Working Status:       %v
+	Connectability Status: %v
 
 	Storage:      %v (%v used)
 	Price:        %v / TB / Month
@@ -264,8 +272,7 @@ RPC Stats:
 	Locked Collateral:    %v
 	Revenue:              %v
 `,
-			hg.ConnectabilityStatus,
-			hg.WorkingStatus,
+			connectabilityString,
 
 			filesizeUnits(int64(totalstorage)),
 			filesizeUnits(int64(totalstorage-storageremaining)), price,
