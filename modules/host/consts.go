@@ -104,12 +104,20 @@ var (
 	// data.
 	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(10).Div(modules.BytesPerTerabyte) // 10 SC / TB
 
+	// workingStatusFirstCheck defines how frequently the Host's working status
+	// check runs
+	workingStatusFirstCheck = build.Select(build.Var{
+		Standard: time.Minute * 3,
+		Dev:      time.Minute * 1,
+		Testing:  time.Second * 3,
+	}).(time.Duration)
+
 	// workingStatusFrequency defines how frequently the Host's working status
 	// check runs
 	workingStatusFrequency = build.Select(build.Var{
-		Standard: time.Minute * 15,
+		Standard: time.Minute * 10,
 		Dev:      time.Minute * 5,
-		Testing:  time.Second * 30,
+		Testing:  time.Second * 10,
 	}).(time.Duration)
 
 	// workingStatusThreshold defines how many settings calls must occur over the
@@ -120,12 +128,20 @@ var (
 		Testing:  uint64(1),
 	}).(uint64)
 
+	// connectablityCheckFirstWait defines how often the host's connectability
+	// check is run.
+	connectabilityCheckFirstWait = build.Select(build.Var{
+		Standard: time.Minute * 2,
+		Dev:      time.Minute * 1,
+		Testing:  time.Second * 3,
+	}).(time.Duration)
+
 	// connectablityCheckFrequency defines how often the host's connectability
 	// check is run.
 	connectabilityCheckFrequency = build.Select(build.Var{
-		Standard: time.Minute * 15,
+		Standard: time.Minute * 10,
 		Dev:      time.Minute * 5,
-		Testing:  time.Second * 30,
+		Testing:  time.Second * 10,
 	}).(time.Duration)
 
 	// connectabilityCheckTimeout defines how long a connectability check's dial
