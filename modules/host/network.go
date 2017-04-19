@@ -238,10 +238,75 @@ func (h *Host) threadedRPCRequestHostCheck(resultChan chan modules.HostConnectab
 	}
 }
 
+// managedGetConnectabilityStatus asks hostCheckNodes random peers to check the
+// connectability of the host's NetAddress and returns the result.
+func (h *Host) managedGetConnectabilityStatus() modules.HostConnectabilityStatus {
+	// collect outbound peers
+	var outboundPeers []modules.Peer
+	for _, peer := range h.gateway.Peers() {
+		if peer.Inbound {
+			continue
+		}
+		outboundPeers = append(outboundPeers, peer)
+	}
+	if uint64(len(outboundPeers)) < hostCheckNodes {
+		h.log.Debugln("waiting for outbound peers to run connectability check")
+		return modules.HostConnectabilityStatusChecking
+	}
+
+	// select hostCheckNodes outbound peers at random to perform the check
+	var askPeers []modules.Peer
+	for i := 0; uint64(i) < hostCheckNodes; i++ {
+		askPeers = append(askPeers, outboundPeers[fastrand.Intn(len(outboundPeers))])
+	}
+
+	// ask each node to connect to our NetAddress and record the results
+	var results []modules.HostConnectabilityStatus
+	for _, peer := range askPeers {
+		resultChan := make(chan modules.HostConnectabilityStatus, 1)
+		err := h.gateway.RPC(peer.NetAddress, "CheckHost", h.threadedRPCRequestHostCheck(resultChan))
+		if err != nil {
+			h.log.Debugln("error calling CheckHost RPC: ", err)
+			continue
+		}
+		results = append(results, <-resultChan)
+	}
+
+	// if no peers responded, set the status to checking and continue
+	if len(results) == 0 {
+		return modules.HostConnectabilityStatusChecking
+	}
+
+	// if there is disagreement among the peers, set the status to 'checking'
+	// and continue
+	hasDisagreement := false
+	for _, result := range results {
+		if result != results[0] {
+			hasDisagreement = true
+		}
+	}
+	if hasDisagreement {
+		return modules.HostConnectabilityStatusChecking
+	}
+
+	return results[0]
+}
+
 // threadedTrackConnectabilityStatus periodically checks if the host is
 // connectable at its NetAddress.
 func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 	defer close(closeChan)
+
+	select {
+	case <-h.tg.StopChan():
+		return
+	case <-time.After(connectabilityCheckFirstWait):
+	}
+
+	status := h.managedGetConnectabilityStatus()
+	h.mu.Lock()
+	h.connectabilityStatus = status
+	h.mu.Unlock()
 
 	for {
 		select {
@@ -250,62 +315,9 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 		case <-time.After(connectabilityCheckFrequency):
 		}
 
-		// collect outbound peers
-		var outboundPeers []modules.Peer
-		for _, peer := range h.gateway.Peers() {
-			if peer.Inbound {
-				continue
-			}
-			outboundPeers = append(outboundPeers, peer)
-		}
-		if uint64(len(outboundPeers)) < hostCheckNodes {
-			h.log.Debugln("waiting for outbound peers to run connectability check")
-			continue
-		}
-
-		// select hostCheckNodes outbound peers at random to perform the check
-		var askPeers []modules.Peer
-		for i := 0; uint64(i) < hostCheckNodes; i++ {
-			askPeers = append(askPeers, outboundPeers[fastrand.Intn(len(outboundPeers))])
-		}
-
-		// ask each node to connect to our NetAddress and record the results
-		var results []modules.HostConnectabilityStatus
-		for _, peer := range askPeers {
-			resultChan := make(chan modules.HostConnectabilityStatus, 1)
-			err := h.gateway.RPC(peer.NetAddress, "CheckHost", h.threadedRPCRequestHostCheck(resultChan))
-			if err != nil {
-				h.log.Debugln("error calling CheckHost RPC: ", err)
-				continue
-			}
-			results = append(results, <-resultChan)
-		}
-
-		// if no peers responded, set the status to checking and continue
-		if len(results) == 0 {
-			h.mu.Lock()
-			h.connectabilityStatus = modules.HostConnectabilityStatusChecking
-			h.mu.Unlock()
-			continue
-		}
-
-		// if there is disagreement among the peers, set the status to 'checking'
-		// and continue
-		hasDisagreement := false
-		for _, result := range results {
-			if result != results[0] {
-				hasDisagreement = true
-			}
-		}
-		if hasDisagreement {
-			h.mu.Lock()
-			h.connectabilityStatus = modules.HostConnectabilityStatusChecking
-			h.mu.Unlock()
-			continue
-		}
-
+		status := h.managedGetConnectabilityStatus()
 		h.mu.Lock()
-		h.connectabilityStatus = results[0]
+		h.connectabilityStatus = status
 		h.mu.Unlock()
 	}
 }
