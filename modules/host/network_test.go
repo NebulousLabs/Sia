@@ -119,8 +119,6 @@ func TestHostConnectabilityStatus(t *testing.T) {
 	}
 	t.Parallel()
 
-	ht, err := newHostTester(t.Name())
-
 	// create a peer for the check to run on
 	peer, err := newHostTester(t.Name())
 	if err != nil {

@@ -58,8 +58,6 @@ func (h *Host) threadedUpdateHostname(closeChan chan struct{}) {
 func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 	defer close(closeChan)
 
-	// Before entering the longer loop, try a greedy, faster attempt to verify
-	// that the host is working.
 	prevSettingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
 	select {
 	case <-h.tg.StopChan():
@@ -76,19 +74,19 @@ func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 	h.mu.Lock()
 	if settingsCalls-prevSettingsCalls >= workingStatusThreshold {
 		h.workingStatus = modules.HostWorkingStatusWorking
+	} else {
+		h.workingStatus = modules.HostWorkingStatusNotWorking
 	}
-	// First check is quick, don't set to 'not working' if host has not been
-	// contacted enough times.
 	h.mu.Unlock()
 
 	for {
-		prevSettingsCalls = atomic.LoadUint64(&h.atomicSettingsCalls)
+		prevSettingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
 		select {
 		case <-h.tg.StopChan():
 			return
 		case <-time.After(workingStatusFrequency):
 		}
-		settingsCalls = atomic.LoadUint64(&h.atomicSettingsCalls)
+		settingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
 
 		// sanity check
 		if prevSettingsCalls > settingsCalls {
@@ -130,17 +128,14 @@ func (h *Host) threadedRPCCheckHost(conn modules.PeerConn) error {
 	defer h.tg.Done()
 
 	var checkAddress modules.NetAddress
-	err = encoding.ReadObject(conn, &checkAddress, 128)
+	err = encoding.ReadObject(conn, &checkAddress, modules.MaxEncodedNetAddressLength)
 	if err != nil {
 		return err
 	}
 
 	// check that the checkAddress resolves to at least one of the remote's IP
 	// addresses.
-	checkHost, _, err := net.SplitHostPort(string(checkAddress))
-	if err != nil {
-		return err
-	}
+	checkHost := checkAddress.Host()
 	checkIPs, err := net.LookupIP(checkHost)
 	if err != nil {
 		return err
@@ -248,30 +243,15 @@ func (h *Host) threadedRPCRequestHostCheck(resultChan chan modules.HostConnectab
 func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 	defer close(closeChan)
 
-	// Wait breifly before checking the first time. This gives time for any port
-	// forwarding to complete.
-	select {
-	case <-h.tg.StopChan():
-		return
-	case <-time.After(connectabilityCheckFirstWait):
-	}
-
 	for {
-		h.mu.RLock()
-		autoAddr := h.autoAddress
-		userAddr := h.settings.NetAddress
-		h.mu.RUnlock()
-
-		activeAddr := autoAddr
-		if userAddr != "" {
-			activeAddr = userAddr
+		select {
+		case <-h.tg.StopChan():
+			return
+		case <-time.After(connectabilityCheckFrequency):
 		}
-<<<<<<< HEAD
-=======
 
 		// collect outbound peers
 		var outboundPeers []modules.Peer
->>>>>>> more advanced random peer selection algorithm
 		for _, peer := range h.gateway.Peers() {
 			if peer.Inbound {
 				continue
@@ -325,19 +305,8 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 		}
 
 		h.mu.Lock()
-<<<<<<< HEAD
-		h.connectabilityStatus = status
-		h.mu.Unlock()
-
-		select {
-		case <-h.tg.StopChan():
-			return
-		case <-time.After(connectabilityCheckFrequency):
-		}
-=======
 		h.connectabilityStatus = results[0]
 		h.mu.Unlock()
->>>>>>> more advanced random peer selection algorithm
 	}
 }
 
