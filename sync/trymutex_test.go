@@ -154,7 +154,7 @@ func TestTryMutexTimedConcurrent(t *testing.T) {
 		if wait < time.Millisecond*450 {
 			t.Error("lock did not wait the correct amount of time before timing out:", wait)
 		}
-		if wait > time.Millisecond*700 {
+		if wait > time.Millisecond*800 {
 			t.Error("lock waited too long before timing out", wait)
 		}
 
