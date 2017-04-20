@@ -261,7 +261,7 @@ func renterallowancecancelcmd() {
 	if err != nil {
 		die("error cancelling allowance:", err)
 	}
-	fmt.Println("successfully cancelled allowance.")
+	fmt.Println("Allowance cancelled.")
 }
 
 // rentersetallowancecmd allows the user to set the allowance.
