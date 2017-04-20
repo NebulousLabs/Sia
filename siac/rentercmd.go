@@ -97,7 +97,7 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 	}
 
 	renterDownloadChunkCmd = &cobra.Command{
-		Use:   "downloadchunk [path] [chunkid] [destination]",
+		Use:   "downloadchunk [path] [offset] [length] [destination]",
 		Short: "Download a chunk",
 		Long:  "Download a specific chunk from a previously uploaded file.",
 		Run:   wrap(renterfilesdownloadchunkcmd),
@@ -401,20 +401,20 @@ func renterfilesdownloadcmd(path, destination string) {
 // renterfilesdownloadchunkcmd is the handler for the command `siac renter downloadchunk [path]
 // [chunk id] [destination]`.
 // Downloads a specific chunk to the local specified destination.
-func renterfilesdownloadchunkcmd(path string, cind string, destination string) {
+func renterfilesdownloadchunkcmd(path, offset, length, destination string) {
 	destination = abs(destination)
 	done := make(chan struct{})
 
 	go downloadprogress(done, destination)
 
-	req := fmt.Sprintf("/renter/downloadchunk/%s?destination=%s&chunkindex=%s", path, destination, cind)
+	req := fmt.Sprintf("/renter/download/%s?destination=%s&offset=%s&length=%s&httpresp=true", path, destination, offset, length)
 
 	err := get(req)
 	close(done)
 	if err != nil {
 		die("could not download chunk:", err)
 	}
-	fmt.Printf("\nDownloaded chunk %s of '%s' to %s.\n", cind, path, abs(destination))
+	fmt.Printf("\nDownloaded offset %s and length %s of '%s' to %s.\n", offset, length, path, abs(destination))
 }
 
 func downloadprogress(done chan struct{}, siapath string) {

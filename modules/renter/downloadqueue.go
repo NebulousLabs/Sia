@@ -25,13 +25,12 @@ func (r *Renter) DownloadSection(p *modules.RenterDownloadParameters) error {
 
 	// Create the download object and add it to the queue.
 	var d *download
-	if p.Offset == maxUint64 {
+	if p.Offset == maxUint64 { // If whole file download.
 		d = r.newDownload(file, p.DlWriter, currentContracts)
 	} else {
-		// Check whether the chunk index is valid.
-		numChunks := file.numChunks()
-		if p.Offset < 0 && p.Offset >= numChunks {
-			emsg := "chunk index not in range of stored chunks. Max chunk index = " + string(numChunks-1)
+		// Check whether offset and length is valid.
+		if p.Offset < 0 || p.Offset + p.Length > file.size {
+			emsg := "offset and length combination invalid, max byte is at index" + string(file.size-1)
 			return errors.New(emsg)
 		}
 		d = r.newSectionDownload(file, p.DlWriter, currentContracts, p.Offset, p.Length)
@@ -64,9 +63,7 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	for i := range r.downloadQueue {
 		d := r.downloadQueue[len(r.downloadQueue)-i-1]
 
-		// Calculate download size. If single chunk this value equals d.chunkSize, otherwise it is equal to
-		// d.FileSize. TODO: Account for variable-size last chunk. Same in download.go
-		dlsize := d.dlChunks * d.chunkSize
+		dlsize := d.length
 
 		downloads[i] = modules.DownloadInfo{
 			SiaPath:     d.siapath,
