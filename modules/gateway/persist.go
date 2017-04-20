@@ -19,30 +19,81 @@ const (
 // gateway persist file.
 var persistMetadata = persist.Metadata{
 	Header:  "Sia Node List",
+	Version: "0.4.0",
+}
+
+// previousPersistMetadata contains the header and version strings that
+// identify the previous gateway persist file. It allows us to load files in a
+// backward-compatible way.
+var previousPersistMetadata = persist.Metadata{
+	Header:  "Sia Node List",
 	Version: "0.3.3",
 }
 
+type nodePersist struct {
+	NetAddress modules.NetAddress `json:"netaddress"`
+	Inbound    bool               `json:"inbound"`
+}
+
+type gatewayPersist struct {
+	Nodes []nodePersist `json:"nodes"`
+}
+
+// TODO: ensure that we actually have all outbound nodes,
+//       as it seems that peers disconnect
+
 // persistData returns the data in the Gateway that will be saved to disk.
-func (g *Gateway) persistData() (nodes []modules.NetAddress) {
-	for node := range g.nodes {
-		nodes = append(nodes, node)
+func (g *Gateway) persistData() (data gatewayPersist) {
+	for address, node := range g.nodes {
+		data.Nodes = append(data.Nodes, nodePersist{
+			NetAddress: address,
+			Inbound:    node.Inbound,
+		})
 	}
+
 	return
 }
 
 // load loads the Gateway's persistent data from disk.
 func (g *Gateway) load() error {
-	var nodes []modules.NetAddress
-	err := persist.LoadFile(persistMetadata, &nodes, filepath.Join(g.persistDir, nodesFile))
+	var data gatewayPersist
+
+	persistFile := filepath.Join(g.persistDir, nodesFile)
+	err := persist.LoadFile(persistMetadata, &data, persistFile)
+	if err == persist.ErrBadVersion {
+		// might be a file from the previous version
+		var addresses []modules.NetAddress
+		err = persist.LoadFile(previousPersistMetadata, &addresses, persistFile)
+		for _, address := range addresses {
+			data.Nodes = append(data.Nodes, nodePersist{
+				NetAddress: address,
+				Inbound:    true,
+			})
+		}
+	}
+
 	if err != nil {
 		return err
 	}
-	for _, node := range nodes {
-		err := g.addNode(node)
+
+	// add saved nodes
+	for _, node := range data.Nodes {
+		if !node.Inbound {
+			// if outbound node, try to connect to it
+			err := g.Connect(node.NetAddress)
+			if err == nil {
+				continue
+			}
+
+			g.log.Printf("WARN: error connecting outbound '%v' from persist: %v", node.NetAddress, err)
+		}
+
+		err := g.addNode(node.NetAddress, node.Inbound)
 		if err != nil {
-			g.log.Printf("WARN: error loading node '%v' from persist: %v", node, err)
+			g.log.Printf("WARN: error loading node '%v' from persist: %v", node.NetAddress, err)
 		}
 	}
+
 	return nil
 }
 

@@ -12,7 +12,8 @@ func TestLoad(t *testing.T) {
 	g := newTestingGateway(t)
 
 	g.mu.Lock()
-	g.addNode(dummyNode)
+	g.addNode("111.111.111.111:1111", false)
+	g.addNode("222.222.222.222:2222", true)
 	g.save()
 	g.mu.Unlock()
 	g.Close()
@@ -21,7 +22,10 @@ func TestLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := g2.nodes[dummyNode]; !ok {
+	if _, ok := g2.nodes["111.111.111.111:1111"]; !ok {
+		t.Fatal("gateway did not load old peer list:", g2.nodes)
+	}
+	if _, ok := g2.nodes["222.222.222.222:2222"]; !ok {
 		t.Fatal("gateway did not load old peer list:", g2.nodes)
 	}
 }

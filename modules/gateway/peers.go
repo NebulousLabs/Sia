@@ -152,18 +152,20 @@ func (g *Gateway) managedAcceptConnOldPeer(conn net.Conn, remoteVersion string) 
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
+	const inbound = true
+
 	// Old peers are unable to give us a dialback port, so we can't verify
 	// whether or not they are local peers.
 	g.acceptPeer(&peer{
 		Peer: modules.Peer{
-			Inbound:    true,
+			Inbound:    inbound,
 			Local:      false,
 			NetAddress: addr,
 			Version:    remoteVersion,
 		},
 		sess: muxado.Server(conn),
 	})
-	g.addNode(addr)
+	g.addNode(addr, inbound)
 	return g.save()
 }
 
@@ -185,10 +187,13 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 	if _, exists := g.peers[remoteAddr]; exists {
 		return fmt.Errorf("already connected to a peer on that address: %v", remoteAddr)
 	}
+
+	const inbound = true
+
 	// Accept the peer.
 	g.acceptPeer(&peer{
 		Peer: modules.Peer{
-			Inbound: true,
+			Inbound: inbound,
 			// NOTE: local may be true even if the supplied remoteAddr is not
 			// actually reachable.
 			Local:      remoteAddr.IsLocal(),
@@ -205,7 +210,7 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 		err := g.pingNode(remoteAddr)
 		if err == nil {
 			g.mu.Lock()
-			g.addNode(remoteAddr)
+			g.addNode(remoteAddr, inbound)
 			g.save()
 			g.mu.Unlock()
 		}
@@ -353,9 +358,11 @@ func acceptConnVersionHandshake(conn net.Conn, version string) (remoteVersion st
 func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
+	const inbound = false
 	g.addPeer(&peer{
 		Peer: modules.Peer{
-			Inbound:    false,
+			Inbound:    inbound,
 			Local:      remoteAddr.IsLocal(),
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
@@ -366,7 +373,7 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 	// validates the address and checks for duplicates, but we don't care
 	// about duplicates and we have already validated the address by
 	// connecting to it.
-	g.addNode(remoteAddr)
+	g.addNode(remoteAddr, inbound)
 	return g.save()
 }
 
@@ -385,9 +392,12 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
+	const inbound = false
+
 	g.addPeer(&peer{
 		Peer: modules.Peer{
-			Inbound:    false,
+			Inbound:    inbound,
 			Local:      remoteAddr.IsLocal(),
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
@@ -398,7 +408,7 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 	// validates the address and checks for duplicates, but we don't care
 	// about duplicates and we have already validated the address by
 	// connecting to it.
-	g.addNode(remoteAddr)
+	g.addNode(remoteAddr, inbound)
 	return g.save()
 }
 

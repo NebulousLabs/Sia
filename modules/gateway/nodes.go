@@ -16,18 +16,29 @@ var (
 	errOurAddress = errors.New("can't add our own address")
 )
 
+type node struct {
+	Inbound bool `json:"inbound"`
+}
+
 // addNode adds an address to the set of nodes on the network.
-func (g *Gateway) addNode(addr modules.NetAddress) error {
+func (g *Gateway) addNode(addr modules.NetAddress, inbound bool) error {
 	if addr == g.myAddr {
 		return errOurAddress
-	} else if _, exists := g.nodes[addr]; exists {
+	} else if node, exists := g.nodes[addr]; exists {
+		if node.Inbound != inbound {
+			node.Inbound = inbound
+			return nil
+		}
+
 		return errNodeExists
 	} else if addr.IsStdValid() != nil {
 		return errors.New("address is not valid: " + string(addr))
 	} else if net.ParseIP(addr.Host()) == nil {
 		return errors.New("address must be an IP address: " + string(addr))
 	}
-	g.nodes[addr] = struct{}{}
+	g.nodes[addr] = &node{
+		Inbound: inbound,
+	}
 	return nil
 }
 
@@ -133,9 +144,10 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 		return err
 	}
 
+	const inbound = true
 	g.mu.Lock()
 	for _, node := range nodes {
-		err := g.addNode(node)
+		err := g.addNode(node, inbound)
 		if err != nil && err != errNodeExists && err != errOurAddress {
 			g.log.Printf("WARN: peer '%v' sent the invalid addr '%v'", conn.RPCAddr(), node)
 		}

@@ -285,9 +285,11 @@ func TestConnect(t *testing.T) {
 	bootstrap := newNamedTestingGateway(t, "1")
 	defer bootstrap.Close()
 
+	const inbound = false
+
 	// give it a node
 	bootstrap.mu.Lock()
-	bootstrap.addNode(dummyNode)
+	bootstrap.addNode(dummyNode, inbound)
 	bootstrap.mu.Unlock()
 
 	// create peer who will connect to bootstrap
@@ -786,8 +788,8 @@ func TestPeerManager(t *testing.T) {
 
 	// g1's node list should only contain g2
 	g1.mu.Lock()
-	g1.nodes = map[modules.NetAddress]struct{}{}
-	g1.nodes[g2.Address()] = struct{}{}
+	g1.nodes = make(map[modules.NetAddress]*node)
+	g1.nodes[g2.Address()] = &node{Inbound: false}
 	g1.mu.Unlock()
 
 	// when peerManager wakes up, it should connect to g2.

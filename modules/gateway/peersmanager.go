@@ -32,6 +32,12 @@ func (g *Gateway) managedPeerManagerConnect(addr modules.NetAddress) {
 			p.Inbound = false
 			g.log.Debugf("[PMC] [SUCCESS] [%v] existing peer has been converted to outbound peer", addr)
 		}
+		n, exists := g.nodes[addr]
+		if exists {
+			n.Inbound = false
+		} else {
+			g.nodes[addr] = &node{Inbound: false}
+		}
 		g.mu.Unlock()
 	} else if err != nil {
 		g.log.Debugf("[PMC] [ERROR] [%v] WARN: removing peer because automatic connect failed: %v\n", addr, err)
