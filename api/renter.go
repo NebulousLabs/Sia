@@ -402,7 +402,7 @@ func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httpro
 
 	// Determines whether to return on completion of download or straight away.
 	// If httprespparam is present, this parameter is ignored.
-	asyncparam := req.FormValue("httpresp")
+	asyncparam := req.FormValue("async")
 
 	// Parse the offset and length parameters. TODO(rnabel): Handle empty string.
 	offset, err := strconv.ParseUint(offsetparam, 10, 64)

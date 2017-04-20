@@ -15,6 +15,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"math"
 )
 
 const (
@@ -63,9 +64,10 @@ type (
 		atomicDataReceived  uint64
 		downloadComplete    bool
 		downloadErr         error
-		finishedChunks      []bool
+		finishedChunks      map[int]bool
 		isWholeFileDownload bool
-		chunkIndex          uint64 // If individual chunk download, indicates which chunk is downloaded.
+		offset              uint64 // If individual chunk download, indicates which chunk is downloaded.
+		length              uint64
 		dlChunks            uint64 // Total number of chunks to be downloaded as part of this download.
 
 		// Timestamp information.
@@ -127,7 +129,7 @@ func (r *Renter) newDownload(f *file, destination modules.DownloadWriter, curren
 
 	// Settings specific to a complete download.
 	d.dlChunks = d.numChunks
-	d.finishedChunks = make([]bool, d.dlChunks)
+	d.finishedChunks = makeRange(int(0), int(d.numChunks), d.finishedChunks)
 
 	d.initPieceSetFull(f, currentContracts, r)
 	return d
@@ -141,10 +143,15 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 
 	// Settings specific to a chunk download.
 	d.isWholeFileDownload = false
-	d.chunkIndex = offset
-	d.dlChunks = 1
-	d.finishedChunks = make([]bool, d.dlChunks)
+	d.offset = offset
 
+	// Calculate chunks to download.
+	min_chunk := uint64(math.Floor(float64(offset / f.chunkSize())))
+	max_chunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
+
+	r.log.Printf("maxchunk: %d, minchunk: %d", max_chunk, min_chunk)
+	d.dlChunks = 1 + max_chunk - min_chunk
+	d.finishedChunks = makeRange(int(min_chunk), int(max_chunk), d.finishedChunks)
 	d.initPieceSetChunk(offset, f, currentContracts, r)
 	return d
 }
@@ -159,6 +166,7 @@ func (d *download) initDownload(f *file, destination modules.DownloadWriter) {
 	d.numChunks = f.numChunks()
 	d.siapath = f.name
 	d.downloadFinished = make(chan struct{})
+	d.finishedChunks = make(map[int]bool)
 }
 
 func (d *download) initPieceSetFull(f *file,
@@ -244,9 +252,9 @@ func (d *download) fail(err error) {
 func (cd *chunkDownload) recoverChunk() error {
 	// Calculate the effective chunk index into the output file. If a chunk is downloaded individually, it will always be the
 	// first chunk in the output file.
-	var index uint64
+	var index int
 	if cd.download.isWholeFileDownload {
-		index = cd.index
+		index = int(cd.index)
 	} else {
 		index = 0
 	}
@@ -295,7 +303,7 @@ func (cd *chunkDownload) recoverChunk() error {
 
 	// Write the bytes to the download file.
 	result := recoverWriter.Bytes()
-	_, err = cd.download.destination.WriteAt(result, int64(index*cd.download.chunkSize))
+	_, err = cd.download.destination.WriteAt(result, int64(uint64(index)*cd.download.chunkSize))
 	if err != nil {
 		return build.ExtendErr("unable to write to download destination", err)
 	}
@@ -339,27 +347,20 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 	}
 
 	// Add the unfinished chunks one at a time.
-	for i := range d.finishedChunks {
+	for i, val := range d.finishedChunks {
 		// Skip chunks that have already finished downloading.
-		if d.finishedChunks[i] {
+		if val {
 			continue
 		}
 
 		// Handle the individual chunk download case, in which the downloaded chunk will always be at index 0
 		// in d.finishedChunks. Thus, the index needs to be set to the chunk index within the originating
 		// file.
-		var index uint64
-		if d.isWholeFileDownload {
-			index = uint64(i)
-		} else {
-			index = d.chunkIndex
-		}
-		//r.log.Printf("Current chunk index: %d\n", index)
 
 		// Add this chunk to the chunk queue.
 		cd := &chunkDownload{
 			download: d,
-			index:    index,
+			index:    uint64(i),
 
 			completedPieces: make(map[uint64][]byte),
 			workerAttempts:  make(map[types.FileContractID]bool),
@@ -653,4 +654,11 @@ func (r *Renter) threadedDownloadLoop() {
 		r.managedDownloadIteration(ds)
 		r.tg.Done()
 	}
+}
+
+func makeRange(min, max int, m map[int]bool) map[int]bool {
+	for i := min; i <= max; i++ {
+		m[i] = false
+	}
+	return m
 }
