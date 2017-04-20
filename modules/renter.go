@@ -107,7 +107,13 @@ func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
 
 	// Write to response if content is exactly at offset.
 	if uint64(off) == dw.offset {
-		r, err = dw.w.Write(b)
+		// Truncate b if necessary.
+		var byts = b
+		if blen > dw.length {
+			byts = b[:dw.length]
+		}
+
+		r, err = dw.w.Write(byts)
 		dw.offset += blen
 		dw.length -= blen
 
@@ -116,6 +122,7 @@ func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
 		copy(dw.buffer[off:int64(blen)+off], b)
 
 		// TODO: Add boundaries to list of written chunks.
+
 	}
 
 	return r, err

@@ -358,6 +358,7 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 	p, errmsg := parseDownloadParameters(w, req, ps)
 	if errmsg != nil {
 		WriteError(w, *errmsg, http.StatusBadRequest)
+		return
 	}
 
 	if p.Async { // Create goroutine if `async` param set.
