@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/NebulousLabs/bolt"
@@ -184,7 +185,14 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	// Get the input module caught up to the currenct consnesus set.
+	// Check that this subscriber is not already subscribed.
+	for _, s := range cs.subscribers {
+		if s == subscriber {
+			build.Critical("refusing to double-subscribe subscriber")
+		}
+	}
+
+	// Get the input module caught up to the current consensus set.
 	cs.subscribers = append(cs.subscribers, subscriber)
 	err = cs.initializeSubscribe(subscriber, start)
 	if err != nil {

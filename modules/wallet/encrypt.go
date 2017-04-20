@@ -325,6 +325,9 @@ func (w *Wallet) Reset() error {
 		return errUnencryptedWallet
 	}
 
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
 	err := dbReset(w.dbTx)
 	if err != nil {
 		return err

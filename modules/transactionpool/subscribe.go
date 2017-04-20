@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -27,6 +28,13 @@ func (tp *TransactionPool) updateSubscribersTransactions() {
 func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.TransactionPoolSubscriber) {
 	tp.mu.Lock()
 	defer tp.mu.Unlock()
+
+	// Check that this subscriber is not already subscribed.
+	for _, s := range tp.subscribers {
+		if s == subscriber {
+			build.Critical("refusing to double-subscribe subscriber")
+		}
+	}
 
 	// Add the subscriber to the subscriber list.
 	tp.subscribers = append(tp.subscribers, subscriber)
