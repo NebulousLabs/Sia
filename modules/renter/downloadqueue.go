@@ -63,12 +63,10 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	for i := range r.downloadQueue {
 		d := r.downloadQueue[len(r.downloadQueue)-i-1]
 
-		dlsize := d.length
-
 		downloads[i] = modules.DownloadInfo{
 			SiaPath:     d.siapath,
 			Destination: d.destination,
-			Filesize:    dlsize,
+			Filesize:    d.length,
 			StartTime:   d.startTime,
 		}
 		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)

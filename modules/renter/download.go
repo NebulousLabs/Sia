@@ -144,6 +144,7 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 	// Settings specific to a chunk download.
 	d.isWholeFileDownload = false
 	d.offset = offset
+	d.length = length
 
 	// Calculate chunks to download.
 	min_chunk := uint64(math.Floor(float64(offset / f.chunkSize())))
@@ -214,13 +215,13 @@ func (d *download) initPieceSetRaw(cind uint64, f *file,
 		// all relevant to the current chunk to the chunk's pieceSet.
 		for i := range contract.Pieces {
 			pieceSetIndex := contract.Pieces[i].Chunk
-			if cind != maxUint64 { // Single-chunk download is a special case.
+			/*if cind != maxUint64 { // Single-chunk download is a special case.
 				if contract.Pieces[i].Chunk == cind {
 					pieceSetIndex = 0
 				} else {
 					continue
 				}
-			}
+			}*/
 			d.pieceSet[pieceSetIndex][id] = contract.Pieces[i]
 		}
 	}
@@ -250,15 +251,6 @@ func (d *download) fail(err error) {
 // recoverChunk takes a chunk that has had a sufficient number of pieces
 // downloaded and verifies, decrypts and decodes them into the file.
 func (cd *chunkDownload) recoverChunk() error {
-	// Calculate the effective chunk index into the output file. If a chunk is downloaded individually, it will always be the
-	// first chunk in the output file.
-	var index int
-	if cd.download.isWholeFileDownload {
-		index = int(cd.index)
-	} else {
-		index = 0
-	}
-
 	// Assemble the chunk from the download.
 	cd.download.mu.Lock()
 	chunk := make([][]byte, cd.download.erasureCode.NumPieces())
@@ -301,9 +293,19 @@ func (cd *chunkDownload) recoverChunk() error {
 		return build.ExtendErr("unable to recover chunk", err)
 	}
 
-	// Write the bytes to the download file.
-	result := recoverWriter.Bytes()
-	_, err = cd.download.destination.WriteAt(result, int64(uint64(index)*cd.download.chunkSize))
+	// Calculate the offset. If the offset is within the chunk, the requested offset is passed, otherwise the offset of the chunk within the overall file is passed.
+	var result = recoverWriter.Bytes()
+	chunk_base := cd.index * cd.download.chunkSize
+	top_address := chunk_base + cd.download.chunkSize - 1
+	var off = chunk_base
+	if cd.download.offset >= chunk_base && cd.download.offset <= top_address {
+		off = cd.download.offset
+		offset_in_block := off - chunk_base
+		result = result[offset_in_block:] // If the offset is within the block, part of the block will be ignored
+	}
+
+	// Write the bytes to the requested output.
+	_, err = cd.download.destination.WriteAt(result, int64(off))
 	if err != nil {
 		return build.ExtendErr("unable to write to download destination", err)
 	}
@@ -313,10 +315,10 @@ func (cd *chunkDownload) recoverChunk() error {
 
 	// Update the download to signal that this chunk has completed. Only update
 	// after the sync, so that durability is maintained.
-	if cd.download.finishedChunks[index] {
+	if cd.download.finishedChunks[int(cd.index)] {
 		build.Critical("recovering chunk when the chunk has already finished downloading")
 	}
-	cd.download.finishedChunks[index] = true
+	cd.download.finishedChunks[int(cd.index)] = true
 
 	// Determine whether the download is complete.
 	nowComplete := true
@@ -462,16 +464,7 @@ loop:
 				continue
 			}
 
-			// If no piece exists for this worker, do not give the worker this
-			// download.
-			var pieceSetIndex uint64
-			if incompleteChunk.download.isWholeFileDownload {
-				pieceSetIndex = incompleteChunk.index
-			} else {
-				pieceSetIndex = 0
-			}
-
-			piece, exists := incompleteChunk.download.pieceSet[pieceSetIndex][worker.contractID]
+			piece, exists := incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID]
 			if !exists {
 				continue
 			}
