@@ -189,7 +189,7 @@ func (wal *writeAheadLog) commit() {
 		if err != nil {
 			wal.cm.log.Severe("ERROR: unable to create write-ahead-log:", err)
 		}
-		// Write the mmetaetadata into the WAL.
+		// Write the metadata into the WAL.
 		err = writeWALMetadata(wal.fileWALTmp)
 		if err != nil {
 			wal.cm.log.Severe("Unable to properly initialize WAL file, crashing to prevent corruption:", err)
