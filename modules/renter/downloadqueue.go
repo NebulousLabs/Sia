@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// DownloadSection performs a file download according to the download parameters passed.
 func (r *Renter) DownloadSection(p *modules.RenterDownloadParameters) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
