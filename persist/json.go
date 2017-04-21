@@ -15,6 +15,9 @@ import (
 func readJSON(meta Metadata, object interface{}, filename string) error {
 	// Open the file.
 	file, err := os.Open(filename)
+	if os.IsNotExist(err) {
+		return err
+	}
 	if err != nil {
 		return build.ExtendErr("unable to open persisted json object file", err)
 	}
@@ -109,7 +112,7 @@ func LoadJSON(meta Metadata, object interface{}, filename string) error {
 
 	// Try opening the primary file.
 	err = readJSON(meta, object, filename)
-	if err == ErrBadHeader || err == ErrBadVersion {
+	if err == ErrBadHeader || err == ErrBadVersion || os.IsNotExist(err) {
 		return err
 	}
 	if err != nil {

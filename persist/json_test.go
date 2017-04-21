@@ -13,6 +13,9 @@ import (
 // TestSaveLoadJSON creates a simple object and then tries saving and loading
 // it.
 func TestSaveLoadJSON(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Create the directory used for testing.
 	dir := filepath.Join(build.TempDir(persistDir), t.Name())
 	err := os.MkdirAll(dir, 0700)
@@ -69,8 +72,8 @@ func TestSaveLoadJSON(t *testing.T) {
 
 	// Try saving the object multiple times concurrently.
 	var wg sync.WaitGroup
-	errs := make([]error, 25)
-	for i := 0; i < 25; i++ {
+	errs := make([]error, 250)
+	for i := 0; i < 250; i++ {
 		wg.Add(1)
 		go func(i int) {
 			errs[i] = SaveJSON(testMeta, obj1, obj1Filename)
@@ -119,6 +122,9 @@ func TestSaveLoadJSON(t *testing.T) {
 // TestLoadJSONCorruptedFiles checks that LoadJSON correctly handles various
 // types of corruption that can occur during the saving process.
 func TestLoadJSONCorruptedFiles(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Define the test object that will be getting loaded.
 	testMeta := Metadata{"Test Struct", "v1.2.1"}
 	type testStruct struct {
