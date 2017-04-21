@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	defaultFilePerm         = 0666
 	downloadFailureCooldown = time.Minute * 30
 	maxUint64               = ^uint64(0)
 )
@@ -151,7 +150,7 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 	max_chunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
 
 	d.dlChunks = 1 + max_chunk - min_chunk
-	d.finishedChunks = makeRange(int(min_chunk), int(max_chunk), d.finishedChunks)
+	d.finishedChunks = makeRange(int(min_chunk), int(max_chunk + 1), d.finishedChunks)
 	d.initPieceSetChunk(offset, f, currentContracts, r)
 	return d
 }
@@ -641,7 +640,7 @@ func (r *Renter) threadedDownloadLoop() {
 }
 
 func makeRange(min, max int, m map[int]bool) map[int]bool {
-	for i := min; i <= max; i++ {
+	for i := min; i < max; i++ {
 		m[i] = false
 	}
 	return m

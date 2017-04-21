@@ -15,6 +15,7 @@ import (
 const (
 	// RenterDir is the name of the directory that is used to store the
 	// renter's persistent data.
+	defaultFilePerm         = 0666
 	RenterDir = "renter"
 )
 
@@ -71,7 +72,7 @@ type DownloadFileWriter struct {
 }
 
 func NewDownloadFileWriter(fname string) *DownloadFileWriter {
-	l, _ := os.Open(fname)
+	l, _ := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
 	return &DownloadFileWriter{f: l}
 }
 

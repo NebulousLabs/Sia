@@ -25,7 +25,7 @@ func (r *Renter) DownloadSection(p *modules.RenterDownloadParameters) error {
 
 	// Create the download object and add it to the queue.
 	var d *download
-	if p.Offset == maxUint64 { // If whole file download.
+	if p.Length == maxUint64 { // If whole file download.
 		d = r.newDownload(file, p.DlWriter, currentContracts)
 	} else {
 		// Check whether offset and length is valid.
