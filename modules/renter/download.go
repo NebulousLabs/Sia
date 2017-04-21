@@ -63,7 +63,7 @@ type (
 		downloadComplete   bool
 		downloadErr        error
 		finishedChunks     map[int]bool
-		offset             uint64 // If individual chunk download, indicates which chunk is downloaded.
+		offset             uint64
 		length             uint64
 		dlChunks           uint64 // Total number of chunks to be downloaded as part of this download.
 
@@ -151,6 +151,7 @@ func (d *download) initDownload(f *file, destination modules.DownloadWriter) {
 	d.finishedChunks = make(map[int]bool)
 }
 
+// initPieceSet initialises the piece set, including calculations of the total download size.
 func (d *download) initPieceSet(f *file,
 	currentContracts map[modules.NetAddress]types.FileContractID, r *Renter) {
 	// Allocate the piece size and progress bar so that the download will
@@ -181,8 +182,6 @@ func (d *download) initPieceSet(f *file,
 			}
 		}
 
-		// Iterate through all pieces of the current contract and add
-		// all relevant to the current chunk to the chunk's pieceSet.
 		for i := range contract.Pieces {
 			d.pieceSet[contract.Pieces[i].Chunk][id] = contract.Pieces[i]
 		}
@@ -316,10 +315,6 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 		if val {
 			continue
 		}
-
-		// Handle the individual chunk download case, in which the downloaded chunk will always be at index 0
-		// in d.finishedChunks. Thus, the index needs to be set to the chunk index within the originating
-		// file.
 
 		// Add this chunk to the chunk queue.
 		cd := &chunkDownload{
@@ -611,6 +606,7 @@ func (r *Renter) threadedDownloadLoop() {
 	}
 }
 
+// makeRange creates a range (min, max] as boolean map.
 func makeRange(min, max int, m map[int]bool) map[int]bool {
 	for i := min; i < max; i++ {
 		m[i] = false

@@ -222,6 +222,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 	return files
 }
 
+// GetFile returns file information about the file with the provided name and returns false if the file does not exist.
 func (r *Renter) GetFile(name string) (*modules.FileInfo, bool) {
 	// Lookup the file associated with the nickname.
 	files := r.FileList()

@@ -151,6 +151,7 @@ type (
 		ASCIIsia string `json:"asciisia"`
 	}
 
+	// DownloadInfo contains all client-facing information of a file.
 	DownloadInfo struct {
 		SiaPath     string    `json:"siapath"`
 		Destination string    `json:"destination"`
@@ -612,6 +613,7 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 	WriteSuccess(w)
 }
 
+// stringToBool converts "true" and "false" strings to their respective boolean value and returns an error if conversion is not possible.
 func stringToBool(param string) (bool, *Error) {
 	// Parse the async parameter.
 	var out bool

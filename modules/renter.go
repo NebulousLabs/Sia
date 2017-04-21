@@ -13,10 +13,10 @@ import (
 )
 
 const (
+	defaultFilePerm = 0666
 	// RenterDir is the name of the directory that is used to store the
 	// renter's persistent data.
-	defaultFilePerm = 0666
-	RenterDir       = "renter"
+	RenterDir = "renter"
 )
 
 // An ErasureCoder is an error-correcting encoder and decoder.
@@ -61,7 +61,7 @@ type DownloadInfo struct {
 	Error       string         `json:"error"`
 }
 
-// DownloadWriter provides an interface which all possible outputs have to implement.
+// DownloadWriter provides an interface which all output writers have to implement.
 type DownloadWriter interface {
 	WriteAt(b []byte, off int64) (int, error)
 }
@@ -88,7 +88,7 @@ func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
 }
 
 // DownloadHttpWriter is a http response writer-backed implementation of DownloadWriter.
-// The writer writes all content that is written to location `offset` directly to the ResponseWriter,
+// The writer writes all content that is written to the current `offset` directly to the ResponseWriter,
 // and buffers all content that is written at other offsets.
 // After every write to the ResponseWriter the `offset` and `length` fields are updated, and buffer content written until
 type DownloadHttpWriter struct {
@@ -122,9 +122,6 @@ func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
 		// TODO: Flush buffer until no more available bytes at offset.
 	} else {
 		copy(dw.buffer[off:int64(blen)+off], b)
-
-		// TODO: Add boundaries to list of written chunks.
-
 	}
 
 	return r, err
@@ -373,6 +370,7 @@ type Renter interface {
 	Upload(FileUploadParams) error
 }
 
+// RenterDownloadParameters contains all parameters that can be passed to the `/download` endpoint.
 type RenterDownloadParameters struct {
 	Async    bool
 	DlWriter DownloadWriter
