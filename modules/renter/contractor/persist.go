@@ -219,7 +219,7 @@ func loadv110persist(dir string, data *contractorPersist) error {
 			UploadSpending   types.Currency
 		}
 	}
-	err := persist.LoadFile(persist.Metadata{
+	err := persist.LoadJSON(persist.Metadata{
 		Header:  "Contractor Persistence",
 		Version: "0.5.2",
 	}, &oldPersist, filepath.Join(dir, "contractor.json"))

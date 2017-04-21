@@ -275,6 +275,17 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
 	}
+	// Spawn the thread to periodically save the gateway.
+	go g.threadedSaveLoop()
+	// Make sure that the gateway saves after shutdown.
+	g.threads.AfterStop(func() {
+		g.mu.Lock()
+		err = g.saveSync()
+		g.mu.Unlock()
+		if err != nil {
+			g.log.Println("ERROR: Unable to save gateway:", err)
+		}
+	})
 
 	// Add the bootstrap peers to the node list.
 	if bootstrap {

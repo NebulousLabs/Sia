@@ -26,6 +26,9 @@ const (
 	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
 	// pre-hardfork.
 	minAcceptableVersion = "0.4.0"
+
+	// saveFrequency defines how often the gateway saves its persistence.
+	saveFrequency = time.Minute * 2
 )
 
 var (

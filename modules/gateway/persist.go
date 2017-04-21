@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"path/filepath"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -33,7 +34,7 @@ func (g *Gateway) persistData() (nodes []modules.NetAddress) {
 // load loads the Gateway's persistent data from disk.
 func (g *Gateway) load() error {
 	var nodes []modules.NetAddress
-	err := persist.LoadFile(persistMetadata, &nodes, filepath.Join(g.persistDir, nodesFile))
+	err := persist.LoadJSON(persistMetadata, &nodes, filepath.Join(g.persistDir, nodesFile))
 	if err != nil {
 		return err
 	}
@@ -46,13 +47,34 @@ func (g *Gateway) load() error {
 	return nil
 }
 
-// save stores the Gateway's persistent data on disk.
-func (g *Gateway) save() error {
-	return persist.SaveFile(persistMetadata, g.persistData(), filepath.Join(g.persistDir, nodesFile))
-}
-
 // saveSync stores the Gateway's persistent data on disk, and then syncs to
 // disk to minimize the possibility of data loss.
 func (g *Gateway) saveSync() error {
-	return persist.SaveFileSync(persistMetadata, g.persistData(), filepath.Join(g.persistDir, nodesFile))
+	return persist.SaveJSON(persistMetadata, g.persistData(), filepath.Join(g.persistDir, nodesFile))
+}
+
+// threadedSaveLoop periodically saves the gateway.
+func (g *Gateway) threadedSaveLoop() {
+	for {
+		select {
+		case <-g.threads.StopChan():
+			return
+		case <-time.After(saveFrequency):
+		}
+
+		func() {
+			err := g.threads.Add()
+			if err != nil {
+				return
+			}
+			defer g.threads.Done()
+
+			g.mu.Lock()
+			err = g.saveSync()
+			g.mu.Unlock()
+			if err != nil {
+				g.log.Println("ERROR: Unable to save gateway persist:", err)
+			}
+		}()
+	}
 }

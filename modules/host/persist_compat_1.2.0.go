@@ -230,7 +230,7 @@ func (h *Host) upgradeFromV112ToV120() error {
 	// and grow them 112 sectors at a time. This is to make sure the user does
 	// not run out of disk space during the upgrade.
 	oldPersist := new(v112StorageManagerPersist)
-	err := persist.LoadFile(v112StorageManagerMetadata, oldPersist, filepath.Join(h.persistDir, v112StorageManagerDir, v112StorageManagerPersistFilename))
+	err := persist.LoadJSON(v112StorageManagerMetadata, oldPersist, filepath.Join(h.persistDir, v112StorageManagerDir, v112StorageManagerPersistFilename))
 	if err != nil {
 		return build.ExtendErr("unable to load the legacy storage manager persist", err)
 	}
