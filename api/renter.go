@@ -16,6 +16,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"strconv"
+	"time"
 )
 
 const (
@@ -130,7 +131,7 @@ type (
 
 	// DownloadQueue contains the renter's download queue.
 	RenterDownloadQueue struct {
-		Downloads []modules.DownloadInfo `json:"downloads"`
+		Downloads []DownloadInfo `json:"downloads"`
 	}
 
 	// RenterFiles lists the files known to the renter.
@@ -152,6 +153,15 @@ type (
 	// RenterShareASCII contains an ASCII-encoded .sia file.
 	RenterShareASCII struct {
 		ASCIIsia string `json:"asciisia"`
+	}
+
+	DownloadInfo struct {
+		SiaPath     string    `json:"siapath"`
+		Destination string    `json:"destination"`
+		Filesize    uint64    `json:"filesize"`
+		Received    uint64    `json:"received"`
+		StartTime   time.Time `json:"starttime"`
+		Error       string    `json:"error"`
 	}
 )
 
@@ -280,6 +290,12 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 
 // renterDownloadsHandler handles the API call to request the download queue.
 func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	//dlq := api.renter.DownloadQueue()
+	//for i := range dlq {
+	//	el := dlq[i]
+	//
+	//} TODO: translate a modules.DownloadInfo into a api.DownloadInfo object.
+
 	WriteJSON(w, RenterDownloadQueue{
 		Downloads: api.renter.DownloadQueue(),
 	})
@@ -406,15 +422,22 @@ func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httpro
 	asyncparam := req.FormValue("async")
 
 	// Parse the offset and length parameters. TODO(rnabel): Handle empty string.
-	offset, err := strconv.ParseUint(offsetparam, 10, 64)
-	if err != nil {
-		return nil, &Error{"could not decode the offset as uint64: " +
-			err.Error()}
+	var offset, length uint64
+	var err error
+	if len(offsetparam) > 0 {
+		offset, err = strconv.ParseUint(offsetparam, 10, 64)
+		if err != nil {
+			return nil, &Error{"could not decode the offset as uint64: " +
+				err.Error()}
+		}
 	}
-	length, err := strconv.ParseUint(lengthparam, 10, 64)
-	if err != nil {
-		return nil, &Error{"could not decode the length as uint64: " +
-			err.Error()}
+	if len(lengthparam) > 0 {
+		length, err = strconv.ParseUint(lengthparam, 10, 64)
+		if err != nil {
+			return nil, &Error{"could not decode the length as uint64: " +
+				err.Error()}
+		}
+
 	}
 	// Verify that if either offset or length have been provided that both were provided.
 	offparampassed := len(offsetparam) > 0
