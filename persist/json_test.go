@@ -1,106 +1,42 @@
 package persist
 
 import (
-	"bytes"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 )
 
-// TestSaveLoad checks that saving and loading data behaves as expected.
-func TestSaveLoad(t *testing.T) {
-	var meta = Metadata{t.Name(), "0.1"}
-	var saveData int = 3
-	buf := new(bytes.Buffer)
-
-	// save data to buffer
-	err := Save(meta, saveData, buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data := buf.Bytes()
-
-	// load valid data
-	var loadData int
-	err = Load(meta, &loadData, bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if loadData != saveData {
-		t.Fatalf("loaded data (%v) does not match saved data (%v)", loadData, saveData)
-	}
-
-	// load with bad metadata
-	err = Load(Metadata{t.Name() + "Bad", "0.1"}, &loadData, bytes.NewReader(data))
-	if err != ErrBadHeader {
-		t.Fatal("expected ErrBadHeader, got", err)
-	}
-	err = Load(Metadata{t.Name(), "-1"}, &loadData, bytes.NewReader(data))
-	if err != ErrBadVersion {
-		t.Fatal("expected ErrBadVersion, got", err)
-	}
-
-	// corrupt data, moving back to front
-	data[21] = '}'
-	err = Load(meta, &loadData, bytes.NewReader(data))
-	if err == nil {
-		t.Fatal("expected error when loading corrupted data")
-	}
-	data[14] = '}'
-	err = Load(meta, &loadData, bytes.NewReader(data))
-	if err == nil {
-		t.Fatal("expected error when loading corrupted data")
-	}
-	data[0] = '}'
-	err = Load(meta, &loadData, bytes.NewReader(data))
-	if err == nil {
-		t.Fatal("expected error when loading corrupted data")
-	}
-}
-
-// TestSaveLoadFile tests that saving and loading a file without fsync properly
-// stores and fetches data.
-func TestSaveLoadFile(t *testing.T) {
-	var meta = Metadata{t.Name(), "0.1"}
-	var saveData int = 3
-
-	os.MkdirAll(build.TempDir("persist"), 0777)
-	filename := build.TempDir("persist", t.Name())
-	err := SaveFile(meta, saveData, filename)
+// TestSaveLoadJSON creates a simple object and then tries saving and loading
+// it.
+func TestSaveLoadJSON(t *testing.T) {
+	// Create the directory used for testing.
+	dir := filepath.Join(build.TempDir(persistDir), t.Name())
+	err := os.MkdirAll(dir, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var loadData int
-	err = LoadFile(meta, &loadData, filename)
-	if err != nil {
-		t.Fatal(err)
+	// Create and save the test object.
+	testMeta := Metadata{"Test Struct", "v1.2.1"}
+	type testStruct struct {
+		One   string
+		Two   uint64
+		Three []byte
 	}
-	if loadData != saveData {
-		t.Fatalf("loaded data (%v) does not match saved data (%v)", loadData, saveData)
-	}
-}
 
-// TestSaveLoadFileSync test that saving and loading a file with fsync properly
-// stores and fetches data.
-func TestSaveLoadFileSync(t *testing.T) {
-	var meta = Metadata{t.Name(), "0.1"}
-	var saveData int = 3
-
-	os.MkdirAll(build.TempDir("persist"), 0777)
-	filename := build.TempDir("persist", t.Name())
-	err := SaveFileSync(meta, saveData, filename)
+	obj1 := testStruct{"dog", 25, []byte("more dog")}
+	obj1Filename := filepath.Join(dir, "obj1.json")
+	err = SaveJSON(testMeta, obj1, obj1Filename)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var loadData int
-	err = LoadFile(meta, &loadData, filename)
+	// Try loading the object
+	var obj2 testStruct
+	err = LoadJSON(testMeta, &obj2, obj1Filename)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if loadData != saveData {
-		t.Fatalf("loaded data (%v) does not match saved data (%v)", loadData, saveData)
 	}
 }
