@@ -73,16 +73,6 @@ type safeFile struct {
 	finalName string
 }
 
-// Commit closes the file, and then renames it to the intended final filename.
-// Commit should not be called from a defer if the function it is being called
-// from can return an error.
-func (sf *safeFile) Commit() error {
-	if err := sf.Close(); err != nil {
-		return err
-	}
-	return os.Rename(sf.finalName+"_temp", sf.finalName)
-}
-
 // CommitSync syncs the file, closes it, and then renames it to the intended
 // final filename. CommitSync should not be called from a defer if the
 // function it is being called from can return an error.
@@ -90,7 +80,10 @@ func (sf *safeFile) CommitSync() error {
 	if err := sf.Sync(); err != nil {
 		return err
 	}
-	return sf.Commit()
+	if err := sf.Close(); err != nil {
+		return err
+	}
+	return os.Rename(sf.finalName+"_temp", sf.finalName)
 }
 
 // NewSafeFile returns a file that can atomically be written to disk,

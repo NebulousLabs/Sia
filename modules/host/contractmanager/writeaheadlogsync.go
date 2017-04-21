@@ -1,11 +1,12 @@
 package contractmanager
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // syncResources will call Sync on all resources that the WAL has open. The
@@ -160,9 +161,19 @@ func (wal *writeAheadLog) commit() {
 			wal.cm.log.Severe("Unable to open temporary settings file for writing:", err)
 		}
 		ss := wal.cm.savedSettings()
-		err = persist.Save(settingsMetadata, ss, wal.fileSettingsTmp)
+		b, err := json.MarshalIndent(ss, "", "\t")
 		if err != nil {
-			wal.cm.log.Severe("writing to settings tmp file has failed:", err)
+			build.ExtendErr("unable to marshal settings data", err)
+		}
+		enc := json.NewEncoder(wal.fileSettingsTmp)
+		if err := enc.Encode(settingsMetadata.Header); err != nil {
+			build.ExtendErr("unable to write header to settings temp file", err)
+		}
+		if err := enc.Encode(settingsMetadata.Version); err != nil {
+			build.ExtendErr("unable to write version to settings temp file", err)
+		}
+		if _, err = wal.fileSettingsTmp.Write(b); err != nil {
+			build.ExtendErr("unable to write data settings temp file", err)
 		}
 	}()
 
@@ -178,7 +189,7 @@ func (wal *writeAheadLog) commit() {
 		if err != nil {
 			wal.cm.log.Severe("ERROR: unable to create write-ahead-log:", err)
 		}
-		// Write the metadata into the WAL.
+		// Write the mmetaetadata into the WAL.
 		err = writeWALMetadata(wal.fileWALTmp)
 		if err != nil {
 			wal.cm.log.Severe("Unable to properly initialize WAL file, crashing to prevent corruption:", err)

@@ -175,7 +175,7 @@ func (r *Renter) saveFile(f *file) error {
 	}
 
 	// Commit the SafeFile.
-	return handle.Commit()
+	return handle.CommitSync()
 }
 
 // saveSync stores the current renter data to disk and then syncs to disk.
