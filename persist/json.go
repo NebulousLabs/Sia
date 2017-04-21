@@ -190,11 +190,11 @@ func SaveJSON(meta Metadata, object interface{}, filename string) error {
 			err = build.ComposeErrors(err, file.Close())
 		}()
 
+		// Write and sync.
 		_, err = file.Write(data)
 		if err != nil {
 			return build.ExtendErr("unable to write temp file", err)
 		}
-
 		err = file.Sync()
 		if err != nil {
 			return build.ExtendErr("unable to sync temp file", err)
@@ -205,8 +205,7 @@ func SaveJSON(meta Metadata, object interface{}, filename string) error {
 		return err
 	}
 
-	// Write out the data to the real file, no sync needed (temp file provides
-	// durability).
+	// Write out the data to the real file, with a sync.
 	err = func() (err error) {
 		file, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0600)
 		if err != nil {
@@ -216,9 +215,14 @@ func SaveJSON(meta Metadata, object interface{}, filename string) error {
 			err = build.ComposeErrors(err, file.Close())
 		}()
 
+		// Write and sync.
 		_, err = file.Write(data)
 		if err != nil {
 			return build.ExtendErr("unable to write file", err)
+		}
+		err = file.Sync()
+		if err != nil {
+			return build.ExtendErr("unable to sync temp file", err)
 		}
 		return nil
 	}()
