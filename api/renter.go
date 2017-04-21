@@ -19,10 +19,6 @@ import (
 	"time"
 )
 
-const (
-	maxUint64 = ^uint64(0)
-)
-
 var (
 	// recommendedHosts is the number of hosts that the renter will form
 	// contracts with if the value is not specified explicitly in the call to
@@ -290,14 +286,33 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 
 // renterDownloadsHandler handles the API call to request the download queue.
 func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	//dlq := api.renter.DownloadQueue()
-	//for i := range dlq {
-	//	el := dlq[i]
-	//
-	//} TODO: translate a modules.DownloadInfo into a api.DownloadInfo object.
+	dlq := api.renter.DownloadQueue()
 
+	// Translate []modules.DownloadInfo to []api.DownloadInfo.
+	downloads := make([]DownloadInfo, len(dlq))
+	for i := range dlq {
+		d := dlq[len(dlq)-i-1]
+
+		// Find the destination of the download.
+		dstwriter, ok := (d.Destination).(*modules.DownloadFileWriter)
+		var dst string
+		if ok {
+			dst = dstwriter.Location
+		} else {
+			dst = "httpresp"
+		}
+
+		downloads[i] = DownloadInfo{
+			SiaPath:     d.SiaPath,
+			Destination: dst,
+			Filesize:    d.Filesize,
+			StartTime:   d.StartTime,
+			Received:    d.Received,
+			Error:       d.Error,
+		}
+	}
 	WriteJSON(w, RenterDownloadQueue{
-		Downloads: api.renter.DownloadQueue(),
+		Downloads: downloads,
 	})
 }
 
@@ -371,7 +386,7 @@ func (api *API) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps
 
 // renterDownloadHandler handles the API call to download a file.
 func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	p, errmsg := parseDownloadParameters(w, req, ps)
+	p, errmsg := api.parseAndValidateDownloadParameters(w, req, ps)
 	if errmsg != nil {
 		WriteError(w, *errmsg, http.StatusBadRequest)
 		return
@@ -392,7 +407,7 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
 func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	p, errmsg := parseDownloadParameters(w, req, ps)
+	p, errmsg := api.parseAndValidateDownloadParameters(w, req, ps)
 	if errmsg != nil {
 		WriteError(w, *errmsg, http.StatusBadRequest)
 	}
@@ -407,7 +422,7 @@ func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Requ
 	WriteSuccess(w)
 }
 
-func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (*modules.RenterDownloadParameters, *Error) {
+func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (*modules.RenterDownloadParameters, *Error) {
 	destination := req.FormValue("destination")
 
 	// The offset and length in bytes.
@@ -467,9 +482,15 @@ func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httpro
 
 	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/") // Sia file name.
 
+	// Lookup the file associated with the nickname.
+	file, exists := api.renter.GetFile(siapath)
+	if !exists {
+		return nil, &Error{Message: "file could not be found"}
+	}
+
 	if !offparampassed { // Determine if entire file is to be downloaded.
 		offset = 0
-		length = maxUint64
+		length = file.Filesize
 	}
 
 	// Instantiate the correct DownloadWriter implementation

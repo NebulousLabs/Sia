@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"fmt"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -23,18 +24,14 @@ func (r *Renter) DownloadSection(p *modules.RenterDownloadParameters) error {
 		currentContracts[contract.NetAddress] = contract.ID
 	}
 
-	// Create the download object and add it to the queue.
-	var d *download
-	if p.Length == maxUint64 { // If whole file download.
-		d = r.newDownload(file, p.DlWriter, currentContracts)
-	} else {
-		// Check whether offset and length is valid.
-		if p.Offset < 0 || p.Offset+p.Length > file.size {
-			emsg := "offset and length combination invalid, max byte is at index" + string(file.size-1)
-			return errors.New(emsg)
-		}
-		d = r.newSectionDownload(file, p.DlWriter, currentContracts, p.Offset, p.Length)
+	// Check whether offset and length is valid.
+	if p.Offset < 0 || p.Offset+p.Length > file.size {
+		emsg := fmt.Sprintf("offset and length combination invalid, max byte is at index %d", file.size-1)
+		return errors.New(emsg)
 	}
+
+	// Create the download object and add it to the queue.
+	d := r.newSectionDownload(file, p.DlWriter, currentContracts, p.Offset, p.Length)
 
 	lockID = r.mu.Lock()
 	r.downloadQueue = append(r.downloadQueue, d)
