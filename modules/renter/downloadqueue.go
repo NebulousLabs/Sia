@@ -29,7 +29,7 @@ func (r *Renter) DownloadSection(p *modules.RenterDownloadParameters) error {
 		d = r.newDownload(file, p.DlWriter, currentContracts)
 	} else {
 		// Check whether offset and length is valid.
-		if p.Offset < 0 || p.Offset + p.Length > file.size {
+		if p.Offset < 0 || p.Offset+p.Length > file.size {
 			emsg := "offset and length combination invalid, max byte is at index" + string(file.size-1)
 			return errors.New(emsg)
 		}

@@ -150,7 +150,6 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 	min_chunk := uint64(math.Floor(float64(offset / f.chunkSize())))
 	max_chunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
 
-	r.log.Printf("maxchunk: %d, minchunk: %d", max_chunk, min_chunk)
 	d.dlChunks = 1 + max_chunk - min_chunk
 	d.finishedChunks = makeRange(int(min_chunk), int(max_chunk), d.finishedChunks)
 	d.initPieceSetChunk(offset, f, currentContracts, r)
@@ -214,15 +213,7 @@ func (d *download) initPieceSetRaw(cind uint64, f *file,
 		// Iterate through all pieces of the current contract and add
 		// all relevant to the current chunk to the chunk's pieceSet.
 		for i := range contract.Pieces {
-			pieceSetIndex := contract.Pieces[i].Chunk
-			/*if cind != maxUint64 { // Single-chunk download is a special case.
-				if contract.Pieces[i].Chunk == cind {
-					pieceSetIndex = 0
-				} else {
-					continue
-				}
-			}*/
-			d.pieceSet[pieceSetIndex][id] = contract.Pieces[i]
+			d.pieceSet[contract.Pieces[i].Chunk][id] = contract.Pieces[i]
 		}
 	}
 	f.mu.RUnlock()
