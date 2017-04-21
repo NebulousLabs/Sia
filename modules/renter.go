@@ -15,8 +15,8 @@ import (
 const (
 	// RenterDir is the name of the directory that is used to store the
 	// renter's persistent data.
-	defaultFilePerm         = 0666
-	RenterDir = "renter"
+	defaultFilePerm = 0666
+	RenterDir       = "renter"
 )
 
 // An ErasureCoder is an error-correcting encoder and decoder.
@@ -68,12 +68,13 @@ type DownloadWriter interface {
 
 // DownloadFileWriter is a file-backed implementation of DownloadWriter.
 type DownloadFileWriter struct {
-	f *os.File
+	f        *os.File
+	Location string
 }
 
 func NewDownloadFileWriter(fname string) *DownloadFileWriter {
 	l, _ := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
-	return &DownloadFileWriter{f: l}
+	return &DownloadFileWriter{f: l, Location: fname}
 }
 
 func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
@@ -330,6 +331,9 @@ type Renter interface {
 
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
+
+	// GetFile returns information on the requested file name. If file does not exist (nil, false) is returned.
+	GetFile(name string) (*FileInfo, bool)
 
 	// Host provides the DB entry and score breakdown for the requested host.
 	Host(pk types.SiaPublicKey) (HostDBEntry, bool)

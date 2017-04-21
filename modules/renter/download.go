@@ -20,7 +20,6 @@ import (
 
 const (
 	downloadFailureCooldown = time.Minute * 30
-	maxUint64               = ^uint64(0)
 )
 
 var (
@@ -60,14 +59,13 @@ type (
 	// A download is a file download that has been queued by the renter.
 	download struct {
 		// Progress variables.
-		atomicDataReceived  uint64
-		downloadComplete    bool
-		downloadErr         error
-		finishedChunks      map[int]bool
-		isWholeFileDownload bool
-		offset              uint64 // If individual chunk download, indicates which chunk is downloaded.
-		length              uint64
-		dlChunks            uint64 // Total number of chunks to be downloaded as part of this download.
+		atomicDataReceived uint64
+		downloadComplete   bool
+		downloadErr        error
+		finishedChunks     map[int]bool
+		offset             uint64 // If individual chunk download, indicates which chunk is downloaded.
+		length             uint64
+		dlChunks           uint64 // Total number of chunks to be downloaded as part of this download.
 
 		// Timestamp information.
 		completeTime time.Time
@@ -120,20 +118,6 @@ type (
 	}
 )
 
-// newDownload initializes and returns a download object for the entire file.
-func (r *Renter) newDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID) *download {
-	d := &download{}
-	d.initDownload(f, destination)
-	d.isWholeFileDownload = true
-
-	// Settings specific to a complete download.
-	d.dlChunks = d.numChunks
-	d.finishedChunks = makeRange(int(0), int(d.numChunks), d.finishedChunks)
-
-	d.initPieceSetFull(f, currentContracts, r)
-	return d
-}
-
 // newSectionDownload initialises and returns a download object for the specified chunk.
 func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID, offset, length uint64) *download {
 	r.log.Println("Chunk download called.")
@@ -141,7 +125,6 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 	d.initDownload(f, destination)
 
 	// Settings specific to a chunk download.
-	d.isWholeFileDownload = false
 	d.offset = offset
 	d.length = length
 
@@ -150,8 +133,8 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 	max_chunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
 
 	d.dlChunks = 1 + max_chunk - min_chunk
-	d.finishedChunks = makeRange(int(min_chunk), int(max_chunk + 1), d.finishedChunks)
-	d.initPieceSetChunk(offset, f, currentContracts, r)
+	d.finishedChunks = makeRange(int(min_chunk), int(max_chunk+1), d.finishedChunks)
+	d.initPieceSet(f, currentContracts, r)
 	return d
 }
 
@@ -168,18 +151,7 @@ func (d *download) initDownload(f *file, destination modules.DownloadWriter) {
 	d.finishedChunks = make(map[int]bool)
 }
 
-func (d *download) initPieceSetFull(f *file,
-	currentContracts map[modules.NetAddress]types.FileContractID, r *Renter) {
-	// maxUint64 indicates that a whole file download was requested.
-	d.initPieceSetRaw(maxUint64, f, currentContracts, r)
-}
-
-func (d *download) initPieceSetChunk(cind uint64, f *file,
-	currentContracts map[modules.NetAddress]types.FileContractID, r *Renter) {
-	d.initPieceSetRaw(cind, f, currentContracts, r)
-}
-
-func (d *download) initPieceSetRaw(cind uint64, f *file,
+func (d *download) initPieceSet(f *file,
 	currentContracts map[modules.NetAddress]types.FileContractID, r *Renter) {
 	// Allocate the piece size and progress bar so that the download will
 	// finish at exactly 100%. Due to rounding error and padding, there is not

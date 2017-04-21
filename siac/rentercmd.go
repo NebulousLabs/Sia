@@ -211,7 +211,7 @@ func renterdownloadscmd() {
 		die("Could not get download queue:", err)
 	}
 	// Filter out files that have been downloaded.
-	var downloading []modules.DownloadInfo
+	var downloading []api.DownloadInfo
 	for _, file := range queue.Downloads {
 		if file.Received != file.Filesize {
 			downloading = append(downloading, file)
@@ -230,7 +230,7 @@ func renterdownloadscmd() {
 	}
 	fmt.Println()
 	// Filter out files that are downloading.
-	var downloaded []modules.DownloadInfo
+	var downloaded []api.DownloadInfo
 	for _, file := range queue.Downloads {
 		if file.Received == file.Filesize {
 			downloaded = append(downloaded, file)
@@ -431,7 +431,7 @@ func downloadprogress(done chan struct{}, siapath string) {
 			if err != nil {
 				continue // benign
 			}
-			var d modules.DownloadInfo
+			var d api.DownloadInfo
 			for _, d = range queue.Downloads {
 				if d.SiaPath == siapath {
 					break
