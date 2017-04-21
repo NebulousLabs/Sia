@@ -3,6 +3,7 @@ package miner
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -12,6 +13,8 @@ import (
 const (
 	logFile      = modules.MinerDir + ".log"
 	settingsFile = modules.MinerDir + ".json"
+
+	saveLoopPeriod = time.Minute * 2
 )
 
 var (
@@ -39,7 +42,7 @@ func (m *Miner) initSettings() error {
 	filename := filepath.Join(m.persistDir, settingsFile)
 	_, err := os.Stat(filename)
 	if os.IsNotExist(err) {
-		return m.save()
+		return m.saveSync()
 	} else if err != nil {
 		return err
 	}
@@ -65,15 +68,35 @@ func (m *Miner) initPersist() error {
 
 // load loads the miner persistence from disk.
 func (m *Miner) load() error {
-	return persist.LoadFile(settingsMetadata, &m.persist, filepath.Join(m.persistDir, settingsFile))
-}
-
-// save saves the miner persistence to disk.
-func (m *Miner) save() error {
-	return persist.SaveFile(settingsMetadata, m.persist, filepath.Join(m.persistDir, settingsFile))
+	return persist.LoadJSON(settingsMetadata, &m.persist, filepath.Join(m.persistDir, settingsFile))
 }
 
 // saveSync saves the miner persistence to disk, and then syncs to disk.
 func (m *Miner) saveSync() error {
-	return persist.SaveFileSync(settingsMetadata, m.persist, filepath.Join(m.persistDir, settingsFile))
+	return persist.SaveJSON(settingsMetadata, m.persist, filepath.Join(m.persistDir, settingsFile))
+}
+
+// threadedSaveLoop periodically saves the miner persist.
+func (m *Miner) threadedSaveLoop() {
+	for {
+		select {
+		case <-m.tg.StopChan():
+			return
+		case <-time.After(saveLoopPeriod):
+		}
+
+		func() {
+			err := m.tg.Add()
+			if err != nil {
+				return
+			}
+			defer m.tg.Done()
+
+			m.mu.Lock()
+			err = m.saveSync()
+			if err != nil {
+				m.log.Println("ERROR: Unable to save miner persist:", err)
+			}
+		}()
+	}
 }
