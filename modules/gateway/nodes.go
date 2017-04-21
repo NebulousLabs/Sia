@@ -140,9 +140,9 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 			g.log.Printf("WARN: peer '%v' sent the invalid addr '%v'", conn.RPCAddr(), node)
 		}
 	}
-	err := g.save()
+	err := g.saveSync()
 	if err != nil {
-		g.log.Println("WARN: failed to save nodelist after requesting nodes:", err)
+		g.log.Println("ERROR: unable to save new nodes added to the gateway:", err)
 	}
 	g.mu.Unlock()
 	return nil
@@ -226,7 +226,6 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		if err != nil {
 			g.mu.Lock()
 			g.removeNode(node)
-			g.save()
 			g.mu.Unlock()
 			g.log.Debugf("INFO: removing node %q because it could not be reached during a random scan: %v", node, err)
 		}
