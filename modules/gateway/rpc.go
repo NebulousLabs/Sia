@@ -173,6 +173,10 @@ func (g *Gateway) threadedListenPeer(p *peer) {
 		// The handler is responsible for closing the connection, though a
 		// default deadline has been set.
 		go g.threadedHandleConn(conn)
+
+		if !g.managedSleep(peerRPCDelay) {
+			break
+		}
 	}
 	// Signal that the goroutine can shutdown.
 	close(peerCloseChan)
