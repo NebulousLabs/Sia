@@ -505,7 +505,7 @@ func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *h
 		if !filepath.IsAbs(destination) {
 			return nil, &Error{"destination must be an absolute path"}
 		}
-		dw = modules.NewDownloadFileWriter(destination)
+		dw = modules.NewDownloadFileWriter(destination, offset, length)
 	}
 
 	return &modules.RenterDownloadParameters{
