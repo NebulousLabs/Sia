@@ -79,7 +79,7 @@ var (
 	peerRPCDelay = build.Select(build.Var{
 		Standard: 1 * time.Second,
 		Dev:      1 * time.Second,
-		Testing:  100 * time.Millisecond,
+		Testing:  10 * time.Millisecond,
 	}).(time.Duration)
 
 	// pruneNodeListLen defines the number of nodes that the gateway must have
@@ -189,7 +189,7 @@ var (
 
 	// the gateway will abort a connection attempt after this long
 	dialTimeout = build.Select(build.Var{
-		Standard: 2 * time.Minute,
+		Standard: 3 * time.Minute,
 		Dev:      20 * time.Second,
 		Testing:  500 * time.Millisecond,
 	}).(time.Duration)
@@ -197,8 +197,8 @@ var (
 	// rpcStdDeadline defines the standard deadline that should be used for all
 	// incoming RPC calls.
 	rpcStdDeadline = build.Select(build.Var{
-		Standard: 10 * time.Minute,
-		Dev:      5 * time.Minute,
-		Testing:  90 * time.Second,
+		Standard: 5 * time.Minute,
+		Dev:      3 * time.Minute,
+		Testing:  30 * time.Second,
 	}).(time.Duration)
 )

@@ -161,9 +161,7 @@ func (g *Gateway) threadedListenPeer(p *peer) {
 			g.log.Debugf("Peer connection with %v closed: %v\n", p.NetAddress, err)
 			break
 		}
-
-		// Set a standard deadline on the conn. The handler may set a new
-		// deadline, this is fine.
+		// Set the default deadline on the conn.
 		err = conn.SetDeadline(time.Now().Add(rpcStdDeadline))
 		if err != nil {
 			g.log.Printf("Peer connection (%v) deadline could not be set: %v\n", p.NetAddress, err)
@@ -173,7 +171,6 @@ func (g *Gateway) threadedListenPeer(p *peer) {
 		// The handler is responsible for closing the connection, though a
 		// default deadline has been set.
 		go g.threadedHandleConn(conn)
-
 		if !g.managedSleep(peerRPCDelay) {
 			break
 		}
@@ -195,6 +192,10 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	defer g.threads.Done()
 
 	var id rpcID
+	err := conn.SetDeadline(time.Now().Add(rpcStdDeadline))
+	if err != nil {
+		return
+	}
 	if err := encoding.ReadObject(conn, &id, 8); err != nil {
 		return
 	}
@@ -209,7 +210,7 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	g.log.Debugf("INFO: incoming conn %v requested RPC \"%v\"", conn.RPCAddr(), id)
 
 	// call fn
-	err := fn(conn)
+	err = fn(conn)
 	// don't log benign errors
 	if err == modules.ErrDuplicateTransactionSet || err == modules.ErrBlockKnown {
 		err = nil
