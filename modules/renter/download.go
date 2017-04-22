@@ -65,7 +65,6 @@ type (
 		finishedChunks     map[int]bool
 		offset             uint64
 		length             uint64
-		dlChunks           uint64 // Total number of chunks to be downloaded as part of this download.
 
 		// Timestamp information.
 		completeTime time.Time
@@ -132,8 +131,7 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 	min_chunk := uint64(math.Floor(float64(offset / f.chunkSize())))
 	max_chunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
 
-	d.dlChunks = 1 + max_chunk - min_chunk
-	d.finishedChunks = makeRange(int(min_chunk), int(max_chunk+1), d.finishedChunks)
+	makeRange(int(min_chunk), int(max_chunk+1), &d.finishedChunks)
 	d.initPieceSet(f, currentContracts, r)
 	return d
 }
@@ -160,12 +158,14 @@ func (d *download) initPieceSet(f *file,
 	// actually necessary to download more bytes than the size of the file.
 	// The effective size of the download is determined by the number of chunks
 	// to be downloaded. TODO: Handle variable-size last chunk - Same in downloadqueue.go
-	dlSize := d.dlChunks * d.chunkSize
-	d.reportedPieceSize = dlSize / (d.dlChunks * uint64(d.erasureCode.MinPieces()))
-	d.atomicDataReceived = dlSize - (d.reportedPieceSize * d.dlChunks * uint64(d.erasureCode.MinPieces()))
+	numChunks := uint64(len(d.finishedChunks))
+
+	dlSize := d.length
+	d.reportedPieceSize = dlSize / (numChunks * uint64(d.erasureCode.MinPieces()))
+	d.atomicDataReceived = dlSize - (d.reportedPieceSize * numChunks * uint64(d.erasureCode.MinPieces()))
 
 	// Assemble the piece set for the download.
-	d.pieceSet = make([]map[types.FileContractID]pieceData, d.dlChunks)
+	d.pieceSet = make([]map[types.FileContractID]pieceData, numChunks)
 	for i := range d.pieceSet {
 		d.pieceSet[i] = make(map[types.FileContractID]pieceData)
 	}
@@ -607,9 +607,8 @@ func (r *Renter) threadedDownloadLoop() {
 }
 
 // makeRange creates a range (min, max] as boolean map.
-func makeRange(min, max int, m map[int]bool) map[int]bool {
+func makeRange(min, max int, m *map[int]bool) {
 	for i := min; i < max; i++ {
-		m[i] = false
+		(*m)[i] = false
 	}
-	return m
 }

@@ -72,11 +72,13 @@ type DownloadFileWriter struct {
 	Location string
 }
 
+// NewDownloadFileWriter creates a new instance of a DownloadWriter backed by the file named.
 func NewDownloadFileWriter(fname string) *DownloadFileWriter {
 	l, _ := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
 	return &DownloadFileWriter{f: l, Location: fname}
 }
 
+// WriteAt writes the passed bytes at the specified offset.
 func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
 	r, err := dw.f.WriteAt(b, off)
 	if err != nil {
@@ -98,10 +100,27 @@ type DownloadHttpWriter struct {
 	buffer []byte
 }
 
+// NewDownloadHttpWriter creates a new instance of http.ResponseWriter backed DownloadWriter.
 func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *DownloadHttpWriter {
 	return &DownloadHttpWriter{w, offset, length, make([]byte, length)}
 }
 
+// WriteAt writes the specified bytes at the passed offset. It also acts
+// as a buffer to ensure that the downloaded file content is received by
+// the client in the right order.
+// Every write is either a) written directly to the ResponseWriter, or
+// b) buffered. The DownloadHttpWriter tracks up to which offset content
+// has been sent to the client and will send all content up to offset X
+// where X is the last offset up until which contiguous content has been
+// downloaded from the remote peers. If new content finishes downloading,
+// whose previous block is not finished yet, it will be buffered.
+//
+// E.g. If offset 0, length 100M was requested and the chunks at offset 0, 80M, 40M arrive in this order, the following will occur:
+// 1) The block at index 0 is written directly to the ResponseWriter,
+// 2) The block at index 80M is buffered,
+// 3) The block at index 40M is written to the ResponseWriter and, once
+// finished, the buffered block at location 80M is sent to the client,
+// too.
 func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
 	var r int
 	var err error

@@ -326,6 +326,55 @@ func TestRenterFileList(t *testing.T) {
 	}
 }
 
+// TestRenterGetFile tests the renter.GetFile(name string) method.
+func TestRenterGetFile(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+
+	// Check that neither "one" nor "two" exists.
+	if _, exists := rt.renter.GetFile("one"); exists {
+		t.Error("GetFile shows non-existent file as existing.")
+	}
+	if _, exists := rt.renter.GetFile("two"); exists {
+		t.Error("GetFile shows non-existent file as existing.")
+	}
+
+	// Put a file in the renter.
+	rsc, _ := NewRSCode(1, 1)
+	rt.renter.files["1"] = &file{
+		name:        "one",
+		erasureCode: rsc,
+		pieceSize:   1,
+	}
+	// Check file now returned by GetFile but "two" is not.
+	if _, exists := rt.renter.GetFile("one"); !exists {
+		t.Error("GetFile does not return existing file.")
+	}
+	if _, exists := rt.renter.GetFile("two"); exists {
+		t.Error("GetFile shows non-existent file as existing.")
+	}
+
+	// Put multiple files in the renter.
+	rt.renter.files["2"] = &file{
+		name:        "two",
+		erasureCode: rsc,
+		pieceSize:   1,
+	}
+	// Check file now returned by GetFile but "two" is not.
+	if _, exists := rt.renter.GetFile("one"); !exists {
+		t.Error("GetFile does not return existing file.")
+	}
+	if _, exists := rt.renter.GetFile("two"); !exists {
+		t.Error("GetFile does not return existing file.")
+	}
+}
+
 // TestRenterRenameFile probes the rename method of the renter.
 func TestRenterRenameFile(t *testing.T) {
 	if testing.Short() {

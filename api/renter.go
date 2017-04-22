@@ -486,7 +486,7 @@ func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *h
 	// Lookup the file associated with the nickname.
 	file, exists := api.renter.GetFile(siapath)
 	if !exists {
-		return nil, &Error{Message: "file could not be found"}
+		return nil, &Error{Message: "download failed: no file with that path"}
 	}
 
 	if !offparampassed { // Determine if entire file is to be downloaded.
