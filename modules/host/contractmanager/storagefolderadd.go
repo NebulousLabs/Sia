@@ -83,7 +83,7 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 }
 
 // managedAddStorageFolder will add a storage folder to the contract manager.
-// The parent fucntion, contractmanager.AddStorageFolder, has already performed
+// The parent function, contractmanager.AddStorageFolder, has already performed
 // any error checking that can be performed without accessing the contract
 // manager state.
 //

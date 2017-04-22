@@ -42,7 +42,7 @@ const (
 	// folderAllocationStepSize is the amount of data that gets allocated at a
 	// time when writing out the sparse sector file during a storageFolderAdd or
 	// a storageFolderGrow.
-	folderAllocationStepSize = 50e6
+	folderAllocationStepSize = 1 << 35
 
 	// sectorMetadataDiskSize defines the number of bytes it takes to store the
 	// metadata of a single sector on disk.
@@ -101,7 +101,7 @@ var (
 			return 1 << 20 // 4 TiB
 		}
 		if build.Release == "standard" {
-			return 1 << 25 // 256 TiB
+			return 1 << 32 // 32 PiB
 		}
 		if build.Release == "testing" {
 			return 1 << 12 // 16 MiB

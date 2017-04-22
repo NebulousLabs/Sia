@@ -65,11 +65,7 @@ func TestHostWorkingStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	workingStatusFrequency = 5 * time.Second
-
 	t.Parallel()
-
 	ht, err := newHostTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -79,20 +75,28 @@ func TestHostWorkingStatus(t *testing.T) {
 		t.Fatal("expected working state to initially be modules.HostWorkingStatusChecking")
 	}
 
-	atomic.StoreUint64(&ht.host.atomicSettingsCalls, workingStatusThreshold+1)
-
-	time.Sleep(workingStatusFrequency)
-	time.Sleep(time.Second)
-
+	// Simulate some setting calls, and see if the host picks up on it.
+	atomic.AddUint64(&ht.host.atomicSettingsCalls, workingStatusThreshold+1)
+	time.Sleep(workingStatusFirstCheck + time.Second)
 	if ht.host.WorkingStatus() != modules.HostWorkingStatusWorking {
 		t.Fatal("expected host working status to be modules.HostWorkingStatusWorking after incrementing status calls")
 	}
 
-	time.Sleep(workingStatusFrequency)
-	time.Sleep(time.Second)
-
+	// No more settings calls, host should believe it is not working now.
+	time.Sleep(workingStatusFrequency + time.Second)
 	if ht.host.WorkingStatus() != modules.HostWorkingStatusNotWorking {
 		t.Fatal("expected host working status to be modules.HostWorkingStatusNotWorking after waiting workingStatusFrequency with no settings calls")
+	}
+
+	// Simulate some setting calls, and see if the host picks up on it.
+	atomic.AddUint64(&ht.host.atomicSettingsCalls, workingStatusThreshold+1)
+	time.Sleep(workingStatusFirstCheck + time.Second)
+	if ht.host.WorkingStatus() != modules.HostWorkingStatusNotWorking {
+		t.Fatal("expected host working status to be modules.HostWorkingStatusWorking after incrementing status calls")
+	}
+	time.Sleep(workingStatusFrequency - workingStatusFirstCheck)
+	if ht.host.WorkingStatus() != modules.HostWorkingStatusWorking {
+		t.Fatal("expected host working status to be modules.HostWorkingStatusWorking after incrementing status calls")
 	}
 }
 
@@ -102,11 +106,7 @@ func TestHostConnectabilityStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	connectabilityCheckFrequency = 5 * time.Second
-
 	t.Parallel()
-
 	ht, err := newHostTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -115,10 +115,7 @@ func TestHostConnectabilityStatus(t *testing.T) {
 	if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusChecking {
 		t.Fatal("expected connectability state to initially be ConnectablityStateChecking")
 	}
-
-	time.Sleep(connectabilityCheckFrequency)
-	time.Sleep(time.Second)
-
+	time.Sleep(connectabilityCheckFirstWait + time.Second)
 	if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusConnectable {
 		t.Fatal("expected connectability state to be modules.HostConnectabilityStatusConnectable")
 	}

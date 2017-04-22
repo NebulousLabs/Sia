@@ -152,7 +152,7 @@ var compat112Meta = persist.Metadata{
 // a wallet.db database.
 func (w *Wallet) convertPersistFrom112To120(dbFilename, compatFilename string) error {
 	var data compat112Persist
-	err := persist.LoadFile(compat112Meta, &data, compatFilename)
+	err := persist.LoadJSON(compat112Meta, &data, compatFilename)
 	if err != nil {
 		return err
 	}

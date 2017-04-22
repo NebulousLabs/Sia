@@ -13,7 +13,7 @@ import (
 var (
 	// errLargeDownloadBatch is returned if the renter requests a download
 	// batch that exceeds the maximum batch size that the host will
-	// accomondate.
+	// accommodate.
 	errLargeDownloadBatch = ErrorCommunication("download request exceeded maximum batch size")
 
 	// errRequestOutOfBounds is returned when a download request is made which

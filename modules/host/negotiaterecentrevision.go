@@ -145,7 +145,7 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, st
 	}
 	err = encoding.WriteObject(conn, revisionSigs)
 	if err != nil {
-		err = extendErr("failed to write recent revision singatures: ", ErrorConnection(err.Error()))
+		err = extendErr("failed to write recent revision signatures: ", ErrorConnection(err.Error()))
 		return types.FileContractID{}, storageObligation{}, err
 	}
 	return fcid, so, nil

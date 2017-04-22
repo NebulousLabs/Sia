@@ -1,7 +1,7 @@
 package renter
 
 // TODO: Change the upload loop to have an upload state, and make it so that
-// instead of occasionally rebuildling the whole file matrix it has just a
+// instead of occasionally rebuilding the whole file matrix it has just a
 // single matrix that it's constantly pulling chunks from. Have a separate loop
 // which goes through the files and adds them to the matrix. Have the loop
 // listen on the channel for new files, so that they can go directly into the

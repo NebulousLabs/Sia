@@ -92,13 +92,13 @@ func TestSaveLoad(t *testing.T) {
 		t.Error("allHosts was not restored properly", ok0, ok1, ok2, len(hdbt.hdb.hostTree.All()))
 	}
 	if h1.FirstSeen != 1 {
-		t.Error("h1 block height loaded incorectly")
+		t.Error("h1 block height loaded incorrectly")
 	}
 	if h2.FirstSeen != 2 {
-		t.Error("h1 block height loaded incorectly")
+		t.Error("h1 block height loaded incorrectly")
 	}
 	if h3.FirstSeen != 2 {
-		t.Error("h1 block height loaded incorectly")
+		t.Error("h1 block height loaded incorrectly")
 	}
 }
 
