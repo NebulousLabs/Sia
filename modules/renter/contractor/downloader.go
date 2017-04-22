@@ -171,7 +171,7 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		_, exists := c.cachedRevisions[contract.ID]
 		c.mu.RUnlock()
 		if !exists {
-			c.log.Critical("Cached revision does not exist for contract.")
+			c.log.Println("WARN: cached revision does not exist for contract", contract.ID)
 		}
 	}
 
