@@ -254,6 +254,21 @@ var (
 		}
 		panic("unrecognized release constant in host - revision submission buffer")
 	}()
+
+	// rpcRatelimit prevents someone from spamming the host with connections,
+	// causing it to spin up enough goroutines to crash.
+	rpcRatelimit = func() time.Duration {
+		if build.Release == "dev" {
+			return time.Millisecond * 10
+		}
+		if build.Release == "standard" {
+			return time.Millisecond * 50
+		}
+		if build.Release == "testing" {
+			return time.Millisecond
+		}
+		panic("unrecognized release constant in host - obligationLockTimeout")
+	}()
 )
 
 // All of the following variables define the names of buckets used by the host
