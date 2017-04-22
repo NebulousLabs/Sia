@@ -94,6 +94,7 @@ func (m *Miner) threadedSaveLoop() {
 
 			m.mu.Lock()
 			err = m.saveSync()
+			m.mu.Unlock()
 			if err != nil {
 				m.log.Println("ERROR: Unable to save miner persist:", err)
 			}
