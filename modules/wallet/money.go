@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -15,9 +16,14 @@ type sortedOutputs struct {
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
 func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
-	// ensure durability of reported balance
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if !w.subscribed {
+		// can't report balance if siafundPool is not known
+		return
+	}
+
+	// ensure durability of reported balance
 	w.syncDB()
 
 	dbForEachSiacoinOutput(w.dbTx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
@@ -61,6 +67,9 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 		return nil, err
 	}
 	defer w.tg.Done()
+	if !w.unlocked {
+		return nil, modules.ErrLockedWallet
+	}
 
 	_, tpoolFee := w.tpool.FeeEstimation()
 	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
@@ -94,6 +103,9 @@ func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]t
 		return nil, err
 	}
 	defer w.tg.Done()
+	if !w.unlocked {
+		return nil, modules.ErrLockedWallet
+	}
 
 	_, tpoolFee := w.tpool.FeeEstimation()
 	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
