@@ -3,7 +3,6 @@ package proto
 import (
 	"errors"
 	"net"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -40,7 +39,8 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 		baseCollateral = hostCollateral
 	}
 
-	// create file contract
+	// Create the file contract.
+	payout := renterFunds.Add(hostCollateral).Add(host.ContractPrice).Mul64(10406).Div64(10000) // renter covers siafund fee
 	fc := types.FileContract{
 		FileSize:       contract.LastRevision.NewFileSize,
 		FileMerkleRoot: contract.LastRevision.NewFileMerkleRoot,
@@ -64,8 +64,6 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 			{Value: basePayment.Add(baseCollateral), UnlockHash: types.UnlockHash{}},
 		},
 	}
-	// Determine the total payout.
-	payout := value.Add(hostCollateral.Add(host.ContractPrice)).Mul64(10406).Div64(10000) // renter covers siafund fee
 
 	// calculate transaction fee
 	_, maxFee := tpool.FeeEstimation()

@@ -13,6 +13,12 @@ import (
 // managedRenew negotiates a new contract for data already stored with a host.
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
+//
+// The renterFunds should be the target amount to spend inside of the contract.
+// The fees portion of the contract will be managed automatically based on the
+// host settings and on the provided host collateral (collateral is provided
+// because it can be set to lower than the maximum offered by the host, reducing
+// fees).
 func (c *Contractor) managedRenewContract(contract modules.RenterContract, host modules.HostDBEntry, renterFunds types.Currency, hostCollateral types.Currency, newEndHeight types.BlockHeight) {
 	// Sanity check - the public key of the host should match the public key of
 	// the contract.

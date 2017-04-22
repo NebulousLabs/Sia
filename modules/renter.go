@@ -195,13 +195,15 @@ type RenterContract struct {
 	HostPublicKey  types.SiaPublicKey   `json:"hostpublickey"`
 	ID             types.FileContractID `json:"id"`
 	NetAddress     NetAddress           `json:"netaddress"`
-	InGoodStanding bool                 `json:"valuable"` // if false, host is due for replacement
+	SecretKey       crypto.SecretKey           `json:"secretkey"`
+
+	InGoodStanding bool                 `json:"ingoodstanding"` // if false, host is due for replacement
+	UsefulForUpload bool                `json:"usefulforupload"` // if false, host cannot be used to upload
 
 	FileContract    types.FileContract         `json:"filecontract"`
 	LastRevision    types.FileContractRevision `json:"lastrevision"`
 	LastRevisionTxn types.Transaction          `json:"lastrevisiontxn"`
 	MerkleRoots     MerkleRootSet              `json:"merkleroots"`
-	SecretKey       crypto.SecretKey           `json:"secretkey"`
 	StartHeight     types.BlockHeight          `json:"startheight"`
 
 	DownloadSpending types.Currency `json:"downloadspending"`

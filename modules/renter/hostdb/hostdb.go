@@ -235,6 +235,27 @@ func (hdb *HostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
 // RandomHosts implements the HostDB interface's RandomHosts() method. It takes
 // a number of hosts to return, and a slice of netaddresses to ignore, and
 // returns a slice of entries.
+//
+// If there are lots of unscanned hosts in the hostdb, or if the consensus set
+// is not yet synced, the host will return 'nil'. This is to prevent the hostdb
+// from facilitating decisions before it has obtained a proper overview of the
+// network.
 func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) []modules.HostDBEntry {
+	// If the consensus set is not synced, there may be a large number of
+	// unscanned host announcements, which could dramatically improve host
+	// quality. Return 'nil' until we've scanned more hosts.
+	if !hdb.cs.Synced() {
+		return nil
+	}
+
+	// Check the length of the scan list does not indicate that there are a
+	// large number of never-scanned hosts on the network.
+	hdb.mu.Lock()
+	scanLen = len(hdb.scanList)
+	hdb.mu.Unlock()
+	if scanLen > hostCheckupQuantity*2 {
+		return nil
+	}
+
 	return hdb.hostTree.SelectRandom(n, excludeKeys)
 }

@@ -9,7 +9,9 @@ import (
 
 const (
 	// badScoreForgiveness is the amount of wiggle room that a host score is
-	// allowed to have before the host is considered to be unacceptable.
+	// allowed to have before the host is considered to be unacceptable. The
+	// least competitive of the set of competitive hosts is selected, and its
+	// score is slased by a factor of 'badScoreForgiveness'.
 	badScoreForgiveness = 25
 
 	// estimatedFileContractTransactionSize provides the estimated size of
@@ -26,9 +28,17 @@ const (
 )
 
 var (
-	// emptiestAcceptableContract indicates the emptiest that a contract is
-	// allowed to get before the renter will renew the contract.
-	emptiestAcceptableContract = types.SiacoinPrecision.Mul64(3)
+	// To alleviate potential block propagation issues, the contractor sleeps
+	// between each contract formation.
+	contractFormationInterval = build.Select(build.Var{
+		Dev:      10 * time.Second,
+		Standard: 60 * time.Second,
+		Testing:  10 * time.Millisecond,
+	}).(time.Duration)
+
+	// lowContractBalance - a contract will be renewed if the renterFunds of the
+	// contract have fallen below this value.
+	lowContractBalance = types.SiacoinPrecision.Mul64(2)
 
 	// minHostsForEstimations describes the minimum number of hosts that
 	// are needed to make broad estimations such as the number of sectors
@@ -52,14 +62,6 @@ var (
 		Testing: 4,
 	}).(int)
 
-	// To alleviate potential block propagation issues, the contractor sleeps
-	// between each contract formation.
-	contractFormationInterval = build.Select(build.Var{
-		Dev:      10 * time.Second,
-		Standard: 60 * time.Second,
-		Testing:  10 * time.Millisecond,
-	}).(time.Duration)
-
 	// missingWindow specifies the amount of time that the host needs to be
 	// offline before the host is considered missing.
 	missingWindow = build.Select(build.Var{
@@ -67,6 +69,15 @@ var (
 		Standard: 7 * 24 * time.Hour,
 		Testing:  1 * time.Minute,
 	}).(time.Duration)
+
+	// storageRemainingThreshold defines the amount of storage remaining a host
+	// needs to have in order to be considered useful for uploading.
+	storageRemainingThreshold = build.Select(build.Var{
+		Dev: 20e6,
+		Standard: 50e9,
+		Testing: 100e3,
+
+	}).(uint64)
 
 	// uptimeWindow specifies the duration in which host uptime is checked.
 	uptimeWindow = build.Select(build.Var{

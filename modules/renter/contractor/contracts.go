@@ -146,17 +146,19 @@ func (c *Contractor) markBadContracts() {
 			continue
 		}
 
-		// TODO: Contract is not useful for upload if the host is full, contract
-		// is not useful for upload if it was formed due to filesharing reasons.
-
-		// TODO: Have another check that figures out whether the host has
-		// storage space remaining. If not, host is nonetheless in good standing
-		// but is 'not uploadable' or something. Tells the contractor that
-		// downloads are okay, but also that this host does not count as one of
-		// the 50, and also that uploads will not work.
-		//
-		// Verify that the contract fee is justified if the host is full. If
-		// not, host is also not in good standing.
+		// Determine whether the host has enough storage space remaining to be
+		// useful for uploading.
+		if host.RemainingStorage < storageRemainingThreshold {
+			contract.UsefulForUpload = false
+			// If the renter is not storing enough data on this host, consider
+			// the host to be too expensive, and mark the host for replacement.
+			// For the sake of simplicity, this value is being set to a
+			// constant, but eventually it should be determined based on things
+			// like the storage price, the contract price, and the other hosts.
+			if contract.LastRevision.NewFilesize < 50e9 {
+				contract.InGoodStanding = false
+			}
+		}
 	}
 }
 
@@ -178,11 +180,11 @@ func (c *Contractor) threadedRepairContracts() {
 	}
 	defer c.contractRepairLock.Unlock()
 
-	// TODO: Verify that the hostdb has finished scanning hosts from the
-	// original blockchain download. If there are unscanned hosts, it's too
-	// early to form contracts.
-
-	// TODO: Verify that consensus has synced. Do not run without it.
+	// The repair contracts loop will not run if the consensus set is not
+	// synced.
+	if !c.cs.Synced() {
+		return
+	}
 
 	// Sanity check - verify that there is at most one contract per host in
 	// c.contracts.
@@ -225,21 +227,20 @@ func (c *Contractor) threadedRepairContracts() {
 				continue // This contract is with a host that doesn't exist.
 			}
 
-			// TODO: Empty is also true if the host has run out of collateral.
-			//
 			// Check that the contract is not empty.
 			empty := contract.RenterFunds().Cmp(emptiestAcceptableContract) <= 0
 			empty = empty && contract.UsefulForUploading
-			// The host is not empty if the host has no more storage remaining.
-			if empty && host.RemainingStorage < 10e9 { // TODO: Const.
-				empty = false
-			}
 			// Check that the contract is not expiring soon.
 			expiring := c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight()
 			if empty || expiring {
 				needsRenew = append(needsRenew, contract)
 			}
 
+			// Host does not count as a 'good' contract if it is not useful for
+			// upload.
+			if !contract.UsefulForUpload {
+				continue
+			}
 			// Contract counts as good regardless of whether it needs to be
 			// renewed.
 			numGoodContracts++
@@ -265,15 +266,13 @@ func (c *Contractor) threadedRepairContracts() {
 		}
 
 		var newCost types.Currency
-		empty := contract.RenterFunds().Cmp(emptiestAcceptableContract) <= 0
+		empty := contract.RenterFunds().Cmp(lowContractBalance) <= 0
 		if empty {
 			// Contract is being renewed because it ran out of money. Double the
 			// amount of money that's allocated to the contract.
 			prevCost := contract.TotalCost.Sub(ContractFee).Sub(TxnFee).Sub(SiafundFee)
-			newCost = prevCost.Mul64(2) // TODO: Const
+			newCost = prevCost.Mul64(2) // Double the renterFunds given that we ran out.
 		} else {
-			// Contract is being renewed because it has hit expiration. Use 33%
-			// more funds than were spent last time.
 			prevBase := contract.TotalCost.Sub(ContractFee).Sub(TxnFee).Sub(SiafundFee)
 			// The amount of money that the contract started with should not be
 			// less than the amount of money remaining in the contract, but
@@ -282,15 +281,20 @@ func (c *Contractor) threadedRepairContracts() {
 				build.Critical("A contracts base funds is smaller than it's available funds:", prevBase, contract.RenterFunds())
 			}
 			prevCost := prevBase.Sub(contract.RenterFunds())
-			newCost = prevCost.Mul64(4).Div64(3) // TODO: Const
+			newCost = prevCost.Mul64(3).Div64(2) // Set the renterFunds to 50% more than the amount of money spent in the last cylce.
 		}
 
 		// Verify that the new cost is at least enough to cover all the existing
 		// data and some extra.
-		timeExtension := uint64(contractsEndHeight - contract.LastRevision.NewWindowEnd)                                 // TODO: May need to add host.WindowSize too.
-		minRequired := host.StoragePrice.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension).Mul64(4).Div64(3) // TODO: Const.
-		if minRequired.Cmp(newCost) < 0 {
-			newCost = minRequired
+		timeExtension := uint64(contractsEndHeight - contract.LastRevision.NewWindowEnd) // TODO: May need to add host.WindowSize too.
+		// Determine how much is going to be spend immediately on existing
+		// storage.
+		baseCost := host.StoragePrice.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension)
+		// Make sure that the renterFunds are at least 50% greater than the base
+		// cost.
+		minFunds = baseCost.Mul64(3).Div64(2)
+		if minFunds.Cmp(newCost) < 0 {
+			newCost = minFunds
 		}
 
 		// Calculate the desired collateral.
@@ -298,10 +302,6 @@ func (c *Contractor) threadedRepairContracts() {
 		// Don't exceed the host's maximum collateral.
 		if collateral.Cmp(host.MaxCollateral) > 0 {
 			collateral = host.MaxCollateral
-		}
-		// Don't exceed the internal collateral fraction.
-		if newCost.Mul64(5).Cmp(collateral) < 0 { // TODO: Const
-			collateral = newCost.Mul64(5) // TODO: Const
 		}
 
 		c.managedLockContract(contract.ID)
@@ -316,11 +316,36 @@ func (c *Contractor) threadedRepairContracts() {
 		}
 	}
 
-	// Form any extra contracts if needed.
+	// Determine how many new contracts we want to form. Also grab the list of
+	// hosts that we already have, so that we do not form any duplicate
+	// contracts.
 	c.mu.Lock()
+	existingHosts := make([]types.SiaPublicKey, 0, len(c.contracts))
 	wantedHosts := c.allowance.Hosts
+	for _, contract := range c.contracts {
+		existingHosts = append(existingHosts, contract.HostPublicKey)
+	}
 	c.mu.Unlock()
-	for numGoodContracts < wantedHosts {
+
+	// Select a bunch of new hosts from the database.
+	selectionSize = wantedHosts*2 + 5 // Select more hosts than needed to account for useless hosts.
+	hosts := hdb.RandomHosts(wantedHosts*2 + 10, existingHosts)
+	// Filter any hosts that do not have enough storage remaining.
+	i := 0
+	for {
+		if i >= len(hosts) {
+			break
+		}
+		if hosts[i].RemainingStorage < storageRemainingThreshold {
+			hosts = append(hosts[:i], hosts[i+1:]...)
+		} else {
+			i++
+		}
+
+	}
+
+	i = 0
+	for numGoodContracts < wantedHosts && i < len(hosts) {
 		// Exit if stop has been called.
 		select {
 		case <-c.tg.StopChan():
@@ -329,9 +354,14 @@ func (c *Contractor) threadedRepairContracts() {
 		}
 
 		c.managedLockContract(contract.ID)
-		c.managedNewContract(HOST, COST, contractsEndHeight) // TODO: Select host and cost.
+		// Try to form a contract with this host. Set the price to twice low
+		// blaance threshold plus twice the contract price. Future interactions
+		// will guide the price to something more reasonalbe.
+		err = c.managedNewContract(hosts[i], lowContractBalance.Mul64(2).Add(host.ContractPrice.Mul64(2)), contractsEndHeight)
 		c.managedUnlockContract(contract.ID)
-
-		numGoodContracts++
+		if err == nil {
+			numGoodContracts++
+		}
+		i++
 	}
 }
