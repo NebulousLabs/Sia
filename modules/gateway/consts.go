@@ -77,7 +77,7 @@ var (
 	// from a peer. Without this delay, a peer can force us to spin up thousands
 	// of goroutines per second.
 	peerRPCDelay = build.Select(build.Var{
-		Standard: 1 * time.Second,
+		Standard: 3 * time.Second,
 		Dev:      1 * time.Second,
 		Testing:  10 * time.Millisecond,
 	}).(time.Duration)
