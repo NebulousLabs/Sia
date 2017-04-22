@@ -70,17 +70,32 @@ type DownloadWriter interface {
 type DownloadFileWriter struct {
 	f        *os.File
 	Location string
+	offset   uint64
+	length   uint64
 }
 
 // NewDownloadFileWriter creates a new instance of a DownloadWriter backed by the file named.
-func NewDownloadFileWriter(fname string) *DownloadFileWriter {
+func NewDownloadFileWriter(fname string, offset, length uint64) *DownloadFileWriter {
 	l, _ := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
-	return &DownloadFileWriter{f: l, Location: fname}
+	return &DownloadFileWriter{
+		f:        l,
+		Location: fname,
+		offset:   offset,
+		length:   length,
+	}
 }
 
 // WriteAt writes the passed bytes at the specified offset.
 func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
-	r, err := dw.f.WriteAt(b, off)
+	fileOffset := off - int64(dw.offset)
+
+	// Truncate b if writing the whole buffer at the specified offset would exceed the maximum file size.
+	var byts = b
+	if uint64(fileOffset)+uint64(len(b)) > dw.length {
+		byts = b[:dw.length]
+	}
+
+	r, err := dw.f.WriteAt(byts, fileOffset)
 	if err != nil {
 		build.ExtendErr("unable to write to download destination", err)
 	}

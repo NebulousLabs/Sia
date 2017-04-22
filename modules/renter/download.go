@@ -165,7 +165,7 @@ func (d *download) initPieceSet(f *file,
 	d.atomicDataReceived = dlSize - (d.reportedPieceSize * numChunks * uint64(d.erasureCode.MinPieces()))
 
 	// Assemble the piece set for the download.
-	d.pieceSet = make([]map[types.FileContractID]pieceData, numChunks)
+	d.pieceSet = make([]map[types.FileContractID]pieceData, d.numChunks)
 	for i := range d.pieceSet {
 		d.pieceSet[i] = make(map[types.FileContractID]pieceData)
 	}
@@ -183,7 +183,7 @@ func (d *download) initPieceSet(f *file,
 		}
 
 		for i := range contract.Pieces {
-			d.pieceSet[contract.Pieces[i].Chunk][id] = contract.Pieces[i]
+			d.pieceSet[int(contract.Pieces[i].Chunk)][id] = contract.Pieces[i]
 		}
 	}
 	f.mu.RUnlock()
