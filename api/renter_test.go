@@ -101,6 +101,35 @@ func TestRenterDownloadError(t *testing.T) {
 	}
 }
 
+func TestRenterDownloadOffsetSingleChunk(t *testing.T) {
+	t.Fail()
+}
+
+func TestRenterDownloadOffsetMultiChunk(t *testing.T) {
+	t.Fail()
+}
+
+func TestRenterDownloadShortLengthSingleChunk(t *testing.T) {
+	t.Fail()
+}
+
+func TestRenterDownloadShortLengthAndOffsetSingleChunk(t *testing.T) {
+	t.Fail()
+}
+
+func TestRenterDownloadShortLengthMultiChunk(t *testing.T) {
+	t.Fail()
+}
+
+func TestRenterDownloadShortLengthAndOffsetMultiChunk(t *testing.T) {
+	t.Fail()
+}
+
+// TODO: Factor out relevant parts from other test.
+// TODO: Add tests for Async
+// TODO: Add tests for httpresp.
+
+
 // TestRenterAsyncDownloadError tests that the /renter/asyncdownload route sets the download's error field if it fails.
 func TestRenterAsyncDownloadError(t *testing.T) {
 	if testing.Short() {
