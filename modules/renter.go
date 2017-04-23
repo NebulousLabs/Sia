@@ -72,7 +72,6 @@ type DownloadFileWriter struct {
 	f        *os.File
 	Location string
 	offset   uint64
-	length   uint64
 }
 
 // NewDownloadFileWriter creates a new instance of a DownloadWriter backed by the file named.
@@ -82,7 +81,6 @@ func NewDownloadFileWriter(fname string, offset, length uint64) *DownloadFileWri
 		f:        l,
 		Location: fname,
 		offset:   offset,
-		length:   length,
 	}
 }
 
@@ -105,10 +103,10 @@ func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
 // After every write to the ResponseWriter the `offset` and `length` fields are updated, and buffer content written until
 type DownloadHttpWriter struct {
 	w              http.ResponseWriter
-	offset         int // The index of the last byte written to the response writer.
-	firstByteIndex int // The index of the first byte.
-	length         int // The total size of the slice to be written.
-	buffer         []byte
+	offset         int         // The index in the original file of the last byte written to the response writer.
+	firstByteIndex int         // The index of the first byte in the original file.
+	length         int         // The total size of the slice to be written.
+	buffer         []byte      // Buffer used for storing the chunks until download finished.
 	offsets        map[int]int // Map from offset to length of chunk.
 }
 
@@ -125,10 +123,8 @@ func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *Downlo
 }
 
 // WriteAt buffers parts of the file until the entire file can be
-// flushed to the client.
+// flushed to the client. Returns the number of bytes written or an error.
 func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
-	var r int
-	var err error
 	blen := len(b)
 
 	// Write bytes to buffer.
@@ -138,12 +134,12 @@ func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
 
 	dw.length -= blen
 
-	// If last chunk received.
+	// If last chunk received, flush output.
 	if dw.length == 0 {
-		dw.w.Write(dw.buffer)
+		return dw.w.Write(dw.buffer)
 	}
 
-	return r, err
+	return 0, nil
 }
 
 // FileUploadParams contains the information used by the Renter to upload a
@@ -339,7 +335,7 @@ type Renter interface {
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error
 
-	// DownloadSection downloads a specific chunk from a file to the specified location.
+	// DownloadSection performs a download according to the parameters passed, including downloads of `offset` and `length` type.
 	DownloadSection(params *RenterDownloadParameters) error
 
 	// DownloadQueue lists all the files that have been scheduled for download.

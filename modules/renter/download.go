@@ -183,7 +183,7 @@ func (d *download) initPieceSet(f *file,
 		}
 
 		for i := range contract.Pieces {
-			d.pieceSet[int(contract.Pieces[i].Chunk)][id] = contract.Pieces[i]
+			d.pieceSet[contract.Pieces[i].Chunk][id] = contract.Pieces[i]
 		}
 	}
 	f.mu.RUnlock()
@@ -257,20 +257,20 @@ func (cd *chunkDownload) recoverChunk() error {
 	var result = recoverWriter.Bytes()
 
 	// Calculate the offset. If the offset is within the chunk, the requested offset is passed, otherwise the offset of the chunk within the overall file is passed.
-	chunkBase := cd.index * cd.download.chunkSize
-	top_address := chunkBase + cd.download.chunkSize - 1
-	var off = chunkBase
+	chunkBaseAddress := cd.index * cd.download.chunkSize
+	chunkTopAddress := chunkBaseAddress + cd.download.chunkSize - 1
+	var off = chunkBaseAddress
 	var lowerBound = 0
-	if cd.download.offset >= chunkBase && cd.download.offset <= top_address {
+	if cd.download.offset >= chunkBaseAddress && cd.download.offset <= chunkTopAddress {
 		off = cd.download.offset
-		offsetInBlock := off - chunkBase
+		offsetInBlock := off - chunkBaseAddress
 		lowerBound = int(offsetInBlock) // If the offset is within the block, part of the block will be ignored
 	}
 
 	// Truncate b if writing the whole buffer at the specified offset would exceed the maximum file size.
 	var upperBound = cd.download.chunkSize
-	if top_address > cd.download.length+cd.download.offset {
-		diff := top_address - (cd.download.length + cd.download.offset)
+	if chunkTopAddress > cd.download.length+cd.download.offset {
+		diff := chunkTopAddress - (cd.download.length + cd.download.offset)
 		upperBound -= diff + 1
 	}
 
@@ -321,9 +321,9 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 	}
 
 	// Add the unfinished chunks one at a time.
-	for i, val := range d.finishedChunks {
+	for i, isChunkFinished := range d.finishedChunks {
 		// Skip chunks that have already finished downloading.
-		if val {
+		if isChunkFinished {
 			continue
 		}
 
