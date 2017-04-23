@@ -289,6 +289,28 @@ func TestRenterDownloadHttpRespOffsetManyChunks(t *testing.T) {
 	setupDownloadTest(t, filesize, 40, filesize-40, true)
 }
 
+func TestRenterDownloadHttpRespOffsetAndLengthSingleChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize)
+	setupDownloadTest(t, filesize, 40, 4*filesize/5, true)
+}
+
+func TestRenterDownloadHttpRespOffsetAndLengthTwoChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize) * 2
+	setupDownloadTest(t, filesize, 80, 3*filesize/4, true)
+}
+
+func TestRenterDownloadHttpRespOffsetAndLengthManyChunks(t *testing.T) {
+	filesize := int64(modules.SectorSize) * 5
+	fmt.Println(modules.SectorSize)
+	setupDownloadTest(t, filesize, 150, 3*filesize/4, true)
+}
+
+func TestRenterDownloadHttpRespOffsetAndLengthManyChunksSubsetOfChunks(t *testing.T) {
+	filesize := int64(modules.SectorSize) * 5
+	fmt.Println(modules.SectorSize)
+	setupDownloadTest(t, filesize, 150, 1*filesize/4, true)
+}
+
 func TestRenterDownloadLengthOnlyError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
