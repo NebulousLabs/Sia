@@ -5,12 +5,12 @@ import (
 	"io"
 	"time"
 
-	"fmt"
+	"net/http"
+	"os"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
-	"net/http"
-	"os"
 )
 
 const (
@@ -124,27 +124,13 @@ func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *Downlo
 	}
 }
 
-// WriteAt writes the specified bytes at the passed offset. It also acts
-// as a buffer to ensure that the downloaded file content is received by
-// the client in the right order.
-// Every write is either a) written directly to the ResponseWriter, or
-// b) buffered. The DownloadHttpWriter tracks up to which offset content
-// has been sent to the client and will send all content up to offset X
-// where X is the last offset up until which contiguous content has been
-// downloaded from the remote peers. If new content finishes downloading,
-// whose previous block is not finished yet, it will be buffered.
-//
-// E.g. If offset 0, length 100M was requested and the chunks at offset 0, 80M, 40M arrive in this order, the following will occur:
-// 1) The block at index 0 is written directly to the ResponseWriter,
-// 2) The block at index 80M is buffered,
-// 3) The block at index 40M is written to the ResponseWriter and, once
-// finished, the buffered block at location 80M is sent to the client,
-// too.
+// WriteAt buffers parts of the file until the entire file can be
+// flushed to the client.
 func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
 	var r int
 	var err error
 	blen := len(b)
-	fmt.Println("offset", dw.offset, "length", dw.length, "curr offset", off, "buffer length:", blen)
+
 	// Write bytes to buffer.
 	offsetInBuffer := int(off) - dw.firstByteIndex
 	copy(dw.buffer[offsetInBuffer:blen+offsetInBuffer], b)

@@ -403,7 +403,9 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 		}
 	}
 
-	WriteSuccess(w)
+	if !p.Httpresp {
+		WriteSuccess(w)
+	}
 }
 
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
