@@ -149,7 +149,10 @@ func setupDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp
 		if err != nil {
 			t.Fatal(err)
 		}
-		buf := bytes.NewBuffer(make([]byte, 0, 1e8)) // TODO: Replace with correct buffer length
+		defer resp.Body.Close()
+
+		buf := bytes.NewBuffer(make([]byte, 0, length))
+
 		_, readErr := buf.ReadFrom(resp.Body)
 		if readErr != nil {
 			t.Fatal(readErr)
@@ -254,7 +257,7 @@ func TestRenterDownloadShortLengthThreeChunkInSecondChunk(t *testing.T) {
 }
 
 func TestRenterDownloadShortLengthMultiChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize * 8)
+	filesize := int64(modules.SectorSize * 5)
 	setupDownloadTest(t, filesize, 0, int64(float64(filesize)*0.75), false)
 }
 
@@ -1113,7 +1116,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	var rf RenterFiles
-	for i := 0; i < 100 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(200 * time.Millisecond)
 	}
