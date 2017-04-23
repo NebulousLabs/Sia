@@ -135,7 +135,7 @@ func setupDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp
 	uf.Seek(offset, 0)
 	uf.Read(b)
 
-	// Download the original file from offset 40 and length 10.
+	// Download the original file from the passed offsets.
 	fname := "offsetsinglechunk.dat"
 	downpath := filepath.Join(st.dir, fname)
 	dlURL := fmt.Sprintf("/renter/download/%s?offset=%d&length=%d", ulSiaPath, offset, length)
