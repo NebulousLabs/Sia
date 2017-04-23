@@ -77,7 +77,7 @@ type (
 		fileSize          uint64
 		masterKey         crypto.TwofishKey
 		numChunks         uint64
-		pieceSet          []map[types.FileContractID]pieceData
+		pieceSet          map[int]map[types.FileContractID]pieceData
 		reportedPieceSize uint64
 		siapath           string
 
@@ -165,8 +165,8 @@ func (d *download) initPieceSet(f *file,
 	d.atomicDataReceived = dlSize - (d.reportedPieceSize * numChunks * uint64(d.erasureCode.MinPieces()))
 
 	// Assemble the piece set for the download.
-	d.pieceSet = make([]map[types.FileContractID]pieceData, d.numChunks)
-	for i := range d.pieceSet {
+	d.pieceSet = make(map[int]map[types.FileContractID]pieceData)
+	for i := range d.finishedChunks {
 		d.pieceSet[i] = make(map[types.FileContractID]pieceData)
 	}
 
@@ -183,7 +183,11 @@ func (d *download) initPieceSet(f *file,
 		}
 
 		for i := range contract.Pieces {
-			d.pieceSet[contract.Pieces[i].Chunk][id] = contract.Pieces[i]
+			m, exists := d.pieceSet[int(contract.Pieces[i].Chunk)]
+			// Only add pieceSet entries for chunks that are going to be downloaded.
+			if exists {
+				m[id] = contract.Pieces[i]
+			}
 		}
 	}
 	f.mu.RUnlock()
@@ -432,7 +436,7 @@ loop:
 				continue
 			}
 
-			piece, exists := incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID]
+			piece, exists := incompleteChunk.download.pieceSet[int(incompleteChunk.index)][worker.contractID]
 			if !exists {
 				continue
 			}
@@ -459,7 +463,7 @@ loop:
 		// completed just not at this time.
 		for fcid := range ds.activeWorkers {
 			// Check whether a piece exists for this worker.
-			_, exists1 := incompleteChunk.download.pieceSet[incompleteChunk.index][fcid]
+			_, exists1 := incompleteChunk.download.pieceSet[int(incompleteChunk.index)][fcid]
 			scheduled, exists2 := incompleteChunk.workerAttempts[fcid]
 			if !scheduled && exists1 && exists2 {
 				// This worker is able to complete the download for this chunk,
