@@ -410,15 +410,12 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
 func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	// Set async flag to true.
+	req.Form.Add("async", "true")
 	p, errmsg := api.parseAndValidateDownloadParameters(w, req, ps)
 	if errmsg != nil {
 		WriteError(w, *errmsg, http.StatusBadRequest)
 	}
-
-	// Set async param to true.
-	// This parameter may be used in the future so it is set for safety reasons,
-	// its intended use is to determine whether to call DownloadSection in a goroutine.
-	p.Async = true
 
 	go api.renter.DownloadSection(p)
 
