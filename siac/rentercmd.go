@@ -96,11 +96,11 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Run:   wrap(renterfilesdownloadcmd),
 	}
 
-	renterDownloadChunkCmd = &cobra.Command{
-		Use:   "downloadchunk [path] [offset] [length] [destination]",
+	renterDownloadSectionCmd = &cobra.Command{
+		Use:   "downloadsection [path] [offset] [length] [destination]",
 		Short: "Download a chunk",
 		Long:  "Download a specific chunk from a previously uploaded file.",
-		Run:   wrap(renterfilesdownloadchunkcmd),
+		Run:   wrap(renterfilesdownloadsectioncmd),
 	}
 
 	renterFilesListCmd = &cobra.Command{
@@ -398,16 +398,16 @@ func renterfilesdownloadcmd(path, destination string) {
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
 }
 
-// renterfilesdownloadchunkcmd is the handler for the command `siac renter downloadchunk [path]
-// [chunk id] [destination]`.
+// renterfilesdownloadsectioncmd is the handler for the command `siac renter downloadsection [path]
+// [offset] [length] [destination]`.
 // Downloads a specific chunk to the local specified destination.
-func renterfilesdownloadchunkcmd(path, offset, length, destination string) {
+func renterfilesdownloadsectioncmd(path, offset, length, destination string) {
 	destination = abs(destination)
 	done := make(chan struct{})
 
 	go downloadprogress(done, destination)
 
-	req := fmt.Sprintf("/renter/download/%s?destination=%s&offset=%s&length=%s&httpresp=true", path, destination, offset, length)
+	req := fmt.Sprintf("/renter/download/%s?destination=%s&offset=%s&length=%s", path, destination, offset, length)
 
 	err := get(req)
 	close(done)

@@ -410,11 +410,18 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
 func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	// Ensure that the async flag is not set to false.
+	if strings.Contains(req.URL.RawQuery, "async=false") {
+		WriteError(w, Error{"/downloadasync does not support allow requests containing `async=false`."}, http.StatusBadRequest)
+		return
+	}
+
 	// Set async flag to true.
-	req.Form.Add("async", "true")
+	req.URL.RawQuery += "&async=true"
 	p, errmsg := api.parseAndValidateDownloadParameters(w, req, ps)
 	if errmsg != nil {
 		WriteError(w, *errmsg, http.StatusBadRequest)
+		return
 	}
 
 	go api.renter.DownloadSection(p)
@@ -436,7 +443,7 @@ func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *h
 	// If httprespparam is present, this parameter is ignored.
 	asyncparam := req.FormValue("async")
 
-	// Parse the offset and length parameters. TODO(rnabel): Handle empty string.
+	// Parse the offset and length parameters.
 	var offset, length uint64
 	var err error
 	if len(offsetparam) > 0 {
@@ -452,7 +459,6 @@ func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *h
 			return nil, &Error{"could not decode the length as uint64: " +
 				err.Error()}
 		}
-
 	}
 	// Verify that if either offset or length have been provided that both were provided.
 	offparampassed := len(offsetparam) > 0
@@ -495,6 +501,18 @@ func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *h
 	if !offparampassed { // Determine if entire file is to be downloaded.
 		offset = 0
 		length = file.Filesize
+	}
+
+	// Check that the combination of offset and length are valid.
+	offsetValid := offset >= 0 && offset < file.Filesize
+	lengthValid := length > 0 && offset+length <= file.Filesize
+	if !offsetValid {
+		errmsg := fmt.Sprintf("offset in file %s has to be >= 0 and < %d", siapath, file.Filesize)
+		return nil, &Error{Message: errmsg}
+	}
+	if !lengthValid {
+		errmsg := fmt.Sprintf("length of file %s with offset %d has to be > 0 and < %d", siapath, offset, file.Filesize-offset)
+		return nil, &Error{Message: errmsg}
 	}
 
 	// Instantiate the correct DownloadWriter implementation

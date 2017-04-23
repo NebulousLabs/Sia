@@ -123,6 +123,7 @@ func setupDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	ulSiaPath := "test.dat"
 	st, path := setupTestDownload(t, int(filesize), ulSiaPath, true)
@@ -307,15 +308,13 @@ func TestRenterDownloadHttpRespOffsetAndLengthManyChunksSubsetOfChunks(t *testin
 	setupDownloadTest(t, filesize, 150, 1*filesize/4, true)
 }
 
-func TestRenterDownloadLengthOnlyError(t *testing.T) {
+func setupDownloadParamTest(t *testing.T, useLength bool, length int, useOffset bool, offset, filesize int) error {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
 
-	filesize := 1e4
 	ulSiaPath := "test.dat"
-	length := 100
 
 	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
 	defer st.server.Close()
@@ -323,33 +322,77 @@ func TestRenterDownloadLengthOnlyError(t *testing.T) {
 	// Download the original file from offset 40 and length 10.
 	fname := "offsetsinglechunk.dat"
 	downpath := filepath.Join(st.dir, fname)
-	dlURL := fmt.Sprintf("/renter/download/%s?destination=%s&length=%d", ulSiaPath, downpath, length)
-	err := st.getAPI(dlURL, nil)
+	dlURL := fmt.Sprintf("/renter/download/%s?destination=%s", ulSiaPath, downpath)
+	if useLength {
+		dlURL += fmt.Sprintf("&length=%d", length)
+	}
+	if useOffset {
+		dlURL += fmt.Sprintf("&offset=%d", offset)
+	}
+	return st.getAPI(dlURL, nil)
+}
+
+func TestRenterDownloadLengthOnlyError(t *testing.T) {
+	err := setupDownloadParamTest(t, true, 10, false, 0, 1e4)
+
 	if err == nil {
-		t.Fatalf("/download not prompting error when only passing length.")
+		t.Fatal("/download not prompting error when only passing length.")
 	}
 }
 
 func TestRenterDownloadOffsetOnlyError(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
+	err := setupDownloadParamTest(t, false, 0, true, 10, 1e4)
 
-	filesize := 1e4
-	ulSiaPath := "test.dat"
-	offset := 100
-
-	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
-	defer st.server.Close()
-
-	// Download the original file from offset 40 and length 10.
-	fname := "offsetsinglechunk.dat"
-	downpath := filepath.Join(st.dir, fname)
-	dlURL := fmt.Sprintf("/renter/download/%s?destination=%s&offset=%d", ulSiaPath, downpath, offset)
-	err := st.getAPI(dlURL, nil)
 	if err == nil {
-		t.Fatalf("/download not prompting error when only passing offset.")
+		t.Fatal("/download not prompting error when only passing offset.")
+	}
+}
+
+func TestRenterDownloadOffsetNegativeError(t *testing.T) {
+	err := setupDownloadParamTest(t, true, 0, true, -10, 1e4)
+
+	if err == nil {
+		t.Fatal("/download not prompting error when passing negative offset.")
+	}
+}
+
+func TestRenterDownloadOffsetGreaterEqualThanFilesizeError(t *testing.T) {
+	err := setupDownloadParamTest(t, true, 0, true, 1e4, 1e4)
+
+	if err == nil {
+		t.Fatal("/download not prompting error when passing offset equal to filesize.")
+	}
+}
+
+func TestRenterDownloadLengthGreaterThanFilesizeOffsetZeroError(t *testing.T) {
+	err := setupDownloadParamTest(t, true, 1e4+1, true, 0, 1e4)
+
+	if err == nil {
+		t.Fatal("/download not prompting error when passing length exceeding filesize.")
+	}
+}
+
+func TestRenterDownloadLengthGreaterThanFilesizeOffsetNonZeroError(t *testing.T) {
+	err := setupDownloadParamTest(t, true, 1e4+11, true, 10, 1e4)
+
+	if err == nil {
+		t.Fatal("/download not prompting error when passing length exceeding filesize with non-zero offset.")
+	}
+}
+
+func TestRenterDownloadLengthZeroError(t *testing.T) {
+	err := setupDownloadParamTest(t, true, 0, true, 0, 1e4)
+
+	if err == nil {
+		t.Fatal("/download not prompting error when passing length = 0.")
+	}
+}
+
+func TestRenterDownloadLengthNegativeError(t *testing.T) {
+	err := setupDownloadParamTest(t, true, -1, true, 0, 1e4)
+
+	if err == nil {
+		t.Fatal("/download not prompting error when passing negative length.")
 	}
 }
 
@@ -408,6 +451,23 @@ func TestRenterAsyncDownloadError(t *testing.T) {
 	}
 }
 
+func TestRenterAsyncSpecifyAsyncFalseError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
+	defer st.server.Close()
+
+	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
+	downpath := filepath.Join(st.dir, "asyncdown.dat")
+	err := st.getAPI("/renter/downloadasync/test.dat?async=false&destination="+downpath, nil)
+	if err == nil {
+		t.Fatal("/downloadasync does not return error when passing `async=false`")
+	}
+}
+
 // TestRenterAsyncDownload tests that the /renter/downloadasync route works
 // correctly.
 func TestRenterAsyncDownload(t *testing.T) {
@@ -419,7 +479,7 @@ func TestRenterAsyncDownload(t *testing.T) {
 	st, _ := setupTestDownload(t, 1e4, "test.dat", true)
 	defer st.server.panicClose()
 
-	// download the file asynchronously
+	// Download the file asynchronously.
 	downpath := filepath.Join(st.dir, "asyncdown.dat")
 	err := st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
 	if err != nil {
