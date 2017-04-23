@@ -481,6 +481,10 @@ func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *h
 		return nil, errmsg
 	}
 
+	if async && httpresp {
+		return nil, &Error{"only one of the async and httpresp flags can be specified."}
+	}
+
 	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/") // Sia file name.
 
 	// Lookup the file associated with the nickname.

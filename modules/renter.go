@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"fmt"
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -89,13 +90,7 @@ func NewDownloadFileWriter(fname string, offset, length uint64) *DownloadFileWri
 func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
 	fileOffset := off - int64(dw.offset)
 
-	// Truncate b if writing the whole buffer at the specified offset would exceed the maximum file size.
-	var byts = b
-	if uint64(fileOffset)+uint64(len(b)) > dw.length {
-		byts = b[:dw.length]
-	}
-
-	r, err := dw.f.WriteAt(byts, fileOffset)
+	r, err := dw.f.WriteAt(b, fileOffset)
 	if err != nil {
 		build.ExtendErr("unable to write to download destination", err)
 	}
@@ -109,15 +104,24 @@ func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
 // and buffers all content that is written at other offsets.
 // After every write to the ResponseWriter the `offset` and `length` fields are updated, and buffer content written until
 type DownloadHttpWriter struct {
-	w      http.ResponseWriter
-	offset uint64 // The index of the last byte written to the response writer.
-	length uint64 // The total size of the slice to be written.
-	buffer []byte
+	w              http.ResponseWriter
+	offset         int // The index of the last byte written to the response writer.
+	firstByteIndex int // The index of the first byte.
+	length         int // The total size of the slice to be written.
+	buffer         []byte
+	offsets        map[int]int // Map from offset to length of chunk.
 }
 
 // NewDownloadHttpWriter creates a new instance of http.ResponseWriter backed DownloadWriter.
 func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *DownloadHttpWriter {
-	return &DownloadHttpWriter{w, offset, length, make([]byte, length)}
+	return &DownloadHttpWriter{
+		w:              w,
+		offset:         int(offset),
+		firstByteIndex: int(offset),
+		length:         int(length),
+		buffer:         make([]byte, length),
+		offsets:        make(map[int]int),
+	}
 }
 
 // WriteAt writes the specified bytes at the passed offset. It also acts
@@ -139,23 +143,18 @@ func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *Downlo
 func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
 	var r int
 	var err error
-	blen := uint64(len(b))
+	blen := len(b)
+	fmt.Println("offset", dw.offset, "length", dw.length, "curr offset", off, "buffer length:", blen)
+	// Write bytes to buffer.
+	offsetInBuffer := int(off) - dw.firstByteIndex
+	copy(dw.buffer[offsetInBuffer:blen+offsetInBuffer], b)
+	dw.offsets[int(off)] = int(blen)
 
-	// Write to response if content is exactly at offset.
-	if uint64(off) == dw.offset {
-		// Truncate b if necessary.
-		var byts = b
-		if blen > dw.length {
-			byts = b[:dw.length]
-		}
+	dw.length -= blen
 
-		r, err = dw.w.Write(byts)
-		dw.offset += blen
-		dw.length -= blen
-
-		// TODO: Flush buffer until no more available bytes at offset.
-	} else {
-		copy(dw.buffer[off:int64(blen)+off], b)
+	// If last chunk received.
+	if dw.length == 0 {
+		dw.w.Write(dw.buffer)
 	}
 
 	return r, err

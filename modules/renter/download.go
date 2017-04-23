@@ -254,16 +254,27 @@ func (cd *chunkDownload) recoverChunk() error {
 		return build.ExtendErr("unable to recover chunk", err)
 	}
 
-	// Calculate the offset. If the offset is within the chunk, the requested offset is passed, otherwise the offset of the chunk within the overall file is passed.
 	var result = recoverWriter.Bytes()
-	chunk_base := cd.index * cd.download.chunkSize
-	top_address := chunk_base + cd.download.chunkSize - 1
-	var off = chunk_base
-	if cd.download.offset >= chunk_base && cd.download.offset <= top_address {
+
+	// Calculate the offset. If the offset is within the chunk, the requested offset is passed, otherwise the offset of the chunk within the overall file is passed.
+	chunkBase := cd.index * cd.download.chunkSize
+	top_address := chunkBase + cd.download.chunkSize - 1
+	var off = chunkBase
+	var lowerBound = 0
+	if cd.download.offset >= chunkBase && cd.download.offset <= top_address {
 		off = cd.download.offset
-		offset_in_block := off - chunk_base
-		result = result[offset_in_block:] // If the offset is within the block, part of the block will be ignored
+		offsetInBlock := off - chunkBase
+		lowerBound = int(offsetInBlock) // If the offset is within the block, part of the block will be ignored
 	}
+
+	// Truncate b if writing the whole buffer at the specified offset would exceed the maximum file size.
+	var upperBound = cd.download.chunkSize
+	if top_address > cd.download.length+cd.download.offset {
+		diff := top_address - (cd.download.length + cd.download.offset)
+		upperBound -= diff + 1
+	}
+
+	result = result[lowerBound:upperBound]
 
 	// Write the bytes to the requested output.
 	_, err = cd.download.destination.WriteAt(result, int64(off))
