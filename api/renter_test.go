@@ -123,7 +123,6 @@ func setupDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 
 	ulSiaPath := "test.dat"
 	st, path := setupTestDownload(t, int(filesize), ulSiaPath, true)
