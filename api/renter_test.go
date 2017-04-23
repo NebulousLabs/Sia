@@ -284,7 +284,6 @@ func TestRenterDownloadHttpRespOffsetTwoChunk(t *testing.T) {
 
 func TestRenterDownloadHttpRespOffsetManyChunks(t *testing.T) {
 	filesize := int64(modules.SectorSize) * 5
-	fmt.Println(modules.SectorSize)
 	setupDownloadTest(t, filesize, 40, filesize-40, true)
 }
 
@@ -300,13 +299,11 @@ func TestRenterDownloadHttpRespOffsetAndLengthTwoChunk(t *testing.T) {
 
 func TestRenterDownloadHttpRespOffsetAndLengthManyChunks(t *testing.T) {
 	filesize := int64(modules.SectorSize) * 5
-	fmt.Println(modules.SectorSize)
 	setupDownloadTest(t, filesize, 150, 3*filesize/4, true)
 }
 
 func TestRenterDownloadHttpRespOffsetAndLengthManyChunksSubsetOfChunks(t *testing.T) {
 	filesize := int64(modules.SectorSize) * 5
-	fmt.Println(modules.SectorSize)
 	setupDownloadTest(t, filesize, 150, 1*filesize/4, true)
 }
 
