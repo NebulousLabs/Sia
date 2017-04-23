@@ -73,6 +73,8 @@ func setupTestDownload(t *testing.T, size int, name string, waitOnAvailability b
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
 	uploadValues.Set("renew", "true")
+	uploadValues.Set("datapieces", "1")
+	uploadValues.Set("paritypieces", "1")
 	err = st.stdPostAPI("/renter/upload/"+name, uploadValues)
 	if err != nil {
 		t.Fatal(err)
@@ -117,6 +119,70 @@ func waitForDownloadToComplete(t *testing.T, st *serverTester, siapath string, e
 	}
 }
 
+func setupDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp bool) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	ulSiaPath := "test.dat"
+	st, path := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer st.server.Close()
+
+	// Read the section to be downloaded from the original file.
+	uf, _ := os.Open(path) // Uploaded file.
+	b := make([]byte, length)
+	uf.Seek(offset, 0)
+	uf.Read(b)
+
+	// Download the original file from offset 40 and length 10.
+	fname := "offsetsinglechunk.dat"
+	downpath := filepath.Join(st.dir, fname)
+	dlURL := fmt.Sprintf("/renter/download/%s?offset=%d&length=%d", ulSiaPath, offset, length)
+
+	var downbytes []byte // Contains the downloaded data.
+
+	if useHttpResp {
+		dlURL += "&httpresp=true"
+		// Make request.
+		resp, err := HttpGET("http://" + st.server.listener.Addr().String() + dlURL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		buf := bytes.NewBuffer(make([]byte, 0, 1e8)) // TODO: Replace with correct buffer length
+		_, readErr := buf.ReadFrom(resp.Body)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		downbytes = buf.Bytes()
+
+		// Check size.
+		if int64(len(downbytes)) != length {
+			t.Fatalf("Downloaded content has incorrect size: %d, %d expected.", len(downbytes), length)
+		}
+	} else {
+		dlURL += "&destination=" + downpath
+		err := st.getAPI(dlURL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		waitForDownloadToComplete(t, st, ulSiaPath, "/renter/download with offset failed.") // TODO: Fix error message.
+
+		df, _ := os.Open(downpath) // Downloaded file.
+		fInfo, _ := df.Stat()
+		if int64(fInfo.Size()) != length {
+			t.Fatalf("Downloaded file has incorrect size: %d, %d expected.", fInfo.Size(), length)
+		}
+		downbytes = make([]byte, length)
+		df.Read(downbytes)
+	}
+
+	eq := bytes.Compare(b, downbytes)
+	if eq != 0 {
+		t.Fatalf("Downloaded content does not equal expected. eq=%d", eq)
+	}
+}
+
 // TestRenterDownloadError tests that the /renter/download route sets the download's error field if it fails.
 func TestRenterDownloadError(t *testing.T) {
 	if testing.Short() {
@@ -147,68 +213,147 @@ func TestRenterDownloadError(t *testing.T) {
 	}
 }
 
+// TESTS FOR FILE-BACKED DOWNLOADS.
 func TestRenterDownloadOffsetSingleChunk(t *testing.T) {
+	setupDownloadTest(t, int64(modules.SectorSize), 40, int64(modules.SectorSize)-40, false)
+}
+
+func TestRenterDownloadOffsetTwoChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize * 2)
+	setupDownloadTest(t, filesize, 20, filesize-20, false)
+}
+
+func TestRenterDownloadOffsetThreeChunk(t *testing.T) {
+	filesize := int64(float64(modules.SectorSize) * 2.4)
+	setupDownloadTest(t, filesize, 20, filesize-20, false)
+}
+
+func TestRenterDownloadShortLengthSingleChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize)
+	setupDownloadTest(t, filesize, 0, filesize/2, false)
+}
+
+func TestRenterDownloadShortLengthAndOffsetSingleChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize)
+	setupDownloadTest(t, filesize, filesize/4, filesize/2, false)
+}
+
+func TestRenterDownloadShortLengthTwoChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize * 2)
+	setupDownloadTest(t, filesize, 0, int64(float64(filesize)*0.75), false)
+}
+
+func TestRenterDownloadShortLengthThreeChunkInThirdChunk(t *testing.T) {
+	filesize := int64(float64(modules.SectorSize) * 2.7)
+	setupDownloadTest(t, filesize, 0, int64(2.2*float64(modules.SectorSize)), false)
+}
+
+func TestRenterDownloadShortLengthThreeChunkInSecondChunk(t *testing.T) {
+	filesize := int64(float64(modules.SectorSize) * 2.7)
+	setupDownloadTest(t, filesize, 0, int64(1.6*float64(modules.SectorSize)), false)
+}
+
+func TestRenterDownloadShortLengthMultiChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize * 8)
+	setupDownloadTest(t, filesize, 0, int64(float64(filesize)*0.75), false)
+}
+
+func TestRenterDownloadShortLengthAndOffsetTwoChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize * 2)
+	setupDownloadTest(t, filesize, 50, int64(float64(filesize)*0.75), false)
+}
+
+func TestRenterDownloadShortLengthAndOffsetThreeChunkInSecondChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize * 3)
+	setupDownloadTest(t, filesize, 50, int64(float64(filesize)*0.5), false)
+}
+
+func TestRenterDownloadShortLengthAndOffsetThreeChunkInThirdChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize * 3)
+	setupDownloadTest(t, filesize, 50, int64(float64(filesize)*0.75), false)
+}
+
+// TESTS FOR HTTP RESPONSE BODY BACKED DOWNLOADS.
+func TestRenterDownloadHttpRespOffsetSingleChunk(t *testing.T) {
+	setupDownloadTest(t, int64(modules.SectorSize), 40, int64(modules.SectorSize)-40, true)
+}
+
+func TestRenterDownloadHttpRespOffsetTwoChunk(t *testing.T) {
+	filesize := int64(modules.SectorSize) * 2
+	setupDownloadTest(t, filesize, 40, filesize-40, true)
+}
+
+func TestRenterDownloadHttpRespOffsetManyChunks(t *testing.T) {
+	filesize := int64(modules.SectorSize) * 5
+	fmt.Println(modules.SectorSize)
+	setupDownloadTest(t, filesize, 40, filesize-40, true)
+}
+
+func TestRenterDownloadLengthOnlyError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
 
-	offset := 40
-	length := 10
-
+	filesize := 1e4
 	ulSiaPath := "test.dat"
-	st, path := setupTestDownload(t, 1e4, ulSiaPath, true)
-	defer st.server.Close()
+	length := 100
 
-	// Read the section to be downloaded from the original file.
-	uf, _ := os.Open(path) // Uploaded file.
-	b := make([]byte, length)
-	uf.Seek(int64(offset), 0)
-	uf.Read(b)
+	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer st.server.Close()
 
 	// Download the original file from offset 40 and length 10.
 	fname := "offsetsinglechunk.dat"
 	downpath := filepath.Join(st.dir, fname)
-	dlURL := fmt.Sprintf("/renter/download/%s?destination=%s&offset=%d&length=%d", ulSiaPath, downpath, offset, length)
+	dlURL := fmt.Sprintf("/renter/download/%s?destination=%s&length=%d", ulSiaPath, downpath, length)
 	err := st.getAPI(dlURL, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	waitForDownloadToComplete(t, st, ulSiaPath, "/renter/download with offset failed.")
-
-	// Read from the resulting file.
-	df, _ := os.Open(downpath) // Downloaded file.
-	fInfo, _ := df.Stat()
-	if int(fInfo.Size()) != length {
-		t.Fatalf("Downloaded file has incorrect size: %d, %d expected.", fInfo.Size(), length)
-	}
-	db := make([]byte, length)
-	df.Read(db)
-	eq := bytes.Compare(b, db)
-	if eq != 0 {
-		t.Fatalf("Downloaded content does not equal expected. eq=%d", eq)
+	if err == nil {
+		t.Fatalf("/download not prompting error when only passing length.")
 	}
 }
 
-func TestRenterDownloadOffsetMultiChunk(t *testing.T) {
-	t.Fail()
+func TestRenterDownloadOffsetOnlyError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	filesize := 1e4
+	ulSiaPath := "test.dat"
+	offset := 100
+
+	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer st.server.Close()
+
+	// Download the original file from offset 40 and length 10.
+	fname := "offsetsinglechunk.dat"
+	downpath := filepath.Join(st.dir, fname)
+	dlURL := fmt.Sprintf("/renter/download/%s?destination=%s&offset=%d", ulSiaPath, downpath, offset)
+	err := st.getAPI(dlURL, nil)
+	if err == nil {
+		t.Fatalf("/download not prompting error when only passing offset.")
+	}
 }
 
-func TestRenterDownloadShortLengthSingleChunk(t *testing.T) {
-	t.Fail()
-}
+func TestRenterDownloadAsyncAndHttpRespError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
 
-func TestRenterDownloadShortLengthAndOffsetSingleChunk(t *testing.T) {
-	t.Fail()
-}
+	filesize := 1e4
+	ulSiaPath := "test.dat"
 
-func TestRenterDownloadShortLengthMultiChunk(t *testing.T) {
-	t.Fail()
-}
+	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer st.server.Close()
 
-func TestRenterDownloadShortLengthAndOffsetMultiChunk(t *testing.T) {
-	t.Fail()
+	// Download the original file from offset 40 and length 10.
+	fname := "offsetsinglechunk.dat"
+	dlURL := fmt.Sprintf("/renter/download/%s?destination=%s&async=true&httpresp=true", ulSiaPath, fname)
+	err := st.getAPI(dlURL, nil)
+	if err == nil {
+		t.Fatalf("/download not prompting error when only passing both async and httpresp fields.")
+	}
 }
 
 // TODO: Factor out relevant parts from other test.
