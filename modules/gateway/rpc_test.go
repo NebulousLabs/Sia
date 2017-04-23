@@ -1,7 +1,10 @@
 package gateway
 
 import (
+	"errors"
 	"io"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -537,4 +540,88 @@ func TestCallingRPCFromRPC(t *testing.T) {
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("expected BAR RPC to be called")
 	}
+}
+
+// TestRPCRatelimit checks that a peer calling an RPC repeatedly does not result
+// in a crash.
+func TestRPCRatelimit(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	g1 := newNamedTestingGateway(t, "1")
+	defer g1.Close()
+	g2 := newNamedTestingGateway(t, "2")
+	defer g2.Close()
+
+	var atomicCalls uint64
+	g2.RegisterRPC("recv", func(conn modules.PeerConn) error {
+		_, err := conn.Write([]byte("hi"))
+		if err != nil {
+			t.Log("recv error:", err)
+		}
+		atomic.AddUint64(&atomicCalls, 1)
+		return nil
+	})
+
+	err := g1.Connect(g2.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Block until the connection is confirmed.
+	for i := 0; i < 50; i++ {
+		time.Sleep(10 * time.Millisecond)
+		g2.mu.Lock()
+		peerCount := len(g2.peers)
+		g2.mu.Unlock()
+		if peerCount > 0 {
+			break
+		}
+	}
+	g2.mu.Lock()
+	peerCount := len(g2.peers)
+	g2.mu.Unlock()
+	if peerCount == 0 {
+		t.Fatal("Peers did not connect to eachother")
+	}
+
+	// Call "recv" in a tight loop. Check that the number of successful calls
+	// does not exceed the ratelimit.
+	start := time.Now()
+	var wg sync.WaitGroup
+	overlapVolume := time.Duration(3)
+	callVolume := int(overlapVolume*(rpcStdDeadline/peerRPCDelay)) * 4 / 3
+	for i := 0; i < callVolume; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := g1.RPC(g2.Address(), "recv", func(conn modules.PeerConn) error {
+				buf := make([]byte, 2)
+				_, err := conn.Read(buf)
+				if err != nil {
+					return err
+				}
+				if string(buf) != "hi" {
+					return errors.New("caller rpc failed")
+				}
+				return nil
+			})
+			if err != nil {
+				t.Log(err)
+			}
+		}()
+		// Sleep for a little bit so that the connections are coming all in a
+		// row instead of all at once. But sleep for little enough time that the
+		// number of connectings is still far surpassing the allowed ratelimit.
+		time.Sleep(peerRPCDelay / overlapVolume)
+	}
+	wg.Wait()
+
+	stop := time.Now()
+	elapsed := stop.Sub(start)
+	expected := peerRPCDelay * (time.Duration(atomic.LoadUint64(&atomicCalls)) + 1)
+	if elapsed < expected {
+		t.Error("ratelimit does not seem to be effective", expected, elapsed)
+	}
+	t.Log(atomicCalls)
 }
