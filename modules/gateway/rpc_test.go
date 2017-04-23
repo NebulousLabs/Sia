@@ -571,17 +571,23 @@ func TestRPCRatelimit(t *testing.T) {
 	// Block until the connection is confirmed.
 	for i := 0; i < 50; i++ {
 		time.Sleep(10 * time.Millisecond)
+		g1.mu.Lock()
+		g1Peers := len(g1.peers)
+		g1.mu.Unlock()
 		g2.mu.Lock()
-		peerCount := len(g2.peers)
+		g2Peers := len(g2.peers)
 		g2.mu.Unlock()
-		if peerCount > 0 {
+		if g1Peers > 0 || g2Peers > 0 {
 			break
 		}
 	}
+	g1.mu.Lock()
+	g1Peers := len(g1.peers)
+	g1.mu.Unlock()
 	g2.mu.Lock()
-	peerCount := len(g2.peers)
+	g2Peers := len(g2.peers)
 	g2.mu.Unlock()
-	if peerCount == 0 {
+	if g1Peers == 0 || g2Peers == 0 {
 		t.Fatal("Peers did not connect to eachother")
 	}
 
