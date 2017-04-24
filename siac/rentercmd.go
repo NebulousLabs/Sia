@@ -42,6 +42,14 @@ var (
 		Long:  "View the current allowance, which controls how much money is spent on file contracts.",
 		Run:   wrap(renterallowancecmd),
 	}
+
+	renterAllowanceCancelCmd = &cobra.Command{
+		Use:   "cancel",
+		Short: "Cancel the current allowance",
+		Long:  "Cancel the current allowance, which controls how much money is spent on file contracts.",
+		Run:   wrap(renterallowancecancelcmd),
+	}
+
 	renterSetAllowanceCmd = &cobra.Command{
 		Use:   "setallowance [amount] [period]",
 		Short: "Set the allowance",
@@ -245,6 +253,15 @@ func renterallowancecmd() {
 	Amount: %v
 	Period: %v blocks
 `, currencyUnits(allowance.Funds), allowance.Period)
+}
+
+// renterallowancecancelcmd cancels the current allowance.
+func renterallowancecancelcmd() {
+	err := post("/renter", "hosts=0&funds=0&period=0&renewwindow=0")
+	if err != nil {
+		die("error cancelling allowance:", err)
+	}
+	fmt.Println("Allowance cancelled.")
 }
 
 // rentersetallowancecmd allows the user to set the allowance.

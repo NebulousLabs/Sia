@@ -280,6 +280,7 @@ func main() {
 		renterPricesCmd)
 
 	renterContractsCmd.AddCommand(renterContractsViewCmd)
+	renterAllowanceCmd.AddCommand(renterAllowanceCancelCmd)
 
 	renterCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
