@@ -34,6 +34,12 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 	}
 	dbForEachSiafundOutput(w.dbTx, func(_ types.SiafundOutputID, sfo types.SiafundOutput) {
 		siafundBalance = siafundBalance.Add(sfo.Value)
+		if sfo.ClaimStart.Cmp(siafundPool) > 0 {
+			// Skip claims larger than the siafund pool. This should only
+			// occur if the siafund pool has not been initialized yet.
+			w.log.Debugf("skipping claim with start value %v because siafund pool is only %v", sfo.ClaimStart, siafundPool)
+			return
+		}
 		siafundClaimBalance = siafundClaimBalance.Add(siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
 	})
 	return
