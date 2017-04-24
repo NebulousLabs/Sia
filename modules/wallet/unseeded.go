@@ -159,6 +159,7 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	if err != nil {
 		return err
 	}
+	w.integrateSpendableKey(masterKey, sk)
 	return nil
 }
 
@@ -168,9 +169,39 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 		return err
 	}
 	defer w.tg.Done()
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.loadSiagKeys(masterKey, keyfiles)
+
+	// load the keys and reset the consensus change ID and height in preparation for rescan
+	err := func() error {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		err := w.loadSiagKeys(masterKey, keyfiles)
+		if err != nil {
+			return err
+		}
+		err = dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
+		if err != nil {
+			return err
+		}
+		return dbPutConsensusHeight(w.dbTx, 0)
+	}()
+	if err != nil {
+		return err
+	}
+
+	// rescan the blockchain
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
+	done := make(chan struct{})
+	go w.rescanMessage(done)
+	defer close(done)
+
+	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	if err != nil {
+		return err
+	}
+	w.tpool.TransactionPoolSubscribe(w)
+	return nil
 }
 
 // Load033xWallet loads a v0.3.3.x wallet as an unseeded key, such that the
@@ -180,30 +211,59 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 		return err
 	}
 	defer w.tg.Done()
-	w.mu.Lock()
-	defer w.mu.Unlock()
 
-	var savedKeys []savedKey033x
-	err := encoding.ReadFile(filepath033x, &savedKeys)
+	// load the keys and reset the consensus change ID and height in preparation for rescan
+	err := func() error {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+
+		var savedKeys []savedKey033x
+		err := encoding.ReadFile(filepath033x, &savedKeys)
+		if err != nil {
+			return err
+		}
+		var seedsLoaded int
+		for _, savedKey := range savedKeys {
+			spendKey := spendableKey{
+				UnlockConditions: savedKey.UnlockConditions,
+				SecretKeys:       []crypto.SecretKey{savedKey.SecretKey},
+			}
+			err = w.loadSpendableKey(masterKey, spendKey)
+			if err != nil && err != errDuplicateSpendableKey {
+				return err
+			}
+			if err == nil {
+				seedsLoaded++
+			}
+			w.integrateSpendableKey(masterKey, spendKey)
+		}
+		if seedsLoaded == 0 {
+			return errAllDuplicates
+		}
+
+		err = dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
+		if err != nil {
+			return err
+		}
+		return dbPutConsensusHeight(w.dbTx, 0)
+	}()
 	if err != nil {
 		return err
 	}
-	var seedsLoaded int
-	for _, savedKey := range savedKeys {
-		spendKey := spendableKey{
-			UnlockConditions: savedKey.UnlockConditions,
-			SecretKeys:       []crypto.SecretKey{savedKey.SecretKey},
-		}
-		err = w.loadSpendableKey(masterKey, spendKey)
-		if err != nil && err != errDuplicateSpendableKey {
-			return err
-		}
-		if err == nil {
-			seedsLoaded++
-		}
+
+	// rescan the blockchain
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
+	done := make(chan struct{})
+	go w.rescanMessage(done)
+	defer close(done)
+
+	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	if err != nil {
+		return err
 	}
-	if seedsLoaded == 0 {
-		return errAllDuplicates
-	}
+	w.tpool.TransactionPoolSubscribe(w)
+
 	return nil
 }
