@@ -350,7 +350,7 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 
 			// If the storage obligation already has sectors, it means that the
 			// file contract is being renewed, and that the sector should be
-			// re-added with a new expriation height. If there is an error at any
+			// re-added with a new expiration height. If there is an error at any
 			// point, all of the sectors should be removed.
 			if len(so.SectorRoots) != 0 {
 				err := h.AddSectorBatch(so.SectorRoots)
@@ -532,13 +532,9 @@ func (h *Host) modifyStorageObligation(so storageObligation, sectorsRemoved []cr
 // removeStorageObligation will remove a storage obligation from the host,
 // either due to failure or success.
 func (h *Host) removeStorageObligation(so storageObligation, sos storageObligationStatus) error {
-
-	// Call removeSector for every sector in the storage obligation.
-	for _, root := range so.SectorRoots {
-		// Error is not checked, we want to call remove on every sector even if
-		// there are problems - disk health information will be updated.
-		_ = h.RemoveSector(root)
-	}
+	// Error is not checked, we want to call remove on every sector even if
+	// there are problems - disk health information will be updated.
+	_ = h.RemoveSectorBatch(so.SectorRoots)
 
 	// Update the host revenue metrics based on the status of the obligation.
 	if sos == obligationUnresolved {
@@ -560,7 +556,7 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 	}
 	if sos == obligationSucceeded {
 		// Remove the obligation statistics as potential risk and income.
-		h.log.Printf("Succesfully submitted a storage proof. Revenue is %v.\n", h.financialMetrics.PotentialContractCompensation.Add(h.financialMetrics.PotentialStorageRevenue).Add(h.financialMetrics.PotentialDownloadBandwidthRevenue).Add(h.financialMetrics.PotentialUploadBandwidthRevenue))
+		h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", h.financialMetrics.PotentialContractCompensation.Add(h.financialMetrics.PotentialStorageRevenue).Add(h.financialMetrics.PotentialDownloadBandwidthRevenue).Add(h.financialMetrics.PotentialUploadBandwidthRevenue))
 		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
 		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
 		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)

@@ -1,7 +1,7 @@
 package renter
 
 // TODO: Change the upload loop to have an upload state, and make it so that
-// instead of occasionally rebuildling the whole file matrix it has just a
+// instead of occasionally rebuilding the whole file matrix it has just a
 // single matrix that it's constantly pulling chunks from. Have a separate loop
 // which goes through the files and adds them to the matrix. Have the loop
 // listen on the channel for new files, so that they can go directly into the
@@ -95,14 +95,14 @@ type hostContractor interface {
 
 	// Editor creates an Editor from the specified contract ID, allowing the
 	// insertion, deletion, and modification of sectors.
-	Editor(types.FileContractID) (contractor.Editor, error)
+	Editor(types.FileContractID, <-chan struct{}) (contractor.Editor, error)
 
 	// IsOffline reports whether the specified host is considered offline.
 	IsOffline(types.FileContractID) bool
 
 	// Downloader creates a Downloader from the specified contract ID,
 	// allowing the retrieval of sectors.
-	Downloader(types.FileContractID) (contractor.Downloader, error)
+	Downloader(types.FileContractID, <-chan struct{}) (contractor.Downloader, error)
 
 	// ResolveID returns the most recent renewal of the specified ID.
 	ResolveID(types.FileContractID) types.FileContractID

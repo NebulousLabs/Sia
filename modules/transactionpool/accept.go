@@ -5,13 +5,14 @@ package transactionpool
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/NebulousLabs/bolt"
 )
 
 const (
@@ -36,7 +37,18 @@ var (
 	errLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
 	errEmptySet            = errors.New("transaction set is empty")
 
-	TransactionMinFee = types.SiacoinPrecision.Mul64(2)
+	// TransactionMinFee defines the minimum fee required for a transaction in
+	// order for it to be accepted if there is already more than
+	// TransactionPoolSizeForFee transactions in the transaction pool.
+	TransactionMinFee = types.SiacoinPrecision.Div64(3)
+
+	// relayTransactionSetTimeout establishes the timeout for a relay
+	// transaction set call.
+	relayTransactionSetTimeout = build.Select(build.Var{
+		Standard: 3 * time.Minute,
+		Dev:      20 * time.Second,
+		Testing:  3 * time.Second,
+	}).(time.Duration)
 )
 
 // relatedObjectIDs determines all of the object ids related to a transaction.
@@ -229,7 +241,18 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 		tp.knownObjects[ObjectID(diff.ID)] = setID
 	}
 	tp.transactionSetDiffs[setID] = cc
-	tp.transactionListSize += len(encoding.Marshal(superset))
+	tsetSize := len(encoding.Marshal(superset))
+	tp.transactionListSize += tsetSize
+
+	// debug logging
+	if build.DEBUG {
+		txLogs := ""
+		for i, t := range superset {
+			txLogs += fmt.Sprintf("superset transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
+		}
+		tp.log.Debugf("accepted transaction superset %v, size: %vB\ntpool size is %vB after accpeting transaction superset\ntransactions: \n%v\n", setID, tsetSize, tp.transactionListSize, txLogs)
+	}
+
 	return nil
 }
 
@@ -241,18 +264,12 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 	}
 
 	// Remove all transactions that have been confirmed in the transaction set.
-	err := tp.db.View(func(tx *bolt.Tx) error {
-		oldTS := ts
-		ts = []types.Transaction{}
-		for _, txn := range oldTS {
-			if !tp.transactionConfirmed(tx, txn.ID()) {
-				ts = append(ts, txn)
-			}
+	oldTS := ts
+	ts = []types.Transaction{}
+	for _, txn := range oldTS {
+		if !tp.transactionConfirmed(tp.dbTx, txn.ID()) {
+			ts = append(ts, txn)
 		}
-		return nil
-	})
-	if err != nil {
-		return err
 	}
 	// If no transactions remain, return a dublicate error.
 	if len(ts) == 0 {
@@ -261,7 +278,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 
 	// Check the composition of the transaction set, including fees and
 	// IsStandard rules.
-	err = tp.checkTransactionSetComposition(ts)
+	err := tp.checkTransactionSetComposition(ts)
 	if err != nil {
 		return err
 	}
@@ -292,7 +309,17 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 		tp.knownObjects[oid] = setID
 	}
 	tp.transactionSetDiffs[setID] = cc
-	tp.transactionListSize += len(encoding.Marshal(ts))
+	tsetSize := len(encoding.Marshal(ts))
+	tp.transactionListSize += tsetSize
+
+	// debug logging
+	if build.DEBUG {
+		txLogs := ""
+		for i, t := range ts {
+			txLogs += fmt.Sprintf("transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
+		}
+		tp.log.Debugf("accepted transaction set %v, size: %vB\ntpool size is %vB after accpeting transaction set\ntransactions: \n%v\n", setID, tsetSize, tp.transactionListSize, txLogs)
+	}
 	return nil
 }
 
@@ -326,8 +353,23 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 // the accept is successful, the transaction will be relayed to the gateway's
 // other peers.
 func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
+	err := conn.SetDeadline(time.Now().Add(relayTransactionSetTimeout))
+	if err != nil {
+		return err
+	}
+	// Automatically close the channel when tg.Stop() is called.
+	finishedChan := make(chan struct{})
+	defer close(finishedChan)
+	go func() {
+		select {
+		case <-tp.tg.StopChan():
+		case <-finishedChan:
+		}
+		conn.Close()
+	}()
+
 	var ts []types.Transaction
-	err := encoding.ReadObject(conn, &ts, types.BlockSizeLimit)
+	err = encoding.ReadObject(conn, &ts, types.BlockSizeLimit)
 	if err != nil {
 		return err
 	}

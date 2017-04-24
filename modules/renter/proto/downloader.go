@@ -3,6 +3,7 @@ package proto
 import (
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -14,9 +15,11 @@ import (
 // A Downloader retrieves sectors by calling the download RPC on a host.
 // Downloaders are NOT thread- safe; calls to Sector must be serialized.
 type Downloader struct {
-	host     modules.HostDBEntry
-	contract modules.RenterContract // updated after each revision
-	conn     net.Conn
+	host      modules.HostDBEntry
+	contract  modules.RenterContract // updated after each revision
+	conn      net.Conn
+	closeChan chan struct{}
+	once      sync.Once
 
 	SaveFn revisionSaver
 }
@@ -102,19 +105,27 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	return hd.contract, sector, nil
 }
 
-// Close cleanly terminates the download loop with the host and closes the
-// connection.
-func (hd *Downloader) Close() error {
+// shutdown terminates the revision loop and signals the goroutine spawned in
+// NewDownloader to return.
+func (hd *Downloader) shutdown() {
 	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
 	// don't care about these errors
 	_, _ = verifySettings(hd.conn, hd.host)
 	_ = modules.WriteNegotiationStop(hd.conn)
+	close(hd.closeChan)
+}
+
+// Close cleanly terminates the download loop with the host and closes the
+// connection.
+func (hd *Downloader) Close() error {
+	// using once ensures that Close is idempotent
+	hd.once.Do(hd.shutdown)
 	return hd.conn.Close()
 }
 
 // NewDownloader initiates the download request loop with a host, and returns a
 // Downloader.
-func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract) (*Downloader, error) {
+func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, cancel <-chan struct{}) (*Downloader, error) {
 	// check that contract has enough value to support a download
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
@@ -125,10 +136,23 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract) (*
 	}
 
 	// initiate download loop
-	conn, err := net.DialTimeout("tcp", string(contract.NetAddress), 15*time.Second)
+	conn, err := (&net.Dialer{
+		Cancel:  cancel,
+		Timeout: 15 * time.Second,
+	}).Dial("tcp", string(contract.NetAddress))
 	if err != nil {
 		return nil, err
 	}
+
+	closeChan := make(chan struct{})
+	go func() {
+		select {
+		case <-cancel:
+			conn.Close()
+		case <-closeChan:
+		}
+	}()
+
 	// allot 2 minutes for RPC request + revision exchange
 	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
 	defer extendDeadline(conn, time.Hour)
@@ -143,8 +167,9 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract) (*
 
 	// the host is now ready to accept revisions
 	return &Downloader{
-		contract: contract,
-		host:     host,
-		conn:     conn,
+		contract:  contract,
+		host:      host,
+		conn:      conn,
+		closeChan: closeChan,
 	}, nil
 }

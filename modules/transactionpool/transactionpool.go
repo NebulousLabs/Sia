@@ -3,16 +3,19 @@ package transactionpool
 import (
 	"errors"
 
+	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/demotemutex"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
 	dbFilename = "transactionpool.db"
+	logFile    = "transactionpool.log"
 )
 
 var (
@@ -70,7 +73,10 @@ type (
 
 		// Utilities.
 		db         *persist.BoltDatabase
+		dbTx       *bolt.Tx
+		log        *persist.Logger
 		mu         demotemutex.DemoteMutex
+		tg         sync.ThreadGroup
 		persistDir string
 	}
 )
@@ -105,20 +111,21 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 
 	// Register RPCs
 	g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
+	tp.tg.OnStop(func() {
+		tp.gateway.UnregisterRPC("RelayTransactionSet")
+	})
 	return tp, nil
 }
 
 func (tp *TransactionPool) Close() error {
-	tp.gateway.UnregisterRPC("RelayTransactionSet")
-	tp.consensusSet.Unsubscribe(tp)
-	return tp.db.Close()
+	return tp.tg.Stop()
 }
 
 // FeeEstimation returns an estimation for what fee should be applied to
 // transactions.
 func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// TODO: The fee estimation tool should look at the recent blocks and use
-	// them to guage what sort of fee should be required, as opposed to just
+	// them to gauge what sort of fee should be required, as opposed to just
 	// guessing blindly.
 	//
 	// TODO: The current minimum has been reduced significantly to account for
@@ -128,7 +135,7 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// a much lower value, which means hosts would be incompatible if the
 	// minimum recommended were set to 10. The value has been set to 1, which
 	// should be okay temporarily while the renters are given time to upgrade.
-	return types.SiacoinPrecision.Mul64(1).Div64(1e3), types.SiacoinPrecision.Mul64(5).Div64(1e3)
+	return types.SiacoinPrecision.Mul64(1).Div64(3).Div64(1e3), types.SiacoinPrecision.Mul64(1).Div64(1e3)
 }
 
 // TransactionList returns a list of all transactions in the transaction pool.

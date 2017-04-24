@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -163,7 +164,7 @@ func (brh mockBlockRuleHelper) minimumValidChildTimestamp(blockMap dbBucket, pb 
 
 // ValidateBlock stores the parameters it receives and returns the mock error
 // defined by mockBlockValidator.err.
-func (bv mockBlockValidator) ValidateBlock(b types.Block, minTimestamp types.Timestamp, target types.Target, height types.BlockHeight) error {
+func (bv mockBlockValidator) ValidateBlock(b types.Block, minTimestamp types.Timestamp, target types.Target, height types.BlockHeight, log *persist.Logger) error {
 	validateBlockParamsGot = validateBlockParams{true, b, minTimestamp, target, height}
 	return bv.err
 }
@@ -1002,9 +1003,6 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 	}
 	select {
 	case <-mg.broadcastCalled:
-		// Broadcast is called twice, once to broadcast blocks to peers <= v0.5.1
-		// and once to broadcast block headers to peers > v0.5.1.
-		<-mg.broadcastCalled
 	case <-time.After(10 * time.Millisecond):
 		t.Error("expected AcceptBlock to broadcast a valid block")
 	}

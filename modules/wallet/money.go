@@ -62,7 +62,8 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 	}
 	defer w.tg.Done()
 
-	tpoolFee := types.SiacoinPrecision.Mul64(10) // TODO: better fee algo.
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
@@ -93,7 +94,10 @@ func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]t
 		return nil, err
 	}
 	defer w.tg.Done()
-	tpoolFee := types.SiacoinPrecision.Mul64(10) // TODO: better fee algo.
+
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
+	tpoolFee = tpoolFee.Mul64(5)   // use large fee to ensure siafund transactions are selected by miners
 	output := types.SiafundOutput{
 		Value:      amount,
 		UnlockHash: dest,

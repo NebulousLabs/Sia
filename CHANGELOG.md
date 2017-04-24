@@ -1,6 +1,13 @@
 Version History
 ---------------
 
+April 2017:
+
+v1.2.0 (minor release)
+- Host overhaul
+- Wallet overhaul
+- Tons of bug fixes and efficiency improvements
+
 March 2017:
 
 v1.1.2 (patch release)

@@ -34,7 +34,7 @@ var (
 	//
 	// TODO: Allow this number to be established in the renter settings.
 	maxActiveDownloadPieces = build.Select(build.Var{
-		Standard: int(40),
+		Standard: int(60),
 		Dev:      int(10),
 		Testing:  int(5),
 	}).(int)
@@ -247,7 +247,7 @@ func (cd *chunkDownload) recoverChunk() error {
 	// Sync the write to provide proper durability.
 	err = fileDest.Sync()
 	if err != nil {
-		return build.ExtendErr("unable to sync downlaod destination", err)
+		return build.ExtendErr("unable to sync download destination", err)
 	}
 
 	cd.download.mu.Lock()

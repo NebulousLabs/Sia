@@ -48,10 +48,6 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 		m.newSourceBlock()
 	}
 	m.persist.RecentChange = cc.ID
-	err := m.save()
-	if err != nil {
-		m.log.Println(err)
-	}
 }
 
 // ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed

@@ -12,15 +12,22 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb/hosttree"
+	"github.com/NebulousLabs/Sia/modules/transactionpool"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 // hdbTester contains a hostdb and all dependencies.
 type hdbTester struct {
-	cs      modules.ConsensusSet
-	gateway modules.Gateway
+	cs        modules.ConsensusSet
+	gateway   modules.Gateway
+	miner     modules.TestMiner
+	tpool     modules.TransactionPool
+	wallet    modules.Wallet
+	walletKey crypto.TwofishKey
 
 	hdb *HostDB
 
@@ -75,6 +82,18 @@ func newHDBTesterDeps(name string, deps dependencies) (*hdbTester, error) {
 	if err != nil {
 		return nil, err
 	}
+	tp, err := transactionpool.New(cs, g, filepath.Join(testDir, modules.TransactionPoolDir))
+	if err != nil {
+		return nil, err
+	}
+	w, err := wallet.New(cs, tp, filepath.Join(testDir, modules.WalletDir))
+	if err != nil {
+		return nil, err
+	}
+	m, err := miner.New(cs, tp, w, filepath.Join(testDir, modules.MinerDir))
+	if err != nil {
+		return nil, err
+	}
 	hdb, err := newHostDB(g, cs, filepath.Join(testDir, modules.RenterDir), deps)
 	if err != nil {
 		return nil, err
@@ -83,12 +102,35 @@ func newHDBTesterDeps(name string, deps dependencies) (*hdbTester, error) {
 	hdbt := &hdbTester{
 		cs:      cs,
 		gateway: g,
+		miner:   m,
+		tpool:   tp,
+		wallet:  w,
 
 		hdb: hdb,
 
 		persistDir: testDir,
 	}
+
+	err = hdbt.initWallet()
+	if err != nil {
+		return nil, err
+	}
+
 	return hdbt, nil
+}
+
+// initWallet creates a wallet key, then initializes and unlocks the wallet.
+func (hdbt *hdbTester) initWallet() error {
+	hdbt.walletKey = crypto.GenerateTwofishKey()
+	_, err := hdbt.wallet.Encrypt(hdbt.walletKey)
+	if err != nil {
+		return err
+	}
+	err = hdbt.wallet.Unlock(hdbt.walletKey)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // TestAverageContractPrice tests the AverageContractPrice method, which also depends on the

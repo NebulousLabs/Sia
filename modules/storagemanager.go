@@ -89,6 +89,11 @@ type (
 		// auto-expiry information for that sector can be properly updated.
 		RemoveSector(sectorRoot crypto.Hash) error
 
+		// RemoveSectorBatch is a non-ACID performance optimization to remove a
+		// ton of sectors from the storage manager all at once. This is
+		// necessary when clearing out an entire contract from the host.
+		RemoveSectorBatch(sectorRoots []crypto.Hash) error
+
 		// RemoveStorageFolder will remove a storage folder from the manager.
 		// All storage on the folder will be moved to other storage folders,
 		// meaning that no data will be lost. If the manager is unable to save

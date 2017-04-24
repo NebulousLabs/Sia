@@ -1,11 +1,12 @@
 package contractmanager
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // syncResources will call Sync on all resources that the WAL has open. The
@@ -28,7 +29,6 @@ func (wal *writeAheadLog) syncResources() {
 		err := wal.fileSettingsTmp.Sync()
 		if err != nil {
 			wal.cm.log.Severe("ERROR: unable to sync the contract manager settings:", err)
-			panic("unable to sync contract manager settings, crashing to avoid data corruption")
 		}
 		err = wal.fileSettingsTmp.Close()
 		if err != nil {
@@ -47,7 +47,6 @@ func (wal *writeAheadLog) syncResources() {
 		err = wal.cm.dependencies.renameFile(tmpFilename, filename)
 		if err != nil {
 			wal.cm.log.Severe("ERROR: unable to atomically copy the contract manager settings:", err)
-			panic("unable to atomically copy contract manager settings, crashing to avoid data corruption")
 		}
 	}()
 
@@ -59,7 +58,6 @@ func (wal *writeAheadLog) syncResources() {
 			err := sf.metadataFile.Sync()
 			if err != nil {
 				wal.cm.log.Severe("ERROR: unable to sync a storage folder:", err)
-				panic("unable to sync a storage folder, creashing to avoid data corruption")
 			}
 		}(sf)
 		go func(sf *storageFolder) {
@@ -67,7 +65,6 @@ func (wal *writeAheadLog) syncResources() {
 			err := sf.sectorFile.Sync()
 			if err != nil {
 				wal.cm.log.Severe("ERROR: unable to sync a storage folder:", err)
-				panic("unable to sync a storage folder, creashing to avoid data corruption")
 			}
 		}(sf)
 	}
@@ -82,7 +79,6 @@ func (wal *writeAheadLog) syncResources() {
 		err := wal.fileWALTmp.Sync()
 		if err != nil {
 			wal.cm.log.Severe("Unable to sync the write-ahead-log:", err)
-			panic("unable to sync the write-ahead-log, crashing to avoid data corrution")
 		}
 		err = wal.fileWALTmp.Close()
 		if err != nil {
@@ -106,7 +102,6 @@ func (wal *writeAheadLog) syncResources() {
 			// Log that the host is having trouble saving the uncommitted changes.
 			// Crash if the list of uncommitted changes has grown very large.
 			wal.cm.log.Severe("ERROR: could not rename temporary write-ahead-log in contract manager:", err)
-			panic("unable to copy-on-write the WAL temporary file, crashing to prevent data corruption")
 		}
 	}
 
@@ -164,13 +159,21 @@ func (wal *writeAheadLog) commit() {
 		wal.fileSettingsTmp, err = wal.cm.dependencies.createFile(filepath.Join(wal.cm.persistDir, settingsFileTmp))
 		if err != nil {
 			wal.cm.log.Severe("Unable to open temporary settings file for writing:", err)
-			panic("unable to open temporary settings file for writing, crashing to prevent data corruption")
 		}
 		ss := wal.cm.savedSettings()
-		err = persist.Save(settingsMetadata, ss, wal.fileSettingsTmp)
+		b, err := json.MarshalIndent(ss, "", "\t")
 		if err != nil {
-			wal.cm.log.Severe("writing to settings tmp file has failed:", err)
-			panic("unable to write to temporary settings file, crashing to avoid data corruption")
+			build.ExtendErr("unable to marshal settings data", err)
+		}
+		enc := json.NewEncoder(wal.fileSettingsTmp)
+		if err := enc.Encode(settingsMetadata.Header); err != nil {
+			build.ExtendErr("unable to write header to settings temp file", err)
+		}
+		if err := enc.Encode(settingsMetadata.Version); err != nil {
+			build.ExtendErr("unable to write version to settings temp file", err)
+		}
+		if _, err = wal.fileSettingsTmp.Write(b); err != nil {
+			build.ExtendErr("unable to write data settings temp file", err)
 		}
 	}()
 
@@ -185,13 +188,11 @@ func (wal *writeAheadLog) commit() {
 		wal.fileWALTmp, err = wal.cm.dependencies.createFile(walTmpName)
 		if err != nil {
 			wal.cm.log.Severe("ERROR: unable to create write-ahead-log:", err)
-			panic("unable to create write-ahead-log in contract manager, crashing to avoid data loss")
 		}
 		// Write the metadata into the WAL.
 		err = writeWALMetadata(wal.fileWALTmp)
 		if err != nil {
 			wal.cm.log.Severe("Unable to properly initialize WAL file, crashing to prevent corruption:", err)
-			panic("Unable to properly initialize WAL file, crashing to prevent corruption.")
 		}
 
 		// Append all of the remaining long running uncommitted changes to the WAL.

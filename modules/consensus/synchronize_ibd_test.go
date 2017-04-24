@@ -419,7 +419,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 	select {
 	case <-doneChan:
-	case <-time.After(2 * (minIBDWaitTime + ibdLoopDelay)):
+	case <-time.After(4 * (minIBDWaitTime + ibdLoopDelay)):
 		t.Fatal("threadedInitialBlockchainDownload never finished with 2 synced peers and 1 non-synced peer")
 	}
 
@@ -490,6 +490,6 @@ func TestGenesisBlockSync(t *testing.T) {
 
 	time.Sleep(time.Second * 12)
 	if len(cst1.gateway.Peers()) == 0 {
-		t.Error("disconnection occured!")
+		t.Error("disconnection occurred!")
 	}
 }

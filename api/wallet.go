@@ -190,6 +190,14 @@ func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ ht
 	if req.FormValue("encryptionpassword") != "" {
 		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionpassword")))
 	}
+
+	if req.FormValue("force") == "true" {
+		err := api.wallet.Reset()
+		if err != nil {
+			WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+	}
 	seed, err := api.wallet.Encrypt(encryptionKey)
 	if err != nil {
 		WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
@@ -225,6 +233,15 @@ func (api *API) walletInitSeedHandler(w http.ResponseWriter, req *http.Request, 
 		WriteError(w, Error{"error when calling /wallet/init/seed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
+
+	if req.FormValue("force") == "true" {
+		err = api.wallet.Reset()
+		if err != nil {
+			WriteError(w, Error{"error when calling /wallet/init/seed: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+	}
+
 	err = api.wallet.InitFromSeed(encryptionKey, seed)
 	if err != nil {
 		WriteError(w, Error{"error when calling /wallet/init/seed: " + err.Error()}, http.StatusBadRequest)

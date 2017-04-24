@@ -255,27 +255,27 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 		},
 		{
 			blocksToMine:          1,
-			expectedNumBroadcasts: 2,
+			expectedNumBroadcasts: 1,
 			synced:                true,
 		},
 		{
 			blocksToMine:          2,
-			expectedNumBroadcasts: 2,
+			expectedNumBroadcasts: 1,
 			synced:                true,
 		},
 		{
 			blocksToMine:          int(MaxCatchUpBlocks),
-			expectedNumBroadcasts: 2,
+			expectedNumBroadcasts: 1,
 			synced:                true,
 		},
 		{
 			blocksToMine:          2 * int(MaxCatchUpBlocks),
-			expectedNumBroadcasts: 2,
+			expectedNumBroadcasts: 1,
 			synced:                true,
 		},
 		{
 			blocksToMine:          2*int(MaxCatchUpBlocks) + 1,
-			expectedNumBroadcasts: 2,
+			expectedNumBroadcasts: 1,
 			synced:                true,
 		},
 	}
@@ -663,9 +663,21 @@ var (
 	errFailingWriter = errors.New("failing writer")
 )
 
+// Close returns 'nil', and does nothing behind the scenes. This is because the
+// testing reuses pipes, but the consensus code now correctly closes conns after
+// handling them.
+func (pc mockPeerConn) Close() error {
+	return nil
+}
+
 // RPCAddr implements this method of the modules.PeerConn interface.
 func (pc mockPeerConn) RPCAddr() modules.NetAddress {
 	return "mockPeerConn dialback addr"
+}
+
+// SetDeadline returns 'nil', and does nothing behind the scenes.
+func (pc mockPeerConn) SetDeadline(time.Time) error {
+	return nil
 }
 
 // Read is a mock implementation of modules.PeerConn.Read that always returns
@@ -1149,18 +1161,13 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 	cst1.cs.gateway.Broadcast("RelayHeader", validBlock.Header(), cst1.cs.gateway.Peers())
 	select {
 	case <-mg.broadcastCalled:
-		// Broadcast is called twice, once to broadcast blocks to peers <= v0.5.1
-		// and once to broadcast block headers to peers > v0.5.1.
-		<-mg.broadcastCalled
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("RelayHeader didn't broadcast a valid block header")
 	}
 }
 
 // TestIntegrationRelaySynchronize tests that blocks are relayed as they are
-// accepted and that peers stay synchronized. This test is header/block
-// broadcast agnostic. When build.Version <= 0.5.1 block relaying will be
-// tested. When build.Version > 0.5.1 header relaying will be tested.
+// accepted and that peers stay synchronized.
 func TestIntegrationRelaySynchronize(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

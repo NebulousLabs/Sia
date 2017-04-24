@@ -59,7 +59,7 @@ func TestAbsolutePathSafeFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = sf.Commit()
+	err = sf.CommitSync()
 	if err != nil {
 		t.Fatal(err)
 	}

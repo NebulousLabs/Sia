@@ -185,7 +185,7 @@ func (pd *productionDependencies) init() {
 
 // loadFile allows the host to load a persistence structure form disk.
 func (productionDependencies) loadFile(m persist.Metadata, i interface{}, s string) error {
-	return persist.LoadFile(m, i, s)
+	return persist.LoadJSON(m, i, s)
 }
 
 // mkdirAll gives the host the ability to create chains of folders within the

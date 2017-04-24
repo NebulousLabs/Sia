@@ -90,7 +90,7 @@ type Miner struct {
 }
 
 // startupRescan will rescan the blockchain in the event that the miner
-// persistance layer has become desynchronized from the consensus persistance
+// persistence layer has become desynchronized from the consensus persistence
 // layer. This might happen if a user replaces any of the folders with backups
 // or deletes any of the folders.
 func (m *Miner) startupRescan() error {
@@ -105,7 +105,7 @@ func (m *Miner) startupRescan() error {
 		m.persist.RecentChange = modules.ConsensusChangeBeginning
 		m.persist.Height = 0
 		m.persist.Target = types.Target{}
-		return m.save()
+		return m.saveSync()
 	}()
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 	})
 
 	// Save after synchronizing with consensus
-	err = m.save()
+	err = m.saveSync()
 	if err != nil {
 		return nil, errors.New("miner could not save during startup: " + err.Error())
 	}

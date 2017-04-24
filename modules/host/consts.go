@@ -57,7 +57,7 @@ var (
 	// with the host. The default is set to 30 siacoins, which the file
 	// contract revision can have 15 siacoins put towards it, and the storage
 	// proof can have 15 siacoins put towards it.
-	defaultContractPrice = types.SiacoinPrecision.Mul64(20) // 20 siacoins
+	defaultContractPrice = types.SiacoinPrecision.Mul64(5) // 5 siacoins
 
 	// defaultDownloadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 10 siacoins per gigabyte, because
@@ -103,6 +103,54 @@ var (
 	// the data, meaning that the host serves to profit from accepting the
 	// data.
 	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(10).Div(modules.BytesPerTerabyte) // 10 SC / TB
+
+	// workingStatusFirstCheck defines how frequently the Host's working status
+	// check runs
+	workingStatusFirstCheck = build.Select(build.Var{
+		Standard: time.Minute * 3,
+		Dev:      time.Minute * 1,
+		Testing:  time.Second * 3,
+	}).(time.Duration)
+
+	// workingStatusFrequency defines how frequently the Host's working status
+	// check runs
+	workingStatusFrequency = build.Select(build.Var{
+		Standard: time.Minute * 10,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 10,
+	}).(time.Duration)
+
+	// workingStatusThreshold defines how many settings calls must occur over the
+	// workingStatusFrequency for the host to be considered working.
+	workingStatusThreshold = build.Select(build.Var{
+		Standard: uint64(3),
+		Dev:      uint64(1),
+		Testing:  uint64(1),
+	}).(uint64)
+
+	// connectablityCheckFirstWait defines how often the host's connectability
+	// check is run.
+	connectabilityCheckFirstWait = build.Select(build.Var{
+		Standard: time.Minute * 2,
+		Dev:      time.Minute * 1,
+		Testing:  time.Second * 3,
+	}).(time.Duration)
+
+	// connectablityCheckFrequency defines how often the host's connectability
+	// check is run.
+	connectabilityCheckFrequency = build.Select(build.Var{
+		Standard: time.Minute * 10,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 10,
+	}).(time.Duration)
+
+	// connectabilityCheckTimeout defines how long a connectability check's dial
+	// will be allowed to block before it times out.
+	connectabilityCheckTimeout = build.Select(build.Var{
+		Standard: time.Minute * 2,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 90,
+	}).(time.Duration)
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window

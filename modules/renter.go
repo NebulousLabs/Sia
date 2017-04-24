@@ -111,6 +111,8 @@ type HostDBScan struct {
 // results provided by this struct can only be used as a guide, and may vary
 // significantly from machine to machine.
 type HostScoreBreakdown struct {
+	Score types.Currency `json:"score"`
+
 	AgeAdjustment              float64 `json:"ageadjustment"`
 	BurnAdjustment             float64 `json:"burnadjustment"`
 	CollateralAdjustment       float64 `json:"collateraladjustment"`
@@ -188,7 +190,7 @@ func (mrs *MerkleRootSet) UnmarshalJSON(b []byte) error {
 }
 
 // A RenterContract contains all the metadata necessary to revise or renew a
-// file contract.
+// file contract. See `api.RenterContract` for field information.
 type RenterContract struct {
 	FileContract    types.FileContract         `json:"filecontract"`
 	HostPublicKey   types.SiaPublicKey         `json:"hostpublickey"`

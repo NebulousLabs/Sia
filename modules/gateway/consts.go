@@ -36,6 +36,9 @@ const (
 	// with the encode package.
 	// sizeof(BlockID) + sizeof(gatewayID) + sizeof(bool) == 32 + 8 + 1 = 41
 	EncodedSessionHeaderLength = 41
+
+	// saveFrequency defines how often the gateway saves its persistence.
+	saveFrequency = time.Minute * 2
 )
 
 var (
@@ -190,5 +193,13 @@ var (
 		Standard: 2 * time.Minute,
 		Dev:      20 * time.Second,
 		Testing:  500 * time.Millisecond,
+	}).(time.Duration)
+
+	// rpcStdDeadline defines the standard deadline that should be used for all
+	// incoming RPC calls.
+	rpcStdDeadline = build.Select(build.Var{
+		Standard: 10 * time.Minute,
+		Dev:      5 * time.Minute,
+		Testing:  90 * time.Second,
 	}).(time.Duration)
 )

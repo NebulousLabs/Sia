@@ -19,7 +19,7 @@ import (
 
 var (
 	// recommendedHosts is the number of hosts that the renter will form
-	// contracts with if the value is not specified explicity in the call to
+	// contracts with if the value is not specified explicitly in the call to
 	// SetSettings.
 	recommendedHosts = build.Select(build.Var{
 		Standard: uint64(50),
@@ -89,12 +89,33 @@ type (
 
 	// RenterContract represents a contract formed by the renter.
 	RenterContract struct {
-		EndHeight       types.BlockHeight    `json:"endheight"`
-		ID              types.FileContractID `json:"id"`
-		LastTransaction types.Transaction    `json:"lasttransaction"`
-		NetAddress      modules.NetAddress   `json:"netaddress"`
-		RenterFunds     types.Currency       `json:"renterfunds"`
-		Size            uint64               `json:"size"`
+		// Amount of contract funds that have been spent on downloads.
+		DownloadSpending types.Currency `json:"downloadspending"`
+		// Block height that the file contract ends on.
+		EndHeight types.BlockHeight `json:"endheight"`
+		// Fees paid in order to form the file contract.
+		Fees types.Currency `json:"fees"`
+		// Public key of the host the contract was formed with.
+		HostPublicKey types.SiaPublicKey `json:"hostpublickey"`
+		// ID of the file contract.
+		ID types.FileContractID `json:"id"`
+		// A signed transaction containing the most recent contract revision.
+		LastTransaction types.Transaction `json:"lasttransaction"`
+		// Address of the host the file contract was formed with.
+		NetAddress modules.NetAddress `json:"netaddress"`
+		// Remaining funds left for the renter to spend on uploads & downloads.
+		RenterFunds types.Currency `json:"renterfunds"`
+		// Size of the file contract, which is typically equal to the number of
+		// bytes that have been uploaded to the host.
+		Size uint64 `json:"size"`
+		// Block height that the file contract began on.
+		StartHeight types.BlockHeight `json:"startheight"`
+		// Amount of contract funds that have been spent on storage.
+		StorageSpending types.Currency `json:"StorageSpending"`
+		// Total cost to the wallet of forming the file contract.
+		TotalCost types.Currency `json:"totalcost"`
+		// Amount of contract funds that have been spent on uploads.
+		UploadSpending types.Currency `json:"uploadspending"`
 	}
 
 	// RenterContracts contains the renter's contracts.
@@ -232,12 +253,19 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 	contracts := []RenterContract{}
 	for _, c := range api.renter.Contracts() {
 		contracts = append(contracts, RenterContract{
-			EndHeight:       c.EndHeight(),
-			ID:              c.ID,
-			NetAddress:      c.NetAddress,
-			LastTransaction: c.LastRevisionTxn,
-			RenterFunds:     c.RenterFunds(),
-			Size:            c.LastRevision.NewFileSize,
+			DownloadSpending: c.DownloadSpending,
+			EndHeight:        c.EndHeight(),
+			Fees:             c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
+			HostPublicKey:    c.HostPublicKey,
+			ID:               c.ID,
+			LastTransaction:  c.LastRevisionTxn,
+			NetAddress:       c.NetAddress,
+			RenterFunds:      c.RenterFunds(),
+			Size:             c.LastRevision.NewFileSize,
+			StartHeight:      c.StartHeight,
+			StorageSpending:  c.StorageSpending,
+			TotalCost:        c.TotalCost,
+			UploadSpending:   c.UploadSpending,
 		})
 	}
 	WriteJSON(w, RenterContracts{

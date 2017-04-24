@@ -43,7 +43,10 @@ returns information about the consensus set, such as the current block height.
 
   // An immediate child block of this block must have a hash less than this
   // target for it to be valid.
-  "target": [0,0,0,0,0,0,11,48,125,79,116,89,136,74,42,27,5,14,10,31,23,53,226,238,202,219,5,204,38,32,59,165]
+  "target": [0,0,0,0,0,0,11,48,125,79,116,89,136,74,42,27,5,14,10,31,23,53,226,238,202,219,5,204,38,32,59,165],
+
+  // The difficulty of the current block target.
+  "difficulty": "1234" // arbitrary-precision integer
 }
 ```
 

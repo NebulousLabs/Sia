@@ -41,8 +41,14 @@ func NewHash() hash.Hash {
 
 // HashAll takes a set of objects as input, encodes them all using the encoding
 // package, and then hashes the result.
-func HashAll(objs ...interface{}) Hash {
-	return HashBytes(encoding.MarshalAll(objs...))
+func HashAll(objs ...interface{}) (hash Hash) {
+	h := NewHash()
+	enc := encoding.NewEncoder(h)
+	for _, obj := range objs {
+		enc.Encode(obj)
+	}
+	h.Sum(hash[:0])
+	return
 }
 
 // HashBytes takes a byte slice and returns the result.
@@ -52,8 +58,11 @@ func HashBytes(data []byte) Hash {
 
 // HashObject takes an object as input, encodes it using the encoding package,
 // and then hashes the result.
-func HashObject(obj interface{}) Hash {
-	return HashBytes(encoding.Marshal(obj))
+func HashObject(obj interface{}) (hash Hash) {
+	h := NewHash()
+	encoding.NewEncoder(h).Encode(obj)
+	h.Sum(hash[:0])
+	return
 }
 
 // These functions implement sort.Interface, allowing hashes to be sorted.

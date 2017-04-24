@@ -54,7 +54,7 @@ import (
 // after they successfully form a connection with the gateway. To limit the
 // attacker's ability to add nodes to the nodelist, connections are
 // ratelimited. An attacker with lots of IP addresses still has the ability to
-// fill up the nodelist, however getting 90% dominance of the nodelist requries
+// fill up the nodelist, however getting 90% dominance of the nodelist requires
 // forming thousands of connections, which will take hours or days. By that
 // time, the attacked node should already have its set of outbound peers,
 // limiting the amount of damage that the attacker can do.
@@ -81,9 +81,8 @@ import (
 // have previously been outbound peers, as it is less likely that those have
 // been manipulated.
 //
-// TODO: There is no public key exhcange,
-// so communications cannot be effectively encrypted or authenticated.
-// The nodes must have some way to share keys.
+// TODO: There is no public key exchange, so communications cannot be
+// effectively encrypted or authenticated.
 //
 // TODO: Gateway hostname discovery currently has significant centralization,
 // namely the fallback is a single third-party website that can easily form any
@@ -253,6 +252,17 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
 	}
+	// Spawn the thread to periodically save the gateway.
+	go g.threadedSaveLoop()
+	// Make sure that the gateway saves after shutdown.
+	g.threads.AfterStop(func() {
+		g.mu.Lock()
+		err = g.saveSync()
+		g.mu.Unlock()
+		if err != nil {
+			g.log.Println("ERROR: Unable to save gateway:", err)
+		}
+	})
 
 	// Add the bootstrap peers to the node list.
 	if bootstrap {

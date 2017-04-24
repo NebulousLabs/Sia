@@ -182,6 +182,9 @@ func TestHostDBHostsHandler(t *testing.T) {
 	// Check that none of the values equal zero. A value of zero indicates that
 	// the field is no longer being tracked/reported, which could break
 	// compatibility for some apps. The default needs to be '1', not zero.
+	if hh.ScoreBreakdown.Score.IsZero() {
+		t.Error("Zero vaue score in score breakdown")
+	}
 	if hh.ScoreBreakdown.AgeAdjustment == 0 {
 		t.Error("Zero value in host score breakdown")
 	}

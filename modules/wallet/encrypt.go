@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/fastrand"
 )
@@ -308,6 +309,41 @@ func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	return w.initEncryption(masterKey, seed)
 }
 
+// Reset will reset the wallet, clearing the database and returning it to
+// the unencrypted state. Reset can only be called on a wallet that has
+// already been encrypted.
+func (w *Wallet) Reset() error {
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	wb := w.dbTx.Bucket(bucketWallet)
+	if wb.Get(keyEncryptionVerification) == nil {
+		return errUnencryptedWallet
+	}
+
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
+	err := dbReset(w.dbTx)
+	if err != nil {
+		return err
+	}
+	w.wipeSecrets()
+	w.keys = make(map[types.UnlockHash]spendableKey)
+	w.seeds = []modules.Seed{}
+	w.unconfirmedProcessedTransactions = []modules.ProcessedTransaction{}
+	w.siafundPool = types.Currency{}
+	w.unlocked = false
+	w.encrypted = false
+	w.subscribed = false
+
+	return nil
+}
+
 // InitFromSeed functions like Init, but using a specified seed. Unlike Init,
 // the blockchain will be scanned to determine the seed's progress. For this
 // reason, InitFromSeed should not be called until the blockchain is fully
@@ -335,15 +371,17 @@ func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) er
 	w.mu.Unlock()
 
 	// estimate the primarySeedProgress by scanning the blockchain
-	s := newSeedScanner(seed)
+	s := newSeedScanner(seed, w.log)
 	if err := s.scan(w.cs); err != nil {
 		return err
 	}
 	// NOTE: each time the wallet generates a key for index n, it sets its
 	// progress to n+1, so the progress should be the largest index seen + 1.
-	// We also add 10% as a buffer because there is little reason not to.
+	// We also add 10% as a buffer because the seed may have addresses in the
+	// wild that have not appeared in the blockchain yet.
 	progress := s.largestIndexSeen + 1
 	progress += progress / 10
+	w.log.Printf("INFO: found key index %v in blockchain. Setting primary seed progress to %v", s.largestIndexSeen, progress)
 	// set primarySeedProgress
 	return dbPutPrimarySeedProgress(w.dbTx, uint64(progress))
 }

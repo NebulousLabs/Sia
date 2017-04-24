@@ -2,6 +2,7 @@ package encoding
 
 import (
 	"encoding/binary"
+	"io"
 )
 
 // EncInt64 encodes an int64 as a slice of 8 bytes.
@@ -32,4 +33,15 @@ func DecUint64(b []byte) uint64 {
 	b2 := make([]byte, 8)
 	copy(b2, b)
 	return binary.LittleEndian.Uint64(b2)
+}
+
+// WriteUint64 writes u to w.
+func WriteUint64(w io.Writer, u uint64) error {
+	_, err := w.Write(EncUint64(u))
+	return err
+}
+
+// WriteInt64 writes i to w.
+func WriteInt(w io.Writer, i int) error {
+	return WriteUint64(w, uint64(i))
 }

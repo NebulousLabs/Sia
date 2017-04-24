@@ -29,10 +29,11 @@ func consensuscmd() {
 	}
 	if cg.Synced {
 		fmt.Printf(`Synced: %v
-Block:  %v
-Height: %v
-Target: %v
-`, yesNo(cg.Synced), cg.CurrentBlock, cg.Height, cg.Target)
+Block:      %v
+Height:     %v
+Target:     %v
+Difficulty: %v
+`, yesNo(cg.Synced), cg.CurrentBlock, cg.Height, cg.Target, cg.Difficulty)
 	} else {
 		estimatedHeight := estimatedHeightAt(time.Now())
 		estimatedProgress := float64(cg.Height) / float64(estimatedHeight) * 100
@@ -41,7 +42,7 @@ Target: %v
 		}
 		fmt.Printf(`Synced: %v
 Height: %v
-Progress (estimated): %.f%%
+Progress (estimated): %.1f%%
 `, yesNo(cg.Synced), cg.Height, estimatedProgress)
 	}
 }
@@ -50,8 +51,9 @@ Progress (estimated): %.f%%
 // Block height is estimated by calculating the minutes since a known block in
 // the past and dividing by 10 minutes (the block time).
 func estimatedHeightAt(t time.Time) types.BlockHeight {
-	block5e4Timestamp := time.Date(2016, time.May, 11, 19, 33, 0, 0, time.UTC)
-	diff := t.Sub(block5e4Timestamp)
-	estimatedHeight := 5e4 + (diff.Minutes() / 10)
+	block100kTimestamp := time.Date(2017, time.April, 13, 23, 29, 49, 0, time.UTC)
+	blockTime := float64(9) // overestimate block time for better UX
+	diff := t.Sub(block100kTimestamp)
+	estimatedHeight := 100e3 + (diff.Minutes() / blockTime)
 	return types.BlockHeight(estimatedHeight + 0.5) // round to the nearest block
 }

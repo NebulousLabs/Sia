@@ -205,7 +205,7 @@ func TestRenterSaveLoad(t *testing.T) {
 	rt.renter.saveFile(f2)
 	rt.renter.saveFile(f3)
 
-	err = rt.renter.save() // save metadata
+	err = rt.renter.saveSync() // save metadata
 	if err != nil {
 		t.Fatal(err)
 	}

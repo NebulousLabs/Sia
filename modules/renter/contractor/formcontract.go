@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
@@ -152,10 +151,9 @@ func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight ty
 		if len(contracts) >= n {
 			break
 		}
-		if build.Release != "testing" {
-			// sleep for 1 minute to alleviate potential block propagation issues
-			time.Sleep(60 * time.Second)
-		}
+		// sleep between forming each contract to alleviate potential block
+		// propagation issues
+		time.Sleep(contractFormationInterval)
 	}
 	// If we couldn't form any contracts, return an error. Otherwise, just log
 	// the failures.

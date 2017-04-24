@@ -33,14 +33,14 @@ func TestEditor(t *testing.T) {
 	}
 
 	// empty contract ID
-	_, err := c.Editor(types.FileContractID{})
+	_, err := c.Editor(types.FileContractID{}, nil)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// expired contract
 	c.blockHeight = 3
-	_, err = c.Editor(types.FileContractID{})
+	_, err = c.Editor(types.FileContractID{}, nil)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -59,7 +59,7 @@ func TestEditor(t *testing.T) {
 	hdb.hosts["foo"] = dbe
 	contract := modules.RenterContract{NetAddress: "foo"}
 	c.contracts[contract.ID] = contract
-	_, err = c.Editor(contract.ID)
+	_, err = c.Editor(contract.ID, nil)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -67,7 +67,7 @@ func TestEditor(t *testing.T) {
 	// invalid contract
 	dbe.StoragePrice = types.NewCurrency64(500)
 	hdb.hosts["bar"] = dbe
-	_, err = c.Editor(contract.ID)
+	_, err = c.Editor(contract.ID, nil)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -82,7 +82,7 @@ func TestEditor(t *testing.T) {
 			},
 		},
 	}
-	_, err = c.Editor(contract.ID)
+	_, err = c.Editor(contract.ID, nil)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
