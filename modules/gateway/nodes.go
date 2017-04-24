@@ -5,15 +5,17 @@ import (
 	"net"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/fastrand"
 )
 
 var (
-	errNodeExists = errors.New("node already added")
-	errNoNodes    = errors.New("no nodes in the node list")
-	errOurAddress = errors.New("can't add our own address")
+	errNodeExists    = errors.New("node already added")
+	errNoNodes       = errors.New("no nodes in the node list")
+	errOurAddress    = errors.New("can't add our own address")
+	errPeerGenesisID = errors.New("peer has different genesis ID")
 )
 
 // addNode adds an address to the set of nodes on the network.
@@ -33,24 +35,32 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 
 // pingNode verifies that there is a reachable node at the provided address
 // by performing the Sia gateway handshake protocol.
-func (g *Gateway) pingNode(addr modules.NetAddress) error {
+func (g *Gateway) pingNode(addr modules.NetAddress) (err error) {
 	// Ping the untrusted node to see whether or not there's actually a
 	// reachable node at the provided address.
 	conn, err := g.dial(addr)
 	if err != nil {
-		return err
+		return
 	}
 	defer conn.Close()
-	// If connection succeeds, supply an unacceptable version so that we
-	// will not be added as a peer.
-	//
-	// NOTE: this is a somewhat clunky way of specifying that you didn't
-	// actually want a connection.
-	_, err = connectVersionHandshake(conn, "0.0.0")
-	if err == errPeerRejectedConn {
-		err = nil // we expect this error
+
+	// Read the node's version.
+	remoteVersion, err := connectVersionHandshake(conn, build.Version)
+	if err != nil {
+		return
 	}
-	return err
+
+	if build.VersionCmp(remoteVersion, sessionHandshakeUpgradeVersion) < 0 {
+		return // for older versions, this is where pinging ends
+	}
+
+	// if both peers are >= 1.2.0,
+	// we'll also guarantee that the connection is between 2 different peers,
+	// and the peers are on the same network
+	wantConnect := false
+	// we're pinging, so we don't care if other side wants to connect or not
+	err = connectSessionHandshake(conn, g.id, wantConnect)
+	return
 }
 
 // removeNode will remove a node from the gateway.
@@ -222,8 +232,7 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		// through, which would cause the node to be pruned even though it may
 		// be a good node. Because nodes are plentiful, this is an acceptable
 		// bug.
-		err = g.pingNode(node)
-		if err != nil {
+		if err = g.pingNode(node); err != nil {
 			g.mu.Lock()
 			g.removeNode(node)
 			g.mu.Unlock()

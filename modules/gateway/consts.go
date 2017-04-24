@@ -8,8 +8,13 @@ import (
 
 const (
 	// handshakeUpgradeVersion is the version where the gateway handshake RPC
-	// was altered to include adiitional information transfer.
+	// was altered to include additional information transfer.
 	handshakeUpgradeVersion = "1.0.0"
+
+	// sessionHandshakeUpgradeVersion is the version where the gateway handshake RPC
+	// was altered to include the ID of the genesis block, the gateway's unique ID,
+	// and whether a connection is desired.
+	sessionHandshakeUpgradeVersion = "1.2.0"
 
 	// maxLocalOutbound is currently set to 3, meaning the gateway will not
 	// consider a local node to be an outbound peer if the gateway already has
@@ -26,6 +31,11 @@ const (
 	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
 	// pre-hardfork.
 	minAcceptableVersion = "0.4.0"
+
+	// EncodedSessionHeaderLength is the length of a session header encoded
+	// with the encode package.
+	// sizeof(BlockID) + sizeof(gatewayID) + sizeof(bool) == 32 + 8 + 1 = 41
+	EncodedSessionHeaderLength = 41
 
 	// saveFrequency defines how often the gateway saves its persistence.
 	saveFrequency = time.Minute * 2
