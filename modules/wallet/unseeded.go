@@ -178,6 +178,14 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 		if err != nil {
 			return err
 		}
+
+		if err = w.dbTx.DeleteBucket(bucketProcessedTransactions); err != nil {
+			return err
+		}
+		if _, err = w.dbTx.CreateBucket(bucketProcessedTransactions); err != nil {
+			return err
+		}
+		w.unconfirmedProcessedTransactions = nil
 		err = dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
 		if err != nil {
 			return err
@@ -241,6 +249,13 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 			return errAllDuplicates
 		}
 
+		if err = w.dbTx.DeleteBucket(bucketProcessedTransactions); err != nil {
+			return err
+		}
+		if _, err = w.dbTx.CreateBucket(bucketProcessedTransactions); err != nil {
+			return err
+		}
+		w.unconfirmedProcessedTransactions = nil
 		err = dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
 		if err != nil {
 			return err

@@ -857,6 +857,14 @@ func TestWalletSiafunds(t *testing.T) {
 		}
 	}
 
+	// record transactions
+	var wtg WalletTransactionsGET
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=100", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	numTxns := len(wtg.ConfirmedTransactions)
+
 	// load siafunds into the wallet
 	siagPath, _ := filepath.Abs("../types/siag0of1of1.siakey")
 	loadSiagValues := url.Values{}
@@ -865,6 +873,14 @@ func TestWalletSiafunds(t *testing.T) {
 	err = st.stdPostAPI("/wallet/siagkey", loadSiagValues)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=100", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtg.ConfirmedTransactions) != numTxns+1 {
+		t.Errorf("expected %v transactions, got %v", numTxns+1, len(wtg.ConfirmedTransactions))
 	}
 
 	// check balance
