@@ -67,6 +67,7 @@ var (
 	keyConsensusHeight        = []byte("keyConsensusHeight")
 	keySpendableKeyFiles      = []byte("keySpendableKeyFiles")
 	keyAuxiliarySeedFiles     = []byte("keyAuxiliarySeedFiles")
+	keySiafundPool            = []byte("keySiafundPool")
 
 	errNoKey = errors.New("key does not exist")
 )
@@ -230,6 +231,7 @@ func dbReset(tx *bolt.Tx) error {
 	wb.Put(keySpendableKeyFiles, encoding.Marshal([]spendableKeyFile{}))
 	dbPutConsensusHeight(tx, 0)
 	dbPutConsensusChangeID(tx, modules.ConsensusChangeBeginning)
+	dbPutSiafundPool(tx, types.ZeroCurrency)
 
 	return nil
 }
@@ -305,4 +307,15 @@ func dbGetConsensusHeight(tx *bolt.Tx) (height types.BlockHeight, err error) {
 // dbPutConsensusHeight stores the height that the wallet has scanned to.
 func dbPutConsensusHeight(tx *bolt.Tx, height types.BlockHeight) error {
 	return tx.Bucket(bucketWallet).Put(keyConsensusHeight, encoding.Marshal(height))
+}
+
+// dbGetSiafundPool returns the value of the siafund pool.
+func dbGetSiafundPool(tx *bolt.Tx) (pool types.Currency, err error) {
+	err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keySiafundPool), &pool)
+	return
+}
+
+// dbPutSiafundPool stores the value of the siafund pool.
+func dbPutSiafundPool(tx *bolt.Tx, pool types.Currency) error {
+	return tx.Bucket(bucketWallet).Put(keySiafundPool, encoding.Marshal(pool))
 }

@@ -18,10 +18,6 @@ type sortedOutputs struct {
 func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if !w.subscribed {
-		// can't report balance if siafundPool is not known
-		return
-	}
 
 	// ensure durability of reported balance
 	w.syncDB()
@@ -31,9 +27,14 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 			siacoinBalance = siacoinBalance.Add(sco.Value)
 		}
 	})
+
+	siafundPool, err := dbGetSiafundPool(w.dbTx)
+	if err != nil {
+		return
+	}
 	dbForEachSiafundOutput(w.dbTx, func(_ types.SiafundOutputID, sfo types.SiafundOutput) {
 		siafundBalance = siafundBalance.Add(sfo.Value)
-		siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
+		siafundClaimBalance = siafundClaimBalance.Add(siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
 	})
 	return
 }
