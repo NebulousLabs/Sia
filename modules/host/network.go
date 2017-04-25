@@ -330,6 +330,12 @@ func (h *Host) threadedListen(closeChan chan struct{}) {
 		}
 
 		go h.threadedHandleConn(conn)
+
+		// Soft-sleep to ratelimit the number of incoming connections.
+		select {
+		case <-h.tg.StopChan():
+		case <-time.After(rpcRatelimit):
+		}
 	}
 }
 
