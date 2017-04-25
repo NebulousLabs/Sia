@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
@@ -65,6 +66,9 @@ func (w *Wallet) openDB(filename string) (err error) {
 		}
 		if wb.Get(keySpendableKeyFiles) == nil {
 			wb.Put(keySpendableKeyFiles, encoding.Marshal([]spendableKeyFile{}))
+		}
+		if wb.Get(keySiafundPool) == nil {
+			wb.Put(keySiafundPool, encoding.Marshal(types.ZeroCurrency))
 		}
 
 		// check whether wallet is encrypted
