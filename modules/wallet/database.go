@@ -15,18 +15,6 @@ import (
 )
 
 var (
-	// bucketHistoricClaimStarts maps a SiafundOutputID to the value of the
-	// siafund pool when the output was processed. It stores every such output
-	// in the blockchain. The wallet uses this mapping to determine the "claim
-	// start" value of siafund outputs in ProcessedTransactions.
-	bucketHistoricClaimStarts = []byte("bucketHistoricClaimStarts")
-	// bucketHistoricOutputs maps a generic OutputID to the number of siacoins
-	// the output contains. The output may be a siacoin or siafund output.
-	// Note that the siafund value here is not the same as the value in
-	// bucketHistoricClaimStarts; see the definition of SiafundOutput in
-	// types/transactions.go for an explanation. The wallet uses this mapping
-	// to determine the value of outputs in ProcessedTransactions.
-	bucketHistoricOutputs = []byte("bucketHistoricOutputs")
 	// bucketProcessedTransactions stores ProcessedTransactions in
 	// chronological order. Only transactions relevant to the wallet are
 	// stored. The key of this bucket is an autoincrementing integer.
@@ -49,8 +37,6 @@ var (
 	bucketWallet = []byte("bucketWallet")
 
 	dbBuckets = [][]byte{
-		bucketHistoricClaimStarts,
-		bucketHistoricOutputs,
 		bucketProcessedTransactions,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
@@ -178,22 +164,6 @@ func dbForEach(b *bolt.Bucket, fn interface{}) error {
 }
 
 // Type-safe wrappers around the db helpers
-
-func dbPutHistoricClaimStart(tx *bolt.Tx, id types.SiafundOutputID, c types.Currency) error {
-	return dbPut(tx.Bucket(bucketHistoricClaimStarts), id, c)
-}
-func dbGetHistoricClaimStart(tx *bolt.Tx, id types.SiafundOutputID) (c types.Currency, err error) {
-	err = dbGet(tx.Bucket(bucketHistoricClaimStarts), id, &c)
-	return
-}
-
-func dbPutHistoricOutput(tx *bolt.Tx, id types.OutputID, c types.Currency) error {
-	return dbPut(tx.Bucket(bucketHistoricOutputs), id, c)
-}
-func dbGetHistoricOutput(tx *bolt.Tx, id types.OutputID) (c types.Currency, err error) {
-	err = dbGet(tx.Bucket(bucketHistoricOutputs), id, &c)
-	return
-}
 
 func dbPutSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, output types.SiacoinOutput) error {
 	return dbPut(tx.Bucket(bucketSiacoinOutputs), id, output)
