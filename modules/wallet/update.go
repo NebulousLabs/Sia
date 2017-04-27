@@ -121,8 +121,24 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 
 // applyHistory applies any transaction history that was introduced by the
 // applied blocks.
-func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
-	for _, block := range applied {
+func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
+	// compute spent outputs
+	spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	spentSiafundOutputs := make(map[types.SiafundOutputID]types.SiafundOutput)
+	for _, diff := range cc.SiacoinOutputDiffs {
+		if diff.Direction == modules.DiffRevert {
+			// revert means spent
+			spentSiacoinOutputs[diff.ID] = diff.SiacoinOutput
+		}
+	}
+	for _, diff := range cc.SiafundOutputDiffs {
+		if diff.Direction == modules.DiffRevert {
+			// revert means spent
+			spentSiafundOutputs[diff.ID] = diff.SiafundOutput
+		}
+	}
+
+	for _, block := range cc.AppliedBlocks {
 		consensusHeight, err := dbGetConsensusHeight(tx)
 		if err != nil {
 			return err
@@ -191,19 +207,12 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 			}
 
 			for _, sci := range txn.SiacoinInputs {
-				input := modules.ProcessedInput{
+				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
 					FundType:       types.SpecifierSiacoinInput,
 					WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
 					RelatedAddress: sci.UnlockConditions.UnlockHash(),
-				}
-				if input.WalletAddress {
-					sco, err := dbGetSiacoinOutput(tx, sci.ParentID)
-					if err != nil {
-						w.log.Println("ERROR: could not get siacoin output value:", err)
-					}
-					input.Value = sco.Value
-				}
-				pt.Inputs = append(pt.Inputs, input)
+					Value:          spentSiacoinOutputs[sci.ParentID].Value,
+				})
 			}
 
 			for _, sco := range txn.SiacoinOutputs {
@@ -217,38 +226,26 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 			}
 
 			for _, sfi := range txn.SiafundInputs {
-				input := modules.ProcessedInput{
+				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
 					FundType:       types.SpecifierSiafundInput,
 					WalletAddress:  w.isWalletAddress(sfi.UnlockConditions.UnlockHash()),
 					RelatedAddress: sfi.UnlockConditions.UnlockHash(),
-				}
-				if input.WalletAddress {
-					sfo, err := dbGetSiafundOutput(tx, sfi.ParentID)
-					if err != nil {
-						w.log.Println("ERROR: could not get siafund output value:", err)
-					}
-					input.Value = sfo.Value
-				}
-				pt.Inputs = append(pt.Inputs, input)
+					Value:          spentSiafundOutputs[sfi.ParentID].Value,
+				})
 
-				output := modules.ProcessedOutput{
+				siafundPool, err := dbGetSiafundPool(w.dbTx)
+				if err != nil {
+					return fmt.Errorf("could not get siafund pool: %v", err)
+				}
+
+				sfo := spentSiafundOutputs[sfi.ParentID]
+				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
 					FundType:       types.SpecifierClaimOutput,
 					MaturityHeight: consensusHeight + types.MaturityDelay,
 					WalletAddress:  w.isWalletAddress(sfi.UnlockConditions.UnlockHash()),
 					RelatedAddress: sfi.ClaimUnlockHash,
-				}
-				if output.WalletAddress {
-					sfo, err := dbGetSiafundOutput(tx, sfi.ParentID)
-					if err != nil {
-						w.log.Println("ERROR: could not get siafund output value:", err)
-					}
-					siafundPool, err := dbGetSiafundPool(w.dbTx)
-					if err != nil {
-						return fmt.Errorf("could not get siafund pool: %v", err)
-					}
-					output.Value = siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value)
-				}
-				pt.Outputs = append(pt.Outputs, output)
+					Value:          siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value),
+				})
 			}
 
 			for _, sfo := range txn.SiafundOutputs {
@@ -297,7 +294,7 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if err := w.revertHistory(w.dbTx, cc.RevertedBlocks); err != nil {
 		w.log.Println("ERROR: failed to revert consensus change:", err)
 	}
-	if err := w.applyHistory(w.dbTx, cc.AppliedBlocks); err != nil {
+	if err := w.applyHistory(w.dbTx, cc); err != nil {
 		w.log.Println("ERROR: failed to apply consensus change:", err)
 	}
 	if err := dbPutConsensusChangeID(w.dbTx, cc.ID); err != nil {
@@ -322,26 +319,13 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// record unconfirmed outputs owned by the wallet
-	unconfirmedOutputs := make(map[types.SiacoinOutputID]types.Currency)
+	// compute spent outputs
+	spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	for _, diff := range cc.SiacoinOutputDiffs {
-		if diff.Direction == modules.DiffApply {
-			if w.isWalletAddress(diff.SiacoinOutput.UnlockHash) {
-				unconfirmedOutputs[diff.ID] = diff.SiacoinOutput.Value
-			}
+		if diff.Direction == modules.DiffRevert {
+			// revert means spent
+			spentSiacoinOutputs[diff.ID] = diff.SiacoinOutput
 		}
-	}
-
-	// getWalletOutputValue is a helper function for looking up the value of
-	// an output owned by the wallet. It first checks for unconfirmed outputs
-	// in w.unconfirmedOutputs and then falls back to confirmed outputs in the
-	// database.
-	getWalletOutputValue := func(id types.SiacoinOutputID) (types.Currency, error) {
-		if val, ok := unconfirmedOutputs[id]; ok {
-			return val, nil
-		}
-		sco, err := dbGetSiacoinOutput(w.dbTx, id)
-		return sco.Value, err
 	}
 
 	w.unconfirmedProcessedTransactions = nil
@@ -367,19 +351,12 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 			ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
 		}
 		for _, sci := range txn.SiacoinInputs {
-			input := modules.ProcessedInput{
+			pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
 				FundType:       types.SpecifierSiacoinInput,
 				WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
 				RelatedAddress: sci.UnlockConditions.UnlockHash(),
-			}
-			if input.WalletAddress {
-				val, err := getWalletOutputValue(sci.ParentID)
-				if err != nil {
-					w.log.Println("ERROR: could not get siacoin output value:", err)
-				}
-				input.Value = val
-			}
-			pt.Inputs = append(pt.Inputs, input)
+				Value:          spentSiacoinOutputs[sci.ParentID].Value,
+			})
 		}
 		for _, sco := range txn.SiacoinOutputs {
 			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
