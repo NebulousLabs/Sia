@@ -290,6 +290,46 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 	r.managedWaitOnRepairWork(rs)
 }
 
+func (r *Renter) managedGetChunkData(file *file, trackedFile trackedFile, chunkID chunkID) ([]byte, error) {
+	filename := chunkID.filename
+	chunkIndex := chunkID.index
+	offset := chunkIndex * file.chunkSize()
+
+	// try to read the chunk from disk
+	f, err := os.Open(trackedFile.RepairPath)
+	if err != nil {
+		// if that fails, try to download the chunk
+		buf := modules.NewDownloadBufferWriter()
+		dlParams := &modules.RenterDownloadParameters{
+			Async:    false,
+			DlWriter: buf,
+			Httpresp: false,
+			Length:   file.chunkSize(),
+			Offset:   offset,
+			Siapath:  filename,
+		}
+		err = r.DownloadSection(dlParams)
+		if err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	}
+	defer f.Close()
+
+	chunkData := make([]byte, file.chunkSize())
+	_, err = f.ReadAt(chunkData, int64(offset))
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		// TODO: We should be doing better error handling here - shouldn't be
+		// running into ErrUnexpectedEOF intentionally because if it happens
+		// unintentionally we will believe that the chunk was read from memory
+		// correctly.
+
+		return nil, err
+	}
+
+	return chunkData, nil
+}
+
 // managedScheduleChunkRepair takes a chunk and schedules some repair on that
 // chunk using the chunk state and a list of workers.
 func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, chunkStatus *chunkStatus, usefulWorkers []types.FileContractID) error {
@@ -303,41 +343,10 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 		return errFileDeleted
 	}
 
-	// Read the file data into memory.
-	chunkIndex := chunkID.index
-	offset := chunkIndex * file.chunkSize()
-	fHandle, err := os.Open(meta.RepairPath)
+	// read the chunk into memory
+	chunkData, err := r.managedGetChunkData(file, meta, chunkID)
 	if err != nil {
-		r.log.Println("downloading chunk for repair")
-		dlParams := &modules.RenterDownloadParameters{
-			Async:    false,
-			DlWriter: modules.NewDownloadFileWriter(meta.RepairPath, offset, file.chunkSize()),
-			Httpresp: false,
-			Length:   file.chunkSize(),
-			Offset:   offset,
-			Siapath:  filename,
-		}
-		err = r.DownloadSection(dlParams)
-		if err != nil {
-			return build.ExtendErr("unable to download chunk for repair:", err)
-		}
-
-		fHandle, err = os.Open(meta.RepairPath)
-		if err != nil {
-			return err
-		}
-	}
-	defer fHandle.Close()
-	chunkData := make([]byte, file.chunkSize())
-	_, err = fHandle.ReadAt(chunkData, int64(chunkIndex*file.chunkSize()))
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-		// TODO: We should be doing better error handling here - shouldn't be
-		// running into ErrUnexpectedEOF intentionally because if it happens
-		// unintentionally we will believe that the chunk was read from memory
-		// correctly.
-
-		// TODO: Perform a download-and-repair instead of returning this error.
-		return build.ExtendErr("unable to read file to repair chunk", err)
+		return build.ExtendErr("unable to get repair chunk:", err)
 	}
 
 	// Erasure code the pieces.
@@ -362,7 +371,7 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 
 	// Encrypt the missing pieces.
 	for _, missingPiece := range missingPieces {
-		key := deriveKey(file.masterKey, chunkIndex, uint64(missingPiece))
+		key := deriveKey(file.masterKey, chunkID.index, uint64(missingPiece))
 		pieces[missingPiece] = key.EncryptBytes(pieces[missingPiece])
 	}
 

@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"time"
@@ -66,6 +67,21 @@ type DownloadInfo struct {
 type DownloadWriter interface {
 	WriteAt(b []byte, off int64) (int, error)
 	String() string
+}
+
+// DownloadBufferWriter is a buffer-backed implementation of DownloadWriter.
+type DownloadBufferWriter struct {
+	bytes.Buffer
+}
+
+// NewDownloadBufferWriter creates a new DownloadWriter that writes to a buffer.
+func NewDownloadBufferWriter() *DownloadBufferWriter {
+	return &DownloadBufferWriter{}
+}
+
+// WriteAt writes the passed bytes to the DownloadBuffer.
+func (dw *DownloadBufferWriter) WriteAt(b []byte, off int64) (int, error) {
+	return dw.Write(b)
 }
 
 // DownloadFileWriter is a file-backed implementation of DownloadWriter.
