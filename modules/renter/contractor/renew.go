@@ -1,9 +1,6 @@
 package contractor
 
 import (
-	"errors"
-	"time"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
@@ -74,6 +71,7 @@ func (c *Contractor) managedRenewContract(contract modules.RenterContract, host 
 	}
 
 	// Success, update the set of contracts in the contractor.
+	c.log.Printf("Renewed a contract with %v for %v SC\n", host.PublicKey.String(), contract.TotalCost.Div(types.SiacoinPrecision))
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -92,5 +90,9 @@ func (c *Contractor) managedRenewContract(contract modules.RenterContract, host 
 	// Update the allowance to account for the change in spending patterns.
 	c.allowance.Funds = c.allowance.Funds.Sub(contract.TotalCost).Add(newContract.TotalCost)
 	// Save the changes.
-	return c.saveSync()
+	err = c.saveSync()
+	if err != nil {
+		c.log.Println("Unable to save the contractor after renewing a contract:", err)
+	}
+	return nil // Don't return the save error.
 }

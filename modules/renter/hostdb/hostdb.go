@@ -251,7 +251,7 @@ func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) []module
 	// Check the length of the scan list does not indicate that there are a
 	// large number of never-scanned hosts on the network.
 	hdb.mu.Lock()
-	scanLen = len(hdb.scanList)
+	scanLen := len(hdb.scanList)
 	hdb.mu.Unlock()
 	if scanLen > hostCheckupQuantity*2 {
 		return nil

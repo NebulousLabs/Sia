@@ -2,12 +2,26 @@ package contractor
 
 import (
 	"sort"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// callateralFromCost calculates the appropriate collateral to expect from the
+// host given the contractor's preferences, the host's preferences, and the
+// amount of funds being thrown into the contract.
+func (c *Contractor) collateralFromCost(funds types.Currency, host modules.HostDBEntry) types.Currency {
+	// Calculate the desired collateral.
+	collateral := funds.Mul(host.Collateral).Div(host.StoragePrice)
+	// Don't exceed the host's maximum collateral.
+	if collateral.Cmp(host.MaxCollateral) > 0 {
+		collateral = host.MaxCollateral
+	}
+	return collateral
+}
 
 // managedLockContract will block until a contract is available, then will grab an
 // exclusive lock on the contract.
@@ -127,6 +141,7 @@ func (c *Contractor) markBadContracts() {
 			// Host has been offline for long enough to fall out of good
 			// standing.
 			contract.InGoodStanding = false
+			c.allowance.Funds = c.allowance.Funds.Sub(contract.TotalCost)
 			c.contracts[contract.ID] = contract
 			continue
 		}
@@ -136,12 +151,14 @@ func (c *Contractor) markBadContracts() {
 		host, exists := c.hdb.Host(contract.HostPublicKey)
 		if !exists {
 			contract.InGoodStanding = false
+			c.allowance.Funds = c.allowance.Funds.Sub(contract.TotalCost)
 			c.contracts[contract.ID] = contract
 			continue
 		}
 		if c.hdb.ScoreBreakdown(host).Score.Cmp(lowestScore) < 0 {
 			// Host's score is unaccepably low.
 			contract.InGoodStanding = false
+			c.allowance.Funds = c.allowance.Funds.Sub(contract.TotalCost)
 			c.contracts[contract.ID] = contract
 			continue
 		}
@@ -155,8 +172,9 @@ func (c *Contractor) markBadContracts() {
 			// For the sake of simplicity, this value is being set to a
 			// constant, but eventually it should be determined based on things
 			// like the storage price, the contract price, and the other hosts.
-			if contract.LastRevision.NewFilesize < 50e9 {
+			if contract.LastRevision.NewFileSize < 50e9 {
 				contract.InGoodStanding = false
+				c.allowance.Funds = c.allowance.Funds.Sub(contract.TotalCost)
 			}
 		}
 	}
@@ -201,6 +219,15 @@ func (c *Contractor) threadedRepairContracts() {
 		c.mu.Unlock()
 	}
 
+	// TODO: If the allowance changes mid-function, abort and restart.
+
+	// Determine whether the current period has advanced to the next period.
+	c.mu.Lock()
+	if c.currentPeriod+c.allowance.Period < c.blockHeight+c.allowance.RenewWindow {
+		c.currentPeriod = c.blockHeight
+	}
+	c.mu.Unlock()
+
 	// Reveiw the set of contracts held by the contractor, and mark any
 	// contracts whose hosts have fallen out of favor.
 	c.mu.Lock()
@@ -228,10 +255,10 @@ func (c *Contractor) threadedRepairContracts() {
 			}
 
 			// Check that the contract is not empty.
-			empty := contract.RenterFunds().Cmp(emptiestAcceptableContract) <= 0
-			empty = empty && contract.UsefulForUploading
+			empty := contract.RenterFunds().Cmp(lowContractBalance) <= 0
+			empty = empty && contract.UsefulForUpload
 			// Check that the contract is not expiring soon.
-			expiring := c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight()
+			expiring := c.currentPeriod+c.allowance.Period-c.allowance.RenewWindow >= contract.EndHeight()
 			if empty || expiring {
 				needsRenew = append(needsRenew, contract)
 			}
@@ -249,7 +276,7 @@ func (c *Contractor) threadedRepairContracts() {
 
 	// Get the height that the contracts should be formed at.
 	c.mu.Lock()
-	contractsEndHeight := c.blockHeight + c.allowance.Period
+	contractsEndHeight := c.currentPeriod + c.allowance.Period
 	c.mu.Unlock()
 	for _, contract := range needsRenew {
 		// Exit if stop has been called.
@@ -262,18 +289,19 @@ func (c *Contractor) threadedRepairContracts() {
 		// Grab the host that is being used for renew.
 		host, exists := c.hdb.Host(contract.HostPublicKey)
 		if !exists {
-			continue // This contract is with a host that doesn't exist.
+			continue // Can't renew without host.
 		}
 
+		// Figure out how much money to give the host.
 		var newCost types.Currency
 		empty := contract.RenterFunds().Cmp(lowContractBalance) <= 0
 		if empty {
 			// Contract is being renewed because it ran out of money. Double the
 			// amount of money that's allocated to the contract.
-			prevCost := contract.TotalCost.Sub(ContractFee).Sub(TxnFee).Sub(SiafundFee)
-			newCost = prevCost.Mul64(2) // Double the renterFunds given that we ran out.
+			prevCost := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee)
+			newCost = prevCost.Mul64(2)
 		} else {
-			prevBase := contract.TotalCost.Sub(ContractFee).Sub(TxnFee).Sub(SiafundFee)
+			prevBase := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee)
 			// The amount of money that the contract started with should not be
 			// less than the amount of money remaining in the contract, but
 			// double check just to be sure.
@@ -292,17 +320,18 @@ func (c *Contractor) threadedRepairContracts() {
 		baseCost := host.StoragePrice.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension)
 		// Make sure that the renterFunds are at least 50% greater than the base
 		// cost.
-		minFunds = baseCost.Mul64(3).Div64(2)
+		minFunds := baseCost.Mul64(3).Div64(2)
 		if minFunds.Cmp(newCost) < 0 {
 			newCost = minFunds
 		}
+		// Make sure there is at least a minimum number of coins in the
+		// contract.
+		if newCost.Cmp(minContractFunds) < 0 {
+			newCost = minContractFunds
+		}
 
 		// Calculate the desired collateral.
-		collateral := newCost.Mul(host.Collateral).Div(host.StoragePrice)
-		// Don't exceed the host's maximum collateral.
-		if collateral.Cmp(host.MaxCollateral) > 0 {
-			collateral = host.MaxCollateral
-		}
+		collateral := c.collateralFromCost(newCost, host)
 
 		c.managedLockContract(contract.ID)
 		c.managedRenewContract(contract, host, newCost, collateral, contractsEndHeight)
@@ -312,7 +341,7 @@ func (c *Contractor) threadedRepairContracts() {
 		select {
 		case <-c.tg.StopChan():
 			return
-		case <-time.After(sleepFormationInterval):
+		case <-time.After(contractFormationInterval):
 		}
 	}
 
@@ -328,8 +357,9 @@ func (c *Contractor) threadedRepairContracts() {
 	c.mu.Unlock()
 
 	// Select a bunch of new hosts from the database.
-	selectionSize = wantedHosts*2 + 5 // Select more hosts than needed to account for useless hosts.
-	hosts := hdb.RandomHosts(wantedHosts*2 + 10, existingHosts)
+	selectionSize := int(wantedHosts*3 + 10) // Fine to have an abundance of hosts.
+	hosts := c.hdb.RandomHosts(selectionSize , existingHosts) // Fine to have an abundance of hosts.
+
 	// Filter any hosts that do not have enough storage remaining.
 	i := 0
 	for {
@@ -344,6 +374,8 @@ func (c *Contractor) threadedRepairContracts() {
 
 	}
 
+	// Form contracts with the hosts until we have the desired number of total
+	// contracts.
 	i = 0
 	for numGoodContracts < wantedHosts && i < len(hosts) {
 		// Exit if stop has been called.
@@ -353,15 +385,25 @@ func (c *Contractor) threadedRepairContracts() {
 		default:
 		}
 
-		c.managedLockContract(contract.ID)
-		// Try to form a contract with this host. Set the price to twice low
-		// blaance threshold plus twice the contract price. Future interactions
-		// will guide the price to something more reasonalbe.
-		err = c.managedNewContract(hosts[i], lowContractBalance.Mul64(2).Add(host.ContractPrice.Mul64(2)), contractsEndHeight)
-		c.managedUnlockContract(contract.ID)
-		if err == nil {
+		// Try to form a contract with this host. Set the price to the min funds
+		// plus twice the contract price. Future interactions will guide the
+		// price to something more reasonalbe.
+		contractFunds := minContractFunds.Add(hosts[i].ContractPrice.Mul64(2))
+
+		contractCollateral := c.collateralFromCost(contractFunds, hosts[i])
+		err = c.managedNewContract(hosts[i], contractFunds, contractCollateral, contractsEndHeight)
+		if err != nil {
+			c.log.Debugln("Unable to form contract with host:", err)
+		} else {
 			numGoodContracts++
 		}
 		i++
+
+		// Soft sleep between contract formation.
+		select {
+		case <-c.tg.StopChan():
+			return
+		case <-time.After(contractFormationInterval):
+		}
 	}
 }

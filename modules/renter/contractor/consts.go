@@ -40,6 +40,10 @@ var (
 	// contract have fallen below this value.
 	lowContractBalance = types.SiacoinPrecision.Mul64(2)
 
+	// minContractFunds defines the minimum number of siacoins that will be put
+	// into a file contract.
+	minContractFunds = types.SiacoinPrecision.Mul64(5)
+
 	// minHostsForEstimations describes the minimum number of hosts that
 	// are needed to make broad estimations such as the number of sectors
 	// that you can store on the network for a given allowance.

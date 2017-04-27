@@ -15,7 +15,7 @@ import (
 // submits the new contract transaction to tpool.
 func Renew(contract modules.RenterContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, cancelChan chan struct{}) (modules.RenterContract, error) {
 	// Extract vars from params, for convenience
-	host, hostCollateral, renterFunds, startHeight, endHeight, refundAddress := params.Host, params.HostCollateral, params.RenterFunds, params.StartHeight, params.EndHeight, params.RefundAddress
+	host, hostCollateral, contractFunds, startHeight, endHeight, refundAddress := params.Host, params.HostCollateral, params.ContractFunds, params.StartHeight, params.EndHeight, params.RefundAddress
 	ourSK := contract.SecretKey
 
 	// Determine the amount of time that is being added to the contract.
@@ -23,10 +23,10 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	// Determine the cost of adding that much time to the existing data in the
 	// contract.
 	basePayment := host.StoragePrice.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension)
-	if basePayment.Cmp(renterFunds) > 0 {
+	if basePayment.Cmp(contractFunds) > 0 {
 		// The caller should have checked that the renter funds were enough to
 		// cover the base payment for the contract.
-		build.Critical("Provided renter funds are insufficient to cover base storage costs:", basePayment, renterFunds)
+		build.Critical("Provided renter funds are insufficient to cover base storage costs:", basePayment, contractFunds)
 		return modules.RenterContract{}, errors.New("provided renter funds are insufficent to cover contract cost")
 	}
 	// Determine the amount of collateral that needs to be added to the data in
@@ -40,7 +40,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	}
 
 	// Create the file contract.
-	payout := renterFunds.Add(hostCollateral).Add(host.ContractPrice).Mul64(10406).Div64(10000) // renter covers siafund fee
+	payout := contractFunds.Add(hostCollateral).Add(host.ContractPrice).Mul64(10406).Div64(10000) // renter covers siafund fee
 	fc := types.FileContract{
 		FileSize:       contract.LastRevision.NewFileSize,
 		FileMerkleRoot: contract.LastRevision.NewFileMerkleRoot,
@@ -51,13 +51,13 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
 			// renter
-			{Value: renterFunds.Sub(basePayment), UnlockHash: refundAddress},
+			{Value: contractFunds.Sub(basePayment), UnlockHash: refundAddress},
 			// host
 			{Value: basePayment.Add(hostCollateral).Add(host.ContractPrice), UnlockHash: host.UnlockHash},
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
 			// renter
-			{Value: renterFunds.Sub(basePayment), UnlockHash: refundAddress},
+			{Value: contractFunds.Sub(basePayment), UnlockHash: refundAddress},
 			// host gets its unused collateral back, plus the contract price
 			{Value: hostCollateral.Add(host.ContractPrice).Sub(baseCollateral), UnlockHash: host.UnlockHash},
 			// void gets the spent storage fees, plus the collateral being risked

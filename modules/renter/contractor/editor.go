@@ -57,23 +57,6 @@ type hostEditor struct {
 	mu         sync.Mutex
 }
 
-// invalidate sets the invalid flag and closes the underlying proto.Editor.
-// Once invalidate returns, the hostEditor is guaranteed to not further revise
-// its contract. This is used during contract renewal to prevent an Editor
-// from revising a contract mid-renewal.
-func (he *hostEditor) invalidate() {
-	he.mu.Lock()
-	defer he.mu.Unlock()
-	if !he.invalid {
-		he.editor.Close()
-		he.invalid = true
-	}
-	he.contractor.mu.Lock()
-	delete(he.contractor.editors, he.contract.ID)
-	delete(he.contractor.revising, he.contract.ID)
-	he.contractor.mu.Unlock()
-}
-
 // Address returns the NetAddress of the host.
 func (he *hostEditor) Address() modules.NetAddress { return he.contract.NetAddress }
 
@@ -98,7 +81,6 @@ func (he *hostEditor) Close() error {
 	he.invalid = true
 	he.contractor.mu.Lock()
 	delete(he.contractor.editors, he.contract.ID)
-	delete(he.contractor.revising, he.contract.ID)
 	he.contractor.mu.Unlock()
 	return he.editor.Close()
 }
@@ -155,9 +137,6 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) error {
 	he.mu.Lock()
 	defer he.mu.Unlock()
-	if he.invalid {
-		return errInvalidEditor
-	}
 	contract, err := he.editor.Modify(oldRoot, newRoot, offset, newData)
 	if err != nil {
 		return err

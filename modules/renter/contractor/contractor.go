@@ -57,8 +57,6 @@ type Contractor struct {
 
 	downloaders map[types.FileContractID]*hostDownloader
 	editors     map[types.FileContractID]*hostEditor
-	renewing    map[types.FileContractID]bool // prevent revising during renewal
-	revising    map[types.FileContractID]bool // prevent overlapping revisions
 
 	cachedRevisions map[types.FileContractID]cachedRevision
 	contractLocks   map[types.FileContractID]*siasync.TryMutex
@@ -89,10 +87,14 @@ func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContra
 // Contracts returns the contracts formed by the contractor in the current
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
-func (c *Contractor) Contracts() (cs []modules.RenterContract) {
+func (c *Contractor) Contracts() []modules.RenterContract {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.onlineContracts()
+	cs := make([]modules.RenterContract, 0, len(c.contracts))
+	for _, contract := range c.contracts {
+		cs = append(cs, contract)
+	}
+	return cs
 }
 
 // AllContracts returns the contracts formed by the contractor in the current
@@ -177,8 +179,6 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		editors:         make(map[types.FileContractID]*hostEditor),
 		oldContracts:    make(map[types.FileContractID]modules.RenterContract),
 		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
-		renewing:        make(map[types.FileContractID]bool),
-		revising:        make(map[types.FileContractID]bool),
 	}
 
 	// Close the logger (provided as a dependency) upon shutdown.
