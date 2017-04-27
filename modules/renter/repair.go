@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -304,10 +305,27 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 
 	// Read the file data into memory.
 	chunkIndex := chunkID.index
+	offset := chunkIndex * file.chunkSize()
 	fHandle, err := os.Open(meta.RepairPath)
 	if err != nil {
-		// TODO: Perform a download-and-repair instead of returning this error.
-		return build.ExtendErr("unable to open file to repair chunk", err)
+		r.log.Println("downloading chunk for repair")
+		dlParams := &modules.RenterDownloadParameters{
+			Async:    false,
+			DlWriter: modules.NewDownloadFileWriter(meta.RepairPath, offset, file.chunkSize()),
+			Httpresp: false,
+			Length:   file.chunkSize(),
+			Offset:   offset,
+			Siapath:  filename,
+		}
+		err = r.DownloadSection(dlParams)
+		if err != nil {
+			return build.ExtendErr("unable to download chunk for repair:", err)
+		}
+
+		fHandle, err = os.Open(meta.RepairPath)
+		if err != nil {
+			return err
+		}
 	}
 	defer fHandle.Close()
 	chunkData := make([]byte, file.chunkSize())
