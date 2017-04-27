@@ -477,8 +477,7 @@ gets the transaction associated with a specific transaction id.
         // selects which addresses will fund a transaction.
         "relatedaddress": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
 
-        // Amount of funds that have been moved in the input. Importantly,
-        // this value is only valid if walletaddress is true.
+        // Amount of funds that have been moved in the input.
         "value": "1234", // hastings or siafunds, depending on fundtype, big int
       }
     ],
