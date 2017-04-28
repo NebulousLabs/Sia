@@ -291,7 +291,6 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 }
 
 func (r *Renter) managedGetChunkData(file *file, trackedFile trackedFile, chunkID chunkID) ([]byte, error) {
-	filename := chunkID.filename
 	chunkIndex := chunkID.index
 	offset := chunkIndex * file.chunkSize()
 
@@ -299,20 +298,31 @@ func (r *Renter) managedGetChunkData(file *file, trackedFile trackedFile, chunkI
 	f, err := os.Open(trackedFile.RepairPath)
 	if err != nil {
 		// if that fails, try to download the chunk
+
+		// build current contracts map
+		currentContracts := make(map[modules.NetAddress]types.FileContractID)
+		for _, contract := range r.hostContractor.Contracts() {
+			currentContracts[contract.NetAddress] = contract.ID
+		}
+
+		// create a DownloadBufferWriter
 		buf := modules.NewDownloadBufferWriter()
-		dlParams := &modules.RenterDownloadParameters{
-			Async:    false,
-			DlWriter: buf,
-			Httpresp: false,
-			Length:   file.chunkSize(),
-			Offset:   offset,
-			Siapath:  filename,
+
+		// create the download object
+		d := r.newSectionDownload(file, buf, currentContracts, offset, file.chunkSize())
+
+		lockID := r.mu.Lock()
+		r.downloadQueue = append(r.downloadQueue, d)
+		r.mu.Unlock(lockID)
+		r.newDownloads <- d
+
+		// wait for the download to complete and return the data
+		select {
+		case <-d.downloadFinished:
+			return buf.Bytes(), d.Err()
+		case <-r.tg.StopChan():
+			return nil, errors.New("chunk download interrupted by shutdown")
 		}
-		err = r.DownloadSection(dlParams)
-		if err != nil {
-			return nil, err
-		}
-		return buf.Bytes(), nil
 	}
 	defer f.Close()
 
