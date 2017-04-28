@@ -7,6 +7,7 @@ package renter
 import (
 	"bytes"
 	"errors"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-	"math"
 )
 
 const (
@@ -71,12 +71,13 @@ type (
 		startTime    time.Time
 
 		// Static information about the file - can be read without a lock.
-		chunkSize         uint64
-		destination       modules.DownloadWriter
-		erasureCode       modules.ErasureCoder
-		fileSize          uint64
-		masterKey         crypto.TwofishKey
-		numChunks         uint64
+		chunkSize   uint64
+		destination modules.DownloadWriter
+		erasureCode modules.ErasureCoder
+		fileSize    uint64
+		masterKey   crypto.TwofishKey
+		numChunks   uint64
+		// The pieceSet contains a sparse map of the chunk indices to be downloaded to their piece data.
 		pieceSet          map[int]map[types.FileContractID]pieceData
 		reportedPieceSize uint64
 		siapath           string
@@ -260,7 +261,9 @@ func (cd *chunkDownload) recoverChunk() error {
 
 	var result = recoverWriter.Bytes()
 
-	// Calculate the offset. If the offset is within the chunk, the requested offset is passed, otherwise the offset of the chunk within the overall file is passed.
+	// Calculate the offset. If the offset is within the chunk, the
+	// requested offset is passed, otherwise the offset of the chunk
+	// within the overall file is passed.
 	chunkBaseAddress := cd.index * cd.download.chunkSize
 	chunkTopAddress := chunkBaseAddress + cd.download.chunkSize - 1
 	var off = chunkBaseAddress

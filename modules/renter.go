@@ -354,7 +354,7 @@ type Renter interface {
 	DeleteFile(path string) error
 
 	// DownloadSection performs a download according to the parameters passed, including downloads of `offset` and `length` type.
-	DownloadSection(params *RenterDownloadParameters) error
+	Download(params *RenterDownloadParameters) error
 
 	// DownloadQueue lists all the files that have been scheduled for download.
 	DownloadQueue() []DownloadInfo
