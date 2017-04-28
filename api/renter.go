@@ -14,6 +14,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/types"
 
+	"errors"
 	"github.com/julienschmidt/httprouter"
 	"strconv"
 	"time"
@@ -294,18 +295,9 @@ func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _
 	for i := range dlq {
 		d := dlq[len(dlq)-i-1]
 
-		// Find the destination of the download.
-		dstwriter, ok := (d.Destination).(*modules.DownloadFileWriter)
-		var dst string
-		if ok {
-			dst = dstwriter.Location
-		} else {
-			dst = "httpresp"
-		}
-
 		downloads[i] = DownloadInfo{
 			SiaPath:     d.SiaPath,
-			Destination: dst,
+			Destination: d.Destination.String(),
 			Filesize:    d.Filesize,
 			StartTime:   d.StartTime,
 			Received:    d.Received,
@@ -387,49 +379,46 @@ func (api *API) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps
 
 // renterDownloadHandler handles the API call to download a file.
 func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	p, errmsg := api.parseAndValidateDownloadParameters(w, req, ps)
+	params, errmsg := api.parseDownloadParameters(w, req, ps)
 	if errmsg != nil {
-		WriteError(w, *errmsg, http.StatusBadRequest)
+		WriteError(w, Error{errmsg.Error()}, http.StatusBadRequest)
 		return
 	}
 
-	if p.Async { // Create goroutine if `async` param set.
-		go api.renter.DownloadSection(p)
+	if params.Async { // Create goroutine if `async` param set.
+		go api.renter.DownloadSection(params)
 	} else {
-		err := api.renter.DownloadSection(p)
+		err := api.renter.DownloadSection(params)
 		if err != nil {
 			WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
 			return
 		}
 	}
 
-	if !p.Httpresp {
+	if !params.Httpresp {
+		// `httpresp=true` causes writes to w before this line is run, automatically
+		// adding `200 Status OK` code to response. Calling this results in a
+		// multiple calls to WriteHeaders() errors.
 		WriteSuccess(w)
+		return
 	}
 }
 
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
 func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	// Ensure that the async flag is not set to false.
-	if strings.Contains(req.URL.RawQuery, "async=false") {
-		WriteError(w, Error{"/downloadasync does not support allow requests containing `async=false`."}, http.StatusBadRequest)
+	// Ensure that the async flag is not set to any other value than "true" or "".
+	async := req.FormValue("async")
+	if async == "false" || async != "true" && async != "" {
+		WriteError(w, Error{"/downloadasync require the `async` parameter to be either equal to `true` or be empty."}, http.StatusBadRequest)
 		return
+	} else if async == "" { // Add async if it is not already set to `true`.
+		req.Form["async"] = []string{"true"}
 	}
 
-	// Set async flag to true.
-	req.URL.RawQuery += "&async=true"
-	p, errmsg := api.parseAndValidateDownloadParameters(w, req, ps)
-	if errmsg != nil {
-		WriteError(w, *errmsg, http.StatusBadRequest)
-		return
-	}
-
-	go api.renter.DownloadSection(p)
-
-	WriteSuccess(w)
+	api.renterDownloadHandler(w, req, ps)
 }
 
-func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (*modules.RenterDownloadParameters, *Error) {
+func (api *API) parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (*modules.RenterDownloadParameters, error) {
 	destination := req.FormValue("destination")
 
 	// The offset and length in bytes.
@@ -449,8 +438,7 @@ func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *h
 	if len(offsetparam) > 0 {
 		offset, err = strconv.ParseUint(offsetparam, 10, 64)
 		if err != nil {
-			return nil, &Error{"could not decode the offset as uint64: " +
-				err.Error()}
+			return nil, build.ExtendErr("could not decode the offset as uint64: ", err)
 		}
 	}
 	if len(lengthparam) > 0 {
@@ -463,57 +451,35 @@ func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *h
 	// Verify that if either offset or length have been provided that both were provided.
 	offparampassed := len(offsetparam) > 0
 	lenparampassed := len(lengthparam) > 0
-	if (offparampassed || lenparampassed) &&
-		!(offparampassed && lenparampassed) {
-		var missingfield = "offset"
-		if lenparampassed {
-			missingfield = "length"
-		}
-		return nil, &Error{"either both \"offset\" and " +
-			"\"length\" have to be specified or neither. " +
-			missingfield + " has not been specified."}
-	}
 
 	// Parse the httpresp parameter.
-	httpresp, errmsg := stringToBool(httprespparam)
-	if errmsg != nil {
-		return nil, errmsg
+	httpresp, err := stringToBool(httprespparam)
+	if err != nil {
+		return nil, build.ExtendErr("httpresp parameter could not be parsed", err)
 	}
 
 	// Parse the async parameter.
-	async, errmsg := stringToBool(asyncparam)
-	if errmsg != nil {
-		return nil, errmsg
+	async, err := stringToBool(asyncparam)
+	if err != nil {
+		return nil, build.ExtendErr("async parameter could not be parsed", err)
 	}
 
+	// Verify that either async or httpresp are true but not both.
 	if async && httpresp {
-		return nil, &Error{"only one of the async and httpresp flags can be specified."}
+		return nil, errors.New("only one of the async and httpresp flags can be specified.")
+	}
+
+	// Ensure that destination is defined if async is set to true.
+	if async && destination == "" {
+		return nil, errors.New("`destination` must be defined if `async=true`")
+	}
+
+	// Ensure destination is not set if httpresp is defined.
+	if httpresp && destination != "" {
+		return nil, errors.New("`destination` cannot be defined if `httpresp=true`")
 	}
 
 	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/") // Sia file name.
-
-	// Lookup the file associated with the nickname.
-	file, exists := api.renter.GetFile(siapath)
-	if !exists {
-		return nil, &Error{Message: "download failed: no file with that path"}
-	}
-
-	if !offparampassed { // Determine if entire file is to be downloaded.
-		offset = 0
-		length = file.Filesize
-	}
-
-	// Check that the combination of offset and length are valid.
-	offsetValid := offset >= 0 && offset < file.Filesize
-	lengthValid := length > 0 && offset+length <= file.Filesize
-	if !offsetValid {
-		errmsg := fmt.Sprintf("offset in file %s has to be >= 0 and < %d", siapath, file.Filesize)
-		return nil, &Error{Message: errmsg}
-	}
-	if !lengthValid {
-		errmsg := fmt.Sprintf("length of file %s with offset %d has to be > 0 and < %d", siapath, offset, file.Filesize-offset)
-		return nil, &Error{Message: errmsg}
-	}
 
 	// Instantiate the correct DownloadWriter implementation
 	// (e.g. content written to file or response body).
@@ -530,12 +496,14 @@ func (api *API) parseAndValidateDownloadParameters(w http.ResponseWriter, req *h
 	}
 
 	return &modules.RenterDownloadParameters{
-		Async:    async,
-		DlWriter: dw,
-		Httpresp: httpresp,
-		Length:   length,
-		Offset:   offset,
-		Siapath:  siapath,
+		Async:        async,
+		DlWriter:     dw,
+		Httpresp:     httpresp,
+		Length:       length,
+		LengthPassed: lenparampassed,
+		Offset:       offset,
+		OffsetPassed: offparampassed,
+		Siapath:      siapath,
 	}, nil
 }
 
@@ -632,20 +600,4 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 		return
 	}
 	WriteSuccess(w)
-}
-
-// stringToBool converts "true" and "false" strings to their respective boolean value and returns an error if conversion is not possible.
-func stringToBool(param string) (bool, *Error) {
-	// Parse the async parameter.
-	var out bool
-	switch {
-	case param == "true":
-		out = true
-	case len(param) == 0 || param == "false":
-		out = false
-	default:
-		return false, &Error{"asyncparam has to be empty, \"true\" or \"false\""}
-	}
-
-	return out, nil
 }
