@@ -272,30 +272,37 @@ func TestHostPoorConnectivity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stLeader.server.Close()
 	stHost1, err := blankServerTester(t.Name() + " - Host 1")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost1.server.Close()
 	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost2.server.Close()
 	stHost3, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost3.server.Close()
 	stHost4, err := blankServerTester(t.Name() + " - Host 4")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost4.server.Close()
 	stRenter1, err := blankServerTester(t.Name() + " - Renter 1")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stRenter1.server.Close()
 	stRenter2, err := blankServerTester(t.Name() + " - Renter 2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stRenter2.server.Close()
 
 	// Fetch all of the addresses of the nodes that got created.
 	var ggSTL, ggSTH1, ggSTH2, ggSTH3, ggSTH4, ggSTR1, ggSTR2 GatewayGET

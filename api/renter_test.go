@@ -937,10 +937,12 @@ func TestRenterPricesHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost1.server.Close()
 	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost2.server.Close()
 
 	// Connect all the nodes and announce all of the hosts.
 	sts := []*serverTester{st, stHost1, stHost2}
@@ -1009,10 +1011,12 @@ func TestRenterPricesHandlerCheap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost1.server.Close()
 	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost2.server.Close()
 
 	var hg HostGET
 	err = st.getAPI("/host", &hg)
@@ -1110,22 +1114,27 @@ func TestRenterPricesHandlerIgnorePricey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost1.server.Close()
 	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost2.server.Close()
 	stHost3, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost3.server.Close()
 	stHost4, err := blankServerTester(t.Name() + " - Host 4")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost4.server.Close()
 	stHost5, err := blankServerTester(t.Name() + " - Host 5")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost5.server.Close()
 
 	// Set host 5 to be cheaper than the rest by a substantial amount. This
 	// should result in a reduction for the price estimation.
