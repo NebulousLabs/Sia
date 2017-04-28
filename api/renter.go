@@ -386,9 +386,9 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 	}
 
 	if params.Async { // Create goroutine if `async` param set.
-		go api.renter.DownloadSection(params)
+		go api.renter.Download(params)
 	} else {
-		err := api.renter.DownloadSection(params)
+		err := api.renter.Download(params)
 		if err != nil {
 			WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
 			return
