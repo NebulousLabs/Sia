@@ -72,31 +72,6 @@ func (c *Contractor) Allowance() modules.Allowance {
 	return c.allowance
 }
 
-// Contract returns the latest contract formed with the specified host.
-func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContract, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	for _, c := range c.contracts {
-		if c.NetAddress == hostAddr {
-			return c, true
-		}
-	}
-	return modules.RenterContract{}, false
-}
-
-// Contracts returns the contracts formed by the contractor in the current
-// allowance period. Only contracts formed with currently online hosts are
-// returned.
-func (c *Contractor) Contracts() []modules.RenterContract {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	cs := make([]modules.RenterContract, 0, len(c.contracts))
-	for _, contract := range c.contracts {
-		cs = append(cs, contract)
-	}
-	return cs
-}
-
 // AllContracts returns the contracts formed by the contractor in the current
 // allowance period.
 func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
@@ -113,6 +88,32 @@ func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
 	return
 }
 
+// Close closes the Contractor.
+func (c *Contractor) Close() error {
+	return c.tg.Stop()
+}
+
+// Contract returns the latest contract formed with the specified host.
+func (c *Contractor) Contract(id types.FileContractID) (modules.RenterContract, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	contract, exists := c.contracts[id]
+	return contract, exists
+}
+
+// Contracts returns the contracts formed by the contractor in the current
+// allowance period. Only contracts formed with currently online hosts are
+// returned.
+func (c *Contractor) Contracts() []modules.RenterContract {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	cs := make([]modules.RenterContract, 0, len(c.contracts))
+	for _, contract := range c.contracts {
+		cs = append(cs, contract)
+	}
+	return cs
+}
+
 // CurrentPeriod returns the height at which the current allowance period
 // began.
 func (c *Contractor) CurrentPeriod() types.BlockHeight {
@@ -127,11 +128,6 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 		return c.ResolveID(newID)
 	}
 	return id
-}
-
-// Close closes the Contractor.
-func (c *Contractor) Close() error {
-	return c.tg.Stop()
 }
 
 // New returns a new Contractor.

@@ -18,12 +18,12 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFunds 
 	// create contract params
 	c.mu.RLock()
 	params := proto.ContractParams{
-		Host:          host,
+		Host:           host,
 		HostCollateral: hostCollateral,
-		RenterFunds:      renterFunds,
-		StartHeight:   c.blockHeight,
-		EndHeight:     endHeight,
-		RefundAddress: uc.UnlockHash(),
+		ContractFunds:  contractFunds,
+		StartHeight:    c.blockHeight,
+		EndHeight:      endHeight,
+		RefundAddress:  uc.UnlockHash(),
 	}
 	c.mu.RUnlock()
 
@@ -39,6 +39,9 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFunds 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// Establish the contract as in good standing and useful for upload.
+	contract.InGoodStanding = true
+	contract.UsefulForUpload = true
 	// Insert the new contract.
 	c.contracts[contract.ID] = contract
 	// Update the allowance to account for the change in spending patterns.

@@ -77,10 +77,9 @@ var (
 	// storageRemainingThreshold defines the amount of storage remaining a host
 	// needs to have in order to be considered useful for uploading.
 	storageRemainingThreshold = build.Select(build.Var{
-		Dev: 20e6,
+		Dev:      20e6,
 		Standard: 50e9,
-		Testing: 100e3,
-
+		Testing:  100e3,
 	}).(uint64)
 
 	// uptimeWindow specifies the duration in which host uptime is checked.

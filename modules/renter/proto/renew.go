@@ -13,7 +13,7 @@ import (
 
 // Renew negotiates a new contract for data already stored with a host, and
 // submits the new contract transaction to tpool.
-func Renew(contract modules.RenterContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, cancelChan chan struct{}) (modules.RenterContract, error) {
+func Renew(contract modules.RenterContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, cancelChan <-chan struct{}) (modules.RenterContract, error) {
 	// Extract vars from params, for convenience
 	host, hostCollateral, contractFunds, startHeight, endHeight, refundAddress := params.Host, params.HostCollateral, params.ContractFunds, params.StartHeight, params.EndHeight, params.RefundAddress
 	ourSK := contract.SecretKey

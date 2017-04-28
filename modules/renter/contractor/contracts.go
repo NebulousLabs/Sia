@@ -164,7 +164,9 @@ func (c *Contractor) markBadContracts() {
 		}
 
 		// Determine whether the host has enough storage space remaining to be
-		// useful for uploading.
+		// useful for uploading. Note that the amount of storage a host has
+		// remaining is dynamic, and so the host may become useful for uploading
+		// in the near future.
 		if host.RemainingStorage < storageRemainingThreshold {
 			contract.UsefulForUpload = false
 			// If the renter is not storing enough data on this host, consider
@@ -176,6 +178,8 @@ func (c *Contractor) markBadContracts() {
 				contract.InGoodStanding = false
 				c.allowance.Funds = c.allowance.Funds.Sub(contract.TotalCost)
 			}
+		} else {
+			contract.UsefulForUpload = true
 		}
 	}
 }
@@ -228,6 +232,32 @@ func (c *Contractor) threadedRepairContracts() {
 	}
 	c.mu.Unlock()
 
+	// Iterate through the set of contracts that have expired and move them to
+	// the archive.
+	c.mu.Lock()
+	var expiredContracts []modules.RenterContract
+	for _, contract := range c.contracts {
+		if c.blockHeight > contract.EndHeight() {
+			expiredContracts = append(expiredContracts, contract)
+		}
+	}
+	for _, contract := range expiredContracts {
+		// Archive the contract.
+		c.oldContracts[contract.ID] = contract
+		// Delete the contract.
+		delete(c.contracts, contract.ID)
+		// Delete the cached revision.
+		delete(c.cachedRevisions, contract.ID)
+		// Update the allowance to account for disappeared spending.
+		c.allowance.Funds = c.allowance.Funds.Sub(contract.TotalCost)
+		// Save the changes.
+		err = c.saveSync()
+		if err != nil {
+			c.log.Println("Unable to save the contractor after renewing a contract:", err)
+		}
+	}
+	c.mu.Unlock()
+
 	// Reveiw the set of contracts held by the contractor, and mark any
 	// contracts whose hosts have fallen out of favor.
 	c.mu.Lock()
@@ -249,7 +279,7 @@ func (c *Contractor) threadedRepairContracts() {
 			}
 
 			// Grab the host that is being used for this contract.
-			host, exists := c.hdb.Host(contract.HostPublicKey)
+			_, exists := c.hdb.Host(contract.HostPublicKey)
 			if !exists {
 				continue // This contract is with a host that doesn't exist.
 			}
@@ -357,8 +387,8 @@ func (c *Contractor) threadedRepairContracts() {
 	c.mu.Unlock()
 
 	// Select a bunch of new hosts from the database.
-	selectionSize := int(wantedHosts*3 + 10) // Fine to have an abundance of hosts.
-	hosts := c.hdb.RandomHosts(selectionSize , existingHosts) // Fine to have an abundance of hosts.
+	selectionSize := int(wantedHosts*3 + 10)                 // Fine to have an abundance of hosts.
+	hosts := c.hdb.RandomHosts(selectionSize, existingHosts) // Fine to have an abundance of hosts.
 
 	// Filter any hosts that do not have enough storage remaining.
 	i := 0

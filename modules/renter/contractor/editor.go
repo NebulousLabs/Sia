@@ -14,8 +14,6 @@ import (
 // the contractor will cap host's MaxCollateral setting to this value
 var maxUploadCollateral = types.SiacoinPrecision.Mul64(1e3).Div(modules.BlockBytesPerMonthTerabyte) // 1k SC / TB / Month
 
-var errInvalidEditor = errors.New("editor has been invalidated because its contract is being renewed")
-
 // An Editor modifies a Contract by communicating with a host. It uses the
 // contract revision protocol to send modification requests to the host.
 // Editors are the means by which the renter uploads data to hosts.
@@ -53,7 +51,6 @@ type hostEditor struct {
 	contract   modules.RenterContract
 	contractor *Contractor
 	editor     *proto.Editor
-	invalid    bool // true if invalidate has been called
 	mu         sync.Mutex
 }
 
@@ -75,13 +72,13 @@ func (he *hostEditor) Close() error {
 	he.clients--
 	// Close is a no-op if invalidate has been called, or if there are other
 	// clients still using the hostEditor.
-	if he.invalid || he.clients > 0 {
+	if he.clients > 0 {
 		return nil
 	}
-	he.invalid = true
 	he.contractor.mu.Lock()
 	delete(he.contractor.editors, he.contract.ID)
 	he.contractor.mu.Unlock()
+	he.contractor.managedUnlockContract(he.contract.ID)
 	return he.editor.Close()
 }
 
@@ -89,9 +86,6 @@ func (he *hostEditor) Close() error {
 func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
-	if he.invalid {
-		return crypto.Hash{}, errInvalidEditor
-	}
 	contract, sectorRoot, err := he.editor.Upload(data)
 	if err != nil {
 		return crypto.Hash{}, err
@@ -115,9 +109,6 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 func (he *hostEditor) Delete(root crypto.Hash) error {
 	he.mu.Lock()
 	defer he.mu.Unlock()
-	if he.invalid {
-		return errInvalidEditor
-	}
 
 	contract, err := he.editor.Delete(root)
 	if err != nil {
@@ -158,12 +149,7 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	cachedEditor, haveEditor := c.editors[id]
 	height := c.blockHeight
 	contract, haveContract := c.contracts[id]
-	renewing := c.renewing[id]
 	c.mu.RUnlock()
-
-	if renewing {
-		return nil, errors.New("currently renewing that contract")
-	}
 
 	if haveEditor {
 		// increment number of clients and return
@@ -180,32 +166,17 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		return nil, errors.New("contract has already ended")
 	} else if !haveHost {
 		return nil, errors.New("no record of that host")
-	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
-		return nil, errTooExpensive
-	} else if build.VersionCmp(host.Version, "0.6.0") > 0 {
-		// COMPATv0.6.0: don't cap host.Collateral on old hosts
-		if host.Collateral.Cmp(maxUploadCollateral) > 0 {
-			host.Collateral = maxUploadCollateral
-		}
 	}
 	contract.NetAddress = host.NetAddress
 
-	// acquire revising lock
-	c.mu.Lock()
-	alreadyRevising := c.revising[contract.ID]
-	if alreadyRevising {
-		c.mu.Unlock()
-		return nil, errors.New("already revising that contract")
+	// Acquire contract lock.
+	if !c.managedTryLockContract(id) {
+		return nil, errors.New("contract is in use elsewhere, unable to create an editor")
 	}
-	c.revising[contract.ID] = true
-	c.mu.Unlock()
-
-	// release lock early if function returns an error
+	// Release lock early if function has an error before returning.
 	defer func() {
 		if err != nil {
-			c.mu.Lock()
-			delete(c.revising, contract.ID)
-			c.mu.Unlock()
+			c.managedUnlockContract(id)
 		}
 	}()
 
@@ -254,6 +225,5 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	c.mu.Lock()
 	c.editors[contract.ID] = he
 	c.mu.Unlock()
-
 	return he, nil
 }

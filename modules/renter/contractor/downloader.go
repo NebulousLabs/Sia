@@ -87,7 +87,7 @@ func (hd *hostDownloader) Close() error {
 
 // Downloader returns a Downloader object that can be used to download sectors
 // from a host.
-func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{}) (d Downloader, err error) {
+func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{}) (_ Downloader, err error) {
 	c.mu.RLock()
 	id = c.ResolveID(id)
 	cachedDownloader, haveDownloader := c.downloaders[id]
@@ -128,7 +128,7 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	// Grab a lock on the contract. If the contract is already in use by either
 	// the renew loop or by an editor, return an error.
 	if !c.managedTryLockContract(id) {
-		return errors.New("contract is in use elsewhere, unable to create a downloader")
+		return nil, errors.New("contract is in use elsewhere, unable to create a downloader")
 	}
 	// If there's an error in the below code, release the lock on the contract.
 	defer func() {
@@ -138,7 +138,7 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	}()
 
 	// create downloader
-	d, err = proto.NewDownloader(host, contract, cancel)
+	protoDownloader, err := proto.NewDownloader(host, contract, cancel)
 	if proto.IsRevisionMismatch(err) {
 		// try again with the cached revision
 		c.mu.RLock()
@@ -151,26 +151,25 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
 		contract.LastRevision = cached.Revision
-		d, err = proto.NewDownloader(host, contract, cancel)
+		protoDownloader, err = proto.NewDownloader(host, contract, cancel)
 	}
 	if err != nil {
 		return nil, err
 	}
 	// supply a SaveFn that saves the revision to the contractor's persist
 	// (the existing revision will be overwritten when SaveFn is called)
-	d.SaveFn = c.saveDownloadRevision(contract.ID)
+	protoDownloader.SaveFn = c.saveDownloadRevision(contract.ID)
 
 	// cache downloader
 	hd := &hostDownloader{
 		clients:      1,
 		contractID:   contract.ID,
 		contractor:   c,
-		downloader:   d,
+		downloader:   protoDownloader,
 		hostSettings: host.HostExternalSettings,
 	}
 	c.mu.Lock()
 	c.downloaders[contract.ID] = hd
 	c.mu.Unlock()
-
 	return hd, nil
 }

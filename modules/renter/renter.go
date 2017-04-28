@@ -84,7 +84,7 @@ type hostContractor interface {
 	Close() error
 
 	// Contract returns the latest contract formed with the specified host.
-	Contract(modules.NetAddress) (modules.RenterContract, bool)
+	Contract(types.FileContractID) (modules.RenterContract, bool)
 
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
@@ -96,9 +96,6 @@ type hostContractor interface {
 	// Editor creates an Editor from the specified contract ID, allowing the
 	// insertion, deletion, and modification of sectors.
 	Editor(types.FileContractID, <-chan struct{}) (contractor.Editor, error)
-
-	// IsOffline reports whether the specified host is considered offline.
-	IsOffline(types.FileContractID) bool
 
 	// Downloader creates a Downloader from the specified contract ID,
 	// allowing the retrieval of sectors.
