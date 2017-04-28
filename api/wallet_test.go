@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -398,7 +399,7 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationWalletSweepSeedPOST")
+	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -453,6 +454,71 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 	err = st.postAPI("/wallet/sweep/seed", qs, &wsp)
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestIntegrationWalletLoadSeedPOST probes the POST call to
+// /wallet/seed.
+func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a wallet.
+	key := crypto.TwofishKey(crypto.HashObject("password"))
+	st, err := assembleServerTester(key, build.TempDir("api", t.Name()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Mine blocks until the wallet has confirmed money.
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		st.miner.AddBlock()
+	}
+
+	// Create a wallet to load coins from.
+	key2 := crypto.GenerateTwofishKey()
+	w2, err := wallet.New(st.cs, st.tpool, filepath.Join(st.dir, "wallet2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w2.Encrypt(key2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w2.Unlock(key2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Mine coins into the second wallet.
+	m, err := miner.New(st.cs, st.tpool, w2, filepath.Join(st.dir, "miner2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		m.AddBlock()
+	}
+
+	// Record starting balances.
+	oldBal, _, _ := st.wallet.ConfirmedBalance()
+	w2bal, _, _ := w2.ConfirmedBalance()
+	if w2bal.IsZero() {
+		t.Fatal("second wallet's balance should not be zero")
+	}
+
+	// Load the second wallet's seed into the first wallet
+	seed, _, _ := w2.PrimarySeed()
+	seedStr, _ := modules.SeedToString(seed, "english")
+	qs := url.Values{}
+	qs.Set("seed", seedStr)
+	qs.Set("encryptionpassword", "password")
+	err = st.stdPostAPI("/wallet/seed", qs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// First wallet should now have balance of both wallets
+	bal, _, _ := st.wallet.ConfirmedBalance()
+	if exp := oldBal.Add(w2bal); !bal.Equals(exp) {
+		t.Fatalf("wallet did not load seed correctly: expected %v coins, got %v", exp, bal)
 	}
 }
 
@@ -690,5 +756,199 @@ func TestWalletRelativePathErrorSiag(t *testing.T) {
 	err = st.stdPostAPI("/wallet/siagkey", loadSiagValues)
 	if err == nil || err.Error() == loadSiagAbsoluteError {
 		t.Fatal(err)
+	}
+}
+
+func TestWalletReset(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	testdir := build.TempDir("api", t.Name())
+
+	walletPassword := "testpass"
+	key := crypto.TwofishKey(crypto.HashObject(walletPassword))
+
+	st, err := assembleServerTester(key, testdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// lock the wallet
+	err = st.stdPostAPI("/wallet/lock", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// reencrypt the wallet
+	newPassword := "testpass2"
+	newKey := crypto.TwofishKey(crypto.HashObject(newPassword))
+
+	initValues := url.Values{}
+	initValues.Set("force", "true")
+	initValues.Set("encryptionpassword", newPassword)
+	err = st.stdPostAPI("/wallet/init", initValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the password to call /wallet/unlock.
+	unlockValues := url.Values{}
+	unlockValues.Set("encryptionpassword", newPassword)
+	err = st.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !st.wallet.Unlocked() {
+		t.Error("wallet is not unlocked")
+	}
+
+	// reload the server and verify unlocking still works
+	err = st.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	st2, err := assembleServerTester(newKey, st.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.server.Close()
+
+	// lock the wallet
+	err = st2.stdPostAPI("/wallet/lock", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the password to call /wallet/unlock.
+	err = st2.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !st2.wallet.Unlocked() {
+		t.Error("wallet is not unlocked")
+	}
+}
+
+func TestWalletSiafunds(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	walletPassword := "testpass"
+	key := crypto.TwofishKey(crypto.HashObject(walletPassword))
+	testdir := build.TempDir("api", t.Name())
+	st, err := assembleServerTester(key, testdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// mine some money
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// record transactions
+	var wtg WalletTransactionsGET
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=100", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	numTxns := len(wtg.ConfirmedTransactions)
+
+	// load siafunds into the wallet
+	siagPath, _ := filepath.Abs("../types/siag0of1of1.siakey")
+	loadSiagValues := url.Values{}
+	loadSiagValues.Set("keyfiles", siagPath)
+	loadSiagValues.Set("encryptionpassword", walletPassword)
+	err = st.stdPostAPI("/wallet/siagkey", loadSiagValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=100", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtg.ConfirmedTransactions) != numTxns+1 {
+		t.Errorf("expected %v transactions, got %v", numTxns+1, len(wtg.ConfirmedTransactions))
+	}
+
+	// check balance
+	var wg WalletGET
+	err = st.getAPI("/wallet", &wg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wg.SiafundBalance.Cmp64(2000) != 0 {
+		t.Fatalf("bad siafund balance: expected %v, got %v", 2000, wg.SiafundBalance)
+	}
+
+	// spend the siafunds into the wallet seed
+	var wag WalletAddressGET
+	err = st.getAPI("/wallet/address", &wag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sendSiafundsValues := url.Values{}
+	sendSiafundsValues.Set("amount", "2000")
+	sendSiafundsValues.Set("destination", wag.Address.String())
+	err = st.stdPostAPI("/wallet/siafunds", sendSiafundsValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Announce the host and form an allowance with it. This will result in a
+	// siafund claim.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// mine a block so that the announcement makes it into the blockchain
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// form allowance
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "20"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mine a block so that the file contract makes it into the blockchain
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// wallet should now have a claim balance
+	err = st.getAPI("/wallet", &wg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wg.SiacoinClaimBalance.IsZero() {
+		t.Fatal("expected non-zero claim balance")
 	}
 }

@@ -199,12 +199,7 @@ func (h *Host) load() error {
 	return nil
 }
 
-// save stores all of the persist data to disk.
-func (h *Host) save() error {
-	return persist.SaveFile(persistMetadata, h.persistData(), filepath.Join(h.persistDir, settingsFile))
-}
-
 // saveSync stores all of the persist data to disk and then syncs to disk.
 func (h *Host) saveSync() error {
-	return persist.SaveFileSync(persistMetadata, h.persistData(), filepath.Join(h.persistDir, settingsFile))
+	return persist.SaveJSON(persistMetadata, h.persistData(), filepath.Join(h.persistDir, settingsFile))
 }

@@ -64,7 +64,7 @@ func createWalletTester(name string) (*walletTester, error) {
 		return nil, err
 	}
 
-	// Assemble all componenets into a wallet tester.
+	// Assemble all components into a wallet tester.
 	wt := &walletTester{
 		cs:      cs,
 		gateway: g,
@@ -114,7 +114,7 @@ func createBlankWalletTester(name string) (*walletTester, error) {
 		return nil, err
 	}
 
-	// Assemble all componenets into a wallet tester.
+	// Assemble all components into a wallet tester.
 	wt := &walletTester{
 		gateway: g,
 		cs:      cs,

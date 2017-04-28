@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -15,9 +16,10 @@ type sortedOutputs struct {
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
 func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
-	// ensure durability of reported balance
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	// ensure durability of reported balance
 	w.syncDB()
 
 	dbForEachSiacoinOutput(w.dbTx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
@@ -25,9 +27,20 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 			siacoinBalance = siacoinBalance.Add(sco.Value)
 		}
 	})
+
+	siafundPool, err := dbGetSiafundPool(w.dbTx)
+	if err != nil {
+		return
+	}
 	dbForEachSiafundOutput(w.dbTx, func(_ types.SiafundOutputID, sfo types.SiafundOutput) {
 		siafundBalance = siafundBalance.Add(sfo.Value)
-		siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
+		if sfo.ClaimStart.Cmp(siafundPool) > 0 {
+			// Skip claims larger than the siafund pool. This should only
+			// occur if the siafund pool has not been initialized yet.
+			w.log.Debugf("skipping claim with start value %v because siafund pool is only %v", sfo.ClaimStart, siafundPool)
+			return
+		}
+		siafundClaimBalance = siafundClaimBalance.Add(siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
 	})
 	return
 }
@@ -61,8 +74,12 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 		return nil, err
 	}
 	defer w.tg.Done()
+	if !w.unlocked {
+		return nil, modules.ErrLockedWallet
+	}
 
-	tpoolFee := types.SiacoinPrecision.Mul64(10) // TODO: better fee algo.
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
@@ -93,7 +110,13 @@ func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]t
 		return nil, err
 	}
 	defer w.tg.Done()
-	tpoolFee := types.SiacoinPrecision.Mul64(10) // TODO: better fee algo.
+	if !w.unlocked {
+		return nil, modules.ErrLockedWallet
+	}
+
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
+	tpoolFee = tpoolFee.Mul64(5)   // use large fee to ensure siafund transactions are selected by miners
 	output := types.SiafundOutput{
 		Value:      amount,
 		UnlockHash: dest,

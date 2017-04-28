@@ -490,6 +490,6 @@ func TestGenesisBlockSync(t *testing.T) {
 
 	time.Sleep(time.Second * 12)
 	if len(cst1.gateway.Peers()) == 0 {
-		t.Error("disconnection occured!")
+		t.Error("disconnection occurred!")
 	}
 }

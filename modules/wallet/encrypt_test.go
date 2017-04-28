@@ -2,12 +2,14 @@ package wallet
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 )
@@ -283,4 +285,54 @@ func TestInitFromSeed(t *testing.T) {
 		t.Log(w.UnconfirmedBalance())
 		t.Fatalf("wallet should have correct balance after loading seed: wanted %v, got %v", origBal, newBal)
 	}
+}
+
+// TestReset tests that Reset resets a wallet correctly.
+func TestReset(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	wt, err := createBlankWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	var originalKey crypto.TwofishKey
+	fastrand.Read(originalKey[:])
+	_, err = wt.wallet.Encrypt(originalKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	postEncryptionTesting(wt.miner, wt.wallet, originalKey)
+
+	err = wt.wallet.Reset()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// reinitialize the miner so it mines into the new seed
+	err = wt.miner.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	minerData := filepath.Join(wt.persistDir, modules.MinerDir)
+	err = os.RemoveAll(minerData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newminer, err := miner.New(wt.cs, wt.tpool, wt.wallet, filepath.Join(wt.persistDir, modules.MinerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt.miner = newminer
+
+	var newKey crypto.TwofishKey
+	fastrand.Read(newKey[:])
+	_, err = wt.wallet.Encrypt(newKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	postEncryptionTesting(wt.miner, wt.wallet, newKey)
 }

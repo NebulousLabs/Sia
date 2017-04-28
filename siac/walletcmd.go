@@ -196,6 +196,9 @@ func walletinitcmd() {
 		}
 		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
+	if initForce {
+		qs += "&force=true"
+	}
 	err := postResp("/wallet/init", qs, &er)
 	if err != nil {
 		die("Error when encrypting wallet:", err)
@@ -221,6 +224,9 @@ func walletinitseedcmd() {
 			die("Reading password failed:", err)
 		}
 		qs += fmt.Sprintf("&encryptionpassword=%s", password)
+	}
+	if initForce {
+		qs += "&force=true"
 	}
 	err = post("/wallet/init/seed", qs)
 	if err != nil {
@@ -301,7 +307,7 @@ func walletseedscmd() {
 		return
 	}
 	fmt.Println()
-	fmt.Println("Auxilliary Seeds:")
+	fmt.Println("Auxiliary Seeds:")
 	for _, seed := range seedInfo.AllSeeds {
 		if seed == seedInfo.PrimarySeed {
 			continue

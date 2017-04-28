@@ -125,7 +125,7 @@ func (tp *TransactionPool) Close() error {
 // transactions.
 func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// TODO: The fee estimation tool should look at the recent blocks and use
-	// them to guage what sort of fee should be required, as opposed to just
+	// them to gauge what sort of fee should be required, as opposed to just
 	// guessing blindly.
 	//
 	// TODO: The current minimum has been reduced significantly to account for
@@ -135,7 +135,7 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// a much lower value, which means hosts would be incompatible if the
 	// minimum recommended were set to 10. The value has been set to 1, which
 	// should be okay temporarily while the renters are given time to upgrade.
-	return types.SiacoinPrecision.Mul64(1).Div64(1e3), types.SiacoinPrecision.Mul64(5).Div64(1e3)
+	return types.SiacoinPrecision.Mul64(1).Div64(3).Div64(1e3), types.SiacoinPrecision.Mul64(1).Div64(1e3)
 }
 
 // TransactionList returns a list of all transactions in the transaction pool.

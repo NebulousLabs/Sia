@@ -101,48 +101,6 @@ func (w *Wallet) integrateSeed(seed modules.Seed, n uint64) {
 	}
 }
 
-// loadSeed integrates a recovery seed into the wallet.
-func (w *Wallet) loadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
-	// Because the recovery seed does not have a UID, duplication must be
-	// prevented by comparing with the list of decrypted seeds. This can only
-	// occur while the wallet is unlocked.
-	if !w.unlocked {
-		return modules.ErrLockedWallet
-	}
-	if seed == w.primarySeed {
-		return errKnownSeed
-	}
-	for _, wSeed := range w.seeds {
-		if seed == wSeed {
-			return errKnownSeed
-		}
-	}
-
-	err := checkMasterKey(w.dbTx, masterKey)
-	if err != nil {
-		return err
-	}
-
-	// create a seedFile for the seed
-	sf := createSeedFile(masterKey, seed)
-
-	// add the seedFile
-	var current []seedFile
-	err = encoding.Unmarshal(w.dbTx.Bucket(bucketWallet).Get(keyAuxiliarySeedFiles), &current)
-	if err != nil {
-		return err
-	}
-	err = w.dbTx.Bucket(bucketWallet).Put(keyAuxiliarySeedFiles, encoding.Marshal(append(current, sf)))
-	if err != nil {
-		return err
-	}
-
-	// load the seed's keys
-	w.integrateSeed(seed, modules.PublicKeysPerSeed)
-	w.seeds = append(w.seeds, seed)
-	return nil
-}
-
 // nextPrimarySeedAddress fetches the next address from the primary seed.
 func (w *Wallet) nextPrimarySeedAddress(tx *bolt.Tx) (types.UnlockConditions, error) {
 	// Check that the wallet has been unlocked.
@@ -228,9 +186,96 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 		return err
 	}
 	defer w.tg.Done()
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.loadSeed(masterKey, seed)
+
+	// Because the recovery seed does not have a UID, duplication must be
+	// prevented by comparing with the list of decrypted seeds. This can only
+	// occur while the wallet is unlocked.
+	w.mu.RLock()
+	if !w.unlocked {
+		w.mu.RUnlock()
+		return modules.ErrLockedWallet
+	}
+	for _, wSeed := range append([]modules.Seed{w.primarySeed}, w.seeds...) {
+		if seed == wSeed {
+			w.mu.RUnlock()
+			return errKnownSeed
+		}
+	}
+	w.mu.RUnlock()
+
+	// scan blockchain to determine how many keys to generate for the seed
+	s := newSeedScanner(seed, w.log)
+	if err := s.scan(w.cs); err != nil {
+		return err
+	}
+	// Add 10% as a buffer because the seed may have addresses in the wild
+	// that have not appeared in the blockchain yet.
+	seedProgress := s.largestIndexSeen + 1
+	seedProgress += seedProgress / 10
+	w.log.Printf("INFO: found key index %v in blockchain. Setting auxiliary seed progress to %v", s.largestIndexSeen, seedProgress)
+
+	err := func() error {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+
+		err := checkMasterKey(w.dbTx, masterKey)
+		if err != nil {
+			return err
+		}
+
+		// create a seedFile for the seed
+		sf := createSeedFile(masterKey, seed)
+
+		// add the seedFile
+		var current []seedFile
+		err = encoding.Unmarshal(w.dbTx.Bucket(bucketWallet).Get(keyAuxiliarySeedFiles), &current)
+		if err != nil {
+			return err
+		}
+		err = w.dbTx.Bucket(bucketWallet).Put(keyAuxiliarySeedFiles, encoding.Marshal(append(current, sf)))
+		if err != nil {
+			return err
+		}
+
+		// load the seed's keys
+		w.integrateSeed(seed, seedProgress)
+		w.seeds = append(w.seeds, seed)
+
+		// delete the set of processed transactions; they will be recreated
+		// when we rescan
+		if err = w.dbTx.DeleteBucket(bucketProcessedTransactions); err != nil {
+			return err
+		}
+		if _, err = w.dbTx.CreateBucket(bucketProcessedTransactions); err != nil {
+			return err
+		}
+		w.unconfirmedProcessedTransactions = nil
+
+		// reset the consensus change ID and height in preparation for rescan
+		err = dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
+		if err != nil {
+			return err
+		}
+		return dbPutConsensusHeight(w.dbTx, 0)
+	}()
+	if err != nil {
+		return err
+	}
+
+	// rescan the blockchain
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
+	done := make(chan struct{})
+	go w.rescanMessage(done)
+	defer close(done)
+
+	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	if err != nil {
+		return err
+	}
+	w.tpool.TransactionPoolSubscribe(w)
+	return nil
 }
 
 // SweepSeed scans the blockchain for outputs generated from seed and creates
@@ -264,7 +309,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 
 	// scan blockchain for outputs, filtering out 'dust' (outputs that cost
 	// more in fees than they are worth)
-	s := newSeedScanner(seed)
+	s := newSeedScanner(seed, w.log)
 	_, maxFee := w.tpool.FeeEstimation()
 	const outputSize = 350 // approx. size in bytes of an output and accompanying signature
 	s.dustThreshold = maxFee.Mul64(outputSize)

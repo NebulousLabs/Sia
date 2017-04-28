@@ -109,8 +109,8 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 		// Add two scans to the scan history. Two are needed because the scans
 		// are forward looking, but we want this first scan to represent as
 		// much as one week of uptime or downtime.
-		earliestStartTime := time.Now().Add(time.Hour * 7 * 24 * -1) // Permit up to a week of starting uptime or downtime.
-		suggestedStartTime := time.Now().Add(time.Minute * 10 * time.Duration(hdb.blockHeight-entry.FirstSeen) * -1)
+		earliestStartTime := time.Now().Add(time.Hour * 7 * 24 * -1)                                                   // Permit up to a week of starting uptime or downtime.
+		suggestedStartTime := time.Now().Add(time.Minute * 10 * time.Duration(hdb.blockHeight-entry.FirstSeen+1) * -1) // Add one to the FirstSeen in case FirstSeen is this block, guarantees incrementing order.
 		if suggestedStartTime.Before(earliestStartTime) {
 			suggestedStartTime = earliestStartTime
 		}
@@ -122,20 +122,35 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 		if newEntry.ScanHistory[len(newEntry.ScanHistory)-1].Success && netErr != nil {
 			hdb.log.Debugf("Host %v is being downgraded from an online host to an offline host: %v\n", newEntry.PublicKey.String(), netErr)
 		}
-		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: time.Now(), Success: netErr == nil})
+
+		// Make sure that the current time is after the timestamp of the
+		// previous scan. It may not be if the system clock has changed. This
+		// will prevent the sort-check sanity checks from triggering.
+		newTimestamp := time.Now()
+		prevTimestamp := newEntry.ScanHistory[len(newEntry.ScanHistory)-1].Timestamp
+		if !newTimestamp.After(prevTimestamp) {
+			newTimestamp = prevTimestamp.Add(time.Second)
+		}
+
+		// Before appending, make sure that the scan we just performed is
+		// timestamped after the previous scan performed. It may not be if the
+		// system clock has changed.
+		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: newTimestamp, Success: netErr == nil})
 	}
 
-	// If the host's earliest scan is more than a month old and there is no
-	// recent uptime, mark the host for deletion.
+	// Check whether any of the recent scans demonstrate uptime. The pruning and
+	// compression of the history ensure that there are only relatively recent
+	// scans represented.
 	var recentUptime bool
-	for _, scan := range entry.ScanHistory {
+	for _, scan := range newEntry.ScanHistory {
 		if scan.Success {
 			recentUptime = true
 		}
 	}
 
 	// If the host has been offline for too long, delete the host from the
-	// hostdb.
+	// hostdb. Only delete if there have been enough scans over a long enough
+	// period to be confident that the host really is offline for good.
 	if time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime && !recentUptime && len(newEntry.ScanHistory) >= minScans {
 		err := hdb.hostTree.Remove(newEntry.PublicKey)
 		if err != nil {
@@ -150,7 +165,7 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 	// Compress any old scans into the historic values.
 	for len(newEntry.ScanHistory) > minScans && time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime {
 		timePassed := newEntry.ScanHistory[1].Timestamp.Sub(newEntry.ScanHistory[0].Timestamp)
-		if newEntry.ScanHistory[1].Success {
+		if newEntry.ScanHistory[0].Success {
 			newEntry.HistoricUptime += timePassed
 		} else {
 			newEntry.HistoricDowntime += timePassed

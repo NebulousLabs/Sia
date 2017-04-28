@@ -101,7 +101,7 @@ hosts
 // Duration of contracts formed. Must be nonzero.
 period // block height
 
-// Renew window specifies how many blocks before the expriation of the current
+// Renew window specifies how many blocks before the expiration of the current
 // contracts the renter will wait before renewing the contracts. A smaller
 // renew window means that Sia must be run more frequently, but also means
 // fewer total transaction fees. Storage spending is not affected by the renew

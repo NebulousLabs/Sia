@@ -19,7 +19,7 @@ import (
 
 var (
 	// recommendedHosts is the number of hosts that the renter will form
-	// contracts with if the value is not specified explicity in the call to
+	// contracts with if the value is not specified explicitly in the call to
 	// SetSettings.
 	recommendedHosts = build.Select(build.Var{
 		Standard: uint64(50),

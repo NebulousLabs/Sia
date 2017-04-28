@@ -45,7 +45,7 @@ func (h *Host) managedAnnounce(addr modules.NetAddress) error {
 	// Create a transaction, with a fee, that contains the full announcement.
 	txnBuilder := h.wallet.StartTransaction()
 	_, fee := h.tpool.FeeEstimation()
-	fee = fee.Mul64(500) // Estimated txn size (in bytes) of a host announcement.
+	fee = fee.Mul64(600) // Estimated txn size (in bytes) of a host announcement.
 	err = txnBuilder.FundSiacoins(fee)
 	if err != nil {
 		txnBuilder.Drop()

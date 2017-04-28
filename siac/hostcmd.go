@@ -133,23 +133,6 @@ func hostcmd() {
 		die("Could not fetch storage info:", err)
 	}
 
-	// Determine the competitive price string.
-	ah := new(api.HostdbActiveGET)
-	var competitivePrice string
-	err = getAPI("/hostdb/active?numhosts=32", ah)
-	if err != nil || len(ah.Hosts) == 0 {
-		competitivePrice = "Unavailable"
-	} else {
-		var sum types.Currency
-		for _, host := range ah.Hosts {
-			sum = sum.Add(host.StoragePrice)
-		}
-
-		// Divide by the number of hosts to get the average price, and then
-		// trim 5% to present what would be a competitive edge.
-		competitivePrice = currencyUnits(sum.Div64(uint64(len(ah.Hosts))).MulFloat(0.95).Mul(modules.BlockBytesPerMonthTerabyte))
-	}
-
 	es := hg.ExternalSettings
 	fm := hg.FinancialMetrics
 	is := hg.InternalSettings
@@ -181,10 +164,21 @@ func hostcmd() {
 		netaddr += " (manually specified)"
 	}
 
+	var connectabilityString string
+	if hg.WorkingStatus == "working" {
+		connectabilityString = "Host appears to be working."
+	} else if hg.WorkingStatus == "not working" && hg.ConnectabilityStatus == "connectable" {
+		connectabilityString = "Nobody is connecting to host. Try re-announcing."
+	} else if hg.WorkingStatus == "checking" || hg.ConnectabilityStatus == "checking" {
+		connectabilityString = "Host is checking status (takes a few minues)."
+	} else {
+		connectabilityString = "Host is not connectable (re-checks every few minutes)."
+	}
+
 	if hostVerbose {
 		// describe net address
 		fmt.Printf(`General Info:
-	Estimated Competitive Price: %v
+	Connectability Status: %v
 
 Host Internal Settings:
 	acceptingcontracts:   %v
@@ -230,7 +224,7 @@ RPC Stats:
 	Settings Calls:     %v
 	FormContract Calls: %v
 `,
-			competitivePrice,
+			connectabilityString,
 
 			yesNo(is.AcceptingContracts), periodUnits(is.MaxDuration),
 			filesizeUnits(int64(is.MaxDownloadBatchSize)),
@@ -267,18 +261,18 @@ RPC Stats:
 			nm.FormContractCalls)
 	} else {
 		fmt.Printf(`Host info:
-	Estimated Competitive Price: %v
+	Connectability Status: %v
 
 	Storage:      %v (%v used)
 	Price:        %v / TB / Month
 	Max Duration: %v Weeks
 
-	Accepting Contracts: %v
-	Anticipated Revenue: %v
-	Locked Collateral:   %v
-	Revenue:             %v
+	Accepting Contracts:  %v
+	Anticipated Revenue:  %v
+	Locked Collateral:    %v
+	Revenue:              %v
 `,
-			competitivePrice,
+			connectabilityString,
 
 			filesizeUnits(int64(totalstorage)),
 			filesizeUnits(int64(totalstorage-storageremaining)), price,

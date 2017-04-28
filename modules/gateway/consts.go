@@ -26,6 +26,9 @@ const (
 	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
 	// pre-hardfork.
 	minAcceptableVersion = "0.4.0"
+
+	// saveFrequency defines how often the gateway saves its persistence.
+	saveFrequency = time.Minute * 2
 )
 
 var (
@@ -68,6 +71,15 @@ var (
 		Standard: 5 * time.Second,
 		Dev:      3 * time.Second,
 		Testing:  500 * time.Millisecond,
+	}).(time.Duration)
+
+	// peerRPCDelay defines the amount of time waited between each RPC accepted
+	// from a peer. Without this delay, a peer can force us to spin up thousands
+	// of goroutines per second.
+	peerRPCDelay = build.Select(build.Var{
+		Standard: 3 * time.Second,
+		Dev:      1 * time.Second,
+		Testing:  25 * time.Millisecond,
 	}).(time.Duration)
 
 	// pruneNodeListLen defines the number of nodes that the gateway must have
@@ -177,7 +189,7 @@ var (
 
 	// the gateway will abort a connection attempt after this long
 	dialTimeout = build.Select(build.Var{
-		Standard: 2 * time.Minute,
+		Standard: 3 * time.Minute,
 		Dev:      20 * time.Second,
 		Testing:  500 * time.Millisecond,
 	}).(time.Duration)
@@ -185,8 +197,8 @@ var (
 	// rpcStdDeadline defines the standard deadline that should be used for all
 	// incoming RPC calls.
 	rpcStdDeadline = build.Select(build.Var{
-		Standard: 10 * time.Minute,
-		Dev:      5 * time.Minute,
-		Testing:  90 * time.Second,
+		Standard: 5 * time.Minute,
+		Dev:      3 * time.Minute,
+		Testing:  15 * time.Second,
 	}).(time.Duration)
 )

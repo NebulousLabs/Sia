@@ -19,6 +19,7 @@ var (
 	// Flags.
 	addr              string // override default API address
 	initPassword      bool   // supply a custom password when creating a wallet
+	initForce         bool   // destroy and reencrypt the wallet on init if it already exists
 	hostVerbose       bool   // display additional host info
 	renterShowHistory bool   // Show download history in addition to download queue.
 	renterListVerbose bool   // Show additional info about uploaded files.
@@ -265,6 +266,8 @@ func main() {
 		walletLoadCmd, walletLockCmd, walletSeedsCmd, walletSendCmd, walletSweepCmd,
 		walletBalanceCmd, walletTransactionsCmd, walletUnlockCmd)
 	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Prompt for a custom password")
+	walletInitCmd.Flags().BoolVarP(&initForce, "force", "", false, "destroy the existing wallet and re-encrypt")
+	walletInitSeedCmd.Flags().BoolVarP(&initForce, "force", "", false, "destroy the existing wallet")
 	walletLoadCmd.AddCommand(walletLoad033xCmd, walletLoadSeedCmd, walletLoadSiagCmd)
 	walletSendCmd.AddCommand(walletSendSiacoinsCmd, walletSendSiafundsCmd)
 
@@ -276,6 +279,7 @@ func main() {
 		renterPricesCmd)
 
 	renterContractsCmd.AddCommand(renterContractsViewCmd)
+	renterAllowanceCmd.AddCommand(renterAllowanceCancelCmd)
 
 	renterCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")

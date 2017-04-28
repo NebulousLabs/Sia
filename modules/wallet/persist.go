@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
@@ -65,6 +66,9 @@ func (w *Wallet) openDB(filename string) (err error) {
 		}
 		if wb.Get(keySpendableKeyFiles) == nil {
 			wb.Put(keySpendableKeyFiles, encoding.Marshal([]spendableKeyFile{}))
+		}
+		if wb.Get(keySiafundPool) == nil {
+			wb.Put(keySiafundPool, encoding.Marshal(types.ZeroCurrency))
 		}
 
 		// check whether wallet is encrypted
@@ -152,7 +156,7 @@ var compat112Meta = persist.Metadata{
 // a wallet.db database.
 func (w *Wallet) convertPersistFrom112To120(dbFilename, compatFilename string) error {
 	var data compat112Persist
-	err := persist.LoadFile(compat112Meta, &data, compatFilename)
+	err := persist.LoadJSON(compat112Meta, &data, compatFilename)
 	if err != nil {
 		return err
 	}

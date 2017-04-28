@@ -47,8 +47,8 @@ func TestHostAndRentVanilla(t *testing.T) {
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
-	testPeriod := "10"
-	testPeriodInt := 10
+	testPeriod := "20"
+	testPeriodInt := 20
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
@@ -172,7 +172,7 @@ func TestHostAndRentVanilla(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 200)
 	}
 
 	// Check that the host was able to get the file contract confirmed on the
@@ -191,7 +191,7 @@ func TestHostAndRentVanilla(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 200)
 	}
 
 	success := false

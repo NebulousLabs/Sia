@@ -5,6 +5,7 @@ package transactionpool
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -36,7 +37,10 @@ var (
 	errLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
 	errEmptySet            = errors.New("transaction set is empty")
 
-	TransactionMinFee = types.SiacoinPrecision.Mul64(2)
+	// TransactionMinFee defines the minimum fee required for a transaction in
+	// order for it to be accepted if there is already more than
+	// TransactionPoolSizeForFee transactions in the transaction pool.
+	TransactionMinFee = types.SiacoinPrecision.Div64(3)
 
 	// relayTransactionSetTimeout establishes the timeout for a relay
 	// transaction set call.
@@ -237,7 +241,18 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 		tp.knownObjects[ObjectID(diff.ID)] = setID
 	}
 	tp.transactionSetDiffs[setID] = cc
-	tp.transactionListSize += len(encoding.Marshal(superset))
+	tsetSize := len(encoding.Marshal(superset))
+	tp.transactionListSize += tsetSize
+
+	// debug logging
+	if build.DEBUG {
+		txLogs := ""
+		for i, t := range superset {
+			txLogs += fmt.Sprintf("superset transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
+		}
+		tp.log.Debugf("accepted transaction superset %v, size: %vB\ntpool size is %vB after accpeting transaction superset\ntransactions: \n%v\n", setID, tsetSize, tp.transactionListSize, txLogs)
+	}
+
 	return nil
 }
 
@@ -294,7 +309,17 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 		tp.knownObjects[oid] = setID
 	}
 	tp.transactionSetDiffs[setID] = cc
-	tp.transactionListSize += len(encoding.Marshal(ts))
+	tsetSize := len(encoding.Marshal(ts))
+	tp.transactionListSize += tsetSize
+
+	// debug logging
+	if build.DEBUG {
+		txLogs := ""
+		for i, t := range ts {
+			txLogs += fmt.Sprintf("transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
+		}
+		tp.log.Debugf("accepted transaction set %v, size: %vB\ntpool size is %vB after accpeting transaction set\ntransactions: \n%v\n", setID, tsetSize, tp.transactionListSize, txLogs)
+	}
 	return nil
 }
 

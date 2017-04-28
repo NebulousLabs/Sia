@@ -154,10 +154,12 @@ type Host struct {
 
 	// Host transient fields - these fields are either determined at startup or
 	// otherwise are not critical to always be correct.
-	autoAddress      modules.NetAddress // Determined using automatic tooling in network.go
-	financialMetrics modules.HostFinancialMetrics
-	settings         modules.HostInternalSettings
-	revisionNumber   uint64
+	autoAddress          modules.NetAddress // Determined using automatic tooling in network.go
+	financialMetrics     modules.HostFinancialMetrics
+	settings             modules.HostInternalSettings
+	revisionNumber       uint64
+	workingStatus        modules.HostWorkingStatus
+	connectabilityStatus modules.HostConnectabilityStatus
 
 	// A map of storage obligations that are currently being modified. Locks on
 	// storage obligations can be long-running, and each storage obligation can
@@ -313,6 +315,23 @@ func (h *Host) ExternalSettings() modules.HostExternalSettings {
 	}
 	defer h.tg.Done()
 	return h.externalSettings()
+}
+
+// WorkingStatus returns the working state of the host, where working is
+// defined as having received more than workingStatusThreshold settings calls
+// over the period of workingStatusFrequency.
+func (h *Host) WorkingStatus() modules.HostWorkingStatus {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.workingStatus
+}
+
+// ConnectabilityStatus returns the connectability state of the host, whether
+// the host can connect to itself on its configured netaddress.
+func (h *Host) ConnectabilityStatus() modules.HostConnectabilityStatus {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.connectabilityStatus
 }
 
 // FinancialMetrics returns information about the financial commitments,

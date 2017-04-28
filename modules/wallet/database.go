@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -66,6 +67,7 @@ var (
 	keyConsensusHeight        = []byte("keyConsensusHeight")
 	keySpendableKeyFiles      = []byte("keySpendableKeyFiles")
 	keyAuxiliarySeedFiles     = []byte("keyAuxiliarySeedFiles")
+	keySiafundPool            = []byte("keySiafundPool")
 
 	errNoKey = errors.New("key does not exist")
 )
@@ -104,6 +106,32 @@ func (w *Wallet) syncDB() {
 	if err != nil {
 		w.log.Severe("ERROR: failed to start database update:", err)
 	}
+}
+
+// dbReset wipes and reinitializes a wallet database.
+func dbReset(tx *bolt.Tx) error {
+	for _, bucket := range dbBuckets {
+		err := tx.DeleteBucket(bucket)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucket(bucket)
+		if err != nil {
+			return err
+		}
+	}
+
+	// reinitialize the database with default values
+	wb := tx.Bucket(bucketWallet)
+	wb.Put(keyUID, fastrand.Bytes(len(uniqueID{})))
+	wb.Put(keyConsensusHeight, encoding.Marshal(uint64(0)))
+	wb.Put(keyAuxiliarySeedFiles, encoding.Marshal([]seedFile{}))
+	wb.Put(keySpendableKeyFiles, encoding.Marshal([]spendableKeyFile{}))
+	dbPutConsensusHeight(tx, 0)
+	dbPutConsensusChangeID(tx, modules.ConsensusChangeBeginning)
+	dbPutSiafundPool(tx, types.ZeroCurrency)
+
+	return nil
 }
 
 // dbPut is a helper function for storing a marshalled key/value pair.
@@ -277,4 +305,15 @@ func dbGetConsensusHeight(tx *bolt.Tx) (height types.BlockHeight, err error) {
 // dbPutConsensusHeight stores the height that the wallet has scanned to.
 func dbPutConsensusHeight(tx *bolt.Tx, height types.BlockHeight) error {
 	return tx.Bucket(bucketWallet).Put(keyConsensusHeight, encoding.Marshal(height))
+}
+
+// dbGetSiafundPool returns the value of the siafund pool.
+func dbGetSiafundPool(tx *bolt.Tx) (pool types.Currency, err error) {
+	err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keySiafundPool), &pool)
+	return
+}
+
+// dbPutSiafundPool stores the value of the siafund pool.
+func dbPutSiafundPool(tx *bolt.Tx, pool types.Currency) error {
+	return tx.Bucket(bucketWallet).Put(keySiafundPool, encoding.Marshal(pool))
 }
