@@ -65,6 +65,7 @@ type DownloadInfo struct {
 // DownloadWriter provides an interface which all output writers have to implement.
 type DownloadWriter interface {
 	WriteAt(b []byte, off int64) (int, error)
+	String() string
 }
 
 // DownloadFileWriter is a file-backed implementation of DownloadWriter.
@@ -97,49 +98,66 @@ func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
 	return r, err
 }
 
+// String returns the destination of the DownloadFileWriter as a string.
+func (dw *DownloadFileWriter) String() string {
+	return dw.Location
+}
+
 // DownloadHttpWriter is a http response writer-backed implementation of DownloadWriter.
 // The writer writes all content that is written to the current `offset` directly to the ResponseWriter,
 // and buffers all content that is written at other offsets.
 // After every write to the ResponseWriter the `offset` and `length` fields are updated, and buffer content written until
 type DownloadHttpWriter struct {
 	w              http.ResponseWriter
-	offset         int         // The index in the original file of the last byte written to the response writer.
-	firstByteIndex int         // The index of the first byte in the original file.
-	length         int         // The total size of the slice to be written.
-	buffer         []byte      // Buffer used for storing the chunks until download finished.
-	offsets        map[int]int // Map from offset to length of chunk.
+	offset         int            // The index in the original file of the last byte written to the response writer.
+	firstByteIndex int            // The index of the first byte in the original file.
+	length         int            // The total size of the slice to be written.
+	buffer         map[int][]byte // Buffer used for storing the chunks until download finished.
 }
 
 // NewDownloadHttpWriter creates a new instance of http.ResponseWriter backed DownloadWriter.
 func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *DownloadHttpWriter {
 	return &DownloadHttpWriter{
 		w:              w,
-		offset:         int(offset),
-		firstByteIndex: int(offset),
+		offset:         0,           // Current offset in the output file.
+		firstByteIndex: int(offset), // Index of first byte in original file.
 		length:         int(length),
-		buffer:         make([]byte, length),
-		offsets:        make(map[int]int),
+		buffer:         make(map[int][]byte),
 	}
 }
 
 // WriteAt buffers parts of the file until the entire file can be
 // flushed to the client. Returns the number of bytes written or an error.
 func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
-	blen := len(b)
-
 	// Write bytes to buffer.
 	offsetInBuffer := int(off) - dw.firstByteIndex
-	copy(dw.buffer[offsetInBuffer:blen+offsetInBuffer], b)
-	dw.offsets[int(off)] = int(blen)
+	dw.buffer[offsetInBuffer] = b
 
-	dw.length -= blen
+	// Send all chunks to the client that can be sent.
+	var totalDataSend = 0
+	for {
+		data, exists := dw.buffer[dw.offset]
+		if exists {
+			// Send data to client.
+			dw.w.Write(data)
 
-	// If last chunk received, flush output.
-	if dw.length == 0 {
-		return dw.w.Write(dw.buffer)
+			// Remove chunk from map.
+			delete(dw.buffer, dw.offset)
+
+			// Increment offset to point to the beginning of the next chunk.
+			dw.offset += len(data)
+			totalDataSend += len(data)
+		} else {
+			break
+		}
 	}
 
-	return 0, nil
+	return totalDataSend, nil
+}
+
+// String returns the destination of the DownloadHttpWriter as a string.
+func (dw *DownloadHttpWriter) String() string {
+	return "httpresp"
 }
 
 // FileUploadParams contains the information used by the Renter to upload a
@@ -344,9 +362,6 @@ type Renter interface {
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
 
-	// GetFile returns information on the requested file name. If file does not exist (nil, false) is returned.
-	GetFile(name string) (*FileInfo, bool)
-
 	// Host provides the DB entry and score breakdown for the requested host.
 	Host(pk types.SiaPublicKey) (HostDBEntry, bool)
 
@@ -387,10 +402,12 @@ type Renter interface {
 
 // RenterDownloadParameters contains all parameters that can be passed to the `/download` endpoint.
 type RenterDownloadParameters struct {
-	Async    bool
-	DlWriter DownloadWriter
-	Httpresp bool
-	Length   uint64
-	Offset   uint64
-	Siapath  string
+	Async        bool
+	DlWriter     DownloadWriter
+	Httpresp     bool
+	Length       uint64
+	LengthPassed bool
+	Offset       uint64
+	OffsetPassed bool
+	Siapath      string
 }

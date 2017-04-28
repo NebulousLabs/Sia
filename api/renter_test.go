@@ -1,23 +1,24 @@
 package api
 
 import (
+	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"bytes"
-	"fmt"
+	"errors"
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
-	"os"
 )
 
 const (
@@ -119,12 +120,7 @@ func waitForDownloadToComplete(t *testing.T, st *serverTester, siapath string, e
 	}
 }
 
-func setupDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp bool) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-
+func runDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp bool) error {
 	ulSiaPath := "test.dat"
 	st, path := setupTestDownload(t, int(filesize), ulSiaPath, true)
 	defer st.server.Close()
@@ -147,7 +143,7 @@ func setupDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp
 		// Make request.
 		resp, err := HttpGET("http://" + st.server.listener.Addr().String() + dlURL)
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
 		defer resp.Body.Close()
 
@@ -155,26 +151,26 @@ func setupDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp
 
 		_, readErr := buf.ReadFrom(resp.Body)
 		if readErr != nil {
-			t.Fatal(readErr)
+			return readErr
 		}
 		downbytes = buf.Bytes()
 
 		// Check size.
 		if int64(len(downbytes)) != length {
-			t.Fatalf("Downloaded content has incorrect size: %d, %d expected.", len(downbytes), length)
+			return errors.New(fmt.Sprintf("Downloaded content has incorrect size: %d, %d expected.", len(downbytes), length))
 		}
 	} else {
 		dlURL += "&destination=" + downpath
 		err := st.getAPI(dlURL, nil)
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
 		waitForDownloadToComplete(t, st, ulSiaPath, "/renter/download with offset failed.") // TODO: Fix error message.
 
 		df, _ := os.Open(downpath) // Downloaded file.
 		fInfo, _ := df.Stat()
 		if int64(fInfo.Size()) != length {
-			t.Fatalf("Downloaded file has incorrect size: %d, %d expected.", fInfo.Size(), length)
+			return errors.New(fmt.Sprintf("Downloaded file has incorrect size: %d, %d expected.", fInfo.Size(), length))
 		}
 		downbytes = make([]byte, length)
 		df.Read(downbytes)
@@ -182,8 +178,10 @@ func setupDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp
 
 	eq := bytes.Compare(b, downbytes)
 	if eq != 0 {
-		t.Fatalf("Downloaded content does not equal expected. eq=%d", eq)
+		return errors.New(fmt.Sprintf("Downloaded content does not equal expected. eq=%d", eq))
 	}
+
+	return nil
 }
 
 // TestRenterDownloadError tests that the /renter/download route sets the download's error field if it fails.
@@ -216,107 +214,55 @@ func TestRenterDownloadError(t *testing.T) {
 	}
 }
 
-// TESTS FOR FILE-BACKED DOWNLOADS.
-func TestRenterDownloadOffsetSingleChunk(t *testing.T) {
-	setupDownloadTest(t, int64(modules.SectorSize), 40, int64(modules.SectorSize)-40, false)
-}
-
-func TestRenterDownloadOffsetTwoChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize * 2)
-	setupDownloadTest(t, filesize, 20, filesize-20, false)
-}
-
-func TestRenterDownloadOffsetThreeChunk(t *testing.T) {
-	filesize := int64(float64(modules.SectorSize) * 2.4)
-	setupDownloadTest(t, filesize, 20, filesize-20, false)
-}
-
-func TestRenterDownloadShortLengthSingleChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize)
-	setupDownloadTest(t, filesize, 0, filesize/2, false)
-}
-
-func TestRenterDownloadShortLengthAndOffsetSingleChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize)
-	setupDownloadTest(t, filesize, filesize/4, filesize/2, false)
-}
-
-func TestRenterDownloadShortLengthTwoChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize * 2)
-	setupDownloadTest(t, filesize, 0, int64(float64(filesize)*0.75), false)
-}
-
-func TestRenterDownloadShortLengthThreeChunkInThirdChunk(t *testing.T) {
-	filesize := int64(float64(modules.SectorSize) * 2.7)
-	setupDownloadTest(t, filesize, 0, int64(2.2*float64(modules.SectorSize)), false)
-}
-
-func TestRenterDownloadShortLengthThreeChunkInSecondChunk(t *testing.T) {
-	filesize := int64(float64(modules.SectorSize) * 2.7)
-	setupDownloadTest(t, filesize, 0, int64(1.6*float64(modules.SectorSize)), false)
-}
-
-func TestRenterDownloadShortLengthMultiChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize * 5)
-	setupDownloadTest(t, filesize, 0, int64(float64(filesize)*0.75), false)
-}
-
-func TestRenterDownloadShortLengthAndOffsetTwoChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize * 2)
-	setupDownloadTest(t, filesize, 50, int64(float64(filesize)*0.75), false)
-}
-
-func TestRenterDownloadShortLengthAndOffsetThreeChunkInSecondChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize * 3)
-	setupDownloadTest(t, filesize, 50, int64(float64(filesize)*0.5), false)
-}
-
-func TestRenterDownloadShortLengthAndOffsetThreeChunkInThirdChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize * 3)
-	setupDownloadTest(t, filesize, 50, int64(float64(filesize)*0.75), false)
-}
-
-// TESTS FOR HTTP RESPONSE BODY BACKED DOWNLOADS.
-func TestRenterDownloadHttpRespOffsetSingleChunk(t *testing.T) {
-	setupDownloadTest(t, int64(modules.SectorSize), 40, int64(modules.SectorSize)-40, true)
-}
-
-func TestRenterDownloadHttpRespOffsetTwoChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize) * 2
-	setupDownloadTest(t, filesize, 40, filesize-40, true)
-}
-
-func TestRenterDownloadHttpRespOffsetManyChunks(t *testing.T) {
-	filesize := int64(modules.SectorSize) * 5
-	setupDownloadTest(t, filesize, 40, filesize-40, true)
-}
-
-func TestRenterDownloadHttpRespOffsetAndLengthSingleChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize)
-	setupDownloadTest(t, filesize, 40, 4*filesize/5, true)
-}
-
-func TestRenterDownloadHttpRespOffsetAndLengthTwoChunk(t *testing.T) {
-	filesize := int64(modules.SectorSize) * 2
-	setupDownloadTest(t, filesize, 80, 3*filesize/4, true)
-}
-
-func TestRenterDownloadHttpRespOffsetAndLengthManyChunks(t *testing.T) {
-	filesize := int64(modules.SectorSize) * 5
-	setupDownloadTest(t, filesize, 150, 3*filesize/4, true)
-}
-
-func TestRenterDownloadHttpRespOffsetAndLengthManyChunksSubsetOfChunks(t *testing.T) {
-	filesize := int64(modules.SectorSize) * 5
-	setupDownloadTest(t, filesize, 150, 1*filesize/4, true)
-}
-
-func setupDownloadParamTest(t *testing.T, useLength bool, length int, useOffset bool, offset, filesize int) error {
+// TestValidDownloads tests valid and boundary parameter combinations.
+func TestValidDownloads(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
 
+	blk := int64(modules.SectorSize)
+
+	testParams := []struct {
+		filesize,
+		offset,
+		length int64
+		useHttpResp bool
+		testName    string
+	}{
+		// File-backed tests.
+		{blk, 40, blk - 40, false, "OffsetSingleChunk"},
+		{blk * 2, 20, blk*2 - 20, false, "OffsetTwoChunk"},
+		{int64(float64(blk) * 2.4), 20, int64(float64(blk)*2.4) - 20, false, "OffsetThreeChunk"},
+		{blk, 0, blk / 2, false, "ShortLengthSingleChunk"},
+		{blk, blk / 4, blk / 2, false, "ShortLengthAndOffsetSingleChunk"},
+		{blk * 2, 0, int64(float64(blk) * 2 * 0.75), false, "ShortLengthTwoChunk"},
+		{int64(float64(blk) * 2.7), 0, int64(2.2 * float64(blk)), false, "ShortLengthThreeChunkInThirdChunk"},
+		{int64(float64(blk) * 2.7), 0, int64(1.6 * float64(blk)), false, "ShortLengthThreeChunkInSecondChunk"},
+		{blk * 5, 0, int64(float64(blk*5) * 0.75), false, "ShortLengthMultiChunk"},
+		{blk * 2, 50, int64(float64(blk*2) * 0.75), false, "ShortLengthAndOffsetTwoChunk"},
+		{blk * 3, 50, int64(float64(blk*3) * 0.5), false, "ShortLengthAndOffsetThreeChunkInSecondChunk"},
+		{blk * 3, 50, int64(float64(blk*3) * 0.75), false, "ShortLengthAndOffsetThreeChunkInThirdChunk"},
+
+		// Http response tests.
+		{blk, 40, blk - 40, true, "HttpRespOffsetSingleChunk"},
+		{blk * 2, 40, blk*2 - 40, true, "HttpRespOffsetTwoChunk"},
+		{blk * 5, 40, blk*5 - 40, true, "HttpRespOffsetManyChunks"},
+		{blk, 40, 4 * blk / 5, true, "RespOffsetAndLengthSingleChunk"},
+		{blk * 2, 80, 3 * (blk * 2) / 4, true, "RespOffsetAndLengthTwoChunk"},
+		{blk * 5, 150, 3 * (blk * 5) / 4, true, "HttpRespOffsetAndLengthManyChunks"},
+		{blk * 5, 150, blk * 5 / 4, true, "HttpRespOffsetAndLengthManyChunksSubsetOfChunks"},
+	}
+
+	for _, params := range testParams {
+		err := runDownloadTest(t, params.filesize, params.offset, params.length, params.useHttpResp)
+		if err != nil {
+			t.Fatalf("Test %s failed: %s", params.testName, err.Error())
+		}
+	}
+}
+
+func setupDownloadParamTest(t *testing.T, useLength bool, length int, useOffset bool, offset, filesize int) error {
 	ulSiaPath := "test.dat"
 
 	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
@@ -335,67 +281,35 @@ func setupDownloadParamTest(t *testing.T, useLength bool, length int, useOffset 
 	return st.getAPI(dlURL, nil)
 }
 
-func TestRenterDownloadLengthOnlyError(t *testing.T) {
-	err := setupDownloadParamTest(t, true, 10, false, 0, 1e4)
-
-	if err == nil {
-		t.Fatal("/download not prompting error when only passing length.")
+func TestInvalidDownloadParameters(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
 	}
-}
+	t.Parallel()
 
-func TestRenterDownloadOffsetOnlyError(t *testing.T) {
-	err := setupDownloadParamTest(t, false, 0, true, 10, 1e4)
-
-	if err == nil {
-		t.Fatal("/download not prompting error when only passing offset.")
+	testParams := []struct {
+		useLength bool
+		length    int
+		useOffset bool
+		offset    int
+		filesize  int
+		errorMsg  string
+	}{
+		{true, 10, false, 0, 1e4, "/download not prompting error when only passing length."},
+		{false, 0, true, 10, 1e4, "/download not prompting error when only passing offset."},
+		{true, 0, true, -10, 1e4, "/download not prompting error when passing negative offset."},
+		{true, 0, true, 1e4, 1e4, "/download not prompting error when passing offset equal to filesize."},
+		{true, 1e4 + 1, true, 0, 1e4, "/download not prompting error when passing length exceeding filesize."},
+		{true, 1e4 + 11, true, 10, 1e4, "/download not prompting error when passing length exceeding filesize with non-zero offset."},
+		{true, 0, true, 0, 1e4, "/download not prompting error when passing length = 0."},
+		{true, -1, true, 0, 1e4, "/download not prompting error when passing negative length."},
 	}
-}
 
-func TestRenterDownloadOffsetNegativeError(t *testing.T) {
-	err := setupDownloadParamTest(t, true, 0, true, -10, 1e4)
-
-	if err == nil {
-		t.Fatal("/download not prompting error when passing negative offset.")
-	}
-}
-
-func TestRenterDownloadOffsetGreaterEqualThanFilesizeError(t *testing.T) {
-	err := setupDownloadParamTest(t, true, 0, true, 1e4, 1e4)
-
-	if err == nil {
-		t.Fatal("/download not prompting error when passing offset equal to filesize.")
-	}
-}
-
-func TestRenterDownloadLengthGreaterThanFilesizeOffsetZeroError(t *testing.T) {
-	err := setupDownloadParamTest(t, true, 1e4+1, true, 0, 1e4)
-
-	if err == nil {
-		t.Fatal("/download not prompting error when passing length exceeding filesize.")
-	}
-}
-
-func TestRenterDownloadLengthGreaterThanFilesizeOffsetNonZeroError(t *testing.T) {
-	err := setupDownloadParamTest(t, true, 1e4+11, true, 10, 1e4)
-
-	if err == nil {
-		t.Fatal("/download not prompting error when passing length exceeding filesize with non-zero offset.")
-	}
-}
-
-func TestRenterDownloadLengthZeroError(t *testing.T) {
-	err := setupDownloadParamTest(t, true, 0, true, 0, 1e4)
-
-	if err == nil {
-		t.Fatal("/download not prompting error when passing length = 0.")
-	}
-}
-
-func TestRenterDownloadLengthNegativeError(t *testing.T) {
-	err := setupDownloadParamTest(t, true, -1, true, 0, 1e4)
-
-	if err == nil {
-		t.Fatal("/download not prompting error when passing negative length.")
+	for _, params := range testParams {
+		err := setupDownloadParamTest(t, params.useLength, params.length, params.useOffset, params.offset, params.filesize)
+		if err == nil {
+			t.Fatal(params.errorMsg)
+		}
 	}
 }
 
@@ -420,9 +334,46 @@ func TestRenterDownloadAsyncAndHttpRespError(t *testing.T) {
 	}
 }
 
-// TODO: Factor out relevant parts from other test.
-// TODO: Add tests for Async
-// TODO: Add tests for httpresp.
+func TestRenterDownloadAsyncAndNotDestinationError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	filesize := 1e4
+	ulSiaPath := "test.dat"
+
+	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer st.server.Close()
+
+	// Download the original file from offset 40 and length 10.
+	dlURL := fmt.Sprintf("/renter/download/%s?async=true", ulSiaPath)
+	err := st.getAPI(dlURL, nil)
+	if err == nil {
+		t.Fatal("/download not prompting error when async is specified but destination is empty.")
+	}
+}
+
+func TestRenterDownloadHttpRespAndDestinationError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	filesize := 1e4
+	ulSiaPath := "test.dat"
+
+	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer st.server.Close()
+
+	// Download the original file from offset 40 and length 10.
+	fname := "test.dat"
+	dlURL := fmt.Sprintf("/renter/download/%s?destination=%shttpresp=true", ulSiaPath, fname)
+	err := st.getAPI(dlURL, nil)
+	if err == nil {
+		t.Fatal("/download not prompting error when httpresp is specified and destination is non-empty.")
+	}
+}
 
 // TestRenterAsyncDownloadError tests that the /renter/asyncdownload route sets the download's error field if it fails.
 func TestRenterAsyncDownloadError(t *testing.T) {
@@ -833,7 +784,8 @@ func TestRenterLoadNonexistent(t *testing.T) {
 	// Try downloading a nonexistent file.
 	downpath := filepath.Join(st.dir, "dnedown.dat")
 	err = st.stdGetAPI("/renter/download/dne?destination=" + downpath)
-	if err == nil || err.Error() != "download failed: no file with that path" {
+	hasPrefix := strings.HasPrefix(err.Error(), "download failed: no file with that path")
+	if err == nil || !hasPrefix {
 		t.Errorf("expected error to be 'download failed: no file with that path'; got %v instead", err)
 	}
 
