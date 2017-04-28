@@ -24,5 +24,5 @@ func mangencmd(path string) {
 	}
 
 
-	doc.GenManTree(rootCmd, header, "/tmp")
+	doc.GenManTree(rootCmd, header, path)
 }
