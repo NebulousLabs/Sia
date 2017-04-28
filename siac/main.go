@@ -11,7 +11,7 @@ import (
 
 	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
-
+	"github.com/spf13/cobra/doc"
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
 )
@@ -289,10 +289,17 @@ func main() {
 	root.AddCommand(consensusCmd)
 
 	root.AddCommand(bashcomplCmd)
+	root.AddCommand(mangenCmd)
 
 	// parse flags
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
 
+	header := &doc.GenManHeader{
+		Title: "MINE",
+		Section: "3",
+	}
+	doc.GenManTree(rootCmd, header, "/home/bjdo/man/")
+	fmt.Print("hello bjdo")
 	// run
 	if err := root.Execute(); err != nil {
 		// Since no commands return errors (all commands set Command.Run instead of
