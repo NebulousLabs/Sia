@@ -9,10 +9,8 @@ var (
 	mangenCmd = &cobra.Command{
 		Use:   "man-generation [path]",
 		Short: "Creates unix style manpages.",
-		Long: "Creates a man pages at the specified " +
-			"directory.\n\n",
-
-		Run: wrap(mangencmd),
+		Long:  "Creates unix style man pages at the specified directory.",
+		Run:   wrap(mangencmd),
 	}
 )
 
@@ -22,7 +20,6 @@ func mangencmd(path string) {
 		Manual:  "siac Manual",
 		Source:  "",
 	}
-
 
 	doc.GenManTree(rootCmd, header, path)
 }
