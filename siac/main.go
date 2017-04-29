@@ -11,6 +11,7 @@ import (
 
 	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
+
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
 )
