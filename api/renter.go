@@ -444,8 +444,7 @@ func (api *API) parseDownloadParameters(w http.ResponseWriter, req *http.Request
 	if len(lengthparam) > 0 {
 		length, err = strconv.ParseUint(lengthparam, 10, 64)
 		if err != nil {
-			return nil, &Error{"could not decode the length as uint64: " +
-				err.Error()}
+			return nil, build.ExtendErr("could not decode the length as uint64: ", err)
 		}
 	}
 	// Verify that if either offset or length have been provided that both were provided.
