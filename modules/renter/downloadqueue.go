@@ -71,6 +71,10 @@ func (r *Renter) Download(p *modules.RenterDownloadParameters) error {
 	}
 }
 
+//func (r *Renter) DownloadChunk(f *file, index, offset, length uint64) ([]byte, error) {
+//	return
+//}
+
 // DownloadQueue returns the list of downloads in the queue.
 func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	lockID := r.mu.RLock()
