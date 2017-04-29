@@ -523,8 +523,8 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	// debug mode.
 	allowanceValues.Set("funds", "0")
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err == nil || err.Error() != contractor.ErrInsufficientAllowance.Error() {
-		t.Errorf("expected error to be %v; got %v", contractor.ErrInsufficientAllowance, err)
+	if err == nil {
+		t.Errorf("expected error to be non-nil; got nil")
 	}
 	// Try a empty period string.
 	allowanceValues.Set("funds", testFunds)

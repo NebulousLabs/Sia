@@ -28,7 +28,6 @@ func TestEditor(t *testing.T) {
 	}
 	c := &Contractor{
 		hdb:       hdb,
-		revising:  make(map[types.FileContractID]bool),
 		contracts: make(map[types.FileContractID]modules.RenterContract),
 	}
 

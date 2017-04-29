@@ -103,9 +103,9 @@ func (c *Contractor) isMissing(contract modules.RenterContract) bool {
 	return lastScan.Sub(lastSuccess) >= missingWindow
 }
 
-// markBadContracts will go through the contractors set of contracts and mark
+// managedMarkBadContracts will go through the contractors set of contracts and mark
 // any of the contracts which are no longer performing well.
-func (c *Contractor) markBadContracts() {
+func (c *Contractor) managedMarkBadContracts() {
 	// The hosts will be compared against the hosts in the hostdb to determine
 	// whether they have an acceptable score or if they should be replaced.
 	// Determine what counts as an acceptable score.
@@ -125,6 +125,9 @@ func (c *Contractor) markBadContracts() {
 	// Adjust the lowest score further down. This gives the hosts wiggle room to
 	// not need to be exactly the best performers in order to be acceptable.
 	lowestScore = lowestScore.Div64(badScoreForgiveness)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	// Check each host for various conditions that would cause them to be
 	contracts := make([]modules.RenterContract, 0, len(c.contracts))
@@ -260,9 +263,7 @@ func (c *Contractor) threadedRepairContracts() {
 
 	// Reveiw the set of contracts held by the contractor, and mark any
 	// contracts whose hosts have fallen out of favor.
-	c.mu.Lock()
-	c.markBadContracts()
-	c.mu.Unlock()
+	c.managedMarkBadContracts()
 
 	// Iterate through the set of contracts and find any that need to be renewed
 	// due to low funds or upcoming expiration.

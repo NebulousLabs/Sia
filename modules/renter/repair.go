@@ -126,11 +126,8 @@ func (r *Renter) addFileToRepairState(rs *repairState, file *file) {
 		// Check whether this contract is offline. Even if the contract is
 		// offline, we want to record that the chunk has attempted to use this
 		// contract.
-		var offline bool
 		renterContract, exists := r.hostContractor.Contract(contract.ID)
-		if exists && renterContract.InGoodStanding {
-			offline = true
-		}
+		offline := !exists || !renterContract.InGoodStanding
 
 		// Scan all of the pieces of the contract.
 		for _, piece := range contract.Pieces {
