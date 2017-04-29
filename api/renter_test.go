@@ -174,6 +174,8 @@ func runDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp b
 		}
 		downbytes = make([]byte, length)
 		df.Read(downbytes)
+		df.Close()
+		os.Remove(downpath)
 	}
 
 	eq := bytes.Compare(b, downbytes)

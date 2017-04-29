@@ -120,7 +120,6 @@ type (
 
 // newSectionDownload initialises and returns a download object for the specified chunk.
 func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID, offset, length uint64) *download {
-	r.log.Println("Chunk download called.")
 	d := &download{}
 	d.initDownload(f, destination)
 
