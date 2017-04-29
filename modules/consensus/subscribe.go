@@ -45,7 +45,7 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 		}
 		for i := len(revertedBlock.SiafundPoolDiffs) - 1; i >= 0; i-- {
 			sfpd := revertedBlock.SiafundPoolDiffs[i]
-			sfpd.Direction = modules.DiffRevert
+			sfpd.Direction = !sfpd.Direction
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
