@@ -525,7 +525,7 @@ func (g *Gateway) managedConnectv120Peer(conn net.Conn, remoteVersion string, re
 	// about duplicates and we have already validated the address by
 	// connecting to it.
 	g.addNode(remoteAddr)
-	return g.save()
+	return g.saveSync()
 }
 
 // managedConnect establishes a persistent connection to a peer, and adds it to
