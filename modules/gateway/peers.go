@@ -440,14 +440,15 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 		},
 		sess: muxado.Client(conn),
 	})
-	// Add the peer to the node list. We can ignore the error: addNode
-	// validates the address and checks for duplicates, but we don't care
-	// about duplicates and we have already validated the address by
-	// connecting to it.
+
+	// Add the peer to the node list and prioritize it for future connections.
+	// NOTE: We can ignore the addNode error: addNode validates the address
+	// and checks for duplicates, but we don't care about duplicates and we
+	// have already validated the address by connecting to it.
 	g.addNode(remoteAddr)
-	// We want to persist the outbound peers.
-	err := g.saveSync()
-	if err != nil {
+	g.prioritizeNode(remoteAddr)
+
+	if err := g.saveSync(); err != nil {
 		g.log.Println("ERROR: Unable to save new outbound peer to gateway:", err)
 	}
 	return nil
@@ -466,28 +467,7 @@ func (g *Gateway) managedConnectv100Peer(conn net.Conn, remoteVersion string, re
 		return err
 	}
 
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.addPeer(&peer{
-		Peer: modules.Peer{
-			Inbound:    false,
-			Local:      remoteAddr.IsLocal(),
-			NetAddress: remoteAddr,
-			Version:    remoteVersion,
-		},
-		sess: muxado.Client(conn),
-	})
-	// Add the peer to the node list. We can ignore the error: addNode
-	// validates the address and checks for duplicates, but we don't care
-	// about duplicates and we have already validated the address by
-	// connecting to it.
-	g.addNode(remoteAddr)
-	// We want to persist the outbound peers.
-	err = g.saveSync()
-	if err != nil {
-		g.log.Println("ERROR: Unable to save new outbound peer to gateway:", err)
-	}
-	return nil
+	return g.managedConnectOldPeer(conn, remoteVersion, remoteAddr)
 }
 
 // managedConnectNewPeer connects to peers >= v1.2.0. The peer is added as a
@@ -499,33 +479,7 @@ func (g *Gateway) managedConnectv120Peer(conn net.Conn, remoteVersion string, re
 		return err
 	}
 
-	g.mu.RLock()
-	port := g.port
-	g.mu.RUnlock()
-	// Send our dialable address to the peer so they can dial us back should we
-	// disconnect.
-	err = connectPortHandshake(conn, port)
-	if err != nil {
-		return err
-	}
-
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.addPeer(&peer{
-		Peer: modules.Peer{
-			Inbound:    false,
-			Local:      remoteAddr.IsLocal(),
-			NetAddress: remoteAddr,
-			Version:    remoteVersion,
-		},
-		sess: muxado.Client(conn),
-	})
-	// Add the peer to the node list. We can ignore the error: addNode
-	// validates the address and checks for duplicates, but we don't care
-	// about duplicates and we have already validated the address by
-	// connecting to it.
-	g.addNode(remoteAddr)
-	return g.saveSync()
+	return g.managedConnectv100Peer(conn, remoteVersion, remoteAddr)
 }
 
 // managedConnect establishes a persistent connection to a peer, and adds it to
