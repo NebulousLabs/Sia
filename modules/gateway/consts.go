@@ -14,7 +14,7 @@ const (
 	// sessionHandshakeUpgradeVersion is the version where the gateway handshake RPC
 	// was altered to include the ID of the genesis block, the gateway's unique ID,
 	// and whether a connection is desired.
-	sessionHandshakeUpgradeVersion = "1.2.0"
+	sessionHandshakeUpgradeVersion = "1.3.0"
 
 	// maxLocalOutbound is currently set to 3, meaning the gateway will not
 	// consider a local node to be an outbound peer if the gateway already has
