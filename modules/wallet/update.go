@@ -87,10 +87,14 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 		}
 	}
 	for _, diff := range cc.SiafundPoolDiffs {
+		var err error
 		if diff.Direction == modules.DiffApply {
-			w.siafundPool = diff.Adjusted
+			err = dbPutSiafundPool(tx, diff.Adjusted)
 		} else {
-			w.siafundPool = diff.Previous
+			err = dbPutSiafundPool(tx, diff.Previous)
+		}
+		if err != nil {
+			w.log.Severe("Could not update siafund pool:", err)
 		}
 	}
 	return nil
@@ -250,7 +254,11 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 				if err != nil {
 					return fmt.Errorf("could not get historic claim start: %v", err)
 				}
-				claimValue := w.siafundPool.Sub(startVal).Mul(sfiValue)
+				siafundPool, err := dbGetSiafundPool(w.dbTx)
+				if err != nil {
+					return fmt.Errorf("could not get siafund pool: %v", err)
+				}
+				claimValue := siafundPool.Sub(startVal).Mul(sfiValue)
 				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
 					FundType:       types.SpecifierClaimOutput,
 					MaturityHeight: consensusHeight + types.MaturityDelay,

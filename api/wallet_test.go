@@ -833,3 +833,122 @@ func TestWalletReset(t *testing.T) {
 		t.Error("wallet is not unlocked")
 	}
 }
+
+func TestWalletSiafunds(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	walletPassword := "testpass"
+	key := crypto.TwofishKey(crypto.HashObject(walletPassword))
+	testdir := build.TempDir("api", t.Name())
+	st, err := assembleServerTester(key, testdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// mine some money
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// record transactions
+	var wtg WalletTransactionsGET
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=100", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	numTxns := len(wtg.ConfirmedTransactions)
+
+	// load siafunds into the wallet
+	siagPath, _ := filepath.Abs("../types/siag0of1of1.siakey")
+	loadSiagValues := url.Values{}
+	loadSiagValues.Set("keyfiles", siagPath)
+	loadSiagValues.Set("encryptionpassword", walletPassword)
+	err = st.stdPostAPI("/wallet/siagkey", loadSiagValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=100", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtg.ConfirmedTransactions) != numTxns+1 {
+		t.Errorf("expected %v transactions, got %v", numTxns+1, len(wtg.ConfirmedTransactions))
+	}
+
+	// check balance
+	var wg WalletGET
+	err = st.getAPI("/wallet", &wg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wg.SiafundBalance.Cmp64(2000) != 0 {
+		t.Fatalf("bad siafund balance: expected %v, got %v", 2000, wg.SiafundBalance)
+	}
+
+	// spend the siafunds into the wallet seed
+	var wag WalletAddressGET
+	err = st.getAPI("/wallet/address", &wag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sendSiafundsValues := url.Values{}
+	sendSiafundsValues.Set("amount", "2000")
+	sendSiafundsValues.Set("destination", wag.Address.String())
+	err = st.stdPostAPI("/wallet/siafunds", sendSiafundsValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Announce the host and form an allowance with it. This will result in a
+	// siafund claim.
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// mine a block so that the announcement makes it into the blockchain
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// form allowance
+	allowanceValues := url.Values{}
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "20"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mine a block so that the file contract makes it into the blockchain
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// wallet should now have a claim balance
+	err = st.getAPI("/wallet", &wg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wg.SiacoinClaimBalance.IsZero() {
+		t.Fatal("expected non-zero claim balance")
+	}
+}

@@ -83,6 +83,15 @@ var (
 		Testing:  500 * time.Millisecond,
 	}).(time.Duration)
 
+	// peerRPCDelay defines the amount of time waited between each RPC accepted
+	// from a peer. Without this delay, a peer can force us to spin up thousands
+	// of goroutines per second.
+	peerRPCDelay = build.Select(build.Var{
+		Standard: 3 * time.Second,
+		Dev:      1 * time.Second,
+		Testing:  25 * time.Millisecond,
+	}).(time.Duration)
+
 	// pruneNodeListLen defines the number of nodes that the gateway must have
 	// to be pruning nodes from the node list.
 	pruneNodeListLen = build.Select(build.Var{
@@ -190,7 +199,7 @@ var (
 
 	// the gateway will abort a connection attempt after this long
 	dialTimeout = build.Select(build.Var{
-		Standard: 2 * time.Minute,
+		Standard: 3 * time.Minute,
 		Dev:      20 * time.Second,
 		Testing:  500 * time.Millisecond,
 	}).(time.Duration)
@@ -198,8 +207,8 @@ var (
 	// rpcStdDeadline defines the standard deadline that should be used for all
 	// incoming RPC calls.
 	rpcStdDeadline = build.Select(build.Var{
-		Standard: 10 * time.Minute,
-		Dev:      5 * time.Minute,
-		Testing:  90 * time.Second,
+		Standard: 5 * time.Minute,
+		Dev:      3 * time.Minute,
+		Testing:  15 * time.Second,
 	}).(time.Duration)
 )

@@ -241,6 +241,16 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 		w.integrateSeed(seed, seedProgress)
 		w.seeds = append(w.seeds, seed)
 
+		// delete the set of processed transactions; they will be recreated
+		// when we rescan
+		if err = w.dbTx.DeleteBucket(bucketProcessedTransactions); err != nil {
+			return err
+		}
+		if _, err = w.dbTx.CreateBucket(bucketProcessedTransactions); err != nil {
+			return err
+		}
+		w.unconfirmedProcessedTransactions = nil
+
 		// reset the consensus change ID and height in preparation for rescan
 		err = dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
 		if err != nil {

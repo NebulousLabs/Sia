@@ -336,7 +336,6 @@ func (w *Wallet) Reset() error {
 	w.keys = make(map[types.UnlockHash]spendableKey)
 	w.seeds = []modules.Seed{}
 	w.unconfirmedProcessedTransactions = []modules.ProcessedTransaction{}
-	w.siafundPool = types.Currency{}
 	w.unlocked = false
 	w.encrypted = false
 	w.subscribed = false

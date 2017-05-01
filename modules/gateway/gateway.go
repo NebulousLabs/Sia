@@ -165,8 +165,8 @@ type Gateway struct {
 type gatewayID [8]byte
 
 // managedSleep will sleep for the given period of time. If the full time
-// elapses, 'false' is returned. If the sleep is interrupted for shutdown,
-// 'true' is returned.
+// elapses, 'true' is returned. If the sleep is interrupted for shutdown,
+// 'false' is returned.
 func (g *Gateway) managedSleep(t time.Duration) (completed bool) {
 	select {
 	case <-time.After(t):
