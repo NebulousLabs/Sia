@@ -18,6 +18,18 @@ var (
 	errPeerGenesisID = errors.New("peer has different genesis ID")
 )
 
+// A node represents a potential peer on the Sia network. The Prioritize field
+// indicates whether the node should be prioritized when forming new
+// connections.
+type node struct {
+	NetAddress modules.NetAddress `json:"netaddress"`
+	Prioritize bool               `json:"prioritize"`
+}
+
+func (n node) String() string {
+	return string(n.NetAddress)
+}
+
 // addNode adds an address to the set of nodes on the network.
 func (g *Gateway) addNode(addr modules.NetAddress) error {
 	if addr == g.myAddr {
@@ -29,8 +41,20 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 	} else if net.ParseIP(addr.Host()) == nil {
 		return errors.New("address must be an IP address: " + string(addr))
 	}
-	g.nodes[addr] = struct{}{}
+	g.nodes[addr] = &node{
+		NetAddress: addr,
+		Prioritize: false,
+	}
 	return nil
+}
+
+// prioritizeNode causes a node to be prioritized when forming new
+// connections. The node must already be present in the gateway's node list.
+func (g *Gateway) prioritizeNode(addr modules.NetAddress) {
+	if n, ok := g.nodes[addr]; ok {
+		n.Prioritize = true
+		g.nodes[addr] = n
+	}
 }
 
 // pingNode verifies that there is a reachable node at the provided address

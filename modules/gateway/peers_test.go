@@ -829,8 +829,8 @@ func TestPeerManager(t *testing.T) {
 
 	// g1's node list should only contain g2
 	g1.mu.Lock()
-	g1.nodes = map[modules.NetAddress]struct{}{}
-	g1.nodes[g2.Address()] = struct{}{}
+	g1.nodes = map[modules.NetAddress]*node{}
+	g1.nodes[g2.Address()] = &node{NetAddress: g2.Address()}
 	g1.mu.Unlock()
 
 	// when peerManager wakes up, it should connect to g2.
