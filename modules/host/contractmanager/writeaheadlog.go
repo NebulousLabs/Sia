@@ -251,7 +251,7 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 	return nil
 }
 
-// load will pull any changes from the uncommited WAL into memory, decoding
+// load will pull any changes from the uncommitted WAL into memory, decoding
 // them and doing any necessary preprocessing. In the most common case (any
 // time the previous shutdown was clean), there will not be a WAL file.
 func (wal *writeAheadLog) load() error {
@@ -318,9 +318,19 @@ func (wal *writeAheadLog) load() error {
 		}
 	})
 	ss := wal.cm.savedSettings()
-	err = persist.Save(settingsMetadata, ss, wal.fileSettingsTmp)
+	b, err := json.MarshalIndent(ss, "", "\t")
 	if err != nil {
-		build.ExtendErr("unable to write to settings temp file", err)
+		build.ExtendErr("unable to marshal settings data", err)
+	}
+	enc := json.NewEncoder(wal.fileSettingsTmp)
+	if err := enc.Encode(settingsMetadata.Header); err != nil {
+		build.ExtendErr("unable to write header to settings temp file", err)
+	}
+	if err := enc.Encode(settingsMetadata.Version); err != nil {
+		build.ExtendErr("unable to write version to settings temp file", err)
+	}
+	if _, err = wal.fileSettingsTmp.Write(b); err != nil {
+		build.ExtendErr("unable to write data settings temp file", err)
 	}
 	return nil
 }

@@ -60,7 +60,7 @@ func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) error {
 	// Check that the timestamp is not too far in the past to be acceptable.
 	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
 
-	return cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1)
+	return cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1, cs.log)
 }
 
 // checkHeaderTarget returns true if the header's ID meets the given target.

@@ -1,7 +1,7 @@
 package host
 
 // TODO: seems like there would be problems with the negotiation protocols if
-// the renter tried something like 'form' or 'renew' but then the conncetion
+// the renter tried something like 'form' or 'renew' but then the connections
 // dropped after the host completed the transaction but before the host was
 // able to send the host signatures for the transaction.
 //
@@ -55,14 +55,37 @@ func (h *Host) threadedUpdateHostname(closeChan chan struct{}) {
 func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 	defer close(closeChan)
 
+	// Before entering the longer loop, try a greedy, faster attempt to verify
+	// that the host is working.
+	prevSettingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
+	select {
+	case <-h.tg.StopChan():
+		return
+	case <-time.After(workingStatusFirstCheck):
+	}
+	settingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
+
+	// sanity check
+	if prevSettingsCalls > settingsCalls {
+		build.Severe("the host's settings calls decremented")
+	}
+
+	h.mu.Lock()
+	if settingsCalls-prevSettingsCalls >= workingStatusThreshold {
+		h.workingStatus = modules.HostWorkingStatusWorking
+	}
+	// First check is quick, don't set to 'not working' if host has not been
+	// contacted enough times.
+	h.mu.Unlock()
+
 	for {
-		prevSettingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
+		prevSettingsCalls = atomic.LoadUint64(&h.atomicSettingsCalls)
 		select {
 		case <-h.tg.StopChan():
 			return
 		case <-time.After(workingStatusFrequency):
 		}
-		settingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
+		settingsCalls = atomic.LoadUint64(&h.atomicSettingsCalls)
 
 		// sanity check
 		if prevSettingsCalls > settingsCalls {
@@ -85,13 +108,15 @@ func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 	defer close(closeChan)
 
-	for {
-		select {
-		case <-h.tg.StopChan():
-			return
-		case <-time.After(connectabilityCheckFrequency):
-		}
+	// Wait breifly before checking the first time. This gives time for any port
+	// forwarding to complete.
+	select {
+	case <-h.tg.StopChan():
+		return
+	case <-time.After(connectabilityCheckFirstWait):
+	}
 
+	for {
 		h.mu.RLock()
 		autoAddr := h.autoAddress
 		userAddr := h.settings.NetAddress
@@ -118,6 +143,12 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 		h.mu.Lock()
 		h.connectabilityStatus = status
 		h.mu.Unlock()
+
+		select {
+		case <-h.tg.StopChan():
+			return
+		case <-time.After(connectabilityCheckFrequency):
+		}
 	}
 }
 
@@ -299,6 +330,12 @@ func (h *Host) threadedListen(closeChan chan struct{}) {
 		}
 
 		go h.threadedHandleConn(conn)
+
+		// Soft-sleep to ratelimit the number of incoming connections.
+		select {
+		case <-h.tg.StopChan():
+		case <-time.After(rpcRatelimit):
+		}
 	}
 }
 

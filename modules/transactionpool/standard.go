@@ -15,7 +15,7 @@ import (
 // Rule: Transaction size is limited
 //		There is a DoS vector where large transactions can both contain many
 //		signatures, and have each signature's CoveredFields object cover a
-//		unique but large portion of the transaciton. A 1mb transaction could
+//		unique but large portion of the transaction. A 1mb transaction could
 //		force a verifier to hash very large volumes of data, which takes a long
 //		time on nonspecialized hardware.
 //

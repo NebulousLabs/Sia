@@ -41,7 +41,7 @@ var (
 
 	// errNoFreeSectors is returned if there are no free sectors in the usage
 	// array fed to randFreeSector. This error should never be returned, as the
-	// contract manager should have sufficent internal consistency to know in
+	// contract manager should have sufficient internal consistency to know in
 	// advance that there are no free sectors.
 	errNoFreeSectors = errors.New("could not find a free sector in the usage array")
 

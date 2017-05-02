@@ -42,6 +42,14 @@ var (
 		Long:  "View the current allowance, which controls how much money is spent on file contracts.",
 		Run:   wrap(renterallowancecmd),
 	}
+
+	renterAllowanceCancelCmd = &cobra.Command{
+		Use:   "cancel",
+		Short: "Cancel the current allowance",
+		Long:  "Cancel the current allowance, which controls how much money is spent on file contracts.",
+		Run:   wrap(renterallowancecancelcmd),
+	}
+
 	renterSetAllowanceCmd = &cobra.Command{
 		Use:   "setallowance [amount] [period]",
 		Short: "Set the allowance",
@@ -247,6 +255,15 @@ func renterallowancecmd() {
 `, currencyUnits(allowance.Funds), allowance.Period)
 }
 
+// renterallowancecancelcmd cancels the current allowance.
+func renterallowancecancelcmd() {
+	err := post("/renter", "hosts=0&funds=0&period=0&renewwindow=0")
+	if err != nil {
+		die("error cancelling allowance:", err)
+	}
+	fmt.Println("Allowance cancelled.")
+}
+
 // rentersetallowancecmd allows the user to set the allowance.
 func rentersetallowancecmd(amount, period string) {
 	hastings, err := parseCurrency(amount)
@@ -293,11 +310,13 @@ func rentercontractscmd() {
 	sort.Sort(byValue(rc.Contracts))
 	fmt.Println("Contracts:")
 	w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "Host\tValue\tData\tEnd Height\tID")
+	fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID")
 	for _, c := range rc.Contracts {
-		fmt.Fprintf(w, "%v\t%8s\t%v\t%v\t%v\n",
+		fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\n",
 			c.NetAddress,
 			currencyUnits(c.RenterFunds),
+			currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
+			currencyUnits(c.Fees),
 			filesizeUnits(int64(c.Size)),
 			c.EndHeight,
 			c.ID)

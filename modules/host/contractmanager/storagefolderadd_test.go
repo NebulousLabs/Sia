@@ -61,7 +61,7 @@ type dependencyLargeFolder struct {
 // limitFile will return an error if a call to Write is made that will put the
 // total throughput of the file over 1 MiB.
 type limitFile struct {
-	throughput int
+	throughput int64
 	mu         sync.Mutex
 	*os.File
 	sync.Mutex
@@ -81,33 +81,36 @@ func (dependencyLargeFolder) createFile(s string) (file, error) {
 	return lf, nil
 }
 
-// Write returns an error if the operation will put the total throughput of the
-// file over 8 MiB. The write will write all the way to 8 MiB before returning
-// the error.
-func (l *limitFile) WriteAt(b []byte, offset int64) (int, error) {
+// Truncate returns an error if the operation will put the total throughput of
+// the file over 8 MiB.
+func (l *limitFile) Truncate(offset int64) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	// If the limit has already been reached, return an error.
 	if l.throughput >= 1<<20 {
-		return 0, errors.New("limitFile throughput limit reached earlier")
+		return errors.New("limitFile throughput limit reached earlier")
 	}
+
+	fi, err := l.Stat()
+	if err != nil {
+		return errors.New("limitFile could not fetch fileinfo: " + err.Error())
+	}
+	// No throughput if file is shrinking.
+	if fi.Size() > offset {
+		return l.File.Truncate(offset)
+	}
+	writeSize := offset - fi.Size()
 
 	// If the limit has not been reached, pass the call through to the
-	// underlying file.
-	if l.throughput+len(b) <= 1<<20 {
-		l.throughput += len(b)
-		return l.File.WriteAt(b, offset)
+	// underlying file. Limit counting is a little wonky because we assume the
+	// file being passed in has currently a size of zero.
+	if l.throughput+writeSize <= 1<<20 {
+		l.throughput += writeSize
+		return l.File.Truncate(offset)
 	}
 
-	// If the limit has been reached, write enough bytes to get to 8 MiB, then
-	// return an error.
-	remaining := 1<<20 - l.throughput
-	l.throughput = 1 << 20
-	written, err := l.File.WriteAt(b[:remaining], offset)
-	if err != nil {
-		return written, err
-	}
-	return written, errors.New("limitFile throughput limit reached before all input was written to disk")
+	// If the limit has been reached, return an error.
+	return errors.New("limitFile throughput limit reached before all input was written to disk")
 }
 
 // TestAddLargeStorageFolder tries to add a storage folder that is too large to
@@ -226,7 +229,7 @@ func TestAddStorageFolderConcurrent(t *testing.T) {
 }
 
 // dependencyBlockSFOne is a mocked dependency for os.Create that will return a
-// file for storage folder one only which will block on a call to file.Write
+// file for storage folder one only which will block on a call to file.Truncate
 // until a signal has been given that the block can be released.
 type dependencyBlockSFOne struct {
 	blockLifted chan struct{}
@@ -243,16 +246,16 @@ type blockedFile struct {
 	sync.Mutex
 }
 
-// Write will block until a signal is given that the block may be lifted. Write
-// will signal when it has been called for the first time, so that the tester
-// knows the function has reached a blocking point.
-func (bf *blockedFile) WriteAt(b []byte, offset int64) (int, error) {
+// Truncate will block until a signal is given that the block may be lifted.
+// Truncate will signal when it has been called for the first time, so that the
+// tester knows the function has reached a blocking point.
+func (bf *blockedFile) Truncate(offset int64) error {
 	if !strings.Contains(bf.File.Name(), "storageFolderOne") || strings.Contains(bf.File.Name(), "siahostmetadata.dat") {
-		return bf.File.WriteAt(b, offset)
+		return bf.File.Truncate(offset)
 	}
 	close(bf.writeCalled)
 	<-bf.blockLifted
-	return bf.File.WriteAt(b, offset)
+	return bf.File.Truncate(offset)
 }
 
 // createFile will return a normal file to all callers except for
@@ -327,7 +330,11 @@ func TestAddStorageFolderBlocking(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	<-d.writeCalled
+	select {
+	case <-time.After(time.Second * 5):
+		t.Fatal("storage folder not written out")
+	case <-d.writeCalled:
+	}
 
 	// Check the status of the storage folder. At this point, the folder should
 	// be returned as an unfinished storage folder addition, with progress

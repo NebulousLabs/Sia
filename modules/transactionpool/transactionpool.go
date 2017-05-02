@@ -125,7 +125,7 @@ func (tp *TransactionPool) Close() error {
 // transactions.
 func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// TODO: The fee estimation tool should look at the recent blocks and use
-	// them to guage what sort of fee should be required, as opposed to just
+	// them to gauge what sort of fee should be required, as opposed to just
 	// guessing blindly.
 	//
 	// TODO: The current minimum has been reduced significantly to account for

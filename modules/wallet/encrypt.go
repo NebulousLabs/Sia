@@ -325,6 +325,9 @@ func (w *Wallet) Reset() error {
 		return errUnencryptedWallet
 	}
 
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
 	err := dbReset(w.dbTx)
 	if err != nil {
 		return err
@@ -333,7 +336,6 @@ func (w *Wallet) Reset() error {
 	w.keys = make(map[types.UnlockHash]spendableKey)
 	w.seeds = []modules.Seed{}
 	w.unconfirmedProcessedTransactions = []modules.ProcessedTransaction{}
-	w.siafundPool = types.Currency{}
 	w.unlocked = false
 	w.encrypted = false
 	w.subscribed = false

@@ -400,7 +400,7 @@ func createServerTester(name string) (*serverTester, error) {
 
 // createAuthenticatedServerTester creates an authenticated server tester
 // object that is ready for testing, including money in the wallet and all
-// modules initalized.
+// modules initialized.
 func createAuthenticatedServerTester(name string, password string) (*serverTester, error) {
 	// createAuthenticatedServerTester should not get called during short
 	// tests, as it takes a long time to run.

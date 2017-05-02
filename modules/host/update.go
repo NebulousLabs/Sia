@@ -321,7 +321,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.recentChange = cc.ID
 
 	// Save the host.
-	err = h.save()
+	err = h.saveSync()
 	if err != nil {
 		h.log.Println("ERROR: could not save during ProcessConsensusChange:", err)
 	}

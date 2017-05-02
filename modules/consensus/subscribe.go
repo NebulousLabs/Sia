@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/NebulousLabs/bolt"
@@ -114,18 +115,23 @@ func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 	}
 }
 
-// initializeSubscribe will take a subscriber and feed them all of the
+// managedInitializeSubscribe will take a subscriber and feed them all of the
 // consensus changes that have occurred since the change provided.
 //
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.
-func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
-	return cs.db.View(func(tx *bolt.Tx) error {
-		// 'exists' and 'entry' are going to be pointed to the first entry that
-		// has not yet been seen by subscriber.
-		var exists bool
-		var entry changeEntry
+func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+	if start == modules.ConsensusChangeRecent {
+		return nil
+	}
 
+	// 'exists' and 'entry' are going to be pointed to the first entry that
+	// has not yet been seen by subscriber.
+	var exists bool
+	var entry changeEntry
+
+	cs.mu.RLock()
+	err := cs.db.View(func(tx *bolt.Tx) error {
 		if start == modules.ConsensusChangeBeginning {
 			// Special case: for modules.ConsensusChangeBeginning, create an
 			// initial node pointing to the genesis block. The subscriber will
@@ -133,12 +139,6 @@ func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubsc
 			// the genesis block.
 			entry = cs.genesisEntry()
 			exists = true
-		} else if start == modules.ConsensusChangeRecent {
-			// Special case: for modules.ConsensusChangeRecent, set up the
-			// subscriber to start receiving only new blocks, but the
-			// subscriber does not need to do any catch-up. For this
-			// implementation, a no-op will have this effect.
-			return nil
 		} else {
 			// The subscriber has provided an existing consensus change.
 			// Because the subscriber already has this consensus change,
@@ -155,18 +155,35 @@ func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubsc
 			}
 			entry, exists = entry.NextEntry(tx)
 		}
-
-		// Send all remaining consensus changes to the subscriber.
-		for exists {
-			cc, err := cs.computeConsensusChange(tx, entry)
-			if err != nil {
-				return err
-			}
-			subscriber.ProcessConsensusChange(cc)
-			entry, exists = entry.NextEntry(tx)
-		}
 		return nil
 	})
+	cs.mu.RUnlock()
+	if err != nil {
+		return err
+	}
+
+	// Send all remaining consensus changes to the subscriber.
+	for exists {
+		// Send changes in batches of 100 so that we don't hold the
+		// lock for too long.
+		cs.mu.RLock()
+		err = cs.db.View(func(tx *bolt.Tx) error {
+			for i := 0; i < 100 && exists; i++ {
+				cc, err := cs.computeConsensusChange(tx, entry)
+				if err != nil {
+					return err
+				}
+				subscriber.ProcessConsensusChange(cc)
+				entry, exists = entry.NextEntry(tx)
+			}
+			return nil
+		})
+		cs.mu.RUnlock()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ConsensusSetSubscribe adds a subscriber to the list of subscribers, and
@@ -181,18 +198,23 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 		return err
 	}
 	defer cs.tg.Done()
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
 
-	// Get the input module caught up to the currenct consnesus set.
-	cs.subscribers = append(cs.subscribers, subscriber)
-	err = cs.initializeSubscribe(subscriber, start)
+	// Get the input module caught up to the current consensus set.
+	err = cs.managedInitializeSubscribe(subscriber, start)
 	if err != nil {
-		// Remove the subscriber from the set of subscribers.
-		cs.subscribers = cs.subscribers[:len(cs.subscribers)-1]
 		return err
 	}
-	// Only add the module as a subscriber if there was no error.
+
+	// Add the module to the list of subscribers.
+	cs.mu.Lock()
+	// Check that this subscriber is not already subscribed.
+	for _, s := range cs.subscribers {
+		if s == subscriber {
+			build.Critical("refusing to double-subscribe subscriber")
+		}
+	}
+	cs.subscribers = append(cs.subscribers, subscriber)
+	cs.mu.Unlock()
 	return nil
 }
 

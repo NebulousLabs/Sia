@@ -39,6 +39,11 @@ const (
 )
 
 const (
+	// folderAllocationStepSize is the amount of data that gets allocated at a
+	// time when writing out the sparse sector file during a storageFolderAdd or
+	// a storageFolderGrow.
+	folderAllocationStepSize = 1 << 35
+
 	// sectorMetadataDiskSize defines the number of bytes it takes to store the
 	// metadata of a single sector on disk.
 	sectorMetadataDiskSize = 14
@@ -74,48 +79,27 @@ var (
 var (
 	// maximumStorageFolders defines the maximum number of storage folders that
 	// the host can support.
-	maximumStorageFolders = func() uint64 {
-		if build.Release == "dev" {
-			return 1 << 5
-		}
-		if build.Release == "standard" {
-			return 1 << 16
-		}
-		if build.Release == "testing" {
-			return 1 << 3
-		}
-		panic("unrecognized release constant in host - maximum storage folders")
-	}()
+	maximumStorageFolders = build.Select(build.Var{
+		Dev:      uint64(1 << 5),
+		Standard: uint64(1 << 16),
+		Testing:  uint64(1 << 3),
+	}).(uint64)
 
 	// MaximumSectorsPerStorageFolder sets an upper bound on how large storage
 	// folders in the host are allowed to be. There is a hard limit at 4
 	// billion sectors because the sector location map only uses 4 bytes to
 	// indicate the location of a sector.
-	MaximumSectorsPerStorageFolder = func() uint64 {
-		if build.Release == "dev" {
-			return 1 << 20 // 4 TiB
-		}
-		if build.Release == "standard" {
-			return 1 << 25 // 256 TiB
-		}
-		if build.Release == "testing" {
-			return 1 << 12 // 16 MiB
-		}
-		panic("unrecognized release constant in host - maximum storage folder size")
-	}()
+	MaximumSectorsPerStorageFolder = build.Select(build.Var{
+		Dev:      uint64(1 << 20), // 4 TiB
+		Standard: uint64(1 << 32), // 32 PiB
+		Testing:  uint64(1 << 12), // 16 MiB
+	}).(uint64)
 
 	// MinimumSectorsPerStorageFolder defines the minimum number of sectors
 	// that a storage folder is allowed to have.
-	MinimumSectorsPerStorageFolder = func() uint64 {
-		if build.Release == "dev" {
-			return 1 << 6 // 16 MiB
-		}
-		if build.Release == "standard" {
-			return 1 << 6 // 512 MiB
-		}
-		if build.Release == "testing" {
-			return 1 << 6 // 256 KiB
-		}
-		panic("unrecognized release constant in host - minimum storage folder size")
-	}()
+	MinimumSectorsPerStorageFolder = build.Select(build.Var{
+		Dev:      uint64(1 << 6), // 16 MiB
+		Standard: uint64(1 << 6), // 512 MiB
+		Testing:  uint64(1 << 6), // 256 KiB
+	}).(uint64)
 )

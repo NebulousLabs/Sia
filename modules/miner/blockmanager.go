@@ -21,7 +21,7 @@ var (
 func (m *Miner) blockForWork() types.Block {
 	b := m.persist.UnsolvedBlock
 
-	// Update the timestmap.
+	// Update the timestamp.
 	if b.Timestamp < types.CurrentTimestamp() {
 		b.Timestamp = types.CurrentTimestamp()
 	}
