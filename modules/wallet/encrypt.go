@@ -193,48 +193,29 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 	subscribed := w.subscribed
 	w.mu.RUnlock()
 	if !subscribed {
-		if primarySeedProgress == 0 {
-			// If the wallet has not been used, we don't need to scan the entire
-			// blockchain looking for relevant transactions. Instead, just grab
-			// the current height and subscribe to future blocks.
-			err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeRecent)
-			if err != nil {
-				return fmt.Errorf("wallet subscription failed: %v", err)
-			}
-			w.mu.Lock()
-			err = dbPutConsensusHeight(w.dbTx, w.cs.Height())
-			w.mu.Unlock()
-			if err != nil {
-				return fmt.Errorf("wallet subscription failed: %v", err)
-			}
-		} else {
-			// If the wallet has been used, we need to scan the entire
-			// blockchain. This can take a while, so spawn a goroutine to
-			// print the wallet height every few seconds. (If subscription
-			// completes quickly, nothing will be printed.)
-			done := make(chan struct{})
-			go w.rescanMessage(done)
-			defer close(done)
+		// Subscription can take a while, so spawn a goroutine to print the
+		// wallet height every few seconds. (If subscription completes
+		// quickly, nothing will be printed.)
+		done := make(chan struct{})
+		go w.rescanMessage(done)
+		defer close(done)
 
-			err = w.cs.ConsensusSetSubscribe(w, lastChange)
-			if err == modules.ErrInvalidConsensusChangeID {
-				// something went wrong; resubscribe from the beginning
-				err = dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
-				if err != nil {
-					return fmt.Errorf("failed to reset db during rescan: %v", err)
-				}
-				err = dbPutConsensusHeight(w.dbTx, 0)
-				if err != nil {
-					return fmt.Errorf("failed to reset db during rescan: %v", err)
-				}
-				err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
-			}
+		err = w.cs.ConsensusSetSubscribe(w, lastChange)
+		if err == modules.ErrInvalidConsensusChangeID {
+			// something went wrong; resubscribe from the beginning
+			err = dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
 			if err != nil {
-				return fmt.Errorf("wallet subscription failed: %v", err)
+				return fmt.Errorf("failed to reset db during rescan: %v", err)
 			}
+			err = dbPutConsensusHeight(w.dbTx, 0)
+			if err != nil {
+				return fmt.Errorf("failed to reset db during rescan: %v", err)
+			}
+			err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 		}
-		// Subscribe to the transaction pool to receive unconfirmed
-		// transactions.
+		if err != nil {
+			return fmt.Errorf("wallet subscription failed: %v", err)
+		}
 		w.tpool.TransactionPoolSubscribe(w)
 	}
 
@@ -443,5 +424,8 @@ func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
 	}
 	defer w.tg.Done()
 	w.log.Println("INFO: Unlocking wallet.")
+
+	// Initialize all of the keys in the wallet under a lock. While holding the
+	// lock, also grab the subscriber status.
 	return w.managedUnlock(masterKey)
 }
