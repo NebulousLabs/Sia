@@ -136,7 +136,6 @@ func TestHostConnectabilityStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ht.Close()
 
 	// TODO: this causes an ndf, because it relies on the host tester starting up
 	// and fully returning faster than the first check, which isnt always the

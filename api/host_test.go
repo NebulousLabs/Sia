@@ -128,7 +128,7 @@ func TestConnectabilityStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.panicClose()
+	defer host.server.panicClose()
 
 	node, err := blankServerTester(t.Name() + " - node")
 	if err != nil {

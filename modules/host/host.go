@@ -290,12 +290,6 @@ func newHost(dependencies dependencies, g modules.Gateway, cs modules.ConsensusS
 		}
 	})
 
-	// register gateway RPCs
-	g.RegisterRPC("CheckHost", h.threadedRPCCheckHost)
-	h.tg.OnStop(func() {
-		h.gateway.UnregisterRPC("CheckHost")
-	})
-
 	// Initialize the networking.
 	err = h.initNetworking(listenerAddress)
 	if err != nil {

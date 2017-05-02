@@ -176,6 +176,14 @@ var (
 		Dev:      5,
 		Testing:  4,
 	}).(int)
+
+	// connectabilityCheckTimeout defines how long a connectability check's dial
+	// will be allowed to block before it times out.
+	connectabilityCheckTimeout = build.Select(build.Var{
+		Standard: time.Minute * 2,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 90,
+	}).(time.Duration)
 )
 
 var (

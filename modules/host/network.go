@@ -16,7 +16,6 @@ package host
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"sync/atomic"
 	"time"
@@ -102,85 +101,6 @@ func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 		}
 		h.mu.Unlock()
 	}
-}
-
-// threadedRPCCheckHost handles a CheckHost RPC call and informs the caller if
-// it can connected to on the requested NetAddress. The requested NetAddress
-// must resolve to a net.IP owned by the conn's RemoteAddress.
-func (h *Host) threadedRPCCheckHost(conn modules.PeerConn) error {
-	err := conn.SetDeadline(time.Now().Add(checkHostTimeout))
-	if err != nil {
-		return err
-	}
-	closeChan := make(chan struct{})
-	defer close(closeChan)
-	go func() {
-		select {
-		case <-h.tg.StopChan():
-		case <-closeChan:
-		}
-		conn.Close()
-	}()
-	err = h.tg.Add()
-	if err != nil {
-		return err
-	}
-	defer h.tg.Done()
-
-	var checkAddress modules.NetAddress
-	err = encoding.ReadObject(conn, &checkAddress, modules.MaxEncodedNetAddressLength)
-	if err != nil {
-		return err
-	}
-
-	// check that the checkAddress resolves to at least one of the remote's IP
-	// addresses.
-	checkHost := checkAddress.Host()
-	checkIPs, err := net.LookupIP(checkHost)
-	if err != nil {
-		return err
-	}
-	requestingHost, _, err := net.SplitHostPort(conn.RemoteAddr().String())
-	if err != nil {
-		return err
-	}
-	requestingIPs, err := net.LookupIP(requestingHost)
-	if err != nil {
-		return err
-	}
-
-	isValid := false
-	for _, cip := range checkIPs {
-		for _, rip := range requestingIPs {
-			if string(cip) == string(rip) {
-				isValid = true
-			}
-		}
-	}
-	if !isValid {
-		return fmt.Errorf("blocked CheckHost call for %v from %v, requested host does not match ip address of remote host.", checkAddress, conn.RemoteAddr().String())
-	}
-
-	dialer := &net.Dialer{
-		Cancel:  h.tg.StopChan(),
-		Timeout: connectabilityCheckTimeout,
-	}
-	testConn, err := dialer.Dial("tcp", string(checkAddress))
-
-	var status modules.HostConnectabilityStatus
-	if err != nil {
-		status = modules.HostConnectabilityStatusNotConnectable
-	} else {
-		testConn.Close()
-		status = modules.HostConnectabilityStatusConnectable
-	}
-
-	err = encoding.WriteObject(conn, status)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // threadedRPCRequestHostCheck asks the node at conn if the host's NetAddress
