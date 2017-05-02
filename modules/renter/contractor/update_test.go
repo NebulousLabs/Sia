@@ -33,6 +33,15 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	for i := 0; i < 50; i++ {
+		time.Sleep(contractFormationInterval)
+		if len(c.Contracts()) > 0 {
+			break
+		}
+	}
+	if len(c.Contracts()) == 0 {
+		t.Fatal("contractor is not forming contracts after the allowance was set")
+	}
 	contract := c.Contracts()[0]
 
 	// revise the contract

@@ -187,6 +187,10 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 	// Load the prior persistence structures.
 	err := c.load()
 	if err != nil && !os.IsNotExist(err) {
+		closeErr := c.Close()
+		if closeErr != nil {
+			fmt.Println("Unable to close contractor safely:", err)
+		}
 		return nil, err
 	}
 	// Close the persist (provided as a dependency) upon shutdown.
@@ -205,6 +209,10 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		err = cs.ConsensusSetSubscribe(c, c.lastChange)
 	}
 	if err != nil {
+		closeErr := c.Close()
+		if closeErr != nil {
+			fmt.Println("Unable to close contractor safely:", err)
+		}
 		return nil, errors.New("contractor subscription failed: " + err.Error())
 	}
 	// Unsubscribe from the consensus set upon shutdown.
@@ -214,10 +222,15 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 
 	// We may have upgraded persist or resubscribed. Save now so that we don't
 	// lose our work.
+	c.mu.Lock()
 	err = c.save()
+	c.mu.Unlock()
 	if err != nil {
+		closeErr := c.Close()
+		if closeErr != nil {
+			fmt.Println("Unable to close contractor safely:", err)
+		}
 		return nil, err
 	}
-
 	return c, nil
 }

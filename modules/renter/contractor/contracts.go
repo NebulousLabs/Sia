@@ -106,10 +106,13 @@ func (c *Contractor) isMissing(contract modules.RenterContract) bool {
 // managedMarkBadContracts will go through the contractors set of contracts and mark
 // any of the contracts which are no longer performing well.
 func (c *Contractor) managedMarkBadContracts() {
+	c.mu.Lock()
+	desiredHosts := c.allowance.Hosts
+	c.mu.Unlock()
 	// The hosts will be compared against the hosts in the hostdb to determine
 	// whether they have an acceptable score or if they should be replaced.
 	// Determine what counts as an acceptable score.
-	hosts := c.hdb.RandomHosts(int(c.allowance.Hosts), nil)
+	hosts := c.hdb.RandomHosts(int(desiredHosts), nil)
 	// Find the host of the bunch with the lowest score.
 	var lowestScore types.Currency
 	if len(hosts) > 0 {
@@ -126,6 +129,8 @@ func (c *Contractor) managedMarkBadContracts() {
 	// not need to be exactly the best performers in order to be acceptable.
 	lowestScore = lowestScore.Div64(badScoreForgiveness)
 
+	// Now that we've finished interacting with external packages, lock the
+	// contractor and begin marking bad contracts.
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
