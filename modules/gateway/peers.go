@@ -446,7 +446,7 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 	// and checks for duplicates, but we don't care about duplicates and we
 	// have already validated the address by connecting to it.
 	g.addNode(remoteAddr)
-	g.prioritizeNode(remoteAddr)
+	g.nodes[remoteAddr].WasOutboundPeer = true
 
 	if err := g.saveSync(); err != nil {
 		g.log.Println("ERROR: Unable to save new outbound peer to gateway:", err)

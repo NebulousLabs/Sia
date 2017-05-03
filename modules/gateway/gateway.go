@@ -264,8 +264,6 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 			if err != nil && err != errNodeExists {
 				g.log.Printf("WARN: failed to add the bootstrap node '%v': %v", addr, err)
 			}
-			// All bootstrap nodes should be prioritized.
-			g.prioritizeNode(addr)
 		}
 	}
 

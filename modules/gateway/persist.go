@@ -39,14 +39,8 @@ func (g *Gateway) load() error {
 		// COMPATv1.2.1
 		return g.loadv033persist()
 	}
-	for _, node := range nodes {
-		err := g.addNode(node.NetAddress)
-		if err != nil {
-			g.log.Printf("WARN: error loading node '%v' from persist: %v", node, err)
-		}
-		if node.Prioritize {
-			g.prioritizeNode(node.NetAddress)
-		}
+	for i := range nodes {
+		g.nodes[nodes[i].NetAddress] = nodes[i]
 	}
 	return nil
 }
