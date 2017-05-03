@@ -3,6 +3,7 @@ package gateway
 import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // managedPeerManagerConnect is a blocking function which tries to connect to
@@ -73,6 +74,29 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 	connectionLimiterChan := make(chan struct{}, maxConcurrentOutboundPeerRequests)
 
 	g.log.Debugln("INFO: [PPM] Permanent peer manager has started")
+
+	// Collect a list of peers that we have previously connected to.
+	g.mu.RLock()
+	var previousOutboundPeers []modules.NetAddress
+	for _, node := range g.nodes {
+		if node.WasOutboundPeer {
+			previousOutboundPeers = append(previousOutboundPeers, node.NetAddress)
+		}
+	}
+	g.mu.RUnlock()
+
+	// Construct a generator to return the next node considered for
+	// connection. The generator will first draw randomly from
+	// previousOutboundPeers, and then fallback to random node selection.
+	perm := fastrand.Perm(len(previousOutboundPeers))
+	nextNode := func() (addr modules.NetAddress, err error) {
+		if len(perm) > 0 {
+			addr, perm = previousOutboundPeers[perm[0]], perm[1:]
+			return addr, nil
+		}
+		return g.randomNode()
+	}
+
 	for {
 		// If the gateway is well connected, sleep for a while and then try
 		// again.
@@ -87,7 +111,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 
 		// Fetch a random node.
 		g.mu.RLock()
-		addr, err := g.randomNode()
+		addr, err := nextNode()
 		g.mu.RUnlock()
 		// If there was an error, log the error and then wait a while before
 		// trying again.
