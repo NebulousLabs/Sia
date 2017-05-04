@@ -49,16 +49,14 @@ func (g *Gateway) managedPeerManagerConnect(addr modules.NetAddress) {
 }
 
 // numOutboundPeers returns the number of outbound peers in the gateway.
-func (g *Gateway) numOutboundPeers() (numOutboundPeers int) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
+func (g *Gateway) numOutboundPeers() int {
+	n := 0
 	for _, p := range g.peers {
 		if !p.Inbound {
-			numOutboundPeers++
+			n++
 		}
 	}
-	return numOutboundPeers
+	return n
 }
 
 // permanentPeerManager tries to keep the Gateway well-connected. As long as
@@ -76,17 +74,6 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 	g.log.Debugln("INFO: [PPM] Permanent peer manager has started")
 
 	for {
-		// If the gateway is well connected, sleep for a while and then try
-		// again.
-		numOutboundPeers := g.numOutboundPeers()
-		if numOutboundPeers >= wellConnectedThreshold {
-			g.log.Debugln("INFO: [PPM] Gateway has enough peers, sleeping.")
-			if !g.managedSleep(wellConnectedDelay) {
-				return
-			}
-			continue
-		}
-
 		// Fetch the set of nodes to try.
 		g.mu.RLock()
 		nodes := g.buildPeerManagerNodeList()
@@ -100,6 +87,18 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		}
 
 		for _, addr := range nodes {
+			// Break as soon as we have enough outbound peers.
+			g.mu.RLock()
+			numOutboundPeers := g.numOutboundPeers()
+			g.mu.RUnlock()
+			if numOutboundPeers >= wellConnectedThreshold {
+				g.log.Debugln("INFO: [PPM] Gateway has enough peers, sleeping.")
+				if !g.managedSleep(wellConnectedDelay) {
+					return
+				}
+				break
+			}
+
 			g.log.Debugln("[PPM] Fetched a random node:", addr)
 
 			// We need at least some of our outbound peers to be remote peers. If
