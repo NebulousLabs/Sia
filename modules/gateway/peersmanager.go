@@ -75,28 +75,6 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 
 	g.log.Debugln("INFO: [PPM] Permanent peer manager has started")
 
-	// Collect a list of peers that we have previously connected to.
-	g.mu.RLock()
-	var previousOutboundPeers []modules.NetAddress
-	for _, node := range g.nodes {
-		if node.WasOutboundPeer {
-			previousOutboundPeers = append(previousOutboundPeers, node.NetAddress)
-		}
-	}
-	g.mu.RUnlock()
-
-	// Construct a generator to return the next node considered for
-	// connection. The generator will first draw randomly from
-	// previousOutboundPeers, and then fallback to random node selection.
-	perm := fastrand.Perm(len(previousOutboundPeers))
-	nextNode := func() (addr modules.NetAddress, err error) {
-		if len(perm) > 0 {
-			addr, perm = previousOutboundPeers[perm[0]], perm[1:]
-			return addr, nil
-		}
-		return g.randomNode()
-	}
-
 	for {
 		// If the gateway is well connected, sleep for a while and then try
 		// again.
@@ -109,59 +87,83 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 			continue
 		}
 
-		// Fetch a random node.
+		// Fetch the set of nodes to try.
 		g.mu.RLock()
-		addr, err := nextNode()
+		nodes := g.buildPeerManagerNodeList()
 		g.mu.RUnlock()
-		// If there was an error, log the error and then wait a while before
-		// trying again.
-		g.log.Debugln("[PPM] Fetched a random node:", addr)
-		if err != nil {
-			g.log.Debugln("[PPM] Unable to acquire selected peer:", err)
+		if len(nodes) == 0 {
+			g.log.Debugln("[PPM] Node list is empty, sleeping")
 			if !g.managedSleep(noNodesDelay) {
 				return
 			}
 			continue
 		}
-		// We need at least some of our outbound peers to be remote peers. If
-		// we already have reached a certain threshold of outbound peers and
-		// this peer is a local peer, do not consider it for an outbound peer.
-		// Sleep briefly to prevent the gateway from hogging the CPU if all
-		// peers are local.
-		if numOutboundPeers >= maxLocalOutboundPeers && addr.IsLocal() && build.Release != "testing" {
-			g.log.Debugln("[PPM] Ignorning selected peer; this peer is local and we already have multiple outbound peers:", addr)
-			if !g.managedSleep(unwantedLocalPeerDelay) {
+
+		for _, addr := range nodes {
+			g.log.Debugln("[PPM] Fetched a random node:", addr)
+
+			// We need at least some of our outbound peers to be remote peers. If
+			// we already have reached a certain threshold of outbound peers and
+			// this peer is a local peer, do not consider it for an outbound peer.
+			// Sleep briefly to prevent the gateway from hogging the CPU if all
+			// peers are local.
+			if numOutboundPeers >= maxLocalOutboundPeers && addr.IsLocal() && build.Release != "testing" {
+				g.log.Debugln("[PPM] Ignorning selected peer; this peer is local and we already have multiple outbound peers:", addr)
+				if !g.managedSleep(unwantedLocalPeerDelay) {
+					return
+				}
+				continue
+			}
+
+			// Try connecting to that peer in a goroutine. Do not block unless
+			// there are currently 3 or more peer connection attempts open at once.
+			// Before spawning the thread, make sure that there is enough room by
+			// throwing a struct into the buffered channel.
+			g.log.Debugln("[PPM] Trying to connect to a node:", addr)
+			connectionLimiterChan <- struct{}{}
+			go func(addr modules.NetAddress) {
+				// After completion, take the struct out of the channel so that the
+				// next thread may proceed.
+				defer func() {
+					<-connectionLimiterChan
+				}()
+
+				if err := g.threads.Add(); err != nil {
+					return
+				}
+				defer g.threads.Done()
+				// peerManagerConnect will handle all of its own logging.
+				g.managedPeerManagerConnect(addr)
+			}(addr)
+
+			// Wait a bit before trying the next peer. The peer connections are
+			// non-blocking, so they should be spaced out to avoid spinning up an
+			// uncontrolled number of threads and therefore peer connections.
+			if !g.managedSleep(acquiringPeersDelay) {
 				return
 			}
-			continue
-		}
-
-		// Try connecting to that peer in a goroutine. Do not block unless
-		// there are currently 3 or more peer connection attempts open at once.
-		// Before spawning the thread, make sure that there is enough room by
-		// throwing a struct into the buffered channel.
-		g.log.Debugln("[PPM] Trying to connect to a node:", addr)
-		connectionLimiterChan <- struct{}{}
-		go func(addr modules.NetAddress) {
-			// After completion, take the struct out of the channel so that the
-			// next thread may proceed.
-			defer func() {
-				<-connectionLimiterChan
-			}()
-
-			if err := g.threads.Add(); err != nil {
-				return
-			}
-			defer g.threads.Done()
-			// peerManagerConnect will handle all of its own logging.
-			g.managedPeerManagerConnect(addr)
-		}(addr)
-
-		// Wait a bit before trying the next peer. The peer connections are
-		// non-blocking, so they should be spaced out to avoid spinning up an
-		// uncontrolled number of threads and therefore peer connections.
-		if !g.managedSleep(acquiringPeersDelay) {
-			return
 		}
 	}
+}
+
+// buildPeerManagerNodeList returns the gateway's node list in the order that
+// permanentPeerManager should attempt to connect to them.
+func (g *Gateway) buildPeerManagerNodeList() []modules.NetAddress {
+	// flatten the node map, inserting in random order
+	nodes := make([]modules.NetAddress, len(g.nodes))
+	perm := fastrand.Perm(len(nodes))
+	for _, node := range g.nodes {
+		nodes[perm[0]] = node.NetAddress
+		perm = perm[1:]
+	}
+
+	// swap the outbound nodes to the front of the list
+	numOutbound := 0
+	for i, node := range nodes {
+		if g.nodes[node].WasOutboundPeer {
+			nodes[numOutbound], nodes[i] = nodes[i], nodes[numOutbound]
+			numOutbound++
+		}
+	}
+	return nodes
 }
