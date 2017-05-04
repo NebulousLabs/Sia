@@ -47,7 +47,7 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 	usfs := findUnfinishedStorageFolderAdditions(scs)
 	for _, usf := range usfs {
 		sf, exists := wal.cm.storageFolders[usf.Index]
-		if exists {
+		if exists && atomic.LoadUint64(&sf.atomicUnavailable) == 0 {
 			// Close the storage folder file handles.
 			err := sf.metadataFile.Close()
 			if err != nil {

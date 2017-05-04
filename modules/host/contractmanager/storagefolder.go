@@ -90,6 +90,11 @@ type storageFolder struct {
 	atomicSuccessfulReads  uint64
 	atomicSuccessfulWrites uint64
 
+	// Atomic bool indicating whether or not the storage folder is available. If
+	// the storage folder is not available, it will still be loaded but return
+	// an error if it is queried.
+	atomicUnavailable uint64 // uint64 for alignment
+
 	// The index, path, and usage are all saved directly to disk.
 	index uint16
 	path  string
@@ -256,11 +261,15 @@ func (sf *storageFolder) setUsage(sectorIndex uint32) {
 	}
 }
 
-// storageFolderSlice returns the contract manager's storage folders map as a
-// slice.
-func (cm *ContractManager) storageFolderSlice() []*storageFolder {
+// availableStorageFolders returns the contract manager's storage folders as a
+// slice, excluding any unavailable storeage folders.
+func (cm *ContractManager) availableStorageFolders() []*storageFolder {
 	sfs := make([]*storageFolder, 0)
 	for _, sf := range cm.storageFolders {
+		// Skip unavailable storage folders.
+		if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+			continue
+		}
 		sfs = append(sfs, sf)
 	}
 	return sfs
@@ -302,7 +311,7 @@ func (cm *ContractManager) ResizeStorageFolder(index uint16, newSize uint64, for
 	cm.wal.mu.Lock()
 	sf, exists := cm.storageFolders[index]
 	cm.wal.mu.Unlock()
-	if !exists {
+	if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
 		return errStorageFolderNotFound
 	}
 
@@ -354,6 +363,13 @@ func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
 			CapacityRemaining: ((64 * uint64(len(sf.usage))) - sf.sectors) * modules.SectorSize,
 			Index:             sf.index,
 			Path:              sf.path,
+		}
+
+		// Set some of the values to extreme numbers if the storage folder is
+		// unavailable, to flag the user's attention.
+		if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+			sfm.FailedReads = 9999999999
+			sfm.FailedWrites = 9999999999
 		}
 
 		// Add this storage folder to the list of storage folders.

@@ -20,9 +20,15 @@ package contractmanager
 // TODO: Re-write the WAL to not need to do group syncing, and also to not need
 // to use the rename call at all.
 
+// TODO: When a storage folder is missing, operations on the sectors in that
+// storage folder (Add, Remove, Delete, etc.) may result in corruption and
+// inconsistent internal state for the contractor. For now, this is fine because
+// it's a rare situation, but it should be addressed eventually.
+
 import (
 	"errors"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -165,6 +171,13 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		defer cm.wal.mu.Unlock()
 
 		for _, sf := range cm.storageFolders {
+			// No storage folder to close if the folder is not available.
+			if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+				// File handles will either already be closed or may even be
+				// nil.
+				continue
+			}
+
 			err = sf.metadataFile.Close()
 			if err != nil {
 				cm.log.Println("Error closing the storage folder file handle", err)
@@ -178,7 +191,9 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 
 	// The sector location data is loaded last. Any corruption that happened
 	// during unclean shutdown has already been fixed by the WAL.
-	cm.loadSectorLocations()
+	for _, sf := range cm.storageFolders {
+		cm.loadSectorLocations(sf)
+	}
 
 	// Launch the sync loop that periodically flushes changes from the WAL to
 	// disk.

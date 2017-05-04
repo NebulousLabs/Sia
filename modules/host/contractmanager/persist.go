@@ -78,14 +78,16 @@ func (cm *ContractManager) loadSettings() error {
 		sf.usage = ss.StorageFolders[i].Usage
 		sf.metadataFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
 		if err != nil {
+			// Mark the folder as unavailable and log an error.
+			atomic.StoreUint64(&sf.atomicUnavailable, 1)
 			cm.log.Printf("ERROR: unable to open the %v sector metadata file: %v\n", sf.path, err)
-			continue
 		}
 		sf.sectorFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
 		if err != nil {
+			// Mark the folder as unavailable and log an error.
+			atomic.StoreUint64(&sf.atomicUnavailable, 1)
 			cm.log.Printf("ERROR: unable to open the %v sector file: %v\n", sf.path, err)
 			sf.metadataFile.Close()
-			continue
 		}
 		sf.availableSectors = make(map[sectorID]uint32)
 		cm.storageFolders[sf.index] = sf
@@ -95,36 +97,40 @@ func (cm *ContractManager) loadSettings() error {
 
 // loadSectorLocations will read the metadata portion of each storage folder
 // file and load the sector location information into memory.
-func (cm *ContractManager) loadSectorLocations() {
-	// Each storage folder houses separate sector location data.
-	for _, sf := range cm.storageFolders {
-		// Read the sector lookup table for this storage folder into memory.
-		sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.usage)*storageFolderGranularity)
-		if err != nil {
-			cm.log.Printf("ERROR: unable to read sector metadata for folder %v: %v\n", sf.path, err)
-			atomic.AddUint64(&sf.atomicFailedReads, 1)
-			continue
-		}
-		atomic.AddUint64(&sf.atomicSuccessfulReads, 1)
+func (cm *ContractManager) loadSectorLocations(sf *storageFolder) {
+	if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+		// The metadata is going to be unavailable, best we can do is count the
+		// number of sectors.
+		sf.sectors = uint64(len(usageSectors(sf.usage)))
+		return
+	}
 
-		// Iterate through the sectors that are in-use and read their storage
-		// locations into memory.
-		sf.sectors = 0 // may be non-zero from WAL operations - they will be double counted here if not reset.
-		for _, sectorIndex := range usageSectors(sf.usage) {
-			readHead := sectorMetadataDiskSize * sectorIndex
-			var id sectorID
-			copy(id[:], sectorLookupBytes[readHead:readHead+12])
-			count := binary.LittleEndian.Uint16(sectorLookupBytes[readHead+12 : readHead+14])
-			sl := sectorLocation{
-				index:         sectorIndex,
-				storageFolder: sf.index,
-				count:         count,
-			}
+	// Read the sector lookup table for this storage folder into memory.
+	sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.usage)*storageFolderGranularity)
+	if err != nil {
+		cm.log.Printf("ERROR: unable to read sector metadata for folder %v: %v\n", sf.path, err)
+		atomic.AddUint64(&sf.atomicFailedReads, 1)
+		return
+	}
+	atomic.AddUint64(&sf.atomicSuccessfulReads, 1)
 
-			// Add the sector to the sector location map.
-			cm.sectorLocations[id] = sl
-			sf.sectors++
+	// Iterate through the sectors that are in-use and read their storage
+	// locations into memory.
+	sf.sectors = 0 // may be non-zero from WAL operations - they will be double counted here if not reset.
+	for _, sectorIndex := range usageSectors(sf.usage) {
+		readHead := sectorMetadataDiskSize * sectorIndex
+		var id sectorID
+		copy(id[:], sectorLookupBytes[readHead:readHead+12])
+		count := binary.LittleEndian.Uint16(sectorLookupBytes[readHead+12 : readHead+14])
+		sl := sectorLocation{
+			index:         sectorIndex,
+			storageFolder: sf.index,
+			count:         count,
 		}
+
+		// Add the sector to the sector location map.
+		cm.sectorLocations[id] = sl
+		sf.sectors++
 	}
 }
 
