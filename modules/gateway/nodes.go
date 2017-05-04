@@ -24,10 +24,6 @@ type node struct {
 	WasOutboundPeer bool               `json:"wasoutboundpeer"`
 }
 
-func (n node) String() string {
-	return string(n.NetAddress)
-}
-
 // addNode adds an address to the set of nodes on the network.
 func (g *Gateway) addNode(addr modules.NetAddress) error {
 	if addr == g.myAddr {
