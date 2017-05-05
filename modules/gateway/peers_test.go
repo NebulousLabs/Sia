@@ -967,3 +967,27 @@ func TestOverloadedBootstrap(t *testing.T) {
 		}
 	}
 }
+
+// TestBuildPeerManagerNodeList tests the buildPeerManagerNodeList method.
+func TestBuildPeerManagerNodeList(t *testing.T) {
+	g := &Gateway{
+		nodes: map[modules.NetAddress]*node{
+			"foo":  {NetAddress: "foo", WasOutboundPeer: true},
+			"bar":  {NetAddress: "bar", WasOutboundPeer: false},
+			"baz":  {NetAddress: "baz", WasOutboundPeer: true},
+			"quux": {NetAddress: "quux", WasOutboundPeer: false},
+		},
+	}
+	nodelist := g.buildPeerManagerNodeList()
+	// all outbound nodes should be at the front of the list
+	var i int
+	for i < len(nodelist) && g.nodes[nodelist[i]].WasOutboundPeer {
+		i++
+	}
+	for i < len(nodelist) && !g.nodes[nodelist[i]].WasOutboundPeer {
+		i++
+	}
+	if i != len(nodelist) {
+		t.Fatal("bad nodelist:", nodelist)
+	}
+}
