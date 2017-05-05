@@ -5,6 +5,7 @@ package api
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
@@ -1355,19 +1356,16 @@ func TestRedundancyReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Make sure that every wallet has money in it.
 	err = fundAllNodes(testGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Add storage to every host.
 	err = addStorageToAllHosts(testGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Announce every host.
 	err = announceAllHosts(testGroup)
 	if err != nil {
@@ -1401,33 +1399,31 @@ func TestRedundancyReporting(t *testing.T) {
 	}
 
 	// redundancy should reach 2
-	success := false
 	var rf RenterFiles
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(time.Millisecond * 100) {
+	err = retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
-			success = true
-			break
+			return nil
 		}
-	}
-	if !success {
-		t.Fatal("file upload did not complete after one minute")
+		return errors.New("file not uploaded")
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// take down one of the hosts
 	stH1.server.Close()
 
 	// wait for the redundancy to decrement
-	success = false
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(time.Millisecond * 100) {
+	err = retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
-			success = true
-			break
+			return nil
 		}
-	}
-	if !success {
-		t.Fatal("file redundancy did not decrement after closing host after one minute")
+		return errors.New("file redundancy not decremented")
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// bring back the host
@@ -1451,15 +1447,14 @@ func TestRedundancyReporting(t *testing.T) {
 	}
 
 	// redundancy should increment back to 2
-	success = false
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(time.Millisecond * 100) {
+	err = retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
-			success = true
-			break
+			return nil
 		}
-	}
-	if !success {
-		t.Fatal("redundancy did not increment after bringing host back online")
+		return errors.New("file redundancy not incremented")
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
