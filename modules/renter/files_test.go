@@ -144,6 +144,25 @@ func TestFileRedundancy(t *testing.T) {
 		if r := f.redundancy(); r <= 1 || r != expectedR {
 			t.Errorf("expected a redundancy >1 and equal to %f, got %f", expectedR, r)
 		}
+
+		// verify offline file contracts are not counted in the redundancy
+		fc = fileContract{
+			ID:      types.FileContractID{4},
+			Offline: true,
+		}
+		for iChunk := uint64(0); iChunk < f.numChunks(); iChunk++ {
+			for iPiece := 0; iPiece < f.erasureCode.MinPieces(); iPiece++ {
+				pd := pieceData{
+					Chunk: iChunk,
+					Piece: uint64(iPiece),
+				}
+				fc.Pieces = append(fc.Pieces, pd)
+			}
+		}
+		f.contracts[fc.ID] = fc
+		if r := f.redundancy(); r != expectedR {
+			t.Errorf("expected redundancy to ignore offline file contracts, wanted %f got %f", expectedR, r)
+		}
 	}
 }
 

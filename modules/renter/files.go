@@ -43,6 +43,7 @@ type fileContract struct {
 	Pieces []pieceData
 
 	WindowStart types.BlockHeight
+	Offline     bool
 }
 
 // pieceData contains the metadata necessary to request a piece from a
@@ -125,6 +126,10 @@ func (f *file) redundancy() float64 {
 		return -1
 	}
 	for _, fc := range f.contracts {
+		// do not count pieces from the contract if the contract is offline
+		if fc.Offline {
+			continue
+		}
 		for _, p := range fc.Pieces {
 			piecesPerChunk[p.Chunk]++
 		}
