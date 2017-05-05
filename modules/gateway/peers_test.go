@@ -968,6 +968,83 @@ func TestOverloadedBootstrap(t *testing.T) {
 	}
 }
 
+// TestPeerManagerPriority tests that the peer manager will prioritize
+// connecting to previous outbound peers before inbound peers.
+func TestPeerManagerPriority(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	g1 := newNamedTestingGateway(t, "1")
+	defer g1.Close()
+	g2 := newNamedTestingGateway(t, "2")
+	defer g2.Close()
+	g3 := newNamedTestingGateway(t, "3")
+	defer g3.Close()
+
+	// Connect g1 to g2. This will cause g2 to be saved as an outbound peer in
+	// g1's node list.
+	if err := g1.Connect(g2.Address()); err != nil {
+		t.Fatal(err)
+	}
+	// Connect g3 to g1. This will cause g3 to be added to g1's node list, but
+	// not as an outbound peer.
+	if err := g3.Connect(g1.Address()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify assumptions about node list.
+	g1.mu.RLock()
+	g2isOutbound := g1.nodes[g2.Address()].WasOutboundPeer
+	g3isOutbound := g1.nodes[g3.Address()].WasOutboundPeer
+	g1.mu.RUnlock()
+	if !g2isOutbound {
+		t.Fatal("g2 should be an outbound node")
+	} else if g3isOutbound {
+		t.Fatal("g3 should not be an outbound node")
+	}
+
+	// Disconnect everyone.
+	g1.Disconnect(g2.Address())
+	g1.Disconnect(g3.Address())
+
+	// Shutdown g1.
+	err := g1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Restart g1. It should immediately reconnect to g2, and then g3 after a
+	// delay.
+	g1, err = New(string(g1.myAddr), false, g1.persistDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g1.Close()
+
+	// Wait until g1 connects to g2.
+	for i := 0; i < 100; i++ {
+		if peers := g1.Peers(); len(peers) == 0 {
+			time.Sleep(10 * time.Millisecond)
+		} else if len(peers) == 1 && peers[0].NetAddress == g2.Address() {
+			break
+		} else {
+			t.Fatal("something wrong with the peer list:", peers)
+		}
+	}
+	// Wait until g1 connects to g3.
+	for i := 0; i < 100; i++ {
+		if peers := g1.Peers(); len(peers) == 1 {
+			time.Sleep(10 * time.Millisecond)
+		} else if len(peers) == 2 {
+			break
+		} else {
+			t.Fatal("something wrong with the peer list:", peers)
+		}
+	}
+}
+
 // TestBuildPeerManagerNodeList tests the buildPeerManagerNodeList method.
 func TestBuildPeerManagerNodeList(t *testing.T) {
 	g := &Gateway{
