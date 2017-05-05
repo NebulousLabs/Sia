@@ -11,7 +11,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
-	"github.com/NebulousLabs/muxado"
 )
 
 var (
@@ -37,7 +36,7 @@ func (s invalidVersionError) Error() string {
 
 type peer struct {
 	modules.Peer
-	sess muxado.Session
+	sess streamSession
 }
 
 // sessionHeader is sent after the initial version exchange. It prevents peers
@@ -138,7 +137,7 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 		return
 	}
 
-	if build.VersionCmp(remoteVersion, sessionHandshakeUpgradeVersion) >= 0 {
+	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
 		err = acceptConnSessionHandshake(conn, g.id)
 		if err != nil {
 			g.log.Debugf("INFO: %v wanted to connect, but failed: %v", addr, err)
@@ -182,7 +181,7 @@ func (g *Gateway) managedAcceptConnOldPeer(conn net.Conn, remoteVersion string) 
 			NetAddress: addr,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Server(conn),
+		sess: newServerStream(conn, remoteVersion),
 	})
 	g.addNode(addr)
 	return nil
@@ -216,7 +215,7 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Server(conn),
+		sess: newServerStream(conn, remoteVersion),
 	})
 
 	// Attempt to ping the supplied address. If successful, and a connection is wanted,
@@ -438,7 +437,7 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Client(conn),
+		sess: newClientStream(conn, remoteVersion),
 	})
 
 	// Add the peer to the node list and prioritize it for future connections.
@@ -518,7 +517,7 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 		return err
 	}
 
-	if build.VersionCmp(remoteVersion, sessionHandshakeUpgradeVersion) >= 0 {
+	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
 		err = g.managedConnectv130Peer(conn, remoteVersion, addr)
 	} else if build.VersionCmp(remoteVersion, handshakeUpgradeVersion) >= 0 {
 		err = g.managedConnectv100Peer(conn, remoteVersion, addr)
