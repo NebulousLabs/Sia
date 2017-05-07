@@ -572,6 +572,32 @@ func TestWalletTransactionGETid(t *testing.T) {
 	if wtgid.Transaction.Outputs[0].FundType != types.SpecifierMinerPayout {
 		t.Error("fund type should be a miner payout")
 	}
+
+	// Query the details of a transaction where siacoins were sent.
+	// NOTE: We call the SendSiacoins method directly to get convenient access
+	// to the txid.
+	sentValue := types.SiacoinPrecision
+	txns, err := st.wallet.SendSiacoins(sentValue, types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.miner.AddBlock()
+
+	var wtgid2 WalletTransactionGETid
+	err = st.getAPI(fmt.Sprintf("/wallet/transaction/%s", txns[1].ID()), &wtgid2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn := wtgid2.Transaction
+	if txn.TransactionID != txns[1].ID() {
+		t.Error("wrong transaction was fetched")
+	} else if len(txn.Inputs) != 1 || len(txn.Outputs) != 2 {
+		t.Error("expected 1 input and 2 outputs, got", len(txn.Inputs), len(txn.Outputs))
+	} else if !txn.Outputs[0].Value.Equals(sentValue) {
+		t.Errorf("expected first output to equal %v, got %v", sentValue, txn.Outputs[0].Value)
+	} else if exp := txn.Inputs[0].Value.Sub(sentValue); !txn.Outputs[1].Value.Equals(exp) {
+		t.Errorf("expected first output to equal %v, got %v", exp, txn.Outputs[1].Value)
+	}
 }
 
 // Tests that the /wallet/backup call checks for relative paths.
