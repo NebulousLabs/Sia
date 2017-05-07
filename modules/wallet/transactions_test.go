@@ -29,7 +29,8 @@ func TestIntegrationTransactions(t *testing.T) {
 	if len(txns) != int(types.MaturityDelay+1) {
 		t.Error("unexpected transaction history length")
 	}
-	sendTxns, err := wt.wallet.SendSiacoins(types.NewCurrency64(5000), types.UnlockHash{})
+	sentValue := types.NewCurrency64(5000)
+	_, err = wt.wallet.SendSiacoins(sentValue, types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,18 +73,76 @@ func TestIntegrationTransactions(t *testing.T) {
 	if len(txns) != 3 {
 		t.Error(len(txns))
 	}
+}
 
-	// Check that transactions can be queried individually.
-	txn, exists := wt.wallet.Transaction(sendTxns[0].ID())
+// TestIntegrationTransaction checks that individually queried transactions
+// contain the correct values.
+func TestIntegrationTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	_, exists := wt.wallet.Transaction(types.TransactionID{})
+	if exists {
+		t.Error("able to query a nonexisting transction")
+	}
+
+	// test sending siacoins
+	sentValue := types.NewCurrency64(5000)
+	sendTxns, err := wt.wallet.SendSiacoins(sentValue, types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// sendTxns[0] is the set-up transaction, sendTxns[1] contains the sentValue output
+	txn, exists := wt.wallet.Transaction(sendTxns[1].ID())
 	if !exists {
 		t.Fatal("unable to query transaction")
 	}
-	if txn.TransactionID != sendTxns[0].ID() {
+	if txn.TransactionID != sendTxns[1].ID() {
 		t.Error("wrong transaction was fetched")
+	} else if len(txn.Inputs) != 1 || len(txn.Outputs) != 2 {
+		t.Error("expected 1 input and 2 outputs, got", len(txn.Inputs), len(txn.Outputs))
+	} else if !txn.Outputs[0].Value.Equals(sentValue) {
+		t.Errorf("expected first output to equal %v, got %v", sentValue, txn.Outputs[0].Value)
+	} else if exp := txn.Inputs[0].Value.Sub(sentValue); !txn.Outputs[1].Value.Equals(exp) {
+		t.Errorf("expected first output to equal %v, got %v", exp, txn.Outputs[1].Value)
 	}
-	_, exists = wt.wallet.Transaction(types.TransactionID{})
-	if exists {
-		t.Error("able to query a nonexisting transction")
+
+	// test sending siafunds
+	err = wt.wallet.LoadSiagKeys(wt.walletMasterKey, []string{"../../types/siag0of1of1.siakey"})
+	if err != nil {
+		t.Error(err)
+	}
+	sentValue = types.NewCurrency64(12)
+	sendTxns, err = wt.wallet.SendSiafunds(sentValue, types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	txn, exists = wt.wallet.Transaction(sendTxns[1].ID())
+	if !exists {
+		t.Fatal("unable to query transaction")
+	}
+	if len(txn.Inputs) != 1 || len(txn.Outputs) != 3 {
+		t.Error("expected 1 input and 3 outputs, got", len(txn.Inputs), len(txn.Outputs))
+	} else if !txn.Outputs[1].Value.Equals(sentValue) {
+		t.Errorf("expected first output to equal %v, got %v", sentValue, txn.Outputs[1].Value)
+	} else if exp := txn.Inputs[0].Value.Sub(sentValue); !txn.Outputs[2].Value.Equals(exp) {
+		t.Errorf("expected first output to equal %v, got %v", exp, txn.Outputs[2].Value)
 	}
 }
 
