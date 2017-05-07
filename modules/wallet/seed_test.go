@@ -12,14 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// resetChangeID clears the wallet's ConsensusChangeID. When Unlock is called,
-// the wallet will rescan from the genesis block.
-func resetChangeID(w *Wallet) {
-	w.mu.Lock()
-	dbPutConsensusChangeID(w.dbTx, modules.ConsensusChangeBeginning)
-	w.mu.Unlock()
-}
-
 // TestPrimarySeed checks that the correct seed is returned when calling
 // PrimarySeed.
 func TestPrimarySeed(t *testing.T) {
@@ -154,29 +146,12 @@ func TestLoadSeed(t *testing.T) {
 	if !bytes.Equal(allSeeds[1][:], seed[:]) {
 		t.Error("AllSeeds returned the wrong seed")
 	}
-	w.Close()
 
-	// Rather than worry about a rescan, which isn't implemented and has
-	// synchronization difficulties, just load a new wallet from the same
-	// settings file - the same effect is achieved without the difficulties.
-	//
-	// TODO: when proper seed loading is implemented, just check the balance
-	// of w directly.
-	w2, err := New(wt.cs, wt.tpool, dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// reset the ccID so that the wallet does a full rescan
-	resetChangeID(w2)
-	err = w2.Unlock(crypto.TwofishKey(crypto.HashObject(newSeed)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	siacoinBal2, _, _ := w2.ConfirmedBalance()
+	siacoinBal2, _, _ := w.ConfirmedBalance()
 	if siacoinBal2.Cmp64(0) <= 0 {
 		t.Error("wallet failed to load a seed with money in it")
 	}
-	allSeeds, err = w2.AllSeeds()
+	allSeeds, err = w.AllSeeds()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +164,6 @@ func TestLoadSeed(t *testing.T) {
 	if !bytes.Equal(allSeeds[1][:], seed[:]) {
 		t.Error("AllSeeds returned the wrong seed")
 	}
-	w2.Close()
 }
 
 // TestSweepSeedCoins tests that sweeping a seed results in the transfer of
@@ -272,22 +246,7 @@ func TestSweepSeedFunds(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	wt.wallet.Close()
 
-	// Create a second wallet that loads the persist structures of the existing
-	// wallet. This wallet should have a siafund balance.
-	//
-	// TODO: when proper seed loading is implemented, this will be unnecessary.
-	wt.wallet, err = New(wt.cs, wt.tpool, wt.wallet.persistDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// reset the changeID
-	resetChangeID(wt.wallet)
-	err = wt.wallet.Unlock(wt.walletMasterKey)
-	if err != nil {
-		t.Fatal(err)
-	}
 	_, siafundBal, _ := wt.wallet.ConfirmedBalance()
 	if siafundBal.Cmp(types.NewCurrency64(2000)) != 0 {
 		t.Error("expecting a siafund balance of 2000 from the 1of1 key")
@@ -362,22 +321,7 @@ func TestSweepSeedSentFunds(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	wt.wallet.Close()
 
-	// Create a second wallet that loads the persist structures of the existing
-	// wallet. This wallet should have a siafund balance.
-	//
-	// TODO: when proper seed loading is implemented, this will be unnecessary.
-	wt.wallet, err = New(wt.cs, wt.tpool, wt.wallet.persistDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// reset the changeID
-	resetChangeID(wt.wallet)
-	err = wt.wallet.Unlock(wt.walletMasterKey)
-	if err != nil {
-		t.Fatal(err)
-	}
 	_, siafundBal, _ := wt.wallet.ConfirmedBalance()
 	if siafundBal.Cmp(types.NewCurrency64(2000)) != 0 {
 		t.Error("expecting a siafund balance of 2000 from the 1of1 key")
@@ -464,30 +408,10 @@ func TestSweepSeedCoinsAndFunds(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	wt.wallet.Close()
 
-	// Create a second wallet that loads the persist structures of the existing
-	// wallet. This wallet should have a siafund balance.
-	//
-	// TODO: when proper seed loading is implemented, this will be unnecessary.
-	wt.wallet, err = New(wt.cs, wt.tpool, wt.wallet.persistDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// reset the changeID
-	resetChangeID(wt.wallet)
-	err = wt.wallet.Unlock(wt.walletMasterKey)
-	if err != nil {
-		t.Fatal(err)
-	}
 	_, siafundBal, _ := wt.wallet.ConfirmedBalance()
 	if siafundBal.Cmp(types.NewCurrency64(2000)) != 0 {
 		t.Error("expecting a siafund balance of 2000 from the 1of1 key")
-	}
-	// need to reset the miner as well, since it depends on the wallet
-	wt.miner, err = miner.New(wt.cs, wt.tpool, wt.wallet, wt.wallet.persistDir)
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	// Create a seed and generate an address to send money to.
