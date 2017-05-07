@@ -16,6 +16,13 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// List of helper functions:
+//    announceAllHosts     // announce all hosts to the network (and mine a block)
+//    fullyConnectNodes    // connects each server tester to all the others
+//    fundAllNodes         // mines blocks until all server testers have money
+//    synchronizationCheck // checks that all server testers have the same recent block
+//    waitForBlock         // block until the provided block is the most recent block for all server testers
+
 // addStorageToAllHosts adds a storage folder with a bunch of storage to each
 // host.
 func addStorageToAllHosts(sts []*serverTester) error {
