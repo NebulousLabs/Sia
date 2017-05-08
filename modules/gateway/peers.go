@@ -454,7 +454,7 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 	return nil
 }
 
-// managedConnectNewPeer connects to peers >= v1.0.0 and < v1.2.0. The peer is added as a
+// managedConnectNewPeer connects to peers >= v1.0.0 and < v1.3.0. The peer is added as a
 // node and a peer. The peer is only added if a nil error is returned.
 func (g *Gateway) managedConnectv100Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
 	g.mu.RLock()
@@ -470,12 +470,12 @@ func (g *Gateway) managedConnectv100Peer(conn net.Conn, remoteVersion string, re
 	return g.managedConnectOldPeer(conn, remoteVersion, remoteAddr)
 }
 
-// managedConnectNewPeer connects to peers >= v1.2.0. The peer is added as a
+// managedConnectNewPeer connects to peers >= v1.3.0. The peer is added as a
 // node and a peer. The peer is only added if a nil error is returned.
-func (g *Gateway) managedConnectv120Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
+func (g *Gateway) managedConnectv130Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
 	wantConnect := true
 	err := connectSessionHandshake(conn, g.id, wantConnect)
-	if err == nil {
+	if err != nil {
 		return err
 	}
 
@@ -519,7 +519,7 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	}
 
 	if build.VersionCmp(remoteVersion, sessionHandshakeUpgradeVersion) >= 0 {
-		err = g.managedConnectv120Peer(conn, remoteVersion, addr)
+		err = g.managedConnectv130Peer(conn, remoteVersion, addr)
 	} else if build.VersionCmp(remoteVersion, handshakeUpgradeVersion) >= 0 {
 		err = g.managedConnectv100Peer(conn, remoteVersion, addr)
 	} else {
