@@ -1,8 +1,8 @@
 package modules
 
 import (
-	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"time"
 
@@ -66,28 +66,53 @@ type DownloadInfo struct {
 // DownloadWriter provides an interface which all output writers have to implement.
 type DownloadWriter interface {
 	WriteAt(b []byte, off int64) (int, error)
-	String() string
+	Location() string
 }
 
 // DownloadBufferWriter is a buffer-backed implementation of DownloadWriter.
 type DownloadBufferWriter struct {
-	bytes.Buffer
+	data []byte
 }
 
 // NewDownloadBufferWriter creates a new DownloadWriter that writes to a buffer.
-func NewDownloadBufferWriter() *DownloadBufferWriter {
-	return &DownloadBufferWriter{}
+func NewDownloadBufferWriter(size uint64) *DownloadBufferWriter {
+	return &DownloadBufferWriter{
+		data: make([]byte, size),
+	}
+}
+
+// Location implements the Location method of the DownloadWriter
+// interface and informs callers where this download writer is
+// being written to.
+func (dw *DownloadBufferWriter) Location() string {
+	return "buffer"
 }
 
 // WriteAt writes the passed bytes to the DownloadBuffer.
-func (dw *DownloadBufferWriter) WriteAt(b []byte, off int64) (int, error) {
-	return dw.Write(b)
+func (dw *DownloadBufferWriter) WriteAt(bytes []byte, off int64) (int, error) {
+	if len(bytes)+int(off) > len(dw.data) {
+		return 0, errors.New("write at specified offset exceeds buffer size")
+	}
+
+	i := 0
+	for _, b := range bytes {
+		dw.data[off+int64(i)] = b
+		i++
+	}
+
+	return i, nil
+}
+
+// Bytes returns the underlying byte slice of the
+// DownloadBufferWriter.
+func (dw *DownloadBufferWriter) Bytes() []byte {
+	return dw.data
 }
 
 // DownloadFileWriter is a file-backed implementation of DownloadWriter.
 type DownloadFileWriter struct {
 	f        *os.File
-	Location string
+	location string
 	offset   uint64
 }
 
@@ -96,9 +121,16 @@ func NewDownloadFileWriter(fname string, offset, length uint64) *DownloadFileWri
 	l, _ := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
 	return &DownloadFileWriter{
 		f:        l,
-		Location: fname,
+		location: fname,
 		offset:   offset,
 	}
+}
+
+// Location implements the Location method of the DownloadWriter
+// interface and informs callers where this download writer is
+// being written to.
+func (dw *DownloadFileWriter) Location() string {
+	return dw.location
 }
 
 // WriteAt writes the passed bytes at the specified offset.
@@ -112,11 +144,6 @@ func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
 	dw.f.Sync()
 
 	return r, err
-}
-
-// String returns the destination of the DownloadFileWriter as a string.
-func (dw *DownloadFileWriter) String() string {
-	return dw.Location
 }
 
 // DownloadHttpWriter is a http response writer-backed implementation of DownloadWriter.
@@ -140,6 +167,13 @@ func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *Downlo
 		length:         int(length),
 		buffer:         make(map[int][]byte),
 	}
+}
+
+// Location implements the Location method of the DownloadWriter
+// interface and informs callers where this download writer is
+// being written to.
+func (dw *DownloadHttpWriter) Location() string {
+	return "httpresp"
 }
 
 // WriteAt buffers parts of the file until the entire file can be
@@ -169,11 +203,6 @@ func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
 	}
 
 	return totalDataSend, nil
-}
-
-// String returns the destination of the DownloadHttpWriter as a string.
-func (dw *DownloadHttpWriter) String() string {
-	return "httpresp"
 }
 
 // FileUploadParams contains the information used by the Renter to upload a

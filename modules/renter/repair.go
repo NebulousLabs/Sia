@@ -290,6 +290,10 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 	r.managedWaitOnRepairWork(rs)
 }
 
+// managedGetChunkData grabs the requested `chunkID` from the file, in order to
+// repair the file. If the `trackedFile` can be found on disk, grab the chunk
+// from the file, otherwise attempt to queue a new download for only that chunk
+// and return the downloaded chunk.
 func (r *Renter) managedGetChunkData(file *file, trackedFile trackedFile, chunkID chunkID) ([]byte, error) {
 	chunkIndex := chunkID.index
 	offset := chunkIndex * file.chunkSize()
@@ -305,16 +309,19 @@ func (r *Renter) managedGetChunkData(file *file, trackedFile trackedFile, chunkI
 			currentContracts[contract.NetAddress] = contract.ID
 		}
 
+		downloadSize := file.chunkSize()
+		if offset+downloadSize > file.size {
+			downloadSize = file.size - offset
+		}
+
 		// create a DownloadBufferWriter
-		buf := modules.NewDownloadBufferWriter()
+		buf := modules.NewDownloadBufferWriter(downloadSize)
 
-		// create the download object
-		d := r.newSectionDownload(file, buf, currentContracts, offset, file.chunkSize())
-
-		lockID := r.mu.Lock()
-		r.downloadQueue = append(r.downloadQueue, d)
-		r.mu.Unlock(lockID)
-		r.newDownloads <- d
+		// create the download object and push it on to the download queue
+		d := r.newSectionDownload(file, buf, currentContracts, offset, downloadSize)
+		go func() {
+			r.newDownloads <- d
+		}()
 
 		// wait for the download to complete and return the data
 		select {
