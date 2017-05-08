@@ -31,6 +31,11 @@ func (g *Gateway) managedPeerManagerConnect(addr modules.NetAddress) {
 			// race condition could mean that the peer was disconnected
 			// before this code block was reached.
 			p.Inbound = false
+			if n, ok := g.nodes[p.NetAddress]; ok && !n.WasOutboundPeer {
+				n.WasOutboundPeer = true
+				g.nodes[n.NetAddress] = n
+				g.saveSync()
+			}
 			g.log.Debugf("[PMC] [SUCCESS] [%v] existing peer has been converted to outbound peer", addr)
 		}
 		g.mu.Unlock()
