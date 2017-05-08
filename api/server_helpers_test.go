@@ -44,45 +44,12 @@ type Server struct {
 	wg sync.WaitGroup
 }
 
-// NewServer creates a new API server from the provided modules. The API will
-// require authentication using HTTP basic auth if the supplied password is not
-// the empty string. Usernames are ignored for authentication. This type of
-// authentication sends passwords in plaintext and should therefore only be
-// used if the APIaddr is localhost.
-func NewServer(APIaddr string, requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*Server, error) {
-	l, err := net.Listen("tcp", APIaddr)
+// panicClose will cloae a Server, panicking if there is an error upon close.
+func (srv *Server) panicClose() {
+	err := srv.Close()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-
-	a := New(requiredUserAgent, requiredPassword, cs, e, g, h, m, r, tp, w)
-	srv := &Server{
-		api: a,
-
-		listener:          l,
-		requiredUserAgent: requiredUserAgent,
-		apiServer: &http.Server{
-			Handler: a,
-		},
-	}
-
-	return srv, nil
-}
-
-// Serve listens for and handles API calls. It is a blocking function.
-func (srv *Server) Serve() error {
-	// Block the Close() method until Serve() has finished.
-	srv.wg.Add(1)
-	defer srv.wg.Done()
-
-	// The server will run until an error is encountered or the listener is
-	// closed, via either the Close method or the signal handling above.
-	// Closing the listener will result in the benign error handled below.
-	err := srv.apiServer.Serve(srv.listener)
-	if err != nil && !strings.HasSuffix(err.Error(), "use of closed network connection") {
-		return err
-	}
-	return nil
 }
 
 // Close closes the Server's listener, causing the HTTP server to shut down.
@@ -124,16 +91,57 @@ func (srv *Server) Close() error {
 	return build.JoinErrors(errs, "\n")
 }
 
+// Serve listens for and handles API calls. It is a blocking function.
+func (srv *Server) Serve() error {
+	// Block the Close() method until Serve() has finished.
+	srv.wg.Add(1)
+	defer srv.wg.Done()
+
+	// The server will run until an error is encountered or the listener is
+	// closed, via either the Close method or the signal handling above.
+	// Closing the listener will result in the benign error handled below.
+	err := srv.apiServer.Serve(srv.listener)
+	if err != nil && !strings.HasSuffix(err.Error(), "use of closed network connection") {
+		return err
+	}
+	return nil
+}
+
+// NewServer creates a new API server from the provided modules. The API will
+// require authentication using HTTP basic auth if the supplied password is not
+// the empty string. Usernames are ignored for authentication. This type of
+// authentication sends passwords in plaintext and should therefore only be
+// used if the APIaddr is localhost.
+func NewServer(APIaddr string, requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*Server, error) {
+	l, err := net.Listen("tcp", APIaddr)
+	if err != nil {
+		return nil, err
+	}
+
+	a := New(requiredUserAgent, requiredPassword, cs, e, g, h, m, r, tp, w)
+	srv := &Server{
+		api: a,
+
+		listener:          l,
+		requiredUserAgent: requiredUserAgent,
+		apiServer: &http.Server{
+			Handler: a,
+		},
+	}
+
+	return srv, nil
+}
+
 // serverTester contains a server and a set of channels for keeping all of the
 // modules synchronized during testing.
 type serverTester struct {
 	cs        modules.ConsensusSet
+	explorer  modules.Explorer
 	gateway   modules.Gateway
 	host      modules.Host
 	miner     modules.TestMiner
 	renter    modules.Renter
 	tpool     modules.TransactionPool
-	explorer  modules.Explorer
 	wallet    modules.Wallet
 	walletKey crypto.TwofishKey
 
@@ -455,6 +463,15 @@ func decodeError(resp *http.Response) error {
 // non2xx returns true for non-success HTTP status codes.
 func non2xx(code int) bool {
 	return code < 200 || code > 299
+}
+
+// panicClose attempts to close a serverTester. If it fails, panic is called
+// with the error.
+func (st *serverTester) panicClose() {
+	err := st.server.Close()
+	if err != nil {
+		panic(err)
+	}
 }
 
 // retry will retry a function multiple times until it returns 'nil'. It will
