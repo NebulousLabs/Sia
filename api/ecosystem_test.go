@@ -8,8 +8,6 @@ package api
 // exclusively through the API.
 
 import (
-	"errors"
-	"net/url"
 	"testing"
 	"time"
 
@@ -27,6 +25,7 @@ func TestHostPoorConnectivity(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create the various nodes that will be forming the simulated ecosystem of
 	// this test.

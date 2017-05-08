@@ -58,7 +58,7 @@ func TestWorkingStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// announce a host, create an allowance, upload some data.
 	if err := st.announceHost(); err != nil {
@@ -127,7 +127,7 @@ func TestConnectabilityStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	if err := st.announceHost(); err != nil {
 		t.Fatal(err)
@@ -155,7 +155,7 @@ func TestStorageHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -227,7 +227,7 @@ func TestAddFolderNoPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Try adding a storage folder without setting "path" in the API call.
 	addValues := url.Values{}
@@ -256,7 +256,7 @@ func TestAddFolderNoSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Try adding a storage folder without setting "size" in the API call.
 	addValues := url.Values{}
@@ -278,7 +278,7 @@ func TestAddSameFolderTwice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Make the call to add a storage folder twice.
 	addValues := url.Values{}
@@ -305,7 +305,7 @@ func TestResizeEmptyStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -387,7 +387,7 @@ func TestResizeNonemptyStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -500,7 +500,7 @@ func TestResizeNonexistentFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// No folder has been created yet at st.dir, so using it as the path for
 	// the resize call should trigger an error.
@@ -524,7 +524,7 @@ func TestResizeFolderNoPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// The call to resize should fail if no path has been provided.
 	resizeValues := url.Values{}
@@ -546,7 +546,7 @@ func TestRemoveEmptyStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Set up a storage folder for the host.
 	if err := st.setHostStorage(); err != nil {
@@ -572,7 +572,7 @@ func TestRemoveStorageFolderError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Set up a storage folder for the host.
 	if err := st.setHostStorage(); err != nil {
@@ -607,7 +607,7 @@ func TestRemoveStorageFolderForced(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host.
 	if err := st.announceHost(); err != nil {
@@ -678,7 +678,7 @@ func TestDeleteSector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Set up the host for forming contracts.
 	if err := st.announceHost(); err != nil {
@@ -746,7 +746,7 @@ func TestDeleteNonexistentSector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// These calls to delete imaginary sectors should fail for a few reasons:
 	// - the given sector root strings are invalid

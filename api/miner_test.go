@@ -19,7 +19,7 @@ func TestMinerGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Get the api returned fields of the miner.
 	var mg MinerGET
@@ -55,7 +55,7 @@ func TestMinerStartStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Start the cpu miner, give time for the first hashrate readings to
 	// appear.
@@ -109,7 +109,7 @@ func TestMinerHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 	startingHeight := st.cs.Height()
 
 	// Get a header that can be used for mining.

@@ -24,11 +24,12 @@ func TestHostAndRentVanilla(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
@@ -213,21 +214,22 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 	stH1, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stH1.server.Close()
+	defer stH1.server.panicClose()
 	stH2, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stH2.server.Close()
+	defer stH2.server.panicClose()
 	testGroup := []*serverTester{st, stH1, stH2}
 
 	// Connect the testers to eachother so that they are all on the same
@@ -328,26 +330,27 @@ func TestHostAndRentManyFiles(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 	stH1, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stH1.server.Close()
+	defer stH1.server.panicClose()
 	stH2, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stH2.server.Close()
+	defer stH2.server.panicClose()
 	stH3, err := blankServerTester(t.Name() + " - Host 4")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stH3.server.Close()
+	defer stH3.server.panicClose()
 	testGroup := []*serverTester{st, stH1, stH2, stH3}
 
 	// Connect the testers to eachother so that they are all on the same
@@ -541,7 +544,7 @@ func TestRenterUploadDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
@@ -667,7 +670,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
@@ -747,7 +750,7 @@ func TestRenterParallelDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
@@ -856,7 +859,7 @@ func TestRenterRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
@@ -972,7 +975,7 @@ func TestRenterAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
@@ -1172,7 +1175,7 @@ func TestHostAndRentReload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 	err = st.announceHost()
 	if err != nil {
 		t.Fatal(err)
