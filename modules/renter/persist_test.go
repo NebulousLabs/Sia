@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -204,6 +205,7 @@ func TestRenterSaveLoad(t *testing.T) {
 	rt.renter.saveFile(f1)
 	rt.renter.saveFile(f2)
 	rt.renter.saveFile(f3)
+	rt.renter.offlineContracts[types.FileContractID{}] = true
 
 	err = rt.renter.saveSync() // save metadata
 	if err != nil {
@@ -218,6 +220,10 @@ func TestRenterSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// load should load the offlineContracts map
+	if _, exists := rt.renter.offlineContracts[types.FileContractID{}]; !exists {
+		t.Fatal("did not load offline contracts")
+	}
 	if err := equalFiles(f1, rt.renter.files[f1.name]); err != nil {
 		t.Fatal(err)
 	}

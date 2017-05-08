@@ -112,8 +112,9 @@ func (f *file) uploadProgress() float64 {
 
 // redundancy returns the redundancy of the least redundant chunk. A file
 // becomes available when this redundancy is >= 1. Assumes that every piece is
-// unique within a file contract. -1 is returned if the file has size 0.
-func (f *file) redundancy() float64 {
+// unique within a file contract. -1 is returned if the file has size 0. It
+// takes one argument, a map of offline contracts for this file.
+func (f *file) redundancy(offlineContracts map[types.FileContractID]bool) float64 {
 	if f.size == 0 {
 		return -1
 	}
@@ -127,7 +128,7 @@ func (f *file) redundancy() float64 {
 	}
 	for _, fc := range f.contracts {
 		// do not count pieces from the contract if the contract is offline
-		if fc.Offline {
+		if _, offline := offlineContracts[fc.ID]; offline {
 			continue
 		}
 		for _, p := range fc.Pieces {
@@ -209,7 +210,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 			SiaPath:        f.name,
 			Filesize:       f.size,
 			Available:      f.available(),
-			Redundancy:     f.redundancy(),
+			Redundancy:     f.redundancy(r.offlineContracts),
 			Renewing:       renewing,
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),

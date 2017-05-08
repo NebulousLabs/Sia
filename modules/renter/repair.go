@@ -122,13 +122,17 @@ func (r *Renter) addFileToRepairState(rs *repairState, file *file) {
 	}
 
 	// Iterate through each contract and figure out which pieces are available.
-	for id, contract := range file.contracts {
+	for _, contract := range file.contracts {
 		// Check whether this contract is offline. Even if the contract is
 		// offline, we want to record that the chunk has attempted to use this
 		// contract.
-		contract.Offline = r.hostContractor.IsOffline(contract.ID)
+		offline := r.hostContractor.IsOffline(contract.ID)
 		file.mu.Lock()
-		file.contracts[id] = contract
+		if offline {
+			r.offlineContracts[contract.ID] = true
+		} else {
+			delete(r.offlineContracts, contract.ID)
+		}
 		file.mu.Unlock()
 
 		// Scan all of the pieces of the contract.
