@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"testing"
@@ -48,6 +49,8 @@ type Server struct {
 func (srv *Server) panicClose() {
 	err := srv.Close()
 	if err != nil {
+		// Print the stack.
+		debug.PrintStack()
 		panic(err)
 	}
 }
@@ -468,10 +471,7 @@ func non2xx(code int) bool {
 // panicClose attempts to close a serverTester. If it fails, panic is called
 // with the error.
 func (st *serverTester) panicClose() {
-	err := st.server.Close()
-	if err != nil {
-		panic(err)
-	}
+	st.server.panicClose()
 }
 
 // retry will retry a function multiple times until it returns 'nil'. It will
