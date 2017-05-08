@@ -95,6 +95,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 			// Break as soon as we have enough outbound peers.
 			g.mu.RLock()
 			numOutboundPeers := g.numOutboundPeers()
+			isOutboundPeer := g.peers[addr] != nil && !g.peers[addr].Inbound
 			g.mu.RUnlock()
 			if numOutboundPeers >= wellConnectedThreshold {
 				g.log.Debugln("INFO: [PPM] Gateway has enough peers, sleeping.")
@@ -102,6 +103,10 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 					return
 				}
 				break
+			}
+			if isOutboundPeer {
+				// Skip current outbound peers.
+				continue
 			}
 
 			g.log.Debugln("[PPM] Fetched a random node:", addr)
