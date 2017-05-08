@@ -994,14 +994,37 @@ func TestPeerManagerPriority(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Spin until the connections succeeded.
+	for i := 0; i < 50; i++ {
+		g1.mu.RLock()
+		_, exists2 := g1.nodes[g2.Address()]
+		_, exists3 := g1.nodes[g3.Address()]
+		g1.mu.RUnlock()
+		if exists2 && exists3 {
+			break
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	g1.mu.RLock()
+	peer2, exists2 := g1.nodes[g2.Address()]
+	peer3, exists3 := g1.nodes[g3.Address()]
+	g1.mu.RUnlock()
+	if !exists2 {
+		t.Fatal("peer 2 not in gateway")
+	}
+	if !exists3 {
+		t.Fatal("peer 3 not found")
+	}
+
 	// Verify assumptions about node list.
 	g1.mu.RLock()
-	g2isOutbound := g1.nodes[g2.Address()].WasOutboundPeer
-	g3isOutbound := g1.nodes[g3.Address()].WasOutboundPeer
+	g2isOutbound := peer2.WasOutboundPeer
+	g3isOutbound := peer3.WasOutboundPeer
 	g1.mu.RUnlock()
 	if !g2isOutbound {
 		t.Fatal("g2 should be an outbound node")
-	} else if g3isOutbound {
+	}
+	if g3isOutbound {
 		t.Fatal("g3 should not be an outbound node")
 	}
 
