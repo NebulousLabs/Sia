@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
