@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -1065,6 +1066,59 @@ func TestPeerManagerPriority(t *testing.T) {
 		} else {
 			t.Fatal("something wrong with the peer list:", peers)
 		}
+	}
+}
+
+// TestPeerManagerOutboundSave sets up an island of nodes and checks that they
+// can all connect to eachother, and that the all add eachother as
+// 'WasOutboundPeer'.
+func TestPeerManagerOutboundSave(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create enough gateways so that every gateway should automatically end up
+	// with every other gateway as an outbound peer.
+	var gs []*Gateway
+	for i := 0; i < wellConnectedThreshold+1; i++ {
+		gs = append(gs, newNamedTestingGateway(t, strconv.Itoa(i)))
+	}
+	// Connect g1 to each peer. This should be enough that every peer eventually
+	// has the full set of outbound peers.
+	for _, g := range gs[1:] {
+		if err := g.Connect(gs[0].Address()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Block until every peer has wellConnectedThreshold outbound peers.
+	err := build.Retry(100, time.Millisecond*100, func() error {
+		for _, g := range gs {
+			var outboundPeers, outboundNodes int
+			g.mu.RLock()
+			for _, peer := range g.peers {
+				if !peer.Inbound {
+					outboundPeers++
+				}
+			}
+			for _, node := range g.nodes {
+				if node.WasOutboundPeer {
+					outboundNodes++
+				}
+			}
+			g.mu.RUnlock()
+
+			if outboundPeers < wellConnectedThreshold {
+				return errors.New("not enough outbound peers: " + strconv.Itoa(outboundPeers))
+			}
+			if outboundNodes < wellConnectedThreshold {
+				return errors.New("not enough outbound nodes: " + strconv.Itoa(outboundNodes))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
