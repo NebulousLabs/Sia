@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -245,6 +246,50 @@ func TestLock(t *testing.T) {
 	siacoinBalance3, _, _ := wt.wallet.ConfirmedBalance()
 	if siacoinBalance3.Cmp(siacoinBalance2) <= 0 {
 		t.Error("balance should increase after a block was mined")
+	}
+}
+
+// TestInitFromSeedParallelUnlock verifies that calling InitFromSeed and then
+// Unlock() in parallel results in the correct balance.
+func TestInitFromSeedParallelUnlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create a wallet with some money
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+	seed, _, err := wt.wallet.PrimarySeed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	origBal, _, _ := wt.wallet.ConfirmedBalance()
+
+	// create a blank wallet
+	dir := filepath.Join(build.TempDir(modules.WalletDir, t.Name()+"-new"), modules.WalletDir)
+	w, err := New(wt.cs, wt.tpool, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// spawn an initfromseed goroutine
+	go w.InitFromSeed(crypto.TwofishKey{}, seed)
+
+	// pause for 10ms to allow the seed sweeper to start
+	time.Sleep(time.Millisecond * 10)
+
+	// unlock
+	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// starting balance should match the original wallet
+	newBal, _, _ := w.ConfirmedBalance()
+	if newBal.Cmp(origBal) != 0 {
+		t.Log(w.UnconfirmedBalance())
+		t.Fatalf("wallet should have correct balance after loading seed: wanted %v, got %v", origBal, newBal)
 	}
 }
 
