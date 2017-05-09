@@ -2,12 +2,8 @@ package modules
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"time"
-
-	"net/http"
-	"os"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -15,7 +11,6 @@ import (
 )
 
 const (
-	defaultFilePerm = 0666
 	// RenterDir is the name of the directory that is used to store the
 	// renter's persistent data.
 	RenterDir = "renter"
@@ -67,142 +62,6 @@ type DownloadInfo struct {
 type DownloadWriter interface {
 	WriteAt(b []byte, off int64) (int, error)
 	Location() string
-}
-
-// DownloadBufferWriter is a buffer-backed implementation of DownloadWriter.
-type DownloadBufferWriter struct {
-	data []byte
-}
-
-// NewDownloadBufferWriter creates a new DownloadWriter that writes to a buffer.
-func NewDownloadBufferWriter(size uint64) *DownloadBufferWriter {
-	return &DownloadBufferWriter{
-		data: make([]byte, size),
-	}
-}
-
-// Location implements the Location method of the DownloadWriter
-// interface and informs callers where this download writer is
-// being written to.
-func (dw *DownloadBufferWriter) Location() string {
-	return "buffer"
-}
-
-// WriteAt writes the passed bytes to the DownloadBuffer.
-func (dw *DownloadBufferWriter) WriteAt(bytes []byte, off int64) (int, error) {
-	if len(bytes)+int(off) > len(dw.data) {
-		return 0, errors.New("write at specified offset exceeds buffer size")
-	}
-
-	i := 0
-	for _, b := range bytes {
-		dw.data[off+int64(i)] = b
-		i++
-	}
-
-	return i, nil
-}
-
-// Bytes returns the underlying byte slice of the
-// DownloadBufferWriter.
-func (dw *DownloadBufferWriter) Bytes() []byte {
-	return dw.data
-}
-
-// DownloadFileWriter is a file-backed implementation of DownloadWriter.
-type DownloadFileWriter struct {
-	f        *os.File
-	location string
-	offset   uint64
-}
-
-// NewDownloadFileWriter creates a new instance of a DownloadWriter backed by the file named.
-func NewDownloadFileWriter(fname string, offset, length uint64) *DownloadFileWriter {
-	l, _ := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
-	return &DownloadFileWriter{
-		f:        l,
-		location: fname,
-		offset:   offset,
-	}
-}
-
-// Location implements the Location method of the DownloadWriter
-// interface and informs callers where this download writer is
-// being written to.
-func (dw *DownloadFileWriter) Location() string {
-	return dw.location
-}
-
-// WriteAt writes the passed bytes at the specified offset.
-func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
-	fileOffset := off - int64(dw.offset)
-
-	r, err := dw.f.WriteAt(b, fileOffset)
-	if err != nil {
-		build.ExtendErr("unable to write to download destination", err)
-	}
-	dw.f.Sync()
-
-	return r, err
-}
-
-// DownloadHttpWriter is a http response writer-backed implementation of DownloadWriter.
-// The writer writes all content that is written to the current `offset` directly to the ResponseWriter,
-// and buffers all content that is written at other offsets.
-// After every write to the ResponseWriter the `offset` and `length` fields are updated, and buffer content written until
-type DownloadHttpWriter struct {
-	w              http.ResponseWriter
-	offset         int            // The index in the original file of the last byte written to the response writer.
-	firstByteIndex int            // The index of the first byte in the original file.
-	length         int            // The total size of the slice to be written.
-	buffer         map[int][]byte // Buffer used for storing the chunks until download finished.
-}
-
-// NewDownloadHttpWriter creates a new instance of http.ResponseWriter backed DownloadWriter.
-func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *DownloadHttpWriter {
-	return &DownloadHttpWriter{
-		w:              w,
-		offset:         0,           // Current offset in the output file.
-		firstByteIndex: int(offset), // Index of first byte in original file.
-		length:         int(length),
-		buffer:         make(map[int][]byte),
-	}
-}
-
-// Location implements the Location method of the DownloadWriter
-// interface and informs callers where this download writer is
-// being written to.
-func (dw *DownloadHttpWriter) Location() string {
-	return "httpresp"
-}
-
-// WriteAt buffers parts of the file until the entire file can be
-// flushed to the client. Returns the number of bytes written or an error.
-func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
-	// Write bytes to buffer.
-	offsetInBuffer := int(off) - dw.firstByteIndex
-	dw.buffer[offsetInBuffer] = b
-
-	// Send all chunks to the client that can be sent.
-	var totalDataSend = 0
-	for {
-		data, exists := dw.buffer[dw.offset]
-		if exists {
-			// Send data to client.
-			dw.w.Write(data)
-
-			// Remove chunk from map.
-			delete(dw.buffer, dw.offset)
-
-			// Increment offset to point to the beginning of the next chunk.
-			dw.offset += len(data)
-			totalDataSend += len(data)
-		} else {
-			break
-		}
-	}
-
-	return totalDataSend, nil
 }
 
 // FileUploadParams contains the information used by the Renter to upload a

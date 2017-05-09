@@ -315,7 +315,7 @@ func (r *Renter) managedGetChunkData(file *file, trackedFile trackedFile, chunkI
 		}
 
 		// create a DownloadBufferWriter
-		buf := modules.NewDownloadBufferWriter(downloadSize)
+		buf := NewDownloadBufferWriter(downloadSize)
 
 		// create the download object and push it on to the download queue
 		d := r.newSectionDownload(file, buf, currentContracts, offset, downloadSize)

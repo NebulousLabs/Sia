@@ -484,14 +484,14 @@ func (api *API) parseDownloadParameters(w http.ResponseWriter, req *http.Request
 	// (e.g. content written to file or response body).
 	var dw modules.DownloadWriter
 	if httpresp {
-		dw = modules.NewDownloadHttpWriter(w, offset, length)
+		dw = renter.NewDownloadHttpWriter(w, offset, length)
 	} else {
 		// Ensure that destination is valid beforehands.
 		// Check that the destination path is absolute.
 		if !filepath.IsAbs(destination) {
 			return nil, &Error{"destination must be an absolute path"}
 		}
-		dw = modules.NewDownloadFileWriter(destination, offset, length)
+		dw = renter.NewDownloadFileWriter(destination, offset, length)
 	}
 
 	return &modules.RenterDownloadParameters{
