@@ -545,7 +545,6 @@ func TestCallingRPCFromRPC(t *testing.T) {
 // TestRPCRatelimit checks that a peer calling an RPC repeatedly does not result
 // in a crash.
 func TestRPCRatelimit(t *testing.T) {
-	t.Skip("Test angers muxado. Can re-enable after switch to smux.")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -632,6 +631,6 @@ func TestRPCRatelimit(t *testing.T) {
 		t.Error("ratelimit does not seem to be effective", expected, elapsed)
 	}
 	if atomic.LoadUint64(&atomicCalls) > uint64((targetDuration+rpcStdDeadline)/peerRPCDelay) {
-		t.Error("The number of sucessful calls exceeds the number allowed by the ratelimit")
+		t.Error("The number of sucessful calls exceeds the number allowed by the ratelimit", atomic.LoadUint64(&atomicCalls), uint64((targetDuration+rpcStdDeadline)/peerRPCDelay))
 	}
 }
