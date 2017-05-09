@@ -297,7 +297,7 @@ func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _
 
 		downloads[i] = DownloadInfo{
 			SiaPath:     d.SiaPath,
-			Destination: d.Destination.Location(),
+			Destination: d.Destination.Destination(),
 			Filesize:    d.Filesize,
 			StartTime:   d.StartTime,
 			Received:    d.Received,

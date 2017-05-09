@@ -645,10 +645,10 @@ func NewDownloadBufferWriter(size uint64) *DownloadBufferWriter {
 	}
 }
 
-// Location implements the Location method of the DownloadWriter
+// Destination implements the Destination method of the DownloadWriter
 // interface and informs callers where this download writer is
 // being written to.
-func (dw *DownloadBufferWriter) Location() string {
+func (dw *DownloadBufferWriter) Destination() string {
 	return "buffer"
 }
 
@@ -690,10 +690,9 @@ func NewDownloadFileWriter(fname string, offset, length uint64) *DownloadFileWri
 	}
 }
 
-// Location implements the Location method of the DownloadWriter
-// interface and informs callers where this download writer is
-// being written to.
-func (dw *DownloadFileWriter) Location() string {
+// Destination implements the Location method of the DownloadWriter interface
+// and informs callers where this download writer is being written to.
+func (dw *DownloadFileWriter) Destination() string {
 	return dw.location
 }
 
@@ -733,10 +732,10 @@ func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *Downlo
 	}
 }
 
-// Location implements the Location method of the DownloadWriter
+// Destination implements the Location method of the DownloadWriter
 // interface and informs callers where this download writer is
 // being written to.
-func (dw *DownloadHttpWriter) Location() string {
+func (dw *DownloadHttpWriter) Destination() string {
 	return "httpresp"
 }
 
