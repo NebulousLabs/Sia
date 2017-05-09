@@ -205,7 +205,7 @@ func TestRenterSaveLoad(t *testing.T) {
 	rt.renter.saveFile(f1)
 	rt.renter.saveFile(f2)
 	rt.renter.saveFile(f3)
-	rt.renter.offlineContracts[types.FileContractID{}] = true
+	rt.renter.offlineContracts[types.FileContractID{}] = fileContract{}
 
 	err = rt.renter.saveSync() // save metadata
 	if err != nil {

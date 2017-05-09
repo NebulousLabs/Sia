@@ -126,7 +126,7 @@ type Renter struct {
 	// default, files loaded through sharing are not maintained by the user.
 	files            map[string]*file
 	tracking         map[string]trackedFile // map from nickname to metadata
-	offlineContracts map[types.FileContractID]bool
+	offlineContracts map[types.FileContractID]fileContract
 
 	// Work management.
 	//
@@ -187,7 +187,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		newRepairs:       make(chan *file),
 		files:            make(map[string]*file),
 		tracking:         make(map[string]trackedFile),
-		offlineContracts: make(map[types.FileContractID]bool),
+		offlineContracts: make(map[types.FileContractID]fileContract),
 
 		newDownloads: make(chan *download),
 		workerPool:   make(map[types.FileContractID]*worker),

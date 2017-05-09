@@ -82,9 +82,12 @@ func (f *file) numChunks() uint64 {
 }
 
 // available indicates whether the file is ready to be downloaded.
-func (f *file) available() bool {
+func (f *file) available(offlineContracts map[types.FileContractID]fileContract) bool {
 	chunkPieces := make([]int, f.numChunks())
 	for _, fc := range f.contracts {
+		if _, offline := offlineContracts[fc.ID]; offline {
+			continue
+		}
 		for _, p := range fc.Pieces {
 			chunkPieces[p.Chunk]++
 		}
@@ -114,7 +117,7 @@ func (f *file) uploadProgress() float64 {
 // becomes available when this redundancy is >= 1. Assumes that every piece is
 // unique within a file contract. -1 is returned if the file has size 0. It
 // takes one argument, a map of offline contracts for this file.
-func (f *file) redundancy(offlineContracts map[types.FileContractID]bool) float64 {
+func (f *file) redundancy(offlineContracts map[types.FileContractID]fileContract) float64 {
 	if f.size == 0 {
 		return -1
 	}
@@ -209,7 +212,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 		files = append(files, modules.FileInfo{
 			SiaPath:        f.name,
 			Filesize:       f.size,
-			Available:      f.available(),
+			Available:      f.available(r.offlineContracts),
 			Redundancy:     f.redundancy(r.offlineContracts),
 			Renewing:       renewing,
 			UploadProgress: f.uploadProgress(),

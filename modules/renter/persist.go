@@ -182,16 +182,12 @@ func (r *Renter) saveFile(f *file) error {
 func (r *Renter) saveSync() error {
 	data := struct {
 		Tracking         map[string]trackedFile
-		OfflineContracts map[string]bool
+		OfflineContracts map[string]fileContract
 	}{}
 	data.Tracking = r.tracking
-	data.OfflineContracts = make(map[string]bool)
-	for id := range r.offlineContracts {
-		fcencoded, err := id.MarshalJSON()
-		if err != nil {
-			return err
-		}
-		data.OfflineContracts[string(fcencoded)] = true
+	data.OfflineContracts = make(map[string]fileContract)
+	for _, contract := range r.offlineContracts {
+		data.OfflineContracts[contract.ID.String()] = contract
 	}
 
 	return persist.SaveJSON(saveMetadata, data, filepath.Join(r.persistDir, PersistFilename))
@@ -236,7 +232,7 @@ func (r *Renter) load() error {
 
 	// Load contracts, repair set, and entropy.
 	data := struct {
-		OfflineContracts map[string]bool
+		OfflineContracts map[string]fileContract
 		Tracking         map[string]trackedFile
 		Repairing        map[string]string // COMPATv0.4.8
 	}{}
@@ -248,13 +244,8 @@ func (r *Renter) load() error {
 		r.tracking = data.Tracking
 	}
 	if data.OfflineContracts != nil {
-		for encodedContract := range data.OfflineContracts {
-			fcid := &types.FileContractID{}
-			err = fcid.UnmarshalJSON([]byte(encodedContract))
-			if err != nil {
-				return err
-			}
-			r.offlineContracts[*fcid] = true
+		for _, offlineContract := range data.OfflineContracts {
+			r.offlineContracts[offlineContract.ID] = offlineContract
 		}
 	}
 

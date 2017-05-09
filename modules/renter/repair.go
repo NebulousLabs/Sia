@@ -129,7 +129,7 @@ func (r *Renter) addFileToRepairState(rs *repairState, file *file) {
 		offline := r.hostContractor.IsOffline(contract.ID)
 		file.mu.Lock()
 		if offline {
-			r.offlineContracts[contract.ID] = true
+			r.offlineContracts[contract.ID] = contract
 		} else {
 			delete(r.offlineContracts, contract.ID)
 		}

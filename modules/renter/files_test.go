@@ -44,7 +44,7 @@ func TestFileAvailable(t *testing.T) {
 		pieceSize:   100,
 	}
 
-	if f.available() {
+	if f.available(nil) {
 		t.Error("file should not be available")
 	}
 
@@ -54,8 +54,13 @@ func TestFileAvailable(t *testing.T) {
 	}
 	f.contracts = map[types.FileContractID]fileContract{{}: fc}
 
-	if !f.available() {
+	if !f.available(nil) {
 		t.Error("file should be available")
+	}
+
+	offlineContracts := f.contracts
+	if f.available(offlineContracts) {
+		t.Error("file should not be available")
 	}
 }
 
@@ -63,7 +68,7 @@ func TestFileAvailable(t *testing.T) {
 // with varying number of filecontracts and erasure code settings.
 func TestFileRedundancy(t *testing.T) {
 	nDatas := []int{1, 2, 10}
-	offlineContracts := make(map[types.FileContractID]bool)
+	offlineContracts := make(map[types.FileContractID]fileContract)
 	for _, nData := range nDatas {
 		rsc, _ := NewRSCode(nData, 10)
 		f := &file{
@@ -160,7 +165,7 @@ func TestFileRedundancy(t *testing.T) {
 			}
 		}
 		f.contracts[fc.ID] = fc
-		offlineContracts[fc.ID] = true
+		offlineContracts[fc.ID] = fc
 		if r := f.redundancy(offlineContracts); r != expectedR {
 			t.Errorf("expected redundancy to ignore offline file contracts, wanted %f got %f", expectedR, r)
 		}
