@@ -319,13 +319,12 @@ func TestUnlockConcurrent(t *testing.T) {
 	wt.wallet.Lock()
 
 	// spawn an unlock goroutine
-	done := make(chan struct{})
+	errChan := make(chan error)
 	go func() {
 		// acquire the write lock so that Unlock acquires the trymutex, but
 		// cannot proceed further
 		wt.wallet.mu.Lock()
-		wt.wallet.Unlock(wt.walletMasterKey)
-		close(done)
+		errChan <- wt.wallet.Unlock(wt.walletMasterKey)
 	}()
 
 	// wait for goroutine to start
@@ -338,7 +337,9 @@ func TestUnlockConcurrent(t *testing.T) {
 	}
 
 	wt.wallet.mu.Unlock()
-	<-done
+	if err := <-errChan; err != nil {
+		t.Fatal("first unlock failed:", err)
+	}
 }
 
 // TestInitFromSeed tests creating a wallet from a preexisting seed.
