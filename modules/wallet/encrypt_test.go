@@ -249,9 +249,9 @@ func TestLock(t *testing.T) {
 	}
 }
 
-// TestInitFromSeedParallelUnlock verifies that calling InitFromSeed and then
-// Unlock() in parallel results in the correct balance.
-func TestInitFromSeedParallelUnlock(t *testing.T) {
+// TestInitFromSeedConcurrentUnlock verifies that calling InitFromSeed and
+// then Unlock() concurrently results in the correct balance.
+func TestInitFromSeedConcurrentUnlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -300,6 +300,45 @@ func TestInitFromSeedParallelUnlock(t *testing.T) {
 		t.Log(w.UnconfirmedBalance())
 		t.Fatalf("wallet should have correct balance after loading seed: wanted %v, got %v", origBal, newBal)
 	}
+}
+
+// TestUnlockConcurrent verifies that calling unlock multiple times
+// concurrently results in only one unlock operation.
+func TestUnlockConcurrent(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create a wallet with some money
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// lock the wallet
+	wt.wallet.Lock()
+
+	// spawn an unlock goroutine
+	done := make(chan struct{})
+	go func() {
+		// acquire the write lock so that Unlock acquires the trymutex, but
+		// cannot proceed further
+		wt.wallet.mu.Lock()
+		wt.wallet.Unlock(wt.walletMasterKey)
+		close(done)
+	}()
+
+	// wait for goroutine to start
+	time.Sleep(time.Millisecond * 10)
+
+	// unlock should now return an error
+	err = wt.wallet.Unlock(wt.walletMasterKey)
+	if err != errScanInProgress {
+		t.Fatal("expected errScanInProgress, got", err)
+	}
+
+	wt.wallet.mu.Unlock()
+	<-done
 }
 
 // TestInitFromSeed tests creating a wallet from a preexisting seed.
