@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -12,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"errors"
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
@@ -83,13 +83,16 @@ func setupTestDownload(t *testing.T, size int, name string, waitOnAvailability b
 
 	if waitOnAvailability {
 		// wait for the file to become available
-		var rf RenterFiles
-		for i := 0; i < 100 && (len(rf.Files) != 1 || !rf.Files[0].Available); i++ {
+		err = retry(200, time.Second, func() error {
+			var rf RenterFiles
 			st.getAPI("/renter/files", &rf)
-			time.Sleep(100 * time.Millisecond)
-		}
-		if len(rf.Files) != 1 || !rf.Files[0].Available {
-			t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+			if len(rf.Files) != 1 || !rf.Files[0].Available {
+				return fmt.Errorf("the uploading is not succeeding for some reason: %v\n", rf.Files[0])
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 
@@ -264,7 +267,7 @@ func TestValidDownloads(t *testing.T) {
 	}
 }
 
-func setupDownloadParamTest(t *testing.T, useLength bool, length int, useOffset bool, offset, filesize int) error {
+func runDownloadParamTest(t *testing.T, length, offset, filesize int) error {
 	ulSiaPath := "test.dat"
 
 	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
@@ -274,12 +277,8 @@ func setupDownloadParamTest(t *testing.T, useLength bool, length int, useOffset 
 	fname := "offsetsinglechunk.dat"
 	downpath := filepath.Join(st.dir, fname)
 	dlURL := fmt.Sprintf("/renter/download/%s?destination=%s", ulSiaPath, downpath)
-	if useLength {
-		dlURL += fmt.Sprintf("&length=%d", length)
-	}
-	if useOffset {
-		dlURL += fmt.Sprintf("&offset=%d", offset)
-	}
+	dlURL += fmt.Sprintf("&length=%d", length)
+	dlURL += fmt.Sprintf("&offset=%d", offset)
 	return st.getAPI(dlURL, nil)
 }
 
@@ -290,25 +289,20 @@ func TestInvalidDownloadParameters(t *testing.T) {
 	t.Parallel()
 
 	testParams := []struct {
-		useLength bool
-		length    int
-		useOffset bool
-		offset    int
-		filesize  int
-		errorMsg  string
+		length   int
+		offset   int
+		filesize int
+		errorMsg string
 	}{
-		{true, 10, false, 0, 1e4, "/download not prompting error when only passing length."},
-		{false, 0, true, 10, 1e4, "/download not prompting error when only passing offset."},
-		{true, 0, true, -10, 1e4, "/download not prompting error when passing negative offset."},
-		{true, 0, true, 1e4, 1e4, "/download not prompting error when passing offset equal to filesize."},
-		{true, 1e4 + 1, true, 0, 1e4, "/download not prompting error when passing length exceeding filesize."},
-		{true, 1e4 + 11, true, 10, 1e4, "/download not prompting error when passing length exceeding filesize with non-zero offset."},
-		{true, 0, true, 0, 1e4, "/download not prompting error when passing length = 0."},
-		{true, -1, true, 0, 1e4, "/download not prompting error when passing negative length."},
+		{0, -10, 1e4, "/download not prompting error when passing negative offset."},
+		{0, 1e4, 1e4, "/download not prompting error when passing offset equal to filesize."},
+		{1e4 + 1, 0, 1e4, "/download not prompting error when passing length exceeding filesize."},
+		{1e4 + 11, 10, 1e4, "/download not prompting error when passing length exceeding filesize with non-zero offset."},
+		{-1, 0, 1e4, "/download not prompting error when passing negative length."},
 	}
 
 	for _, params := range testParams {
-		err := setupDownloadParamTest(t, params.useLength, params.length, params.useOffset, params.offset, params.filesize)
+		err := runDownloadParamTest(t, params.length, params.offset, params.filesize)
 		if err == nil {
 			t.Fatal(params.errorMsg)
 		}
@@ -389,14 +383,11 @@ func TestRenterAsyncDownloadError(t *testing.T) {
 
 	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
 	downpath := filepath.Join(st.dir, "asyncdown.dat")
-	err := st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
 
 	// verify the file has an error
 	var rdq RenterDownloadQueue
-	err = st.getAPI("/renter/downloads", &rdq)
+	err := st.getAPI("/renter/downloads", &rdq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1057,7 +1048,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	renterDownloadAbsoluteError := "destination must be an absolute path"
+	renterDownloadAbsoluteError := "download failed: destination must be an absolute path"
 
 	// Create a file, and upload it.
 	path := filepath.Join(st.dir, "test.dat")
