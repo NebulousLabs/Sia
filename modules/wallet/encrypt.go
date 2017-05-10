@@ -19,6 +19,7 @@ var (
 	errAlreadyUnlocked   = errors.New("wallet has already been unlocked")
 	errReencrypt         = errors.New("wallet is already encrypted, cannot encrypt again")
 	errUnencryptedWallet = errors.New("wallet has not been encrypted yet")
+	errScanInProgress    = errors.New("another wallet rescan is already underway")
 
 	// verificationPlaintext is the plaintext used to verify encryption keys.
 	// By storing the corresponding ciphertext for a given key, we can later
@@ -362,6 +363,11 @@ func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) er
 		masterKey = crypto.TwofishKey(crypto.HashObject(seed))
 	}
 
+	if !w.scanLock.TryLock() {
+		return errScanInProgress
+	}
+	defer w.scanLock.Unlock()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -423,6 +429,12 @@ func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
 		return err
 	}
 	defer w.tg.Done()
+
+	if !w.scanLock.TryLock() {
+		return errScanInProgress
+	}
+	defer w.scanLock.Unlock()
+
 	w.log.Println("INFO: Unlocking wallet.")
 
 	// Initialize all of the keys in the wallet under a lock. While holding the

@@ -280,11 +280,20 @@ func TestInitFromSeedParallelUnlock(t *testing.T) {
 	// pause for 10ms to allow the seed sweeper to start
 	time.Sleep(time.Millisecond * 10)
 
-	// unlock
+	// unlock should now return an error
 	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
-	if err != nil {
-		t.Fatal(err)
+	if err != errScanInProgress {
+		t.Fatal("expected errScanInProgress, got", err)
 	}
+	// wait for init to finish
+	for i := 0; i < 100; i++ {
+		time.Sleep(time.Millisecond * 10)
+		err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+		if err == nil {
+			break
+		}
+	}
+
 	// starting balance should match the original wallet
 	newBal, _, _ := w.ConfirmedBalance()
 	if newBal.Cmp(origBal) != 0 {
