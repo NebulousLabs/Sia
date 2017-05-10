@@ -330,6 +330,25 @@ func TestRenterDownloadAsyncAndHttpRespError(t *testing.T) {
 	}
 }
 
+func TestRenterDownloadAsyncNonexistentFile(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	downpath := filepath.Join(st.dir, "testfile")
+	err = st.getAPI(fmt.Sprintf("/renter/downloadasync/doesntexist?destination=%v", downpath), nil)
+	if err == nil || err.Error() != fmt.Sprintf("download failed: no file with that path: doesntexist") {
+		t.Fatal("downloadasync did not return error on nonexistent file")
+	}
+}
+
 func TestRenterDownloadAsyncAndNotDestinationError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
