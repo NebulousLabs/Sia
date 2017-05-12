@@ -470,6 +470,7 @@ func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 	// Mine blocks until the wallet has confirmed money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
 		st.miner.AddBlock()

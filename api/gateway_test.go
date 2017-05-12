@@ -44,6 +44,7 @@ func TestGatewayPeerConnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer peer.Close()
 	err = st.stdPostAPI("/gateway/connect/"+string(peer.Address()), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +77,7 @@ func TestGatewayPeerDisconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer peer.Close()
 	err = st.stdPostAPI("/gateway/connect/"+string(peer.Address()), nil)
 	if err != nil {
 		t.Fatal(err)
