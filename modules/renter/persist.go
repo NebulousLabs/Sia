@@ -34,7 +34,7 @@ var (
 
 	saveMetadata = persist.Metadata{
 		Header:  "Renter Persistence",
-		Version: "1.2.2",
+		Version: "0.4",
 	}
 )
 
@@ -181,14 +181,8 @@ func (r *Renter) saveFile(f *file) error {
 // saveSync stores the current renter data to disk and then syncs to disk.
 func (r *Renter) saveSync() error {
 	data := struct {
-		Tracking         map[string]trackedFile
-		OfflineContracts map[string]fileContract
-	}{}
-	data.Tracking = r.tracking
-	data.OfflineContracts = make(map[string]fileContract)
-	for _, contract := range r.offlineContracts {
-		data.OfflineContracts[contract.ID.String()] = contract
-	}
+		Tracking map[string]trackedFile
+	}{r.tracking}
 
 	return persist.SaveJSON(saveMetadata, data, filepath.Join(r.persistDir, PersistFilename))
 }
@@ -232,9 +226,8 @@ func (r *Renter) load() error {
 
 	// Load contracts, repair set, and entropy.
 	data := struct {
-		OfflineContracts map[string]fileContract
-		Tracking         map[string]trackedFile
-		Repairing        map[string]string // COMPATv0.4.8
+		Tracking  map[string]trackedFile
+		Repairing map[string]string // COMPATv0.4.8
 	}{}
 	err = persist.LoadJSON(saveMetadata, &data, filepath.Join(r.persistDir, PersistFilename))
 	if err != nil {
@@ -242,11 +235,6 @@ func (r *Renter) load() error {
 	}
 	if data.Tracking != nil {
 		r.tracking = data.Tracking
-	}
-	if data.OfflineContracts != nil {
-		for _, offlineContract := range data.OfflineContracts {
-			r.offlineContracts[offlineContract.ID] = offlineContract
-		}
 	}
 
 	return nil

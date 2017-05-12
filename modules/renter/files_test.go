@@ -43,8 +43,11 @@ func TestFileAvailable(t *testing.T) {
 		erasureCode: rsc,
 		pieceSize:   100,
 	}
+	isOffline := func(fcid types.FileContractID) bool {
+		return false
+	}
 
-	if f.available(nil) {
+	if f.available(isOffline) {
 		t.Error("file should not be available")
 	}
 
@@ -54,12 +57,17 @@ func TestFileAvailable(t *testing.T) {
 	}
 	f.contracts = map[types.FileContractID]fileContract{{}: fc}
 
-	if !f.available(nil) {
+	if !f.available(isOffline) {
 		t.Error("file should be available")
 	}
 
-	offlineContracts := f.contracts
-	if f.available(offlineContracts) {
+	isOffline = func(fcid types.FileContractID) bool {
+		if fcid == fc.ID {
+			return true
+		}
+		return false
+	}
+	if f.available(isOffline) {
 		t.Error("file should not be available")
 	}
 }
@@ -68,7 +76,9 @@ func TestFileAvailable(t *testing.T) {
 // with varying number of filecontracts and erasure code settings.
 func TestFileRedundancy(t *testing.T) {
 	nDatas := []int{1, 2, 10}
-	offlineContracts := make(map[types.FileContractID]fileContract)
+	isOffline := func(fcid types.FileContractID) bool {
+		return false
+	}
 	for _, nData := range nDatas {
 		rsc, _ := NewRSCode(nData, 10)
 		f := &file{
@@ -79,7 +89,7 @@ func TestFileRedundancy(t *testing.T) {
 		}
 
 		// Test that an empty file has 0 redundancy.
-		if r := f.redundancy(offlineContracts); r != 0 {
+		if r := f.redundancy(isOffline); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
 		}
 		// Test that a file with 1 filecontract that has a piece for every chunk but
@@ -95,7 +105,7 @@ func TestFileRedundancy(t *testing.T) {
 			fc.Pieces = append(fc.Pieces, pd)
 		}
 		f.contracts[fc.ID] = fc
-		if r := f.redundancy(offlineContracts); r != 0 {
+		if r := f.redundancy(isOffline); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
 		}
 		// Test that adding another filecontract with a piece for every chunk but one
@@ -111,7 +121,7 @@ func TestFileRedundancy(t *testing.T) {
 			fc.Pieces = append(fc.Pieces, pd)
 		}
 		f.contracts[fc.ID] = fc
-		if r := f.redundancy(offlineContracts); r != 0 {
+		if r := f.redundancy(isOffline); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
 		}
 		// Test that adding a file contract with a piece for the missing chunk
@@ -127,7 +137,7 @@ func TestFileRedundancy(t *testing.T) {
 		f.contracts[fc.ID] = fc
 		// 1.0 / MinPieces because the chunk with the least number of pieces has 1 piece.
 		expectedR := 1.0 / float64(f.erasureCode.MinPieces())
-		if r := f.redundancy(offlineContracts); r == 0 || r > 1 || r != expectedR {
+		if r := f.redundancy(isOffline); r == 0 || r > 1 || r != expectedR {
 			t.Errorf("expected %f redundancy, got %f", expectedR, r)
 		}
 		// Test that adding a file contract that has erasureCode.MinPieces() pieces
@@ -147,7 +157,7 @@ func TestFileRedundancy(t *testing.T) {
 		f.contracts[fc.ID] = fc
 		// 1+MinPieces / MinPieces because the chunk with the least number of pieces has 1+MinPieces pieces.
 		expectedR = float64(1+f.erasureCode.MinPieces()) / float64(f.erasureCode.MinPieces())
-		if r := f.redundancy(offlineContracts); r <= 1 || r != expectedR {
+		if r := f.redundancy(isOffline); r <= 1 || r != expectedR {
 			t.Errorf("expected a redundancy >1 and equal to %f, got %f", expectedR, r)
 		}
 
@@ -165,8 +175,13 @@ func TestFileRedundancy(t *testing.T) {
 			}
 		}
 		f.contracts[fc.ID] = fc
-		offlineContracts[fc.ID] = fc
-		if r := f.redundancy(offlineContracts); r != expectedR {
+		isOffline = func(fcid types.FileContractID) bool {
+			if fcid == fc.ID {
+				return true
+			}
+			return false
+		}
+		if r := f.redundancy(isOffline); r != expectedR {
 			t.Errorf("expected redundancy to ignore offline file contracts, wanted %f got %f", expectedR, r)
 		}
 	}

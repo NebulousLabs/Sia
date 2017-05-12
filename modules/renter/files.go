@@ -43,7 +43,6 @@ type fileContract struct {
 	Pieces []pieceData
 
 	WindowStart types.BlockHeight
-	Offline     bool
 }
 
 // pieceData contains the metadata necessary to request a piece from a
@@ -82,10 +81,10 @@ func (f *file) numChunks() uint64 {
 }
 
 // available indicates whether the file is ready to be downloaded.
-func (f *file) available(offlineContracts map[types.FileContractID]fileContract) bool {
+func (f *file) available(isOffline func(types.FileContractID) bool) bool {
 	chunkPieces := make([]int, f.numChunks())
 	for _, fc := range f.contracts {
-		if _, offline := offlineContracts[fc.ID]; offline {
+		if isOffline(fc.ID) {
 			continue
 		}
 		for _, p := range fc.Pieces {
@@ -117,7 +116,7 @@ func (f *file) uploadProgress() float64 {
 // becomes available when this redundancy is >= 1. Assumes that every piece is
 // unique within a file contract. -1 is returned if the file has size 0. It
 // takes one argument, a map of offline contracts for this file.
-func (f *file) redundancy(offlineContracts map[types.FileContractID]fileContract) float64 {
+func (f *file) redundancy(isOffline func(types.FileContractID) bool) float64 {
 	if f.size == 0 {
 		return -1
 	}
@@ -131,7 +130,7 @@ func (f *file) redundancy(offlineContracts map[types.FileContractID]fileContract
 	}
 	for _, fc := range f.contracts {
 		// do not count pieces from the contract if the contract is offline
-		if _, offline := offlineContracts[fc.ID]; offline {
+		if isOffline(fc.ID) {
 			continue
 		}
 		for _, p := range fc.Pieces {
@@ -212,8 +211,8 @@ func (r *Renter) FileList() []modules.FileInfo {
 		files = append(files, modules.FileInfo{
 			SiaPath:        f.name,
 			Filesize:       f.size,
-			Available:      f.available(r.offlineContracts),
-			Redundancy:     f.redundancy(r.offlineContracts),
+			Available:      f.available(r.hostContractor.IsOffline),
+			Redundancy:     f.redundancy(r.hostContractor.IsOffline),
 			Renewing:       renewing,
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
