@@ -1,11 +1,13 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -571,6 +573,188 @@ func TestWalletTransactionGETid(t *testing.T) {
 	}
 	if wtgid.Transaction.Outputs[0].FundType != types.SpecifierMinerPayout {
 		t.Error("fund type should be a miner payout")
+	}
+	if wtgid.Transaction.Outputs[0].Value.IsZero() {
+		t.Error("output should have a nonzero value")
+	}
+
+	// Query the details of a transaction where siacoins were sent.
+	//
+	// NOTE: We call the SendSiacoins method directly to get convenient access
+	// to the txid.
+	sentValue := types.SiacoinPrecision.Mul64(3)
+	txns, err := st.wallet.SendSiacoins(sentValue, types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.miner.AddBlock()
+
+	var wtgid2 WalletTransactionGETid
+	err = st.getAPI(fmt.Sprintf("/wallet/transaction/%s", txns[1].ID()), &wtgid2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn := wtgid2.Transaction
+	if txn.TransactionID != txns[1].ID() {
+		t.Error("wrong transaction was fetched")
+	} else if len(txn.Inputs) != 1 || len(txn.Outputs) != 2 {
+		t.Error("expected 1 input and 2 outputs, got", len(txn.Inputs), len(txn.Outputs))
+	} else if !txn.Outputs[0].Value.Equals(sentValue) {
+		t.Errorf("expected first output to equal %v, got %v", sentValue, txn.Outputs[0].Value)
+	} else if exp := txn.Inputs[0].Value.Sub(sentValue); !txn.Outputs[1].Value.Equals(exp) {
+		t.Errorf("expected first output to equal %v, got %v", exp, txn.Outputs[1].Value)
+	}
+
+	// Create a second wallet and send money to that wallet.
+	st2, err := createServerTester(t.Name() + "w2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fullyConnectNodes([]*serverTester{st, st2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Send a transaction from the one wallet to the other.
+	var wag WalletAddressGET
+	err = st2.getAPI("/wallet/address", &wag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sendSiacoinsValues := url.Values{}
+	sendSiacoinsValues.Set("amount", sentValue.String())
+	sendSiacoinsValues.Set("destination", wag.Address.String())
+	err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the unconfirmed transactions struct to make sure all fields are
+	// filled out correctly in the receiving wallet.
+	err = st2.getAPI("/wallet/transactions?startheight=0&endheight=10000", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// There should be at least one unconfirmed transaction:
+	err = retry(50, time.Millisecond*100, func() error {
+		if len(wtg.UnconfirmedTransactions) < 1 {
+			return errors.New("unconfirmed transaction not found")
+		}
+		return nil
+	})
+	// The unconfirmed transaction should have inputs and outputs, and both of
+	// those should have value.
+	for _, txn := range wtg.UnconfirmedTransactions {
+		if len(txn.Inputs) < 1 {
+			t.Fatal("transaction should have an input")
+		}
+		if len(txn.Outputs) < 1 {
+			t.Fatal("transaciton should have outputs")
+		}
+		for _, input := range txn.Inputs {
+			if input.Value.IsZero() {
+				t.Error("input should not have zero value")
+			}
+		}
+		for _, output := range txn.Outputs {
+			if output.Value.IsZero() {
+				t.Error("output should not have zero value")
+			}
+		}
+	}
+
+	// Restart st2.
+	err = st2.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st2, err = assembleServerTester(st2.walletKey, st2.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st2.getAPI("/wallet/transactions?startheight=0&endheight=10000", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Reconnect st2 and st.
+	err = fullyConnectNodes([]*serverTester{st, st2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine a block on st to get the transactions into the blockchain.
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck([]*serverTester{st, st2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st2.getAPI("/wallet/transactions?startheight=0&endheight=10000", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// There should be at least one confirmed transaction:
+	if len(wtg.ConfirmedTransactions) < 1 {
+		t.Fatal("confirmed transaction not found")
+	}
+	for _, txn := range wtg.ConfirmedTransactions {
+		if len(txn.Inputs) < 1 {
+			t.Fatal("transaction should have an input")
+		}
+		if len(txn.Outputs) < 1 {
+			t.Fatal("transaciton should have outputs")
+		}
+		for _, input := range txn.Inputs {
+			if input.Value.IsZero() {
+				t.Error("input should not have zero value")
+			}
+		}
+		for _, output := range txn.Outputs {
+			if output.Value.IsZero() {
+				t.Error("output should not have zero value")
+			}
+		}
+	}
+
+	// Reset the wallet and see that the confirmed transactions are still there.
+	err = st2.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st2, err = assembleServerTester(st2.walletKey, st2.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.server.Close()
+	err = st2.getAPI("/wallet/transactions?startheight=0&endheight=10000", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// There should be at least one confirmed transaction:
+	if len(wtg.ConfirmedTransactions) < 1 {
+		t.Fatal("unconfirmed transaction not found")
+	}
+	// Check whether the confirmed transactions remain.
+	for _, txn := range wtg.ConfirmedTransactions {
+		if len(txn.Inputs) < 1 {
+			t.Fatal("transaction should have an input")
+		}
+		if len(txn.Outputs) < 1 {
+			t.Fatal("transaciton should have outputs")
+		}
+		for _, input := range txn.Inputs {
+			if input.Value.IsZero() {
+				t.Error("input should not have zero value")
+			}
+		}
+		for _, output := range txn.Outputs {
+			if output.Value.IsZero() {
+				t.Error("output should not have zero value")
+			}
+		}
 	}
 }
 
