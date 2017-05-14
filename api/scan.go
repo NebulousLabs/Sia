@@ -3,6 +3,7 @@ package api
 import (
 	"math/big"
 
+	"errors"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -34,4 +35,21 @@ func scanHash(s string) (h crypto.Hash, err error) {
 		return crypto.Hash{}, err
 	}
 	return h, nil
+}
+
+// stringToBool converts "true" and "false" strings to their respective
+// boolean value and returns an error if conversion is not possible.
+func stringToBool(param string) (bool, error) {
+	// Parse the async parameter.
+	var out bool
+	switch {
+	case param == "true":
+		out = true
+	case len(param) == 0 || param == "false":
+		out = false
+	default:
+		return false, errors.New(`bool parameter has to be either "true" or "false"`)
+	}
+
+	return out, nil
 }

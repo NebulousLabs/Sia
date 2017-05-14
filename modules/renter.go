@@ -5,12 +5,16 @@ import (
 	"io"
 	"time"
 
+	"net/http"
+	"os"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
+	defaultFilePerm = 0666
 	// RenterDir is the name of the directory that is used to store the
 	// renter's persistent data.
 	RenterDir = "renter"
@@ -50,12 +54,110 @@ type Allowance struct {
 // DownloadInfo provides information about a file that has been requested for
 // download.
 type DownloadInfo struct {
-	SiaPath     string    `json:"siapath"`
-	Destination string    `json:"destination"`
-	Filesize    uint64    `json:"filesize"`
-	Received    uint64    `json:"received"`
-	StartTime   time.Time `json:"starttime"`
-	Error       string    `json:"error"`
+	SiaPath     string         `json:"siapath"`
+	Destination DownloadWriter `json:"destination"`
+	Filesize    uint64         `json:"filesize"`
+	Received    uint64         `json:"received"`
+	StartTime   time.Time      `json:"starttime"`
+	Error       string         `json:"error"`
+}
+
+// DownloadWriter provides an interface which all output writers have to implement.
+type DownloadWriter interface {
+	WriteAt(b []byte, off int64) (int, error)
+	String() string
+}
+
+// DownloadFileWriter is a file-backed implementation of DownloadWriter.
+type DownloadFileWriter struct {
+	f        *os.File
+	Location string
+	offset   uint64
+}
+
+// NewDownloadFileWriter creates a new instance of a DownloadWriter backed by the file named.
+func NewDownloadFileWriter(fname string, offset, length uint64) *DownloadFileWriter {
+	l, _ := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+	return &DownloadFileWriter{
+		f:        l,
+		Location: fname,
+		offset:   offset,
+	}
+}
+
+// WriteAt writes the passed bytes at the specified offset.
+func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
+	fileOffset := off - int64(dw.offset)
+
+	r, err := dw.f.WriteAt(b, fileOffset)
+	if err != nil {
+		build.ExtendErr("unable to write to download destination", err)
+	}
+	dw.f.Sync()
+
+	return r, err
+}
+
+// String returns the destination of the DownloadFileWriter as a string.
+func (dw *DownloadFileWriter) String() string {
+	return dw.Location
+}
+
+// DownloadHttpWriter is a http response writer-backed implementation of DownloadWriter.
+// The writer writes all content that is written to the current `offset` directly to the ResponseWriter,
+// and buffers all content that is written at other offsets.
+// After every write to the ResponseWriter the `offset` and `length` fields are updated, and buffer content written until
+type DownloadHttpWriter struct {
+	w              http.ResponseWriter
+	offset         int            // The index in the original file of the last byte written to the response writer.
+	firstByteIndex int            // The index of the first byte in the original file.
+	length         int            // The total size of the slice to be written.
+	buffer         map[int][]byte // Buffer used for storing the chunks until download finished.
+}
+
+// NewDownloadHttpWriter creates a new instance of http.ResponseWriter backed DownloadWriter.
+func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *DownloadHttpWriter {
+	return &DownloadHttpWriter{
+		w:              w,
+		offset:         0,           // Current offset in the output file.
+		firstByteIndex: int(offset), // Index of first byte in original file.
+		length:         int(length),
+		buffer:         make(map[int][]byte),
+	}
+}
+
+// WriteAt buffers parts of the file until the entire file can be
+// flushed to the client. Returns the number of bytes written or an error.
+func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
+	// Write bytes to buffer.
+	offsetInBuffer := int(off) - dw.firstByteIndex
+	dw.buffer[offsetInBuffer] = b
+
+	// Send all chunks to the client that can be sent.
+	var totalDataSend = 0
+	for {
+		data, exists := dw.buffer[dw.offset]
+		if exists {
+			// Send data to client.
+			dw.w.Write(data)
+
+			// Remove chunk from map.
+			delete(dw.buffer, dw.offset)
+
+			// Increment offset to point to the beginning of the next chunk.
+			dw.offset += len(data)
+			totalDataSend += len(data)
+		} else {
+			break
+		}
+	}
+
+	return totalDataSend, nil
+}
+
+// String returns the destination of the DownloadHttpWriter as a string.
+func (dw *DownloadHttpWriter) String() string {
+	return "httpresp"
 }
 
 // FileUploadParams contains the information used by the Renter to upload a
@@ -251,8 +353,8 @@ type Renter interface {
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error
 
-	// Download downloads a file to the given destination.
-	Download(path, destination string) error
+	// DownloadSection performs a download according to the parameters passed, including downloads of `offset` and `length` type.
+	Download(params *RenterDownloadParameters) error
 
 	// DownloadQueue lists all the files that have been scheduled for download.
 	DownloadQueue() []DownloadInfo
@@ -296,4 +398,16 @@ type Renter interface {
 
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error
+}
+
+// RenterDownloadParameters contains all parameters that can be passed to the `/download` endpoint.
+type RenterDownloadParameters struct {
+	Async        bool
+	DlWriter     DownloadWriter
+	Httpresp     bool
+	Length       uint64
+	LengthPassed bool
+	Offset       uint64
+	OffsetPassed bool
+	Siapath      string
 }

@@ -7,7 +7,7 @@ package renter
 import (
 	"bytes"
 	"errors"
-	"os"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	defaultFilePerm         = 0666
 	downloadFailureCooldown = time.Minute * 30
 )
 
@@ -63,20 +62,23 @@ type (
 		atomicDataReceived uint64
 		downloadComplete   bool
 		downloadErr        error
-		finishedChunks     []bool
+		finishedChunks     map[int]bool
+		offset             uint64
+		length             uint64
 
 		// Timestamp information.
 		completeTime time.Time
 		startTime    time.Time
 
 		// Static information about the file - can be read without a lock.
-		chunkSize         uint64
-		destination       string
-		erasureCode       modules.ErasureCoder
-		fileSize          uint64
-		masterKey         crypto.TwofishKey
-		numChunks         uint64
-		pieceSet          []map[types.FileContractID]pieceData
+		chunkSize   uint64
+		destination modules.DownloadWriter
+		erasureCode modules.ErasureCoder
+		fileSize    uint64
+		masterKey   crypto.TwofishKey
+		numChunks   uint64
+		// The pieceSet contains a sparse map of the chunk indices to be downloaded to their piece data.
+		pieceSet          map[int]map[types.FileContractID]pieceData
 		reportedPieceSize uint64
 		siapath           string
 
@@ -116,35 +118,58 @@ type (
 	}
 )
 
-// newDownload initializes and returns a download object.
-func (r *Renter) newDownload(f *file, destination string, currentContracts map[modules.NetAddress]types.FileContractID) *download {
-	d := &download{
-		finishedChunks: make([]bool, f.numChunks()),
+// newSectionDownload initialises and returns a download object for the specified chunk.
+func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID, offset, length uint64) *download {
+	d := &download{}
+	d.initDownload(f, destination)
 
-		startTime: time.Now(),
+	// Settings specific to a chunk download.
+	d.offset = offset
+	d.length = length
 
-		chunkSize:   f.chunkSize(),
-		destination: destination,
-		erasureCode: f.erasureCode,
-		fileSize:    f.size,
-		masterKey:   f.masterKey,
-		numChunks:   f.numChunks(),
-		siapath:     f.name,
+	// Calculate chunks to download.
+	min_chunk := uint64(math.Floor(float64(offset / f.chunkSize())))
+	max_chunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
 
-		downloadFinished: make(chan struct{}),
-	}
+	makeRange(int(min_chunk), int(max_chunk+1), &d.finishedChunks)
+	d.initPieceSet(f, currentContracts, r)
+	return d
+}
+
+func (d *download) initDownload(f *file, destination modules.DownloadWriter) {
+	d.startTime = time.Now()
+	d.chunkSize = f.chunkSize()
+	d.destination = destination
+	d.erasureCode = f.erasureCode
+	d.fileSize = f.size
+	d.masterKey = f.masterKey
+	d.numChunks = f.numChunks()
+	d.siapath = f.name
+	d.downloadFinished = make(chan struct{})
+	d.finishedChunks = make(map[int]bool)
+}
+
+// initPieceSet initialises the piece set, including calculations of the total download size.
+func (d *download) initPieceSet(f *file,
+	currentContracts map[modules.NetAddress]types.FileContractID, r *Renter) {
 	// Allocate the piece size and progress bar so that the download will
 	// finish at exactly 100%. Due to rounding error and padding, there is not
 	// a strict mapping between 'progress' and 'bytes downloaded' - it is
 	// actually necessary to download more bytes than the size of the file.
-	d.reportedPieceSize = d.fileSize / (d.numChunks * uint64(d.erasureCode.MinPieces()))
-	d.atomicDataReceived = d.fileSize - (d.reportedPieceSize * d.numChunks * uint64(d.erasureCode.MinPieces()))
+	// The effective size of the download is determined by the number of chunks
+	// to be downloaded. TODO: Handle variable-size last chunk - Same in downloadqueue.go
+	numChunks := uint64(len(d.finishedChunks))
+
+	dlSize := d.length
+	d.reportedPieceSize = dlSize / (numChunks * uint64(d.erasureCode.MinPieces()))
+	d.atomicDataReceived = dlSize - (d.reportedPieceSize * numChunks * uint64(d.erasureCode.MinPieces()))
 
 	// Assemble the piece set for the download.
-	d.pieceSet = make([]map[types.FileContractID]pieceData, f.numChunks())
-	for i := range d.pieceSet {
+	d.pieceSet = make(map[int]map[types.FileContractID]pieceData)
+	for i := range d.finishedChunks {
 		d.pieceSet[i] = make(map[types.FileContractID]pieceData)
 	}
+
 	f.mu.RLock()
 	for _, contract := range f.contracts {
 		// Get latest contract ID.
@@ -156,13 +181,16 @@ func (r *Renter) newDownload(f *file, destination string, currentContracts map[m
 				continue
 			}
 		}
+
 		for i := range contract.Pieces {
-			d.pieceSet[contract.Pieces[i].Chunk][id] = contract.Pieces[i]
+			m, exists := d.pieceSet[int(contract.Pieces[i].Chunk)]
+			// Only add pieceSet entries for chunks that are going to be downloaded.
+			if exists {
+				m[id] = contract.Pieces[i]
+			}
 		}
 	}
 	f.mu.RUnlock()
-
-	return d
 }
 
 // Err returns the error encountered by a download, if it exists.
@@ -230,24 +258,34 @@ func (cd *chunkDownload) recoverChunk() error {
 		return build.ExtendErr("unable to recover chunk", err)
 	}
 
-	// Open a file handle for the download.
-	fileDest, err := os.OpenFile(cd.download.destination, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
-	if err != nil {
-		return build.ExtendErr("unable to open download destination", err)
-	}
-	defer fileDest.Close()
+	var result = recoverWriter.Bytes()
 
-	// Write the bytes to the download file.
-	result := recoverWriter.Bytes()
-	_, err = fileDest.WriteAt(result, int64(cd.index*cd.download.chunkSize))
+	// Calculate the offset. If the offset is within the chunk, the
+	// requested offset is passed, otherwise the offset of the chunk
+	// within the overall file is passed.
+	chunkBaseAddress := cd.index * cd.download.chunkSize
+	chunkTopAddress := chunkBaseAddress + cd.download.chunkSize - 1
+	var off = chunkBaseAddress
+	var lowerBound = 0
+	if cd.download.offset >= chunkBaseAddress && cd.download.offset <= chunkTopAddress {
+		off = cd.download.offset
+		offsetInBlock := off - chunkBaseAddress
+		lowerBound = int(offsetInBlock) // If the offset is within the block, part of the block will be ignored
+	}
+
+	// Truncate b if writing the whole buffer at the specified offset would exceed the maximum file size.
+	var upperBound = cd.download.chunkSize
+	if chunkTopAddress > cd.download.length+cd.download.offset {
+		diff := chunkTopAddress - (cd.download.length + cd.download.offset)
+		upperBound -= diff + 1
+	}
+
+	result = result[lowerBound:upperBound]
+
+	// Write the bytes to the requested output.
+	_, err = cd.download.destination.WriteAt(result, int64(off))
 	if err != nil {
 		return build.ExtendErr("unable to write to download destination", err)
-	}
-
-	// Sync the write to provide proper durability.
-	err = fileDest.Sync()
-	if err != nil {
-		return build.ExtendErr("unable to sync download destination", err)
 	}
 
 	cd.download.mu.Lock()
@@ -255,10 +293,10 @@ func (cd *chunkDownload) recoverChunk() error {
 
 	// Update the download to signal that this chunk has completed. Only update
 	// after the sync, so that durability is maintained.
-	if cd.download.finishedChunks[cd.index] {
+	if cd.download.finishedChunks[int(cd.index)] {
 		build.Critical("recovering chunk when the chunk has already finished downloading")
 	}
-	cd.download.finishedChunks[cd.index] = true
+	cd.download.finishedChunks[int(cd.index)] = true
 
 	// Determine whether the download is complete.
 	nowComplete := true
@@ -289,9 +327,9 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 	}
 
 	// Add the unfinished chunks one at a time.
-	for i := range d.finishedChunks {
+	for i, isChunkFinished := range d.finishedChunks {
 		// Skip chunks that have already finished downloading.
-		if d.finishedChunks[i] {
+		if isChunkFinished {
 			continue
 		}
 
@@ -400,9 +438,7 @@ loop:
 				continue
 			}
 
-			// If no piece exists for this worker, do not give the worker this
-			// download.
-			piece, exists := incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID]
+			piece, exists := incompleteChunk.download.pieceSet[int(incompleteChunk.index)][worker.contractID]
 			if !exists {
 				continue
 			}
@@ -429,7 +465,7 @@ loop:
 		// completed just not at this time.
 		for fcid := range ds.activeWorkers {
 			// Check whether a piece exists for this worker.
-			_, exists1 := incompleteChunk.download.pieceSet[incompleteChunk.index][fcid]
+			_, exists1 := incompleteChunk.download.pieceSet[int(incompleteChunk.index)][fcid]
 			scheduled, exists2 := incompleteChunk.workerAttempts[fcid]
 			if !scheduled && exists1 && exists2 {
 				// This worker is able to complete the download for this chunk,
@@ -584,5 +620,12 @@ func (r *Renter) threadedDownloadLoop() {
 		}
 		r.managedDownloadIteration(ds)
 		r.tg.Done()
+	}
+}
+
+// makeRange creates a range (min, max] as boolean map.
+func makeRange(min, max int, m *map[int]bool) {
+	for i := min; i < max; i++ {
+		(*m)[i] = false
 	}
 }

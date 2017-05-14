@@ -96,6 +96,13 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Run:   wrap(renterfilesdownloadcmd),
 	}
 
+	renterDownloadSectionCmd = &cobra.Command{
+		Use:   "downloadsection [path] [offset] [length] [destination]",
+		Short: "Download a chunk",
+		Long:  "Download a specific chunk from a previously uploaded file.",
+		Run:   wrap(renterfilesdownloadsectioncmd),
+	}
+
 	renterFilesListCmd = &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -204,7 +211,7 @@ func renterdownloadscmd() {
 		die("Could not get download queue:", err)
 	}
 	// Filter out files that have been downloaded.
-	var downloading []modules.DownloadInfo
+	var downloading []api.DownloadInfo
 	for _, file := range queue.Downloads {
 		if file.Received != file.Filesize {
 			downloading = append(downloading, file)
@@ -223,7 +230,7 @@ func renterdownloadscmd() {
 	}
 	fmt.Println()
 	// Filter out files that are downloading.
-	var downloaded []modules.DownloadInfo
+	var downloaded []api.DownloadInfo
 	for _, file := range queue.Downloads {
 		if file.Received == file.Filesize {
 			downloaded = append(downloaded, file)
@@ -381,37 +388,7 @@ func renterfilesdeletecmd(path string) {
 func renterfilesdownloadcmd(path, destination string) {
 	destination = abs(destination)
 	done := make(chan struct{})
-	go func() {
-		time.Sleep(time.Second) // give download time to initialize
-		for {
-			select {
-			case <-done:
-				return
-
-			case <-time.Tick(time.Second):
-				// get download progress of file
-				var queue api.RenterDownloadQueue
-				err := getAPI("/renter/downloads", &queue)
-				if err != nil {
-					continue // benign
-				}
-				var d modules.DownloadInfo
-				for _, d = range queue.Downloads {
-					if d.Destination == destination {
-						break
-					}
-				}
-				if d.Filesize == 0 {
-					continue // file hasn't appeared in queue yet
-				}
-				pct := 100 * float64(d.Received) / float64(d.Filesize)
-				elapsed := time.Since(d.StartTime)
-				elapsed -= elapsed % time.Second // round to nearest second
-				mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
-				fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
-			}
-		}
-	}()
+	go downloadprogress(done, path)
 
 	err := get("/renter/download/" + path + "?destination=" + destination)
 	close(done)
@@ -419,6 +396,58 @@ func renterfilesdownloadcmd(path, destination string) {
 		die("Could not download file:", err)
 	}
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
+}
+
+// renterfilesdownloadsectioncmd is the handler for the command `siac renter downloadsection [path]
+// [offset] [length] [destination]`.
+// Downloads a specific chunk to the local specified destination.
+func renterfilesdownloadsectioncmd(path, offset, length, destination string) {
+	destination = abs(destination)
+	done := make(chan struct{})
+
+	go downloadprogress(done, destination)
+
+	req := fmt.Sprintf("/renter/download/%s?destination=%s&offset=%s&length=%s", path, destination, offset, length)
+
+	err := get(req)
+	close(done)
+	if err != nil {
+		die("could not download chunk:", err)
+	}
+	fmt.Printf("\nDownloaded offset %s and length %s of '%s' to %s.\n", offset, length, path, abs(destination))
+}
+
+func downloadprogress(done chan struct{}, siapath string) {
+	time.Sleep(time.Second) // give download time to initialize
+	for {
+		select {
+		case <-done:
+			return
+
+		case <-time.Tick(time.Second):
+			// get download progress of file
+			var queue api.RenterDownloadQueue
+			err := getAPI("/renter/downloads", &queue)
+			if err != nil {
+				continue // benign
+			}
+			var d api.DownloadInfo
+			for _, d = range queue.Downloads {
+				if d.SiaPath == siapath {
+					break
+				}
+			}
+			if d.Filesize == 0 {
+				continue // file hasn't appeared in queue yet
+			}
+			pct := 100 * float64(d.Received) / float64(d.Filesize)
+			elapsed := time.Since(d.StartTime)
+			elapsed -= elapsed % time.Second // round to nearest second
+			mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
+			fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
+		}
+	}
+
 }
 
 // bySiaPath implements sort.Interface for [] modules.FileInfo based on the
