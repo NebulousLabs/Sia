@@ -79,7 +79,7 @@ var (
 	peerRPCDelay = build.Select(build.Var{
 		Standard: 3 * time.Second,
 		Dev:      1 * time.Second,
-		Testing:  25 * time.Millisecond,
+		Testing:  50 * time.Millisecond,
 	}).(time.Duration)
 
 	// pruneNodeListLen defines the number of nodes that the gateway must have

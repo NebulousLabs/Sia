@@ -595,8 +595,8 @@ func TestRPCRatelimit(t *testing.T) {
 	// does not exceed the ratelimit.
 	start := time.Now()
 	var wg sync.WaitGroup
-	overlapVolume := time.Duration(3)
-	targetDuration := rpcStdDeadline * 7 / 3
+	overlapVolume := time.Duration(5)
+	targetDuration := rpcStdDeadline * 3
 	maxCallsForDuration := targetDuration / peerRPCDelay
 	callVolume := int(overlapVolume * maxCallsForDuration)
 	for i := 0; i < callVolume; i++ {
@@ -622,6 +622,7 @@ func TestRPCRatelimit(t *testing.T) {
 		// number of connectings is still far surpassing the allowed ratelimit.
 		time.Sleep(peerRPCDelay / overlapVolume)
 	}
+	threadLaunchTime := time.Now().Sub(start)
 	wg.Wait()
 
 	stop := time.Now()
@@ -630,7 +631,7 @@ func TestRPCRatelimit(t *testing.T) {
 	if elapsed < expected {
 		t.Error("ratelimit does not seem to be effective", expected, elapsed)
 	}
-	if atomic.LoadUint64(&atomicCalls) > uint64((targetDuration+rpcStdDeadline)/peerRPCDelay) {
-		t.Error("The number of sucessful calls exceeds the number allowed by the ratelimit", atomic.LoadUint64(&atomicCalls), uint64((targetDuration+rpcStdDeadline)/peerRPCDelay))
+	if elapsed > targetDuration+threadLaunchTime+rpcStdDeadline {
+		t.Error("The amount of time spent handling threads is longer than expected", elapsed, targetDuration, threadLaunchTime, rpcStdDeadline, targetDuration+threadLaunchTime+rpcStdDeadline)
 	}
 }
