@@ -192,6 +192,12 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 	// The sector location data is loaded last. Any corruption that happened
 	// during unclean shutdown has already been fixed by the WAL.
 	for _, sf := range cm.storageFolders {
+		if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+			// Metadata unavailable, just count the number of sectors instead of
+			// loading them.
+			sf.sectors = uint64(len(usageSectors(sf.usage)))
+			continue
+		}
 		cm.loadSectorLocations(sf)
 	}
 
@@ -202,6 +208,10 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		cm.log.Println("ERROR: Unable to spawn the contract manager synchronization loop:", err)
 		return nil, build.ExtendErr("error while spawning contract manager sync loop", err)
 	}
+
+	// Spin up the thread that continuously looks for missing storage folders
+	// and adds them if they are discovered.
+	go cm.threadedFolderRecheck()
 
 	// Simulate an error to make sure the cleanup code is triggered correctly.
 	if cm.dependencies.disrupt("erroredStartup") {

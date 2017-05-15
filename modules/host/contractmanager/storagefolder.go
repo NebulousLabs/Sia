@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
@@ -273,6 +276,56 @@ func (cm *ContractManager) availableStorageFolders() []*storageFolder {
 		sfs = append(sfs, sf)
 	}
 	return sfs
+}
+
+// threadedFolderRecheck checks the unavailable storage folders and looks to see
+// if they have been mounted or restored by the user.
+func (cm *ContractManager) threadedFolderRecheck() {
+	// Don't spawn the loop if 'noRecheck' disruption is set.
+	if cm.dependencies.disrupt("noRecheck") {
+		return
+	}
+
+	sleepTime := folderRecheckInitialInterval
+	for {
+		// Check for shutdown.
+		select {
+		case <-cm.tg.StopChan():
+			return
+		case <-time.After(sleepTime):
+		}
+
+		// Check all of the storage folders and recover any that have been added
+		// to the contract manager.
+		cm.wal.mu.Lock()
+		for _, sf := range cm.storageFolders {
+			if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+				var err1, err2 error
+				sf.metadataFile, err1 = cm.dependencies.openFile(filepath.Join(sf.path, metadataFile), os.O_RDWR, 0700)
+				sf.sectorFile, err2 = cm.dependencies.openFile(filepath.Join(sf.path, sectorFile), os.O_RDWR, 0700)
+				if err1 == nil && err2 == nil {
+					// The storage folder has been found, and loading can be
+					// completed.
+					cm.loadSectorLocations(sf)
+				} else {
+					// One of the opens failed, close the file handle for the
+					// opens that did not fail.
+					if err1 == nil {
+						sf.metadataFile.Close()
+					}
+					if err2 == nil {
+						sf.sectorFile.Close()
+					}
+				}
+			}
+		}
+		cm.wal.mu.Unlock()
+
+		// Increase the sleep time.
+		if sleepTime*2 < maxFolderRecheckInterval {
+			sleepTime *= 2
+		}
+	}
 }
 
 // ResetStorageFolderHealth will reset the read and write statistics for the

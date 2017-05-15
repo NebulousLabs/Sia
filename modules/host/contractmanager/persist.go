@@ -87,7 +87,9 @@ func (cm *ContractManager) loadSettings() error {
 			// Mark the folder as unavailable and log an error.
 			atomic.StoreUint64(&sf.atomicUnavailable, 1)
 			cm.log.Printf("ERROR: unable to open the %v sector file: %v\n", sf.path, err)
-			sf.metadataFile.Close()
+			if sf.metadataFile != nil {
+				sf.metadataFile.Close()
+			}
 		}
 		sf.availableSectors = make(map[sectorID]uint32)
 		cm.storageFolders[sf.index] = sf
@@ -98,18 +100,14 @@ func (cm *ContractManager) loadSettings() error {
 // loadSectorLocations will read the metadata portion of each storage folder
 // file and load the sector location information into memory.
 func (cm *ContractManager) loadSectorLocations(sf *storageFolder) {
-	if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
-		// The metadata is going to be unavailable, best we can do is count the
-		// number of sectors.
-		sf.sectors = uint64(len(usageSectors(sf.usage)))
-		return
-	}
-
 	// Read the sector lookup table for this storage folder into memory.
 	sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.usage)*storageFolderGranularity)
 	if err != nil {
-		cm.log.Printf("ERROR: unable to read sector metadata for folder %v: %v\n", sf.path, err)
 		atomic.AddUint64(&sf.atomicFailedReads, 1)
+		atomic.StoreUint64(&sf.atomicUnavailable, 1)
+		err = build.ComposeErrors(err, sf.metadataFile.Close())
+		err = build.ComposeErrors(err, sf.sectorFile.Close())
+		cm.log.Printf("ERROR: unable to read sector metadata for folder %v: %v\n", sf.path, err)
 		return
 	}
 	atomic.AddUint64(&sf.atomicSuccessfulReads, 1)
@@ -132,6 +130,7 @@ func (cm *ContractManager) loadSectorLocations(sf *storageFolder) {
 		cm.sectorLocations[id] = sl
 		sf.sectors++
 	}
+	atomic.StoreUint64(&sf.atomicUnavailable, 0)
 }
 
 // savedSettings returns the settings of the contract manager in an

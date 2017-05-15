@@ -6,10 +6,25 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 )
+
+// dependencyNoRecheck prevents the recheck loop from running in the contract
+// manager.
+type dependencyNoRecheck struct {
+	productionDependencies
+}
+
+// disrupt prevents the recheck loop from running in the contract manager.
+func (dependencyNoRecheck) disrupt(s string) bool {
+	if s == "noRecheck" {
+		return true
+	}
+	return false
+}
 
 // TestLoadMissingStorageFolder checks that loading a storage folder which is
 // missing doesn't result in a complete loss of the storage folder on subsequent
@@ -80,7 +95,8 @@ func TestLoadMissingStorageFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Re-open the contract manager.
-	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	d := new(dependencyNoRecheck)
+	cmt.cm, err = newContractManager(d, filepath.Join(cmt.persistDir, modules.ContractManagerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +123,7 @@ func TestLoadMissingStorageFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Re-open the contract manager.
-	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	cmt.cm, err = newContractManager(d, filepath.Join(cmt.persistDir, modules.ContractManagerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,6 +144,13 @@ func TestLoadMissingStorageFolder(t *testing.T) {
 	_, err = cmt.cm.ReadSector(root)
 	if err == nil {
 		t.Fatal("Expecting error when reading missing sector.")
+	}
+
+	// Try adding a sector to the contract manager - no folder can receive it.
+	rootF, dataF := randSector()
+	err = cmt.cm.AddSector(rootF, dataF)
+	if err == nil {
+		t.Error("should not be able to add sector")
 	}
 
 	// Check that you can add folders, add sectors while the contract manager
@@ -358,7 +381,7 @@ func TestLoadMissingStorageFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Re-open the contract manager.
-	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	cmt.cm, err = newContractManager(d, filepath.Join(cmt.persistDir, modules.ContractManagerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,6 +398,11 @@ func TestLoadMissingStorageFolder(t *testing.T) {
 		t.Error("folder should be visible again")
 	}
 	if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize {
+		cmt.cm.wal.mu.Lock()
+		t.Log("Usage len:", len(cmt.cm.storageFolders[sfs[0].Index].usage))
+		t.Log("Reported Sectors:", cmt.cm.storageFolders[sfs[0].Index].sectors)
+		t.Log("Avail:", len(cmt.cm.storageFolders[sfs[0].Index].availableSectors))
+		cmt.cm.wal.mu.Unlock()
 		t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
 	}
 
@@ -400,7 +428,7 @@ func TestLoadMissingStorageFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Re-open the contract manager.
-	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	cmt.cm, err = newContractManager(d, filepath.Join(cmt.persistDir, modules.ContractManagerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,7 +459,7 @@ func TestLoadMissingStorageFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Re-open the contract manager.
-	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	cmt.cm, err = newContractManager(d, filepath.Join(cmt.persistDir, modules.ContractManagerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -441,6 +469,182 @@ func TestLoadMissingStorageFolder(t *testing.T) {
 	}
 }
 
-// TODO: Add a loop that infrequently checks for the missing storage folder, and
-// can load it as a non-missing storage folder. Then run another battery of
-// tests to make sure that the now-loaded storage folder is usable again.
+// TestFolderRechecker verifies that the folder rechecker is able to discover
+// when a storage folder has become available again.
+func TestFolderRechecker(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	cmt, err := newContractManagerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderDir := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*storageFolderGranularity*2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the storage folder has been added.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("There should be one storage folder reported")
+	}
+	// Check that the storage folder has the right path and size.
+	if sfs[0].Path != storageFolderDir {
+		t.Error("storage folder reported with wrong path")
+	}
+	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*2 {
+		t.Error("storage folder reported with wrong sector size")
+	}
+
+	// Add a sector to the storage folder.
+	root, data := randSector()
+	err = cmt.cm.AddSector(root, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the sector was successfully added.
+	sfs = cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("There should be one storage folder in the contract manager", len(sfs))
+	}
+	if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize {
+		t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+	}
+
+	// Try reloading the contract manager after the storage folder has been
+	// moved somewhere else.
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Move the storage folder directory to a new location - hiding it from the
+	// contract manager.
+	err = os.Rename(storageFolderDir, storageFolderDir+"-moved")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Re-open the contract manager.
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The contract manager should still be reporting the storage folder, but
+	// with errors reported.
+	sfs = cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("wrong number of storage folders being reported")
+	}
+	if sfs[0].FailedReads < 100000000 {
+		t.Error("Not enough failures reported for absent storage folder")
+	}
+	if sfs[0].FailedWrites < 100000000 {
+		t.Error("Not enough failures reported for absent storage folder")
+	}
+	if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize {
+		t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+	}
+
+	// Move the storage folder back to where the contract manager can see it.
+	err = os.Rename(storageFolderDir+"-moved", storageFolderDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sleep until the rechecker can find the storage folder.
+	time.Sleep(maxFolderRecheckInterval)
+
+	// Check that the storage folder has been found by the rechecker.
+	sfs = cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("wrong number of storage folders being reported")
+	}
+	if sfs[0].FailedReads != 0 {
+		t.Error("Not enough failures reported for absent storage folder")
+	}
+	if sfs[0].FailedWrites != 0 {
+		t.Error("Not enough failures reported for absent storage folder")
+	}
+	if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize {
+		t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+	}
+
+	// Check that the sector is once again available.
+	recoveredData, err := cmt.cm.ReadSector(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(recoveredData, data) {
+		t.Error("recovered data does not equal original data")
+	}
+
+	// Try adding a sector to the contract manager - no folder can receive it.
+	root2, data2 := randSector()
+	err = cmt.cm.AddSector(root2, data2)
+	if err != nil {
+		t.Error("should not be able to add sector")
+	}
+	recoveredData, err = cmt.cm.ReadSector(root2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(recoveredData, data2) {
+		t.Error("recovered data does not equal original data")
+	}
+
+	// Grow the storage folder.
+	err = cmt.cm.ResizeStorageFolder(sfs[0].Index, modules.SectorSize*storageFolderGranularity*4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sfs = cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("wrong number of storage folders being reported")
+	}
+	if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*2 {
+		t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+	}
+	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*4 {
+		t.Error("the storage folder growth does not seem to have worked")
+	}
+
+	// Restart the client. Sector should still be readable, storage folder
+	// should still be grown.
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the sector is once again available.
+	recoveredData, err = cmt.cm.ReadSector(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(recoveredData, data) {
+		t.Error("recovered data does not equal original data")
+	}
+	sfs = cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("wrong number of storage folders being reported")
+	}
+	if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*2 {
+		t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+	}
+	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*4 {
+		t.Error("the storage folder growth does not seem to have worked")
+	}
+}
