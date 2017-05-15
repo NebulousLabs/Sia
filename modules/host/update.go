@@ -6,7 +6,6 @@ package host
 import (
 	"encoding/binary"
 	"encoding/json"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -126,22 +125,11 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// terminate.
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	err := h.tg.Add()
-	if err != nil {
-		return
-	}
-	wg := new(sync.WaitGroup)
-	defer func() {
-		go func() {
-			wg.Wait()
-			h.tg.Done()
-		}()
-	}()
 
 	// Wrap the whole parsing into a single large database tx to keep things
 	// efficient.
 	var actionItems []types.FileContractID
-	err = h.db.Update(func(tx *bolt.Tx) error {
+	err := h.db.Update(func(tx *bolt.Tx) error {
 		for _, block := range cc.RevertedBlocks {
 			// Look for transactions relevant to open storage obligations.
 			for _, txn := range block.Transactions {
@@ -309,11 +297,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 		h.log.Println(err)
 	}
 	for i := range actionItems {
-		// Add the action item to the wait group outside of the threaded call.
-		// The call to wg.Done() was established at the beginning of the
-		// function in a defer statement.
-		wg.Add(1)
-		go h.threadedHandleActionItem(actionItems[i], wg)
+		go h.threadedHandleActionItem(actionItems[i])
 	}
 
 	// Update the host's recent change pointer to point to the most recent

@@ -18,7 +18,7 @@ func TestIntegrationConsensusGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	var cg ConsensusGET
 	err = st.getAPI("/consensus", &cg)
@@ -48,7 +48,7 @@ func TestConsensusValidateTransactionSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Anounce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {

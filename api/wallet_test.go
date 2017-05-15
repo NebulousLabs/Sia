@@ -71,7 +71,7 @@ func TestWalletGETEncrypted(t *testing.T) {
 			t.Fatalf("API server quit: %v", err)
 		}
 	}()
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	var wg WalletGET
 	err = st.getAPI("/wallet", &wg)
@@ -132,7 +132,7 @@ func TestWalletEncrypt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st2.server.Close()
+	defer st2.server.panicClose()
 
 	// lock the wallet
 	err = st2.stdPostAPI("/wallet/lock", nil)
@@ -195,7 +195,7 @@ func TestWalletBlankEncrypt(t *testing.T) {
 			panic(listenErr)
 		}
 	}()
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Make a call to /wallet/init and get the seed. Provide no encryption
 	// key so that the encryption key is the seed that gets returned.
@@ -259,7 +259,7 @@ func TestIntegrationWalletInitSeed(t *testing.T) {
 			panic(listenErr)
 		}
 	}()
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Make a call to /wallet/init/seed using an invalid seed
 	qs := url.Values{}
@@ -311,7 +311,7 @@ func TestWalletGETSiacoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Check the initial wallet is encrypted, unlocked, and has the siacoins
 	// that got mined.
@@ -405,7 +405,7 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// send coins to a new wallet, then sweep them back
 	key := crypto.GenerateTwofishKey()
@@ -472,6 +472,7 @@ func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	// Mine blocks until the wallet has confirmed money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
 		st.miner.AddBlock()
@@ -535,7 +536,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Mining blocks should have created transactions for the wallet containing
 	// miner payouts. Get the list of transactions.
@@ -768,7 +769,7 @@ func TestWalletRelativePathErrorBackup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host.
 	if err := st.announceHost(); err != nil {
@@ -816,7 +817,7 @@ func TestWalletRelativePathError033x(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host.
 	if err := st.announceHost(); err != nil {
@@ -871,7 +872,7 @@ func TestWalletRelativePathErrorSiag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host.
 	if err := st.announceHost(); err != nil {
@@ -999,7 +1000,7 @@ func TestWalletReset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st2.server.Close()
+	defer st2.server.panicClose()
 
 	// lock the wallet
 	err = st2.stdPostAPI("/wallet/lock", nil)
@@ -1031,7 +1032,7 @@ func TestWalletSiafunds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// mine some money
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {

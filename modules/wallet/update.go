@@ -278,13 +278,6 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 // ProcessConsensusChange parses a consensus change to update the set of
 // confirmed outputs known to the wallet.
 func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
-	if err := w.tg.Add(); err != nil {
-		// The wallet should gracefully reject updates from the consensus set
-		// or transaction pool that are sent after the wallet's Close method
-		// has closed the wallet's ThreadGroup.
-		return
-	}
-	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -309,13 +302,6 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
 // transaction set.
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction, cc modules.ConsensusChange) {
-	if err := w.tg.Add(); err != nil {
-		// Gracefully reject transactions if the wallet's Close method has
-		// closed the wallet's ThreadGroup already.
-		return
-	}
-	defer w.tg.Done()
-
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
