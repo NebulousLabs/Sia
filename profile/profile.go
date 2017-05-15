@@ -23,7 +23,7 @@ var (
 	memLock   sync.Mutex
 )
 
-// startCPUProfile starts cpu profiling. An error will be returned if a cpu
+// StartCPUProfile starts cpu profiling. An error will be returned if a cpu
 // profiler is already running.
 func StartCPUProfile(profileDir, identifier string) error {
 	// Lock the cpu profile lock so that only one profiler is running at a
@@ -46,7 +46,7 @@ func StartCPUProfile(profileDir, identifier string) error {
 	return nil
 }
 
-// stopCPUProfile stops cpu profiling.
+// StopCPUProfile stops cpu profiling.
 func StopCPUProfile() {
 	cpuLock.Lock()
 	if cpuActive {
@@ -56,7 +56,7 @@ func StopCPUProfile() {
 	cpuLock.Unlock()
 }
 
-// saveMemProfile saves the current memory structure of the program. An error
+// SaveMemProfile saves the current memory structure of the program. An error
 // will be returned if memory profiling is already in progress. Unlike for cpu
 // profiling, there is no 'stopMemProfile' call - everything happens at once.
 func SaveMemProfile(profileDir, identifier string) error {
