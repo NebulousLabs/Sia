@@ -147,6 +147,10 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 		cm.log.Critical("Unable to load storage folder despite having sector metadata")
 		return nil, ErrSectorNotFound
 	}
+	if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+		// TODO: Pick a new error instead.
+		return nil, ErrSectorNotFound
+	}
 
 	// Read the sector.
 	sectorData, err := readSector(sf.sectorFile, sl.index)

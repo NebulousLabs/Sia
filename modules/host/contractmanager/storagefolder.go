@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
@@ -89,6 +92,11 @@ type storageFolder struct {
 	atomicFailedWrites     uint64
 	atomicSuccessfulReads  uint64
 	atomicSuccessfulWrites uint64
+
+	// Atomic bool indicating whether or not the storage folder is available. If
+	// the storage folder is not available, it will still be loaded but return
+	// an error if it is queried.
+	atomicUnavailable uint64 // uint64 for alignment
 
 	// The index, path, and usage are all saved directly to disk.
 	index uint16
@@ -256,14 +264,68 @@ func (sf *storageFolder) setUsage(sectorIndex uint32) {
 	}
 }
 
-// storageFolderSlice returns the contract manager's storage folders map as a
-// slice.
-func (cm *ContractManager) storageFolderSlice() []*storageFolder {
+// availableStorageFolders returns the contract manager's storage folders as a
+// slice, excluding any unavailable storeage folders.
+func (cm *ContractManager) availableStorageFolders() []*storageFolder {
 	sfs := make([]*storageFolder, 0)
 	for _, sf := range cm.storageFolders {
+		// Skip unavailable storage folders.
+		if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+			continue
+		}
 		sfs = append(sfs, sf)
 	}
 	return sfs
+}
+
+// threadedFolderRecheck checks the unavailable storage folders and looks to see
+// if they have been mounted or restored by the user.
+func (cm *ContractManager) threadedFolderRecheck() {
+	// Don't spawn the loop if 'noRecheck' disruption is set.
+	if cm.dependencies.disrupt("noRecheck") {
+		return
+	}
+
+	sleepTime := folderRecheckInitialInterval
+	for {
+		// Check for shutdown.
+		select {
+		case <-cm.tg.StopChan():
+			return
+		case <-time.After(sleepTime):
+		}
+
+		// Check all of the storage folders and recover any that have been added
+		// to the contract manager.
+		cm.wal.mu.Lock()
+		for _, sf := range cm.storageFolders {
+			if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+				var err1, err2 error
+				sf.metadataFile, err1 = cm.dependencies.openFile(filepath.Join(sf.path, metadataFile), os.O_RDWR, 0700)
+				sf.sectorFile, err2 = cm.dependencies.openFile(filepath.Join(sf.path, sectorFile), os.O_RDWR, 0700)
+				if err1 == nil && err2 == nil {
+					// The storage folder has been found, and loading can be
+					// completed.
+					cm.loadSectorLocations(sf)
+				} else {
+					// One of the opens failed, close the file handle for the
+					// opens that did not fail.
+					if err1 == nil {
+						sf.metadataFile.Close()
+					}
+					if err2 == nil {
+						sf.sectorFile.Close()
+					}
+				}
+			}
+		}
+		cm.wal.mu.Unlock()
+
+		// Increase the sleep time.
+		if sleepTime*2 < maxFolderRecheckInterval {
+			sleepTime *= 2
+		}
+	}
 }
 
 // ResetStorageFolderHealth will reset the read and write statistics for the
@@ -302,7 +364,7 @@ func (cm *ContractManager) ResizeStorageFolder(index uint16, newSize uint64, for
 	cm.wal.mu.Lock()
 	sf, exists := cm.storageFolders[index]
 	cm.wal.mu.Unlock()
-	if !exists {
+	if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
 		return errStorageFolderNotFound
 	}
 
@@ -354,6 +416,13 @@ func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
 			CapacityRemaining: ((64 * uint64(len(sf.usage))) - sf.sectors) * modules.SectorSize,
 			Index:             sf.index,
 			Path:              sf.path,
+		}
+
+		// Set some of the values to extreme numbers if the storage folder is
+		// unavailable, to flag the user's attention.
+		if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+			sfm.FailedReads = 9999999999
+			sfm.FailedWrites = 9999999999
 		}
 
 		// Add this storage folder to the list of storage folders.

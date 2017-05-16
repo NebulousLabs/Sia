@@ -3,11 +3,13 @@ package api
 import (
 	"io"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/host/contractmanager"
@@ -510,6 +512,128 @@ func TestResizeNonexistentFolder(t *testing.T) {
 	err = st.stdPostAPI("/host/storage/folders/resize", resizeValues)
 	if err == nil || err.Error() != errStorageFolderNotFound.Error() {
 		t.Fatalf("expected error to be %v, got %v", errStorageFolderNotFound, err)
+	}
+}
+
+// TestStorageFolderUnavailable simulates the situation where a storage folder
+// is not available to the host when the host starts, verifying that it sets
+// FailedWrites and FailedReads correctly and eventually finds the storage
+// folder when it is made available to the host again.
+func TestStorageFolderUnavailable(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// add a storage folder
+	sfPath := build.TempDir(t.Name(), "storagefolder")
+	err = os.MkdirAll(sfPath, 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sfValues := url.Values{}
+	sfValues.Set("path", sfPath)
+	sfValues.Set("size", "1048576")
+	err = st.stdPostAPI("/host/storage/folders/add", sfValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var sfs StorageGET
+	err = st.getAPI("/host/storage", &sfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if sfs.Folders[0].FailedReads != 0 || sfs.Folders[0].FailedWrites != 0 {
+		t.Fatal("newly added folder has failed reads or writes")
+	}
+
+	// remove the folder on disk
+	st.server.Close()
+	sfPath2 := build.TempDir(t.Name(), "storagefolder-old")
+	err = os.Rename(sfPath, sfPath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// reload the host
+	st, err = st.reloadedServerTester()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	err = st.getAPI("/host/storage", &sfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sfs.Folders[0].FailedWrites < 999 {
+		t.Fatal("storage folder should have lots of failed writes after being moved on disk")
+	}
+	if sfs.Folders[0].FailedReads < 999 {
+		t.Fatal("storage folder should have lots of failed reads after being moved on disk")
+	}
+
+	// try some actions on the dead storage folder
+	// resize
+	sfValues.Set("size", "2097152")
+	err = st.stdPostAPI("/host/storage/folders/resize", sfValues)
+	if err == nil {
+		t.Fatal("expected resize on unavailable storage folder to fail")
+	}
+	// remove
+	err = st.stdPostAPI("/host/storage/folders/remove", sfValues)
+	if err == nil {
+		t.Fatal("expected remove on unavailable storage folder to fail")
+	}
+
+	// move the folder back
+	err = os.Rename(sfPath2, sfPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the contract manager to recheck the storage folder
+	// NOTE: this is a hard-coded constant based on the contractmanager's maxFolderRecheckInterval constant.
+	time.Sleep(time.Second * 10)
+
+	// verify the storage folder is reset to normal
+	err = st.getAPI("/host/storage", &sfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sfs.Folders[0].FailedWrites > 0 {
+		t.Fatal("storage folder should have no failed writes after being moved back")
+	}
+	if sfs.Folders[0].FailedReads > 0 {
+		t.Fatal("storage folder should have no failed reads after being moved back")
+	}
+
+	// reload the host and verify the storage folder is still good
+	st.server.Close()
+	st, err = st.reloadedServerTester()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// storage folder should still be good
+	err = st.getAPI("/host/storage", &sfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sfs.Folders[0].FailedWrites > 0 {
+		t.Fatal("storage folder should have no failed writes after being moved back")
+	}
+	if sfs.Folders[0].FailedReads > 0 {
+		t.Fatal("storage folder should have no failed reads after being moved back")
 	}
 }
 
