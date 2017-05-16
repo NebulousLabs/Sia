@@ -471,6 +471,9 @@ gets the transaction associated with a specific transaction id.
     // Array of processed inputs detailing the inputs to the transaction.
     "inputs": [
       {
+        // The id of the output being spent.
+        "parentid": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         // Type of fund represented by the input. Possible values are
         // 'siacoin input' and 'siafund input'.
         "fundtype": "siacoin input",
@@ -491,6 +494,9 @@ gets the transaction associated with a specific transaction id.
     // Outputs related to file contracts are excluded.
     "outputs": [
       {
+        // The id of the output that was created.
+        "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         // Type of fund is represented by the output. Possible values are
         // 'siacoin output', 'siafund output', 'claim output', and 'miner
         // payout'. Siacoin outputs and claim outputs both relate to siacoins.

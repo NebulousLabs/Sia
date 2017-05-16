@@ -782,6 +782,18 @@ func TestWalletTransactionGETid(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Check the unconfirmed transactions in the sending wallet to see the id of
+	// the output being spent.
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=10000", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtg.UnconfirmedTransactions) != 2 {
+		t.Fatal("expecting two unconfirmed transactions in sender wallet")
+	}
+	// Get the id of the non-change output sent to the receiving wallet.
+	expectedOutputID := wtg.UnconfirmedTransactions[1].Outputs[0].ID
+
 	// Check the unconfirmed transactions struct to make sure all fields are
 	// filled out correctly in the receiving wallet.
 	err = st2.getAPI("/wallet/transactions?startheight=0&endheight=10000", &wtg)
@@ -813,6 +825,9 @@ func TestWalletTransactionGETid(t *testing.T) {
 			if output.Value.IsZero() {
 				t.Error("output should not have zero value")
 			}
+		}
+		if txn.Outputs[0].ID != expectedOutputID {
+			t.Error("transactions should have matching output ids for the same transaction")
 		}
 	}
 

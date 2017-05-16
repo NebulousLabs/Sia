@@ -55,6 +55,7 @@ type (
 	// coming from an address and going to the outputs. The fund types are
 	// 'SiacoinInput', 'SiafundInput'.
 	ProcessedInput struct {
+		ParentID       types.OutputID   `json:"parentid"`
 		FundType       types.Specifier  `json:"fundtype"`
 		WalletAddress  bool             `json:"walletaddress"`
 		RelatedAddress types.UnlockHash `json:"relatedaddress"`
@@ -74,6 +75,7 @@ type (
 	// available. SiacoinInputs and SiafundInputs become available immediately.
 	// ClaimInputs and MinerPayouts become available after 144 confirmations.
 	ProcessedOutput struct {
+		ID             types.OutputID    `json:"id"`
 		FundType       types.Specifier   `json:"fundtype"`
 		MaturityHeight types.BlockHeight `json:"maturityheight"`
 		WalletAddress  bool              `json:"walletaddress"`
