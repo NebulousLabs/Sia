@@ -977,7 +977,9 @@ locked or unlocked.
 {
   "encrypted":  true,
   "unlocked":   true,
+
   "rescanning": false,
+  "scanheight": 0,
 
   "confirmedsiacoinbalance":     "123456", // hastings, big int
   "unconfirmedoutgoingsiacoins": "0",      // hastings, big int

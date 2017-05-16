@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"errors"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -204,6 +205,7 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	go w.rescanMessage(done)
 	defer close(done)
 
+	atomic.StoreUint64(&w.scanHeight, 0)
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {
 		return err
@@ -274,6 +276,7 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 	go w.rescanMessage(done)
 	defer close(done)
 
+	atomic.StoreUint64(&w.scanHeight, 0)
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {
 		return err

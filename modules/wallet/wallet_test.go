@@ -235,7 +235,7 @@ func TestRescanning(t *testing.T) {
 	defer wt.closeWt()
 
 	// A fresh wallet should not be rescanning.
-	if wt.wallet.Rescanning() {
+	if rescanning, _ := wt.wallet.Rescanning(); rescanning {
 		t.Fatal("fresh wallet should not report that a scan is underway")
 	}
 
@@ -253,7 +253,7 @@ func TestRescanning(t *testing.T) {
 
 	// wait for goroutine to start, after which Rescanning should return true
 	time.Sleep(time.Millisecond * 10)
-	if !wt.wallet.Rescanning() {
+	if rescanning, _ := wt.wallet.Rescanning(); !rescanning {
 		t.Fatal("wallet should report that a scan is underway")
 	}
 
@@ -264,7 +264,7 @@ func TestRescanning(t *testing.T) {
 	}
 
 	// Rescanning should now return false again
-	if wt.wallet.Rescanning() {
+	if rescanning, _ := wt.wallet.Rescanning(); rescanning {
 		t.Fatal("wallet should not report that a scan is underway")
 	}
 }

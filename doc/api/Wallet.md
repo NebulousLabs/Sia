@@ -73,6 +73,10 @@ locked or unlocked.
   // and /sweep/seed.
   "rescanning": false,
 
+  // Highest blockheight scanned during a rescan operation. Only valid if
+  // rescanning is true.
+  "scanheight": 1234,
+
   // Number of siacoins, in hastings, available to the wallet as of the most
   // recent block in the blockchain.
   "confirmedsiacoinbalance": "123456", // hastings, big int

@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -61,7 +62,8 @@ type seedScanner struct {
 	siacoinOutputs   map[types.SiacoinOutputID]scannedOutput
 	siafundOutputs   map[types.SiafundOutputID]scannedOutput
 
-	log *persist.Logger
+	scanHeight *uint64
+	log        *persist.Logger
 }
 
 func (s *seedScanner) numKeys() uint64 {
@@ -79,6 +81,20 @@ func (s *seedScanner) generateKeys(n uint64) {
 // ProcessConsensusChange scans the blockchain for information relevant to the
 // seedScanner.
 func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
+	// update scanHeight
+	currentHeight := atomic.LoadUint64(s.scanHeight)
+	for _, block := range cc.AppliedBlocks {
+		if currentHeight > 0 || block.ID() != types.GenesisID {
+			currentHeight++
+		}
+	}
+	for _, block := range cc.RevertedBlocks {
+		if currentHeight > 0 || block.ID() != types.GenesisID {
+			currentHeight--
+		}
+	}
+	atomic.StoreUint64(s.scanHeight, currentHeight)
+
 	// update outputs
 	for _, diff := range cc.SiacoinOutputDiffs {
 		if diff.Direction == modules.DiffApply {
@@ -152,6 +168,7 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 	var numKeys uint64 = numInitialKeys
 	for s.numKeys() < maxScanKeys {
 		s.generateKeys(numKeys)
+		atomic.StoreUint64(s.scanHeight, 0)
 		if err := cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
 			return err
 		}
@@ -170,13 +187,14 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 }
 
 // newSeedScanner returns a new seedScanner.
-func newSeedScanner(seed modules.Seed, log *persist.Logger) *seedScanner {
+func newSeedScanner(seed modules.Seed, scanHeight *uint64, log *persist.Logger) *seedScanner {
 	return &seedScanner{
 		seed:           seed,
 		keys:           make(map[types.UnlockHash]uint64),
 		siacoinOutputs: make(map[types.SiacoinOutputID]scannedOutput),
 		siafundOutputs: make(map[types.SiafundOutputID]scannedOutput),
 
-		log: log,
+		scanHeight: scanHeight,
+		log:        log,
 	}
 }

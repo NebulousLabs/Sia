@@ -4,6 +4,7 @@ import (
 	"errors"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -213,7 +214,7 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	w.mu.RUnlock()
 
 	// scan blockchain to determine how many keys to generate for the seed
-	s := newSeedScanner(seed, w.log)
+	s := newSeedScanner(seed, &w.scanHeight, w.log)
 	if err := s.scan(w.cs); err != nil {
 		return err
 	}
@@ -274,6 +275,7 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	// rescan the blockchain
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
+	atomic.StoreUint64(&w.scanHeight, 0)
 
 	done := make(chan struct{})
 	go w.rescanMessage(done)
@@ -323,7 +325,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 
 	// scan blockchain for outputs, filtering out 'dust' (outputs that cost
 	// more in fees than they are worth)
-	s := newSeedScanner(seed, w.log)
+	s := newSeedScanner(seed, &w.scanHeight, w.log)
 	_, maxFee := w.tpool.FeeEstimation()
 	const outputSize = 350 // approx. size in bytes of an output and accompanying signature
 	s.dustThreshold = maxFee.Mul64(outputSize)
