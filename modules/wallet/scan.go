@@ -6,7 +6,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -62,8 +61,7 @@ type seedScanner struct {
 	siacoinOutputs   map[types.SiacoinOutputID]scannedOutput
 	siafundOutputs   map[types.SiafundOutputID]scannedOutput
 
-	scanHeight *uint64
-	log        *persist.Logger
+	wallet *Wallet
 }
 
 func (s *seedScanner) numKeys() uint64 {
@@ -82,7 +80,7 @@ func (s *seedScanner) generateKeys(n uint64) {
 // seedScanner.
 func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// update scanHeight
-	currentHeight := atomic.LoadUint64(s.scanHeight)
+	currentHeight := atomic.LoadUint64(&s.wallet.scanHeight)
 	for _, block := range cc.AppliedBlocks {
 		if currentHeight > 0 || block.ID() != types.GenesisID {
 			currentHeight++
@@ -93,7 +91,7 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 			currentHeight--
 		}
 	}
-	atomic.StoreUint64(s.scanHeight, currentHeight)
+	atomic.StoreUint64(&s.wallet.scanHeight, currentHeight)
 
 	// update outputs
 	for _, diff := range cc.SiacoinOutputDiffs {
@@ -137,7 +135,7 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, diff := range cc.SiacoinOutputDiffs {
 		index, exists := s.keys[diff.SiacoinOutput.UnlockHash]
 		if exists {
-			s.log.Debugln("Seed scanner found a key used at index", index)
+			s.wallet.log.Debugln("Seed scanner found a key used at index", index)
 			if index > s.largestIndexSeen {
 				s.largestIndexSeen = index
 			}
@@ -146,7 +144,7 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, diff := range cc.SiafundOutputDiffs {
 		index, exists := s.keys[diff.SiafundOutput.UnlockHash]
 		if exists {
-			s.log.Debugln("Seed scanner found a key used at index", index)
+			s.wallet.log.Debugln("Seed scanner found a key used at index", index)
 			if index > s.largestIndexSeen {
 				s.largestIndexSeen = index
 			}
@@ -154,10 +152,10 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 }
 
-// scan subscribes s to cs and scans the blockchain for addresses that belong
-// to s's seed. If scan returns errMaxKeys, additional keys may need to be
-// generated to find all the addresses.
-func (s *seedScanner) scan(cs modules.ConsensusSet) error {
+// scan subscribes s to the consensus set and scans the blockchain for
+// addresses that belong to s's seed. If scan returns errMaxKeys, additional
+// keys may need to be generated to find all the addresses.
+func (s *seedScanner) scan() error {
 	// generate a bunch of keys and scan the blockchain looking for them. If
 	// none of the 'upper' half of the generated keys are found, we are done;
 	// otherwise, generate more keys and try again (bounded by a sane
@@ -168,11 +166,11 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 	var numKeys uint64 = numInitialKeys
 	for s.numKeys() < maxScanKeys {
 		s.generateKeys(numKeys)
-		atomic.StoreUint64(s.scanHeight, 0)
-		if err := cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
+		atomic.StoreUint64(&s.wallet.scanHeight, 0)
+		if err := s.wallet.cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
 			return err
 		}
-		cs.Unsubscribe(s)
+		s.wallet.cs.Unsubscribe(s)
 		if s.largestIndexSeen < s.numKeys()/2 {
 			return nil
 		}
@@ -187,14 +185,13 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 }
 
 // newSeedScanner returns a new seedScanner.
-func newSeedScanner(seed modules.Seed, scanHeight *uint64, log *persist.Logger) *seedScanner {
+func (w *Wallet) newSeedScanner(seed modules.Seed) *seedScanner {
 	return &seedScanner{
 		seed:           seed,
 		keys:           make(map[types.UnlockHash]uint64),
 		siacoinOutputs: make(map[types.SiacoinOutputID]scannedOutput),
 		siafundOutputs: make(map[types.SiafundOutputID]scannedOutput),
 
-		scanHeight: scanHeight,
-		log:        log,
+		wallet: w,
 	}
 }

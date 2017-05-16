@@ -369,8 +369,8 @@ func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) er
 	defer w.scanLock.Unlock()
 
 	// estimate the primarySeedProgress by scanning the blockchain
-	s := newSeedScanner(seed, &w.scanHeight, w.log)
-	if err := s.scan(w.cs); err != nil {
+	s := w.newSeedScanner(seed)
+	if err := s.scan(); err != nil {
 		return err
 	}
 	// NOTE: each time the wallet generates a key for index n, it sets its
