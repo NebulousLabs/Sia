@@ -36,7 +36,6 @@ func setupTestDownload(t *testing.T, size int, name string, waitOnAvailability b
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
