@@ -5,6 +5,7 @@ package api
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
@@ -1329,5 +1330,131 @@ func TestHostAndRenterRenewInterrupt(t *testing.T) {
 	if bytes.Compare(orig, download) != 0 {
 		t.Fatal("data mismatch when downloading a file")
 	}
+}
 
+// TestRedundancyReporting verifies that redundancy reporting is accurate if
+// contracts become offline.
+func TestRedundancyReporting(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+	stH1, err := blankServerTester(t.Name() + " - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH1.server.Close()
+	testGroup := []*serverTester{st, stH1}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Add storage to every host.
+	err = addStorageToAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Announce every host.
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance with two hosts.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
+	allowanceValues.Set("hosts", "2")
+	allowanceValues.Set("period", "10")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file to upload.
+	filesize := int(45678)
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, filesize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// upload the file
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// redundancy should reach 2
+	var rf RenterFiles
+	err = retry(60, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+			return nil
+		}
+		return errors.New("file not uploaded")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// take down one of the hosts
+	stH1.server.Close()
+
+	// wait for the redundancy to decrement
+	err = retry(60, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
+			return nil
+		}
+		return errors.New("file redundancy not decremented")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// bring back the host
+	stH1, err = assembleServerTester(stH1.walletKey, stH1.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH1.server.Close()
+
+	// add a few blocks, without this this test fails with `wallet has coins spent in incomplete transactions`
+	for i := 0; i < 5; i++ {
+		_, err = stH1.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = stH1.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// redundancy should increment back to 2
+	err = retry(60, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+			return nil
+		}
+		return errors.New("file redundancy not incremented")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
