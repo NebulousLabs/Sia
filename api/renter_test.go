@@ -441,7 +441,7 @@ func TestRenterAsyncDownload(t *testing.T) {
 	}
 	t.Parallel()
 
-	st, _ := setupTestDownload(t, 1e4, "test.dat", true)
+	st, _ := setupTestDownload(t, 4e5, "test.dat", true)
 	defer st.server.panicClose()
 
 	// Download the file asynchronously.
