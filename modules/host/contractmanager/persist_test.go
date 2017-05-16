@@ -391,19 +391,25 @@ func TestLoadMissingStorageFolder(t *testing.T) {
 	if len(sfs) != 2 {
 		t.Fatal("wrong number of storage folders being reported")
 	}
-	if sfs[0].FailedReads > 0 {
+	var sfOne modules.StorageFolderMetadata
+	for _, sf := range sfs {
+		if sf.Index == sfOneIndex {
+			sfOne = sf
+		}
+	}
+	if sfOne.FailedReads > 0 {
 		t.Error("folder should be visible again")
 	}
-	if sfs[0].FailedWrites > 0 {
+	if sfOne.FailedWrites > 0 {
 		t.Error("folder should be visible again")
 	}
-	if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize {
+	if sfOne.Capacity != sfOne.CapacityRemaining+modules.SectorSize {
 		cmt.cm.wal.mu.Lock()
-		t.Log("Usage len:", len(cmt.cm.storageFolders[sfs[0].Index].usage))
-		t.Log("Reported Sectors:", cmt.cm.storageFolders[sfs[0].Index].sectors)
-		t.Log("Avail:", len(cmt.cm.storageFolders[sfs[0].Index].availableSectors))
+		t.Log("Usage len:", len(cmt.cm.storageFolders[sfOne.Index].usage))
+		t.Log("Reported Sectors:", cmt.cm.storageFolders[sfOne.Index].sectors)
+		t.Log("Avail:", len(cmt.cm.storageFolders[sfOne.Index].availableSectors))
 		cmt.cm.wal.mu.Unlock()
-		t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+		t.Error("One sector's worth of capacity should be consumed:", sfOne.Capacity, sfOne.CapacityRemaining)
 	}
 
 	// See if the sector is still available.
