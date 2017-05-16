@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -104,6 +105,7 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 
 	// Load db objects into memory.
 	var lastChange modules.ConsensusChangeID
+	var currentHeight types.BlockHeight
 	var primarySeedFile seedFile
 	var primarySeedProgress uint64
 	var auxiliarySeedFiles []seedFile
@@ -120,6 +122,9 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 
 		// lastChange
 		lastChange = dbGetConsensusChangeID(w.dbTx)
+
+		// currentHeight
+		currentHeight = dbGetConsensusHeight(w.dbTx)
 
 		// primarySeedFile + primarySeedProgress
 		wb := w.dbTx.Bucket(bucketWallet)
@@ -193,6 +198,8 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 	subscribed := w.subscribed
 	w.mu.RUnlock()
 	if !subscribed {
+		// set scanHeight to match lastChange
+		atomic.StoreUint64(&w.scanHeight, uint64(currentHeight))
 		err = w.cs.ConsensusSetSubscribe(w, lastChange)
 		if err == modules.ErrInvalidConsensusChangeID {
 			// something went wrong; resubscribe from the beginning
