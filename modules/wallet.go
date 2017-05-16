@@ -363,6 +363,10 @@ type (
 		// a TransactionBuilder which can be used to expand the transaction.
 		RegisterTransaction(t types.Transaction, parents []types.Transaction) TransactionBuilder
 
+		// Rescanning reports whether the wallet is currently rescanning the
+		// blockchain.
+		Rescanning() bool
+
 		// StartTransaction is a convenience method that calls
 		// RegisterTransaction(types.Transaction{}, nil)
 		StartTransaction() TransactionBuilder

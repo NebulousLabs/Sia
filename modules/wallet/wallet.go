@@ -181,3 +181,13 @@ func (w *Wallet) AllAddresses() []types.UnlockHash {
 	})
 	return addrs
 }
+
+// Rescanning reports whether the wallet is currently rescanning the
+// blockchain.
+func (w *Wallet) Rescanning() bool {
+	rescanning := !w.scanLock.TryLock()
+	if !rescanning {
+		w.scanLock.Unlock()
+	}
+	return rescanning
+}
