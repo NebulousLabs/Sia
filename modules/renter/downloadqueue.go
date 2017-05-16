@@ -25,16 +25,24 @@ func (r *Renter) Download(p *modules.RenterDownloadParameters) error {
 		currentContracts[contract.NetAddress] = contract.ID
 	}
 
-	// Ensure that both offset and length were passed or neither.
-	if (p.OffsetPassed || p.LengthPassed) && !(p.OffsetPassed && p.LengthPassed) {
-		var missingfield = "offset"
-		if p.LengthPassed {
-			missingfield = "length"
-		}
-		return errors.New("either both \"offset\" and " +
-			"\"length\" have to be specified or neither. " +
-			missingfield + " has not been specified.")
+	// Handle special cases.
+	if !p.OffsetPassed {
+		p.Offset = 0
 	}
+
+	if !p.LengthPassed {
+		p.Length = file.size - p.Offset
+	}
+	//// Ensure that both offset and length were passed or neither.
+	//if (p.OffsetPassed || p.LengthPassed) && !(p.OffsetPassed && p.LengthPassed) {
+	//	var missingfield = "offset"
+	//	if p.LengthPassed {
+	//		missingfield = "length"
+	//	}
+	//	return errors.New("either both \"offset\" and " +
+	//		"\"length\" have to be specified or neither. " +
+	//		missingfield + " has not been specified.")
+	//}
 
 	// Determine if entire file is to be downloaded.
 	if !p.OffsetPassed {
@@ -47,9 +55,9 @@ func (r *Renter) Download(p *modules.RenterDownloadParameters) error {
 		emsg := fmt.Sprintf("offset and length combination invalid, max byte is at index %d", file.size-1)
 		return errors.New(emsg)
 	}
-	if p.Length == 0 {
-		return errors.New("the length parameter has to be greater than 0.")
-	}
+	//if p.Length == 0 {
+	//	return errors.New("the length parameter has to be greater than 0.")
+	//}
 
 	// Create the download object and add it to the queue.
 	d := r.newSectionDownload(file, p.DlWriter, currentContracts, p.Offset, p.Length)

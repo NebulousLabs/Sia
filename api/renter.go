@@ -404,6 +404,30 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 	}
 }
 
+func (api *API) renterHeadDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	// Extract the requested siapath.
+	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/")
+	fileExists := false
+	var f modules.FileInfo
+
+	files := api.renter.FileList()
+	for _, file := range files {
+		if file.SiaPath == siapath {
+			fileExists = true
+			f = file
+		}
+	}
+
+	if !fileExists {
+		WriteError(w, Error{"file at specified siapath does not exist"}, http.StatusBadRequest)
+		return
+	}
+	w.Header().Add("Accept-Ranges", "bytes")
+	w.Header().Add("Content-Length", strconv.FormatUint(f.Filesize, 10)) // TODO fix this.
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
 func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	// Ensure that the async flag is not set to any other value than "true" or "".
@@ -422,8 +446,20 @@ func (api *API) parseDownloadParameters(w http.ResponseWriter, req *http.Request
 	destination := req.FormValue("destination")
 
 	// The offset and length in bytes.
-	offsetparam := req.FormValue("offset")
-	lengthparam := req.FormValue("length")
+	var offsetparam = req.FormValue("offset")
+	var lengthparam = req.FormValue("length")
+	var headerreq = false
+
+	if len(offsetparam) == 0 && len(lengthparam) == 0 {
+		brange := req.Header.Get("Range")
+		if len(brange) > 0 && strings.Index(brange, "bytes=") == 0{
+			substr := brange[6:]
+			parts := strings.Split(substr, "-")
+			offsetparam = parts[0]
+			lengthparam = parts[1]
+			headerreq = true
+		}
+	}
 
 	// Determines whether the response is written to response body.
 	httprespparam := req.FormValue("httpresp")
@@ -445,6 +481,10 @@ func (api *API) parseDownloadParameters(w http.ResponseWriter, req *http.Request
 		length, err = strconv.ParseUint(lengthparam, 10, 64)
 		if err != nil {
 			return nil, build.ExtendErr("could not decode the length as uint64: ", err)
+		}
+
+		if headerreq {
+			length = length - offset
 		}
 	}
 	// Verify that if either offset or length have been provided that both were provided.
