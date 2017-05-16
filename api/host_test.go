@@ -556,6 +556,7 @@ func TestStorageFolderUnavailable(t *testing.T) {
 	}
 
 	// remove the folder on disk
+	st.server.Close()
 	sfPath2 := build.TempDir(t.Name(), "storagefolder-old")
 	err = os.Rename(sfPath, sfPath2)
 	if err != nil {
@@ -616,6 +617,7 @@ func TestStorageFolderUnavailable(t *testing.T) {
 	}
 
 	// reload the host and verify the storage folder is still good
+	st.server.Close()
 	st, err = st.reloadedServerTester()
 	if err != nil {
 		t.Fatal(err)
