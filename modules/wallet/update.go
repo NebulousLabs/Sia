@@ -3,7 +3,6 @@ package wallet
 import (
 	"fmt"
 	"math"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -283,18 +282,16 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	defer w.mu.Unlock()
 
 	// update scanHeight
-	currentHeight := atomic.LoadUint64(&w.scanHeight)
 	for _, block := range cc.AppliedBlocks {
-		if currentHeight > 0 || block.ID() != types.GenesisID {
-			currentHeight++
+		if w.scanHeight > 0 || block.ID() != types.GenesisID {
+			w.scanHeight++
 		}
 	}
 	for _, block := range cc.RevertedBlocks {
-		if currentHeight > 0 || block.ID() != types.GenesisID {
-			currentHeight--
+		if w.scanHeight > 0 || block.ID() != types.GenesisID {
+			w.scanHeight--
 		}
 	}
-	atomic.StoreUint64(&w.scanHeight, currentHeight)
 
 	if err := w.updateConfirmedSet(w.dbTx, cc); err != nil {
 		w.log.Println("ERROR: failed to update confirmed set:", err)

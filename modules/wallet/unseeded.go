@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"errors"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -191,7 +190,13 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 		if err != nil {
 			return err
 		}
-		return dbPutConsensusHeight(w.dbTx, 0)
+		err = dbPutConsensusHeight(w.dbTx, 0)
+		if err != nil {
+			return err
+		}
+		// reset scanHeight to 0
+		w.scanHeight = 0
+		return nil
 	}()
 	if err != nil {
 		return err
@@ -201,7 +206,6 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
 
-	atomic.StoreUint64(&w.scanHeight, 0)
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {
 		return err
@@ -258,7 +262,13 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 		if err != nil {
 			return err
 		}
-		return dbPutConsensusHeight(w.dbTx, 0)
+		err = dbPutConsensusHeight(w.dbTx, 0)
+		if err != nil {
+			return err
+		}
+		// reset scanHeight to 0
+		w.scanHeight = 0
+		return nil
 	}()
 	if err != nil {
 		return err
@@ -268,7 +278,6 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
 
-	atomic.StoreUint64(&w.scanHeight, 0)
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {
 		return err

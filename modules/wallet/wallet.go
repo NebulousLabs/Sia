@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/bolt"
 
@@ -89,7 +88,7 @@ type Wallet struct {
 	// A separate TryMutex is used to ensure that only one blockchain scan
 	// occurs at a time. During the scan, the scanHeight is also recorded.
 	scanLock   siasync.TryMutex
-	scanHeight uint64 // must be 8-byte aligned
+	scanHeight types.BlockHeight
 
 	// The wallet's ThreadGroup tells tracked functions to shut down and
 	// blocks until they have all exited before returning from Close.
@@ -191,5 +190,7 @@ func (w *Wallet) Rescanning() (bool, types.BlockHeight) {
 	if !rescanning {
 		w.scanLock.Unlock()
 	}
-	return rescanning, types.BlockHeight(atomic.LoadUint64(&w.scanHeight))
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return rescanning, types.BlockHeight(w.scanHeight)
 }

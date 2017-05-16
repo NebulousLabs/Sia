@@ -4,7 +4,6 @@ import (
 	"errors"
 	"runtime"
 	"sync"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -266,7 +265,13 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 		if err != nil {
 			return err
 		}
-		return dbPutConsensusHeight(w.dbTx, 0)
+		err = dbPutConsensusHeight(w.dbTx, 0)
+		if err != nil {
+			return err
+		}
+		// reset scanHeight to 0
+		w.scanHeight = 0
+		return nil
 	}()
 	if err != nil {
 		return err
@@ -275,7 +280,6 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	// rescan the blockchain
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
-	atomic.StoreUint64(&w.scanHeight, 0)
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {
 		return err

@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"fmt"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -80,18 +79,18 @@ func (s *seedScanner) generateKeys(n uint64) {
 // seedScanner.
 func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// update scanHeight
-	currentHeight := atomic.LoadUint64(&s.wallet.scanHeight)
+	s.wallet.mu.Lock()
 	for _, block := range cc.AppliedBlocks {
-		if currentHeight > 0 || block.ID() != types.GenesisID {
-			currentHeight++
+		if s.wallet.scanHeight > 0 || block.ID() != types.GenesisID {
+			s.wallet.scanHeight++
 		}
 	}
 	for _, block := range cc.RevertedBlocks {
-		if currentHeight > 0 || block.ID() != types.GenesisID {
-			currentHeight--
+		if s.wallet.scanHeight > 0 || block.ID() != types.GenesisID {
+			s.wallet.scanHeight--
 		}
 	}
-	atomic.StoreUint64(&s.wallet.scanHeight, currentHeight)
+	s.wallet.mu.Unlock()
 
 	// update outputs
 	for _, diff := range cc.SiacoinOutputDiffs {
@@ -166,7 +165,9 @@ func (s *seedScanner) scan() error {
 	var numKeys uint64 = numInitialKeys
 	for s.numKeys() < maxScanKeys {
 		s.generateKeys(numKeys)
-		atomic.StoreUint64(&s.wallet.scanHeight, 0)
+		s.wallet.mu.Lock()
+		s.wallet.scanHeight = 0
+		s.wallet.mu.Unlock()
 		if err := s.wallet.cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
 			return err
 		}
