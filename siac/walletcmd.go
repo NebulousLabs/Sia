@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
@@ -457,10 +458,45 @@ func walletunlockcmd() {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
+
+	done := make(chan struct{})
+	go rescanMessage(done)
+
 	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
 	err = post("/wallet/unlock", qs)
 	if err != nil {
 		die("Could not unlock wallet:", err)
 	}
+
+	close(done)
 	fmt.Println("Wallet unlocked")
+}
+
+// rescanMessage prints the wallet's scanheight every 3 seconds until done is
+// closed.
+func rescanMessage(done chan struct{}) {
+	// sleep first because we may not need to print a message at all if
+	// done is closed quickly.
+	select {
+	case <-done:
+		return
+	case <-time.After(3 * time.Second):
+	}
+
+	for {
+		var wg api.WalletGET
+		err := getAPI("/wallet", &wg)
+		if err != nil || !wg.Rescanning {
+			continue
+		}
+		fmt.Printf("\rScanned to height %v...", wg.ScanHeight)
+
+		select {
+		case <-done:
+			// when finished, complete the line
+			fmt.Println()
+			return
+		case <-time.After(3 * time.Second):
+		}
+	}
 }

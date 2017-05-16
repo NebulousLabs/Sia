@@ -201,10 +201,6 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
 
-	done := make(chan struct{})
-	go w.rescanMessage(done)
-	defer close(done)
-
 	atomic.StoreUint64(&w.scanHeight, 0)
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {
@@ -271,10 +267,6 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 	// rescan the blockchain
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
-
-	done := make(chan struct{})
-	go w.rescanMessage(done)
-	defer close(done)
 
 	atomic.StoreUint64(&w.scanHeight, 0)
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)

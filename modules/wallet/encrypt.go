@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -194,13 +193,6 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 	subscribed := w.subscribed
 	w.mu.RUnlock()
 	if !subscribed {
-		// Subscription can take a while, so spawn a goroutine to print the
-		// wallet height every few seconds. (If subscription completes
-		// quickly, nothing will be printed.)
-		done := make(chan struct{})
-		go w.rescanMessage(done)
-		defer close(done)
-
 		err = w.cs.ConsensusSetSubscribe(w, lastChange)
 		if err == modules.ErrInvalidConsensusChangeID {
 			// something went wrong; resubscribe from the beginning
@@ -225,35 +217,6 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 	w.subscribed = true
 	w.mu.Unlock()
 	return nil
-}
-
-// rescanMessage prints the blockheight every 3 seconds until done is closed.
-func (w *Wallet) rescanMessage(done chan struct{}) {
-	if build.Release == "testing" {
-		return
-	}
-
-	// sleep first because we may not need to print a message at all if
-	// done is closed quickly.
-	select {
-	case <-done:
-		return
-	case <-time.After(3 * time.Second):
-	}
-
-	for {
-		w.mu.Lock()
-		height, _ := dbGetConsensusHeight(w.dbTx)
-		w.mu.Unlock()
-		print("\rWallet: scanned to height ", height, "...")
-
-		select {
-		case <-done:
-			println("\nDone!")
-			return
-		case <-time.After(3 * time.Second):
-		}
-	}
 }
 
 // wipeSecrets erases all of the seeds and secret keys in the wallet.

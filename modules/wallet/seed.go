@@ -276,11 +276,6 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
 	atomic.StoreUint64(&w.scanHeight, 0)
-
-	done := make(chan struct{})
-	go w.rescanMessage(done)
-	defer close(done)
-
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {
 		return err
