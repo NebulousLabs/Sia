@@ -249,9 +249,9 @@ func TestLock(t *testing.T) {
 	}
 }
 
-// TestInitFromSeedParallelUnlock verifies that calling InitFromSeed and then
-// Unlock() in parallel results in the correct balance.
-func TestInitFromSeedParallelUnlock(t *testing.T) {
+// TestInitFromSeedConcurrentUnlock verifies that calling InitFromSeed and
+// then Unlock() concurrently results in the correct balance.
+func TestInitFromSeedConcurrentUnlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -280,16 +280,65 @@ func TestInitFromSeedParallelUnlock(t *testing.T) {
 	// pause for 10ms to allow the seed sweeper to start
 	time.Sleep(time.Millisecond * 10)
 
-	// unlock
+	// unlock should now return an error
 	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
-	if err != nil {
-		t.Fatal(err)
+	if err != errScanInProgress {
+		t.Fatal("expected errScanInProgress, got", err)
 	}
+	// wait for init to finish
+	for i := 0; i < 100; i++ {
+		time.Sleep(time.Millisecond * 10)
+		err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+		if err == nil {
+			break
+		}
+	}
+
 	// starting balance should match the original wallet
 	newBal, _, _ := w.ConfirmedBalance()
 	if newBal.Cmp(origBal) != 0 {
 		t.Log(w.UnconfirmedBalance())
 		t.Fatalf("wallet should have correct balance after loading seed: wanted %v, got %v", origBal, newBal)
+	}
+}
+
+// TestUnlockConcurrent verifies that calling unlock multiple times
+// concurrently results in only one unlock operation.
+func TestUnlockConcurrent(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create a wallet with some money
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// lock the wallet
+	wt.wallet.Lock()
+
+	// spawn an unlock goroutine
+	errChan := make(chan error)
+	go func() {
+		// acquire the write lock so that Unlock acquires the trymutex, but
+		// cannot proceed further
+		wt.wallet.mu.Lock()
+		errChan <- wt.wallet.Unlock(wt.walletMasterKey)
+	}()
+
+	// wait for goroutine to start
+	time.Sleep(time.Millisecond * 10)
+
+	// unlock should now return an error
+	err = wt.wallet.Unlock(wt.walletMasterKey)
+	if err != errScanInProgress {
+		t.Fatal("expected errScanInProgress, got", err)
+	}
+
+	wt.wallet.mu.Unlock()
+	if err := <-errChan; err != nil {
+		t.Fatal("first unlock failed:", err)
 	}
 }
 

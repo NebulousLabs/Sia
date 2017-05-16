@@ -68,6 +68,11 @@ locked or unlocked.
   // become unavailable when the wallet is locked.
   "unlocked": true,
 
+  // Indicates whether the wallet is currently rescanning the blockchain. This
+  // will be true for the duration of calls to /unlock, /seeds, /init/seed,
+  // and /sweep/seed.
+  "rescanning": false,
+
   // Number of siacoins, in hastings, available to the wallet as of the most
   // recent block in the blockchain.
   "confirmedsiacoinbalance": "123456", // hastings, big int

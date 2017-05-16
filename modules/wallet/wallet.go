@@ -84,6 +84,11 @@ type Wallet struct {
 	persistDir string
 	log        *persist.Logger
 	mu         sync.RWMutex
+
+	// A separate TryMutex is used to protect against concurrent unlocking or
+	// initialization.
+	scanLock siasync.TryMutex
+
 	// The wallet's ThreadGroup tells tracked functions to shut down and
 	// blocks until they have all exited before returning from Close.
 	tg siasync.ThreadGroup
@@ -175,4 +180,14 @@ func (w *Wallet) AllAddresses() []types.UnlockHash {
 		return bytes.Compare(addrs[i][:], addrs[j][:]) < 0
 	})
 	return addrs
+}
+
+// Rescanning reports whether the wallet is currently rescanning the
+// blockchain.
+func (w *Wallet) Rescanning() bool {
+	rescanning := !w.scanLock.TryLock()
+	if !rescanning {
+		w.scanLock.Unlock()
+	}
+	return rescanning
 }

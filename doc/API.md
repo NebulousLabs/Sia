@@ -975,8 +975,9 @@ locked or unlocked.
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response)
 ```javascript
 {
-  "encrypted": true,
-  "unlocked":  true,
+  "encrypted":  true,
+  "unlocked":   true,
+  "rescanning": false,
 
   "confirmedsiacoinbalance":     "123456", // hastings, big int
   "unconfirmedoutgoingsiacoins": "0",      // hastings, big int
