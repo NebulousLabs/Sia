@@ -359,6 +359,11 @@ Unlock the wallet to view balance
 		return
 	}
 
+	scanMessage := ""
+	if status.Rescanning {
+		scanMessage = " (not final, scan in progress)"
+	}
+
 	unconfirmedBalance := status.ConfirmedSiacoinBalance.Add(status.UnconfirmedIncomingSiacoins).Sub(status.UnconfirmedOutgoingSiacoins)
 	var delta string
 	if unconfirmedBalance.Cmp(status.ConfirmedSiacoinBalance) >= 0 {
@@ -369,12 +374,12 @@ Unlock the wallet to view balance
 
 	fmt.Printf(`Wallet status:
 %s, Unlocked
-Confirmed Balance:   %v
+Confirmed Balance:   %v%v
 Unconfirmed Delta:  %v
 Exact:               %v H
 Siafunds:            %v SF
 Siafund Claims:      %v H
-`, encStatus, currencyUnits(status.ConfirmedSiacoinBalance), delta,
+`, encStatus, currencyUnits(status.ConfirmedSiacoinBalance), scanMessage, delta,
 		status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
 }
 
