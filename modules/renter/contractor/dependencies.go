@@ -80,7 +80,9 @@ func (p *stdPersist) save(data contractorPersist) error {
 	if p.journal == nil {
 		var err error
 		p.journal, err = newJournal(p.filename, data)
-		return err
+		if err != nil {
+			return err
+		}
 	}
 	return p.journal.checkpoint(data)
 }
