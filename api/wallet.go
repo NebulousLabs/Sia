@@ -93,6 +93,12 @@ type (
 		ConfirmedTransactions   []modules.ProcessedTransaction `json:"confirmedtransactions"`
 		UnconfirmedTransactions []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
 	}
+
+	// WalletVerifyAddressGET contains a bool indicating if the address passed to
+	// /wallet/verify/address/:addr is a valid address.
+	WalletVerifyAddressGET struct {
+		Valid bool
+	}
 )
 
 // encryptionKeys enumerates the possible encryption keys that can be derived
@@ -524,4 +530,16 @@ func (api *API) walletUnlockHandler(w http.ResponseWriter, req *http.Request, _ 
 		}
 	}
 	WriteError(w, Error{"error when calling /wallet/unlock: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
+}
+
+// walletVerifyAddressHandler handles API calls to /wallet/verify/address/:addr.
+func (api *API) walletVerifyAddressHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	addrString := ps.ByName("addr")
+	ulh := &types.UnlockHash{}
+
+	valid := true
+	if err := ulh.LoadString(addrString); err != nil {
+		valid = false
+	}
+	WriteJSON(w, WalletVerifyAddressGET{valid})
 }

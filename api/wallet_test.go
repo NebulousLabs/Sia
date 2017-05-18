@@ -1304,7 +1304,7 @@ func TestWalletVerifyAddress(t *testing.T) {
 	}
 	defer st.server.panicClose()
 
-	var res WalletVerifyGET
+	var res WalletVerifyAddressGET
 	fakeaddr := "thisisaninvalidwalletaddress"
 	if err = st.getAPI("/wallet/verify/address/"+fakeaddr, &res); err != nil {
 		t.Fatal(err)
