@@ -535,11 +535,7 @@ func (api *API) walletUnlockHandler(w http.ResponseWriter, req *http.Request, _ 
 // walletVerifyAddressHandler handles API calls to /wallet/verify/address/:addr.
 func (api *API) walletVerifyAddressHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	addrString := ps.ByName("addr")
-	ulh := &types.UnlockHash{}
 
-	valid := true
-	if err := ulh.LoadString(addrString); err != nil {
-		valid = false
-	}
-	WriteJSON(w, WalletVerifyAddressGET{valid})
+	err := new(types.UnlockHash).LoadString(addrString)
+	WriteJSON(w, WalletVerifyAddressGET{Valid: err == nil})
 }
