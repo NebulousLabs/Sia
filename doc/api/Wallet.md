@@ -47,6 +47,7 @@ Index
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
 | [/wallet/unlock](#walletunlock-post)                            | POST      |
+| [/wallet/verify/address/:___addr___](#walletverifyaddress-get)  | GET       |
 
 #### /wallet [GET]
 
@@ -596,3 +597,15 @@ encryptionpassword string
 ###### Response
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
+
+#### /wallet/verify/address/:addr [GET]
+
+takes the address specified by :addr and returns a JSON response indicating if the address is valid.
+
+###### JSON Response
+```javascript
+{
+	// valid indicates if the address supplied to :addr is a valid UnlockHash.
+	"valid": true
+}
+```

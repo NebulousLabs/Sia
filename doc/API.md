@@ -963,6 +963,7 @@ Wallet
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
 | [/wallet/unlock](#walletunlock-post)                            | POST      |
+| [/wallet/verify/address/:___addr___](#walletverifyaddress-get)  | GET       |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Wallet.md](/doc/api/Wallet.md).
@@ -1325,3 +1326,14 @@ encryptionpassword
 ###### Response
 standard success or error response. See
 [#standard-responses](#standard-responses).
+
+#### /wallet/verify/address/:addr [GET]
+
+takes the address specified by :addr and returns a JSON response indicating if the address is valid.
+
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-11)
+```javascript
+{
+	"valid": true
+}
+```
