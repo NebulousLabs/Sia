@@ -125,28 +125,18 @@ func (j *journal) Close() error {
 // newJournal creates a new journal, using data as the initial object.
 func newJournal(filename string, data contractorPersist) (*journal, error) {
 	// safely create the journal
-	tmp, err := os.Create(filename + "_tmp")
+	f, err := os.Create(filename)
 	if err != nil {
 		return nil, err
 	}
-	enc := json.NewEncoder(tmp)
+	enc := json.NewEncoder(f)
 	if err := enc.Encode(journalMeta); err != nil {
 		return nil, err
 	}
 	if err := enc.Encode(data); err != nil {
 		return nil, err
 	}
-	if err := tmp.Sync(); err != nil {
-		return nil, err
-	}
-	if err := tmp.Close(); err != nil {
-		return nil, err
-	}
-	if err := os.Rename(tmp.Name(), filename); err != nil {
-		return nil, err
-	}
-	f, err := os.OpenFile(filename, os.O_RDWR|os.O_APPEND, 0)
-	if err != nil {
+	if err := f.Sync(); err != nil {
 		return nil, err
 	}
 
