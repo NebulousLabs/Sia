@@ -105,6 +105,9 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 			}
 			if isOutboundPeer {
 				// Skip current outbound peers.
+				if !g.managedSleep(acquiringPeersDelay) {
+					return
+				}
 				continue
 			}
 
