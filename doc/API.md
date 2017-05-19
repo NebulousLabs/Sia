@@ -485,7 +485,7 @@ standard success or error response. See
 Host DB
 -------
 
-| Request                                                 | HTTP Verb |
+| Route                                                   | HTTP verb |
 | ------------------------------------------------------- | --------- |
 | [/hostdb/active](#hostdbactive-get-example)             | GET       |
 | [/hostdb/all](#hostdball-get-example)                   | GET       |
