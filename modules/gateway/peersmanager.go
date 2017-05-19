@@ -34,7 +34,6 @@ func (g *Gateway) managedPeerManagerConnect(addr modules.NetAddress) {
 			if n, ok := g.nodes[p.NetAddress]; ok && !n.WasOutboundPeer {
 				n.WasOutboundPeer = true
 				g.nodes[n.NetAddress] = n
-				g.saveSync()
 			}
 			g.log.Debugf("[PMC] [SUCCESS] [%v] existing peer has been converted to outbound peer", addr)
 		}
