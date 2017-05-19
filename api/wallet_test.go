@@ -1289,3 +1289,39 @@ func TestWalletSiafunds(t *testing.T) {
 		t.Fatal("expected non-zero claim balance")
 	}
 }
+
+// TestWalletVerifyAddress tests that the /wallet/verify/address/:addr endpoint
+// validates wallet addresses correctly.
+func TestWalletVerifyAddress(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	var res WalletVerifyAddressGET
+	fakeaddr := "thisisaninvalidwalletaddress"
+	if err = st.getAPI("/wallet/verify/address/"+fakeaddr, &res); err != nil {
+		t.Fatal(err)
+	}
+	if res.Valid == true {
+		t.Fatal("expected /wallet/verify to fail an invalid address")
+	}
+
+	var wag WalletAddressGET
+	err = st.getAPI("/wallet/address", &wag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = st.getAPI("/wallet/verify/address/"+wag.Address.String(), &res); err != nil {
+		t.Fatal(err)
+	}
+	if res.Valid == false {
+		t.Fatal("expected /wallet/verify to pass a valid address")
+	}
+}

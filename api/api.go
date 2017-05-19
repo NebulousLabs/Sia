@@ -255,6 +255,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.GET("/wallet/transaction/:id", api.walletTransactionHandler)
 		router.GET("/wallet/transactions", api.walletTransactionsHandler)
 		router.GET("/wallet/transactions/:addr", api.walletTransactionsAddrHandler)
+		router.GET("/wallet/verify/address/:addr", api.walletVerifyAddressHandler)
 		router.POST("/wallet/unlock", RequirePassword(api.walletUnlockHandler, requiredPassword))
 	}
 
