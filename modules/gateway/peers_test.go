@@ -1093,18 +1093,26 @@ func TestPeerManagerOutboundSave(t *testing.T) {
 	}
 
 	// Block until every peer has wellConnectedThreshold outbound peers.
-	err := build.Retry(100, time.Millisecond*100, func() error {
+	err := build.Retry(100, time.Millisecond*200, func() error {
 		for _, g := range gs {
-			var outboundNodes int
+			var outboundNodes, outboundPeers int
 			g.mu.RLock()
 			for _, node := range g.nodes {
 				if node.WasOutboundPeer {
 					outboundNodes++
 				}
 			}
+			for _, peer := range g.peers {
+				if !peer.Inbound {
+					outboundPeers++
+				}
+			}
 			g.mu.RUnlock()
 			if outboundNodes < wellConnectedThreshold {
 				return errors.New("not enough outbound nodes: " + strconv.Itoa(outboundNodes))
+			}
+			if outboundPeers < wellConnectedThreshold {
+				return errors.New("not enough outbound peers: " + strconv.Itoa(outboundPeers))
 			}
 		}
 		return nil
