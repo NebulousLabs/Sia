@@ -964,6 +964,7 @@ Wallet
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
 | [/wallet/unlock](#walletunlock-post)                            | POST      |
 | [/wallet/verify/address/:___addr___](#walletverifyaddress-get)  | GET       |
+| [/wallet/changekey](#walletchangekey-post)                      | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Wallet.md](/doc/api/Wallet.md).
@@ -1337,3 +1338,17 @@ takes the address specified by :addr and returns a JSON response indicating if t
 	"valid": true
 }
 ```
+
+#### /wallet/changekey [POST]
+
+changes the wallet's encryption key.
+
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-12)
+```
+encryptionpassword
+newpassword
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
