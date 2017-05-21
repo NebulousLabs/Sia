@@ -40,7 +40,7 @@ var (
 	// TransactionMinFee defines the minimum fee required for a transaction in
 	// order for it to be accepted if there is already more than
 	// TransactionPoolSizeForFee transactions in the transaction pool.
-	TransactionMinFee = types.SiacoinPrecision.Div64(3)
+	TransactionMinFee = types.SiacoinPrecision.Div64(20)
 
 	// relayTransactionSetTimeout establishes the timeout for a relay
 	// transaction set call.
