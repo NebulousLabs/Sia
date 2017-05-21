@@ -535,12 +535,12 @@ func (api *API) walletUnlockHandler(w http.ResponseWriter, req *http.Request, _ 
 // walletChangePasswordHandler handles API calls to /wallet/changepassword
 func (api *API) walletChangePasswordHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var newKey crypto.TwofishKey
-	newKeys := encryptionKeys(req.FormValue("newpassword"))
-	if len(newKeys) != 1 {
-		WriteError(w, Error{"expected one encryption key to be passed to newpassword"}, http.StatusBadRequest)
+	newPassword := req.FormValue("newpassword")
+	if newPassword == "" {
+		WriteError(w, Error{"a password must be provided to newpassword"}, http.StatusBadRequest)
 		return
 	}
-	newKey = newKeys[0]
+	newKey = crypto.TwofishKey(crypto.HashObject(newPassword))
 
 	originalKeys := encryptionKeys(req.FormValue("encryptionpassword"))
 	if len(originalKeys) != 1 {
