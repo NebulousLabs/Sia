@@ -254,6 +254,10 @@ type (
 		// derived from the master key.
 		Unlock(masterKey crypto.TwofishKey) error
 
+		// ChangeKey changes the wallet's materKey from masterKey to newKey,
+		// re-encrypting the wallet with the provided key.
+		ChangeKey(masterKey crypto.TwofishKey, newKey crypto.TwofishKey) error
+
 		// Unlocked returns true if the wallet is currently unlocked, false
 		// otherwise.
 		Unlocked() bool

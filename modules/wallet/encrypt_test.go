@@ -430,3 +430,49 @@ func TestReset(t *testing.T) {
 	}
 	postEncryptionTesting(wt.miner, wt.wallet, newKey)
 }
+
+func TestChangeKey(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	var newKey crypto.TwofishKey
+	fastrand.Read(newKey[:])
+	origBal, _, _ := wt.wallet.ConfirmedBalance()
+
+	err = wt.wallet.ChangeKey(wt.walletMasterKey, newKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wt.wallet.Lock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wt.wallet.Unlock(wt.walletMasterKey)
+	if err == nil {
+		t.Fatal("expected unlock to fail with the original key")
+	}
+
+	err = wt.wallet.Unlock(newKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newBal, _, _ := wt.wallet.ConfirmedBalance()
+	if newBal.Cmp(origBal) != 0 {
+		t.Fatal("wallet with changed key did not have the same balance")
+	}
+
+	err = wt.wallet.Lock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	postEncryptionTesting(wt.miner, wt.wallet, newKey)
+}
