@@ -1325,3 +1325,98 @@ func TestWalletVerifyAddress(t *testing.T) {
 		t.Fatal("expected /wallet/verify to pass a valid address")
 	}
 }
+
+// TestWalletChangeKey verifies that the /wallet/changekey endpoint works
+// correctly and changes a wallet password.
+func TestWalletChangeKey(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	testdir := build.TempDir("api", t.Name())
+
+	originalPassword := "testpass"
+	newPassword := "newpass"
+	originalKey := crypto.TwofishKey(crypto.HashObject(originalPassword))
+	newKey := crypto.TwofishKey(crypto.HashObject(newPassword))
+
+	st, err := assembleServerTester(originalKey, testdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// lock the wallet
+	err = st.stdPostAPI("/wallet/lock", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the password to call /wallet/unlock.
+	unlockValues := url.Values{}
+	unlockValues.Set("encryptionpassword", originalPassword)
+	err = st.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !st.wallet.Unlocked() {
+		t.Error("wallet is not unlocked")
+	}
+
+	// change the wallet key
+	changeKeyValues := url.Values{}
+	changeKeyValues.Set("encryptionpassword", originalPassword)
+	changeKeyValues.Set("newpassword", newPassword)
+	err = st.stdPostAPI("/wallet/changekey", changeKeyValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// wallet should still be unlocked
+	if !st.wallet.Unlocked() {
+		t.Fatal("changekey locked the wallet")
+	}
+
+	// lock the wallet and verify unlocking works with the new password
+	err = st.stdPostAPI("/wallet/lock", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlockValues.Set("encryptionpassword", newPassword)
+	err = st.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !st.wallet.Unlocked() {
+		t.Error("wallet is not unlocked")
+	}
+
+	// reload the server and verify unlocking still works
+	err = st.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	st2, err := assembleServerTester(newKey, st.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.server.panicClose()
+
+	// lock the wallet
+	err = st2.stdPostAPI("/wallet/lock", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the password to call /wallet/unlock.
+	err = st2.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !st2.wallet.Unlocked() {
+		t.Error("wallet is not unlocked")
+	}
+}

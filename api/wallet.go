@@ -538,7 +538,7 @@ func (api *API) walletChangeKeyHandler(w http.ResponseWriter, req *http.Request,
 	var newKey crypto.TwofishKey
 
 	originalKeys := encryptionKeys(req.FormValue("encryptionpassword"))
-	if len(potentialOriginalKeys) != 1 {
+	if len(originalKeys) != 1 {
 		WriteError(w, Error{"expected one encryption key passed to encryptionpassword"}, http.StatusBadRequest)
 		return
 	}
