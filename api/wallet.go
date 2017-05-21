@@ -532,18 +532,9 @@ func (api *API) walletUnlockHandler(w http.ResponseWriter, req *http.Request, _ 
 	WriteError(w, Error{"error when calling /wallet/unlock: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
 }
 
-// walletChangeKeyHandler handles API calls to /wallet/changekey.
-func (api *API) walletChangeKeyHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	var originalKey crypto.TwofishKey
+// walletChangePasswordHandler handles API calls to /wallet/changepassword
+func (api *API) walletChangePasswordHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var newKey crypto.TwofishKey
-
-	originalKeys := encryptionKeys(req.FormValue("encryptionpassword"))
-	if len(originalKeys) != 1 {
-		WriteError(w, Error{"expected one encryption key passed to encryptionpassword"}, http.StatusBadRequest)
-		return
-	}
-	originalKey = originalKeys[0]
-
 	newKeys := encryptionKeys(req.FormValue("newpassword"))
 	if len(newKeys) != 1 {
 		WriteError(w, Error{"expected one encryption key to be passed to newpassword"}, http.StatusBadRequest)
@@ -551,12 +542,23 @@ func (api *API) walletChangeKeyHandler(w http.ResponseWriter, req *http.Request,
 	}
 	newKey = newKeys[0]
 
-	if err := api.wallet.ChangeKey(originalKey, newKey); err != nil {
-		WriteError(w, Error{"error when calling /wallet/changekey: " + err.Error()}, http.StatusBadRequest)
+	originalKeys := encryptionKeys(req.FormValue("encryptionpassword"))
+	if len(originalKeys) != 1 {
+		WriteError(w, Error{"expected one encryption key passed to encryptionpassword"}, http.StatusBadRequest)
 		return
 	}
-
-	WriteSuccess(w)
+	for _, key := range originalKeys {
+		err := api.wallet.ChangeKey(key, newKey)
+		if err == nil {
+			WriteSuccess(w)
+			return
+		}
+		if err != nil && err != modules.ErrBadEncryptionKey {
+			WriteError(w, Error{"error when calling /wallet/changepassword: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+	}
+	WriteError(w, Error{"error when calling /wallet/changepassword: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
 }
 
 // walletVerifyAddressHandler handles API calls to /wallet/verify/address/:addr.

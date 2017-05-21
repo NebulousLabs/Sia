@@ -48,7 +48,7 @@ Index
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
 | [/wallet/unlock](#walletunlock-post)                            | POST      |
 | [/wallet/verify/address/:___addr___](#walletverifyaddress-get)  | GET       |
-| [/wallet/changekey](#walletchangekey-post)                      | POST      |
+| [/wallet/changepassword](#walletchangepassword-post)            | POST      |
 
 #### /wallet [GET]
 
@@ -611,9 +611,9 @@ takes the address specified by :addr and returns a JSON response indicating if t
 }
 ```
 
-#### /wallet/changekey [POST]
+#### /wallet/changepassword [POST]
 
-changes the wallet's encryption key.
+changes the wallet's encryption password.
 
 ###### Query String Parameter
 ```

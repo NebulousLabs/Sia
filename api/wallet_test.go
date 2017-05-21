@@ -1326,9 +1326,9 @@ func TestWalletVerifyAddress(t *testing.T) {
 	}
 }
 
-// TestWalletChangeKey verifies that the /wallet/changekey endpoint works
-// correctly and changes a wallet password.
-func TestWalletChangeKey(t *testing.T) {
+// TestWalletChangePassword verifies that the /wallet/changepassword endpoint
+// works correctly and changes a wallet password.
+func TestWalletChangePassword(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -1368,13 +1368,13 @@ func TestWalletChangeKey(t *testing.T) {
 	changeKeyValues := url.Values{}
 	changeKeyValues.Set("encryptionpassword", originalPassword)
 	changeKeyValues.Set("newpassword", newPassword)
-	err = st.stdPostAPI("/wallet/changekey", changeKeyValues)
+	err = st.stdPostAPI("/wallet/changepassword", changeKeyValues)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// wallet should still be unlocked
 	if !st.wallet.Unlocked() {
-		t.Fatal("changekey locked the wallet")
+		t.Fatal("changepassword locked the wallet")
 	}
 
 	// lock the wallet and verify unlocking works with the new password
