@@ -550,11 +550,6 @@ func (w *Wallet) ChangeKey(masterKey crypto.TwofishKey, newKey crypto.TwofishKey
 	}
 	defer w.tg.Done()
 
-	if !w.scanLock.TryLock() {
-		return errScanInProgress
-	}
-	defer w.scanLock.Unlock()
-
 	return w.managedChangeKey(masterKey, newKey)
 }
 
