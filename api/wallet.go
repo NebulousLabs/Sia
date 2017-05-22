@@ -543,10 +543,6 @@ func (api *API) walletChangePasswordHandler(w http.ResponseWriter, req *http.Req
 	newKey = crypto.TwofishKey(crypto.HashObject(newPassword))
 
 	originalKeys := encryptionKeys(req.FormValue("encryptionpassword"))
-	if len(originalKeys) != 1 {
-		WriteError(w, Error{"expected one encryption key passed to encryptionpassword"}, http.StatusBadRequest)
-		return
-	}
 	for _, key := range originalKeys {
 		err := api.wallet.ChangeKey(key, newKey)
 		if err == nil {
