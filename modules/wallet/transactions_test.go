@@ -190,3 +190,68 @@ func TestIntegrationAddressTransactions(t *testing.T) {
 		t.Error("addresses unconfirmed transactions should be empty")
 	}
 }
+
+// TestTransactionInputOutputIDs verifies that ProcessedTransaction's inputs
+// and outputs have a valid ID field.
+func TestTransactionInputOutputIDs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// mine a few blocks to create miner payouts
+	for i := 0; i < 5; i++ {
+		_, err = wt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// create some siacoin outputs
+	uc, err := wt.wallet.NextAddress()
+	addr := uc.UnlockHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify the miner payouts and siacoin outputs/inputs have correct IDs
+	txns, err := wt.wallet.Transactions(0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outputIDs := make(map[types.OutputID]struct{})
+	for _, txn := range txns {
+		block, _ := wt.cs.BlockAtHeight(txn.ConfirmationHeight)
+		for i, output := range txn.Outputs {
+			outputIDs[output.ID] = struct{}{}
+			if output.FundType == types.SpecifierMinerPayout {
+				if output.ID != types.OutputID(block.MinerPayoutID(uint64(i))) {
+					t.Fatal("miner payout had incorrect output ID")
+				}
+			}
+			if output.FundType == types.SpecifierSiacoinOutput {
+				if output.ID != types.OutputID(txn.Transaction.SiacoinOutputID(uint64(i))) {
+					t.Fatal("siacoin output had incorrect output ID")
+				}
+			}
+		}
+		for _, input := range txn.Inputs {
+			if _, exists := outputIDs[input.ParentID]; !exists {
+				t.Fatal("input has ParentID that points to a nonexistent output:", input.ParentID)
+			}
+		}
+	}
+}

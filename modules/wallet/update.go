@@ -164,8 +164,9 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 				ConfirmationHeight:    consensusHeight,
 				ConfirmationTimestamp: block.Timestamp,
 			}
-			for _, mp := range block.MinerPayouts {
+			for i, mp := range block.MinerPayouts {
 				minerPT.Outputs = append(minerPT.Outputs, modules.ProcessedOutput{
+					ID:             types.OutputID(block.MinerPayoutID(uint64(i))),
 					FundType:       types.SpecifierMinerPayout,
 					MaturityHeight: consensusHeight + types.MaturityDelay,
 					WalletAddress:  w.isWalletAddress(mp.UnlockHash),
@@ -208,6 +209,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 
 			for _, sci := range txn.SiacoinInputs {
 				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+					ParentID:       types.OutputID(sci.ParentID),
 					FundType:       types.SpecifierSiacoinInput,
 					WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
 					RelatedAddress: sci.UnlockConditions.UnlockHash(),
@@ -215,8 +217,9 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 				})
 			}
 
-			for _, sco := range txn.SiacoinOutputs {
+			for i, sco := range txn.SiacoinOutputs {
 				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					ID:             types.OutputID(txn.SiacoinOutputID(uint64(i))),
 					FundType:       types.SpecifierSiacoinOutput,
 					MaturityHeight: consensusHeight,
 					WalletAddress:  w.isWalletAddress(sco.UnlockHash),
@@ -227,6 +230,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 
 			for _, sfi := range txn.SiafundInputs {
 				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+					ParentID:       types.OutputID(sfi.ParentID),
 					FundType:       types.SpecifierSiafundInput,
 					WalletAddress:  w.isWalletAddress(sfi.UnlockConditions.UnlockHash()),
 					RelatedAddress: sfi.UnlockConditions.UnlockHash(),
@@ -240,6 +244,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 
 				sfo := spentSiafundOutputs[sfi.ParentID]
 				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					ID:             types.OutputID(sfi.ParentID),
 					FundType:       types.SpecifierClaimOutput,
 					MaturityHeight: consensusHeight + types.MaturityDelay,
 					WalletAddress:  w.isWalletAddress(sfi.UnlockConditions.UnlockHash()),
@@ -248,8 +253,9 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 				})
 			}
 
-			for _, sfo := range txn.SiafundOutputs {
+			for i, sfo := range txn.SiafundOutputs {
 				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					ID:             types.OutputID(txn.SiafundOutputID(uint64(i))),
 					FundType:       types.SpecifierSiafundOutput,
 					MaturityHeight: consensusHeight,
 					WalletAddress:  w.isWalletAddress(sfo.UnlockHash),
@@ -338,14 +344,16 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 		}
 		for _, sci := range txn.SiacoinInputs {
 			pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+				ParentID:       types.OutputID(sci.ParentID),
 				FundType:       types.SpecifierSiacoinInput,
 				WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
 				RelatedAddress: sci.UnlockConditions.UnlockHash(),
 				Value:          spentSiacoinOutputs[sci.ParentID].Value,
 			})
 		}
-		for _, sco := range txn.SiacoinOutputs {
+		for i, sco := range txn.SiacoinOutputs {
 			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+				ID:             types.OutputID(txn.SiacoinOutputID(uint64(i))),
 				FundType:       types.SpecifierSiacoinOutput,
 				MaturityHeight: types.BlockHeight(math.MaxUint64),
 				WalletAddress:  w.isWalletAddress(sco.UnlockHash),
