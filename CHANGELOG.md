@@ -1,6 +1,13 @@
 Version History
 ---------------
 
+May 2017:
+
+v1.2.2 (patch release)
+- Faster + smaller wallet database
+- Gracefully handle missing storage folders
+- >2500 lines of new testing + bug fixes
+
 April 2017:
 
 v1.2.1 (patch release)
