@@ -48,6 +48,7 @@ Index
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
 | [/wallet/unlock](#walletunlock-post)                            | POST      |
 | [/wallet/verify/address/:___addr___](#walletverifyaddress-get)  | GET       |
+| [/wallet/changepassword](#walletchangepassword-post)            | POST      |
 
 #### /wallet [GET]
 
@@ -615,3 +616,19 @@ takes the address specified by :addr and returns a JSON response indicating if t
 	"valid": true
 }
 ```
+
+#### /wallet/changepassword [POST]
+
+changes the wallet's encryption password.
+
+###### Query String Parameter
+```
+// encryptionpassword is the wallet's current encryption password.
+encryptionpassword
+// newpassword is the new password for the wallet.
+newpassword
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
