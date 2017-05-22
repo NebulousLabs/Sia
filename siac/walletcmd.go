@@ -169,8 +169,8 @@ will be sent to your wallet.`,
 
 const askPasswordText = "We need to encrypt the new data using the current wallet password, please provide: "
 
-const newPasswordText = "Please provide the current password of the wallet: "
-const oldPasswordText = "Please provide the new password for the wallet: "
+const currentPasswordText = "Current Password: "
+const newPassword = "New Password: "
 
 // walletaddresscmd fetches a new address from the wallet that will be able to
 // receive coins.
@@ -197,7 +197,7 @@ func walletaddressescmd() {
 
 // walletchangepasswordcmd changes the password of the wallet.
 func walletchangepasswordcmd() {
-	oldPassword, err := speakeasy.Ask(oldPasswordText)
+	currentPassword, err := speakeasy.Ask(currentPasswordText)
 	if err != nil {
 		die("Reading password failed:", err)
 	}
@@ -205,7 +205,7 @@ func walletchangepasswordcmd() {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	qs := fmt.Sprintf("encryptionpassword=%s&newpassword=%s", oldPassword, newPassword)
+	qs := fmt.Sprintf("newpassword=%s&encryptionpassword=%s", newPassword, currentPassword)
 	err = post("/wallet/changepassword", qs)
 	if err != nil {
 		die("Changing the password failed:", err)
