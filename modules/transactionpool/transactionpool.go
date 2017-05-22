@@ -135,7 +135,7 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// a much lower value, which means hosts would be incompatible if the
 	// minimum recommended were set to 10. The value has been set to 1, which
 	// should be okay temporarily while the renters are given time to upgrade.
-	return types.SiacoinPrecision.Mul64(1).Div64(3).Div64(1e3), types.SiacoinPrecision.Mul64(1).Div64(1e3)
+	return types.SiacoinPrecision.Mul64(1).Div64(20).Div64(1e3), types.SiacoinPrecision.Mul64(1).Div64(1e3) // TODO: Adjust down once miners have upgraded.
 }
 
 // TransactionList returns a list of all transactions in the transaction pool.
