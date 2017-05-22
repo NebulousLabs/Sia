@@ -9,11 +9,10 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/bgentry/speakeasy"
-	"github.com/spf13/cobra"
-
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/bgentry/speakeasy"
+	"github.com/spf13/cobra"
 )
 
 var (
