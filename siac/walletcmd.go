@@ -170,7 +170,7 @@ will be sent to your wallet.`,
 const askPasswordText = "We need to encrypt the new data using the current wallet password, please provide: "
 
 const currentPasswordText = "Current Password: "
-const newPassword = "New Password: "
+const newPasswordText = "New Password: "
 
 // walletaddresscmd fetches a new address from the wallet that will be able to
 // receive coins.

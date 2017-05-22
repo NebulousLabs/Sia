@@ -264,7 +264,9 @@ func TestWalletChangePasswordDeep(t *testing.T) {
 	}
 	defer st3.server.Close()
 
-	st4, err := blankServerTester(t.Name() + "-wallet3")
+	st4Dir := build.TempDir("api", t.Name()+"-wallet3-data")
+	key := crypto.TwofishKey(crypto.HashObject("wallet3 unlock key"))
+	st4, err := assembleServerTester(key, st4Dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,6 +291,12 @@ func TestWalletChangePasswordDeep(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		var wg WalletGET
+		err = destST.getAPI("/wallet", &wg)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		sendValue := types.SiacoinPrecision.Mul64(amount)
 		sendSiacoinsValues := url.Values{}
 		sendSiacoinsValues.Set("amount", sendValue.String())
@@ -296,21 +304,28 @@ func TestWalletChangePasswordDeep(t *testing.T) {
 		if err = srcST.stdPostAPI("/wallet/siacoins", sendSiacoinsValues); err != nil {
 			t.Fatal(err)
 		}
-		_, err = st.miner.AddBlock()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, wallet := range wallets {
-		sendSiacoins(st, wallet, 10000)
-	}
 
-	// mine a few blocks
-	for i := 0; i < 15; i++ {
-		_, err = st.miner.AddBlock()
-		if err != nil {
-			t.Fatal(err)
+		// mine blocks until the send is confirmed
+		originalBalance := wg.ConfirmedSiacoinBalance
+		for {
+			b, err := st.miner.AddBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, wallet := range wallets {
+				waitForBlock(b.ID(), wallet)
+			}
+			err = destST.getAPI("/wallet", &wg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if wg.ConfirmedSiacoinBalance.Cmp(originalBalance) > 0 {
+				break
+			}
 		}
+	}
+	for _, wallet := range wallets[1:4] {
+		sendSiacoins(st, wallet, 10000)
 	}
 
 	st2seed, _, err := st2.wallet.PrimarySeed()
@@ -352,20 +367,19 @@ func TestWalletChangePasswordDeep(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// changekey the third wallet
-	newKey := crypto.TwofishKey(crypto.HashObject("newpassword"))
-	err = st4.wallet.ChangeKey(st4.walletKey, newKey)
+	// send all of the money from the third wallet to the fourth wallet
+	sendSiacoins(st4, st5, 27000)
+
+	// changekey the third wallet, should work with spaces
+	newPassword := "test password with spaces"
+	oldPassword := "wallet3 unlock key"
+	changeKeyValues := url.Values{}
+	changeKeyValues.Set("encryptionpassword", oldPassword)
+	changeKeyValues.Set("newpassword", newPassword)
+	err = st4.stdPostAPI("/wallet/changepassword", changeKeyValues)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// send all of the money from the third wallet to the fourth wallet
-	sendSiacoins(st4, st5, 5000)
-	sendSiacoins(st4, st5, 5000)
-	sendSiacoins(st4, st5, 5000)
-	sendSiacoins(st4, st5, 5000)
-	sendSiacoins(st4, st5, 5000)
-	sendSiacoins(st4, st5, 4000)
 
 	// verify the money went through
 	minExpectedBalance := types.SiacoinPrecision.Mul64(26900)
