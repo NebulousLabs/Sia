@@ -1341,6 +1341,7 @@ func TestRedundancyReporting(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -1435,10 +1436,19 @@ func TestRedundancyReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer stH1.server.Close()
+	testGroup = []*serverTester{st, stH1}
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// add a few blocks, without this this test fails with `wallet has coins spent in incomplete transactions`
-	for i := 0; i < 5; i++ {
-		_, err = stH1.miner.AddBlock()
+	// add a block, without this this test fails with `wallet has coins spent in incomplete transactions`
+	b, err := st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tester := range testGroup {
+		err = waitForBlock(b.ID(), tester)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1469,6 +1479,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -1504,13 +1515,12 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Announce every host.
 	err = announceAllHosts(hosts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// allow some time for the rneter's hsotdb to scan the hosts
+	// allow some time for the rneter's hostdb to scan the hosts
 	time.Sleep(time.Second)
 
 	// Set an allowance with two hosts.
@@ -1524,7 +1534,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// Create a file to upload.
-	filesize := int(45678)
+	filesize := int(1024)
 	path := filepath.Join(st.dir, "test.dat")
 	err = createRandFile(path, filesize)
 	if err != nil {
@@ -1594,6 +1604,10 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Make sure that every wallet has money in it.
 	err = fundAllNodes(testGroup)
 	if err != nil {
@@ -1610,24 +1624,12 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b, err := stNewHost.miner.AddBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, st := range testGroup {
-		err = waitForBlock(b.ID(), st)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
 	// add a few new blocks in order to cause the renter to form contracts with the new host
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 5; i++ {
 		b, err := stNewHost.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		for _, tester := range testGroup {
 			err = waitForBlock(b.ID(), tester)
 			if err != nil {
@@ -1650,14 +1652,21 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// we have to wait a bit for the download loop to update with the new contracts.
-	// TODO: figure out why, and fix this
-	time.Sleep(time.Second * 10)
-
-	// we should now be able to take down the original host and download successfully
-	downloadPath := filepath.Join(st.dir, "test.dat")
-	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
-	if err != nil {
-		t.Fatal(err)
+	success := false
+	retryTime := time.Second
+	downloadPath := filepath.Join(st.dir, "test-downloaded.dat")
+	for i := 0; i < 10; i++ {
+		err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+		if err != nil {
+			retryTime *= 2
+		} else {
+			success = true
+			break
+		}
+		time.Sleep(retryTime)
+	}
+	if !success {
+		t.Fatal("could not successfully download file after doing remote repair")
 	}
 
 	// Check that the download has the right contents.
@@ -1668,4 +1677,5 @@ func TestRemoteFileRepair(t *testing.T) {
 	if bytes.Compare(orig, downloaded) != 0 {
 		t.Fatal("data mismatch when downloading a file")
 	}
+
 }
