@@ -1622,14 +1622,14 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// add a few new blocks in order to cause the renter to form contracts with the new host
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 2; i++ {
 		b, err := stNewHost.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		for _, st := range testGroup {
-			err = waitForBlock(b.ID(), st)
+		for _, tester := range testGroup {
+			err = waitForBlock(b.ID(), tester)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1648,6 +1648,10 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// we have to wait a bit for the download loop to update with the new contracts.
+	// TODO: figure out why, and fix this
+	time.Sleep(time.Second * 10)
 
 	// we should now be able to take down the original host and download successfully
 	downloadPath := filepath.Join(st.dir, "test.dat")
