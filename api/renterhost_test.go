@@ -1605,21 +1605,34 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = stNewHost.miner.AddBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	err = stNewHost.announceHost()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// add a few new blocks in order to cause the renter to form contracts with the new host
-	for i := 0; i < 5; i++ {
-		_, err = stNewHost.miner.AddBlock()
+	b, err := stNewHost.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, st := range testGroup {
+		err = waitForBlock(b.ID(), st)
 		if err != nil {
 			t.Fatal(err)
+		}
+	}
+
+	// add a few new blocks in order to cause the renter to form contracts with the new host
+	for i := 0; i < 5; i++ {
+		b, err := stNewHost.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, st := range testGroup {
+			err = waitForBlock(b.ID(), st)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 
