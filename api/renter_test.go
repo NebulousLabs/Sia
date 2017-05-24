@@ -457,7 +457,7 @@ func TestRenterAsyncDownload(t *testing.T) {
 	}
 	t.Parallel()
 
-	st, _ := setupTestDownload(t, 4e5, "test.dat", true)
+	st, _ := setupTestDownload(t, 1e4, "test.dat", true)
 	defer st.server.panicClose()
 
 	// Download the file asynchronously.
@@ -467,19 +467,8 @@ func TestRenterAsyncDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// verify the file is not currently downloaded
-	var rdq RenterDownloadQueue
-	err = st.getAPI("/renter/downloads", &rdq)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, download := range rdq.Downloads {
-		if download.SiaPath == "test.dat" && download.Received == download.Filesize {
-			t.Fatal("download finished prematurely")
-		}
-	}
-
 	// download should eventually complete
+	var rdq RenterDownloadQueue
 	success := false
 	for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
 		err = st.getAPI("/renter/downloads", &rdq)
