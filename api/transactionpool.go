@@ -3,17 +3,30 @@ package api
 import (
 	"net/http"
 
-	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/crypto"
 
 	"github.com/julienschmidt/httprouter"
 )
 
-type TransactionPoolGET struct {
-	Transactions []types.Transaction `json:"transactions"`
-}
+// transactionpoolGetTransactionHandler returns the transaction in the tpool
+// with the id passed to the handler, or an error if that transaction does not
+// exist in the tpool.
+func (api *API) transactionpoolGetTransactionHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	txidStr := ps.ByName("id")
+	txid := new(crypto.Hash)
+	err := txid.LoadString(txidStr)
+	if err != nil {
+		WriteError(w, Error{"error decoding transaction id:" + err.Error()}, http.StatusBadRequest)
+		return
+	}
 
-// transactionpoolTransactionsHandler handles the API call to get the
-// transaction pool trasactions.
-func (api *API) transactionpoolTransactionsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	WriteJSON(w, TransactionPoolGET{Transactions: api.tpool.TransactionList()})
+	txns := api.tpool.TransactionList()
+	for _, txn := range txns {
+		if crypto.Hash(txn.ID()) == *txid {
+			WriteJSON(w, txn)
+			return
+		}
+	}
+
+	WriteError(w, Error{"transaction not found in tpool"}, http.StatusBadRequest)
 }

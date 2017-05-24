@@ -233,6 +233,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	// TransactionPool API Calls
 	if api.tpool != nil {
 		// TODO: re-enable this route once the transaction pool API has been finalized
+		router.GET("/transaction/raw/:id", api.transactionpoolGetTransactionHandler)
 		//router.GET("/transactionpool/transactions", api.transactionpoolTransactionsHandler)
 	}
 

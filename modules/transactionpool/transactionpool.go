@@ -117,6 +117,8 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 	return tp, nil
 }
 
+// Close releases any resources held by the transaction pool, stopping all of
+// its worker threads.
 func (tp *TransactionPool) Close() error {
 	return tp.tg.Stop()
 }
