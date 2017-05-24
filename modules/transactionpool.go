@@ -99,6 +99,10 @@ type TransactionPool interface {
 	// transaction pool changes, and should not subscribe to both.
 	TransactionPoolSubscribe(TransactionPoolSubscriber)
 
+	// Transaction returns the transaction and unconfirmed parents
+	// corresponding to the provided transaction id.
+	Transaction(id types.TransactionID) (txn types.Transaction, unconfirmedParents []types.Transaction, exists bool)
+
 	// Unsubscribe removes a subscriber from the transaction pool.
 	// This is necessary for clean shutdown of the miner.
 	Unsubscribe(TransactionPoolSubscriber)

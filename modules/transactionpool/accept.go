@@ -326,6 +326,10 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 // AcceptTransaction adds a transaction to the unconfirmed set of
 // transactions. If the transaction is accepted, it will be relayed to
 // connected peers.
+//
+// TODO: Relay the thing if this call is made, even if it's a duplicate or
+// whatever. Only for the exported call, not for the internal
+// 'acceptTransactionSet' call.
 func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	// assert on consensus set to get special method
 	cs, ok := tp.consensusSet.(interface {
@@ -373,5 +377,7 @@ func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+	// TODO: Should probably be the 'accept' one. ('Accept' will
+	// auto-broadcast, but this should not broadcast bad ones or duplicates.
 	return tp.AcceptTransactionSet(ts)
 }
