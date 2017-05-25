@@ -153,3 +153,54 @@ func (tp *TransactionPool) TransactionList() []types.Transaction {
 	}
 	return txns
 }
+
+// Transaction returns the transaction with the provided txid, its parents, and
+// a bool indicating if it exists in the transaction pool.
+func (tp *TransactionPool) Transaction(id types.TransactionID) (types.Transaction, []types.Transaction, bool) {
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	// find the transaction
+	exists := false
+	var txn types.Transaction
+	for _, tSet := range tp.transactionSets {
+		for _, t := range tSet {
+			if t.ID() == id {
+				txn = t
+				exists = true
+			}
+		}
+	}
+
+	// collect parent IDs
+	var parentIDs []types.TransactionID
+	for _, input := range txn.SiacoinInputs {
+		parentIDs = append(parentIDs, types.TransactionID(input.ParentID))
+	}
+	for _, fcr := range txn.FileContractRevisions {
+		parentIDs = append(parentIDs, types.TransactionID(fcr.ParentID))
+	}
+	for _, input := range txn.SiafundInputs {
+		parentIDs = append(parentIDs, types.TransactionID(input.ParentID))
+	}
+	for _, proof := range txn.StorageProofs {
+		parentIDs = append(parentIDs, types.TransactionID(proof.ParentID))
+	}
+	for _, sig := range txn.TransactionSignatures {
+		parentIDs = append(parentIDs, types.TransactionID(sig.ParentID))
+	}
+
+	// find the parents
+	var parents []types.Transaction
+	for _, parentID := range parentIDs {
+		for _, tset := range tp.transactionSets {
+			for _, t := range tset {
+				if t.ID() == parentID {
+					parents = append(parents, t)
+				}
+			}
+		}
+	}
+
+	return txn, parents, exists
+}

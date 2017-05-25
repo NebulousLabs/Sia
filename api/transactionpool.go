@@ -13,10 +13,11 @@ type (
 	// TpoolRawGET contains the requested transaction encoded to the raw
 	// format, along with the id of that transaction.
 	TpoolRawGET struct {
-		ID             types.TransactionID
-		RawParents     []byte `json:"rawparents"`
-		RawTransaction []byte `json:"rawtransaction"`
+		ID          types.TransactionID `json:"id"`
+		Parents     []types.Transaction `json:"parents"`
+		Transaction types.Transaction   `json:"transaction"`
 	}
+)
 
 // transactionpoolRawHandlerGET will provide the raw byte representation of a
 // transaction that matches the input id.
@@ -30,21 +31,15 @@ func (api *API) transactionpoolRawHandlerGET(w http.ResponseWriter, req *http.Re
 	}
 
 	txn, parents, exists := api.tpool.Transaction(txid)
-	// TODO: Handle !exists
-	for _, txn := range txns {
-		if crypto.Hash(txn.ID()) == *txid {
-			txnRaw := encoding.Marshal(txn)
-			parentsRaw := encoding.Marshal(parents)
-			WriteJSON(w, TpoolRawGET{
-				ID: txid,
-				RawParents: parentsRaw,
-				RawTransaction: txnRaw,
-		})
-			return
-		}
+	if !exists {
+		WriteError(w, Error{"transaction not found in transaction pool"}, http.StatusBadRequest)
+		return
 	}
-
-	WriteError(w, Error{"transaction not found in tpool"}, http.StatusBadRequest)
+	WriteJSON(w, TpoolRawGET{
+		ID:          txid,
+		Parents:     parents,
+		Transaction: txn,
+	})
 }
 
 // transactionpoolRawHandlerPOST will provide the raw byte representation of a
