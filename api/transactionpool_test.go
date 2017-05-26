@@ -145,3 +145,93 @@ func TestTransactionPoolRawHandlerPOST(t *testing.T) {
 		return nil
 	})
 }
+
+// TestTransactionPoolRawHandlersVerification verifies that the transaction
+// pool's raw endpoints get and broadcast transactions correctly.
+func TestTransactionPoolRawHandlersVerification(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// create two servers, connect them, mine a few blocks
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+	st2, err := blankServerTester(t.Name() + "-st2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.server.panicClose()
+
+	testGroup := []*serverTester{st, st2}
+
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		_, err = st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// disconnect the servers, isolating them
+	for _, tester := range testGroup {
+		for _, peer := range tester.gateway.Peers() {
+			tester.gateway.Disconnect(peer.NetAddress)
+		}
+	}
+
+	// make a transaction on the disconnected server
+	sentValue := types.SiacoinPrecision.Mul64(1000)
+	txns, err := st.wallet.SendSiacoins(sentValue, types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// use the tpool handlers to show the transaction to the other disconnected
+	// server
+	txn := txns[len(txns)-1]
+	var trg TpoolRawGET
+	err = st.getAPI("/tpool/raw/"+txn.ID().String(), &trg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	postValues := url.Values{}
+	postValues.Set("parents", string(trg.Parents))
+	postValues.Set("transaction", string(trg.Transaction))
+	err = st2.stdPostAPI("/tpool/raw", postValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make a new server and connect/sync it with st2
+	st3, err := blankServerTester(t.Name() + "-st3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st3.server.panicClose()
+	err = fullyConnectNodes([]*serverTester{st2, st3})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// post the transaction to st2 again
+	err = st2.stdPostAPI("/tpool/raw", postValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// st3 should eventually see the transaction
+	retry(60, time.Second, func() error {
+		return st3.getAPI("/tpool/raw/"+txn.ID().String(), &trg)
+	})
+}
