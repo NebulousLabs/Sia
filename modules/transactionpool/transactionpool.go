@@ -163,20 +163,68 @@ func (tp *TransactionPool) Transaction(id types.TransactionID) (types.Transactio
 	// find the transaction
 	exists := false
 	var txn types.Transaction
-	var parents []types.Transaction
+	var allParents []types.Transaction
 	for _, tSet := range tp.transactionSets {
 		for i, t := range tSet {
 			if t.ID() == id {
 				txn = t
-				// TODO: prune unneeded parents
-				parents = tSet[:i]
+				allParents = tSet[:i]
 				exists = true
 				break
 			}
 		}
 	}
 
-	return txn, parents, exists
+	// prune unneeded parents
+	parentIDs := make(map[types.TransactionID]struct{})
+	addOutputIDs := func(txn types.Transaction) {
+		for _, input := range txn.SiacoinInputs {
+			parentIDs[types.TransactionID(input.ParentID)] = struct{}{}
+		}
+		for _, fcr := range txn.FileContractRevisions {
+			parentIDs[types.TransactionID(fcr.ParentID)] = struct{}{}
+		}
+		for _, input := range txn.SiafundInputs {
+			parentIDs[types.TransactionID(input.ParentID)] = struct{}{}
+		}
+		for _, proof := range txn.StorageProofs {
+			parentIDs[types.TransactionID(proof.ParentID)] = struct{}{}
+		}
+		for _, sig := range txn.TransactionSignatures {
+			parentIDs[types.TransactionID(sig.ParentID)] = struct{}{}
+		}
+	}
+	isParent := func(t types.Transaction) bool {
+		for i := range t.SiacoinOutputs {
+			if _, exists := parentIDs[types.TransactionID(t.SiacoinOutputID(uint64(i)))]; exists {
+				return true
+			}
+		}
+		for i := range t.FileContracts {
+			if _, exists := parentIDs[types.TransactionID(t.SiacoinOutputID(uint64(i)))]; exists {
+				return true
+			}
+		}
+		for i := range t.SiafundOutputs {
+			if _, exists := parentIDs[types.TransactionID(t.SiacoinOutputID(uint64(i)))]; exists {
+				return true
+			}
+		}
+		return false
+	}
+
+	addOutputIDs(txn)
+	var necessaryParents []types.Transaction
+	for i := len(allParents) - 1; i >= 0; i-- {
+		parent := allParents[i]
+
+		if isParent(parent) {
+			necessaryParents = append([]types.Transaction{parent}, necessaryParents...)
+			addOutputIDs(parent)
+		}
+	}
+
+	return txn, necessaryParents, exists
 }
 
 // Broadcast broadcasts a transaction set to all of the transaction pool's
