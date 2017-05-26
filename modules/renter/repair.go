@@ -314,8 +314,8 @@ func (r *Renter) managedGetChunkData(file *file, trackedFile trackedFile, chunkI
 			downloadSize = file.size - offset
 		}
 
-		// create a DownloadBufferWriter
-		buf := NewDownloadBufferWriter(downloadSize)
+		// create a DownloadBufferWriter for the chunk
+		buf := NewDownloadBufferWriter(file.chunkSize())
 
 		// create the download object and push it on to the download queue
 		d := r.newSectionDownload(file, buf, currentContracts, offset, downloadSize)
