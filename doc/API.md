@@ -198,8 +198,8 @@ Gateway
 | Route                                                                              | HTTP verb |
 | ---------------------------------------------------------------------------------- | --------- |
 | [/gateway](#gateway-get-example)                                                   | GET       |
-| [/gateway/connect/___:netaddress___](#gatewayconnectnetaddress-post-example)       | POST      |
-| [/gateway/disconnect/___:netaddress___](#gatewaydisconnectnetaddress-post-example) | POST      |
+| [/gateway/connect/:___netaddress___](#gatewayconnectnetaddress-post-example)       | POST      |
+| [/gateway/disconnect/:___netaddress___](#gatewaydisconnectnetaddress-post-example) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Gateway.md](/doc/api/Gateway.md).
@@ -220,7 +220,7 @@ returns information about the gateway, including the list of connected peers.
 }
 ```
 
-#### /gateway/connect/___:netaddress___ [POST] [(example)](/doc/api/Gateway.md#connecting-to-a-peer)
+#### /gateway/connect/:___netaddress___ [POST] [(example)](/doc/api/Gateway.md#connecting-to-a-peer)
 
 connects the gateway to a peer. The peer is added to the node list if it is not
 already present. The node list is the list of all nodes the gateway knows
@@ -235,7 +235,7 @@ about, but is not necessarily connected to.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /gateway/disconnect/___:netaddress___ [POST] [(example)](/doc/api/Gateway.md#disconnecting-from-a-peer)
+#### /gateway/disconnect/:___netaddress___ [POST] [(example)](/doc/api/Gateway.md#disconnecting-from-a-peer)
 
 disconnects the gateway from a peer. The peer remains in the node list.
 
@@ -260,7 +260,7 @@ Host
 | [/host/storage/folders/add](#hoststoragefoldersadd-post)                              | POST      |
 | [/host/storage/folders/remove](#hoststoragefoldersremove-post)                        | POST      |
 | [/host/storage/folders/resize](#hoststoragefoldersresize-post)                        | POST      |
-| [/host/storage/sectors/delete/___:merkleroot___](#hoststoragesectorsdeletemerkleroot) | POST      |
+| [/host/storage/sectors/delete/:___merkleroot___](#hoststoragesectorsdeletemerkleroot-post) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Host.md](/doc/api/Host.md).
@@ -463,7 +463,7 @@ newsize // bytes, Required
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /host/storage/sectors/delete/___:merkleroot___ [POST]
+#### /host/storage/sectors/delete/:___merkleroot___ [POST]
 
 deletes a sector, meaning that the manager will be unable to upload that sector
 and be unable to provide a storage proof on that sector. This endpoint is for
@@ -488,7 +488,7 @@ Host DB
 | ------------------------------------------------------- | --------- |
 | [/hostdb/active](#hostdbactive-get-example)             | GET       |
 | [/hostdb/all](#hostdball-get-example)                   | GET       |
-| [/hostdb/hosts/___:pubkey___](#hostdbhosts-get-example) | GET       |
+| [/hostdb/hosts/:___pubkey___](#hostdbhostspubkey-get-example) | GET       |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [HostDB.md](/doc/api/HostDB.md).
@@ -557,7 +557,7 @@ any particular order, and the order may change in subsequent calls.
 }
 ```
 
-#### /hostdb/hosts/___:pubkey___ [GET] [(example)](/doc/api/HostDB.md#host-details)
+#### /hostdb/hosts/:___pubkey___ [GET] [(example)](/doc/api/HostDB.md#host-details)
 
 fetches detailed information about a particular host, including metrics
 regarding the score of the host within the database. It should be noted that
@@ -685,11 +685,11 @@ Renter
 | [/renter/downloads](#renterdownloads-get)                               | GET       |
 | [/renter/prices](#renterprices-get)                                     | GET       |
 | [/renter/files](#renterfiles-get)                                       | GET       |
-| [/renter/delete/___*siapath___](#renterdeletesiapath-post)              | POST      |
-| [/renter/download/___*siapath___](#renterdownloadsiapath-get)           | GET       |
-| [/renter/downloadasync/___*siapath___](#renterdownloadasyncsiapath-get) | GET       |
-| [/renter/rename/___*siapath___](#renterrenamesiapath-post)              | POST      |
-| [/renter/upload/___*siapath___](#renteruploadsiapath-post)              | POST      |
+| [/renter/delete/*___siapath___](#renterdeletesiapath-post)              | POST      |
+| [/renter/download/*___siapath___](#renterdownloadsiapath-get)           | GET       |
+| [/renter/downloadasync/*___siapath___](#renterdownloadasyncsiapath-get) | GET       |
+| [/renter/rename/*___siapath___](#renterrenamesiapath-post)              | POST      |
+| [/renter/upload/*___siapath___](#renteruploadsiapath-post)              | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Renter.md](/doc/api/Renter.md).
@@ -848,7 +848,7 @@ lists the estimated prices of performing various storage and data operations.
 ```
 
 
-#### /renter/delete/___*siapath___ [POST]
+#### /renter/delete/*___siapath___ [POST]
 
 deletes a renter file entry. Does not delete any downloads or original files,
 only the entry in the renter.
@@ -862,7 +862,7 @@ only the entry in the renter.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /renter/download/___*siapath___ [GET]
+#### /renter/download/*___siapath___ [GET]
 
 downloads a file to the local filesystem. The call will block until the file
 has been downloaded.
@@ -881,7 +881,7 @@ destination
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /renter/downloadasync/___*siapath___ [GET]
+#### /renter/downloadasync/*___siapath___ [GET]
 
 downloads a file to the local filesystem. The call will return immediately.
 
@@ -899,7 +899,7 @@ destination
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /renter/rename/___*siapath___ [POST]
+#### /renter/rename/*___siapath___ [POST]
 
 renames a file. Does not rename any downloads or source files, only renames the
 entry in the renter. An error is returned if `siapath` does not exist or
@@ -919,7 +919,7 @@ newsiapath
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /renter/upload/___*siapath___ [POST]
+#### /renter/upload/*___siapath___ [POST]
 
 uploads a file to the network from the local filesystem.
 
@@ -959,11 +959,11 @@ Wallet
 | [/wallet/siafunds](#walletsiafunds-post)                        | POST      |
 | [/wallet/siagkey](#walletsiagkey-post)                          | POST      |
 | [/wallet/sweep/seed](#walletsweepseed-post)                     | POST      |
-| [/wallet/transaction/___:id___](#wallettransactionid-get)       | GET       |
+| [/wallet/transaction/:___id___](#wallettransactionid-get)       | GET       |
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
-| [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
+| [/wallet/transactions/:___addr___](#wallettransactionsaddr-get) | GET       |
 | [/wallet/unlock](#walletunlock-post)                            | POST      |
-| [/wallet/verify/address/:___addr___](#walletverifyaddress-get)  | GET       |
+| [/wallet/verify/address/:___addr___](#walletverifyaddressaddr-get)  | GET       |
 | [/wallet/changepassword](#walletchangepassword-post)            | POST      |
 
 For examples and detailed descriptions of request and response parameters,
@@ -1228,7 +1228,7 @@ available.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /wallet/transaction/___:id___ [GET]
+#### /wallet/transaction/:___id___ [GET]
 
 gets the transaction associated with a specific transaction id.
 
@@ -1296,7 +1296,7 @@ endheight   // block height
 }
 ```
 
-#### /wallet/transactions/___:addr___ [GET]
+#### /wallet/transactions/:___addr___ [GET]
 
 returns all of the transactions related to a specific address.
 
