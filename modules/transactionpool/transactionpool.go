@@ -173,26 +173,26 @@ func (tp *TransactionPool) Transaction(id types.TransactionID) (types.Transactio
 	}
 
 	// collect parent IDs
-	var parentIDs []types.TransactionID
+	parentIDs := make(map[types.TransactionID]struct{})
 	for _, input := range txn.SiacoinInputs {
-		parentIDs = append(parentIDs, types.TransactionID(input.ParentID))
+		parentIDs[types.TransactionID(input.ParentID)] = struct{}{}
 	}
 	for _, fcr := range txn.FileContractRevisions {
-		parentIDs = append(parentIDs, types.TransactionID(fcr.ParentID))
+		parentIDs[types.TransactionID(fcr.ParentID)] = struct{}{}
 	}
 	for _, input := range txn.SiafundInputs {
-		parentIDs = append(parentIDs, types.TransactionID(input.ParentID))
+		parentIDs[types.TransactionID(input.ParentID)] = struct{}{}
 	}
 	for _, proof := range txn.StorageProofs {
-		parentIDs = append(parentIDs, types.TransactionID(proof.ParentID))
+		parentIDs[types.TransactionID(proof.ParentID)] = struct{}{}
 	}
 	for _, sig := range txn.TransactionSignatures {
-		parentIDs = append(parentIDs, types.TransactionID(sig.ParentID))
+		parentIDs[types.TransactionID(sig.ParentID)] = struct{}{}
 	}
 
 	// find the parents
 	var parents []types.Transaction
-	for _, parentID := range parentIDs {
+	for parentID := range parentIDs {
 		for _, tset := range tp.transactionSets {
 			for _, t := range tset {
 				if t.ID() == parentID {
@@ -203,4 +203,10 @@ func (tp *TransactionPool) Transaction(id types.TransactionID) (types.Transactio
 	}
 
 	return txn, parents, exists
+}
+
+// Broadcast broadcasts a transaction set to all of the transaction pool's
+// peers.
+func (tp *TransactionPool) Broadcast(ts []types.Transaction) {
+	go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 }

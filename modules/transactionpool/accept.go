@@ -338,11 +338,11 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	return cs.LockedTryTransactionSet(func(txnFn func(txns []types.Transaction) (modules.ConsensusChange, error)) error {
 		tp.mu.Lock()
 		defer tp.mu.Unlock()
-		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 		err := tp.acceptTransactionSet(ts, txnFn)
 		if err != nil {
 			return err
 		}
+		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 		// Notify subscribers of an accepted transaction set
 		tp.updateSubscribersTransactions()
 		return nil

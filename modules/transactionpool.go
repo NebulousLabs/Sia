@@ -106,6 +106,10 @@ type TransactionPool interface {
 	// Unsubscribe removes a subscriber from the transaction pool.
 	// This is necessary for clean shutdown of the miner.
 	Unsubscribe(TransactionPoolSubscriber)
+
+	// Broadcast broadcasts a transaction set to all of the transaction pool's
+	// peers.
+	Broadcast(ts []types.Transaction)
 }
 
 // ConsensusConflict implements the error interface, and indicates that a
