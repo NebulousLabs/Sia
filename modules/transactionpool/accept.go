@@ -373,7 +373,6 @@ func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
-	// TODO: Should probably be the 'accept' one. ('Accept' will
-	// auto-broadcast, but this should not broadcast bad ones or duplicates.
+
 	return tp.AcceptTransactionSet(ts)
 }
