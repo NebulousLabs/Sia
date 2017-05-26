@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -79,5 +80,41 @@ func TestTransactionPoolRawHandlerGET(t *testing.T) {
 	err = st.getAPI("/tpool/raw/"+lastTxn.ID().String(), &trg)
 	if err.Error() != "transaction not found in transaction pool" {
 		t.Fatal("transaction should be gone from the pool after mining a block")
+	}
+}
+
+// TestTransactionPoolRawHandlerPOST verifies that the transaction pools' raw
+// transaction post endpoint works correctly.
+func TestTransactionPoolRawHandlerPOST(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	sentValue := types.SiacoinPrecision.Mul64(1000)
+	txns, err := st.wallet.SendSiacoins(sentValue, types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// should be able to get and rebroadcast this transaction
+	lastTxn := txns[len(txns)-1]
+	var trg TpoolRawGET
+	err = st.getAPI("/tpool/raw/"+lastTxn.ID().String(), &trg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	postValues := url.Values{}
+	postValues.Set("parents", string(trg.Parents))
+	postValues.Set("transaction", string(trg.Transaction))
+	err = st.stdPostAPI("/tpool/raw", postValues)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
