@@ -38,12 +38,12 @@ func (api *API) tpoolRawHandlerGET(w http.ResponseWriter, req *http.Request, ps 
 		WriteError(w, Error{"error decoding transaction id:" + err.Error()}, http.StatusBadRequest)
 		return
 	}
-
 	txn, parents, exists := api.tpool.Transaction(txid)
 	if !exists {
 		WriteError(w, Error{"transaction not found in transaction pool"}, http.StatusBadRequest)
 		return
 	}
+
 	WriteJSON(w, TpoolRawGET{
 		ID:          txid,
 		Parents:     encoding.Marshal(parents),
