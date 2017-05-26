@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -73,7 +74,7 @@ func (api *API) tpoolRawHandlerPOST(w http.ResponseWriter, req *http.Request, _ 
 
 	api.tpool.Broadcast(txnSet)
 	err = api.tpool.AcceptTransactionSet(txnSet)
-	if err != nil {
+	if err != nil && err != modules.ErrDuplicateTransactionSet {
 		WriteError(w, Error{"error accepting transaction set:" + err.Error()}, http.StatusBadRequest)
 		return
 	}
