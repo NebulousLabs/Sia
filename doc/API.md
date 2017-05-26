@@ -90,6 +90,7 @@ Table of contents
 - [Miner](#miner)
 - [Renter](#renter)
 - [Wallet](#wallet)
+- [Transaction Pool](#transaction-pool)
 
 Daemon
 ------
@@ -1354,3 +1355,43 @@ newpassword
 ###### Response
 standard success or error response. See
 [#standard-responses](#standard-responses).
+
+
+Transaction Pool
+------
+
+| Route                           | HTTP verb |
+| ------------------------------- | --------- |
+| [/tpool/raw/:id](#tpoolraw-get) | GET       |
+| [/tpool/raw](#tpoolraw-post)    | POST      |
+
+#### /tpool/raw/:id [GET]
+
+returns the ID for the requested transaction and its raw encoded parents and transaction data.
+
+###### JSON Response [(with comments)](/doc/api/Transactionpool.md#json-response)
+```javascript
+{
+	// id of the transaction
+	"id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+	// raw transaction data
+	"transaction": "AAAAAQID",
+	"parents": "TWFuIGlzIGRpc3Rpbmd1aXNoZWQsIG5vdCBvbmx5IGJ5IGhpcyByZWFzb24sIGJ1dCBieSB0aGlz",
+}
+```
+
+#### /tpool/raw [POST]
+
+submits a raw transaction to the transaction pool, broadcasting it to the transaction pool's peers.
+
+###### Query String Parameters [(with comments)](/doc/api/Transactionpool.md#query-string-parameters)
+
+```
+parents string // raw encoded transaction parents
+transaction string // raw encoded transaction
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
