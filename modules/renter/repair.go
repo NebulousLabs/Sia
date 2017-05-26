@@ -63,12 +63,16 @@ type (
 		// redundancy, along with information about which pieces and contracts
 		// aren't being used.
 		//
+		// downloadingChunks tracks the set of chunks that are currently being
+		// downloaded in order to be re-uploaded.
+		//
 		// workerSet tracks the set of workers which can be used for uploading.
-		activeWorkers    map[types.FileContractID]*worker
-		availableWorkers map[types.FileContractID]*worker
-		gapCounts        map[int]int
-		incompleteChunks map[chunkID]*chunkStatus
-		resultChan       chan finishedUpload
+		activeWorkers     map[types.FileContractID]*worker
+		availableWorkers  map[types.FileContractID]*worker
+		gapCounts         map[int]int
+		incompleteChunks  map[chunkID]*chunkStatus
+		downloadingChunks map[chunkID]struct{}
+		resultChan        chan finishedUpload
 	}
 )
 
@@ -274,6 +278,12 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 			continue
 		}
 
+		// Skip this chunk if it's currently being downloaded, in order to be
+		// re-uploaded
+		if _, downloading := rs.downloadingChunks[chunkID]; downloading {
+			continue
+		}
+
 		// Send off the work.
 		err := r.managedScheduleChunkRepair(rs, chunkID, chunkStatus, usefulWorkers)
 		if err != nil {
@@ -294,7 +304,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 // repair the file. If the `trackedFile` can be found on disk, grab the chunk
 // from the file, otherwise attempt to queue a new download for only that chunk
 // and return the downloaded chunk.
-func (r *Renter) managedGetChunkData(file *file, trackedFile trackedFile, chunkID chunkID) ([]byte, error) {
+func (r *Renter) managedGetChunkData(rs *repairState, file *file, trackedFile trackedFile, chunkID chunkID) ([]byte, error) {
 	chunkIndex := chunkID.index
 	offset := chunkIndex * file.chunkSize()
 
@@ -302,6 +312,9 @@ func (r *Renter) managedGetChunkData(file *file, trackedFile trackedFile, chunkI
 	f, err := os.Open(trackedFile.RepairPath)
 	if err != nil {
 		// if that fails, try to download the chunk
+		// mark the chunk as being downloaded
+		rs.downloadingChunks[chunkID] = struct{}{}
+		defer delete(rs.downloadingChunks, chunkID)
 
 		// build current contracts map
 		currentContracts := make(map[modules.NetAddress]types.FileContractID)
@@ -361,7 +374,7 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 	}
 
 	// read the chunk into memory
-	chunkData, err := r.managedGetChunkData(file, meta, chunkID)
+	chunkData, err := r.managedGetChunkData(rs, file, meta, chunkID)
 	if err != nil {
 		return build.ExtendErr("unable to get repair chunk:", err)
 	}
@@ -523,11 +536,12 @@ func (r *Renter) threadedQueueRepairs() {
 // before the file reaches full redundancy.
 func (r *Renter) threadedRepairLoop() {
 	rs := &repairState{
-		activeWorkers:    make(map[types.FileContractID]*worker),
-		availableWorkers: make(map[types.FileContractID]*worker),
-		gapCounts:        make(map[int]int),
-		incompleteChunks: make(map[chunkID]*chunkStatus),
-		resultChan:       make(chan finishedUpload),
+		activeWorkers:     make(map[types.FileContractID]*worker),
+		availableWorkers:  make(map[types.FileContractID]*worker),
+		gapCounts:         make(map[int]int),
+		incompleteChunks:  make(map[chunkID]*chunkStatus),
+		downloadingChunks: make(map[chunkID]struct{}),
+		resultChan:        make(chan finishedUpload),
 	}
 	for {
 		if r.tg.Add() != nil {
