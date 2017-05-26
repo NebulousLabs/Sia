@@ -191,18 +191,38 @@ func (tp *TransactionPool) Transaction(id types.TransactionID) (types.Transactio
 	}
 
 	// find the parents
-	var parents []types.Transaction
+	parents := make(map[types.TransactionID]types.Transaction)
 	for parentID := range parentIDs {
 		for _, tset := range tp.transactionSets {
 			for _, t := range tset {
 				if t.ID() == parentID {
-					parents = append(parents, t)
+					parents[parentID] = t
+				}
+				for i := range t.SiacoinOutputs {
+					if types.TransactionID(t.SiacoinOutputID(uint64(i))) == parentID {
+						parents[parentID] = t
+					}
+				}
+				for i := range t.FileContracts {
+					if types.TransactionID(t.FileContractID(uint64(i))) == parentID {
+						parents[parentID] = t
+					}
+				}
+				for i := range t.SiafundOutputs {
+					if types.TransactionID(t.SiafundOutputID(uint64(i))) == parentID {
+						parents[parentID] = t
+					}
 				}
 			}
 		}
 	}
 
-	return txn, parents, exists
+	var parentSlice []types.Transaction
+	for _, parentTxn := range parents {
+		parentSlice = append(parentSlice, parentTxn)
+	}
+
+	return txn, parentSlice, exists
 }
 
 // Broadcast broadcasts a transaction set to all of the transaction pool's

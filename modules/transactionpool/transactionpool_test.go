@@ -137,3 +137,66 @@ func TestIntegrationNewNilInputs(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// TestGetTransaction verifies that the transaction pool's Transaction() method
+// works correctly.
+func TestGetTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	tpt, err := createTpoolTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpt.Close()
+
+	value := types.NewCurrency64(35e6)
+	fee := types.NewCurrency64(3e2)
+	emptyUH := types.UnlockConditions{}.UnlockHash()
+	txnBuilder := tpt.wallet.StartTransaction()
+	err = txnBuilder.FundSiacoins(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnBuilder.AddMinerFee(fee)
+	output := types.SiacoinOutput{
+		Value:      value.Sub(fee),
+		UnlockHash: emptyUH,
+	}
+	txnBuilder.AddSiacoinOutput(output)
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parentTxn := txnSet[len(txnSet)-1]
+	childrenSet := []types.Transaction{{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID: parentTxn.SiacoinOutputID(0),
+		}},
+		SiacoinOutputs: []types.SiacoinOutput{{
+			Value:      value.Sub(fee),
+			UnlockHash: emptyUH,
+		}},
+	}}
+
+	superSet := append(txnSet, childrenSet...)
+	err = tpt.tpool.AcceptTransactionSet(superSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetTxn := childrenSet[0]
+	txn, parents, exists := tpt.tpool.Transaction(targetTxn.ID())
+	if !exists {
+		t.Fatal("transaction set did not exist")
+	}
+	if txn.ID() != targetTxn.ID() {
+		t.Fatal("returned the wrong transaction")
+	}
+	if len(parents) != 1 {
+		t.Fatal("transaction had wrong number of parents")
+	}
+	if parents[0].ID() != parentTxn.ID() {
+		t.Fatal("returned the wrong parent")
+	}
+}
