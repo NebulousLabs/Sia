@@ -324,7 +324,7 @@ func (r *Renter) managedGetChunkData(rs *repairState, file *file, trackedFile tr
 		// if that fails, try to download the chunk
 		// mark the chunk as being downloaded
 		rs.downloadingChunks[chunkID] = struct{}{}
-		delete(rs.downloadingChunks, chunkID)
+		defer delete(rs.downloadingChunks, chunkID)
 
 		// build current contracts map
 		currentContracts := make(map[modules.NetAddress]types.FileContractID)
