@@ -163,66 +163,20 @@ func (tp *TransactionPool) Transaction(id types.TransactionID) (types.Transactio
 	// find the transaction
 	exists := false
 	var txn types.Transaction
+	var parents []types.Transaction
 	for _, tSet := range tp.transactionSets {
-		for _, t := range tSet {
+		for i, t := range tSet {
 			if t.ID() == id {
 				txn = t
+				// TODO: prune unneeded parents
+				parents = tSet[:i]
 				exists = true
+				break
 			}
 		}
 	}
 
-	// collect parent IDs
-	parentIDs := make(map[types.TransactionID]struct{})
-	for _, input := range txn.SiacoinInputs {
-		parentIDs[types.TransactionID(input.ParentID)] = struct{}{}
-	}
-	for _, fcr := range txn.FileContractRevisions {
-		parentIDs[types.TransactionID(fcr.ParentID)] = struct{}{}
-	}
-	for _, input := range txn.SiafundInputs {
-		parentIDs[types.TransactionID(input.ParentID)] = struct{}{}
-	}
-	for _, proof := range txn.StorageProofs {
-		parentIDs[types.TransactionID(proof.ParentID)] = struct{}{}
-	}
-	for _, sig := range txn.TransactionSignatures {
-		parentIDs[types.TransactionID(sig.ParentID)] = struct{}{}
-	}
-
-	// find the parents
-	parents := make(map[types.TransactionID]types.Transaction)
-	for parentID := range parentIDs {
-		for _, tset := range tp.transactionSets {
-			for _, t := range tset {
-				if t.ID() == parentID {
-					parents[parentID] = t
-				}
-				for i := range t.SiacoinOutputs {
-					if types.TransactionID(t.SiacoinOutputID(uint64(i))) == parentID {
-						parents[parentID] = t
-					}
-				}
-				for i := range t.FileContracts {
-					if types.TransactionID(t.FileContractID(uint64(i))) == parentID {
-						parents[parentID] = t
-					}
-				}
-				for i := range t.SiafundOutputs {
-					if types.TransactionID(t.SiafundOutputID(uint64(i))) == parentID {
-						parents[parentID] = t
-					}
-				}
-			}
-		}
-	}
-
-	var parentSlice []types.Transaction
-	for _, parentTxn := range parents {
-		parentSlice = append(parentSlice, parentTxn)
-	}
-
-	return txn, parentSlice, exists
+	return txn, parents, exists
 }
 
 // Broadcast broadcasts a transaction set to all of the transaction pool's

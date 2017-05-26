@@ -168,10 +168,9 @@ func TestGetTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	parentTxn := txnSet[len(txnSet)-1]
 	childrenSet := []types.Transaction{{
 		SiacoinInputs: []types.SiacoinInput{{
-			ParentID: parentTxn.SiacoinOutputID(0),
+			ParentID: txnSet[len(txnSet)-1].SiacoinOutputID(0),
 		}},
 		SiacoinOutputs: []types.SiacoinOutput{{
 			Value:      value.Sub(fee),
@@ -193,10 +192,12 @@ func TestGetTransaction(t *testing.T) {
 	if txn.ID() != targetTxn.ID() {
 		t.Fatal("returned the wrong transaction")
 	}
-	if len(parents) != 1 {
+	if len(parents) != len(txnSet) {
 		t.Fatal("transaction had wrong number of parents")
 	}
-	if parents[0].ID() != parentTxn.ID() {
-		t.Fatal("returned the wrong parent")
+	for i, txn := range txnSet {
+		if parents[i].ID() != txn.ID() {
+			t.Fatal("returned the wrong parent")
+		}
 	}
 }
