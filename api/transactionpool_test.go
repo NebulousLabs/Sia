@@ -3,6 +3,7 @@ package api
 import (
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
@@ -103,9 +104,27 @@ func TestTransactionPoolRawHandlerPOST(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// should be able to get and rebroadcast this transaction
+	// spin up a new server tester that hasn't seen this txn
+	st2, err := blankServerTester(t.Name() + "-st2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.server.panicClose()
+
+	err = fullyConnectNodes([]*serverTester{st, st2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	lastTxn := txns[len(txns)-1]
+
 	var trg TpoolRawGET
+	err = st2.getAPI("/tpool/raw/"+lastTxn.ID().String(), &trg)
+	if err.Error() != "transaction not found in transaction pool" {
+		t.Fatal("transaction should be missing initially from the second tpool")
+	}
+
+	// should be able to get and rebroadcast this transaction
 	err = st.getAPI("/tpool/raw/"+lastTxn.ID().String(), &trg)
 	if err != nil {
 		t.Fatal(err)
@@ -117,4 +136,12 @@ func TestTransactionPoolRawHandlerPOST(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	retry(60, time.Second, func() error {
+		err = st2.getAPI("/tpool/raw/"+lastTxn.ID().String(), &trg)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }
