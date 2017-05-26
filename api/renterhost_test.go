@@ -72,7 +72,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// Create a file to upload.
-	filesize := int(1024)
+	filesize := int(45678)
 	path := filepath.Join(st.dir, "test.dat")
 	err = createRandFile(path, filesize)
 	if err != nil {
