@@ -342,8 +342,8 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 		if err != nil {
 			return err
 		}
-		// Notify subscribers and broadcast the transaction set.
 		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
+		// Notify subscribers of an accepted transaction set
 		tp.updateSubscribersTransactions()
 		return nil
 	})
@@ -373,5 +373,6 @@ func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+
 	return tp.AcceptTransactionSet(ts)
 }
