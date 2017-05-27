@@ -176,37 +176,37 @@ func (tp *TransactionPool) Transaction(id types.TransactionID) (types.Transactio
 	}
 
 	// prune unneeded parents
-	parentIDs := make(map[types.TransactionID]struct{})
+	parentIDs := make(map[types.OutputID]struct{})
 	addOutputIDs := func(txn types.Transaction) {
 		for _, input := range txn.SiacoinInputs {
-			parentIDs[types.TransactionID(input.ParentID)] = struct{}{}
+			parentIDs[types.OutputID(input.ParentID)] = struct{}{}
 		}
 		for _, fcr := range txn.FileContractRevisions {
-			parentIDs[types.TransactionID(fcr.ParentID)] = struct{}{}
+			parentIDs[types.OutputID(fcr.ParentID)] = struct{}{}
 		}
 		for _, input := range txn.SiafundInputs {
-			parentIDs[types.TransactionID(input.ParentID)] = struct{}{}
+			parentIDs[types.OutputID(input.ParentID)] = struct{}{}
 		}
 		for _, proof := range txn.StorageProofs {
-			parentIDs[types.TransactionID(proof.ParentID)] = struct{}{}
+			parentIDs[types.OutputID(proof.ParentID)] = struct{}{}
 		}
 		for _, sig := range txn.TransactionSignatures {
-			parentIDs[types.TransactionID(sig.ParentID)] = struct{}{}
+			parentIDs[types.OutputID(sig.ParentID)] = struct{}{}
 		}
 	}
 	isParent := func(t types.Transaction) bool {
 		for i := range t.SiacoinOutputs {
-			if _, exists := parentIDs[types.TransactionID(t.SiacoinOutputID(uint64(i)))]; exists {
+			if _, exists := parentIDs[types.OutputID(t.SiacoinOutputID(uint64(i)))]; exists {
 				return true
 			}
 		}
 		for i := range t.FileContracts {
-			if _, exists := parentIDs[types.TransactionID(t.SiacoinOutputID(uint64(i)))]; exists {
+			if _, exists := parentIDs[types.OutputID(t.SiacoinOutputID(uint64(i)))]; exists {
 				return true
 			}
 		}
 		for i := range t.SiafundOutputs {
-			if _, exists := parentIDs[types.TransactionID(t.SiacoinOutputID(uint64(i)))]; exists {
+			if _, exists := parentIDs[types.OutputID(t.SiacoinOutputID(uint64(i)))]; exists {
 				return true
 			}
 		}
