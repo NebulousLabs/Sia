@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"net/url"
 	"testing"
 	"time"
@@ -55,16 +56,25 @@ func TestTransactionPoolRawHandlerGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	parentBytes, err := base64.StdEncoding.DecodeString(trg.Parents)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var decodedParents []types.Transaction
-	err = encoding.Unmarshal(trg.Parents, &decodedParents)
+	err = encoding.Unmarshal(parentBytes, &decodedParents)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(decodedParents) != len(txns)-1 {
 		t.Fatal("returned the incorrect number of parents")
 	}
+	txnBytes, err := base64.StdEncoding.DecodeString(trg.Transaction)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var decodedTxn types.Transaction
-	err = encoding.Unmarshal(trg.Transaction, &decodedTxn)
+	err = encoding.Unmarshal(txnBytes, &decodedTxn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,8 +140,8 @@ func TestTransactionPoolRawHandlerPOST(t *testing.T) {
 		t.Fatal(err)
 	}
 	postValues := url.Values{}
-	postValues.Set("parents", string(trg.Parents))
-	postValues.Set("transaction", string(trg.Transaction))
+	postValues.Set("parents", trg.Parents)
+	postValues.Set("transaction", trg.Transaction)
 	err = st.stdPostAPI("/tpool/raw", postValues)
 	if err != nil {
 		t.Fatal(err)
@@ -206,8 +216,8 @@ func TestTransactionPoolRawHandlersVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 	postValues := url.Values{}
-	postValues.Set("parents", string(trg.Parents))
-	postValues.Set("transaction", string(trg.Transaction))
+	postValues.Set("parents", trg.Parents)
+	postValues.Set("transaction", trg.Transaction)
 	err = st2.stdPostAPI("/tpool/raw", postValues)
 	if err != nil {
 		t.Fatal(err)
