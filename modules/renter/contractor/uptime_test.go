@@ -160,4 +160,13 @@ func TestIsOffline(t *testing.T) {
 			t.Errorf("IsOffline(%v) = %v, expected %v", i, offline, test.offline)
 		}
 	}
+	c := &Contractor{
+		contracts: map[types.FileContractID]modules.RenterContract{
+			{1}: {HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
+		},
+	}
+	// should return true for an unknown contract id
+	if !c.IsOffline(types.FileContractID{4}) {
+		t.Fatal("IsOffline returned false for a nonexistent contract id")
+	}
 }
