@@ -9,9 +9,10 @@ go:
 install:
   - make dependencies
   - test -z "$(go fmt ./...)"
+  - glyphcheck ./...
   - make
 
-script: make test && make test-long && make cover
+script: make test && make test-long && make cover && make bench
 
 sudo: false
 

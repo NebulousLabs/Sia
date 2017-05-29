@@ -30,7 +30,7 @@ var (
 	// minCollateral is the amount of collateral we weight all hosts as having,
 	// even if they do not have any collateral. This is to temporarily prop up
 	// weak / cheap hosts on the network while the network is bootstrapping.
-	minCollateral = types.SiacoinPrecision.Mul64(25).Div64(tbMonth)
+	minCollateral = types.SiacoinPrecision.Mul64(5).Div64(tbMonth)
 
 	// Set a minimum price, below which setting lower prices will no longer put
 	// this host at an advatnage. This price is considered the bar for
@@ -39,11 +39,11 @@ var (
 	//
 	// NOTE: This needs to be intelligently adjusted down as the practical price
 	// of storage changes, and as the price of the siacoin changes.
-	minTotalPrice = types.SiacoinPrecision.Mul64(250).Div64(tbMonth)
+	minTotalPrice = types.SiacoinPrecision.Mul64(25).Div64(tbMonth)
 
 	// priceExponentiation is the number of times that the weight is divided by
 	// the price.
-	priceExponentiation = 4
+	priceExponentiation = 5
 
 	// requiredStorage indicates the amount of storage that the host must be
 	// offering in order to be considered a valuable/worthwhile host.
@@ -120,7 +120,7 @@ func (hdb *HostDB) priceAdjustments(entry modules.HostDBEntry) float64 {
 	//
 	// In the future, the renter should be able to track average user behavior
 	// and adjust accordingly. This flexibility will be added later.
-	adjustedContractPrice := entry.ContractPrice.Div64(6048).Div64(15e9)        // Adjust contract price to match 25GB for 6 weeks.
+	adjustedContractPrice := entry.ContractPrice.Div64(6048).Div64(25e9)        // Adjust contract price to match 25GB for 6 weeks.
 	adjustedUploadPrice := entry.UploadBandwidthPrice.Div64(24192)              // Adjust upload price to match a single upload over 24 weeks.
 	adjustedDownloadPrice := entry.DownloadBandwidthPrice.Div64(12096).Div64(3) // Adjust download price to match one download over 12 weeks, 1 redundancy.
 	siafundFee := adjustedContractPrice.Add(adjustedUploadPrice).Add(adjustedDownloadPrice).Add(entry.Collateral).MulTax()
@@ -195,8 +195,11 @@ func storageRemainingAdjustments(entry modules.HostDBEntry) float64 {
 // version reported by the host.
 func versionAdjustments(entry modules.HostDBEntry) float64 {
 	base := float64(1)
-	if build.VersionCmp(entry.Version, "1.2.2") < 0 {
+	if build.VersionCmp(entry.Version, "1.3.0") < 0 {
 		base = base * 0.99999 // Safety value to make sure we update the version penalties every time we update the host.
+	}
+	if build.VersionCmp(entry.Version, "1.2.2") < 0 {
+		base = base * 0.9
 	}
 	if build.VersionCmp(entry.Version, "1.2.1") < 0 {
 		base = base / 2 // 2x total penalty.

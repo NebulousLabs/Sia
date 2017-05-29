@@ -32,6 +32,6 @@ var (
 	repairQueueInterval = build.Select(build.Var{
 		Dev:      30 * time.Second,
 		Standard: time.Minute * 15,
-		Testing:  time.Minute * 15,
+		Testing:  10 * time.Second,
 	}).(time.Duration)
 )

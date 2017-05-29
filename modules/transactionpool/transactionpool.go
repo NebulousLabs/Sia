@@ -117,6 +117,8 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 	return tp, nil
 }
 
+// Close releases any resources held by the transaction pool, stopping all of
+// its worker threads.
 func (tp *TransactionPool) Close() error {
 	return tp.tg.Stop()
 }
@@ -135,7 +137,7 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// a much lower value, which means hosts would be incompatible if the
 	// minimum recommended were set to 10. The value has been set to 1, which
 	// should be okay temporarily while the renters are given time to upgrade.
-	return types.SiacoinPrecision.Mul64(1).Div64(3).Div64(1e3), types.SiacoinPrecision.Mul64(1).Div64(1e3)
+	return types.SiacoinPrecision.Mul64(1).Div64(20).Div64(1e3), types.SiacoinPrecision.Mul64(1).Div64(1e3) // TODO: Adjust down once miners have upgraded.
 }
 
 // TransactionList returns a list of all transactions in the transaction pool.
@@ -150,4 +152,83 @@ func (tp *TransactionPool) TransactionList() []types.Transaction {
 		txns = append(txns, tSet...)
 	}
 	return txns
+}
+
+// Transaction returns the transaction with the provided txid, its parents, and
+// a bool indicating if it exists in the transaction pool.
+func (tp *TransactionPool) Transaction(id types.TransactionID) (types.Transaction, []types.Transaction, bool) {
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	// find the transaction
+	exists := false
+	var txn types.Transaction
+	var allParents []types.Transaction
+	for _, tSet := range tp.transactionSets {
+		for i, t := range tSet {
+			if t.ID() == id {
+				txn = t
+				allParents = tSet[:i]
+				exists = true
+				break
+			}
+		}
+	}
+
+	// prune unneeded parents
+	parentIDs := make(map[types.OutputID]struct{})
+	addOutputIDs := func(txn types.Transaction) {
+		for _, input := range txn.SiacoinInputs {
+			parentIDs[types.OutputID(input.ParentID)] = struct{}{}
+		}
+		for _, fcr := range txn.FileContractRevisions {
+			parentIDs[types.OutputID(fcr.ParentID)] = struct{}{}
+		}
+		for _, input := range txn.SiafundInputs {
+			parentIDs[types.OutputID(input.ParentID)] = struct{}{}
+		}
+		for _, proof := range txn.StorageProofs {
+			parentIDs[types.OutputID(proof.ParentID)] = struct{}{}
+		}
+		for _, sig := range txn.TransactionSignatures {
+			parentIDs[types.OutputID(sig.ParentID)] = struct{}{}
+		}
+	}
+	isParent := func(t types.Transaction) bool {
+		for i := range t.SiacoinOutputs {
+			if _, exists := parentIDs[types.OutputID(t.SiacoinOutputID(uint64(i)))]; exists {
+				return true
+			}
+		}
+		for i := range t.FileContracts {
+			if _, exists := parentIDs[types.OutputID(t.SiacoinOutputID(uint64(i)))]; exists {
+				return true
+			}
+		}
+		for i := range t.SiafundOutputs {
+			if _, exists := parentIDs[types.OutputID(t.SiacoinOutputID(uint64(i)))]; exists {
+				return true
+			}
+		}
+		return false
+	}
+
+	addOutputIDs(txn)
+	var necessaryParents []types.Transaction
+	for i := len(allParents) - 1; i >= 0; i-- {
+		parent := allParents[i]
+
+		if isParent(parent) {
+			necessaryParents = append([]types.Transaction{parent}, necessaryParents...)
+			addOutputIDs(parent)
+		}
+	}
+
+	return txn, necessaryParents, exists
+}
+
+// Broadcast broadcasts a transaction set to all of the transaction pool's
+// peers.
+func (tp *TransactionPool) Broadcast(ts []types.Transaction) {
+	go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 }

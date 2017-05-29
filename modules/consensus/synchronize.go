@@ -407,11 +407,11 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 		// managedReceiveBlocks is adjusted.
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.managedReceiveBlocks)
 			if err != nil {
 				cs.log.Debugln("WARN: failed to get parents of orphan header:", err)
 			}
-			wg.Done()
 		}()
 		return nil
 	} else if err != nil {
@@ -430,11 +430,11 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 	// adjusted.
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		err = cs.gateway.RPC(conn.RPCAddr(), "SendBlk", cs.managedReceiveBlock(h.ID()))
 		if err != nil {
 			cs.log.Debugln("WARN: failed to get header's corresponding block:", err)
 		}
-		wg.Done()
 	}()
 	return nil
 }

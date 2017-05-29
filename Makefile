@@ -22,10 +22,11 @@ dependencies:
 	go get -u github.com/kardianos/osext
 	# Frontend Dependencies
 	go get -u github.com/bgentry/speakeasy
-	go get -u github.com/spf13/cobra
+	go get -u github.com/spf13/cobra/...
 	# Developer Dependencies
 	go install -race std
 	go get -u github.com/golang/lint/golint
+	go get -u github.com/NebulousLabs/glyphcheck
 
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.

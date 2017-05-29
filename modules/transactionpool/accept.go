@@ -40,7 +40,7 @@ var (
 	// TransactionMinFee defines the minimum fee required for a transaction in
 	// order for it to be accepted if there is already more than
 	// TransactionPoolSizeForFee transactions in the transaction pool.
-	TransactionMinFee = types.SiacoinPrecision.Div64(3)
+	TransactionMinFee = types.SiacoinPrecision.Div64(20)
 
 	// relayTransactionSetTimeout establishes the timeout for a relay
 	// transaction set call.
@@ -342,8 +342,8 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 		if err != nil {
 			return err
 		}
-		// Notify subscribers and broadcast the transaction set.
 		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
+		// Notify subscribers of an accepted transaction set
 		tp.updateSubscribersTransactions()
 		return nil
 	})
@@ -373,5 +373,6 @@ func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+
 	return tp.AcceptTransactionSet(ts)
 }

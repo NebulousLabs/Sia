@@ -1,6 +1,8 @@
 package contractmanager
 
 import (
+	"sync/atomic"
+
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -19,6 +21,11 @@ func (wal *writeAheadLog) commitStorageFolderReduction(sfr storageFolderReductio
 	sf, exists := wal.cm.storageFolders[sfr.Index]
 	if !exists {
 		wal.cm.log.Critical("ERROR: storage folder reduction established for a storage folder that does not exist")
+		return
+	}
+	if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+		// Cannot complete the storage folder reduction - storage folder is not
+		// available.
 		return
 	}
 
@@ -50,11 +57,14 @@ func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint3
 	// Retrieve the specified storage folder.
 	wal.mu.Lock()
 	sf, exists := wal.cm.storageFolders[index]
+	wal.mu.Unlock()
 	if !exists {
-		wal.mu.Unlock()
 		return errStorageFolderNotFound
 	}
-	wal.mu.Unlock()
+	if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+		// TODO: Better error.
+		return errStorageFolderNotFound
+	}
 
 	// Lock the storage folder for the duration of the operation.
 	sf.mu.Lock()

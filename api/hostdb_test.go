@@ -31,7 +31,7 @@ func TestHostDBHostsActiveHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Try the call with numhosts unset, and set to -1, 0, and 1.
 	var ah HostdbActiveGET
@@ -120,7 +120,7 @@ func TestHostDBHostsAllHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Try the call before any hosts have been declared.
 	var ah HostdbAllGET
@@ -151,7 +151,7 @@ func TestHostDBHostsHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and then get the list of hosts.
 	var ah HostdbActiveGET
@@ -325,6 +325,7 @@ func TestHostDBScanOnlineOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
@@ -393,6 +394,7 @@ func TestHostDBScanOnlineOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost.panicClose()
 	sts[1] = stHost
 	err = fullyConnectNodes(sts)
 	if err != nil {
@@ -425,6 +427,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
@@ -546,6 +549,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost.panicClose()
 	sts[1] = stHost
 	err = fullyConnectNodes(sts)
 	if err != nil {
@@ -643,6 +647,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
@@ -745,6 +750,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost.panicClose()
 	sts[1] = stHost
 	err = fullyConnectNodes(sts)
 	if err != nil {
@@ -892,6 +898,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
@@ -960,6 +967,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost.panicClose()
 	sts[1] = stHost
 	err = fullyConnectNodes(sts)
 	if err != nil {
@@ -1096,6 +1104,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
@@ -1210,6 +1219,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost.panicClose()
 	sts[1] = stHost
 	err = fullyConnectNodes(sts)
 	if err != nil {

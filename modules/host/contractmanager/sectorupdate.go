@@ -15,7 +15,7 @@ import (
 // the usage info if the sector does not exist. The update is idempotent.
 func (wal *writeAheadLog) commitUpdateSector(su sectorUpdate) {
 	sf, exists := wal.cm.storageFolders[su.Folder]
-	if !exists {
+	if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
 		wal.cm.log.Printf("ERROR: unable to locate storage folder for a committed sector update.")
 		return
 	}
@@ -49,7 +49,7 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 	// this sector. Keep trying new storage folders if some return
 	// errors during disk operations.
 	wal.mu.Lock()
-	storageFolders := wal.cm.storageFolderSlice()
+	storageFolders := wal.cm.availableStorageFolders()
 	wal.mu.Unlock()
 	var syncChan chan struct{}
 	for len(storageFolders) >= 1 {
@@ -178,6 +178,13 @@ func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLo
 
 	// Append the sector update to the WAL.
 	wal.mu.Lock()
+	sf, exists := wal.cm.storageFolders[su.Folder]
+	if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+		// Need to check that the storage folder exists before syncing the
+		// commit that increases the virtual sector count.
+		wal.mu.Unlock()
+		return errStorageFolderNotFound
+	}
 	wal.appendChange(stateChange{
 		SectorUpdates: []sectorUpdate{su},
 	})
@@ -189,9 +196,6 @@ func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLo
 	// Update the metadata on disk. Metadata is updated on disk after the sync
 	// so that there is no risk of obliterating the previous count in the event
 	// that the change is not fully committed during unclean shutdown.
-	wal.mu.Lock()
-	sf := wal.cm.storageFolders[su.Folder]
-	wal.mu.Unlock()
 	err := wal.writeSectorMetadata(sf, su)
 	if err != nil {
 		// Revert the sector update in the WAL to reflect the fact that adding
@@ -226,7 +230,7 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 			return ErrSectorNotFound
 		}
 		sf, exists = wal.cm.storageFolders[location.storageFolder]
-		if !exists {
+		if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
 			wal.cm.log.Critical("deleting a sector from a storage folder that does not exist?")
 			return errStorageFolderNotFound
 		}
@@ -283,7 +287,7 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 			return ErrSectorNotFound
 		}
 		sf, exists = wal.cm.storageFolders[location.storageFolder]
-		if !exists {
+		if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
 			wal.cm.log.Critical("deleting a sector from a storage folder that does not exist?")
 			return errStorageFolderNotFound
 		}

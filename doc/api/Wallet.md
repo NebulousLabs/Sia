@@ -47,6 +47,8 @@ Index
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
 | [/wallet/unlock](#walletunlock-post)                            | POST      |
+| [/wallet/verify/address/:___addr___](#walletverifyaddress-get)  | GET       |
+| [/wallet/changepassword](#walletchangepassword-post)            | POST      |
 
 #### /wallet [GET]
 
@@ -67,6 +69,11 @@ locked or unlocked.
   // Indicates whether the wallet is currently locked or unlocked. Some calls
   // become unavailable when the wallet is locked.
   "unlocked": true,
+
+  // Indicates whether the wallet is currently rescanning the blockchain. This
+  // will be true for the duration of calls to /unlock, /seeds, /init/seed,
+  // and /sweep/seed.
+  "rescanning": false,
 
   // Number of siacoins, in hastings, available to the wallet as of the most
   // recent block in the blockchain.
@@ -465,6 +472,9 @@ gets the transaction associated with a specific transaction id.
     // Array of processed inputs detailing the inputs to the transaction.
     "inputs": [
       {
+        // The id of the output being spent.
+        "parentid": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         // Type of fund represented by the input. Possible values are
         // 'siacoin input' and 'siafund input'.
         "fundtype": "siacoin input",
@@ -485,6 +495,9 @@ gets the transaction associated with a specific transaction id.
     // Outputs related to file contracts are excluded.
     "outputs": [
       {
+        // The id of the output that was created.
+        "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         // Type of fund is represented by the output. Possible values are
         // 'siacoin output', 'siafund output', 'claim output', and 'miner
         // payout'. Siacoin outputs and claim outputs both relate to siacoins.
@@ -591,3 +604,31 @@ encryptionpassword string
 ###### Response
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
+
+#### /wallet/verify/address/:addr [GET]
+
+takes the address specified by :addr and returns a JSON response indicating if the address is valid.
+
+###### JSON Response
+```javascript
+{
+	// valid indicates if the address supplied to :addr is a valid UnlockHash.
+	"valid": true
+}
+```
+
+#### /wallet/changepassword [POST]
+
+changes the wallet's encryption password.
+
+###### Query String Parameter
+```
+// encryptionpassword is the wallet's current encryption password.
+encryptionpassword
+// newpassword is the new password for the wallet.
+newpassword
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).

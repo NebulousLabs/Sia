@@ -1,10 +1,8 @@
 package wallet
 
 import (
-	"bytes"
 	"fmt"
 	"math"
-	"sort"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -30,13 +28,7 @@ func (w *Wallet) isWalletAddress(uh types.UnlockHash) bool {
 // updateConfirmedSet uses a consensus change to update the confirmed set of
 // outputs as understood by the wallet.
 func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) error {
-	var historicOutputs []historicOutput
 	for _, diff := range cc.SiacoinOutputDiffs {
-		// Add to historic outputs.
-		// NOTE: it's never necessary to delete from the historic output set.
-		if diff.Direction == modules.DiffApply {
-			historicOutputs = append(historicOutputs, historicOutput{types.OutputID(diff.ID), diff.SiacoinOutput.Value})
-		}
 		// Verify that the diff is relevant to the wallet.
 		if !w.isWalletAddress(diff.SiacoinOutput.UnlockHash) {
 			continue
@@ -52,25 +44,7 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 			w.log.Severe("Could not update siacoin output:", err)
 		}
 	}
-	sort.Slice(historicOutputs, func(i, j int) bool {
-		return bytes.Compare(historicOutputs[i].id[:], historicOutputs[j].id[:]) < 0
-	})
-	for _, ho := range historicOutputs {
-		err := dbPutHistoricOutput(tx, ho.id, ho.val)
-		if err != nil {
-			w.log.Severe("Could not update historic output:", err)
-		}
-	}
 	for _, diff := range cc.SiafundOutputDiffs {
-		// Add to historic claim starts.
-		// NOTE: it's never necessary to delete from the historic claim start set.
-		if diff.Direction == modules.DiffApply {
-			err := dbPutHistoricClaimStart(tx, diff.ID, diff.SiafundOutput.ClaimStart)
-			if err != nil {
-				w.log.Severe("Could not update historic claim start:", err)
-			}
-		}
-
 		// Verify that the diff is relevant to the wallet.
 		if !w.isWalletAddress(diff.SiafundOutput.UnlockHash) {
 			continue
@@ -147,8 +121,24 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 
 // applyHistory applies any transaction history that was introduced by the
 // applied blocks.
-func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
-	for _, block := range applied {
+func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
+	// compute spent outputs
+	spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	spentSiafundOutputs := make(map[types.SiafundOutputID]types.SiafundOutput)
+	for _, diff := range cc.SiacoinOutputDiffs {
+		if diff.Direction == modules.DiffRevert {
+			// revert means spent
+			spentSiacoinOutputs[diff.ID] = diff.SiacoinOutput
+		}
+	}
+	for _, diff := range cc.SiafundOutputDiffs {
+		if diff.Direction == modules.DiffRevert {
+			// revert means spent
+			spentSiafundOutputs[diff.ID] = diff.SiafundOutput
+		}
+	}
+
+	for _, block := range cc.AppliedBlocks {
 		consensusHeight, err := dbGetConsensusHeight(tx)
 		if err != nil {
 			return err
@@ -174,8 +164,9 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 				ConfirmationHeight:    consensusHeight,
 				ConfirmationTimestamp: block.Timestamp,
 			}
-			for _, mp := range block.MinerPayouts {
+			for i, mp := range block.MinerPayouts {
 				minerPT.Outputs = append(minerPT.Outputs, modules.ProcessedOutput{
+					ID:             types.OutputID(block.MinerPayoutID(uint64(i))),
 					FundType:       types.SpecifierMinerPayout,
 					MaturityHeight: consensusHeight + types.MaturityDelay,
 					WalletAddress:  w.isWalletAddress(mp.UnlockHash),
@@ -217,20 +208,18 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 			}
 
 			for _, sci := range txn.SiacoinInputs {
-				val, err := dbGetHistoricOutput(tx, types.OutputID(sci.ParentID))
-				if err != nil {
-					return fmt.Errorf("could not get historic output: %v", err)
-				}
 				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+					ParentID:       types.OutputID(sci.ParentID),
 					FundType:       types.SpecifierSiacoinInput,
 					WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
 					RelatedAddress: sci.UnlockConditions.UnlockHash(),
-					Value:          val,
+					Value:          spentSiacoinOutputs[sci.ParentID].Value,
 				})
 			}
 
-			for _, sco := range txn.SiacoinOutputs {
+			for i, sco := range txn.SiacoinOutputs {
 				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					ID:             types.OutputID(txn.SiacoinOutputID(uint64(i))),
 					FundType:       types.SpecifierSiacoinOutput,
 					MaturityHeight: consensusHeight,
 					WalletAddress:  w.isWalletAddress(sco.UnlockHash),
@@ -240,36 +229,33 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 			}
 
 			for _, sfi := range txn.SiafundInputs {
-				sfiValue, err := dbGetHistoricOutput(tx, types.OutputID(sfi.ParentID))
-				if err != nil {
-					return fmt.Errorf("could not get historic output: %v", err)
-				}
 				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+					ParentID:       types.OutputID(sfi.ParentID),
 					FundType:       types.SpecifierSiafundInput,
 					WalletAddress:  w.isWalletAddress(sfi.UnlockConditions.UnlockHash()),
 					RelatedAddress: sfi.UnlockConditions.UnlockHash(),
-					Value:          sfiValue,
+					Value:          spentSiafundOutputs[sfi.ParentID].Value,
 				})
-				startVal, err := dbGetHistoricClaimStart(tx, sfi.ParentID)
-				if err != nil {
-					return fmt.Errorf("could not get historic claim start: %v", err)
-				}
+
 				siafundPool, err := dbGetSiafundPool(w.dbTx)
 				if err != nil {
 					return fmt.Errorf("could not get siafund pool: %v", err)
 				}
-				claimValue := siafundPool.Sub(startVal).Mul(sfiValue)
+
+				sfo := spentSiafundOutputs[sfi.ParentID]
 				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					ID:             types.OutputID(sfi.ParentID),
 					FundType:       types.SpecifierClaimOutput,
 					MaturityHeight: consensusHeight + types.MaturityDelay,
 					WalletAddress:  w.isWalletAddress(sfi.UnlockConditions.UnlockHash()),
 					RelatedAddress: sfi.ClaimUnlockHash,
-					Value:          claimValue,
+					Value:          siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value),
 				})
 			}
 
-			for _, sfo := range txn.SiafundOutputs {
+			for i, sfo := range txn.SiafundOutputs {
 				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					ID:             types.OutputID(txn.SiafundOutputID(uint64(i))),
 					FundType:       types.SpecifierSiafundOutput,
 					MaturityHeight: consensusHeight,
 					WalletAddress:  w.isWalletAddress(sfo.UnlockHash),
@@ -295,19 +281,9 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 	return nil
 }
 
-// next: make global txn implicit everywhere
-// also need exclusivity wrt consistency (can't report anything that isn't synced to disk)
-
 // ProcessConsensusChange parses a consensus change to update the set of
 // confirmed outputs known to the wallet.
 func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
-	if err := w.tg.Add(); err != nil {
-		// The wallet should gracefully reject updates from the consensus set
-		// or transaction pool that are sent after the wallet's Close method
-		// has closed the wallet's ThreadGroup.
-		return
-	}
-	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -317,7 +293,7 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if err := w.revertHistory(w.dbTx, cc.RevertedBlocks); err != nil {
 		w.log.Println("ERROR: failed to revert consensus change:", err)
 	}
-	if err := w.applyHistory(w.dbTx, cc.AppliedBlocks); err != nil {
+	if err := w.applyHistory(w.dbTx, cc); err != nil {
 		w.log.Println("ERROR: failed to apply consensus change:", err)
 	}
 	if err := dbPutConsensusChangeID(w.dbTx, cc.ID); err != nil {
@@ -332,24 +308,15 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
 // transaction set.
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction, cc modules.ConsensusChange) {
-	if err := w.tg.Add(); err != nil {
-		// Gracefully reject transactions if the wallet's Close method has
-		// closed the wallet's ThreadGroup already.
-		return
-	}
-	defer w.tg.Done()
-
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// record the historic outputs.
-	// NOTE: it's safe to add unconfirmed outputs to the historic output set.
+	// compute spent outputs
+	spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	for _, diff := range cc.SiacoinOutputDiffs {
-		if diff.Direction == modules.DiffApply {
-			err := dbPutHistoricOutput(w.dbTx, types.OutputID(diff.ID), diff.SiacoinOutput.Value)
-			if err != nil {
-				w.log.Severe("Could not add historic output:", err)
-			}
+		if diff.Direction == modules.DiffRevert {
+			// revert means spent
+			spentSiacoinOutputs[diff.ID] = diff.SiacoinOutput
 		}
 	}
 
@@ -376,19 +343,17 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 			ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
 		}
 		for _, sci := range txn.SiacoinInputs {
-			val, err := dbGetHistoricOutput(w.dbTx, types.OutputID(sci.ParentID))
-			if err != nil {
-				w.log.Println("ERROR: could not get historic output:", err)
-			}
 			pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+				ParentID:       types.OutputID(sci.ParentID),
 				FundType:       types.SpecifierSiacoinInput,
 				WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
 				RelatedAddress: sci.UnlockConditions.UnlockHash(),
-				Value:          val,
+				Value:          spentSiacoinOutputs[sci.ParentID].Value,
 			})
 		}
-		for _, sco := range txn.SiacoinOutputs {
+		for i, sco := range txn.SiacoinOutputs {
 			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+				ID:             types.OutputID(txn.SiacoinOutputID(uint64(i))),
 				FundType:       types.SpecifierSiacoinOutput,
 				MaturityHeight: types.BlockHeight(math.MaxUint64),
 				WalletAddress:  w.isWalletAddress(sco.UnlockHash),

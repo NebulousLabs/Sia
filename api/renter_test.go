@@ -38,7 +38,7 @@ func TestRenterDownloadError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
@@ -112,7 +112,7 @@ func TestRenterAsyncDownloadError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
@@ -187,7 +187,7 @@ func TestRenterAsyncDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
@@ -291,7 +291,7 @@ func TestRenterPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host.
 	err = st.announceHost()
@@ -336,7 +336,7 @@ func TestRenterConflicts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host.
 	err = st.announceHost()
@@ -397,7 +397,7 @@ func TestRenterHandlerContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Anounce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -461,7 +461,7 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Anounce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -558,7 +558,7 @@ func TestRenterLoadNonexistent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Anounce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -616,7 +616,7 @@ func TestRenterHandlerRename(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Anounce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -714,7 +714,7 @@ func TestRenterHandlerDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Anounce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -779,7 +779,7 @@ func TestRenterRelativePathErrorUpload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Anounce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -840,7 +840,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Anounce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -920,7 +920,7 @@ func TestRenterPricesHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and then get the calculated prices for when there is a
 	// single host.
@@ -937,10 +937,12 @@ func TestRenterPricesHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost1.panicClose()
 	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost2.panicClose()
 
 	// Connect all the nodes and announce all of the hosts.
 	sts := []*serverTester{st, stHost1, stHost2}
@@ -992,7 +994,7 @@ func TestRenterPricesHandlerCheap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and then get the calculated prices for when there is a
 	// single host.
@@ -1009,10 +1011,12 @@ func TestRenterPricesHandlerCheap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost1.panicClose()
 	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost2.panicClose()
 
 	var hg HostGET
 	err = st.getAPI("/host", &hg)
@@ -1093,7 +1097,7 @@ func TestRenterPricesHandlerIgnorePricey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and then get the calculated prices for when there is a
 	// single host.
@@ -1110,22 +1114,27 @@ func TestRenterPricesHandlerIgnorePricey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost1.panicClose()
 	stHost2, err := blankServerTester(t.Name() + " - Host 2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost2.panicClose()
 	stHost3, err := blankServerTester(t.Name() + " - Host 3")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost3.panicClose()
 	stHost4, err := blankServerTester(t.Name() + " - Host 4")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost4.panicClose()
 	stHost5, err := blankServerTester(t.Name() + " - Host 5")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost5.panicClose()
 
 	// Set host 5 to be cheaper than the rest by a substantial amount. This
 	// should result in a reduction for the price estimation.
@@ -1193,7 +1202,7 @@ func TestRenterPricesHandlerPricey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and then get the calculated prices for when there is a
 	// single host.

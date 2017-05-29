@@ -72,19 +72,25 @@ func TestSaveLoadJSON(t *testing.T) {
 
 	// Try saving the object multiple times concurrently.
 	var wg sync.WaitGroup
-	errs := make([]error, 250)
+	errs := make([]bool, 250)
 	for i := 0; i < 250; i++ {
 		wg.Add(1)
 		go func(i int) {
-			errs[i] = SaveJSON(testMeta, obj1, obj1Filename)
-			wg.Done()
+			defer wg.Done()
+			defer func() {
+				r := recover() // Error is irrelevant, managed by err slice.
+				if r != nil {
+					errs[i] = true
+				}
+			}()
+			SaveJSON(testMeta, obj1, obj1Filename)
 		}(i)
 	}
 	wg.Wait()
 	// At least one of the saves should have complained about concurrent usage.
 	var found bool
 	for i := range errs {
-		if errs[i] == ErrFileInUse {
+		if errs[i] {
 			found = true
 			break
 		}

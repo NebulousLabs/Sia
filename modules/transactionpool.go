@@ -67,6 +67,10 @@ type TransactionPool interface {
 	// transactions.
 	AcceptTransactionSet([]types.Transaction) error
 
+	// Broadcast broadcasts a transaction set to all of the transaction pool's
+	// peers.
+	Broadcast(ts []types.Transaction)
+
 	// Close is necessary for clean shutdown (e.g. during testing).
 	Close() error
 
@@ -98,6 +102,10 @@ type TransactionPool interface {
 	// Subscribers will receive all consensus set changes as well as
 	// transaction pool changes, and should not subscribe to both.
 	TransactionPoolSubscribe(TransactionPoolSubscriber)
+
+	// Transaction returns the transaction and unconfirmed parents
+	// corresponding to the provided transaction id.
+	Transaction(id types.TransactionID) (txn types.Transaction, unconfirmedParents []types.Transaction, exists bool)
 
 	// Unsubscribe removes a subscriber from the transaction pool.
 	// This is necessary for clean shutdown of the miner.

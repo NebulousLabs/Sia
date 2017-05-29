@@ -16,7 +16,7 @@ func TestExplorerPreset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Try calling a legal endpoint without a user agent.
 	err = st.stdGetAPIUA("/explorer", "")
@@ -46,7 +46,7 @@ func TestReloading(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rst.server.Close()
+	defer rst.server.panicClose()
 	if height != rst.server.api.cs.Height() {
 		t.Error("server heights do not match")
 	}
@@ -73,7 +73,7 @@ func TestAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	testGETURL := "http://" + st.server.listener.Addr().String() + "/wallet/seeds"
 	testPOSTURL := "http://" + st.server.listener.Addr().String() + "/host/announce"

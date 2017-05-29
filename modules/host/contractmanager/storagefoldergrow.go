@@ -61,7 +61,7 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderExtensions(scs []stateCh
 	usfes := findUnfinishedStorageFolderExtensions(scs)
 	for _, usfe := range usfes {
 		sf, exists := wal.cm.storageFolders[usfe.Index]
-		if !exists {
+		if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
 			wal.cm.log.Critical("unfinished storage folder extension exists where the storage folder does not exist")
 			continue
 		}
@@ -88,7 +88,7 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderExtensions(scs []stateCh
 // state.
 func (wal *writeAheadLog) commitStorageFolderExtension(sfe storageFolderExtension) {
 	sf, exists := wal.cm.storageFolders[sfe.Index]
-	if !exists {
+	if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
 		wal.cm.log.Critical("ERROR: storage folder extension provided for storage folder that does not exist")
 		return
 	}
@@ -105,7 +105,7 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 	wal.mu.Lock()
 	sf, exists := wal.cm.storageFolders[index]
 	wal.mu.Unlock()
-	if !exists {
+	if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
 		return errStorageFolderNotFound
 	}
 

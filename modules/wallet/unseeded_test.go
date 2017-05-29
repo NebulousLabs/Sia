@@ -3,7 +3,6 @@ package wallet
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -25,42 +24,22 @@ func TestIntegrationLoad1of1Siag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	wt.wallet.Close()
 
-	// Create a second wallet that loads the persist structures of the existing
-	// wallet. This wallet should have a siafund balance.
-	//
-	// TODO: when proper seed loading is implemented, this will be unnecessary.
-	w, err := New(wt.cs, wt.tpool, wt.wallet.persistDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer w.Close()
-	// reset the changeID
-	resetChangeID(w)
-	err = w.Unlock(wt.walletMasterKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, siafundBal, _ := w.ConfirmedBalance()
+	_, siafundBal, _ := wt.wallet.ConfirmedBalance()
 	if !siafundBal.Equals64(2000) {
 		t.Error("expecting a siafund balance of 2000 from the 1of1 key")
 	}
 
 	// Send some siafunds to the void.
-	_, err = w.SendSiafunds(types.NewCurrency64(12), types.UnlockHash{})
+	_, err = wt.wallet.SendSiafunds(types.NewCurrency64(12), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := miner.New(wt.cs, wt.tpool, w, w.persistDir)
+	_, err = wt.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = m.AddBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, siafundBal, _ = w.ConfirmedBalance()
+	_, siafundBal, _ = wt.wallet.ConfirmedBalance()
 	if !siafundBal.Equals64(1988) {
 		t.Error("expecting balance of 1988 after sending siafunds to the void")
 	}
@@ -84,42 +63,22 @@ func TestIntegrationLoad2of3Siag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	wt.wallet.Close()
 
-	// Create a second wallet that loads the persist structures of the existing
-	// wallet. This wallet should have a siafund balance.
-	//
-	// TODO: when proper seed loading is implemented, this will be unnecessary.
-	w, err := New(wt.cs, wt.tpool, wt.wallet.persistDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer w.Close()
-	// reset the changeID
-	resetChangeID(w)
-	err = w.Unlock(wt.walletMasterKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, siafundBal, _ := w.ConfirmedBalance()
+	_, siafundBal, _ := wt.wallet.ConfirmedBalance()
 	if !siafundBal.Equals64(7000) {
 		t.Error("expecting a siafund balance of 7000 from the 2of3 key")
 	}
 
 	// Send some siafunds to the void.
-	_, err = w.SendSiafunds(types.NewCurrency64(12), types.UnlockHash{})
+	_, err = wt.wallet.SendSiafunds(types.NewCurrency64(12), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := miner.New(wt.cs, wt.tpool, w, w.persistDir)
+	_, err = wt.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = m.AddBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, siafundBal, _ = w.ConfirmedBalance()
+	_, siafundBal, _ = wt.wallet.ConfirmedBalance()
 	if !siafundBal.Equals64(6988) {
 		t.Error("expecting balance of 6988 after sending siafunds to the void")
 	}

@@ -17,8 +17,9 @@ import (
 type (
 	// WalletGET contains general information about the wallet.
 	WalletGET struct {
-		Encrypted bool `json:"encrypted"`
-		Unlocked  bool `json:"unlocked"`
+		Encrypted  bool `json:"encrypted"`
+		Unlocked   bool `json:"unlocked"`
+		Rescanning bool `json:"rescanning"`
 
 		ConfirmedSiacoinBalance     types.Currency `json:"confirmedsiacoinbalance"`
 		UnconfirmedOutgoingSiacoins types.Currency `json:"unconfirmedoutgoingsiacoins"`
@@ -92,6 +93,12 @@ type (
 		ConfirmedTransactions   []modules.ProcessedTransaction `json:"confirmedtransactions"`
 		UnconfirmedTransactions []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
 	}
+
+	// WalletVerifyAddressGET contains a bool indicating if the address passed to
+	// /wallet/verify/address/:addr is a valid address.
+	WalletVerifyAddressGET struct {
+		Valid bool
+	}
 )
 
 // encryptionKeys enumerates the possible encryption keys that can be derived
@@ -114,8 +121,9 @@ func (api *API) walletHandler(w http.ResponseWriter, req *http.Request, _ httpro
 	siacoinBal, siafundBal, siaclaimBal := api.wallet.ConfirmedBalance()
 	siacoinsOut, siacoinsIn := api.wallet.UnconfirmedBalance()
 	WriteJSON(w, WalletGET{
-		Encrypted: api.wallet.Encrypted(),
-		Unlocked:  api.wallet.Unlocked(),
+		Encrypted:  api.wallet.Encrypted(),
+		Unlocked:   api.wallet.Unlocked(),
+		Rescanning: api.wallet.Rescanning(),
 
 		ConfirmedSiacoinBalance:     siacoinBal,
 		UnconfirmedOutgoingSiacoins: siacoinsOut,
@@ -522,4 +530,37 @@ func (api *API) walletUnlockHandler(w http.ResponseWriter, req *http.Request, _ 
 		}
 	}
 	WriteError(w, Error{"error when calling /wallet/unlock: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
+}
+
+// walletChangePasswordHandler handles API calls to /wallet/changepassword
+func (api *API) walletChangePasswordHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var newKey crypto.TwofishKey
+	newPassword := req.FormValue("newpassword")
+	if newPassword == "" {
+		WriteError(w, Error{"a password must be provided to newpassword"}, http.StatusBadRequest)
+		return
+	}
+	newKey = crypto.TwofishKey(crypto.HashObject(newPassword))
+
+	originalKeys := encryptionKeys(req.FormValue("encryptionpassword"))
+	for _, key := range originalKeys {
+		err := api.wallet.ChangeKey(key, newKey)
+		if err == nil {
+			WriteSuccess(w)
+			return
+		}
+		if err != nil && err != modules.ErrBadEncryptionKey {
+			WriteError(w, Error{"error when calling /wallet/changepassword: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+	}
+	WriteError(w, Error{"error when calling /wallet/changepassword: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
+}
+
+// walletVerifyAddressHandler handles API calls to /wallet/verify/address/:addr.
+func (api *API) walletVerifyAddressHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	addrString := ps.ByName("addr")
+
+	err := new(types.UnlockHash).LoadString(addrString)
+	WriteJSON(w, WalletVerifyAddressGET{Valid: err == nil})
 }

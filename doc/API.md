@@ -90,6 +90,7 @@ Table of contents
 - [Miner](#miner)
 - [Renter](#renter)
 - [Wallet](#wallet)
+- [Transaction Pool](#transaction-pool)
 
 Daemon
 ------
@@ -198,8 +199,8 @@ Gateway
 | Route                                                                              | HTTP verb |
 | ---------------------------------------------------------------------------------- | --------- |
 | [/gateway](#gateway-get-example)                                                   | GET       |
-| [/gateway/connect/___:netaddress___](#gatewayconnectnetaddress-post-example)       | POST      |
-| [/gateway/disconnect/___:netaddress___](#gatewaydisconnectnetaddress-post-example) | POST      |
+| [/gateway/connect/:___netaddress___](#gatewayconnectnetaddress-post-example)       | POST      |
+| [/gateway/disconnect/:___netaddress___](#gatewaydisconnectnetaddress-post-example) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Gateway.md](/doc/api/Gateway.md).
@@ -220,7 +221,7 @@ returns information about the gateway, including the list of connected peers.
 }
 ```
 
-#### /gateway/connect/___:netaddress___ [POST] [(example)](/doc/api/Gateway.md#connecting-to-a-peer)
+#### /gateway/connect/:___netaddress___ [POST] [(example)](/doc/api/Gateway.md#connecting-to-a-peer)
 
 connects the gateway to a peer. The peer is added to the node list if it is not
 already present. The node list is the list of all nodes the gateway knows
@@ -235,7 +236,7 @@ about, but is not necessarily connected to.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /gateway/disconnect/___:netaddress___ [POST] [(example)](/doc/api/Gateway.md#disconnecting-from-a-peer)
+#### /gateway/disconnect/:___netaddress___ [POST] [(example)](/doc/api/Gateway.md#disconnecting-from-a-peer)
 
 disconnects the gateway from a peer. The peer remains in the node list.
 
@@ -260,7 +261,7 @@ Host
 | [/host/storage/folders/add](#hoststoragefoldersadd-post)                              | POST      |
 | [/host/storage/folders/remove](#hoststoragefoldersremove-post)                        | POST      |
 | [/host/storage/folders/resize](#hoststoragefoldersresize-post)                        | POST      |
-| [/host/storage/sectors/delete/___:merkleroot___](#hoststoragesectorsdeletemerkleroot) | POST      |
+| [/host/storage/sectors/delete/:___merkleroot___](#hoststoragesectorsdeletemerkleroot-post) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Host.md](/doc/api/Host.md).
@@ -463,7 +464,7 @@ newsize // bytes, Required
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /host/storage/sectors/delete/___:merkleroot___ [POST]
+#### /host/storage/sectors/delete/:___merkleroot___ [POST]
 
 deletes a sector, meaning that the manager will be unable to upload that sector
 and be unable to provide a storage proof on that sector. This endpoint is for
@@ -488,7 +489,7 @@ Host DB
 | ------------------------------------------------------- | --------- |
 | [/hostdb/active](#hostdbactive-get-example)             | GET       |
 | [/hostdb/all](#hostdball-get-example)                   | GET       |
-| [/hostdb/hosts/___:pubkey___](#hostdbhosts-get-example) | GET       |
+| [/hostdb/hosts/:___pubkey___](#hostdbhostspubkey-get-example) | GET       |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [HostDB.md](/doc/api/HostDB.md).
@@ -557,7 +558,7 @@ any particular order, and the order may change in subsequent calls.
 }
 ```
 
-#### /hostdb/hosts/___:pubkey___ [GET] [(example)](/doc/api/HostDB.md#host-details)
+#### /hostdb/hosts/:___pubkey___ [GET] [(example)](/doc/api/HostDB.md#host-details)
 
 fetches detailed information about a particular host, including metrics
 regarding the score of the host within the database. It should be noted that
@@ -685,11 +686,11 @@ Renter
 | [/renter/downloads](#renterdownloads-get)                               | GET       |
 | [/renter/prices](#renterprices-get)                                     | GET       |
 | [/renter/files](#renterfiles-get)                                       | GET       |
-| [/renter/delete/___*siapath___](#renterdeletesiapath-post)              | POST      |
-| [/renter/download/___*siapath___](#renterdownloadsiapath-get)           | GET       |
-| [/renter/downloadasync/___*siapath___](#renterdownloadasyncsiapath-get) | GET       |
-| [/renter/rename/___*siapath___](#renterrenamesiapath-post)              | POST      |
-| [/renter/upload/___*siapath___](#renteruploadsiapath-post)              | POST      |
+| [/renter/delete/*___siapath___](#renterdeletesiapath-post)              | POST      |
+| [/renter/download/*___siapath___](#renterdownloadsiapath-get)           | GET       |
+| [/renter/downloadasync/*___siapath___](#renterdownloadasyncsiapath-get) | GET       |
+| [/renter/rename/*___siapath___](#renterrenamesiapath-post)              | POST      |
+| [/renter/upload/*___siapath___](#renteruploadsiapath-post)              | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Renter.md](/doc/api/Renter.md).
@@ -848,7 +849,7 @@ lists the estimated prices of performing various storage and data operations.
 ```
 
 
-#### /renter/delete/___*siapath___ [POST]
+#### /renter/delete/*___siapath___ [POST]
 
 deletes a renter file entry. Does not delete any downloads or original files,
 only the entry in the renter.
@@ -862,7 +863,7 @@ only the entry in the renter.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /renter/download/___*siapath___ [GET]
+#### /renter/download/*___siapath___ [GET]
 
 downloads a file to the local filesystem. The call will block until the file
 has been downloaded.
@@ -881,7 +882,7 @@ destination
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /renter/downloadasync/___*siapath___ [GET]
+#### /renter/downloadasync/*___siapath___ [GET]
 
 downloads a file to the local filesystem. The call will return immediately.
 
@@ -899,7 +900,7 @@ destination
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /renter/rename/___*siapath___ [POST]
+#### /renter/rename/*___siapath___ [POST]
 
 renames a file. Does not rename any downloads or source files, only renames the
 entry in the renter. An error is returned if `siapath` does not exist or
@@ -919,7 +920,7 @@ newsiapath
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /renter/upload/___*siapath___ [POST]
+#### /renter/upload/*___siapath___ [POST]
 
 uploads a file to the network from the local filesystem.
 
@@ -959,10 +960,12 @@ Wallet
 | [/wallet/siafunds](#walletsiafunds-post)                        | POST      |
 | [/wallet/siagkey](#walletsiagkey-post)                          | POST      |
 | [/wallet/sweep/seed](#walletsweepseed-post)                     | POST      |
-| [/wallet/transaction/___:id___](#wallettransactionid-get)       | GET       |
+| [/wallet/transaction/:___id___](#wallettransactionid-get)       | GET       |
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
-| [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
+| [/wallet/transactions/:___addr___](#wallettransactionsaddr-get) | GET       |
 | [/wallet/unlock](#walletunlock-post)                            | POST      |
+| [/wallet/verify/address/:___addr___](#walletverifyaddressaddr-get)  | GET       |
+| [/wallet/changepassword](#walletchangepassword-post)            | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Wallet.md](/doc/api/Wallet.md).
@@ -975,8 +978,9 @@ locked or unlocked.
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response)
 ```javascript
 {
-  "encrypted": true,
-  "unlocked":  true,
+  "encrypted":  true,
+  "unlocked":   true,
+  "rescanning": false,
 
   "confirmedsiacoinbalance":     "123456", // hastings, big int
   "unconfirmedoutgoingsiacoins": "0",      // hastings, big int
@@ -1225,7 +1229,7 @@ available.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /wallet/transaction/___:id___ [GET]
+#### /wallet/transaction/:___id___ [GET]
 
 gets the transaction associated with a specific transaction id.
 
@@ -1246,6 +1250,7 @@ gets the transaction associated with a specific transaction id.
     "confirmationtimestamp": 1257894000,
     "inputs": [
       {
+        "parentid":       "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         "fundtype":       "siacoin input",
         "walletaddress":  false,
         "relatedaddress": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
@@ -1254,6 +1259,7 @@ gets the transaction associated with a specific transaction id.
     ],
     "outputs": [
       {
+        "id":             "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         "fundtype":       "siacoin output",
         "maturityheight": 50000,
         "walletaddress":  false,
@@ -1291,7 +1297,7 @@ endheight   // block height
 }
 ```
 
-#### /wallet/transactions/___:addr___ [GET]
+#### /wallet/transactions/:___addr___ [GET]
 
 returns all of the transactions related to a specific address.
 
@@ -1324,3 +1330,69 @@ encryptionpassword
 ###### Response
 standard success or error response. See
 [#standard-responses](#standard-responses).
+
+#### /wallet/verify/address/:addr [GET]
+
+takes the address specified by :addr and returns a JSON response indicating if the address is valid.
+
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-11)
+```javascript
+{
+	"valid": true
+}
+```
+
+#### /wallet/changepassword  [POST]
+
+changes the wallet's encryption key.
+
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-12)
+```
+encryptionpassword
+newpassword
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+
+Transaction Pool
+------
+
+| Route                           | HTTP verb |
+| ------------------------------- | --------- |
+| [/tpool/raw/:id](#tpoolraw-get) | GET       |
+| [/tpool/raw](#tpoolraw-post)    | POST      |
+
+#### /tpool/raw/:id [GET]
+
+returns the ID for the requested transaction and its raw encoded parents and transaction data.
+
+###### JSON Response [(with comments)](/doc/api/Transactionpool.md#json-response)
+```javascript
+{
+	// id of the transaction
+	"id": "124302d30a219d52f368ecd94bae1bfb922a3e45b6c32dd7fb5891b863808788",
+
+	// raw, base64 encoded transaction data
+	"transaction": "AQAAAAAAAADBM1ca/FyURfizmSukoUQ2S0GwXMit1iNSeYgrnhXOPAAAAAAAAAAAAQAAAAAAAABlZDI1NTE5AAAAAAAAAAAAIAAAAAAAAACdfzoaJ1MBY7L0fwm7O+BoQlFkkbcab5YtULa6B9aecgEAAAAAAAAAAQAAAAAAAAAMAAAAAAAAAAM7Ljyf0IA86AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAACgAAAAAAAACe0ZTbGbI4wAAAAAAAAAAAAAABAAAAAAAAAMEzVxr8XJRF+LOZK6ShRDZLQbBcyK3WI1J5iCueFc48AAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAA+z4P1wc98IqKxykTSJxiVT+BVbWezIBnIBO1gRRlLq2x/A+jIc6G7/BA5YNJRbdnqPHrzsZvkCv4TKYd/XzwBA==",
+	"parents": "AQAAAAAAAAABAAAAAAAAAJYYmFUdXXfLQ2p6EpF+tcqM9M4Pw5SLSFHdYwjMDFCjAAAAAAAAAAABAAAAAAAAAGVkMjU1MTkAAAAAAAAAAAAgAAAAAAAAAAHONvdzzjHfHBx6psAN8Z1rEVgqKPZ+K6Bsqp3FbrfjAQAAAAAAAAACAAAAAAAAAAwAAAAAAAAAAzvNDjSrme8gwAAA4w8ODnW8DxbOV/JribivvTtjJ4iHVOug0SXJc31BdSINAAAAAAAAAAPGHY4699vggx5AAAC2qBhm5vwPaBsmwAVPho/1Pd8ecce/+BGv4UimnEPzPQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAACWGJhVHV13y0NqehKRfrXKjPTOD8OUi0hR3WMIzAxQowAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAABnt64wN1qxym/CfiMgOx5fg/imVIEhY+4IiiM7gwvSx8qtqKniOx50ekrGv8B+gTKDXpmm2iJibWTI9QLZHWAY=",
+}
+```
+
+#### /tpool/raw [POST]
+
+submits a raw transaction to the transaction pool, broadcasting it to the transaction pool's peers.
+
+###### Query String Parameters [(with comments)](/doc/api/Transactionpool.md#query-string-parameters)
+
+```
+parents     string // raw base64 encoded transaction parents
+transaction string // raw base64 encoded transaction
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+

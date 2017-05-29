@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -52,6 +53,11 @@ func (wal *writeAheadLog) syncResources() {
 
 	// Sync all of the storage folders.
 	for _, sf := range wal.cm.storageFolders {
+		// Skip operation on unavailable storage folders.
+		if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+			continue
+		}
+
 		wg.Add(2)
 		go func(sf *storageFolder) {
 			defer wg.Done()
