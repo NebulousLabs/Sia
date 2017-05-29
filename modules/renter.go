@@ -41,10 +41,39 @@ type ErasureCoder interface {
 // An Allowance dictates how much the Renter is allowed to spend in a given
 // period. Note that funds are spent on both storage and bandwidth.
 type Allowance struct {
-	Funds       types.Currency    `json:"funds"`
-	Hosts       uint64            `json:"hosts"`
-	Period      types.BlockHeight `json:"period"`
-	RenewWindow types.BlockHeight `json:"renewwindow"`
+	// ActiveFunding is the amount of money that the renter has tied up in its
+	// active contracts. This number adjusts as the renter creates, renews, and
+	// retires file contracts.
+	ActiveFunding types.Currency `json:"activefunding"`
+
+	// BillingPeriod is the amount of time between each renew cycle for the
+	// contractor. At the end of each billing period, 'Spending' is reset to
+	// zero.
+	BillingPeriod types.BlockHeight `json:"billingperiod"`
+
+	// Budget is the amount of money the renter is allowed to spend each billing
+	// cylce.
+	Budget types.Currency `json:"budget"`
+
+	// The GracePeriod defines the amount of time that a renter has to renew
+	// their contracts following the end of a billing period. If the renter does
+	// no come online to renew by the end of the grace period, all of the
+	// contracts and files for the renter will be lost. This means that the
+	// maximum amount of downtime that a renter can have without risk of losing
+	// files is 'GracePeriod', and the maximum amount of downtime a renter can
+	// have before being guaranteed to lose files is 'BillingPeriod +
+	// GracePeriod'.
+	GracePeriod types.BlockHeight `json:"graceperiod"`
+
+	// Spending is the amount of money that the renter has spent on contracts in
+	// the current billing cylce.
+	Spending types.Currency `json:"spending"`
+
+	// UploadHosts defines the number of hosts that the renter needs to keep
+	// available for upload. The actual number of contracts may be higher than
+	// this, as the renter may have hosts that it cannot upload to, or otherwise
+	// that the renter does not consider reliable.
+	UploadHosts uint64 `json:"uploadhosts"`
 }
 
 // DownloadInfo provides information about a file that has been requested for
