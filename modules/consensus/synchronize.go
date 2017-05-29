@@ -176,7 +176,7 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 
 	// Read blocks off of the wire and add them to the consensus set until
 	// there are no more blocks available.
-	blocksChan := make(chan []types.Block, 1000)
+	blocksChan := make(chan []types.Block, 100)
 	var processingFailed int32
 	var downloadErr, acceptErr error
 	var wg sync.WaitGroup
