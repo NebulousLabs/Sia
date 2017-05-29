@@ -50,6 +50,7 @@ type (
 		ActiveHosts() []modules.HostDBEntry
 		Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
 		RandomHosts(n int, exclude []types.SiaPublicKey) []modules.HostDBEntry
+		ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
 	}
 
 	persister interface {

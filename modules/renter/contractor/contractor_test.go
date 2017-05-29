@@ -34,6 +34,9 @@ func (newStub) AllHosts() []modules.HostDBEntry                                 
 func (newStub) ActiveHosts() []modules.HostDBEntry                              { return nil }
 func (newStub) Host(types.SiaPublicKey) (settings modules.HostDBEntry, ok bool) { return }
 func (newStub) RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry     { return nil }
+func (newStub) ScoreBreakdown(entry modules.HostDBEntry) modules.HostScoreBreakdown {
+	return modules.HostScoreBreakdown{}
+}
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
@@ -94,7 +97,7 @@ func TestContract(t *testing.T) {
 		{"nope", false, types.FileContractID{}},
 	}
 	for _, test := range tests {
-		contract, ok := c.Contract(test.addr)
+		contract, ok := c.Contract(test.contractID)
 		if ok != test.exists {
 			t.Errorf("%v: expected %v, got %v", test.addr, test.exists, ok)
 		} else if contract.ID != test.contractID {
@@ -105,7 +108,7 @@ func TestContract(t *testing.T) {
 	// delete all contracts
 	c.contracts = map[types.FileContractID]modules.RenterContract{}
 	for _, test := range tests {
-		_, ok := c.Contract(test.addr)
+		_, ok := c.Contract(test.contractID)
 		if ok {
 			t.Error("no contracts should remain")
 		}
@@ -186,6 +189,9 @@ func (stubHostDB) ActiveHosts() (hs []modules.HostDBEntry)                      
 func (stubHostDB) Host(types.SiaPublicKey) (h modules.HostDBEntry, ok bool)         { return }
 func (stubHostDB) PublicKey() (spk types.SiaPublicKey)                              { return }
 func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) (hs []modules.HostDBEntry) { return }
+func (stubHostDB) ScoreBreakdown(entry modules.HostDBEntry) modules.HostScoreBreakdown {
+	return modules.HostScoreBreakdown{}
+}
 
 // TestIntegrationSetAllowance tests the SetAllowance method.
 func TestIntegrationSetAllowance(t *testing.T) {

@@ -46,9 +46,9 @@ type Contractor struct {
 	tpool   transactionPool
 	wallet  wallet
 
-	// in addition to mu, a separate lock enforces that multiple goroutines
-	// won't try to simultaneously edit the contract set.
-	editLock siasync.TryMutex
+	// Only one thread should be running contract repair at a time.
+	editLock           siasync.TryMutex
+	contractRepairLock siasync.TryMutex
 
 	allowance     modules.Allowance
 	blockHeight   types.BlockHeight
@@ -57,10 +57,9 @@ type Contractor struct {
 
 	downloaders map[types.FileContractID]*hostDownloader
 	editors     map[types.FileContractID]*hostEditor
-	renewing    map[types.FileContractID]bool // prevent revising during renewal
-	revising    map[types.FileContractID]bool // prevent overlapping revisions
 
 	cachedRevisions map[types.FileContractID]cachedRevision
+	contractLocks   map[types.FileContractID]*siasync.TryMutex
 	contracts       map[types.FileContractID]modules.RenterContract
 	oldContracts    map[types.FileContractID]modules.RenterContract
 	renewedIDs      map[types.FileContractID]types.FileContractID
@@ -71,27 +70,6 @@ func (c *Contractor) Allowance() modules.Allowance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.allowance
-}
-
-// Contract returns the latest contract formed with the specified host.
-func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContract, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	for _, c := range c.contracts {
-		if c.NetAddress == hostAddr {
-			return c, true
-		}
-	}
-	return modules.RenterContract{}, false
-}
-
-// Contracts returns the contracts formed by the contractor in the current
-// allowance period. Only contracts formed with currently online hosts are
-// returned.
-func (c *Contractor) Contracts() (cs []modules.RenterContract) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.onlineContracts()
 }
 
 // AllContracts returns the contracts formed by the contractor in the current
@@ -110,6 +88,32 @@ func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
 	return
 }
 
+// Close closes the Contractor.
+func (c *Contractor) Close() error {
+	return c.tg.Stop()
+}
+
+// Contract returns the latest contract formed with the specified host.
+func (c *Contractor) Contract(id types.FileContractID) (modules.RenterContract, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	contract, exists := c.contracts[id]
+	return contract, exists
+}
+
+// Contracts returns the contracts formed by the contractor in the current
+// allowance period. Only contracts formed with currently online hosts are
+// returned.
+func (c *Contractor) Contracts() []modules.RenterContract {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	cs := make([]modules.RenterContract, 0, len(c.contracts))
+	for _, contract := range c.contracts {
+		cs = append(cs, contract)
+	}
+	return cs
+}
+
 // CurrentPeriod returns the height at which the current allowance period
 // began.
 func (c *Contractor) CurrentPeriod() types.BlockHeight {
@@ -124,11 +128,6 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 		return c.ResolveID(newID)
 	}
 	return id
-}
-
-// Close closes the Contractor.
-func (c *Contractor) Close() error {
-	return c.tg.Stop()
 }
 
 // New returns a new Contractor.
@@ -176,8 +175,6 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		editors:         make(map[types.FileContractID]*hostEditor),
 		oldContracts:    make(map[types.FileContractID]modules.RenterContract),
 		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
-		renewing:        make(map[types.FileContractID]bool),
-		revising:        make(map[types.FileContractID]bool),
 	}
 
 	// Close the logger (provided as a dependency) upon shutdown.
@@ -190,6 +187,10 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 	// Load the prior persistence structures.
 	err := c.load()
 	if err != nil && !os.IsNotExist(err) {
+		closeErr := c.Close()
+		if closeErr != nil {
+			fmt.Println("Unable to close contractor safely:", err)
+		}
 		return nil, err
 	}
 	// Close the persist (provided as a dependency) upon shutdown.
@@ -208,6 +209,10 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		err = cs.ConsensusSetSubscribe(c, c.lastChange)
 	}
 	if err != nil {
+		closeErr := c.Close()
+		if closeErr != nil {
+			fmt.Println("Unable to close contractor safely:", err)
+		}
 		return nil, errors.New("contractor subscription failed: " + err.Error())
 	}
 	// Unsubscribe from the consensus set upon shutdown.
@@ -217,10 +222,15 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 
 	// We may have upgraded persist or resubscribed. Save now so that we don't
 	// lose our work.
+	c.mu.Lock()
 	err = c.save()
+	c.mu.Unlock()
 	if err != nil {
+		closeErr := c.Close()
+		if closeErr != nil {
+			fmt.Println("Unable to close contractor safely:", err)
+		}
 		return nil, err
 	}
-
 	return c, nil
 }

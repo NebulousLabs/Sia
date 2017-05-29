@@ -3,7 +3,6 @@ package proto
 import (
 	"errors"
 	"net"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -19,9 +18,9 @@ const (
 
 // FormContract forms a contract with a host and submits the contract
 // transaction to tpool.
-func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool) (modules.RenterContract, error) {
+func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, cancelChan <-chan struct{}) (modules.RenterContract, error) {
 	// Extract vars from params, for convenience.
-	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
+	host, hostCollateral, contractFunds, startHeight, endHeight, refundAddress := params.Host, params.HostCollateral, params.ContractFunds, params.StartHeight, params.EndHeight, params.RefundAddress
 
 	// Create our key.
 	ourSK, ourPK := crypto.GenerateKeyPair()
@@ -34,24 +33,8 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		SignaturesRequired: 2,
 	}
 
-	// Calculate cost to renter and cost to host.
-	// TODO: clarify/abstract this math
-	storageAllocation := host.StoragePrice.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
-	hostCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
-	if hostCollateral.Cmp(host.MaxCollateral) > 0 {
-		// TODO: if we have to cap the collateral, it probably means we shouldn't be using this host
-		// (ok within a factor of 2)
-		hostCollateral = host.MaxCollateral
-	}
-	hostPayout := hostCollateral.Add(host.ContractPrice)
-	payout := storageAllocation.Add(hostPayout).Mul64(10406).Div64(10000) // renter pays for siafund fee
-
-	// Check for negative currency.
-	if types.PostTax(startHeight, payout).Cmp(hostPayout) < 0 {
-		return modules.RenterContract{}, errors.New("payout smaller than host payout")
-	}
-
 	// Create file contract.
+	payout := contractFunds.Add(hostCollateral).Add(host.ContractPrice).Mul64(10406).Div64(10000) // renter covers siafund fee
 	fc := types.FileContract{
 		FileSize:       0,
 		FileMerkleRoot: crypto.Hash{}, // no proof possible without data
@@ -62,15 +45,15 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
 			// Outputs need to account for tax.
-			{Value: types.PostTax(startHeight, payout).Sub(hostPayout), UnlockHash: refundAddress},
+			{Value: contractFunds, UnlockHash: refundAddress},
 			// Collateral is returned to host.
-			{Value: hostPayout, UnlockHash: host.UnlockHash},
+			{Value: hostCollateral.Add(host.ContractPrice), UnlockHash: host.UnlockHash},
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
 			// Same as above.
-			{Value: types.PostTax(startHeight, payout).Sub(hostPayout), UnlockHash: refundAddress},
+			{Value: contractFunds, UnlockHash: refundAddress},
 			// Same as above.
-			{Value: hostPayout, UnlockHash: host.UnlockHash},
+			{Value: hostCollateral.Add(host.ContractPrice), UnlockHash: host.UnlockHash},
 			// Once we start doing revisions, we'll move some coins to the host and some to the void.
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
@@ -96,7 +79,11 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	txnSet := append(parentTxns, txn)
 
 	// Initiate connection.
-	conn, err := net.DialTimeout("tcp", string(host.NetAddress), 15*time.Second)
+	dialer := &net.Dialer{
+		Cancel:  cancelChan,
+		Timeout: dialHostTimeout,
+	}
+	conn, err := dialer.Dial("tcp", string(host.NetAddress))
 	if err != nil {
 		return modules.RenterContract{}, err
 	}

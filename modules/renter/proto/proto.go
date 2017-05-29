@@ -31,12 +31,12 @@ type (
 
 // ContractParams are supplied as an argument to FormContract.
 type ContractParams struct {
-	Host          modules.HostDBEntry
-	Filesize      uint64
-	StartHeight   types.BlockHeight
-	EndHeight     types.BlockHeight
-	RefundAddress types.UnlockHash
-	// TODO: add optional keypair
+	ContractFunds  types.Currency
+	EndHeight      types.BlockHeight
+	Host           modules.HostDBEntry
+	HostCollateral types.Currency
+	RefundAddress  types.UnlockHash
+	StartHeight    types.BlockHeight
 }
 
 // A revisionSaver is called just before we send our revision signature to the host; this
