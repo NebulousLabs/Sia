@@ -64,7 +64,7 @@ release:
 release-race:
 	go install -race -tags='debug profile' $(pkgs)
 release-std:
-	go install $(pkgs)
+	go install -ldflags='-s -w' $(pkgs)
 
 # clean removes all directories that get automatically created during
 # development.
