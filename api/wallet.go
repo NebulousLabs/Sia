@@ -377,8 +377,17 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 		WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-
-	txns, err := api.wallet.SendSiacoins(amount, dest)
+	var txns []types.Transaction
+	if req.FormValue("fee") != "" {
+		fee, ok := scanAmount(req.FormValue("fee"))
+		if !ok {
+			WriteError(w, Error{"could not read 'fee' from POST call to /wallet/siacoins"}, http.StatusBadRequest)
+			return
+		}
+		txns, err = api.wallet.SendSiacoinsFee(amount, fee, dest)
+	} else {
+		txns, err = api.wallet.SendSiacoins(amount, dest)
+	}
 	if err != nil {
 		WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 		return
@@ -405,7 +414,17 @@ func (api *API) walletSiafundsHandler(w http.ResponseWriter, req *http.Request, 
 		return
 	}
 
-	txns, err := api.wallet.SendSiafunds(amount, dest)
+	var txns []types.Transaction
+	if req.FormValue("fee") != "" {
+		fee, ok := scanAmount(req.FormValue("fee"))
+		if !ok {
+			WriteError(w, Error{"could not read 'fee' from POST call to /wallet/siafunds"}, http.StatusBadRequest)
+			return
+		}
+		txns, err = api.wallet.SendSiafundsFee(amount, fee, dest)
+	} else {
+		txns, err = api.wallet.SendSiafunds(amount, dest)
+	}
 	if err != nil {
 		WriteError(w, Error{"error after call to /wallet/siafunds: " + err.Error()}, http.StatusInternalServerError)
 		return

@@ -22,8 +22,9 @@ var (
 	initPassword      bool   // supply a custom password when creating a wallet
 	initForce         bool   // destroy and reencrypt the wallet on init if it already exists
 	hostVerbose       bool   // display additional host info
-	renterShowHistory bool   // Show download history in addition to download queue.
-	renterListVerbose bool   // Show additional info about uploaded files.
+	renterShowHistory bool   // show download history in addition to download queue
+	renterListVerbose bool   // show additional info about uploaded files.
+	walletTxnFee      string // supply a custom transaction fee when sending coins or funds
 
 	// Globals.
 	rootCmd *cobra.Command // Root command cobra object, used by bash completion cmd.
@@ -267,10 +268,11 @@ func main() {
 		walletLoadCmd, walletLockCmd, walletSeedsCmd, walletSendCmd, walletSweepCmd,
 		walletBalanceCmd, walletTransactionsCmd, walletUnlockCmd)
 	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Prompt for a custom password")
-	walletInitCmd.Flags().BoolVarP(&initForce, "force", "", false, "destroy the existing wallet and re-encrypt")
-	walletInitSeedCmd.Flags().BoolVarP(&initForce, "force", "", false, "destroy the existing wallet")
+	walletInitCmd.Flags().BoolVarP(&initForce, "force", "", false, "Destroy the existing wallet and re-encrypt")
+	walletInitSeedCmd.Flags().BoolVarP(&initForce, "force", "", false, "Destroy the existing wallet")
 	walletLoadCmd.AddCommand(walletLoad033xCmd, walletLoadSeedCmd, walletLoadSiagCmd)
 	walletSendCmd.AddCommand(walletSendSiacoinsCmd, walletSendSiafundsCmd)
+	walletSendCmd.Flags().StringVar(&walletTxnFee, "fee", "", "Set miner fee for including transaction")
 
 	root.AddCommand(renterCmd)
 	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd,

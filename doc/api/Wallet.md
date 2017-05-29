@@ -315,7 +315,7 @@ dictionary
 #### /wallet/siacoins [POST]
 
 Function: Send siacoins to an address. The outputs are arbitrarily selected
-from addresses in the wallet.
+from addresses in the wallet. A custom fee may be supplied.
 
 ###### Query String Parameters
 ```
@@ -325,6 +325,9 @@ amount      // hastings
 
 // Address that is receiving the coins.
 destination // address
+
+// Fee to be paid to miner.
+fee // Optional, hastings
 ```
 
 ###### JSON Response
@@ -358,6 +361,9 @@ amount      // siafunds
 
 // Address that is receiving the funds.
 destination // address
+
+// Fee to be paid to miner.
+fee // Optional, hastings
 ```
 
 ###### JSON Response
