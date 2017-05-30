@@ -37,8 +37,8 @@ func TestRenterSiapathValidate(t *testing.T) {
 	}
 }
 
-// TestRenterUploadInode verifies that the renter returns an error if an inode
-// is provided as the source of an upload.
+// TestRenterUploadDirectory verifies that the renter returns an error if a
+// directory is provided as the source of an upload.
 func TestRenterUploadInode(t *testing.T) {
 	rt, err := newRenterTester(t.Name())
 	if err != nil {
@@ -63,9 +63,9 @@ func TestRenterUploadInode(t *testing.T) {
 	}
 	err = rt.renter.Upload(params)
 	if err == nil {
-		t.Fatal("expected Upload to fail with empty inode as source")
+		t.Fatal("expected Upload to fail with empty directory as source")
 	}
-	if err != errUploadInode {
-		t.Fatal("expected errUploadEmptyInode, got", err)
+	if err != errUploadDirectory {
+		t.Fatal("expected errUploadDirectory, got", err)
 	}
 }

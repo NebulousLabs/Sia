@@ -13,7 +13,7 @@ import (
 
 var (
 	errInsufficientContracts = errors.New("not enough contracts to upload file")
-	errUploadInode           = errors.New("cannot upload inode")
+	errUploadDirectory       = errors.New("cannot upload directory")
 
 	// Erasure-coded piece size
 	pieceSize = modules.SectorSize - crypto.TwofishOverhead
@@ -77,7 +77,7 @@ func validateSource(sourcePath string) error {
 		return err
 	}
 	if finfo.IsDir() {
-		return errUploadInode
+		return errUploadDirectory
 	}
 
 	return nil
