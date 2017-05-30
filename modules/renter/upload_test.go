@@ -65,7 +65,7 @@ func TestRenterUploadInode(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected Upload to fail with empty inode as source")
 	}
-	if err != errUploadEmptyInode {
+	if err != errUploadInode {
 		t.Fatal("expected errUploadEmptyInode, got", err)
 	}
 }

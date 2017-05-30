@@ -13,7 +13,7 @@ import (
 
 var (
 	errInsufficientContracts = errors.New("not enough contracts to upload file")
-	errUploadEmptyInode      = errors.New("cannot upload empty inode")
+	errUploadInode           = errors.New("cannot upload inode")
 
 	// Erasure-coded piece size
 	pieceSize = modules.SectorSize - crypto.TwofishOverhead
@@ -69,11 +69,36 @@ func validateSiapath(siapath string) error {
 	return nil
 }
 
+// validateSource verifies that a sourcePath meets the
+// requirements for upload.
+func validateSource(sourcePath string) error {
+	f, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	finfo, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if finfo.IsDir() {
+		return errUploadInode
+	}
+
+	return nil
+}
+
 // Upload instructs the renter to start tracking a file. The renter will
 // automatically upload and repair tracked files using a background loop.
 func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Enforce nickname rules.
 	if err := validateSiapath(up.SiaPath); err != nil {
+		return err
+	}
+
+	// Enforce source rules.
+	if err := validateSource(up.Source); err != nil {
 		return err
 	}
 
