@@ -499,6 +499,9 @@ func renterfilesuploadcmd(source, path string) {
 				fmt.Println("Warning: skipping file:", err)
 				return nil
 			}
+			if info.IsDir() {
+				return nil
+			}
 			files = append(files, path)
 			return nil
 		})
