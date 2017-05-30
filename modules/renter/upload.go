@@ -13,6 +13,7 @@ import (
 
 var (
 	errInsufficientContracts = errors.New("not enough contracts to upload file")
+	errUploadEmptyInode      = errors.New("cannot upload empty inode")
 
 	// Erasure-coded piece size
 	pieceSize = modules.SectorSize - crypto.TwofishOverhead
