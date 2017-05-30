@@ -72,13 +72,7 @@ func validateSiapath(siapath string) error {
 // validateSource verifies that a sourcePath meets the
 // requirements for upload.
 func validateSource(sourcePath string) error {
-	f, err := os.Open(sourcePath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	finfo, err := f.Stat()
+	finfo, err := os.Stat(sourcePath)
 	if err != nil {
 		return err
 	}
