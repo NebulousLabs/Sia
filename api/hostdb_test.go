@@ -522,7 +522,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -600,7 +600,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -629,8 +629,8 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if bytes.Compare(orig, download) != 0 {
-				return err
+			if !bytes.Equal(orig, download) {
+				return errors.New("downloaded file does not equal the original")
 			}
 			return nil
 		})
@@ -833,7 +833,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig2, download2) != 0 {
+	if !bytes.Equal(orig2, download2) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -868,7 +868,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -886,7 +886,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig2, download2) != 0 {
+	if !bytes.Equal(orig2, download2) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 }
@@ -1062,7 +1062,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -1092,7 +1092,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 }
@@ -1197,7 +1197,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -1284,7 +1284,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 }
