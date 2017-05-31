@@ -36,8 +36,10 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 
 		var err error
 		if diff.Direction == modules.DiffApply {
+			w.log.Println("Previously spent siacoin output is no longer spent on-chain:", diff.ID)
 			err = dbPutSiacoinOutput(tx, diff.ID, diff.SiacoinOutput)
 		} else {
+			w.log.Println("Wallet has had a confirmed siacoin output reverted:", diff.ID)
 			err = dbDeleteSiacoinOutput(tx, diff.ID)
 		}
 		if err != nil {
@@ -52,8 +54,10 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 
 		var err error
 		if diff.Direction == modules.DiffApply {
+			w.log.Println("Previously spent siafund output is no longer spent on-chain:", diff.ID)
 			err = dbPutSiafundOutput(tx, diff.ID, diff.SiafundOutput)
 		} else {
+			w.log.Println("Wallet has had a confirmed siafund output reverted:", diff.ID)
 			err = dbDeleteSiafundOutput(tx, diff.ID)
 		}
 		if err != nil {
@@ -88,6 +92,7 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 				break // bucket is empty
 			}
 			if txid == pt.TransactionID {
+				w.log.Println("Wallet has reverted a transaction:", txid)
 				if err := dbDeleteLastProcessedTransaction(tx); err != nil {
 					w.log.Severe("Could not revert transaction:", err)
 				}
@@ -95,8 +100,9 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 		}
 
 		// Remove the miner payout transaction if applicable.
-		for _, mp := range block.MinerPayouts {
+		for i, mp := range block.MinerPayouts {
 			if w.isWalletAddress(mp.UnlockHash) {
+				w.log.Println("Wallet has reverted a miner payout:", block.MinerPayoutID(uint64(i)))
 				if err := dbDeleteLastProcessedTransaction(tx); err != nil {
 					w.log.Severe("Could not revert transaction:", err)
 				}
@@ -157,6 +163,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 			relevant = relevant || w.isWalletAddress(mp.UnlockHash)
 		}
 		if relevant {
+			w.log.Println("Wallet has received new miner payouts:", block.ID())
 			// Apply the miner payout transaction if applicable.
 			minerPT := modules.ProcessedTransaction{
 				Transaction:           types.Transaction{},
@@ -165,6 +172,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 				ConfirmationTimestamp: block.Timestamp,
 			}
 			for i, mp := range block.MinerPayouts {
+				w.log.Println("\tminer payout:", block.MinerPayoutID(uint64(i)))
 				minerPT.Outputs = append(minerPT.Outputs, modules.ProcessedOutput{
 					ID:             types.OutputID(block.MinerPayoutID(uint64(i))),
 					FundType:       types.SpecifierMinerPayout,
@@ -199,6 +207,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 			if !relevant {
 				continue
 			}
+			w.log.Println("Wallet has confirmed a new transaction:", txn.ID())
 
 			pt := modules.ProcessedTransaction{
 				Transaction:           txn,
@@ -208,34 +217,52 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 			}
 
 			for _, sci := range txn.SiacoinInputs {
-				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+				pi := modules.ProcessedInput{
 					ParentID:       types.OutputID(sci.ParentID),
 					FundType:       types.SpecifierSiacoinInput,
 					WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
 					RelatedAddress: sci.UnlockConditions.UnlockHash(),
 					Value:          spentSiacoinOutputs[sci.ParentID].Value,
-				})
+				}
+				pt.Inputs = append(pt.Inputs, pi)
+
+				// Log any wallet-relevant inputs.
+				if pi.WalletAddress {
+					w.log.Println("\tSiacoin Input:", pi.ParentID, "::", pi.Value)
+				}
+
 			}
 
 			for i, sco := range txn.SiacoinOutputs {
-				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+				po := modules.ProcessedOutput{
 					ID:             types.OutputID(txn.SiacoinOutputID(uint64(i))),
 					FundType:       types.SpecifierSiacoinOutput,
 					MaturityHeight: consensusHeight,
 					WalletAddress:  w.isWalletAddress(sco.UnlockHash),
 					RelatedAddress: sco.UnlockHash,
 					Value:          sco.Value,
-				})
+				}
+				pt.Outputs = append(pt.Outputs, po)
+
+				// Log any wallet-relevant outputs.
+				if po.WalletAddress {
+					w.log.Println("\tSiacoin Output:", po.ID, "::", po.Value)
+				}
 			}
 
 			for _, sfi := range txn.SiafundInputs {
-				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+				pi := modules.ProcessedInput{
 					ParentID:       types.OutputID(sfi.ParentID),
 					FundType:       types.SpecifierSiafundInput,
 					WalletAddress:  w.isWalletAddress(sfi.UnlockConditions.UnlockHash()),
 					RelatedAddress: sfi.UnlockConditions.UnlockHash(),
 					Value:          spentSiafundOutputs[sfi.ParentID].Value,
-				})
+				}
+				pt.Inputs = append(pt.Inputs, pi)
+				// Log any wallet-relevant inputs.
+				if pi.WalletAddress {
+					w.log.Println("\tSiafund Input:", pi.ParentID, "::", pi.Value)
+				}
 
 				siafundPool, err := dbGetSiafundPool(w.dbTx)
 				if err != nil {
@@ -243,25 +270,35 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 				}
 
 				sfo := spentSiafundOutputs[sfi.ParentID]
-				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+				po := modules.ProcessedOutput{
 					ID:             types.OutputID(sfi.ParentID),
 					FundType:       types.SpecifierClaimOutput,
 					MaturityHeight: consensusHeight + types.MaturityDelay,
 					WalletAddress:  w.isWalletAddress(sfi.UnlockConditions.UnlockHash()),
 					RelatedAddress: sfi.ClaimUnlockHash,
 					Value:          siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value),
-				})
+				}
+				pt.Outputs = append(pt.Outputs, po)
+				// Log any wallet-relevant outputs.
+				if po.WalletAddress {
+					w.log.Println("\tClaim Output:", po.ID, "::", po.Value)
+				}
 			}
 
 			for i, sfo := range txn.SiafundOutputs {
-				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+				po := modules.ProcessedOutput{
 					ID:             types.OutputID(txn.SiafundOutputID(uint64(i))),
 					FundType:       types.SpecifierSiafundOutput,
 					MaturityHeight: consensusHeight,
 					WalletAddress:  w.isWalletAddress(sfo.UnlockHash),
 					RelatedAddress: sfo.UnlockHash,
 					Value:          sfo.Value,
-				})
+				}
+				pt.Outputs = append(pt.Outputs, po)
+				// Log any wallet-relevant outputs.
+				if po.WalletAddress {
+					w.log.Println("\tSiafund Output:", po.ID, "::", po.Value)
+				}
 			}
 
 			for _, fee := range txn.MinerFees {
