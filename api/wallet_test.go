@@ -101,7 +101,7 @@ func TestWalletRescanning(t *testing.T) {
 	defer st.server.panicClose()
 
 	// mine a few blocks to make rescanning take some time
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 300; i++ {
 		_, err = st.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -129,7 +129,7 @@ func TestWalletRescanning(t *testing.T) {
 		defer close(doneChan)
 		st.stdPostAPI("/wallet/sweep/seed", qs)
 	}()
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Millisecond * 5)
 	err = st.getAPI("/wallet", &wg)
 	if err != nil {
 		t.Fatal(err)
@@ -153,7 +153,7 @@ func TestWalletRescanning(t *testing.T) {
 		defer close(doneChan)
 		st.stdPostAPI("/wallet/init/seed", qs)
 	}()
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Millisecond * 5)
 	err = st.getAPI("/wallet", &wg)
 	if err != nil {
 		t.Fatal(err)
@@ -178,7 +178,7 @@ func TestWalletRescanning(t *testing.T) {
 		defer close(doneChan)
 		st.stdPostAPI("/wallet/unlock", unlockValues)
 	}()
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Millisecond * 5)
 	err = st.getAPI("/wallet", &wg)
 	if err != nil {
 		t.Fatal(err)
@@ -201,7 +201,7 @@ func TestWalletRescanning(t *testing.T) {
 		defer close(doneChan)
 		st.stdPostAPI("/wallet/unlock", unlockValues)
 	}()
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Millisecond * 5)
 	if err = st.stdPostAPI("/wallet/unlock", unlockValues); err == nil {
 		t.Fatal("concurrent call to /wallet/unlock succeeded")
 	}
@@ -216,7 +216,7 @@ func TestWalletRescanning(t *testing.T) {
 		defer close(doneChan)
 		st.stdPostAPI("/wallet/init/seed", qs)
 	}()
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Millisecond * 5)
 	if err = st.stdPostAPI("/wallet/unlock", unlockValues); err == nil {
 		t.Fatal("concurrent call to /wallet/unlock succeeded")
 	}
@@ -231,7 +231,7 @@ func TestWalletRescanning(t *testing.T) {
 		defer close(doneChan)
 		st.stdPostAPI("/wallet/sweep/seed", qs)
 	}()
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Millisecond * 5)
 	if err = st.stdPostAPI("/wallet/unlock", unlockValues); err == nil {
 		t.Fatal("concurrent call to /wallet/unlock succeeded")
 	}
