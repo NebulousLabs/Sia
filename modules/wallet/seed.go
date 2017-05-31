@@ -437,5 +437,12 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 	// submit the transaction
 	txnSet := append(parents, txn)
 	err = w.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		return
+	}
+	w.log.Println("Creating a transaction set to sweep a seed, IDs:")
+	for _, txn := range txnSet {
+		w.log.Println("\t", txn.ID())
+	}
 	return
 }
