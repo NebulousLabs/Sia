@@ -758,7 +758,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 	}
 
 	// Create a second wallet and send money to that wallet.
-	st2, err := createServerTester(t.Name() + "w2")
+	st2, err := blankServerTester(t.Name() + "w2")
 	if err != nil {
 		t.Fatal(err)
 	}
