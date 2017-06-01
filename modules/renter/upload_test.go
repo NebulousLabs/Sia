@@ -40,6 +40,9 @@ func TestRenterSiapathValidate(t *testing.T) {
 // TestRenterUploadDirectory verifies that the renter returns an error if a
 // directory is provided as the source of an upload.
 func TestRenterUploadInode(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	rt, err := newRenterTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
