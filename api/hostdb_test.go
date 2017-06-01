@@ -560,7 +560,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Pull the host's net address and pubkey from the hostdb.
-	err = retry(50, time.Millisecond*100, func() error {
+	err = retry(100, time.Millisecond*200, func() error {
 		// Get the hostdb internals.
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			return err
