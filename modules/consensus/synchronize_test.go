@@ -1161,7 +1161,7 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 	cst1.cs.gateway.Broadcast("RelayHeader", validBlock.Header(), cst1.cs.gateway.Peers())
 	select {
 	case <-mg.broadcastCalled:
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(1500 * time.Millisecond):
 		t.Fatal("RelayHeader didn't broadcast a valid block header")
 	}
 }
