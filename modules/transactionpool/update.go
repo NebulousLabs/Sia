@@ -52,20 +52,21 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 
-	// TODO: Right now, transactions that were reverted to not get saved and
-	// retried, because some transactions such as storage proofs might be
-	// illegal, and there's no good way to preserve dependencies when illegal
-	// transactions are suddenly involved.
-	//
-	// One potential solution is to have modules manually do resubmission if
-	// something goes wrong. Another is to have the transaction pool remember
-	// recent transaction sets on the off chance that they become valid again
-	// due to a reorg.
-	//
-	// Another option is to scan through the blocks transactions one at a time
-	// check if they are valid. If so, lump them in a set with the next guy.
-	// When they stop being valid, you've found a guy to throw away. It's n^2
-	// in the number of transactions in the block.
+	// Scan through the reverted blocks and try to add each transaction in the
+	// block to the transactionSet. If the add succeeds, add the transaction back
+	// to the transaction pool.
+	for _, block := range cc.RevertedBlocks {
+		for _, txn := range block.Transactions {
+			err = tp.acceptTransactionSet([]types.Transaction{txn}, cc.TryTransactionSet)
+			if err == nil {
+				txids[txn.ID()] = struct{}{}
+				err = tp.addTransaction(tp.dbTx, txn.ID())
+				if err != nil {
+					tp.log.Println("ERROR: could not add a transaction:", err)
+				}
+			}
+		}
+	}
 
 	// Save all of the current unconfirmed transaction sets into a list.
 	var unconfirmedSets [][]types.Transaction
