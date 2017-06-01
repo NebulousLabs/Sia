@@ -115,6 +115,35 @@ func (c *Currency) UnmarshalSia(r io.Reader) error {
 	return nil
 }
 
+// HumanString prints the Currency using human readable units. The unit used
+// will be the largest unit that results in a value greater than 1. The value is
+// rounded to 4 significant digits.
+func (c Currency) HumanString() string {
+	pico := SiacoinPrecision.Div64(1e12)
+	if c.Cmp(pico) < 0 {
+		return c.String() + " H"
+	}
+
+	// iterate until we find a unit greater than c
+	mag := pico
+	unit := ""
+	for _, unit = range []string{"pS", "nS", "uS", "mS", "SC", "KS", "MS", "GS", "TS"} {
+		if c.Cmp(mag.Mul64(1e3)) < 0 {
+			break
+		} else if unit != "TS" {
+			// don't want to perform this multiply on the last iter; that
+			// would give us 1.235 TS instead of 1235 TS
+			mag = mag.Mul64(1e3)
+		}
+	}
+
+	num := new(big.Rat).SetInt(c.Big())
+	denom := new(big.Rat).SetInt(mag.Big())
+	res, _ := new(big.Rat).Mul(num, denom.Inv(denom)).Float64()
+
+	return fmt.Sprintf("%.4g %s", res, unit)
+}
+
 // String implements the fmt.Stringer interface.
 func (c Currency) String() string {
 	return c.i.String()

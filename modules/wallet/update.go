@@ -36,10 +36,10 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 
 		var err error
 		if diff.Direction == modules.DiffApply {
-			w.log.Println("Previously spent siacoin output is no longer spent on-chain:", diff.ID)
+			w.log.Println("Wallet has gained a spandable siacoin output:", diff.ID, "::", diff.SiacoinOutput.Value.HumanString())
 			err = dbPutSiacoinOutput(tx, diff.ID, diff.SiacoinOutput)
 		} else {
-			w.log.Println("Wallet has had a confirmed siacoin output reverted:", diff.ID)
+			w.log.Println("Wallet has lost a spendable siacoin output:", diff.ID, "::", diff.SiacoinOutput.Value.HumanString())
 			err = dbDeleteSiacoinOutput(tx, diff.ID)
 		}
 		if err != nil {
@@ -54,10 +54,10 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 
 		var err error
 		if diff.Direction == modules.DiffApply {
-			w.log.Println("Previously spent siafund output is no longer spent on-chain:", diff.ID)
+			w.log.Println("Wallet has gained a spendable siafund output:", diff.ID, "::", diff.SiafundOutput.Value)
 			err = dbPutSiafundOutput(tx, diff.ID, diff.SiafundOutput)
 		} else {
-			w.log.Println("Wallet has had a confirmed siafund output reverted:", diff.ID)
+			w.log.Println("Wallet has lost a spendable siafund output:", diff.ID, "::", diff.SiafundOutput.Value)
 			err = dbDeleteSiafundOutput(tx, diff.ID)
 		}
 		if err != nil {
@@ -92,7 +92,7 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 				break // bucket is empty
 			}
 			if txid == pt.TransactionID {
-				w.log.Println("Wallet has reverted a transaction:", txid)
+				w.log.Println("A wallet transaction has been reverted due to a reorg:", txid)
 				if err := dbDeleteLastProcessedTransaction(tx); err != nil {
 					w.log.Severe("Could not revert transaction:", err)
 				}
@@ -102,7 +102,7 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 		// Remove the miner payout transaction if applicable.
 		for i, mp := range block.MinerPayouts {
 			if w.isWalletAddress(mp.UnlockHash) {
-				w.log.Println("Wallet has reverted a miner payout:", block.MinerPayoutID(uint64(i)))
+				w.log.Println("Miner payout has been reverted due to a reorg:", block.MinerPayoutID(uint64(i)), "::", mp.Value.HumanString())
 				if err := dbDeleteLastProcessedTransaction(tx); err != nil {
 					w.log.Severe("Could not revert transaction:", err)
 				}
@@ -172,7 +172,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 				ConfirmationTimestamp: block.Timestamp,
 			}
 			for i, mp := range block.MinerPayouts {
-				w.log.Println("\tminer payout:", block.MinerPayoutID(uint64(i)))
+				w.log.Println("\tminer payout:", block.MinerPayoutID(uint64(i)), "::", mp.Value.HumanString())
 				minerPT.Outputs = append(minerPT.Outputs, modules.ProcessedOutput{
 					ID:             types.OutputID(block.MinerPayoutID(uint64(i))),
 					FundType:       types.SpecifierMinerPayout,
@@ -207,7 +207,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 			if !relevant {
 				continue
 			}
-			w.log.Println("Wallet has confirmed a new transaction:", txn.ID())
+			w.log.Println("A transaction has been confirmed on the blockchain:", txn.ID())
 
 			pt := modules.ProcessedTransaction{
 				Transaction:           txn,
@@ -228,7 +228,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 
 				// Log any wallet-relevant inputs.
 				if pi.WalletAddress {
-					w.log.Println("\tSiacoin Input:", pi.ParentID, "::", pi.Value)
+					w.log.Println("\tSiacoin Input:", pi.ParentID, "::", pi.Value.HumanString())
 				}
 
 			}
@@ -246,7 +246,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 
 				// Log any wallet-relevant outputs.
 				if po.WalletAddress {
-					w.log.Println("\tSiacoin Output:", po.ID, "::", po.Value)
+					w.log.Println("\tSiacoin Output:", po.ID, "::", po.Value.HumanString())
 				}
 			}
 
@@ -261,7 +261,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 				pt.Inputs = append(pt.Inputs, pi)
 				// Log any wallet-relevant inputs.
 				if pi.WalletAddress {
-					w.log.Println("\tSiafund Input:", pi.ParentID, "::", pi.Value)
+					w.log.Println("\tSiafund Input:", pi.ParentID, "::", pi.Value.HumanString())
 				}
 
 				siafundPool, err := dbGetSiafundPool(w.dbTx)
@@ -281,7 +281,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 				pt.Outputs = append(pt.Outputs, po)
 				// Log any wallet-relevant outputs.
 				if po.WalletAddress {
-					w.log.Println("\tClaim Output:", po.ID, "::", po.Value)
+					w.log.Println("\tClaim Output:", po.ID, "::", po.Value.HumanString())
 				}
 			}
 
@@ -297,7 +297,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 				pt.Outputs = append(pt.Outputs, po)
 				// Log any wallet-relevant outputs.
 				if po.WalletAddress {
-					w.log.Println("\tSiafund Output:", po.ID, "::", po.Value)
+					w.log.Println("\tSiafund Output:", po.ID, "::", po.Value.HumanString())
 				}
 			}
 

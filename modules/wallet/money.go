@@ -100,7 +100,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 	if err != nil {
 		return nil, build.ExtendErr("unable to get transaction accepted", err)
 	}
-	w.log.Println("Submitted a siacoin transfer transaction set for value", amount, "with fees", tpoolFee, "IDs:")
+	w.log.Println("Submitted a siacoin transfer transaction set for value", amount.HumanString(), "with fees", tpoolFee.HumanString(), "IDs:")
 	for _, txn := range txnSet {
 		w.log.Println("\t", txn.ID())
 	}
@@ -145,7 +145,7 @@ func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]t
 	if err != nil {
 		return nil, err
 	}
-	w.log.Println("Submitted a siafund transfer transaction set for value", amount, "with fees", tpoolFee, "IDs:")
+	w.log.Println("Submitted a siafund transfer transaction set for value", amount.HumanString(), "with fees", tpoolFee.HumanString(), "IDs:")
 	for _, txn := range txnSet {
 		w.log.Println("\t", txn.ID())
 	}
