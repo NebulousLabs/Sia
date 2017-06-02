@@ -1,7 +1,6 @@
 package transactionpool
 
 import (
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -51,42 +50,6 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		tp.log.Println("ERROR: could not update the block height:", err)
 	}
 
-	// prune transactions older than maxTxnAge.
-	pruneTxns := make(map[types.TransactionID]struct{})
-	for txid, seenHeight := range tp.transactionHeights {
-		if tp.blockHeight-seenHeight > maxTxnAge {
-			delete(tp.transactionHeights, txid)
-			pruneTxns[txid] = struct{}{}
-		}
-	}
-	for id, tSet := range tp.transactionSets {
-		var validTxns []types.Transaction
-		for _, txn := range tSet {
-			_, shouldPrune := pruneTxns[txn.ID()]
-			if !shouldPrune {
-				validTxns = append(validTxns, txn)
-			}
-		}
-		tp.transactionSets[id] = validTxns
-		tp.transactionListSize -= len(encoding.Marshal(tSet)) - len(encoding.Marshal(validTxns))
-		if len(validTxns) == 0 {
-			delete(tp.transactionSets, id)
-			setDiffs, exists := tp.transactionSetDiffs[id]
-			if exists {
-				for _, diff := range setDiffs.SiacoinOutputDiffs {
-					delete(tp.knownObjects, ObjectID(diff.ID))
-				}
-				for _, diff := range setDiffs.FileContractDiffs {
-					delete(tp.knownObjects, ObjectID(diff.ID))
-				}
-				for _, diff := range setDiffs.SiafundOutputDiffs {
-					delete(tp.knownObjects, ObjectID(diff.ID))
-				}
-			}
-			delete(tp.transactionSetDiffs, id)
-		}
-	}
-
 	// Scan the applied blocks for transactions that got accepted. This will
 	// help to determine which transactions to remove from the transaction
 	// pool. Having this list enables both efficiency improvements and helps to
@@ -120,6 +83,20 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Purge the transaction pool. Some of the transactions sets may be invalid
 	// after the consensus change.
 	tp.purge()
+
+	// prune transactions older than maxTxnAge.
+	for i, tSet := range unconfirmedSets {
+		var validTxns []types.Transaction
+		for _, txn := range tSet {
+			seenHeight, seen := tp.transactionHeights[txn.ID()]
+			if tp.blockHeight-seenHeight <= maxTxnAge || !seen {
+				validTxns = append(validTxns, txn)
+			} else {
+				delete(tp.transactionHeights, txn.ID())
+			}
+		}
+		unconfirmedSets[i] = validTxns
+	}
 
 	// Scan through the reverted blocks and re-add any transactions that got
 	// reverted to the tpool.
