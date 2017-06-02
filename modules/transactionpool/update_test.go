@@ -126,8 +126,9 @@ func TestValidRevertedTransaction(t *testing.T) {
 	// verify the transaction pool still has the reorged txns
 	for _, txnSet := range txnSets {
 		for _, txn := range txnSet {
-			if !tpt.tpool.transactionConfirmed(tpt.tpool.dbTx, txn.ID()) {
-				t.Error("tpt did not have a valid reorged transaction:", txn.ID())
+			_, _, exists := tpt.tpool.Transaction(txn.ID())
+			if !exists {
+				t.Error("Transaction was not re-added to the transaction pool after being re-orged out of the blockchain:", txn.ID())
 			}
 		}
 	}

@@ -52,22 +52,6 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 
-	// Scan through the reverted blocks and try to add each transaction in the
-	// block to the transactionSet. If the add succeeds, add the transaction back
-	// to the transaction pool.
-	for _, block := range cc.RevertedBlocks {
-		for _, txn := range block.Transactions {
-			err = tp.acceptTransactionSet([]types.Transaction{txn}, cc.TryTransactionSet)
-			if err == nil {
-				txids[txn.ID()] = struct{}{}
-				err = tp.addTransaction(tp.dbTx, txn.ID())
-				if err != nil {
-					tp.log.Println("ERROR: could not add a transaction:", err)
-				}
-			}
-		}
-	}
-
 	// Save all of the current unconfirmed transaction sets into a list.
 	var unconfirmedSets [][]types.Transaction
 	for _, tSet := range tp.transactionSets {
@@ -89,6 +73,23 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Purge the transaction pool. Some of the transactions sets may be invalid
 	// after the consensus change.
 	tp.purge()
+
+	// Scan through the reverted blocks and re-add any transactions that got
+	// reverted to the tpool.
+	for i := len(cc.RevertedBlocks) - 1; i >= 0; i-- {
+		block := cc.RevertedBlocks[i]
+		for _, txn := range block.Transactions {
+			// Check whether this transaction has already be re-added to the
+			// consensus set by the applied blocks.
+			_, exists := txids[txn.ID()]
+			if exists {
+				continue
+			}
+
+			// Try adding the transaction back into the transaction pool.
+			tp.acceptTransactionSet([]types.Transaction{txn}, cc.TryTransactionSet) // Error is ignored.
+		}
+	}
 
 	// Add all of the unconfirmed transaction sets back to the transaction
 	// pool. The ones that are invalid will throw an error and will not be
