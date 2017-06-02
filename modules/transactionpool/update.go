@@ -52,21 +52,6 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 
-	// TODO: Right now, transactions that were reverted to not get saved and
-	// retried, because some transactions such as storage proofs might be
-	// illegal, and there's no good way to preserve dependencies when illegal
-	// transactions are suddenly involved.
-	//
-	// One potential solution is to have modules manually do resubmission if
-	// something goes wrong. Another is to have the transaction pool remember
-	// recent transaction sets on the off chance that they become valid again
-	// due to a reorg.
-	//
-	// Another option is to scan through the blocks transactions one at a time
-	// check if they are valid. If so, lump them in a set with the next guy.
-	// When they stop being valid, you've found a guy to throw away. It's n^2
-	// in the number of transactions in the block.
-
 	// Save all of the current unconfirmed transaction sets into a list.
 	var unconfirmedSets [][]types.Transaction
 	for _, tSet := range tp.transactionSets {
@@ -89,6 +74,23 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// after the consensus change.
 	tp.purge()
 
+	// Scan through the reverted blocks and re-add any transactions that got
+	// reverted to the tpool.
+	for i := len(cc.RevertedBlocks) - 1; i >= 0; i-- {
+		block := cc.RevertedBlocks[i]
+		for _, txn := range block.Transactions {
+			// Check whether this transaction has already be re-added to the
+			// consensus set by the applied blocks.
+			_, exists := txids[txn.ID()]
+			if exists {
+				continue
+			}
+
+			// Try adding the transaction back into the transaction pool.
+			tp.acceptTransactionSet([]types.Transaction{txn}, cc.TryTransactionSet) // Error is ignored.
+		}
+	}
+
 	// Add all of the unconfirmed transaction sets back to the transaction
 	// pool. The ones that are invalid will throw an error and will not be
 	// re-added.
@@ -104,7 +106,9 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// processing consensus changes. Overall, the locking is pretty fragile and
 	// more rules need to be put in place.
 	for _, set := range unconfirmedSets {
-		tp.acceptTransactionSet(set, cc.TryTransactionSet) // Error is not checked.
+		for _, txn := range set {
+			tp.acceptTransactionSet([]types.Transaction{txn}, cc.TryTransactionSet) // Error is not checked.
+		}
 	}
 
 	// Inform subscribers that an update has executed.

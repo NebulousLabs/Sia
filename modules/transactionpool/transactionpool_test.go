@@ -28,9 +28,9 @@ type tpoolTester struct {
 	persistDir string
 }
 
-// createTpoolTester returns a ready-to-use tpool tester, with all modules
-// initialized.
-func createTpoolTester(name string) (*tpoolTester, error) {
+// blankTpoolTester returns a ready-to-use tpool tester, with all modules
+// initialized, without mining a block.
+func blankTpoolTester(name string) (*tpoolTester, error) {
 	// Initialize the modules.
 	testdir := build.TempDir(modules.TransactionPoolDir, name)
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
@@ -65,7 +65,7 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 	}
 
 	// Assemble all of the objects into a tpoolTester
-	tpt := &tpoolTester{
+	return &tpoolTester{
 		cs:        cs,
 		gateway:   g,
 		tpool:     tp,
@@ -74,6 +74,15 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 		walletKey: key,
 
 		persistDir: testdir,
+	}, nil
+}
+
+// createTpoolTester returns a ready-to-use tpool tester, with all modules
+// initialized.
+func createTpoolTester(name string) (*tpoolTester, error) {
+	tpt, err := blankTpoolTester(name)
+	if err != nil {
+		return nil, err
 	}
 
 	// Mine blocks until there is money in the wallet.
