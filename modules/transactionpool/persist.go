@@ -163,13 +163,15 @@ func (tp *TransactionPool) initPersist() error {
 	}
 
 	// Get the most recent block height
-	_, err = tp.getBlockHeight(tp.dbTx)
+	bh, err := tp.getBlockHeight(tp.dbTx)
 	if err != nil {
 		err = tp.putBlockHeight(tp.dbTx, types.BlockHeight(0))
 		if err != nil {
 			return build.ExtendErr("unable to initialize the block height in the tpool", err)
 		}
 		err = tp.putRecentConsensusChange(tp.dbTx, modules.ConsensusChangeBeginning)
+	} else {
+		tp.blockHeight = bh
 	}
 	if err != nil {
 		return build.ExtendErr("unable to initialize the block height in the tpool", err)
@@ -210,6 +212,7 @@ func (tp *TransactionPool) getBlockHeight(tx *bolt.Tx) (bh types.BlockHeight, er
 
 // putBlockHeight updates the transaction pool's block height.
 func (tp *TransactionPool) putBlockHeight(tx *bolt.Tx, height types.BlockHeight) error {
+	tp.blockHeight = height
 	return tx.Bucket(bucketBlockHeight).Put(fieldBlockHeight, encoding.Marshal(height))
 }
 

@@ -25,14 +25,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Update the database of confirmed transactions.
 	for _, block := range cc.RevertedBlocks {
-		blockHeight, err := tp.getBlockHeight(tp.dbTx)
-		if err != nil {
-			tp.log.Println("ERROR: could not get block height:", err)
-		}
-		err = tp.putBlockHeight(tp.dbTx, blockHeight-1)
-		if err != nil {
-			tp.log.Println("ERROR: could not put block height:", err)
-		}
+		tp.blockHeight--
 		for _, txn := range block.Transactions {
 			err := tp.deleteTransaction(tp.dbTx, txn.ID())
 			if err != nil {
@@ -41,14 +34,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 	for _, block := range cc.AppliedBlocks {
-		blockHeight, err := tp.getBlockHeight(tp.dbTx)
-		if err != nil {
-			tp.log.Println("ERROR: could not get block height:", err)
-		}
-		err = tp.putBlockHeight(tp.dbTx, blockHeight+1)
-		if err != nil {
-			tp.log.Println("ERROR: could not put block height:", err)
-		}
+		tp.blockHeight++
 		for _, txn := range block.Transactions {
 			err := tp.addTransaction(tp.dbTx, txn.ID())
 			if err != nil {
@@ -60,15 +46,15 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if err != nil {
 		tp.log.Println("ERROR: could not update the recent consensus change:", err)
 	}
+	err = tp.putBlockHeight(tp.dbTx, tp.blockHeight)
+	if err != nil {
+		tp.log.Println("ERROR: could not update the block height:", err)
+	}
 
 	// prune transactions older than maxTxnAge.
 	pruneTxns := make(map[types.TransactionID]struct{})
-	blockHeight, err := tp.getBlockHeight(tp.dbTx)
-	if err != nil {
-		tp.log.Println("ERROR: could not get block height: err")
-	}
 	for txid, seenHeight := range tp.transactionHeights {
-		if blockHeight-seenHeight > maxTxnAge {
+		if tp.blockHeight-seenHeight > maxTxnAge {
 			delete(tp.transactionHeights, txid)
 			pruneTxns[txid] = struct{}{}
 		}
