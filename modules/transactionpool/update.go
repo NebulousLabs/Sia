@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -24,7 +25,14 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Update the database of confirmed transactions.
 	for _, block := range cc.RevertedBlocks {
-		tp.blockHeight--
+		blockHeight, err := tp.getBlockHeight(tp.dbTx)
+		if err != nil {
+			tp.log.Println("ERROR: could not get block height:", err)
+		}
+		err = tp.putBlockHeight(tp.dbTx, blockHeight-1)
+		if err != nil {
+			tp.log.Println("ERROR: could not put block height:", err)
+		}
 		for _, txn := range block.Transactions {
 			err := tp.deleteTransaction(tp.dbTx, txn.ID())
 			if err != nil {
@@ -33,7 +41,14 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 	for _, block := range cc.AppliedBlocks {
-		tp.blockHeight++
+		blockHeight, err := tp.getBlockHeight(tp.dbTx)
+		if err != nil {
+			tp.log.Println("ERROR: could not get block height:", err)
+		}
+		err = tp.putBlockHeight(tp.dbTx, blockHeight+1)
+		if err != nil {
+			tp.log.Println("ERROR: could not put block height:", err)
+		}
 		for _, txn := range block.Transactions {
 			err := tp.addTransaction(tp.dbTx, txn.ID())
 			if err != nil {
@@ -48,8 +63,12 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// prune transactions older than maxTxnAge.
 	pruneTxns := make(map[types.TransactionID]struct{})
+	blockHeight, err := tp.getBlockHeight(tp.dbTx)
+	if err != nil {
+		tp.log.Println("ERROR: could not get block height: err")
+	}
 	for txid, seenHeight := range tp.transactionHeights {
-		if tp.blockHeight-seenHeight > maxTxnAge {
+		if blockHeight-seenHeight > maxTxnAge {
 			delete(tp.transactionHeights, txid)
 			pruneTxns[txid] = struct{}{}
 		}
@@ -63,9 +82,21 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 		}
 		tp.transactionSets[id] = validTxns
-		tp.trasactionListSize -= len(encoding.Marshal(tSet)) - len(encoding.Marshal(validTxns))
+		tp.transactionListSize -= len(encoding.Marshal(tSet)) - len(encoding.Marshal(validTxns))
 		if len(validTxns) == 0 {
 			delete(tp.transactionSets, id)
+			setDiffs, exists := tp.transactionSetDiffs[id]
+			if exists {
+				for _, diff := range setDiffs.SiacoinOutputDiffs {
+					delete(tp.knownObjects, ObjectID(diff.ID))
+				}
+				for _, diff := range setDiffs.FileContractDiffs {
+					delete(tp.knownObjects, ObjectID(diff.ID))
+				}
+				for _, diff := range setDiffs.SiafundOutputDiffs {
+					delete(tp.knownObjects, ObjectID(diff.ID))
+				}
+			}
 			delete(tp.transactionSetDiffs, id)
 		}
 	}

@@ -311,9 +311,13 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 	tp.transactionSetDiffs[setID] = cc
 	tsetSize := len(encoding.Marshal(ts))
 	tp.transactionListSize += tsetSize
+	blockHeight, err := tp.getBlockHeight(tp.dbTx)
+	if err != nil {
+		return err
+	}
 	for _, txn := range ts {
 		if _, exists := tp.transactionHeights[txn.ID()]; !exists {
-			tp.transactionHeights[txn.ID()] = tp.blockHeight
+			tp.transactionHeights[txn.ID()] = blockHeight
 		}
 	}
 

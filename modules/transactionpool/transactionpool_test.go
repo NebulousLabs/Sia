@@ -105,8 +105,7 @@ func (tpt *tpoolTester) Close() error {
 		tpt.gateway.Close(),
 		tpt.tpool.Close(),
 		tpt.miner.Close(),
-		// TODO: implement modules.Wallet.Close()
-		// tpt.wallet.Close()
+		tpt.wallet.Close(),
 	}
 	if err := build.JoinErrors(errs, "; "); err != nil {
 		panic(err)

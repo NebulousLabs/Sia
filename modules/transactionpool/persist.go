@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
@@ -22,6 +23,10 @@ var (
 	// by the transaction pool.
 	bucketRecentConsensusChange = []byte("RecentConsensusChange")
 
+	// bucketBlockHeight holds the most recent block height seen by the
+	// transaction pool.
+	bucketBlockHeight = []byte("BlockHeight")
+
 	// bucketConfirmedTransactions holds the ids of every transaction that has
 	// been confirmed on the blockchain.
 	bucketConfirmedTransactions = []byte("ConfirmedTransactions")
@@ -33,6 +38,10 @@ var (
 	// fieldRecentConsensusChange is the field in bucketRecentConsensusChange
 	// that holds the value of the most recent consensus change.
 	fieldRecentConsensusChange = []byte("RecentConsensusChange")
+
+	// fieldBlockHeight is the field in bucketBlockHeight that holds the value of
+	// the most recent block height.
+	fieldBlockHeight = []byte("BlockHeight")
 )
 
 // threadedRegularSync will make sure that sync gets called on the database
@@ -73,6 +82,10 @@ func (tp *TransactionPool) resetDB(tx *bolt.Tx) error {
 		return err
 	}
 	err = tp.putRecentConsensusChange(tx, modules.ConsensusChangeBeginning)
+	if err != nil {
+		return err
+	}
+	err = tp.putBlockHeight(tx, types.BlockHeight(0))
 	if err != nil {
 		return err
 	}
@@ -129,6 +142,7 @@ func (tp *TransactionPool) initPersist() error {
 	var cc modules.ConsensusChangeID
 	// Create the database buckets.
 	buckets := [][]byte{
+		bucketBlockHeight,
 		bucketRecentConsensusChange,
 		bucketConfirmedTransactions,
 	}
@@ -146,6 +160,19 @@ func (tp *TransactionPool) initPersist() error {
 	}
 	if err != nil {
 		return build.ExtendErr("unable to initialize the recent consensus change in the tpool", err)
+	}
+
+	// Get the most recent block height
+	_, err = tp.getBlockHeight(tp.dbTx)
+	if err != nil {
+		err = tp.putBlockHeight(tp.dbTx, types.BlockHeight(0))
+		if err != nil {
+			return build.ExtendErr("unable to initialize the block height in the tpool", err)
+		}
+		err = tp.putRecentConsensusChange(tp.dbTx, modules.ConsensusChangeBeginning)
+	}
+	if err != nil {
+		return build.ExtendErr("unable to initialize the block height in the tpool", err)
 	}
 
 	// Subscribe to the consensus set using the most recent consensus change.
@@ -173,6 +200,17 @@ func (tp *TransactionPool) initPersist() error {
 		tp.consensusSet.Unsubscribe(tp)
 	})
 	return nil
+}
+
+// getBlockHeight returns the most recent block height from the database.
+func (tp *TransactionPool) getBlockHeight(tx *bolt.Tx) (bh types.BlockHeight, err error) {
+	err = encoding.Unmarshal(tx.Bucket(bucketBlockHeight).Get(fieldBlockHeight), &bh)
+	return
+}
+
+// putBlockHeight updates the transaction pool's block height.
+func (tp *TransactionPool) putBlockHeight(tx *bolt.Tx, height types.BlockHeight) error {
+	return tx.Bucket(bucketBlockHeight).Put(fieldBlockHeight, encoding.Marshal(height))
 }
 
 // getRecentConsensusChange returns the most recent consensus change from the

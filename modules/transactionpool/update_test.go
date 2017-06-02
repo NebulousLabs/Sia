@@ -180,7 +180,7 @@ func TestTransactionPoolPruning(t *testing.T) {
 	// disconnect tpt, create an unconfirmed transaction on tpt, mine maxTxnAge
 	// blocks on tpt2 and reconnect. The unconfirmed transactions should be
 	// removed from tpt's pool.
-	err = tpt2.gateway.Disconnect(tpt.gateway.Address())
+	err = tpt.gateway.Disconnect(tpt2.gateway.Address())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,5 +219,14 @@ func TestTransactionPoolPruning(t *testing.T) {
 	}
 	if len(tpt.tpool.TransactionList()) != 0 {
 		t.Fatal("should have no unconfirmed transactions")
+	}
+	if len(tpt.tpool.knownObjects) != 0 {
+		t.Fatal("should have no known objects")
+	}
+	if len(tpt.tpool.transactionSetDiffs) != 0 {
+		t.Fatal("should have no transaction set diffs")
+	}
+	if tpt.tpool.transactionListSize != 0 {
+		t.Fatal("transactionListSize should be zero")
 	}
 }
