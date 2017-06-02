@@ -142,3 +142,82 @@ func TestValidRevertedTransaction(t *testing.T) {
 		t.Error("Does not seem that the transactions were added to the transaction pool.")
 	}
 }
+
+// TestTransactionPoolPruning verifies that the transaction pool correctly
+// prunes transactions older than maxTxnAge.
+func TestTransactionPoolPruning(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	tpt, err := createTpoolTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpt.Close()
+	tpt2, err := blankTpoolTester(t.Name() + "-tpt2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpt2.Close()
+
+	// connect the testers and wait for them to have the same current block
+	err = tpt2.gateway.Connect(tpt.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	success := false
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(time.Millisecond * 100) {
+		if tpt.cs.CurrentBlock().ID() == tpt2.cs.CurrentBlock().ID() {
+			success = true
+			break
+		}
+	}
+	if !success {
+		t.Fatal("testers did not have the same block height after one minute")
+	}
+
+	// disconnect tpt, create an unconfirmed transaction on tpt, mine maxTxnAge
+	// blocks on tpt2 and reconnect. The unconfirmed transactions should be
+	// removed from tpt's pool.
+	err = tpt2.gateway.Disconnect(tpt.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	txns, err := tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(1000), types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := types.BlockHeight(0); i < maxTxnAge+1; i++ {
+		_, err = tpt2.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// reconnect the testers
+	err = tpt.gateway.Connect(tpt2.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	success = false
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(time.Millisecond * 100) {
+		if tpt.cs.CurrentBlock().ID() == tpt2.cs.CurrentBlock().ID() {
+			success = true
+			break
+		}
+	}
+	if !success {
+		t.Fatal("testers did not have the same block height after one minute")
+	}
+
+	for _, txn := range txns {
+		_, _, exists := tpt.tpool.Transaction(txn.ID())
+		if exists {
+			t.Fatal("transaction pool had a transaction that should have been pruned")
+		}
+	}
+	if len(tpt.tpool.TransactionList()) != 0 {
+		t.Fatal("should have no unconfirmed transactions")
+	}
+}

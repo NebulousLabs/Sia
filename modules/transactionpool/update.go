@@ -5,6 +5,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// maxTxnAge determines the maximum age of a transaction (in block height)
+// allowed before the transaction is pruned from the transaction pool.
+const maxTxnAge = types.BlockHeight(12)
+
 // purge removes all transactions from the transaction pool.
 func (tp *TransactionPool) purge() {
 	tp.knownObjects = make(map[ObjectID]TransactionSetID)
@@ -20,6 +24,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Update the database of confirmed transactions.
 	for _, block := range cc.RevertedBlocks {
+		tp.blockHeight--
 		for _, txn := range block.Transactions {
 			err := tp.deleteTransaction(tp.dbTx, txn.ID())
 			if err != nil {
@@ -28,6 +33,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 	for _, block := range cc.AppliedBlocks {
+		tp.blockHeight++
 		for _, txn := range block.Transactions {
 			err := tp.addTransaction(tp.dbTx, txn.ID())
 			if err != nil {
@@ -38,6 +44,30 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	err := tp.putRecentConsensusChange(tp.dbTx, cc.ID)
 	if err != nil {
 		tp.log.Println("ERROR: could not update the recent consensus change:", err)
+	}
+
+	// prune transactions older than maxTxnAge.
+	pruneTxns := make(map[types.TransactionID]struct{})
+	for txid, seenHeight := range tp.transactionHeights {
+		if tp.blockHeight-seenHeight > maxTxnAge {
+			delete(tp.transactionHeights, txid)
+			pruneTxns[txid] = struct{}{}
+		}
+	}
+	for id, tSet := range tp.transactionSets {
+		var validTxns []types.Transaction
+		for _, txn := range tSet {
+			_, shouldPrune := pruneTxns[txn.ID()]
+			if !shouldPrune {
+				validTxns = append(validTxns, txn)
+			}
+		}
+		tp.transactionSets[id] = validTxns
+		tp.trasactionListSize -= len(encoding.Marshal(tSet)) - len(encoding.Marshal(validTxns))
+		if len(validTxns) == 0 {
+			delete(tp.transactionSets, id)
+			delete(tp.transactionSetDiffs, id)
+		}
 	}
 
 	// Scan the applied blocks for transactions that got accepted. This will
