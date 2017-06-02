@@ -75,6 +75,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 	}
 	defer w.tg.Done()
 	if !w.unlocked {
+		w.log.Println("Attempt to send coins has failed - wallet is locked")
 		return nil, modules.ErrLockedWallet
 	}
 
@@ -88,16 +89,19 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 	txnBuilder := w.StartTransaction()
 	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
 	if err != nil {
+		w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
 		return nil, build.ExtendErr("unable to fund transaction", err)
 	}
 	txnBuilder.AddMinerFee(tpoolFee)
 	txnBuilder.AddSiacoinOutput(output)
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
+		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
 		return nil, build.ExtendErr("unable to sign transaction", err)
 	}
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
+		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
 		return nil, build.ExtendErr("unable to get transaction accepted", err)
 	}
 	w.log.Println("Submitted a siacoin transfer transaction set for value", amount.HumanString(), "with fees", tpoolFee.HumanString(), "IDs:")
