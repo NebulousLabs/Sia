@@ -132,4 +132,13 @@ func TestValidRevertedTransaction(t *testing.T) {
 			}
 		}
 	}
+
+	// Try to get the transactoins into a block.
+	_, err = tpt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tpt.tpool.TransactionList()) != 0 {
+		t.Error("Does not seem that the transactions were added to the transaction pool.")
+	}
 }
