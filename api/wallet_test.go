@@ -155,7 +155,7 @@ func TestWalletChangePasswordDeep(t *testing.T) {
 
 		// mine blocks until the send is confirmed
 		originalBalance := wg.ConfirmedSiacoinBalance
-		for {
+		for i := 0; i < 5; i++ {
 			b, err := st.miner.AddBlock()
 			if err != nil {
 				t.Fatal(err)
@@ -170,6 +170,9 @@ func TestWalletChangePasswordDeep(t *testing.T) {
 			if wg.ConfirmedSiacoinBalance.Cmp(originalBalance) > 0 {
 				break
 			}
+		}
+		if wg.ConfirmedSiacoinBalance.Cmp(originalBalance) <= 0 {
+			t.Fatal("siacoins send failed")
 		}
 	}
 	for _, wallet := range wallets[1:4] {
