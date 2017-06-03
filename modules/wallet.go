@@ -383,6 +383,10 @@ type (
 		// are also returned to the caller.
 		SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
 
+		// SendSiacoinsMulti sends coins to multiple addresses. The number of
+		// amounts and destinations must match.
+		SendSiacoinsMulti(amounts []types.Currency, dests []types.UnlockHash) ([]types.Transaction, error)
+
 		// SendSiafunds is a tool for sending siafunds from the wallet to an
 		// address. Sending money usually results in multiple transactions. The
 		// transactions are automatically given to the transaction pool, and

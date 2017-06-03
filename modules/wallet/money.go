@@ -1,6 +1,8 @@
 package wallet
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -107,6 +109,58 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 	w.log.Println("Submitted a siacoin transfer transaction set for value", amount.HumanString(), "with fees", tpoolFee.HumanString(), "IDs:")
 	for _, txn := range txnSet {
 		w.log.Println("\t", txn.ID())
+	}
+	return txnSet, nil
+}
+
+// SendSiacoinsMulti creates a transaction sending each amount in 'amounts' to
+// it's corresponding destination in 'dests'. The transaction is submitted to
+// the transaction pool and is also returned.
+func (w *Wallet) SendSiacoinsMulti(amounts []types.Currency, dests []types.UnlockHash) ([]types.Transaction, error) {
+	if err := w.tg.Add(); err != nil {
+		return nil, err
+	}
+	defer w.tg.Done()
+	if !w.unlocked {
+		w.log.Println("Attempt to send coins has failed - wallet is locked")
+		return nil, modules.ErrLockedWallet
+	}
+	if len(amounts) != len(dests) {
+		return nil, errors.New("number of amounts and destinations must match")
+	}
+
+	txnBuilder := w.StartTransaction()
+
+	// Add estimated transaction fee
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750 * uint64(len(dests))) // Estimated transaction size in bytes
+	txnBuilder.AddMinerFee(tpoolFee)
+	err := txnBuilder.FundSiacoins(tpoolFee)
+	if err != nil {
+		return nil, build.ExtendErr("unable to fund transaction", err)
+	}
+
+	for i := range dests {
+		err := txnBuilder.FundSiacoins(amounts[i])
+		if err != nil {
+			w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
+			return nil, build.ExtendErr("unable to fund transaction", err)
+		}
+		txnBuilder.AddSiacoinOutput(types.SiacoinOutput{
+			Value:      amounts[i],
+			UnlockHash: dests[i],
+		})
+	}
+
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
+		return nil, build.ExtendErr("unable to sign transaction", err)
+	}
+	err = w.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
+		return nil, build.ExtendErr("unable to get transaction accepted", err)
 	}
 	return txnSet, nil
 }
