@@ -82,10 +82,6 @@ type TransactionPool interface {
 	// within 10 blocks.
 	FeeEstimation() (minimumRecommended, maximumRecommended types.Currency)
 
-	// IsStandardTransaction returns `err = nil` if the transaction is
-	// standard, otherwise it returns an error explaining what is not standard.
-	IsStandardTransaction(types.Transaction) error
-
 	// PurgeTransactionPool is a temporary function available to the miner. In
 	// the event that a miner mines an unacceptable block, the transaction pool
 	// will be purged to clear out the transaction pool and get rid of the
