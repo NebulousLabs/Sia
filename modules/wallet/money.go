@@ -131,21 +131,25 @@ func (w *Wallet) SendSiacoinsMulti(amounts []types.Currency, dests []types.Unloc
 
 	txnBuilder := w.StartTransaction()
 
-	// Add estimated transaction fee
+	// Add estimated transaction fee.
 	_, tpoolFee := w.tpool.FeeEstimation()
 	tpoolFee = tpoolFee.Mul64(750 * uint64(len(dests))) // Estimated transaction size in bytes
 	txnBuilder.AddMinerFee(tpoolFee)
-	err := txnBuilder.FundSiacoins(tpoolFee)
+
+	// Calculate total cost to wallet.
+	// NOTE: we only want to call FundSiacoins once; that way, it will
+	// (ideally) fund the entire transaction with a single input, instead of
+	// many smaller ones.
+	totalCost := tpoolFee
+	for _, amount := range amounts {
+		totalCost = totalCost.Add(amount)
+	}
+	err := txnBuilder.FundSiacoins(totalCost)
 	if err != nil {
 		return nil, build.ExtendErr("unable to fund transaction", err)
 	}
 
 	for i := range dests {
-		err := txnBuilder.FundSiacoins(amounts[i])
-		if err != nil {
-			w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
-			return nil, build.ExtendErr("unable to fund transaction", err)
-		}
 		txnBuilder.AddSiacoinOutput(types.SiacoinOutput{
 			Value:      amounts[i],
 			UnlockHash: dests[i],
