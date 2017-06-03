@@ -5,6 +5,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// maxTxnAge determines the maximum age of a transaction (in block height)
+// allowed before the transaction is pruned from the transaction pool.
+const maxTxnAge = types.BlockHeight(12)
+
 // purge removes all transactions from the transaction pool.
 func (tp *TransactionPool) purge() {
 	tp.knownObjects = make(map[ObjectID]TransactionSetID)
@@ -20,6 +24,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Update the database of confirmed transactions.
 	for _, block := range cc.RevertedBlocks {
+		tp.blockHeight--
 		for _, txn := range block.Transactions {
 			err := tp.deleteTransaction(tp.dbTx, txn.ID())
 			if err != nil {
@@ -28,6 +33,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 	for _, block := range cc.AppliedBlocks {
+		tp.blockHeight++
 		for _, txn := range block.Transactions {
 			err := tp.addTransaction(tp.dbTx, txn.ID())
 			if err != nil {
@@ -38,6 +44,10 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	err := tp.putRecentConsensusChange(tp.dbTx, cc.ID)
 	if err != nil {
 		tp.log.Println("ERROR: could not update the recent consensus change:", err)
+	}
+	err = tp.putBlockHeight(tp.dbTx, tp.blockHeight)
+	if err != nil {
+		tp.log.Println("ERROR: could not update the block height:", err)
 	}
 
 	// Scan the applied blocks for transactions that got accepted. This will
@@ -73,6 +83,20 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Purge the transaction pool. Some of the transactions sets may be invalid
 	// after the consensus change.
 	tp.purge()
+
+	// prune transactions older than maxTxnAge.
+	for i, tSet := range unconfirmedSets {
+		var validTxns []types.Transaction
+		for _, txn := range tSet {
+			seenHeight, seen := tp.transactionHeights[txn.ID()]
+			if tp.blockHeight-seenHeight <= maxTxnAge || !seen {
+				validTxns = append(validTxns, txn)
+			} else {
+				delete(tp.transactionHeights, txn.ID())
+			}
+		}
+		unconfirmedSets[i] = validTxns
+	}
 
 	// Scan through the reverted blocks and re-add any transactions that got
 	// reverted to the tpool.

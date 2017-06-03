@@ -56,9 +56,11 @@ type (
 		// transactionSetDiffs map form a transaction set id to the set of
 		// diffs that resulted from the transaction set.
 		knownObjects        map[ObjectID]TransactionSetID
+		transactionHeights  map[types.TransactionID]types.BlockHeight
 		transactionSets     map[TransactionSetID][]types.Transaction
 		transactionSetDiffs map[TransactionSetID]modules.ConsensusChange
 		transactionListSize int
+		blockHeight         types.BlockHeight
 		// TODO: Write a consistency check comparing transactionSets,
 		// transactionSetDiffs.
 		//
@@ -97,6 +99,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 		gateway:      g,
 
 		knownObjects:        make(map[ObjectID]TransactionSetID),
+		transactionHeights:  make(map[types.TransactionID]types.BlockHeight),
 		transactionSets:     make(map[TransactionSetID][]types.Transaction),
 		transactionSetDiffs: make(map[TransactionSetID]modules.ConsensusChange),
 
