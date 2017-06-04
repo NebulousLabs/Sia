@@ -1138,12 +1138,13 @@ dictionary
 #### /wallet/siacoins [POST]
 
 sends siacoins to an address. The outputs are arbitrarily selected from
-addresses in the wallet.
+addresses in the wallet. A custom fee may be supplied.
 
 ###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-6)
 ```
 amount      // hastings
 destination // address
+fee         // Optional, hastings
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-5)
@@ -1171,6 +1172,7 @@ while still letting you control the siafunds).
 ```
 amount      // siafunds
 destination // address
+fee         // Optional, hastings
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-6)

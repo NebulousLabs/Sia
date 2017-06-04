@@ -123,9 +123,7 @@ By default the wallet encryption / unlock password is the same as the generated 
 		Short: "Send siacoins to an address",
 		Long: `Send siacoins to an address. 'dest' must be a 76-byte hexadecimal address.
 'amount' can be specified in units, e.g. 1.23KS. Run 'wallet --help' for a list of units.
-If no unit is supplied, hastings will be assumed.
-
-A miner fee of 10 SC is levied on all transactions.`,
+If no unit is supplied, hastings will be assumed.`,
 		Run: wrap(walletsendsiacoinscmd),
 	}
 
@@ -351,7 +349,7 @@ func walletsendsiacoinscmd(amount, dest string) {
 	if err != nil {
 		die("Could not parse amount:", err)
 	}
-	err = post("/wallet/siacoins", fmt.Sprintf("amount=%s&destination=%s", hastings, dest))
+	err = post("/wallet/siacoins", fmt.Sprintf("amount=%s&destination=%s&fee=%s", hastings, dest, walletTxnFee))
 	if err != nil {
 		die("Could not send siacoins:", err)
 	}
@@ -360,7 +358,7 @@ func walletsendsiacoinscmd(amount, dest string) {
 
 // walletsendsiafundscmd sends siafunds to a destination address.
 func walletsendsiafundscmd(amount, dest string) {
-	err := post("/wallet/siafunds", fmt.Sprintf("amount=%s&destination=%s", amount, dest))
+	err := post("/wallet/siafunds", fmt.Sprintf("amount=%s&destination=%s&fee=%s", amount, dest, walletTxnFee))
 	if err != nil {
 		die("Could not send siafunds:", err)
 	}

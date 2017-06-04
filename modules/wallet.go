@@ -383,11 +383,19 @@ type (
 		// are also returned to the caller.
 		SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
 
+		// SendSiacoinsFee behaves like SendSiacoins, but with a custom
+		// transaction fee.
+		SendSiacoinsFee(amount, fee types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
+
 		// SendSiafunds is a tool for sending siafunds from the wallet to an
 		// address. Sending money usually results in multiple transactions. The
 		// transactions are automatically given to the transaction pool, and
 		// are also returned to the caller.
 		SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
+
+		// SendSiafundsFee behaves like SendSiafunds, but with a custom
+		// transaction fee.
+		SendSiafundsFee(amount, fee types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
 	}
 )
 

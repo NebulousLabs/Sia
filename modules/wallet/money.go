@@ -70,6 +70,15 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 // SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
+	return w.SendSiacoinsFee(amount, tpoolFee, dest)
+}
+
+// SendSiacoinsFee creates a transaction sending 'amount' to 'dest', with 'fee'
+// paid to the miner that includes the transaction in a block. The transaction
+// is submitted to the transaction pool and is also returned.
+func (w *Wallet) SendSiacoinsFee(amount, fee types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
@@ -79,21 +88,17 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 		return nil, modules.ErrLockedWallet
 	}
 
-	_, tpoolFee := w.tpool.FeeEstimation()
-	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
-	output := types.SiacoinOutput{
-		Value:      amount,
-		UnlockHash: dest,
-	}
-
 	txnBuilder := w.StartTransaction()
-	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
+	err := txnBuilder.FundSiacoins(amount.Add(fee))
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
 		return nil, build.ExtendErr("unable to fund transaction", err)
 	}
-	txnBuilder.AddMinerFee(tpoolFee)
-	txnBuilder.AddSiacoinOutput(output)
+	txnBuilder.AddMinerFee(fee)
+	txnBuilder.AddSiacoinOutput(types.SiacoinOutput{
+		Value:      amount,
+		UnlockHash: dest,
+	})
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
@@ -114,6 +119,16 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 // SendSiafunds creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
+	tpoolFee = tpoolFee.Mul64(5)   // use large fee to ensure siafund transactions are selected by miners
+	return w.SendSiafundsFee(amount, tpoolFee, dest)
+}
+
+// SendSiafundsFee creates a transaction sending 'amount' to 'dest', with 'fee'
+// paid to the miner that includes the transaction in a block. The transaction
+// is submitted to the transaction pool and is also returned.
+func (w *Wallet) SendSiafundsFee(amount, fee types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
@@ -122,25 +137,16 @@ func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]t
 		return nil, modules.ErrLockedWallet
 	}
 
-	_, tpoolFee := w.tpool.FeeEstimation()
-	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
-	tpoolFee = tpoolFee.Mul64(5)   // use large fee to ensure siafund transactions are selected by miners
-	output := types.SiafundOutput{
+	txnBuilder := w.StartTransaction()
+	err := txnBuilder.FundSiacoins(amount.Add(fee))
+	if err != nil {
+		return nil, err
+	}
+	txnBuilder.AddMinerFee(fee)
+	txnBuilder.AddSiafundOutput(types.SiafundOutput{
 		Value:      amount,
 		UnlockHash: dest,
-	}
-
-	txnBuilder := w.StartTransaction()
-	err := txnBuilder.FundSiacoins(tpoolFee)
-	if err != nil {
-		return nil, err
-	}
-	err = txnBuilder.FundSiafunds(amount)
-	if err != nil {
-		return nil, err
-	}
-	txnBuilder.AddMinerFee(tpoolFee)
-	txnBuilder.AddSiafundOutput(output)
+	})
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		return nil, err
