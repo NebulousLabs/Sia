@@ -225,7 +225,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			scoid := scod.ID
 			sco := scod.SiacoinOutput
 
-			if scod.Direction == true {
+			if scod.Direction == modules.DiffApply {
 				dbAddSiacoinOutput(tx, scoid, sco)
 			}
 		}
@@ -235,7 +235,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			sfoid := sfod.ID
 			sfo := sfod.SiafundOutput
 
-			if sfod.Direction == true {
+			if sfod.Direction == modules.DiffApply {
 				dbAddSiafundOutput(tx, sfoid, sfo)
 			}
 		}
