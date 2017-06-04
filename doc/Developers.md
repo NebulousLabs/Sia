@@ -9,7 +9,7 @@ environment, you are set to build the project. If you plan on cross compiling
 Sia, you may need to install Go from source. You can find information on that
 [here](http://golang.org/doc/install/source).
 
-Sia has has a development build, an automated testing build, and a release
+Sia has a development build, an automated testing build, and a release
 build. The release build is the only one that can synchronize to the full
 network. To get the release build, it is usually sufficient to run `go get -u
 github.com/NebulousLabs/Sia/...`. This will download Sia and its dependencies
