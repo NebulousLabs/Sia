@@ -42,7 +42,7 @@ import (
 // accepted as valid by the consnensus set, but rejected by the transaction
 // pool. This allows new types of keys to be added via a softfork without
 // alienating all of the older nodes.
-func (tp *TransactionPool) checkUnlockConditions(uc types.UnlockConditions) error {
+func checkUnlockConditions(uc types.UnlockConditions) error {
 	for _, pk := range uc.PublicKeys {
 		if pk.Algorithm != types.SignatureEntropy &&
 			pk.Algorithm != types.SignatureEd25519 {
@@ -53,12 +53,12 @@ func (tp *TransactionPool) checkUnlockConditions(uc types.UnlockConditions) erro
 	return nil
 }
 
-// IsStandardTransaction enforces extra rules such as a transaction size limit.
+// isStandardTransaction enforces extra rules such as a transaction size limit.
 // These rules can be altered without disrupting consensus.
 //
 // The size of the transaction is returned so that the transaction does not need
 // to be encoded multiple times.
-func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (uint64, error) {
+func isStandardTransaction(t types.Transaction) (uint64, error) {
 	// Check that the size of the transaction does not exceed the standard
 	// established in Standard.md. Larger transactions are a DOS vector,
 	// because someone can fill a large transaction with a bunch of signatures
@@ -77,19 +77,19 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (uint64, e
 	// may make certain unrecognized signatures invalid, and this node cannot
 	// tell which signatures are the invalid ones.
 	for _, sci := range t.SiacoinInputs {
-		err := tp.checkUnlockConditions(sci.UnlockConditions)
+		err := checkUnlockConditions(sci.UnlockConditions)
 		if err != nil {
 			return 0, err
 		}
 	}
 	for _, fcr := range t.FileContractRevisions {
-		err := tp.checkUnlockConditions(fcr.UnlockConditions)
+		err := checkUnlockConditions(fcr.UnlockConditions)
 		if err != nil {
 			return 0, err
 		}
 	}
 	for _, sfi := range t.SiafundInputs {
-		err := tp.checkUnlockConditions(sfi.UnlockConditions)
+		err := checkUnlockConditions(sfi.UnlockConditions)
 		if err != nil {
 			return 0, err
 		}
@@ -114,18 +114,18 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (uint64, e
 	return uint64(tlen), nil
 }
 
-// IsStandardTransactionSet checks that all transacitons of a set follow the
+// isStandardTransactionSet checks that all transacitons of a set follow the
 // IsStandard guidelines, and that the set as a whole follows the guidelines as
 // well.
 //
 // The size of the transaction set is returned so that the encoding only needs
 // to happen once.
-func (tp *TransactionPool) IsStandardTransactionSet(ts []types.Transaction) (uint64, error) {
+func isStandardTransactionSet(ts []types.Transaction) (uint64, error) {
 	// Check that each transaction is acceptable, while also making sure that
 	// the size of the whole set is legal.
 	var totalSize uint64
 	for i := range ts {
-		tSize, err := tp.IsStandardTransaction(ts[i])
+		tSize, err := isStandardTransaction(ts[i])
 		if err != nil {
 			return 0, err
 		}

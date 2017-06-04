@@ -127,7 +127,7 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 	// fly.
 
 	// Check that all transactions follow 'Standard.md' guidelines.
-	setSize, err := tp.IsStandardTransactionSet(ts)
+	setSize, err := isStandardTransactionSet(ts)
 	if err != nil {
 		return 0, err
 	}
