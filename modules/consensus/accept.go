@@ -259,6 +259,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 						cs.managedBroadcastBlock(b)
 					}()
 				}
+				return err
 			}
 
 			// Try adding the block to the block tree. This call will perform
