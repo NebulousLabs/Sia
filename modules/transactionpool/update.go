@@ -135,7 +135,12 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// more rules need to be put in place.
 	for _, set := range unconfirmedSets {
 		for _, txn := range set {
-			tp.acceptTransactionSet([]types.Transaction{txn}, cc.TryTransactionSet) // Error is not checked.
+			err := tp.acceptTransactionSet([]types.Transaction{txn}, cc.TryTransactionSet)
+			if err != nil {
+				// The transaction is no longer valid, delete it from the
+				// heights map to prevent a memory leak.
+				delete(tp.transactionHeights, txn.ID())
+			}
 		}
 	}
 
