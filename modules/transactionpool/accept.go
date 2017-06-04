@@ -6,6 +6,7 @@ package transactionpool
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -98,13 +99,8 @@ func (tp *TransactionPool) requiredFeesToExtendTpool() types.Currency {
 	}
 
 	// Calculate the fee required to bump out the size of the transaction pool.
-	numer := TransactionPoolSizeTarget
-	denom := tp.transactionListSize
-	for i := 1; i < TransactionPoolExponentiation; i++ {
-		numer *= TransactionPoolSizeTarget
-		denom *= tp.transactionListSize
-	}
-	feeFactor := float64(numer) / float64(denom)
+	ratioToTarget := float64(tp.transactionListSize) / TransactionPoolSizeTarget
+	feeFactor := math.Pow(ratioToTarget, TransactionPoolExponentiation)
 	return types.SiacoinPrecision.MulFloat(feeFactor).Div64(1000)
 }
 
