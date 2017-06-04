@@ -187,11 +187,12 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 		}
 
 		// Integrate the blocks into the consensus set.
-		for _, block := range newBlocks {
+		if len(newBlocks) > 0 {
 			stalled = false
+
 			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
 			// every block.
-			acceptErr := cs.managedAcceptBlock(block)
+			acceptErr := cs.managedAcceptBlocks(newBlocks)
 			// Set a flag to indicate that we should broadcast the last block received.
 			if acceptErr == nil {
 				chainExtended = true
