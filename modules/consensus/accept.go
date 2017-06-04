@@ -208,9 +208,9 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (ce changeEntry, err error
 // consecutive calls to AcceptBlock with each successive call accepting the
 // child block of the previous call.
 func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
-	// Grab a lock on the consensus set. Lock is demoted later in the function,
-	// failure to unlock before returning an error will cause a deadlock.
+	// Grab a lock on the consensus set.
 	cs.mu.Lock()
+	defer cs.mu.Unlock()
 
 	// Start verification inside of a bolt View tx.
 	err := cs.db.View(func(tx *bolt.Tx) error {
@@ -255,7 +255,6 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 		return nil
 	})
 	if err != nil {
-		cs.mu.Unlock()
 		return err
 	}
 
@@ -265,7 +264,6 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	// the longest fork.
 	changeEntry, err := cs.addBlockToTree(b)
 	if err != nil {
-		cs.mu.Unlock()
 		return err
 	}
 	// If appliedBlocks is 0, revertedBlocks will also be 0.
@@ -277,7 +275,6 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	if len(changeEntry.AppliedBlocks) > 0 {
 		cs.readlockUpdateSubscribers(changeEntry)
 	}
-	cs.mu.Unlock()
 	return nil
 }
 
