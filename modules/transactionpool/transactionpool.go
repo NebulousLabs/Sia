@@ -129,18 +129,50 @@ func (tp *TransactionPool) Close() error {
 // FeeEstimation returns an estimation for what fee should be applied to
 // transactions.
 func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
-	// TODO: The fee estimation tool should look at the recent blocks and use
-	// them to gauge what sort of fee should be required, as opposed to just
-	// guessing blindly.
+	err := tp.tg.Add()
+	if err != nil {
+		return
+	}
+	defer tp.tg.Done()
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	// Use three methods to determine an acceptable fee, and then take the
+	// largest result of the two methods. The first method checks the historic
+	// blocks, to make sure that we don't under-estimate the number of fees
+	// needed in the event that we just purged the tpool.
 	//
-	// TODO: The current minimum has been reduced significantly to account for
-	// legacy renters that are not correctly adding transaction fees. The
-	// minimum has been set to 1 siacoin per kb (or 1/1000 SC per byte), but
-	// really should look more like 10 SC per kb. But, legacy renters are using
-	// a much lower value, which means hosts would be incompatible if the
-	// minimum recommended were set to 10. The value has been set to 1, which
-	// should be okay temporarily while the renters are given time to upgrade.
-	return types.SiacoinPrecision.Mul64(1).Div64(20).Div64(1e3), types.SiacoinPrecision.Mul64(1).Div64(1e3) // TODO: Adjust down once miners have upgraded.
+	// The second method looks at the existing tpool. Sudden congestion won't be
+	// represented on the blockchain right away, but should be immediately
+	// influencing how you set fees. Using the current tpool fullness will help
+	// pick appropriate fees in the event of sudden congestion.
+	//
+	// The third method just has hardcoded minimums as a sanity check. In the
+	// event of empty blocks, there should still be some fees being added to the
+	// chain.
+
+	// TODO: Implement the blockchain method.
+
+	// Method two: use 'requiredFeesToExtendPool'.
+	required := tp.requiredFeesToExtendTpool()
+	requiredMin := required.MulFloat(1.2) // Clear the local requirement by a little bit.
+	requiredMax := required.MulFloat(3)   // Clear the local requirement by a lot.
+	if min.Cmp(requiredMin) < 0 {
+		min = requiredMin
+	}
+	if max.Cmp(requiredMax) < 0 {
+		max = requiredMax
+	}
+
+	// Method three: sane mimimums.
+	if min.Cmp(TpoolSaneMinFee) < 0 {
+		min = TpoolSaneMinFee
+	}
+	if max.Cmp(TpoolSaneMinFee.Mul64(3)) < 0 {
+		max = TpoolSaneMinFee.Mul64(3)
+	}
+
+	return
 }
 
 // TransactionList returns a list of all transactions in the transaction pool.
