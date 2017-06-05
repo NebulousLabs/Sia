@@ -127,6 +127,15 @@ func TestIntegrationCheckMinerFees(t *testing.T) {
 	}
 	defer tpt.Close()
 
+	// Recommended fees at this point should be the minimum.
+	minRec, maxRec := tpt.tpool.FeeEstimation()
+	if minRec.Cmp(TpoolSaneMinFee) < 0 {
+		t.Error("transaction pool is not respecting the sane fee minimum")
+	}
+	if maxRec.Cmp(TpoolSaneMinFee.Mul64(3)) < 0 {
+		t.Error("transaction pool is not respecting the sane fee min maximum")
+	}
+
 	// Fill the transaction pool to the fee limit.
 	for i := 0; i < TransactionPoolSizeForFee/10e3; i++ {
 		arbData := make([]byte, 10e3)
@@ -151,7 +160,76 @@ func TestIntegrationCheckMinerFees(t *testing.T) {
 		t.Error(err)
 	}
 
+	// TODO: Fill the transaction pool to the target.
+
 	// TODO: fill the pool up all the way and try again.
+}
+
+// TestTransactionGraph checks that the TransactionGraph method of the types
+// package is able to create transasctions that actually validate and can get
+// inserted into the tpool.
+func TestTransactionGraph(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// Create a transaction pool tester.
+	tpt, err := createTpoolTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpt.Close()
+
+	// Create a transaction sending money to an output that TransactionGraph can
+	// spent (the empty UnlockConditions).
+	txns, err := tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), types.UnlockConditions{}.UnlockHash())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the output of that transaction.
+	graphSourceOutputID := txns[len(txns)-1].SiacoinOutputID(0)
+	graphTxns, err := types.TransactionGraph(graphSourceOutputID, []int{0}, []int{1}, []types.Currency{types.SiacoinPrecision.Mul64(90)}, []types.Currency{types.SiacoinPrecision.Mul64(10)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(graphTxns)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestTransactionGraphDiamond checks that the TransactionGraph method of the
+// types package is able to create transasctions that actually validate and can
+// get inserted into the tpool.
+func TestTransactionGraphDiamond(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// Create a transaction pool tester.
+	tpt, err := createTpoolTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpt.Close()
+
+	// Create a transaction sending money to an output that TransactionGraph can
+	// spent (the empty UnlockConditions).
+	txns, err := tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), types.UnlockConditions{}.UnlockHash())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the output of that transaction.
+	sp := types.SiacoinPrecision
+	graphSourceOutputID := txns[len(txns)-1].SiacoinOutputID(0)
+	graphTxns, err := types.TransactionGraph(graphSourceOutputID, []int{0, 0, 1, 2}, []int{1, 2, 3, 3}, []types.Currency{sp.Mul64(40), sp.Mul64(40), sp.Mul64(30), sp.Mul64(30)}, []types.Currency{sp.Mul64(10), sp.Mul64(10), sp.Mul64(10), sp.Mul64(10)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(graphTxns)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestTransactionSuperset submits a single transaction to the network,
