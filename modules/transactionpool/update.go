@@ -24,7 +24,9 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Update the database of confirmed transactions.
 	for _, block := range cc.RevertedBlocks {
-		tp.blockHeight--
+		if tp.blockHeight > 0 || block.ID() != types.GenesisID {
+			tp.blockHeight--
+		}
 		for _, txn := range block.Transactions {
 			err := tp.deleteTransaction(tp.dbTx, txn.ID())
 			if err != nil {
@@ -33,7 +35,9 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 	for _, block := range cc.AppliedBlocks {
-		tp.blockHeight++
+		if tp.blockHeight > 0 || block.ID() != types.GenesisID {
+			tp.blockHeight++
+		}
 		for _, txn := range block.Transactions {
 			err := tp.addTransaction(tp.dbTx, txn.ID())
 			if err != nil {

@@ -230,3 +230,28 @@ func TestTransactionPoolPruning(t *testing.T) {
 		t.Fatal("transactionListSize should be zero")
 	}
 }
+
+// TestUpdateBlockHeight verifies that the transactionpool updates its internal
+// block height correctly.
+func TestUpdateBlockHeight(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	tpt, err := blankTpoolTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpt.Close()
+
+	targetHeight := 20
+	for i := 0; i < targetHeight; i++ {
+		_, err = tpt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if tpt.tpool.blockHeight != types.BlockHeight(targetHeight) {
+		t.Fatalf("transaction pool had the wrong block height, got %v wanted %v\n", tpt.tpool.blockHeight, targetHeight)
+	}
+}
