@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1435,5 +1436,82 @@ func TestWalletChangePassword(t *testing.T) {
 	// Check that the wallet actually unlocked.
 	if !st2.wallet.Unlocked() {
 		t.Error("wallet is not unlocked")
+	}
+}
+
+// TestWalletSiacoins tests the /wallet/siacoins endpoint, including sending
+// to multiple addresses.
+func TestWalletSiacoins(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	st2, err := blankServerTester(t.Name() + "-wallet2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.server.Close()
+
+	st3, err := blankServerTester(t.Name() + "-wallet3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st3.server.Close()
+
+	st4, err := blankServerTester(t.Name() + "-wallet4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st4.server.Close()
+
+	wallets := []*serverTester{st, st2, st3, st4}
+	err = fullyConnectNodes(wallets)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// send 10KS to each of the blank wallets
+	sendAmount := types.SiacoinPrecision.Mul64(10000)
+	var amounts, dests []string
+	for _, w := range wallets[1:] {
+		var wag WalletAddressGET
+		err = w.getAPI("/wallet/address", &wag)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dests = append(dests, wag.Address.String())
+		amounts = append(amounts, sendAmount.String())
+	}
+	sendSiacoinsValues := url.Values{}
+	sendSiacoinsValues.Set("amount", strings.Join(amounts, ","))
+	sendSiacoinsValues.Set("destination", strings.Join(dests, ","))
+	if err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues); err != nil {
+		t.Fatal(err)
+	}
+
+	// mine blocks until the send is confirmed
+	for i := 0; i < 5; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for i, w := range wallets[1:] {
+		var wg WalletGET
+		err = w.getAPI("/wallet", &wg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !wg.ConfirmedSiacoinBalance.Equals(sendAmount) {
+			t.Errorf("wallet %d should have %v coins, has %v", i+1, sendAmount, wg.ConfirmedSiacoinBalance)
+		}
 	}
 }
