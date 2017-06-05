@@ -314,20 +314,24 @@ dictionary
 
 #### /wallet/siacoins [POST]
 
-Function: Send siacoins to a set of addresses. The outputs are arbitrarily
-selected from addresses in the wallet. Each address is paired with an amount;
-the number of amounts must match the number of addresses. The number of pairs
-should not exceed 250; this may result in a transaction too large to fit in
-the transaction pool.
+Function: Send siacoins to an address or set of addresses. The outputs are
+arbitrarily selected from addresses in the wallet. If 'outputs' is supplied,
+'amount' and 'destination' must be empty. The number of outputs should not
+exceed 400; this may result in a transaction too large to fit in the
+transaction pool.
 
 ###### Query String Parameters
 ```
-// Comma-separated list of hastings being sent to each address. A hasting is
-// the smallest unit in Sia. There are 10^24 hastings in a siacoin.
+// Number of hastings being sent. A hasting is the smallest unit in Sia. There
+// are 10^24 hastings in a siacoin.
 amount      // hastings
 
-// Comma-separated list of addresses that are receiving coins.
+// Address that is receiving the coins.
 destination // address
+
+// JSON array of outputs. The structure of each output is:
+// {"unlockhash": "<destination>", "value": "<amount>"}
+outputs
 ```
 
 ###### JSON Response

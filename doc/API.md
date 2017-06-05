@@ -1177,14 +1177,15 @@ dictionary
 
 #### /wallet/siacoins [POST]
 
-sends siacoins to a set of addresses. The outputs are arbitrarily selected
-from addresses in the wallet. The number of amounts must match the number of
-destinations.
+sends siacoins to an address or set of addresses. The outputs are arbitrarily
+selected from addresses in the wallet. If 'outputs' is supplied, 'amount' and
+'destination' must be empty.
 
 ###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-6)
 ```
-amount      // list of hastings (comma separated)
-destination // list of addresses (comma separated)
+amount      // hastings
+destination // address
+outputs     // JSON array of {unlockhash, value} pairs
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-5)
