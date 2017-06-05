@@ -1503,6 +1503,8 @@ func TestWalletSiacoins(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// allow some time for blocks to propagate
+	time.Sleep(time.Second)
 
 	for i, w := range wallets[1:] {
 		var wg WalletGET
