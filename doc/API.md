@@ -89,8 +89,8 @@ Table of contents
 - [Host DB](#host-db)
 - [Miner](#miner)
 - [Renter](#renter)
-- [Wallet](#wallet)
 - [Transaction Pool](#transaction-pool)
+- [Wallet](#wallet)
 
 Daemon
 ------
@@ -941,6 +941,46 @@ standard success or error response. See
 [#standard-responses](#standard-responses).
 
 
+Transaction Pool
+------
+
+| Route                           | HTTP verb |
+| ------------------------------- | --------- |
+| [/tpool/raw/:id](#tpoolraw-get) | GET       |
+| [/tpool/raw](#tpoolraw-post)    | POST      |
+
+#### /tpool/raw/:id [GET]
+
+returns the ID for the requested transaction and its raw encoded parents and transaction data.
+
+###### JSON Response [(with comments)](/doc/api/Transactionpool.md#json-response)
+```javascript
+{
+	// id of the transaction
+	"id": "124302d30a219d52f368ecd94bae1bfb922a3e45b6c32dd7fb5891b863808788",
+
+	// raw, base64 encoded transaction data
+	"transaction": "AQAAAAAAAADBM1ca/FyURfizmSukoUQ2S0GwXMit1iNSeYgrnhXOPAAAAAAAAAAAAQAAAAAAAABlZDI1NTE5AAAAAAAAAAAAIAAAAAAAAACdfzoaJ1MBY7L0fwm7O+BoQlFkkbcab5YtULa6B9aecgEAAAAAAAAAAQAAAAAAAAAMAAAAAAAAAAM7Ljyf0IA86AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAACgAAAAAAAACe0ZTbGbI4wAAAAAAAAAAAAAABAAAAAAAAAMEzVxr8XJRF+LOZK6ShRDZLQbBcyK3WI1J5iCueFc48AAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAA+z4P1wc98IqKxykTSJxiVT+BVbWezIBnIBO1gRRlLq2x/A+jIc6G7/BA5YNJRbdnqPHrzsZvkCv4TKYd/XzwBA==",
+	"parents": "AQAAAAAAAAABAAAAAAAAAJYYmFUdXXfLQ2p6EpF+tcqM9M4Pw5SLSFHdYwjMDFCjAAAAAAAAAAABAAAAAAAAAGVkMjU1MTkAAAAAAAAAAAAgAAAAAAAAAAHONvdzzjHfHBx6psAN8Z1rEVgqKPZ+K6Bsqp3FbrfjAQAAAAAAAAACAAAAAAAAAAwAAAAAAAAAAzvNDjSrme8gwAAA4w8ODnW8DxbOV/JribivvTtjJ4iHVOug0SXJc31BdSINAAAAAAAAAAPGHY4699vggx5AAAC2qBhm5vwPaBsmwAVPho/1Pd8ecce/+BGv4UimnEPzPQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAACWGJhVHV13y0NqehKRfrXKjPTOD8OUi0hR3WMIzAxQowAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAABnt64wN1qxym/CfiMgOx5fg/imVIEhY+4IiiM7gwvSx8qtqKniOx50ekrGv8B+gTKDXpmm2iJibWTI9QLZHWAY=",
+}
+```
+
+#### /tpool/raw [POST]
+
+submits a raw transaction to the transaction pool, broadcasting it to the transaction pool's peers.
+
+###### Query String Parameters [(with comments)](/doc/api/Transactionpool.md#query-string-parameters)
+
+```
+parents     string // raw base64 encoded transaction parents
+transaction string // raw base64 encoded transaction
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+
 Wallet
 ------
 
@@ -1137,13 +1177,14 @@ dictionary
 
 #### /wallet/siacoins [POST]
 
-sends siacoins to an address. The outputs are arbitrarily selected from
-addresses in the wallet.
+sends siacoins to a set of addresses. The outputs are arbitrarily selected
+from addresses in the wallet. The number of amounts must match the number of
+destinations.
 
 ###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-6)
 ```
-amount      // hastings
-destination // address
+amount      // list of hastings (comma separated)
+destination // list of addresses (comma separated)
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-5)
@@ -1350,46 +1391,6 @@ changes the wallet's encryption key.
 ```
 encryptionpassword
 newpassword
-```
-
-###### Response
-standard success or error response. See
-[#standard-responses](#standard-responses).
-
-
-Transaction Pool
-------
-
-| Route                           | HTTP verb |
-| ------------------------------- | --------- |
-| [/tpool/raw/:id](#tpoolraw-get) | GET       |
-| [/tpool/raw](#tpoolraw-post)    | POST      |
-
-#### /tpool/raw/:id [GET]
-
-returns the ID for the requested transaction and its raw encoded parents and transaction data.
-
-###### JSON Response [(with comments)](/doc/api/Transactionpool.md#json-response)
-```javascript
-{
-	// id of the transaction
-	"id": "124302d30a219d52f368ecd94bae1bfb922a3e45b6c32dd7fb5891b863808788",
-
-	// raw, base64 encoded transaction data
-	"transaction": "AQAAAAAAAADBM1ca/FyURfizmSukoUQ2S0GwXMit1iNSeYgrnhXOPAAAAAAAAAAAAQAAAAAAAABlZDI1NTE5AAAAAAAAAAAAIAAAAAAAAACdfzoaJ1MBY7L0fwm7O+BoQlFkkbcab5YtULa6B9aecgEAAAAAAAAAAQAAAAAAAAAMAAAAAAAAAAM7Ljyf0IA86AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAACgAAAAAAAACe0ZTbGbI4wAAAAAAAAAAAAAABAAAAAAAAAMEzVxr8XJRF+LOZK6ShRDZLQbBcyK3WI1J5iCueFc48AAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAA+z4P1wc98IqKxykTSJxiVT+BVbWezIBnIBO1gRRlLq2x/A+jIc6G7/BA5YNJRbdnqPHrzsZvkCv4TKYd/XzwBA==",
-	"parents": "AQAAAAAAAAABAAAAAAAAAJYYmFUdXXfLQ2p6EpF+tcqM9M4Pw5SLSFHdYwjMDFCjAAAAAAAAAAABAAAAAAAAAGVkMjU1MTkAAAAAAAAAAAAgAAAAAAAAAAHONvdzzjHfHBx6psAN8Z1rEVgqKPZ+K6Bsqp3FbrfjAQAAAAAAAAACAAAAAAAAAAwAAAAAAAAAAzvNDjSrme8gwAAA4w8ODnW8DxbOV/JribivvTtjJ4iHVOug0SXJc31BdSINAAAAAAAAAAPGHY4699vggx5AAAC2qBhm5vwPaBsmwAVPho/1Pd8ecce/+BGv4UimnEPzPQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAACWGJhVHV13y0NqehKRfrXKjPTOD8OUi0hR3WMIzAxQowAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAABnt64wN1qxym/CfiMgOx5fg/imVIEhY+4IiiM7gwvSx8qtqKniOx50ekrGv8B+gTKDXpmm2iJibWTI9QLZHWAY=",
-}
-```
-
-#### /tpool/raw [POST]
-
-submits a raw transaction to the transaction pool, broadcasting it to the transaction pool's peers.
-
-###### Query String Parameters [(with comments)](/doc/api/Transactionpool.md#query-string-parameters)
-
-```
-parents     string // raw base64 encoded transaction parents
-transaction string // raw base64 encoded transaction
 ```
 
 ###### Response

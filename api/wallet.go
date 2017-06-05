@@ -367,22 +367,44 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 
 // walletSiacoinsHandler handles API calls to /wallet/siacoins.
 func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	amount, ok := scanAmount(req.FormValue("amount"))
-	if !ok {
-		WriteError(w, Error{"could not read 'amount' from POST call to /wallet/siacoins"}, http.StatusBadRequest)
-		return
+	amountStrs := strings.Split(req.FormValue("amount"), ",")
+	destStrs := strings.Split(req.FormValue("destination"), ",")
+	amounts := make([]types.Currency, len(amountStrs))
+	dests := make([]types.UnlockHash, len(destStrs))
+	for i, amountStr := range amountStrs {
+		var ok bool
+		amounts[i], ok = scanAmount(amountStr)
+		if !ok {
+			WriteError(w, Error{"could not read amount from POST call to /wallet/siacoins"}, http.StatusBadRequest)
+			return
+		}
 	}
-	dest, err := scanAddress(req.FormValue("destination"))
-	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusBadRequest)
-		return
+	var err error
+	for i, destStr := range destStrs {
+		dests[i], err = scanAddress(destStr)
+		if err != nil {
+			WriteError(w, Error{"could not read address from POST call to /wallet/siacoins"}, http.StatusBadRequest)
+			return
+		}
 	}
 
-	txns, err := api.wallet.SendSiacoins(amount, dest)
-	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
-		return
+	var txns []types.Transaction
+	if len(amounts) == 1 && len(dests) == 1 {
+		// single amount + destination
+		txns, err = api.wallet.SendSiacoins(amounts[0], dests[0])
+		if err != nil {
+			WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// multiple amounts + destinations
+		txns, err = api.wallet.SendSiacoinsMulti(amounts, dests)
+		if err != nil {
+			WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
+			return
+		}
 	}
+
 	var txids []types.TransactionID
 	for _, txn := range txns {
 		txids = append(txids, txn.ID())
