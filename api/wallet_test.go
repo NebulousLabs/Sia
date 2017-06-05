@@ -1,12 +1,12 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -1501,33 +1501,37 @@ func TestWalletSiacoins(t *testing.T) {
 		t.Fatal(err)
 	}
 	sendSiacoinsValues := url.Values{}
-	sendSiacoinsValues.Set("amount", sendAmount.String())
-	sendSiacoinsValues.Set("destination", wag.Address.String())
+	outputsJSON, _ := json.Marshal([]types.SiacoinOutput{{
+		UnlockHash: wag.Address,
+		Value:      sendAmount,
+	}})
+	sendSiacoinsValues.Set("outputs", string(outputsJSON))
 	if err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues); err != nil {
 		t.Fatal(err)
 	}
 
 	// Send 10KS to 3, 4, 5 in a single send.
-	var amounts, dests []string
+	var outputs []types.SiacoinOutput
 	for _, w := range wallets[2:5] {
 		var wag WalletAddressGET
 		err = w.getAPI("/wallet/address", &wag)
 		if err != nil {
 			t.Fatal(err)
 		}
-		amounts = append(amounts, sendAmount.String())
-		dests = append(dests, wag.Address.String())
+		outputs = append(outputs, types.SiacoinOutput{
+			UnlockHash: wag.Address,
+			Value:      sendAmount,
+		})
 	}
+	outputsJSON, _ = json.Marshal(outputs)
 	sendSiacoinsValues = url.Values{}
-	sendSiacoinsValues.Set("amount", strings.Join(amounts, ","))
-	sendSiacoinsValues.Set("destination", strings.Join(dests, ","))
+	sendSiacoinsValues.Set("outputs", string(outputsJSON))
 	if err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues); err != nil {
 		t.Fatal(err)
 	}
 
 	// Send 10KS to 6 through a joined 250 sends.
-	amounts = nil
-	dests = nil
+	outputs = nil
 	smallSend := sendAmount.Div64(250)
 	for i := 0; i < 250; i++ {
 		var wag WalletAddressGET
@@ -1535,12 +1539,14 @@ func TestWalletSiacoins(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		amounts = append(amounts, smallSend.String())
-		dests = append(dests, wag.Address.String())
+		outputs = append(outputs, types.SiacoinOutput{
+			UnlockHash: wag.Address,
+			Value:      smallSend,
+		})
 	}
+	outputsJSON, _ = json.Marshal(outputs)
 	sendSiacoinsValues = url.Values{}
-	sendSiacoinsValues.Set("amount", strings.Join(amounts, ","))
-	sendSiacoinsValues.Set("destination", strings.Join(dests, ","))
+	sendSiacoinsValues.Set("outputs", string(outputsJSON))
 	if err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues); err != nil {
 		t.Fatal(err)
 	}
