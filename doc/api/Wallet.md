@@ -317,7 +317,7 @@ dictionary
 Function: Send siacoins to an address or set of addresses. The outputs are
 arbitrarily selected from addresses in the wallet. If 'outputs' is supplied,
 'amount' and 'destination' must be empty. The number of outputs should not
-exceed 250; this may result in a transaction too large to fit in the
+exceed 400; this may result in a transaction too large to fit in the
 transaction pool.
 
 ###### Query String Parameters
