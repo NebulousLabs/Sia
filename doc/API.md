@@ -1,4 +1,4 @@
-Siad API
+Sia API
 ========
 
 Sia uses semantic versioning and is backwards compatible to version v1.0.0.
