@@ -8,9 +8,9 @@ import (
 	"github.com/NebulousLabs/fastrand"
 )
 
-// TestIntegrationAcceptTransactionSet probes the AcceptTransactionSet method
+// TestAcceptTransactionSet probes the AcceptTransactionSet method
 // of the transaction pool.
-func TestIntegrationAcceptTransactionSet(t *testing.T) {
+func TestAcceptTransactionSet(t *testing.T) {
 	// Create a transaction pool tester.
 	tpt, err := createTpoolTester(t.Name())
 	if err != nil {
@@ -55,10 +55,10 @@ func TestIntegrationAcceptTransactionSet(t *testing.T) {
 	}
 }
 
-// TestIntegrationConflictingTransactionSets tries to add two transaction sets
+// TestConflictingTransactionSets tries to add two transaction sets
 // to the transaction pool that are each legal individually, but double spend
 // an output.
-func TestIntegrationConflictingTransactionSets(t *testing.T) {
+func TestConflictingTransactionSets(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -114,9 +114,9 @@ func TestIntegrationConflictingTransactionSets(t *testing.T) {
 	}
 }
 
-// TestIntegrationCheckMinerFees probes the checkMinerFees method of the
+// TestCheckMinerFees probes the checkMinerFees method of the
 // transaction pool.
-func TestIntegrationCheckMinerFees(t *testing.T) {
+func TestCheckMinerFees(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -126,6 +126,29 @@ func TestIntegrationCheckMinerFees(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tpt.Close()
+
+	// Prepare a bunch of outputs for a series of graphs to fill up the
+	// transaction pool.
+	graphLens := 200                                                     // 40 kb per graph
+	numGraphs := (int(TransactionPoolSizeTarget) * 4 / 3) / (graphLens * 206) // 206 is the size of a single input-output graph txn.
+	graphFund := types.SiacoinPrecision.Mul64(1000)
+	var amounts []types.Currency
+	var dests []types.UnlockHash
+	for i := 0; i < numGraphs+1; i++ {
+		amounts = append(amounts, graphFund)
+		dests = append(dests, types.UnlockConditions{}.UnlockHash())
+	}
+	txns, err := tpt.wallet.SendSiacoinsMulti(amounts, dests)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Mine the graph setup in the consensus set so that the graph outputs are
+	// distinct transaction sets.
+	_, err = tpt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Recommended fees at this point should be the minimum.
 	minRec, maxRec := tpt.tpool.FeeEstimation()
@@ -155,14 +178,44 @@ func TestIntegrationCheckMinerFees(t *testing.T) {
 	}
 
 	// Add a transaction that has sufficient fees.
-	_, err = tpt.wallet.SendSiacoins(types.NewCurrency64(100), types.UnlockHash{})
+	_, err = tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(50), types.UnlockHash{})
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	// TODO: Fill the transaction pool to the target.
+	// Create all of the graphs.
+	finalTxn := txns[len(txns)-1]
+	for i := 0; i < numGraphs; i++ {
+		var sources, dests []int
+		var values, fees []types.Currency
+		for j := 0; j < graphLens; j++ {
+			sources = append(sources, j)
+			dests = append(dests, j+1)
+			values = append(values, graphFund.Sub(types.SiacoinPrecision.Mul64(uint64(j+1))))
+			fees = append(fees, types.SiacoinPrecision)
+		}
+		graph, err := types.TransactionGraph(finalTxn.SiacoinOutputID(uint64(i)), sources, dests, values, fees)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = tpt.tpool.AcceptTransactionSet(graph)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 
-	// TODO: fill the pool up all the way and try again.
+	// Try to submit a transaction with too few fees.
+	source := finalTxn.SiacoinOutputID(uint64(numGraphs))
+	lowFee := types.SiacoinPrecision.Div64(3)
+	remaining := types.SiacoinPrecision.Mul64(1000).Sub(lowFee)
+	lowFeeGraph, err := types.TransactionGraph(source, []int{0}, []int{1}, []types.Currency{remaining}, []types.Currency{lowFee})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(lowFeeGraph)
+	if err != errLowMinerFees {
+		t.Fatal(err)
+	}
 }
 
 // TestTransactionGraph checks that the TransactionGraph method of the types
@@ -191,6 +244,9 @@ func TestTransactionGraph(t *testing.T) {
 	graphTxns, err := types.TransactionGraph(graphSourceOutputID, []int{0}, []int{1}, []types.Currency{types.SiacoinPrecision.Mul64(90)}, []types.Currency{types.SiacoinPrecision.Mul64(10)})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(graphTxns) != 1 {
+		t.Fatal("wrong number of tranasctions produced")
 	}
 	err = tpt.tpool.AcceptTransactionSet(graphTxns)
 	if err != nil {
@@ -226,6 +282,9 @@ func TestTransactionGraphDiamond(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(graphTxns) != 3 {
+		t.Fatal("wrong number of tranasctions produced")
+	}
 	err = tpt.tpool.AcceptTransactionSet(graphTxns)
 	if err != nil {
 		t.Fatal(err)
@@ -234,7 +293,7 @@ func TestTransactionGraphDiamond(t *testing.T) {
 
 // TestTransactionSuperset submits a single transaction to the network,
 // followed by a transaction set containing that single transaction.
-func TestIntegrationTransactionSuperset(t *testing.T) {
+func TestTransactionSuperset(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -293,7 +352,7 @@ func TestIntegrationTransactionSuperset(t *testing.T) {
 
 // TestTransactionSubset submits a transaction set to the network, followed by
 // just a subset, expectint ErrDuplicateTransactionSet as a response.
-func TestIntegrationTransactionSubset(t *testing.T) {
+func TestTransactionSubset(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -338,9 +397,9 @@ func TestIntegrationTransactionSubset(t *testing.T) {
 	}
 }
 
-// TestIntegrationTransactionChild submits a single transaction to the network,
+// TestTransactionChild submits a single transaction to the network,
 // followed by a child transaction.
-func TestIntegrationTransactionChild(t *testing.T) {
+func TestTransactionChild(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -385,9 +444,9 @@ func TestIntegrationTransactionChild(t *testing.T) {
 	}
 }
 
-// TestIntegrationNilAccept tries submitting a nil transaction set and a 0-len
+// TestNilAccept tries submitting a nil transaction set and a 0-len
 // transaction set to the transaction pool.
-func TestIntegrationNilAccept(t *testing.T) {
+func TestNilAccept(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}

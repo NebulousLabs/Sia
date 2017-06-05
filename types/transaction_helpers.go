@@ -72,9 +72,9 @@ func TransactionGraph(sourceOutput SiacoinOutputID, sources []int, dests []int, 
 
 	// Go through the nodes bit by bit and create outputs.
 	// Fill out the outputs for the source.
-	j := 0
+	i, j := 0, 0
 	ts := make([]Transaction, sources[len(sources)-1]+1)
-	for i := 0; i < len(sources); i++ {
+	for i < len(sources) {
 		var t Transaction
 
 		// Grab the inputs for this transaction.
