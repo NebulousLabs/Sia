@@ -314,16 +314,17 @@ dictionary
 
 #### /wallet/siacoins [POST]
 
-Function: Send siacoins to an address. The outputs are arbitrarily selected
-from addresses in the wallet.
+Function: Send siacoins to a set of addresses. The outputs are arbitrarily
+selected from addresses in the wallet. Each address is paired with an amount;
+the number of amounts must match the number of addresses.
 
 ###### Query String Parameters
 ```
-// Number of hastings being sent. A hasting is the smallest unit in Sia. There
-// are 10^24 hastings in a siacoin.
+// Comma-separated list of hastings being sent to each address. A hasting is
+// the smallest unit in Sia. There are 10^24 hastings in a siacoin.
 amount      // hastings
 
-// Address that is receiving the coins.
+// Comma-separated list of addresses that are receiving coins.
 destination // address
 ```
 

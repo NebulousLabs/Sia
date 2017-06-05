@@ -1137,13 +1137,14 @@ dictionary
 
 #### /wallet/siacoins [POST]
 
-sends siacoins to an address. The outputs are arbitrarily selected from
-addresses in the wallet.
+sends siacoins to a set of addresses. The outputs are arbitrarily selected
+from addresses in the wallet. The number of amounts must match the number of
+destinations.
 
 ###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-6)
 ```
-amount      // hastings
-destination // address
+amount      // list of hastings (comma separated)
+destination // list of addresses (comma separated)
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-5)

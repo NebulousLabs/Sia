@@ -367,46 +367,37 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 
 // walletSiacoinsHandler handles API calls to /wallet/siacoins.
 func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	var txns []types.Transaction
-	if req.FormValue("destination") != "" {
-		// single amount + destination
-		amount, ok := scanAmount(req.FormValue("amount"))
+	amountStrs := strings.Split(req.FormValue("amount"), ",")
+	destStrs := strings.Split(req.FormValue("destination"), ",")
+	amounts := make([]types.Currency, len(amountStrs))
+	dests := make([]types.UnlockHash, len(destStrs))
+	for i, amountStr := range amountStrs {
+		var ok bool
+		amounts[i], ok = scanAmount(amountStr)
 		if !ok {
-			WriteError(w, Error{"could not read 'amount' from POST call to /wallet/siacoins"}, http.StatusBadRequest)
+			WriteError(w, Error{"could not read amount from POST call to /wallet/siacoins"}, http.StatusBadRequest)
 			return
 		}
-		dest, err := scanAddress(req.FormValue("destination"))
+	}
+	var err error
+	for i, destStr := range destStrs {
+		dests[i], err = scanAddress(destStr)
 		if err != nil {
-			WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"could not read address from POST call to /wallet/siacoins"}, http.StatusBadRequest)
 			return
 		}
-		txns, err = api.wallet.SendSiacoins(amount, dest)
+	}
+
+	var txns []types.Transaction
+	if len(amounts) == 1 && len(dests) == 1 {
+		// single amount + destination
+		txns, err = api.wallet.SendSiacoins(amounts[0], dests[0])
 		if err != nil {
 			WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 			return
 		}
 	} else {
 		// multiple amounts + destinations
-		amountStrs := strings.Split(req.FormValue("amounts"), ",")
-		destStrs := strings.Split(req.FormValue("destinations"), ",")
-		amounts := make([]types.Currency, len(amountStrs))
-		dests := make([]types.UnlockHash, len(destStrs))
-		for i, amountStr := range amountStrs {
-			var ok bool
-			amounts[i], ok = scanAmount(amountStr)
-			if !ok {
-				WriteError(w, Error{"could not read amount from POST call to /wallet/siacoins"}, http.StatusBadRequest)
-				return
-			}
-		}
-		var err error
-		for i, destStr := range destStrs {
-			dests[i], err = scanAddress(destStr)
-			if err != nil {
-				WriteError(w, Error{"could not read address from POST call to /wallet/siacoins"}, http.StatusBadRequest)
-				return
-			}
-		}
 		txns, err = api.wallet.SendSiacoinsMulti(amounts, dests)
 		if err != nil {
 			WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
