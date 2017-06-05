@@ -77,16 +77,32 @@ func processModules(modules string) (string, error) {
 	return modules, nil
 }
 
+// processProfiles checks that the flags given for profiling are valid
+func processProfile(profile string) (string, error) {
+	profile = strings.ToLower(profile)
+	validProfiles := "cmt"
+
+	invalidProfiles := profile
+	for _, p := range validProfiles {
+		invalidProfiles = strings.Replace(invalidProfiles, string(p), "", 1)
+	}
+	if len(invalidProfiles) > 0 {
+		return "", errors.New("Unable to parse --profile flags, unrecognized or duplicate flags: " + invalidProfiles)
+	}
+	return profile, nil
+}
+
 // processConfig checks the configuration values and performs cleanup on
 // incorrect-but-allowed values.
 func processConfig(config Config) (Config, error) {
-	var err1 error
+	var err1, err2 error
 	config.Siad.APIaddr = processNetAddr(config.Siad.APIaddr)
 	config.Siad.RPCaddr = processNetAddr(config.Siad.RPCaddr)
 	config.Siad.HostAddr = processNetAddr(config.Siad.HostAddr)
 	config.Siad.Modules, err1 = processModules(config.Siad.Modules)
-	err2 := verifyAPISecurity(config)
-	err := build.JoinErrors([]error{err1, err2}, ", and ")
+	config.Siad.Profile, err2 = processProfile(config.Siad.Profile)
+	err3 := verifyAPISecurity(config)
+	err := build.JoinErrors([]error{err1, err2, err3}, ", and ")
 	if err != nil {
 		return Config{}, err
 	}
@@ -300,11 +316,19 @@ func startDaemon(config Config) (err error) {
 
 // startDaemonCmd is a passthrough function for startDaemon.
 func startDaemonCmd(cmd *cobra.Command, _ []string) {
-	if globalConfig.Siad.Profile || build.DEBUG {
-		go profile.StartContinuousProfile(globalConfig.Siad.ProfileDir)
+	var profileCPU, profileMem, profileTrace bool
+
+	profileCPU = strings.Contains(globalConfig.Siad.Profile, "c")
+	profileMem = strings.Contains(globalConfig.Siad.Profile, "m")
+	profileTrace = strings.Contains(globalConfig.Siad.Profile, "t")
+
+	if build.DEBUG {
+		profileCPU = true
+		profileMem = true
 	}
-	if globalConfig.Siad.Trace {
-		go profile.StartContinuousTrace(globalConfig.Siad.TraceDir)
+
+	if profileCPU || profileMem || profileTrace {
+		go profile.StartContinuousProfile(globalConfig.Siad.ProfileDir, profileCPU, profileMem, profileTrace)
 	}
 
 	// Start siad. startDaemon will only return when it is shutting down.

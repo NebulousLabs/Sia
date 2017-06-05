@@ -34,7 +34,7 @@ func StartCPUProfile(profileDir, identifier string) error {
 	cpuLock.Lock()
 	if cpuActive {
 		cpuLock.Unlock()
-		return errors.New("cannot start cpu profilier, a profiler is already running")
+		return errors.New("cannot start cpu profiler, a profiler is already running")
 	}
 	cpuActive = true
 	cpuLock.Unlock()
@@ -148,20 +148,22 @@ func startContinuousLog(dir string, restart func()) {
 	}()
 }
 
-// StartContinuousProfiling will continuously print statistics about the cpu
-// usage, memory usage, and runtime stats of the program.
-func StartContinuousProfile(profileDir string) {
+// StartContinuousProfile will continuously print statistics about the cpu
+// usage, memory usage, and runtime stats of the program, and run an execution
+//logger. Select one (recommended) or more functionalities by passing the
+//corresponding flag(s)
+func StartContinuousProfile(profileDir string, profileCPU bool, profileMem bool, profileTrace bool) {
 	startContinuousLog(profileDir, func() {
-		StopCPUProfile()
-		SaveMemProfile(profileDir, "continuousProfilingMem")
-		StartCPUProfile(profileDir, "continuousProfilingCPU")
-	})
-}
-
-// StartContinuousTrace will continuously run execution logger.
-func StartContinuousTrace(traceDir string) {
-	startContinuousLog(traceDir, func() {
-		StopTrace()
-		StartTrace(traceDir, "continuousTrace")
+		if profileCPU {
+			StopCPUProfile()
+			StartCPUProfile(profileDir, "continuousProfileCPU")
+		}
+		if profileMem {
+			SaveMemProfile(profileDir, "continuousProfileMem")
+		}
+		if profileTrace {
+			StopTrace()
+			StartTrace(profileDir, "continuousProfileTrace")
+		}
 	})
 }
