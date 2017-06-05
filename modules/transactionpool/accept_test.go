@@ -129,16 +129,17 @@ func TestCheckMinerFees(t *testing.T) {
 
 	// Prepare a bunch of outputs for a series of graphs to fill up the
 	// transaction pool.
-	graphLens := 200                                                     // 40 kb per graph
+	graphLens := 200                                                          // 40 kb per graph
 	numGraphs := (int(TransactionPoolSizeTarget) * 4 / 3) / (graphLens * 206) // 206 is the size of a single input-output graph txn.
 	graphFund := types.SiacoinPrecision.Mul64(1000)
-	var amounts []types.Currency
-	var dests []types.UnlockHash
+	var outputs []types.SiacoinOutput
 	for i := 0; i < numGraphs+1; i++ {
-		amounts = append(amounts, graphFund)
-		dests = append(dests, types.UnlockConditions{}.UnlockHash())
+		outputs = append(outputs, types.SiacoinOutput{
+			UnlockHash: types.UnlockConditions{}.UnlockHash(),
+			Value:      graphFund,
+		})
 	}
-	txns, err := tpt.wallet.SendSiacoinsMulti(amounts, dests)
+	txns, err := tpt.wallet.SendSiacoinsMulti(outputs)
 	if err != nil {
 		t.Error(err)
 	}
@@ -186,15 +187,16 @@ func TestCheckMinerFees(t *testing.T) {
 	// Create all of the graphs.
 	finalTxn := txns[len(txns)-1]
 	for i := 0; i < numGraphs; i++ {
-		var sources, dests []int
-		var values, fees []types.Currency
+		var edges []types.TransactionGraphEdge
 		for j := 0; j < graphLens; j++ {
-			sources = append(sources, j)
-			dests = append(dests, j+1)
-			values = append(values, graphFund.Sub(types.SiacoinPrecision.Mul64(uint64(j+1))))
-			fees = append(fees, types.SiacoinPrecision)
+			edges = append(edges, types.TransactionGraphEdge{
+				Dest:   j + 1,
+				Fee:    types.SiacoinPrecision,
+				Source: j,
+				Value:  graphFund.Sub(types.SiacoinPrecision.Mul64(uint64(j + 1))),
+			})
 		}
-		graph, err := types.TransactionGraph(finalTxn.SiacoinOutputID(uint64(i)), sources, dests, values, fees)
+		graph, err := types.TransactionGraph(finalTxn.SiacoinOutputID(uint64(i)), edges)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -208,7 +210,13 @@ func TestCheckMinerFees(t *testing.T) {
 	source := finalTxn.SiacoinOutputID(uint64(numGraphs))
 	lowFee := types.SiacoinPrecision.Div64(3)
 	remaining := types.SiacoinPrecision.Mul64(1000).Sub(lowFee)
-	lowFeeGraph, err := types.TransactionGraph(source, []int{0}, []int{1}, []types.Currency{remaining}, []types.Currency{lowFee})
+	edge := types.TransactionGraphEdge{
+		Dest:   1,
+		Fee:    lowFee,
+		Source: 0,
+		Value:  remaining,
+	}
+	lowFeeGraph, err := types.TransactionGraph(source, []types.TransactionGraphEdge{edge})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +249,13 @@ func TestTransactionGraph(t *testing.T) {
 
 	// Get the output of that transaction.
 	graphSourceOutputID := txns[len(txns)-1].SiacoinOutputID(0)
-	graphTxns, err := types.TransactionGraph(graphSourceOutputID, []int{0}, []int{1}, []types.Currency{types.SiacoinPrecision.Mul64(90)}, []types.Currency{types.SiacoinPrecision.Mul64(10)})
+	edge := types.TransactionGraphEdge{
+		Dest:   1,
+		Fee:    types.SiacoinPrecision.Mul64(10),
+		Source: 0,
+		Value:  types.SiacoinPrecision.Mul64(90),
+	}
+	graphTxns, err := types.TransactionGraph(graphSourceOutputID, []types.TransactionGraphEdge{edge})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,9 +290,21 @@ func TestTransactionGraphDiamond(t *testing.T) {
 	}
 
 	// Get the output of that transaction.
-	sp := types.SiacoinPrecision
 	graphSourceOutputID := txns[len(txns)-1].SiacoinOutputID(0)
-	graphTxns, err := types.TransactionGraph(graphSourceOutputID, []int{0, 0, 1, 2}, []int{1, 2, 3, 3}, []types.Currency{sp.Mul64(40), sp.Mul64(40), sp.Mul64(30), sp.Mul64(30)}, []types.Currency{sp.Mul64(10), sp.Mul64(10), sp.Mul64(10), sp.Mul64(10)})
+	var edges []types.TransactionGraphEdge
+	sources := []int{0, 0, 1, 2}
+	dests := []int{1, 2, 3, 3}
+	values := []uint64{40, 40, 30, 30}
+	fees := []uint64{10, 10, 10, 10}
+	for i := range sources {
+		edges = append(edges, types.TransactionGraphEdge{
+			Dest:   dests[i],
+			Fee:    types.SiacoinPrecision.Mul64(fees[i]),
+			Source: sources[i],
+			Value:  types.SiacoinPrecision.Mul64(values[i]),
+		})
+	}
+	graphTxns, err := types.TransactionGraph(graphSourceOutputID, edges)
 	if err != nil {
 		t.Fatal(err)
 	}
