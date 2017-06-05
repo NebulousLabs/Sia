@@ -101,7 +101,7 @@ func (tp *TransactionPool) requiredFeesToExtendTpool() types.Currency {
 	// Calculate the fee required to bump out the size of the transaction pool.
 	ratioToTarget := float64(tp.transactionListSize) / TransactionPoolSizeTarget
 	feeFactor := math.Pow(ratioToTarget, TransactionPoolExponentiation)
-	return types.SiacoinPrecision.MulFloat(feeFactor).Div64(1000)
+	return types.SiacoinPrecision.MulFloat(feeFactor).Div64(1000) // Divide by 1000 to get SC / kb
 }
 
 // checkTransactionSetComposition checks if the transaction set is valid given
