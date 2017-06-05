@@ -7,6 +7,7 @@ package renter
 import (
 	"bytes"
 	"errors"
+	"math"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -38,6 +39,29 @@ var (
 		Dev:      int(10),
 		Testing:  int(5),
 	}).(int)
+
+	// maxActivePPCMultiplier determines the maximum of pieces downloaded
+	// concurrently per chunk, relative to the minimum number required.
+	// E.g. if the minimum is 10 pieces, as in 10-of-30 erasure coding,
+	// and multiplier value of 1.2, 12 pieces will be downloaded rather
+	// than 10.
+	// This is an effective measure to reduce latency, as chunk latency
+	// is the min( set( all piece latencies ) ).
+	maxActivePPCMultiplier = build.Select(build.Var{
+		Standard: float32(1.2),
+		Dev:      float32(1.2),
+		Testing:  float32(1.2),
+	}).(float32)
+
+	// numFastChunks determines how many pieces will be downloaded with
+	// maxActivePPCMultiplier. Once a downloaded file has numFastChunks
+	// remaining all chunks will use a higher number of concurrent piece
+	// downloads.
+	numFastChunks = build.Select(build.Var{
+		Standard: int(4),
+		Dev:      int(4),
+		Testing:  int(4),
+	}).(int)
 )
 
 type (
@@ -55,6 +79,10 @@ type (
 		// have tried to fetch a piece of the chunk.
 		completedPieces map[uint64][]byte
 		workerAttempts  map[types.FileContractID]bool
+
+		assignedPieceCount int // Tracks the number of pieces assigned to a worker.
+		maxPieceCount      int // Tracks the maximum number of pieces assigned to a worked.
+		minPieceCount      int // Tracks the minimum number of pieces required to recover the chunk.
 	}
 
 	// A download is a file download that has been queued by the renter.
@@ -80,7 +108,7 @@ type (
 		reportedPieceSize uint64
 		siapath           string
 
-		// Syncrhonization tools.
+		// Synchronization tools.
 		downloadFinished chan struct{}
 		mu               sync.Mutex
 	}
@@ -295,6 +323,24 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 			continue
 		}
 
+		// Calculate number of pieces to add to the download list.
+		// If the chunk's download speed should be sped up, the piece
+		// count will be raised above the minimum required.
+		// speedupchunk is true if it is the Nth last chunk where N is
+		// defined by `numFastChunks`.
+		speedupchunk := (d.numChunks - uint64(i)) <= uint64(numFastChunks)
+		var maxpieces = d.erasureCode.MinPieces()
+		if speedupchunk {
+			min := maxpieces
+			max := d.erasureCode.NumPieces()
+			n := int(math.Ceil(float64(min) * float64(maxActivePPCMultiplier)))
+			if n > max { // Cap the number of pieces downloaded at the total number of pieces.
+				n = max
+			}
+
+			maxpieces = n
+		}
+
 		// Add this chunk to the chunk queue.
 		cd := &chunkDownload{
 			download: d,
@@ -302,6 +348,10 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 
 			completedPieces: make(map[uint64][]byte),
 			workerAttempts:  make(map[types.FileContractID]bool),
+
+			assignedPieceCount: 0,
+			maxPieceCount:      maxpieces,
+			minPieceCount:      d.erasureCode.MinPieces(),
 		}
 		for fcid := range d.pieceSet[i] {
 			cd.workerAttempts[fcid] = false
@@ -367,7 +417,7 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 
 // managedScheduleIncompleteChunks iterates through all of the incomplete
 // chunks and finds workers to complete the chunks.
-// managedScheduleIncompleteChunks also checks wheter a chunk is unable to be
+// managedScheduleIncompleteChunks also checks whether a chunk is unable to be
 // completed.
 func (r *Renter) managedScheduleIncompleteChunks(ds *downloadState) {
 	var newIncompleteChunks []*chunkDownload
@@ -380,9 +430,8 @@ loop:
 		if downloadComplete {
 			// The download has most likely failed. No need to complete this
 			// chunk.
-			ds.activePieces--                                       // For the current incomplete chunk.
-			ds.activePieces -= len(incompleteChunk.completedPieces) // For all completed pieces.
-
+			ds.activePieces--
+			ds.activePieces -= incompleteChunk.assignedPieceCount
 			// Clear the set of completed pieces so that we do not
 			// over-subtract if the above code is run multiple times.
 			incompleteChunk.completedPieces = make(map[uint64][]byte)
@@ -421,6 +470,9 @@ loop:
 			default:
 				r.log.Critical("Download work not immediately received by worker")
 			}
+
+			incompleteChunk.assignedPieceCount++
+
 			continue loop
 		}
 
@@ -444,17 +496,24 @@ loop:
 		// or the active set is able to pick up the slack. Verify that they are
 		// safe to be scheduled, and then schedule them if so.
 
-		// Cannot find workers to complete this download, fail the download
-		// connected to this chunk.
-		r.log.Println("Not enough workers to finish download:", errInsufficientHosts)
-		incompleteChunk.download.fail(errInsufficientHosts)
+		// Failed to find a worker for the current piece, so check if the piece must be downloaded.
+		// In the event of sped up downloads there may already be enough pieces assigned to a worker,
+		// in which case the current piece download request should be dropped as no more hosts are
+		// available.
+		if incompleteChunk.assignedPieceCount < incompleteChunk.minPieceCount {
+			// Cannot find workers to complete this download, fail the download
+			// connected to this chunk.
+			r.log.Println("Not enough workers to finish download:", errInsufficientHosts)
+			incompleteChunk.download.fail(errInsufficientHosts)
 
-		// Clear out the piece burden for this chunk.
-		ds.activePieces--                                       // for the current incomplete chunk
-		ds.activePieces -= len(incompleteChunk.completedPieces) // for all completed pieces
-		// Clear the set of completed pieces so that we do not
-		// over-subtract if the above code is run multiple times.
-		incompleteChunk.completedPieces = make(map[uint64][]byte)
+			// Clear out the piece burden for this chunk.
+			ds.activePieces -= len(incompleteChunk.completedPieces) // for all completed pieces
+			// Clear the set of completed pieces so that we do not
+			// over-subtract if the above code is run multiple times.
+			incompleteChunk.completedPieces = make(map[uint64][]byte)
+		}
+
+		ds.activePieces-- // Current piece no longer active.
 	}
 	ds.incompleteChunks = newIncompleteChunks
 }
@@ -473,12 +532,16 @@ func (r *Renter) managedScheduleNewChunks(ds *downloadState) {
 		// View the next chunk.
 		nextChunk := r.chunkQueue[0]
 
+		availablePieces := maxActiveDownloadPieces - ds.activePieces
+
 		// Check whether there are enough resources to perform the download.
-		if ds.activePieces+nextChunk.download.erasureCode.MinPieces() > maxActiveDownloadPieces {
+		if availablePieces < nextChunk.minPieceCount {
 			// There is a limited amount of RAM available, and scheduling the
 			// next piece would consume too much RAM.
 			return
 		}
+
+		piecesToDownload := int(math.Min(float64(availablePieces), float64(nextChunk.maxPieceCount)))
 
 		// Chunk is set to be downloaded. Clear it from the queue.
 		r.chunkQueue = r.chunkQueue[1:]
@@ -494,10 +557,10 @@ func (r *Renter) managedScheduleNewChunks(ds *downloadState) {
 		}
 
 		// Add an incomplete chunk entry for every piece of the download.
-		for i := 0; i < nextChunk.download.erasureCode.MinPieces(); i++ {
+		for i := 0; i < piecesToDownload; i++ {
 			ds.incompleteChunks = append(ds.incompleteChunks, nextChunk)
 		}
-		ds.activePieces += nextChunk.download.erasureCode.MinPieces()
+		ds.activePieces += piecesToDownload
 	}
 }
 
@@ -549,8 +612,7 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	// If the chunk has completed, perform chunk recovery.
 	if len(cd.completedPieces) == cd.download.erasureCode.MinPieces() {
 		err := cd.recoverChunk()
-		ds.activePieces -= len(cd.completedPieces)
-		cd.completedPieces = make(map[uint64][]byte)
+		ds.activePieces -= cd.assignedPieceCount
 		if err != nil {
 			r.log.Println("Download failed - could not recover a chunk:", err)
 			cd.download.mu.Lock()
