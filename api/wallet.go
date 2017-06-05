@@ -371,6 +371,11 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 	var txns []types.Transaction
 	if req.FormValue("outputs") != "" {
 		// multiple amounts + destinations
+		if req.FormValue("amount") != "" || req.FormValue("destination") != "" {
+			WriteError(w, Error{"cannot supply both 'outputs' and single amount+destination pair"}, http.StatusInternalServerError)
+			return
+		}
+
 		var outputs []types.SiacoinOutput
 		err := json.Unmarshal([]byte(req.FormValue("outputs")), &outputs)
 		if err != nil {
