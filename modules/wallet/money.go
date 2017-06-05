@@ -133,7 +133,7 @@ func (w *Wallet) SendSiacoinsMulti(amounts []types.Currency, dests []types.Unloc
 
 	// Add estimated transaction fee.
 	_, tpoolFee := w.tpool.FeeEstimation()
-	tpoolFee = tpoolFee.Mul64(750 * uint64(len(dests))) // Estimated transaction size in bytes
+	tpoolFee = tpoolFee.Mul64(1000 + 60*uint64(len(dests))) // Estimated transaction size in bytes
 	txnBuilder.AddMinerFee(tpoolFee)
 
 	// Calculate total cost to wallet.

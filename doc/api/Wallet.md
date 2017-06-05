@@ -316,7 +316,9 @@ dictionary
 
 Function: Send siacoins to a set of addresses. The outputs are arbitrarily
 selected from addresses in the wallet. Each address is paired with an amount;
-the number of amounts must match the number of addresses.
+the number of amounts must match the number of addresses. The number of pairs
+should not exceed 250; this may result in a transaction too large to fit in
+the transaction pool.
 
 ###### Query String Parameters
 ```

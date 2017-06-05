@@ -1497,7 +1497,7 @@ func TestWalletSiacoins(t *testing.T) {
 	}
 
 	// mine blocks until the send is confirmed
-	for i := 0; i < 5; i++ {
+	for i := types.BlockHeight(0); i < types.MaturityDelay; i++ {
 		_, err := st.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -1511,7 +1511,7 @@ func TestWalletSiacoins(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !wg.ConfirmedSiacoinBalance.Equals(sendAmount) {
-			t.Errorf("wallet %d should have %v coins, has %v", i+1, sendAmount, wg.ConfirmedSiacoinBalance)
+			t.Errorf("wallet %d should have %v coins, has %v", i+2, sendAmount, wg.ConfirmedSiacoinBalance)
 		}
 	}
 }
