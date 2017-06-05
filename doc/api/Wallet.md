@@ -447,88 +447,84 @@ gets the transaction associated with a specific transaction id.
 ###### JSON Response
 ```javascript
 {
+  // Raw transaction. The rest of the fields in the response are determined
+  // from this raw transaction. It is left undocumented here as the processed
+  // transaction (the rest of the fields in this object) are usually what is
+  // desired.
   "transaction": {
-    // Raw transaction. The rest of the fields in the resposne are determined
-    // from this raw transaction. It is left undocumented here as the processed
-    // transaction (the rest of the fields in this object) are usually what is
-    // desired.
-    "transaction": {
-      // See types.Transaction in https://github.com/NebulousLabs/Sia/blob/master/types/transactions.go
-    },
+  },
 
-    // ID of the transaction from which the wallet transaction was derived.
-    "transactionid": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  // ID of the transaction from which the wallet transaction was derived.
+  "transactionid": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 
-    // Block height at which the transaction was confirmed. If the transaction
-    // is unconfirmed the height will be the max value of an unsigned 64-bit
-    // integer.
-    "confirmationheight": 50000,
+  // Block height at which the transaction was confirmed. If the transaction
+  // is unconfirmed the height will be the max value of an unsigned 64-bit
+  // integer.
+  "confirmationheight": 50000,
 
-    // Time, in unix time, at which a transaction was confirmed. If the
-    // transaction is unconfirmed the timestamp will be the max value of an
-    // unsigned 64-bit integer.
-    "confirmationtimestamp": 1257894000,
+  // Time, in unix time, at which a transaction was confirmed. If the
+  // transaction is unconfirmed the timestamp will be the max value of an
+  // unsigned 64-bit integer.
+  "confirmationtimestamp": 1257894000,
 
-    // Array of processed inputs detailing the inputs to the transaction.
-    "inputs": [
-      {
-        // The id of the output being spent.
-        "parentid": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  // Array of processed inputs detailing the inputs to the transaction.
+  "inputs": [
+    {
+      // The id of the output being spent.
+      "parentid": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 
-        // Type of fund represented by the input. Possible values are
-        // 'siacoin input' and 'siafund input'.
-        "fundtype": "siacoin input",
+      // Type of fund represented by the input. Possible values are
+      // 'siacoin input' and 'siafund input'.
+      "fundtype": "siacoin input",
 
-        // true if the address is owned by the wallet.
-        "walletaddress": false,
+      // true if the address is owned by the wallet.
+      "walletaddress": false,
 
-        // Address that is affected. For inputs (outgoing money), the related
-        // address is usually not important because the wallet arbitrarily
-        // selects which addresses will fund a transaction.
-        "relatedaddress": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      // Address that is affected. For inputs (outgoing money), the related
+      // address is usually not important because the wallet arbitrarily
+      // selects which addresses will fund a transaction.
+      "relatedaddress": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
 
-        // Amount of funds that have been moved in the input.
-        "value": "1234", // hastings or siafunds, depending on fundtype, big int
-      }
-    ],
-    // Array of processed outputs detailing the outputs of the transaction.
-    // Outputs related to file contracts are excluded.
-    "outputs": [
-      {
-        // The id of the output that was created.
-        "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      // Amount of funds that have been moved in the input.
+      "value": "1234", // hastings or siafunds, depending on fundtype, big int
+    }
+  ],
+  // Array of processed outputs detailing the outputs of the transaction.
+  // Outputs related to file contracts are excluded.
+  "outputs": [
+    {
+      // The id of the output that was created.
+      "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      // Type of fund is represented by the output. Possible values are
+      // 'siacoin output', 'siafund output', 'claim output', and 'miner
+      // payout'. Siacoin outputs and claim outputs both relate to siacoins.
+      // Siafund outputs relate to siafunds. Miner payouts point to siacoins
+      // that have been spent on a miner payout. Because the destination of
+      // the miner payout is determined by the block and not the transaction,
+      // the data 'maturityheight', 'walletaddress', and 'relatedaddress' are
+      // left blank.
+      "fundtype": "siacoin output",
 
-        // Type of fund is represented by the output. Possible values are
-        // 'siacoin output', 'siafund output', 'claim output', and 'miner
-        // payout'. Siacoin outputs and claim outputs both relate to siacoins.
-        // Siafund outputs relate to siafunds. Miner payouts point to siacoins
-        // that have been spent on a miner payout. Because the destination of
-        // the miner payout is determined by the block and not the transaction,
-        // the data 'maturityheight', 'walletaddress', and 'relatedaddress' are
-        // left blank.
-        "fundtype": "siacoin output",
+      // Block height the output becomes available to be spent. Siacoin
+      // outputs and siafund outputs mature immediately - their maturity
+      // height will always be the confirmation height of the transaction.
+      // Claim outputs cannot be spent until they have had 144 confirmations,
+      // thus the maturity height of a claim output will always be 144 larger
+      // than the confirmation height of the transaction.
+      "maturityheight": 50000,
 
-        // Block height the output becomes available to be spent. Siacoin
-        // outputs and siafund outputs mature immediately - their maturity
-        // height will always be the confirmation height of the transaction.
-        // Claim outputs cannot be spent until they have had 144 confirmations,
-        // thus the maturity height of a claim output will always be 144 larger
-        // than the confirmation height of the transaction.
-        "maturityheight": 50000,
+      // true if the address is owned by the wallet.
+      "walletaddress": false,
 
-        // true if the address is owned by the wallet.
-        "walletaddress": false,
+      // Address that is affected. For outputs (incoming money), the related
+      // address field can be used to determine who has sent money to the
+      // wallet.
+      "relatedaddress": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 
-        // Address that is affected. For outputs (incoming money), the related
-        // address field can be used to determine who has sent money to the
-        // wallet.
-        "relatedaddress": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-
-        // Amount of funds that have been moved in the output.
-        "value": "1234", // hastings or siafunds, depending on fundtype, big int
-      }
-    ]
-  }
+      // Amount of funds that have been moved in the output.
+      "value": "1234", // hastings or siafunds, depending on fundtype, big int
+    }
+  ]
 }
 ```
 
