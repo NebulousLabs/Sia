@@ -137,14 +137,11 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
 //
-// addBlockToTree must use its own database update because it might need to
-// modify the database while returning an error on the block. To prevent error
-// tracking complexity, the error is handled inside the function so that 'nil'
-// can be appropriately returned by the database and the transaction can be
-// committed. Switching to a managed tx through bolt will make this complexity
+// addBlockToTree might need to modify the database while returning an error
+// on the block. Such errors are handled outside of the transaction by the
+// caller. Switching to a managed tx through bolt will make this complexity
 // unneeded.
 func (cs *ConsensusSet) addBlockToTree(tx *bolt.Tx, b types.Block) (ce changeEntry, err error) {
-	var nonExtending bool
 	err = func() error {
 		pb, err := getBlockMap(tx, b.ParentID)
 		if build.DEBUG && err != nil {
@@ -152,14 +149,8 @@ func (cs *ConsensusSet) addBlockToTree(tx *bolt.Tx, b types.Block) (ce changeEnt
 		}
 		currentNode := currentProcessedBlock(tx)
 		newNode := cs.newChild(tx, pb, b)
-
-		// modules.ErrNonExtendingBlock should be returned if the block does
-		// not extend the current blockchain, however the changes from newChild
-		// should be committed (which means 'nil' must be returned). A flag is
-		// set to indicate that modules.ErrNonExtending should be returned.
-		nonExtending = !newNode.heavierThan(currentNode)
-		if nonExtending {
-			return nil
+		if !newNode.heavierThan(currentNode) {
+			return modules.ErrNonExtendingBlock
 		}
 		var revertedBlocks, appliedBlocks []*processedBlock
 		revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, newNode)
@@ -190,9 +181,6 @@ func (cs *ConsensusSet) addBlockToTree(tx *bolt.Tx, b types.Block) (ce changeEnt
 	if err != nil {
 		return changeEntry{}, err
 	}
-	if nonExtending {
-		return changeEntry{}, modules.ErrNonExtendingBlock
-	}
 	return ce, nil
 }
 
@@ -220,6 +208,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	}
 
 	var changes changeEntry
+	var nonExtending bool
 
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		// Do not accept a block if the database is inconsistent.
@@ -267,7 +256,16 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 			// error is returned if verification fails or if the block does not extend
 			// the longest fork.
 			changeEntry, err := cs.addBlockToTree(tx, b)
-			if err != nil {
+
+			// modules.ErrNonExtendingBlock should be returned if the block does
+			// not extend the current blockchain, however the changes from
+			// addBlockToTree should be committed (which means 'nil' must
+			// be returned). A flag is set to indicate that modules.ErrNonExtending
+			// should be returned.
+			if err == modules.ErrNonExtendingBlock {
+				nonExtending = true
+				return nil
+			} else if err != nil {
 				return err
 			}
 			// If appliedBlocks is 0, revertedBlocks will also be 0.
@@ -281,6 +279,9 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	})
 	if err != nil {
 		return err
+	}
+	if nonExtending {
+		return modules.ErrNonExtendingBlock
 	}
 
 	// Updates complete, demote the lock.
