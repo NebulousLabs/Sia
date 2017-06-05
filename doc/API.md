@@ -1242,32 +1242,29 @@ gets the transaction associated with a specific transaction id.
 ```javascript
 {
   "transaction": {
-    "transaction": {
-      // See types.Transaction in https://github.com/NebulousLabs/Sia/blob/master/types/transactions.go
-    },
-    "transactionid":         "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "confirmationheight":    50000,
-    "confirmationtimestamp": 1257894000,
-    "inputs": [
-      {
-        "parentid":       "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-        "fundtype":       "siacoin input",
-        "walletaddress":  false,
-        "relatedaddress": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
-        "value":          "1234", // hastings or siafunds, depending on fundtype, big int
-      }
-    ],
-    "outputs": [
-      {
-        "id":             "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-        "fundtype":       "siacoin output",
-        "maturityheight": 50000,
-        "walletaddress":  false,
-        "relatedaddress": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "value":          "1234", // hastings or siafunds, depending on fundtype, big int
-      }
-    ]
-  }
+  },
+  "transactionid":         "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "confirmationheight":    50000,
+  "confirmationtimestamp": 1257894000,
+  "inputs": [
+    {
+      "parentid":       "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "fundtype":       "siacoin input",
+      "walletaddress":  false,
+      "relatedaddress": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "value":          "1234", // hastings or siafunds, depending on fundtype, big int
+    }
+  ],
+  "outputs": [
+    {
+      "id":             "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "fundtype":       "siacoin output",
+      "maturityheight": 50000,
+      "walletaddress":  false,
+      "relatedaddress": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "value":          "1234", // hastings or siafunds, depending on fundtype, big int
+    }
+  ]
 }
 ```
 
