@@ -10,16 +10,16 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/fastrand"
-	"github.com/NebulousLabs/muxado"
+	"github.com/xtaci/smux"
 )
 
 // dummyConn implements the net.Conn interface, but does not carry any actual
-// data. It is passed to muxado, because passing nil results in segfaults.
+// data. It is passed to smux, because passing nil results in segfaults.
 type dummyConn struct {
 	net.Conn
 }
 
-// muxado uses these methods when sending its GoAway signal
+// smux uses these methods when sending its GoAway signal
 func (dc *dummyConn) Write(p []byte) (int, error) { return len(p), nil }
 
 // Close is a no-op to satisfy the Conn interface.
@@ -39,11 +39,17 @@ func TestAddPeer(t *testing.T) {
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
+	sess, err := smux.Client(new(dummyConn), nil)
+	if err != nil {
+		t.Fatalf("smux client could not be created: %v", err)
+	}
+
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			NetAddress: "foo.com:123",
 		},
-		sess: muxado.Client(new(dummyConn)),
+		sess: sess,
 	})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
@@ -144,12 +150,17 @@ func TestRandomOutboundPeer(t *testing.T) {
 		t.Fatal("expected errNoPeers, got", err)
 	}
 
+	sess, err := smux.Client(new(dummyConn), nil)
+	if err != nil {
+		t.Fatalf("smux client could not be created: %v", err)
+	}
+
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			NetAddress: "foo.com:123",
 			Inbound:    false,
 		},
-		sess: muxado.Client(new(dummyConn)),
+		sess: sess,
 	})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
@@ -192,8 +203,12 @@ func TestListen(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	// a simple 'conn.Close' would not obey the muxado disconnect protocol
-	muxado.Client(conn).Close()
+	// a simple 'conn.Close' would not obey the smux disconnect protocol
+	client, err := smux.Client(conn, nil)
+	if err != nil {
+		t.Fatalf("couldn't create smux client: %v", err)
+	}
+	client.Close()
 
 	// compliant connect with invalid port
 	conn, err = net.Dial("tcp", string(g.Address()))
@@ -222,8 +237,12 @@ func TestListen(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	// a simple 'conn.Close' would not obey the muxado disconnect protocol
-	muxado.Client(conn).Close()
+	// a simple 'conn.Close' would not obey the smux disconnect protocol
+	client, err = smux.Client(conn, nil)
+	if err != nil {
+		t.Fatalf("couldn't create smux client: %v", err)
+	}
+	client.Close()
 
 	// compliant connect
 	conn, err = net.Dial("tcp", string(g.Address()))
@@ -251,7 +270,11 @@ func TestListen(t *testing.T) {
 		g.mu.RUnlock()
 	}
 
-	muxado.Client(conn).Close()
+	client, err = smux.Client(conn, nil)
+	if err != nil {
+		t.Fatalf("couldn't create smux client: %v", err)
+	}
+	client.Close()
 
 	// g should remove the peer
 	for ok {
@@ -757,12 +780,18 @@ func TestDisconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal("dial failed:", err)
 	}
+
+	sess, err := smux.Client(conn, nil)
+	if err != nil {
+		t.Fatalf("couldn't create smux client: %v", err)
+	}
+
 	g.mu.Lock()
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			NetAddress: "foo.com:123",
 		},
-		sess: muxado.Client(conn),
+		sess: sess,
 	})
 	g.mu.Unlock()
 	if err := g.Disconnect("foo.com:123"); err != nil {
