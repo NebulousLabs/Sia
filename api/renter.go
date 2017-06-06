@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -418,15 +417,8 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
 func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	// Ensure that the async flag is not set to any other value than "true" or "".
-	async := req.FormValue("async")
-	if async == "false" || async != "true" && async != "" {
-		WriteError(w, Error{"/downloadasync require the `async` parameter to be either equal to `true` or be empty."}, http.StatusBadRequest)
-		return
-	} else if async == "" { // Add async if it is not already set to `true`.
-		req.Form["async"] = []string{"true"}
-	}
-
+	req.ParseForm()
+	req.Form.Set("async", "true")
 	api.renterDownloadHandler(w, req, ps)
 }
 
@@ -449,28 +441,27 @@ func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httpro
 
 	// Parse the offset and length parameters.
 	var offset, length uint64
-	var err error
 	if len(offsetparam) > 0 {
-		offset, err = strconv.ParseUint(offsetparam, 10, 64)
+		_, err := fmt.Sscan(offsetparam, &offset)
 		if err != nil {
 			return nil, build.ExtendErr("could not decode the offset as uint64: ", err)
 		}
 	}
 	if len(lengthparam) > 0 {
-		length, err = strconv.ParseUint(lengthparam, 10, 64)
+		_, err := fmt.Sscan(lengthparam, &length)
 		if err != nil {
-			return nil, build.ExtendErr("could not decode the length as uint64: ", err)
+			return nil, build.ExtendErr("could not decode the offset as uint64: ", err)
 		}
 	}
 
 	// Parse the httpresp parameter.
-	httpresp, err := stringToBool(httprespparam)
+	httpresp, err := scanBool(httprespparam)
 	if err != nil {
 		return nil, build.ExtendErr("httpresp parameter could not be parsed", err)
 	}
 
 	// Parse the async parameter.
-	async, err := stringToBool(asyncparam)
+	async, err := scanBool(asyncparam)
 	if err != nil {
 		return nil, build.ExtendErr("async parameter could not be parsed", err)
 	}

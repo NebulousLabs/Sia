@@ -37,19 +37,13 @@ func scanHash(s string) (h crypto.Hash, err error) {
 	return h, nil
 }
 
-// stringToBool converts "true" and "false" strings to their respective
+// scanBool converts "true" and "false" strings to their respective
 // boolean value and returns an error if conversion is not possible.
-func stringToBool(param string) (bool, error) {
-	// Parse the async parameter.
-	var out bool
-	switch {
-	case param == "true":
-		out = true
-	case len(param) == 0 || param == "false":
-		out = false
-	default:
-		return false, errors.New(`bool parameter has to be either "true" or "false"`)
+func scanBool(param string) (bool, error) {
+	if param == "true" {
+		return true, nil
+	} else if param == "false" || len(param) == 0 {
+		return false, nil
 	}
-
-	return out, nil
+	return false, errors.New("could not decode boolean: value was not true or false")
 }
