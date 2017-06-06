@@ -475,7 +475,6 @@ func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httpro
 		Offset:      offset,
 		Siapath:     siapath,
 	}
-
 	if httpresp {
 		dp.Httpwriter = w
 	}

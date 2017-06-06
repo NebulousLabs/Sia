@@ -7,6 +7,7 @@ package renter
 import (
 	"bytes"
 	"errors"
+	"io"
 	"math"
 	"net/http"
 	"os"
@@ -123,33 +124,39 @@ type (
 
 // newSectionDownload initialises and returns a download object for the specified chunk.
 func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID, offset, length uint64) *download {
-	d := &download{}
-	d.initDownload(f, destination)
+	d := newDownload(f, destination)
 
 	// Settings specific to a chunk download.
 	d.offset = offset
 	d.length = length
 
 	// Calculate chunks to download.
-	min_chunk := uint64(math.Floor(float64(offset / f.chunkSize())))
-	max_chunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
+	minChunk := uint64(math.Floor(float64(offset / f.chunkSize())))
+	maxChunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
 
-	makeRange(int(min_chunk), int(max_chunk+1), &d.finishedChunks)
+	// mark the chunks as not being downloaded yet
+	for i := int(minChunk); i <= int(maxChunk); i++ {
+		d.finishedChunks[i] = false
+	}
+
 	d.initPieceSet(f, currentContracts, r)
 	return d
 }
 
-func (d *download) initDownload(f *file, destination modules.DownloadWriter) {
-	d.startTime = time.Now()
-	d.chunkSize = f.chunkSize()
-	d.destination = destination
-	d.erasureCode = f.erasureCode
-	d.fileSize = f.size
-	d.masterKey = f.masterKey
-	d.numChunks = f.numChunks()
-	d.siapath = f.name
-	d.downloadFinished = make(chan struct{})
-	d.finishedChunks = make(map[int]bool)
+// newDownload creates a newly initialized download.
+func newDownload(f *file, destination modules.DownloadWriter) *download {
+	return &download{
+		startTime:        time.Now(),
+		chunkSize:        f.chunkSize(),
+		destination:      destination,
+		erasureCode:      f.erasureCode,
+		fileSize:         f.size,
+		masterKey:        f.masterKey,
+		numChunks:        f.numChunks(),
+		siapath:          f.name,
+		downloadFinished: make(chan struct{}),
+		finishedChunks:   make(map[int]bool),
+	}
 }
 
 // initPieceSet initialises the piece set, including calculations of the total download size.
@@ -261,15 +268,15 @@ func (cd *chunkDownload) recoverChunk() error {
 		return build.ExtendErr("unable to recover chunk", err)
 	}
 
-	var result = recoverWriter.Bytes()
+	result := recoverWriter.Bytes()
 
 	// Calculate the offset. If the offset is within the chunk, the
 	// requested offset is passed, otherwise the offset of the chunk
 	// within the overall file is passed.
 	chunkBaseAddress := cd.index * cd.download.chunkSize
 	chunkTopAddress := chunkBaseAddress + cd.download.chunkSize - 1
-	var off = chunkBaseAddress
-	var lowerBound = 0
+	off := chunkBaseAddress
+	lowerBound := 0
 	if cd.download.offset >= chunkBaseAddress && cd.download.offset <= chunkTopAddress {
 		off = cd.download.offset
 		offsetInBlock := off - chunkBaseAddress
@@ -277,7 +284,7 @@ func (cd *chunkDownload) recoverChunk() error {
 	}
 
 	// Truncate b if writing the whole buffer at the specified offset would exceed the maximum file size.
-	var upperBound = cd.download.chunkSize
+	upperBound := cd.download.chunkSize
 	if chunkTopAddress > cd.download.length+cd.download.offset {
 		diff := chunkTopAddress - (cd.download.length + cd.download.offset)
 		upperBound -= diff + 1
@@ -626,13 +633,6 @@ func (r *Renter) threadedDownloadLoop() {
 	}
 }
 
-// makeRange creates a range (min, max] as boolean map.
-func makeRange(min, max int, m *map[int]bool) {
-	for i := min; i < max; i++ {
-		(*m)[i] = false
-	}
-}
-
 // DownloadBufferWriter is a buffer-backed implementation of DownloadWriter.
 type DownloadBufferWriter struct {
 	data []byte
@@ -658,12 +658,7 @@ func (dw *DownloadBufferWriter) WriteAt(bytes []byte, off int64) (int, error) {
 		return 0, errors.New("write at specified offset exceeds buffer size")
 	}
 
-	i := 0
-	for _, b := range bytes {
-		dw.data[off+int64(i)] = b
-		i++
-	}
-
+	i := copy(dw.data[off:], bytes)
 	return i, nil
 }
 
@@ -709,12 +704,14 @@ func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
 	return r, err
 }
 
-// DownloadHttpWriter is a http response writer-backed implementation of DownloadWriter.
-// The writer writes all content that is written to the current `offset` directly to the ResponseWriter,
-// and buffers all content that is written at other offsets.
-// After every write to the ResponseWriter the `offset` and `length` fields are updated, and buffer content written until
+// DownloadHttpWriter is a http response writer-backed implementation of
+// DownloadWriter.  The writer writes all content that is written to the
+// current `offset` directly to the ResponseWriter, and buffers all content
+// that is written at other offsets.  After every write to the ResponseWriter
+// the `offset` and `length` fields are updated, and buffer content written
+// until
 type DownloadHttpWriter struct {
-	w              http.ResponseWriter
+	w              io.Writer
 	offset         int            // The index in the original file of the last byte written to the response writer.
 	firstByteIndex int            // The index of the first byte in the original file.
 	length         int            // The total size of the slice to be written.
@@ -747,7 +744,7 @@ func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
 	dw.buffer[offsetInBuffer] = b
 
 	// Send all chunks to the client that can be sent.
-	var totalDataSend = 0
+	totalDataSent := 0
 	for {
 		data, exists := dw.buffer[dw.offset]
 		if exists {
@@ -759,11 +756,11 @@ func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
 
 			// Increment offset to point to the beginning of the next chunk.
 			dw.offset += len(data)
-			totalDataSend += len(data)
+			totalDataSent += len(data)
 		} else {
 			break
 		}
 	}
 
-	return totalDataSend, nil
+	return totalDataSent, nil
 }
