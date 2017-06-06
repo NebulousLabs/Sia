@@ -72,3 +72,76 @@ func TestBlockFacts(t *testing.T) {
 		t.Error("call to 'BlockFacts' has failed")
 	}
 }
+
+// TestFileContractPayouts checks that file contract outputs are tracked by the explorer
+func TestFileContractPayouts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	et, err := createExplorerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create and fund valid file contracts.
+	builder := et.wallet.StartTransaction()
+	payout := types.NewCurrency64(1e9)
+	err = builder.FundSiacoins(payout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	windowStart := et.cs.Height() + 2
+	windowEnd := et.cs.Height() + 5
+
+	fc := types.FileContract{
+		WindowStart:        windowStart,
+		WindowEnd:          windowEnd,
+		Payout:             payout,
+		ValidProofOutputs:  []types.SiacoinOutput{{Value: types.PostTax(et.cs.Height(), payout)}},
+		MissedProofOutputs: []types.SiacoinOutput{{Value: types.PostTax(et.cs.Height(), payout)}},
+		UnlockHash:         types.UnlockConditions{}.UnlockHash(),
+	}
+
+	index := builder.AddFileContract(fc)
+	tSet, err := builder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = et.tpool.AcceptTransactionSet(tSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine until contract payouts is in consensus
+	for i := et.cs.Height(); i < windowEnd+types.MaturityDelay; i++ {
+		b, _ := et.miner.FindBlock()
+		err = et.cs.AcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	fcid := tSet[1].FileContractID(index)
+	txns := et.explorer.FileContractID(fcid)
+	if len(txns) == 0 {
+		t.Error("Filecontract ID does not appear in blockchain")
+	}
+
+	outputs, err := et.explorer.FileContractPayouts(fcid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check if MissedProofOutputs were added to spendable outputs
+	if len(outputs) != len(fc.MissedProofOutputs) {
+		t.Error("Incorrect number of outputs returned")
+		t.Error("Expecting -> ", len(fc.MissedProofOutputs))
+		t.Error("But was -> ", len(outputs))
+	}
+}
