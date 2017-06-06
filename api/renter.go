@@ -378,7 +378,7 @@ func (api *API) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps
 
 // renterDownloadHandler handles the API call to download a file.
 func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	params, err := api.parseDownloadParameters(w, req, ps)
+	params, err := parseDownloadParameters(w, req, ps)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -433,7 +433,7 @@ func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Requ
 // parseDownloadParameters parses the download parameters passed to the
 // /renter/download endpoint. Validation of these parameters is done by the
 // renter.
-func (api *API) parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (*modules.RenterDownloadParameters, error) {
+func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (*modules.RenterDownloadParameters, error) {
 	destination := req.FormValue("destination")
 
 	// The offset and length in bytes.
