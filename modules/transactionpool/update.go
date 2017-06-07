@@ -58,7 +58,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 			tp.blockHeight++
 		}
 		for _, txn := range block.Transactions {
-			err := tp.addTransaction(tp.dbTx, txn.ID())
+			err := tp.putTransaction(tp.dbTx, txn.ID())
 			if err != nil {
 				tp.log.Println("ERROR: could not add a transaction:", err)
 			}
@@ -126,7 +126,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if err != nil {
 		tp.log.Println("ERROR: could not update the block height:", err)
 	}
-	err = tp.putMedianFees(tp.dbTx, medianPersist{
+	err = tp.putFeeMedian(tp.dbTx, medianPersist{
 		RecentConfirmedFees: tp.recentConfirmedFees,
 		TxnsPerBlock:        tp.txnsPerBlock,
 		RecentMedianFee:     tp.recentMedianFee,
