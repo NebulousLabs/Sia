@@ -38,8 +38,16 @@ type (
 
 	// feeSummary desribes the fee structure of a transaction.
 	feeSummary struct {
-		fee  types.Currency // SC per byte
-		size uint64
+		Fee  types.Currency // SC per byte
+		Size uint64
+	}
+
+	// medianPersist is the json object that gets stored in the database so that
+	// the transaction pool can persist its block based fee estimations.
+	medianPersist struct {
+		RecentConfirmedFees []feeSummary
+		TxnsPerBlock        []uint64
+		RecentMedianFee     types.Currency
 	}
 
 	// The TransactionPool tracks incoming transactions, accepting them or
@@ -161,7 +169,9 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// event of empty blocks, there should still be some fees being added to the
 	// chain.
 
-	// TODO: Implement the blockchain method.
+	// Set the minimum fee to the numbers recommended by the blockchain.
+	min = tp.recentMedianFee
+	max = tp.recentMedianFee.Mul64(2)
 
 	// Method two: use 'requiredFeesToExtendPool'.
 	required := tp.requiredFeesToExtendTpool()

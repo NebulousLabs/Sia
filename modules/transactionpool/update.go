@@ -74,16 +74,16 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			feeAvg := feeSum.Div64(size)
 			tp.recentConfirmedFees = append(tp.recentConfirmedFees, feeSummary{
-				fee:  feeAvg,
-				size: size,
+				Fee:  feeAvg,
+				Size: size,
 			})
 			totalSize += size
 		}
 		// Add an extra zero-fee tranasction for any unused block space.
 		remaining := types.BlockSizeLimit - totalSize
 		tp.recentConfirmedFees = append(tp.recentConfirmedFees, feeSummary{
-			fee:  types.ZeroCurrency,
-			size: remaining, // fine if remaining is zero.
+			Fee:  types.ZeroCurrency,
+			Size: remaining, // fine if remaining is zero.
 		})
 		// Mark the number of fee transactions in this block.
 		tp.txnsPerBlock = append(tp.txnsPerBlock, uint64(len(block.Transactions)+1))
@@ -106,14 +106,14 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		replica := make([]feeSummary, len(tp.recentConfirmedFees))
 		copy(replica, tp.recentConfirmedFees)
 		sort.Slice(replica, func(i, j int) bool {
-			return replica[i].fee.Cmp(replica[j].fee) < 0
+			return replica[i].Fee.Cmp(replica[j].Fee) < 0
 		})
 		// Scroll through the sorted fees until hitting the median.
 		var progress uint64
 		for i := range tp.recentConfirmedFees {
-			progress += tp.recentConfirmedFees[i].size
+			progress += tp.recentConfirmedFees[i].Size
 			if progress > (uint64(len(tp.txnsPerBlock))*types.BlockSizeLimit)/2 {
-				tp.recentMedianFee = tp.recentConfirmedFees[i].fee
+				tp.recentMedianFee = tp.recentConfirmedFees[i].Fee
 				break
 			}
 		}
@@ -125,6 +125,14 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	err = tp.putBlockHeight(tp.dbTx, tp.blockHeight)
 	if err != nil {
 		tp.log.Println("ERROR: could not update the block height:", err)
+	}
+	err = tp.putMedianFees(tp.dbTx, medianPersist{
+		RecentConfirmedFees: tp.recentConfirmedFees,
+		TxnsPerBlock:        tp.txnsPerBlock,
+		RecentMedianFee:     tp.recentMedianFee,
+	})
+	if err != nil {
+		tp.log.Println("ERROR: could not update the transaction pool median fee information:", err)
 	}
 
 	// Scan the applied blocks for transactions that got accepted. This will

@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -31,6 +32,10 @@ var (
 	// been confirmed on the blockchain.
 	bucketConfirmedTransactions = []byte("ConfirmedTransactions")
 
+	// bucketFeeMedian stores all of the persist data relating to the fee
+	// median.
+	bucketFeeMedian = []byte("FeeMedian")
+
 	// errNilConsensusChange is returned if there is no consensus change in the
 	// database.
 	errNilConsensusChange = errors.New("no consensus change found")
@@ -42,7 +47,19 @@ var (
 	// fieldBlockHeight is the field in bucketBlockHeight that holds the value of
 	// the most recent block height.
 	fieldBlockHeight = []byte("BlockHeight")
+
+	// fieldFeeMedian is the fee median persist data stored in a fee median
+	// field.
+	fieldFeeMedian = []byte("FeeMedian")
 )
+
+// feeMedian is the persist format for the fee median data storage.
+type feeMedian struct {
+	BlockHeight         types.BlockHeight
+	RecentConfirmedFees []feeSummary
+	TxnsPerBlock        []uint64
+	RecentMedianFee     types.Currency
+}
 
 // threadedRegularSync will make sure that sync gets called on the database
 // every once in a while.
@@ -145,6 +162,7 @@ func (tp *TransactionPool) initPersist() error {
 		bucketBlockHeight,
 		bucketRecentConsensusChange,
 		bucketConfirmedTransactions,
+		bucketFeeMedian,
 	}
 	for _, bucket := range buckets {
 		_, err := tp.dbTx.CreateBucketIfNotExists(bucket)
@@ -176,6 +194,21 @@ func (tp *TransactionPool) initPersist() error {
 	if err != nil {
 		return build.ExtendErr("unable to initialize the block height in the tpool", err)
 	}
+
+	// Get the fee median data.
+	var mp medianPersist
+	medianBytes := tp.dbTx.Bucket(bucketFeeMedian).Get(fieldFeeMedian)
+	// If medianBytes is 'nil', it just means that median data has never been
+	// saved.
+	if medianBytes != nil {
+		err = json.Unmarshal(medianBytes, &mp)
+		if err != nil {
+			return build.ExtendErr("unable to unmarshal median data:", err)
+		}
+	}
+	tp.recentConfirmedFees = mp.RecentConfirmedFees
+	tp.txnsPerBlock = mp.TxnsPerBlock
+	tp.recentMedianFee = mp.RecentMedianFee
 
 	// Subscribe to the consensus set using the most recent consensus change.
 	err = tp.consensusSet.ConsensusSetSubscribe(tp, cc)
@@ -214,6 +247,15 @@ func (tp *TransactionPool) getBlockHeight(tx *bolt.Tx) (bh types.BlockHeight, er
 func (tp *TransactionPool) putBlockHeight(tx *bolt.Tx, height types.BlockHeight) error {
 	tp.blockHeight = height
 	return tx.Bucket(bucketBlockHeight).Put(fieldBlockHeight, encoding.Marshal(height))
+}
+
+// putMedianFees puts a median fees object into the database.
+func (tp *TransactionPool) putMedianFees(tx *bolt.Tx, mp medianPersist) error {
+	objBytes, err := json.Marshal(mp)
+	if err != nil {
+		return err
+	}
+	return tx.Bucket(bucketFeeMedian).Put(fieldFeeMedian, objBytes)
 }
 
 // getRecentConsensusChange returns the most recent consensus change from the
