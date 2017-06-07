@@ -36,6 +36,12 @@ type (
 	ObjectID         crypto.Hash
 	TransactionSetID crypto.Hash
 
+	// feeSummary desribes the fee structure of a transaction.
+	feeSummary struct {
+		fee  types.Currency // SC per byte
+		size uint64
+	}
+
 	// The TransactionPool tracks incoming transactions, accepting them or
 	// rejecting them based on internal criteria such as fees and unconfirmed
 	// double spends.
@@ -60,12 +66,16 @@ type (
 		transactionSets     map[TransactionSetID][]types.Transaction
 		transactionSetDiffs map[TransactionSetID]modules.ConsensusChange
 		transactionListSize int
-		blockHeight         types.BlockHeight
 		// TODO: Write a consistency check comparing transactionSets,
 		// transactionSetDiffs.
 		//
 		// TODO: Write a consistency check making sure that all unconfirmedIDs
 		// point to the right place, and that all UnconfirmedIDs are accounted for.
+
+		blockHeight         types.BlockHeight
+		recentConfirmedFees []feeSummary
+		txnsPerBlock        []uint64       // the number of txns in each of the blocks
+		recentMedianFee     types.Currency // SC per byte
 
 		// The consensus change index tracks how many consensus changes have
 		// been sent to the transaction pool. When a new subscriber joins the

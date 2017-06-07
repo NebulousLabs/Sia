@@ -1,6 +1,9 @@
 package transactionpool
 
 import (
+	"sort"
+
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -33,6 +36,22 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 				tp.log.Println("ERROR: could not delete a transaction:", err)
 			}
 		}
+
+		// Pull the transactions out of the fee summary. For estimating only
+		// over 10 blocks, it is extermely likely that there will be more
+		// applied blocks than reverted blocks, and if there aren't (a height
+		// decreasing reorg), there will be more than 10 applied blocks.
+		if len(tp.txnsPerBlock) > 0 {
+			tailOffset := uint64(0)
+			for i := 0; i < len(tp.txnsPerBlock)-1; i++ {
+				tailOffset += tp.txnsPerBlock[i]
+			}
+
+			// Strip out all of the transactions in this block.
+			tp.recentConfirmedFees = tp.recentConfirmedFees[:tailOffset]
+			// Strip off the tail offset.
+			tp.txnsPerBlock = tp.txnsPerBlock[:len(tp.txnsPerBlock)-1]
+		}
 	}
 	for _, block := range cc.AppliedBlocks {
 		if tp.blockHeight > 0 || block.ID() != types.GenesisID {
@@ -42,6 +61,60 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 			err := tp.addTransaction(tp.dbTx, txn.ID())
 			if err != nil {
 				tp.log.Println("ERROR: could not add a transaction:", err)
+			}
+		}
+
+		// Add the transactions from this block.
+		var totalSize uint64
+		for _, txn := range block.Transactions {
+			var feeSum types.Currency
+			size := uint64(len(encoding.Marshal(txn)))
+			for _, fee := range txn.MinerFees {
+				feeSum = feeSum.Add(fee)
+			}
+			feeAvg := feeSum.Div64(size)
+			tp.recentConfirmedFees = append(tp.recentConfirmedFees, feeSummary{
+				fee:  feeAvg,
+				size: size,
+			})
+			totalSize += size
+		}
+		// Add an extra zero-fee tranasction for any unused block space.
+		remaining := types.BlockSizeLimit - totalSize
+		tp.recentConfirmedFees = append(tp.recentConfirmedFees, feeSummary{
+			fee:  types.ZeroCurrency,
+			size: remaining, // fine if remaining is zero.
+		})
+		// Mark the number of fee transactions in this block.
+		tp.txnsPerBlock = append(tp.txnsPerBlock, uint64(len(block.Transactions)+1))
+
+		// If there are more than 10 blocks recorded in the txnsPerBlock, strip
+		// off the oldest blocks.
+		for len(tp.txnsPerBlock) > 10 { // TODO: Constant
+			tp.recentConfirmedFees = tp.recentConfirmedFees[tp.txnsPerBlock[0]:]
+			tp.txnsPerBlock = tp.txnsPerBlock[1:]
+		}
+
+		// Sort the recent confirmed fees, then scroll forward 10MB and set the
+		// median to that txn. First we need to create and copy the fees into a
+		// new slice so that the don't get jumbled.
+		//
+		// TODO: Sort can be altered for quickSelect, which can grab the median
+		// in constant time. When counting the number of elements on either side
+		// of the pivot, use the 'size' field instead of counting each element
+		// as one.
+		replica := make([]feeSummary, len(tp.recentConfirmedFees))
+		copy(replica, tp.recentConfirmedFees)
+		sort.Slice(replica, func(i, j int) bool {
+			return replica[i].fee.Cmp(replica[j].fee) < 0
+		})
+		// Scroll through the sorted fees until hitting the median.
+		var progress uint64
+		for i := range tp.recentConfirmedFees {
+			progress += tp.recentConfirmedFees[i].size
+			if progress > (uint64(len(tp.txnsPerBlock))*types.BlockSizeLimit)/2 {
+				tp.recentMedianFee = tp.recentConfirmedFees[i].fee
+				break
 			}
 		}
 	}
