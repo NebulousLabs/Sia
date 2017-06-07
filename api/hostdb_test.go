@@ -1232,6 +1232,10 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = waitForBlock(stHost.cs.CurrentBlock().ID(), st)
+	if err != nil {
+		t.Fatal()
+	}
 	// Pull the host's net address and pubkey from the hostdb.
 	err = retry(50, time.Millisecond*100, func() error {
 		// Get the hostdb internals.

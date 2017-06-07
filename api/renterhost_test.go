@@ -184,18 +184,16 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// add a few new blocks in order to cause the renter to form contracts with the new host
-	var blockTip types.BlockID
 	for i := 0; i < 10; i++ {
 		b, err := stNewHost.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
-		blockTip = b.ID()
-	}
-	for _, tester := range testGroup {
-		err = waitForBlock(blockTip, tester)
-		if err != nil {
-			t.Fatal(err)
+		for _, tester := range testGroup {
+			err = waitForBlock(b.ID(), tester)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 
