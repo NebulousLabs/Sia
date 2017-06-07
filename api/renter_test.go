@@ -32,6 +32,8 @@ func createRandFile(path string, size int) error {
 	return ioutil.WriteFile(path, fastrand.Bytes(size), 0600)
 }
 
+// setupTestDownload creates a server tester with an uploaded file of size
+// `size` and name `name`.
 func setupTestDownload(t *testing.T, size int, name string, waitOnAvailability bool) (*serverTester, string) {
 	st, err := createServerTester(t.Name())
 	if err != nil {
@@ -99,30 +101,6 @@ func setupTestDownload(t *testing.T, size int, name string, waitOnAvailability b
 	return st, path
 }
 
-func waitForDownloadToComplete(t *testing.T, st *serverTester, siapath string, errmsg string) {
-	var rdq RenterDownloadQueue
-
-	// download should eventually complete
-	success := false
-	for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
-		err := st.getAPI("/renter/downloads", &rdq)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, download := range rdq.Downloads {
-			if download.Received == download.Filesize && download.SiaPath == siapath {
-				success = true
-			}
-		}
-		if success {
-			break
-		}
-	}
-	if !success {
-		t.Fatal(errmsg)
-	}
-}
-
 // runDownloadTest uploads a file and downloads it using the specified
 // parameters, verifying that the parameters are applied correctly and the file
 // is downloaded successfully.
@@ -177,9 +155,26 @@ func runDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp b
 		if err != nil {
 			return err
 		}
-		waitForDownloadToComplete(t, st, ulSiaPath, "/renter/download with offset failed.") // TODO: Fix error message.
+		// wait for the download to complete
+		err = retry(30, time.Second, func() error {
+			var rdq RenterDownloadQueue
+			err = st.getAPI("/renter/downloads", &rdq)
+			if err != nil {
+				return err
+			}
+			for _, download := range rdq.Downloads {
+				if download.Received == download.Filesize && download.SiaPath == ulSiaPath {
+					return nil
+				}
+			}
+			return errors.New("file not downloaded")
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		df, err := os.Open(downpath) // Downloaded file.
+		// open the downloaded file
+		df, err := os.Open(downpath)
 		if err != nil {
 			return err
 		}
@@ -197,7 +192,7 @@ func runDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp b
 	}
 
 	// should be byte-for-byte equal to the original uploaded file
-	if bytes.Compare(originalBytes.Bytes(), downbytes.Bytes()) != 0 {
+	if !bytes.Equal(originalBytes.Bytes(), downbytes.Bytes()) {
 		return errors.New(fmt.Sprintf("downloaded content differs from original content"))
 	}
 
@@ -241,7 +236,7 @@ func TestValidDownloads(t *testing.T) {
 	}
 	t.Parallel()
 
-	blk := int64(modules.SectorSize)
+	sectorSize := int64(modules.SectorSize)
 
 	testParams := []struct {
 		filesize,
@@ -250,28 +245,28 @@ func TestValidDownloads(t *testing.T) {
 		useHttpResp bool
 		testName    string
 	}{
-		// File-backed tests.
-		{blk, 40, blk - 40, false, "OffsetSingleChunk"},
-		{blk * 2, 20, blk*2 - 20, false, "OffsetTwoChunk"},
-		{int64(float64(blk) * 2.4), 20, int64(float64(blk)*2.4) - 20, false, "OffsetThreeChunk"},
-		{blk, 0, blk / 2, false, "ShortLengthSingleChunk"},
-		{blk, blk / 4, blk / 2, false, "ShortLengthAndOffsetSingleChunk"},
-		{blk * 2, 0, int64(float64(blk) * 2 * 0.75), false, "ShortLengthTwoChunk"},
-		{int64(float64(blk) * 2.7), 0, int64(2.2 * float64(blk)), false, "ShortLengthThreeChunkInThirdChunk"},
-		{int64(float64(blk) * 2.7), 0, int64(1.6 * float64(blk)), false, "ShortLengthThreeChunkInSecondChunk"},
-		{blk * 5, 0, int64(float64(blk*5) * 0.75), false, "ShortLengthMultiChunk"},
-		{blk * 2, 50, int64(float64(blk*2) * 0.75), false, "ShortLengthAndOffsetTwoChunk"},
-		{blk * 3, 50, int64(float64(blk*3) * 0.5), false, "ShortLengthAndOffsetThreeChunkInSecondChunk"},
-		{blk * 3, 50, int64(float64(blk*3) * 0.75), false, "ShortLengthAndOffsetThreeChunkInThirdChunk"},
+		// file-backed tests.
+		{sectorSize, 40, sectorSize - 40, false, "OffsetSingleChunk"},
+		{sectorSize * 2, 20, sectorSize*2 - 20, false, "OffsetTwoChunk"},
+		{int64(float64(sectorSize) * 2.4), 20, int64(float64(sectorSize)*2.4) - 20, false, "OffsetThreeChunk"},
+		{sectorSize, 0, sectorSize / 2, false, "ShortLengthSingleChunk"},
+		{sectorSize, sectorSize / 4, sectorSize / 2, false, "ShortLengthAndOffsetSingleChunk"},
+		{sectorSize * 2, 0, int64(float64(sectorSize) * 2 * 0.75), false, "ShortLengthTwoChunk"},
+		{int64(float64(sectorSize) * 2.7), 0, int64(2.2 * float64(sectorSize)), false, "ShortLengthThreeChunkInThirdChunk"},
+		{int64(float64(sectorSize) * 2.7), 0, int64(1.6 * float64(sectorSize)), false, "ShortLengthThreeChunkInSecondChunk"},
+		{sectorSize * 5, 0, int64(float64(sectorSize*5) * 0.75), false, "ShortLengthMultiChunk"},
+		{sectorSize * 2, 50, int64(float64(sectorSize*2) * 0.75), false, "ShortLengthAndOffsetTwoChunk"},
+		{sectorSize * 3, 50, int64(float64(sectorSize*3) * 0.5), false, "ShortLengthAndOffsetThreeChunkInSecondChunk"},
+		{sectorSize * 3, 50, int64(float64(sectorSize*3) * 0.75), false, "ShortLengthAndOffsetThreeChunkInThirdChunk"},
 
-		// Http response tests.
-		{blk, 40, blk - 40, true, "HttpRespOffsetSingleChunk"},
-		{blk * 2, 40, blk*2 - 40, true, "HttpRespOffsetTwoChunk"},
-		{blk * 5, 40, blk*5 - 40, true, "HttpRespOffsetManyChunks"},
-		{blk, 40, 4 * blk / 5, true, "RespOffsetAndLengthSingleChunk"},
-		{blk * 2, 80, 3 * (blk * 2) / 4, true, "RespOffsetAndLengthTwoChunk"},
-		{blk * 5, 150, 3 * (blk * 5) / 4, true, "HttpRespOffsetAndLengthManyChunks"},
-		{blk * 5, 150, blk * 5 / 4, true, "HttpRespOffsetAndLengthManyChunksSubsetOfChunks"},
+		// http response tests.
+		{sectorSize, 40, sectorSize - 40, true, "HttpRespOffsetSingleChunk"},
+		{sectorSize * 2, 40, sectorSize*2 - 40, true, "HttpRespOffsetTwoChunk"},
+		{sectorSize * 5, 40, sectorSize*5 - 40, true, "HttpRespOffsetManyChunks"},
+		{sectorSize, 40, 4 * sectorSize / 5, true, "RespOffsetAndLengthSingleChunk"},
+		{sectorSize * 2, 80, 3 * (sectorSize * 2) / 4, true, "RespOffsetAndLengthTwoChunk"},
+		{sectorSize * 5, 150, 3 * (sectorSize * 5) / 4, true, "HttpRespOffsetAndLengthManyChunks"},
+		{sectorSize * 5, 150, sectorSize * 5 / 4, true, "HttpRespOffsetAndLengthManyChunksSubsetOfChunks"},
 	}
 
 	for _, params := range testParams {
@@ -405,7 +400,8 @@ func TestRenterDownloadHttpRespAndDestinationError(t *testing.T) {
 	}
 }
 
-// TestRenterAsyncDownloadError tests that the /renter/asyncdownload route sets the download's error field if it fails.
+// TestRenterAsyncDownloadError tests that the /renter/asyncdownload route sets
+// the download's error field if it fails.
 func TestRenterAsyncDownloadError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -415,7 +411,8 @@ func TestRenterAsyncDownloadError(t *testing.T) {
 	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
 	defer st.server.panicClose()
 
-	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
+	// don't wait for the upload to complete, try to download immediately to
+	// intentionally cause a download error
 	downpath := filepath.Join(st.dir, "asyncdown.dat")
 	st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
 
@@ -441,7 +438,8 @@ func TestRenterAsyncSpecifyAsyncFalseError(t *testing.T) {
 	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
 	defer st.server.Close()
 
-	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
+	// don't wait for the upload to complete, try to download immediately to
+	// intentionally cause a download error
 	downpath := filepath.Join(st.dir, "asyncdown.dat")
 	err := st.getAPI("/renter/downloadasync/test.dat?async=false&destination="+downpath, nil)
 	if err == nil {

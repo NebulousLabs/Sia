@@ -20,9 +20,9 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestRemoteFileRepair verifies that if a trackedFile unavailable locally by
-// being deleted, the repair loop will download the necessary chunks from the
-// living hosts
+// TestRemoteFileRepair verifies that if a trackedFile is made unavailable
+// locally by being deleted, the repair loop will download the necessary chunks
+// from the living hosts and upload them to new hosts.
 func TestRemoteFileRepair(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -191,11 +191,11 @@ func TestRemoteFileRepair(t *testing.T) {
 			t.Fatal(err)
 		}
 		blockTip = b.ID()
-		for _, tester := range testGroup {
-			err = waitForBlock(blockTip, tester)
-			if err != nil {
-				t.Fatal(err)
-			}
+	}
+	for _, tester := range testGroup {
+		err = waitForBlock(blockTip, tester)
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 
@@ -212,7 +212,8 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// we have to wait a bit for the download loop to update with the new contracts.
+	// we have to wait a bit for the download loop to update with the new
+	// contracts. retry the download for up to 90 seconds.
 	downloadPath = filepath.Join(st.dir, "test-downloaded.dat")
 	err = retry(90, time.Second, func() error {
 		return st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
@@ -226,7 +227,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, downloaded) != 0 {
+	if !bytes.Equal(orig, downloaded) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 }
