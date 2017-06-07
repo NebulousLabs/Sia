@@ -257,8 +257,9 @@ type Renter interface {
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error
 
-	// DownloadSection performs a download according to the parameters passed, including downloads of `offset` and `length` type.
-	Download(params *RenterDownloadParameters) error
+	// Download performs a download according to the parameters passed, including
+	// downloads of `offset` and `length` type.
+	Download(params RenterDownloadParameters) error
 
 	// DownloadQueue lists all the files that have been scheduled for download.
 	DownloadQueue() []DownloadInfo
@@ -304,7 +305,8 @@ type Renter interface {
 	Upload(FileUploadParams) error
 }
 
-// RenterDownloadParameters contains all parameters that can be passed to the `/download` endpoint.
+// RenterDownloadParameters defines the parameters passed to the Renter's
+// Download method.
 type RenterDownloadParameters struct {
 	Async       bool
 	Httpwriter  io.Writer

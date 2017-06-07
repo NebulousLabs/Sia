@@ -692,15 +692,7 @@ func (dw *DownloadFileWriter) Destination() string {
 
 // WriteAt writes the passed bytes at the specified offset.
 func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
-	fileOffset := off - int64(dw.offset)
-
-	r, err := dw.f.WriteAt(b, fileOffset)
-	if err != nil {
-		build.ExtendErr("unable to write to download destination", err)
-	}
-	dw.f.Sync()
-
-	return r, err
+	return dw.f.WriteAt(b, off-int64(dw.offset))
 }
 
 // DownloadHttpWriter is a http response writer-backed implementation of

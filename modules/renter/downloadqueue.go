@@ -10,9 +10,9 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// DownloadSection performs a file download according to the download parameters passed.
-func (r *Renter) Download(p *modules.RenterDownloadParameters) error {
-	// Lookup the file associated with the nickname.
+// Download performs a file download using the passed parameters.
+func (r *Renter) Download(p modules.RenterDownloadParameters) error {
+	// lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
 	file, exists := r.files[p.Siapath]
 	r.mu.RUnlock(lockID)

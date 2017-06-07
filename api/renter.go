@@ -425,7 +425,7 @@ func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Requ
 // parseDownloadParameters parses the download parameters passed to the
 // /renter/download endpoint. Validation of these parameters is done by the
 // renter.
-func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (*modules.RenterDownloadParameters, error) {
+func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (modules.RenterDownloadParameters, error) {
 	destination := req.FormValue("destination")
 
 	// The offset and length in bytes.
@@ -444,31 +444,31 @@ func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httpro
 	if len(offsetparam) > 0 {
 		_, err := fmt.Sscan(offsetparam, &offset)
 		if err != nil {
-			return nil, build.ExtendErr("could not decode the offset as uint64: ", err)
+			return modules.RenterDownloadParameters{}, build.ExtendErr("could not decode the offset as uint64: ", err)
 		}
 	}
 	if len(lengthparam) > 0 {
 		_, err := fmt.Sscan(lengthparam, &length)
 		if err != nil {
-			return nil, build.ExtendErr("could not decode the offset as uint64: ", err)
+			return modules.RenterDownloadParameters{}, build.ExtendErr("could not decode the offset as uint64: ", err)
 		}
 	}
 
 	// Parse the httpresp parameter.
 	httpresp, err := scanBool(httprespparam)
 	if err != nil {
-		return nil, build.ExtendErr("httpresp parameter could not be parsed", err)
+		return modules.RenterDownloadParameters{}, build.ExtendErr("httpresp parameter could not be parsed", err)
 	}
 
 	// Parse the async parameter.
 	async, err := scanBool(asyncparam)
 	if err != nil {
-		return nil, build.ExtendErr("async parameter could not be parsed", err)
+		return modules.RenterDownloadParameters{}, build.ExtendErr("async parameter could not be parsed", err)
 	}
 
 	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/") // Sia file name.
 
-	dp := &modules.RenterDownloadParameters{
+	dp := modules.RenterDownloadParameters{
 		Destination: destination,
 		Async:       async,
 		Length:      length,
