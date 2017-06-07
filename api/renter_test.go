@@ -199,7 +199,8 @@ func runDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp b
 	return nil
 }
 
-// TestRenterDownloadError tests that the /renter/download route sets the download's error field if it fails.
+// TestRenterDownloadError tests that the /renter/download route sets the
+// download's error field if it fails.
 func TestRenterDownloadError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -209,7 +210,8 @@ func TestRenterDownloadError(t *testing.T) {
 	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
 	defer st.server.Close()
 
-	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
+	// don't wait for the upload to complete, try to download immediately to
+	// intentionally cause a download error
 	downpath := filepath.Join(st.dir, "down.dat")
 	expectedErr := st.getAPI("/renter/download/test.dat?destination="+downpath, nil)
 	if expectedErr == nil {
@@ -268,12 +270,15 @@ func TestValidDownloads(t *testing.T) {
 		{sectorSize * 5, 150, 3 * (sectorSize * 5) / 4, true, "HttpRespOffsetAndLengthManyChunks"},
 		{sectorSize * 5, 150, sectorSize * 5 / 4, true, "HttpRespOffsetAndLengthManyChunksSubsetOfChunks"},
 	}
-
-	for _, params := range testParams {
-		err := runDownloadTest(t, params.filesize, params.offset, params.length, params.useHttpResp, params.testName)
-		if err != nil {
-			t.Fatalf("Test %s failed: %s", params.testName, err.Error())
-		}
+	for i, params := range testParams {
+		params := params
+		t.Run(fmt.Sprintf("%v-%v", t.Name(), i), func(st *testing.T) {
+			st.Parallel()
+			err := runDownloadTest(st, params.filesize, params.offset, params.length, params.useHttpResp, params.testName)
+			if err != nil {
+				st.Fatal(err)
+			}
+		})
 	}
 }
 

@@ -394,7 +394,7 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 				WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
 				return
 			}
-		case <-time.After(time.Second * 5):
+		case <-time.After(time.Millisecond * 100):
 		}
 	} else {
 		err := api.renter.Download(params)
