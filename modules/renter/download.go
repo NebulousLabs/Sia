@@ -65,7 +65,7 @@ type (
 		atomicDataReceived uint64
 		downloadComplete   bool
 		downloadErr        error
-		finishedChunks     map[int]bool
+		finishedChunks     map[uint64]bool
 		offset             uint64
 		length             uint64
 
@@ -80,8 +80,10 @@ type (
 		fileSize    uint64
 		masterKey   crypto.TwofishKey
 		numChunks   uint64
-		// The pieceSet contains a sparse map of the chunk indices to be downloaded to their piece data.
-		pieceSet          map[int]map[types.FileContractID]pieceData
+
+		// pieceSet contains a sparse map of the chunk indices to be downloaded to
+		// their piece data.
+		pieceSet          map[uint64]map[types.FileContractID]pieceData
 		reportedPieceSize uint64
 		siapath           string
 
@@ -134,7 +136,7 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 	maxChunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
 
 	// mark the chunks as not being downloaded yet
-	for i := int(minChunk); i <= int(maxChunk); i++ {
+	for i := minChunk; i <= maxChunk; i++ {
 		d.finishedChunks[i] = false
 	}
 
@@ -154,7 +156,7 @@ func newDownload(f *file, destination modules.DownloadWriter) *download {
 		numChunks:        f.numChunks(),
 		siapath:          f.name,
 		downloadFinished: make(chan struct{}),
-		finishedChunks:   make(map[int]bool),
+		finishedChunks:   make(map[uint64]bool),
 	}
 }
 
@@ -174,7 +176,7 @@ func (d *download) initPieceSet(f *file,
 	d.atomicDataReceived = dlSize - (d.reportedPieceSize * numChunks * uint64(d.erasureCode.MinPieces()))
 
 	// Assemble the piece set for the download.
-	d.pieceSet = make(map[int]map[types.FileContractID]pieceData)
+	d.pieceSet = make(map[uint64]map[types.FileContractID]pieceData)
 	for i := range d.finishedChunks {
 		d.pieceSet[i] = make(map[types.FileContractID]pieceData)
 	}
@@ -192,7 +194,7 @@ func (d *download) initPieceSet(f *file,
 		}
 
 		for i := range contract.Pieces {
-			m, exists := d.pieceSet[int(contract.Pieces[i].Chunk)]
+			m, exists := d.pieceSet[contract.Pieces[i].Chunk]
 			// Only add pieceSet entries for chunks that are going to be downloaded.
 			if exists {
 				m[id] = contract.Pieces[i]
@@ -302,10 +304,10 @@ func (cd *chunkDownload) recoverChunk() error {
 
 	// Update the download to signal that this chunk has completed. Only update
 	// after the sync, so that durability is maintained.
-	if cd.download.finishedChunks[int(cd.index)] {
+	if cd.download.finishedChunks[cd.index] {
 		build.Critical("recovering chunk when the chunk has already finished downloading")
 	}
-	cd.download.finishedChunks[int(cd.index)] = true
+	cd.download.finishedChunks[cd.index] = true
 
 	// Determine whether the download is complete.
 	nowComplete := true
@@ -447,7 +449,7 @@ loop:
 				continue
 			}
 
-			piece, exists := incompleteChunk.download.pieceSet[int(incompleteChunk.index)][worker.contractID]
+			piece, exists := incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID]
 			if !exists {
 				continue
 			}
@@ -474,7 +476,7 @@ loop:
 		// completed just not at this time.
 		for fcid := range ds.activeWorkers {
 			// Check whether a piece exists for this worker.
-			_, exists1 := incompleteChunk.download.pieceSet[int(incompleteChunk.index)][fcid]
+			_, exists1 := incompleteChunk.download.pieceSet[incompleteChunk.index][fcid]
 			scheduled, exists2 := incompleteChunk.workerAttempts[fcid]
 			if !scheduled && exists1 && exists2 {
 				// This worker is able to complete the download for this chunk,
