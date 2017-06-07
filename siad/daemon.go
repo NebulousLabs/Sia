@@ -77,7 +77,7 @@ func processModules(modules string) (string, error) {
 	return modules, nil
 }
 
-// processProfiles checks that the flags given for profiling are valid
+// processProfiles checks that the flags given for profiling are valid.
 func processProfile(profile string) (string, error) {
 	profile = strings.ToLower(profile)
 	validProfiles := "cmt"

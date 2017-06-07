@@ -150,8 +150,8 @@ func startContinuousLog(dir string, restart func()) {
 
 // StartContinuousProfile will continuously print statistics about the cpu
 // usage, memory usage, and runtime stats of the program, and run an execution
-//logger. Select one (recommended) or more functionalities by passing the
-//corresponding flag(s)
+// logger. Select one (recommended) or more functionalities by passing the
+// corresponding flag(s)
 func StartContinuousProfile(profileDir string, profileCPU bool, profileMem bool, profileTrace bool) {
 	startContinuousLog(profileDir, func() {
 		if profileCPU {
