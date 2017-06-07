@@ -405,6 +405,10 @@ func (w *Wallet) Lock() error {
 	}
 	w.log.Println("INFO: Locking wallet.")
 
+	// Unsubscribe from Consensus Set and Transaction Pool
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
 	// Wipe all of the seeds and secret keys. They will be replaced upon
 	// calling 'Unlock' again. Note that since the public keys are not wiped,
 	// we can continue processing blocks.

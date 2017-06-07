@@ -157,9 +157,6 @@ func (w *Wallet) Close() error {
 		}
 	}
 
-	w.cs.Unsubscribe(w)
-	w.tpool.Unsubscribe(w)
-
 	if err := w.log.Close(); err != nil {
 		errs = append(errs, fmt.Errorf("log.Close failed: %v", err))
 	}
