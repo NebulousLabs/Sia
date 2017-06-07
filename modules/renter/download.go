@@ -9,7 +9,6 @@ import (
 	"errors"
 	"io"
 	"math"
-	"net/http"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -719,7 +718,7 @@ type DownloadHttpWriter struct {
 }
 
 // NewDownloadHttpWriter creates a new instance of http.ResponseWriter backed DownloadWriter.
-func NewDownloadHttpWriter(w http.ResponseWriter, offset, length uint64) *DownloadHttpWriter {
+func NewDownloadHttpWriter(w io.Writer, offset, length uint64) *DownloadHttpWriter {
 	return &DownloadHttpWriter{
 		w:              w,
 		offset:         0,           // Current offset in the output file.

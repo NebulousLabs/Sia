@@ -3,7 +3,6 @@ package modules
 import (
 	"encoding/json"
 	"io"
-	"net/http"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -308,7 +307,7 @@ type Renter interface {
 // RenterDownloadParameters contains all parameters that can be passed to the `/download` endpoint.
 type RenterDownloadParameters struct {
 	Async       bool
-	Httpwriter  http.ResponseWriter
+	Httpwriter  io.Writer
 	Length      uint64
 	Offset      uint64
 	Siapath     string
