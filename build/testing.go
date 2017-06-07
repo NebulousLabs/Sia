@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 var (
@@ -15,35 +16,6 @@ var (
 	// folders created during testing.
 	SiaTestingDir = filepath.Join(os.TempDir(), "SiaTesting")
 )
-
-// TempDir joins the provided directories and prefixes them with the Sia
-// testing directory.
-func TempDir(dirs ...string) string {
-	path := filepath.Join(SiaTestingDir, filepath.Join(dirs...))
-	os.RemoveAll(path) // remove old test data
-	return path
-}
-
-// CopyFile copies a file from a source to a destination.
-func CopyFile(source, dest string) error {
-	sf, err := os.Open(source)
-	if err != nil {
-		return err
-	}
-	defer sf.Close()
-
-	df, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer df.Close()
-
-	_, err = io.Copy(df, sf)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 // CopyDir copies a directory and all of its contents to the destination
 // directory.
@@ -77,6 +49,27 @@ func CopyDir(source, dest string) error {
 		}
 	}
 
+	return nil
+}
+
+// CopyFile copies a file from a source to a destination.
+func CopyFile(source, dest string) error {
+	sf, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer sf.Close()
+
+	df, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer df.Close()
+
+	_, err = io.Copy(df, sf)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -131,4 +124,26 @@ func ExtractTarGz(filename, dir string) error {
 			}
 		}
 	}
+}
+
+// Retry will retry a function multiple times until it returns 'nil'. It will
+// sleep the specified duration between tries. If success is not achieved in the
+// specified number of attempts, the final error is returned.
+func Retry(tries int, durationBetweenAttempts time.Duration, fn func() error) (err error) {
+	for i := 0; i < tries-1; i++ {
+		err = fn()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(durationBetweenAttempts)
+	}
+	return fn()
+}
+
+// TempDir joins the provided directories and prefixes them with the Sia
+// testing directory.
+func TempDir(dirs ...string) string {
+	path := filepath.Join(SiaTestingDir, filepath.Join(dirs...))
+	os.RemoveAll(path) // remove old test data
+	return path
 }

@@ -18,6 +18,12 @@ var (
 	errPeerGenesisID = errors.New("peer has different genesis ID")
 )
 
+// A node represents a potential peer on the Sia network.
+type node struct {
+	NetAddress      modules.NetAddress `json:"netaddress"`
+	WasOutboundPeer bool               `json:"wasoutboundpeer"`
+}
+
 // addNode adds an address to the set of nodes on the network.
 func (g *Gateway) addNode(addr modules.NetAddress) error {
 	if addr == g.myAddr {
@@ -29,7 +35,10 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 	} else if net.ParseIP(addr.Host()) == nil {
 		return errors.New("address must be an IP address: " + string(addr))
 	}
-	g.nodes[addr] = struct{}{}
+	g.nodes[addr] = &node{
+		NetAddress:      addr,
+		WasOutboundPeer: false,
+	}
 	return nil
 }
 
