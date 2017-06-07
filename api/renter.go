@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -286,22 +287,19 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 
 // renterDownloadsHandler handles the API call to request the download queue.
 func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	dlq := api.renter.DownloadQueue()
-
-	// Translate []modules.DownloadInfo to []api.DownloadInfo.
-	downloads := make([]DownloadInfo, len(dlq))
-	for i := range dlq {
-		d := dlq[len(dlq)-i-1]
-
-		downloads[i] = DownloadInfo{
+	var downloads []DownloadInfo
+	for _, d := range api.renter.DownloadQueue() {
+		downloads = append(downloads, DownloadInfo{
 			SiaPath:     d.SiaPath,
 			Destination: d.Destination.Destination(),
 			Filesize:    d.Filesize,
 			StartTime:   d.StartTime,
 			Received:    d.Received,
 			Error:       d.Error,
-		}
+		})
 	}
+	// sort the downloads by newest first
+	sort.Slice(downloads, func(i, j int) bool { return downloads[i].StartTime.After(downloads[j].StartTime) })
 	WriteJSON(w, RenterDownloadQueue{
 		Downloads: downloads,
 	})
