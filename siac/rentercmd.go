@@ -96,13 +96,6 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Run:   wrap(renterfilesdownloadcmd),
 	}
 
-	renterDownloadSectionCmd = &cobra.Command{
-		Use:   "downloadsection [path] [offset] [length] [destination]",
-		Short: "Download a chunk",
-		Long:  "Download a specific chunk from a previously uploaded file.",
-		Run:   wrap(renterfilesdownloadsectioncmd),
-	}
-
 	renterFilesListCmd = &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -396,25 +389,6 @@ func renterfilesdownloadcmd(path, destination string) {
 		die("Could not download file:", err)
 	}
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
-}
-
-// renterfilesdownloadsectioncmd is the handler for the command `siac renter downloadsection [path]
-// [offset] [length] [destination]`.
-// Downloads a specific chunk to the local specified destination.
-func renterfilesdownloadsectioncmd(path, offset, length, destination string) {
-	destination = abs(destination)
-	done := make(chan struct{})
-
-	go downloadprogress(done, destination)
-
-	req := fmt.Sprintf("/renter/download/%s?destination=%s&offset=%s&length=%s", path, destination, offset, length)
-
-	err := get(req)
-	close(done)
-	if err != nil {
-		die("could not download chunk:", err)
-	}
-	fmt.Printf("\nDownloaded offset %s and length %s of '%s' to %s.\n", offset, length, path, abs(destination))
 }
 
 func downloadprogress(done chan struct{}, siapath string) {
