@@ -43,11 +43,6 @@ func verifyAPISecurity(config Config) error {
 		return nil
 	}
 
-	// If the --disable-api-security flag is used, enforce that
-	// --authenticate-api must also be used.
-	if config.Siad.AllowAPIBind && !config.Siad.AuthenticateAPI {
-		return errors.New("cannot use --disable-api-security without setting an api password")
-	}
 	return nil
 }
 

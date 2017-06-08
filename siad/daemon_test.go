@@ -142,14 +142,14 @@ func TestVerifyAPISecurity(t *testing.T) {
 		t.Error("public + securityOn was accepted")
 	}
 
-	// Check that a public hostname is rejected when security is disabled and
-	// there is no api password.
+	// Check that a public hostname is accepted when security is disabled
+	// and there is no api password.
 	var securityOffPublic Config
 	securityOffPublic.Siad.APIaddr = "sia.tech:9980"
 	securityOffPublic.Siad.AllowAPIBind = true
 	err = verifyAPISecurity(securityOffPublic)
-	if err == nil {
-		t.Error("public + securityOff was accepted without authentication")
+	if err != nil {
+		t.Error("public + securityOff was rejected")
 	}
 
 	// Check that a public hostname is accepted when security is disabled and
