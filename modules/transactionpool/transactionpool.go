@@ -161,11 +161,11 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	}
 
 	// Method three: sane mimimums.
-	if min.Cmp(TpoolSaneMinFee) < 0 {
-		min = TpoolSaneMinFee
+	if min.Cmp(minEstimation) < 0 {
+		min = minEstimation
 	}
-	if max.Cmp(TpoolSaneMinFee.Mul64(maxMultiplier)) < 0 {
-		max = TpoolSaneMinFee.Mul64(maxMultiplier)
+	if max.Cmp(minEstimation.Mul64(maxMultiplier)) < 0 {
+		max = minEstimation.Mul64(maxMultiplier)
 	}
 
 	return

@@ -106,10 +106,10 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		})
 		// Scroll through the sorted fees until hitting the median.
 		var progress uint64
-		for i := range tp.recentConfirmedFees {
-			progress += tp.recentConfirmedFees[i].Size
+		for i := range replica {
+			progress += replica[i].Size
 			if progress > (uint64(len(tp.txnsPerBlock))*types.BlockSizeLimit)/2 {
-				tp.recentMedianFee = tp.recentConfirmedFees[i].Fee
+				tp.recentMedianFee = replica[i].Fee
 				break
 			}
 		}

@@ -66,10 +66,9 @@ var (
 
 // Variables related to the size and ease-of-entry of the transaction pool.
 var (
-	// TpoolSaneMinFee defines a sane minimum fee per byte for transactions.
-	// This will typically be only suggested as a fee in the absense of
-	// congestion.
-	TpoolSaneMinFee = types.SiacoinPrecision.Div64(20).Div64(1e3)
+	// minEstimation defines a sane minimum fee per byte for transactions.  This
+	// will typically be only suggested as a fee in the absense of congestion.
+	minEstimation = types.SiacoinPrecision.Div64(20).Div64(1e3)
 )
 
 // Variables related to propagating transactions through the network.

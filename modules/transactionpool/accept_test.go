@@ -153,10 +153,10 @@ func TestCheckMinerFees(t *testing.T) {
 
 	// Recommended fees at this point should be the minimum.
 	minRec, maxRec := tpt.tpool.FeeEstimation()
-	if minRec.Cmp(TpoolSaneMinFee) < 0 {
+	if minRec.Cmp(minEstimation) < 0 {
 		t.Error("transaction pool is not respecting the sane fee minimum")
 	}
-	if maxRec.Cmp(TpoolSaneMinFee.Mul64(3)) < 0 {
+	if maxRec.Cmp(minEstimation.Mul64(3)) < 0 {
 		t.Error("transaction pool is not respecting the sane fee min maximum")
 	}
 
