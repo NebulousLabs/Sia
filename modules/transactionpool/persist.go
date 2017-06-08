@@ -27,7 +27,6 @@ var (
 	errNilFeeMedian = errors.New("no fee median found")
 )
 
-
 // threadedRegularSync will make sure that sync gets called on the database
 // every once in a while.
 func (tp *TransactionPool) threadedRegularSync() {

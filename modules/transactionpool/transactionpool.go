@@ -13,17 +13,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	dbFilename = "transactionpool.db"
-	logFile    = "transactionpool.log"
-)
-
 var (
-	dbMetadata = persist.Metadata{
-		Header:  "Sia Transaction Pool DB",
-		Version: "0.6.0",
-	}
-
 	errNilCS      = errors.New("transaction pool cannot initialize with a nil consensus set")
 	errNilGateway = errors.New("transaction pool cannot initialize with a nil gateway")
 )
@@ -157,12 +147,12 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 
 	// Set the minimum fee to the numbers recommended by the blockchain.
 	min = tp.recentMedianFee
-	max = tp.recentMedianFee.Mul64(2)
+	max = tp.recentMedianFee.Mul64(maxMultiplier)
 
 	// Method two: use 'requiredFeesToExtendPool'.
 	required := tp.requiredFeesToExtendTpool()
-	requiredMin := required.MulFloat(1.2) // Clear the local requirement by a little bit.
-	requiredMax := required.MulFloat(3)   // Clear the local requirement by a lot.
+	requiredMin := required.MulFloat(minExtendMultiplier) // Clear the local requirement by a little bit.
+	requiredMax := requiredMin.MulFloat(maxMultiplier)    // Clear the local requirement by a lot.
 	if min.Cmp(requiredMin) < 0 {
 		min = requiredMin
 	}
@@ -174,8 +164,8 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	if min.Cmp(TpoolSaneMinFee) < 0 {
 		min = TpoolSaneMinFee
 	}
-	if max.Cmp(TpoolSaneMinFee.Mul64(3)) < 0 {
-		max = TpoolSaneMinFee.Mul64(3)
+	if max.Cmp(TpoolSaneMinFee.Mul64(maxMultiplier)) < 0 {
+		max = TpoolSaneMinFee.Mul64(maxMultiplier)
 	}
 
 	return

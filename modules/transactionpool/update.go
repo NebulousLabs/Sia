@@ -8,10 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// maxTxnAge determines the maximum age of a transaction (in block height)
-// allowed before the transaction is pruned from the transaction pool.
-const maxTxnAge = types.BlockHeight(12)
-
 // purge removes all transactions from the transaction pool.
 func (tp *TransactionPool) purge() {
 	tp.knownObjects = make(map[ObjectID]TransactionSetID)
@@ -90,7 +86,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 		// If there are more than 10 blocks recorded in the txnsPerBlock, strip
 		// off the oldest blocks.
-		for len(tp.txnsPerBlock) > 10 { // TODO: Constant
+		for len(tp.txnsPerBlock) > blockFeeEstimationDepth {
 			tp.recentConfirmedFees = tp.recentConfirmedFees[tp.txnsPerBlock[0]:]
 			tp.txnsPerBlock = tp.txnsPerBlock[1:]
 		}
