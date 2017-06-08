@@ -48,7 +48,10 @@ func (g *Gateway) managedRPC(addr modules.NetAddress, name string, fn modules.RP
 		// peer probably disconnected without sending a shutdown signal;
 		// disconnect from them
 		g.log.Debugf("Could not initiate RPC with %v; disconnecting", addr)
-		if derr := g.Disconnect(addr); derr != nil {
+		g.mu.Lock()
+		delete(g.peers, addr)
+		g.mu.Unlock()
+		if derr := peer.sess.Close(); err != nil {
 			g.log.Debugf("Could not cleanly disconnect from %v: %v", addr, derr)
 		}
 		return err
