@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -62,12 +63,20 @@ type (
 		// redundancy, along with information about which pieces and contracts
 		// aren't being used.
 		//
+		// downloadingChunks tracks the set of chunks that are currently being
+		// downloaded in order to be re-uploaded.
+		//
+		// cachedChunks tracks the set of chunks that have recently been retreived
+		// from hosts.
+		//
 		// workerSet tracks the set of workers which can be used for uploading.
-		activeWorkers    map[types.FileContractID]*worker
-		availableWorkers map[types.FileContractID]*worker
-		gapCounts        map[int]int
-		incompleteChunks map[chunkID]*chunkStatus
-		resultChan       chan finishedUpload
+		activeWorkers     map[types.FileContractID]*worker
+		availableWorkers  map[types.FileContractID]*worker
+		gapCounts         map[int]int
+		incompleteChunks  map[chunkID]*chunkStatus
+		downloadingChunks map[chunkID]struct{}
+		cachedChunks      map[chunkID][]byte
+		resultChan        chan finishedUpload
 	}
 )
 
@@ -230,9 +239,21 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		}
 	}
 
+	// prune the chunk cache
+	for cid := range rs.cachedChunks {
+		if len(rs.cachedChunks) <= maxChunkCacheSize {
+			break
+		}
+		delete(rs.cachedChunks, cid)
+	}
+
 	// Scan through the chunks until a candidate for uploads is found.
 	var chunksToDelete []chunkID
 	for chunkID, chunkStatus := range rs.incompleteChunks {
+		// check if the chunk is currently being downloaded for recovery
+		if _, downloading := rs.downloadingChunks[chunkID]; downloading {
+			continue
+		}
 		// Update the number of gaps for this chunk.
 		numGaps := chunkStatus.numGaps(rs)
 		rs.gapCounts[chunkStatus.recordedGaps]--
@@ -289,6 +310,66 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 	r.managedWaitOnRepairWork(rs)
 }
 
+// managedGetChunkData grabs the requested `chunkID` from the file, in order to
+// repair the file. If the `trackedFile` can be found on disk, grab the chunk
+// from the file, otherwise attempt to queue a new download for only that chunk
+// and return the downloaded chunk.
+func (r *Renter) managedGetChunkData(rs *repairState, file *file, trackedFile trackedFile, chunkID chunkID) ([]byte, error) {
+	chunkIndex := chunkID.index
+	offset := chunkIndex * file.chunkSize()
+
+	// try to read the chunk from disk
+	f, err := os.Open(trackedFile.RepairPath)
+	if err != nil {
+		// if that fails, try to download the chunk
+		// mark the chunk as being downloaded
+		rs.downloadingChunks[chunkID] = struct{}{}
+		defer delete(rs.downloadingChunks, chunkID)
+
+		// build current contracts map
+		currentContracts := make(map[modules.NetAddress]types.FileContractID)
+		for _, contract := range r.hostContractor.Contracts() {
+			currentContracts[contract.NetAddress] = contract.ID
+		}
+
+		downloadSize := file.chunkSize()
+		if offset+downloadSize > file.size {
+			downloadSize = file.size - offset
+		}
+
+		// create a DownloadBufferWriter for the chunk
+		buf := NewDownloadBufferWriter(file.chunkSize())
+
+		// create the download object and push it on to the download queue
+		d := r.newSectionDownload(file, buf, currentContracts, offset, downloadSize)
+		go func() {
+			r.newDownloads <- d
+		}()
+
+		// wait for the download to complete and return the data
+		select {
+		case <-d.downloadFinished:
+			return buf.Bytes(), d.Err()
+		case <-r.tg.StopChan():
+			return nil, errors.New("chunk download interrupted by shutdown")
+		}
+	}
+	defer f.Close()
+
+	chunkData := make([]byte, file.chunkSize())
+	_, err = f.ReadAt(chunkData, int64(offset))
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		// TODO: We should be doing better error handling here - shouldn't be
+		// running into ErrUnexpectedEOF intentionally because if it happens
+		// unintentionally we will believe that the chunk was read from memory
+		// correctly.
+
+		return nil, err
+	}
+
+	return chunkData, nil
+}
+
 // managedScheduleChunkRepair takes a chunk and schedules some repair on that
 // chunk using the chunk state and a list of workers.
 func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, chunkStatus *chunkStatus, usefulWorkers []types.FileContractID) error {
@@ -302,24 +383,18 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 		return errFileDeleted
 	}
 
-	// Read the file data into memory.
-	chunkIndex := chunkID.index
-	fHandle, err := os.Open(meta.RepairPath)
-	if err != nil {
-		// TODO: Perform a download-and-repair instead of returning this error.
-		return build.ExtendErr("unable to open file to repair chunk", err)
-	}
-	defer fHandle.Close()
-	chunkData := make([]byte, file.chunkSize())
-	_, err = fHandle.ReadAt(chunkData, int64(chunkIndex*file.chunkSize()))
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-		// TODO: We should be doing better error handling here - shouldn't be
-		// running into ErrUnexpectedEOF intentionally because if it happens
-		// unintentionally we will believe that the chunk was read from memory
-		// correctly.
-
-		// TODO: Perform a download-and-repair instead of returning this error.
-		return build.ExtendErr("unable to read file to repair chunk", err)
+	// read the chunk into memory
+	// check the cache first
+	var chunkData []byte
+	if cachedData, exists := rs.cachedChunks[chunkID]; exists {
+		chunkData = cachedData
+	} else {
+		data, err := r.managedGetChunkData(rs, file, meta, chunkID)
+		if err != nil {
+			return build.ExtendErr("unable to get repair chunk:", err)
+		}
+		chunkData = data
+		rs.cachedChunks[chunkID] = data
 	}
 
 	// Erasure code the pieces.
@@ -344,7 +419,7 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 
 	// Encrypt the missing pieces.
 	for _, missingPiece := range missingPieces {
-		key := deriveKey(file.masterKey, chunkIndex, uint64(missingPiece))
+		key := deriveKey(file.masterKey, chunkID.index, uint64(missingPiece))
 		pieces[missingPiece] = key.EncryptBytes(pieces[missingPiece])
 	}
 
@@ -479,11 +554,13 @@ func (r *Renter) threadedQueueRepairs() {
 // before the file reaches full redundancy.
 func (r *Renter) threadedRepairLoop() {
 	rs := &repairState{
-		activeWorkers:    make(map[types.FileContractID]*worker),
-		availableWorkers: make(map[types.FileContractID]*worker),
-		gapCounts:        make(map[int]int),
-		incompleteChunks: make(map[chunkID]*chunkStatus),
-		resultChan:       make(chan finishedUpload),
+		activeWorkers:     make(map[types.FileContractID]*worker),
+		availableWorkers:  make(map[types.FileContractID]*worker),
+		gapCounts:         make(map[int]int),
+		incompleteChunks:  make(map[chunkID]*chunkStatus),
+		cachedChunks:      make(map[chunkID][]byte),
+		downloadingChunks: make(map[chunkID]struct{}),
+		resultChan:        make(chan finishedUpload),
 	}
 	for {
 		if r.tg.Add() != nil {
