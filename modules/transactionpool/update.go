@@ -37,16 +37,9 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// over 10 blocks, it is extermely likely that there will be more
 		// applied blocks than reverted blocks, and if there aren't (a height
 		// decreasing reorg), there will be more than 10 applied blocks.
-		if len(tp.txnsPerBlock) > 0 {
-			tailOffset := uint64(0)
-			for i := 0; i < len(tp.txnsPerBlock)-1; i++ {
-				tailOffset += tp.txnsPerBlock[i]
-			}
-
+		if len(tp.recentMedians) > 0 {
 			// Strip out all of the transactions in this block.
-			tp.recentConfirmedFees = tp.recentConfirmedFees[:tailOffset]
-			// Strip off the tail offset.
-			tp.txnsPerBlock = tp.txnsPerBlock[:len(tp.txnsPerBlock)-1]
+			tp.recentMedians = tp.recentMedians[:len(tp.recentMedians)-1]
 		}
 	}
 	for _, block := range cc.AppliedBlocks {
@@ -60,60 +53,62 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 		}
 
-		// Add the transactions from this block.
-		var totalSize uint64
+		// Find the median transaction fee for this block.
+		type feeSummary struct {
+			fee  types.Currency
+			size int
+		}
+		var fees []feeSummary
+		var totalSize int
 		for _, txn := range block.Transactions {
 			var feeSum types.Currency
-			size := uint64(len(encoding.Marshal(txn)))
+			size := len(encoding.Marshal(txn))
 			for _, fee := range txn.MinerFees {
 				feeSum = feeSum.Add(fee)
 			}
-			feeAvg := feeSum.Div64(size)
-			tp.recentConfirmedFees = append(tp.recentConfirmedFees, feeSummary{
-				Fee:  feeAvg,
-				Size: size,
+			feeAvg := feeSum.Div64(uint64(size))
+			fees = append(fees, feeSummary{
+				fee:  feeAvg,
+				size: size,
 			})
 			totalSize += size
 		}
 		// Add an extra zero-fee tranasction for any unused block space.
-		remaining := types.BlockSizeLimit - totalSize
-		tp.recentConfirmedFees = append(tp.recentConfirmedFees, feeSummary{
-			Fee:  types.ZeroCurrency,
-			Size: remaining, // fine if remaining is zero.
+		remaining := int(types.BlockSizeLimit) - totalSize
+		fees = append(fees, feeSummary{
+			fee:  types.ZeroCurrency,
+			size: remaining, // fine if remaining is zero.
 		})
-		// Mark the number of fee transactions in this block.
-		tp.txnsPerBlock = append(tp.txnsPerBlock, uint64(len(block.Transactions)+1))
-
-		// If there are more than 10 blocks recorded in the txnsPerBlock, strip
-		// off the oldest blocks.
-		for len(tp.txnsPerBlock) > blockFeeEstimationDepth {
-			tp.recentConfirmedFees = tp.recentConfirmedFees[tp.txnsPerBlock[0]:]
-			tp.txnsPerBlock = tp.txnsPerBlock[1:]
-		}
-
-		// Sort the recent confirmed fees, then scroll forward 10MB and set the
-		// median to that txn. First we need to create and copy the fees into a
-		// new slice so that the don't get jumbled.
-		//
-		// TODO: Sort can be altered for quickSelect, which can grab the median
-		// in constant time. When counting the number of elements on either side
-		// of the pivot, use the 'size' field instead of counting each element
-		// as one.
-		replica := make([]feeSummary, len(tp.recentConfirmedFees))
-		copy(replica, tp.recentConfirmedFees)
-		sort.Slice(replica, func(i, j int) bool {
-			return replica[i].Fee.Cmp(replica[j].Fee) < 0
+		// Sort the fees by value and then scroll until the median.
+		sort.Slice(fees, func(i, j int) bool {
+			return fees[i].fee.Cmp(fees[j].fee) < 0
 		})
-		// Scroll through the sorted fees until hitting the median.
-		var progress uint64
-		for i := range replica {
-			progress += replica[i].Size
-			if progress > (uint64(len(tp.txnsPerBlock))*types.BlockSizeLimit)/2 {
-				tp.recentMedianFee = replica[i].Fee
+		var progress int
+		for i := range fees {
+			progress += fees[i].size
+			// Due to cp4p issues, grab the median at 75% instead of at 50%.
+			if uint64(progress) > (types.BlockSizeLimit/2 + types.BlockSizeLimit/4) {
+				tp.recentMedians = append(tp.recentMedians, fees[i].fee)
 				break
 			}
 		}
+
+		// If there are more than 10 blocks recorded in the txnsPerBlock, strip
+		// off the oldest blocks.
+		for len(tp.recentMedians) > blockFeeEstimationDepth {
+			tp.recentMedians = tp.recentMedians[1:]
+		}
 	}
+	// Grab the median of the recent medians. Copy to a new slice so the sorting
+	// doesn't screw up the slice.
+	safeMedians := make([]types.Currency, len(tp.recentMedians))
+	copy(safeMedians, tp.recentMedians)
+	sort.Slice(safeMedians, func(i, j int) bool {
+		return safeMedians[i].Cmp(safeMedians[j]) < 0
+	})
+	tp.recentMedianFee = safeMedians[len(safeMedians)/2]
+
+	// Update all the on-disk structures.
 	err := tp.putRecentConsensusChange(tp.dbTx, cc.ID)
 	if err != nil {
 		tp.log.Println("ERROR: could not update the recent consensus change:", err)
@@ -123,9 +118,8 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		tp.log.Println("ERROR: could not update the block height:", err)
 	}
 	err = tp.putFeeMedian(tp.dbTx, medianPersist{
-		RecentConfirmedFees: tp.recentConfirmedFees,
-		TxnsPerBlock:        tp.txnsPerBlock,
-		RecentMedianFee:     tp.recentMedianFee,
+		RecentMedians:   tp.recentMedians,
+		RecentMedianFee: tp.recentMedianFee,
 	})
 	if err != nil {
 		tp.log.Println("ERROR: could not update the transaction pool median fee information:", err)

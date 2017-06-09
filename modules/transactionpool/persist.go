@@ -169,8 +169,7 @@ func (tp *TransactionPool) initPersist() error {
 	// Just leave the fields empty if no fee median was found. They will be
 	// filled out.
 	if err != errNilFeeMedian {
-		tp.recentConfirmedFees = mp.RecentConfirmedFees
-		tp.txnsPerBlock = mp.TxnsPerBlock
+		tp.recentMedians = mp.RecentMedians
 		tp.recentMedianFee = mp.RecentMedianFee
 	}
 
