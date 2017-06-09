@@ -165,7 +165,7 @@ func TestFileContractsPayoutValidProof(t *testing.T) {
 	for et.cs.Height() <= 10 {
 		_, err := et.miner.AddBlock()
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 	}
 
@@ -192,22 +192,22 @@ func TestFileContractsPayoutValidProof(t *testing.T) {
 	builder := et.wallet.StartTransaction()
 	err = builder.FundSiacoins(payout)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	fcIndex := builder.AddFileContract(fc)
 	tSet, err := builder.Sign(true)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	err = et.tpool.AcceptTransactionSet(tSet)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	_, err = et.miner.AddBlock()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	ti := len(tSet) - 1
@@ -216,7 +216,7 @@ func TestFileContractsPayoutValidProof(t *testing.T) {
 	// Create and submit a storage proof for the file contract.
 	segmentIndex, err := et.cs.StorageProofSegment(fcid)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	segment, hashSet := crypto.MerkleProof(file, segmentIndex)
 	sp := types.StorageProof{
@@ -228,11 +228,11 @@ func TestFileContractsPayoutValidProof(t *testing.T) {
 	builder.AddStorageProof(sp)
 	tSet, err = builder.Sign(true)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	err = et.tpool.AcceptTransactionSet(tSet)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	// Mine until contract payout is in consensus
@@ -256,8 +256,6 @@ func TestFileContractsPayoutValidProof(t *testing.T) {
 	}
 
 	if len(outputs) != len(fc.ValidProofOutputs) {
-		t.Error("Incorrect number of outputs returned")
-		t.Error("Expecting -> ", len(fc.MissedProofOutputs))
-		t.Error("But was -> ", len(outputs))
+		t.Errorf("expected %v, got %v ", fc.MissedProofOutputs, outputs)
 	}
 }

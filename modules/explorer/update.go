@@ -220,23 +220,17 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 		}
 
-		// Update stats for according to SiacoinOutputDiffs
+		// Update stats according to SiacoinOutputDiffs
 		for _, scod := range cc.SiacoinOutputDiffs {
-			scoid := scod.ID
-			sco := scod.SiacoinOutput
-
 			if scod.Direction == modules.DiffApply {
-				dbAddSiacoinOutput(tx, scoid, sco)
+				dbAddSiacoinOutput(tx, scod.ID, scod.SiacoinOutput)
 			}
 		}
 
-		// Update stats for according to SiafundOutputDiffs
+		// Update stats according to SiafundOutputDiffs
 		for _, sfod := range cc.SiafundOutputDiffs {
-			sfoid := sfod.ID
-			sfo := sfod.SiafundOutput
-
 			if sfod.Direction == modules.DiffApply {
-				dbAddSiafundOutput(tx, sfoid, sfo)
+				dbAddSiafundOutput(tx, sfod.ID, sfod.SiafundOutput)
 			}
 		}
 
