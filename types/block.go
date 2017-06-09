@@ -111,15 +111,16 @@ func (b Block) ID() BlockID {
 // transactions (one leaf per transaction).
 func (b Block) MerkleRoot() crypto.Hash {
 	tree := crypto.NewTree()
+	var buf bytes.Buffer
 	for _, payout := range b.MinerPayouts {
-		var b bytes.Buffer
-		payout.MarshalSia(&b)
-		tree.Push(b.Bytes())
+		payout.MarshalSia(&buf)
+		tree.Push(buf.Bytes())
+		buf.Reset()
 	}
 	for _, txn := range b.Transactions {
-		var b bytes.Buffer
-		txn.MarshalSia(&b)
-		tree.Push(b.Bytes())
+		txn.MarshalSia(&buf)
+		tree.Push(buf.Bytes())
+		buf.Reset()
 	}
 	return tree.Root()
 }
