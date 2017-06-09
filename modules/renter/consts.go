@@ -47,8 +47,8 @@ var (
 	// chunk download to finish before returning in the download-to-upload repair
 	// loop
 	chunkDownloadTimeout = build.Select(build.Var{
-		Dev:      time.Minute,
-		Standard: time.Minute,
-		Testing:  20 * time.Second,
+		Dev:      15 * time.Minute,
+		Standard: 15 * time.Minute,
+		Testing:  40 * time.Second,
 	}).(time.Duration)
 )
