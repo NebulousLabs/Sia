@@ -46,11 +46,12 @@ type HostDB struct {
 	// handful of goroutines constantly waiting on the channel for hosts to
 	// scan. The scan map is used to prevent duplicates from entering the scan
 	// pool.
-	scanList []modules.HostDBEntry
-	scanMap  map[string]struct{}
-	scanPool chan modules.HostDBEntry
-	scanWait bool
-	online   bool
+	scanList        []modules.HostDBEntry
+	scanMap         map[string]struct{}
+	scanPool        chan modules.HostDBEntry
+	scanWait        bool
+	online          bool
+	scanningThreads int
 
 	blockHeight types.BlockHeight
 	lastChange  modules.ConsensusChangeID
@@ -168,9 +169,6 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		hdb.mu.Lock()
 		hdb.online = true
 		hdb.mu.Unlock()
-	}
-	for i := 0; i < scanningThreads; i++ {
-		go hdb.threadedProbeHosts()
 	}
 
 	// Spawn the scan loop during production, but allow it to be disrupted

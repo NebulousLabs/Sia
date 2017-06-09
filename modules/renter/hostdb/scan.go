@@ -34,8 +34,8 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 
 	// Sanity check - the scan map and the scan list should have the same
 	// length.
-	if build.DEBUG && len(hdb.scanMap) > len(hdb.scanList)+scanningThreads {
-		hdb.log.Critical("The hostdb scan map has seemingly grown too large:", len(hdb.scanMap), len(hdb.scanList), scanningThreads)
+	if build.DEBUG && len(hdb.scanMap) > len(hdb.scanList)+maxScanningThreads {
+		hdb.log.Critical("The hostdb scan map has seemingly grown too large:", len(hdb.scanMap), len(hdb.scanList), maxScanningThreads)
 	}
 
 	hdb.scanWait = true
@@ -75,6 +75,13 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			hdb.log.Debugf("Sending host %v for scan, %v hosts remain", entry.PublicKey.String(), scansRemaining)
 			select {
 			case hdb.scanPool <- entry:
+				// Create new worker thread
+				hdb.mu.Lock()
+				if hdb.scanningThreads < maxScanningThreads {
+					go hdb.threadedProbeHosts()
+					hdb.scanningThreads++
+				}
+				hdb.mu.Unlock()
 				// iterate again
 			case <-hdb.tg.StopChan():
 				// quit
@@ -254,6 +261,12 @@ func (hdb *HostDB) threadedProbeHosts() {
 		select {
 		case <-hdb.tg.StopChan():
 			return
+		case <-time.After(time.Second * 5):
+			// Wait a few seconds but quit if there is no more work
+			hdb.mu.RLock()
+			hdb.scanningThreads--
+			hdb.mu.RUnlock()
+			return
 		case hostEntry := <-hdb.scanPool:
 			// Block the scan until the host is online.
 			for {
@@ -262,14 +275,6 @@ func (hdb *HostDB) threadedProbeHosts() {
 				hdb.mu.RUnlock()
 				if online {
 					break
-				}
-
-				// Check again in 30 seconds.
-				select {
-				case <-time.After(time.Second * 30):
-					continue
-				case <-hdb.tg.StopChan():
-					return
 				}
 			}
 
