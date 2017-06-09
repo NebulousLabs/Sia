@@ -9,6 +9,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 const (
@@ -143,17 +144,51 @@ type (
 // ID returns the id of a transaction, which is taken by marshalling all of the
 // fields except for the signatures and taking the hash of the result.
 func (t Transaction) ID() TransactionID {
-	return TransactionID(crypto.HashAll(
-		t.SiacoinInputs,
-		t.SiacoinOutputs,
-		t.FileContracts,
-		t.FileContractRevisions,
-		t.StorageProofs,
-		t.SiafundInputs,
-		t.SiafundOutputs,
-		t.MinerFees,
-		t.ArbitraryData,
-	))
+	var hash crypto.Hash
+	h := crypto.NewHash()
+	enc := encoding.NewEncoder(h)
+
+	for i := range t.SiacoinInputs {
+		t.SiacoinInputs[i].MarshalSia(h)
+	}
+	encoding.WriteInt(h, len((t.SiacoinOutputs)))
+	for i := range t.SiacoinOutputs {
+		t.SiacoinOutputs[i].MarshalSia(h)
+	}
+	encoding.WriteInt(h, len((t.FileContracts)))
+	for i := range t.FileContracts {
+		enc.Encode(t.FileContracts[i])
+	}
+	encoding.WriteInt(h, len((t.FileContractRevisions)))
+	for i := range t.FileContractRevisions {
+		enc.Encode(t.FileContractRevisions[i])
+	}
+	encoding.WriteInt(h, len((t.StorageProofs)))
+	for i := range t.StorageProofs {
+		enc.Encode(t.StorageProofs[i])
+	}
+	encoding.WriteInt(h, len((t.SiafundInputs)))
+	for i := range t.SiafundInputs {
+		enc.Encode(t.SiafundInputs[i])
+	}
+	encoding.WriteInt(h, len((t.SiafundOutputs)))
+	for i := range t.SiafundOutputs {
+		t.SiafundOutputs[i].MarshalSia(h)
+	}
+	encoding.WriteInt(h, len((t.MinerFees)))
+	for i := range t.MinerFees {
+		t.MinerFees[i].MarshalSia(h)
+	}
+	encoding.WriteInt(h, len((t.ArbitraryData)))
+	for i := range t.ArbitraryData {
+		encoding.WritePrefix(h, t.ArbitraryData[i])
+	}
+	encoding.WriteInt(h, len((t.TransactionSignatures)))
+	for i := range t.TransactionSignatures {
+		t.TransactionSignatures[i].MarshalSia(h)
+	}
+	h.Sum(hash[:0])
+	return TransactionID(hash)
 }
 
 // SiacoinOutputID returns the ID of a siacoin output at the given index,
