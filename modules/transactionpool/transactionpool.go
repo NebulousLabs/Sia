@@ -13,17 +13,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	dbFilename = "transactionpool.db"
-	logFile    = "transactionpool.log"
-)
-
 var (
-	dbMetadata = persist.Metadata{
-		Header:  "Sia Transaction Pool DB",
-		Version: "0.6.0",
-	}
-
 	errNilCS      = errors.New("transaction pool cannot initialize with a nil consensus set")
 	errNilGateway = errors.New("transaction pool cannot initialize with a nil gateway")
 )
@@ -60,12 +50,16 @@ type (
 		transactionSets     map[TransactionSetID][]types.Transaction
 		transactionSetDiffs map[TransactionSetID]modules.ConsensusChange
 		transactionListSize int
-		blockHeight         types.BlockHeight
 		// TODO: Write a consistency check comparing transactionSets,
 		// transactionSetDiffs.
 		//
 		// TODO: Write a consistency check making sure that all unconfirmedIDs
 		// point to the right place, and that all UnconfirmedIDs are accounted for.
+
+		blockHeight         types.BlockHeight
+		recentConfirmedFees []feeSummary
+		txnsPerBlock        []uint64       // the number of txns in each of the blocks
+		recentMedianFee     types.Currency // SC per byte
 
 		// The consensus change index tracks how many consensus changes have
 		// been sent to the transaction pool. When a new subscriber joins the
@@ -151,12 +145,14 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// event of empty blocks, there should still be some fees being added to the
 	// chain.
 
-	// TODO: Implement the blockchain method.
+	// Set the minimum fee to the numbers recommended by the blockchain.
+	min = tp.recentMedianFee
+	max = tp.recentMedianFee.Mul64(maxMultiplier)
 
 	// Method two: use 'requiredFeesToExtendPool'.
 	required := tp.requiredFeesToExtendTpool()
-	requiredMin := required.MulFloat(1.2) // Clear the local requirement by a little bit.
-	requiredMax := required.MulFloat(3)   // Clear the local requirement by a lot.
+	requiredMin := required.MulFloat(minExtendMultiplier) // Clear the local requirement by a little bit.
+	requiredMax := requiredMin.MulFloat(maxMultiplier)    // Clear the local requirement by a lot.
 	if min.Cmp(requiredMin) < 0 {
 		min = requiredMin
 	}
@@ -165,11 +161,11 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	}
 
 	// Method three: sane mimimums.
-	if min.Cmp(TpoolSaneMinFee) < 0 {
-		min = TpoolSaneMinFee
+	if min.Cmp(minEstimation) < 0 {
+		min = minEstimation
 	}
-	if max.Cmp(TpoolSaneMinFee.Mul64(3)) < 0 {
-		max = TpoolSaneMinFee.Mul64(3)
+	if max.Cmp(minEstimation.Mul64(maxMultiplier)) < 0 {
+		max = minEstimation.Mul64(maxMultiplier)
 	}
 
 	return

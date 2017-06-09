@@ -16,42 +16,11 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	// TransactionPoolSizeTarget defines the target size of the pool when the
-	// transactions are paying 1 SC / kb in fees.
-	TransactionPoolSizeTarget = 2e6
-
-	// TransactionPoolFeeExponentiation defines the polynomial rate of growth
-	// required to keep putting transactions into the transaction pool. If the
-	// exponentiation is 2, then doubling the size of the transaction pool
-	// requires quadrupling the fees of the transactions being added.
-	TransactionPoolExponentiation = 3
-
-	// TransactionPoolSizeForFee defines how large the transaction pool needs to
-	// be before it starts expecting fees to be on the transaction. This initial
-	// limit is to help the network grow and provide some wiggle room for
-	// wallets that are not yet able to operate via a fee market.
-	TransactionPoolSizeForFee = 500e3
-)
-
 var (
 	errObjectConflict      = errors.New("transaction set conflicts with an existing transaction set")
 	errFullTransactionPool = errors.New("transaction pool cannot accept more transactions")
 	errLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
 	errEmptySet            = errors.New("transaction set is empty")
-
-	// TpoolSaneMinFee defines a sane minimum fee per byte for transactions.
-	// This will typically be only suggested as a fee in the absense of
-	// congestion.
-	TpoolSaneMinFee = types.SiacoinPrecision.Div64(20).Div64(1e3)
-
-	// relayTransactionSetTimeout establishes the timeout for a relay
-	// transaction set call.
-	relayTransactionSetTimeout = build.Select(build.Var{
-		Standard: 3 * time.Minute,
-		Dev:      20 * time.Second,
-		Testing:  3 * time.Second,
-	}).(time.Duration)
 )
 
 // relatedObjectIDs determines all of the object ids related to a transaction.
