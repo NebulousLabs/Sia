@@ -232,6 +232,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 
 	// Transaction pool API Calls
 	if api.tpool != nil {
+		router.GET("/tpool/fee", api.tpoolFeeHandlerGET)
 		router.GET("/tpool/raw/:id", api.tpoolRawHandlerGET)
 		router.POST("/tpool/raw", api.tpoolRawHandlerPOST)
 

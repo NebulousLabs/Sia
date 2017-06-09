@@ -13,6 +13,11 @@ import (
 )
 
 type (
+	TpoolFeeGET struct {
+		Minimum types.Currency `json:"minimum"`
+		Maximum types.Currency `json:"maximum"`
+	}
+
 	// TpoolRawGET contains the requested transaction encoded to the raw
 	// format, along with the id of that transaction.
 	TpoolRawGET struct {
@@ -32,7 +37,17 @@ func decodeTransactionID(txidStr string) (types.TransactionID, error) {
 	return types.TransactionID(*txid), nil
 }
 
-// transactionpoolRawHandlerGET will provide the raw byte representation of a
+// tpoolFeeHandlerGET returns the current estimated fee. Transactions with
+// fees are lower than the estimated fee may take longer to confirm.
+func (api *API) tpoolFeeHandlerGET(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	min, max := api.tpool.FeeEstimation()
+	WriteJSON(w, TpoolFeeGET{
+		Minimum: min,
+		Maximum: max,
+	})
+}
+
+// tpoolRawHandlerGET will provide the raw byte representation of a
 // transaction that matches the input id.
 func (api *API) tpoolRawHandlerGET(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	txid, err := decodeTransactionID(ps.ByName("id"))
@@ -53,7 +68,7 @@ func (api *API) tpoolRawHandlerGET(w http.ResponseWriter, req *http.Request, ps 
 	})
 }
 
-// transactionpoolRawHandlerPOST takes a raw encoded transaction set and posts
+// tpoolRawHandlerPOST takes a raw encoded transaction set and posts
 // it to the transaction pool, relaying it to the transaction pool's peers
 // regardless of if the set is accepted.
 func (api *API) tpoolRawHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
