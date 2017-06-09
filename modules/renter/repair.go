@@ -352,6 +352,8 @@ func (r *Renter) managedGetChunkData(rs *repairState, file *file, trackedFile tr
 			return buf.Bytes(), d.Err()
 		case <-r.tg.StopChan():
 			return nil, errors.New("chunk download interrupted by shutdown")
+		case <-time.After(chunkDownloadTimeout):
+			return nil, errors.New("chunk download timed out")
 		}
 	}
 	defer f.Close()

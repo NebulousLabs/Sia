@@ -42,4 +42,13 @@ var (
 		Standard: 30,
 		Testing:  60,
 	}).(int)
+
+	// chunkDownloadTimeout defines the maximum amount of time to wait for a
+	// chunk download to finish before returning in the download-to-upload repair
+	// loop
+	chunkDownloadTimeout = build.Select(build.Var{
+		Dev:      time.Minute,
+		Standard: time.Minute,
+		Testing:  20 * time.Second,
+	}).(time.Duration)
 )
