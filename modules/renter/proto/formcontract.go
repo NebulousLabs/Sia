@@ -19,7 +19,7 @@ const (
 
 // FormContract forms a contract with a host and submits the contract
 // transaction to tpool.
-func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool) (modules.RenterContract, error) {
+func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, cancel <-chan struct{}) (modules.RenterContract, error) {
 	// Extract vars from params, for convenience.
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
 
@@ -96,7 +96,11 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	txnSet := append(parentTxns, txn)
 
 	// Initiate connection.
-	conn, err := net.DialTimeout("tcp", string(host.NetAddress), 15*time.Second)
+	dialer := &net.Dialer{
+		Cancel:  cancel,
+		Timeout: 15 * time.Second,
+	}
+	conn, err := dialer.Dial("tcp", string(host.NetAddress))
 	if err != nil {
 		return modules.RenterContract{}, err
 	}

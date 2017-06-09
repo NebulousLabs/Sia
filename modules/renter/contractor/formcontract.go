@@ -104,7 +104,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 	// create transaction builder
 	txnBuilder := c.wallet.StartTransaction()
 
-	contract, err := proto.FormContract(params, txnBuilder, c.tpool)
+	contract, err := proto.FormContract(params, txnBuilder, c.tpool, c.tg.StopChan())
 	if err != nil {
 		txnBuilder.Drop()
 		return modules.RenterContract{}, err
