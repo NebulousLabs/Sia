@@ -39,6 +39,7 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 	}
 
 	hdb.scanWait = true
+	scanStop := make(chan struct{})
 	go func() {
 		// Nobody is emptying the scan list, volunteer.
 		if hdb.tg.Add() != nil {
@@ -55,6 +56,7 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 				// Scan list is empty, can exit. Let the world know that nobody
 				// is emptying the scan list anymore.
 				hdb.scanWait = false
+				close(scanStop)
 				hdb.mu.Unlock()
 				return
 			}
@@ -69,19 +71,18 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			if exists {
 				entry = recentEntry
 			}
+
+			// Create new worker thread
+			if hdb.scanningThreads < maxScanningThreads {
+				hdb.scanningThreads++
+				go hdb.threadedProbeHosts(scanStop)
+			}
 			hdb.mu.Unlock()
 
 			// Block while waiting for an opening in the scan pool.
 			hdb.log.Debugf("Sending host %v for scan, %v hosts remain", entry.PublicKey.String(), scansRemaining)
 			select {
 			case hdb.scanPool <- entry:
-				// Create new worker thread
-				hdb.mu.Lock()
-				if hdb.scanningThreads < maxScanningThreads {
-					go hdb.threadedProbeHosts()
-					hdb.scanningThreads++
-				}
-				hdb.mu.Unlock()
 				// iterate again
 			case <-hdb.tg.StopChan():
 				// quit
@@ -250,22 +251,21 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 }
 
 // threadedProbeHosts pulls hosts from the thread pool and runs a scan on them.
-func (hdb *HostDB) threadedProbeHosts() {
+func (hdb *HostDB) threadedProbeHosts(cancel <-chan struct{}) {
 	err := hdb.tg.Add()
 	if err != nil {
 		return
 	}
 	defer hdb.tg.Done()
-
 	for {
 		select {
 		case <-hdb.tg.StopChan():
 			return
-		case <-time.After(time.Second * 5):
-			// Wait a few seconds but quit if there is no more work
-			hdb.mu.RLock()
+		case <-cancel:
+			// Stop if no more new entries are expected
+			hdb.mu.Lock()
 			hdb.scanningThreads--
-			hdb.mu.RUnlock()
+			hdb.mu.Unlock()
 			return
 		case hostEntry := <-hdb.scanPool:
 			// Block the scan until the host is online.
