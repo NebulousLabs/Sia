@@ -43,9 +43,9 @@ var (
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
 	maxScanningThreads = build.Select(build.Var{
-		Standard: int(20),
-		Dev:      int(4),
-		Testing:  int(3),
+		Standard: int(40),
+		Dev:      int(8),
+		Testing:  int(6),
 	}).(int)
 )
 

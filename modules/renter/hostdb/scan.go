@@ -250,15 +250,21 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	hdb.mu.Unlock()
 }
 
-// runs scan on a host
+// threadedProbeHost runs a scan on a single host
 func (hdb *HostDB) threadedProbeHost(hostEntry modules.HostDBEntry) {
-	// Block the scan until the host is online.
+	// Block until hostdb has internet connectivity.
 	for {
 		hdb.mu.RLock()
 		online := hdb.online
 		hdb.mu.RUnlock()
 		if online {
 			break
+		}
+		select {
+		case <-time.After(time.Second * 30):
+			continue
+		case <-hdb.tg.StopChan():
+			return
 		}
 	}
 
