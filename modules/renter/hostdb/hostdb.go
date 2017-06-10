@@ -48,7 +48,6 @@ type HostDB struct {
 	// pool.
 	scanList        []modules.HostDBEntry
 	scanMap         map[string]struct{}
-	scanPool        chan modules.HostDBEntry
 	scanWait        bool
 	online          bool
 	scanningThreads int
@@ -81,8 +80,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		gateway:    g,
 		persistDir: persistDir,
 
-		scanMap:  make(map[string]struct{}),
-		scanPool: make(chan modules.HostDBEntry),
+		scanMap: make(map[string]struct{}),
 	}
 
 	// Create the persist directory if it does not yet exist.
