@@ -8,6 +8,124 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// findSets takes a bunch of transactions (presumably from a block) and finds
+// all of the separate transaction sets within it. Set does not check for
+// conflicts.
+func findSets(ts []types.Transaction) [][]types.Transaction {
+	// txMap marks what set each transaction is in. If two sets get combined,
+	// this number will not be updated. The 'forwards' map defined further on
+	// will help to discover which sets have been combined.
+	txMap := make(map[types.TransactionID]int)
+	setMap := make(map[int][]types.Transaction)
+	objMap := make(map[ObjectID]types.TransactionID)
+	forwards := make(map[int]int)
+
+	// Define a function to follow and collapse any update chain.
+	forward := func(prev int) (ret int) {
+		ret = prev
+		next, exists := forwards[prev]
+		for exists {
+			ret = next
+			forwards[prev] = next // collapse the forwards function to prevent quadratic runtime of findSets.
+			next, exists = forwards[next]
+		}
+		return ret
+	}
+
+	// Add the transactions to the setup one-by-one, merging them as they belong
+	// to a set.
+	for i, t := range ts {
+		// Check if the inputs depend on any previous transaction outputs.
+		tid := t.ID()
+		parentSets := make(map[int]struct{})
+		for _, obj := range t.SiacoinInputs {
+			txid, exists := objMap[ObjectID(obj.ParentID)]
+			if exists {
+				parentSet := forward(txMap[txid])
+				parentSets[parentSet] = struct{}{}
+			}
+		}
+		for _, obj := range t.FileContractRevisions {
+			txid, exists := objMap[ObjectID(obj.ParentID)]
+			if exists {
+				parentSet := forward(txMap[txid])
+				parentSets[parentSet] = struct{}{}
+			}
+		}
+		for _, obj := range t.StorageProofs {
+			txid, exists := objMap[ObjectID(obj.ParentID)]
+			if exists {
+				parentSet := forward(txMap[txid])
+				parentSets[parentSet] = struct{}{}
+			}
+		}
+		for _, obj := range t.SiafundInputs {
+			txid, exists := objMap[ObjectID(obj.ParentID)]
+			if exists {
+				parentSet := forward(txMap[txid])
+				parentSets[parentSet] = struct{}{}
+			}
+		}
+
+		// Determine the new counter for this transaction.
+		if len(parentSets) == 0 {
+			// No parent sets. Make a new set for this transaction.
+			txMap[tid] = i
+			setMap[i] = []types.Transaction{t}
+			// Don't need to add anything for the file contract outputs, storage
+			// proof outputs, siafund claim outputs; these outputs are not
+			// allowed to be spent until 50 confirmations.
+		} else {
+			// There are parent sets, pick one as the base and then merge the
+			// rest into it.
+			parentsSlice := make([]int, 0, len(parentSets))
+			for j := range parentSets {
+				parentsSlice = append(parentsSlice, j)
+			}
+			base := parentsSlice[0]
+			txMap[tid] = base
+			for _, j := range parentsSlice[1:] {
+				// Forward any future transactions pointing at this set to the
+				// base set.
+				forwards[j] = base
+				// Combine the transactions in this set with the transactions in
+				// the base set.
+				setMap[base] = append(setMap[base], setMap[j]...)
+				// Delete this set map, it has been merged with the base set.
+				delete(setMap, j)
+			}
+			// Add this transaction to the base set.
+			setMap[base] = append(setMap[base], t)
+		}
+
+		// Mark this transaction's outputs as potential inputs to future
+		// transactions.
+		for j := range t.SiacoinOutputs {
+			scoid := t.SiacoinOutputID(uint64(j))
+			objMap[ObjectID(scoid)] = tid
+		}
+		for j := range t.FileContracts {
+			fcid := t.FileContractID(uint64(j))
+			objMap[ObjectID(fcid)] = tid
+		}
+		for j := range t.FileContractRevisions {
+			fcid := t.FileContractRevisions[j].ParentID
+			objMap[ObjectID(fcid)] = tid
+		}
+		for j := range t.SiafundOutputs {
+			sfoid := t.SiafundOutputID(uint64(j))
+			objMap[ObjectID(sfoid)] = tid
+		}
+	}
+
+	// Compile the final group of sets.
+	ret := make([][]types.Transaction, 0, len(setMap))
+	for _, set := range setMap {
+		ret = append(ret, set)
+	}
+	return ret
+}
+
 // purge removes all transactions from the transaction pool.
 func (tp *TransactionPool) purge() {
 	tp.knownObjects = make(map[ObjectID]TransactionSetID)
@@ -60,18 +178,23 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 		var fees []feeSummary
 		var totalSize int
-		for _, txn := range block.Transactions {
+		txnSets := findSets(block.Transactions)
+		for _, set := range txnSets {
+			// Compile the fees for this set.
 			var feeSum types.Currency
-			size := len(encoding.Marshal(txn))
-			for _, fee := range txn.MinerFees {
-				feeSum = feeSum.Add(fee)
+			var sizeSum int
+			for _, txn := range set {
+				sizeSum += len(encoding.Marshal(txn))
+				for _, fee := range txn.MinerFees {
+					feeSum = feeSum.Add(fee)
+				}
 			}
-			feeAvg := feeSum.Div64(uint64(size))
+			feeAvg := feeSum.Div64(uint64(sizeSum))
 			fees = append(fees, feeSummary{
 				fee:  feeAvg,
-				size: size,
+				size: sizeSum,
 			})
-			totalSize += size
+			totalSize += sizeSum
 		}
 		// Add an extra zero-fee tranasction for any unused block space.
 		remaining := int(types.BlockSizeLimit) - totalSize
@@ -86,8 +209,10 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		var progress int
 		for i := range fees {
 			progress += fees[i].size
-			// Due to cp4p issues, grab the median at 75% instead of at 50%.
-			if uint64(progress) > (types.BlockSizeLimit/2 + types.BlockSizeLimit/4) {
+			// Instead of grabbing the full median, look at the 75%-ile. It's
+			// going to be cheaper than the 50%-ile, but it still got into a
+			// block.
+			if uint64(progress) > types.BlockSizeLimit/4 {
 				tp.recentMedians = append(tp.recentMedians, fees[i].fee)
 				break
 			}

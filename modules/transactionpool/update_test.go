@@ -8,6 +8,134 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestFindSets checks that the findSets functions is properly parsing and
+// combining transactions into their minimal sets.
+func TestFindSets(t *testing.T) {
+	// Graph a graph which is a chain. Graph will be invalid, but we don't need
+	// the consensus set, so no worries.
+	graph1Size := 5
+	edges := make([]types.TransactionGraphEdge, 0, graph1Size)
+	for i := 0; i < graph1Size; i++ {
+		edges = append(edges, types.TransactionGraphEdge{
+			Dest:   i + 1,
+			Fee:    types.NewCurrency64(5),
+			Source: i,
+			Value:  types.NewCurrency64(100),
+		})
+	}
+	graph1, err := types.TransactionGraph(types.SiacoinOutputID{}, edges)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Split the graph using findSets. Result should be a single set with 5
+	// transactions.
+	sets := findSets(graph1)
+	if len(sets) != 1 {
+		t.Fatal("there should be only one set")
+	}
+	if len(sets[0]) != graph1Size {
+		t.Error("findSets is not grouping the transactions correctly")
+	}
+
+	// Create a second graph to check it can handle two graphs.
+	graph2Size := 6
+	edges = make([]types.TransactionGraphEdge, 0, graph2Size)
+	for i := 0; i < graph2Size; i++ {
+		edges = append(edges, types.TransactionGraphEdge{
+			Dest:   i + 1,
+			Fee:    types.NewCurrency64(5),
+			Source: i,
+			Value:  types.NewCurrency64(100),
+		})
+	}
+	graph2, err := types.TransactionGraph(types.SiacoinOutputID{1}, edges)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sets = findSets(append(graph1, graph2...))
+	if len(sets) != 2 {
+		t.Fatal("there should be two sets")
+	}
+	lens := make(map[int]struct{})
+	lens[len(sets[0])] = struct{}{}
+	lens[len(sets[1])] = struct{}{}
+	_, exists1 := lens[graph1Size]
+	_, exists2 := lens[graph2Size]
+	if !exists1 || !exists2 {
+		t.Fatal("there should be five transactions in each set")
+	}
+
+	// Create a diamond graph to make sure it can handle diamond graph.
+	edges = make([]types.TransactionGraphEdge, 0, 5)
+	sources := []int{0, 0, 1, 2, 3}
+	dests := []int{1, 2, 3, 3, 4}
+	for i := 0; i < 5; i++ {
+		edges = append(edges, types.TransactionGraphEdge{
+			Dest:   dests[i],
+			Fee:    types.NewCurrency64(5),
+			Source: sources[i],
+			Value:  types.NewCurrency64(100),
+		})
+	}
+	graph3, err := types.TransactionGraph(types.SiacoinOutputID{2}, edges)
+	graph3Size := len(graph3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sets = findSets(append(graph1, append(graph2, graph3...)...))
+	if len(sets) != 3 {
+		t.Fatal("there should be two sets")
+	}
+	lens = make(map[int]struct{})
+	lens[len(sets[0])] = struct{}{}
+	lens[len(sets[1])] = struct{}{}
+	lens[len(sets[2])] = struct{}{}
+	_, exists1 = lens[graph1Size]
+	_, exists2 = lens[graph2Size]
+	_, exists3 := lens[graph3Size]
+	if !exists1 || !exists2 || !exists3 {
+		t.Fatal("sets have wrong counts", exists1, exists2, exists3)
+	}
+
+	// Sporadically weave the transactions and make sure the set finder still
+	// parses the sets correctly (sets can assumed to be ordered, but not all in
+	// a row).
+	var sporadic []types.Transaction
+	for len(graph1) > 0 || len(graph2) > 0 || len(graph3) > 0 {
+		if len(graph1) > 0 {
+			sporadic = append(sporadic, graph1[0])
+			graph1 = graph1[1:]
+		}
+		if len(graph2) > 0 {
+			sporadic = append(sporadic, graph2[0])
+			graph2 = graph2[1:]
+		}
+		if len(graph3) > 0 {
+			sporadic = append(sporadic, graph3[0])
+			graph3 = graph3[1:]
+		}
+	}
+	if len(sporadic) != graph1Size+graph2Size+graph3Size {
+		t.Error("sporadic block creation failed")
+	}
+	// Result of findSets should match previous result.
+	sets = findSets(sporadic)
+	if len(sets) != 3 {
+		t.Fatal("there should be two sets")
+	}
+	lens = make(map[int]struct{})
+	lens[len(sets[0])] = struct{}{}
+	lens[len(sets[1])] = struct{}{}
+	lens[len(sets[2])] = struct{}{}
+	_, exists1 = lens[graph1Size]
+	_, exists2 = lens[graph2Size]
+	_, exists3 = lens[graph3Size]
+	if !exists1 || !exists2 || !exists3 {
+		t.Fatal("sets have wrong counts", exists1, exists2, exists3)
+	}
+}
+
 // TestArbDataOnly tries submitting a transaction with only arbitrary data to
 // the transaction pool. Then a block is mined, putting the transaction on the
 // blockchain. The arb data transaction should no longer be in the transaction
