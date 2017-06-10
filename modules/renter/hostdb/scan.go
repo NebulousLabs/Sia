@@ -250,6 +250,23 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	hdb.mu.Unlock()
 }
 
+// runs scan on a host
+func (hdb *HostDB) threadedProbeHost(hostEntry modules.HostDBEntry) {
+	// Block the scan until the host is online.
+	for {
+		hdb.mu.RLock()
+		online := hdb.online
+		hdb.mu.RUnlock()
+		if online {
+			break
+		}
+	}
+
+	// There appears to be internet connectivity, continue with the
+	// scan.
+	hdb.managedScanHost(hostEntry)
+}
+
 // threadedProbeHosts pulls hosts from the thread pool and runs a scan on them.
 func (hdb *HostDB) threadedProbeHosts(cancel <-chan struct{}) {
 	err := hdb.tg.Add()
@@ -258,29 +275,27 @@ func (hdb *HostDB) threadedProbeHosts(cancel <-chan struct{}) {
 	}
 	defer hdb.tg.Done()
 	for {
+		// Shutdown or host scans have higher priority than cancel
 		select {
 		case <-hdb.tg.StopChan():
 			return
+		case hostEntry := <-hdb.scanPool:
+			// scan host if available
+			hdb.threadedProbeHost(hostEntry)
+		default:
+			// Continue
+		}
+		// Only cancel if no host was available to scan before
+		select {
+		case <-hdb.tg.StopChan():
+			return
+		case hostEntry := <-hdb.scanPool:
+			hdb.threadedProbeHost(hostEntry)
 		case <-cancel:
-			// Stop if no more new entries are expected
 			hdb.mu.Lock()
 			hdb.scanningThreads--
 			hdb.mu.Unlock()
 			return
-		case hostEntry := <-hdb.scanPool:
-			// Block the scan until the host is online.
-			for {
-				hdb.mu.RLock()
-				online := hdb.online
-				hdb.mu.RUnlock()
-				if online {
-					break
-				}
-			}
-
-			// There appears to be internet connectivity, continue with the
-			// scan.
-			hdb.managedScanHost(hostEntry)
 		}
 	}
 }
