@@ -26,10 +26,6 @@ var (
 	traceLock   sync.Mutex
 )
 
-const (
-	sleepCap = 10 * time.Minute
-)
-
 // StartCPUProfile starts cpu profiling. An error will be returned if a cpu
 // profiler is already running.
 func StartCPUProfile(profileDir, identifier string) error {
@@ -122,7 +118,7 @@ func StopTrace() {
 
 // startContinuousLog creates dir and saves inexpensive logs periodically.
 // It also runs the restart function periodically.
-func startContinuousLog(dir string, restart func()) {
+func startContinuousLog(dir string, sleepCap time.Duration, restart func()) {
 	// Create the folder for all of the profiling results.
 	err := os.MkdirAll(dir, 0700)
 	if err != nil {
@@ -146,7 +142,7 @@ func startContinuousLog(dir string, restart func()) {
 			restart()
 			time.Sleep(sleepTime)
 			sleepTime = time.Duration(1.5 * float64(sleepTime))
-			if sleepTime > sleepCap {
+			if sleepCap != 0 * time.Second && sleepTime > sleepCap {
 				sleepTime = sleepCap
 			}
 			var m runtime.MemStats
@@ -161,7 +157,11 @@ func startContinuousLog(dir string, restart func()) {
 // logger. Select one (recommended) or more functionalities by passing the
 // corresponding flag(s)
 func StartContinuousProfile(profileDir string, profileCPU bool, profileMem bool, profileTrace bool) {
-	startContinuousLog(profileDir, func() {
+	sleepCap := 0 * time.Second // Unlimited.
+	if profileTrace {
+		sleepCap = 10 * time.Minute
+	}
+	startContinuousLog(profileDir, sleepCap, func() {
 		if profileCPU {
 			StopCPUProfile()
 			StartCPUProfile(profileDir, "continuousProfileCPU")
