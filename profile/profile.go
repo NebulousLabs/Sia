@@ -26,6 +26,10 @@ var (
 	traceLock   sync.Mutex
 )
 
+const (
+	sleepCap = 10 * time.Minute
+)
+
 // StartCPUProfile starts cpu profiling. An error will be returned if a cpu
 // profiler is already running.
 func StartCPUProfile(profileDir, identifier string) error {
@@ -142,7 +146,9 @@ func startContinuousLog(dir string, restart func()) {
 			restart()
 			time.Sleep(sleepTime)
 			sleepTime = time.Duration(1.5 * float64(sleepTime))
-
+			if sleepTime > sleepCap {
+				sleepTime = sleepCap
+			}
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
 			log.Printf("\n\tGoroutines: %v\n\tAlloc: %v\n\tTotalAlloc: %v\n\tHeapAlloc: %v\n\tHeapSys: %v\n", runtime.NumGoroutine(), m.Alloc, m.TotalAlloc, m.HeapAlloc, m.HeapSys)
