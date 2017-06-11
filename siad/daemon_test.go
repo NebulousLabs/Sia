@@ -68,7 +68,7 @@ func TestUnitProcessModules(t *testing.T) {
 	}
 }
 
-// TestUnitProcessProfile tests that processProfile correctly processes profiles
+// TestUnitProcessProfile tests that processProfileFlags correctly processes profiles
 // passed to the --profile flag.
 func TestUnitProcessProfile(t *testing.T) {
 	// Test valid profiles.
@@ -86,21 +86,21 @@ func TestUnitProcessProfile(t *testing.T) {
 		{"T", "t"},
 	}
 	for _, testVal := range testVals {
-		out, err := processProfile(testVal.in)
+		out, err := processProfileFlags(testVal.in)
 		if err != nil {
-			t.Error("processProfile failed with error:", err)
+			t.Error("processProfileFlags failed with error:", err)
 		}
 		if out != testVal.out {
-			t.Errorf("processProfile returned incorrect modules: expected %s, got %s\n", testVal.out, out)
+			t.Errorf("processProfileFlags returned incorrect modules: expected %s, got %s\n", testVal.out, out)
 		}
 	}
 
 	// Test invalid modules.
 	invalidProfiles := []string{"abdfijklnopqsuvxyz", "cghmrtwez", "cz", "z", "cc", "ccz", "ccm", "cmm", "ccmm", "g", "h", "cghmrtwe", "CGHMRTWE", "mts"}
 	for _, invalidProfiles := range invalidProfiles {
-		_, err := processProfile(invalidProfiles)
+		_, err := processProfileFlags(invalidProfiles)
 		if err == nil {
-			t.Error("processProfile didn't error on invalid profile:", invalidProfiles)
+			t.Error("processProfileFlags didn't error on invalid profile:", invalidProfiles)
 		}
 	}
 }

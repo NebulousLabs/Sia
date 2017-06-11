@@ -77,8 +77,8 @@ func processModules(modules string) (string, error) {
 	return modules, nil
 }
 
-// processProfiles checks that the flags given for profiling are valid.
-func processProfile(profile string) (string, error) {
+// processProfileFlags checks that the flags given for profiling are valid.
+func processProfileFlags(profile string) (string, error) {
 	profile = strings.ToLower(profile)
 	validProfiles := "cmt"
 
@@ -100,7 +100,7 @@ func processConfig(config Config) (Config, error) {
 	config.Siad.RPCaddr = processNetAddr(config.Siad.RPCaddr)
 	config.Siad.HostAddr = processNetAddr(config.Siad.HostAddr)
 	config.Siad.Modules, err1 = processModules(config.Siad.Modules)
-	config.Siad.Profile, err2 = processProfile(config.Siad.Profile)
+	config.Siad.Profile, err2 = processProfileFlags(config.Siad.Profile)
 	err3 := verifyAPISecurity(config)
 	err := build.JoinErrors([]error{err1, err2, err3}, ", and ")
 	if err != nil {
