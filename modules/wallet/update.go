@@ -344,66 +344,114 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
 // transaction set.
-func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction, cc modules.ConsensusChange) {
+func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diffs []*modules.TransactionSetDiff) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// compute spent outputs
-	spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
-	for _, diff := range cc.SiacoinOutputDiffs {
+	// Do the pruning first. If there are any pruned transactions, we will need
+	// to re-allocate the whole processed transactions array.
+	droppedTransactions := make(map[types.TransactionID]struct{})
+	for _, diff := range diffs {
 		if diff.Direction == modules.DiffRevert {
-			// revert means spent
-			spentSiacoinOutputs[diff.ID] = diff.SiacoinOutput
+			txids := w.unconfirmedSets[diff.ID]
+			for i := range txids {
+				droppedTransactions[txids[i]] = struct{}{}
+			}
+			delete(w.unconfirmedSets, diff.ID)
+		} else {
+			// All of the reverted transactions come first. If this is not a
+			// revert, we are done.
+			break
 		}
 	}
 
-	w.unconfirmedProcessedTransactions = nil
-	for _, txn := range txns {
-		// determine whether transaction is relevant to the wallet
-		relevant := false
-		for _, sci := range txn.SiacoinInputs {
-			relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
-		}
-		for _, sco := range txn.SiacoinOutputs {
-			relevant = relevant || w.isWalletAddress(sco.UnlockHash)
+	// Skip the reallocation if we can, otherwise reallocate the
+	// unconfirmedProcessedTransactions to no longer have the dropped
+	// transactions.
+	if len(droppedTransactions) != 0 {
+		// Capacity can't be reduced, because we have no way of knowing if the
+		// dropped transactions are relevant to the wallet or not, and some will
+		// not be relevant to the wallet, meaning they don't have a counterpart
+		// in w.unconfirmedProcessedTransactions.
+		newUPT := make([]modules.ProcessedTransaction, 0, len(w.unconfirmedProcessedTransactions))
+		for _, txn := range w.unconfirmedProcessedTransactions {
+			_, exists := droppedTransactions[txn.TransactionID]
+			if !exists {
+				// Transaction was not dropped, add it to the new unconfirmed
+				// transactions.
+				newUPT = append(newUPT, txn)
+			}
 		}
 
-		// only create a ProcessedTransaction if txn is relevant
-		if !relevant {
-			continue
-		}
+		// Set the unconfirmed preocessed transactions to the pruned set.
+		w.unconfirmedProcessedTransactions = newUPT
+	}
 
-		pt := modules.ProcessedTransaction{
-			Transaction:           txn,
-			TransactionID:         txn.ID(),
-			ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
-			ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
+	// Scroll through all of the diffs and add any new transactions.
+	for _, diff := range diffs {
+		if diff.Direction == modules.DiffApply {
+			// Get the values for the spent outputs.
+			spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
+			for _, scod := range diff.Change.SiacoinOutputDiffs {
+				if scod.Direction == modules.DiffRevert {
+					// revert means spent
+					spentSiacoinOutputs[scod.ID] = scod.SiacoinOutput
+				}
+			}
+
+			// Add each transaction to our set of unconfirmed transactions.
+			txids := make([]types.TransactionID, 0, len(diff.Transactions))
+			for _, txn := range diff.Transactions {
+				tid := txn.ID()
+				txids = append(txids, tid)
+				// determine whether transaction is relevant to the wallet
+				relevant := false
+				for _, sci := range txn.SiacoinInputs {
+					relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
+				}
+				for _, sco := range txn.SiacoinOutputs {
+					relevant = relevant || w.isWalletAddress(sco.UnlockHash)
+				}
+
+				// only create a ProcessedTransaction if txn is relevant
+				if !relevant {
+					continue
+				}
+
+				pt := modules.ProcessedTransaction{
+					Transaction:           txn,
+					TransactionID:         tid,
+					ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
+					ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
+				}
+				for _, sci := range txn.SiacoinInputs {
+					pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+						ParentID:       types.OutputID(sci.ParentID),
+						FundType:       types.SpecifierSiacoinInput,
+						WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
+						RelatedAddress: sci.UnlockConditions.UnlockHash(),
+						Value:          spentSiacoinOutputs[sci.ParentID].Value,
+					})
+				}
+				for i, sco := range txn.SiacoinOutputs {
+					pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+						ID:             types.OutputID(txn.SiacoinOutputID(uint64(i))),
+						FundType:       types.SpecifierSiacoinOutput,
+						MaturityHeight: types.BlockHeight(math.MaxUint64),
+						WalletAddress:  w.isWalletAddress(sco.UnlockHash),
+						RelatedAddress: sco.UnlockHash,
+						Value:          sco.Value,
+					})
+				}
+				for _, fee := range txn.MinerFees {
+					pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+						FundType: types.SpecifierMinerFee,
+						Value:    fee,
+					})
+				}
+				w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
+			}
+			w.unconfirmedSets[diff.ID] = txids
 		}
-		for _, sci := range txn.SiacoinInputs {
-			pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
-				ParentID:       types.OutputID(sci.ParentID),
-				FundType:       types.SpecifierSiacoinInput,
-				WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
-				RelatedAddress: sci.UnlockConditions.UnlockHash(),
-				Value:          spentSiacoinOutputs[sci.ParentID].Value,
-			})
-		}
-		for i, sco := range txn.SiacoinOutputs {
-			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
-				ID:             types.OutputID(txn.SiacoinOutputID(uint64(i))),
-				FundType:       types.SpecifierSiacoinOutput,
-				MaturityHeight: types.BlockHeight(math.MaxUint64),
-				WalletAddress:  w.isWalletAddress(sco.UnlockHash),
-				RelatedAddress: sco.UnlockHash,
-				Value:          sco.Value,
-			})
-		}
-		for _, fee := range txn.MinerFees {
-			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
-				FundType: types.SpecifierMinerFee,
-				Value:    fee,
-			})
-		}
-		w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
 	}
 }

@@ -3,6 +3,7 @@ package transactionpool
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -10,15 +11,26 @@ import (
 // mockSubscriber receives transactions from the transaction pool it is
 // subscribed to, retaining them in the order they were received.
 type mockSubscriber struct {
-	txns []types.Transaction
+	txnMap map[crypto.Hash][]types.Transaction
+	txns   []types.Transaction
 }
 
 // ReceiveUpdatedUnconfirmedTransactions receives transactinos from the
 // transaction pool and stores them in the order they were received.
 // This method allows *mockSubscriber to satisfy the
 // modules.TransactionPoolSubscriber interface.
-func (ms *mockSubscriber) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction, _ modules.ConsensusChange) {
-	ms.txns = append(ms.txns, txns...)
+func (ms *mockSubscriber) ReceiveUpdatedUnconfirmedTransactions(diffs []*modules.TransactionSetDiff) {
+	for _, diff := range diffs {
+		if diff.Direction == modules.DiffRevert {
+			delete(ms.txnMap, diff.ID)
+		} else {
+			ms.txnMap[diff.ID] = diff.Transactions
+		}
+	}
+	ms.txns = nil
+	for _, txnSet := range ms.txnMap {
+		ms.txns = append(ms.txns, txnSet...)
+	}
 }
 
 // TestSubscription checks that calling Unsubscribe on a mockSubscriber
@@ -41,7 +53,9 @@ func TestSubscription(t *testing.T) {
 	}
 
 	// Create a mock subscriber and subscribe it to the transaction pool.
-	ms := mockSubscriber{}
+	ms := mockSubscriber{
+		txnMap: make(map[crypto.Hash][]types.Transaction),
+	}
 	tpt.tpool.TransactionPoolSubscribe(&ms)
 	if len(ms.txns) != 0 {
 		t.Fatalf("mock subscriber has received %v transactions; shouldn't have received any yet", len(ms.txns))

@@ -72,6 +72,12 @@ type Wallet struct {
 	keys  map[types.UnlockHash]spendableKey
 
 	// unconfirmedProcessedTransactions tracks unconfirmed transactions.
+	//
+	// TODO: Replace this field with a linked list. Currently when a new
+	// transaction set diff is provided, the entire array needs to be
+	// reallocated. Since this can happen tens of times per second, and the
+	// array can have tens of thousands of elements, it's a performance issue.
+	unconfirmedSets                  map[crypto.Hash][]types.TransactionID
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
 
 	// The wallet's database tracks its seeds, keys, outputs, and
@@ -113,6 +119,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		tpool: tpool,
 
 		keys: make(map[types.UnlockHash]spendableKey),
+
+		unconfirmedSets: make(map[crypto.Hash][]types.TransactionID),
 
 		persistDir: persistDir,
 	}

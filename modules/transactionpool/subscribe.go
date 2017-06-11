@@ -2,23 +2,58 @@ package transactionpool
 
 import (
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // updateSubscribersTransactions sends a new transaction pool update to all
 // subscribers.
 func (tp *TransactionPool) updateSubscribersTransactions() {
-	var txns []types.Transaction
-	var cc modules.ConsensusChange
-	for _, tSet := range tp.transactionSets {
-		txns = append(txns, tSet...)
+	var diffs []*modules.TransactionSetDiff
+	// Create all of the diffs for reverted sets.
+	for id := range tp.subscriberSets {
+		// The transaction set is still in the transaction pool, no need to
+		// create an update.
+		_, exists := tp.transactionSets[id]
+		if exists {
+			continue
+		}
+
+		// Report that this set has been removed. Negative diffs don't have all
+		// fields filled out.
+		diffs = append(diffs, &modules.TransactionSetDiff{
+			Direction: modules.DiffRevert,
+			ID:        crypto.Hash(id),
+		})
 	}
-	for _, tSetDiff := range tp.transactionSetDiffs {
-		cc = cc.Append(tSetDiff)
+
+	// Clear the subscriber sets map.
+	for _, diff := range diffs {
+		delete(tp.subscriberSets, TransactionSetID(diff.ID))
 	}
+
+	// Create all of the diffs for sets that have been recently created.
+	for id, set := range tp.transactionSets {
+		_, exists := tp.subscriberSets[id]
+		if exists {
+			// The transaction set has already been sent in an update.
+			continue
+		}
+
+		// Report that this transaction set is new to the transaction pool.
+		diff := &modules.TransactionSetDiff{
+			Change:       tp.transactionSetDiffs[id],
+			Direction:    modules.DiffApply,
+			ID:           crypto.Hash(id),
+			Transactions: set,
+		}
+		// Add this diff to our set of subscriber diffs.
+		tp.subscriberSets[id] = diff
+		diffs = append(diffs, diff)
+	}
+
 	for _, subscriber := range tp.subscribers {
-		subscriber.ReceiveUpdatedUnconfirmedTransactions(txns, cc)
+		subscriber.ReceiveUpdatedUnconfirmedTransactions(diffs)
 	}
 }
 
@@ -40,15 +75,11 @@ func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.Transacti
 	tp.subscribers = append(tp.subscribers, subscriber)
 
 	// Send the new subscriber the transaction pool set.
-	var txns []types.Transaction
-	for _, tSet := range tp.transactionSets {
-		txns = append(txns, tSet...)
+	diffs := make([]*modules.TransactionSetDiff, 0, len(tp.subscriberSets))
+	for _, diff := range tp.subscriberSets {
+		diffs = append(diffs, diff)
 	}
-	var cc modules.ConsensusChange
-	for _, tSetDiff := range tp.transactionSetDiffs {
-		cc = cc.Append(tSetDiff)
-	}
-	subscriber.ReceiveUpdatedUnconfirmedTransactions(txns, cc)
+	subscriber.ReceiveUpdatedUnconfirmedTransactions(diffs)
 }
 
 // Unsubscribe removes a subscriber from the transaction pool. If the

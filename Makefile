@@ -77,6 +77,10 @@ test-v:
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint
 	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
+test-cpu:
+	go test -v -tags='testing debug' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)
+test-mem:
+	go test -v -tags='testing debug' -timeout=500s -memprofile mem.prof $(pkgs) -run=$(run)
 bench: clean fmt
 	go test -tags='debug testing' -timeout=500s -run=XXX -bench=$(run) $(pkgs)
 cover: clean

@@ -46,16 +46,13 @@ type (
 		// transactionSetDiffs map form a transaction set id to the set of
 		// diffs that resulted from the transaction set.
 		knownObjects        map[ObjectID]TransactionSetID
+		subscriberSets      map[TransactionSetID]*modules.TransactionSetDiff
 		transactionHeights  map[types.TransactionID]types.BlockHeight
 		transactionSets     map[TransactionSetID][]types.Transaction
 		transactionSetDiffs map[TransactionSetID]modules.ConsensusChange
 		transactionListSize int
-		// TODO: Write a consistency check comparing transactionSets,
-		// transactionSetDiffs.
-		//
-		// TODO: Write a consistency check making sure that all unconfirmedIDs
-		// point to the right place, and that all UnconfirmedIDs are accounted for.
 
+		// Variables related to the blockchain.
 		blockHeight     types.BlockHeight
 		recentMedians   []types.Currency
 		recentMedianFee types.Currency // SC per byte
@@ -92,6 +89,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 		gateway:      g,
 
 		knownObjects:        make(map[ObjectID]TransactionSetID),
+		subscriberSets:      make(map[TransactionSetID]*modules.TransactionSetDiff),
 		transactionHeights:  make(map[types.TransactionID]types.BlockHeight),
 		transactionSets:     make(map[TransactionSetID][]types.Transaction),
 		transactionSetDiffs: make(map[TransactionSetID]modules.ConsensusChange),

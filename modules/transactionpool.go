@@ -3,6 +3,7 @@ package modules
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -51,6 +52,21 @@ var (
 	TransactionPoolDir = "transactionpool"
 )
 
+// A TransactionSetDiff indicates the adding or removal of a transaction set to
+// the transaction pool. The transactions in the pool are not persisted, so at
+// startup modules should assume an empty transaction pool.
+//
+// If 'Direction' is true, the transaction set has been added to the transaction
+// pool, and the transactions along with a complete consensus change will be
+// included. If 'Direction' is false, the transaction set has been removed, so
+// no transactions or consensus change will be provided.
+type TransactionSetDiff struct {
+	Change       ConsensusChange
+	Direction    DiffDirection
+	ID           crypto.Hash
+	Transactions []types.Transaction
+}
+
 // A TransactionPoolSubscriber receives updates about the confirmed and
 // unconfirmed set from the transaction pool. Generally, there is no need to
 // subscribe to both the consensus set and the transaction pool.
@@ -58,7 +74,7 @@ type TransactionPoolSubscriber interface {
 	// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
 	// consensus set and/or unconfirmed set, and includes the consensus change
 	// that would result if all of the transactions made it into a block.
-	ReceiveUpdatedUnconfirmedTransactions([]types.Transaction, ConsensusChange)
+	ReceiveUpdatedUnconfirmedTransactions([]*TransactionSetDiff)
 }
 
 // A TransactionPool manages unconfirmed transactions.

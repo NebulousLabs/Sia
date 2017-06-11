@@ -639,12 +639,6 @@ func TestPartialConfirmationWeave(t *testing.T) {
 	}
 	defer tpt.Close()
 
-	// Step 1: create an output to the empty address in a tx.
-	// Step 2: create a second output to the empty address in another tx.
-	// Step 3: create a transaction using both those outputs.
-	// Step 4: mine the txn set in step 2
-	// Step 5: Submit the complete set.
-
 	// Create a transaction with a single output to a fully controlled address.
 	emptyUH := types.UnlockConditions{}.UnlockHash()
 	builder1 := tpt.wallet.StartTransaction()

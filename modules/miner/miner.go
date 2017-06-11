@@ -48,6 +48,16 @@ var (
 	}).(time.Duration)
 )
 
+// splitSet defines a transaction set that can be added componenet-wise to a
+// block. It's split because it doesn't necessarily represent the full set
+// prpovided by the transaction pool. Splits can be sorted so that the largest
+// and most valuable sets can be selected when picking transactions.
+type splitSet struct {
+	averageFee   types.Currency
+	size         int
+	transactions []types.Transaction
+}
+
 // Miner struct contains all variables the miner needs
 // in order to create and submit blocks.
 type Miner struct {
@@ -73,6 +83,11 @@ type Miner struct {
 	sourceBlock     *types.Block                                   // The block from which new headers for mining are created.
 	sourceBlockTime time.Time                                      // How long headers have been using the same block (different from 'recent block').
 	memProgress     int                                            // The index of the most recent header used in headerMem.
+
+	// Transaction pool variables.
+	fullSets   map[crypto.Hash][]int
+	setCounter int
+	splitSets  map[int]splitSet
 
 	// CPUMiner variables.
 	miningOn bool  // indicates if the miner is supposed to be running
@@ -148,6 +163,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		blockMem:   make(map[types.BlockHeader]*types.Block),
 		arbDataMem: make(map[types.BlockHeader][crypto.EntropySize]byte),
 		headerMem:  make([]types.BlockHeader, HeaderMemory),
+
+		fullSets:  make(map[crypto.Hash][]int),
+		splitSets: make(map[int]splitSet),
 
 		persistDir: persistDir,
 	}
