@@ -116,6 +116,8 @@ func StopTrace() {
 	traceLock.Unlock()
 }
 
+// startContinuousLog creates dir and saves inexpensive logs periodically.
+// It also runs the restart function periodically.
 func startContinuousLog(dir string, restart func()) {
 	// Create the folder for all of the profiling results.
 	err := os.MkdirAll(dir, 0700)
