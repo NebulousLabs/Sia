@@ -268,3 +268,128 @@ func TestRescanning(t *testing.T) {
 		t.Fatal("wallet should not report that a scan is underway")
 	}
 }
+
+// TestFutureAddressGeneration checks if the right amount of future addresses
+// is generated after calling NextAddress() or locking + unlocking the wallet.
+func TestFutureAddressGeneration(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Check if number of future keys is correct
+	wt.wallet.mu.RLock()
+	progress, err := dbGetPrimarySeedProgress(wt.wallet.dbTx)
+	wt.wallet.mu.RUnlock()
+	if err != nil {
+		t.Fatal("Couldn't fetch primary seed from db")
+	}
+
+	actualKeys := uint64(len(wt.wallet.futureKeys))
+	expectedKeys := maxFutureKeys(progress)
+	if actualKeys != expectedKeys {
+		t.Errorf("expected len(futureKeys) == %d but was %d", actualKeys, expectedKeys)
+	}
+
+	// Generate some more keys
+	for i := 0; i < 100; i++ {
+		wt.wallet.NextAddress()
+	}
+
+	// Lock and unlock
+	wt.wallet.Lock()
+	wt.wallet.Unlock(wt.walletMasterKey)
+
+	wt.wallet.mu.RLock()
+	progress, err = dbGetPrimarySeedProgress(wt.wallet.dbTx)
+	wt.wallet.mu.RUnlock()
+	if err != nil {
+		t.Fatal("Couldn't fetch primary seed from db")
+	}
+
+	actualKeys = uint64(len(wt.wallet.futureKeys))
+	expectedKeys = maxFutureKeys(progress)
+	if actualKeys != expectedKeys {
+		t.Errorf("expected len(futureKeys) == %d but was %d", actualKeys, expectedKeys)
+	}
+
+	wt.wallet.mu.RLock()
+	for i := range wt.wallet.keys {
+		_, exists := wt.wallet.futureKeys[i]
+		if exists {
+			t.Fatal("wallet.keys contained a key which is also present in wallet.futurekeys")
+		}
+	}
+	wt.wallet.mu.RUnlock()
+}
+
+// TestFutureAddressReceive
+func TestFutureAddressReceive(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	builder := wt.wallet.StartTransaction()
+	payout := types.ZeroCurrency
+
+	// choose 10 of the future keys and remember them
+	var receivingAddresses []types.UnlockHash
+	for uh := range wt.wallet.futureKeys {
+		sco := types.SiacoinOutput{
+			UnlockHash: uh,
+			Value:      types.NewCurrency64(1e3),
+		}
+
+		builder.AddSiacoinOutput(sco)
+		payout = payout.Add(sco.Value)
+		receivingAddresses = append(receivingAddresses, uh)
+
+		if len(receivingAddresses) > 10 {
+			break
+		}
+	}
+
+	err = builder.FundSiacoins(payout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tSet, err := builder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wt.tpool.AcceptTransactionSet(tSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check if the receiving addresses were moved from future keys to keys
+	wt.wallet.mu.RLock()
+	for _, uh := range receivingAddresses {
+		_, exists := wt.wallet.futureKeys[uh]
+		if exists {
+			t.Fatal("UnlockHash still exists in wallet.futureKeys")
+		}
+
+		_, exists = wt.wallet.keys[uh]
+		if !exists {
+			t.Fatal("UnlockHash not in map of spendable keys")
+		}
+	}
+	wt.wallet.mu.RUnlock()
+}

@@ -163,6 +163,7 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 		}
 		w.integrateSeed(primarySeed, primarySeedProgress)
 		w.primarySeed = primarySeed
+		w.updateFutureKeys(primarySeedProgress)
 
 		// auxiliarySeedFiles
 		for _, sf := range auxiliarySeedFiles {
@@ -335,6 +336,7 @@ func (w *Wallet) Reset() error {
 	}
 	w.wipeSecrets()
 	w.keys = make(map[types.UnlockHash]spendableKey)
+	w.futureKeys = make(map[types.UnlockHash]bool)
 	w.seeds = []modules.Seed{}
 	w.unconfirmedProcessedTransactions = []modules.ProcessedTransaction{}
 	w.unlocked = false
