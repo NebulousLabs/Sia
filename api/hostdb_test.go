@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -107,6 +108,13 @@ func TestHostDBHostsActiveHandler(t *testing.T) {
 	}
 	if len(ah.Hosts) != 1 {
 		t.Fatal(len(ah.Hosts))
+	}
+	err = st.getAPI("/hostdb/active?numhosts=2", &ah)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(ah.Hosts[0].ScoreBreakdown, st.renter.ScoreBreakdown(ah.Hosts[0].HostDBEntry)) {
+		t.Fatal("score breakdown did not match")
 	}
 }
 

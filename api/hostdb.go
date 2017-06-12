@@ -13,10 +13,12 @@ import (
 type (
 	// ExtendedHostDBEntry is an extension to modules.HostDBEntry that includes
 	// the string representation of the public key, otherwise presented as two
-	// fields, a string and a base64 encoded byte slice.
+	// fields, a string and a base64 encoded byte slice, as well as the Score
+	// Breakdown for the host.
 	ExtendedHostDBEntry struct {
 		modules.HostDBEntry
 		PublicKeyString string `json:"publickeystring"`
+		ScoreBreakdown  modules.HostScoreBreakdown
 	}
 
 	// HostdbActiveGET lists active hosts on the network.
@@ -66,6 +68,7 @@ func (api *API) hostdbActiveHandler(w http.ResponseWriter, req *http.Request, _ 
 		extendedHosts = append(extendedHosts, ExtendedHostDBEntry{
 			HostDBEntry:     host,
 			PublicKeyString: host.PublicKey.String(),
+			ScoreBreakdown:  api.renter.ScoreBreakdown(host),
 		})
 	}
 
