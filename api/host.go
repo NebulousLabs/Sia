@@ -199,6 +199,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 // hostEstimateScoreGET handles the POST request to /host/estimatescore and
 // computes an estimated HostDB score for the provided settings.
 func (api *API) hostEstimateScorePOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	entry, _ := api.renter.Host(api.host.PublicKey())
 	settings, err := api.parseHostSettings(req)
 	if err != nil {
 		WriteError(w, Error{"error parsing host settings: " + err.Error()}, http.StatusBadRequest)
@@ -209,8 +210,7 @@ func (api *API) hostEstimateScorePOST(w http.ResponseWriter, req *http.Request, 
 		totalStorage += sf.Capacity
 		remainingStorage += sf.CapacityRemaining
 	}
-	dbe := modules.HostDBEntry{}
-	dbe.HostExternalSettings = modules.HostExternalSettings{
+	entry.HostExternalSettings = modules.HostExternalSettings{
 		AcceptingContracts:   settings.AcceptingContracts,
 		MaxDownloadBatchSize: settings.MaxDownloadBatchSize,
 		MaxDuration:          settings.MaxDuration,
@@ -231,7 +231,7 @@ func (api *API) hostEstimateScorePOST(w http.ResponseWriter, req *http.Request, 
 		Version: build.Version,
 	}
 	e := HostEstimateScorePOST{
-		EstimatedScore: api.renter.ScoreBreakdown(dbe).Score,
+		EstimatedScore: api.renter.ScoreBreakdown(entry).Score,
 	}
 	WriteJSON(w, e)
 }
