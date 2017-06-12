@@ -193,7 +193,7 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 	}
 
 	// Remove the conflicts from the transaction pool.
-	for _, conflict := range conflictMap {
+	for conflict := range supersetMap {
 		conflictSet := tp.transactionSets[conflict]
 		tp.transactionListSize -= len(encoding.Marshal(conflictSet))
 		delete(tp.transactionSets, conflict)

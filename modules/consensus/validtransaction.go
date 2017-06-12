@@ -52,6 +52,8 @@ func validSiacoins(tx *bolt.Tx, t types.Transaction) error {
 		inputSum = inputSum.Add(sco.Value)
 	}
 	if !inputSum.Equals(t.SiacoinOutputSum()) {
+		println(inputSum.String())
+		println(t.SiacoinOutputSum().String())
 		return errSiacoinInputOutputMismatch
 	}
 	return nil

@@ -54,7 +54,7 @@ func (m *Miner) deleteReverts(diff *modules.TransactionPoolDiff) {
 }
 
 // pickNewTransactions picks new transactions after the transaction pool has
-// presented more 
+// presented more
 func (m *Miner) pickNewTransactions(diff *modules.TransactionPoolDiff) {
 	// Sort the split sets and select the BlockSizeLimit most valueable sets.
 	sortedSets := make([]*splitSet, 0, len(m.splitSets))

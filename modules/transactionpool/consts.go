@@ -30,7 +30,7 @@ const (
 
 	// TransactionPoolSizeTarget defines the target size of the pool when the
 	// transactions are paying 1 SC / kb in fees.
-	TransactionPoolSizeTarget = 2e6
+	TransactionPoolSizeTarget = 3e6
 
 	// TransactionPoolSizeForFee defines how large the transaction pool needs to
 	// be before it starts expecting fees to be on the transaction. This initial

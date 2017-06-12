@@ -2,7 +2,6 @@ package transactionpool
 
 import (
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -45,7 +44,7 @@ func (tp *TransactionPool) updateSubscribersTransactions() {
 		for i := range set {
 			encodedTxn := encoding.Marshal(set[i])
 			sizes = append(sizes, uint64(len(encodedTxn)))
-			ids = append(ids, types.TransactionID(crypto.HashBytes(encodedTxn)))
+			ids = append(ids, set[i].ID())
 		}
 		ut := &modules.UnconfirmedTransactionSet{
 			Change: tp.transactionSetDiffs[id],
