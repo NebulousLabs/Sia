@@ -13,6 +13,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/host/contractmanager"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -49,7 +50,53 @@ var (
 	}
 )
 
-// TestWorkingStatus tests that the host's WorkingStatus field is set correctly.
+// TestEstimateWeight tests that /host/estimatescore works correctly.
+func TestEstimateWeight(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	// announce a host, create an allowance, upload some data.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.acceptContracts(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	var eg HostEstimateScoreGET
+	if err := st.getAPI("/host/estimatescore", &eg); err != nil {
+		t.Fatal(err)
+	}
+	originalEstimate := eg.EstimatedScore
+
+	// verify that the estimate is being correctly updated by setting a massively
+	// increased min contract price and verifying that the score decreases.
+	is := st.host.InternalSettings()
+	is.MinContractPrice = is.MinContractPrice.Add(types.SiacoinPrecision.Mul64(9999999999))
+	if err := st.host.SetInternalSettings(is); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.getAPI("/host/estimatescore", &eg); err != nil {
+		t.Fatal(err)
+	}
+	if eg.EstimatedScore.Cmp(originalEstimate) != -1 {
+		t.Fatal("score estimate did not decrease after incrementing mincontractprice")
+	}
+}
+
+// TestWorkingStatus tests that the host's WorkingStatus field is set
+// correctly.
 func TestWorkingStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

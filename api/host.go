@@ -34,6 +34,12 @@ type (
 		WorkingStatus        modules.HostWorkingStatus        `json:"workingstatus"`
 	}
 
+	// HostEstimateScoreGET contains the information that is returned from a
+	// /host/estimatescore call, currently only the EstimatedScore.
+	HostEstimateScoreGET struct {
+		EstimatedScore types.Currency
+	}
+
 	// StorageGET contains the information that is returned after a GET request
 	// to /host/storage - a bunch of information about the status of storage
 	// management on the host.
@@ -71,6 +77,17 @@ func (api *API) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httpr
 		WorkingStatus:        ws,
 	}
 	WriteJSON(w, hg)
+}
+
+// hostEstimateScoreGET handles the GET request to /host/estimatescore and
+// computes an estimated HostDB score for the host's current settings.
+func (api *API) hostEstimateScoreGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	dbe := modules.HostDBEntry{}
+	dbe.HostExternalSettings = api.host.ExternalSettings()
+	e := HostEstimateScoreGET{
+		EstimatedScore: api.renter.ScoreBreakdown(dbe).Score,
+	}
+	WriteJSON(w, e)
 }
 
 // hostHandlerPOST handles POST request to the /host API endpoint, which sets
