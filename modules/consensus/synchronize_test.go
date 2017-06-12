@@ -438,12 +438,12 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 		// Create the "remote" peer.
 		remoteCST, err := blankConsensusSetTester(filepath.Join(t.Name()+" - remote", strconv.Itoa(i)))
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 		}
 		// Create the "local" peer.
 		localCST, err := blankConsensusSetTester(filepath.Join(t.Name()+" - local", strconv.Itoa(i)))
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 		}
 
 		localCST.cs.gateway.Connect(remoteCST.cs.gateway.Address())
@@ -454,35 +454,35 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 		for i := types.BlockHeight(0); i < tt.commonBlocksToMine; i++ {
 			b, err := remoteCST.miner.FindBlock()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
 			err = remoteCST.cs.managedAcceptBlock(b)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
 			err = localCST.cs.managedAcceptBlock(b)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
 		}
 		for i := types.BlockHeight(0); i < tt.remoteBlocksToMine; i++ {
 			b, err := remoteCST.miner.FindBlock()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
 			err = remoteCST.cs.managedAcceptBlock(b)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
 		}
 		for i := types.BlockHeight(0); i < tt.localBlocksToMine; i++ {
 			b, err := localCST.miner.FindBlock()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
 			err = localCST.cs.managedAcceptBlock(b)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
 		}
 
@@ -491,7 +491,7 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 
 		err = localCST.cs.gateway.RPC(remoteCST.cs.gateway.Address(), "SendBlocks", localCST.cs.threadedReceiveBlocks)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("test #%d, %v: %v", i, tt.msg, err)
 		}
 
 		// Assume that if remoteBlocksToMine is greater than localBlocksToMine, then
@@ -499,30 +499,30 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 		if tt.remoteBlocksToMine > tt.localBlocksToMine {
 			// Verify that the remote cs did not change.
 			if remoteCST.cs.CurrentBlock().ID() != remoteCurrentBlockID {
-				t.Errorf("%v: the remote CS is at a different current block than before SendBlocks", tt.msg)
+				t.Errorf("test #%d, %v: the remote CS is at a different current block than before SendBlocks", i, tt.msg)
 			}
 			// Verify that the local cs got the new blocks.
 			if localCST.cs.Height() != remoteCST.cs.Height() {
-				t.Errorf("%v: expected height %v, got %v", tt.msg, remoteCST.cs.Height(), localCST.cs.Height())
+				t.Errorf("test #%d, %v: expected height %v, got %v", i, tt.msg, remoteCST.cs.Height(), localCST.cs.Height())
 			}
 			if localCST.cs.CurrentBlock().ID() != remoteCST.cs.CurrentBlock().ID() {
-				t.Errorf("%v: remote and local CSTs have different current blocks", tt.msg)
+				t.Errorf("test #%d, %v: remote and local CSTs have different current blocks", i, tt.msg)
 			}
 		} else {
 			// Verify that the local cs did not change.
 			if localCST.cs.CurrentBlock().ID() != localCurrentBlockID {
-				t.Errorf("%v: the local CS is at a different current block than before SendBlocks", tt.msg)
+				t.Errorf("test #%d, %v: the local CS is at a different current block than before SendBlocks", i, tt.msg)
 			}
 		}
 
 		// Cleanup.
 		err = localCST.Close()
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 		}
 		err = remoteCST.Close()
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 		}
 	}
 }
@@ -1161,7 +1161,7 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 	cst1.cs.gateway.Broadcast("RelayHeader", validBlock.Header(), cst1.cs.gateway.Peers())
 	select {
 	case <-mg.broadcastCalled:
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(1500 * time.Millisecond):
 		t.Fatal("RelayHeader didn't broadcast a valid block header")
 	}
 }

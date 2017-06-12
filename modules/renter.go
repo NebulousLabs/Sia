@@ -50,12 +50,18 @@ type Allowance struct {
 // DownloadInfo provides information about a file that has been requested for
 // download.
 type DownloadInfo struct {
-	SiaPath     string    `json:"siapath"`
-	Destination string    `json:"destination"`
-	Filesize    uint64    `json:"filesize"`
-	Received    uint64    `json:"received"`
-	StartTime   time.Time `json:"starttime"`
-	Error       string    `json:"error"`
+	SiaPath     string         `json:"siapath"`
+	Destination DownloadWriter `json:"destination"`
+	Filesize    uint64         `json:"filesize"`
+	Received    uint64         `json:"received"`
+	StartTime   time.Time      `json:"starttime"`
+	Error       string         `json:"error"`
+}
+
+// DownloadWriter provides an interface which all output writers have to implement.
+type DownloadWriter interface {
+	WriteAt(b []byte, off int64) (int, error)
+	Destination() string
 }
 
 // FileUploadParams contains the information used by the Renter to upload a
@@ -251,8 +257,9 @@ type Renter interface {
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error
 
-	// Download downloads a file to the given destination.
-	Download(path, destination string) error
+	// Download performs a download according to the parameters passed, including
+	// downloads of `offset` and `length` type.
+	Download(params RenterDownloadParameters) error
 
 	// DownloadQueue lists all the files that have been scheduled for download.
 	DownloadQueue() []DownloadInfo
@@ -296,4 +303,15 @@ type Renter interface {
 
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error
+}
+
+// RenterDownloadParameters defines the parameters passed to the Renter's
+// Download method.
+type RenterDownloadParameters struct {
+	Async       bool
+	Httpwriter  io.Writer
+	Length      uint64
+	Offset      uint64
+	Siapath     string
+	Destination string
 }

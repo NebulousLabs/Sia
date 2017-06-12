@@ -174,6 +174,7 @@ func (h *Host) load() error {
 
 	// Get the contract count by observing all of the incomplete storage
 	// obligations in the database.
+	h.financialMetrics.ContractCount = 0
 	err = h.db.View(func(tx *bolt.Tx) error {
 		cursor := tx.Bucket(bucketStorageObligations).Cursor()
 		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
@@ -192,11 +193,7 @@ func (h *Host) load() error {
 		return err
 	}
 
-	err = h.initConsensusSubscription()
-	if err != nil {
-		return err
-	}
-	return nil
+	return h.initConsensusSubscription()
 }
 
 // saveSync stores all of the persist data to disk and then syncs to disk.

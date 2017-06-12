@@ -314,8 +314,11 @@ dictionary
 
 #### /wallet/siacoins [POST]
 
-Function: Send siacoins to an address. The outputs are arbitrarily selected
-from addresses in the wallet.
+Function: Send siacoins to an address or set of addresses. The outputs are
+arbitrarily selected from addresses in the wallet. If 'outputs' is supplied,
+'amount' and 'destination' must be empty. The number of outputs should not
+exceed 400; this may result in a transaction too large to fit in the
+transaction pool.
 
 ###### Query String Parameters
 ```
@@ -325,6 +328,10 @@ amount      // hastings
 
 // Address that is receiving the coins.
 destination // address
+
+// JSON array of outputs. The structure of each output is:
+// {"unlockhash": "<destination>", "value": "<amount>"}
+outputs
 ```
 
 ###### JSON Response

@@ -145,5 +145,10 @@ func (w *Wallet) threadedDefragWallet() {
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		w.log.Println("WARN: defrag transaction was rejected:", err)
+		return
+	}
+	w.log.Println("Submitting a transaction set to defragment the wallet's outputs, IDs:")
+	for _, txn := range txnSet {
+		w.log.Println("\t", txn.ID())
 	}
 }

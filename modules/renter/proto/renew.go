@@ -13,7 +13,7 @@ import (
 
 // Renew negotiates a new contract for data already stored with a host, and
 // submits the new contract transaction to tpool.
-func Renew(contract modules.RenterContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool) (modules.RenterContract, error) {
+func Renew(contract modules.RenterContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, cancel <-chan struct{}) (modules.RenterContract, error) {
 	// extract vars from params, for convenience
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
 	ourSK := contract.SecretKey
@@ -91,7 +91,11 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	txnSet := append(parentTxns, txn)
 
 	// initiate connection
-	conn, err := net.DialTimeout("tcp", string(host.NetAddress), 15*time.Second)
+	dialer := &net.Dialer{
+		Cancel:  cancel,
+		Timeout: 15 * time.Second,
+	}
+	conn, err := dialer.Dial("tcp", string(host.NetAddress))
 	if err != nil {
 		return modules.RenterContract{}, err
 	}

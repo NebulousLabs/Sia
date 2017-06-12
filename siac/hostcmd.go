@@ -189,7 +189,7 @@ Host Internal Settings:
 	windowsize:           %v Hours
 
 	collateral:       %v / TB / Month
-	collateralbudget: %v 
+	collateralbudget: %v
 	maxcollateral:    %v Per Contract
 
 	mincontractprice:          %v
@@ -212,7 +212,7 @@ Host Financials:
 
 	Download Revenue:           %v
 	Potential Download Revenue: %v
-	Upload Revenue :            %v
+	Upload Revenue:             %v
 	Potential Upload Revenue:   %v
 
 RPC Stats:

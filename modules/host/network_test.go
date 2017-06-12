@@ -73,9 +73,13 @@ func TestHostWorkingStatus(t *testing.T) {
 	}
 	defer ht.Close()
 
-	if ht.host.WorkingStatus() != modules.HostWorkingStatusChecking {
-		t.Fatal("expected working state to initially be modules.HostWorkingStatusChecking")
-	}
+	// TODO: this causes an ndf, because it relies on the host tester starting up
+	// and fully returning faster than the first check, which isnt always the
+	// case.  This check is disabled for now, but can be fixed by using the
+	// disrupt() pattern.
+	// if ht.host.WorkingStatus() != modules.HostWorkingStatusChecking {
+	// 	t.Fatal("expected working state to initially be modules.HostWorkingStatusChecking")
+	// }
 
 	for i := 0; i < 5; i++ {
 		// Simulate some setting calls, and see if the host picks up on it.
@@ -119,9 +123,13 @@ func TestHostConnectabilityStatus(t *testing.T) {
 	}
 	defer ht.Close()
 
-	if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusChecking {
-		t.Fatal("expected connectability state to initially be ConnectablityStateChecking")
-	}
+	// TODO: this causes an ndf, because it relies on the host tester starting up
+	// and fully returning faster than the first check, which isnt always the
+	// case.  This check is disabled for now, but can be fixed by using the
+	// disrupt() pattern.
+	// if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusChecking {
+	// 		t.Fatal("expected connectability state to initially be ConnectablityStateChecking")
+	// }
 
 	success := false
 	for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {

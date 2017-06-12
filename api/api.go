@@ -230,8 +230,11 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.GET("/hostdb/hosts/:pubkey", api.hostdbHostsHandler)
 	}
 
-	// TransactionPool API Calls
+	// Transaction pool API Calls
 	if api.tpool != nil {
+		router.GET("/tpool/raw/:id", api.tpoolRawHandlerGET)
+		router.POST("/tpool/raw", api.tpoolRawHandlerPOST)
+
 		// TODO: re-enable this route once the transaction pool API has been finalized
 		//router.GET("/transactionpool/transactions", api.transactionpoolTransactionsHandler)
 	}

@@ -1,6 +1,9 @@
 package transactionpool
 
 import (
+	"sort"
+
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -20,24 +23,112 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Update the database of confirmed transactions.
 	for _, block := range cc.RevertedBlocks {
+		if tp.blockHeight > 0 || block.ID() != types.GenesisID {
+			tp.blockHeight--
+		}
 		for _, txn := range block.Transactions {
 			err := tp.deleteTransaction(tp.dbTx, txn.ID())
 			if err != nil {
 				tp.log.Println("ERROR: could not delete a transaction:", err)
 			}
 		}
+
+		// Pull the transactions out of the fee summary. For estimating only
+		// over 10 blocks, it is extermely likely that there will be more
+		// applied blocks than reverted blocks, and if there aren't (a height
+		// decreasing reorg), there will be more than 10 applied blocks.
+		if len(tp.txnsPerBlock) > 0 {
+			tailOffset := uint64(0)
+			for i := 0; i < len(tp.txnsPerBlock)-1; i++ {
+				tailOffset += tp.txnsPerBlock[i]
+			}
+
+			// Strip out all of the transactions in this block.
+			tp.recentConfirmedFees = tp.recentConfirmedFees[:tailOffset]
+			// Strip off the tail offset.
+			tp.txnsPerBlock = tp.txnsPerBlock[:len(tp.txnsPerBlock)-1]
+		}
 	}
 	for _, block := range cc.AppliedBlocks {
+		if tp.blockHeight > 0 || block.ID() != types.GenesisID {
+			tp.blockHeight++
+		}
 		for _, txn := range block.Transactions {
-			err := tp.addTransaction(tp.dbTx, txn.ID())
+			err := tp.putTransaction(tp.dbTx, txn.ID())
 			if err != nil {
 				tp.log.Println("ERROR: could not add a transaction:", err)
+			}
+		}
+
+		// Add the transactions from this block.
+		var totalSize uint64
+		for _, txn := range block.Transactions {
+			var feeSum types.Currency
+			size := uint64(len(encoding.Marshal(txn)))
+			for _, fee := range txn.MinerFees {
+				feeSum = feeSum.Add(fee)
+			}
+			feeAvg := feeSum.Div64(size)
+			tp.recentConfirmedFees = append(tp.recentConfirmedFees, feeSummary{
+				Fee:  feeAvg,
+				Size: size,
+			})
+			totalSize += size
+		}
+		// Add an extra zero-fee tranasction for any unused block space.
+		remaining := types.BlockSizeLimit - totalSize
+		tp.recentConfirmedFees = append(tp.recentConfirmedFees, feeSummary{
+			Fee:  types.ZeroCurrency,
+			Size: remaining, // fine if remaining is zero.
+		})
+		// Mark the number of fee transactions in this block.
+		tp.txnsPerBlock = append(tp.txnsPerBlock, uint64(len(block.Transactions)+1))
+
+		// If there are more than 10 blocks recorded in the txnsPerBlock, strip
+		// off the oldest blocks.
+		for len(tp.txnsPerBlock) > blockFeeEstimationDepth {
+			tp.recentConfirmedFees = tp.recentConfirmedFees[tp.txnsPerBlock[0]:]
+			tp.txnsPerBlock = tp.txnsPerBlock[1:]
+		}
+
+		// Sort the recent confirmed fees, then scroll forward 10MB and set the
+		// median to that txn. First we need to create and copy the fees into a
+		// new slice so that the don't get jumbled.
+		//
+		// TODO: Sort can be altered for quickSelect, which can grab the median
+		// in constant time. When counting the number of elements on either side
+		// of the pivot, use the 'size' field instead of counting each element
+		// as one.
+		replica := make([]feeSummary, len(tp.recentConfirmedFees))
+		copy(replica, tp.recentConfirmedFees)
+		sort.Slice(replica, func(i, j int) bool {
+			return replica[i].Fee.Cmp(replica[j].Fee) < 0
+		})
+		// Scroll through the sorted fees until hitting the median.
+		var progress uint64
+		for i := range replica {
+			progress += replica[i].Size
+			if progress > (uint64(len(tp.txnsPerBlock))*types.BlockSizeLimit)/2 {
+				tp.recentMedianFee = replica[i].Fee
+				break
 			}
 		}
 	}
 	err := tp.putRecentConsensusChange(tp.dbTx, cc.ID)
 	if err != nil {
 		tp.log.Println("ERROR: could not update the recent consensus change:", err)
+	}
+	err = tp.putBlockHeight(tp.dbTx, tp.blockHeight)
+	if err != nil {
+		tp.log.Println("ERROR: could not update the block height:", err)
+	}
+	err = tp.putFeeMedian(tp.dbTx, medianPersist{
+		RecentConfirmedFees: tp.recentConfirmedFees,
+		TxnsPerBlock:        tp.txnsPerBlock,
+		RecentMedianFee:     tp.recentMedianFee,
+	})
+	if err != nil {
+		tp.log.Println("ERROR: could not update the transaction pool median fee information:", err)
 	}
 
 	// Scan the applied blocks for transactions that got accepted. This will
@@ -51,21 +142,6 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 			txids[txn.ID()] = struct{}{}
 		}
 	}
-
-	// TODO: Right now, transactions that were reverted to not get saved and
-	// retried, because some transactions such as storage proofs might be
-	// illegal, and there's no good way to preserve dependencies when illegal
-	// transactions are suddenly involved.
-	//
-	// One potential solution is to have modules manually do resubmission if
-	// something goes wrong. Another is to have the transaction pool remember
-	// recent transaction sets on the off chance that they become valid again
-	// due to a reorg.
-	//
-	// Another option is to scan through the blocks transactions one at a time
-	// check if they are valid. If so, lump them in a set with the next guy.
-	// When they stop being valid, you've found a guy to throw away. It's n^2
-	// in the number of transactions in the block.
 
 	// Save all of the current unconfirmed transaction sets into a list.
 	var unconfirmedSets [][]types.Transaction
@@ -89,6 +165,37 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// after the consensus change.
 	tp.purge()
 
+	// prune transactions older than maxTxnAge.
+	for i, tSet := range unconfirmedSets {
+		var validTxns []types.Transaction
+		for _, txn := range tSet {
+			seenHeight, seen := tp.transactionHeights[txn.ID()]
+			if tp.blockHeight-seenHeight <= maxTxnAge || !seen {
+				validTxns = append(validTxns, txn)
+			} else {
+				delete(tp.transactionHeights, txn.ID())
+			}
+		}
+		unconfirmedSets[i] = validTxns
+	}
+
+	// Scan through the reverted blocks and re-add any transactions that got
+	// reverted to the tpool.
+	for i := len(cc.RevertedBlocks) - 1; i >= 0; i-- {
+		block := cc.RevertedBlocks[i]
+		for _, txn := range block.Transactions {
+			// Check whether this transaction has already be re-added to the
+			// consensus set by the applied blocks.
+			_, exists := txids[txn.ID()]
+			if exists {
+				continue
+			}
+
+			// Try adding the transaction back into the transaction pool.
+			tp.acceptTransactionSet([]types.Transaction{txn}, cc.TryTransactionSet) // Error is ignored.
+		}
+	}
+
 	// Add all of the unconfirmed transaction sets back to the transaction
 	// pool. The ones that are invalid will throw an error and will not be
 	// re-added.
@@ -104,7 +211,14 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// processing consensus changes. Overall, the locking is pretty fragile and
 	// more rules need to be put in place.
 	for _, set := range unconfirmedSets {
-		tp.acceptTransactionSet(set, cc.TryTransactionSet) // Error is not checked.
+		for _, txn := range set {
+			err := tp.acceptTransactionSet([]types.Transaction{txn}, cc.TryTransactionSet)
+			if err != nil {
+				// The transaction is no longer valid, delete it from the
+				// heights map to prevent a memory leak.
+				delete(tp.transactionHeights, txn.ID())
+			}
+		}
 	}
 
 	// Inform subscribers that an update has executed.

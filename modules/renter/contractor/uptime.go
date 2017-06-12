@@ -39,11 +39,11 @@ func (c *Contractor) IsOffline(id types.FileContractID) bool {
 func (c *Contractor) isOffline(id types.FileContractID) bool {
 	contract, ok := c.contracts[id]
 	if !ok {
-		return false
+		return true
 	}
 	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
-		return false
+		return true
 	}
 
 	// Sanity check - ScanHistory should always be ordered from oldest to

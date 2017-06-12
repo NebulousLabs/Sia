@@ -18,21 +18,13 @@ import (
 const tpoolSyncRate = time.Minute * 2
 
 var (
-	// bucketRecentConsensusChange holds the most recent consensus change seen
-	// by the transaction pool.
-	bucketRecentConsensusChange = []byte("RecentConsensusChange")
-
-	// bucketConfirmedTransactions holds the ids of every transaction that has
-	// been confirmed on the blockchain.
-	bucketConfirmedTransactions = []byte("ConfirmedTransactions")
-
 	// errNilConsensusChange is returned if there is no consensus change in the
 	// database.
 	errNilConsensusChange = errors.New("no consensus change found")
 
-	// fieldRecentConsensusChange is the field in bucketRecentConsensusChange
-	// that holds the value of the most recent consensus change.
-	fieldRecentConsensusChange = []byte("RecentConsensusChange")
+	// errNilFeeMedian is the message returned if a database does not find fee
+	// median persistance.
+	errNilFeeMedian = errors.New("no fee median found")
 )
 
 // threadedRegularSync will make sure that sync gets called on the database
@@ -73,6 +65,10 @@ func (tp *TransactionPool) resetDB(tx *bolt.Tx) error {
 		return err
 	}
 	err = tp.putRecentConsensusChange(tx, modules.ConsensusChangeBeginning)
+	if err != nil {
+		return err
+	}
+	err = tp.putBlockHeight(tx, types.BlockHeight(0))
 	if err != nil {
 		return err
 	}
@@ -129,8 +125,10 @@ func (tp *TransactionPool) initPersist() error {
 	var cc modules.ConsensusChangeID
 	// Create the database buckets.
 	buckets := [][]byte{
+		bucketBlockHeight,
 		bucketRecentConsensusChange,
 		bucketConfirmedTransactions,
+		bucketFeeMedian,
 	}
 	for _, bucket := range buckets {
 		_, err := tp.dbTx.CreateBucketIfNotExists(bucket)
@@ -146,6 +144,34 @@ func (tp *TransactionPool) initPersist() error {
 	}
 	if err != nil {
 		return build.ExtendErr("unable to initialize the recent consensus change in the tpool", err)
+	}
+
+	// Get the most recent block height
+	bh, err := tp.getBlockHeight(tp.dbTx)
+	if err != nil {
+		err = tp.putBlockHeight(tp.dbTx, types.BlockHeight(0))
+		if err != nil {
+			return build.ExtendErr("unable to initialize the block height in the tpool", err)
+		}
+		err = tp.putRecentConsensusChange(tp.dbTx, modules.ConsensusChangeBeginning)
+	} else {
+		tp.blockHeight = bh
+	}
+	if err != nil {
+		return build.ExtendErr("unable to initialize the block height in the tpool", err)
+	}
+
+	// Get the fee median data.
+	mp, err := tp.getFeeMedian(tp.dbTx)
+	if err != nil && err != errNilFeeMedian {
+		return build.ExtendErr("unable to load the fee median", err)
+	}
+	// Just leave the fields empty if no fee median was found. They will be
+	// filled out.
+	if err != errNilFeeMedian {
+		tp.recentConfirmedFees = mp.RecentConfirmedFees
+		tp.txnsPerBlock = mp.TxnsPerBlock
+		tp.recentMedianFee = mp.RecentMedianFee
 	}
 
 	// Subscribe to the consensus set using the most recent consensus change.
@@ -175,23 +201,6 @@ func (tp *TransactionPool) initPersist() error {
 	return nil
 }
 
-// getRecentConsensusChange returns the most recent consensus change from the
-// database.
-func (tp *TransactionPool) getRecentConsensusChange(tx *bolt.Tx) (cc modules.ConsensusChangeID, err error) {
-	ccBytes := tx.Bucket(bucketRecentConsensusChange).Get(fieldRecentConsensusChange)
-	if ccBytes == nil {
-		return modules.ConsensusChangeID{}, errNilConsensusChange
-	}
-	copy(cc[:], ccBytes)
-	return cc, nil
-}
-
-// putRecentConsensusChange updates the most recent consensus change seen by
-// the transaction pool.
-func (tp *TransactionPool) putRecentConsensusChange(tx *bolt.Tx, cc modules.ConsensusChangeID) error {
-	return tx.Bucket(bucketRecentConsensusChange).Put(fieldRecentConsensusChange, cc[:])
-}
-
 // transactionConfirmed returns true if the transaction has been confirmed on
 // the blockchain and false if the transaction has not been confirmed on the
 // blockchain.
@@ -201,15 +210,4 @@ func (tp *TransactionPool) transactionConfirmed(tx *bolt.Tx, id types.Transactio
 		return false
 	}
 	return true
-}
-
-// addTransaction adds a transaction to the list of confirmed transactions.
-func (tp *TransactionPool) addTransaction(tx *bolt.Tx, id types.TransactionID) error {
-	return tx.Bucket(bucketConfirmedTransactions).Put(id[:], []byte{})
-}
-
-// deleteTransaction deletes a transaction from the list of confirmed
-// transactions.
-func (tp *TransactionPool) deleteTransaction(tx *bolt.Tx, id types.TransactionID) error {
-	return tx.Bucket(bucketConfirmedTransactions).Delete(id[:])
 }

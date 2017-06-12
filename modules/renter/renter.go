@@ -129,9 +129,9 @@ type Renter struct {
 
 	// Work management.
 	//
-	// chunkQueue contains a list of incomplete work that the download loop
-	// acts upon. The chunkQueue is only ever modified by the main download
-	// loop thread, which means it can be accessed and updated without locks.
+	// chunkQueue contains a list of incomplete work that the download loop acts
+	// upon. The chunkQueue is only ever modified by the main download loop
+	// thread, which means it can be accessed and updated without locks.
 	//
 	// downloadQueue contains a complete history of work that has been
 	// submitted to the download loop.

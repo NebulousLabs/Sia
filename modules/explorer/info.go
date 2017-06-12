@@ -4,7 +4,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
 	"github.com/NebulousLabs/bolt"
 )
 
@@ -129,6 +128,39 @@ func (e *Explorer) FileContractID(id types.FileContractID) []types.TransactionID
 		ids = nil
 	}
 	return ids
+}
+
+// FileContractPayouts returns all of the spendable siacoin outputs which are the
+// result of a FileContract. An empty set indicates that the file contract is
+// still open
+func (e *Explorer) FileContractPayouts(id types.FileContractID) ([]types.SiacoinOutput, error) {
+	var history fileContractHistory
+	err := e.db.View(dbGetAndDecode(bucketFileContractHistories, id, &history))
+	if err != nil {
+		return []types.SiacoinOutput{}, err
+	}
+
+	fc := history.Contract
+	var outputs []types.SiacoinOutput
+
+	for i := range fc.ValidProofOutputs {
+		scoid := id.StorageProofOutputID(types.ProofValid, uint64(i))
+
+		sco, found := e.SiacoinOutput(scoid)
+		if found {
+			outputs = append(outputs, sco)
+		}
+	}
+	for i := range fc.MissedProofOutputs {
+		scoid := id.StorageProofOutputID(types.ProofMissed, uint64(i))
+
+		sco, found := e.SiacoinOutput(scoid)
+		if found {
+			outputs = append(outputs, sco)
+		}
+	}
+
+	return outputs, nil
 }
 
 // SiafundOutput returns the siafund output associated with the specified ID.

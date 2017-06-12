@@ -34,4 +34,12 @@ var (
 		Standard: time.Minute * 15,
 		Testing:  10 * time.Second,
 	}).(time.Duration)
+
+	// maxChunkCacheSize determines the maximum number of chunks that will be
+	// cached in memory.
+	maxChunkCacheSize = build.Select(build.Var{
+		Dev:      50,
+		Standard: 30,
+		Testing:  60,
+	}).(int)
 )

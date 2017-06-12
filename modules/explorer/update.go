@@ -164,7 +164,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					scoid := txn.SiacoinOutputID(uint64(j))
 					dbAddSiacoinOutputID(tx, scoid, txid)
 					dbAddUnlockHash(tx, sco.UnlockHash, txid)
-					dbAddSiacoinOutput(tx, scoid, sco)
 				}
 				for k, fc := range txn.FileContracts {
 					fcid := txn.FileContractID(uint64(k))
@@ -211,7 +210,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					sfoid := txn.SiafundOutputID(uint64(k))
 					dbAddSiafundOutputID(tx, sfoid, txid)
 					dbAddUnlockHash(tx, sfo.UnlockHash, txid)
-					dbAddSiafundOutput(tx, sfoid, sfo)
 				}
 			}
 
@@ -219,6 +217,20 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			if tx.Bucket(bucketBlockFacts).Get(encoding.Marshal(block.ParentID)) != nil {
 				facts := dbCalculateBlockFacts(tx, e.cs, block)
 				dbAddBlockFacts(tx, facts)
+			}
+		}
+
+		// Update stats according to SiacoinOutputDiffs
+		for _, scod := range cc.SiacoinOutputDiffs {
+			if scod.Direction == modules.DiffApply {
+				dbAddSiacoinOutput(tx, scod.ID, scod.SiacoinOutput)
+			}
+		}
+
+		// Update stats according to SiafundOutputDiffs
+		for _, sfod := range cc.SiafundOutputDiffs {
+			if sfod.Direction == modules.DiffApply {
+				dbAddSiafundOutput(tx, sfod.ID, sfod.SiafundOutput)
 			}
 		}
 
@@ -286,6 +298,10 @@ func mustPutSet(bucket *bolt.Bucket, key interface{}) {
 func mustDelete(bucket *bolt.Bucket, key interface{}) {
 	assertNil(bucket.Delete(encoding.Marshal(key)))
 }
+func bucketIsEmpty(bucket *bolt.Bucket) bool {
+	k, _ := bucket.Cursor().First()
+	return k == nil
+}
 
 // These functions panic on error. The panic will be caught by
 // ProcessConsensusChange.
@@ -330,8 +346,11 @@ func dbAddFileContractID(tx *bolt.Tx, id types.FileContractID, txid types.Transa
 	mustPutSet(b, txid)
 }
 func dbRemoveFileContractID(tx *bolt.Tx, id types.FileContractID, txid types.TransactionID) {
-	// TODO: delete bucket when it becomes empty
-	mustDelete(tx.Bucket(bucketFileContractIDs).Bucket(encoding.Marshal(id)), txid)
+	bucket := tx.Bucket(bucketFileContractIDs).Bucket(encoding.Marshal(id))
+	mustDelete(bucket, txid)
+	if bucketIsEmpty(bucket) {
+		tx.Bucket(bucketFileContractIDs).DeleteBucket(encoding.Marshal(id))
+	}
 }
 
 func dbAddFileContractRevision(tx *bolt.Tx, fcid types.FileContractID, fcr types.FileContractRevision) {
@@ -363,8 +382,11 @@ func dbAddSiacoinOutputID(tx *bolt.Tx, id types.SiacoinOutputID, txid types.Tran
 	mustPutSet(b, txid)
 }
 func dbRemoveSiacoinOutputID(tx *bolt.Tx, id types.SiacoinOutputID, txid types.TransactionID) {
-	// TODO: delete bucket when it becomes empty
-	mustDelete(tx.Bucket(bucketSiacoinOutputIDs).Bucket(encoding.Marshal(id)), txid)
+	bucket := tx.Bucket(bucketSiacoinOutputIDs).Bucket(encoding.Marshal(id))
+	mustDelete(bucket, txid)
+	if bucketIsEmpty(bucket) {
+		tx.Bucket(bucketSiacoinOutputIDs).DeleteBucket(encoding.Marshal(id))
+	}
 }
 
 // Add/Remove siafund output
@@ -382,8 +404,11 @@ func dbAddSiafundOutputID(tx *bolt.Tx, id types.SiafundOutputID, txid types.Tran
 	mustPutSet(b, txid)
 }
 func dbRemoveSiafundOutputID(tx *bolt.Tx, id types.SiafundOutputID, txid types.TransactionID) {
-	// TODO: delete bucket when it becomes empty
-	mustDelete(tx.Bucket(bucketSiafundOutputIDs).Bucket(encoding.Marshal(id)), txid)
+	bucket := tx.Bucket(bucketSiafundOutputIDs).Bucket(encoding.Marshal(id))
+	mustDelete(bucket, txid)
+	if bucketIsEmpty(bucket) {
+		tx.Bucket(bucketSiafundOutputIDs).DeleteBucket(encoding.Marshal(id))
+	}
 }
 
 // Add/Remove storage proof
@@ -412,8 +437,11 @@ func dbAddUnlockHash(tx *bolt.Tx, uh types.UnlockHash, txid types.TransactionID)
 	mustPutSet(b, txid)
 }
 func dbRemoveUnlockHash(tx *bolt.Tx, uh types.UnlockHash, txid types.TransactionID) {
-	// TODO: delete bucket when it becomes empty
-	mustDelete(tx.Bucket(bucketUnlockHashes).Bucket(encoding.Marshal(uh)), txid)
+	bucket := tx.Bucket(bucketUnlockHashes).Bucket(encoding.Marshal(uh))
+	mustDelete(bucket, txid)
+	if bucketIsEmpty(bucket) {
+		tx.Bucket(bucketUnlockHashes).DeleteBucket(encoding.Marshal(uh))
+	}
 }
 
 func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Block) blockFacts {

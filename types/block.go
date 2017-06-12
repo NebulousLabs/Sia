@@ -3,7 +3,11 @@ package types
 // block.go defines the Block type for Sia, and provides some helper functions
 // for working with blocks.
 
-import "github.com/NebulousLabs/Sia/crypto"
+import (
+	"bytes"
+
+	"github.com/NebulousLabs/Sia/crypto"
+)
 
 const (
 	// BlockHeaderSize is the size, in bytes, of a block header.
@@ -107,11 +111,16 @@ func (b Block) ID() BlockID {
 // transactions (one leaf per transaction).
 func (b Block) MerkleRoot() crypto.Hash {
 	tree := crypto.NewTree()
+	var buf bytes.Buffer
 	for _, payout := range b.MinerPayouts {
-		tree.PushObject(payout)
+		payout.MarshalSia(&buf)
+		tree.Push(buf.Bytes())
+		buf.Reset()
 	}
 	for _, txn := range b.Transactions {
-		tree.PushObject(txn)
+		txn.MarshalSia(&buf)
+		tree.Push(buf.Bytes())
+		buf.Reset()
 	}
 	return tree.Root()
 }
