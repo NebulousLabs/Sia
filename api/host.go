@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -34,9 +35,9 @@ type (
 		WorkingStatus        modules.HostWorkingStatus        `json:"workingstatus"`
 	}
 
-	// HostEstimateScoreGET contains the information that is returned from a
+	// HostEstimateScorePOST contains the information that is returned from a
 	// /host/estimatescore call, currently only the EstimatedScore.
-	HostEstimateScoreGET struct {
+	HostEstimateScorePOST struct {
 		EstimatedScore types.Currency `json:"estimatedscore"`
 	}
 
@@ -79,29 +80,17 @@ func (api *API) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httpr
 	WriteJSON(w, hg)
 }
 
-// hostEstimateScoreGET handles the GET request to /host/estimatescore and
-// computes an estimated HostDB score for the host's current settings.
-func (api *API) hostEstimateScoreGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	dbe := modules.HostDBEntry{}
-	dbe.HostExternalSettings = api.host.ExternalSettings()
-	e := HostEstimateScoreGET{
-		EstimatedScore: api.renter.ScoreBreakdown(dbe).Score,
-	}
-	WriteJSON(w, e)
-}
-
-// hostHandlerPOST handles POST request to the /host API endpoint, which sets
-// the internal settings of the host.
-func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// Map each query string to a field in the host settings.
+// parseHostSettings a request's query strings and returns a
+// modules.HostInternalSettings configured with the request's query string
+// parameters.
+func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettings, error) {
 	settings := api.host.InternalSettings()
 
 	if req.FormValue("acceptingcontracts") != "" {
 		var x bool
 		_, err := fmt.Sscan(req.FormValue("acceptingcontracts"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed acceptingcontracts"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.AcceptingContracts = x
 	}
@@ -109,8 +98,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x uint64
 		_, err := fmt.Sscan(req.FormValue("maxdownloadbatchsize"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed maxdownloadbatchsize"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.MaxDownloadBatchSize = x
 	}
@@ -118,8 +106,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x types.BlockHeight
 		_, err := fmt.Sscan(req.FormValue("maxduration"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed maxduration"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.MaxDuration = x
 	}
@@ -127,8 +114,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x uint64
 		_, err := fmt.Sscan(req.FormValue("maxrevisebatchsize"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed maxrevisebatchsize"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.MaxReviseBatchSize = x
 	}
@@ -136,8 +122,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x modules.NetAddress
 		_, err := fmt.Sscan(req.FormValue("netaddress"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed netaddress"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.NetAddress = x
 	}
@@ -145,8 +130,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x types.BlockHeight
 		_, err := fmt.Sscan(req.FormValue("windowsize"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed windowsize"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.WindowSize = x
 	}
@@ -155,8 +139,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("collateral"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed collateral"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.Collateral = x
 	}
@@ -164,8 +147,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("collateralbudget"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed collateralbudget"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.CollateralBudget = x
 	}
@@ -173,8 +155,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("maxcollateral"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed maxcollateral"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.MaxCollateral = x
 	}
@@ -183,8 +164,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("mincontractprice"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed mincontractprice"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.MinContractPrice = x
 	}
@@ -192,8 +172,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("mindownloadbandwidthprice"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed mindownloadbandwidthprice"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.MinDownloadBandwidthPrice = x
 	}
@@ -201,8 +180,7 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("minstorageprice"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed minstorageprice"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.MinStoragePrice = x
 	}
@@ -210,13 +188,64 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("minuploadbandwidthprice"), &x)
 		if err != nil {
-			WriteError(w, Error{"Malformed minuploadbandwidthprice"}, http.StatusBadRequest)
-			return
+			return modules.HostInternalSettings{}, nil
 		}
 		settings.MinUploadBandwidthPrice = x
 	}
 
-	err := api.host.SetInternalSettings(settings)
+	return settings, nil
+}
+
+// hostEstimateScoreGET handles the POST request to /host/estimatescore and
+// computes an estimated HostDB score for the provided settings.
+func (api *API) hostEstimateScorePOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	settings, err := api.parseHostSettings(req)
+	if err != nil {
+		WriteError(w, Error{"error parsing host settings: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	var totalStorage, remainingStorage uint64
+	for _, sf := range api.host.StorageFolders() {
+		totalStorage += sf.Capacity
+		remainingStorage += sf.CapacityRemaining
+	}
+	dbe := modules.HostDBEntry{}
+	dbe.HostExternalSettings = modules.HostExternalSettings{
+		AcceptingContracts:   settings.AcceptingContracts,
+		MaxDownloadBatchSize: settings.MaxDownloadBatchSize,
+		MaxDuration:          settings.MaxDuration,
+		MaxReviseBatchSize:   settings.MaxReviseBatchSize,
+		RemainingStorage:     remainingStorage,
+		SectorSize:           modules.SectorSize,
+		TotalStorage:         totalStorage,
+		WindowSize:           settings.WindowSize,
+
+		Collateral:    settings.Collateral,
+		MaxCollateral: settings.MaxCollateral,
+
+		ContractPrice:          settings.MinContractPrice,
+		DownloadBandwidthPrice: settings.MinDownloadBandwidthPrice,
+		StoragePrice:           settings.MinStoragePrice,
+		UploadBandwidthPrice:   settings.MinUploadBandwidthPrice,
+
+		Version: build.Version,
+	}
+	e := HostEstimateScorePOST{
+		EstimatedScore: api.renter.ScoreBreakdown(dbe).Score,
+	}
+	WriteJSON(w, e)
+}
+
+// hostHandlerPOST handles POST request to the /host API endpoint, which sets
+// the internal settings of the host.
+func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	settings, err := api.parseHostSettings(req)
+	if err != nil {
+		WriteError(w, Error{"error parsing host settings: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+
+	err = api.host.SetInternalSettings(settings)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return

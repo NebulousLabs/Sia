@@ -257,7 +257,7 @@ Host
 | [/host](#host-get)                                                                         | GET       |
 | [/host](#host-post)                                                                        | POST      |
 | [/host/announce](#hostannounce-post)                                                       | POST      |
-| [/host/estimatescore](#hostestimatescore-get)                                              | GET       |
+| [/host/estimatescore](#hostestimatescore-post)                                             | POST      |
 | [/host/storage](#hoststorage-get)                                                          | GET       |
 | [/host/storage/folders/add](#hoststoragefoldersadd-post)                                   | POST      |
 | [/host/storage/folders/remove](#hoststoragefoldersremove-post)                             | POST      |
@@ -482,15 +482,35 @@ data.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /host/estimatescore [GET]
+#### /host/estimatescore [POST]
 
-returns the estimated HostDB score of the host using its current settings.
+returns the estimated HostDB score of the host using its current settings,
+combined with the provided settings.
 
 ###### JSON Response [(with comments)](/doc/api/Host.md#json-response-2)
 ```javascript
 {
 	"estimatedscore": "123456786786786786786786786742133"
 }
+```
+
+###### Query String Parameters [(with comments)](/doc/api/Host.md#query-string-parameters-5)
+```
+acceptingcontracts   // Optional, true / false
+maxdownloadbatchsize // Optional, bytes
+maxduration          // Optional, blocks
+maxrevisebatchsize   // Optional, bytes
+netaddress           // Optional
+windowsize           // Optional, blocks
+
+collateral       // Optional, hastings / byte / block
+collateralbudget // Optional, hastings
+maxcollateral    // Optional, hastings
+
+mincontractprice          // Optional, hastings
+mindownloadbandwidthprice // Optional, hastings / byte
+minstorageprice           // Optional, hastings / byte / block
+minuploadbandwidthprice   // Optional, hastings / byte
 ```
 
 

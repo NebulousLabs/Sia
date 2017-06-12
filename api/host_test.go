@@ -74,8 +74,8 @@ func TestEstimateWeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var eg HostEstimateScoreGET
-	if err := st.getAPI("/host/estimatescore", &eg); err != nil {
+	var eg HostEstimateScorePOST
+	if err := st.postAPI("/host/estimatescore", url.Values{}, &eg); err != nil {
 		t.Fatal(err)
 	}
 	originalEstimate := eg.EstimatedScore
@@ -87,7 +87,7 @@ func TestEstimateWeight(t *testing.T) {
 	if err := st.host.SetInternalSettings(is); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.getAPI("/host/estimatescore", &eg); err != nil {
+	if err := st.postAPI("/host/estimatescore", url.Values{}, &eg); err != nil {
 		t.Fatal(err)
 	}
 	if eg.EstimatedScore.Cmp(originalEstimate) != -1 {
