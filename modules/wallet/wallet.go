@@ -77,7 +77,7 @@ type Wallet struct {
 	// transaction set diff is provided, the entire array needs to be
 	// reallocated. Since this can happen tens of times per second, and the
 	// array can have tens of thousands of elements, it's a performance issue.
-	unconfirmedSets                  map[crypto.Hash][]types.TransactionID
+	unconfirmedSets                  map[modules.TransactionSetID][]types.TransactionID
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
 
 	// The wallet's database tracks its seeds, keys, outputs, and
@@ -120,7 +120,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 
 		keys: make(map[types.UnlockHash]spendableKey),
 
-		unconfirmedSets: make(map[crypto.Hash][]types.TransactionID),
+		unconfirmedSets: make(map[modules.TransactionSetID][]types.TransactionID),
 
 		persistDir: persistDir,
 	}

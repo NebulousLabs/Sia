@@ -3,7 +3,6 @@ package miner
 import (
 	"sort"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -54,56 +53,45 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 // ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed
 // set of transactions with the input transactions.
-func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(diffs []*modules.TransactionSetDiff) {
+func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(diff *modules.TransactionPoolDiff) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// Delete the sets that are no longer useful. That means recognizing which
 	// of your splits belong to the missing sets.
-	for _, diff := range diffs {
-		// Break if this diff is not revert, as there will be no more reverted
-		// diffs after this point.
-		if diff.Direction != modules.DiffRevert {
-			break
-		}
-
+	for _, id := range diff.RevertedTransactions {
 		// Look up all of the split sets associated with the set being reverted,
 		// and delete them. Then delete the lookups from the list of full sets
 		// as well.
-		splitSetIndexes := m.fullSets[diff.ID]
+		splitSetIndexes := m.fullSets[id]
 		for _, ss := range splitSetIndexes {
 			delete(m.splitSets, ss)
 		}
-		delete(m.fullSets, diff.ID)
+		delete(m.fullSets, id)
 	}
 
 	// Split the new sets and add the splits to the list of transactions we pull
 	// form.
-	for _, diff := range diffs {
-		// Skip the reverted diffs, we only care about the applied ones.
-		if diff.Direction == modules.DiffRevert {
-			continue
-		}
-
+	for _, newSet := range diff.AppliedTransactions {
 		// Split the sets into smaller sets, and add them to the list of
 		// transactions the miner can draw from.
 		//
 		// TODO: Split the one set into a bunch of smaller sets using the cp4p
 		// splitter.
 		m.setCounter++
-		m.fullSets[diff.ID] = []int{m.setCounter}
-		var size int
+		m.fullSets[newSet.ID] = []int{m.setCounter}
+		var size uint64
 		var totalFees types.Currency
-		for _, txn := range diff.Transactions {
-			size += len(encoding.Marshal(txn))
-			for _, fee := range txn.MinerFees {
+		for i := range newSet.IDs {
+			size += newSet.Sizes[i]
+			for _, fee := range newSet.Transactions[i].MinerFees {
 				totalFees = totalFees.Add(fee)
 			}
 		}
 		m.splitSets[m.setCounter] = splitSet{
 			size:         size,
-			averageFee:   totalFees.Div64(uint64(size)),
-			transactions: diff.Transactions,
+			averageFee:   totalFees.Div64(size),
+			transactions: newSet.Transactions,
 		}
 	}
 
@@ -115,11 +103,11 @@ func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(diffs []*modules.Transacti
 	sort.Slice(sortedSets, func(i, j int) bool {
 		return sortedSets[i].averageFee.Cmp(sortedSets[j].averageFee) < 0
 	})
-	var totalSize int
+	var totalSize uint64
 	m.persist.UnsolvedBlock.Transactions = nil
 	for _, set := range m.splitSets {
 		totalSize += set.size
-		if uint64(totalSize) > types.BlockSizeLimit-5e3 {
+		if totalSize > types.BlockSizeLimit-5e3 {
 			// There is no longer enough room to add this transction set. Stop
 			// here.
 			break

@@ -54,7 +54,7 @@ var (
 // and most valuable sets can be selected when picking transactions.
 type splitSet struct {
 	averageFee   types.Currency
-	size         int
+	size         uint64
 	transactions []types.Transaction
 }
 
@@ -85,7 +85,7 @@ type Miner struct {
 	memProgress     int                                            // The index of the most recent header used in headerMem.
 
 	// Transaction pool variables.
-	fullSets   map[crypto.Hash][]int
+	fullSets   map[modules.TransactionSetID][]int
 	setCounter int
 	splitSets  map[int]splitSet
 
@@ -164,7 +164,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		arbDataMem: make(map[types.BlockHeader][crypto.EntropySize]byte),
 		headerMem:  make([]types.BlockHeader, HeaderMemory),
 
-		fullSets:  make(map[crypto.Hash][]int),
+		fullSets:  make(map[modules.TransactionSetID][]int),
 		splitSets: make(map[int]splitSet),
 
 		persistDir: persistDir,

@@ -212,7 +212,7 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 	for _, diff := range cc.SiafundOutputDiffs {
 		tp.knownObjects[ObjectID(diff.ID)] = setID
 	}
-	tp.transactionSetDiffs[setID] = cc
+	tp.transactionSetDiffs[setID] = &cc
 	tsetSize := len(encoding.Marshal(superset))
 	tp.transactionListSize += tsetSize
 
@@ -297,7 +297,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 	for _, oid := range oids {
 		tp.knownObjects[oid] = setID
 	}
-	tp.transactionSetDiffs[setID] = cc
+	tp.transactionSetDiffs[setID] = &cc
 	tsetSize := len(encoding.Marshal(ts))
 	tp.transactionListSize += tsetSize
 	for _, txn := range ts {
