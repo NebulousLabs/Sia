@@ -79,7 +79,6 @@ func TestEstimateWeight(t *testing.T) {
 		t.Fatal(err)
 	}
 	originalEstimate := eg.EstimatedScore
-	t.Log(originalEstimate)
 
 	// verify that the estimate is being correctly updated by setting a massively
 	// increased min contract price and verifying that the score decreases.

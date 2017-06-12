@@ -37,7 +37,7 @@ type (
 	// HostEstimateScoreGET contains the information that is returned from a
 	// /host/estimatescore call, currently only the EstimatedScore.
 	HostEstimateScoreGET struct {
-		EstimatedScore types.Currency
+		EstimatedScore types.Currency `json:"estimatedscore"`
 	}
 
 	// StorageGET contains the information that is returned after a GET request
