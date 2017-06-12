@@ -87,7 +87,7 @@ type Miner struct {
 	// Transaction pool variables.
 	fullSets   map[modules.TransactionSetID][]int
 	setCounter int
-	splitSets  map[int]splitSet
+	splitSets  map[int]*splitSet
 
 	// CPUMiner variables.
 	miningOn bool  // indicates if the miner is supposed to be running
@@ -165,7 +165,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		headerMem:  make([]types.BlockHeader, HeaderMemory),
 
 		fullSets:  make(map[modules.TransactionSetID][]int),
-		splitSets: make(map[int]splitSet),
+		splitSets: make(map[int]*splitSet),
 
 		persistDir: persistDir,
 	}
