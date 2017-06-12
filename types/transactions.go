@@ -144,7 +144,7 @@ type (
 // ID returns the id of a transaction, which is taken by marshalling all of the
 // fields except for the signatures and taking the hash of the result.
 func (t Transaction) ID() TransactionID {
-	var hash crypto.Hash
+	var txid TransactionID
 	h := crypto.NewHash()
 	enc := encoding.NewEncoder(h)
 
@@ -187,8 +187,8 @@ func (t Transaction) ID() TransactionID {
 	for i := range t.TransactionSignatures {
 		t.TransactionSignatures[i].MarshalSia(h)
 	}
-	h.Sum(hash[:0])
-	return TransactionID(hash)
+	h.Sum(txid[:0])
+	return txid
 }
 
 // SiacoinOutputID returns the ID of a siacoin output at the given index,
