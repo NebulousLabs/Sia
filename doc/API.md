@@ -252,15 +252,16 @@ standard success or error response. See
 Host
 ----
 
-| Route                                                                                 | HTTP verb |
-| ------------------------------------------------------------------------------------- | --------- |
-| [/host](#host-get)                                                                    | GET       |
-| [/host](#host-post)                                                                   | POST      |
-| [/host/announce](#hostannounce-post)                                                  | POST      |
-| [/host/storage](#hoststorage-get)                                                     | GET       |
-| [/host/storage/folders/add](#hoststoragefoldersadd-post)                              | POST      |
-| [/host/storage/folders/remove](#hoststoragefoldersremove-post)                        | POST      |
-| [/host/storage/folders/resize](#hoststoragefoldersresize-post)                        | POST      |
+| Route                                                                                      | HTTP verb |
+| ------------------------------------------------------------------------------------------ | --------- |
+| [/host](#host-get)                                                                         | GET       |
+| [/host](#host-post)                                                                        | POST      |
+| [/host/announce](#hostannounce-post)                                                       | POST      |
+| [/host/estimatescore](#hostestimatescore-get)                                              | GET       |
+| [/host/storage](#hoststorage-get)                                                          | GET       |
+| [/host/storage/folders/add](#hoststoragefoldersadd-post)                                   | POST      |
+| [/host/storage/folders/remove](#hoststoragefoldersremove-post)                             | POST      |
+| [/host/storage/folders/resize](#hoststoragefoldersresize-post)                             | POST      |
 | [/host/storage/sectors/delete/:___merkleroot___](#hoststoragesectorsdeletemerkleroot-post) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
@@ -480,6 +481,17 @@ data.
 ###### Response
 standard success or error response. See
 [#standard-responses](#standard-responses).
+
+#### /host/estimatescore [GET]
+
+returns the estimated HostDB score of the host using its current settings.
+
+###### JSON Response [(with comments)](/doc/api/Host.md#json-response-2)
+```javascript
+{
+	"estimatedscore": "123456786786786786786786786742133"
+}
+```
 
 
 Host DB
