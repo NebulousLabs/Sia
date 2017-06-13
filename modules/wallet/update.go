@@ -18,59 +18,46 @@ type historicOutput struct {
 	val types.Currency
 }
 
-// isFutureWalletAddress is a helper function that checks if an UnlockHash is
-// derived from one of the wallet's future keys. If it is all future keys up to
-// this one will be added to the spendable keys or a blockhain rescan will be
-// initiated
-func (w *Wallet) isFutureWalletAddress(uh types.UnlockHash) bool {
-	if _, exists := w.futureKeys[uh]; !exists {
-		return false
+// advanceSeedLookahead is a helper function that checks if an UnlockHash is
+// derived from one of the wallet's lookahead keys. If it is all lookahead keys up to
+// this one will be added to the spendable keys
+func (w *Wallet) advanceSeedLookahead(index uint64) {
+	progress, err := dbGetPrimarySeedProgress(w.dbTx)
+	if err != nil {
+		return
 	}
 
-	// generate and add spendable keys until the future key is present in w.keys
-	foundKey := false
-	for i := 0; i < 1000; i++ {
-		_, err := w.nextPrimarySeedAddress(w.dbTx)
-		if err != nil {
-			return false
-		}
-
-		if _, exists := w.keys[uh]; exists {
-			foundKey = true
-			break
-		}
+	// Add spendable keys and remove them from lookahead
+	spendableKeys := generateKeys(w.primarySeed, progress, index-progress+1)
+	for _, key := range spendableKeys {
+		w.keys[key.UnlockConditions.UnlockHash()] = key
+		delete(w.lookahead, key.UnlockConditions.UnlockHash())
 	}
 
-	// if future key was not among the next 1000 keys rescan the blockchain
-	if !foundKey {
-		// TODO: rescan blockchain
-		/*
-			w.cs.Unsubscribe(w)
-			w.tpool.Unsubscribe(w)
-
-			done := make(chan struct{})
-			go w.rescanMessage(done)
-			defer close(done)
-
-			err := w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
-			if err != nil {
-				// TODO: error handling
-			}
-			w.tpool.TransactionPoolSubscribe(w)
-
-		*/
-		return false
+	// Update the primarySeedProgress
+	newProgress := progress + uint64(len(spendableKeys))
+	dbPutPrimarySeedProgress(w.dbTx, newProgress)
+	if err != nil {
+		return
 	}
 
-	return true
+	// Regenerate lookahead
+	w.regenerateLookahead(newProgress)
 }
 
 // isWalletAddress is a helper function that checks if an UnlockHash is
 // derived from one of the wallet's spendable keys or future keys.
 func (w *Wallet) isWalletAddress(uh types.UnlockHash) bool {
 	_, exists := w.keys[uh]
-	if !exists {
-		exists = w.isFutureWalletAddress(uh)
+	if exists {
+		return true
+	}
+
+	// check keys in lookahead
+	index, exists := w.lookahead[uh]
+	if exists {
+		// advance the lookahead accordingly
+		w.advanceSeedLookahead(index)
 	}
 	return exists
 }

@@ -45,3 +45,9 @@ func init() {
 		panic("constants are incorrect, defragThreshold needs to be larger than the sum of defragBatchSize and defragStartIndex")
 	}
 }
+
+// maxLookahead returns the size of the lookahead for a given seed progress
+// which usually is the current primarySeedProgress
+func maxLookahead(start uint64) uint64 {
+	return start + 5000 + start/10
+}

@@ -93,20 +93,14 @@ func decryptSeedFile(masterKey crypto.TwofishKey, sf seedFile) (seed modules.See
 	return seed, nil
 }
 
-// maxFutureKeys is a helper function from a given start index
-// which usually is the current primarySeedProgress
-func maxFutureKeys(start uint64) uint64 {
-	return start + 5000 + start/10
-}
-
-// updateFutureKeys creates future keys up to a maximum of maxKeys keys
-func (w *Wallet) updateFutureKeys(start uint64) {
+// regenerateLookahead creates future keys up to a maximum of maxKeys keys
+func (w *Wallet) regenerateLookahead(start uint64) {
 	// Check how many keys need to be generated
-	maxKeys := maxFutureKeys(start)
-	existingKeys := uint64(len(w.futureKeys))
+	maxKeys := maxLookahead(start)
+	existingKeys := uint64(len(w.lookahead))
 
-	for _, k := range generateKeys(w.primarySeed, start+existingKeys, maxKeys-existingKeys) {
-		w.futureKeys[k.UnlockConditions.UnlockHash()] = true
+	for i, k := range generateKeys(w.primarySeed, start+existingKeys, maxKeys-existingKeys) {
+		w.lookahead[k.UnlockConditions.UnlockHash()] = start + existingKeys + uint64(i)
 	}
 }
 
@@ -139,8 +133,8 @@ func (w *Wallet) nextPrimarySeedAddress(tx *bolt.Tx) (types.UnlockConditions, er
 	w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
 
 	// Remove new key from the future keys and update them according to new progress
-	delete(w.futureKeys, spendableKey.UnlockConditions.UnlockHash())
-	w.updateFutureKeys(progress + 1)
+	delete(w.lookahead, spendableKey.UnlockConditions.UnlockHash())
+	w.regenerateLookahead(progress + 1)
 
 	return spendableKey.UnlockConditions, nil
 }

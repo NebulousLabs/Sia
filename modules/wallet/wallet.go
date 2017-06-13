@@ -68,9 +68,9 @@ type Wallet struct {
 	// from the seeds, when checking new outputs or spending outputs, the seeds
 	// are not referenced at all. The seeds are only stored so that the user
 	// may access them.
-	seeds      []modules.Seed
-	keys       map[types.UnlockHash]spendableKey
-	futureKeys map[types.UnlockHash]bool
+	seeds     []modules.Seed
+	keys      map[types.UnlockHash]spendableKey
+	lookahead map[types.UnlockHash]uint64
 
 	// unconfirmedProcessedTransactions tracks unconfirmed transactions.
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
@@ -113,8 +113,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		cs:    cs,
 		tpool: tpool,
 
-		keys:       make(map[types.UnlockHash]spendableKey),
-		futureKeys: make(map[types.UnlockHash]bool),
+		keys:      make(map[types.UnlockHash]spendableKey),
+		lookahead: make(map[types.UnlockHash]uint64),
 
 		persistDir: persistDir,
 	}

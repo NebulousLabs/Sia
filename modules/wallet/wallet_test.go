@@ -289,10 +289,10 @@ func TestFutureAddressGeneration(t *testing.T) {
 		t.Fatal("Couldn't fetch primary seed from db")
 	}
 
-	actualKeys := uint64(len(wt.wallet.futureKeys))
-	expectedKeys := maxFutureKeys(progress)
+	actualKeys := uint64(len(wt.wallet.lookahead))
+	expectedKeys := maxLookahead(progress)
 	if actualKeys != expectedKeys {
-		t.Errorf("expected len(futureKeys) == %d but was %d", actualKeys, expectedKeys)
+		t.Errorf("expected len(lookahead) == %d but was %d", actualKeys, expectedKeys)
 	}
 
 	// Generate some more keys
@@ -311,15 +311,15 @@ func TestFutureAddressGeneration(t *testing.T) {
 		t.Fatal("Couldn't fetch primary seed from db")
 	}
 
-	actualKeys = uint64(len(wt.wallet.futureKeys))
-	expectedKeys = maxFutureKeys(progress)
+	actualKeys = uint64(len(wt.wallet.lookahead))
+	expectedKeys = maxLookahead(progress)
 	if actualKeys != expectedKeys {
-		t.Errorf("expected len(futureKeys) == %d but was %d", actualKeys, expectedKeys)
+		t.Errorf("expected len(lookahead) == %d but was %d", actualKeys, expectedKeys)
 	}
 
 	wt.wallet.mu.RLock()
 	for i := range wt.wallet.keys {
-		_, exists := wt.wallet.futureKeys[i]
+		_, exists := wt.wallet.lookahead[i]
 		if exists {
 			t.Fatal("wallet.keys contained a key which is also present in wallet.futurekeys")
 		}
@@ -343,7 +343,7 @@ func TestFutureAddressReceive(t *testing.T) {
 
 	// choose 10 of the future keys and remember them
 	var receivingAddresses []types.UnlockHash
-	for uh := range wt.wallet.futureKeys {
+	for uh := range wt.wallet.lookahead {
 		sco := types.SiacoinOutput{
 			UnlockHash: uh,
 			Value:      types.NewCurrency64(1e3),
@@ -381,9 +381,9 @@ func TestFutureAddressReceive(t *testing.T) {
 	// Check if the receiving addresses were moved from future keys to keys
 	wt.wallet.mu.RLock()
 	for _, uh := range receivingAddresses {
-		_, exists := wt.wallet.futureKeys[uh]
+		_, exists := wt.wallet.lookahead[uh]
 		if exists {
-			t.Fatal("UnlockHash still exists in wallet.futureKeys")
+			t.Fatal("UnlockHash still exists in wallet.lookahead")
 		}
 
 		_, exists = wt.wallet.keys[uh]
