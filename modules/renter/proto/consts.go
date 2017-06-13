@@ -12,6 +12,6 @@ var (
 	connTimeout = build.Select(build.Var{
 		Dev:      10 * time.Second,
 		Standard: 60 * time.Second,
-		Testing:  1 * time.Second,
+		Testing:  5 * time.Second,
 	}).(time.Duration)
 )
