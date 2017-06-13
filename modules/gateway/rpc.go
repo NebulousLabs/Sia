@@ -59,9 +59,11 @@ func (g *Gateway) managedRPC(addr modules.NetAddress, name string, fn modules.RP
 	defer conn.Close()
 
 	// write header
+	conn.SetDeadline(time.Now().Add(10 * time.Second))
 	if err := encoding.WriteObject(conn, handlerName(name)); err != nil {
 		return err
 	}
+	conn.SetDeadline(time.Time{})
 	// call fn
 	return fn(conn)
 }
