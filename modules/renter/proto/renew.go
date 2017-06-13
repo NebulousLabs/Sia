@@ -3,7 +3,6 @@ package proto
 import (
 	"errors"
 	"net"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -93,7 +92,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	// initiate connection
 	dialer := &net.Dialer{
 		Cancel:  cancel,
-		Timeout: 15 * time.Second,
+		Timeout: connTimeout,
 	}
 	conn, err := dialer.Dial("tcp", string(host.NetAddress))
 	if err != nil {

@@ -3,7 +3,6 @@ package proto
 import (
 	"errors"
 	"net"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -98,7 +97,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	// Initiate connection.
 	dialer := &net.Dialer{
 		Cancel:  cancel,
-		Timeout: 15 * time.Second,
+		Timeout: connTimeout,
 	}
 	conn, err := dialer.Dial("tcp", string(host.NetAddress))
 	if err != nil {
