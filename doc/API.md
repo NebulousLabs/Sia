@@ -490,7 +490,8 @@ combined with the provided settings.
 ###### JSON Response [(with comments)](/doc/api/Host.md#json-response-2)
 ```javascript
 {
-	"estimatedscore": "123456786786786786786786786742133"
+	"estimatedscore": "123456786786786786786786786742133",
+	"conversionrate": 95
 }
 ```
 

@@ -556,7 +556,12 @@ combined with the provided settings.
 ###### JSON Response
 ```javascript
 {
-	"estimatedscore": "123456786786786786786786786742133"
+	// estimatedscore is the estimated HostDB score of the host given the
+	// settings passed to estimatescore.
+	"estimatedscore": "123456786786786786786786786742133",
+	// conversionrate is the likelyhood given the settings passed to
+	// estimatescore that the host will be selected by renters forming contracts.
+	"conversionrate": 95
 }
 ```
 
