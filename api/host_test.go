@@ -93,6 +93,56 @@ func TestEstimateWeight(t *testing.T) {
 	if eg.EstimatedScore.Cmp(originalEstimate) != -1 {
 		t.Fatal("score estimate did not decrease after incrementing mincontractprice")
 	}
+	if eg.ConversionRate != float64(100) {
+		t.Fatal("incorrect conversion rate", eg.ConversionRate)
+	}
+
+	// add a few hosts to the hostdb and verify that the conversion rate is
+	// reflected correctly
+	st2, err := blankServerTester(t.Name() + "-st2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.panicClose()
+	st3, err := blankServerTester(t.Name() + "-st3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st3.panicClose()
+	st4, err := blankServerTester(t.Name() + "-st4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st4.panicClose()
+	sts := []*serverTester{st, st2, st3, st4}
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fundAllNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = announceAllHosts(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tester := range sts {
+		err = tester.postAPI("/host/estimatescore", url.Values{}, &eg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if eg.ConversionRate > 100 {
+			t.Fatal("conversion rate was greater than 100")
+		}
+		if eg.ConversionRate < 0 {
+			t.Fatal("conversion rate was less than zero")
+		}
+		if eg.ConversionRate < 90 {
+			t.Fatal("all the sts should have had a conversion rate of >90%")
+		}
+	}
 }
 
 // TestWorkingStatus tests that the host's WorkingStatus field is set
