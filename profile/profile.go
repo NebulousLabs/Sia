@@ -142,7 +142,7 @@ func startContinuousLog(dir string, sleepCap time.Duration, restart func()) {
 			restart()
 			time.Sleep(sleepTime)
 			sleepTime = time.Duration(1.5 * float64(sleepTime))
-			if sleepCap != 0 * time.Second && sleepTime > sleepCap {
+			if sleepCap != 0*time.Second && sleepTime > sleepCap {
 				sleepTime = sleepCap
 			}
 			var m runtime.MemStats
