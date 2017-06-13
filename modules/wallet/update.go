@@ -18,9 +18,10 @@ type historicOutput struct {
 	val types.Currency
 }
 
-// advanceSeedLookahead is a helper function that checks if an UnlockHash is
-// derived from one of the wallet's lookahead keys. If it is all lookahead keys up to
-// this one will be added to the spendable keys
+// advanceSeedLookahead generates all keys from the current primary seed
+// progress up to index and adds them to the set of spendable keys.
+// Therefore the new primary seed progress will be index+1 and new
+// lookahead keys will be generated starting from index+1
 func (w *Wallet) advanceSeedLookahead(index uint64) {
 	progress, err := dbGetPrimarySeedProgress(w.dbTx)
 	if err != nil {
