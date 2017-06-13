@@ -1,7 +1,6 @@
 package miner
 
 import (
-	"container/heap"
 	"math/rand"
 	"testing"
 
@@ -26,8 +25,8 @@ func TestMapHeapSimple(t *testing.T) {
 		minHeap:  true,
 	}
 
-	heap.Init(max)
-	heap.Init(min)
+	max.Init()
+	min.Init()
 
 	for i := 0; i < 1000; i++ {
 		e1 := &mapElement{
@@ -50,15 +49,18 @@ func TestMapHeapSimple(t *testing.T) {
 			id:    splitSetID(i),
 			index: 0,
 		}
-		heap.Push(max, e1)
-		heap.Push(min, e2)
+		max.Push(e1)
+		min.Push(e2)
 	}
 
 	for i := 0; i < 1000; i++ {
-		maxPop := heap.Pop(max).(*mapElement)
-		minPop := heap.Pop(min).(*mapElement)
+		maxPop := max.Pop()
+		minPop := min.Pop()
 
 		if int(maxPop.id) != 999-i {
+			t.Log(maxPop.set.averageFee)
+			t.Log(maxPop.id)
+			t.Log(999 - i)
 			t.Error("Unexpected splitSetID in result from max-heap pop.")
 		}
 
@@ -94,8 +96,8 @@ func TestMapHeapSimpleDiffOrder(t *testing.T) {
 		minHeap:  true,
 	}
 
-	heap.Init(max)
-	heap.Init(min)
+	max.Init()
+	min.Init()
 
 	for i := 50; i < 100; i++ {
 		e1 := &mapElement{
@@ -118,28 +120,38 @@ func TestMapHeapSimpleDiffOrder(t *testing.T) {
 			id:    splitSetID(i),
 			index: 0,
 		}
-		heap.Push(max, e1)
-		heap.Push(min, e2)
+		max.Push(e1)
+		min.Push(e2)
 	}
 
 	for i := 0; i < 50; i++ {
-		e := &mapElement{
+		e1 := &mapElement{
 			set: &splitSet{
 				averageFee:   types.SiacoinPrecision.Mul64(uint64(i)),
-				size:         uint64(i),
-				transactions: make([]types.Transaction, 10),
+				size:         uint64(10 * i),
+				transactions: make([]types.Transaction, 0),
 			},
 
 			id:    splitSetID(i),
 			index: 0,
 		}
-		heap.Push(max, e)
-		heap.Push(min, e)
+		e2 := &mapElement{
+			set: &splitSet{
+				averageFee:   types.SiacoinPrecision.Mul64(uint64(i)),
+				size:         uint64(10 * i),
+				transactions: make([]types.Transaction, 0),
+			},
+
+			id:    splitSetID(i),
+			index: 0,
+		}
+		max.Push(e1)
+		min.Push(e2)
 	}
 
 	for i := 0; i < 100; i++ {
-		maxPop := heap.Pop(max).(*mapElement)
-		minPop := heap.Pop(min).(*mapElement)
+		maxPop := max.Pop()
+		minPop := min.Pop()
 
 		if int(maxPop.id) != 99-i {
 			t.Error("Unexpected splitSetID in result from max-heap pop.")
@@ -177,8 +189,8 @@ func TestMapHeapSize(t *testing.T) {
 		minHeap:  true,
 	}
 
-	heap.Init(max)
-	heap.Init(min)
+	max.Init()
+	min.Init()
 
 	var expectedSize uint64
 
@@ -203,9 +215,8 @@ func TestMapHeapSize(t *testing.T) {
 			id:    splitSetID(i),
 			index: 0,
 		}
-		heap.Push(max, e1)
-		heap.Push(min, e2)
-
+		max.Push(e1)
+		min.Push(e2)
 		expectedSize += e1.set.size
 	}
 
@@ -217,14 +228,16 @@ func TestMapHeapSize(t *testing.T) {
 	}
 
 	for i := 0; i < 1000; i++ {
-		maxPop := heap.Pop(max).(*mapElement)
-		minPop := heap.Pop(min).(*mapElement)
+		maxPop := max.Pop()
+		minPop := min.Pop()
 
 		if maxPop.set.size != uint64(100*(999-i)) {
+			t.Log(i)
 			t.Error("Unexpected set size in result from max-heap pop.")
 		}
 
 		if minPop.set.size != uint64(100*i) {
+			t.Log(i)
 			t.Error("Unexpected set size in result from min-heap pop.")
 		}
 
@@ -249,8 +262,8 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 		minHeap:  true,
 	}
 
-	heap.Init(max)
-	heap.Init(min)
+	max.Init()
+	min.Init()
 
 	for i := 0; i < 5000; i++ {
 		e1 := &mapElement{
@@ -273,8 +286,8 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 			id:    splitSetID(i),
 			index: 0,
 		}
-		heap.Push(max, e1)
-		heap.Push(min, e2)
+		max.Push(e1)
+		min.Push(e2)
 	}
 
 	randID := splitSetID(rand.Intn(5000))
