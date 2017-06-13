@@ -176,3 +176,26 @@ func TestTransactionPoolRawHandlerPOST(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestTransactionPoolFee tests the /tpool/fee endpoint.
+func TestTransactionPoolFee(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var fees TpoolFeeGET
+	err = st.getAPI("/tpool/fee", &fees)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	min, max := st.tpool.FeeEstimation()
+	if !min.Equals(fees.Minimum) || !max.Equals(fees.Maximum) {
+		t.Fatal("fee mismatch")
+	}
+}
