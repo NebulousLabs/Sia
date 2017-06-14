@@ -49,7 +49,7 @@ type (
 	}
 
 	// WalletSiacoinsPOST contains the transaction sent in the POST call to
-	// /wallet/siafunds.
+	// /wallet/siacoins.
 	WalletSiacoinsPOST struct {
 		TransactionIDs []types.TransactionID `json:"transactionids"`
 	}
