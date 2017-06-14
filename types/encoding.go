@@ -72,6 +72,22 @@ func (cf CoveredFields) MarshalSia(w io.Writer) error {
 	return nil
 }
 
+// MarshalSiaSize returns the encoded size of cf.
+func (cf CoveredFields) MarshalSiaSize() (size int) {
+	size += 1 // WholeTransaction
+	size += 8 + len(cf.SiacoinInputs)*8
+	size += 8 + len(cf.SiacoinOutputs)*8
+	size += 8 + len(cf.FileContracts)*8
+	size += 8 + len(cf.FileContractRevisions)*8
+	size += 8 + len(cf.StorageProofs)*8
+	size += 8 + len(cf.SiafundInputs)*8
+	size += 8 + len(cf.SiafundOutputs)*8
+	size += 8 + len(cf.MinerFees)*8
+	size += 8 + len(cf.ArbitraryData)*8
+	size += 8 + len(cf.TransactionSignatures)*8
+	return
+}
+
 // MarshalJSON implements the json.Marshaler interface.
 func (c Currency) MarshalJSON() ([]byte, error) {
 	// Must enclosed the value in quotes; otherwise JS will convert it to a
@@ -101,6 +117,31 @@ func (c *Currency) UnmarshalJSON(b []byte) error {
 // integer, there is no way to marshal a negative Currency.
 func (c Currency) MarshalSia(w io.Writer) error {
 	return encoding.WritePrefix(w, c.i.Bytes())
+}
+
+// MarshalSiaSize returns the encoded size of c.
+func (c Currency) MarshalSiaSize() int {
+	// from math/big/arith.go
+	const (
+		_m    = ^big.Word(0)
+		_logS = _m>>8&1 + _m>>16&1 + _m>>32&1
+		_S    = 1 << _logS // number of bytes per big.Word
+	)
+
+	// start with the number of Words * number of bytes per Word, then
+	// subtract trailing bytes that are 0
+	bits := c.i.Bits()
+	size := len(bits) * _S
+zeros:
+	for i := len(bits) - 1; i >= 0; i-- {
+		for j := _S - 1; j >= 0; j-- {
+			if (bits[i] >> uintptr(j*8)) != 0 {
+				break zeros
+			}
+			size--
+		}
+	}
+	return 8 + size // account for length prefix
 }
 
 // UnmarshalSia implements the encoding.SiaUnmarshaler interface.
@@ -183,6 +224,27 @@ func (fc FileContract) MarshalSia(w io.Writer) error {
 	return encoding.WriteUint64(w, fc.RevisionNumber)
 }
 
+// MarshalSiaSize returns the encoded size of fc.
+func (fc FileContract) MarshalSiaSize() (size int) {
+	size += 8 // FileSize
+	size += len(fc.FileMerkleRoot)
+	size += 8 + 8 // WindowStart + WindowEnd
+	size += fc.Payout.MarshalSiaSize()
+	size += 8
+	for _, sco := range fc.ValidProofOutputs {
+		size += sco.Value.MarshalSiaSize()
+		size += len(sco.UnlockHash)
+	}
+	size += 8
+	for _, sco := range fc.MissedProofOutputs {
+		size += sco.Value.MarshalSiaSize()
+		size += len(sco.UnlockHash)
+	}
+	size += len(fc.UnlockHash)
+	size += 8 // RevisionNumber
+	return
+}
+
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (fcr FileContractRevision) MarshalSia(w io.Writer) error {
 	w.Write(fcr.ParentID[:])
@@ -202,6 +264,28 @@ func (fcr FileContractRevision) MarshalSia(w io.Writer) error {
 	}
 	_, err := w.Write(fcr.NewUnlockHash[:])
 	return err
+}
+
+// MarshalSiaSize returns the encoded size of fcr.
+func (fcr FileContractRevision) MarshalSiaSize() (size int) {
+	size += len(fcr.ParentID)
+	size += fcr.UnlockConditions.MarshalSiaSize()
+	size += 8 // NewRevisionNumber
+	size += 8 // NewFileSize
+	size += len(fcr.NewFileMerkleRoot)
+	size += 8 + 8 // NewWindowStart + NewWindowEnd
+	size += 8
+	for _, sco := range fcr.NewValidProofOutputs {
+		size += sco.Value.MarshalSiaSize()
+		size += len(sco.UnlockHash)
+	}
+	size += 8
+	for _, sco := range fcr.NewMissedProofOutputs {
+		size += sco.Value.MarshalSiaSize()
+		size += len(sco.UnlockHash)
+	}
+	size += len(fcr.NewUnlockHash)
+	return
 }
 
 // MarshalJSON marshals an id as a hex string.
@@ -395,6 +479,62 @@ func (t Transaction) MarshalSia(w io.Writer) error {
 	return nil
 }
 
+// MarshalSiaSize returns the encoded size of t.
+func (t Transaction) MarshalSiaSize() (size int) {
+	size += 8
+	for _, sci := range t.SiacoinInputs {
+		size += len(sci.ParentID)
+		size += sci.UnlockConditions.MarshalSiaSize()
+	}
+	size += 8
+	for _, sco := range t.SiacoinOutputs {
+		size += sco.Value.MarshalSiaSize()
+		size += len(sco.UnlockHash)
+	}
+	size += 8
+	for i := range t.FileContracts {
+		size += t.FileContracts[i].MarshalSiaSize()
+	}
+	size += 8
+	for i := range t.FileContractRevisions {
+		size += t.FileContractRevisions[i].MarshalSiaSize()
+	}
+	size += 8
+	for _, sp := range t.StorageProofs {
+		size += 8 + len(sp.HashSet)*crypto.HashSize
+		size += len(sp.ParentID)
+		size += 8 + len(sp.Segment)
+	}
+	size += 8
+	for _, sfi := range t.SiafundInputs {
+		size += len(sfi.ParentID)
+		size += len(sfi.ClaimUnlockHash)
+		size += sfi.UnlockConditions.MarshalSiaSize()
+	}
+	size += 8
+	for _, sfo := range t.SiafundOutputs {
+		size += sfo.Value.MarshalSiaSize()
+		size += len(sfo.UnlockHash)
+		size += sfo.ClaimStart.MarshalSiaSize()
+	}
+	size += 8
+	for i := range t.MinerFees {
+		size += t.MinerFees[i].MarshalSiaSize()
+	}
+	size += 8
+	for i := range t.ArbitraryData {
+		size += 8 + len(t.ArbitraryData[i])
+	}
+	size += 8
+	for _, ts := range t.TransactionSignatures {
+		size += len(ts.ParentID)
+		size += 8 // ts.PublicKeyIndex
+		size += ts.CoveredFields.MarshalSiaSize()
+		size += 8 + len(ts.Signature)
+	}
+	return
+}
+
 // MarshalJSON marshals an id as a hex string.
 func (tid TransactionID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(tid.String())
@@ -427,6 +567,18 @@ func (uc UnlockConditions) MarshalSia(w io.Writer) error {
 		spk.MarshalSia(w)
 	}
 	return encoding.WriteUint64(w, uc.SignaturesRequired)
+}
+
+// MarshalSiaSize returns the encoded size of uc.
+func (uc UnlockConditions) MarshalSiaSize() (size int) {
+	size += 8 // Timelock
+	size += 8 // length prefix for PublicKeys
+	for _, spk := range uc.PublicKeys {
+		size += len(spk.Algorithm)
+		size += 8 + len(spk.Key)
+	}
+	size += 8 // SignaturesRequired
+	return
 }
 
 // MarshalJSON is implemented on the unlock hash to always produce a hex string
