@@ -164,6 +164,46 @@ func (c *Currency) Scan(s fmt.ScanState, ch rune) error {
 	return nil
 }
 
+// MarshalSia implements the encoding.SiaMarshaler interface.
+func (fc FileContract) MarshalSia(w io.Writer) error {
+	encoding.WriteUint64(w, fc.FileSize)
+	w.Write(fc.FileMerkleRoot[:])
+	encoding.WriteUint64(w, uint64(fc.WindowStart))
+	encoding.WriteUint64(w, uint64(fc.WindowEnd))
+	fc.Payout.MarshalSia(w)
+	encoding.WriteInt(w, len(fc.ValidProofOutputs))
+	for _, sco := range fc.ValidProofOutputs {
+		sco.MarshalSia(w)
+	}
+	encoding.WriteInt(w, len(fc.MissedProofOutputs))
+	for _, sco := range fc.MissedProofOutputs {
+		sco.MarshalSia(w)
+	}
+	w.Write(fc.UnlockHash[:])
+	return encoding.WriteUint64(w, fc.RevisionNumber)
+}
+
+// MarshalSia implements the encoding.SiaMarshaler interface.
+func (fcr FileContractRevision) MarshalSia(w io.Writer) error {
+	w.Write(fcr.ParentID[:])
+	fcr.UnlockConditions.MarshalSia(w)
+	encoding.WriteUint64(w, fcr.NewRevisionNumber)
+	encoding.WriteUint64(w, fcr.NewFileSize)
+	w.Write(fcr.NewFileMerkleRoot[:])
+	encoding.WriteUint64(w, uint64(fcr.NewWindowStart))
+	encoding.WriteUint64(w, uint64(fcr.NewWindowEnd))
+	encoding.WriteInt(w, len(fcr.NewValidProofOutputs))
+	for _, sco := range fcr.NewValidProofOutputs {
+		sco.MarshalSia(w)
+	}
+	encoding.WriteInt(w, len(fcr.NewMissedProofOutputs))
+	for _, sco := range fcr.NewMissedProofOutputs {
+		sco.MarshalSia(w)
+	}
+	_, err := w.Write(fcr.NewUnlockHash[:])
+	return err
+}
+
 // MarshalJSON marshals an id as a hex string.
 func (fcid FileContractID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(fcid.String())
@@ -319,11 +359,11 @@ func (t Transaction) MarshalSia(w io.Writer) error {
 	}
 	encoding.WriteInt(w, len((t.FileContracts)))
 	for i := range t.FileContracts {
-		enc.Encode(t.FileContracts[i])
+		t.FileContracts[i].MarshalSia(w)
 	}
 	encoding.WriteInt(w, len((t.FileContractRevisions)))
 	for i := range t.FileContractRevisions {
-		enc.Encode(t.FileContractRevisions[i])
+		t.FileContractRevisions[i].MarshalSia(w)
 	}
 	encoding.WriteInt(w, len((t.StorageProofs)))
 	for i := range t.StorageProofs {
