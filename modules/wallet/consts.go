@@ -16,6 +16,10 @@ const (
 	// defragStartIndex is the number of outputs to skip over when performing a
 	// defrag.
 	defragStartIndex = 10
+
+	// lookaheadRescanThreshold is the number of keys in the lookahead that will be
+	// generated before a complete wallet rescan is initialized.
+	lookaheadRescanThreshold = 1000
 )
 
 // dustValue is the quantity below which a Currency is considered to be Dust.
@@ -49,5 +53,5 @@ func init() {
 // maxLookahead returns the size of the lookahead for a given seed progress
 // which usually is the current primarySeedProgress
 func maxLookahead(start uint64) uint64 {
-	return start + 5000 + start/10
+	return start + lookaheadRescanThreshold + 4000 + start/10
 }
