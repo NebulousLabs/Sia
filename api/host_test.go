@@ -123,12 +123,25 @@ func TestEstimateWeight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// set the sts to be priced such that the first st is the most attractive,
+	// and the last st is the least attractive
+	for i, tester := range sts {
+		is = tester.host.InternalSettings()
+		is.MinContractPrice = types.SiacoinPrecision.Mul64(1000 + (10 * uint64(i)))
+		err = tester.host.SetInternalSettings(is)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// announce the sts and verify that their estimation of their conversion rate
+	// is accurate
 	err = announceAllHosts(sts)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	for _, tester := range sts {
+	for i, tester := range sts {
 		err = tester.postAPI("/host/estimatescore", url.Values{}, &eg)
 		if err != nil {
 			t.Fatal(err)
@@ -139,8 +152,9 @@ func TestEstimateWeight(t *testing.T) {
 		if eg.ConversionRate < 0 {
 			t.Fatal("conversion rate was less than zero")
 		}
-		if eg.ConversionRate < 90 {
-			t.Fatal("all the sts should have had a conversion rate of >90%")
+		expectedRate := 100 - ((float64(i) / 50) * 100)
+		if eg.ConversionRate != expectedRate {
+			t.Fatal("incorrect conversion rate: ", eg.ConversionRate)
 		}
 	}
 }

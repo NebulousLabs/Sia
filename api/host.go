@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 
@@ -242,15 +243,15 @@ func (api *API) hostEstimateScorePOST(w http.ResponseWriter, req *http.Request, 
 		hosts = append(hosts, entry)
 	}
 	sort.Slice(hosts, func(i, j int) bool {
-		return api.renter.ScoreBreakdown(hosts[i]).Score.Cmp(api.renter.ScoreBreakdown(hosts[j]).Score) == -1
+		return api.renter.ScoreBreakdown(hosts[i]).Score.Cmp(api.renter.ScoreBreakdown(hosts[j]).Score) == 1
 	})
-	var position float64
+	var rank float64
 	for i, host := range hosts {
 		if host.PublicKey.String() == entry.PublicKey.String() {
-			position = float64(i)
+			rank = float64(i)
 		}
 	}
-	conversionRate := 100 - ((position / 50) * 100)
+	conversionRate := math.Max(100-((rank/50)*100), 0)
 
 	e := HostEstimateScorePOST{
 		EstimatedScore: api.renter.ScoreBreakdown(entry).Score,
