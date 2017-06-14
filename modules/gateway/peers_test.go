@@ -12,22 +12,17 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
-	"github.com/NebulousLabs/muxado"
 )
 
 // dummyConn implements the net.Conn interface, but does not carry any actual
-// data. It is passed to muxado, because passing nil results in segfaults.
+// data.
 type dummyConn struct {
 	net.Conn
 }
 
-// muxado uses these methods when sending its GoAway signal
-func (dc *dummyConn) Write(p []byte) (int, error) { return len(p), nil }
-
-// Close is a no-op to satisfy the Conn interface.
-func (dc *dummyConn) Close() error { return nil }
-
-// SetWriteDeadline is a no-op to satisfy the Conn interface.
+func (dc *dummyConn) Read(p []byte) (int, error)       { return len(p), nil }
+func (dc *dummyConn) Write(p []byte) (int, error)      { return len(p), nil }
+func (dc *dummyConn) Close() error                     { return nil }
 func (dc *dummyConn) SetWriteDeadline(time.Time) error { return nil }
 
 // TestAddPeer tries adding a peer to the gateway.
@@ -45,7 +40,7 @@ func TestAddPeer(t *testing.T) {
 		Peer: modules.Peer{
 			NetAddress: "foo.com:123",
 		},
-		sess: muxado.Client(new(dummyConn)),
+		sess: newClientStream(new(dummyConn), build.Version),
 	})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
@@ -73,7 +68,7 @@ func TestAcceptPeer(t *testing.T) {
 				Inbound:    false,
 				Local:      false,
 			},
-			sess: muxado.Client(new(dummyConn)),
+			sess: newClientStream(new(dummyConn), build.Version),
 		}
 		unkickablePeers = append(unkickablePeers, p)
 	}
@@ -85,7 +80,7 @@ func TestAcceptPeer(t *testing.T) {
 				Inbound:    true,
 				Local:      true,
 			},
-			sess: muxado.Client(new(dummyConn)),
+			sess: newClientStream(new(dummyConn), build.Version),
 		}
 		unkickablePeers = append(unkickablePeers, p)
 	}
@@ -99,7 +94,7 @@ func TestAcceptPeer(t *testing.T) {
 			NetAddress: "9.9.9.9",
 			Inbound:    true,
 		},
-		sess: muxado.Client(new(dummyConn)),
+		sess: newClientStream(new(dummyConn), build.Version),
 	})
 	for _, p := range unkickablePeers {
 		if _, exists := g.peers[p.NetAddress]; !exists {
@@ -113,7 +108,7 @@ func TestAcceptPeer(t *testing.T) {
 			NetAddress: "9.9.9.9",
 			Inbound:    true,
 		},
-		sess: muxado.Client(new(dummyConn)),
+		sess: newClientStream(new(dummyConn), build.Version),
 	})
 	// Test that accepting a local peer will kick a kickable peer.
 	g.acceptPeer(&peer{
@@ -122,7 +117,7 @@ func TestAcceptPeer(t *testing.T) {
 			Inbound:    true,
 			Local:      true,
 		},
-		sess: muxado.Client(new(dummyConn)),
+		sess: newClientStream(new(dummyConn), build.Version),
 	})
 	if _, exists := g.peers["9.9.9.9"]; exists {
 		t.Error("acceptPeer didn't kick a peer to make room for a local peer")
@@ -151,7 +146,7 @@ func TestRandomOutboundPeer(t *testing.T) {
 			NetAddress: "foo.com:123",
 			Inbound:    false,
 		},
-		sess: muxado.Client(new(dummyConn)),
+		sess: newClientStream(new(dummyConn), build.Version),
 	})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
@@ -194,8 +189,8 @@ func TestListen(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	// a simple 'conn.Close' would not obey the muxado disconnect protocol
-	muxado.Client(conn).Close()
+	// a simple 'conn.Close' would not obey the stream disconnect protocol
+	newClientStream(conn, build.Version).Close()
 
 	// compliant connect with invalid port
 	conn, err = net.Dial("tcp", string(g.Address()))
@@ -224,8 +219,8 @@ func TestListen(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	// a simple 'conn.Close' would not obey the muxado disconnect protocol
-	muxado.Client(conn).Close()
+	// a simple 'conn.Close' would not obey the stream disconnect protocol
+	newClientStream(conn, build.Version).Close()
 
 	// compliant connect
 	conn, err = net.Dial("tcp", string(g.Address()))
@@ -241,7 +236,7 @@ func TestListen(t *testing.T) {
 		t.Fatal("gateway should have given ack")
 	}
 
-	if build.VersionCmp(build.Version, sessionHandshakeUpgradeVersion) >= 0 {
+	if build.VersionCmp(build.Version, sessionUpgradeVersion) >= 0 {
 		// generate fake ID
 		var gID gatewayID
 		fastrand.Read(gID[:])
@@ -266,7 +261,7 @@ func TestListen(t *testing.T) {
 		g.mu.RUnlock()
 	}
 
-	muxado.Client(conn).Close()
+	newClientStream(conn, build.Version).Close()
 
 	// g should remove the peer
 	for ok {
@@ -587,27 +582,27 @@ func TestConnectRejectsVersions(t *testing.T) {
 			version: "0.9.0",
 			msg:     "Connect should succeed when the remote peer's version is 0.9.0",
 		},
-		// Test that Connect /could/ succeed when the remote peer's version is >= 1.2.0.
+		// Test that Connect /could/ succeed when the remote peer's version is >= 1.3.0.
 		{
-			version:         sessionHandshakeUpgradeVersion,
-			msg:             "Connect should succeed when the remote peer's version is 1.2.0 and sessionHeader checks out",
+			version:         sessionUpgradeVersion,
+			msg:             "Connect should succeed when the remote peer's version is 1.3.0 and sessionHeader checks out",
 			uniqueID:        func() (id gatewayID) { fastrand.Read(id[:]); return }(),
 			genesisID:       types.GenesisID,
-			versionRequired: sessionHandshakeUpgradeVersion,
+			versionRequired: sessionUpgradeVersion,
 		},
 		{
-			version:         sessionHandshakeUpgradeVersion,
+			version:         sessionUpgradeVersion,
 			msg:             "Connect should not succeed when peer is connecting to itself",
 			uniqueID:        g.id,
 			genesisID:       types.GenesisID,
 			errWant:         errOurAddress,
 			localErrWant:    errOurAddress,
-			versionRequired: sessionHandshakeUpgradeVersion,
+			versionRequired: sessionUpgradeVersion,
 		},
 	}
 	for testIndex, tt := range tests {
 		if tt.versionRequired != "" && build.VersionCmp(build.Version, tt.versionRequired) < 0 {
-			continue // skip, as we do not meed the required version
+			continue // skip, as we do not meet the required version
 		}
 
 		doneChan := make(chan struct{})
@@ -624,12 +619,12 @@ func TestConnectRejectsVersions(t *testing.T) {
 			if remoteVersion != build.Version {
 				panic(fmt.Sprintf("test #%d failed: remoteVersion != build.Version", testIndex))
 			}
-			if !build.IsVersion(tt.version) || build.VersionCmp(tt.version, sessionHandshakeUpgradeVersion) < 0 {
-				return // in case test version is gibrish or < 1.2.0
+			if !build.IsVersion(tt.version) || build.VersionCmp(tt.version, sessionUpgradeVersion) < 0 {
+				return // in case test version is invalid or < 1.2.0
 			}
 
-			if build.VersionCmp(remoteVersion, sessionHandshakeUpgradeVersion) >= 0 &&
-				build.VersionCmp(build.Version, sessionHandshakeUpgradeVersion) >= 0 {
+			if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 &&
+				build.VersionCmp(build.Version, sessionUpgradeVersion) >= 0 {
 				if err := acceptConnSessionHandshake(conn, tt.uniqueID); err != tt.localErrWant {
 					panic(fmt.Sprintf("test #%d failed: %v != %v", testIndex, tt.localErrWant, err))
 				}
@@ -806,7 +801,7 @@ func TestDisconnect(t *testing.T) {
 		Peer: modules.Peer{
 			NetAddress: "foo.com:123",
 		},
-		sess: muxado.Client(conn),
+		sess: newClientStream(conn, build.Version),
 	})
 	g.mu.Unlock()
 	if err := g.Disconnect("foo.com:123"); err != nil {
