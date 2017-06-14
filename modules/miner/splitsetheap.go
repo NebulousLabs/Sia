@@ -50,7 +50,7 @@ func (mh mapHeap) Swap(i, j int) {
 	mh.selectID[mh.data[j].id].index = j
 }
 
-// Push and Pop implement the heap interface.
+// Push puts an element onto the heap and maintains the heap condition.
 func (mh *mapHeap) Push(elem *mapElement) {
 	// Get the number of items stored in the heap.
 	n := len(mh.data)
@@ -69,6 +69,8 @@ func (mh *mapHeap) Push(elem *mapElement) {
 	mh.up(n)
 }
 
+// Pop removes the top element from the heap (as defined by Less())
+// Pop will panic if called on an empty heap. Use Peek before Pop to be safe.
 func (mh *mapHeap) Pop() *mapElement {
 	n := mh.Len() - 1
 
@@ -98,10 +100,12 @@ func (mh *mapHeap) RemoveSetByID(s splitSetID) *mapElement {
 	return mh.Remove(i)
 }
 
-// Peak returns the element at the top of the heap without removing it.
-// TODO: TEST !!! !!! ! ! ! ! ! !
-func (mh *mapHeap) Peak() *mapElement {
-	return mh.data[0]
+// Peek returns the element at the top of the heap without removing it.
+func (mh *mapHeap) Peek() (*mapElement, bool) {
+	if len(mh.data) == 0 {
+		return nil, false
+	}
+	return mh.data[0], true
 }
 
 // The following are copied from the Golang heap package.

@@ -358,3 +358,93 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 	}
 
 }
+
+// TestMapHeapPeek test the Peek method. First, on an empty heap Peek should
+// return false. Then it checks that Peek returns the same result as the next Pop.
+func TestMapHeapPeek(t *testing.T) {
+	max := &mapHeap{
+		selectID: make(map[splitSetID]*mapElement),
+		data:     make([]*mapElement, 0),
+		size:     0,
+		minHeap:  false,
+	}
+
+	min := &mapHeap{
+		selectID: make(map[splitSetID]*mapElement),
+		data:     make([]*mapElement, 0),
+		size:     0,
+		minHeap:  true,
+	}
+
+	max.Init()
+	min.Init()
+
+	_, maxNotEmpty := max.Peek()
+	_, minNotEmpty := min.Peek()
+
+	if maxNotEmpty {
+		t.Error("Unexpected result from max.Peek(), heap not empty")
+	}
+
+	if minNotEmpty {
+		t.Error("Unexpected result from max.Peek(), heap not empty")
+	}
+
+	for i := 0; i < 10; i++ {
+		e1 := &mapElement{
+			set: &splitSet{
+				averageFee:   types.SiacoinPrecision.Mul64(uint64(i)),
+				size:         uint64(10 * i),
+				transactions: make([]types.Transaction, 0),
+			},
+
+			id:    splitSetID(i),
+			index: 0,
+		}
+		e2 := &mapElement{
+			set: &splitSet{
+				averageFee:   types.SiacoinPrecision.Mul64(uint64(i)),
+				size:         uint64(10 * i),
+				transactions: make([]types.Transaction, 0),
+			},
+
+			id:    splitSetID(i),
+			index: 0,
+		}
+		max.Push(e1)
+		min.Push(e2)
+	}
+
+	for i := 0; i < 10; i++ {
+		maxPeek, maxNotEmpty := max.Peek()
+		minPeek, minNotEmpty := min.Peek()
+
+		if !maxNotEmpty {
+			t.Error("Unexpected result from max.Peek(), heap empty after pushes")
+		}
+
+		if !minNotEmpty {
+			t.Error("Unexpected result from max.Peek(), heap empty after pushes")
+		}
+
+		maxPop := max.Pop()
+		minPop := min.Pop()
+
+		if int(maxPop.id) != int(maxPeek.id) {
+			t.Error("Unexpected splitSetID in result from max-heap Peek.")
+		}
+
+		if int(minPop.id) != int(minPeek.id) {
+			t.Error("Unexpected splitSetID in result from min-heap Peek.")
+		}
+
+		if maxPop.set.averageFee.Cmp(maxPeek.set.averageFee) != 0 {
+			t.Error("Unexpected currency value in result from max-heap Peek.")
+		}
+
+		if minPop.set.averageFee.Cmp(minPeek.set.averageFee) != 0 {
+			t.Error("Unexpected currency value in result from min-heap Peek.")
+		}
+	}
+
+}
