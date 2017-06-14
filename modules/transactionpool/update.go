@@ -1,9 +1,9 @@
 package transactionpool
 
 import (
+	"bytes"
 	"sort"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -215,8 +215,11 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// Compile the fees for this set.
 			var feeSum types.Currency
 			var sizeSum int
+			b := new(bytes.Buffer)
 			for _, txn := range set {
-				sizeSum += len(encoding.Marshal(txn))
+				txn.MarshalSia(b)
+				sizeSum += b.Len()
+				b.Reset()
 				for _, fee := range txn.MinerFees {
 					feeSum = feeSum.Add(fee)
 				}
