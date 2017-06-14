@@ -11,6 +11,38 @@ import (
 // findSets takes a bunch of transactions (presumably from a block) and finds
 // all of the separate transaction sets within it. Set does not check for
 // conflicts.
+//
+// The algorithm goes through one transaction at a time. All of the outputs of
+// that transaction are added to the objMap, pointing to the transaction to
+// indicate that the transaction contains those outputs. The transaction is
+// assigned an integer id (each transaction will have a unique id) and added to
+// the txMap.
+//
+// The transaction's inputs are then checked against the objMap to see if there
+// are any parents of the transaction in the graph. If there are, the
+// transaction is added to the parent set instead of its own set. If not, the
+// transaction is added as its own set.
+//
+// The forwards map contains a list of ints indicating when a transaction has
+// been merged with a set. When a transaction gets merged with a parent set, its
+// integer id gets added to the forwards map, indicating that the transaction is
+// no longer in its own set, but instead has been merged with other sets.
+//
+// Some transactions will have parents from multiple distinct sets. If a
+// transaction has parents in multiple distinct sets, those sets get merged
+// together and the transaction gets added to the result. One of the sets is
+// nominated (arbitrarily) as the official set, and the integer id of the other
+// set and the new transaction get forwarded to the official set.
+//
+// TODO: Set merging currently occurs any time that there is a child. But
+// really, it should only occur if the child increases the average fee value of
+// the set that it is merging with (which it will if and only if it has a higher
+// average fee than that set). If the child has multiple parent sets, it should
+// be compared with the parent set that has the lowest fee value. Then, after it
+// is merged with that parent, the result should be merged with the next
+// lowest-fee parent set if and only if the new set has a higher average fee
+// than the parent set. And this continues until either all of the sets have
+// been merged, or until the remaining parent sets have higher values.
 func findSets(ts []types.Transaction) [][]types.Transaction {
 	// txMap marks what set each transaction is in. If two sets get combined,
 	// this number will not be updated. The 'forwards' map defined further on
