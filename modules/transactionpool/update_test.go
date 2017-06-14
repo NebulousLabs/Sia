@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -57,13 +58,12 @@ func TestFindSets(t *testing.T) {
 	if len(sets) != 2 {
 		t.Fatal("there should be two sets")
 	}
-	lens := make(map[int]struct{})
-	lens[len(sets[0])] = struct{}{}
-	lens[len(sets[1])] = struct{}{}
-	_, exists1 := lens[graph1Size]
-	_, exists2 := lens[graph2Size]
-	if !exists1 || !exists2 {
-		t.Fatal("there should be five transactions in each set")
+	lens := []int{len(sets[0]), len(sets[1])}
+	sort.Ints(lens)
+	expected := []int{graph1Size, graph2Size}
+	sort.Ints(expected)
+	if lens[0] != expected[0] || lens[1] != expected[1] {
+		t.Error("Resulting sets do not have the right lengths")
 	}
 
 	// Create a diamond graph to make sure it can handle diamond graph.
@@ -87,15 +87,12 @@ func TestFindSets(t *testing.T) {
 	if len(sets) != 3 {
 		t.Fatal("there should be two sets")
 	}
-	lens = make(map[int]struct{})
-	lens[len(sets[0])] = struct{}{}
-	lens[len(sets[1])] = struct{}{}
-	lens[len(sets[2])] = struct{}{}
-	_, exists1 = lens[graph1Size]
-	_, exists2 = lens[graph2Size]
-	_, exists3 := lens[graph3Size]
-	if !exists1 || !exists2 || !exists3 {
-		t.Fatal("sets have wrong counts", exists1, exists2, exists3)
+	lens = []int{len(sets[0]), len(sets[1]), len(sets[2])}
+	sort.Ints(lens)
+	expected = []int{graph1Size, graph2Size, graph3Size}
+	sort.Ints(expected)
+	if lens[0] != expected[0] || lens[1] != expected[1] || lens[2] != expected[2] {
+		t.Error("Resulting sets do not have the right lengths")
 	}
 
 	// Sporadically weave the transactions and make sure the set finder still
@@ -124,15 +121,12 @@ func TestFindSets(t *testing.T) {
 	if len(sets) != 3 {
 		t.Fatal("there should be two sets")
 	}
-	lens = make(map[int]struct{})
-	lens[len(sets[0])] = struct{}{}
-	lens[len(sets[1])] = struct{}{}
-	lens[len(sets[2])] = struct{}{}
-	_, exists1 = lens[graph1Size]
-	_, exists2 = lens[graph2Size]
-	_, exists3 = lens[graph3Size]
-	if !exists1 || !exists2 || !exists3 {
-		t.Fatal("sets have wrong counts", exists1, exists2, exists3)
+	lens = []int{len(sets[0]), len(sets[1]), len(sets[2])}
+	sort.Ints(lens)
+	expected = []int{graph1Size, graph2Size, graph3Size}
+	sort.Ints(expected)
+	if lens[0] != expected[0] || lens[1] != expected[1] || lens[2] != expected[2] {
+		t.Error("Resulting sets do not have the right lengths")
 	}
 }
 
