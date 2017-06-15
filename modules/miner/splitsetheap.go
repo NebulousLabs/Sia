@@ -42,12 +42,10 @@ func (mh mapHeap) Swap(i, j int) {
 	mh.data[i], mh.data[j] = mh.data[j], mh.data[i]
 
 	// Change values in slice to correct indices.
+	// Note that the same mapeElement pointer is in the map also, so we only
+	// have to mutate it in one place.
 	mh.data[i].index = i
 	mh.data[j].index = j
-
-	// Change indices in mapElement structs in map to reflect position in slice.
-	mh.selectID[mh.data[i].id].index = i
-	mh.selectID[mh.data[j].id].index = j
 }
 
 // Push puts an element onto the heap and maintains the heap condition.
@@ -107,9 +105,6 @@ func (mh *mapHeap) Peek() (*mapElement, bool) {
 	}
 	return mh.data[0], true
 }
-
-// The following are copied from the Golang heap package.
-// Find the source atL https://golang.org/src/container/heap/heap.go
 
 // A heap must be initialized before any of the heap operations
 // can be used. Init is idempotent with respect to the heap conditions
