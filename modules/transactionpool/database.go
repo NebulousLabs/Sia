@@ -51,18 +51,11 @@ var (
 
 // Complex objects that get stored in database fields.
 type (
-	// feeSummary desribes the fee structure of a transaction.
-	feeSummary struct {
-		Fee  types.Currency // SC per byte
-		Size uint64
-	}
-
 	// medianPersist is the json object that gets stored in the database so that
 	// the transaction pool can persist its block based fee estimations.
 	medianPersist struct {
-		RecentConfirmedFees []feeSummary
-		TxnsPerBlock        []uint64
-		RecentMedianFee     types.Currency
+		RecentMedians   []types.Currency
+		RecentMedianFee types.Currency
 	}
 )
 

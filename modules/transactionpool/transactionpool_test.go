@@ -253,7 +253,7 @@ func TestFeeEstimation(t *testing.T) {
 		var edges []types.TransactionGraphEdge
 		var cumFee types.Currency
 		for j := 0; j < graphLens; j++ {
-			fee := types.SiacoinPrecision.Mul64(uint64(j + 1)).Div64(100)
+			fee := types.SiacoinPrecision.Mul64(uint64(j + i + 1)).Div64(200)
 			cumFee = cumFee.Add(fee)
 			edges = append(edges, types.TransactionGraphEdge{
 				Dest:   j + 1,

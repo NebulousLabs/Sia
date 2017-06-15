@@ -56,10 +56,9 @@ type (
 		// TODO: Write a consistency check making sure that all unconfirmedIDs
 		// point to the right place, and that all UnconfirmedIDs are accounted for.
 
-		blockHeight         types.BlockHeight
-		recentConfirmedFees []feeSummary
-		txnsPerBlock        []uint64       // the number of txns in each of the blocks
-		recentMedianFee     types.Currency // SC per byte
+		blockHeight     types.BlockHeight
+		recentMedians   []types.Currency
+		recentMedianFee types.Currency // SC per byte
 
 		// The consensus change index tracks how many consensus changes have
 		// been sent to the transaction pool. When a new subscriber joins the
