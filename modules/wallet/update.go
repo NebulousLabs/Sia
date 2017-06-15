@@ -64,7 +64,7 @@ func (w *Wallet) advanceSeedLookahead(index uint64) error {
 
 	// If more than lookaheadRescanThreshold keys were generated
 	// also initialize a rescan just to be safe.
-	if len(spendableKeys) > lookaheadRescanThreshold {
+	if uint64(len(spendableKeys)) > lookaheadRescanThreshold {
 		go w.threadedResetSubscriptions()
 	}
 
