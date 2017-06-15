@@ -3,9 +3,7 @@ package api
 import (
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
-	"sort"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -202,7 +200,6 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 // hostEstimateScoreGET handles the POST request to /host/estimatescore and
 // computes an estimated HostDB score for the provided settings.
 func (api *API) hostEstimateScorePOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	entry, exists := api.renter.Host(api.host.PublicKey())
 	settings, err := api.parseHostSettings(req)
 	if err != nil {
 		WriteError(w, Error{"error parsing host settings: " + err.Error()}, http.StatusBadRequest)
@@ -213,7 +210,7 @@ func (api *API) hostEstimateScorePOST(w http.ResponseWriter, req *http.Request, 
 		totalStorage += sf.Capacity
 		remainingStorage += sf.CapacityRemaining
 	}
-	entry.HostExternalSettings = modules.HostExternalSettings{
+	mergedSettings := modules.HostExternalSettings{
 		AcceptingContracts:   settings.AcceptingContracts,
 		MaxDownloadBatchSize: settings.MaxDownloadBatchSize,
 		MaxDuration:          settings.MaxDuration,
@@ -233,29 +230,13 @@ func (api *API) hostEstimateScorePOST(w http.ResponseWriter, req *http.Request, 
 
 		Version: build.Version,
 	}
+	entry := modules.HostDBEntry{}
 	entry.PublicKey = api.host.PublicKey()
-
-	// compute the host's conversion rate, that is, how likely it is to be
-	// selected by renters for use in contracts, by finding its position in the
-	// sorted list of active hosts
-	hosts := api.renter.ActiveHosts()
-	if !exists {
-		hosts = append(hosts, entry)
-	}
-	sort.Slice(hosts, func(i, j int) bool {
-		return api.renter.ScoreBreakdown(hosts[i]).Score.Cmp(api.renter.ScoreBreakdown(hosts[j]).Score) == 1
-	})
-	var rank float64
-	for i, host := range hosts {
-		if host.PublicKey.String() == entry.PublicKey.String() {
-			rank = float64(i)
-		}
-	}
-	conversionRate := math.Max(100-((rank/50)*100), 0)
-
+	entry.HostExternalSettings = mergedSettings
+	estimatedScoreBreakdown := api.renter.EstimateHostScore(entry)
 	e := HostEstimateScorePOST{
-		EstimatedScore: api.renter.ScoreBreakdown(entry).Score,
-		ConversionRate: conversionRate,
+		EstimatedScore: estimatedScoreBreakdown.Score,
+		ConversionRate: estimatedScoreBreakdown.ConversionRate,
 	}
 	WriteJSON(w, e)
 }

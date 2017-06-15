@@ -117,7 +117,8 @@ type HostDBScan struct {
 // results provided by this struct can only be used as a guide, and may vary
 // significantly from machine to machine.
 type HostScoreBreakdown struct {
-	Score types.Currency `json:"score"`
+	Score          types.Currency `json:"score"`
+	ConversionRate float64        `json:"conversionrate"`
 
 	AgeAdjustment              float64 `json:"ageadjustment"`
 	BurnAdjustment             float64 `json:"burnadjustment"`
@@ -284,6 +285,10 @@ type Renter interface {
 
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error
+
+	// EstimateHostScore will return the score for a host with the provided
+	// settings, assuming perfect age and uptime adjustments
+	EstimateHostScore(entry HostDBEntry) HostScoreBreakdown
 
 	// ScoreBreakdown will return the score for a host db entry using the
 	// hostdb's weighting algorithm.

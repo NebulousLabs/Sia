@@ -123,38 +123,38 @@ func TestEstimateWeight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// set the sts to be priced such that the first st is the most attractive,
-	// and the last st is the least attractive
 	for i, tester := range sts {
 		is = tester.host.InternalSettings()
-		is.MinContractPrice = types.SiacoinPrecision.Mul64(1000 + (10 * uint64(i)))
+		is.MinContractPrice = types.SiacoinPrecision.Mul64(1000 + (1000 * uint64(i)))
 		err = tester.host.SetInternalSettings(is)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-
-	// announce the sts and verify that their estimation of their conversion rate
-	// is accurate
 	err = announceAllHosts(sts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i, tester := range sts {
-		err = tester.postAPI("/host/estimatescore", url.Values{}, &eg)
+
+	tests := []struct {
+		price          types.Currency
+		conversionRate float64
+	}{
+		{types.SiacoinPrecision, 100},
+		{types.SiacoinPrecision.Mul64(30000), 98},
+		{types.SiacoinPrecision.Mul64(50000), 96},
+		{types.SiacoinPrecision.Mul64(70000), 94},
+		{types.SiacoinPrecision.Mul64(60000000), 94},
+	}
+	for _, test := range tests {
+		values := url.Values{}
+		values.Set("mincontractprice", test.price.String())
+		err = st.postAPI("/host/estimatescore", values, &eg)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if eg.ConversionRate > 100 {
-			t.Fatal("conversion rate was greater than 100")
-		}
-		if eg.ConversionRate < 0 {
-			t.Fatal("conversion rate was less than zero")
-		}
-		expectedRate := 100 - ((float64(i) / 50) * 100)
-		if eg.ConversionRate != expectedRate {
-			t.Fatal("incorrect conversion rate: ", eg.ConversionRate)
+		if eg.ConversionRate != test.conversionRate {
+			t.Fatalf("incorrect conversion rate: got %v wanted %v\n", eg.ConversionRate, test.conversionRate)
 		}
 	}
 }
