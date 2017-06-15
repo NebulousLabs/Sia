@@ -133,11 +133,48 @@ func fullyConnectNodes(sts []*serverTester) error {
 
 		// Connect this node to every other node.
 		for _, stb := range sts[i+1:] {
-			// NOTE: this check depends on string-matching an error in the
-			// gateway. If that error changes at all, this string will need to
-			// be updated.
-			err := stb.stdPostAPI("/gateway/connect/"+string(gg.NetAddress), nil)
-			if err != nil && err.Error() != "already connected to this peer" {
+			// Try connecting to the other node until both have the other in
+			// their peer list.
+			err = retry(50, time.Millisecond*50, func() error {
+				// NOTE: this check depends on string-matching an error in the
+				// gateway. If that error changes at all, this string will need to
+				// be updated.
+				err := stb.stdPostAPI("/gateway/connect/"+string(gg.NetAddress), nil)
+				if err != nil && err.Error() != "already connected to this peer" {
+					return err
+				}
+
+				// Check that the gateways are connected.
+				bToA := false
+				aToB := false
+				var ggb GatewayGET
+				err = stb.getAPI("/gateway", &ggb)
+				if err != nil {
+					return err
+				}
+				for _, peer := range ggb.Peers {
+					if peer.NetAddress == gg.NetAddress {
+						bToA = true
+						break
+					}
+				}
+				err = sta.getAPI("/gateway", &gg)
+				if err != nil {
+					return err
+				}
+				for _, peer := range gg.Peers {
+					if peer.NetAddress == ggb.NetAddress {
+						aToB = true
+						break
+					}
+				}
+				if !aToB || !bToA {
+					return errors.New("called connect between two nodes, but they are not peers")
+				}
+				return nil
+
+			})
+			if err != nil {
 				return err
 			}
 		}
