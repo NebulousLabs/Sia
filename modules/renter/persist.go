@@ -30,7 +30,7 @@ var (
 	ErrIncompatible   = errors.New("file is not compatible with current version")
 
 	shareHeader  = [15]byte{'S', 'i', 'a', ' ', 'S', 'h', 'a', 'r', 'e', 'd', ' ', 'F', 'i', 'l', 'e'}
-	shareVersion = "0.4"
+	shareVersion = "0.5"
 
 	saveMetadata = persist.Metadata{
 		Header:  "Renter Persistence",
@@ -169,7 +169,7 @@ func (r *Renter) saveFile(f *file) error {
 	defer handle.Close()
 
 	// Write file data.
-	err = shareFiles([]*file{f}, handle)
+	err = shareFiles([]*file{f}, handle, r)
 	if err != nil {
 		return err
 	}
@@ -240,9 +240,10 @@ func (r *Renter) load() error {
 	return nil
 }
 
+
 // shareFiles writes the specified files to w. First a header is written,
 // followed by the gzipped concatenation of each file.
-func shareFiles(files []*file, w io.Writer) error {
+func shareFiles(files []*file, w io.Writer, r *Renter) error {
 	// Write header.
 	err := encoding.NewEncoder(w).EncodeAll(
 		shareHeader,
@@ -253,13 +254,46 @@ func shareFiles(files []*file, w io.Writer) error {
 		return err
 	}
 
+	shareFiles := make([]*ShareFile, len(files))
+	ocs := r.hostContractor.Contracts()
+	for _, f := range files {
+		// firgure out share file structure
+		sf := &ShareFile{
+			name:         f.name,
+			size:         f.size,
+			masterKey:    f.masterKey,
+			pieceSize:    f.pieceSize,
+			mode:         f.mode,
+			contracts:    make(map[string]shareFileContract),
+		}
+		for _, c := range f.contracts {
+			r.log.Println("id:", c.ID)
+			newId := r.hostContractor.ResolveID(c.ID)
+			r.log.Println("new id:", newId)
+			for _, oc := range ocs {
+				if oc.ID == newId {
+					PublicKey := oc.HostPublicKey
+					sfc := shareFileContract{
+						PublicKeyString: PublicKey.String(),
+						Pieces:  c.Pieces,
+						WindowStart: c.WindowStart,
+					}
+					r.log.Println("pub key:", sfc.PublicKeyString)
+					sf.contracts[sfc.PublicKeyString] = sfc
+					break
+				}
+			}
+		}
+		shareFiles = append(shareFiles, sf)
+	}
+
 	// Create compressor.
 	zip, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
 	enc := encoding.NewEncoder(zip)
 
 	// Encode each file.
-	for _, f := range files {
-		err = enc.Encode(f)
+	for _, sf := range shareFiles {
+		err = enc.Encode(sf)
 		if err != nil {
 			return err
 		}
@@ -294,7 +328,7 @@ func (r *Renter) ShareFiles(nicknames []string, shareDest string) error {
 		files[i] = f
 	}
 
-	err = shareFiles(files, handle)
+	err = shareFiles(files, handle, r)
 	if err != nil {
 		os.Remove(shareDest)
 		return err
@@ -319,7 +353,7 @@ func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 	}
 
 	buf := new(bytes.Buffer)
-	err := shareFiles(files, base64.NewEncoder(base64.URLEncoding, buf))
+	err := shareFiles(files, base64.NewEncoder(base64.URLEncoding, buf), r)
 	if err != nil {
 		return "", err
 	}

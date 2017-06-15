@@ -215,9 +215,9 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		// TODO: re-enable these routes once the new .sia format has been
 		// standardized and implemented.
 		// router.POST("/renter/load", RequirePassword(api.renterLoadHandler, requiredPassword))
-		// router.POST("/renter/loadascii", RequirePassword(api.renterLoadAsciiHandler, requiredPassword))
+		router.POST("/renter/loadascii", RequirePassword(api.renterLoadAsciiHandler, requiredPassword))
 		// router.GET("/renter/share", RequirePassword(api.renterShareHandler, requiredPassword))
-		// router.GET("/renter/shareascii", RequirePassword(api.renterShareAsciiHandler, requiredPassword))
+		router.GET("/renter/shareascii", RequirePassword(api.renterShareAsciiHandler, requiredPassword))
 
 		router.POST("/renter/delete/*siapath", RequirePassword(api.renterDeleteHandler, requiredPassword))
 		router.GET("/renter/download/*siapath", RequirePassword(api.renterDownloadHandler, requiredPassword))
