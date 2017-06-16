@@ -35,9 +35,9 @@ type (
 		WorkingStatus        modules.HostWorkingStatus        `json:"workingstatus"`
 	}
 
-	// HostEstimateScorePOST contains the information that is returned from a
+	// HostEstimateScoreGET contains the information that is returned from a
 	// /host/estimatescore call.
-	HostEstimateScorePOST struct {
+	HostEstimateScoreGET struct {
 		EstimatedScore types.Currency `json:"estimatedscore"`
 		ConversionRate float64        `json:"conversionrate"`
 	}
@@ -199,7 +199,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 
 // hostEstimateScoreGET handles the POST request to /host/estimatescore and
 // computes an estimated HostDB score for the provided settings.
-func (api *API) hostEstimateScorePOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (api *API) hostEstimateScoreGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	settings, err := api.parseHostSettings(req)
 	if err != nil {
 		WriteError(w, Error{"error parsing host settings: " + err.Error()}, http.StatusBadRequest)
@@ -234,7 +234,7 @@ func (api *API) hostEstimateScorePOST(w http.ResponseWriter, req *http.Request, 
 	entry.PublicKey = api.host.PublicKey()
 	entry.HostExternalSettings = mergedSettings
 	estimatedScoreBreakdown := api.renter.EstimateHostScore(entry)
-	e := HostEstimateScorePOST{
+	e := HostEstimateScoreGET{
 		EstimatedScore: estimatedScoreBreakdown.Score,
 		ConversionRate: estimatedScoreBreakdown.ConversionRate,
 	}

@@ -25,7 +25,7 @@ Index
 | [/host](#host-get)                                                                         | GET       |
 | [/host](#host-post)                                                                        | POST      |
 | [/host/announce](#hostannounce-post)                                                       | POST      |
-| [/host/estimatescore](#hostestimatescore-post)                                             | POST      |
+| [/host/estimatescore](#hostestimatescore-get)                                              | GET       |
 | [/host/storage](#hoststorage-get)                                                          | GET       |
 | [/host/storage/folders/add](#hoststoragefoldersadd-post)                                   | POST      |
 | [/host/storage/folders/remove](#hoststoragefoldersremove-post)                             | POST      |
@@ -548,7 +548,7 @@ data.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /host/estimatescore [POST]
+#### /host/estimatescore [GET]
 
 returns the estimated HostDB score of the host using its current settings,
 combined with the provided settings.

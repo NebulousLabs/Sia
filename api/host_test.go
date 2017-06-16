@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -74,8 +75,8 @@ func TestEstimateWeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var eg HostEstimateScorePOST
-	if err := st.postAPI("/host/estimatescore", url.Values{}, &eg); err != nil {
+	var eg HostEstimateScoreGET
+	if err := st.getAPI("/host/estimatescore", &eg); err != nil {
 		t.Fatal(err)
 	}
 	originalEstimate := eg.EstimatedScore
@@ -87,7 +88,7 @@ func TestEstimateWeight(t *testing.T) {
 	if err := st.host.SetInternalSettings(is); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.postAPI("/host/estimatescore", url.Values{}, &eg); err != nil {
+	if err := st.getAPI("/host/estimatescore", &eg); err != nil {
 		t.Fatal(err)
 	}
 	if eg.EstimatedScore.Cmp(originalEstimate) != -1 {
@@ -147,9 +148,7 @@ func TestEstimateWeight(t *testing.T) {
 		{types.SiacoinPrecision.Mul64(60000000), 94},
 	}
 	for _, test := range tests {
-		values := url.Values{}
-		values.Set("mincontractprice", test.price.String())
-		err = st.postAPI("/host/estimatescore", values, &eg)
+		err = st.getAPI(fmt.Sprintf("/host/estimatescore?mincontractprice=%v", test.price.String()), &eg)
 		if err != nil {
 			t.Fatal(err)
 		}
