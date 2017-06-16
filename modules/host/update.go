@@ -4,10 +4,8 @@ package host
 // it was the *most recent* revision that got confirmed.
 
 import (
-	"encoding/binary"
 	"encoding/json"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -72,13 +70,7 @@ func (h *Host) initRescan() error {
 	// Re-queue all of the action items for the storage obligations.
 	for i, so := range allObligations {
 		soid := so.id()
-		err1 := h.queueActionItem(h.blockHeight+resubmissionTimeout, soid)
-		err2 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer, soid)
-		err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
-		err = composeErrors(err1, err2, err3)
-		if err != nil {
-			h.log.Println("dropping storage obligation during rescan, id", so.id())
-		}
+		go h.threadedHandleStorageObligation(soid)
 
 		// AcceptTransactionSet needs to be called in a goroutine to avoid a
 		// deadlock.
@@ -128,7 +120,6 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Wrap the whole parsing into a single large database tx to keep things
 	// efficient.
-	var actionItems []types.FileContractID
 	err := h.db.Update(func(tx *bolt.Tx) error {
 		for _, block := range cc.RevertedBlocks {
 			// Look for transactions relevant to open storage obligations.
@@ -270,34 +261,34 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			if block.ID() != types.GenesisID {
 				h.blockHeight++
 			}
-
-			// Handle any action items relevant to the current height.
-			bai := tx.Bucket(bucketActionItems)
-			heightBytes := make([]byte, 8)
-			binary.BigEndian.PutUint64(heightBytes, uint64(h.blockHeight)) // BigEndian used so bolt will keep things sorted automatically.
-			existingItems := bai.Get(heightBytes)
-
-			// From the existing items, pull out a storage obligation.
-			knownActionItems := make(map[types.FileContractID]struct{})
-			obligationIDs := make([]types.FileContractID, len(existingItems)/crypto.HashSize)
-			for i := 0; i < len(existingItems); i += crypto.HashSize {
-				copy(obligationIDs[i/crypto.HashSize][:], existingItems[i:i+crypto.HashSize])
-			}
-			for _, soid := range obligationIDs {
-				_, exists := knownActionItems[soid]
-				if !exists {
-					actionItems = append(actionItems, soid)
-					knownActionItems[soid] = struct{}{}
-				}
-			}
 		}
 		return nil
 	})
 	if err != nil {
 		h.log.Println(err)
 	}
-	for i := range actionItems {
-		go h.threadedHandleActionItem(actionItems[i])
+
+	var obligationIDs []types.FileContractID
+	// Get all File contract IDS
+	err = h.db.View(func(tx *bolt.Tx) error {
+		bso := tx.Bucket(bucketStorageObligations)
+		bso.ForEach(func(k, v []byte) error {
+			var so storageObligation
+			err := json.Unmarshal(v, &so)
+			if err != nil {
+				return err
+			}
+			obligationIDs = append(obligationIDs, so.id())
+			return nil
+		})
+		return nil
+	})
+	if err != nil {
+		h.log.Println(err)
+	}
+
+	for i := range obligationIDs {
+		go h.threadedHandleStorageObligation(obligationIDs[i])
 	}
 
 	// Update the host's recent change pointer to point to the most recent

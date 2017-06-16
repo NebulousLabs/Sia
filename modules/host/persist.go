@@ -128,7 +128,6 @@ func (h *Host) initDB() (err error) {
 		// The storage obligation bucket does not exist, which means the
 		// database needs to be initialized. Create the database buckets.
 		buckets := [][]byte{
-			bucketActionItems,
 			bucketStorageObligations,
 		}
 		for _, bucket := range buckets {
@@ -137,6 +136,7 @@ func (h *Host) initDB() (err error) {
 				return err
 			}
 		}
+
 		return nil
 	})
 }
