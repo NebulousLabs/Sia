@@ -7,8 +7,10 @@ package types
 
 import (
 	"errors"
+	"io"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 const (
@@ -140,20 +142,63 @@ type (
 	UnlockHash crypto.Hash
 )
 
+func (t Transaction) marshalSiaNoSignatures(w io.Writer) {
+	enc := encoding.NewEncoder(w)
+
+	for i := range t.SiacoinInputs {
+		t.SiacoinInputs[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.SiacoinOutputs)))
+	for i := range t.SiacoinOutputs {
+		t.SiacoinOutputs[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.FileContracts)))
+	for i := range t.FileContracts {
+		enc.Encode(t.FileContracts[i])
+	}
+	encoding.WriteInt(w, len((t.FileContractRevisions)))
+	for i := range t.FileContractRevisions {
+		enc.Encode(t.FileContractRevisions[i])
+	}
+	encoding.WriteInt(w, len((t.StorageProofs)))
+	for i := range t.StorageProofs {
+		enc.Encode(t.StorageProofs[i])
+	}
+	encoding.WriteInt(w, len((t.SiafundInputs)))
+	for i := range t.SiafundInputs {
+		enc.Encode(t.SiafundInputs[i])
+	}
+	encoding.WriteInt(w, len((t.SiafundOutputs)))
+	for i := range t.SiafundOutputs {
+		t.SiafundOutputs[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.MinerFees)))
+	for i := range t.MinerFees {
+		t.MinerFees[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.ArbitraryData)))
+	for i := range t.ArbitraryData {
+		encoding.WritePrefix(w, t.ArbitraryData[i])
+	}
+}
+
 // ID returns the id of a transaction, which is taken by marshalling all of the
 // fields except for the signatures and taking the hash of the result.
 func (t Transaction) ID() TransactionID {
-	return TransactionID(crypto.HashAll(
-		t.SiacoinInputs,
-		t.SiacoinOutputs,
-		t.FileContracts,
-		t.FileContractRevisions,
-		t.StorageProofs,
-		t.SiafundInputs,
-		t.SiafundOutputs,
-		t.MinerFees,
-		t.ArbitraryData,
-	))
+	var txid TransactionID
+	h := crypto.NewHash()
+
+	// Encode non-signature fields into hash.
+	t.marshalSiaNoSignatures(h)
+
+	// Encode signatures.
+	encoding.WriteInt(h, len((t.TransactionSignatures)))
+	for i := range t.TransactionSignatures {
+		t.TransactionSignatures[i].MarshalSia(h)
+	}
+
+	h.Sum(txid[:0])
+	return txid
 }
 
 // SiacoinOutputID returns the ID of a siacoin output at the given index,
@@ -161,19 +206,15 @@ func (t Transaction) ID() TransactionID {
 // Specifier, all of the fields in the transaction (except the signatures),
 // and output index.
 func (t Transaction) SiacoinOutputID(i uint64) SiacoinOutputID {
-	return SiacoinOutputID(crypto.HashAll(
-		SpecifierSiacoinOutput,
-		t.SiacoinInputs,
-		t.SiacoinOutputs,
-		t.FileContracts,
-		t.FileContractRevisions,
-		t.StorageProofs,
-		t.SiafundInputs,
-		t.SiafundOutputs,
-		t.MinerFees,
-		t.ArbitraryData,
-		i,
-	))
+	var id SiacoinOutputID
+	h := crypto.NewHash()
+
+	h.Write(SpecifierSiacoinOutput[:])
+	t.marshalSiaNoSignatures(h) // Encode non-signature fields into hash.
+	encoding.WriteUint64(h, i)  // Writes index of this output.
+
+	h.Sum(id[:0])
+	return id
 }
 
 // FileContractID returns the ID of a file contract at the given index, which
@@ -181,19 +222,14 @@ func (t Transaction) SiacoinOutputID(i uint64) SiacoinOutputID {
 // all of the fields in the transaction (except the signatures), and the
 // contract index.
 func (t Transaction) FileContractID(i uint64) FileContractID {
-	return FileContractID(crypto.HashAll(
-		SpecifierFileContract,
-		t.SiacoinInputs,
-		t.SiacoinOutputs,
-		t.FileContracts,
-		t.FileContractRevisions,
-		t.StorageProofs,
-		t.SiafundInputs,
-		t.SiafundOutputs,
-		t.MinerFees,
-		t.ArbitraryData,
-		i,
-	))
+	var id FileContractID
+	h := crypto.NewHash()
+	h.Write(SpecifierFileContract[:])
+	t.marshalSiaNoSignatures(h) // Encode non-signature fields into hash.
+	encoding.WriteUint64(h, i)  // Writes index of this output.
+
+	h.Sum(id[:0])
+	return id
 }
 
 // SiafundOutputID returns the ID of a SiafundOutput at the given index, which
@@ -201,19 +237,14 @@ func (t Transaction) FileContractID(i uint64) FileContractID {
 // all of the fields in the transaction (except the signatures), and output
 // index.
 func (t Transaction) SiafundOutputID(i uint64) SiafundOutputID {
-	return SiafundOutputID(crypto.HashAll(
-		SpecifierSiafundOutput,
-		t.SiacoinInputs,
-		t.SiacoinOutputs,
-		t.FileContracts,
-		t.FileContractRevisions,
-		t.StorageProofs,
-		t.SiafundInputs,
-		t.SiafundOutputs,
-		t.MinerFees,
-		t.ArbitraryData,
-		i,
-	))
+	var id SiafundOutputID
+	h := crypto.NewHash()
+	h.Write(SpecifierSiafundOutput[:])
+	t.marshalSiaNoSignatures(h) // Encode non-signature fields into hash.
+	encoding.WriteUint64(h, i)  // Writes index of this output.
+
+	h.Sum(id[:0])
+	return id
 }
 
 // SiacoinOutputSum returns the sum of all the siacoin outputs in the
