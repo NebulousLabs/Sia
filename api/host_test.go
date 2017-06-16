@@ -94,9 +94,6 @@ func TestEstimateWeight(t *testing.T) {
 	if eg.EstimatedScore.Cmp(originalEstimate) != -1 {
 		t.Fatal("score estimate did not decrease after incrementing mincontractprice")
 	}
-	if eg.ConversionRate != float64(100) {
-		t.Fatal("incorrect conversion rate", eg.ConversionRate)
-	}
 
 	// add a few hosts to the hostdb and verify that the conversion rate is
 	// reflected correctly
@@ -138,22 +135,22 @@ func TestEstimateWeight(t *testing.T) {
 	}
 
 	tests := []struct {
-		price          types.Currency
-		conversionRate float64
+		price             types.Currency
+		minConversionRate float64
 	}{
 		{types.SiacoinPrecision, 100},
-		{types.SiacoinPrecision.Mul64(30000), 98},
-		{types.SiacoinPrecision.Mul64(50000), 96},
-		{types.SiacoinPrecision.Mul64(70000), 94},
-		{types.SiacoinPrecision.Mul64(60000000), 94},
+		{types.SiacoinPrecision.Mul64(50), 98},
+		{types.SiacoinPrecision.Mul64(2500), 50},
+		{types.SiacoinPrecision.Mul64(3000), 10},
+		{types.SiacoinPrecision.Mul64(30000), 0.00001},
 	}
 	for _, test := range tests {
 		err = st.getAPI(fmt.Sprintf("/host/estimatescore?mincontractprice=%v", test.price.String()), &eg)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if eg.ConversionRate != test.conversionRate {
-			t.Fatalf("incorrect conversion rate: got %v wanted %v\n", eg.ConversionRate, test.conversionRate)
+		if eg.ConversionRate < test.minConversionRate {
+			t.Fatalf("incorrect conversion rate: got %v wanted %v\n", eg.ConversionRate, test.minConversionRate)
 		}
 	}
 }

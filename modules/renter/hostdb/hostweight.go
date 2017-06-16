@@ -3,7 +3,6 @@ package hostdb
 import (
 	"math"
 	"math/big"
-	"sort"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -378,32 +377,17 @@ func (hdb *HostDB) EstimateHostScore(entry modules.HostDBEntry) modules.HostScor
 	// compute the host's conversion rate, that is, how likely it is to be
 	// selected by renters for use in contracts, by finding its position in the
 	// sorted list of active hosts
-	rankedHosts := []struct {
-		pk    string
-		score types.Currency
-	}{}
+	var totalScore types.Currency
 	for _, h := range hdb.ActiveHosts() {
-		var score types.Currency
-		if h.PublicKey.String() == entry.PublicKey.String() {
-			score = estimatedScore
-		} else {
-			score = hdb.ScoreBreakdown(h).Score
-		}
-		rankedHosts = append(rankedHosts, struct {
-			pk    string
-			score types.Currency
-		}{h.PublicKey.String(), score})
+		totalScore = totalScore.Add(hdb.ScoreBreakdown(h).Score)
 	}
-	sort.Slice(rankedHosts, func(i, j int) bool {
-		return rankedHosts[i].score.Cmp(rankedHosts[j].score) >= 0
-	})
-	var rank float64
-	for i, host := range rankedHosts {
-		if host.pk == entry.PublicKey.String() {
-			rank = float64(i)
-		}
+	if totalScore.IsZero() {
+		totalScore = types.NewCurrency64(1)
 	}
-	conversionRate := math.Max(100-((rank/50)*100), 0)
+	conversionRate, _ := big.NewRat(0, 1).SetFrac(estimatedScore.Mul64(50).Big(), totalScore.Big()).Float64()
+	if conversionRate > 100 {
+		conversionRate = 100
+	}
 
 	return modules.HostScoreBreakdown{
 		Score:          estimatedScore,
