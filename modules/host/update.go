@@ -267,9 +267,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if err != nil {
 		h.log.Println(err)
 	}
-
-	var obligationIDs []types.FileContractID
-	// Get all File contract IDS
+	// Get all StorageObligations and handle them.
 	err = h.db.View(func(tx *bolt.Tx) error {
 		bso := tx.Bucket(bucketStorageObligations)
 		bso.ForEach(func(k, v []byte) error {
@@ -278,17 +276,13 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			if err != nil {
 				return err
 			}
-			obligationIDs = append(obligationIDs, so.id())
+			go h.threadedHandleStorageObligation(so.id())
 			return nil
 		})
 		return nil
 	})
 	if err != nil {
 		h.log.Println(err)
-	}
-
-	for i := range obligationIDs {
-		go h.threadedHandleStorageObligation(obligationIDs[i])
 	}
 
 	// Update the host's recent change pointer to point to the most recent

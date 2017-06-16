@@ -127,16 +127,10 @@ func (h *Host) initDB() (err error) {
 	return h.db.Update(func(tx *bolt.Tx) error {
 		// The storage obligation bucket does not exist, which means the
 		// database needs to be initialized. Create the database buckets.
-		buckets := [][]byte{
-			bucketStorageObligations,
+		_, err := tx.CreateBucketIfNotExists(bucketStorageObligations)
+		if err != nil {
+			return err
 		}
-		for _, bucket := range buckets {
-			_, err := tx.CreateBucketIfNotExists(bucket)
-			if err != nil {
-				return err
-			}
-		}
-
 		return nil
 	})
 }
