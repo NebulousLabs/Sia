@@ -184,6 +184,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.GET("/host", api.hostHandlerGET)                                                   // Get the host status.
 		router.POST("/host", RequirePassword(api.hostHandlerPOST, requiredPassword))              // Change the settings of the host.
 		router.POST("/host/announce", RequirePassword(api.hostAnnounceHandler, requiredPassword)) // Announce the host to the network.
+		router.GET("/host/estimatescore", api.hostEstimateScoreGET)
 
 		// Calls pertaining to the storage manager that the host uses.
 		router.GET("/host/storage", api.storageHandler)
