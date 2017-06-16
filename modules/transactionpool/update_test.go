@@ -170,13 +170,11 @@ func TestValidRevertedTransaction(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	tpt, err := createTpoolTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tpt.Close()
-
 	tpt2, err := blankTpoolTester(t.Name() + "-tpt2")
 	if err != nil {
 		t.Fatal(err)

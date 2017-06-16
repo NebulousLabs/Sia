@@ -162,7 +162,7 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 func (tp *TransactionPool) purge() {
 	tp.knownObjects = make(map[ObjectID]TransactionSetID)
 	tp.transactionSets = make(map[TransactionSetID][]types.Transaction)
-	tp.transactionSetDiffs = make(map[TransactionSetID]modules.ConsensusChange)
+	tp.transactionSetDiffs = make(map[TransactionSetID]*modules.ConsensusChange)
 	tp.transactionListSize = 0
 }
 
