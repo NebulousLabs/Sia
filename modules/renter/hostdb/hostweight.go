@@ -360,6 +360,24 @@ func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency
 	return weight
 }
 
+// calculateConversionRate calculates the conversion rate of the provided
+// host score, comparing it to the hosts in the database and returning what
+// percentage of contracts it is likely to participate in.
+func (hdb *HostDB) calculateConversionRate(score types.Currency) float64 {
+	var totalScore types.Currency
+	for _, h := range hdb.ActiveHosts() {
+		totalScore = totalScore.Add(hdb.calculateHostWeight(h))
+	}
+	if totalScore.IsZero() {
+		totalScore = types.NewCurrency64(1)
+	}
+	conversionRate, _ := big.NewRat(0, 1).SetFrac(score.Mul64(50).Big(), totalScore.Big()).Float64()
+	if conversionRate > 100 {
+		conversionRate = 100
+	}
+	return conversionRate
+}
+
 // EstimateHostScore takes a HostExternalSettings and returns the estimated
 // score of that host in the hostdb, assuming no penalties for age or uptime.
 func (hdb *HostDB) EstimateHostScore(entry modules.HostDBEntry) modules.HostScoreBreakdown {
@@ -374,24 +392,9 @@ func (hdb *HostDB) EstimateHostScore(entry modules.HostDBEntry) modules.HostScor
 		estimatedScore = types.NewCurrency64(1)
 	}
 
-	// compute the host's conversion rate, that is, how likely it is to be
-	// selected by renters for use in contracts, by finding its position in the
-	// sorted list of active hosts
-	var totalScore types.Currency
-	for _, h := range hdb.ActiveHosts() {
-		totalScore = totalScore.Add(hdb.ScoreBreakdown(h).Score)
-	}
-	if totalScore.IsZero() {
-		totalScore = types.NewCurrency64(1)
-	}
-	conversionRate, _ := big.NewRat(0, 1).SetFrac(estimatedScore.Mul64(50).Big(), totalScore.Big()).Float64()
-	if conversionRate > 100 {
-		conversionRate = 100
-	}
-
 	return modules.HostScoreBreakdown{
 		Score:          estimatedScore,
-		ConversionRate: conversionRate,
+		ConversionRate: hdb.calculateConversionRate(estimatedScore),
 
 		AgeAdjustment:              1,
 		BurnAdjustment:             1,
@@ -406,8 +409,10 @@ func (hdb *HostDB) EstimateHostScore(entry modules.HostDBEntry) modules.HostScor
 // ScoreBreakdown provdes a detailed set of scalars and bools indicating
 // elements of the host's overall score.
 func (hdb *HostDB) ScoreBreakdown(entry modules.HostDBEntry) modules.HostScoreBreakdown {
+	score := hdb.calculateHostWeight(entry)
 	return modules.HostScoreBreakdown{
-		Score: hdb.calculateHostWeight(entry),
+		Score:          score,
+		ConversionRate: hdb.calculateConversionRate(score),
 
 		AgeAdjustment:              hdb.lifetimeAdjustments(entry),
 		BurnAdjustment:             1,
