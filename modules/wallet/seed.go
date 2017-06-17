@@ -332,6 +332,12 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		return
 	}
 
+	if len(s.siacoinOutputs) == 0 && len(s.siafundOutputs) == 0 {
+		// if we aren't sweeping any coins or funds, then just return an
+		// error; no reason to proceed
+		return types.Currency{}, types.Currency{}, errors.New("nothing to sweep")
+	}
+
 	for len(s.siacoinOutputs) > 0 || len(s.siafundOutputs) > 0 {
 		// Create temporary maps and var for the current transaction
 		siacoinOutputs := make(map[types.SiacoinOutputID]scannedOutput)
