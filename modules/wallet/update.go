@@ -35,14 +35,14 @@ func (w *Wallet) threadedResetSubscriptions() error {
 	return nil
 }
 
-// advanceSeedLookahead generates all keys from the current primary seed
-// progress up to index and adds them to the set of spendable keys.
-// Therefore the new primary seed progress will be index+1 and new
-// lookahead keys will be generated starting from index+1
-func (w *Wallet) advanceSeedLookahead(index uint64) error {
+// advanceSeedLookahead generates all keys from the current primary seed progress up to index
+// and adds them to the set of spendable keys.  Therefore the new primary seed progress will
+// be index+1 and new lookahead keys will be generated starting from index+1
+// Returns true if a blockchain rescan is required
+func (w *Wallet) advanceSeedLookahead(index uint64) (bool, error) {
 	progress, err := dbGetPrimarySeedProgress(w.dbTx)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Add spendable keys and remove them from lookahead
@@ -56,7 +56,7 @@ func (w *Wallet) advanceSeedLookahead(index uint64) error {
 	newProgress := progress + uint64(len(spendableKeys))
 	dbPutPrimarySeedProgress(w.dbTx, newProgress)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Regenerate lookahead
@@ -65,10 +65,10 @@ func (w *Wallet) advanceSeedLookahead(index uint64) error {
 	// If more than lookaheadRescanThreshold keys were generated
 	// also initialize a rescan just to be safe.
 	if uint64(len(spendableKeys)) > lookaheadRescanThreshold {
-		go w.threadedResetSubscriptions()
+		return true, nil
 	}
 
-	return nil
+	return false, nil
 }
 
 // isWalletAddress is a helper function that checks if an UnlockHash is
@@ -79,8 +79,8 @@ func (w *Wallet) isWalletAddress(uh types.UnlockHash) bool {
 }
 
 // updateLookahead uses a consensus change to update the seed progress if one of the outputs
-// contains an unlock hash of the lookahead set.
-func (w *Wallet) updateLookahead(tx *bolt.Tx, cc modules.ConsensusChange) error {
+// contains an unlock hash of the lookahead set. Returns true if a blockchain rescan is required
+func (w *Wallet) updateLookahead(tx *bolt.Tx, cc modules.ConsensusChange) (bool, error) {
 
 	var largestIndex uint64 = 0
 	advance := false
@@ -104,7 +104,7 @@ func (w *Wallet) updateLookahead(tx *bolt.Tx, cc modules.ConsensusChange) error 
 		return w.advanceSeedLookahead(largestIndex)
 	}
 
-	return nil
+	return false, nil
 }
 
 // updateConfirmedSet uses a consensus change to update the confirmed set of
@@ -406,8 +406,10 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if err := w.updateLookahead(w.dbTx, cc); err != nil {
+	if needRescan, err := w.updateLookahead(w.dbTx, cc); err != nil {
 		w.log.Println("ERROR: failed to update lookahead:", err)
+	} else if needRescan {
+		go w.threadedResetSubscriptions()
 	}
 	if err := w.updateConfirmedSet(w.dbTx, cc); err != nil {
 		w.log.Println("ERROR: failed to update confirmed set:", err)
