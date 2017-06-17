@@ -352,25 +352,15 @@ func TestAdvanceLookaheadNoRescan(t *testing.T) {
 
 	// choose 10 keys in the lookahead and remember them
 	var receivingAddresses []types.UnlockHash
-	for uh, index := range wt.wallet.lookahead {
-
-		// Ignore keys that would force a rescan
-		if index > progress+lookaheadRescanThreshold {
-			continue
-		}
-
+	for _, sk := range generateKeys(wt.wallet.primarySeed, progress, 10) {
 		sco := types.SiacoinOutput{
-			UnlockHash: uh,
+			UnlockHash: sk.UnlockConditions.UnlockHash(),
 			Value:      types.NewCurrency64(1e3),
 		}
 
 		builder.AddSiacoinOutput(sco)
 		payout = payout.Add(sco.Value)
-		receivingAddresses = append(receivingAddresses, uh)
-
-		if len(receivingAddresses) > 10 {
-			break
-		}
+		receivingAddresses = append(receivingAddresses, sk.UnlockConditions.UnlockHash())
 	}
 
 	err = builder.FundSiacoins(payout)
