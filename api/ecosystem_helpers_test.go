@@ -13,6 +13,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"time"
 
@@ -169,7 +170,7 @@ func fullyConnectNodes(sts []*serverTester) error {
 					}
 				}
 				if !aToB || !bToA {
-					return errors.New("called connect between two nodes, but they are not peers")
+					return fmt.Errorf("called connect between two nodes, but they are not peers: %v %v %v %v %v %v", aToB, bToA, gg.NetAddress, ggb.NetAddress, gg.Peers, ggb.Peers)
 				}
 				return nil
 
