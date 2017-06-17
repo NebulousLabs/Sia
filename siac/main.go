@@ -277,7 +277,7 @@ func main() {
 		renterDownloadsCmd, renterAllowanceCmd, renterSetAllowanceCmd,
 		renterContractsCmd, renterFilesListCmd, renterFilesRenameCmd,
 		renterFilesUploadCmd, renterUploadsCmd, renterExportCmd,
-		renterPricesCmd)
+		renterPricesCmd, renterShareASCIICmd, renterLoadASCIICmd)
 
 	renterContractsCmd.AddCommand(renterContractsViewCmd)
 	renterAllowanceCmd.AddCommand(renterAllowanceCancelCmd)

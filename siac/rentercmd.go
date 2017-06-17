@@ -125,6 +125,20 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Long:  "Display the estimated prices of storing files, retrieving files, and creating a set of contracts",
 		Run:   wrap(renterpricescmd),
 	}
+
+	renterShareASCIICmd = &cobra.Command{
+		Use:     "shareascii [nicknames]",
+		Short:   "share a file in base64",
+		Long:    "writes the .sia file specified by `nickname` to stdout base64 encoded.",
+		Run:     wrap(rentershareasciicmd),
+	}
+
+	renterLoadASCIICmd = &cobra.Command{
+		Use:     "loadascii [data]",
+		Short:   "load a file in base64",
+		Long:    "load sia file base64 encoded.",
+		Run:     wrap(renterloadasciicmd),
+	}
 )
 
 // abs returns the absolute representation of a path.
@@ -549,4 +563,23 @@ func renterpricescmd() {
 	fmt.Fprintln(w, "\tStore 1 TB for 1 Month:\t", currencyUnits(rpg.StorageTerabyteMonth))
 	fmt.Fprintln(w, "\tUpload 1 TB:\t", currencyUnits(rpg.UploadTerabyte))
 	w.Flush()
+}
+
+func rentershareasciicmd(nicknames string) {
+	var rsa api.RenterShareASCII
+	err := getAPI("/renter/shareascii?siapaths="+nicknames, &rsa)
+	if err != nil {
+		die("Could not get share code:", err)
+	}
+	fmt.Printf("share code: %s\n", rsa.ASCIIsia)
+}
+
+func renterloadasciicmd(data string) {
+	var rl api.RenterLoad
+	qs := "asciisia="+data
+	err := postResp("/renter/loadascii", qs, &rl)
+	if err != nil {
+		die("Could not load data:", err)
+	}
+	fmt.Printf("Files Added '%s'.\n", rl.FilesAdded)
 }
