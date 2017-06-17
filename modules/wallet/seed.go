@@ -338,35 +338,34 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		return types.Currency{}, types.Currency{}, errors.New("nothing to sweep")
 	}
 
-	for len(s.siacoinOutputs) > 0 || len(s.siafundOutputs) > 0 {
-		// Create temporary maps and var for the current transaction
-		siacoinOutputs := make(map[types.SiacoinOutputID]scannedOutput)
-		siafundOutputs := make(map[types.SiafundOutputID]scannedOutput)
-		var currentCoins, currentFunds types.Currency
+	// Flatten map to slice
+	var siacoinOutputs, siafundOutputs []scannedOutput
+	for _, sco := range s.siacoinOutputs {
+		siacoinOutputs = append(siacoinOutputs, sco)
+	}
+	for _, sfo := range s.siafundOutputs {
+		siafundOutputs = append(siafundOutputs, sfo)
+	}
 
-		// Fill those maps with up to maxOutputs outputs from the scanner
-		counter := 0
-		for id, output := range s.siacoinOutputs {
-			if counter == maxOutputs {
-				break
-			}
-			siacoinOutputs[id] = output
-			delete(s.siacoinOutputs, id)
-			counter++
-		}
-		for id, output := range s.siafundOutputs {
-			if counter == maxOutputs {
-				break
-			}
-			siafundOutputs[id] = output
-			delete(s.siafundOutputs, id)
-			counter++
-		}
+	for len(siacoinOutputs) > 0 || len(siafundOutputs) > 0 {
+		// process up to maxOutputs siacoinOutputs
+		txnSiacoinOutputs := make([]scannedOutput, maxOutputs)
+		n := copy(txnSiacoinOutputs, siacoinOutputs)
+		txnSiacoinOutputs = txnSiacoinOutputs[:n]
+		siacoinOutputs = siacoinOutputs[n:]
+
+		// process up to (maxOutputs-n) siafundOutputs
+		txnSiafundOutputs := make([]scannedOutput, maxOutputs-n)
+		n = copy(txnSiafundOutputs, siafundOutputs)
+		txnSiafundOutputs = txnSiafundOutputs[:n]
+		siafundOutputs = siafundOutputs[n:]
+
+		var txnCoins, txnFunds types.Currency
 
 		// construct a transaction that spends the outputs
 		tb := w.StartTransaction()
 		var sweptCoins, sweptFunds types.Currency // total values of swept outputs
-		for _, output := range siacoinOutputs {
+		for _, output := range txnSiacoinOutputs {
 			// construct a siacoin input that spends the output
 			sk := generateSpendableKey(seed, output.seedIndex)
 			tb.AddSiacoinInput(types.SiacoinInput{
@@ -376,7 +375,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 			// add a signature for the input
 			sweptCoins = sweptCoins.Add(output.value)
 		}
-		for _, output := range siafundOutputs {
+		for _, output := range txnSiafundOutputs {
 			// construct a siafund input that spends the output
 			sk := generateSpendableKey(seed, output.seedIndex)
 			tb.AddSiafundInput(types.SiafundInput{
@@ -390,38 +389,38 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		// estimate the transaction size and fee. NOTE: this equation doesn't
 		// account for other fields in the transaction, but since we are
 		// multiplying by maxFee, lowballing is ok
-		estTxnSize := (len(siacoinOutputs) + len(siafundOutputs)) * outputSize
+		estTxnSize := (len(txnSiacoinOutputs) + len(txnSiafundOutputs)) * outputSize
 		estFee := maxFee.Mul64(uint64(estTxnSize))
 		tb.AddMinerFee(estFee)
 
 		// calculate total siacoin payout
 		if sweptCoins.Cmp(estFee) > 0 {
-			currentCoins = sweptCoins.Sub(estFee)
+			txnCoins = sweptCoins.Sub(estFee)
 		}
-		currentFunds = sweptFunds
+		txnFunds = sweptFunds
 
 		switch {
-		case currentCoins.IsZero() && currentFunds.IsZero():
+		case txnCoins.IsZero() && txnFunds.IsZero():
 			// if we aren't sweeping any coins or funds, then just return an
 			// error; no reason to proceed
 			return types.Currency{}, types.Currency{}, errors.New("transaction fee exceeds value of swept outputs")
 
-		case !currentCoins.IsZero() && currentFunds.IsZero():
+		case !txnCoins.IsZero() && txnFunds.IsZero():
 			// if we're sweeping coins but not funds, add a siacoin output for
 			// them
 			tb.AddSiacoinOutput(types.SiacoinOutput{
-				Value:      currentCoins,
+				Value:      txnCoins,
 				UnlockHash: uc.UnlockHash(),
 			})
 
-		case currentCoins.IsZero() && !currentFunds.IsZero():
+		case txnCoins.IsZero() && !txnFunds.IsZero():
 			// if we're sweeping funds but not coins, add a siafund output for
 			// them. This is tricky because we still need to pay for the
 			// transaction fee, but we can't simply subtract the fee from the
 			// output value like we can with swept coins. Instead, we need to fund
 			// the fee using the existing wallet balance.
 			tb.AddSiafundOutput(types.SiafundOutput{
-				Value:      currentFunds,
+				Value:      txnFunds,
 				UnlockHash: uc.UnlockHash(),
 			})
 			err = tb.FundSiacoins(estFee)
@@ -429,15 +428,15 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 				return types.Currency{}, types.Currency{}, errors.New("couldn't pay transaction fee on swept funds: " + err.Error())
 			}
 
-		case !currentCoins.IsZero() && !currentFunds.IsZero():
+		case !txnCoins.IsZero() && !txnFunds.IsZero():
 			// if we're sweeping both coins and funds, add a siacoin output and a
 			// siafund output
 			tb.AddSiacoinOutput(types.SiacoinOutput{
-				Value:      currentCoins,
+				Value:      txnCoins,
 				UnlockHash: uc.UnlockHash(),
 			})
 			tb.AddSiafundOutput(types.SiafundOutput{
-				Value:      currentFunds,
+				Value:      txnFunds,
 				UnlockHash: uc.UnlockHash(),
 			})
 		}
@@ -445,11 +444,11 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		// add signatures for all coins and funds (manually, since tb doesn't have
 		// access to the signing keys)
 		txn, parents := tb.View()
-		for _, output := range siacoinOutputs {
+		for _, output := range txnSiacoinOutputs {
 			sk := generateSpendableKey(seed, output.seedIndex)
 			addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk)
 		}
-		for _, sfo := range siafundOutputs {
+		for _, sfo := range txnSiafundOutputs {
 			sk := generateSpendableKey(seed, sfo.seedIndex)
 			addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(sfo.id), sk)
 		}
@@ -479,8 +478,8 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 			w.log.Println("\t", txn.ID())
 		}
 
-		coins = coins.Add(currentCoins)
-		funds = funds.Add(currentFunds)
+		coins = coins.Add(txnCoins)
+		funds = funds.Add(txnFunds)
 	}
 	return
 }
