@@ -192,9 +192,9 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 
 			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
 			// every block.
-			acceptErr := cs.managedAcceptBlocks(newBlocks)
+			chainExtended2, acceptErr := cs.managedAcceptBlocks(newBlocks)
 			// Set a flag to indicate that we should broadcast the last block received.
-			if acceptErr == nil {
+			if chainExtended2 {
 				chainExtended = true
 			}
 			// ErrNonExtendingBlock must be ignored until headers-first block

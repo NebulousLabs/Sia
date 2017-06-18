@@ -195,7 +195,7 @@ func (cs *ConsensusSet) addBlockToTree(tx *bolt.Tx, b types.Block, parent *proce
 // This method is typically only be used when there would otherwise be multiple
 // consecutive calls to AcceptBlock with each successive call accepting the
 // child block of the previous call.
-func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
+func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (bool, error) {
 	// Grab a lock on the consensus set.
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -203,13 +203,14 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	// Make sure that blocks are consecutive.
 	for i, b := range blocks {
 		if i > 0 && b.Header().ParentID != blocks[i-1].ID() {
-			return errOrphan
+			return false, errOrphan
 		}
 	}
 
 	var changes changeEntry
 	var err2 error
 
+	chainExtended := false
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		// Do not accept a block if the database is inconsistent.
 		if inconsistencyDetected(tx) {
@@ -278,24 +279,26 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 			}
 			changes.RevertedBlocks = append(changes.RevertedBlocks, changeEntry.RevertedBlocks...)
 			changes.AppliedBlocks = append(changes.AppliedBlocks, changeEntry.AppliedBlocks...)
+			chainExtended = true
 		}
 		return nil
 	})
 	if err != nil {
-		return err
+		return chainExtended, err
 	}
 	if len(changes.AppliedBlocks) > 0 {
 		cs.readlockUpdateSubscribers(changes)
 	}
 	if err2 != nil {
-		return err2
+		return chainExtended, err2
 	}
 
-	return nil
+	return chainExtended, nil
 }
 
 func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
-	return cs.managedAcceptBlocks([]types.Block{b})
+	_, err := cs.managedAcceptBlocks([]types.Block{b})
+	return err
 }
 
 // AcceptBlock will try to add a block to the consensus set. If the block does
