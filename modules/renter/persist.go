@@ -190,14 +190,19 @@ func (f *file) UnmarshalSia(r io.Reader, renter *Renter) error {
 		// figure out contract id & net address from publickey here
 		err := resolveInfoFromPublicKey(shareContract.PublicKeyString, &contract, renter)
 		if err != nil {
-			renter.log.Println("can't find public key:", shareContract.PublicKeyString)
-			renter.log.Println("should form download only contract here")
+			renter.log.Println("some error with:", f.name, " ", shareContract.PublicKeyString)
+			renter.log.Println(err)
 			continue
 		}
 		contract.Pieces = shareContract.Pieces
 		contract.WindowStart = shareContract.WindowStart
 		f.contracts[contract.ID] = contract
 	}
+	// check if enough contract founded
+	if !f.available(renter.hostContractor.IsOffline) {
+		renter.log.Println("should form more download only contract here")
+	}
+
 	return nil
 }
 
@@ -307,7 +312,7 @@ func shareFiles(files []*file, w io.Writer, r *Renter) error {
 
 	// Encode each file.
 	for _, f := range files {
-		err = f.MarshalSia(w, r)
+		err = f.MarshalSia(zip, r)
 		if err != nil {
 			return err
 		}
@@ -396,16 +401,16 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 	}
 
 	// Create decompressor.
-	// unzip, err := gzip.NewReader(reader)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	unzip, err := gzip.NewReader(reader)
+	if err != nil {
+		return nil, err
+	}
 
 	// Read each file.
 	files := make([]*file, numFiles)
 	for i := range files {
 		files[i] = new(file)
-		err := files[i].UnmarshalSia(reader, r)
+		err := files[i].UnmarshalSia(unzip, r)
 		if err != nil {
 			return nil, err
 		}
