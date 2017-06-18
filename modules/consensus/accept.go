@@ -208,7 +208,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	}
 
 	var changes changeEntry
-	var nonExtending bool
+	var err2 error
 
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		// Do not accept a block if the database is inconsistent.
@@ -248,6 +248,10 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 						cs.managedBroadcastBlock(b)
 					}()
 				}
+				if err == modules.ErrNonExtendingBlock || err == modules.ErrBlockKnown {
+					err2 = err
+					continue
+				}
 				return err
 			}
 
@@ -262,9 +266,9 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 			// addBlockToTree should be committed (which means 'nil' must
 			// be returned). A flag is set to indicate that modules.ErrNonExtending
 			// should be returned.
-			if err == modules.ErrNonExtendingBlock {
-				nonExtending = true
-				return nil
+			if err == modules.ErrNonExtendingBlock || err == modules.ErrBlockKnown {
+				err2 = err
+				continue
 			} else if err != nil {
 				return err
 			}
@@ -280,8 +284,8 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	if err != nil {
 		return err
 	}
-	if nonExtending {
-		return modules.ErrNonExtendingBlock
+	if err2 != nil {
+		return err2
 	}
 
 	// Updates complete, demote the lock.
