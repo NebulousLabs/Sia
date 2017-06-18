@@ -284,14 +284,13 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	if err != nil {
 		return err
 	}
+	if len(changes.AppliedBlocks) > 0 {
+		cs.readlockUpdateSubscribers(changes)
+	}
 	if err2 != nil {
 		return err2
 	}
 
-	// Updates complete, demote the lock.
-	if len(changes.AppliedBlocks) > 0 {
-		cs.readlockUpdateSubscribers(changes)
-	}
 	return nil
 }
 
