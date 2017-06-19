@@ -12,6 +12,12 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
+const (
+	// Decay values related to the oak difficulty adjustment hardfork.
+	OakDifficultyDecayNum   = 995
+	OakDifficultyDecayDenom = 1000
+)
+
 var (
 	BlockSizeLimit   = uint64(2e6)
 	RootDepth        = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
@@ -39,6 +45,11 @@ var (
 	// The GenesisID is used in many places. Calculating it once saves lots of
 	// redundant computation.
 	GenesisID BlockID
+
+	// Oak hardfork constants.
+	OakHardforkBlock     BlockHeight
+	OakDifficultyMaxRise = big.NewRat(1004, 1000)
+	OakDifficultyMaxDrop = big.NewRat(1000, 1004)
 )
 
 // init checks which build constant is in place and initializes the variables
@@ -62,6 +73,8 @@ func init() {
 		ExtremeFutureThreshold = 4 * 60          // 4 minutes.
 
 		MinimumCoinbase = 30e3
+
+		OakHardforkBlock = 100
 
 		GenesisSiafundAllocation = []SiafundOutput{
 			{
@@ -96,6 +109,8 @@ func init() {
 		ExtremeFutureThreshold = 6 // 6 seconds
 
 		MinimumCoinbase = 299990 // Minimum coinbase is hit after 10 blocks to make testing minimum-coinbase code easier.
+
+		OakHardforkBlock = 25
 
 		GenesisSiafundAllocation = []SiafundOutput{
 			{
@@ -173,6 +188,14 @@ func init() {
 		// increasingly potent dropoff for about 5 years, until inflation more
 		// or less permanently settles around 2%.
 		MinimumCoinbase = 30e3
+
+		// The oak difficulty adjustment hardfork is set to trigger at block
+		// 135,000, which is just under 6 months after the hardfork was first
+		// released as beta software to the network. This hopefully gives
+		// everyone plenty of time to upgrade and adopt the hardfork, while also
+		// being earlier than the most optimistic shipping dates for the miners
+		// that would otherwise be very disruptive to the network.
+		OakHardforkBlock = 135e3
 
 		GenesisSiafundAllocation = []SiafundOutput{
 			{

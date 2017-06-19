@@ -41,6 +41,13 @@ var (
 	// blocks in the current path.
 	BlockPath = []byte("BlockPath")
 
+	// BucketOak is the database bucket that contains all of the fields related
+	// to the oak difficulty adjustment algorithm. The cumulative difficulty and
+	// time values are stored for each block id, and then the key "OakInit"
+	// contains the value "true" if the oak fields have been properly
+	// initialized.
+	BucketOak = []byte("Oak")
+
 	// Consistency is a database bucket with a flag indicating whether
 	// inconsistencies within the database have been detected.
 	Consistency = []byte("Consistency")
@@ -60,6 +67,18 @@ var (
 	// SiafundPool is a database bucket storing the current value of the
 	// siafund pool.
 	SiafundPool = []byte("SiafundPool")
+)
+
+var (
+	// FieldOakInit is a field in BucketOak that gets set to "true" after the
+	// oak initialiation process has completed.
+	FieldOakInit = []byte("OakInit")
+)
+
+var (
+	// ValueOakInit is the value that the oak init field is set to if the oak
+	// difficulty adjustment fields have been correctly intialized.
+	ValueOakInit = []byte("true")
 )
 
 // createConsensusObjects initialzes the consensus portions of the database.

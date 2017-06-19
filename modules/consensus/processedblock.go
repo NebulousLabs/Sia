@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"encoding/binary"
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -129,9 +130,29 @@ func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block)
 		Height: pb.Height + 1,
 		Depth:  pb.childDepth(),
 	}
+
+	// Grab the total values that were computed for the parent block. They will
+	// be used to compute the total values for the child block.
+	var prevTotalTarget, parentTarget types.Target
+	prevTotalsBytes := tx.Bucket(BucketOak).Get(b.ParentID[:])
+	prevTotalTime := int64(binary.LittleEndian.Uint64(prevTotalsBytes[:8]))
+	copy(prevTotalTarget[:], prevTotalsBytes[8:40])
+	copy(parentTarget[:], prevTotalsBytes[40:])
+
+	// Push the total values for this block into the oak difficulty adjustment
+	// bucket.
+	_, _, err := cs.storeBlockTotals(tx, child.Height, childID, prevTotalTime, pb.Block.Timestamp, b.Timestamp, prevTotalTarget, pb.ChildTarget)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+
 	blockMap := tx.Bucket(BlockMap)
-	cs.setChildTarget(blockMap, child)
-	err := blockMap.Put(childID[:], encoding.Marshal(*child))
+	if pb.Height < types.OakHardforkBlock {
+		cs.setChildTarget(blockMap, child)
+	} else {
+		child.ChildTarget = cs.childTargetOak(prevTotalTime, prevTotalTarget, parentTarget, pb.Height)
+	}
+	err = blockMap.Put(childID[:], encoding.Marshal(*child))
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
