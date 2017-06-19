@@ -209,9 +209,7 @@ func (t Transaction) ID() TransactionID {
 		))
 
 		if verify != txid {
-			println(txid.String())
-			println(verify.String())
-			panic("transaction id marshalling is incorrect")
+			panic("TransactionID is not marshalling correctly")
 		}
 	}
 
@@ -265,8 +263,29 @@ func (t Transaction) FileContractID(i uint64) FileContractID {
 	h.Write(SpecifierFileContract[:])
 	t.marshalSiaNoSignatures(h) // Encode non-signature fields into hash.
 	encoding.WriteUint64(h, i)  // Writes index of this output.
-
 	h.Sum(id[:0])
+
+	// Sanity check - verify that the optimized code is always returning the
+	// same ids as the unoptimized code.
+	if build.DEBUG {
+		verificationID := FileContractID(crypto.HashAll(
+			SpecifierFileContract,
+			t.SiacoinInputs,
+			t.SiacoinOutputs,
+			t.FileContracts,
+			t.FileContractRevisions,
+			t.StorageProofs,
+			t.SiafundInputs,
+			t.SiafundOutputs,
+			t.MinerFees,
+			t.ArbitraryData,
+			i,
+		))
+		if id != verificationID {
+			panic("FileContractID is not marshalling correctly")
+		}
+	}
+
 	return id
 }
 
@@ -280,8 +299,28 @@ func (t Transaction) SiafundOutputID(i uint64) SiafundOutputID {
 	h.Write(SpecifierSiafundOutput[:])
 	t.marshalSiaNoSignatures(h) // Encode non-signature fields into hash.
 	encoding.WriteUint64(h, i)  // Writes index of this output.
-
 	h.Sum(id[:0])
+
+	// Sanity check - verify that the optimized code is always returning the
+	// same ids as the unoptimized code.
+	if build.DEBUG {
+		verificationID := SiafundOutputID(crypto.HashAll(
+			SpecifierSiafundOutput,
+			t.SiacoinInputs,
+			t.SiacoinOutputs,
+			t.FileContracts,
+			t.FileContractRevisions,
+			t.StorageProofs,
+			t.SiafundInputs,
+			t.SiafundOutputs,
+			t.MinerFees,
+			t.ArbitraryData,
+			i,
+		))
+		if id != verificationID {
+			panic("SiafundOutputID is not marshalling correctly")
+		}
+	}
 	return id
 }
 
