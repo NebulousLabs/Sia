@@ -6,6 +6,7 @@ package types
 import (
 	"bytes"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -122,6 +123,22 @@ func (b Block) MerkleRoot() crypto.Hash {
 		tree.Push(buf.Bytes())
 		buf.Reset()
 	}
+
+	// Sanity check - verify that this root is the same as the root provided in
+	// the old implementation.
+	if build.DEBUG {
+		verifyTree := crypto.NewTree()
+		for _, payout := range b.MinerPayouts {
+			verifyTree.PushObject(payout)
+		}
+		for _, txn := range b.Transactions {
+			verifyTree.PushObject(txn)
+		}
+		if tree.Root() != verifyTree.Root() {
+			panic("Block MerkleRoot implementation is broken")
+		}
+	}
+
 	return tree.Root()
 }
 
