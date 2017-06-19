@@ -214,13 +214,17 @@ func TestWorkingStatus(t *testing.T) {
 		t.Fatal("uploading has failed")
 	}
 
-	time.Sleep(time.Second * 31)
+	err = retry(30, time.Second, func() error {
+		var hg HostGET
+		st.getAPI("/host", &hg)
 
-	var hg HostGET
-	st.getAPI("/host", &hg)
-
-	if hg.WorkingStatus != modules.HostWorkingStatusWorking {
-		t.Fatal("expected host to be working")
+		if hg.WorkingStatus != modules.HostWorkingStatusWorking {
+			return errors.New("expected host to be working")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
