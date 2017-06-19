@@ -30,6 +30,10 @@ var (
 // threadedRegularSync will make sure that sync gets called on the database
 // every once in a while.
 func (tp *TransactionPool) threadedRegularSync() {
+	if err := tp.tg.Add(); err != nil {
+		return
+	}
+	defer tp.tg.Done()
 	for {
 		select {
 		case <-tp.tg.StopChan():
