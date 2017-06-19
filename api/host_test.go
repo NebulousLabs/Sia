@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -242,15 +243,17 @@ func TestConnectabilityStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// wait a bit for the check to run
-	time.Sleep(time.Second * 31)
+	err = retry(30, time.Second, func() error {
+		var hg HostGET
+		st.getAPI("/host", &hg)
 
-	// check that the field was set correctly
-	var hg HostGET
-	st.getAPI("/host", &hg)
-
-	if hg.ConnectabilityStatus != modules.HostConnectabilityStatusConnectable {
-		t.Fatal("expected host to be connectable")
+		if hg.ConnectabilityStatus != modules.HostConnectabilityStatusConnectable {
+			return errors.New("expected host to be connectable")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
