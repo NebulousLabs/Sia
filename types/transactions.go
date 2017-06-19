@@ -145,6 +145,7 @@ type (
 func (t Transaction) marshalSiaNoSignatures(w io.Writer) {
 	enc := encoding.NewEncoder(w)
 
+	encoding.WriteInt(w, len((t.SiacoinInputs)))
 	for i := range t.SiacoinInputs {
 		t.SiacoinInputs[i].MarshalSia(w)
 	}
