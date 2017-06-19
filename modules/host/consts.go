@@ -16,6 +16,10 @@ const (
 	// support 6 month contracts when Sia leaves beta.
 	defaultMaxDuration = 144 * 30 * 6 // 6 months.
 
+	// checkHostTimeout indicates the amount of time that a peer has to check the
+	// connectability of a host.
+	checkHostTimeout = 30 * time.Second
+
 	// fileContractNegotiationTimeout indicates the amount of time that a
 	// renter has to negotiate a file contract with the host. A timeout is
 	// necessary to limit the impact of DoS attacks.
@@ -151,6 +155,14 @@ var (
 		Dev:      time.Minute * 5,
 		Testing:  time.Second * 90,
 	}).(time.Duration)
+
+	// hostCheckNodes indicates the number of nodes that will be used to
+	// determine the connectability status of a host.
+	hostCheckNodes = build.Select(build.Var{
+		Standard: uint64(2),
+		Dev:      uint64(1),
+		Testing:  uint64(1),
+	}).(uint64)
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window

@@ -15,6 +15,7 @@ package host
 // have to keep all the files following a renew in order to get the money.
 
 import (
+	"errors"
 	"net"
 	"sync/atomic"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // rpcSettingsDeprecated is a specifier for a deprecated settings request.
@@ -55,8 +57,6 @@ func (h *Host) threadedUpdateHostname(closeChan chan struct{}) {
 func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 	defer close(closeChan)
 
-	// Before entering the longer loop, try a greedy, faster attempt to verify
-	// that the host is working.
 	prevSettingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
 	select {
 	case <-h.tg.StopChan():
@@ -73,19 +73,19 @@ func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 	h.mu.Lock()
 	if settingsCalls-prevSettingsCalls >= workingStatusThreshold {
 		h.workingStatus = modules.HostWorkingStatusWorking
+	} else {
+		h.workingStatus = modules.HostWorkingStatusNotWorking
 	}
-	// First check is quick, don't set to 'not working' if host has not been
-	// contacted enough times.
 	h.mu.Unlock()
 
 	for {
-		prevSettingsCalls = atomic.LoadUint64(&h.atomicSettingsCalls)
+		prevSettingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
 		select {
 		case <-h.tg.StopChan():
 			return
 		case <-time.After(workingStatusFrequency):
 		}
-		settingsCalls = atomic.LoadUint64(&h.atomicSettingsCalls)
+		settingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
 
 		// sanity check
 		if prevSettingsCalls > settingsCalls {
@@ -103,20 +103,30 @@ func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 	}
 }
 
-// threadedTrackConnectabilityStatus periodically checks if the host is
-// connectable at its netaddress.
-func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
-	defer close(closeChan)
+// threadedRPCRequestHostCheck asks the node at conn if the host's NetAddress
+// is connectable and returns the result on the resultChan.
+func (h *Host) threadedRPCRequestHostCheck(resultChan chan modules.HostConnectabilityStatus) modules.RPCFunc {
+	return func(conn modules.PeerConn) error {
+		err := conn.SetDeadline(time.Now().Add(checkHostTimeout))
+		if err != nil {
+			return err
+		}
+		closeChan := make(chan struct{})
+		defer close(closeChan)
+		go func() {
+			select {
+			case <-h.tg.StopChan():
+			case <-closeChan:
+			}
+			conn.Close()
+		}()
+		err = h.tg.Add()
+		if err != nil {
+			return err
+		}
+		defer h.tg.Done()
 
-	// Wait breifly before checking the first time. This gives time for any port
-	// forwarding to complete.
-	select {
-	case <-h.tg.StopChan():
-		return
-	case <-time.After(connectabilityCheckFirstWait):
-	}
-
-	for {
+		// ask the remote to check our NetAddress
 		h.mu.RLock()
 		autoAddr := h.autoAddress
 		userAddr := h.settings.NetAddress
@@ -127,28 +137,108 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 			activeAddr = userAddr
 		}
 
-		dialer := &net.Dialer{
-			Cancel:  h.tg.StopChan(),
-			Timeout: connectabilityCheckTimeout,
+		err = encoding.WriteObject(conn, activeAddr)
+		if err != nil {
+			return err
 		}
-		conn, err := dialer.Dial("tcp", string(activeAddr))
 
 		var status modules.HostConnectabilityStatus
+		err = encoding.ReadObject(conn, &status, 256)
 		if err != nil {
-			status = modules.HostConnectabilityStatusNotConnectable
-		} else {
-			conn.Close()
-			status = modules.HostConnectabilityStatusConnectable
+			return err
 		}
-		h.mu.Lock()
-		h.connectabilityStatus = status
-		h.mu.Unlock()
 
+		if status != modules.HostConnectabilityStatusNotConnectable &&
+			status != modules.HostConnectabilityStatusConnectable {
+			return errors.New("peer responded with invalid connectability status")
+		}
+
+		resultChan <- status
+		return nil
+	}
+}
+
+// managedGetConnectabilityStatus asks hostCheckNodes random peers to check the
+// connectability of the host's NetAddress and returns the result.
+func (h *Host) managedGetConnectabilityStatus() modules.HostConnectabilityStatus {
+	// collect outbound peers
+	var outboundPeers []modules.Peer
+	for _, peer := range h.gateway.Peers() {
+		if peer.Inbound {
+			continue
+		}
+		outboundPeers = append(outboundPeers, peer)
+	}
+	if uint64(len(outboundPeers)) < hostCheckNodes {
+		h.log.Debugln("waiting for outbound peers to run connectability check")
+		return modules.HostConnectabilityStatusChecking
+	}
+
+	// select hostCheckNodes outbound peers at random to perform the check
+	var askPeers []modules.Peer
+	for i := 0; uint64(i) < hostCheckNodes; i++ {
+		askPeers = append(askPeers, outboundPeers[fastrand.Intn(len(outboundPeers))])
+	}
+
+	// ask each node to connect to our NetAddress and record the results
+	var results []modules.HostConnectabilityStatus
+	for _, peer := range askPeers {
+		resultChan := make(chan modules.HostConnectabilityStatus, 1)
+		err := h.gateway.RPC(peer.NetAddress, "CheckHost", h.threadedRPCRequestHostCheck(resultChan))
+		if err != nil {
+			h.log.Debugln("error calling CheckHost RPC: ", err)
+			continue
+		}
+		results = append(results, <-resultChan)
+	}
+
+	// if no peers responded, set the status to checking and continue
+	if len(results) == 0 {
+		return modules.HostConnectabilityStatusChecking
+	}
+
+	// if there is disagreement among the peers, set the status to 'checking'
+	// and continue
+	hasDisagreement := false
+	for _, result := range results {
+		if result != results[0] {
+			hasDisagreement = true
+		}
+	}
+	if hasDisagreement {
+		return modules.HostConnectabilityStatusChecking
+	}
+
+	return results[0]
+}
+
+// threadedTrackConnectabilityStatus periodically checks if the host is
+// connectable at its NetAddress.
+func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
+	defer close(closeChan)
+
+	select {
+	case <-h.tg.StopChan():
+		return
+	case <-time.After(connectabilityCheckFirstWait):
+	}
+
+	status := h.managedGetConnectabilityStatus()
+	h.mu.Lock()
+	h.connectabilityStatus = status
+	h.mu.Unlock()
+
+	for {
 		select {
 		case <-h.tg.StopChan():
 			return
 		case <-time.After(connectabilityCheckFrequency):
 		}
+
+		status := h.managedGetConnectabilityStatus()
+		h.mu.Lock()
+		h.connectabilityStatus = status
+		h.mu.Unlock()
 	}
 }
 

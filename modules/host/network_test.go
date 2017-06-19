@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -117,11 +118,24 @@ func TestHostConnectabilityStatus(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ht, err := newHostTester(t.Name())
+
+	// create a peer for the check to run on
+	peer, err := newHostTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer peer.Close()
+
+	ht, err := newHostTester(t.Name() + "-peer")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer ht.Close()
+
+	err = ht.gateway.Connect(peer.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// TODO: this causes an ndf, because it relies on the host tester starting up
 	// and fully returning faster than the first check, which isnt always the
@@ -140,5 +154,57 @@ func TestHostConnectabilityStatus(t *testing.T) {
 	}
 	if !success {
 		t.Fatal("expected connectability state to flip to HostConnectabilityStatusConnectable")
+	}
+}
+
+// TestHostConnectabilityStatusAdversarialCallers verifies that an adversary
+// cannot abuse the host status check, using nodes to connect scan arbitrary
+// hosts.
+func TestHostConnectabilityStatusAdversarialCallers(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	evilpeer, err := newHostTester(t.Name() + "-evilpeer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer evilpeer.Close()
+
+	host, err := newHostTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Close()
+
+	err = evilpeer.gateway.Connect(host.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	evilCheckHostRPC := func(conn modules.PeerConn) error {
+		defer conn.Close()
+
+		err = encoding.WriteObject(conn, "google.com:80")
+		if err != nil {
+			return err
+		}
+
+		var status modules.HostConnectabilityStatus
+		err = encoding.ReadObject(conn, &status, 256)
+		if err != nil {
+			return err
+		}
+
+		if status != "" {
+			t.Fatal("status checked on external domain")
+		}
+
+		return nil
+	}
+
+	err = evilpeer.gateway.RPC(host.gateway.Address(), "CheckHost", evilCheckHostRPC)
+	if err == nil {
+		t.Fatal("expected malicious CheckHost call to fail")
 	}
 }

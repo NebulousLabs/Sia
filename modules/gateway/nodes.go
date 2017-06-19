@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
@@ -145,6 +146,85 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 		g.log.Println("ERROR: unable to save new nodes added to the gateway:", err)
 	}
 	g.mu.Unlock()
+	return nil
+}
+
+// checkHost is the receiving end of the CheckHost RPC. It performs the
+// connectability check and informs the caller if the requested host can be
+// connected to on the provided netaddress.
+func (g *Gateway) checkHost(conn modules.PeerConn) error {
+	err := conn.SetDeadline(time.Now().Add(connStdDeadline))
+	if err != nil {
+		return err
+	}
+	closeChan := make(chan struct{})
+	defer close(closeChan)
+	go func() {
+		select {
+		case <-g.threads.StopChan():
+		case <-closeChan:
+		}
+		conn.Close()
+	}()
+	err = g.threads.Add()
+	if err != nil {
+		return err
+	}
+	defer g.threads.Done()
+
+	var checkAddress modules.NetAddress
+	err = encoding.ReadObject(conn, &checkAddress, modules.MaxEncodedNetAddressLength)
+	if err != nil {
+		return err
+	}
+
+	// check that the checkAddress resolves to at least one of the remote's IP
+	// addresses.
+	checkHost := checkAddress.Host()
+	checkIPs, err := net.LookupIP(checkHost)
+	if err != nil {
+		return err
+	}
+	requestingHost, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		return err
+	}
+	requestingIPs, err := net.LookupIP(requestingHost)
+	if err != nil {
+		return err
+	}
+
+	isValid := false
+	for _, cip := range checkIPs {
+		for _, rip := range requestingIPs {
+			if string(cip) == string(rip) {
+				isValid = true
+			}
+		}
+	}
+	if !isValid {
+		return fmt.Errorf("blocked CheckHost call for %v from %v, requested host does not match ip address of remote host.", checkAddress, conn.RemoteAddr().String())
+	}
+
+	dialer := &net.Dialer{
+		Cancel:  g.threads.StopChan(),
+		Timeout: connectabilityCheckTimeout,
+	}
+	testConn, err := dialer.Dial("tcp", string(checkAddress))
+
+	var status modules.HostConnectabilityStatus
+	if err != nil {
+		status = modules.HostConnectabilityStatusNotConnectable
+	} else {
+		testConn.Close()
+		status = modules.HostConnectabilityStatusConnectable
+	}
+
+	err = encoding.WriteObject(conn, status)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
