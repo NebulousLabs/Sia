@@ -10,18 +10,9 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// historicOutput defines a historic output as recognized by the wallet. This
-// struct is primarily used to sort the historic outputs before inserting them
-// into the bolt database.
-type historicOutput struct {
-	id  types.OutputID
-	val types.Currency
-}
-
 // threadedResetSubscriptions unsubscribes the wallet from the consensus set and transaction pool
 // and subscribes again.
 func (w *Wallet) threadedResetSubscriptions() error {
-
 	w.mu.Lock()
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
@@ -44,16 +35,16 @@ func (w *Wallet) advanceSeedLookahead(index uint64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	newProgress := index + 1
 
 	// Add spendable keys and remove them from lookahead
-	spendableKeys := generateKeys(w.primarySeed, progress, index-progress+1)
+	spendableKeys := generateKeys(w.primarySeed, progress, newProgress-progress)
 	for _, key := range spendableKeys {
 		w.keys[key.UnlockConditions.UnlockHash()] = key
 		delete(w.lookahead, key.UnlockConditions.UnlockHash())
 	}
 
 	// Update the primarySeedProgress
-	newProgress := progress + uint64(len(spendableKeys))
 	dbPutPrimarySeedProgress(w.dbTx, newProgress)
 	if err != nil {
 		return false, err
@@ -81,15 +72,12 @@ func (w *Wallet) isWalletAddress(uh types.UnlockHash) bool {
 // updateLookahead uses a consensus change to update the seed progress if one of the outputs
 // contains an unlock hash of the lookahead set. Returns true if a blockchain rescan is required
 func (w *Wallet) updateLookahead(tx *bolt.Tx, cc modules.ConsensusChange) (bool, error) {
-
-	var largestIndex uint64 = 0
-	advance := false
+	var largestIndex uint64
 	for _, diff := range cc.SiacoinOutputDiffs {
 		if index, ok := w.lookahead[diff.SiacoinOutput.UnlockHash]; ok {
 			if index > largestIndex {
 				largestIndex = index
 			}
-			advance = true
 		}
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
@@ -97,10 +85,9 @@ func (w *Wallet) updateLookahead(tx *bolt.Tx, cc modules.ConsensusChange) (bool,
 			if index > largestIndex {
 				largestIndex = index
 			}
-			advance = true
 		}
 	}
-	if advance {
+	if largestIndex > 0 {
 		return w.advanceSeedLookahead(largestIndex)
 	}
 
