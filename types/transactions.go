@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 )
@@ -186,19 +187,34 @@ func (t Transaction) marshalSiaNoSignatures(w io.Writer) {
 // ID returns the id of a transaction, which is taken by marshalling all of the
 // fields except for the signatures and taking the hash of the result.
 func (t Transaction) ID() TransactionID {
+	// Get the transaction id by hashing all data minus the signatures.
 	var txid TransactionID
 	h := crypto.NewHash()
-
-	// Encode non-signature fields into hash.
 	t.marshalSiaNoSignatures(h)
+	h.Sum(txid[:0])
 
-	// Encode signatures.
-	encoding.WriteInt(h, len((t.TransactionSignatures)))
-	for i := range t.TransactionSignatures {
-		t.TransactionSignatures[i].MarshalSia(h)
+	// Sanity check in debug builds to make sure that the ids are going to be
+	// the same.
+	if build.DEBUG {
+		verify := TransactionID(crypto.HashAll(
+			t.SiacoinInputs,
+			t.SiacoinOutputs,
+			t.FileContracts,
+			t.FileContractRevisions,
+			t.StorageProofs,
+			t.SiafundInputs,
+			t.SiafundOutputs,
+			t.MinerFees,
+			t.ArbitraryData,
+		))
+
+		if verify != txid {
+			println(txid.String())
+			println(verify.String())
+			panic("transaction id marshalling is incorrect")
+		}
 	}
 
-	h.Sum(txid[:0])
 	return txid
 }
 
@@ -207,14 +223,35 @@ func (t Transaction) ID() TransactionID {
 // Specifier, all of the fields in the transaction (except the signatures),
 // and output index.
 func (t Transaction) SiacoinOutputID(i uint64) SiacoinOutputID {
+	// Create the id.
 	var id SiacoinOutputID
 	h := crypto.NewHash()
-
 	h.Write(SpecifierSiacoinOutput[:])
 	t.marshalSiaNoSignatures(h) // Encode non-signature fields into hash.
 	encoding.WriteUint64(h, i)  // Writes index of this output.
-
 	h.Sum(id[:0])
+
+	// Sanity check - verify that the optimized code is always returning the
+	// same ids as the unoptimized code.
+	if build.DEBUG {
+		verificationID := SiacoinOutputID(crypto.HashAll(
+			SpecifierSiacoinOutput,
+			t.SiacoinInputs,
+			t.SiacoinOutputs,
+			t.FileContracts,
+			t.FileContractRevisions,
+			t.StorageProofs,
+			t.SiafundInputs,
+			t.SiafundOutputs,
+			t.MinerFees,
+			t.ArbitraryData,
+			i,
+		))
+		if id != verificationID {
+			panic("SiacoinOutputID is not marshalling correctly")
+		}
+	}
+
 	return id
 }
 
