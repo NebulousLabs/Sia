@@ -213,6 +213,7 @@ func TestGetTransaction(t *testing.T) {
 // TestBlockFeeEstimation checks that the fee estimation algorithm is reasonably
 // on target when the tpool is relying on blockchain based fee estimation.
 func TestFeeEstimation(t *testing.T) {
+	t.Skip("Tpool is too slow to run this test regularly")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -343,6 +344,7 @@ func TestFeeEstimation(t *testing.T) {
 // up, and less than 250ms per mb to empty out - indicating linear scalability
 // and tolerance for a larger pool size.
 func TestTpoolScalability(t *testing.T) {
+	t.Skip("Tpool is too slow to run this test regularly")
 	if testing.Short() {
 		t.SkipNow()
 	}
