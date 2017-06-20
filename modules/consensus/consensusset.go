@@ -86,13 +86,6 @@ type ConsensusSet struct {
 	blockRuleHelper blockRuleHelper
 	blockValidator  blockValidator
 
-	// Cache values - values we store while processing a block to minimize the
-	// amount of time spent on-disk and to minimize the total amount of hashing
-	// and memory allocation that is required.
-	parent            types.BlockID // Used to sanity-check that outdated cache is never used.
-	parentTimestamp   types.Timestamp
-	parentChildTarget types.Target
-
 	// Utilities
 	db         *persist.BoltDatabase
 	log        *persist.Logger

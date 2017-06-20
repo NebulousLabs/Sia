@@ -14,6 +14,7 @@ dependencies:
 	go get -u golang.org/x/crypto/ed25519
 	# Module + Daemon Dependencies
 	go get -u github.com/NebulousLabs/entropy-mnemonics
+	go get -u github.com/NebulousLabs/errors
 	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/muxado
 	go get -u github.com/klauspost/reedsolomon

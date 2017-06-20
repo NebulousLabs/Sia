@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/errors"
 )
 
+// Errors returned by this file.
 var (
 	// errOakHardforkIncompatibility is the error returned if Oak initialization
 	// cannot begin because the consensus database was not upgraded before the
@@ -97,8 +98,8 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 
 	// Determine the new target by multiplying the visible hashrate by the
 	// target block time. Clamp it to a 0.4% difficulty adjustment.
-	maxNewTarget := parentTarget.MulDifficulty(types.OakDifficultyMaxRise)
-	minNewTarget := parentTarget.MulDifficulty(types.OakDifficultyMaxDrop)
+	maxNewTarget := parentTarget.MulDifficulty(types.OakMaxRise)
+	minNewTarget := parentTarget.MulDifficulty(types.OakMaxDrop)
 	newTarget := types.RatToTarget(new(big.Rat).SetFrac(types.RootDepth.Int(), visibleHashrate.Mul64(uint64(targetBlockTime)).Big()))
 	if newTarget.Cmp(maxNewTarget) < 0 {
 		newTarget = maxNewTarget
@@ -107,6 +108,16 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 		newTarget = minNewTarget
 	}
 	return newTarget
+}
+
+// getBlockTotals returns the block totals values that get stored in
+// storeBlockTotals.
+func (cs *ConsensusSet) getBlockTotals(tx *bolt.Tx, id types.BlockID) (totalTime int64, totalTarget, target types.Target) {
+	totalsBytes := tx.Bucket(BucketOak).Get(id[:])
+	totalTime = int64(binary.LittleEndian.Uint64(totalsBytes[:8]))
+	copy(totalTarget[:], totalsBytes[8:40])
+	copy(target[:], totalsBytes[40:])
+	return
 }
 
 // storeBlockTotals computes the new total time and total target for the current
@@ -120,12 +131,12 @@ func (cs *ConsensusSet) storeBlockTotals(tx *bolt.Tx, currentHeight types.BlockH
 
 	// For each value, first multiply by the decay, and then add in the new
 	// delta.
-	newTotalTime = (prevTotalTime * types.OakDifficultyDecayNum / types.OakDifficultyDecayDenom) + (int64(currentTimestamp) - int64(parentTimestamp))
-	newTotalTarget = prevTotalTarget.MulDifficulty(big.NewRat(types.OakDifficultyDecayNum, types.OakDifficultyDecayDenom)).AddDifficulties(targetOfCurrentBlock)
+	newTotalTime = (prevTotalTime * types.OakDecayNum / types.OakDecayDenom) + (int64(currentTimestamp) - int64(parentTimestamp))
+	newTotalTarget = prevTotalTarget.MulDifficulty(big.NewRat(types.OakDecayNum, types.OakDecayDenom)).AddDifficulties(targetOfCurrentBlock)
 
 	// Store the new total time and total target in the database at the
 	// appropriate id.
-	bytes := make([]byte, 72, 72)
+	bytes := make([]byte, 72)
 	binary.LittleEndian.PutUint64(bytes[:8], uint64(newTotalTime))
 	copy(bytes[8:40], newTotalTarget[:])
 	copy(bytes[40:], targetOfCurrentBlock[:])

@@ -12,12 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
-const (
-	// Decay values related to the oak difficulty adjustment hardfork.
-	OakDifficultyDecayNum   = 995
-	OakDifficultyDecayDenom = 1000
-)
-
 var (
 	BlockSizeLimit   = uint64(2e6)
 	RootDepth        = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
@@ -46,10 +40,13 @@ var (
 	// redundant computation.
 	GenesisID BlockID
 
-	// Oak hardfork constants.
+	// Oak hardfork constants. Oak is the name of the difficulty algorithm for
+	// Sia following a hardfork at block 135e3.
 	OakHardforkBlock     BlockHeight
-	OakDifficultyMaxRise = big.NewRat(1004, 1000)
-	OakDifficultyMaxDrop = big.NewRat(1000, 1004)
+	OakDecayNum          int64
+	OakDecayDenom        int64
+	OakMaxRise *big.Rat
+	OakMaxDrop *big.Rat
 )
 
 // init checks which build constant is in place and initializes the variables
@@ -75,6 +72,10 @@ func init() {
 		MinimumCoinbase = 30e3
 
 		OakHardforkBlock = 100
+		OakDecayNum = 985
+		OakDecayDenom = 1000
+		OakMaxRise = big.NewRat(102, 100)
+		OakMaxDrop = big.NewRat(100, 102)
 
 		GenesisSiafundAllocation = []SiafundOutput{
 			{
@@ -110,7 +111,13 @@ func init() {
 
 		MinimumCoinbase = 299990 // Minimum coinbase is hit after 10 blocks to make testing minimum-coinbase code easier.
 
-		OakHardforkBlock = 25
+		// Do not let the difficulty change rapidly - blocks will be getting
+		// mined far faster than the difficulty can adjust to.
+		OakHardforkBlock = 20
+		OakDecayNum = 9999
+		OakDecayDenom = 10e3
+		OakMaxRise = big.NewRat(10001, 10e3)
+		OakMaxDrop = big.NewRat(10e3, 10001)
 
 		GenesisSiafundAllocation = []SiafundOutput{
 			{
@@ -196,6 +203,24 @@ func init() {
 		// being earlier than the most optimistic shipping dates for the miners
 		// that would otherwise be very disruptive to the network.
 		OakHardforkBlock = 135e3
+
+		// The decay is kept at 995/1000, or a decay of about 0.5% each block.
+		// This puts the halflife of a block's relevance at about 1 day. This
+		// allows the difficulty to adjust rapidly if the hashrate is adjusting
+		// rapidly, while still keeping a relatively strong insulation against
+		// random variance.
+		OakDecayNum = 995
+		OakDecayDenom = 1e3
+
+		// The max rise and max drop for the difficulty is kept at 0.4% per
+		// block, which means that in 1008 blocks the difficulty can move a
+		// maximum of about 55x. This is significant, and means that dramatic
+		// hashrate changes can be responded to quickly, while still forcing an
+		// attacker to do a significant amount of work in order to execute a
+		// difficulty raising attack, and minimizing the chance that an attacker
+		// can get lucky and fake a ton of work.
+		OakMaxRise = big.NewRat(1004, 1e3)
+		OakMaxDrop = big.NewRat(1e3, 1004)
 
 		GenesisSiafundAllocation = []SiafundOutput{
 			{
