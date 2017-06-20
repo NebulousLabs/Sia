@@ -80,7 +80,6 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 	}
 	shift := square / 10e6 // 10e3 second delta leads to 10 second shift.
 	targetBlockTime := int64(types.BlockFrequency) + shift
-	println(targetBlockTime)
 
 	// Clamp the block time to 1/3 and 3x the target block time.
 	if targetBlockTime < int64(types.BlockFrequency)/3 {
