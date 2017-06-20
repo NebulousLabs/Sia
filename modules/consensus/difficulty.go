@@ -72,16 +72,17 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 	// Determine the detla of the current total time vs. the desired total time.
 	expectedTime := types.BlockFrequency * parentHeight
 	delta := int64(expectedTime) - parentTotalTime
+	// Convert the delta in to a target block time.
 	square := delta * delta
 	if delta < 0 {
 		// If the delta is negative, restore the negative value.
 		square *= -1
 	}
+	shift := square / 10e6 // 10e3 second delta leads to 10 second shift.
+	targetBlockTime := int64(types.BlockFrequency) + shift
+	println(targetBlockTime)
 
-	// Convert the delta in to a target block time. Clamp the target block time
-	// to 1/3 and 3x the real block time.
-	delta /= 10e6 // 10e3 second delta leads to 10 second shift.
-	targetBlockTime := int64(types.BlockFrequency) + delta
+	// Clamp the block time to 1/3 and 3x the target block time.
 	if targetBlockTime < int64(types.BlockFrequency)/3 {
 		targetBlockTime = int64(types.BlockFrequency) / 3
 	}
@@ -95,6 +96,9 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 		parentTotalTime = 1
 	}
 	visibleHashrate := parentTotalTarget.Difficulty().Div64(uint64(parentTotalTime)) // Hashes per second.
+	if visibleHashrate.IsZero() {
+		visibleHashrate = visibleHashrate.Add(types.NewCurrency64(1))
+	}
 
 	// Determine the new target by multiplying the visible hashrate by the
 	// target block time. Clamp it to a 0.4% difficulty adjustment.
