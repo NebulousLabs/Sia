@@ -13,10 +13,13 @@ import (
 // threadedResetSubscriptions unsubscribes the wallet from the consensus set and transaction pool
 // and subscribes again.
 func (w *Wallet) threadedResetSubscriptions() error {
-	w.mu.Lock()
+	if !w.scanLock.TryLock() {
+		return errScanInProgress
+	}
+	defer w.scanLock.Unlock()
+
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
-	w.mu.Unlock()
 
 	err := w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {
