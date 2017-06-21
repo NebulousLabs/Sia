@@ -202,10 +202,7 @@ func TestValidRevertedTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = tpt.gateway.Disconnect(tpt2.gateway.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
+	tpt.gateway.Disconnect(tpt2.gateway.Address())
 
 	// make some transactions on tpt
 	var txnSets [][]types.Transaction
