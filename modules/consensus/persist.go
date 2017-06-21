@@ -32,8 +32,19 @@ func (cs *ConsensusSet) loadDB() error {
 	// Walk through initialization for Sia.
 	return cs.db.Update(func(tx *bolt.Tx) error {
 		// Check if the database has been initialized.
-		if !dbInitialized(tx) {
-			return cs.initDB(tx)
+		err = cs.initDB(tx)
+		if err != nil {
+			return err
+		}
+
+		// Check the initialization of the oak difficulty adjustment fields, and
+		// create them if they do not exist. This is separate from 'initDB'
+		// because older consensus databases will have completed the 'initDB'
+		// process but will not have the oak difficulty adjustment fields, so a
+		// scan will be needed to add and update them.
+		err = cs.initOak(tx)
+		if err != nil {
+			return err
 		}
 
 		// Check that inconsistencies have not been detected in the database.
