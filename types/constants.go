@@ -42,11 +42,11 @@ var (
 
 	// Oak hardfork constants. Oak is the name of the difficulty algorithm for
 	// Sia following a hardfork at block 135e3.
-	OakHardforkBlock     BlockHeight
-	OakDecayNum          int64
-	OakDecayDenom        int64
-	OakMaxRise *big.Rat
-	OakMaxDrop *big.Rat
+	OakHardforkBlock BlockHeight
+	OakDecayNum      int64
+	OakDecayDenom    int64
+	OakMaxRise       *big.Rat
+	OakMaxDrop       *big.Rat
 )
 
 // init checks which build constant is in place and initializes the variables

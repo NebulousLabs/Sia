@@ -174,15 +174,13 @@ func (cs *ConsensusSet) initOak(tx *bolt.Tx) error {
 	}
 
 	// Store base values for the genesis block.
-	_, _, err = cs.storeBlockTotals(tx, 0, types.GenesisID, 0, types.GenesisTimestamp, types.GenesisTimestamp, types.RootDepth, types.RootTarget)
+	totalTime, totalTarget, err := cs.storeBlockTotals(tx, 0, types.GenesisID, 0, types.GenesisTimestamp, types.GenesisTimestamp, types.RootDepth, types.RootTarget)
 	if err != nil {
 		return errors.Extend(errors.New("unable to store genesis block totals"), err)
 	}
 
 	// The Oak fields have not been initialized, scan through the consensus set
 	// and set the fields for each block.
-	var totalTime int64
-	var totalTarget types.Target
 	parentTimestamp := types.GenesisTimestamp
 	parentChildTarget := types.RootTarget
 	for i := types.BlockHeight(1); i <= height; i++ { // Skip Genesis block
