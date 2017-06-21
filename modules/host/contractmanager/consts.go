@@ -33,11 +33,6 @@ const (
 	// walFile is the name of the file that is used to save the write ahead log
 	// for the contract manager.
 	walFile = "contractmanager.wal"
-
-	// walFileTmp is used for incomplete writes to the WAL. Data could be
-	// interrupted by power outages, etc., and is therefore written to a
-	// temporary file before being atomically renamed to the correct name.
-	walFileTmp = "contractmanager.wal_temp"
 )
 
 const (

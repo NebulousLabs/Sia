@@ -113,7 +113,7 @@ func writeSectorMetadata(f file, sectorIndex uint32, id sectorID, count uint16) 
 // when an attacker can perform orders of magnitude more than a billion trials
 // per second. When attacking the host sector ids though, the attacker can only
 // do one trial per sector upload, and even then has minimal means to learn
-// whether or not a collision was successfully achieved. Hash length can safely
+// whether or not a collision was successfully achieved. Hash changeLength can safely
 // be reduced from 32 bytes to 12 bytes, which has a collision resistance of
 // 2^48. The host however is unlikely to be storing 2^48 sectors, which would
 // be an exabyte of data.

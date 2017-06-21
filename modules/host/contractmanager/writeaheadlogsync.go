@@ -82,34 +82,14 @@ func (wal *writeAheadLog) syncResources() {
 	go func() {
 		defer wg.Done()
 
-		err := wal.fileWALTmp.Sync()
+		err := wal.fileWal.Sync()
 		if err != nil {
 			wal.cm.log.Severe("Unable to sync the write-ahead-log:", err)
-		}
-		err = wal.fileWALTmp.Close()
-		if err != nil {
-			// Log that the host is having trouble saving the uncommitted changes.
-			// Crash if the list of uncommitted changes has grown very large.
-			wal.cm.log.Println("ERROR: could not close temporary write-ahead-log in contract manager:", err)
-			return
 		}
 	}()
 
 	// Wait for all of the sync calls to finish.
 	wg.Wait()
-
-	// Now that all the Sync calls have completed, rename the WAL tmp file to
-	// update the WAL.
-	if !wal.cm.dependencies.disrupt("walRename") {
-		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
-		walFileName := filepath.Join(wal.cm.persistDir, walFile)
-		err := wal.cm.dependencies.renameFile(walTmpName, walFileName)
-		if err != nil {
-			// Log that the host is having trouble saving the uncommitted changes.
-			// Crash if the list of uncommitted changes has grown very large.
-			wal.cm.log.Severe("ERROR: could not rename temporary write-ahead-log in contract manager:", err)
-		}
-	}
 
 	// Perform any cleanup actions on the updates.
 	for _, sc := range wal.uncommittedChanges {
@@ -188,19 +168,6 @@ func (wal *writeAheadLog) commit() {
 	go func() {
 		defer wg.Done()
 
-		// Recreate the wal file so that it can receive new updates.
-		var err error
-		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
-		wal.fileWALTmp, err = wal.cm.dependencies.createFile(walTmpName)
-		if err != nil {
-			wal.cm.log.Severe("ERROR: unable to create write-ahead-log:", err)
-		}
-		// Write the metadata into the WAL.
-		err = writeWALMetadata(wal.fileWALTmp)
-		if err != nil {
-			wal.cm.log.Severe("Unable to properly initialize WAL file, crashing to prevent corruption:", err)
-		}
-
 		// Append all of the remaining long running uncommitted changes to the WAL.
 		wal.appendChange(stateChange{
 			UnfinishedStorageFolderAdditions:  unfinishedAdditions,
@@ -242,6 +209,12 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 
 		// Allow unclean shutdown to be simulated by disrupting the removal of
 		// the WAL file.
+		err := wal.fileWal.Close()
+		if err != nil {
+			wal.cm.log.Println("ERROR: error closing wal file during contract manager shutdown:", err)
+			return
+		}
+
 		if !wal.cm.dependencies.disrupt("cleanWALFile") {
 			err = wal.cm.dependencies.removeFile(filepath.Join(wal.cm.persistDir, walFile))
 			if err != nil {
