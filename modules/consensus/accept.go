@@ -28,40 +28,41 @@ func (cs *ConsensusSet) managedBroadcastBlock(b types.Block) {
 // validateHeaderAndBlock does some early, low computation verification on the
 // block. Callers should not assume that validation will happen in a particular
 // order.
-func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) (parent processedBlock, err error) {
+func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) (parent *processedBlock, err error) {
 	// Check if the block is a DoS block - a known invalid block that is expensive
 	// to validate.
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
 	if exists {
-		return processedBlock{}, errDoSBlock
+		return nil, errDoSBlock
 	}
 
 	// Check if the block is already known.
 	blockMap := tx.Bucket(BlockMap)
 	if blockMap == nil {
-		return processedBlock{}, errNoBlockMap
+		return nil, errNoBlockMap
 	}
 	if blockMap.Get(id[:]) != nil {
-		return processedBlock{}, modules.ErrBlockKnown
+		return nil, modules.ErrBlockKnown
 	}
 
 	// Check for the parent.
 	parentID := b.ParentID
 	parentBytes := blockMap.Get(parentID[:])
 	if parentBytes == nil {
-		return processedBlock{}, errOrphan
+		return nil, errOrphan
 	}
-	err = cs.marshaler.Unmarshal(parentBytes, &parent)
+	parent = new(processedBlock)
+	err = cs.marshaler.Unmarshal(parentBytes, parent)
 	if err != nil {
-		return processedBlock{}, err
+		return nil, err
 	}
 	// Check that the timestamp is not too far in the past to be acceptable.
-	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
+	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, parent)
 
 	err = cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1, cs.log)
 	if err != nil {
-		return processedBlock{}, err
+		return nil, err
 	}
 	return parent, nil
 }
@@ -212,7 +213,7 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	cs.mu.Lock()
 
 	// Start verification inside of a bolt View tx.
-	var parent processedBlock
+	var parent *processedBlock
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		// Do not accept a block if the database is inconsistent.
 		if inconsistencyDetected(tx) {
@@ -264,7 +265,7 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
-	changeEntry, err := cs.addBlockToTree(b, &parent)
+	changeEntry, err := cs.addBlockToTree(b, parent)
 	if err != nil {
 		cs.mu.Unlock()
 		return err
