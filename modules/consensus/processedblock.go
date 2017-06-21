@@ -132,7 +132,7 @@ func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block)
 
 	// Push the total values for this block into the oak difficulty adjustment
 	// bucket. The previous totals are required to compute the new totals.
-	prevTotalTime, prevTotalTarget, parentTarget := cs.getBlockTotals(tx, b.ParentID)
+	prevTotalTime, prevTotalTarget := cs.getBlockTotals(tx, b.ParentID)
 	_, _, err := cs.storeBlockTotals(tx, child.Height, childID, prevTotalTime, pb.Block.Timestamp, b.Timestamp, prevTotalTarget, pb.ChildTarget)
 	if build.DEBUG && err != nil {
 		panic(err)
@@ -144,7 +144,7 @@ func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block)
 	if pb.Height < types.OakHardforkBlock {
 		cs.setChildTarget(blockMap, child)
 	} else {
-		child.ChildTarget = cs.childTargetOak(prevTotalTime, prevTotalTarget, parentTarget, pb.Height)
+		child.ChildTarget = cs.childTargetOak(prevTotalTime, prevTotalTarget, pb.ChildTarget, pb.Height)
 	}
 	err = blockMap.Put(childID[:], encoding.Marshal(*child))
 	if build.DEBUG && err != nil {

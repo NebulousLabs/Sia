@@ -68,7 +68,7 @@ var (
 // however we do not use the child block deltas because that would allow the
 // child block to influence the target of the following block, which makes abuse
 // easier in selfish mining scenarios.
-func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget, parentTarget types.Target, parentHeight types.BlockHeight) types.Target {
+func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget, currentTarget types.Target, parentHeight types.BlockHeight) types.Target {
 	// Determine the detla of the current total time vs. the desired total time.
 	expectedTime := types.BlockFrequency * parentHeight
 	delta := int64(expectedTime) - parentTotalTime
@@ -101,8 +101,8 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 
 	// Determine the new target by multiplying the visible hashrate by the
 	// target block time. Clamp it to a 0.4% difficulty adjustment.
-	maxNewTarget := parentTarget.MulDifficulty(types.OakMaxRise)
-	minNewTarget := parentTarget.MulDifficulty(types.OakMaxDrop)
+	maxNewTarget := currentTarget.MulDifficulty(types.OakMaxRise)
+	minNewTarget := currentTarget.MulDifficulty(types.OakMaxDrop)
 	newTarget := types.RatToTarget(new(big.Rat).SetFrac(types.RootDepth.Int(), visibleHashrate.Mul64(uint64(targetBlockTime)).Big()))
 	if newTarget.Cmp(maxNewTarget) < 0 {
 		newTarget = maxNewTarget
@@ -115,11 +115,10 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 
 // getBlockTotals returns the block totals values that get stored in
 // storeBlockTotals.
-func (cs *ConsensusSet) getBlockTotals(tx *bolt.Tx, id types.BlockID) (totalTime int64, totalTarget, target types.Target) {
+func (cs *ConsensusSet) getBlockTotals(tx *bolt.Tx, id types.BlockID) (totalTime int64, totalTarget types.Target) {
 	totalsBytes := tx.Bucket(BucketOak).Get(id[:])
 	totalTime = int64(binary.LittleEndian.Uint64(totalsBytes[:8]))
-	copy(totalTarget[:], totalsBytes[8:40])
-	copy(target[:], totalsBytes[40:])
+	copy(totalTarget[:], totalsBytes[8:])
 	return
 }
 
@@ -139,10 +138,9 @@ func (cs *ConsensusSet) storeBlockTotals(tx *bolt.Tx, currentHeight types.BlockH
 
 	// Store the new total time and total target in the database at the
 	// appropriate id.
-	bytes := make([]byte, 72)
+	bytes := make([]byte, 40)
 	binary.LittleEndian.PutUint64(bytes[:8], uint64(newTotalTime))
-	copy(bytes[8:40], newTotalTarget[:])
-	copy(bytes[40:], targetOfCurrentBlock[:])
+	copy(bytes[8:], newTotalTarget[:])
 	err = tx.Bucket(BucketOak).Put(currentBlockID[:], bytes)
 	if err != nil {
 		return 0, types.Target{}, errors.Extend(errors.New("unable to store total time values"), err)
