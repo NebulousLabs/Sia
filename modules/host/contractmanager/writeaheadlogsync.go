@@ -91,21 +91,6 @@ func (wal *writeAheadLog) syncResources() {
 	// Wait for all of the sync calls to finish.
 	wg.Wait()
 
-	// Perform any cleanup actions on the updates.
-	for _, sc := range wal.uncommittedChanges {
-		for _, sfe := range sc.StorageFolderExtensions {
-			wal.commitStorageFolderExtension(sfe)
-		}
-		for _, sfr := range sc.StorageFolderReductions {
-			wal.commitStorageFolderReduction(sfr)
-		}
-		for _, sfr := range sc.StorageFolderRemovals {
-			wal.commitStorageFolderRemoval(sfr)
-		}
-
-		// TODO: Virtual sector handling here.
-	}
-
 	// Now that the WAL is sync'd and updated, any calls waiting on ACID
 	// guarantees can safely return.
 	close(wal.syncChan)
@@ -125,13 +110,6 @@ func (wal *writeAheadLog) syncResources() {
 func (wal *writeAheadLog) commit() {
 	// Sync all open, non-WAL files on the host.
 	wal.syncResources()
-
-	// Extract any unfinished long-running jobs from the list of WAL items.
-	unfinishedAdditions := findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)
-	unfinishedExtensions := findUnfinishedStorageFolderExtensions(wal.uncommittedChanges)
-
-	// Clear the set of uncommitted changes.
-	wal.uncommittedChanges = nil
 
 	// Begin writing to the settings file.
 	var wg sync.WaitGroup
@@ -163,17 +141,6 @@ func (wal *writeAheadLog) commit() {
 		}
 	}()
 
-	// Begin writing new changes to the WAL.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		// Append all of the remaining long running uncommitted changes to the WAL.
-		wal.appendChange(stateChange{
-			UnfinishedStorageFolderAdditions:  unfinishedAdditions,
-			UnfinishedStorageFolderExtensions: unfinishedExtensions,
-		})
-	}()
 	wg.Wait()
 }
 

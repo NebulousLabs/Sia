@@ -117,12 +117,11 @@ type (
 		// uncommittedChanges details a list of operations which have been
 		// suggested or queued to be made to the state, but are not yet
 		// guaranteed to have completed.
-		fileSettingsTmp    file
-		fileWal            file
-		header             walHeader
-		changeOffset       int64
-		syncChan           chan struct{}
-		uncommittedChanges []stateChange
+		fileSettingsTmp file
+		fileWal         file
+		header          walHeader
+		changeOffset    int64
+		syncChan        chan struct{}
 
 		// Utilities. The WAL needs access to the ContractManager because all
 		// mutations to ACID fields of the contract manager happen through the
@@ -252,7 +251,7 @@ func (wal *writeAheadLog) readStateChange(offset int64, sc *stateChange) (int64,
 	}
 
 	// Don't trust changeLength. It might be corrupted
-	if prefix.ChangeLength > maxWalSize-offset {
+	if prefix.ChangeLength < 0 || prefix.ChangeLength > maxWalSize-offset {
 		return 0, build.ExtendErr("changeLength was too large. Probably due to corruption", err)
 	}
 
@@ -344,9 +343,18 @@ func (wal *writeAheadLog) appendChange(sc stateChange) {
 	// Update the offset
 	wal.changeOffset += prefixLength() + changeLength
 
-	// Update the WAL to include the new storage folder in the uncommitted
-	// changes.
-	wal.uncommittedChanges = append(wal.uncommittedChanges, sc)
+	// Perform any cleanup actions on the updates.
+	for _, sfe := range sc.StorageFolderExtensions {
+		wal.commitStorageFolderExtension(sfe)
+	}
+	for _, sfr := range sc.StorageFolderReductions {
+		wal.commitStorageFolderReduction(sfr)
+	}
+	for _, sfr := range sc.StorageFolderRemovals {
+		wal.commitStorageFolderRemoval(sfr)
+	}
+
+	// TODO: Virtual sector handling here.
 }
 
 // commitChange will commit the provided change to the contract manager,
