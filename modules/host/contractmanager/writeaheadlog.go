@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/fastrand"
 )
 
 type (
@@ -317,6 +318,11 @@ func (wal *writeAheadLog) appendChange(sc stateChange) {
 		panic("unable to append a change to the WAL, crashing to prevent corruption")
 	}
 
+	// Simulate a corruption of the stateChange when the StorageFolderAddition is appended.
+	if wal.cm.dependencies.disrupt("walCorruptedChange") && len(sc.StorageFolderAdditions) > 0 {
+		wal.fileWal.WriteAt(fastrand.Bytes(len(changeBytes)), wal.header.OffsetSC+prefixLength())
+	}
+
 	// update the header
 	wal.header.OffsetSC += prefixLength() + changeLength
 	err = writeWALHeader(wal.fileWal, wal.header)
@@ -422,21 +428,21 @@ func (wal *writeAheadLog) recoverWAL() error {
 	offset := headerLength() + header.LengthMD
 	for err == nil && offset < wal.header.OffsetSC {
 		changeLength, err := wal.readStateChange(offset, &sc)
-		if err == nil {
-			// The uncommitted changes are loaded into memory using a simple
-			// append, because the tmp WAL file has not been created yet, and
-			// will not be created until the sync loop is spawned. The sync
-			// loop spawner will make sure that the uncommitted changes are
-			// written to the tmp WAL file.
-			wal.commitChange(sc)
-			scs = append(scs, sc)
-			offset += prefixLength() + changeLength
+		if err != nil {
+			break
 		}
+		// The uncommitted changes are loaded into memory using a simple
+		// append, because the WAL file is still being read. The sync
+		// loop spawner will make sure that the uncommitted changes are
+		// written to the new WAL file.
+		wal.commitChange(sc)
+		scs = append(scs, sc)
+		offset += prefixLength() + changeLength
 	}
-	if err != nil {
-		wal.cm.log.Println("ERROR: could not load WAL json:", err)
-		return build.ExtendErr("error loading WAL json", err)
-	}
+	//if err != nil {
+	//	wal.cm.log.Println("ERROR: could not load WAL json:", err)
+	//	return build.ExtendErr("error loading WAL json", err)
+	//}
 
 	// Do any cleanup regarding long-running unfinished tasks. Long running
 	// task cleanup cannot be handled in the 'commitChange' loop because future

@@ -656,6 +656,10 @@ type dependencySFAddNoFinish struct {
 	productionDependencies
 }
 
+type dependencySFACorruptedChange struct {
+	productionDependencies
+}
+
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
 func (d *dependencySFAddNoFinish) disrupt(s string) bool {
@@ -669,9 +673,22 @@ func (d *dependencySFAddNoFinish) disrupt(s string) bool {
 	return false
 }
 
-// TestAddStorageFolderUnfinishedCreate hijacks both the sync loop and the
-// AddStorageFolder code to create a situation where the added storage folder
-// is started but not seen through to conclusion, and no commit is run.
+// disrupt will prevent the WAL from bein cleaned and will corrupt the
+// addition of the added storage folder to the log
+func (d *dependencySFACorruptedChange) disrupt(s string) bool {
+	if s == "cleanWALFile" {
+		return true
+	}
+	if s == "walCorruptedChange" {
+		return true
+	}
+	return false
+}
+
+// TestAddStorageFolderUnfinishedCreate hijacks the AddStorageFolder code
+// to create a situation where the added storage folder is started but not
+// seen through conclusion and also added to the wal. Afterwards the header
+// is corrupted with random data to see if the wal can handle header corruption
 func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -882,5 +899,73 @@ func TestAddStorageFolderReload(t *testing.T) {
 	}
 	if fi.Size() != sectorLookupTableSize {
 		t.Error("sector file had unexpected size", fi.Size(), sectorLookupTableSize)
+	}
+}
+
+// TestAddStorageFolderCorruptChange hijacks the WAL to create a situation
+// in which a StorageFolderAddition is corrupted and therefore reset
+func TestAddStorageFolderCorruptChange(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	d := new(dependencySFACorruptedChange)
+	cmt, err := newMockedContractManagerTester(d, t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Call AddStorageFolder, knowing that the changes will not be properly
+	// committed, and that the call itself will not actually complete.
+	sfSize := modules.SectorSize * storageFolderGranularity * 8
+	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the storage folder has been added.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("There should be one storage folder reported")
+	}
+
+	// Close the contract manager and replace it with a new contract manager.
+	// The new contract manager should have normal dependencies.
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create the new contract manager using the same persist dir, so that it
+	// will see the uncommitted WAL.
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the storage folder was properly removed - incomplete storage
+	// folder adds should be removed upon startup.
+	sfs = cmt.cm.StorageFolders()
+	if len(sfs) != 0 {
+		t.Error("Storage folder add should have failed.")
+	}
+	// Check that the storage folder is empty - because the operation failed,
+	// any files that got created should have been removed.
+	files, err := ioutil.ReadDir(storageFolderOne)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(files) != 0 {
+		t.Error("there should not be any files in the storage folder because the append to the WAL failed:", len(files))
+		t.Error(len(files))
+		for _, file := range files {
+			t.Error(file.Name())
+		}
 	}
 }
