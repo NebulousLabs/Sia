@@ -58,6 +58,10 @@ func findUnfinishedStorageFolderExtensions(scs []stateChange) []unfinishedStorag
 // cleanupUnfinishedStorageFolderExtensions will reset any unsuccessful storage
 // folder extensions from the previous run.
 func (wal *writeAheadLog) cleanupUnfinishedStorageFolderExtensions(scs []stateChange) {
+	// Wait if WAL reset is in progress
+	wal.rmu.RLock()
+	defer wal.rmu.RUnlock()
+
 	usfes := findUnfinishedStorageFolderExtensions(scs)
 	for _, usfe := range usfes {
 		sf, exists := wal.cm.storageFolders[usfe.Index]
@@ -101,6 +105,10 @@ func (wal *writeAheadLog) commitStorageFolderExtension(sfe storageFolderExtensio
 // growStorageFolder will extend the storage folder files so that they may hold
 // more sectors.
 func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32) error {
+	// Wait if WAL reset is in progress
+	wal.rmu.RLock()
+	defer wal.rmu.RUnlock()
+
 	// Retrieve the specified storage folder.
 	wal.mu.Lock()
 	sf, exists := wal.cm.storageFolders[index]

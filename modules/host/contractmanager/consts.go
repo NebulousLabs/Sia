@@ -33,9 +33,6 @@ const (
 	// walFile is the name of the file that is used to save the write ahead log
 	// for the contract manager.
 	walFile = "contractmanager.wal"
-
-	// maxWalSize defines the maximum size in bytes of the WAL
-	maxWalSize = 1000000
 )
 
 const (
@@ -74,6 +71,13 @@ var (
 		Header:  "Sia Contract Manager WAL",
 		Version: "1.2.0",
 	}
+
+	// maxWalSize defines the maximum size in bytes of the WAL
+	maxWalSize = build.Select(build.Var{
+		Dev:      int64(5e+5),
+		Standard: int64(5e+6),
+		Testing:  int64(5e+4),
+	}).(int64)
 )
 
 var (

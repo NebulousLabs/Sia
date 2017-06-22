@@ -54,6 +54,10 @@ func (wal *writeAheadLog) commitStorageFolderReduction(sfr storageFolderReductio
 // shrinkStoragefolder will truncate a storage folder, moving all of the
 // sectors in the truncated space to new storage folders.
 func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint32, force bool) error {
+	// Wait if WAL reset is in progress
+	wal.rmu.RLock()
+	defer wal.rmu.RUnlock()
+
 	// Retrieve the specified storage folder.
 	wal.mu.Lock()
 	sf, exists := wal.cm.storageFolders[index]

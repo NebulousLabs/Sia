@@ -192,6 +192,35 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 	return nil
 }
 
+// resetWall checks the current size of the WAL and resets it if it approaches the max size.
+func (wal *writeAheadLog) resetWAL() {
+	// Only reset if no reset is in progress and the WAL is 80% full
+	resetNeeded := !wal.resetInProgress && float64(wal.changeOffset) > 0.8*float64(maxWalSize)
+	if !resetNeeded {
+		return
+	}
+
+	// Start reset
+	wal.resetInProgress = true
+	go func() {
+		wal.rmu.Lock()
+		defer wal.rmu.Unlock()
+		wal.mu.Lock()
+		defer wal.mu.Unlock()
+
+		wal.header.Revision += 1
+		err := writeWALHeader(wal.fileWal, wal.header)
+		if err != nil {
+			panic(build.ExtendErr("Could not write WAL header during WAL reset."+
+				"Crashing to prevent corruption.", err))
+		}
+
+		wal.changeOffset = headerLength() + wal.header.LengthMD
+
+		wal.resetInProgress = false
+	}()
+}
+
 // threadedSyncLoop is a background thread that occasionally commits the WAL to
 // the state as an ACID transaction. This process can be very slow, so
 // transactions to the contract manager are batched automatically and
@@ -214,6 +243,7 @@ func (wal *writeAheadLog) threadedSyncLoop(threadsStopped chan struct{}, syncLoo
 			// changes.
 			wal.mu.Lock()
 			wal.commit()
+			wal.resetWAL()
 			wal.mu.Unlock()
 		}
 	}

@@ -39,6 +39,10 @@ func (wal *writeAheadLog) commitUpdateSector(su sectorUpdate) {
 // managedAddPhysicalSector is a WAL operation to add a physical sector to the
 // contract manager.
 func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, count uint16) error {
+	// Wait if WAL reset is in progress
+	wal.rmu.RLock()
+	defer wal.rmu.RUnlock()
+
 	// Sanity check - data should have modules.SectorSize bytes.
 	if uint64(len(data)) != modules.SectorSize {
 		wal.cm.log.Critical("sector has the wrong size", modules.SectorSize, len(data))
@@ -162,6 +166,10 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 
 // managedAddVirtualSector will add a virtual sector to the contract manager.
 func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLocation) error {
+	// Wait if WAL reset is in progress
+	wal.rmu.RLock()
+	defer wal.rmu.RUnlock()
+
 	// Update the location count.
 	if location.count == 65535 {
 		return errMaxVirtualSectors
@@ -215,6 +223,10 @@ func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLo
 
 // managedDeleteSector will delete a sector (physical) from the contract manager.
 func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
+	// Wait if WAL reset is in progress
+	wal.rmu.RLock()
+	defer wal.rmu.RUnlock()
+
 	// Write the sector delete to the WAL.
 	var location sectorLocation
 	var syncChan chan struct{}
@@ -270,6 +282,10 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 // managedRemoveSector will remove a sector (virtual or physical) from the
 // contract manager.
 func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
+	// Wait if WAL reset is in progress
+	wal.rmu.RLock()
+	defer wal.rmu.RUnlock()
+
 	// Inform the WAL of the removed sector.
 	var location sectorLocation
 	var su sectorUpdate

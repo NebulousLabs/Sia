@@ -44,6 +44,9 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []savedStorageFolde
 // cleanupUnfinishedStorageFolderAdditions will purge any unfinished storage
 // folder additions from the previous run.
 func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateChange) {
+	// Wait if WAL reset is in progress
+	wal.rmu.RLock()
+	defer wal.rmu.RUnlock()
 	usfs := findUnfinishedStorageFolderAdditions(scs)
 	for _, usf := range usfs {
 		sf, exists := wal.cm.storageFolders[usf.Index]
@@ -93,6 +96,10 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 // running operation is in progress, so that any changes to disk can be
 // reverted in the event of unclean shutdown.
 func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
+	// Wait if WAL reset is in progress
+	wal.rmu.RLock()
+	defer wal.rmu.RUnlock()
+
 	// Lock the storage folder for the duration of the function.
 	sf.mu.Lock()
 	defer sf.mu.Unlock()

@@ -128,6 +128,10 @@ type (
 		// WAL.
 		cm *ContractManager
 		mu sync.Mutex
+
+		// Utilities needed for a reset.
+		resetInProgress bool
+		rmu             sync.RWMutex
 	}
 )
 
