@@ -297,6 +297,11 @@ func (wal *writeAheadLog) appendChange(sc stateChange) {
 	// set the revision to which the stateChange is added
 	sc.Revision = wal.header.Revision
 
+	// Simulate a wrong revision when the StorageFolderAddition is appended.
+	if wal.cm.dependencies.disrupt("walWrongRevision") && len(sc.StorageFolderAdditions) > 0 {
+		sc.Revision = wal.header.Revision + 1
+	}
+
 	// Marshal the change and then write the change to the WAL file. Syncing
 	// happens in the sync loop.
 	changeBytes, err := json.MarshalIndent(sc, "", "\t")
