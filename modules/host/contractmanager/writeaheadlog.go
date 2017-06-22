@@ -18,15 +18,14 @@ import (
 type (
 	// walHeader is the header of the wal file
 	//
-	// lengthMD defines the changeLength (in bytes) of the metadata section right after
+	// LengthMD defines the changeLength (in bytes) of the metadata section right after
 	// the walHeader
 	//
-	// offsetSC defines the current offset (in bytes) from the start of the file
-	// to the next stateChange. That way new stateChanges can be appended without
-	// parsing the WAL file again.
+	// Revision defines the current revision of the WAL. If an older revision than the one
+	// in the header is encountered during a recovery it stops reading the WAL
 	walHeader struct {
 		LengthMD int64
-		OffsetSC int64
+		Revision uint64
 	}
 
 	// sectorUpdate is an idempotent update to the sector metadata.
@@ -76,6 +75,11 @@ type (
 		// that a sector update will not make it into the synced WAL unless the
 		// sector data is already on-disk and synced.
 		SectorUpdates []sectorUpdate
+
+		// Revision describes the revision the stateChange belongs to. After the WAL is full
+		// it will process the changes, restart from the beginning and increase the revision
+		// to invalidate old stateChanges should they still be readable.
+		Revision uint64
 	}
 
 	// stateChangePrefix defines a short prefix of constant size that is written to the WAL before each
@@ -116,6 +120,7 @@ type (
 		fileSettingsTmp    file
 		fileWal            file
 		header             walHeader
+		changeOffset       int64
 		syncChan           chan struct{}
 		uncommittedChanges []stateChange
 
@@ -247,7 +252,7 @@ func (wal *writeAheadLog) readStateChange(offset int64, sc *stateChange) (int64,
 	}
 
 	// Don't trust changeLength. It might be corrupted
-	if prefix.ChangeLength > wal.header.OffsetSC-offset {
+	if prefix.ChangeLength > maxWalSize-offset {
 		return 0, build.ExtendErr("changeLength was too large. Probably due to corruption", err)
 	}
 
@@ -274,6 +279,11 @@ func (wal *writeAheadLog) readStateChange(offset int64, sc *stateChange) (int64,
 		return 0, build.ExtendErr("could not decode stateChange", err)
 	}
 
+	// Check if the revision of the stateChange matches the header
+	if sc.Revision != wal.header.Revision {
+		return 0, errors.New("stateChange doesn't match the current header's revision")
+	}
+
 	return prefix.ChangeLength, nil
 }
 
@@ -284,6 +294,9 @@ func (wal *writeAheadLog) readStateChange(offset int64, sc *stateChange) (int64,
 // appending an error. This is common for long running operations like adding a
 // storage folder.
 func (wal *writeAheadLog) appendChange(sc stateChange) {
+	// set the revision to which the stateChange is added
+	sc.Revision = wal.header.Revision
+
 	// Marshal the change and then write the change to the WAL file. Syncing
 	// happens in the sync loop.
 	changeBytes, err := json.MarshalIndent(sc, "", "\t")
@@ -306,13 +319,13 @@ func (wal *writeAheadLog) appendChange(sc stateChange) {
 	}
 
 	// Write the prefix to the file followed by the state change
-	_, err = wal.fileWal.WriteAt(buffer.Bytes(), wal.header.OffsetSC)
+	_, err = wal.fileWal.WriteAt(buffer.Bytes(), wal.changeOffset)
 	if err != nil {
 		wal.cm.log.Severe("Unable to write state change prefix to WAL:", err)
 		panic("unable to append a change to the WAL, crashing to prevent corruption")
 	}
 
-	_, err = wal.fileWal.WriteAt(changeBytes, wal.header.OffsetSC+prefixLength())
+	_, err = wal.fileWal.WriteAt(changeBytes, wal.changeOffset+prefixLength())
 	if err != nil {
 		wal.cm.log.Severe("Unable to write state change to WAL:", err)
 		panic("unable to append a change to the WAL, crashing to prevent corruption")
@@ -320,16 +333,11 @@ func (wal *writeAheadLog) appendChange(sc stateChange) {
 
 	// Simulate a corruption of the stateChange when the StorageFolderAddition is appended.
 	if wal.cm.dependencies.disrupt("walCorruptedChange") && len(sc.StorageFolderAdditions) > 0 {
-		wal.fileWal.WriteAt(fastrand.Bytes(len(changeBytes)), wal.header.OffsetSC+prefixLength())
+		wal.fileWal.WriteAt(fastrand.Bytes(len(changeBytes)), wal.changeOffset+prefixLength())
 	}
 
-	// update the header
-	wal.header.OffsetSC += prefixLength() + changeLength
-	err = writeWALHeader(wal.fileWal, wal.header)
-	if err != nil {
-		wal.cm.log.Severe("Unable to write header change to WAL:", err)
-		panic("unable to append a change to the WAL, crashing to prevent corruption")
-	}
+	// Update the offset
+	wal.changeOffset += prefixLength() + changeLength
 
 	// Update the WAL to include the new storage folder in the uncommitted
 	// changes.
@@ -389,7 +397,6 @@ func (wal *writeAheadLog) createWAL() {
 
 	header := walHeader{
 		LengthMD: lengthMD,
-		OffsetSC: headerLength() + lengthMD,
 	}
 
 	err = writeWALHeader(wal.fileWal, header)
@@ -398,6 +405,7 @@ func (wal *writeAheadLog) createWAL() {
 		panic("unable to write WAL header, crashing to avoid corruption")
 	}
 	wal.header = header
+	wal.changeOffset = headerLength() + lengthMD
 }
 
 // recoverWAL will read a previous WAL and re-commit all of the changes inside,
@@ -426,7 +434,7 @@ func (wal *writeAheadLog) recoverWAL() error {
 	var sc stateChange
 	var scs []stateChange
 	offset := headerLength() + header.LengthMD
-	for err == nil && offset < wal.header.OffsetSC {
+	for offset < maxWalSize {
 		changeLength, err := wal.readStateChange(offset, &sc)
 		if err != nil {
 			break

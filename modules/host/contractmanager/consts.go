@@ -33,6 +33,9 @@ const (
 	// walFile is the name of the file that is used to save the write ahead log
 	// for the contract manager.
 	walFile = "contractmanager.wal"
+
+	// maxWalSize defines the maximum size in bytes of the WAL
+	maxWalSize = 1000000
 )
 
 const (
