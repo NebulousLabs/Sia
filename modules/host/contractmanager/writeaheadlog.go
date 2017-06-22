@@ -12,7 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/persist"
-	"log"
 )
 
 type (
@@ -130,11 +129,16 @@ type (
 // readWALMetadata reads WAL metadata from the input file, returning an error
 // if the result is unexpected.
 func readWALMetadata(f file, header walHeader) error {
+	// Check if the metadata of the file has the same length as the current version
+	if ml, err := metadataLength(); (err != nil) || (header.LengthMD != ml) {
+		return errors.New("WAL metadata header does not have the same length as the one in the WAL." +
+			"The file might use an older version or the header was corrupted")
+	}
+
 	// Read the bytes of the metadata
 	byteMD := make([]byte, header.LengthMD)
 	_, err := f.ReadAt(byteMD, headerLength())
 	if err != nil {
-		log.Print(err)
 		return build.ExtendErr("error reading WAL metadata", err)
 	}
 
@@ -143,17 +147,14 @@ func readWALMetadata(f file, header walHeader) error {
 	var md persist.Metadata
 	err = decoder.Decode(&md)
 	if err != nil {
-		log.Print(err)
 		return build.ExtendErr("error decoding WAL metadata", err)
 	}
 
 	// Check if correct header was found
 	if md.Header != walMetadata.Header {
-		log.Print(err)
 		return errors.New("WAL metadata header does not match header found in WAL file")
 	}
 	if md.Version != walMetadata.Version {
-		log.Print(err)
 		return errors.New("WAL metadata version does not match version found in WAL file")
 	}
 	return nil
@@ -161,16 +162,16 @@ func readWALMetadata(f file, header walHeader) error {
 
 // writeWALMetadata writes WAL metadata to the input file.
 func writeWALMetadata(f file) (int64, error) {
-	changeBytes, err := json.MarshalIndent(walMetadata, "", "\t")
+	mdBytes, err := json.MarshalIndent(walMetadata, "", "\t")
 	if err != nil {
 		return 0, build.ExtendErr("could not marshal WAL metadata", err)
 	}
 
-	_, err = f.WriteAt(changeBytes, headerLength())
+	_, err = f.WriteAt(mdBytes, headerLength())
 	if err != nil {
 		return 0, build.ExtendErr("unable to write WAL metadata", err)
 	}
-	return int64(len(changeBytes)), nil
+	return int64(len(mdBytes)), nil
 }
 
 // headerLength is a helper function that returns the changeLength of the binary encoded wal header
@@ -178,6 +179,16 @@ func headerLength() int64 {
 	return int64(binary.Size(walHeader{}))
 }
 
+// metadataLength is a helper function that returns the length of the binary encoded metadata
+func metadataLength() (int64, error) {
+	mdBytes, err := json.MarshalIndent(walMetadata, "", "\t")
+	if err != nil {
+		return 0, build.ExtendErr("could not marshal WAL metadata", err)
+	}
+	return int64(len(mdBytes)), nil
+}
+
+// prefixLength is a helper function that returns the length of a binary encoded stateChange prefix
 func prefixLength() int64 {
 	return int64(binary.Size(stateChangePrefix{}))
 }
@@ -216,11 +227,11 @@ func writeWALHeader(f file, header walHeader) error {
 
 // readStateChange reads a stateChange at a specific offset in the file and
 // returns the changeLength of the stateChange read
-func readStateChange(f file, offset int64, sc *stateChange) (int64, error) {
+func (wal *writeAheadLog) readStateChange(offset int64, sc *stateChange) (int64, error) {
 	// Read the prefix
 	bytesPrefix := make([]byte, prefixLength())
 
-	_, err := f.ReadAt(bytesPrefix, offset)
+	_, err := wal.fileWal.ReadAt(bytesPrefix, offset)
 	if err != nil {
 		return 0, build.ExtendErr("could not read stateChange prefix", err)
 	}
@@ -234,10 +245,15 @@ func readStateChange(f file, offset int64, sc *stateChange) (int64, error) {
 		return 0, build.ExtendErr("could not decode stateChange prefix", err)
 	}
 
+	// Don't trust changeLength. It might be corrupted
+	if prefix.ChangeLength > wal.header.OffsetSC-offset {
+		return 0, build.ExtendErr("changeLength was too large. Probably due to corruption", err)
+	}
+
 	// Read the state change
 	bytesChange := make([]byte, prefix.ChangeLength)
 
-	_, err = f.ReadAt(bytesChange, offset+prefixLength())
+	_, err = wal.fileWal.ReadAt(bytesChange, offset+prefixLength())
 	if err != nil {
 		return 0, build.ExtendErr("could not read stateChange", err)
 	}
@@ -405,7 +421,7 @@ func (wal *writeAheadLog) recoverWAL() error {
 	var scs []stateChange
 	offset := headerLength() + header.LengthMD
 	for err == nil && offset < wal.header.OffsetSC {
-		changeLength, err := readStateChange(wal.fileWal, offset, &sc)
+		changeLength, err := wal.readStateChange(offset, &sc)
 		if err == nil {
 			// The uncommitted changes are loaded into memory using a simple
 			// append, because the tmp WAL file has not been created yet, and
