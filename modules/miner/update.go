@@ -62,7 +62,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 	candidateSet := elem.set
 
 	// Check if heap for highest fee transactions has space.
-	if m.blockMapHeap.size+candidateSet.size < types.BlockSizeLimit {
+	if m.blockMapHeap.size+candidateSet.size < types.BlockSizeLimit-5e3 {
 		m.blockMapHeap.Push(elem)
 		return
 	}
@@ -116,7 +116,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 		}
 
 		// Check if the candidateSet can fit in the block.
-		if m.blockMapHeap.size-sizeOfBottomSets+candidateSet.size < types.BlockSizeLimit {
+		if m.blockMapHeap.size-sizeOfBottomSets+candidateSet.size < types.BlockSizeLimit-5e3 {
 			//Place candidate into block,
 			m.blockMapHeap.Push(elem)
 
@@ -165,7 +165,7 @@ func (m *Miner) deleteMapElementTxns(id splitSetID) {
 		// Promote sets from overflow heap to block if possible.
 		for {
 			overflowElem, canPromote := m.overflowMapHeap.Peek()
-			if canPromote && m.blockMapHeap.size+overflowElem.set.size < types.BlockSizeLimit {
+			if canPromote && m.blockMapHeap.size+overflowElem.set.size < types.BlockSizeLimit-5e3 {
 				promotedElem := m.overflowMapHeap.Pop()
 				m.blockMapHeap.Push(promotedElem)
 				continue

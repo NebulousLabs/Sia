@@ -175,14 +175,14 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 			selectID: make(map[splitSetID]*mapElement),
 			data:     make([]*mapElement, 0),
 			size:     uint64(0),
-			minHeap:  false,
+			minHeap:  true,
 		},
 
 		overflowMapHeap: &mapHeap{
 			selectID: make(map[splitSetID]*mapElement),
 			data:     make([]*mapElement, 0),
 			size:     uint64(0),
-			minHeap:  true,
+			minHeap:  false,
 		},
 
 		persistDir: persistDir,
