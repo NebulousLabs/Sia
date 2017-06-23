@@ -339,7 +339,7 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 }
 
 // calculateHostWeight returns the weight of a host according to the settings of
-// the host database entry. Currently, only the price is considered.
+// the host database entry.
 func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency {
 	collateralReward := hdb.collateralAdjustments(entry)
 	pricePenalty := hdb.priceAdjustments(entry)
