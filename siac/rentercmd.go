@@ -127,17 +127,17 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 	}
 
 	renterShareASCIICmd = &cobra.Command{
-		Use:     "shareascii [nicknames]",
-		Short:   "share a file in base64",
-		Long:    "writes the .sia file specified by `nickname` to stdout base64 encoded.",
-		Run:     wrap(rentershareasciicmd),
+		Use:   "shareascii [nicknames]",
+		Short: "share a file in base64",
+		Long:  "writes the .sia file specified by `nickname` to stdout base64 encoded.",
+		Run:   wrap(rentershareasciicmd),
 	}
 
 	renterLoadASCIICmd = &cobra.Command{
-		Use:     "loadascii [data]",
-		Short:   "load a file in base64",
-		Long:    "load sia file base64 encoded.",
-		Run:     wrap(renterloadasciicmd),
+		Use:   "loadascii [data]",
+		Short: "load a file in base64",
+		Long:  "load sia file base64 encoded.",
+		Run:   wrap(renterloadasciicmd),
 	}
 )
 
@@ -576,7 +576,7 @@ func rentershareasciicmd(nicknames string) {
 
 func renterloadasciicmd(data string) {
 	var rl api.RenterLoad
-	qs := "asciisia="+data
+	qs := "asciisia=" + data
 	err := postResp("/renter/loadascii", qs, &rl)
 	if err != nil {
 		die("Could not load data:", err)

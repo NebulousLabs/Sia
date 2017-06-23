@@ -58,7 +58,7 @@ type pieceData struct {
 
 type shareFileContract struct {
 	PublicKeyString string
-	Pieces []pieceData
+	Pieces          []pieceData
 
 	WindowStart types.BlockHeight
 }

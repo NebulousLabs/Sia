@@ -53,12 +53,21 @@ func equalFiles(f1, f2 *file) error {
 // TestFileMarshalling tests the MarshalSia and UnmarshalSia functions of the
 // file type.
 func TestFileMarshalling(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+
 	savedFile := newTestingFile()
 	buf := new(bytes.Buffer)
-	savedFile.MarshalSia(buf)
+	savedFile.MarshalSia(buf, rt.renter)
 
 	loadedFile := new(file)
-	err := loadedFile.UnmarshalSia(buf)
+	err = loadedFile.UnmarshalSia(buf, rt.renter)
 	if err != nil {
 		t.Fatal(err)
 	}
