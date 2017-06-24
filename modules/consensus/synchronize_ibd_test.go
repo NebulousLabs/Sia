@@ -14,6 +14,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestSimpleInitialBlockchainDownload tests that
@@ -71,7 +72,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlock(b)
+			err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown {
 				t.Fatal(err)
 			}
@@ -97,7 +98,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlock(b)
+			err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown {
 				t.Fatal(err)
 			}
@@ -122,7 +123,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = localCST.cs.managedAcceptBlock(b)
+		err = localCST.cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,7 +134,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlock(b)
+			err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown {
 				t.Log(i)
 				t.Fatal(err)
@@ -159,7 +160,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = localCST.cs.managedAcceptBlock(b)
+		err = localCST.cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -170,7 +171,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlock(b)
+			err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown {
 				t.Log(i)
 				t.Fatal(err)

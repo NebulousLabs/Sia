@@ -159,17 +159,15 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 	// Broadcast the last block accepted. This functionality is in a defer to
 	// ensure that a block is always broadcast if any blocks are accepted. This
 	// is to stop an attacker from preventing block broadcasts.
-	chainExtended := false
+	initialBlock := cs.dbCurrentBlockID()
 	defer func() {
 		cs.mu.RLock()
 		synced := cs.synced
 		cs.mu.RUnlock()
-		if chainExtended && synced {
-			// The last block received will be the current block since
-			// managedAcceptBlocks only returns nil if a block extends the longest chain.
-			currentBlock := cs.managedCurrentBlock()
-			// broadcast the block header to all peers
-			go cs.gateway.Broadcast("RelayHeader", currentBlock.Header(), cs.gateway.Peers())
+		currentBlock := cs.dbCurrentBlockID()
+		if synced && initialBlock == currentBlock {
+			fullBlock := cs.managedCurrentBlock()
+			go cs.gateway.Broadcast("RelayHeader", fullBlock.Header(), cs.gateway.Peers())
 		}
 	}()
 
@@ -192,11 +190,7 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 
 			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
 			// every block.
-			chainExtended2, acceptErr := cs.managedAcceptBlocks(newBlocks)
-			// Set a flag to indicate that we should broadcast the last block received.
-			if chainExtended2 {
-				chainExtended = true
-			}
+			acceptErr := cs.managedAcceptBlocks(newBlocks)
 			// ErrNonExtendingBlock must be ignored until headers-first block
 			// sharing is implemented, block already in database should also be
 			// ignored.
@@ -504,7 +498,7 @@ func (cs *ConsensusSet) managedReceiveBlock(id types.BlockID) modules.RPCFunc {
 		if err := encoding.ReadObject(conn, &block, types.BlockSizeLimit); err != nil {
 			return err
 		}
-		if err := cs.managedAcceptBlock(block); err != nil {
+		if err := cs.managedAcceptBlocks([]types.Block{block}); err != nil {
 			return err
 		}
 		cs.managedBroadcastBlock(block)

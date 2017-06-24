@@ -157,6 +157,19 @@ func currentBlockID(tx *bolt.Tx) types.BlockID {
 	return id
 }
 
+// dbCurrentBlockID is a convenience function allowing currentBlockID to be
+// called without a bolt.Tx.
+func (cs *ConsensusSet) dbCurrentBlockID() (id types.BlockID) {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+		id = currentBlockID(tx)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+	return id
+}
+
 // currentProcessedBlock returns the most recent block in the consensus set.
 func currentProcessedBlock(tx *bolt.Tx) *processedBlock {
 	pb, err := getBlockMap(tx, currentBlockID(tx))

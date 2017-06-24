@@ -1020,7 +1020,7 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 
 	// Test that Broadcast is not called in managedAcceptBlock.
 	b, _ = cst.miner.FindBlock()
-	err = cst.cs.managedAcceptBlock(b)
+	err = cst.cs.managedAcceptBlocks([]types.Block{b})
 	if err != nil {
 		t.Fatal(err)
 	}
