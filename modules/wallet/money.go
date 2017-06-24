@@ -111,6 +111,56 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 	return txnSet, nil
 }
 
+// SendSiacoinsMulti creates a transaction that includes the specified
+// outputs. The transaction is submitted to the transaction pool and is also
+// returned.
+func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) ([]types.Transaction, error) {
+	if err := w.tg.Add(); err != nil {
+		return nil, err
+	}
+	defer w.tg.Done()
+	if !w.unlocked {
+		w.log.Println("Attempt to send coins has failed - wallet is locked")
+		return nil, modules.ErrLockedWallet
+	}
+
+	txnBuilder := w.StartTransaction()
+
+	// Add estimated transaction fee.
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(1000 + 60*uint64(len(outputs))) // Estimated transaction size in bytes
+	txnBuilder.AddMinerFee(tpoolFee)
+
+	// Calculate total cost to wallet.
+	// NOTE: we only want to call FundSiacoins once; that way, it will
+	// (ideally) fund the entire transaction with a single input, instead of
+	// many smaller ones.
+	totalCost := tpoolFee
+	for _, sco := range outputs {
+		totalCost = totalCost.Add(sco.Value)
+	}
+	err := txnBuilder.FundSiacoins(totalCost)
+	if err != nil {
+		return nil, build.ExtendErr("unable to fund transaction", err)
+	}
+
+	for _, sco := range outputs {
+		txnBuilder.AddSiacoinOutput(sco)
+	}
+
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
+		return nil, build.ExtendErr("unable to sign transaction", err)
+	}
+	err = w.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
+		return nil, build.ExtendErr("unable to get transaction accepted", err)
+	}
+	return txnSet, nil
+}
+
 // SendSiafunds creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {

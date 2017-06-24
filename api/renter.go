@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -125,7 +127,7 @@ type (
 
 	// DownloadQueue contains the renter's download queue.
 	RenterDownloadQueue struct {
-		Downloads []modules.DownloadInfo `json:"downloads"`
+		Downloads []DownloadInfo `json:"downloads"`
 	}
 
 	// RenterFiles lists the files known to the renter.
@@ -147,6 +149,16 @@ type (
 	// RenterShareASCII contains an ASCII-encoded .sia file.
 	RenterShareASCII struct {
 		ASCIIsia string `json:"asciisia"`
+	}
+
+	// DownloadInfo contains all client-facing information of a file.
+	DownloadInfo struct {
+		SiaPath     string    `json:"siapath"`
+		Destination string    `json:"destination"`
+		Filesize    uint64    `json:"filesize"`
+		Received    uint64    `json:"received"`
+		StartTime   time.Time `json:"starttime"`
+		Error       string    `json:"error"`
 	}
 )
 
@@ -275,8 +287,21 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 
 // renterDownloadsHandler handles the API call to request the download queue.
 func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	var downloads []DownloadInfo
+	for _, d := range api.renter.DownloadQueue() {
+		downloads = append(downloads, DownloadInfo{
+			SiaPath:     d.SiaPath,
+			Destination: d.Destination.Destination(),
+			Filesize:    d.Filesize,
+			StartTime:   d.StartTime,
+			Received:    d.Received,
+			Error:       d.Error,
+		})
+	}
+	// sort the downloads by newest first
+	sort.Slice(downloads, func(i, j int) bool { return downloads[i].StartTime.After(downloads[j].StartTime) })
 	WriteJSON(w, RenterDownloadQueue{
-		Downloads: api.renter.DownloadQueue(),
+		Downloads: downloads,
 	})
 }
 
@@ -350,49 +375,109 @@ func (api *API) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps
 
 // renterDownloadHandler handles the API call to download a file.
 func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	destination := req.FormValue("destination")
-	// Check that the destination path is absolute.
-	if !filepath.IsAbs(destination) {
-		WriteError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
-		return
-	}
-
-	err := api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
+	params, err := parseDownloadParameters(w, req, ps)
 	if err != nil {
-		WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
-	WriteSuccess(w)
+	if params.Async { // Create goroutine if `async` param set.
+		// check for errors for 5 seconds to catch validation errors (no file with
+		// that path, invalid parameters, insufficient hosts, etc)
+		errchan := make(chan error)
+		go func() {
+			errchan <- api.renter.Download(params)
+		}()
+		select {
+		case err = <-errchan:
+			if err != nil {
+				WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
+				return
+			}
+		case <-time.After(time.Millisecond * 100):
+		}
+	} else {
+		err := api.renter.Download(params)
+		if err != nil {
+			WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if params.Httpwriter == nil {
+		// `httpresp=true` causes writes to w before this line is run, automatically
+		// adding `200 Status OK` code to response. Calling this results in a
+		// multiple calls to WriteHeaders() errors.
+		WriteSuccess(w)
+		return
+	}
 }
 
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
 func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	req.ParseForm()
+	req.Form.Set("async", "true")
+	api.renterDownloadHandler(w, req, ps)
+}
+
+// parseDownloadParameters parses the download parameters passed to the
+// /renter/download endpoint. Validation of these parameters is done by the
+// renter.
+func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (modules.RenterDownloadParameters, error) {
 	destination := req.FormValue("destination")
-	// Check that the destination path is absolute.
-	if !filepath.IsAbs(destination) {
-		WriteError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
-		return
+
+	// The offset and length in bytes.
+	offsetparam := req.FormValue("offset")
+	lengthparam := req.FormValue("length")
+
+	// Determines whether the response is written to response body.
+	httprespparam := req.FormValue("httpresp")
+
+	// Determines whether to return on completion of download or straight away.
+	// If httprespparam is present, this parameter is ignored.
+	asyncparam := req.FormValue("async")
+
+	// Parse the offset and length parameters.
+	var offset, length uint64
+	if len(offsetparam) > 0 {
+		_, err := fmt.Sscan(offsetparam, &offset)
+		if err != nil {
+			return modules.RenterDownloadParameters{}, build.ExtendErr("could not decode the offset as uint64: ", err)
+		}
 	}
-
-	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/")
-	fileExists := false
-
-	files := api.renter.FileList()
-	for _, file := range files {
-		if file.SiaPath == siapath {
-			fileExists = true
+	if len(lengthparam) > 0 {
+		_, err := fmt.Sscan(lengthparam, &length)
+		if err != nil {
+			return modules.RenterDownloadParameters{}, build.ExtendErr("could not decode the offset as uint64: ", err)
 		}
 	}
 
-	if !fileExists {
-		WriteError(w, Error{"file at specified siapath does not exist"}, http.StatusBadRequest)
-		return
+	// Parse the httpresp parameter.
+	httpresp, err := scanBool(httprespparam)
+	if err != nil {
+		return modules.RenterDownloadParameters{}, build.ExtendErr("httpresp parameter could not be parsed", err)
 	}
 
-	go api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
+	// Parse the async parameter.
+	async, err := scanBool(asyncparam)
+	if err != nil {
+		return modules.RenterDownloadParameters{}, build.ExtendErr("async parameter could not be parsed", err)
+	}
 
-	WriteSuccess(w)
+	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/") // Sia file name.
+
+	dp := modules.RenterDownloadParameters{
+		Destination: destination,
+		Async:       async,
+		Length:      length,
+		Offset:      offset,
+		Siapath:     siapath,
+	}
+	if httpresp {
+		dp.Httpwriter = w
+	}
+
+	return dp, nil
 }
 
 // renterShareHandler handles the API call to create a '.sia' file that

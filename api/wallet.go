@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -48,7 +49,7 @@ type (
 	}
 
 	// WalletSiacoinsPOST contains the transaction sent in the POST call to
-	// /wallet/siafunds.
+	// /wallet/siacoins.
 	WalletSiacoinsPOST struct {
 		TransactionIDs []types.TransactionID `json:"transactionids"`
 	}
@@ -367,22 +368,46 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 
 // walletSiacoinsHandler handles API calls to /wallet/siacoins.
 func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	amount, ok := scanAmount(req.FormValue("amount"))
-	if !ok {
-		WriteError(w, Error{"could not read 'amount' from POST call to /wallet/siacoins"}, http.StatusBadRequest)
-		return
-	}
-	dest, err := scanAddress(req.FormValue("destination"))
-	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusBadRequest)
-		return
+	var txns []types.Transaction
+	if req.FormValue("outputs") != "" {
+		// multiple amounts + destinations
+		if req.FormValue("amount") != "" || req.FormValue("destination") != "" {
+			WriteError(w, Error{"cannot supply both 'outputs' and single amount+destination pair"}, http.StatusInternalServerError)
+			return
+		}
+
+		var outputs []types.SiacoinOutput
+		err := json.Unmarshal([]byte(req.FormValue("outputs")), &outputs)
+		if err != nil {
+			WriteError(w, Error{"could not decode outputs: " + err.Error()}, http.StatusInternalServerError)
+			return
+		}
+		txns, err = api.wallet.SendSiacoinsMulti(outputs)
+		if err != nil {
+			WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// single amount + destination
+		amount, ok := scanAmount(req.FormValue("amount"))
+		if !ok {
+			WriteError(w, Error{"could not read amount from POST call to /wallet/siacoins"}, http.StatusBadRequest)
+			return
+		}
+		dest, err := scanAddress(req.FormValue("destination"))
+		if err != nil {
+			WriteError(w, Error{"could not read address from POST call to /wallet/siacoins"}, http.StatusBadRequest)
+			return
+		}
+
+		txns, err = api.wallet.SendSiacoins(amount, dest)
+		if err != nil {
+			WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
+			return
+		}
+
 	}
 
-	txns, err := api.wallet.SendSiacoins(amount, dest)
-	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
-		return
-	}
 	var txids []types.TransactionID
 	for _, txn := range txns {
 		txids = append(txids, txn.ID())

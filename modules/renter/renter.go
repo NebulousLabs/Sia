@@ -66,6 +66,10 @@ type hostDB interface {
 	// ScoreBreakdown returns a detailed explanation of the various properties
 	// of the host.
 	ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
+
+	// EstimateHostScore returns the estimated score breakdown of a host with the
+	// provided settings.
+	EstimateHostScore(modules.HostDBEntry) modules.HostScoreBreakdown
 }
 
 // A hostContractor negotiates, revises, renews, and provides access to file
@@ -129,9 +133,9 @@ type Renter struct {
 
 	// Work management.
 	//
-	// chunkQueue contains a list of incomplete work that the download loop
-	// acts upon. The chunkQueue is only ever modified by the main download
-	// loop thread, which means it can be accessed and updated without locks.
+	// chunkQueue contains a list of incomplete work that the download loop acts
+	// upon. The chunkQueue is only ever modified by the main download loop
+	// thread, which means it can be accessed and updated without locks.
 	//
 	// downloadQueue contains a complete history of work that has been
 	// submitted to the download loop.
@@ -303,6 +307,9 @@ func (r *Renter) AllHosts() []modules.HostDBEntry                         { retu
 func (r *Renter) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) { return r.hostDB.Host(spk) }
 func (r *Renter) ScoreBreakdown(e modules.HostDBEntry) modules.HostScoreBreakdown {
 	return r.hostDB.ScoreBreakdown(e)
+}
+func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreakdown {
+	return r.hostDB.EstimateHostScore(e)
 }
 
 // contractor passthroughs

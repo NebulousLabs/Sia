@@ -419,15 +419,21 @@ func TestSweepSeedCoinsAndFunds(t *testing.T) {
 	sk := generateSpendableKey(seed, 1)
 
 	// Send some siafunds to the address.
-	_, err = wt.wallet.SendSiafunds(types.NewCurrency64(12), sk.UnlockConditions.UnlockHash())
-	if err != nil {
-		t.Fatal(err)
+	for i := 0; i < 12; i++ {
+		_, err = wt.wallet.SendSiafunds(types.NewCurrency64(1), sk.UnlockConditions.UnlockHash())
+		if err != nil {
+			t.Fatal(err)
+		}
+		wt.addBlockNoPayout()
 	}
 	// Send some siacoins to the address -- must be more than the transaction
 	// fee.
-	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(1000), sk.UnlockConditions.UnlockHash())
-	if err != nil {
-		t.Fatal(err)
+	for i := 0; i < 100; i++ {
+		_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(10), sk.UnlockConditions.UnlockHash())
+		if err != nil {
+			t.Fatal(err)
+		}
+		wt.addBlockNoPayout()
 	}
 	// mine blocks without earning payout until our balance is stable
 	for i := types.BlockHeight(0); i < types.MaturityDelay; i++ {

@@ -1,6 +1,8 @@
 package api
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -13,6 +15,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/host/contractmanager"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -49,7 +52,112 @@ var (
 	}
 )
 
-// TestWorkingStatus tests that the host's WorkingStatus field is set correctly.
+// TestEstimateWeight tests that /host/estimatescore works correctly.
+func TestEstimateWeight(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	// announce a host, create an allowance, upload some data.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.acceptContracts(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	var eg HostEstimateScoreGET
+	if err := st.getAPI("/host/estimatescore", &eg); err != nil {
+		t.Fatal(err)
+	}
+	originalEstimate := eg.EstimatedScore
+
+	// verify that the estimate is being correctly updated by setting a massively
+	// increased min contract price and verifying that the score decreases.
+	is := st.host.InternalSettings()
+	is.MinContractPrice = is.MinContractPrice.Add(types.SiacoinPrecision.Mul64(9999999999))
+	if err := st.host.SetInternalSettings(is); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.getAPI("/host/estimatescore", &eg); err != nil {
+		t.Fatal(err)
+	}
+	if eg.EstimatedScore.Cmp(originalEstimate) != -1 {
+		t.Fatal("score estimate did not decrease after incrementing mincontractprice")
+	}
+
+	// add a few hosts to the hostdb and verify that the conversion rate is
+	// reflected correctly
+	st2, err := blankServerTester(t.Name() + "-st2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.panicClose()
+	st3, err := blankServerTester(t.Name() + "-st3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st3.panicClose()
+	st4, err := blankServerTester(t.Name() + "-st4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st4.panicClose()
+	sts := []*serverTester{st, st2, st3, st4}
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fundAllNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, tester := range sts {
+		is = tester.host.InternalSettings()
+		is.MinContractPrice = types.SiacoinPrecision.Mul64(1000 + (1000 * uint64(i)))
+		err = tester.host.SetInternalSettings(is)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = announceAllHosts(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		price             types.Currency
+		minConversionRate float64
+	}{
+		{types.SiacoinPrecision, 100},
+		{types.SiacoinPrecision.Mul64(50), 98},
+		{types.SiacoinPrecision.Mul64(2500), 50},
+		{types.SiacoinPrecision.Mul64(3000), 10},
+		{types.SiacoinPrecision.Mul64(30000), 0.00001},
+	}
+	for _, test := range tests {
+		err = st.getAPI(fmt.Sprintf("/host/estimatescore?mincontractprice=%v", test.price.String()), &eg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if eg.ConversionRate < test.minConversionRate {
+			t.Fatalf("incorrect conversion rate: got %v wanted %v\n", eg.ConversionRate, test.minConversionRate)
+		}
+	}
+}
+
+// TestWorkingStatus tests that the host's WorkingStatus field is set
+// correctly.
 func TestWorkingStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -106,13 +214,17 @@ func TestWorkingStatus(t *testing.T) {
 		t.Fatal("uploading has failed")
 	}
 
-	time.Sleep(time.Second * 31)
+	err = retry(30, time.Second, func() error {
+		var hg HostGET
+		st.getAPI("/host", &hg)
 
-	var hg HostGET
-	st.getAPI("/host", &hg)
-
-	if hg.WorkingStatus != modules.HostWorkingStatusWorking {
-		t.Fatal("expected host to be working")
+		if hg.WorkingStatus != modules.HostWorkingStatusWorking {
+			return errors.New("expected host to be working")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -135,15 +247,17 @@ func TestConnectabilityStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// wait a bit for the check to run
-	time.Sleep(time.Second * 31)
+	err = retry(30, time.Second, func() error {
+		var hg HostGET
+		st.getAPI("/host", &hg)
 
-	// check that the field was set correctly
-	var hg HostGET
-	st.getAPI("/host", &hg)
-
-	if hg.ConnectabilityStatus != modules.HostConnectabilityStatusConnectable {
-		t.Fatal("expected host to be connectable")
+		if hg.ConnectabilityStatus != modules.HostConnectabilityStatusConnectable {
+			return errors.New("expected host to be connectable")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

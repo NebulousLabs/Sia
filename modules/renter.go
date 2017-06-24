@@ -50,12 +50,18 @@ type Allowance struct {
 // DownloadInfo provides information about a file that has been requested for
 // download.
 type DownloadInfo struct {
-	SiaPath     string    `json:"siapath"`
-	Destination string    `json:"destination"`
-	Filesize    uint64    `json:"filesize"`
-	Received    uint64    `json:"received"`
-	StartTime   time.Time `json:"starttime"`
-	Error       string    `json:"error"`
+	SiaPath     string         `json:"siapath"`
+	Destination DownloadWriter `json:"destination"`
+	Filesize    uint64         `json:"filesize"`
+	Received    uint64         `json:"received"`
+	StartTime   time.Time      `json:"starttime"`
+	Error       string         `json:"error"`
+}
+
+// DownloadWriter provides an interface which all output writers have to implement.
+type DownloadWriter interface {
+	WriteAt(b []byte, off int64) (int, error)
+	Destination() string
 }
 
 // FileUploadParams contains the information used by the Renter to upload a
@@ -111,7 +117,8 @@ type HostDBScan struct {
 // results provided by this struct can only be used as a guide, and may vary
 // significantly from machine to machine.
 type HostScoreBreakdown struct {
-	Score types.Currency `json:"score"`
+	Score          types.Currency `json:"score"`
+	ConversionRate float64        `json:"conversionrate"`
 
 	AgeAdjustment              float64 `json:"ageadjustment"`
 	BurnAdjustment             float64 `json:"burnadjustment"`
@@ -251,8 +258,9 @@ type Renter interface {
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error
 
-	// Download downloads a file to the given destination.
-	Download(path, destination string) error
+	// Download performs a download according to the parameters passed, including
+	// downloads of `offset` and `length` type.
+	Download(params RenterDownloadParameters) error
 
 	// DownloadQueue lists all the files that have been scheduled for download.
 	DownloadQueue() []DownloadInfo
@@ -278,6 +286,10 @@ type Renter interface {
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error
 
+	// EstimateHostScore will return the score for a host with the provided
+	// settings, assuming perfect age and uptime adjustments
+	EstimateHostScore(entry HostDBEntry) HostScoreBreakdown
+
 	// ScoreBreakdown will return the score for a host db entry using the
 	// hostdb's weighting algorithm.
 	ScoreBreakdown(entry HostDBEntry) HostScoreBreakdown
@@ -296,4 +308,15 @@ type Renter interface {
 
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error
+}
+
+// RenterDownloadParameters defines the parameters passed to the Renter's
+// Download method.
+type RenterDownloadParameters struct {
+	Async       bool
+	Httpwriter  io.Writer
+	Length      uint64
+	Offset      uint64
+	Siapath     string
+	Destination string
 }

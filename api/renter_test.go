@@ -1,8 +1,13 @@
 package api
 
 import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,7 +23,7 @@ import (
 )
 
 const (
-	testFunds  = "10000000000000000000000000000"
+	testFunds  = "10000000000000000000000000000" // 10k SC
 	testPeriod = "5"
 )
 
@@ -27,18 +32,13 @@ func createRandFile(path string, size int) error {
 	return ioutil.WriteFile(path, fastrand.Bytes(size), 0600)
 }
 
-// TestRenterDownloadError tests that the /renter/download route sets the download's error field if it fails.
-func TestRenterDownloadError(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-
+// setupTestDownload creates a server tester with an uploaded file of size
+// `size` and name `name`.
+func setupTestDownload(t *testing.T, size int, name string, waitOnAvailability bool) (*serverTester, string) {
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	err = st.announceHost()
@@ -56,7 +56,7 @@ func TestRenterDownloadError(t *testing.T) {
 
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
-	testFunds := "10000000000000000000000000000" // 10k SC
+	testFunds := testFunds
 	testPeriod := "10"
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
@@ -66,8 +66,8 @@ func TestRenterDownloadError(t *testing.T) {
 	}
 
 	// Create a file.
-	path := filepath.Join(build.SiaTestingDir, "api", t.Name(), "test.dat")
-	err = createRandFile(path, 1e4)
+	path := filepath.Join(build.SiaTestingDir, "api", t.Name(), name)
+	err = createRandFile(path, size)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,12 +76,142 @@ func TestRenterDownloadError(t *testing.T) {
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
 	uploadValues.Set("renew", "true")
-	err = st.stdPostAPI("/renter/upload/test.dat", uploadValues)
+	uploadValues.Set("datapieces", "1")
+	uploadValues.Set("paritypieces", "1")
+	err = st.stdPostAPI("/renter/upload/"+name, uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
+	if waitOnAvailability {
+		// wait for the file to become available
+		err = retry(200, time.Second, func() error {
+			var rf RenterFiles
+			st.getAPI("/renter/files", &rf)
+			if len(rf.Files) != 1 || !rf.Files[0].Available {
+				return fmt.Errorf("the uploading is not succeeding for some reason: %v\n", rf.Files[0])
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return st, path
+}
+
+// runDownloadTest uploads a file and downloads it using the specified
+// parameters, verifying that the parameters are applied correctly and the file
+// is downloaded successfully.
+func runDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp bool, testName string) error {
+	ulSiaPath := testName + ".dat"
+	st, path := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer func() {
+		st.server.panicClose()
+		os.Remove(path)
+	}()
+
+	// Read the section to be downloaded from the original file.
+	uf, err := os.Open(path) // Uploaded file.
+	if err != nil {
+		return err
+	}
+	var originalBytes bytes.Buffer
+	_, err = uf.Seek(offset, 0)
+	if err != nil {
+		return err
+	}
+	_, err = io.CopyN(&originalBytes, uf, length)
+	if err != nil {
+		return err
+	}
+
+	// Download the original file from the passed offsets.
+	fname := testName + "-download.dat"
+	downpath := filepath.Join(st.dir, fname)
+	defer os.Remove(downpath)
+
+	dlURL := fmt.Sprintf("/renter/download/%s?offset=%d&length=%d", ulSiaPath, offset, length)
+
+	var downbytes bytes.Buffer
+
+	if useHttpResp {
+		dlURL += "&httpresp=true"
+		// Make request.
+		resp, err := HttpGET("http://" + st.server.listener.Addr().String() + dlURL)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		_, err = io.Copy(&downbytes, resp.Body)
+		if err != nil {
+			return err
+		}
+	} else {
+		dlURL += "&destination=" + downpath
+		err := st.getAPI(dlURL, nil)
+		if err != nil {
+			return err
+		}
+		// wait for the download to complete
+		err = retry(30, time.Second, func() error {
+			var rdq RenterDownloadQueue
+			err = st.getAPI("/renter/downloads", &rdq)
+			if err != nil {
+				return err
+			}
+			for _, download := range rdq.Downloads {
+				if download.Received == download.Filesize && download.SiaPath == ulSiaPath {
+					return nil
+				}
+			}
+			return errors.New("file not downloaded")
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// open the downloaded file
+		df, err := os.Open(downpath)
+		if err != nil {
+			return err
+		}
+		defer df.Close()
+
+		_, err = io.Copy(&downbytes, df)
+		if err != nil {
+			return err
+		}
+	}
+
+	// should have correct length
+	if int64(downbytes.Len()) != length {
+		return errors.New(fmt.Sprintf("downloaded file has incorrect size: %d, %d expected.", downbytes.Len(), length))
+	}
+
+	// should be byte-for-byte equal to the original uploaded file
+	if !bytes.Equal(originalBytes.Bytes(), downbytes.Bytes()) {
+		return errors.New(fmt.Sprintf("downloaded content differs from original content"))
+	}
+
+	return nil
+}
+
+// TestRenterDownloadError tests that the /renter/download route sets the
+// download's error field if it fails.
+func TestRenterDownloadError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
+	defer st.server.Close()
+
+	// don't wait for the upload to complete, try to download immediately to
+	// intentionally cause a download error
 	downpath := filepath.Join(st.dir, "down.dat")
 	expectedErr := st.getAPI("/renter/download/test.dat?destination="+downpath, nil)
 	if expectedErr == nil {
@@ -90,7 +220,7 @@ func TestRenterDownloadError(t *testing.T) {
 
 	// verify the file has the expected error
 	var rdq RenterDownloadQueue
-	err = st.getAPI("/renter/downloads", &rdq)
+	err := st.getAPI("/renter/downloads", &rdq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,8 +231,121 @@ func TestRenterDownloadError(t *testing.T) {
 	}
 }
 
-// TestRenterAsyncDownloadError tests that the /renter/asyncdownload route sets the download's error field if it fails.
-func TestRenterAsyncDownloadError(t *testing.T) {
+// TestValidDownloads tests valid and boundary parameter combinations.
+func TestValidDownloads(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	sectorSize := int64(modules.SectorSize)
+
+	testParams := []struct {
+		filesize,
+		offset,
+		length int64
+		useHttpResp bool
+		testName    string
+	}{
+		// file-backed tests.
+		{sectorSize, 40, sectorSize - 40, false, "OffsetSingleChunk"},
+		{sectorSize * 2, 20, sectorSize*2 - 20, false, "OffsetTwoChunk"},
+		{int64(float64(sectorSize) * 2.4), 20, int64(float64(sectorSize)*2.4) - 20, false, "OffsetThreeChunk"},
+		{sectorSize, 0, sectorSize / 2, false, "ShortLengthSingleChunk"},
+		{sectorSize, sectorSize / 4, sectorSize / 2, false, "ShortLengthAndOffsetSingleChunk"},
+		{sectorSize * 2, 0, int64(float64(sectorSize) * 2 * 0.75), false, "ShortLengthTwoChunk"},
+		{int64(float64(sectorSize) * 2.7), 0, int64(2.2 * float64(sectorSize)), false, "ShortLengthThreeChunkInThirdChunk"},
+		{int64(float64(sectorSize) * 2.7), 0, int64(1.6 * float64(sectorSize)), false, "ShortLengthThreeChunkInSecondChunk"},
+		{sectorSize * 5, 0, int64(float64(sectorSize*5) * 0.75), false, "ShortLengthMultiChunk"},
+		{sectorSize * 2, 50, int64(float64(sectorSize*2) * 0.75), false, "ShortLengthAndOffsetTwoChunk"},
+		{sectorSize * 3, 50, int64(float64(sectorSize*3) * 0.5), false, "ShortLengthAndOffsetThreeChunkInSecondChunk"},
+		{sectorSize * 3, 50, int64(float64(sectorSize*3) * 0.75), false, "ShortLengthAndOffsetThreeChunkInThirdChunk"},
+
+		// http response tests.
+		{sectorSize, 40, sectorSize - 40, true, "HttpRespOffsetSingleChunk"},
+		{sectorSize * 2, 40, sectorSize*2 - 40, true, "HttpRespOffsetTwoChunk"},
+		{sectorSize * 5, 40, sectorSize*5 - 40, true, "HttpRespOffsetManyChunks"},
+		{sectorSize, 40, 4 * sectorSize / 5, true, "RespOffsetAndLengthSingleChunk"},
+		{sectorSize * 2, 80, 3 * (sectorSize * 2) / 4, true, "RespOffsetAndLengthTwoChunk"},
+		{sectorSize * 5, 150, 3 * (sectorSize * 5) / 4, true, "HttpRespOffsetAndLengthManyChunks"},
+		{sectorSize * 5, 150, sectorSize * 5 / 4, true, "HttpRespOffsetAndLengthManyChunksSubsetOfChunks"},
+	}
+	for i, params := range testParams {
+		params := params
+		t.Run(fmt.Sprintf("%v-%v", t.Name(), i), func(st *testing.T) {
+			st.Parallel()
+			err := runDownloadTest(st, params.filesize, params.offset, params.length, params.useHttpResp, params.testName)
+			if err != nil {
+				st.Fatal(err)
+			}
+		})
+	}
+}
+
+func runDownloadParamTest(t *testing.T, length, offset, filesize int) error {
+	ulSiaPath := "test.dat"
+
+	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer st.server.Close()
+
+	// Download the original file from offset 40 and length 10.
+	fname := "offsetsinglechunk.dat"
+	downpath := filepath.Join(st.dir, fname)
+	dlURL := fmt.Sprintf("/renter/download/%s?destination=%s", ulSiaPath, downpath)
+	dlURL += fmt.Sprintf("&length=%d", length)
+	dlURL += fmt.Sprintf("&offset=%d", offset)
+	return st.getAPI(dlURL, nil)
+}
+
+func TestInvalidDownloadParameters(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	testParams := []struct {
+		length   int
+		offset   int
+		filesize int
+		errorMsg string
+	}{
+		{0, -10, 1e4, "/download not prompting error when passing negative offset."},
+		{0, 1e4, 1e4, "/download not prompting error when passing offset equal to filesize."},
+		{1e4 + 1, 0, 1e4, "/download not prompting error when passing length exceeding filesize."},
+		{1e4 + 11, 10, 1e4, "/download not prompting error when passing length exceeding filesize with non-zero offset."},
+		{-1, 0, 1e4, "/download not prompting error when passing negative length."},
+	}
+
+	for _, params := range testParams {
+		err := runDownloadParamTest(t, params.length, params.offset, params.filesize)
+		if err == nil {
+			t.Fatal(params.errorMsg)
+		}
+	}
+}
+
+func TestRenterDownloadAsyncAndHttpRespError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	filesize := 1e4
+	ulSiaPath := "test.dat"
+
+	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer st.server.Close()
+
+	// Download the original file from offset 40 and length 10.
+	fname := "offsetsinglechunk.dat"
+	dlURL := fmt.Sprintf("/renter/download/%s?destination=%s&async=true&httpresp=true", ulSiaPath, fname)
+	err := st.getAPI(dlURL, nil)
+	if err == nil {
+		t.Fatalf("/download not prompting error when only passing both async and httpresp fields.")
+	}
+}
+
+func TestRenterDownloadAsyncNonexistentFile(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -112,59 +355,75 @@ func TestRenterAsyncDownloadError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
+
+	downpath := filepath.Join(st.dir, "testfile")
+	err = st.getAPI(fmt.Sprintf("/renter/downloadasync/doesntexist?destination=%v", downpath), nil)
+	if err == nil || err.Error() != fmt.Sprintf("download failed: no file with that path: doesntexist") {
+		t.Fatal("downloadasync did not return error on nonexistent file")
+	}
+}
+
+func TestRenterDownloadAsyncAndNotDestinationError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	filesize := 1e4
+	ulSiaPath := "test.dat"
+
+	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer st.server.Close()
+
+	// Download the original file from offset 40 and length 10.
+	dlURL := fmt.Sprintf("/renter/download/%s?async=true", ulSiaPath)
+	err := st.getAPI(dlURL, nil)
+	if err == nil {
+		t.Fatal("/download not prompting error when async is specified but destination is empty.")
+	}
+}
+
+func TestRenterDownloadHttpRespAndDestinationError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	filesize := 1e4
+	ulSiaPath := "test.dat"
+
+	st, _ := setupTestDownload(t, int(filesize), ulSiaPath, true)
+	defer st.server.Close()
+
+	// Download the original file from offset 40 and length 10.
+	fname := "test.dat"
+	dlURL := fmt.Sprintf("/renter/download/%s?destination=%shttpresp=true", ulSiaPath, fname)
+	err := st.getAPI(dlURL, nil)
+	if err == nil {
+		t.Fatal("/download not prompting error when httpresp is specified and destination is non-empty.")
+	}
+}
+
+// TestRenterAsyncDownloadError tests that the /renter/asyncdownload route sets
+// the download's error field if it fails.
+func TestRenterAsyncDownloadError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
 	defer st.server.panicClose()
 
-	// Announce the host and start accepting contracts.
-	err = st.announceHost()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = st.acceptContracts()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = st.setHostStorage()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Set an allowance for the renter, allowing a contract to be formed.
-	allowanceValues := url.Values{}
-	testFunds := "10000000000000000000000000000" // 10k SC
-	testPeriod := "10"
-	allowanceValues.Set("funds", testFunds)
-	allowanceValues.Set("period", testPeriod)
-	err = st.stdPostAPI("/renter", allowanceValues)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a file.
-	path := filepath.Join(build.SiaTestingDir, "api", t.Name(), "test.dat")
-	err = createRandFile(path, 1e4)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Upload to host.
-	uploadValues := url.Values{}
-	uploadValues.Set("source", path)
-	uploadValues.Set("renew", "true")
-	err = st.stdPostAPI("/renter/upload/test.dat", uploadValues)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// don't wait for the upload to complete, try to download immediately to intentionally cause a download error
+	// don't wait for the upload to complete, try to download immediately to
+	// intentionally cause a download error
 	downpath := filepath.Join(st.dir, "asyncdown.dat")
-	err = st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
 
 	// verify the file has an error
 	var rdq RenterDownloadQueue
-	err = st.getAPI("/renter/downloads", &rdq)
+	err := st.getAPI("/renter/downloads", &rdq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,6 +431,24 @@ func TestRenterAsyncDownloadError(t *testing.T) {
 		if download.SiaPath == "test.dat" && download.Received == download.Filesize && download.Error == "" {
 			t.Fatal("download had nil error")
 		}
+	}
+}
+
+func TestRenterAsyncSpecifyAsyncFalseError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
+	defer st.server.Close()
+
+	// don't wait for the upload to complete, try to download immediately to
+	// intentionally cause a download error
+	downpath := filepath.Join(st.dir, "asyncdown.dat")
+	err := st.getAPI("/renter/downloadasync/test.dat?async=false&destination="+downpath, nil)
+	if err == nil {
+		t.Fatal("/downloadasync does not return error when passing `async=false`")
 	}
 }
 
@@ -183,83 +460,18 @@ func TestRenterAsyncDownload(t *testing.T) {
 	}
 	t.Parallel()
 
-	st, err := createServerTester(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+	st, _ := setupTestDownload(t, 1e4, "test.dat", true)
 	defer st.server.panicClose()
 
-	// Announce the host and start accepting contracts.
-	err = st.announceHost()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = st.acceptContracts()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = st.setHostStorage()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Set an allowance for the renter, allowing a contract to be formed.
-	allowanceValues := url.Values{}
-	testFunds := "10000000000000000000000000000" // 10k SC
-	testPeriod := "10"
-	allowanceValues.Set("funds", testFunds)
-	allowanceValues.Set("period", testPeriod)
-	err = st.stdPostAPI("/renter", allowanceValues)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a file.
-	path := filepath.Join(build.SiaTestingDir, "api", t.Name(), "test.dat")
-	err = createRandFile(path, 1e4)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Upload to host.
-	uploadValues := url.Values{}
-	uploadValues.Set("source", path)
-	uploadValues.Set("renew", "true")
-	err = st.stdPostAPI("/renter/upload/test.dat", uploadValues)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// wait for the file to become available
-	var rf RenterFiles
-	for i := 0; i < 100 && (len(rf.Files) != 1 || !rf.Files[0].Available); i++ {
-		st.getAPI("/renter/files", &rf)
-		time.Sleep(100 * time.Millisecond)
-	}
-	if len(rf.Files) != 1 || !rf.Files[0].Available {
-		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
-	}
-
-	// download the file asynchronously
+	// Download the file asynchronously.
 	downpath := filepath.Join(st.dir, "asyncdown.dat")
-	err = st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
+	err := st.getAPI("/renter/downloadasync/test.dat?destination="+downpath, nil)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// verify the file is not currently downloaded
-	var rdq RenterDownloadQueue
-	err = st.getAPI("/renter/downloads", &rdq)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, download := range rdq.Downloads {
-		if download.SiaPath == "test.dat" && download.Received == download.Filesize {
-			t.Fatal("download finished prematurely")
-		}
 	}
 
 	// download should eventually complete
+	var rdq RenterDownloadQueue
 	success := false
 	for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
 		err = st.getAPI("/renter/downloads", &rdq)
@@ -591,7 +803,8 @@ func TestRenterLoadNonexistent(t *testing.T) {
 	// Try downloading a nonexistent file.
 	downpath := filepath.Join(st.dir, "dnedown.dat")
 	err = st.stdGetAPI("/renter/download/dne?destination=" + downpath)
-	if err == nil || err.Error() != "download failed: no file with that path" {
+	hasPrefix := strings.HasPrefix(err.Error(), "download failed: no file with that path")
+	if err == nil || !hasPrefix {
 		t.Errorf("expected error to be 'download failed: no file with that path'; got %v instead", err)
 	}
 
@@ -861,7 +1074,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	renterDownloadAbsoluteError := "destination must be an absolute path"
+	renterDownloadAbsoluteError := "download failed: destination must be an absolute path"
 
 	// Create a file, and upload it.
 	path := filepath.Join(st.dir, "test.dat")
@@ -874,7 +1087,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	var rf RenterFiles
-	for i := 0; i < 100 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(200 * time.Millisecond)
 	}

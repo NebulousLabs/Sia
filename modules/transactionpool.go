@@ -3,6 +3,7 @@ package modules
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -51,72 +52,97 @@ var (
 	TransactionPoolDir = "transactionpool"
 )
 
-// A TransactionPoolSubscriber receives updates about the confirmed and
-// unconfirmed set from the transaction pool. Generally, there is no need to
-// subscribe to both the consensus set and the transaction pool.
-type TransactionPoolSubscriber interface {
-	// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
-	// consensus set and/or unconfirmed set, and includes the consensus change
-	// that would result if all of the transactions made it into a block.
-	ReceiveUpdatedUnconfirmedTransactions([]types.Transaction, ConsensusChange)
-}
+type (
+	// ConsensusConflict implements the error interface, and indicates that a
+	// transaction was rejected due to being incompatible with the current
+	// consensus set, meaning either a double spend or a consensus rule violation -
+	// it is unlikely that the transaction will ever be valid.
+	ConsensusConflict string
 
-// A TransactionPool manages unconfirmed transactions.
-type TransactionPool interface {
-	// AcceptTransactionSet accepts a set of potentially interdependent
-	// transactions.
-	AcceptTransactionSet([]types.Transaction) error
+	// TransactionSetID is a type-safe wrapper for a crypto.Hash that represents
+	// the ID of an entire transaction set.
+	TransactionSetID crypto.Hash
 
-	// Broadcast broadcasts a transaction set to all of the transaction pool's
-	// peers.
-	Broadcast(ts []types.Transaction)
+	// A TransactionPoolDiff indicates the adding or removal of a transaction set to
+	// the transaction pool. The transactions in the pool are not persisted, so at
+	// startup modules should assume an empty transaction pool.
+	TransactionPoolDiff struct {
+		AppliedTransactions  []*UnconfirmedTransactionSet
+		RevertedTransactions []TransactionSetID
+	}
 
-	// Close is necessary for clean shutdown (e.g. during testing).
-	Close() error
+	// UnconfirmedTransactionSet defines a new unconfirmed transaction that has
+	// been added to the transaction pool. ID is the ID of the set, IDs contians
+	// an ID for each transaction, eliminating the need to recompute it (because
+	// that's an expensive operation).
+	UnconfirmedTransactionSet struct {
+		Change *ConsensusChange
+		ID     TransactionSetID
 
-	// FeeEstimation returns an estimation for how high the transaction fee
-	// needs to be per byte. The minimum recommended targets getting accepted
-	// in ~3 blocks, and the maximum recommended targets getting accepted
-	// immediately. Taking the average has a moderate chance of being accepted
-	// within one block. The minimum has a strong chance of getting accepted
-	// within 10 blocks.
-	FeeEstimation() (minimumRecommended, maximumRecommended types.Currency)
+		IDs          []types.TransactionID
+		Sizes        []uint64
+		Transactions []types.Transaction
+	}
+)
 
-	// IsStandardTransaction returns `err = nil` if the transaction is
-	// standard, otherwise it returns an error explaining what is not standard.
-	IsStandardTransaction(types.Transaction) error
+type (
+	// A TransactionPoolSubscriber receives updates about the confirmed and
+	// unconfirmed set from the transaction pool. Generally, there is no need to
+	// subscribe to both the consensus set and the transaction pool.
+	TransactionPoolSubscriber interface {
+		// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
+		// consensus set and/or unconfirmed set, and includes the consensus change
+		// that would result if all of the transactions made it into a block.
+		ReceiveUpdatedUnconfirmedTransactions(*TransactionPoolDiff)
+	}
 
-	// PurgeTransactionPool is a temporary function available to the miner. In
-	// the event that a miner mines an unacceptable block, the transaction pool
-	// will be purged to clear out the transaction pool and get rid of the
-	// illegal transaction. This should never happen, however there are bugs
-	// that make this condition necessary.
-	PurgeTransactionPool()
+	// A TransactionPool manages unconfirmed transactions.
+	TransactionPool interface {
+		// AcceptTransactionSet accepts a set of potentially interdependent
+		// transactions.
+		AcceptTransactionSet([]types.Transaction) error
 
-	// TransactionList returns a list of all transactions in the transaction
-	// pool. The transactions are provided in an order that can acceptably be
-	// put into a block.
-	TransactionList() []types.Transaction
+		// Broadcast broadcasts a transaction set to all of the transaction pool's
+		// peers.
+		Broadcast(ts []types.Transaction)
 
-	// TransactionPoolSubscribe adds a subscriber to the transaction pool.
-	// Subscribers will receive all consensus set changes as well as
-	// transaction pool changes, and should not subscribe to both.
-	TransactionPoolSubscribe(TransactionPoolSubscriber)
+		// Close is necessary for clean shutdown (e.g. during testing).
+		Close() error
 
-	// Transaction returns the transaction and unconfirmed parents
-	// corresponding to the provided transaction id.
-	Transaction(id types.TransactionID) (txn types.Transaction, unconfirmedParents []types.Transaction, exists bool)
+		// FeeEstimation returns an estimation for how high the transaction fee
+		// needs to be per byte. The minimum recommended targets getting accepted
+		// in ~3 blocks, and the maximum recommended targets getting accepted
+		// immediately. Taking the average has a moderate chance of being accepted
+		// within one block. The minimum has a strong chance of getting accepted
+		// within 10 blocks.
+		FeeEstimation() (minimumRecommended, maximumRecommended types.Currency)
 
-	// Unsubscribe removes a subscriber from the transaction pool.
-	// This is necessary for clean shutdown of the miner.
-	Unsubscribe(TransactionPoolSubscriber)
-}
+		// PurgeTransactionPool is a temporary function available to the miner. In
+		// the event that a miner mines an unacceptable block, the transaction pool
+		// will be purged to clear out the transaction pool and get rid of the
+		// illegal transaction. This should never happen, however there are bugs
+		// that make this condition necessary.
+		PurgeTransactionPool()
 
-// ConsensusConflict implements the error interface, and indicates that a
-// transaction was rejected due to being incompatible with the current
-// consensus set, meaning either a double spend or a consensus rule violation -
-// it is unlikely that the transaction will ever be valid.
-type ConsensusConflict string
+		// TransactionList returns a list of all transactions in the transaction
+		// pool. The transactions are provided in an order that can acceptably be
+		// put into a block.
+		TransactionList() []types.Transaction
+
+		// TransactionPoolSubscribe adds a subscriber to the transaction pool.
+		// Subscribers will receive all consensus set changes as well as
+		// transaction pool changes, and should not subscribe to both.
+		TransactionPoolSubscribe(TransactionPoolSubscriber)
+
+		// Transaction returns the transaction and unconfirmed parents
+		// corresponding to the provided transaction id.
+		Transaction(id types.TransactionID) (txn types.Transaction, unconfirmedParents []types.Transaction, exists bool)
+
+		// Unsubscribe removes a subscriber from the transaction pool.
+		// This is necessary for clean shutdown of the miner.
+		Unsubscribe(TransactionPoolSubscriber)
+	}
+)
 
 // NewConsensusConflict returns a consensus conflict, which implements the
 // error interface.

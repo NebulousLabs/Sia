@@ -89,8 +89,8 @@ Table of contents
 - [Host DB](#host-db)
 - [Miner](#miner)
 - [Renter](#renter)
-- [Wallet](#wallet)
 - [Transaction Pool](#transaction-pool)
+- [Wallet](#wallet)
 
 Daemon
 ------
@@ -252,15 +252,16 @@ standard success or error response. See
 Host
 ----
 
-| Route                                                                                 | HTTP verb |
-| ------------------------------------------------------------------------------------- | --------- |
-| [/host](#host-get)                                                                    | GET       |
-| [/host](#host-post)                                                                   | POST      |
-| [/host/announce](#hostannounce-post)                                                  | POST      |
-| [/host/storage](#hoststorage-get)                                                     | GET       |
-| [/host/storage/folders/add](#hoststoragefoldersadd-post)                              | POST      |
-| [/host/storage/folders/remove](#hoststoragefoldersremove-post)                        | POST      |
-| [/host/storage/folders/resize](#hoststoragefoldersresize-post)                        | POST      |
+| Route                                                                                      | HTTP verb |
+| ------------------------------------------------------------------------------------------ | --------- |
+| [/host](#host-get)                                                                         | GET       |
+| [/host](#host-post)                                                                        | POST      |
+| [/host/announce](#hostannounce-post)                                                       | POST      |
+| [/host/estimatescore](#hostestimatescore-get)                                              | GET       |
+| [/host/storage](#hoststorage-get)                                                          | GET       |
+| [/host/storage/folders/add](#hoststoragefoldersadd-post)                                   | POST      |
+| [/host/storage/folders/remove](#hoststoragefoldersremove-post)                             | POST      |
+| [/host/storage/folders/resize](#hoststoragefoldersresize-post)                             | POST      |
 | [/host/storage/sectors/delete/:___merkleroot___](#hoststoragesectorsdeletemerkleroot-post) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
@@ -480,6 +481,38 @@ data.
 ###### Response
 standard success or error response. See
 [#standard-responses](#standard-responses).
+
+#### /host/estimatescore [GET]
+
+returns the estimated HostDB score of the host using its current settings,
+combined with the provided settings.
+
+###### JSON Response [(with comments)](/doc/api/Host.md#json-response-2)
+```javascript
+{
+	"estimatedscore": "123456786786786786786786786742133",
+	"conversionrate": 95
+}
+```
+
+###### Query String Parameters [(with comments)](/doc/api/Host.md#query-string-parameters-5)
+```
+acceptingcontracts   // Optional, true / false
+maxdownloadbatchsize // Optional, bytes
+maxduration          // Optional, blocks
+maxrevisebatchsize   // Optional, bytes
+netaddress           // Optional
+windowsize           // Optional, blocks
+
+collateral       // Optional, hastings / byte / block
+collateralbudget // Optional, hastings
+maxcollateral    // Optional, hastings
+
+mincontractprice          // Optional, hastings
+mindownloadbandwidthprice // Optional, hastings / byte
+minstorageprice           // Optional, hastings / byte / block
+minuploadbandwidthprice   // Optional, hastings / byte
+```
 
 
 Host DB
@@ -844,7 +877,7 @@ lists the estimated prices of performing various storage and data operations.
   "downloadterabyte":      "1234", // hastings
   "formcontracts":         "1234", // hastings
   "storageterabytemonth":  "1234", // hastings
-  "uploadterabyte":        "1234", // hastings
+  "uploadterabyte":        "1234"  // hastings
 }
 ```
 
@@ -934,6 +967,59 @@ uploads a file to the network from the local filesystem.
 datapieces   // int
 paritypieces // int
 source       // string - a filepath
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+
+Transaction Pool
+------
+
+| Route                           | HTTP verb |
+| ------------------------------- | --------- |
+| [/tpool/fee](#tpoolfee-get)     | GET       |
+| [/tpool/raw/:id](#tpoolraw-get) | GET       |
+| [/tpool/raw](#tpoolraw-post)    | POST      |
+
+#### /tpool/fee [GET]
+
+returns the minimum and maximum estimated fees expected by the transaction pool.
+
+###### JSON Response [(with comments)](/doc/api/Transactionpool.md#json-response-1)
+```javascript
+{
+  "minimum": "1234", // hastings
+  "maximum": "5678"  // hastings
+}
+```
+
+#### /tpool/raw/:id [GET]
+
+returns the ID for the requested transaction and its raw encoded parents and transaction data.
+
+###### JSON Response [(with comments)](/doc/api/Transactionpool.md#json-response-2)
+```javascript
+{
+	// id of the transaction
+	"id": "124302d30a219d52f368ecd94bae1bfb922a3e45b6c32dd7fb5891b863808788",
+
+	// raw, base64 encoded transaction data
+	"transaction": "AQAAAAAAAADBM1ca/FyURfizmSukoUQ2S0GwXMit1iNSeYgrnhXOPAAAAAAAAAAAAQAAAAAAAABlZDI1NTE5AAAAAAAAAAAAIAAAAAAAAACdfzoaJ1MBY7L0fwm7O+BoQlFkkbcab5YtULa6B9aecgEAAAAAAAAAAQAAAAAAAAAMAAAAAAAAAAM7Ljyf0IA86AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAACgAAAAAAAACe0ZTbGbI4wAAAAAAAAAAAAAABAAAAAAAAAMEzVxr8XJRF+LOZK6ShRDZLQbBcyK3WI1J5iCueFc48AAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAA+z4P1wc98IqKxykTSJxiVT+BVbWezIBnIBO1gRRlLq2x/A+jIc6G7/BA5YNJRbdnqPHrzsZvkCv4TKYd/XzwBA==",
+	"parents": "AQAAAAAAAAABAAAAAAAAAJYYmFUdXXfLQ2p6EpF+tcqM9M4Pw5SLSFHdYwjMDFCjAAAAAAAAAAABAAAAAAAAAGVkMjU1MTkAAAAAAAAAAAAgAAAAAAAAAAHONvdzzjHfHBx6psAN8Z1rEVgqKPZ+K6Bsqp3FbrfjAQAAAAAAAAACAAAAAAAAAAwAAAAAAAAAAzvNDjSrme8gwAAA4w8ODnW8DxbOV/JribivvTtjJ4iHVOug0SXJc31BdSINAAAAAAAAAAPGHY4699vggx5AAAC2qBhm5vwPaBsmwAVPho/1Pd8ecce/+BGv4UimnEPzPQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAACWGJhVHV13y0NqehKRfrXKjPTOD8OUi0hR3WMIzAxQowAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAABnt64wN1qxym/CfiMgOx5fg/imVIEhY+4IiiM7gwvSx8qtqKniOx50ekrGv8B+gTKDXpmm2iJibWTI9QLZHWAY=",
+}
+```
+
+#### /tpool/raw [POST]
+
+submits a raw transaction to the transaction pool, broadcasting it to the transaction pool's peers.
+
+###### Query String Parameters [(with comments)](/doc/api/Transactionpool.md#query-string-parameters)
+
+```
+parents     string // raw base64 encoded transaction parents
+transaction string // raw base64 encoded transaction
 ```
 
 ###### Response
@@ -1137,13 +1223,15 @@ dictionary
 
 #### /wallet/siacoins [POST]
 
-sends siacoins to an address. The outputs are arbitrarily selected from
-addresses in the wallet.
+sends siacoins to an address or set of addresses. The outputs are arbitrarily
+selected from addresses in the wallet. If 'outputs' is supplied, 'amount' and
+'destination' must be empty.
 
 ###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-6)
 ```
 amount      // hastings
 destination // address
+outputs     // JSON array of {unlockhash, value} pairs
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-5)
@@ -1350,46 +1438,6 @@ changes the wallet's encryption key.
 ```
 encryptionpassword
 newpassword
-```
-
-###### Response
-standard success or error response. See
-[#standard-responses](#standard-responses).
-
-
-Transaction Pool
-------
-
-| Route                           | HTTP verb |
-| ------------------------------- | --------- |
-| [/tpool/raw/:id](#tpoolraw-get) | GET       |
-| [/tpool/raw](#tpoolraw-post)    | POST      |
-
-#### /tpool/raw/:id [GET]
-
-returns the ID for the requested transaction and its raw encoded parents and transaction data.
-
-###### JSON Response [(with comments)](/doc/api/Transactionpool.md#json-response)
-```javascript
-{
-	// id of the transaction
-	"id": "124302d30a219d52f368ecd94bae1bfb922a3e45b6c32dd7fb5891b863808788",
-
-	// raw, base64 encoded transaction data
-	"transaction": "AQAAAAAAAADBM1ca/FyURfizmSukoUQ2S0GwXMit1iNSeYgrnhXOPAAAAAAAAAAAAQAAAAAAAABlZDI1NTE5AAAAAAAAAAAAIAAAAAAAAACdfzoaJ1MBY7L0fwm7O+BoQlFkkbcab5YtULa6B9aecgEAAAAAAAAAAQAAAAAAAAAMAAAAAAAAAAM7Ljyf0IA86AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAACgAAAAAAAACe0ZTbGbI4wAAAAAAAAAAAAAABAAAAAAAAAMEzVxr8XJRF+LOZK6ShRDZLQbBcyK3WI1J5iCueFc48AAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAA+z4P1wc98IqKxykTSJxiVT+BVbWezIBnIBO1gRRlLq2x/A+jIc6G7/BA5YNJRbdnqPHrzsZvkCv4TKYd/XzwBA==",
-	"parents": "AQAAAAAAAAABAAAAAAAAAJYYmFUdXXfLQ2p6EpF+tcqM9M4Pw5SLSFHdYwjMDFCjAAAAAAAAAAABAAAAAAAAAGVkMjU1MTkAAAAAAAAAAAAgAAAAAAAAAAHONvdzzjHfHBx6psAN8Z1rEVgqKPZ+K6Bsqp3FbrfjAQAAAAAAAAACAAAAAAAAAAwAAAAAAAAAAzvNDjSrme8gwAAA4w8ODnW8DxbOV/JribivvTtjJ4iHVOug0SXJc31BdSINAAAAAAAAAAPGHY4699vggx5AAAC2qBhm5vwPaBsmwAVPho/1Pd8ecce/+BGv4UimnEPzPQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAACWGJhVHV13y0NqehKRfrXKjPTOD8OUi0hR3WMIzAxQowAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAABnt64wN1qxym/CfiMgOx5fg/imVIEhY+4IiiM7gwvSx8qtqKniOx50ekrGv8B+gTKDXpmm2iJibWTI9QLZHWAY=",
-}
-```
-
-#### /tpool/raw [POST]
-
-submits a raw transaction to the transaction pool, broadcasting it to the transaction pool's peers.
-
-###### Query String Parameters [(with comments)](/doc/api/Transactionpool.md#query-string-parameters)
-
-```
-parents     string // raw base64 encoded transaction parents
-transaction string // raw base64 encoded transaction
 ```
 
 ###### Response
