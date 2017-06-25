@@ -305,6 +305,7 @@ func TestTransactionPoolPruning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	tpt2.gateway.Disconnect(tpt.gateway.Address())
 	txns, err := tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(1000), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
