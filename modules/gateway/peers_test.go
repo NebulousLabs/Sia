@@ -735,8 +735,9 @@ func TestDisconnect(t *testing.T) {
 	}
 	t.Parallel()
 	g := newTestingGateway(t)
-	g2 := newNamedTestingGateway(t, "2")
 	defer g.Close()
+	g2 := newNamedTestingGateway(t, "2")
+	defer g2.Close()
 	// Try disconnecting from a peer that doesn't exist.
 	if err := g.Disconnect("bar.com:123"); err == nil {
 		t.Fatal("disconnect removed unconnected peer")
