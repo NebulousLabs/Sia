@@ -159,14 +159,23 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 	// Broadcast the last block accepted. This functionality is in a defer to
 	// ensure that a block is always broadcast if any blocks are accepted. This
 	// is to stop an attacker from preventing block broadcasts.
-	initialBlock := cs.dbCurrentBlockID()
+	var initialBlock types.BlockID
+	if build.DEBUG {
+		// Prepare for a sanity check on 'chainExtended' - chain extended should
+		// be set to true if an ony if the result of calling dbCurrentBlockID
+		// changes.
+		initialBlock = cs.dbCurrentBlockID()
+	}
+	chainExtended := false
 	defer func() {
 		cs.mu.RLock()
 		synced := cs.synced
 		cs.mu.RUnlock()
-		currentBlock := cs.dbCurrentBlockID()
-		if synced && initialBlock != currentBlock {
-			fullBlock := cs.managedCurrentBlock()
+		if synced && chainExtended {
+			if build.DEBUG && initialBlock == cs.dbCurrentBlockID() {
+				panic("blockchain extension reporting is incorrect")
+			}
+			fullBlock := cs.managedCurrentBlock() // TODO: Add cacheing, replace this line by looking at the cache.
 			go cs.gateway.Broadcast("RelayHeader", fullBlock.Header(), cs.gateway.Peers())
 		}
 	}()
@@ -190,7 +199,10 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 
 		// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
 		// every block.
-		acceptErr := cs.managedAcceptBlocks(newBlocks)
+		extended, acceptErr := cs.managedAcceptBlocks(newBlocks)
+		if extended {
+			chainExtended = true
+		}
 		// ErrNonExtendingBlock must be ignored until headers-first block
 		// sharing is implemented, block already in database should also be
 		// ignored.
@@ -492,10 +504,13 @@ func (cs *ConsensusSet) managedReceiveBlock(id types.BlockID) modules.RPCFunc {
 		if err := encoding.ReadObject(conn, &block, types.BlockSizeLimit); err != nil {
 			return err
 		}
-		if err := cs.managedAcceptBlocks([]types.Block{block}); err != nil {
+		chainExtended, err := cs.managedAcceptBlocks([]types.Block{block})
+		if chainExtended {
+			cs.managedBroadcastBlock(block)
+		}
+		if err != nil {
 			return err
 		}
-		cs.managedBroadcastBlock(block)
 		return nil
 	}
 }

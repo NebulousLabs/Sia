@@ -198,7 +198,7 @@ func (cs *ConsensusSet) threadedSleepOnFutureBlock(b types.Block) {
 	case <-cs.tg.StopChan():
 		return
 	case <-time.After(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second):
-		err := cs.managedAcceptBlocks([]types.Block{b})
+		_, err := cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			cs.log.Debugln("WARN: failed to accept a future block:", err)
 		}
@@ -217,7 +217,7 @@ func (cs *ConsensusSet) threadedSleepOnFutureBlock(b types.Block) {
 // This method is typically only be used when there would otherwise be multiple
 // consecutive calls to AcceptBlock with each successive call accepting the
 // child block of the previous call.
-func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
+func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExtended bool, err error) {
 	// Grab a lock on the consensus set.
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -231,13 +231,13 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	for i := 0; i < len(blocks); i++ {
 		blockIDs = append(blockIDs, blocks[i].ID())
 		if i > 0 && blocks[i].ParentID != blockIDs[i-1] {
-			return errNonLinearChain
+			return false, errNonLinearChain
 		}
 	}
 
 	// Verify the headers for every block, throw out known blocks, and the
 	// invalid blocks (which includes the children of invalid blocks).
-	nonExtendingSet := true // set to false if any block returns nil after being added to the tree.
+	chainExtended := false
 	changes := make([]changeEntry, 0, len(blocks))
 	validBlocks := make([]types.Block, 0, len(blocks))
 	parents := make([]*processedBlock, 0, len(blocks))
@@ -264,10 +264,11 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 
 			// Try adding the block to consnesus.
 			changeEntry, err := cs.addBlockToTree(tx, blocks[i], parent)
+			if err == nil {
+				chainExtended = true
+			}
 			if err == modules.ErrNonExtendingBlock {
 				err = nil
-			} else {
-				nonExtendingSet = false
 			}
 			if err != nil {
 				return err
@@ -288,33 +289,41 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 		// Check if any blocks were valid.
 		if len(validBlocks) < 1 {
 			// Nothing more to do, the first block was invalid.
-			return setErr
+			return false, setErr
 		}
 
 		// At least some of the blocks were valid. Add the valid blocks before
 		// returning, since we've already done the downloading and header
 		// validation.
+		verifyExtended := false
 		err := cs.db.Update(func(tx *bolt.Tx) error {
 			for i := 0; i < len(validBlocks); i++ {
 				_, err := cs.addBlockToTree(tx, validBlocks[i], parents[i])
+				if err == nil {
+					verifyExtended = true
+				}
 				if err != modules.ErrNonExtendingBlock && err != nil {
 					return err
 				}
 			}
 			return nil
 		})
+		// Sanity check - verifyExtended should match chainExtended.
+		if build.DEBUG && verifyExtended != chainExtended {
+			panic("chain extension logic does not match up between first and last attempt")
+		}
 		// Something has gone wrong. Maybe the filesystem is having errors for
 		// example. But under normal conditions, this code should not be
 		// reached. If it is, return early because both attempts to add blocks
 		// have failed.
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
 
 	// Stop here if the blocks did not extend the longest blockchain.
-	if nonExtendingSet {
-		return modules.ErrNonExtendingBlock
+	if !chainExtended {
+		return false, modules.ErrNonExtendingBlock
 	}
 
 	// Sanity check - if we get here, len(changes) should be non-zero.
@@ -346,15 +355,20 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 		// Add all of the applied blocks.
 		fullChange.AppliedBlocks = append(fullChange.AppliedBlocks, changes[i].AppliedBlocks...)
 	}
+	// Sanity check - if we got here, the number of applied blocks should be
+	// non-zero.
+	if build.DEBUG && len(fullChange.AppliedBlocks) == 0 {
+		panic("should not be updating subscribers witha blank change")
+	}
 	cs.updateSubscribers(fullChange)
 
 	// If there were valid blocks and invalid blocks in the set that was
 	// provided, then the setErr is not going to be nil. Return the set error to
 	// the caller.
 	if setErr != nil {
-		return setErr
+		return chainExtended, setErr
 	}
-	return nil
+	return chainExtended, nil
 }
 
 // AcceptBlock will try to add a block to the consensus set. If the block does
@@ -371,10 +385,12 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	}
 	defer cs.tg.Done()
 
-	err = cs.managedAcceptBlocks([]types.Block{b})
+	chainExtended, err := cs.managedAcceptBlocks([]types.Block{b})
 	if err != nil {
 		return err
 	}
-	cs.managedBroadcastBlock(b)
+	if chainExtended {
+		cs.managedBroadcastBlock(b)
+	}
 	return nil
 }

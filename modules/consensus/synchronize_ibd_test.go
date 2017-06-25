@@ -72,7 +72,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlocks([]types.Block{b})
+			_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown && err != modules.ErrNonExtendingBlock {
 				t.Fatal(err)
 			}
@@ -98,7 +98,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlocks([]types.Block{b})
+			_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown {
 				t.Fatal(err)
 			}
@@ -123,7 +123,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = localCST.cs.managedAcceptBlocks([]types.Block{b})
+		_, err = localCST.cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -134,7 +134,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlocks([]types.Block{b})
+			_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown {
 				t.Log(i)
 				t.Fatal(err)
@@ -160,7 +160,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = localCST.cs.managedAcceptBlocks([]types.Block{b})
+		_, err = localCST.cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,7 +171,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlocks([]types.Block{b})
+			_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown {
 				t.Log(i)
 				t.Fatal(err)

@@ -293,7 +293,7 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 			}
 			// managedAcceptBlock is used here instead of AcceptBlock so as not to
 			// call Broadcast outside of the SendBlocks RPC.
-			err = cst2.cs.managedAcceptBlocks([]types.Block{b})
+			_, err = cst2.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -456,11 +456,11 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
-			err = remoteCST.cs.managedAcceptBlocks([]types.Block{b})
+			_, err = remoteCST.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
-			err = localCST.cs.managedAcceptBlocks([]types.Block{b})
+			_, err = localCST.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
@@ -470,7 +470,7 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
-			err = remoteCST.cs.managedAcceptBlocks([]types.Block{b})
+			_, err = remoteCST.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
@@ -480,7 +480,7 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
-			err = localCST.cs.managedAcceptBlocks([]types.Block{b})
+			_, err = localCST.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
@@ -571,11 +571,11 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = cst.cs.managedAcceptBlocks([]types.Block{b})
+		_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = cs.managedAcceptBlocks([]types.Block{b})
+		_, err = cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -589,7 +589,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = cst.cs.managedAcceptBlocks([]types.Block{b})
+		_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -946,7 +946,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst2.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
+	_, err = cst2.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -960,7 +960,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst1.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
+	_, err = cst1.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -974,7 +974,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst2.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
+	_, err = cst2.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -982,7 +982,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst2.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
+	_, err = cst2.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1154,7 +1154,7 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst1.cs.managedAcceptBlocks([]types.Block{validBlock})
+	_, err = cst1.cs.managedAcceptBlocks([]types.Block{validBlock})
 	if err != nil {
 		t.Fatal(err)
 	}
