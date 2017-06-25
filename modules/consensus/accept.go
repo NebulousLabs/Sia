@@ -204,7 +204,6 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (bool, error) 
 	var changes changeEntry
 	var err2 error
 
-	chainExtended := false
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		// Do not accept a block if the database is inconsistent.
 		if inconsistencyDetected(tx) {
@@ -276,14 +275,14 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (bool, error) 
 			// See https://github.com/NebulousLabs/Sia/pull/1878#discussion_r123674511
 			changes.RevertedBlocks = append(changes.RevertedBlocks, changeEntry.RevertedBlocks...)
 			changes.AppliedBlocks = append(changes.AppliedBlocks, changeEntry.AppliedBlocks...)
-			chainExtended = true
 		}
 		return nil
 	})
+	chainExtended := len(changes.AppliedBlocks) > 0
 	if err != nil {
 		return chainExtended, err
 	}
-	if len(changes.AppliedBlocks) > 0 {
+	if chainExtended {
 		cs.readlockUpdateSubscribers(changes)
 	}
 	if err2 != nil {
