@@ -736,38 +736,42 @@ func TestDisconnect(t *testing.T) {
 	t.Parallel()
 	g := newTestingGateway(t)
 	defer g.Close()
-
+	g2 := newNamedTestingGateway(t, "2")
+	defer g2.Close()
+	// Try disconnecting from a peer that doesn't exist.
 	if err := g.Disconnect("bar.com:123"); err == nil {
 		t.Fatal("disconnect removed unconnected peer")
 	}
 
-	// dummy listener to accept connection
-	l, err := net.Listen("tcp", "localhost:0")
+	// Connect two peers to eachother.
+	err := g.Connect(g2.myAddr)
 	if err != nil {
-		t.Fatal("couldn't start listener:", err)
-	}
-	go func() {
-		_, err := l.Accept()
-		if err != nil {
-			panic(err)
-		}
-	}()
-	// skip standard connection protocol
-	conn, err := net.Dial("tcp", l.Addr().String())
-	if err != nil {
-		t.Fatal("dial failed:", err)
+		t.Fatal(err)
 	}
 	g.mu.Lock()
-	g.addPeer(&peer{
-		Peer: modules.Peer{
-			NetAddress: "foo.com:123",
-		},
-		sess: muxado.Client(conn),
-	})
+	_, exists := g.nodes[g2.myAddr]
+	if !exists {
+		t.Error("peer never made it into node list")
+	}
 	g.mu.Unlock()
-	if err := g.Disconnect("foo.com:123"); err != nil {
+
+	// Disconnect the peer.
+	if err := g.Disconnect(g2.myAddr); err != nil {
 		t.Fatal("disconnect failed:", err)
 	}
+	g2.Disconnect(g.myAddr) // Prevents g2 from connecting back to g
+	peers := g.Peers()
+	for _, peer := range peers {
+		if peer.NetAddress == g2.myAddr {
+			t.Error("disconnect seems to have failed - still have this peer")
+		}
+	}
+	g.mu.Lock()
+	_, exists = g.nodes[g2.myAddr]
+	if exists {
+		t.Error("should be dropping peer from nodelist after disconnect")
+	}
+	g.mu.Unlock()
 }
 
 // TestPeerManager checks that the peer manager is properly spacing out peer
