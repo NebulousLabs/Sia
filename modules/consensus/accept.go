@@ -321,12 +321,23 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 		panic("changes is empty, but this code should not be reached if no blocks got added")
 	}
 
-	// Update the subscribers with all of the consensus changes.
-	for i := 0; i < len(changes); i++ {
-		if len(changes[i].AppliedBlocks) > 0 {
-			cs.updateSubscribers(changes[i])
+	// Update the subscribers with all of the consensus changes. First combine
+	// the changes into a single set.
+	fullChange := changes[0]
+	for i := 1; i < len(changes); i++ {
+		if len(fullChange.RevertedBlocks) == 0 && len(fullChange.AppliedBlocks) == 0 {
+			fullChange.RevertedBlocks = append(fullChange.RevertedBlocks, changes[i].RevertedBlocks...)
+		} else if build.DEBUG && len(changes[i].RevertedBlocks) != 0 {
+			// Sanity Check - if the aggregate change has reverted blocks, no
+			// more reverted blocks should appear in the set of changes. This is
+			// because the blocks are strictly children of eachother - the first
+			// one that extends the chain could cause reverted blocks, but the
+			// rest should not be able to.
+			panic("multi-block acceptance failed - reverted blocks on the final change?")
 		}
+		fullChange.AppliedBlocks = append(fullChange.AppliedBlocks, changes[i].AppliedBlocks...)
 	}
+	cs.updateSubscribers(fullChange)
 
 	// If there were valid blocks and invalid blocks in the set that was
 	// provided, then the setErr is not going to be nil. Return the set error to
