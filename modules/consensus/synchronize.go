@@ -165,7 +165,7 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 		synced := cs.synced
 		cs.mu.RUnlock()
 		currentBlock := cs.dbCurrentBlockID()
-		if synced && initialBlock == currentBlock {
+		if synced && initialBlock != currentBlock {
 			fullBlock := cs.managedCurrentBlock()
 			go cs.gateway.Broadcast("RelayHeader", fullBlock.Header(), cs.gateway.Peers())
 		}
@@ -184,7 +184,7 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 			return err
 		}
 		if len(newBlocks) == 0 {
-			return errSendBlocksStalled
+			continue
 		}
 		stalled = false
 

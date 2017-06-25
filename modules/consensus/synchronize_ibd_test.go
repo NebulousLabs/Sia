@@ -73,7 +73,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		}
 		for _, cst := range remoteCSTs {
 			err = cst.cs.managedAcceptBlocks([]types.Block{b})
-			if err != nil && err != modules.ErrBlockKnown {
+			if err != nil && err != modules.ErrBlockKnown && err != modules.ErrNonExtendingBlock {
 				t.Fatal(err)
 			}
 		}

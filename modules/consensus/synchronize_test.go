@@ -279,7 +279,7 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 			synced:                true,
 		},
 	}
-	for _, test := range tests {
+	for j, test := range tests {
 		cst1.cs.mu.Lock()
 		cst1.cs.synced = test.synced
 		cst1.cs.mu.Unlock()
@@ -310,7 +310,7 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 		numBroadcasts := mg.numBroadcasts
 		mg.mu.RUnlock()
 		if numBroadcasts != test.expectedNumBroadcasts {
-			t.Errorf("expected %d number of broadcasts, got %d", test.expectedNumBroadcasts, numBroadcasts)
+			t.Errorf("test #%d: expected %d number of broadcasts, got %d", j, test.expectedNumBroadcasts, numBroadcasts)
 		}
 	}
 }
@@ -932,7 +932,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 
 	// Test that cst1 doesn't accept a block it's already seen (the genesis block).
 	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.managedReceiveBlock(types.GenesisID))
-	if err != modules.ErrBlockKnown {
+	if err != modules.ErrBlockKnown && err != modules.ErrNonExtendingBlock {
 		t.Errorf("cst1 should reject known blocks: expected error '%v', got '%v'", modules.ErrBlockKnown, err)
 	}
 	// Test that cst2 errors when it doesn't recognize the requested block.
