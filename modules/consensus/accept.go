@@ -29,10 +29,9 @@ func (cs *ConsensusSet) managedBroadcastBlock(b types.Block) {
 // validateHeaderAndBlock does some early, low computation verification on the
 // block. Callers should not assume that validation will happen in a particular
 // order.
-func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) (parent *processedBlock, err error) {
+func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block, id types.BlockID) (parent *processedBlock, err error) {
 	// Check if the block is a DoS block - a known invalid block that is expensive
 	// to validate.
-	id := b.ID()
 	_, exists := cs.dosBlocks[id]
 	if exists {
 		return nil, errDoSBlock
@@ -61,7 +60,7 @@ func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) (parent *
 	// Check that the timestamp is not too far in the past to be acceptable.
 	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, parent)
 
-	err = cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1, cs.log)
+	err = cs.blockValidator.ValidateBlock(b, id, minTimestamp, parent.ChildTarget, parent.Height+1, cs.log)
 	if err != nil {
 		return nil, err
 	}
@@ -227,9 +226,11 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	// requirement, if blocks are not consecutive then it becomes a lot harder
 	// to maintain correcetness when adding multiple blocks in a single tx.
 	//
-	// TODO: Too much ID calculating here.
+	// This is the first time that IDs on the blocks have been computed.
+	blockIDs := make([]types.BlockID, 0, len(blocks))
 	for i := 0; i < len(blocks); i++ {
-		if i > 0 && blocks[i].Header().ParentID != blocks[i-1].ID() {
+		blockIDs = append(blockIDs, blocks[i].ID())
+		if i > 0 && blocks[i].ParentID != blockIDs[i-1] {
 			return errNonLinearChain
 		}
 	}
@@ -248,7 +249,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 
 		for i := 0; i < len(blocks); i++ {
 			// Start by checking the header of the block.
-			parent, err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, blocks[i])
+			parent, err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, blocks[i], blockIDs[i])
 			if err == modules.ErrBlockKnown {
 				// Skip over known blocks.
 				continue
@@ -325,7 +326,13 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	// the changes into a single set.
 	fullChange := changes[0]
 	for i := 1; i < len(changes); i++ {
+		// The consistency model of the modules will break if two different
+		// changes have reverted blocks in them, the modules strictly expect all
+		// the reverted blocks to be in order, followed by all of the applied
+		// blocks. This check ensures that rule is being followed.
 		if len(fullChange.RevertedBlocks) == 0 && len(fullChange.AppliedBlocks) == 0 {
+			// Only add reverted blocks if there have been no reverted blocks or
+			// applied blocks previously.
 			fullChange.RevertedBlocks = append(fullChange.RevertedBlocks, changes[i].RevertedBlocks...)
 		} else if build.DEBUG && len(changes[i].RevertedBlocks) != 0 {
 			// Sanity Check - if the aggregate change has reverted blocks, no
@@ -335,6 +342,8 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 			// rest should not be able to.
 			panic("multi-block acceptance failed - reverted blocks on the final change?")
 		}
+
+		// Add all of the applied blocks.
 		fullChange.AppliedBlocks = append(fullChange.AppliedBlocks, changes[i].AppliedBlocks...)
 	}
 	cs.updateSubscribers(fullChange)

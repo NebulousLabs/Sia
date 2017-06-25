@@ -482,9 +482,7 @@ func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 
 // managedReceiveBlock takes a block id and returns an RPCFunc that requests that
 // block and then calls AcceptBlock on it. The returned function should be used
-// as the calling end of the SendBlk RPC. Note that although the function
-// itself does not do any locking, it is still prefixed with "threaded" because
-// the function it returns calls the exported method AcceptBlock.
+// as the calling end of the SendBlk RPC.
 func (cs *ConsensusSet) managedReceiveBlock(id types.BlockID) modules.RPCFunc {
 	return func(conn modules.PeerConn) error {
 		if err := encoding.WriteObject(conn, id); err != nil {
