@@ -282,6 +282,9 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (bool, error) 
 	if err != nil {
 		return chainExtended, err
 	}
+	// The order is important here: subscribers must be updated after
+	// the check for fatal errors (which result in rollback) but before
+	// the check for other errors which don't result in rollback.
 	if chainExtended {
 		cs.readlockUpdateSubscribers(changes)
 	}
