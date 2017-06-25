@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -15,9 +16,10 @@ type sortedOutputs struct {
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
 func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
-	// ensure durability of reported balance
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	// ensure durability of reported balance
 	w.syncDB()
 
 	dbForEachSiacoinOutput(w.dbTx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
@@ -25,9 +27,20 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 			siacoinBalance = siacoinBalance.Add(sco.Value)
 		}
 	})
+
+	siafundPool, err := dbGetSiafundPool(w.dbTx)
+	if err != nil {
+		return
+	}
 	dbForEachSiafundOutput(w.dbTx, func(_ types.SiafundOutputID, sfo types.SiafundOutput) {
 		siafundBalance = siafundBalance.Add(sfo.Value)
-		siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
+		if sfo.ClaimStart.Cmp(siafundPool) > 0 {
+			// Skip claims larger than the siafund pool. This should only
+			// occur if the siafund pool has not been initialized yet.
+			w.log.Debugf("skipping claim with start value %v because siafund pool is only %v", sfo.ClaimStart, siafundPool)
+			return
+		}
+		siafundClaimBalance = siafundClaimBalance.Add(siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
 	})
 	return
 }
@@ -61,8 +74,13 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 		return nil, err
 	}
 	defer w.tg.Done()
+	if !w.unlocked {
+		w.log.Println("Attempt to send coins has failed - wallet is locked")
+		return nil, modules.ErrLockedWallet
+	}
 
-	tpoolFee := types.SiacoinPrecision.Mul64(10) // TODO: better fee algo.
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
@@ -71,16 +89,73 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 	txnBuilder := w.StartTransaction()
 	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
 	if err != nil {
+		w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
 		return nil, build.ExtendErr("unable to fund transaction", err)
 	}
 	txnBuilder.AddMinerFee(tpoolFee)
 	txnBuilder.AddSiacoinOutput(output)
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
+		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
 		return nil, build.ExtendErr("unable to sign transaction", err)
 	}
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
+		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
+		return nil, build.ExtendErr("unable to get transaction accepted", err)
+	}
+	w.log.Println("Submitted a siacoin transfer transaction set for value", amount.HumanString(), "with fees", tpoolFee.HumanString(), "IDs:")
+	for _, txn := range txnSet {
+		w.log.Println("\t", txn.ID())
+	}
+	return txnSet, nil
+}
+
+// SendSiacoinsMulti creates a transaction that includes the specified
+// outputs. The transaction is submitted to the transaction pool and is also
+// returned.
+func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) ([]types.Transaction, error) {
+	if err := w.tg.Add(); err != nil {
+		return nil, err
+	}
+	defer w.tg.Done()
+	if !w.unlocked {
+		w.log.Println("Attempt to send coins has failed - wallet is locked")
+		return nil, modules.ErrLockedWallet
+	}
+
+	txnBuilder := w.StartTransaction()
+
+	// Add estimated transaction fee.
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(1000 + 60*uint64(len(outputs))) // Estimated transaction size in bytes
+	txnBuilder.AddMinerFee(tpoolFee)
+
+	// Calculate total cost to wallet.
+	// NOTE: we only want to call FundSiacoins once; that way, it will
+	// (ideally) fund the entire transaction with a single input, instead of
+	// many smaller ones.
+	totalCost := tpoolFee
+	for _, sco := range outputs {
+		totalCost = totalCost.Add(sco.Value)
+	}
+	err := txnBuilder.FundSiacoins(totalCost)
+	if err != nil {
+		return nil, build.ExtendErr("unable to fund transaction", err)
+	}
+
+	for _, sco := range outputs {
+		txnBuilder.AddSiacoinOutput(sco)
+	}
+
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
+		return nil, build.ExtendErr("unable to sign transaction", err)
+	}
+	err = w.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
 		return nil, build.ExtendErr("unable to get transaction accepted", err)
 	}
 	return txnSet, nil
@@ -93,7 +168,13 @@ func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]t
 		return nil, err
 	}
 	defer w.tg.Done()
-	tpoolFee := types.SiacoinPrecision.Mul64(10) // TODO: better fee algo.
+	if !w.unlocked {
+		return nil, modules.ErrLockedWallet
+	}
+
+	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
+	tpoolFee = tpoolFee.Mul64(5)   // use large fee to ensure siafund transactions are selected by miners
 	output := types.SiafundOutput{
 		Value:      amount,
 		UnlockHash: dest,
@@ -117,6 +198,10 @@ func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]t
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		return nil, err
+	}
+	w.log.Println("Submitted a siafund transfer transaction set for value", amount.HumanString(), "with fees", tpoolFee.HumanString(), "IDs:")
+	for _, txn := range txnSet {
+		w.log.Println("\t", txn.ID())
 	}
 	return txnSet, nil
 }

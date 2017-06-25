@@ -15,7 +15,6 @@ type (
 		dialTimeout(modules.NetAddress, time.Duration) (net.Conn, error)
 		disrupt(string) bool
 		loadFile(persist.Metadata, interface{}, string) error
-		saveFile(persist.Metadata, interface{}, string) error
 		saveFileSync(persist.Metadata, interface{}, string) error
 		sleep(time.Duration)
 	}
@@ -30,15 +29,11 @@ func (prodDependencies) dialTimeout(addr modules.NetAddress, timeout time.Durati
 func (prodDependencies) disrupt(string) bool { return false }
 
 func (prodDependencies) loadFile(meta persist.Metadata, data interface{}, filename string) error {
-	return persist.LoadFile(meta, data, filename)
-}
-
-func (prodDependencies) saveFile(meta persist.Metadata, data interface{}, filename string) error {
-	return persist.SaveFile(meta, data, filename)
+	return persist.LoadJSON(meta, data, filename)
 }
 
 func (prodDependencies) saveFileSync(meta persist.Metadata, data interface{}, filename string) error {
-	return persist.SaveFileSync(meta, data, filename)
+	return persist.SaveJSON(meta, data, filename)
 }
 
 func (prodDependencies) sleep(d time.Duration) { time.Sleep(d) }

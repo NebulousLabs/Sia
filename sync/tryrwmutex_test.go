@@ -182,14 +182,13 @@ func TestTryRWMutexReadUnavailable(t *testing.T) {
 		t.Fatal("Data should not have changed while under readlock")
 	}
 
-	// Release the lock and wait for the other locks to finish their
-	// modifications.
-	tm.RUnlock()
-
-	// Try to grab another readlock. It should succeed. The data should have
-	// changed.
+	// Try to grab another readlock. It should not succeed.
 	if tm.TryRLock() {
 		t.Fatal("Able to get readlock on available TryRWMutex")
 	}
+
+	// Release the lock and wait for the other locks to finish their
+	// modifications.
+	tm.RUnlock()
 	wg.Wait()
 }

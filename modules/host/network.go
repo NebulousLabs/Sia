@@ -1,7 +1,7 @@
 package host
 
 // TODO: seems like there would be problems with the negotiation protocols if
-// the renter tried something like 'form' or 'renew' but then the conncetion
+// the renter tried something like 'form' or 'renew' but then the connections
 // dropped after the host completed the transaction but before the host was
 // able to send the host signatures for the transaction.
 //
@@ -49,6 +49,109 @@ func (h *Host) threadedUpdateHostname(closeChan chan struct{}) {
 	}
 }
 
+// threadedTrackWorkingStatus periodically checks if the host is working,
+// where working is defined as having received 3 settings calls in the past 15
+// minutes.
+func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
+	defer close(closeChan)
+
+	// Before entering the longer loop, try a greedy, faster attempt to verify
+	// that the host is working.
+	prevSettingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
+	select {
+	case <-h.tg.StopChan():
+		return
+	case <-time.After(workingStatusFirstCheck):
+	}
+	settingsCalls := atomic.LoadUint64(&h.atomicSettingsCalls)
+
+	// sanity check
+	if prevSettingsCalls > settingsCalls {
+		build.Severe("the host's settings calls decremented")
+	}
+
+	h.mu.Lock()
+	if settingsCalls-prevSettingsCalls >= workingStatusThreshold {
+		h.workingStatus = modules.HostWorkingStatusWorking
+	}
+	// First check is quick, don't set to 'not working' if host has not been
+	// contacted enough times.
+	h.mu.Unlock()
+
+	for {
+		prevSettingsCalls = atomic.LoadUint64(&h.atomicSettingsCalls)
+		select {
+		case <-h.tg.StopChan():
+			return
+		case <-time.After(workingStatusFrequency):
+		}
+		settingsCalls = atomic.LoadUint64(&h.atomicSettingsCalls)
+
+		// sanity check
+		if prevSettingsCalls > settingsCalls {
+			build.Severe("the host's settings calls decremented")
+			continue
+		}
+
+		h.mu.Lock()
+		if settingsCalls-prevSettingsCalls >= workingStatusThreshold {
+			h.workingStatus = modules.HostWorkingStatusWorking
+		} else {
+			h.workingStatus = modules.HostWorkingStatusNotWorking
+		}
+		h.mu.Unlock()
+	}
+}
+
+// threadedTrackConnectabilityStatus periodically checks if the host is
+// connectable at its netaddress.
+func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
+	defer close(closeChan)
+
+	// Wait breifly before checking the first time. This gives time for any port
+	// forwarding to complete.
+	select {
+	case <-h.tg.StopChan():
+		return
+	case <-time.After(connectabilityCheckFirstWait):
+	}
+
+	for {
+		h.mu.RLock()
+		autoAddr := h.autoAddress
+		userAddr := h.settings.NetAddress
+		h.mu.RUnlock()
+
+		activeAddr := autoAddr
+		if userAddr != "" {
+			activeAddr = userAddr
+		}
+
+		dialer := &net.Dialer{
+			Cancel:  h.tg.StopChan(),
+			Timeout: connectabilityCheckTimeout,
+		}
+		conn, err := dialer.Dial("tcp", string(activeAddr))
+
+		var status modules.HostConnectabilityStatus
+		if err != nil {
+			status = modules.HostConnectabilityStatusNotConnectable
+		} else {
+			conn.Close()
+			status = modules.HostConnectabilityStatusConnectable
+		}
+		h.mu.Lock()
+		h.connectabilityStatus = status
+		h.mu.Unlock()
+
+		select {
+		case <-h.tg.StopChan():
+			return
+		case <-time.After(connectabilityCheckFrequency):
+		}
+	}
+}
+
 // initNetworking performs actions like port forwarding, and gets the
 // host established on the network.
 func (h *Host) initNetworking(address string) (err error) {
@@ -68,6 +171,12 @@ func (h *Host) initNetworking(address string) (err error) {
 		// Wait until the threadedListener has returned to continue shutdown.
 		<-threadedListenerClosedChan
 	})
+
+	// Set the initial working state of the host
+	h.workingStatus = modules.HostWorkingStatusChecking
+
+	// Set the initial connectability state of the host
+	h.connectabilityStatus = modules.HostConnectabilityStatusChecking
 
 	// Set the port.
 	_, port, err := net.SplitHostPort(h.listener.Addr().String())
@@ -111,6 +220,18 @@ func (h *Host) initNetworking(address string) (err error) {
 		go h.threadedUpdateHostname(threadedUpdateHostnameClosedChan)
 		h.tg.OnStop(func() {
 			<-threadedUpdateHostnameClosedChan
+		})
+
+		threadedTrackWorkingStatusClosedChan := make(chan struct{})
+		go h.threadedTrackWorkingStatus(threadedTrackWorkingStatusClosedChan)
+		h.tg.OnStop(func() {
+			<-threadedTrackWorkingStatusClosedChan
+		})
+
+		threadedTrackConnectabilityStatusClosedChan := make(chan struct{})
+		go h.threadedTrackConnectabilityStatus(threadedTrackConnectabilityStatusClosedChan)
+		h.tg.OnStop(func() {
+			<-threadedTrackConnectabilityStatusClosedChan
 		})
 	}()
 
@@ -209,6 +330,12 @@ func (h *Host) threadedListen(closeChan chan struct{}) {
 		}
 
 		go h.threadedHandleConn(conn)
+
+		// Soft-sleep to ratelimit the number of incoming connections.
+		select {
+		case <-h.tg.StopChan():
+		case <-time.After(rpcRatelimit):
+		}
 	}
 }
 

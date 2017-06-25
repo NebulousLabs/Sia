@@ -49,7 +49,7 @@ type (
 		storageFolder uint16
 
 		// count indicates the number of virtual sectors represented by the
-		// phsyical sector described by this object. A maximum of 2^16 virtual
+		// physical sector described by this object. A maximum of 2^16 virtual
 		// sectors are allowed for each sector. Proper use by the renter should
 		// mean that the host never has more than 3 virtual sectors for any sector.
 		count uint16
@@ -145,6 +145,10 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 	}
 	if !exists2 {
 		cm.log.Critical("Unable to load storage folder despite having sector metadata")
+		return nil, ErrSectorNotFound
+	}
+	if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+		// TODO: Pick a new error instead.
 		return nil, ErrSectorNotFound
 	}
 

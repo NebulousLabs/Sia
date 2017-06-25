@@ -1354,7 +1354,7 @@ func TestDeleteSector(t *testing.T) {
 	}
 }
 
-// TestDeleteSectorVirtual tries to delete a sector with virutal pieces from
+// TestDeleteSectorVirtual tries to delete a sector with virtual pieces from
 // the contract manager.
 func TestDeleteSectorVirtual(t *testing.T) {
 	if testing.Short() {

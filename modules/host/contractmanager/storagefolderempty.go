@@ -26,7 +26,7 @@ func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
 	oldLocation, exists1 := wal.cm.sectorLocations[id]
 	oldFolder, exists2 := wal.cm.storageFolders[oldLocation.storageFolder]
 	wal.mu.Unlock()
-	if !exists1 || !exists2 {
+	if !exists1 || !exists2 || atomic.LoadUint64(&oldFolder.atomicUnavailable) == 1 {
 		return errors.New("unable to find sector that is targeted for move")
 	}
 
@@ -49,7 +49,7 @@ func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
 
 	// Place the sector into its new folder and add the atomic move to the WAL.
 	wal.mu.Lock()
-	storageFolders := wal.cm.storageFolderSlice()
+	storageFolders := wal.cm.availableStorageFolders()
 	wal.mu.Unlock()
 	var syncChan chan struct{}
 	for len(storageFolders) >= 1 {
@@ -168,7 +168,7 @@ func (wal *writeAheadLog) managedEmptyStorageFolder(sfIndex uint16, startingPoin
 	wal.mu.Lock()
 	sf, exists := wal.cm.storageFolders[sfIndex]
 	wal.mu.Unlock()
-	if !exists {
+	if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
 		return 0, errBadStorageFolderIndex
 	}
 

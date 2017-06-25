@@ -164,7 +164,7 @@ func (g *Gateway) managedAcceptConnOldPeer(conn net.Conn, remoteVersion string) 
 		sess: muxado.Server(conn),
 	})
 	g.addNode(addr)
-	return g.save()
+	return nil
 }
 
 // managedAcceptConnNewPeer accepts connection requests from peers >= v1.0.0.
@@ -206,7 +206,6 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 		if err == nil {
 			g.mu.Lock()
 			g.addNode(remoteAddr)
-			g.save()
 			g.mu.Unlock()
 		}
 	}()
@@ -367,7 +366,12 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 	// about duplicates and we have already validated the address by
 	// connecting to it.
 	g.addNode(remoteAddr)
-	return g.save()
+	// We want to persist the outbound peers.
+	err := g.saveSync()
+	if err != nil {
+		g.log.Println("ERROR: Unable to save new outbound peer to gateway:", err)
+	}
+	return nil
 }
 
 // managedConnectNewPeer connects to peers >= v1.0.0. The peer is added as a
@@ -399,7 +403,12 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 	// about duplicates and we have already validated the address by
 	// connecting to it.
 	g.addNode(remoteAddr)
-	return g.save()
+	// We want to persist the outbound peers.
+	err = g.saveSync()
+	if err != nil {
+		g.log.Println("ERROR: Unable to save new outbound peer to gateway:", err)
+	}
+	return nil
 }
 
 // managedConnect establishes a persistent connection to a peer, and adds it to

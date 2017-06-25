@@ -69,7 +69,7 @@ func (h *Host) managedLearnHostname() {
 
 	h.mu.Lock()
 	h.autoAddress = autoAddress
-	err = h.save()
+	err = h.saveSync()
 	h.mu.Unlock()
 	if err != nil {
 		h.log.Println(err)

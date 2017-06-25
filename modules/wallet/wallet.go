@@ -58,13 +58,9 @@ type Wallet struct {
 	subscribed  bool
 	primarySeed modules.Seed
 
-	// The wallet's dependencies. siafundPool is tracked separately from the
-	// consensus set to minimize the number of queries that the wallet needs
-	// to make to the consensus set; queries to the consensus set are very
-	// slow.
-	cs          modules.ConsensusSet
-	tpool       modules.TransactionPool
-	siafundPool types.Currency
+	// The wallet's dependencies.
+	cs    modules.ConsensusSet
+	tpool modules.TransactionPool
 
 	// The following set of fields are responsible for tracking the confirmed
 	// outputs, and for being able to spend them. The seeds are used to derive
@@ -76,6 +72,12 @@ type Wallet struct {
 	keys  map[types.UnlockHash]spendableKey
 
 	// unconfirmedProcessedTransactions tracks unconfirmed transactions.
+	//
+	// TODO: Replace this field with a linked list. Currently when a new
+	// transaction set diff is provided, the entire array needs to be
+	// reallocated. Since this can happen tens of times per second, and the
+	// array can have tens of thousands of elements, it's a performance issue.
+	unconfirmedSets                  map[modules.TransactionSetID][]types.TransactionID
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
 
 	// The wallet's database tracks its seeds, keys, outputs, and
@@ -88,6 +90,11 @@ type Wallet struct {
 	persistDir string
 	log        *persist.Logger
 	mu         sync.RWMutex
+
+	// A separate TryMutex is used to protect against concurrent unlocking or
+	// initialization.
+	scanLock siasync.TryMutex
+
 	// The wallet's ThreadGroup tells tracked functions to shut down and
 	// blocks until they have all exited before returning from Close.
 	tg siasync.ThreadGroup
@@ -112,6 +119,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		tpool: tpool,
 
 		keys: make(map[types.UnlockHash]spendableKey),
+
+		unconfirmedSets: make(map[modules.TransactionSetID][]types.TransactionID),
 
 		persistDir: persistDir,
 	}
@@ -179,4 +188,14 @@ func (w *Wallet) AllAddresses() []types.UnlockHash {
 		return bytes.Compare(addrs[i][:], addrs[j][:]) < 0
 	})
 	return addrs
+}
+
+// Rescanning reports whether the wallet is currently rescanning the
+// blockchain.
+func (w *Wallet) Rescanning() bool {
+	rescanning := !w.scanLock.TryLock()
+	if !rescanning {
+		w.scanLock.Unlock()
+	}
+	return rescanning
 }

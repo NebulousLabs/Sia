@@ -55,6 +55,7 @@ type (
 	// coming from an address and going to the outputs. The fund types are
 	// 'SiacoinInput', 'SiafundInput'.
 	ProcessedInput struct {
+		ParentID       types.OutputID   `json:"parentid"`
 		FundType       types.Specifier  `json:"fundtype"`
 		WalletAddress  bool             `json:"walletaddress"`
 		RelatedAddress types.UnlockHash `json:"relatedaddress"`
@@ -74,6 +75,7 @@ type (
 	// available. SiacoinInputs and SiafundInputs become available immediately.
 	// ClaimInputs and MinerPayouts become available after 144 confirmations.
 	ProcessedOutput struct {
+		ID             types.OutputID    `json:"id"`
 		FundType       types.Specifier   `json:"fundtype"`
 		MaturityHeight types.BlockHeight `json:"maturityheight"`
 		WalletAddress  bool              `json:"walletaddress"`
@@ -225,6 +227,11 @@ type (
 		// a different directory or deleted.
 		Encrypt(masterKey crypto.TwofishKey) (Seed, error)
 
+		// Reset will reset the wallet, clearing the database and returning it to
+		// the unencrypted state. Reset can only be called on a wallet that has
+		// already been encrypted.
+		Reset() error
+
 		// Encrypted returns whether or not the wallet has been encrypted yet.
 		// After being encrypted for the first time, the wallet can only be
 		// unlocked using the encryption password.
@@ -248,6 +255,10 @@ type (
 		// All items in the wallet are encrypted using different keys which are
 		// derived from the master key.
 		Unlock(masterKey crypto.TwofishKey) error
+
+		// ChangeKey changes the wallet's materKey from masterKey to newKey,
+		// re-encrypting the wallet with the provided key.
+		ChangeKey(masterKey crypto.TwofishKey, newKey crypto.TwofishKey) error
 
 		// Unlocked returns true if the wallet is currently unlocked, false
 		// otherwise.
@@ -358,6 +369,10 @@ type (
 		// a TransactionBuilder which can be used to expand the transaction.
 		RegisterTransaction(t types.Transaction, parents []types.Transaction) TransactionBuilder
 
+		// Rescanning reports whether the wallet is currently rescanning the
+		// blockchain.
+		Rescanning() bool
+
 		// StartTransaction is a convenience method that calls
 		// RegisterTransaction(types.Transaction{}, nil)
 		StartTransaction() TransactionBuilder
@@ -367,6 +382,9 @@ type (
 		// transactions are automatically given to the transaction pool, and
 		// are also returned to the caller.
 		SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
+
+		// SendSiacoinsMulti sends coins to multiple addresses.
+		SendSiacoinsMulti(outputs []types.SiacoinOutput) ([]types.Transaction, error)
 
 		// SendSiafunds is a tool for sending siafunds from the wallet to an
 		// address. Sending money usually results in multiple transactions. The

@@ -18,7 +18,7 @@ func TestGatewayStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	var info GatewayGET
 	st.getAPI("/gateway", &info)
@@ -38,12 +38,18 @@ func TestGatewayPeerConnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
-	peer, err := gateway.New("localhost:0", false, build.TempDir("api", t.Name(), "gateway"))
+	peer, err := gateway.New("localhost:0", false, build.TempDir("api", t.Name()+"2", "gateway"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := peer.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	err = st.stdPostAPI("/gateway/connect/"+string(peer.Address()), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -70,12 +76,18 @@ func TestGatewayPeerDisconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	peer, err := gateway.New("localhost:0", false, build.TempDir("api", t.Name()+"2", "gateway"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := peer.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	err = st.stdPostAPI("/gateway/connect/"+string(peer.Address()), nil)
 	if err != nil {
 		t.Fatal(err)

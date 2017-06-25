@@ -5,6 +5,8 @@ package transactionpool
 
 import (
 	"errors"
+	"fmt"
+	"math"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -14,37 +16,11 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	// The TransactionPoolSizeLimit is first checked, and then a transaction
-	// set is added. The current transaction pool does not do any priority
-	// ordering, so the size limit is such that the transaction pool will never
-	// exceed the size of a block.
-	//
-	// TODO: Add a priority structure that will allow the transaction pool to
-	// fill up beyond the size of a single block, without being subject to
-	// manipulation.
-	//
-	// The first ~1/4 of the transaction pool can be filled for free. This is
-	// mostly to preserve compatibility with clients that do not add fees.
-	TransactionPoolSizeLimit  = 2e6 - 5e3 - modules.TransactionSetSizeLimit
-	TransactionPoolSizeForFee = 500e3
-)
-
 var (
 	errObjectConflict      = errors.New("transaction set conflicts with an existing transaction set")
 	errFullTransactionPool = errors.New("transaction pool cannot accept more transactions")
 	errLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
 	errEmptySet            = errors.New("transaction set is empty")
-
-	TransactionMinFee = types.SiacoinPrecision.Mul64(2)
-
-	// relayTransactionSetTimeout establishes the timeout for a relay
-	// transaction set call.
-	relayTransactionSetTimeout = build.Select(build.Var{
-		Standard: 3 * time.Minute,
-		Dev:      20 * time.Second,
-		Testing:  3 * time.Second,
-	}).(time.Duration)
 )
 
 // relatedObjectIDs determines all of the object ids related to a transaction.
@@ -81,51 +57,32 @@ func relatedObjectIDs(ts []types.Transaction) []ObjectID {
 	return oids
 }
 
-// checkMinerFees checks that the total amount of transaction fees in the
-// transaction set is sufficient to earn a spot in the transaction pool.
-func (tp *TransactionPool) checkMinerFees(ts []types.Transaction) error {
-	// Transactions cannot be added after the TransactionPoolSizeLimit has been
-	// hit.
-	if tp.transactionListSize > TransactionPoolSizeLimit {
-		return errFullTransactionPool
+// requiredFeesToExtendTpool returns the amount of fees required to extend the
+// transaction pool to fit another transaction set. The amount returned has the
+// unit 'currency per byte'.
+func (tp *TransactionPool) requiredFeesToExtendTpool() types.Currency {
+	// If the transaction pool is nearly empty, it can be extended even if there
+	// are no fees.
+	if tp.transactionListSize < TransactionPoolSizeForFee {
+		return types.ZeroCurrency
 	}
 
-	// The first TransactionPoolSizeForFee transactions do not need fees.
-	if tp.transactionListSize > TransactionPoolSizeForFee {
-		// Currently required fees are set on a per-transaction basis. 2 coins
-		// are required per transaction if the free-fee limit has been reached,
-		// adding a larger fee is not useful.
-		var feeSum types.Currency
-		for i := range ts {
-			for _, fee := range ts[i].MinerFees {
-				feeSum = feeSum.Add(fee)
-			}
-		}
-		feeRequired := TransactionMinFee.Mul64(uint64(len(ts)))
-		if feeSum.Cmp(feeRequired) < 0 {
-			return errLowMinerFees
-		}
-	}
-	return nil
+	// Calculate the fee required to bump out the size of the transaction pool.
+	ratioToTarget := float64(tp.transactionListSize) / TransactionPoolSizeTarget
+	feeFactor := math.Pow(ratioToTarget, TransactionPoolExponentiation)
+	return types.SiacoinPrecision.MulFloat(feeFactor).Div64(1000) // Divide by 1000 to get SC / kb
 }
 
 // checkTransactionSetComposition checks if the transaction set is valid given
 // the state of the pool. It does not check that each individual transaction
 // would be legal in the next block, but does check things like miner fees and
 // IsStandard.
-func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction) error {
+func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction) (uint64, error) {
 	// Check that the transaction set is not already known.
 	setID := TransactionSetID(crypto.HashObject(ts))
 	_, exists := tp.transactionSets[setID]
 	if exists {
-		return modules.ErrDuplicateTransactionSet
-	}
-
-	// Check that the transaction set has enough fees to justify adding it to
-	// the transaction list.
-	err := tp.checkMinerFees(ts)
-	if err != nil {
-		return err
+		return 0, modules.ErrDuplicateTransactionSet
 	}
 
 	// All checks after this are expensive.
@@ -135,11 +92,12 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 	// fly.
 
 	// Check that all transactions follow 'Standard.md' guidelines.
-	err = tp.IsStandardTransactionSet(ts)
+	setSize, err := isStandardTransactionSet(ts)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+
+	return setSize, nil
 }
 
 // handleConflicts detects whether the conflicts in the transaction pool are
@@ -205,9 +163,27 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 
 	// Check the composition of the transaction set, including fees and
 	// IsStandard rules (this is a new set, the rules must be rechecked).
-	err := tp.checkTransactionSetComposition(superset)
+	setSize, err := tp.checkTransactionSetComposition(superset)
 	if err != nil {
 		return err
+	}
+
+	// Check that the transaction set has enough fees to justify adding it to
+	// the transaction list.
+	requiredFees := tp.requiredFeesToExtendTpool().Mul64(setSize)
+	if err != nil {
+		return err
+	}
+	var setFees types.Currency
+	for _, txn := range superset {
+		for _, fee := range txn.MinerFees {
+			setFees = setFees.Add(fee)
+		}
+	}
+	if requiredFees.Cmp(setFees) > 0 {
+		// TODO: check if there is an existing set with lower fees that we can
+		// kick out.
+		return errLowMinerFees
 	}
 
 	// Check that the transaction set is valid.
@@ -217,7 +193,7 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 	}
 
 	// Remove the conflicts from the transaction pool.
-	for _, conflict := range conflictMap {
+	for conflict := range supersetMap {
 		conflictSet := tp.transactionSets[conflict]
 		tp.transactionListSize -= len(encoding.Marshal(conflictSet))
 		delete(tp.transactionSets, conflict)
@@ -236,8 +212,19 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 	for _, diff := range cc.SiafundOutputDiffs {
 		tp.knownObjects[ObjectID(diff.ID)] = setID
 	}
-	tp.transactionSetDiffs[setID] = cc
-	tp.transactionListSize += len(encoding.Marshal(superset))
+	tp.transactionSetDiffs[setID] = &cc
+	tsetSize := len(encoding.Marshal(superset))
+	tp.transactionListSize += tsetSize
+
+	// debug logging
+	if build.DEBUG {
+		txLogs := ""
+		for i, t := range superset {
+			txLogs += fmt.Sprintf("superset transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
+		}
+		tp.log.Debugf("accepted transaction superset %v, size: %vB\ntpool size is %vB after accpeting transaction superset\ntransactions: \n%v\n", setID, tsetSize, tp.transactionListSize, txLogs)
+	}
+
 	return nil
 }
 
@@ -261,11 +248,28 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 		return modules.ErrDuplicateTransactionSet
 	}
 
-	// Check the composition of the transaction set, including fees and
-	// IsStandard rules.
-	err := tp.checkTransactionSetComposition(ts)
+	// Check the composition of the transaction set.
+	setSize, err := tp.checkTransactionSetComposition(ts)
 	if err != nil {
 		return err
+	}
+
+	// Check that the transaction set has enough fees to justify adding it to
+	// the transaction list.
+	requiredFees := tp.requiredFeesToExtendTpool().Mul64(setSize)
+	if err != nil {
+		return err
+	}
+	var setFees types.Currency
+	for _, txn := range ts {
+		for _, fee := range txn.MinerFees {
+			setFees = setFees.Add(fee)
+		}
+	}
+	if requiredFees.Cmp(setFees) > 0 {
+		// TODO: check if there is an existing set with lower fees that we can
+		// kick out.
+		return errLowMinerFees
 	}
 
 	// Check for conflicts with other transactions, which would indicate a
@@ -293,8 +297,23 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 	for _, oid := range oids {
 		tp.knownObjects[oid] = setID
 	}
-	tp.transactionSetDiffs[setID] = cc
-	tp.transactionListSize += len(encoding.Marshal(ts))
+	tp.transactionSetDiffs[setID] = &cc
+	tsetSize := len(encoding.Marshal(ts))
+	tp.transactionListSize += tsetSize
+	for _, txn := range ts {
+		if _, exists := tp.transactionHeights[txn.ID()]; !exists {
+			tp.transactionHeights[txn.ID()] = tp.blockHeight
+		}
+	}
+
+	// debug logging
+	if build.DEBUG {
+		txLogs := ""
+		for i, t := range ts {
+			txLogs += fmt.Sprintf("transaction %v size: %vB\n", i, len(encoding.Marshal(t)))
+		}
+		tp.log.Debugf("accepted transaction set %v, size: %vB\ntpool size is %vB after accpeting transaction set\ntransactions: \n%v\n", setID, tsetSize, tp.transactionListSize, txLogs)
+	}
 	return nil
 }
 
@@ -317,8 +336,8 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 		if err != nil {
 			return err
 		}
-		// Notify subscribers and broadcast the transaction set.
 		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
+		// Notify subscribers of an accepted transaction set
 		tp.updateSubscribersTransactions()
 		return nil
 	})
@@ -348,5 +367,6 @@ func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+
 	return tp.AcceptTransactionSet(ts)
 }

@@ -31,7 +31,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -350,7 +349,7 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 
 			// If the storage obligation already has sectors, it means that the
 			// file contract is being renewed, and that the sector should be
-			// re-added with a new expriation height. If there is an error at any
+			// re-added with a new expiration height. If there is an error at any
 			// point, all of the sectors should be removed.
 			if len(so.SectorRoots) != 0 {
 				err := h.AddSectorBatch(so.SectorRoots)
@@ -556,7 +555,7 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 	}
 	if sos == obligationSucceeded {
 		// Remove the obligation statistics as potential risk and income.
-		h.log.Printf("Succesfully submitted a storage proof. Revenue is %v.\n", h.financialMetrics.PotentialContractCompensation.Add(h.financialMetrics.PotentialStorageRevenue).Add(h.financialMetrics.PotentialDownloadBandwidthRevenue).Add(h.financialMetrics.PotentialUploadBandwidthRevenue))
+		h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", h.financialMetrics.PotentialContractCompensation.Add(h.financialMetrics.PotentialStorageRevenue).Add(h.financialMetrics.PotentialDownloadBandwidthRevenue).Add(h.financialMetrics.PotentialUploadBandwidthRevenue))
 		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
 		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
 		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
@@ -599,9 +598,12 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 
 // threadedHandleActionItem will look at a storage obligation and determine
 // which action is necessary for the storage obligation to succeed.
-func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.WaitGroup) {
-	// The calling thread is responsible for calling Add to the thread group.
-	defer wg.Done()
+func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
+	err := h.tg.Add()
+	if err != nil {
+		return
+	}
+	defer h.tg.Done()
 
 	// Lock the storage obligation in question.
 	h.managedLockStorageObligation(soid)
@@ -610,7 +612,6 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 	}()
 
 	// Fetch the storage obligation associated with the storage obligation id.
-	var err error
 	var so storageObligation
 	h.mu.RLock()
 	blockHeight := h.blockHeight

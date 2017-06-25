@@ -51,18 +51,18 @@ var (
 	// host is going to allocate towards collateral. The number has been chosen
 	// as a number that is large, but not so large that someone would be
 	// furious for losing access to it for a few weeks.
-	defaultCollateralBudget = types.SiacoinPrecision.Mul64(1e6)
+	defaultCollateralBudget = types.SiacoinPrecision.Mul64(100e3)
 
 	// defaultContractPrice defines the default price of creating a contract
 	// with the host. The default is set to 30 siacoins, which the file
 	// contract revision can have 15 siacoins put towards it, and the storage
 	// proof can have 15 siacoins put towards it.
-	defaultContractPrice = types.SiacoinPrecision.Mul64(20) // 20 siacoins
+	defaultContractPrice = types.SiacoinPrecision.Mul64(3) // 3 siacoins
 
 	// defaultDownloadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 10 siacoins per gigabyte, because
 	// download bandwidth is expected to be plentiful but also in-demand.
-	defaultDownloadBandwidthPrice = types.SiacoinPrecision.Mul64(250).Div(modules.BytesPerTerabyte) // 250 SC / TB
+	defaultDownloadBandwidthPrice = types.SiacoinPrecision.Mul64(25).Div(modules.BytesPerTerabyte) // 25 SC / TB
 
 	// defaultMaxDownloadBatchSize defines the maximum number of bytes that the
 	// host will allow to be requested by a single download request. 17 MiB has
@@ -94,7 +94,7 @@ var (
 	// defaultStoragePrice defines the starting price for hosts selling
 	// storage. We try to match a number that is both reasonably profitable and
 	// reasonably competitive.
-	defaultStoragePrice = types.SiacoinPrecision.Mul64(750).Div(modules.BlockBytesPerMonthTerabyte) // 750 SC / TB / Month
+	defaultStoragePrice = types.SiacoinPrecision.Mul64(50).Div(modules.BlockBytesPerMonthTerabyte) // 50 SC / TB / Month
 
 	// defaultUploadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 1 siacoin per GB, because the host is
@@ -102,7 +102,55 @@ var (
 	// the host is typically only downloading data if it is planning to store
 	// the data, meaning that the host serves to profit from accepting the
 	// data.
-	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(10).Div(modules.BytesPerTerabyte) // 10 SC / TB
+	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(1).Div(modules.BytesPerTerabyte) // 1 SC / TB
+
+	// workingStatusFirstCheck defines how frequently the Host's working status
+	// check runs
+	workingStatusFirstCheck = build.Select(build.Var{
+		Standard: time.Minute * 3,
+		Dev:      time.Minute * 1,
+		Testing:  time.Second * 3,
+	}).(time.Duration)
+
+	// workingStatusFrequency defines how frequently the Host's working status
+	// check runs
+	workingStatusFrequency = build.Select(build.Var{
+		Standard: time.Minute * 10,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 10,
+	}).(time.Duration)
+
+	// workingStatusThreshold defines how many settings calls must occur over the
+	// workingStatusFrequency for the host to be considered working.
+	workingStatusThreshold = build.Select(build.Var{
+		Standard: uint64(3),
+		Dev:      uint64(1),
+		Testing:  uint64(1),
+	}).(uint64)
+
+	// connectablityCheckFirstWait defines how often the host's connectability
+	// check is run.
+	connectabilityCheckFirstWait = build.Select(build.Var{
+		Standard: time.Minute * 2,
+		Dev:      time.Minute * 1,
+		Testing:  time.Second * 3,
+	}).(time.Duration)
+
+	// connectablityCheckFrequency defines how often the host's connectability
+	// check is run.
+	connectabilityCheckFrequency = build.Select(build.Var{
+		Standard: time.Minute * 10,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 10,
+	}).(time.Duration)
+
+	// connectabilityCheckTimeout defines how long a connectability check's dial
+	// will be allowed to block before it times out.
+	connectabilityCheckTimeout = build.Select(build.Var{
+		Standard: time.Minute * 2,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 90,
+	}).(time.Duration)
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window
@@ -112,100 +160,66 @@ var (
 	// optimal default, especially as the network matures, is probably closer
 	// to 36 blocks. An experienced or high powered host should not be
 	// frustrated by lost coins due to long periods of downtime.
-	defaultWindowSize = func() types.BlockHeight {
-		if build.Release == "dev" {
-			return 36 // 3.6 minutes.
-		}
-		if build.Release == "standard" {
-			return 144 // 1 day.
-		}
-		if build.Release == "testing" {
-			return 5 // 5 seconds.
-		}
-		panic("unrecognized release constant in host - defaultWindowSize")
-	}()
+	defaultWindowSize = build.Select(build.Var{
+		Dev:      types.BlockHeight(36),  // 3.6 minutes.
+		Standard: types.BlockHeight(144), // 1 day.
+		Testing:  types.BlockHeight(5),   // 5 seconds.
+	}).(types.BlockHeight)
 
 	// logAllLimit is the number of errors of each type that the host will log
 	// before switching to probabilistic logging. If there are not many errors,
 	// it is reasonable that all errors get logged. If there are lots of
 	// errors, to cut down on the noise only some of the errors get logged.
-	logAllLimit = func() uint64 {
-		if build.Release == "dev" {
-			return 50
-		}
-		if build.Release == "standard" {
-			return 250
-		}
-		if build.Release == "testing" {
-			return 100
-		}
-		panic("unrecognized release constant in host - logAllLimit")
-	}()
+	logAllLimit = build.Select(build.Var{
+		Dev:      uint64(50),
+		Standard: uint64(250),
+		Testing:  uint64(100),
+	}).(uint64)
 
 	// logFewLimit is the number of errors of each type that the host will log
 	// before substantially constricting the amount of logging that it is
 	// doing.
-	logFewLimit = func() uint64 {
-		if build.Release == "dev" {
-			return 500
-		}
-		if build.Release == "standard" {
-			return 2500
-		}
-		if build.Release == "testing" {
-			return 500
-		}
-		panic("unrecognized release constant in host - logAllLimit")
-	}()
+	logFewLimit = build.Select(build.Var{
+		Dev:      uint64(500),
+		Standard: uint64(2500),
+		Testing:  uint64(500),
+	}).(uint64)
 
 	// maximumLockedStorageObligations sets the maximum number of storage
 	// obligations that are allowed to be locked at a time. The map uses an
 	// in-memory lock, but also a locked storage obligation could be reading a
 	// whole sector into memory, which could use a bunch of system resources.
-	maximumLockedStorageObligations = func() uint64 {
-		if build.Release == "dev" {
-			return 20
-		}
-		if build.Release == "standard" {
-			return 100
-		}
-		if build.Release == "testing" {
-			return 5
-		}
-		panic("unrecognized release constant in host - maximumLockedStorageObligations")
-	}()
+	maximumLockedStorageObligations = build.Select(build.Var{
+		Dev:      uint64(20),
+		Standard: uint64(100),
+		Testing:  uint64(5),
+	}).(uint64)
 
 	// obligationLockTimeout defines how long a thread will wait to get a lock
 	// on a storage obligation before timing out and reporting an error to the
 	// renter.
-	obligationLockTimeout = func() time.Duration {
-		if build.Release == "dev" {
-			return time.Second * 20
-		}
-		if build.Release == "standard" {
-			return time.Second * 60
-		}
-		if build.Release == "testing" {
-			return time.Second * 3
-		}
-		panic("unrecognized release constant in host - obligationLockTimeout")
-	}()
+	obligationLockTimeout = build.Select(build.Var{
+		Dev:      time.Second * 20,
+		Standard: time.Second * 60,
+		Testing:  time.Second * 3,
+	}).(time.Duration)
 
 	// revisionSubmissionBuffer describes the number of blocks ahead of time
 	// that the host will submit a file contract revision. The host will not
 	// accept any more revisions once inside the submission buffer.
-	revisionSubmissionBuffer = func() types.BlockHeight {
-		if build.Release == "dev" {
-			return 20 // About 4 minutes
-		}
-		if build.Release == "standard" {
-			return 144 // 1 day.
-		}
-		if build.Release == "testing" {
-			return 4
-		}
-		panic("unrecognized release constant in host - revision submission buffer")
-	}()
+	revisionSubmissionBuffer = build.Select(build.Var{
+		Dev:      types.BlockHeight(20),  // About 4 minutes
+		Standard: types.BlockHeight(144), // 1 day.
+		Testing:  types.BlockHeight(4),
+	}).(types.BlockHeight)
+
+	// rpcRatelimit prevents someone from spamming the host with connections,
+	// causing it to spin up enough goroutines to crash.
+	rpcRatelimit = build.Select(build.Var{
+		Dev:      time.Millisecond * 10,
+		Standard: time.Millisecond * 50,
+		Testing:  time.Millisecond,
+	}).(time.Duration)
 )
 
 // All of the following variables define the names of buckets used by the host

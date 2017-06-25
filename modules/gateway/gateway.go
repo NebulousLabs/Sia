@@ -54,7 +54,7 @@ import (
 // after they successfully form a connection with the gateway. To limit the
 // attacker's ability to add nodes to the nodelist, connections are
 // ratelimited. An attacker with lots of IP addresses still has the ability to
-// fill up the nodelist, however getting 90% dominance of the nodelist requries
+// fill up the nodelist, however getting 90% dominance of the nodelist requires
 // forming thousands of connections, which will take hours or days. By that
 // time, the attacked node should already have its set of outbound peers,
 // limiting the amount of damage that the attacker can do.
@@ -88,7 +88,7 @@ import (
 // of bootstrap nodes. If there is any cross-polination (which an attacker
 // could do pretty easily), the gateways will not clean up over time, which
 // will degrade the quality of the flood network as the two networks will
-// continously flood eachother with irrelevant information. Additionally, there
+// continuously flood eachother with irrelevant information. Additionally, there
 // is no public key exhcange, so communications cannot be effectively encrypted
 // or authenticated. The nodes must have some way to share keys.
 //
@@ -191,8 +191,8 @@ type Gateway struct {
 }
 
 // managedSleep will sleep for the given period of time. If the full time
-// elapses, 'false' is returned. If the sleep is interrupted for shutdown,
-// 'true' is returned.
+// elapses, 'true' is returned. If the sleep is interrupted for shutdown,
+// 'false' is returned.
 func (g *Gateway) managedSleep(t time.Duration) (completed bool) {
 	select {
 	case <-time.After(t):
@@ -214,8 +214,8 @@ func (g *Gateway) Close() error {
 	if err := g.threads.Stop(); err != nil {
 		return err
 	}
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	return g.saveSync()
 }
 
@@ -275,6 +275,17 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
 	}
+	// Spawn the thread to periodically save the gateway.
+	go g.threadedSaveLoop()
+	// Make sure that the gateway saves after shutdown.
+	g.threads.AfterStop(func() {
+		g.mu.Lock()
+		err = g.saveSync()
+		g.mu.Unlock()
+		if err != nil {
+			g.log.Println("ERROR: Unable to save gateway:", err)
+		}
+	})
 
 	// Add the bootstrap peers to the node list.
 	if bootstrap {

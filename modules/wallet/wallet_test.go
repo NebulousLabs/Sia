@@ -3,6 +3,7 @@ package wallet
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -64,7 +65,7 @@ func createWalletTester(name string) (*walletTester, error) {
 		return nil, err
 	}
 
-	// Assemble all componenets into a wallet tester.
+	// Assemble all components into a wallet tester.
 	wt := &walletTester{
 		cs:      cs,
 		gateway: g,
@@ -114,7 +115,7 @@ func createBlankWalletTester(name string) (*walletTester, error) {
 		return nil, err
 	}
 
-	// Assemble all componenets into a wallet tester.
+	// Assemble all components into a wallet tester.
 	wt := &walletTester{
 		gateway: g,
 		cs:      cs,
@@ -218,5 +219,52 @@ func TestCloseWallet(t *testing.T) {
 	}
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestRescanning verifies that calling Rescanning during a scan operation
+// returns true, and false otherwise.
+func TestRescanning(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// A fresh wallet should not be rescanning.
+	if wt.wallet.Rescanning() {
+		t.Fatal("fresh wallet should not report that a scan is underway")
+	}
+
+	// lock the wallet
+	wt.wallet.Lock()
+
+	// spawn an unlock goroutine
+	errChan := make(chan error)
+	go func() {
+		// acquire the write lock so that Unlock acquires the trymutex, but
+		// cannot proceed further
+		wt.wallet.mu.Lock()
+		errChan <- wt.wallet.Unlock(wt.walletMasterKey)
+	}()
+
+	// wait for goroutine to start, after which Rescanning should return true
+	time.Sleep(time.Millisecond * 10)
+	if !wt.wallet.Rescanning() {
+		t.Fatal("wallet should report that a scan is underway")
+	}
+
+	// release the mutex and allow the call to complete
+	wt.wallet.mu.Unlock()
+	if err := <-errChan; err != nil {
+		t.Fatal("unlock failed:", err)
+	}
+
+	// Rescanning should now return false again
+	if wt.wallet.Rescanning() {
+		t.Fatal("wallet should not report that a scan is underway")
 	}
 }

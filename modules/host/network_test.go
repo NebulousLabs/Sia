@@ -1,8 +1,11 @@
 package host
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // blockingPortForward is a dependency set that causes the host port forward
@@ -54,4 +57,88 @@ func TestPortForwardBlocking(t *testing.T) {
 	// where the host was not shutting down correctly. Currently, the extra
 	// sleep does nothing, but in the regression a logging panic would occur.
 	time.Sleep(time.Second * 4)
+}
+
+// TestHostWorkingStatus checks that the host properly updates its working
+// state
+func TestHostWorkingStatus(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	ht, err := newHostTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ht.Close()
+
+	// TODO: this causes an ndf, because it relies on the host tester starting up
+	// and fully returning faster than the first check, which isnt always the
+	// case.  This check is disabled for now, but can be fixed by using the
+	// disrupt() pattern.
+	// if ht.host.WorkingStatus() != modules.HostWorkingStatusChecking {
+	// 	t.Fatal("expected working state to initially be modules.HostWorkingStatusChecking")
+	// }
+
+	for i := 0; i < 5; i++ {
+		// Simulate some setting calls, and see if the host picks up on it.
+		atomic.AddUint64(&ht.host.atomicSettingsCalls, workingStatusThreshold+1)
+
+		success := false
+		for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
+			if ht.host.WorkingStatus() == modules.HostWorkingStatusWorking {
+				success = true
+				break
+			}
+		}
+		if !success {
+			t.Fatal("expected working state to flip to HostWorkingStatusWorking after incrementing settings calls")
+		}
+
+		// make no settins calls, host should flip back to NotWorking
+		success = false
+		for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
+			if ht.host.WorkingStatus() == modules.HostWorkingStatusNotWorking {
+				success = true
+				break
+			}
+		}
+		if !success {
+			t.Fatal("expected working state to flip to HostStatusNotWorking if no settings calls occur")
+		}
+	}
+}
+
+// TestHostConnectabilityStatus checks that the host properly updates its connectable
+// state
+func TestHostConnectabilityStatus(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	ht, err := newHostTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ht.Close()
+
+	// TODO: this causes an ndf, because it relies on the host tester starting up
+	// and fully returning faster than the first check, which isnt always the
+	// case.  This check is disabled for now, but can be fixed by using the
+	// disrupt() pattern.
+	// if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusChecking {
+	// 		t.Fatal("expected connectability state to initially be ConnectablityStateChecking")
+	// }
+
+	success := false
+	for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
+		if ht.host.ConnectabilityStatus() == modules.HostConnectabilityStatusConnectable {
+			success = true
+			break
+		}
+	}
+	if !success {
+		t.Fatal("expected connectability state to flip to HostConnectabilityStatusConnectable")
+	}
 }

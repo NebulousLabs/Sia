@@ -13,7 +13,7 @@ func TestLoad(t *testing.T) {
 
 	g.mu.Lock()
 	g.addNode(dummyNode)
-	g.save()
+	g.saveSync()
 	g.mu.Unlock()
 	g.Close()
 

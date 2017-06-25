@@ -384,7 +384,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	// Add a peer that is synced to the peer that is not synced. IBD should not
 	// be considered completed when there is a tie between synced and
 	// not-synced peers.
-	gatewayNoTimeout, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
+	gatewayNoTimeout, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout1", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	// Test when there is 2 peers that are synced and one that is not synced.
 	// There is now a majority synced peers and the minIBDWaitTime has passed,
 	// so the IBD function should finish.
-	gatewayNoTimeout2, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
+	gatewayNoTimeout2, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout2", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,7 +426,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	// Test when there are >= minNumOutbound peers and >= minNumOutbound peers are synced.
 	gatewayNoTimeouts := make([]modules.Gateway, minNumOutbound-1)
 	for i := 0; i < len(gatewayNoTimeouts); i++ {
-		tmpG, err := gateway.New("localhost:0", false, filepath.Join(testdir, fmt.Sprintf("remote - no timeout %v", i), modules.GatewayDir))
+		tmpG, err := gateway.New("localhost:0", false, filepath.Join(testdir, fmt.Sprintf("remote - no timeout-auto-%v", i+3), modules.GatewayDir))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -490,6 +490,6 @@ func TestGenesisBlockSync(t *testing.T) {
 
 	time.Sleep(time.Second * 12)
 	if len(cst1.gateway.Peers()) == 0 {
-		t.Error("disconnection occured!")
+		t.Error("disconnection occurred!")
 	}
 }

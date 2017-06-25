@@ -42,7 +42,7 @@ type Config struct {
 		RequiredUserAgent string
 		AuthenticateAPI   bool
 
-		Profile    bool
+		Profile    string
 		ProfileDir string
 		SiaDir     string
 	}
@@ -163,7 +163,7 @@ func main() {
 	root.Flags().StringVarP(&globalConfig.Siad.APIaddr, "api-addr", "", "localhost:9980", "which host:port the API server listens on")
 	root.Flags().StringVarP(&globalConfig.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
 	root.Flags().BoolVarP(&globalConfig.Siad.NoBootstrap, "no-bootstrap", "", false, "disable bootstrapping on this run")
-	root.Flags().BoolVarP(&globalConfig.Siad.Profile, "profile", "", false, "enable profiling")
+	root.Flags().StringVarP(&globalConfig.Siad.Profile, "profile", "", "", "enable profiling with flags 'cmt' for CPU, memory, trace")
 	root.Flags().StringVarP(&globalConfig.Siad.RPCaddr, "rpc-addr", "", ":9981", "which port the gateway listens on")
 	root.Flags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghrtw", "enabled modules, see 'siad modules' for more info")
 	root.Flags().BoolVarP(&globalConfig.Siad.AuthenticateAPI, "authenticate-api", "", false, "enable API password protection")

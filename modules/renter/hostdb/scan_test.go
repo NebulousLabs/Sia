@@ -9,7 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestUpdateEntry checks that the various componenets of updateEntry are
+// TestUpdateEntry checks that the various components of updateEntry are
 // working correctly.
 func TestUpdateEntry(t *testing.T) {
 	if testing.Short() {

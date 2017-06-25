@@ -28,39 +28,43 @@ func (cs *ConsensusSet) managedBroadcastBlock(b types.Block) {
 // validateHeaderAndBlock does some early, low computation verification on the
 // block. Callers should not assume that validation will happen in a particular
 // order.
-func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) error {
+func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) (parent *processedBlock, err error) {
 	// Check if the block is a DoS block - a known invalid block that is expensive
 	// to validate.
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
 	if exists {
-		return errDoSBlock
+		return nil, errDoSBlock
 	}
 
 	// Check if the block is already known.
 	blockMap := tx.Bucket(BlockMap)
 	if blockMap == nil {
-		return errNoBlockMap
+		return nil, errNoBlockMap
 	}
 	if blockMap.Get(id[:]) != nil {
-		return modules.ErrBlockKnown
+		return nil, modules.ErrBlockKnown
 	}
 
 	// Check for the parent.
 	parentID := b.ParentID
 	parentBytes := blockMap.Get(parentID[:])
 	if parentBytes == nil {
-		return errOrphan
+		return nil, errOrphan
 	}
-	var parent processedBlock
-	err := cs.marshaler.Unmarshal(parentBytes, &parent)
+	parent = new(processedBlock)
+	err = cs.marshaler.Unmarshal(parentBytes, parent)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Check that the timestamp is not too far in the past to be acceptable.
-	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
+	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, parent)
 
-	return cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1)
+	err = cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1, cs.log)
+	if err != nil {
+		return nil, err
+	}
+	return parent, nil
 }
 
 // checkHeaderTarget returns true if the header's ID meets the given target.
@@ -143,15 +147,11 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
 // can be appropriately returned by the database and the transaction can be
 // committed. Switching to a managed tx through bolt will make this complexity
 // unneeded.
-func (cs *ConsensusSet) addBlockToTree(b types.Block) (ce changeEntry, err error) {
+func (cs *ConsensusSet) addBlockToTree(b types.Block, parent *processedBlock) (ce changeEntry, err error) {
 	var nonExtending bool
 	err = cs.db.Update(func(tx *bolt.Tx) error {
-		pb, err := getBlockMap(tx, b.ParentID)
-		if build.DEBUG && err != nil {
-			panic(err)
-		}
 		currentNode := currentProcessedBlock(tx)
-		newNode := cs.newChild(tx, pb, b)
+		newNode := cs.newChild(tx, parent, b)
 
 		// modules.ErrNonExtendingBlock should be returned if the block does
 		// not extend the current blockchain, however the changes from newChild
@@ -213,6 +213,7 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	cs.mu.Lock()
 
 	// Start verification inside of a bolt View tx.
+	var parent *processedBlock
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		// Do not accept a block if the database is inconsistent.
 		if inconsistencyDetected(tx) {
@@ -222,7 +223,8 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 		// Do some relatively inexpensive checks to validate the header and block.
 		// Validation generally occurs in the order of least expensive validation
 		// first.
-		err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, b)
+		var err error
+		parent, err = cs.validateHeaderAndBlock(boltTxWrapper{tx}, b)
 		if err != nil {
 			// If the block is in the near future, but too far to be acceptable, then
 			// save the block and add it to the consensus set after it is no longer
@@ -263,7 +265,7 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
-	changeEntry, err := cs.addBlockToTree(b)
+	changeEntry, err := cs.addBlockToTree(b, parent)
 	if err != nil {
 		cs.mu.Unlock()
 		return err

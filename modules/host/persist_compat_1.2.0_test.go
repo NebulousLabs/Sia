@@ -20,7 +20,7 @@ const (
 	v112Host = "v112Host.tar.gz"
 )
 
-// loadExistingHostWithNewDeps will create all of the depedencies for a host, then load
+// loadExistingHostWithNewDeps will create all of the dependencies for a host, then load
 // the host on top of the given directory.
 func loadExistingHostWithNewDeps(modulesDir, hostDir string) (modules.Host, error) {
 	testdir := build.TempDir(modules.HostDir, modulesDir)
@@ -69,13 +69,13 @@ func TestV112StorageManagerUpgrade(t *testing.T) {
 	// Patch the storagemanager.json to point to the new storage folder
 	// location.
 	smPersist := new(v112StorageManagerPersist)
-	err = persist.LoadFile(v112StorageManagerMetadata, smPersist, filepath.Join(legacyHost, v112StorageManagerDir, v112StorageManagerPersistFilename))
+	err = persist.LoadJSON(v112StorageManagerMetadata, smPersist, filepath.Join(legacyHost, v112StorageManagerDir, v112StorageManagerPersistFilename))
 	if err != nil {
 		t.Fatal(err)
 	}
 	smPersist.StorageFolders[0].Path = filepath.Join(legacyHost, "storageFolderOne")
 	smPersist.StorageFolders[1].Path = filepath.Join(legacyHost, "storageFolderTwo")
-	err = persist.SaveFile(v112StorageManagerMetadata, smPersist, filepath.Join(legacyHost, v112StorageManagerDir, v112StorageManagerPersistFilename))
+	err = persist.SaveJSON(v112StorageManagerMetadata, smPersist, filepath.Join(legacyHost, v112StorageManagerDir, v112StorageManagerPersistFilename))
 	if err != nil {
 		t.Fatal(err)
 	}

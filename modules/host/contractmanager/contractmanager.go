@@ -1,7 +1,11 @@
 package contractmanager
 
-// TODO: Empty storage folder operation does not indicate progress, nor
-// indiciate what operation is taking so long.
+// TODO: Need to sync the directory after doing rename and create operations.
+
+// TODO: Use fallocate when adding + growing storage folders.
+
+// TODO: Long-running operations (add, empty) don't tally progress, and don't
+// indicate what operation is running.
 
 // TODO: Add disk failure testing.
 
@@ -16,9 +20,15 @@ package contractmanager
 // TODO: Re-write the WAL to not need to do group syncing, and also to not need
 // to use the rename call at all.
 
+// TODO: When a storage folder is missing, operations on the sectors in that
+// storage folder (Add, Remove, Delete, etc.) may result in corruption and
+// inconsistent internal state for the contractor. For now, this is fine because
+// it's a rare situation, but it should be addressed eventually.
+
 import (
 	"errors"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -161,6 +171,13 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		defer cm.wal.mu.Unlock()
 
 		for _, sf := range cm.storageFolders {
+			// No storage folder to close if the folder is not available.
+			if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+				// File handles will either already be closed or may even be
+				// nil.
+				continue
+			}
+
 			err = sf.metadataFile.Close()
 			if err != nil {
 				cm.log.Println("Error closing the storage folder file handle", err)
@@ -174,7 +191,15 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 
 	// The sector location data is loaded last. Any corruption that happened
 	// during unclean shutdown has already been fixed by the WAL.
-	cm.loadSectorLocations()
+	for _, sf := range cm.storageFolders {
+		if atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+			// Metadata unavailable, just count the number of sectors instead of
+			// loading them.
+			sf.sectors = uint64(len(usageSectors(sf.usage)))
+			continue
+		}
+		cm.loadSectorLocations(sf)
+	}
 
 	// Launch the sync loop that periodically flushes changes from the WAL to
 	// disk.
@@ -183,6 +208,10 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		cm.log.Println("ERROR: Unable to spawn the contract manager synchronization loop:", err)
 		return nil, build.ExtendErr("error while spawning contract manager sync loop", err)
 	}
+
+	// Spin up the thread that continuously looks for missing storage folders
+	// and adds them if they are discovered.
+	go cm.threadedFolderRecheck()
 
 	// Simulate an error to make sure the cleanup code is triggered correctly.
 	if cm.dependencies.disrupt("erroredStartup") {

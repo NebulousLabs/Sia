@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -163,7 +164,7 @@ func (brh mockBlockRuleHelper) minimumValidChildTimestamp(blockMap dbBucket, pb 
 
 // ValidateBlock stores the parameters it receives and returns the mock error
 // defined by mockBlockValidator.err.
-func (bv mockBlockValidator) ValidateBlock(b types.Block, minTimestamp types.Timestamp, target types.Target, height types.BlockHeight) error {
+func (bv mockBlockValidator) ValidateBlock(b types.Block, minTimestamp types.Timestamp, target types.Target, height types.BlockHeight, log *persist.Logger) error {
 	validateBlockParamsGot = validateBlockParams{true, b, minTimestamp, target, height}
 	return bv.err
 }
@@ -293,7 +294,7 @@ func TestUnitValidateHeaderAndBlock(t *testing.T) {
 		}
 		// Reset the stored parameters to ValidateBlock.
 		validateBlockParamsGot = validateBlockParams{}
-		err := cs.validateHeaderAndBlock(tx, tt.block)
+		_, err := cs.validateHeaderAndBlock(tx, tt.block)
 		if err != tt.errWant {
 			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
 		}

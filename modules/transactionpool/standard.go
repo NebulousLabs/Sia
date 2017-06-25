@@ -15,7 +15,7 @@ import (
 // Rule: Transaction size is limited
 //		There is a DoS vector where large transactions can both contain many
 //		signatures, and have each signature's CoveredFields object cover a
-//		unique but large portion of the transaciton. A 1mb transaction could
+//		unique but large portion of the transaction. A 1mb transaction could
 //		force a verifier to hash very large volumes of data, which takes a long
 //		time on nonspecialized hardware.
 //
@@ -42,7 +42,7 @@ import (
 // accepted as valid by the consnensus set, but rejected by the transaction
 // pool. This allows new types of keys to be added via a softfork without
 // alienating all of the older nodes.
-func (tp *TransactionPool) checkUnlockConditions(uc types.UnlockConditions) error {
+func checkUnlockConditions(uc types.UnlockConditions) error {
 	for _, pk := range uc.PublicKeys {
 		if pk.Algorithm != types.SignatureEntropy &&
 			pk.Algorithm != types.SignatureEd25519 {
@@ -53,9 +53,12 @@ func (tp *TransactionPool) checkUnlockConditions(uc types.UnlockConditions) erro
 	return nil
 }
 
-// IsStandardTransaction enforces extra rules such as a transaction size limit.
+// isStandardTransaction enforces extra rules such as a transaction size limit.
 // These rules can be altered without disrupting consensus.
-func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
+//
+// The size of the transaction is returned so that the transaction does not need
+// to be encoded multiple times.
+func isStandardTransaction(t types.Transaction) (uint64, error) {
 	// Check that the size of the transaction does not exceed the standard
 	// established in Standard.md. Larger transactions are a DOS vector,
 	// because someone can fill a large transaction with a bunch of signatures
@@ -63,8 +66,9 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 	// of hashing can be required of a verifier. Enforcing this rule makes it
 	// more difficult for attackers to exploid this DOS vector, though a miner
 	// with sufficient power could still create unfriendly blocks.
-	if len(encoding.Marshal(t)) > modules.TransactionSizeLimit {
-		return modules.ErrLargeTransaction
+	tlen := len(encoding.Marshal(t))
+	if tlen > modules.TransactionSizeLimit {
+		return 0, modules.ErrLargeTransaction
 	}
 
 	// Check that all public keys are of a recognized type. Need to check all
@@ -73,21 +77,21 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 	// may make certain unrecognized signatures invalid, and this node cannot
 	// tell which signatures are the invalid ones.
 	for _, sci := range t.SiacoinInputs {
-		err := tp.checkUnlockConditions(sci.UnlockConditions)
+		err := checkUnlockConditions(sci.UnlockConditions)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 	for _, fcr := range t.FileContractRevisions {
-		err := tp.checkUnlockConditions(fcr.UnlockConditions)
+		err := checkUnlockConditions(fcr.UnlockConditions)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 	for _, sfi := range t.SiafundInputs {
-		err := tp.checkUnlockConditions(sfi.UnlockConditions)
+		err := checkUnlockConditions(sfi.UnlockConditions)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
@@ -105,30 +109,31 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 			continue
 		}
 
-		return modules.ErrInvalidArbPrefix
+		return 0, modules.ErrInvalidArbPrefix
 	}
-	return nil
+	return uint64(tlen), nil
 }
 
-// IsStandardTransactionSet checks that all transacitons of a set follow the
+// isStandardTransactionSet checks that all transacitons of a set follow the
 // IsStandard guidelines, and that the set as a whole follows the guidelines as
 // well.
-func (tp *TransactionPool) IsStandardTransactionSet(ts []types.Transaction) error {
-	// Check that the set is a reasonable size.
-	totalSize := 0
+//
+// The size of the transaction set is returned so that the encoding only needs
+// to happen once.
+func isStandardTransactionSet(ts []types.Transaction) (uint64, error) {
+	// Check that each transaction is acceptable, while also making sure that
+	// the size of the whole set is legal.
+	var totalSize uint64
 	for i := range ts {
-		totalSize += len(encoding.Marshal(ts[i]))
-		if totalSize > modules.TransactionSetSizeLimit {
-			return modules.ErrLargeTransactionSet
-		}
-	}
-
-	// Check that each transaction is acceptable.
-	for i := range ts {
-		err := tp.IsStandardTransaction(ts[i])
+		tSize, err := isStandardTransaction(ts[i])
 		if err != nil {
-			return err
+			return 0, err
 		}
+		totalSize += tSize
+		if totalSize > modules.TransactionSetSizeLimit {
+			return 0, modules.ErrLargeTransactionSet
+		}
+
 	}
-	return nil
+	return totalSize, nil
 }

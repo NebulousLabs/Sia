@@ -42,6 +42,14 @@ var (
 		Long:  "View the current allowance, which controls how much money is spent on file contracts.",
 		Run:   wrap(renterallowancecmd),
 	}
+
+	renterAllowanceCancelCmd = &cobra.Command{
+		Use:   "cancel",
+		Short: "Cancel the current allowance",
+		Long:  "Cancel the current allowance, which controls how much money is spent on file contracts.",
+		Run:   wrap(renterallowancecancelcmd),
+	}
+
 	renterSetAllowanceCmd = &cobra.Command{
 		Use:   "setallowance [amount] [period]",
 		Short: "Set the allowance",
@@ -196,7 +204,7 @@ func renterdownloadscmd() {
 		die("Could not get download queue:", err)
 	}
 	// Filter out files that have been downloaded.
-	var downloading []modules.DownloadInfo
+	var downloading []api.DownloadInfo
 	for _, file := range queue.Downloads {
 		if file.Received != file.Filesize {
 			downloading = append(downloading, file)
@@ -215,7 +223,7 @@ func renterdownloadscmd() {
 	}
 	fmt.Println()
 	// Filter out files that are downloading.
-	var downloaded []modules.DownloadInfo
+	var downloaded []api.DownloadInfo
 	for _, file := range queue.Downloads {
 		if file.Received == file.Filesize {
 			downloaded = append(downloaded, file)
@@ -245,6 +253,15 @@ func renterallowancecmd() {
 	Amount: %v
 	Period: %v blocks
 `, currencyUnits(allowance.Funds), allowance.Period)
+}
+
+// renterallowancecancelcmd cancels the current allowance.
+func renterallowancecancelcmd() {
+	err := post("/renter", "hosts=0&funds=0&period=0&renewwindow=0")
+	if err != nil {
+		die("error cancelling allowance:", err)
+	}
+	fmt.Println("Allowance cancelled.")
 }
 
 // rentersetallowancecmd allows the user to set the allowance.
@@ -293,11 +310,13 @@ func rentercontractscmd() {
 	sort.Sort(byValue(rc.Contracts))
 	fmt.Println("Contracts:")
 	w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "Host\tValue\tData\tEnd Height\tID")
+	fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID")
 	for _, c := range rc.Contracts {
-		fmt.Fprintf(w, "%v\t%8s\t%v\t%v\t%v\n",
+		fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\n",
 			c.NetAddress,
 			currencyUnits(c.RenterFunds),
+			currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
+			currencyUnits(c.Fees),
 			filesizeUnits(int64(c.Size)),
 			c.EndHeight,
 			c.ID)
@@ -362,37 +381,7 @@ func renterfilesdeletecmd(path string) {
 func renterfilesdownloadcmd(path, destination string) {
 	destination = abs(destination)
 	done := make(chan struct{})
-	go func() {
-		time.Sleep(time.Second) // give download time to initialize
-		for {
-			select {
-			case <-done:
-				return
-
-			case <-time.Tick(time.Second):
-				// get download progress of file
-				var queue api.RenterDownloadQueue
-				err := getAPI("/renter/downloads", &queue)
-				if err != nil {
-					continue // benign
-				}
-				var d modules.DownloadInfo
-				for _, d = range queue.Downloads {
-					if d.Destination == destination {
-						break
-					}
-				}
-				if d.Filesize == 0 {
-					continue // file hasn't appeared in queue yet
-				}
-				pct := 100 * float64(d.Received) / float64(d.Filesize)
-				elapsed := time.Since(d.StartTime)
-				elapsed -= elapsed % time.Second // round to nearest second
-				mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
-				fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
-			}
-		}
-	}()
+	go downloadprogress(done, path)
 
 	err := get("/renter/download/" + path + "?destination=" + destination)
 	close(done)
@@ -400,6 +389,39 @@ func renterfilesdownloadcmd(path, destination string) {
 		die("Could not download file:", err)
 	}
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
+}
+
+func downloadprogress(done chan struct{}, siapath string) {
+	time.Sleep(time.Second) // give download time to initialize
+	for {
+		select {
+		case <-done:
+			return
+
+		case <-time.Tick(time.Second):
+			// get download progress of file
+			var queue api.RenterDownloadQueue
+			err := getAPI("/renter/downloads", &queue)
+			if err != nil {
+				continue // benign
+			}
+			var d api.DownloadInfo
+			for _, d = range queue.Downloads {
+				if d.SiaPath == siapath {
+					break
+				}
+			}
+			if d.Filesize == 0 {
+				continue // file hasn't appeared in queue yet
+			}
+			pct := 100 * float64(d.Received) / float64(d.Filesize)
+			elapsed := time.Since(d.StartTime)
+			elapsed -= elapsed % time.Second // round to nearest second
+			mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
+			fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
+		}
+	}
+
 }
 
 // bySiaPath implements sort.Interface for [] modules.FileInfo based on the
@@ -462,18 +484,57 @@ func renterfilesrenamecmd(path, newpath string) {
 	fmt.Printf("Renamed %s to %s\n", path, newpath)
 }
 
-// renterfilesuploadcmd is the handler for the command `siac renter upload [source] [path]`.
-// Uploads the [source] file to [path] on the Sia network.
+// renterfilesuploadcmd is the handler for the command `siac renter upload
+// [source] [path]`. Uploads the [source] file to [path] on the Sia network.
+// If [source] is a directory, all files inside it will be uploaded and named
+// relative to [path].
 func renterfilesuploadcmd(source, path string) {
-	err := post("/renter/upload/"+path, "source="+abs(source))
+	stat, err := os.Stat(source)
 	if err != nil {
-		die("Could not upload file:", err)
+		die("Could not stat file or folder:", err)
 	}
-	fmt.Printf("Uploaded '%s' as %s.\n", abs(source), path)
+
+	if stat.IsDir() {
+		// folder
+		var files []string
+		err := filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				fmt.Println("Warning: skipping file:", err)
+				return nil
+			}
+			if info.IsDir() {
+				return nil
+			}
+			files = append(files, path)
+			return nil
+		})
+		if err != nil {
+			die("Could not read folder:", err)
+		} else if len(files) == 0 {
+			die("Nothing to upload.")
+		}
+		for _, file := range files {
+			fpath, _ := filepath.Rel(source, file)
+			fpath = filepath.Join(path, fpath)
+			fpath = filepath.ToSlash(fpath)
+			err = post("/renter/upload/"+fpath, "source="+abs(file))
+			if err != nil {
+				die("Could not upload file:", err)
+			}
+		}
+		fmt.Printf("Uploaded %d files into '%s'.\n", len(files), path)
+	} else {
+		// single file
+		err = post("/renter/upload/"+path, "source="+abs(source))
+		if err != nil {
+			die("Could not upload file:", err)
+		}
+		fmt.Printf("Uploaded '%s' as %s.\n", abs(source), path)
+	}
 }
 
 // renterpricescmd is the handler for the command `siac renter prices`, which
-// displays the pirces of various storage operations.
+// displays the prices of various storage operations.
 func renterpricescmd() {
 	var rpg api.RenterPricesGET
 	err := getAPI("/renter/prices", &rpg)

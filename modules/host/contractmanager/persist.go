@@ -46,10 +46,9 @@ func (cm *ContractManager) initSettings() error {
 	// Initialize the sector salt to a random value.
 	fastrand.Read(cm.sectorSalt[:])
 
-	// Ensure that the initialized defaults have stuck by doing a SaveFileSync
-	// with the new settings values.
+	// Ensure that the initialized defaults have stuck.
 	ss := cm.savedSettings()
-	err := persist.SaveFileSync(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile))
+	err := persist.SaveJSON(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile))
 	if err != nil {
 		cm.log.Println("ERROR: unable to initialize settings file for contract manager:", err)
 		return build.ExtendErr("error saving contract manager after initialization", err)
@@ -79,14 +78,18 @@ func (cm *ContractManager) loadSettings() error {
 		sf.usage = ss.StorageFolders[i].Usage
 		sf.metadataFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
 		if err != nil {
+			// Mark the folder as unavailable and log an error.
+			atomic.StoreUint64(&sf.atomicUnavailable, 1)
 			cm.log.Printf("ERROR: unable to open the %v sector metadata file: %v\n", sf.path, err)
-			continue
 		}
 		sf.sectorFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
 		if err != nil {
+			// Mark the folder as unavailable and log an error.
+			atomic.StoreUint64(&sf.atomicUnavailable, 1)
 			cm.log.Printf("ERROR: unable to open the %v sector file: %v\n", sf.path, err)
-			sf.metadataFile.Close()
-			continue
+			if sf.metadataFile != nil {
+				sf.metadataFile.Close()
+			}
 		}
 		sf.availableSectors = make(map[sectorID]uint32)
 		cm.storageFolders[sf.index] = sf
@@ -96,37 +99,38 @@ func (cm *ContractManager) loadSettings() error {
 
 // loadSectorLocations will read the metadata portion of each storage folder
 // file and load the sector location information into memory.
-func (cm *ContractManager) loadSectorLocations() {
-	// Each storage folder houses separate sector location data.
-	for _, sf := range cm.storageFolders {
-		// Read the sector lookup table for this storage folder into memory.
-		sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.usage)*storageFolderGranularity)
-		if err != nil {
-			cm.log.Printf("ERROR: unable to read sector metadata for folder %v: %v\n", sf.path, err)
-			atomic.AddUint64(&sf.atomicFailedReads, 1)
-			continue
-		}
-		atomic.AddUint64(&sf.atomicSuccessfulReads, 1)
-
-		// Iterate through the sectors that are in-use and read their storage
-		// locations into memory.
-		sf.sectors = 0 // may be non-zero from WAL operations - they will be double counted here if not reset.
-		for _, sectorIndex := range usageSectors(sf.usage) {
-			readHead := sectorMetadataDiskSize * sectorIndex
-			var id sectorID
-			copy(id[:], sectorLookupBytes[readHead:readHead+12])
-			count := binary.LittleEndian.Uint16(sectorLookupBytes[readHead+12 : readHead+14])
-			sl := sectorLocation{
-				index:         sectorIndex,
-				storageFolder: sf.index,
-				count:         count,
-			}
-
-			// Add the sector to the sector location map.
-			cm.sectorLocations[id] = sl
-			sf.sectors++
-		}
+func (cm *ContractManager) loadSectorLocations(sf *storageFolder) {
+	// Read the sector lookup table for this storage folder into memory.
+	sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.usage)*storageFolderGranularity)
+	if err != nil {
+		atomic.AddUint64(&sf.atomicFailedReads, 1)
+		atomic.StoreUint64(&sf.atomicUnavailable, 1)
+		err = build.ComposeErrors(err, sf.metadataFile.Close())
+		err = build.ComposeErrors(err, sf.sectorFile.Close())
+		cm.log.Printf("ERROR: unable to read sector metadata for folder %v: %v\n", sf.path, err)
+		return
 	}
+	atomic.AddUint64(&sf.atomicSuccessfulReads, 1)
+
+	// Iterate through the sectors that are in-use and read their storage
+	// locations into memory.
+	sf.sectors = 0 // may be non-zero from WAL operations - they will be double counted here if not reset.
+	for _, sectorIndex := range usageSectors(sf.usage) {
+		readHead := sectorMetadataDiskSize * sectorIndex
+		var id sectorID
+		copy(id[:], sectorLookupBytes[readHead:readHead+12])
+		count := binary.LittleEndian.Uint16(sectorLookupBytes[readHead+12 : readHead+14])
+		sl := sectorLocation{
+			index:         sectorIndex,
+			storageFolder: sf.index,
+			count:         count,
+		}
+
+		// Add the sector to the sector location map.
+		cm.sectorLocations[id] = sl
+		sf.sectors++
+	}
+	atomic.StoreUint64(&sf.atomicUnavailable, 0)
 }
 
 // savedSettings returns the settings of the contract manager in an

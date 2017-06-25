@@ -102,7 +102,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		// We need at least some of our outbound peers to be remote peers. If
 		// we already have reached a certain threshold of outbound peers and
 		// this peer is a local peer, do not consider it for an outbound peer.
-		// Sleep breifly to prevent the gateway from hogging the CPU if all
+		// Sleep briefly to prevent the gateway from hogging the CPU if all
 		// peers are local.
 		if numOutboundPeers >= maxLocalOutboundPeers && addr.IsLocal() && build.Release != "testing" {
 			g.log.Debugln("[PPM] Ignorning selected peer; this peer is local and we already have multiple outbound peers:", addr)

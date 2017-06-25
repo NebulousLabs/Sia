@@ -93,12 +93,12 @@ const (
 
 	// NegotiateMaxTransactionSignatureSize defines the maximum size that a
 	// transaction signature is allowed to be when being sent over the wire
-	// during negoitation.
+	// during negotiation.
 	NegotiateMaxTransactionSignatureSize = 2e3
 
 	// NegotiateMaxTransactionSignaturesSize defines the maximum size that a
 	// transaction signature slice is allowed to be when being sent over the
-	// wire during negoitation.
+	// wire during negotiation.
 	NegotiateMaxTransactionSignaturesSize = 5e3
 )
 

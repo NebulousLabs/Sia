@@ -9,23 +9,12 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/bolt"
 )
 
 var (
-	// bucketHistoricClaimStarts maps a SiafundOutputID to the value of the
-	// siafund pool when the output was processed. It stores every such output
-	// in the blockchain. The wallet uses this mapping to determine the "claim
-	// start" value of siafund outputs in ProcessedTransactions.
-	bucketHistoricClaimStarts = []byte("bucketHistoricClaimStarts")
-	// bucketHistoricOutputs maps a generic OutputID to the number of siacoins
-	// the output contains. The output may be a siacoin or siafund output.
-	// Note that the siafund value here is not the same as the value in
-	// bucketHistoricClaimStarts; see the definition of SiafundOutput in
-	// types/transactions.go for an explanation. The wallet uses this mapping
-	// to determine the value of outputs in ProcessedTransactions.
-	bucketHistoricOutputs = []byte("bucketHistoricOutputs")
 	// bucketProcessedTransactions stores ProcessedTransactions in
 	// chronological order. Only transactions relevant to the wallet are
 	// stored. The key of this bucket is an autoincrementing integer.
@@ -48,8 +37,6 @@ var (
 	bucketWallet = []byte("bucketWallet")
 
 	dbBuckets = [][]byte{
-		bucketHistoricClaimStarts,
-		bucketHistoricOutputs,
 		bucketProcessedTransactions,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
@@ -66,6 +53,7 @@ var (
 	keyConsensusHeight        = []byte("keyConsensusHeight")
 	keySpendableKeyFiles      = []byte("keySpendableKeyFiles")
 	keyAuxiliarySeedFiles     = []byte("keyAuxiliarySeedFiles")
+	keySiafundPool            = []byte("keySiafundPool")
 
 	errNoKey = errors.New("key does not exist")
 )
@@ -104,6 +92,32 @@ func (w *Wallet) syncDB() {
 	if err != nil {
 		w.log.Severe("ERROR: failed to start database update:", err)
 	}
+}
+
+// dbReset wipes and reinitializes a wallet database.
+func dbReset(tx *bolt.Tx) error {
+	for _, bucket := range dbBuckets {
+		err := tx.DeleteBucket(bucket)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucket(bucket)
+		if err != nil {
+			return err
+		}
+	}
+
+	// reinitialize the database with default values
+	wb := tx.Bucket(bucketWallet)
+	wb.Put(keyUID, fastrand.Bytes(len(uniqueID{})))
+	wb.Put(keyConsensusHeight, encoding.Marshal(uint64(0)))
+	wb.Put(keyAuxiliarySeedFiles, encoding.Marshal([]seedFile{}))
+	wb.Put(keySpendableKeyFiles, encoding.Marshal([]spendableKeyFile{}))
+	dbPutConsensusHeight(tx, 0)
+	dbPutConsensusChangeID(tx, modules.ConsensusChangeBeginning)
+	dbPutSiafundPool(tx, types.ZeroCurrency)
+
+	return nil
 }
 
 // dbPut is a helper function for storing a marshalled key/value pair.
@@ -150,22 +164,6 @@ func dbForEach(b *bolt.Bucket, fn interface{}) error {
 }
 
 // Type-safe wrappers around the db helpers
-
-func dbPutHistoricClaimStart(tx *bolt.Tx, id types.SiafundOutputID, c types.Currency) error {
-	return dbPut(tx.Bucket(bucketHistoricClaimStarts), id, c)
-}
-func dbGetHistoricClaimStart(tx *bolt.Tx, id types.SiafundOutputID) (c types.Currency, err error) {
-	err = dbGet(tx.Bucket(bucketHistoricClaimStarts), id, &c)
-	return
-}
-
-func dbPutHistoricOutput(tx *bolt.Tx, id types.OutputID, c types.Currency) error {
-	return dbPut(tx.Bucket(bucketHistoricOutputs), id, c)
-}
-func dbGetHistoricOutput(tx *bolt.Tx, id types.OutputID) (c types.Currency, err error) {
-	err = dbGet(tx.Bucket(bucketHistoricOutputs), id, &c)
-	return
-}
 
 func dbPutSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, output types.SiacoinOutput) error {
 	return dbPut(tx.Bucket(bucketSiacoinOutputs), id, output)
@@ -223,6 +221,12 @@ func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) 
 func dbGetLastProcessedTransaction(tx *bolt.Tx) (pt modules.ProcessedTransaction, err error) {
 	_, val := tx.Bucket(bucketProcessedTransactions).Cursor().Last()
 	err = encoding.Unmarshal(val, &pt)
+	if err != nil {
+		// COMPATv1.2.1: try decoding into old transaction type
+		var oldpt v121ProcessedTransaction
+		err = encoding.Unmarshal(val, &oldpt)
+		pt = convertProcessedTransaction(oldpt)
+	}
 	return
 }
 func dbDeleteLastProcessedTransaction(tx *bolt.Tx) error {
@@ -237,6 +241,45 @@ func dbForEachProcessedTransaction(tx *bolt.Tx, fn func(modules.ProcessedTransac
 	return dbForEach(tx.Bucket(bucketProcessedTransactions), func(_ uint64, pt modules.ProcessedTransaction) {
 		fn(pt)
 	})
+}
+
+// A processedTransactionsIter iterates through the ProcessedTransactions bucket.
+type processedTransactionsIter struct {
+	c  *bolt.Cursor
+	pt modules.ProcessedTransaction
+}
+
+// next decodes the next ProcessedTransaction, returning false if the end of
+// the bucket has been reached.
+func (it *processedTransactionsIter) next() bool {
+	var ptBytes []byte
+	if it.pt.TransactionID == (types.TransactionID{}) {
+		// this is the first time next has been called, so cursor is not
+		// initialized yet
+		_, ptBytes = it.c.First()
+	} else {
+		_, ptBytes = it.c.Next()
+	}
+	err := encoding.Unmarshal(ptBytes, &it.pt)
+	if err != nil {
+		// COMPATv1.2.1: try decoding into old transaction type
+		var oldpt v121ProcessedTransaction
+		err = encoding.Unmarshal(ptBytes, &oldpt)
+		it.pt = convertProcessedTransaction(oldpt)
+	}
+	return err == nil
+}
+
+// value returns the most recently decoded ProcessedTransaction.
+func (it *processedTransactionsIter) value() modules.ProcessedTransaction {
+	return it.pt
+}
+
+// dbProcessedTransactionsIterator creates a new processedTransactionsIter.
+func dbProcessedTransactionsIterator(tx *bolt.Tx) *processedTransactionsIter {
+	return &processedTransactionsIter{
+		c: tx.Bucket(bucketProcessedTransactions).Cursor(),
+	}
 }
 
 // dbGetWalletUID returns the UID assigned to the wallet's primary seed.
@@ -277,4 +320,69 @@ func dbGetConsensusHeight(tx *bolt.Tx) (height types.BlockHeight, err error) {
 // dbPutConsensusHeight stores the height that the wallet has scanned to.
 func dbPutConsensusHeight(tx *bolt.Tx, height types.BlockHeight) error {
 	return tx.Bucket(bucketWallet).Put(keyConsensusHeight, encoding.Marshal(height))
+}
+
+// dbGetSiafundPool returns the value of the siafund pool.
+func dbGetSiafundPool(tx *bolt.Tx) (pool types.Currency, err error) {
+	err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keySiafundPool), &pool)
+	return
+}
+
+// dbPutSiafundPool stores the value of the siafund pool.
+func dbPutSiafundPool(tx *bolt.Tx, pool types.Currency) error {
+	return tx.Bucket(bucketWallet).Put(keySiafundPool, encoding.Marshal(pool))
+}
+
+// COMPATv121: these types were stored in the db in v1.2.2 and earlier.
+type (
+	v121ProcessedInput struct {
+		FundType       types.Specifier
+		WalletAddress  bool
+		RelatedAddress types.UnlockHash
+		Value          types.Currency
+	}
+
+	v121ProcessedOutput struct {
+		FundType       types.Specifier
+		MaturityHeight types.BlockHeight
+		WalletAddress  bool
+		RelatedAddress types.UnlockHash
+		Value          types.Currency
+	}
+
+	v121ProcessedTransaction struct {
+		Transaction           types.Transaction
+		TransactionID         types.TransactionID
+		ConfirmationHeight    types.BlockHeight
+		ConfirmationTimestamp types.Timestamp
+		Inputs                []v121ProcessedInput
+		Outputs               []v121ProcessedOutput
+	}
+)
+
+func convertProcessedTransaction(oldpt v121ProcessedTransaction) (pt modules.ProcessedTransaction) {
+	pt.Transaction = oldpt.Transaction
+	pt.TransactionID = oldpt.TransactionID
+	pt.ConfirmationHeight = oldpt.ConfirmationHeight
+	pt.ConfirmationTimestamp = oldpt.ConfirmationTimestamp
+	pt.Inputs = make([]modules.ProcessedInput, len(oldpt.Inputs))
+	for i, in := range oldpt.Inputs {
+		pt.Inputs[i] = modules.ProcessedInput{
+			FundType:       in.FundType,
+			WalletAddress:  in.WalletAddress,
+			RelatedAddress: in.RelatedAddress,
+			Value:          in.Value,
+		}
+	}
+	pt.Outputs = make([]modules.ProcessedOutput, len(oldpt.Outputs))
+	for i, out := range oldpt.Outputs {
+		pt.Outputs[i] = modules.ProcessedOutput{
+			FundType:       out.FundType,
+			MaturityHeight: out.MaturityHeight,
+			WalletAddress:  out.WalletAddress,
+			RelatedAddress: out.RelatedAddress,
+			Value:          out.Value,
+		}
+	}
+	return
 }

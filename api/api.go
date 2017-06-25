@@ -184,6 +184,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.GET("/host", api.hostHandlerGET)                                                   // Get the host status.
 		router.POST("/host", RequirePassword(api.hostHandlerPOST, requiredPassword))              // Change the settings of the host.
 		router.POST("/host/announce", RequirePassword(api.hostAnnounceHandler, requiredPassword)) // Announce the host to the network.
+		router.GET("/host/estimatescore", api.hostEstimateScoreGET)
 
 		// Calls pertaining to the storage manager that the host uses.
 		router.GET("/host/storage", api.storageHandler)
@@ -230,8 +231,12 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.GET("/hostdb/hosts/:pubkey", api.hostdbHostsHandler)
 	}
 
-	// TransactionPool API Calls
+	// Transaction pool API Calls
 	if api.tpool != nil {
+		router.GET("/tpool/fee", api.tpoolFeeHandlerGET)
+		router.GET("/tpool/raw/:id", api.tpoolRawHandlerGET)
+		router.POST("/tpool/raw", api.tpoolRawHandlerPOST)
+
 		// TODO: re-enable this route once the transaction pool API has been finalized
 		//router.GET("/transactionpool/transactions", api.transactionpoolTransactionsHandler)
 	}
@@ -255,7 +260,9 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.GET("/wallet/transaction/:id", api.walletTransactionHandler)
 		router.GET("/wallet/transactions", api.walletTransactionsHandler)
 		router.GET("/wallet/transactions/:addr", api.walletTransactionsAddrHandler)
+		router.GET("/wallet/verify/address/:addr", api.walletVerifyAddressHandler)
 		router.POST("/wallet/unlock", RequirePassword(api.walletUnlockHandler, requiredPassword))
+		router.POST("/wallet/changepassword", RequirePassword(api.walletChangePasswordHandler, requiredPassword))
 	}
 
 	// Apply UserAgent middleware and return the API
