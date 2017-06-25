@@ -189,7 +189,7 @@ func (cs *ConsensusSet) addBlockToTree(tx *bolt.Tx, b types.Block, parent *proce
 // This method is typically only be used when there would otherwise be multiple
 // consecutive calls to AcceptBlock with each successive call accepting the
 // child block of the previous call.
-func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (bool, error) {
+func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	// Grab a lock on the consensus set.
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -197,7 +197,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (bool, error) 
 	// Make sure that blocks are consecutive.
 	for i, b := range blocks {
 		if i > 0 && b.Header().ParentID != blocks[i-1].ID() {
-			return false, errOrphan
+			return errOrphan
 		}
 	}
 
@@ -278,26 +278,20 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (bool, error) 
 		}
 		return nil
 	})
-	chainExtended := len(changes.AppliedBlocks) > 0
 	if err != nil {
-		return chainExtended, err
+		return err
 	}
 	// The order is important here: subscribers must be updated after
 	// the check for fatal errors (which result in rollback) but before
 	// the check for other errors which don't result in rollback.
-	if chainExtended {
+	if len(changes.AppliedBlocks) > 0 {
 		cs.readlockUpdateSubscribers(changes)
 	}
-	if err2 != nil {
-		return chainExtended, err2
-	}
-
-	return chainExtended, nil
+	return err2
 }
 
 func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
-	_, err := cs.managedAcceptBlocks([]types.Block{b})
-	return err
+	return cs.managedAcceptBlocks([]types.Block{b})
 }
 
 // AcceptBlock will try to add a block to the consensus set. If the block does
