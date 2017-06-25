@@ -139,6 +139,20 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Long:  "load sia file base64 encoded.",
 		Run:   wrap(renterloadasciicmd),
 	}
+
+	renterShareCmd = &cobra.Command{
+		Use:   "share [nicknames filepath]",
+		Short: "write share file to .sia file",
+		Long:  "writes the .sia file specified by `nickname` to `filepath`.",
+		Run:   wrap(rentersharecmd),
+	}
+
+	renterLoadCmd = &cobra.Command{
+		Use:   "load [filename]",
+		Short: "load a file in filename",
+		Long:  "load sia file from filename.",
+		Run:   wrap(renterloadcmd),
+	}
 )
 
 // abs returns the absolute representation of a path.
@@ -580,6 +594,24 @@ func renterloadasciicmd(data string) {
 	err := postResp("/renter/loadascii", qs, &rl)
 	if err != nil {
 		die("Could not load data:", err)
+	}
+	fmt.Printf("Files Added '%s'.\n", rl.FilesAdded)
+}
+
+func rentersharecmd(nicknames string, filepath string) {
+	err := get("/renter/share?siapaths=" + nicknames + "&destination=" + filepath)
+	if err != nil {
+		die("Could share file:", err)
+	}
+	fmt.Printf("write share file success:'%s'.\n", filepath)
+}
+
+func renterloadcmd(filename string) {
+	var rl api.RenterLoad
+	qs := "source=" + filename
+	err := postResp("/renter/load", qs, &rl)
+	if err != nil {
+		die("Could not load sia file:", err)
 	}
 	fmt.Printf("Files Added '%s'.\n", rl.FilesAdded)
 }
