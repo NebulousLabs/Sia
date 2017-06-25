@@ -183,23 +183,19 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 		if err := encoding.ReadObject(conn, &moreAvailable, 1); err != nil {
 			return err
 		}
+		if len(newBlocks) == 0 {
+			return errSendBlocksStalled
+		}
+		stalled = false
 
-		// Integrate the blocks into the consensus set.
-		if len(newBlocks) > 0 {
-			stalled = false
-
-			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
-			// every block.
-			acceptErr := cs.managedAcceptBlocks(newBlocks)
-			// ErrNonExtendingBlock must be ignored until headers-first block
-			// sharing is implemented, block already in database should also be
-			// ignored.
-			if acceptErr == modules.ErrNonExtendingBlock || acceptErr == modules.ErrBlockKnown {
-				acceptErr = nil
-			}
-			if acceptErr != nil {
-				return acceptErr
-			}
+		// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
+		// every block.
+		acceptErr := cs.managedAcceptBlocks(newBlocks)
+		// ErrNonExtendingBlock must be ignored until headers-first block
+		// sharing is implemented, block already in database should also be
+		// ignored.
+		if acceptErr != nil && acceptErr != modules.ErrNonExtendingBlock && acceptErr != modules.ErrBlockKnown {
+			return acceptErr
 		}
 	}
 	return nil

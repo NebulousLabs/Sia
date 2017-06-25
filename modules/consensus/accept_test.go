@@ -570,16 +570,16 @@ func TestBlockKnownHandling(t *testing.T) {
 
 	// Submit all the blocks again, looking for a 'stale block' error.
 	err = cst.cs.AcceptBlock(block1)
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	if err == nil {
+		t.Fatal("expected an error upon submitting the block")
 	}
 	err = cst.cs.AcceptBlock(block2)
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	if err == nil {
+		t.Fatal("expected an error upon submitting the block")
 	}
 	err = cst.cs.AcceptBlock(staleBlock)
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	if err == nil {
+		t.Fatal("expected an error upon submitting the block")
 	}
 
 	// Try submitting the genesis block.
@@ -592,8 +592,8 @@ func TestBlockKnownHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cst.cs.AcceptBlock(genesisBlock.Block)
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	if err == nil {
+		t.Fatal("expected an error upon submitting the block")
 	}
 }
 

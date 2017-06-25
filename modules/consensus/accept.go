@@ -226,90 +226,76 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 	// Make sure that blocks are consecutive. Though this isn't a strict
 	// requirement, if blocks are not consecutive then it becomes a lot harder
 	// to maintain correcetness when adding multiple blocks in a single tx.
-	for i, b := range blocks {
-		if i > 0 && b.Header().ParentID != blocks[i-1].ID() {
+	//
+	// TODO: Too much ID calculating here.
+	for i := 0; i < len(blocks); i++ {
+		if i > 0 && blocks[i].Header().ParentID != blocks[i-1].ID() {
 			return errNonLinearChain
 		}
 	}
 
 	// Verify the headers for every block, throw out known blocks, and the
 	// invalid blocks (which includes the children of invalid blocks).
+	nonExtendingSet := true // set to false if any block returns nil after being added to the tree.
+	changes := make([]changeEntry, 0, len(blocks))
+	validBlocks := make([]types.Block, 0, len(blocks))
 	parents := make([]*processedBlock, 0, len(blocks))
-	unknownBlocks := make([]types.Block, 0, len(blocks))
-	headerError := cs.db.View(func(tx *bolt.Tx) error {
+	setErr := cs.db.Update(func(tx *bolt.Tx) error {
 		// Do not accept a block if the database is inconsistent.
 		if inconsistencyDetected(tx) {
 			return errInconsistentSet
 		}
 
-		// Do some relatively inexpensive checks to validate the header and
-		// block. Validation generally occurs in the order of least expensive
-		// validation first. If an invalid block is found in the group, the
-		// group will be trunacted.
-		var err error
-		var parent *processedBlock
 		for i := 0; i < len(blocks); i++ {
-			parent, err = cs.validateHeaderAndBlock(boltTxWrapper{tx}, blocks[i])
+			// Start by checking the header of the block.
+			parent, err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, blocks[i])
 			if err == modules.ErrBlockKnown {
 				// Skip over known blocks.
-				err = nil
 				continue
 			}
 			if err == errFutureTimestamp {
-				// If a block exists in the future, we will hold the block in
-				// memory until time to accept the block has arrived.
+				// Queue the block to be tried again if it is a future block.
 				go cs.threadedSleepOnFutureBlock(blocks[i])
-			}
-			if err != nil {
-				break // Break the loop without appending the parent to the set of parents.
-			}
-
-			unknownBlocks = append(unknownBlocks, blocks[i])
-			parents = append(parents, parent)
-		}
-		return err
-	})
-
-	// If there is an invalid header, then length of 'parents' will not match
-	// the length of 'blocks'. Even if there was a header error, we want to add
-	// every block that had a valid header, so we will go ahead with the update
-	// call for those blocks.
-	var nonExtending bool
-	changes := make([]changeEntry, 0, len(unknownBlocks))
-	blocksError := cs.db.Update(func(tx *bolt.Tx) error {
-		// Add the blocks to the consensus set one at a time.
-		for i := 0; i < len(unknownBlocks); i++ {
-			// Submit the block for processing.
-			changeEntry, err := cs.addBlockToTree(tx, unknownBlocks[i], parents[i])
-			// We don't care about non-extending errors unless the last block
-			// submitted is a non-extending block. This is handled by setting
-			// 'nonExtending' to the most recent error result.
-			nonExtending = err == modules.ErrNonExtendingBlock
-			if nonExtending {
-				err = nil
 			}
 			if err != nil {
 				return err
 			}
 
+			// Try adding the block to consnesus.
+			changeEntry, err := cs.addBlockToTree(tx, blocks[i], parent)
+			if err == modules.ErrNonExtendingBlock {
+				err = nil
+			} else {
+				nonExtendingSet = false
+			}
+			if err != nil {
+				return err
+			}
 			// Sanity check - If reverted blocks is zero, applied blocks should also
 			// be zero.
 			if build.DEBUG && len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
 				panic("after adding a change entry, there are no applied blocks but there are reverted blocks")
 			}
-
-			// Append to the set of changes.
+			// Append to the set of changes, and append the valid block.
 			changes = append(changes, changeEntry)
+			validBlocks = append(validBlocks, blocks[i])
+			parents = append(parents, parent)
 		}
 		return nil
 	})
-	// blocksError != nil means that the transaction was rolled back, and any
-	// valid blocks which were discovered also got rolled back. Each change in
-	// 'changes' corresponds to a valid block, those need to be added back in.
-	if blocksError != nil {
+	if setErr != nil {
+		// Check if any blocks were valid.
+		if len(validBlocks) < 1 {
+			// Nothing more to do, the first block was invalid.
+			return setErr
+		}
+
+		// At least some of the blocks were valid. Add the valid blocks before
+		// returning, since we've already done the downloading and header
+		// validation.
 		err := cs.db.Update(func(tx *bolt.Tx) error {
-			for i := 0; i < len(changes); i++ {
-				_, err := cs.addBlockToTree(tx, unknownBlocks[i], parents[i])
+			for i := 0; i < len(validBlocks); i++ {
+				_, err := cs.addBlockToTree(tx, validBlocks[i], parents[i])
 				if err != modules.ErrNonExtendingBlock && err != nil {
 					return err
 				}
@@ -318,27 +304,35 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) error {
 		})
 		// Something has gone wrong. Maybe the filesystem is having errors for
 		// example. But under normal conditions, this code should not be
-		// reached.
+		// reached. If it is, return early because both attempts to add blocks
+		// have failed.
 		if err != nil {
 			return err
 		}
 	}
 
 	// Stop here if the blocks did not extend the longest blockchain.
-	if nonExtending {
+	if nonExtendingSet {
 		return modules.ErrNonExtendingBlock
+	}
+
+	// Sanity check - if we get here, len(changes) should be non-zero.
+	if build.DEBUG && len(changes) == 0 || len(changes) != len(validBlocks) {
+		panic("changes is empty, but this code should not be reached if no blocks got added")
 	}
 
 	// Update the subscribers with all of the consensus changes.
 	for i := 0; i < len(changes); i++ {
-		cs.readlockUpdateSubscribers(changes[i])
+		if len(changes[i].AppliedBlocks) > 0 {
+			cs.updateSubscribers(changes[i])
+		}
 	}
 
-	if blocksError != nil {
-		return blocksError
-	}
-	if headerError != nil {
-		return headerError
+	// If there were valid blocks and invalid blocks in the set that was
+	// provided, then the setErr is not going to be nil. Return the set error to
+	// the caller.
+	if setErr != nil {
+		return setErr
 	}
 	return nil
 }
