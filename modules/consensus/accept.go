@@ -146,38 +146,32 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
 // caller. Switching to a managed tx through bolt will make this complexity
 // unneeded.
 func (cs *ConsensusSet) addBlockToTree(tx *bolt.Tx, b types.Block, parent *processedBlock) (ce changeEntry, err error) {
-	err = func() error {
-		currentNode := currentProcessedBlock(tx)
-		newNode := cs.newChild(tx, parent, b)
-		if !newNode.heavierThan(currentNode) {
-			return modules.ErrNonExtendingBlock
-		}
-		var revertedBlocks, appliedBlocks []*processedBlock
-		revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, newNode)
-		if err != nil {
-			return err
-		}
-		for _, rn := range revertedBlocks {
-			ce.RevertedBlocks = append(ce.RevertedBlocks, rn.Block.ID())
-		}
-		for _, an := range appliedBlocks {
-			ce.AppliedBlocks = append(ce.AppliedBlocks, an.Block.ID())
-		}
-		// To have correct error handling, appendChangeLog must be called
-		// before appending to the in-memory changelog. If this call fails, the
-		// change is going to be reverted, but the in-memory changelog is not
-		// going to be reverted.
-		//
-		// Technically, if bolt fails for some other reason (such as a
-		// filesystem error), the in-memory changelog will be incorrect anyway.
-		// Restarting Sia will fix it. The in-memory changelog is being phased
-		// out.
-		err = appendChangeLog(tx, ce)
-		if err != nil {
-			return err
-		}
-		return nil
-	}()
+	currentNode := currentProcessedBlock(tx)
+	newNode := cs.newChild(tx, parent, b)
+	if !newNode.heavierThan(currentNode) {
+		return changeEntry{}, modules.ErrNonExtendingBlock
+	}
+	var revertedBlocks, appliedBlocks []*processedBlock
+	revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, newNode)
+	if err != nil {
+		return changeEntry{}, err
+	}
+	for _, rn := range revertedBlocks {
+		ce.RevertedBlocks = append(ce.RevertedBlocks, rn.Block.ID())
+	}
+	for _, an := range appliedBlocks {
+		ce.AppliedBlocks = append(ce.AppliedBlocks, an.Block.ID())
+	}
+	// To have correct error handling, appendChangeLog must be called
+	// before appending to the in-memory changelog. If this call fails, the
+	// change is going to be reverted, but the in-memory changelog is not
+	// going to be reverted.
+	//
+	// Technically, if bolt fails for some other reason (such as a
+	// filesystem error), the in-memory changelog will be incorrect anyway.
+	// Restarting Sia will fix it. The in-memory changelog is being phased
+	// out.
+	err = appendChangeLog(tx, ce)
 	if err != nil {
 		return changeEntry{}, err
 	}
