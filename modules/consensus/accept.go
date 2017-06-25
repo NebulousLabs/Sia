@@ -242,11 +242,6 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 	validBlocks := make([]types.Block, 0, len(blocks))
 	parents := make([]*processedBlock, 0, len(blocks))
 	setErr := cs.db.Update(func(tx *bolt.Tx) error {
-		// Do not accept a block if the database is inconsistent.
-		if inconsistencyDetected(tx) {
-			return errInconsistentSet
-		}
-
 		for i := 0; i < len(blocks); i++ {
 			// Start by checking the header of the block.
 			parent, err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, blocks[i], blockIDs[i])
