@@ -271,6 +271,9 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (bool, error) 
 			if build.DEBUG && len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
 				panic("appliedBlocks and revertedBlocks are mismatched!")
 			}
+			// We can group changes from many blocks because the blocks are
+			// consecutive as checked in the beginning of managedAcceptBlocks.
+			// See https://github.com/NebulousLabs/Sia/pull/1878#discussion_r123674511
 			changes.RevertedBlocks = append(changes.RevertedBlocks, changeEntry.RevertedBlocks...)
 			changes.AppliedBlocks = append(changes.AppliedBlocks, changeEntry.AppliedBlocks...)
 			chainExtended = true
