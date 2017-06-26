@@ -1062,7 +1062,7 @@ func TestChainedAcceptBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.Close()
-	cst2, err := blankConsensusSetTester(t.Name())
+	cst2, err := blankConsensusSetTester(t.Name() + "2")
 	if err != nil {
 		t.Fatal(err)
 	}
