@@ -236,7 +236,7 @@ func TestHostAndRentVanilla(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -426,7 +426,7 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -542,7 +542,7 @@ func TestHostAndRentManyFiles(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -1184,7 +1184,6 @@ func TestRenterAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
@@ -1295,7 +1294,7 @@ func TestHostAndRentReload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -1423,7 +1422,7 @@ func TestHostAndRenterRenewInterrupt(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -1554,7 +1553,7 @@ func TestRedundancyReporting(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)

@@ -28,7 +28,7 @@ func TestWalletGETEncrypted(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	// Check a wallet that has never been encrypted.
 	testdir := build.TempDir("api", t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
@@ -93,7 +93,6 @@ func TestWalletEncrypt(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
 
 	testdir := build.TempDir("api", t.Name())
 
@@ -159,7 +158,7 @@ func TestWalletBlankEncrypt(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	// Create a server object without encrypting or unlocking the wallet.
 	testdir := build.TempDir("api", t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
@@ -307,7 +306,7 @@ func TestWalletGETSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -532,7 +531,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -780,7 +779,7 @@ func TestWalletRelativePathErrorBackup(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -828,7 +827,7 @@ func TestWalletRelativePathError033x(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -883,7 +882,7 @@ func TestWalletRelativePathErrorSiag(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -964,7 +963,6 @@ func TestWalletReset(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
 
 	testdir := build.TempDir("api", t.Name())
 
@@ -1039,7 +1037,6 @@ func TestWalletSiafunds(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
 
 	walletPassword := "testpass"
 	key := crypto.TwofishKey(crypto.HashObject(walletPassword))
@@ -1160,7 +1157,6 @@ func TestWalletVerifyAddress(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
@@ -1196,7 +1192,6 @@ func TestWalletChangePassword(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
 
 	testdir := build.TempDir("api", t.Name())
 
@@ -1291,7 +1286,6 @@ func TestWalletSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
