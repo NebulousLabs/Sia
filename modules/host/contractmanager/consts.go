@@ -74,9 +74,9 @@ var (
 
 	// maxWalSize defines the maximum size in bytes of the WAL
 	maxWalSize = build.Select(build.Var{
-		Dev:      int64(5e+5),
+		Dev:      int64(500e+3),
 		Standard: int64(5e+6),
-		Testing:  int64(5e+4),
+		Testing:  int64(50e+3),
 	}).(int64)
 )
 
