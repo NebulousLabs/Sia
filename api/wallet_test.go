@@ -526,7 +526,7 @@ func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
 	}
 }
 
-// TestWalletTransactionGETid queries the /wallet/transaction/$(id)
+// TestWalletTransactionGETid queries the /wallet/transaction/:id
 // api call.
 func TestWalletTransactionGETid(t *testing.T) {
 	if testing.Short() {
@@ -560,7 +560,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 	}
 
 	// Query the details of the first transaction using
-	// /wallet/transaction/$(id)
+	// /wallet/transaction/:id
 	var wtgid WalletTransactionGETid
 	wtgidQuery := fmt.Sprintf("/wallet/transaction/%s", wtg.ConfirmedTransactions[0].TransactionID)
 	err = st.getAPI(wtgidQuery, &wtgid)
