@@ -172,7 +172,7 @@ func startDaemon(config Config) (err error) {
 			return err
 		}
 		defer func() {
-			fmt.Println("Closing consensus set...")
+			fmt.Println("Closing consensus...")
 			err := cs.Close()
 			if err != nil {
 				fmt.Println("Error during consensus set shutdown:", err)
