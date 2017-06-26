@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/errors"
+	siasync "github.com/NebulousLabs/Sia/sync"
 )
 
 // computeConsensusChange computes the consensus change from the change entry
@@ -174,7 +175,7 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 			for i := 0; i < 100 && exists; i++ {
 				select {
 				case <-cancel:
-					return errors.New("aborting managedInitializeSubscribe")
+					return siasync.ErrStopped
 				default:
 					cc, err := cs.computeConsensusChange(tx, entry)
 					if err != nil {
