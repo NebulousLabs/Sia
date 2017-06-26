@@ -5,6 +5,7 @@ package api
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/types"
@@ -478,6 +480,78 @@ func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httpro
 	}
 
 	return dp, nil
+}
+
+func (api *API) renterReadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	params, err := api.parseReadParameters(w, req, ps)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+	data, err := api.renter.Read(params)
+	if err != nil {
+		WriteError(w, Error{"read failed: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+func (api *API) parseReadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (modules.RenterReadParameters, error) {
+	contractIDstr := strings.TrimPrefix(ps.ByName("contractid"), "/")
+	var h crypto.Hash
+	if err := h.LoadString(contractIDstr); err != nil {
+		return modules.RenterReadParameters{}, build.ExtendErr("contractID could not be parsed", err)
+	}
+	contractID := types.FileContractID(h)
+	sectorStr := strings.TrimPrefix(ps.ByName("sector_root"), "/")
+	var sectorRoot crypto.Hash
+	if err := sectorRoot.LoadString(sectorStr); err != nil {
+		return modules.RenterReadParameters{}, build.ExtendErr("sector could not be parsed", err)
+	}
+	return modules.RenterReadParameters{
+		ContractID: contractID,
+		SectorRoot: sectorRoot,
+	}, nil
+}
+
+func (api *API) renterWriteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	params, err := api.parseWriteParameters(w, req, ps)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+	sectorRoot, err := api.renter.Write(params)
+	if err != nil {
+		WriteError(w, Error{"write failed: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf(`{"sector_root": %q}`, sectorRoot)))
+}
+
+func (api *API) parseWriteParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (modules.RenterWriteParameters, error) {
+	contractIDstr := strings.TrimPrefix(ps.ByName("contractid"), "/")
+	var h crypto.Hash
+	if err := h.LoadString(contractIDstr); err != nil {
+		return modules.RenterWriteParameters{}, build.ExtendErr("contractID could not be parsed", err)
+	}
+	contractID := types.FileContractID(h)
+	f, _, err := req.FormFile("data")
+	if err != nil {
+		return modules.RenterWriteParameters{}, build.ExtendErr("data should be provided as a form file", err)
+	}
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		return modules.RenterWriteParameters{}, build.ExtendErr("failed to read the form file", err)
+	}
+	if uint64(len(data)) != modules.SectorSize {
+		return modules.RenterWriteParameters{}, fmt.Errorf("data length (%d) != sector size (%d)", len(data), modules.SectorSize)
+	}
+	return modules.RenterWriteParameters{
+		ContractID: contractID,
+		Data:       data,
+	}, nil
 }
 
 // renterShareHandler handles the API call to create a '.sia' file that

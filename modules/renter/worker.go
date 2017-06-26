@@ -36,6 +36,40 @@ type (
 		workerID      types.FileContractID
 	}
 
+	// readWork contains instructions to download a sector from a host, and
+	// a channel for returning the results.
+	readWork struct {
+		// sectorRoot is the MerkleRoot of the data being requested, which serves
+		// as an ID when requesting data from the host.
+		sectorRoot crypto.Hash
+
+		// resultChan is a channel that the worker will use to return the
+		// results of the read.
+		resultChan chan finishedRead
+	}
+
+	// finishedRead contains the data and error from performing a read.
+	finishedRead struct {
+		data []byte
+		err  error
+	}
+
+	// writeWork contains instructions to upload a sector to a host, and
+	// a channel for returning the results.
+	writeWork struct {
+		data []byte
+
+		// resultChan is a channel that the worker will use to return the
+		// results of the write.
+		resultChan chan finishedWrite
+	}
+
+	// finishedWrite contains the data and error from performing a write.
+	finishedWrite struct {
+		sectorRoot crypto.Hash
+		err        error
+	}
+
 	// finishedUpload contains the Merkle root and error from performing an
 	// upload.
 	finishedUpload struct {
@@ -75,6 +109,8 @@ type (
 		downloadChan         chan downloadWork // higher priority than all uploads
 		killChan             chan struct{}     // highest priority
 		priorityDownloadChan chan downloadWork // higher priority than downloads (used for user-initiated downloads)
+		priorityReadChan     chan readWork     // higher priority than reads (used for user-initiated reads)
+		writeChan            chan writeWork    // lowest priority
 		uploadChan           chan uploadWork   // lowest priority
 
 		// recentUploadFailure documents the most recent time that an upload
@@ -106,6 +142,40 @@ func (w *worker) download(dw downloadWork) {
 	data, err := d.Sector(dw.dataRoot)
 	select {
 	case dw.resultChan <- finishedDownload{dw.chunkDownload, data, err, dw.pieceIndex, w.contractID}:
+	case <-w.renter.tg.StopChan():
+	}
+}
+
+func (w *worker) read(rw readWork) {
+	d, err := w.renter.hostContractor.Downloader(w.contractID, w.renter.tg.StopChan())
+	if err != nil {
+		select {
+		case rw.resultChan <- finishedRead{nil, err}:
+		case <-w.renter.tg.StopChan():
+		}
+		return
+	}
+	defer d.Close()
+	data, err := d.Sector(rw.sectorRoot)
+	select {
+	case rw.resultChan <- finishedRead{data, err}:
+	case <-w.renter.tg.StopChan():
+	}
+}
+
+func (w *worker) write(ww writeWork) {
+	e, err := w.renter.hostContractor.Editor(w.contractID, w.renter.tg.StopChan())
+	if err != nil {
+		select {
+		case ww.resultChan <- finishedWrite{crypto.Hash{}, err}:
+		case <-w.renter.tg.StopChan():
+		}
+		return
+	}
+	defer e.Close()
+	sectorRoot, err := e.Upload(ww.data)
+	select {
+	case ww.resultChan <- finishedWrite{sectorRoot, err}:
 	case <-w.renter.tg.StopChan():
 	}
 }
@@ -176,6 +246,13 @@ func (w *worker) work() {
 	default:
 		// do nothing
 	}
+	select {
+	case d := <-w.priorityReadChan:
+		w.read(d)
+		return
+	default:
+		// do nothing
+	}
 
 	// Check for standard downloads.
 	select {
@@ -195,6 +272,12 @@ func (w *worker) work() {
 		return
 	case d := <-w.priorityDownloadChan:
 		w.download(d)
+		return
+	case rw := <-w.priorityReadChan:
+		w.read(rw)
+		return
+	case ww := <-w.writeChan:
+		w.write(ww)
 		return
 	case u := <-w.uploadChan:
 		w.upload(u)
@@ -243,6 +326,8 @@ func (r *Renter) updateWorkerPool() {
 				downloadChan:         make(chan downloadWork, 1),
 				killChan:             make(chan struct{}),
 				priorityDownloadChan: make(chan downloadWork, 1),
+				priorityReadChan:     make(chan readWork, 1),
+				writeChan:            make(chan writeWork, 1),
 				uploadChan:           make(chan uploadWork, 1),
 
 				renter: r,

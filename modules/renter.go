@@ -272,6 +272,12 @@ type Renter interface {
 	// DownloadQueue lists all the files that have been scheduled for download.
 	DownloadQueue() []DownloadInfo
 
+	// Read returns data of a sector of a host.
+	Read(params RenterReadParameters) ([]byte, error)
+
+	// Write creates a sector in a host.
+	Write(params RenterWriteParameters) (crypto.Hash, error)
+
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
 
@@ -326,4 +332,18 @@ type RenterDownloadParameters struct {
 	Offset      uint64
 	Siapath     string
 	Destination string
+}
+
+// RenterReadParameters defines the parameters passed to the Renter's
+// Read method.
+type RenterReadParameters struct {
+	ContractID types.FileContractID
+	SectorRoot crypto.Hash
+}
+
+// RenterWriteParameters defines the parameters passed to the Renter's
+// Write method.
+type RenterWriteParameters struct {
+	ContractID types.FileContractID
+	Data       []byte
 }
