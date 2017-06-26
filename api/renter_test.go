@@ -235,6 +235,7 @@ func TestValidDownloads(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	sectorSize := int64(modules.SectorSize)
 

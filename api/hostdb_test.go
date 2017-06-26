@@ -645,6 +645,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
@@ -896,6 +897,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
@@ -1102,6 +1104,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	st, err := createServerTester(t.Name())
 	if err != nil {

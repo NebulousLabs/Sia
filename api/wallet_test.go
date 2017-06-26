@@ -1286,6 +1286,7 @@ func TestWalletSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
