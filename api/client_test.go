@@ -10,7 +10,6 @@ func TestApiClient(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +31,7 @@ func TestAuthenticatedApiClient(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	
+
 	testpass := "testPassword"
 	st, err := createAuthenticatedServerTester(t.Name(), testpass)
 	if err != nil {
