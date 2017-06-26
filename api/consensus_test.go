@@ -13,7 +13,7 @@ func TestIntegrationConsensusGET(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +43,7 @@ func TestConsensusValidateTransactionSet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)

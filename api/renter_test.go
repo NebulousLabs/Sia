@@ -205,7 +205,7 @@ func TestRenterDownloadError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
 	defer st.server.Close()
@@ -236,7 +236,7 @@ func TestValidDownloads(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	sectorSize := int64(modules.SectorSize)
 
@@ -273,7 +273,7 @@ func TestValidDownloads(t *testing.T) {
 	for i, params := range testParams {
 		params := params
 		t.Run(fmt.Sprintf("%v-%v", t.Name(), i), func(st *testing.T) {
-			st.Parallel()
+			s
 			err := runDownloadTest(st, params.filesize, params.offset, params.length, params.useHttpResp, params.testName)
 			if err != nil {
 				st.Fatal(err)
@@ -301,7 +301,7 @@ func TestInvalidDownloadParameters(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	testParams := []struct {
 		length   int
@@ -328,7 +328,7 @@ func TestRenterDownloadAsyncAndHttpRespError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	filesize := 1e4
 	ulSiaPath := "test.dat"
@@ -349,7 +349,7 @@ func TestRenterDownloadAsyncNonexistentFile(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
@@ -368,7 +368,7 @@ func TestRenterDownloadAsyncAndNotDestinationError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	filesize := 1e4
 	ulSiaPath := "test.dat"
@@ -388,7 +388,7 @@ func TestRenterDownloadHttpRespAndDestinationError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	filesize := 1e4
 	ulSiaPath := "test.dat"
@@ -411,7 +411,7 @@ func TestRenterAsyncDownloadError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
 	defer st.server.panicClose()
@@ -438,7 +438,7 @@ func TestRenterAsyncSpecifyAsyncFalseError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
 	defer st.server.Close()
@@ -458,7 +458,7 @@ func TestRenterAsyncDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	st, _ := setupTestDownload(t, 1e4, "test.dat", true)
 	defer st.server.panicClose()
@@ -498,7 +498,7 @@ func TestRenterPaths(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -543,7 +543,7 @@ func TestRenterConflicts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -604,7 +604,7 @@ func TestRenterHandlerContracts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -668,7 +668,7 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -765,7 +765,7 @@ func TestRenterLoadNonexistent(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -824,7 +824,7 @@ func TestRenterHandlerRename(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -922,7 +922,7 @@ func TestRenterHandlerDelete(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -987,7 +987,7 @@ func TestRenterRelativePathErrorUpload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -1048,7 +1048,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -1128,7 +1128,7 @@ func TestRenterPricesHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -1202,7 +1202,7 @@ func TestRenterPricesHandlerCheap(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -1305,7 +1305,7 @@ func TestRenterPricesHandlerIgnorePricey(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -1410,7 +1410,7 @@ func TestRenterPricesHandlerPricey(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)

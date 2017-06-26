@@ -57,7 +57,7 @@ func TestEstimateWeight(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
@@ -162,7 +162,7 @@ func TestWorkingStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
@@ -234,7 +234,7 @@ func TestConnectabilityStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	// create and announce a host
 	st, err := createServerTester(t.Name())
@@ -266,7 +266,7 @@ func TestStorageHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -338,7 +338,7 @@ func TestAddFolderNoPath(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -367,7 +367,7 @@ func TestAddFolderNoSize(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -389,7 +389,7 @@ func TestAddSameFolderTwice(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -416,7 +416,7 @@ func TestResizeEmptyStorageFolder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -498,7 +498,7 @@ func TestResizeNonemptyStorageFolder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -611,7 +611,7 @@ func TestResizeNonexistentFolder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -637,7 +637,7 @@ func TestStorageFolderUnavailable(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
@@ -757,7 +757,7 @@ func TestResizeFolderNoPath(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -779,7 +779,7 @@ func TestRemoveEmptyStorageFolder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -805,7 +805,7 @@ func TestRemoveStorageFolderError(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -840,7 +840,7 @@ func TestRemoveStorageFolderForced(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -911,7 +911,7 @@ func TestDeleteSector(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -979,7 +979,7 @@ func TestDeleteNonexistentSector(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)

@@ -14,7 +14,7 @@ func TestMinerGET(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +50,7 @@ func TestMinerStartStop(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +104,7 @@ func TestMinerHeader(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
