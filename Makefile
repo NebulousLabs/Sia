@@ -88,11 +88,6 @@ cover: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@mkdir -p cover/modules/host
-	@for package in $(pkgs); do                                                                                                 \
-		go test -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package -run=$(run) \
-		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                                      \
-		&& rm cover/$$package.out ;                                                                                             \
-	done
 
 # whitepaper builds the whitepaper from whitepaper.tex. pdflatex has to be
 # called twice because references will not update correctly the first time.
