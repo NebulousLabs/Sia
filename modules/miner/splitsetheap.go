@@ -18,6 +18,62 @@ type mapHeap struct {
 	minHeap  bool
 }
 
+// up maintains the heap condition by checking if the element at index j is
+// less than its parent (as defined by Less()). If so it swaps them, so that the
+// element at index j goes 'up' the heap. It continues until the heap condition
+// is satisfied again.
+func (mh *mapHeap) up(j int) {
+	for {
+		// i is the parent of element at index j.
+		i := (j - 1) / 2
+
+		if i == j || !mh.Less(j, i) {
+			// Heap condition maintained.
+			break
+		}
+
+		// Swap i and j, then continue.
+		mh.Swap(i, j)
+		j = i
+	}
+}
+
+// down maintains the heap condition by checking that the children of the element
+// at index i are less than the element at i (as defined by Less()). If so,
+// it swaps them, and continues down the heap until the heap condition is satisfied.
+func (mh *mapHeap) down(i0, n int) bool {
+	i := i0
+	for {
+		// j1 is the left child of the element at index i
+		j1 := 2*i + 1
+
+		// Check that j1 is in the bounds of the heap (j1 < 0 after int overflow).
+		if j1 >= n || j1 < 0 {
+			break
+		}
+
+		//j is the left child of i.
+		j := j1
+
+		// If the right child (j2) of the element at index i (the sibling of j),
+		// is within the bounds of the heap and satisfies
+		if j2 := j1 + 1; j2 < n && !mh.Less(j1, j2) {
+
+			j = j2 // = 2*i + 2  // right child
+		}
+
+		// If the heap condition is true here, the method can exit.
+		if !mh.Less(j, i) {
+			break
+		}
+
+		// Swap with the child and continue down the heap.
+		mh.Swap(i, j)
+		i = j
+	}
+	return i > i0
+}
+
 // Len returns the number of items stored in the heap.
 // It implements the sort interface.
 func (mh mapHeap) Len() int {
@@ -154,60 +210,4 @@ func (mh *mapHeap) Fix(i int) {
 	if !mh.down(i, mh.Len()) {
 		mh.up(i)
 	}
-}
-
-// up maintains the heap condition by checking if the element at index j is
-// less than its parent (as defined by Less()). If so it swaps them, so that the
-// element at index j goes 'up' the heap. It continues until the heap condition
-// is satisfied again.
-func (mh *mapHeap) up(j int) {
-	for {
-		// i is the parent of element at index j.
-		i := (j - 1) / 2
-
-		if i == j || !mh.Less(j, i) {
-			// Heap condition maintained.
-			break
-		}
-
-		// Swap i and j, then continue.
-		mh.Swap(i, j)
-		j = i
-	}
-}
-
-// down maintains the heap condition by checking that the children of the element
-// at index i are less than the element at i (as defined by Less()). If so,
-// it swaps them, and continues down the heap until the heap condition is satisfied.
-func (mh *mapHeap) down(i0, n int) bool {
-	i := i0
-	for {
-		// j1 is the left child of the element at index i
-		j1 := 2*i + 1
-
-		// Check that j1 is in the bounds of the heap (j1 < 0 after int overflow).
-		if j1 >= n || j1 < 0 {
-			break
-		}
-
-		//j is the left child of i.
-		j := j1
-
-		// If the right child (j2) of the element at index i (the sibling of j),
-		// is within the bounds of the heap and satisfies
-		if j2 := j1 + 1; j2 < n && !mh.Less(j1, j2) {
-
-			j = j2 // = 2*i + 2  // right child
-		}
-
-		// If the heap condition is true here, the method can exit.
-		if !mh.Less(j, i) {
-			break
-		}
-
-		// Swap with the child and continue down the heap.
-		mh.Swap(i, j)
-		i = j
-	}
-	return i > i0
 }
