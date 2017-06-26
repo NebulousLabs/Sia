@@ -51,6 +51,7 @@ func (srv *Server) panicClose() {
 		// Print the stack.
 		//debug.PrintStack()
 		//panic(err)
+		fmt.Println("PANICCLOSE")
 		fmt.Println(err)
 	}
 }

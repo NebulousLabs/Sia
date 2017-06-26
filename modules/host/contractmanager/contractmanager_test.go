@@ -28,6 +28,7 @@ func (cmt *contractManagerTester) panicClose() {
 	err := cmt.Close()
 	if err != nil {
 		//panic(err)
+		fmt.Println("PANICCLOSE")
 		fmt.Println(err)
 	}
 }
