@@ -299,6 +299,7 @@ func TestInvalidDownloadParameters(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	testParams := []struct {
 		length   int
@@ -1295,6 +1296,7 @@ func TestRenterPricesHandlerIgnorePricey(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	st, err := createServerTester(t.Name())
 	if err != nil {
