@@ -178,7 +178,7 @@ func (tp *TransactionPool) initPersist() error {
 	}
 
 	// Subscribe to the consensus set using the most recent consensus change.
-	err = tp.consensusSet.ConsensusSetSubscribe(tp, cc)
+	err = tp.consensusSet.ConsensusSetSubscribe(tp, cc, tp.tg.StopChan())
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Reset and rescan because the consensus set does not recognize the
 		// provided consensus change id.
@@ -186,7 +186,7 @@ func (tp *TransactionPool) initPersist() error {
 		if resetErr != nil {
 			return resetErr
 		}
-		freshScanErr := tp.consensusSet.ConsensusSetSubscribe(tp, modules.ConsensusChangeBeginning)
+		freshScanErr := tp.consensusSet.ConsensusSetSubscribe(tp, modules.ConsensusChangeBeginning, tp.tg.StopChan())
 		if freshScanErr != nil {
 			return freshScanErr
 		}

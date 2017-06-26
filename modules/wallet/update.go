@@ -21,7 +21,7 @@ func (w *Wallet) threadedResetSubscriptions() error {
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
 
-	err := w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	err := w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning, w.tg.StopChan())
 	if err != nil {
 		return err
 	}

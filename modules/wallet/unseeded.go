@@ -204,7 +204,7 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	go w.rescanMessage(done)
 	defer close(done)
 
-	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning, w.tg.StopChan())
 	if err != nil {
 		return err
 	}
@@ -274,7 +274,7 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 	go w.rescanMessage(done)
 	defer close(done)
 
-	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning, w.tg.StopChan())
 	if err != nil {
 		return err
 	}

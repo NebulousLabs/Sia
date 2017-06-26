@@ -142,7 +142,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	}
 	hdb.mu.Unlock()
 
-	err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
+	err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange, hdb.tg.StopChan())
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Subscribe again using the new ID. This will cause a triggered scan
 		// on all of the hosts, but that should be acceptable.
@@ -150,7 +150,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		hdb.blockHeight = 0
 		hdb.lastChange = modules.ConsensusChangeBeginning
 		hdb.mu.Unlock()
-		err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
+		err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange, hdb.tg.StopChan())
 	}
 	if err != nil {
 		return nil, errors.New("hostdb subscription failed: " + err.Error())
