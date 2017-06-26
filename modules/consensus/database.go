@@ -113,17 +113,6 @@ func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 	return nil
 }
 
-// inconsistencyDetected indicates whether inconsistency has been detected
-// within the database.
-func inconsistencyDetected(tx *bolt.Tx) (detected bool) {
-	inconsistencyBytes := tx.Bucket(Consistency).Get(Consistency)
-	err := encoding.Unmarshal(inconsistencyBytes, &detected)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return detected
-}
-
 // markInconsistency flags the database to indicate that inconsistency has been
 // detected.
 func markInconsistency(tx *bolt.Tx) {
