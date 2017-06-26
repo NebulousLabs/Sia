@@ -203,6 +203,8 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		return nil, errors.New("no record of that host")
 	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return nil, errTooExpensive
+	} else if host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
+		return nil, errTooExpensive
 	} else if build.VersionCmp(host.Version, "0.6.0") > 0 {
 		// COMPATv0.6.0: don't cap host.Collateral on old hosts
 		if host.Collateral.Cmp(maxUploadCollateral) > 0 {
