@@ -3,6 +3,7 @@ package consensus
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -175,39 +176,82 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 
 	// Read blocks off of the wire and add them to the consensus set until
 	// there are no more blocks available.
-	moreAvailable := true
-	for moreAvailable {
-		// Read a slice of blocks from the wire.
-		var newBlocks []types.Block
-		if err := encoding.ReadObject(conn, &newBlocks, uint64(MaxCatchUpBlocks)*types.BlockSizeLimit); err != nil {
-			return err
-		}
-		if err := encoding.ReadObject(conn, &moreAvailable, 1); err != nil {
-			return err
-		}
+	blocksChan := make(chan []types.Block, 100)
+	var processingFailed int32
+	var downloadErr, acceptErr error
+	var wg sync.WaitGroup
 
-		// Integrate the blocks into the consensus set.
-		for _, block := range newBlocks {
-			stalled = false
-			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
-			// every block.
-			acceptErr := cs.managedAcceptBlock(block)
-			// Set a flag to indicate that we should broadcast the last block received.
-			if acceptErr == nil {
-				chainExtended = true
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(blocksChan)
+		moreAvailable := true
+		for moreAvailable && atomic.LoadInt32(&processingFailed) == 0 {
+			// Read a slice of blocks from the wire.
+			var newBlocks []types.Block
+			if err := encoding.ReadObject(conn, &newBlocks, uint64(MaxCatchUpBlocks)*types.BlockSizeLimit); err != nil {
+				downloadErr = err
+				return
 			}
-			// ErrNonExtendingBlock must be ignored until headers-first block
-			// sharing is implemented, block already in database should also be
-			// ignored.
-			if acceptErr == modules.ErrNonExtendingBlock || acceptErr == modules.ErrBlockKnown {
-				acceptErr = nil
+			if err := encoding.ReadObject(conn, &moreAvailable, 1); err != nil {
+				downloadErr = err
+				return
 			}
-			if acceptErr != nil {
-				return acceptErr
-			}
+			// Send blocks over the channel.
+			blocksChan <- newBlocks
 		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		func() {
+			for {
+				var newBlocks []types.Block
+				var has bool
+				select {
+				case <-cs.tg.StopChan():
+					atomic.StoreInt32(&processingFailed, 1)
+					return
+				case newBlocks, has = <-blocksChan:
+					if !has {
+						return
+					}
+				}
+				// Integrate the blocks into the consensus set.
+				for _, block := range newBlocks {
+					stalled = false
+					// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
+					// every block.
+					acceptErr = cs.managedAcceptBlock(block)
+					// Set a flag to indicate that we should broadcast the last block received.
+					if acceptErr == nil {
+						chainExtended = true
+					}
+					// ErrNonExtendingBlock must be ignored until headers-first block
+					// sharing is implemented, block already in database should also be
+					// ignored.
+					if acceptErr == modules.ErrNonExtendingBlock || acceptErr == modules.ErrBlockKnown {
+						acceptErr = nil
+					}
+					if acceptErr != nil {
+						atomic.StoreInt32(&processingFailed, 1)
+						return
+					}
+				}
+			}
+		}()
+		// Read all remaining blocks from the chan to prevent leak.
+		for _ = range blocksChan {
+		}
+	}()
+
+	wg.Wait()
+
+	if acceptErr != nil {
+		return acceptErr
 	}
-	return nil
+	return downloadErr
 }
 
 // threadedReceiveBlocks is the calling end of the SendBlocks RPC.
