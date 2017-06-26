@@ -268,3 +268,326 @@ func TestRescanning(t *testing.T) {
 		t.Fatal("wallet should not report that a scan is underway")
 	}
 }
+
+// TestFutureAddressGeneration checks if the right amount of future addresses
+// is generated after calling NextAddress() or locking + unlocking the wallet.
+func TestLookaheadGeneration(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Check if number of future keys is correct
+	wt.wallet.mu.RLock()
+	progress, err := dbGetPrimarySeedProgress(wt.wallet.dbTx)
+	wt.wallet.mu.RUnlock()
+	if err != nil {
+		t.Fatal("Couldn't fetch primary seed from db")
+	}
+
+	actualKeys := uint64(len(wt.wallet.lookahead))
+	expectedKeys := maxLookahead(progress)
+	if actualKeys != expectedKeys {
+		t.Errorf("expected len(lookahead) == %d but was %d", actualKeys, expectedKeys)
+	}
+
+	// Generate some more keys
+	for i := 0; i < 100; i++ {
+		wt.wallet.NextAddress()
+	}
+
+	// Lock and unlock
+	wt.wallet.Lock()
+	wt.wallet.Unlock(wt.walletMasterKey)
+
+	wt.wallet.mu.RLock()
+	progress, err = dbGetPrimarySeedProgress(wt.wallet.dbTx)
+	wt.wallet.mu.RUnlock()
+	if err != nil {
+		t.Fatal("Couldn't fetch primary seed from db")
+	}
+
+	actualKeys = uint64(len(wt.wallet.lookahead))
+	expectedKeys = maxLookahead(progress)
+	if actualKeys != expectedKeys {
+		t.Errorf("expected len(lookahead) == %d but was %d", actualKeys, expectedKeys)
+	}
+
+	wt.wallet.mu.RLock()
+	defer wt.wallet.mu.RUnlock()
+	for i := range wt.wallet.keys {
+		_, exists := wt.wallet.lookahead[i]
+		if exists {
+			t.Fatal("wallet keys contained a key which is also present in lookahead")
+		}
+	}
+}
+
+// TestAdvanceLookaheadNoRescan tests if a transaction to multiple lookahead addresses
+// is handled correctly without forcing a wallet rescan.
+func TestAdvanceLookaheadNoRescan(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	builder := wt.wallet.StartTransaction()
+	payout := types.ZeroCurrency
+
+	// Get the current progress
+	wt.wallet.mu.RLock()
+	progress, err := dbGetPrimarySeedProgress(wt.wallet.dbTx)
+	wt.wallet.mu.RUnlock()
+	if err != nil {
+		t.Fatal("Couldn't fetch primary seed from db")
+	}
+
+	// choose 10 keys in the lookahead and remember them
+	var receivingAddresses []types.UnlockHash
+	for _, sk := range generateKeys(wt.wallet.primarySeed, progress, 10) {
+		sco := types.SiacoinOutput{
+			UnlockHash: sk.UnlockConditions.UnlockHash(),
+			Value:      types.NewCurrency64(1e3),
+		}
+
+		builder.AddSiacoinOutput(sco)
+		payout = payout.Add(sco.Value)
+		receivingAddresses = append(receivingAddresses, sk.UnlockConditions.UnlockHash())
+	}
+
+	err = builder.FundSiacoins(payout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tSet, err := builder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wt.tpool.AcceptTransactionSet(tSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check if the receiving addresses were moved from future keys to keys
+	wt.wallet.mu.RLock()
+	defer wt.wallet.mu.RUnlock()
+	for _, uh := range receivingAddresses {
+		_, exists := wt.wallet.lookahead[uh]
+		if exists {
+			t.Fatal("UnlockHash still exists in wallet lookahead")
+		}
+
+		_, exists = wt.wallet.keys[uh]
+		if !exists {
+			t.Fatal("UnlockHash not in map of spendable keys")
+		}
+	}
+}
+
+// TestAdvanceLookaheadNoRescan tests if a transaction to multiple lookahead addresses
+// is handled correctly forcing a wallet rescan.
+func TestAdvanceLookaheadForceRescan(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Mine blocks without payouts so that the balance stabilizes
+	for i := types.BlockHeight(0); i < types.MaturityDelay; i++ {
+		wt.addBlockNoPayout()
+	}
+
+	// Get the current progress and balance
+	wt.wallet.mu.RLock()
+	progress, err := dbGetPrimarySeedProgress(wt.wallet.dbTx)
+	wt.wallet.mu.RUnlock()
+	if err != nil {
+		t.Fatal("Couldn't fetch primary seed from db")
+	}
+	startBal, _, _ := wt.wallet.ConfirmedBalance()
+
+	// Send coins to an address with a high seed index, just outside the
+	// lookahead range. It will not be initially detected, but later the
+	// rescan should find it.
+	highIndex := progress + uint64(len(wt.wallet.lookahead)) + 5
+	farAddr := generateSpendableKey(wt.wallet.primarySeed, highIndex).UnlockConditions.UnlockHash()
+	farPayout := types.SiacoinPrecision.Mul64(8888)
+
+	builder := wt.wallet.StartTransaction()
+	builder.AddSiacoinOutput(types.SiacoinOutput{
+		UnlockHash: farAddr,
+		Value:      farPayout,
+	})
+	err = builder.FundSiacoins(farPayout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	txnSet, err := builder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wt.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt.addBlockNoPayout()
+	newBal, _, _ := wt.wallet.ConfirmedBalance()
+	if !startBal.Sub(newBal).Equals(farPayout) {
+		t.Fatal("wallet should not recognize coins sent to very high seed index")
+	}
+
+	builder = wt.wallet.StartTransaction()
+	var payout types.Currency
+
+	// choose 10 keys in the lookahead and remember them
+	var receivingAddresses []types.UnlockHash
+	for uh, index := range wt.wallet.lookahead {
+		// Only choose keys that force a rescan
+		if index < progress+lookaheadRescanThreshold {
+			continue
+		}
+		sco := types.SiacoinOutput{
+			UnlockHash: uh,
+			Value:      types.SiacoinPrecision.Mul64(1000),
+		}
+		builder.AddSiacoinOutput(sco)
+		payout = payout.Add(sco.Value)
+		receivingAddresses = append(receivingAddresses, uh)
+
+		if len(receivingAddresses) >= 10 {
+			break
+		}
+	}
+
+	err = builder.FundSiacoins(payout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	txnSet, err = builder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wt.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt.addBlockNoPayout()
+
+	// Allow the wallet rescan to finish
+	time.Sleep(time.Second * 2)
+
+	// Check that high seed index txn was discovered in the rescan
+	rescanBal, _, _ := wt.wallet.ConfirmedBalance()
+	if !rescanBal.Equals(startBal) {
+		t.Fatal("wallet did not discover txn after rescan")
+	}
+
+	// Check if the receiving addresses were moved from future keys to keys
+	wt.wallet.mu.RLock()
+	defer wt.wallet.mu.RUnlock()
+	for _, uh := range receivingAddresses {
+		_, exists := wt.wallet.lookahead[uh]
+		if exists {
+			t.Fatal("UnlockHash still exists in wallet lookahead")
+		}
+
+		_, exists = wt.wallet.keys[uh]
+		if !exists {
+			t.Fatal("UnlockHash not in map of spendable keys")
+		}
+	}
+}
+
+// TestDistantWallets tests if two wallets that use the same seed stay
+// synchronized.
+func TestDistantWallets(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Create another wallet with the same seed.
+	w2, err := New(wt.cs, wt.tpool, build.TempDir(modules.WalletDir, t.Name()+"2", modules.WalletDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w2.InitFromSeed(crypto.TwofishKey{}, wt.wallet.primarySeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w2.Unlock(crypto.TwofishKey(crypto.HashObject(wt.wallet.primarySeed)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the first wallet.
+	for i := uint64(0); i < lookaheadBuffer/2; i++ {
+		_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, types.UnlockHash{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		wt.addBlockNoPayout()
+	}
+
+	// The second wallet's balance should update accordingly.
+	w1bal, _, _ := wt.wallet.ConfirmedBalance()
+	w2bal, _, _ := w2.ConfirmedBalance()
+
+	if !w1bal.Equals(w2bal) {
+		t.Fatal("balances do not match:", w1bal, w2bal)
+	}
+
+	// Send coins to an address with a very high seed index, outside the
+	// lookahead range. w2 should not detect it.
+	tbuilder := wt.wallet.StartTransaction()
+	farAddr := generateSpendableKey(wt.wallet.primarySeed, lookaheadBuffer*10).UnlockConditions.UnlockHash()
+	value := types.SiacoinPrecision.Mul64(1e3)
+	tbuilder.AddSiacoinOutput(types.SiacoinOutput{
+		UnlockHash: farAddr,
+		Value:      value,
+	})
+	err = tbuilder.FundSiacoins(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnSet, err := tbuilder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt.addBlockNoPayout()
+
+	if newBal, _, _ := w2.ConfirmedBalance(); !newBal.Equals(w2bal.Sub(value)) {
+		t.Fatal("wallet should not recognize coins sent to very high seed index")
+	}
+}
