@@ -91,9 +91,10 @@ type Wallet struct {
 	log        *persist.Logger
 	mu         sync.RWMutex
 
-	// A separate TryMutex is used to protect against concurrent unlocking or
-	// initialization.
-	scanLock siasync.TryMutex
+	// A separate TryMutex is used to ensure that only one blockchain scan
+	// occurs at a time. During the scan, the scanHeight is also recorded.
+	scanLock   siasync.TryMutex
+	scanHeight types.BlockHeight
 
 	// The wallet's ThreadGroup tells tracked functions to shut down and
 	// blocks until they have all exited before returning from Close.
@@ -191,11 +192,13 @@ func (w *Wallet) AllAddresses() []types.UnlockHash {
 }
 
 // Rescanning reports whether the wallet is currently rescanning the
-// blockchain.
-func (w *Wallet) Rescanning() bool {
+// blockchain, and if so, the highest blockheight scanned.
+func (w *Wallet) Rescanning() (bool, types.BlockHeight) {
 	rescanning := !w.scanLock.TryLock()
 	if !rescanning {
 		w.scanLock.Unlock()
 	}
-	return rescanning
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return rescanning, types.BlockHeight(w.scanHeight)
 }

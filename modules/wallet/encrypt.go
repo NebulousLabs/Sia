@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -105,6 +104,7 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 
 	// Load db objects into memory.
 	var lastChange modules.ConsensusChangeID
+	var currentHeight types.BlockHeight
 	var primarySeedFile seedFile
 	var primarySeedProgress uint64
 	var auxiliarySeedFiles []seedFile
@@ -121,6 +121,12 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 
 		// lastChange
 		lastChange = dbGetConsensusChangeID(w.dbTx)
+
+		// currentHeight
+		currentHeight, err = dbGetConsensusHeight(w.dbTx)
+		if err != nil {
+			return err
+		}
 
 		// primarySeedFile + primarySeedProgress
 		wb := w.dbTx.Bucket(bucketWallet)
@@ -194,13 +200,10 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 	subscribed := w.subscribed
 	w.mu.RUnlock()
 	if !subscribed {
-		// Subscription can take a while, so spawn a goroutine to print the
-		// wallet height every few seconds. (If subscription completes
-		// quickly, nothing will be printed.)
-		done := make(chan struct{})
-		go w.rescanMessage(done)
-		defer close(done)
-
+		// set scanHeight to match lastChange
+		w.mu.Lock()
+		w.scanHeight = currentHeight
+		w.mu.Unlock()
 		err = w.cs.ConsensusSetSubscribe(w, lastChange)
 		if err == modules.ErrInvalidConsensusChangeID {
 			// something went wrong; resubscribe from the beginning
@@ -225,35 +228,6 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 	w.subscribed = true
 	w.mu.Unlock()
 	return nil
-}
-
-// rescanMessage prints the blockheight every 3 seconds until done is closed.
-func (w *Wallet) rescanMessage(done chan struct{}) {
-	if build.Release == "testing" {
-		return
-	}
-
-	// sleep first because we may not need to print a message at all if
-	// done is closed quickly.
-	select {
-	case <-done:
-		return
-	case <-time.After(3 * time.Second):
-	}
-
-	for {
-		w.mu.Lock()
-		height, _ := dbGetConsensusHeight(w.dbTx)
-		w.mu.Unlock()
-		print("\rWallet: scanned to height ", height, "...")
-
-		select {
-		case <-done:
-			println("\nDone!")
-			return
-		case <-time.After(3 * time.Second):
-		}
-	}
 }
 
 // wipeSecrets erases all of the seeds and secret keys in the wallet.
@@ -369,8 +343,8 @@ func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) er
 	defer w.scanLock.Unlock()
 
 	// estimate the primarySeedProgress by scanning the blockchain
-	s := newSeedScanner(seed, w.log)
-	if err := s.scan(w.cs); err != nil {
+	s := w.newSeedScanner(seed)
+	if err := s.scan(); err != nil {
 		return err
 	}
 	// NOTE: each time the wallet generates a key for index n, it sets its

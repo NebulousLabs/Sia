@@ -324,6 +324,18 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	// update scanHeight
+	for _, block := range cc.AppliedBlocks {
+		if w.scanHeight > 0 || block.ID() != types.GenesisID {
+			w.scanHeight++
+		}
+	}
+	for _, block := range cc.RevertedBlocks {
+		if w.scanHeight > 0 || block.ID() != types.GenesisID {
+			w.scanHeight--
+		}
+	}
+
 	if err := w.updateConfirmedSet(w.dbTx, cc); err != nil {
 		w.log.Println("ERROR: failed to update confirmed set:", err)
 	}

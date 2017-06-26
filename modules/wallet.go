@@ -370,8 +370,8 @@ type (
 		RegisterTransaction(t types.Transaction, parents []types.Transaction) TransactionBuilder
 
 		// Rescanning reports whether the wallet is currently rescanning the
-		// blockchain.
-		Rescanning() bool
+		// blockchain, and if so, the highest blockheight scanned.
+		Rescanning() (bool, types.BlockHeight)
 
 		// StartTransaction is a convenience method that calls
 		// RegisterTransaction(types.Transaction{}, nil)

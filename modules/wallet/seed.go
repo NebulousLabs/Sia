@@ -213,8 +213,8 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	w.mu.RUnlock()
 
 	// scan blockchain to determine how many keys to generate for the seed
-	s := newSeedScanner(seed, w.log)
-	if err := s.scan(w.cs); err != nil {
+	s := w.newSeedScanner(seed)
+	if err := s.scan(); err != nil {
 		return err
 	}
 	// Add 10% as a buffer because the seed may have addresses in the wild
@@ -265,7 +265,13 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 		if err != nil {
 			return err
 		}
-		return dbPutConsensusHeight(w.dbTx, 0)
+		err = dbPutConsensusHeight(w.dbTx, 0)
+		if err != nil {
+			return err
+		}
+		// reset scanHeight to 0
+		w.scanHeight = 0
+		return nil
 	}()
 	if err != nil {
 		return err
@@ -274,11 +280,6 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	// rescan the blockchain
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
-
-	done := make(chan struct{})
-	go w.rescanMessage(done)
-	defer close(done)
-
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {
 		return err
@@ -323,12 +324,12 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 
 	// scan blockchain for outputs, filtering out 'dust' (outputs that cost
 	// more in fees than they are worth)
-	s := newSeedScanner(seed, w.log)
+	s := w.newSeedScanner(seed)
 	_, maxFee := w.tpool.FeeEstimation()
 	const outputSize = 350 // approx. size in bytes of an output and accompanying signature
 	const maxOutputs = 50  // approx. number of outputs that a transaction can handle
 	s.dustThreshold = maxFee.Mul64(outputSize)
-	if err = s.scan(w.cs); err != nil {
+	if err = s.scan(); err != nil {
 		return
 	}
 

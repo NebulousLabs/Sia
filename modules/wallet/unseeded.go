@@ -190,7 +190,13 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 		if err != nil {
 			return err
 		}
-		return dbPutConsensusHeight(w.dbTx, 0)
+		err = dbPutConsensusHeight(w.dbTx, 0)
+		if err != nil {
+			return err
+		}
+		// reset scanHeight to 0
+		w.scanHeight = 0
+		return nil
 	}()
 	if err != nil {
 		return err
@@ -199,10 +205,6 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	// rescan the blockchain
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
-
-	done := make(chan struct{})
-	go w.rescanMessage(done)
-	defer close(done)
 
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {
@@ -260,7 +262,13 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 		if err != nil {
 			return err
 		}
-		return dbPutConsensusHeight(w.dbTx, 0)
+		err = dbPutConsensusHeight(w.dbTx, 0)
+		if err != nil {
+			return err
+		}
+		// reset scanHeight to 0
+		w.scanHeight = 0
+		return nil
 	}()
 	if err != nil {
 		return err
@@ -269,10 +277,6 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 	// rescan the blockchain
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
-
-	done := make(chan struct{})
-	go w.rescanMessage(done)
-	defer close(done)
 
 	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 	if err != nil {

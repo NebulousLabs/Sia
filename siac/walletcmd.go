@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
@@ -386,6 +387,11 @@ Unlock the wallet to view balance
 		return
 	}
 
+	scanMessage := ""
+	if status.Rescanning {
+		scanMessage = " (not final, scan in progress)"
+	}
+
 	unconfirmedBalance := status.ConfirmedSiacoinBalance.Add(status.UnconfirmedIncomingSiacoins).Sub(status.UnconfirmedOutgoingSiacoins)
 	var delta string
 	if unconfirmedBalance.Cmp(status.ConfirmedSiacoinBalance) >= 0 {
@@ -396,12 +402,12 @@ Unlock the wallet to view balance
 
 	fmt.Printf(`Wallet status:
 %s, Unlocked
-Confirmed Balance:   %v
+Confirmed Balance:   %v%v
 Unconfirmed Delta:  %v
 Exact:               %v H
 Siafunds:            %v SF
 Siafund Claims:      %v H
-`, encStatus, currencyUnits(status.ConfirmedSiacoinBalance), delta,
+`, encStatus, currencyUnits(status.ConfirmedSiacoinBalance), scanMessage, delta,
 		status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
 }
 
@@ -485,10 +491,31 @@ func walletunlockcmd() {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
-	err = post("/wallet/unlock", qs)
-	if err != nil {
-		die("Could not unlock wallet:", err)
+
+	errChan := make(chan error)
+	go func() {
+		qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
+		errChan <- post("/wallet/unlock", qs)
+	}()
+
+	for {
+		select {
+		// when unlock completes, handle error
+		case err := <-errChan:
+			if err != nil {
+				die("Could not unlock wallet:", err)
+			}
+			fmt.Println("\nWallet unlocked")
+			return
+
+		// otherwise, display scan height every 3 seconds
+		case <-time.After(3 * time.Second):
+			var wg api.WalletGET
+			err := getAPI("/wallet", &wg)
+			if err != nil || !wg.Rescanning {
+				continue
+			}
+			fmt.Printf("\rScanned to height %v...", wg.ScanHeight)
+		}
 	}
-	fmt.Println("Wallet unlocked")
 }

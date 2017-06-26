@@ -233,38 +233,44 @@ func TestRescanning(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer wt.closeWt()
-
-	// A fresh wallet should not be rescanning.
-	if wt.wallet.Rescanning() {
-		t.Fatal("fresh wallet should not report that a scan is underway")
+	// mine some blocks with the wallet locked
+	if err := wt.wallet.Lock(); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 100; i++ {
+		wt.miner.AddBlock()
 	}
 
-	// lock the wallet
-	wt.wallet.Lock()
+	// A fresh wallet should not be rescanning.
+	if rescanning, _ := wt.wallet.Rescanning(); rescanning {
+		t.Fatal("fresh wallet should not report that a scan is underway")
+	}
 
 	// spawn an unlock goroutine
 	errChan := make(chan error)
 	go func() {
-		// acquire the write lock so that Unlock acquires the trymutex, but
-		// cannot proceed further
-		wt.wallet.mu.Lock()
 		errChan <- wt.wallet.Unlock(wt.walletMasterKey)
 	}()
 
-	// wait for goroutine to start, after which Rescanning should return true
-	time.Sleep(time.Millisecond * 10)
-	if !wt.wallet.Rescanning() {
+	// Rescanning should now return true once the unlock begins
+	var rescanning bool
+	for i := 0; i < 100; i++ {
+		if rescanning, _ = wt.wallet.Rescanning(); rescanning {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if !rescanning {
 		t.Fatal("wallet should report that a scan is underway")
 	}
 
-	// release the mutex and allow the call to complete
-	wt.wallet.mu.Unlock()
+	// Wait for the unlock call to complete
 	if err := <-errChan; err != nil {
 		t.Fatal("unlock failed:", err)
 	}
 
 	// Rescanning should now return false again
-	if wt.wallet.Rescanning() {
+	if rescanning, _ := wt.wallet.Rescanning(); rescanning {
 		t.Fatal("wallet should not report that a scan is underway")
 	}
 }
