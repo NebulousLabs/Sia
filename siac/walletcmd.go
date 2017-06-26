@@ -403,6 +403,15 @@ Siafunds:            %v SF
 Siafund Claims:      %v H
 `, encStatus, currencyUnits(status.ConfirmedSiacoinBalance), delta,
 		status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
+
+	var fees api.TpoolFeeGET
+	err = getAPI("/tpool/fee", &fees)
+	if err != nil {
+		die("Could not get fee estimation:", err)
+	}
+	fmt.Printf(`
+Estimated Fee        %v / KB
+`, fees.Maximum.Mul64(1e3).HumanString())
 }
 
 // walletsweepcmd sweeps coins and funds from a seed.
