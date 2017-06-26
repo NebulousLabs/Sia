@@ -127,6 +127,19 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 	if err != nil {
 		return err
 	}
+	finishedChan := make(chan struct{})
+	defer close(finishedChan)
+	go func() {
+		select {
+		case <-cs.tg.StopChan():
+		case <-finishedChan:
+		}
+		conn.Close()
+	}()
+
+	// Check whether this RPC has timed out with the remote peer at the end of
+	// the fuction, and if so, return a custom error to signal that a new peer
+	// needs to be chosen.
 	stalled := true
 	defer func() {
 		// TODO: Timeout errors returned by muxado do not conform to the net.Error
