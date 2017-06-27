@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/types"
 
