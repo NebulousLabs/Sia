@@ -4,9 +4,8 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
-	"github.com/NebulousLabs/bolt"
-	"github.com/NebulousLabs/errors"
 	siasync "github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/bolt"
 )
 
 // computeConsensusChange computes the consensus change from the change entry
