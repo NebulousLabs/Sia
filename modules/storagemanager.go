@@ -84,6 +84,9 @@ type (
 		// bytes that match the input sector root.
 		ReadSector(sectorRoot crypto.Hash) ([]byte, error)
 
+		// ReadSectorPart will read part of a sector from the storage manager.
+		ReadSectorPart(sectorRoot crypto.Hash, offset, length uint32) ([]byte, error)
+
 		// RemoveSector will remove a sector from the storage manager. The
 		// height at which the sector expires should be provided, so that the
 		// auto-expiry information for that sector can be properly updated.

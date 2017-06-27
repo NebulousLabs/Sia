@@ -114,6 +114,24 @@ func TestAddSector(t *testing.T) {
 		t.Fatal("wrong sector provided")
 	}
 
+	// Check ReadSectorPart.
+	testCases := []struct {
+		offset, length uint32
+	}{
+		{0, 1},
+		{0, uint32(modules.SectorSize)},
+		{uint32(modules.SectorSize) - 1, 1},
+	}
+	for _, c := range testCases {
+		sectorPartData, err := cmt.cm.ReadSectorPart(root, c.offset, c.length)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(sectorPartData, data[c.offset:c.offset+c.length]) {
+			t.Fatal("wrong sector part provided")
+		}
+	}
+
 	// Try reloading the contract manager and see if all of the stateful checks
 	// still hold.
 	err = cmt.cm.Close()
