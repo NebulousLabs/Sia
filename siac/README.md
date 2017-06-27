@@ -102,6 +102,8 @@ seed into itself. This can be used for wallet recovery and merging.
 is used to configure hosting.
 
 In version `1.2.2`, sia hosting is configured as follows:
+```
+| -------------------------|-------------------------------------------------|
 | Setting                  | Value                                           |
 | -------------------------|-------------------------------------------------|
 | acceptingcontracts       | Yes or No                                       |
@@ -114,6 +116,7 @@ In version `1.2.2`, sia hosting is configured as follows:
 | minstorageprice          | in SC / TB                                      |
 | minuploadbandwidthprice  | in SC / TB                                      |
 | -------------------------|-------------------------------------------------|
+```
 
 You can call this many times to configure you host before
 announcing. Alternatively, you can manually adjust these parameters
