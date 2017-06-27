@@ -19,6 +19,12 @@ type ConsensusGET struct {
 	Difficulty   types.Currency    `json:"difficulty"`
 }
 
+// ConsensusBlockGET is the object returned by a GET request to
+// /consensus/block.
+type ConsensusBlock struct {
+	Block       types.Block             `json:"rawblock"`
+}
+
 // consensusHandler handles the API calls to /consensus.
 func (api *API) consensusHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	cbid := api.cs.CurrentBlock().ID()
@@ -47,4 +53,25 @@ func (api *API) consensusValidateTransactionsetHandler(w http.ResponseWriter, re
 		return
 	}
 	WriteSuccess(w)
+}
+
+// consensusBlocksHandler handles API calls to /consensus/blocks/:height.
+func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	// Parse the height that's being requested.
+	var height types.BlockHeight
+	_, err := fmt.Sscan(ps.ByName("height"), &height)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+
+	// Fetch and return the explorer block.
+	block, exists := api.cs.BlockAtHeight(height)
+	if !exists {
+		WriteError(w, Error{"no block found at input height in call to /consensus/blocks"}, http.StatusBadRequest)
+		return
+	}
+	WriteJSON(w, ConsensusBlock{
+		Block: block,
+	})
 }
