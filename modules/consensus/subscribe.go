@@ -95,9 +95,9 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 }
 
 // readLockUpdateSubscribers will inform all subscribers of a new update to the
-// consensus set. readlockUpdateSubscribers does not alter the changelog, the
-// changelog must be updated beforehand.
-func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
+// consensus set. updateSubscribers does not alter the changelog, the changelog
+// must be updated beforehand.
+func (cs *ConsensusSet) updateSubscribers(ce changeEntry) {
 	// Get the consensus change and send it to all subscribers.
 	var cc modules.ConsensusChange
 	err := cs.db.View(func(tx *bolt.Tx) error {

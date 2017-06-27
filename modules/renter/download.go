@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"math"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -132,8 +131,8 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 	d.length = length
 
 	// Calculate chunks to download.
-	minChunk := uint64(math.Floor(float64(offset / f.chunkSize())))
-	maxChunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
+	minChunk := offset / f.chunkSize()
+	maxChunk := (offset + length) / f.chunkSize()
 
 	// mark the chunks as not being downloaded yet
 	for i := minChunk; i <= maxChunk; i++ {

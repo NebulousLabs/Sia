@@ -990,8 +990,8 @@ returns the minimum and maximum estimated fees expected by the transaction pool.
 ###### JSON Response [(with comments)](/doc/api/Transactionpool.md#json-response-1)
 ```javascript
 {
-  "minimum": "1234", // hastings
-  "maximum": "5678"  // hastings
+  "minimum": "1234", // hastings / byte
+  "maximum": "5678"  // hastings / byte
 }
 ```
 

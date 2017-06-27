@@ -10,19 +10,91 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// historicOutput defines a historic output as recognized by the wallet. This
-// struct is primarily used to sort the historic outputs before inserting them
-// into the bolt database.
-type historicOutput struct {
-	id  types.OutputID
-	val types.Currency
+// threadedResetSubscriptions unsubscribes the wallet from the consensus set and transaction pool
+// and subscribes again.
+func (w *Wallet) threadedResetSubscriptions() error {
+	if !w.scanLock.TryLock() {
+		return errScanInProgress
+	}
+	defer w.scanLock.Unlock()
+
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
+	err := w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	if err != nil {
+		return err
+	}
+	w.tpool.TransactionPoolSubscribe(w)
+	return nil
+}
+
+// advanceSeedLookahead generates all keys from the current primary seed progress up to index
+// and adds them to the set of spendable keys.  Therefore the new primary seed progress will
+// be index+1 and new lookahead keys will be generated starting from index+1
+// Returns true if a blockchain rescan is required
+func (w *Wallet) advanceSeedLookahead(index uint64) (bool, error) {
+	progress, err := dbGetPrimarySeedProgress(w.dbTx)
+	if err != nil {
+		return false, err
+	}
+	newProgress := index + 1
+
+	// Add spendable keys and remove them from lookahead
+	spendableKeys := generateKeys(w.primarySeed, progress, newProgress-progress)
+	for _, key := range spendableKeys {
+		w.keys[key.UnlockConditions.UnlockHash()] = key
+		delete(w.lookahead, key.UnlockConditions.UnlockHash())
+	}
+
+	// Update the primarySeedProgress
+	dbPutPrimarySeedProgress(w.dbTx, newProgress)
+	if err != nil {
+		return false, err
+	}
+
+	// Regenerate lookahead
+	w.regenerateLookahead(newProgress)
+
+	// If more than lookaheadRescanThreshold keys were generated
+	// also initialize a rescan just to be safe.
+	if uint64(len(spendableKeys)) > lookaheadRescanThreshold {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // isWalletAddress is a helper function that checks if an UnlockHash is
-// derived from one of the wallet's spendable keys.
+// derived from one of the wallet's spendable keys or future keys.
 func (w *Wallet) isWalletAddress(uh types.UnlockHash) bool {
 	_, exists := w.keys[uh]
 	return exists
+}
+
+// updateLookahead uses a consensus change to update the seed progress if one of the outputs
+// contains an unlock hash of the lookahead set. Returns true if a blockchain rescan is required
+func (w *Wallet) updateLookahead(tx *bolt.Tx, cc modules.ConsensusChange) (bool, error) {
+	var largestIndex uint64
+	for _, diff := range cc.SiacoinOutputDiffs {
+		if index, ok := w.lookahead[diff.SiacoinOutput.UnlockHash]; ok {
+			if index > largestIndex {
+				largestIndex = index
+			}
+		}
+	}
+	for _, diff := range cc.SiafundOutputDiffs {
+		if index, ok := w.lookahead[diff.SiafundOutput.UnlockHash]; ok {
+			if index > largestIndex {
+				largestIndex = index
+			}
+		}
+	}
+	if largestIndex > 0 {
+		return w.advanceSeedLookahead(largestIndex)
+	}
+
+	return false, nil
 }
 
 // updateConfirmedSet uses a consensus change to update the confirmed set of
@@ -36,7 +108,7 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 
 		var err error
 		if diff.Direction == modules.DiffApply {
-			w.log.Println("Wallet has gained a spandable siacoin output:", diff.ID, "::", diff.SiacoinOutput.Value.HumanString())
+			w.log.Println("Wallet has gained a spendable siacoin output:", diff.ID, "::", diff.SiacoinOutput.Value.HumanString())
 			err = dbPutSiacoinOutput(tx, diff.ID, diff.SiacoinOutput)
 		} else {
 			w.log.Println("Wallet has lost a spendable siacoin output:", diff.ID, "::", diff.SiacoinOutput.Value.HumanString())
@@ -324,6 +396,11 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	if needRescan, err := w.updateLookahead(w.dbTx, cc); err != nil {
+		w.log.Println("ERROR: failed to update lookahead:", err)
+	} else if needRescan {
+		go w.threadedResetSubscriptions()
+	}
 	if err := w.updateConfirmedSet(w.dbTx, cc); err != nil {
 		w.log.Println("ERROR: failed to update confirmed set:", err)
 	}

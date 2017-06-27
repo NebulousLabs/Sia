@@ -374,6 +374,11 @@ func walletbalancecmd() {
 	if err != nil {
 		die("Could not get wallet status:", err)
 	}
+	var fees api.TpoolFeeGET
+	err = getAPI("/tpool/fee", &fees)
+	if err != nil {
+		die("Could not get fee estimation:", err)
+	}
 	encStatus := "Unencrypted"
 	if status.Encrypted {
 		encStatus = "Encrypted"
@@ -401,8 +406,11 @@ Unconfirmed Delta:  %v
 Exact:               %v H
 Siafunds:            %v SF
 Siafund Claims:      %v H
+
+Estimated Fee:       %v / KB
 `, encStatus, currencyUnits(status.ConfirmedSiacoinBalance), delta,
-		status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
+		status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance,
+		fees.Maximum.Mul64(1e3).HumanString())
 }
 
 // walletsweepcmd sweeps coins and funds from a seed.

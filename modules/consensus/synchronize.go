@@ -127,6 +127,19 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 	if err != nil {
 		return err
 	}
+	finishedChan := make(chan struct{})
+	defer close(finishedChan)
+	go func() {
+		select {
+		case <-cs.tg.StopChan():
+		case <-finishedChan:
+		}
+		conn.Close()
+	}()
+
+	// Check whether this RPC has timed out with the remote peer at the end of
+	// the fuction, and if so, return a custom error to signal that a new peer
+	// needs to be chosen.
 	stalled := true
 	defer func() {
 		// TODO: Timeout errors returned by muxado do not conform to the net.Error
@@ -159,17 +172,24 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 	// Broadcast the last block accepted. This functionality is in a defer to
 	// ensure that a block is always broadcast if any blocks are accepted. This
 	// is to stop an attacker from preventing block broadcasts.
+	var initialBlock types.BlockID
+	if build.DEBUG {
+		// Prepare for a sanity check on 'chainExtended' - chain extended should
+		// be set to true if an ony if the result of calling dbCurrentBlockID
+		// changes.
+		initialBlock = cs.dbCurrentBlockID()
+	}
 	chainExtended := false
 	defer func() {
 		cs.mu.RLock()
 		synced := cs.synced
 		cs.mu.RUnlock()
-		if chainExtended && synced {
-			// The last block received will be the current block since
-			// managedAcceptBlock only returns nil if a block extends the longest chain.
-			currentBlock := cs.managedCurrentBlock()
-			// broadcast the block header to all peers
-			go cs.gateway.Broadcast("RelayHeader", currentBlock.Header(), cs.gateway.Peers())
+		if synced && chainExtended {
+			if build.DEBUG && initialBlock == cs.dbCurrentBlockID() {
+				panic("blockchain extension reporting is incorrect")
+			}
+			fullBlock := cs.managedCurrentBlock() // TODO: Add cacheing, replace this line by looking at the cache.
+			go cs.gateway.Broadcast("RelayHeader", fullBlock.Header(), cs.gateway.Peers())
 		}
 	}()
 
@@ -185,26 +205,22 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 		if err := encoding.ReadObject(conn, &moreAvailable, 1); err != nil {
 			return err
 		}
+		if len(newBlocks) == 0 {
+			continue
+		}
+		stalled = false
 
-		// Integrate the blocks into the consensus set.
-		for _, block := range newBlocks {
-			stalled = false
-			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
-			// every block.
-			acceptErr := cs.managedAcceptBlock(block)
-			// Set a flag to indicate that we should broadcast the last block received.
-			if acceptErr == nil {
-				chainExtended = true
-			}
-			// ErrNonExtendingBlock must be ignored until headers-first block
-			// sharing is implemented, block already in database should also be
-			// ignored.
-			if acceptErr == modules.ErrNonExtendingBlock || acceptErr == modules.ErrBlockKnown {
-				acceptErr = nil
-			}
-			if acceptErr != nil {
-				return acceptErr
-			}
+		// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
+		// every block.
+		extended, acceptErr := cs.managedAcceptBlocks(newBlocks)
+		if extended {
+			chainExtended = true
+		}
+		// ErrNonExtendingBlock must be ignored until headers-first block
+		// sharing is implemented, block already in database should also be
+		// ignored.
+		if acceptErr != nil && acceptErr != modules.ErrNonExtendingBlock && acceptErr != modules.ErrBlockKnown {
+			return acceptErr
 		}
 	}
 	return nil
@@ -491,9 +507,7 @@ func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 
 // managedReceiveBlock takes a block id and returns an RPCFunc that requests that
 // block and then calls AcceptBlock on it. The returned function should be used
-// as the calling end of the SendBlk RPC. Note that although the function
-// itself does not do any locking, it is still prefixed with "threaded" because
-// the function it returns calls the exported method AcceptBlock.
+// as the calling end of the SendBlk RPC.
 func (cs *ConsensusSet) managedReceiveBlock(id types.BlockID) modules.RPCFunc {
 	return func(conn modules.PeerConn) error {
 		if err := encoding.WriteObject(conn, id); err != nil {
@@ -503,10 +517,13 @@ func (cs *ConsensusSet) managedReceiveBlock(id types.BlockID) modules.RPCFunc {
 		if err := encoding.ReadObject(conn, &block, types.BlockSizeLimit); err != nil {
 			return err
 		}
-		if err := cs.managedAcceptBlock(block); err != nil {
+		chainExtended, err := cs.managedAcceptBlocks([]types.Block{block})
+		if chainExtended {
+			cs.managedBroadcastBlock(block)
+		}
+		if err != nil {
 			return err
 		}
-		cs.managedBroadcastBlock(block)
 		return nil
 	}
 }

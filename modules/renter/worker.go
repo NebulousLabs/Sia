@@ -67,9 +67,8 @@ type (
 		contractID types.FileContractID
 
 		// If there is work on all three channels, the worker will first do all
-		// of the work in the download chan, then all of the work in the
-		// priority upload chan, and finally all of the work in the upload
-		// chan.
+		// of the work in the priority download chan, then all of the work in the
+		// download chan, and finally all of the work in the upload chan.
 		//
 		// A busy higher priority channel is able to entirely starve all of the
 		// channels with lower priority.

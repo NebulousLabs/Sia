@@ -145,13 +145,13 @@ func TestEstimateWeight(t *testing.T) {
 		{types.SiacoinPrecision.Mul64(3000), 10},
 		{types.SiacoinPrecision.Mul64(30000), 0.00001},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		err = st.getAPI(fmt.Sprintf("/host/estimatescore?mincontractprice=%v", test.price.String()), &eg)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatal("test", i, "failed:", err)
 		}
 		if eg.ConversionRate < test.minConversionRate {
-			t.Fatalf("incorrect conversion rate: got %v wanted %v\n", eg.ConversionRate, test.minConversionRate)
+			t.Fatalf("test %v: incorrect conversion rate: got %v wanted %v\n", i, eg.ConversionRate, test.minConversionRate)
 		}
 	}
 }

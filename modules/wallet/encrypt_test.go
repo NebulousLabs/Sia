@@ -431,6 +431,8 @@ func TestReset(t *testing.T) {
 	postEncryptionTesting(wt.miner, wt.wallet, newKey)
 }
 
+// TestChangeKey tests that a wallet can only be unlocked with the new key
+// after changing it and that it shows the same balance as before
 func TestChangeKey(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
