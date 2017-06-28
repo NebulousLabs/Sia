@@ -221,14 +221,14 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 		}
 
 		ct[txid.String()] = ConsensusTransaction{
-            SiacoinInputs:  inputs,
-    		SiacoinOutputs: outputs,
-    		FileContracts: filecontracts,
-    		FileContractRevisions: filecontractrevisions,
-    		StorageProofs: storageproofs,
-    		SiafundInputs: sfinputs,
-    		SiafundOutputs: sfoutputs,
-    		ArbitraryData: txn.ArbitraryData,
+			SiacoinInputs:  inputs,
+			SiacoinOutputs: outputs,
+			FileContracts: filecontracts,
+			FileContractRevisions: filecontractrevisions,
+			StorageProofs: storageproofs,
+			SiafundInputs: sfinputs,
+			SiafundOutputs: sfoutputs,
+			ArbitraryData: txn.ArbitraryData,
 		}
 	}
 	WriteJSON(w, ConsensusBlock{
