@@ -4,14 +4,18 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
+// Constants related to fees and fee estimation.
 const (
 	// estimatedFileContractTransactionSize provides the estimated size of
 	// the average file contract in bytes.
 	estimatedFileContractTransactionSize = 1200
 )
 
+// Constants related to contract formation parameters.
 var (
 	// minHostsForEstimations describes the minimum number of hosts that
 	// are needed to make broad estimations such as the number of sectors
@@ -42,4 +46,13 @@ var (
 		Standard: 60 * time.Second,
 		Testing:  10 * time.Millisecond,
 	}).(time.Duration)
+)
+
+// Constants related to the safety values for when the contractor is forming
+// contracts.
+var (
+	maxCollateral    = types.SiacoinPrecision.Mul64(1e3) // 1k SC
+	maxDownloadPrice = maxStoragePrice.Mul64(3 * 4320)
+	maxStoragePrice  = types.SiacoinPrecision.Mul64(30e3).Div(modules.BlockBytesPerMonthTerabyte) // 30k SC / TB / Month
+	maxUploadPrice   = maxStoragePrice.Mul64(4320)
 )

@@ -279,7 +279,7 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 			synced:                true,
 		},
 	}
-	for _, test := range tests {
+	for j, test := range tests {
 		cst1.cs.mu.Lock()
 		cst1.cs.synced = test.synced
 		cst1.cs.mu.Unlock()
@@ -293,7 +293,7 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 			}
 			// managedAcceptBlock is used here instead of AcceptBlock so as not to
 			// call Broadcast outside of the SendBlocks RPC.
-			err = cst2.cs.managedAcceptBlock(b)
+			_, err = cst2.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -310,7 +310,7 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 		numBroadcasts := mg.numBroadcasts
 		mg.mu.RUnlock()
 		if numBroadcasts != test.expectedNumBroadcasts {
-			t.Errorf("expected %d number of broadcasts, got %d", test.expectedNumBroadcasts, numBroadcasts)
+			t.Errorf("test #%d: expected %d number of broadcasts, got %d", j, test.expectedNumBroadcasts, numBroadcasts)
 		}
 	}
 }
@@ -456,11 +456,11 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
-			err = remoteCST.cs.managedAcceptBlock(b)
+			_, err = remoteCST.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
-			err = localCST.cs.managedAcceptBlock(b)
+			_, err = localCST.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
@@ -470,7 +470,7 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
-			err = remoteCST.cs.managedAcceptBlock(b)
+			_, err = remoteCST.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
@@ -480,7 +480,7 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
-			err = localCST.cs.managedAcceptBlock(b)
+			_, err = localCST.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil {
 				t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 			}
@@ -571,11 +571,11 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = cst.cs.managedAcceptBlock(b)
+		_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = cs.managedAcceptBlock(b)
+		_, err = cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -589,7 +589,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = cst.cs.managedAcceptBlock(b)
+		_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -932,7 +932,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 
 	// Test that cst1 doesn't accept a block it's already seen (the genesis block).
 	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.managedReceiveBlock(types.GenesisID))
-	if err != modules.ErrBlockKnown {
+	if err != modules.ErrBlockKnown && err != modules.ErrNonExtendingBlock {
 		t.Errorf("cst1 should reject known blocks: expected error '%v', got '%v'", modules.ErrBlockKnown, err)
 	}
 	// Test that cst2 errors when it doesn't recognize the requested block.
@@ -946,7 +946,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst2.cs.managedAcceptBlock(block) // Call managedAcceptBlock so that the block isn't broadcast.
+	_, err = cst2.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -960,7 +960,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst1.cs.managedAcceptBlock(block) // Call managedAcceptBlock so that the block isn't broadcast.
+	_, err = cst1.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -974,7 +974,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst2.cs.managedAcceptBlock(block) // Call managedAcceptBlock so that the block isn't broadcast.
+	_, err = cst2.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -982,7 +982,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst2.cs.managedAcceptBlock(block) // Call managedAcceptBlock so that the block isn't broadcast.
+	_, err = cst2.cs.managedAcceptBlocks([]types.Block{block}) // Call managedAcceptBlock so that the block isn't broadcast.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1154,7 +1154,7 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst1.cs.managedAcceptBlock(validBlock)
+	_, err = cst1.cs.managedAcceptBlocks([]types.Block{validBlock})
 	if err != nil {
 		t.Fatal(err)
 	}

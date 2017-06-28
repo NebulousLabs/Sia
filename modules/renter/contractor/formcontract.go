@@ -12,13 +12,6 @@ import (
 )
 
 var (
-	// the contractor will not form contracts above this price
-	maxStoragePrice = types.SiacoinPrecision.Mul64(500e3).Div(modules.BlockBytesPerMonthTerabyte) // 500k SC / TB / Month
-	// the contractor will not download data above this price (3x the maximum monthly storage price)
-	maxDownloadPrice = maxStoragePrice.Mul64(3 * 4320)
-	// the contractor will cap host's MaxCollateral setting to this value
-	maxCollateral = types.SiacoinPrecision.Mul64(1e3) // 1k SC
-
 	// ErrInsufficientAllowance indicates that the renter's allowance is less
 	// than the amount necessary to store at least one sector
 	ErrInsufficientAllowance = errors.New("allowance is not large enough to cover fees of contract creation")

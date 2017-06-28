@@ -75,7 +75,7 @@ type (
 	}
 
 	// WalletTransactionGETid contains the transaction returned by a call to
-	// /wallet/transaction/$(id)
+	// /wallet/transaction/:id
 	WalletTransactionGETid struct {
 		Transaction modules.ProcessedTransaction `json:"transaction"`
 	}
@@ -89,7 +89,7 @@ type (
 
 	// WalletTransactionsGETaddr contains the set of wallet transactions
 	// relevant to the input address provided in the call to
-	// /wallet/transaction/$(addr)
+	// /wallet/transaction/:addr
 	WalletTransactionsGETaddr struct {
 		ConfirmedTransactions   []modules.ProcessedTransaction `json:"confirmedtransactions"`
 		UnconfirmedTransactions []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
@@ -481,7 +481,7 @@ func (api *API) walletTransactionHandler(w http.ResponseWriter, req *http.Reques
 
 	txn, ok := api.wallet.Transaction(id)
 	if !ok {
-		WriteError(w, Error{"error when calling /wallet/transaction/$(id): transaction not found"}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/transaction/:id  :  transaction not found"}, http.StatusBadRequest)
 		return
 	}
 	WriteJSON(w, WalletTransactionGETid{

@@ -128,6 +128,7 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) ([]types.Trans
 
 	// Add estimated transaction fee.
 	_, tpoolFee := w.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(2)                              // We don't want send-to-many transactions to fail.
 	tpoolFee = tpoolFee.Mul64(1000 + 60*uint64(len(outputs))) // Estimated transaction size in bytes
 	txnBuilder.AddMinerFee(tpoolFee)
 
