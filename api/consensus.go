@@ -14,60 +14,60 @@ import (
 // ConsensusGET contains general information about the consensus set, with tags
 // to support idiomatic json encodings.
 type ConsensusGET struct {
-		Synced       bool              `json:"synced"`
-		Height       types.BlockHeight `json:"height"`
-		CurrentBlock types.BlockID     `json:"currentblock"`
-		Target       types.Target      `json:"target"`
-		Difficulty   types.Currency    `json:"difficulty"`
+	Synced       bool              `json:"synced"`
+	Height       types.BlockHeight `json:"height"`
+	CurrentBlock types.BlockID     `json:"currentblock"`
+	Target       types.Target      `json:"target"`
+	Difficulty   types.Currency    `json:"difficulty"`
 }
 
 type ConsensusFileContract struct {
-		FileSize           uint64                         `json:"filesize"`
-		FileMerkleRoot     crypto.Hash                    `json:"filemerkleroot"`
-		WindowStart        types.BlockHeight              `json:"windowstart"`
-		WindowEnd          types.BlockHeight              `json:"windowend"`
-		Payout             types.Currency                 `json:"payout"`
-		ValidProofOutputs  map[string]types.SiacoinOutput `json:"validproofoutputs"`
-		MissedProofOutputs map[string]types.SiacoinOutput `json:"missedproofoutputs"`
-		UnlockHash         types.UnlockHash               `json:"unlockhash"`
-		RevisionNumber     uint64                         `json:"revisionnumber"`
+	FileSize           uint64                         `json:"filesize"`
+	FileMerkleRoot     crypto.Hash                    `json:"filemerkleroot"`
+	WindowStart        types.BlockHeight              `json:"windowstart"`
+	WindowEnd          types.BlockHeight              `json:"windowend"`
+	Payout             types.Currency                 `json:"payout"`
+	ValidProofOutputs  map[string]types.SiacoinOutput `json:"validproofoutputs"`
+	MissedProofOutputs map[string]types.SiacoinOutput `json:"missedproofoutputs"`
+	UnlockHash         types.UnlockHash               `json:"unlockhash"`
+	RevisionNumber     uint64                         `json:"revisionnumber"`
 }
 
 type ConsensusFileContractRevision struct {
-		ParentID          types.FileContractID   `json:"parentid"`
-		UnlockConditions  types.UnlockConditions `json:"unlockconditions"`
-		NewRevisionNumber uint64                 `json:"newrevisionnumber"`
+	ParentID          types.FileContractID   `json:"parentid"`
+	UnlockConditions  types.UnlockConditions `json:"unlockconditions"`
+	NewRevisionNumber uint64                 `json:"newrevisionnumber"`
 
-		NewFileSize           uint64                         `json:"newfilesize"`
-		NewFileMerkleRoot     crypto.Hash                    `json:"newfilemerkleroot"`
-		NewWindowStart        types.BlockHeight              `json:"newwindowstart"`
-		NewWindowEnd          types.BlockHeight              `json:"newwindowend"`
-		NewValidProofOutputs  map[string]types.SiacoinOutput `json:"newvalidproofoutputs"`
-		NewMissedProofOutputs map[string]types.SiacoinOutput `json:"newmissedproofoutputs"`
-		NewUnlockHash         types.UnlockHash               `json:"newunlockhash"`
+	NewFileSize           uint64                         `json:"newfilesize"`
+	NewFileMerkleRoot     crypto.Hash                    `json:"newfilemerkleroot"`
+	NewWindowStart        types.BlockHeight              `json:"newwindowstart"`
+	NewWindowEnd          types.BlockHeight              `json:"newwindowend"`
+	NewValidProofOutputs  map[string]types.SiacoinOutput `json:"newvalidproofoutputs"`
+	NewMissedProofOutputs map[string]types.SiacoinOutput `json:"newmissedproofoutputs"`
+	NewUnlockHash         types.UnlockHash               `json:"newunlockhash"`
 }
 
 type ConsensusTransaction struct {
-		SiacoinInputs         map[string]types.SiacoinInput            `json:"siacoininputs"`
-		SiacoinOutputs        map[string]types.SiacoinOutput           `json:"siacoinoutputs"`
-		FileContracts         map[string]ConsensusFileContract         `json:"filecontracts"`
-		FileContractRevisions map[string]ConsensusFileContractRevision `json:"filecontractrevisions"`
-		StorageProofs         map[string]types.StorageProof            `json:"storageproofs"`
-		SiafundInputs         map[string]types.SiafundInput            `json:"siafundinputs"`
-		SiafundOutputs        map[string]types.SiafundOutput           `json:"siafundoutputs"`
-		MinerFees             map[string]types.Currency                `json:"minerfees"`
-		ArbitraryData         [][]byte                                 `json:"arbitrarydata"`
-		TransactionSignatures map[string]types.TransactionSignature    `json:"transactionsignatures"`
+	SiacoinInputs         map[string]types.SiacoinInput            `json:"siacoininputs"`
+	SiacoinOutputs        map[string]types.SiacoinOutput           `json:"siacoinoutputs"`
+	FileContracts         map[string]ConsensusFileContract         `json:"filecontracts"`
+	FileContractRevisions map[string]ConsensusFileContractRevision `json:"filecontractrevisions"`
+	StorageProofs         map[string]types.StorageProof            `json:"storageproofs"`
+	SiafundInputs         map[string]types.SiafundInput            `json:"siafundinputs"`
+	SiafundOutputs        map[string]types.SiafundOutput           `json:"siafundoutputs"`
+	MinerFees             map[string]types.Currency                `json:"minerfees"`
+	ArbitraryData         [][]byte                                 `json:"arbitrarydata"`
+	TransactionSignatures map[string]types.TransactionSignature    `json:"transactionsignatures"`
 }
 
 // ConsensusBlockGET is the object returned by a GET request to
 // /consensus/block.
 type ConsensusBlock struct {
-		BlockHeight types.BlockHeight `json:"blockheight"`
-		BlockHeader types.BlockHeader `json:"blockheader"`
+	BlockHeight types.BlockHeight `json:"blockheight"`
+	BlockHeader types.BlockHeader `json:"blockheader"`
 
-		MinerPayouts map[string]types.SiacoinOutput  `json:"minerpayouts"`
-		Transactions map[string]ConsensusTransaction `json:"transactions"`
+	MinerPayouts map[string]types.SiacoinOutput  `json:"minerpayouts"`
+	Transactions map[string]ConsensusTransaction `json:"transactions"`
 }
 
 // consensusHandler handles the API calls to /consensus.
