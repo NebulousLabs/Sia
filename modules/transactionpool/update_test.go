@@ -130,6 +130,49 @@ func TestFindSets(t *testing.T) {
 	}
 }
 
+// TestFindSetsMerging checks that the merging in findSets is done properly.
+// Specifically, it checks that a child transaction is merged iff it doesn't
+// decrease the average fee of its (new) parent set
+func TestFindSetsMerging(t *testing.T) {
+	// Create a 2 level binary tree graph.
+	edges := make([]types.TransactionGraphEdge, 0, 6)
+	sources := []int{0, 0, 1, 1, 2, 2}
+	dests := []int{1, 2, 3, 4, 5, 6}
+	fees := []int{5, 5, 50, 50, 1, 3}
+
+	for i := 0; i < 6; i++ {
+		edges = append(edges, types.TransactionGraphEdge{
+			Dest:   dests[i],
+			Fee:    types.NewCurrency64(uint64(fees[i])),
+			Source: sources[i],
+			Value:  types.NewCurrency64(100),
+		})
+	}
+	graph, err := types.TransactionGraph(types.SiacoinOutputID{0}, edges)
+	if err != nil {
+		t.Fatal(err)
+	}
+	graphSize := len(graph)
+	t.Log("graph size:", graphSize)
+	sets := findSets(graph)
+
+	var i int
+	for _, set := range sets {
+		t.Log("SET NUMBER: ", i)
+		i++
+		var totalFee types.Currency
+		for _, tx := range set {
+			for _, fee := range tx.MinerFees {
+				t.Log(fee)
+				totalFee = totalFee.Add(fee)
+			}
+
+		}
+		t.Log("TOTAL:", totalFee)
+	}
+
+}
+
 // TestArbDataOnly tries submitting a transaction with only arbitrary data to
 // the transaction pool. Then a block is mined, putting the transaction on the
 // blockchain. The arb data transaction should no longer be in the transaction
