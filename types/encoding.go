@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 )
@@ -531,6 +532,13 @@ func (t Transaction) MarshalSiaSize() (size int) {
 		size += 8 // ts.PublicKeyIndex
 		size += ts.CoveredFields.MarshalSiaSize()
 		size += 8 + len(ts.Signature)
+	}
+	// Sanity check against the slower method.
+	if build.DEBUG {
+		expectedSize := len(encoding.Marshal(t))
+		if expectedSize != size {
+			panic("Transaction size different from expected size.")
+		}
 	}
 	return
 }
