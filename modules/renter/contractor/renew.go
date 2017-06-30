@@ -12,7 +12,16 @@ import (
 // managedRenew negotiates a new contract for data already stored with a host.
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
-func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
+func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (_ modules.RenterContract, err error) {
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			c.hdb.IncrementFailedInteractions(contract.HostPublicKey)
+		} else {
+			c.hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+		}
+	}()
+
 	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
 		return modules.RenterContract{}, errors.New("no record of that host")

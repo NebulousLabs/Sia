@@ -238,3 +238,31 @@ func (hdb *HostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
 func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) []modules.HostDBEntry {
 	return hdb.hostTree.SelectRandom(n, excludeKeys)
 }
+
+// IncrementSuccessfulInteractions increments the number of successful interactions with a host for a given key
+func (hdb *HostDB) IncrementSuccessfulInteractions(key types.SiaPublicKey) {
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+
+	host, haveHost := hdb.hostTree.Select(key)
+	if !haveHost {
+		return
+	}
+
+	host.RecentSuccessfulInteractions++
+	hdb.hostTree.Modify(host)
+}
+
+// IncrementFailedInteractions increments the number of failed interactions with a host for a given key
+func (hdb *HostDB) IncrementFailedInteractions(key types.SiaPublicKey) {
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+
+	host, haveHost := hdb.hostTree.Select(key)
+	if !haveHost {
+		return
+	}
+
+	host.RecentFailedInteractions++
+	hdb.hostTree.Modify(host)
+}

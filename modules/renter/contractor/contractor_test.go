@@ -34,6 +34,8 @@ func (newStub) AllHosts() []modules.HostDBEntry                                 
 func (newStub) ActiveHosts() []modules.HostDBEntry                              { return nil }
 func (newStub) Host(types.SiaPublicKey) (settings modules.HostDBEntry, ok bool) { return }
 func (newStub) RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry     { return nil }
+func (newStub) IncrementSuccessfulInteractions(key types.SiaPublicKey)          {}
+func (newStub) IncrementFailedInteractions(key types.SiaPublicKey)              {}
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
@@ -186,6 +188,8 @@ func (stubHostDB) ActiveHosts() (hs []modules.HostDBEntry)                      
 func (stubHostDB) Host(types.SiaPublicKey) (h modules.HostDBEntry, ok bool)         { return }
 func (stubHostDB) PublicKey() (spk types.SiaPublicKey)                              { return }
 func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) (hs []modules.HostDBEntry) { return }
+func (stubHostDB) IncrementSuccessfulInteractions(key types.SiaPublicKey)           {}
+func (stubHostDB) IncrementFailedInteractions(key types.SiaPublicKey)               {}
 
 // TestIntegrationSetAllowance tests the SetAllowance method.
 func TestIntegrationSetAllowance(t *testing.T) {

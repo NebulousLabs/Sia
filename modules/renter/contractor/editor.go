@@ -104,9 +104,19 @@ func (he *hostEditor) Close() error {
 }
 
 // Upload negotiates a revision that adds a sector to a file contract.
-func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
+func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
+
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			he.contractor.hdb.IncrementFailedInteractions(he.contract.HostPublicKey)
+		} else {
+			he.contractor.hdb.IncrementSuccessfulInteractions(he.contract.HostPublicKey)
+		}
+	}()
+
 	if he.invalid {
 		return crypto.Hash{}, errInvalidEditor
 	}
@@ -130,9 +140,19 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 }
 
 // Delete negotiates a revision that removes a sector from a file contract.
-func (he *hostEditor) Delete(root crypto.Hash) error {
+func (he *hostEditor) Delete(root crypto.Hash) (err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
+
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			he.contractor.hdb.IncrementFailedInteractions(he.contract.HostPublicKey)
+		} else {
+			he.contractor.hdb.IncrementSuccessfulInteractions(he.contract.HostPublicKey)
+		}
+	}()
+
 	if he.invalid {
 		return errInvalidEditor
 	}
@@ -152,9 +172,19 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 }
 
 // Modify negotiates a revision that edits a sector in a file contract.
-func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) error {
+func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) (err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
+
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			he.contractor.hdb.IncrementFailedInteractions(he.contract.HostPublicKey)
+		} else {
+			he.contractor.hdb.IncrementSuccessfulInteractions(he.contract.HostPublicKey)
+		}
+	}()
+
 	if he.invalid {
 		return errInvalidEditor
 	}
@@ -242,6 +272,15 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 			c.log.Critical("Cached revision does not exist for contract.")
 		}
 	}
+
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			c.hdb.IncrementFailedInteractions(contract.HostPublicKey)
+		} else {
+			c.hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+		}
+	}()
 
 	// create editor
 	e, err := proto.NewEditor(host, contract, height, cancel)

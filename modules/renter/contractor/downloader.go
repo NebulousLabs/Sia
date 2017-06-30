@@ -175,6 +175,15 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		}
 	}
 
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			c.hdb.IncrementFailedInteractions(contract.HostPublicKey)
+		} else {
+			c.hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+		}
+	}()
+
 	// create downloader
 	d, err := proto.NewDownloader(host, contract, cancel)
 	if proto.IsRevisionMismatch(err) {

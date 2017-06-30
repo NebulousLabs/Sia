@@ -230,9 +230,14 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	}()
 	if err != nil {
 		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
+		// Increment failed host interactions
+		entry.RecentFailedInteractions++
 	} else {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 		entry.HostExternalSettings = settings
+
+		// Increment successful host interactions
+		entry.RecentSuccessfulInteractions++
 	}
 
 	// Update the host tree to have a new entry, including the new error. Then

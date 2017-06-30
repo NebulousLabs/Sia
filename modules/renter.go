@@ -98,6 +98,11 @@ type HostDBEntry struct {
 	HistoricUptime   time.Duration `json:"historicuptime"`
 	ScanHistory      HostDBScans   `json:"scanhistory"`
 
+	HistoricSuccessfulInteractions uint64 `json:"historicSuccessfulInteractions"`
+	HistoricFailedInteractions     uint64 `json:"historicFailedInteractions"`
+	RecentSuccessfulInteractions   uint64 `json:"recentSuccessfulInteractions"`
+	RecentFailedInteractions       uint64 `json:"recentFailedInteractions"`
+
 	// The public key of the host, stored separately to minimize risk of certain
 	// MitM based vulnerabilities.
 	PublicKey types.SiaPublicKey `json:"publickey"`
