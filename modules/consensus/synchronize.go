@@ -72,6 +72,7 @@ var (
 	}).(time.Duration)
 
 	errEarlyStop         = errors.New("initial blockchain download did not complete by the time shutdown was issued")
+	errNilProcBlock      = errors.New("nil processed block was fetched from the database")
 	errSendBlocksStalled = errors.New("SendBlocks RPC timed and never received any blocks")
 )
 
@@ -338,12 +339,18 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 			height := blockHeight(tx)
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
 				id, err := getPath(tx, i)
-				if build.DEBUG && err != nil {
-					panic(err)
+				if err != nil {
+					cs.log.Critical("Unable to get path: height", height, ":: request", i)
+					return err
 				}
 				pb, err := getBlockMap(tx, id)
-				if build.DEBUG && err != nil {
-					panic(err)
+				if err != nil {
+					cs.log.Critical("Unable to get block from block map: height", height, ":: request", i, ":: id", id)
+					return err
+				}
+				if pb == nil {
+					cs.log.Critical("getBlockMap yielded 'nil' block:", height, ":: request", i, ":: id", id)
+					return errNilProcBlock
 				}
 				blocks = append(blocks, pb.Block)
 			}
