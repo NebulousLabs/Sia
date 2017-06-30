@@ -2,6 +2,7 @@ package contractmanager
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +27,9 @@ type contractManagerTester struct {
 func (cmt *contractManagerTester) panicClose() {
 	err := cmt.Close()
 	if err != nil {
-		panic(err)
+		//panic(err)
+		fmt.Println("PANICCLOSE")
+		fmt.Println(err)
 	}
 }
 

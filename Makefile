@@ -77,7 +77,7 @@ test:
 test-v:
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint
-	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
+	go test -v -race -tags='testing debug' -timeout=2000s ./api
 test-cpu:
 	go test -v -tags='testing debug' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)
 test-mem:
@@ -88,11 +88,6 @@ cover: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@mkdir -p cover/modules/host
-	@for package in $(pkgs); do                                                                                                 \
-		go test -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package -run=$(run) \
-		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                                      \
-		&& rm cover/$$package.out ;                                                                                             \
-	done
 
 # whitepaper builds the whitepaper from whitepaper.tex. pdflatex has to be
 # called twice because references will not update correctly the first time.

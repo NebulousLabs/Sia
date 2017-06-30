@@ -13,7 +13,7 @@ func TestGatewayStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +33,7 @@ func TestGatewayPeerConnect(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestGatewayPeerDisconnect(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"testing"
@@ -50,8 +49,10 @@ func (srv *Server) panicClose() {
 	err := srv.Close()
 	if err != nil {
 		// Print the stack.
-		debug.PrintStack()
-		panic(err)
+		//debug.PrintStack()
+		//panic(err)
+		fmt.Println("PANICCLOSE")
+		fmt.Println(err)
 	}
 }
 
