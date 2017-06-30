@@ -127,7 +127,6 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 				setTotalFeeMap[j] = totalFee
 				parentsSlice = append(parentsSlice, j)
 			}
-
 			sort.Slice(parentsSlice, func(i, j int) bool {
 				var iAvgFee types.Currency
 				iFee := setTotalFeeMap[i]
@@ -146,7 +145,6 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 				} else {
 					jAvgFee = types.ZeroCurrency
 				}
-
 				return iAvgFee.Cmp(jAvgFee) < 0
 			})
 
@@ -157,10 +155,8 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 			}
 
 			var baseSet int
-
 			baseSetFee := tFee
 			baseSetSize := tSize
-
 			// False until the current tx has been merged with some parent set.
 			var merged bool // (This is kinda gross...)
 
@@ -170,7 +166,7 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 				parentAvgFee := parentFee.Div64(uint64(parentSize))
 
 				// Check if merging the current set to its parent set will
-				// increase the average fee
+				// increase the average fee.
 				mergedFee := baseSetFee.Add(parentFee)
 				mergedSize := baseSetSize + parentSize
 				mergedAvgFee := mergedFee.Div64(uint64(mergedSize))
