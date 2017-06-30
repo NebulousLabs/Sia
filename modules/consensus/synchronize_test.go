@@ -319,7 +319,7 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 // the consensus set, and that the consensus set catches with the remote peer
 // and possibly reorgs.
 func TestIntegrationRPCSendBlocks(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 

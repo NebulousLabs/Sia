@@ -634,7 +634,7 @@ func TestResizeNonexistentFolder(t *testing.T) {
 // FailedWrites and FailedReads correctly and eventually finds the storage
 // folder when it is made available to the host again.
 func TestStorageFolderUnavailable(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

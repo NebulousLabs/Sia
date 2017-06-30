@@ -1288,7 +1288,7 @@ func TestWalletChangePassword(t *testing.T) {
 // TestWalletSiacoins tests the /wallet/siacoins endpoint, including sending
 // to multiple addresses.
 func TestWalletSiacoins(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

@@ -3,6 +3,7 @@ package consensus
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -253,7 +254,7 @@ func TestIntegrationFileContractRevisionReorg(t *testing.T) {
 // TestIntegrationComplexReorg stacks up blocks of all types into a single
 // blockchain that undergoes a massive reorg as a stress test to the codebase.
 func TestIntegrationComplexReorg(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
