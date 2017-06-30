@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"sort"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -119,7 +118,7 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 				var size int
 				var totalFee types.Currency
 				for _, tx := range setMap[j] {
-					size += len(encoding.Marshal(tx))
+					size += tx.MarshalSiaSize()
 					for _, fee := range tx.MinerFees {
 						totalFee = totalFee.Add(fee)
 					}
@@ -151,17 +150,16 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 				return iAvgFee.Cmp(jAvgFee) < 0
 			})
 
-			//tsSize = t.MarshalSiaSize
+			tSize := t.MarshalSiaSize()
 			var tFee types.Currency
 			for _, fee := range t.MinerFees {
 				tFee = tFee.Add(fee)
 			}
 
 			var baseSet int
-			//var baseSetFee types.Currency
-			//var baseSetSize int
+
 			baseSetFee := tFee
-			baseSetSize := len(encoding.Marshal(t))
+			baseSetSize := tSize
 
 			// False until the current tx has been merged with some parent set.
 			var merged bool // (This is kinda gross...)
