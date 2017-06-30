@@ -126,12 +126,28 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 				}
 				setTotalSizeMap[j] = size
 				setTotalFeeMap[j] = totalFee
-
 				parentsSlice = append(parentsSlice, j)
 			}
+
 			sort.Slice(parentsSlice, func(i, j int) bool {
-				iAvgFee := setTotalFeeMap[i].Div64(uint64(setTotalSizeMap[i]))
-				jAvgFee := setTotalFeeMap[j].Div64(uint64(setTotalSizeMap[j]))
+				var iAvgFee types.Currency
+				iFee := setTotalFeeMap[i]
+				iSize := setTotalSizeMap[i]
+				if iSize != 0 {
+					iAvgFee = iFee.Div64(uint64(iSize))
+				} else {
+					iAvgFee = types.ZeroCurrency
+				}
+
+				var jAvgFee types.Currency
+				jFee := setTotalFeeMap[i]
+				jSize := setTotalSizeMap[i]
+				if jSize != 0 {
+					iAvgFee = jFee.Div64(uint64(jSize))
+				} else {
+					jAvgFee = types.ZeroCurrency
+				}
+
 				return iAvgFee.Cmp(jAvgFee) < 0
 			})
 
@@ -141,14 +157,14 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 				tFee = tFee.Add(fee)
 			}
 
-			// False until the current tx has been merged with some parent set.
-			var merged bool // (This is kinda gross...)
-
 			var baseSet int
 			//var baseSetFee types.Currency
 			//var baseSetSize int
 			baseSetFee := tFee
 			baseSetSize := len(encoding.Marshal(t))
+
+			// False until the current tx has been merged with some parent set.
+			var merged bool // (This is kinda gross...)
 
 			for _, j := range parentsSlice {
 				parentFee := setTotalFeeMap[j]
@@ -168,16 +184,15 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 						baseSet = j
 						baseSetFee = mergedFee
 						baseSetSize = mergedSize
-
 						// Add this transaction to the base set, and adjust
 						// its fee and size.
 						txMap[tid] = baseSet
-						setMap[baseSet] = append(setMap[baseSet], t)
+						setMap[baseSet] = append(setMap[baseSet], []types.Transaction{t}...)
 						setTotalFeeMap[baseSet] = baseSetFee
 						setTotalSizeMap[baseSet] = baseSetSize
+						merged = true
 						continue
 					}
-
 					// Forward any future transactions pointing at this set to the
 					// base set.
 					forwards[j] = baseSet
