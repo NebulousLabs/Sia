@@ -15,7 +15,7 @@ const (
 	// was altered to include the ID of the genesis block, the gateway's
 	// unique ID, and whether a connection is desired. This version also uses
 	// smux instead of muxado for stream multiplexing.
-	sessionUpgradeVersion = "1.3.0"
+	sessionUpgradeVersion = "1.4.0"
 
 	// maxLocalOutbound is currently set to 3, meaning the gateway will not
 	// consider a local node to be an outbound peer if the gateway already has
