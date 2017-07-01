@@ -103,6 +103,8 @@ type HostDBEntry struct {
 	RecentSuccessfulInteractions   uint64 `json:"recentSuccessfulInteractions"`
 	RecentFailedInteractions       uint64 `json:"recentFailedInteractions"`
 
+	LastHistoricUpdate types.BlockHeight
+
 	// The public key of the host, stored separately to minimize risk of certain
 	// MitM based vulnerabilities.
 	PublicKey types.SiaPublicKey `json:"publickey"`

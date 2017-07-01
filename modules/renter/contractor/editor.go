@@ -108,6 +108,10 @@ func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
 
+	if he.invalid {
+		return crypto.Hash{}, errInvalidEditor
+	}
+
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
 		if err != nil {
@@ -117,9 +121,6 @@ func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
 		}
 	}()
 
-	if he.invalid {
-		return crypto.Hash{}, errInvalidEditor
-	}
 	contract, sectorRoot, err := he.editor.Upload(data)
 	if err != nil {
 		return crypto.Hash{}, err
@@ -144,6 +145,10 @@ func (he *hostEditor) Delete(root crypto.Hash) (err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
 
+	if he.invalid {
+		return errInvalidEditor
+	}
+
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
 		if err != nil {
@@ -152,10 +157,6 @@ func (he *hostEditor) Delete(root crypto.Hash) (err error) {
 			he.contractor.hdb.IncrementSuccessfulInteractions(he.contract.HostPublicKey)
 		}
 	}()
-
-	if he.invalid {
-		return errInvalidEditor
-	}
 
 	contract, err := he.editor.Delete(root)
 	if err != nil {
@@ -176,6 +177,10 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 	he.mu.Lock()
 	defer he.mu.Unlock()
 
+	if he.invalid {
+		return errInvalidEditor
+	}
+
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
 		if err != nil {
@@ -185,9 +190,6 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 		}
 	}()
 
-	if he.invalid {
-		return errInvalidEditor
-	}
 	contract, err := he.editor.Modify(oldRoot, newRoot, offset, newData)
 	if err != nil {
 		return err

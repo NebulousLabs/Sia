@@ -17,6 +17,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"math"
 )
 
 var (
@@ -183,6 +184,25 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	return hdb, nil
 }
 
+// updateHostDBEntry updates a HostDBEntries's historic interactions if more than one block passed
+// since the last update. This should be called every time before the recent interactions are updated.
+func updateHostsHistoricInteractions(host *modules.HostDBEntry, bh types.BlockHeight) {
+	passedTime := bh - host.LastHistoricUpdate
+	if passedTime == 0 {
+		// no time passed. nothing to do.
+	}
+
+	// Decay the historic interactions depending on the number of blocks that passed without any interaction
+	decay := math.Pow(historicInteractionDecay, float64(passedTime))
+	host.HistoricSuccessfulInteractions = uint64(float64(host.HistoricSuccessfulInteractions) * decay)
+	host.HistoricFailedInteractions = uint64(float64(host.HistoricFailedInteractions) * decay)
+
+	host.HistoricSuccessfulInteractions += host.RecentSuccessfulInteractions
+	host.RecentSuccessfulInteractions = 0
+	host.HistoricFailedInteractions += host.RecentFailedInteractions
+	host.RecentFailedInteractions = 0
+}
+
 // ActiveHosts returns a list of hosts that are currently online, sorted by
 // weight.
 func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostDBEntry) {
@@ -249,7 +269,12 @@ func (hdb *HostDB) IncrementSuccessfulInteractions(key types.SiaPublicKey) {
 		return
 	}
 
+	// Update historic values if necessary
+	updateHostsHistoricInteractions(&host, hdb.cs.Height())
+
+	// Increment the successful interactions
 	host.RecentSuccessfulInteractions++
+
 	hdb.hostTree.Modify(host)
 }
 
@@ -263,6 +288,11 @@ func (hdb *HostDB) IncrementFailedInteractions(key types.SiaPublicKey) {
 		return
 	}
 
+	// Update historic values if necessary
+	updateHostsHistoricInteractions(&host, hdb.cs.Height())
+
+	// Increment the failed interactions
 	host.RecentFailedInteractions++
+
 	hdb.hostTree.Modify(host)
 }

@@ -29,23 +29,6 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostDBEntry) 
 	return
 }
 
-// updateHistoricInteractions adds the recent interactions to the historic interactions
-// and progresses the decay
-func (hdb *HostDB) updateHistoricInteractions() {
-	hosts := hdb.hostTree.All()
-	for _, host := range hosts {
-		host.HistoricSuccessfulInteractions = uint64(float64(host.HistoricSuccessfulInteractions) * historicInteractionDecay)
-		host.HistoricSuccessfulInteractions += host.RecentSuccessfulInteractions
-		host.RecentSuccessfulInteractions = 0
-
-		host.HistoricFailedInteractions = uint64(float64(host.HistoricFailedInteractions) * historicInteractionDecay)
-		host.HistoricFailedInteractions += host.RecentFailedInteractions
-		host.RecentFailedInteractions = 0
-
-		hdb.hostTree.Modify(host)
-	}
-}
-
 // insertBlockchainHost adds a host entry to the state. The host will be inserted
 // into the set of all hosts, and if it is online and responding to requests it
 // will be put into the list of active hosts.
@@ -128,9 +111,6 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 			hdb.insertBlockchainHost(host)
 		}
 	}
-
-	// Update historic interactions
-	hdb.updateHistoricInteractions()
 
 	hdb.lastChange = cc.ID
 }
