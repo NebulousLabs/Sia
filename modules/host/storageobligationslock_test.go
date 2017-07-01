@@ -4,13 +4,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestObligationLocks checks that the storage obligation locking functions
 // properly blocks and errors out for various use cases.
 func TestObligationLocks(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

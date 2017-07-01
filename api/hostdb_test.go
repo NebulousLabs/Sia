@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -317,7 +318,7 @@ func assembleHostPort(key crypto.TwofishKey, hostHostname string, testdir string
 // TestHostDBScanOnlineOffline checks that both online and offline hosts get
 // scanned in the hostdb.
 func TestHostDBScanOnlineOffline(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -419,7 +420,7 @@ func TestHostDBScanOnlineOffline(t *testing.T) {
 // successfully able to follow a host that has changed IP addresses and then
 // re-announced.
 func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -642,7 +643,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 // successfully able to follow a host that has changed IP addresses and then
 // re-announced.
 func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -893,7 +894,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 // successfully able to follow a host that has changed IP addresses and then
 // re-announced.
 func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -1099,7 +1100,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 // successfully able to follow a host that has changed IP addresses and then
 // re-announced.
 func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

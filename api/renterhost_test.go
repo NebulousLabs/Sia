@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -24,7 +25,7 @@ import (
 // locally by being deleted, the repair loop will download the necessary chunks
 // from the living hosts and upload them to new hosts.
 func TestRemoteFileRepair(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	st, err := createServerTester(t.Name())
@@ -233,7 +234,7 @@ func TestRemoteFileRepair(t *testing.T) {
 // TestHostAndRentVanilla sets up an integration test where a host and renter
 // do basic uploads and downloads.
 func TestHostAndRentVanilla(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -423,7 +424,7 @@ func TestHostAndRentVanilla(t *testing.T) {
 // TestHostAndRentMultiHost sets up an integration test where three hosts and a
 // renter do basic (parallel) uploads and downloads.
 func TestHostAndRentMultiHost(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -539,7 +540,7 @@ func TestHostAndRentMultiHost(t *testing.T) {
 // TestHostAndRentManyFiles sets up an integration test where a single renter
 // is uploading many files to the network.
 func TestHostAndRentManyFiles(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

@@ -561,3 +561,23 @@ func TestCurrencyUnits(t *testing.T) {
 		}
 	}
 }
+
+// TestTransactionMarshalSiaSize tests that the txn.MarshalSiaSize method is
+// always consistent with len(encoding.Marshal(txn)).
+func TestTransactionMarshalSiaSize(t *testing.T) {
+	txn := Transaction{
+		SiacoinInputs:         []SiacoinInput{{}},
+		SiacoinOutputs:        []SiacoinOutput{{}},
+		FileContracts:         []FileContract{{}},
+		FileContractRevisions: []FileContractRevision{{}},
+		StorageProofs:         []StorageProof{{}},
+		SiafundInputs:         []SiafundInput{{}},
+		SiafundOutputs:        []SiafundOutput{{}},
+		MinerFees:             []Currency{{}},
+		ArbitraryData:         [][]byte{{}},
+		TransactionSignatures: []TransactionSignature{{}},
+	}
+	if txn.MarshalSiaSize() != len(encoding.Marshal(txn)) {
+		t.Errorf("sizes do not match: expected %v, got %v", len(encoding.Marshal(txn)), txn.MarshalSiaSize())
+	}
+}

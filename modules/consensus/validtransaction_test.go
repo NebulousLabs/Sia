@@ -3,6 +3,7 @@ package consensus
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
@@ -82,7 +83,7 @@ func TestTryInvalidTransactionSet(t *testing.T) {
 // for them, probing segment boundaries (first segment, last segment,
 // incomplete segment, etc.).
 func TestStorageProofBoundaries(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -211,7 +212,7 @@ func TestStorageProofBoundaries(t *testing.T) {
 // them, probing segment boundaries (first segment, last segment, incomplete
 // segment, etc.).
 func TestEmptyStorageProof(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

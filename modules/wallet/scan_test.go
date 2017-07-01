@@ -3,6 +3,7 @@ package wallet
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
@@ -77,7 +78,7 @@ func TestScanLargeIndex(t *testing.T) {
 // TestScanLoop tests that the scan loop will continue to run as long as it
 // finds indices in the upper half of the last set of generated keys.
 func TestScanLoop(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 
