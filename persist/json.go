@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -161,6 +162,12 @@ func SaveJSON(meta Metadata, object interface{}, filename string) error {
 		delete(activeFiles, filename)
 		activeFilesMu.Unlock()
 	}()
+
+	// Call GoSched during testing to make this condition more likely to
+	// trigger.
+	if build.DEBUG {
+		runtime.Gosched()
+	}
 
 	// Write the metadata to the buffer.
 	buf := new(bytes.Buffer)
