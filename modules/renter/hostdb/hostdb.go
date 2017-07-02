@@ -196,23 +196,32 @@ func updateHostsHistoricInteractions(host *modules.HostDBEntry, bh types.BlockHe
 		return
 	}
 
+	// tmp float64 values for more accurate decay
+	hsi := float64(host.HistoricSuccessfulInteractions)
+	hfi := float64(host.HistoricFailedInteractions)
+
 	// Apply the decay of a single block
 	decay := historicInteractionDecay
-	host.HistoricSuccessfulInteractions = uint64(float64(host.HistoricSuccessfulInteractions) * decay)
-	host.HistoricFailedInteractions = uint64(float64(host.HistoricFailedInteractions) * decay)
+	hsi *= decay
+	hfi *= decay
 
 	// Apply the recent interactions of that single block
-	host.HistoricSuccessfulInteractions += host.RecentSuccessfulInteractions
-	host.RecentSuccessfulInteractions = 0
-	host.HistoricFailedInteractions += host.RecentFailedInteractions
-	host.RecentFailedInteractions = 0
+	hsi += float64(host.RecentSuccessfulInteractions)
+	hfi += float64(host.RecentFailedInteractions)
 
 	// Apply the decay of the rest of the blocks
 	if passedTime > 1 {
 		decay = math.Pow(historicInteractionDecay, float64(passedTime-1))
-		host.HistoricSuccessfulInteractions = uint64(float64(host.HistoricSuccessfulInteractions) * decay)
-		host.HistoricFailedInteractions = uint64(float64(host.HistoricFailedInteractions) * decay)
+		hsi *= decay
+		hfi *= decay
 	}
+
+	// Set new values
+	host.HistoricSuccessfulInteractions = uint64(hsi)
+	host.HistoricFailedInteractions = uint64(hfi)
+	host.RecentSuccessfulInteractions = 0
+	host.RecentFailedInteractions = 0
+
 	// Update the time of the last update
 	host.LastHistoricUpdate = bh
 }
