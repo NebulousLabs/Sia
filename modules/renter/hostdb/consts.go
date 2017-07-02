@@ -29,6 +29,10 @@ const (
 	// saveFrequency defines how frequently the hostdb will save to disk. Hostdb
 	// will also save immediately prior to shutdown.
 	saveFrequency = 2 * time.Minute
+
+	// historicInteractionDecay defines the decay of the HistoricSuccessfulInteractions
+	// and HistoricFailedInteractions after every block
+	historicInteractionDecay = 0.997
 )
 
 var (

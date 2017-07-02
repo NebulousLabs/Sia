@@ -12,7 +12,7 @@ import (
 // managedRenew negotiates a new contract for data already stored with a host.
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
-func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
+func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (_ modules.RenterContract, err error) {
 	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
 		return modules.RenterContract{}, errors.New("no record of that host")
@@ -46,7 +46,7 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 
 	// execute negotiation protocol
 	txnBuilder := c.wallet.StartTransaction()
-	newContract, err := proto.Renew(contract, params, txnBuilder, c.tpool, c.tg.StopChan())
+	newContract, err := proto.Renew(contract, params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if proto.IsRevisionMismatch(err) {
 		// return unused outputs to wallet
 		txnBuilder.Drop()
@@ -63,7 +63,11 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 		contract.LastRevision = cached.Revision
 		// need to start a new transaction
 		txnBuilder = c.wallet.StartTransaction()
-		newContract, err = proto.Renew(contract, params, txnBuilder, c.tpool, c.tg.StopChan())
+		newContract, err = proto.Renew(contract, params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
+		// needs to be handled separately since a revision mismatch is not automatically a failed interaction
+		if proto.IsRevisionMismatch(err) {
+			c.hdb.IncrementFailedInteractions(host.PublicKey)
+		}
 	}
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet

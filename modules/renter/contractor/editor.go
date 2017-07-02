@@ -104,7 +104,7 @@ func (he *hostEditor) Close() error {
 }
 
 // Upload negotiates a revision that adds a sector to a file contract.
-func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
+func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
 	if he.invalid {
@@ -130,13 +130,12 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 }
 
 // Delete negotiates a revision that removes a sector from a file contract.
-func (he *hostEditor) Delete(root crypto.Hash) error {
+func (he *hostEditor) Delete(root crypto.Hash) (err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
 	if he.invalid {
 		return errInvalidEditor
 	}
-
 	contract, err := he.editor.Delete(root)
 	if err != nil {
 		return err
@@ -152,7 +151,7 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 }
 
 // Modify negotiates a revision that edits a sector in a file contract.
-func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) error {
+func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) (err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
 	if he.invalid {
@@ -244,7 +243,7 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	}
 
 	// create editor
-	e, err := proto.NewEditor(host, contract, height, cancel)
+	e, err := proto.NewEditor(host, contract, height, c.hdb, cancel)
 	if proto.IsRevisionMismatch(err) {
 		// try again with the cached revision
 		c.mu.RLock()
@@ -258,7 +257,11 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
 		contract.LastRevision = cached.Revision
 		contract.MerkleRoots = cached.MerkleRoots
-		e, err = proto.NewEditor(host, contract, height, cancel)
+		e, err = proto.NewEditor(host, contract, height, c.hdb, cancel)
+		// needs to be handled separately since a revision mismatch is not automatically a failed interaction
+		if proto.IsRevisionMismatch(err) {
+			c.hdb.IncrementFailedInteractions(host.PublicKey)
+		}
 	}
 	if err != nil {
 		return nil, err

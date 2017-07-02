@@ -228,11 +228,22 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 		copy(pubkey[:], pubKey.Key)
 		return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 	}()
+	// Update historic interactions of entry if necessary
+	updateHostsHistoricInteractions(&entry, hdb.cs.Height())
+
 	if err != nil {
 		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
+		if hdb.online {
+			// Increment failed host interactions
+			entry.RecentFailedInteractions++
+		}
+
 	} else {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 		entry.HostExternalSettings = settings
+
+		// Increment successful host interactions
+		entry.RecentSuccessfulInteractions++
 	}
 
 	// Update the host tree to have a new entry, including the new error. Then

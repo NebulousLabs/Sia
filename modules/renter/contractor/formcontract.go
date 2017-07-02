@@ -67,7 +67,7 @@ func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, er
 
 // managedNewContract negotiates an initial file contract with the specified
 // host, saves it, and returns it.
-func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uint64, endHeight types.BlockHeight) (modules.RenterContract, error) {
+func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uint64, endHeight types.BlockHeight) (_ modules.RenterContract, err error) {
 	// reject hosts that are too expensive
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return modules.RenterContract{}, errTooExpensive
@@ -97,7 +97,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 	// create transaction builder
 	txnBuilder := c.wallet.StartTransaction()
 
-	contract, err := proto.FormContract(params, txnBuilder, c.tpool, c.tg.StopChan())
+	contract, err := proto.FormContract(params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if err != nil {
 		txnBuilder.Drop()
 		return modules.RenterContract{}, err
