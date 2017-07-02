@@ -186,21 +186,35 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 
 // updateHostDBEntry updates a HostDBEntries's historic interactions if more than one block passed
 // since the last update. This should be called every time before the recent interactions are updated.
+// if passedTime is e.g. 10, this means that the recent interactions were updated 10 blocks ago
+// but never since. So we need to apply the decay of 1 block before we append the recent interactions
+// from 10 blocks ago and then apply the decay of 9 more blocks in which the recent interactions have been 0
 func updateHostsHistoricInteractions(host *modules.HostDBEntry, bh types.BlockHeight) {
 	passedTime := bh - host.LastHistoricUpdate
 	if passedTime == 0 {
 		// no time passed. nothing to do.
+		return
 	}
 
-	// Decay the historic interactions depending on the number of blocks that passed without any interaction
-	decay := math.Pow(historicInteractionDecay, float64(passedTime))
+	// Apply the decay of a single block
+	decay := historicInteractionDecay
 	host.HistoricSuccessfulInteractions = uint64(float64(host.HistoricSuccessfulInteractions) * decay)
 	host.HistoricFailedInteractions = uint64(float64(host.HistoricFailedInteractions) * decay)
 
+	// Apply the recent interactions of that single block
 	host.HistoricSuccessfulInteractions += host.RecentSuccessfulInteractions
 	host.RecentSuccessfulInteractions = 0
 	host.HistoricFailedInteractions += host.RecentFailedInteractions
 	host.RecentFailedInteractions = 0
+
+	// Apply the decay of the rest of the blocks
+	if passedTime > 1 {
+		decay = math.Pow(historicInteractionDecay, float64(passedTime-1))
+		host.HistoricSuccessfulInteractions = uint64(float64(host.HistoricSuccessfulInteractions) * decay)
+		host.HistoricFailedInteractions = uint64(float64(host.HistoricFailedInteractions) * decay)
+	}
+	// Update the time of the last update
+	host.LastHistoricUpdate = bh
 }
 
 // ActiveHosts returns a list of hosts that are currently online, sorted by

@@ -125,7 +125,7 @@ func (hd *Downloader) Close() error {
 
 // NewDownloader initiates the download request loop with a host, and returns a
 // Downloader.
-func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, cancel <-chan struct{}) (*Downloader, error) {
+func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, hdb hostDB, cancel <-chan struct{}) (_ *Downloader, err error) {
 	// check that contract has enough value to support a download
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
@@ -134,6 +134,16 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, ca
 	if contract.RenterFunds().Cmp(sectorPrice) < 0 {
 		return nil, errors.New("contract has insufficient funds to support download")
 	}
+
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		// A revision mismatch might not be the host's fault.
+		if err != nil && !IsRevisionMismatch(err) {
+			hdb.IncrementFailedInteractions(contract.HostPublicKey)
+		} else {
+			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+		}
+	}()
 
 	// initiate download loop
 	conn, err := (&net.Dialer{

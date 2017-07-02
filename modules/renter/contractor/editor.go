@@ -107,20 +107,9 @@ func (he *hostEditor) Close() error {
 func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
-
 	if he.invalid {
 		return crypto.Hash{}, errInvalidEditor
 	}
-
-	// Increase Successful/Failed interactions accordingly
-	defer func() {
-		if err != nil {
-			he.contractor.hdb.IncrementFailedInteractions(he.contract.HostPublicKey)
-		} else {
-			he.contractor.hdb.IncrementSuccessfulInteractions(he.contract.HostPublicKey)
-		}
-	}()
-
 	contract, sectorRoot, err := he.editor.Upload(data)
 	if err != nil {
 		return crypto.Hash{}, err
@@ -144,20 +133,9 @@ func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
 func (he *hostEditor) Delete(root crypto.Hash) (err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
-
 	if he.invalid {
 		return errInvalidEditor
 	}
-
-	// Increase Successful/Failed interactions accordingly
-	defer func() {
-		if err != nil {
-			he.contractor.hdb.IncrementFailedInteractions(he.contract.HostPublicKey)
-		} else {
-			he.contractor.hdb.IncrementSuccessfulInteractions(he.contract.HostPublicKey)
-		}
-	}()
-
 	contract, err := he.editor.Delete(root)
 	if err != nil {
 		return err
@@ -176,20 +154,9 @@ func (he *hostEditor) Delete(root crypto.Hash) (err error) {
 func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) (err error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
-
 	if he.invalid {
 		return errInvalidEditor
 	}
-
-	// Increase Successful/Failed interactions accordingly
-	defer func() {
-		if err != nil {
-			he.contractor.hdb.IncrementFailedInteractions(he.contract.HostPublicKey)
-		} else {
-			he.contractor.hdb.IncrementSuccessfulInteractions(he.contract.HostPublicKey)
-		}
-	}()
-
 	contract, err := he.editor.Modify(oldRoot, newRoot, offset, newData)
 	if err != nil {
 		return err
@@ -275,17 +242,8 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		}
 	}
 
-	// Increase Successful/Failed interactions accordingly
-	defer func() {
-		if err != nil {
-			c.hdb.IncrementFailedInteractions(contract.HostPublicKey)
-		} else {
-			c.hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
-		}
-	}()
-
 	// create editor
-	e, err := proto.NewEditor(host, contract, height, cancel)
+	e, err := proto.NewEditor(host, contract, height, c.hdb, cancel)
 	if proto.IsRevisionMismatch(err) {
 		// try again with the cached revision
 		c.mu.RLock()
@@ -299,7 +257,11 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
 		contract.LastRevision = cached.Revision
 		contract.MerkleRoots = cached.MerkleRoots
-		e, err = proto.NewEditor(host, contract, height, cancel)
+		e, err = proto.NewEditor(host, contract, height, c.hdb, cancel)
+		// needs to be handled separately since a revision mismatch is not automatically a failed interaction
+		if proto.IsRevisionMismatch(err) {
+			c.hdb.IncrementFailedInteractions(host.PublicKey)
+		}
 	}
 	if err != nil {
 		return nil, err
