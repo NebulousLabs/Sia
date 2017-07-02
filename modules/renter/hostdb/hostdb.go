@@ -307,7 +307,8 @@ func (hdb *HostDB) IncrementFailedInteractions(key types.SiaPublicKey) {
 	defer hdb.mu.Unlock()
 
 	host, haveHost := hdb.hostTree.Select(key)
-	if !haveHost {
+	if !haveHost || !hdb.online {
+		// If we are offline it probably wasn't the host's fault
 		return
 	}
 

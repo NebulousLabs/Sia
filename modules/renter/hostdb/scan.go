@@ -233,8 +233,11 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 
 	if err != nil {
 		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
-		// Increment failed host interactions
-		entry.RecentFailedInteractions++
+		if hdb.online {
+			// Increment failed host interactions
+			entry.RecentFailedInteractions++
+		}
+
 	} else {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 		entry.HostExternalSettings = settings
