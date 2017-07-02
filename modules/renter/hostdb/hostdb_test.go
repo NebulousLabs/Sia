@@ -2,6 +2,7 @@ package hostdb
 
 import (
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,7 +19,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
-	"math"
 )
 
 // hdbTester contains a hostdb and all dependencies.
