@@ -20,6 +20,7 @@ type Downloader struct {
 	conn      net.Conn
 	closeChan chan struct{}
 	once      sync.Once
+	hdb       hostDB
 
 	SaveFn revisionSaver
 }
@@ -27,7 +28,7 @@ type Downloader struct {
 // Sector retrieves the sector with the specified Merkle root, and revises
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
-func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, error) {
+func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []byte, err error) {
 	extendDeadline(hd.conn, modules.NegotiateDownloadTime)
 	defer extendDeadline(hd.conn, time.Hour) // reset deadline when finished
 
@@ -63,7 +64,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	}
 
 	// send download action
-	err := encoding.WriteObject(hd.conn, []modules.DownloadAction{{
+	err = encoding.WriteObject(hd.conn, []modules.DownloadAction{{
 		MerkleRoot: root,
 		Offset:     0,
 		Length:     modules.SectorSize,
@@ -71,6 +72,15 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	if err != nil {
 		return modules.RenterContract{}, nil, err
 	}
+
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			hd.hdb.IncrementFailedInteractions(hd.contract.HostPublicKey)
+		} else if err == nil {
+			hd.hdb.IncrementSuccessfulInteractions(hd.contract.HostPublicKey)
+		}
+	}()
 
 	// send the revision to the host for approval
 	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
@@ -181,5 +191,6 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, hd
 		host:      host,
 		conn:      conn,
 		closeChan: closeChan,
+		hdb:       hdb,
 	}, nil
 }
