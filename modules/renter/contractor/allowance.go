@@ -2,7 +2,6 @@ package contractor
 
 import (
 	"errors"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -19,17 +18,6 @@ var (
 	// period to 1 block, since RenewWindow := period / 2.
 	ErrAllowanceZeroWindow = errors.New("renew window must be non-zero")
 )
-
-// contractEndHeight returns the height at which the Contractor's contracts
-// end. If there are no contracts, it returns zero.
-func (c *Contractor) contractEndHeight() types.BlockHeight {
-	var endHeight types.BlockHeight
-	for _, contract := range c.contracts {
-		endHeight = contract.EndHeight()
-		break
-	}
-	return endHeight
-}
 
 // SetAllowance sets the amount of money the Contractor is allowed to spend on
 // contracts over a given time period, divided among the number of hosts
@@ -104,41 +92,12 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return err
 	}
 
-	c.mu.RLock()
-	// gather contracts to renew
-	var renewSet []modules.RenterContract
-	for _, contract := range c.contracts {
-		renewSet = append(renewSet, contract)
-	}
-
-	// calculate new endHeight; if the period has not changed, the endHeight
-	// should not change either
+	// Renew what contracts we currently have.
 	periodStart := c.blockHeight
 	endHeight := periodStart + a.Period
-	if a.Period == c.allowance.Period && len(c.contracts) > 0 {
-		// COMPAT v0.6.0 - old hosts require end height increase by at least 1
-		endHeight = c.contractEndHeight() + 1
-	}
-	c.mu.RUnlock()
-
-	// renew existing contracts with new allowance parameters
-	newContracts := make(map[types.FileContractID]modules.RenterContract)
-	renewedIDs := make(map[types.FileContractID]types.FileContractID)
-	for _, contract := range renewSet {
-		newContract, err := c.managedRenew(contract, numSectors, endHeight)
-		if err != nil {
-			c.log.Printf("WARN: failed to renew contract with %v (error: %v); a new contract will be formed in its place", contract.NetAddress, err)
-			remaining++
-			continue
-		}
-		newContracts[newContract.ID] = newContract
-		renewedIDs[contract.ID] = newContract.ID
-		if len(newContracts) >= int(a.Hosts) {
-			break
-		}
-		// sleep between renewing each contract to alleviate potential block
-		// propagation issues
-		time.Sleep(contractFormationInterval)
+	newContracts, renewedIDs, remaining := c.managedRenewAllowanceContracts(a, periodStart, endHeight, numSectors, remaining)
+	if err != nil {
+		return err
 	}
 
 	// if we did not renew enough contracts, form new ones
@@ -173,41 +132,6 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	// if the currentPeriod was previously unset, set it now
 	if c.currentPeriod == 0 {
 		c.currentPeriod = periodStart
-	}
-	err = c.saveSync()
-	c.mu.Unlock()
-
-	return err
-}
-
-// managedFormAllowanceContracts handles the special case where no contracts
-// need to be renewed when setting the allowance.
-func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a modules.Allowance) error {
-	if n <= 0 {
-		return nil
-	}
-
-	// if we're forming contracts but not renewing, the new contracts should
-	// have the same endHeight as the existing ones. Otherwise, the endHeight
-	// should be a full period.
-	c.mu.RLock()
-	endHeight := c.blockHeight + a.Period
-	if len(c.contracts) > 0 {
-		endHeight = c.contractEndHeight()
-	}
-	c.mu.RUnlock()
-
-	// form the contracts
-	formed, err := c.managedFormContracts(n, numSectors, endHeight)
-	if err != nil {
-		return err
-	}
-
-	// Set the allowance and update the contract set
-	c.mu.Lock()
-	c.allowance = a
-	for _, contract := range formed {
-		c.contracts[contract.ID] = contract
 	}
 	err = c.saveSync()
 	c.mu.Unlock()
