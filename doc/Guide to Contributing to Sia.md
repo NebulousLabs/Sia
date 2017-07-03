@@ -238,9 +238,11 @@ $ git push <fork remote> master
   * [Official resources for learning Git][git]
 
 <a name="where-to-start"/>
+
 ## Where to start
+
 If you'd like to contribute to Sia but don't have any specific ideas, writing 
-tests is a good way to get your feet wet.  See [doc/Running and Writing Tests for Sia.md](Running\ and\ Writing\ Tests\ for\ Sia.md) to get started. 
+tests is a good way to get your feet wet.  See [doc/Running and Writing Tests for Sia.md](Running%20and%20Writing%20Tests%20for%20Sia.md) to get started.
 
 <a name="contact"/>
 
