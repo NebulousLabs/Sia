@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestMapHeapSimple test max-heap and min-heap versions of the MapHeap on the
@@ -28,7 +29,8 @@ func TestMapHeapSimple(t *testing.T) {
 	max.Init()
 	min.Init()
 
-	for i := 0; i < 1000; i++ {
+	randSlice := fastrand.Perm(1000)
+	for _, i := range randSlice {
 		e1 := &mapElement{
 			set: &splitSet{
 				averageFee:   types.SiacoinPrecision.Mul64(uint64(i)),
@@ -58,9 +60,6 @@ func TestMapHeapSimple(t *testing.T) {
 		minPop := min.Pop()
 
 		if int(maxPop.id) != 999-i {
-			t.Log(maxPop.set.averageFee)
-			t.Log(maxPop.id)
-			t.Log(999 - i)
 			t.Error("Unexpected splitSetID in result from max-heap pop.")
 		}
 
@@ -78,102 +77,9 @@ func TestMapHeapSimple(t *testing.T) {
 	}
 }
 
-// TestMapHeapSimpleDiffOrder performs the same test as TestMapHeapSimple but
-// pushes the half of elements with larger averageFee values first, and the
-// smaller sized fee elements last. Then the sequence of pops is checked.
-func TestMapHeapSimpleDiffOrder(t *testing.T) {
-	max := &mapHeap{
-		selectID: make(map[splitSetID]*mapElement),
-		data:     make([]*mapElement, 0),
-		size:     0,
-		minHeap:  false,
-	}
-
-	min := &mapHeap{
-		selectID: make(map[splitSetID]*mapElement),
-		data:     make([]*mapElement, 0),
-		size:     0,
-		minHeap:  true,
-	}
-
-	max.Init()
-	min.Init()
-
-	for i := 50; i < 100; i++ {
-		e1 := &mapElement{
-			set: &splitSet{
-				averageFee:   types.SiacoinPrecision.Mul64(uint64(i)),
-				size:         uint64(10 * i),
-				transactions: make([]types.Transaction, 0),
-			},
-
-			id:    splitSetID(i),
-			index: 0,
-		}
-		e2 := &mapElement{
-			set: &splitSet{
-				averageFee:   types.SiacoinPrecision.Mul64(uint64(i)),
-				size:         uint64(10 * i),
-				transactions: make([]types.Transaction, 0),
-			},
-
-			id:    splitSetID(i),
-			index: 0,
-		}
-		max.Push(e1)
-		min.Push(e2)
-	}
-
-	for i := 0; i < 50; i++ {
-		e1 := &mapElement{
-			set: &splitSet{
-				averageFee:   types.SiacoinPrecision.Mul64(uint64(i)),
-				size:         uint64(10 * i),
-				transactions: make([]types.Transaction, 0),
-			},
-
-			id:    splitSetID(i),
-			index: 0,
-		}
-		e2 := &mapElement{
-			set: &splitSet{
-				averageFee:   types.SiacoinPrecision.Mul64(uint64(i)),
-				size:         uint64(10 * i),
-				transactions: make([]types.Transaction, 0),
-			},
-
-			id:    splitSetID(i),
-			index: 0,
-		}
-		max.Push(e1)
-		min.Push(e2)
-	}
-
-	for i := 0; i < 100; i++ {
-		maxPop := max.Pop()
-		minPop := min.Pop()
-
-		if int(maxPop.id) != 99-i {
-			t.Error("Unexpected splitSetID in result from max-heap pop.")
-		}
-
-		if int(minPop.id) != i {
-			t.Error("Unexpected splitSetID in result from min-heap pop.")
-		}
-
-		if maxPop.set.averageFee.Cmp(types.SiacoinPrecision.Mul64(uint64(99-i))) != 0 {
-			t.Error("Unexpected currency value in result from max-heap pop.")
-		}
-
-		if minPop.set.averageFee.Cmp(types.SiacoinPrecision.Mul64(uint64(i))) != 0 {
-			t.Error("Unexpected currency value in result from min-heap pop.")
-		}
-	}
-}
-
 // TestMapHeapSize tests that the size of MapHeaps changes accordingly with the
-// sizes of elements added to it, and with those elements removed from it.
-// Tests a max-heap and min-heap on the same sequence of pushes and pops.
+// sizes of elements added to it, and with those elements removed from it. Tests
+// a max-heap and min-heap on the same sequence of pushes and pops.
 func TestMapHeapSize(t *testing.T) {
 	max := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
@@ -194,7 +100,8 @@ func TestMapHeapSize(t *testing.T) {
 
 	var expectedSize uint64
 
-	for i := 0; i < 1000; i++ {
+	randSlice := fastrand.Perm(1000)
+	for _, i := range randSlice {
 		e1 := &mapElement{
 			set: &splitSet{
 				averageFee:   types.SiacoinPrecision.Mul64(uint64(i)),
@@ -244,9 +151,9 @@ func TestMapHeapSize(t *testing.T) {
 	}
 }
 
-// TestMapHeapRemoveBySetID pushes a sequence of elements onto
-// a max-heap and min-heap. Then it removes a random element using
-// its splitSetID, and checks that it has been removed.
+// TestMapHeapRemoveBySetID pushes a sequence of elements onto a max-heap and
+// min-heap. Then it removes a random element using its splitSetID, and checks
+// that it has been removed.
 func TestMapHeapRemoveBySetID(t *testing.T) {
 	max := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
@@ -320,8 +227,25 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 		t.Error("Element not found in map(s) before being removed by splitSetID")
 	}
 
+	minSizeBefore := min.size
+	maxSizeBefore := max.size
+
+	minRemovedSetSize := min.selectID[randID].set.size
+	maxRemovedSetSize := max.selectID[randID].set.size
+
 	max.RemoveSetByID(randID)
 	min.RemoveSetByID(randID)
+
+	minSizeAfter := min.size
+	maxSizeAfter := max.size
+
+	if minSizeBefore-minRemovedSetSize != minSizeAfter {
+		t.Error("unexpected difference in size after removing from min heap.")
+	}
+
+	if maxSizeBefore-maxRemovedSetSize != maxSizeAfter {
+		t.Error("unexpected difference in size after removing from max heap.")
+	}
 
 	// Iterate over data in min heap and max heap to confirm the element to be
 	// removed was actually removed
@@ -360,7 +284,8 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 }
 
 // TestMapHeapPeek test the Peek method. First, on an empty heap Peek should
-// return false. Then it checks that Peek returns the same result as the next Pop.
+// return false. Then it checks that Peek returns the same result as the next
+// Pop.
 func TestMapHeapPeek(t *testing.T) {
 	max := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
@@ -379,8 +304,14 @@ func TestMapHeapPeek(t *testing.T) {
 	max.Init()
 	min.Init()
 
+	minSizeBefore := min.size
+	maxSizeBefore := max.size
+
 	_, maxNotEmpty := max.Peek()
 	_, minNotEmpty := min.Peek()
+
+	minSizeAfter := min.size
+	maxSizeAfter := max.size
 
 	if maxNotEmpty {
 		t.Error("Unexpected result from max.Peek(), heap not empty")
@@ -388,6 +319,10 @@ func TestMapHeapPeek(t *testing.T) {
 
 	if minNotEmpty {
 		t.Error("Unexpected result from max.Peek(), heap not empty")
+	}
+
+	if minSizeBefore != minSizeAfter || maxSizeBefore != maxSizeAfter {
+		t.Error("expected heap size not to change from peek.")
 	}
 
 	for i := 0; i < 10; i++ {
@@ -416,8 +351,18 @@ func TestMapHeapPeek(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
+		minSizeBefore := min.size
+		maxSizeBefore := max.size
+
 		maxPeek, maxNotEmpty := max.Peek()
 		minPeek, minNotEmpty := min.Peek()
+
+		minSizeAfter := min.size
+		maxSizeAfter := max.size
+
+		if minSizeBefore != minSizeAfter || maxSizeBefore != maxSizeAfter {
+			t.Error("expected heap size not to change from peek.")
+		}
 
 		if !maxNotEmpty {
 			t.Error("Unexpected result from max.Peek(), heap empty after pushes")

@@ -472,6 +472,9 @@ func TestTpoolScalability(t *testing.T) {
 	}
 }
 
+// TestHeapFees creates a large number of transaction graphs with increasing fee
+// value. Then it checks that those sets with higher value transaction fees are
+// prioritized for placement in blocks.
 func TestHeapFees(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -483,19 +486,15 @@ func TestHeapFees(t *testing.T) {
 	defer tpt.Close()
 
 	// Mine a few more blocks to get some extra funding.
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 4; i++ {
 		_, err := tpt.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	// Make a bunch of transactions with high fees. A bunch with low fees.
-	// See that the next block has all high fee txns.
-	// Iterate over block txns and add up fees
-	// Prepare a bunch of outputs for a series of graphs to fill up the
-	// transaction pool.
-	coinFrac := types.SiacoinPrecision
 
+	// Create transaction graph setup.
+	coinFrac := types.SiacoinPrecision
 	numGraphs := 110
 	graphFund := coinFrac.Mul64(12210)
 	var outputs []types.SiacoinOutput
@@ -509,16 +508,14 @@ func TestHeapFees(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
 	// Mine the graph setup in the consensus set so that the graph outputs are
-	// transaction sets.
+	// transaction sets. This guarantees that the parent of every graph will be
+	// its own output.
 	_, err = tpt.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	finalTxn := txns[len(txns)-1]
-
 	// For each output, create 250 transactions
 	var graphs [][]types.Transaction
 	for i := 0; i < numGraphs; i++ {
@@ -544,7 +541,6 @@ func TestHeapFees(t *testing.T) {
 				Value:  fee,
 			})
 		}
-
 		graph, err := types.TransactionGraph(finalTxn.SiacoinOutputID(uint64(i)), edges)
 		if err != nil {
 			t.Fatal(err)
@@ -552,19 +548,20 @@ func TestHeapFees(t *testing.T) {
 		graphs = append(graphs, graph)
 
 	}
-
+	// Accept the parent node of each graph so that its outputs we can test
+	// spending its outputs after mining the next block.
 	for _, graph := range graphs {
 		err := tpt.tpool.AcceptTransactionSet([]types.Transaction{graph[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-
 	block, err := tpt.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Now accept all the other nodes of each graph.
 	for _, graph := range graphs {
 		for _, txn := range graph[1:] {
 			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
@@ -573,18 +570,15 @@ func TestHeapFees(t *testing.T) {
 			}
 		}
 	}
-
 	// Now we mine 2 blocks in sequence and check that higher fee transactions
-	// show up to the first block
-
-	// Mine the next block so we can check the transactions inside
+	// show up to the first block.
 	block, err = tpt.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var totalFee1 types.Currency
-	//var expectedFee types.Currency // Calculate this
+	expectedFee1 := coinFrac.Mul64(321915)
 
 	// Add up total fees
 	numTxns1 := 0
@@ -603,6 +597,11 @@ func TestHeapFees(t *testing.T) {
 		}
 	}
 	avgFee1 := totalFee1.Div64(uint64(numTxns1))
+	if totalFee1.Cmp(expectedFee1) != 0 {
+		t.Error("totalFee1 different than expected fee.", totalFee1.String(), expectedFee1.String())
+		//t.Log(totalFee1.Sub(expectedFee1).HumanString())
+
+	}
 
 	// Mine the next block so we can check the transactions inside
 	block, err = tpt.miner.AddBlock()
@@ -611,7 +610,7 @@ func TestHeapFees(t *testing.T) {
 	}
 
 	var totalFee2 types.Currency
-	//var expectedFee types.Currency // Calculate this
+	expectedFee2 := coinFrac.Mul64(13860)
 
 	// Add up total fees
 	numTxns2 := 0
@@ -630,6 +629,10 @@ func TestHeapFees(t *testing.T) {
 		}
 	}
 	avgFee2 := totalFee2.Div64(uint64(numTxns2))
+	if totalFee2.Cmp(expectedFee2) != 0 {
+		t.Error("totalFee2 different than expected fee.", totalFee2.String(), expectedFee2.String())
+		//t.Log(totalFee2.Sub(expectedFee2).HumanString())
+	}
 
 	if avgFee1.Cmp(avgFee2) <= 0 {
 		t.Error("Expected average fee from first block to be greater than average fee from second block.")

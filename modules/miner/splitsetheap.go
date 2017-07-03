@@ -1,16 +1,15 @@
 package miner
 
-// mapElements are stored in a mapHeap.
-// The index refers to the location of the splitSet in the underlying slice
-// used to represent the heap.
+// mapElements are stored in a mapHeap. The index refers to the location of the
+// splitSet in the underlying slice used to represent the heap.
 type mapElement struct {
 	set   *splitSet
 	id    splitSetID
 	index int
 }
 
-// MapHeap is a heap of splitSets (compared by averageFee).
-// The minHeap bool specifies whether it is a min-heap or max-heap.
+// MapHeap is a heap of splitSets (compared by averageFee). The minHeap bool
+// specifies whether it is a min-heap or max-heap.
 type mapHeap struct {
 	selectID map[splitSetID]*mapElement
 	data     []*mapElement
@@ -18,8 +17,8 @@ type mapHeap struct {
 	minHeap  bool
 }
 
-// up maintains the heap condition by checking if the element at index j is
-// less than its parent (as defined by Less()). If so it swaps them, so that the
+// up maintains the heap condition by checking if the element at index j is less
+// than its parent (as defined by Less()). If so it swaps them, so that the
 // element at index j goes 'up' the heap. It continues until the heap condition
 // is satisfied again.
 func (mh *mapHeap) up(j int) {
@@ -38,9 +37,10 @@ func (mh *mapHeap) up(j int) {
 	}
 }
 
-// down maintains the heap condition by checking that the children of the element
-// at index i are less than the element at i (as defined by Less()). If so,
-// it swaps them, and continues down the heap until the heap condition is satisfied.
+// down maintains the heap condition by checking that the children of the
+// element at index i are less than the element at i (as defined by Less()). If
+// so, it swaps them, and continues down the heap until the heap condition is
+// satisfied.
 func (mh *mapHeap) down(i0, n int) bool {
 	i := i0
 	for {
@@ -74,16 +74,16 @@ func (mh *mapHeap) down(i0, n int) bool {
 	return i > i0
 }
 
-// Len returns the number of items stored in the heap.
-// It implements the sort interface.
+// Len returns the number of items stored in the heap. It implements the sort
+// interface.
 func (mh mapHeap) Len() int {
 	return len(mh.data)
 }
 
 // Less returns true if the mapElement at index i is less than the element at
 // index j if the mapHeap is a min-heap. If the mapHeap is a max-heap, it
-// returns true if the element at index i is greater.
-// It implements the sort interface.
+// returns true if the element at index i is greater. It implements the sort
+// interface.
 func (mh mapHeap) Less(i, j int) bool {
 	if mh.minHeap {
 		return mh.data[i].set.averageFee.Cmp(mh.data[j].set.averageFee) == -1
@@ -97,9 +97,8 @@ func (mh mapHeap) Swap(i, j int) {
 	// Swap in slice.
 	mh.data[i], mh.data[j] = mh.data[j], mh.data[i]
 
-	// Change values in slice to correct indices.
-	// Note that the same mapeElement pointer is in the map also, so we only
-	// have to mutate it in one place.
+	// Change values in slice to correct indices. Note that the same mapeElement
+	// pointer is in the map also, so we only have to mutate it in one place.
 	mh.data[i].index = i
 	mh.data[j].index = j
 }
@@ -123,8 +122,8 @@ func (mh *mapHeap) Push(elem *mapElement) {
 	mh.up(n)
 }
 
-// Pop removes the top element from the heap (as defined by Less())
-// Pop will panic if called on an empty heap. Use Peek before Pop to be safe.
+// Pop removes the top element from the heap (as defined by Less()) Pop will
+// panic if called on an empty heap. Use Peek before Pop to be safe.
 func (mh *mapHeap) Pop() *mapElement {
 	n := mh.Len() - 1
 
@@ -162,10 +161,10 @@ func (mh *mapHeap) Peek() (*mapElement, bool) {
 	return mh.data[0], true
 }
 
-// A heap must be initialized before any of the heap operations
-// can be used. Init is idempotent with respect to the heap conditions
-// and may be called whenever the heap conditions may have been invalidated.
-// Its complexity is O(n) where n = h.Len().
+// A heap must be initialized before any of the heap operations can be used.
+// Init is idempotent with respect to the heap conditions and may be called
+// whenever the heap conditions may have been invalidated. Its complexity is
+// O(n) where n = h.Len().
 func (mh *mapHeap) Init() {
 	// Sifts down through the heap to achieve the heap condition.
 	n := mh.Len()
@@ -174,13 +173,13 @@ func (mh *mapHeap) Init() {
 	}
 }
 
-// Remove removes the element at index i from the heap.
-// The complexity is O(log(n)) where n = h.Len().
+// Remove removes the element at index i from the heap. The complexity is
+// O(log(n)) where n = h.Len().
 func (mh *mapHeap) Remove(i int) *mapElement {
 	n := mh.Len() - 1
 
-	// If the element to be removed is not at the top of the heap, move it.
-	// Then fix the heap condition.
+	// If the element to be removed is not at the top of the heap, move it. Then
+	// fix the heap condition.
 	if n != i {
 		mh.Swap(i, n)
 		mh.down(i, n)
@@ -196,14 +195,13 @@ func (mh *mapHeap) Remove(i int) *mapElement {
 
 	// Decrement the size of the mapHeap.
 	mh.size -= elem.set.size
-
 	return elem
 }
 
-// Fix re-establishes the heap ordering after the element at index i has changed its value.
-// Changing the value of the element at index i and then calling Fix is equivalent to,
-// but less expensive than, calling Remove(h, i) followed by a Push of the new value.
-// The complexity is O(log(n)) where n = h.Len().
+// Fix re-establishes the heap ordering after the element at index i has changed
+// its value. Changing the value of the element at index i and then calling Fix
+// is equivalent to, but less expensive than, calling Remove(h, i) followed by a
+// Push of the new value. The complexity is O(log(n)) where n = h.Len().
 func (mh *mapHeap) Fix(i int) {
 	// Check if the heap condition can be satisfied by sifting down.
 	// If not, sift up too.
