@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 const (
@@ -33,10 +34,9 @@ const (
 	// pre-hardfork.
 	minAcceptableVersion = "0.4.0"
 
-	// EncodedSessionHeaderLength is the length of a session header encoded
-	// with the encode package.
-	// sizeof(BlockID) + sizeof(gatewayID) + sizeof(bool) == 32 + 8 + 1 = 41
-	EncodedSessionHeaderLength = 41
+	// maxEncodedSessionHeaderSize is the maximum allowed size of an encoded
+	// sessionHeader object.
+	maxEncodedSessionHeaderSize = 40 + modules.MaxEncodedNetAddressLength
 
 	// saveFrequency defines how often the gateway saves its persistence.
 	saveFrequency = time.Minute * 2

@@ -2,12 +2,14 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -44,32 +46,50 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 
 // pingNode verifies that there is a reachable node at the provided address
 // by performing the Sia gateway handshake protocol.
-func (g *Gateway) pingNode(addr modules.NetAddress) (err error) {
+func (g *Gateway) pingNode(addr modules.NetAddress) error {
 	// Ping the untrusted node to see whether or not there's actually a
 	// reachable node at the provided address.
 	conn, err := g.dial(addr)
 	if err != nil {
-		return
+		return err
 	}
 	defer conn.Close()
 
 	// Read the node's version.
 	remoteVersion, err := connectVersionHandshake(conn, build.Version)
 	if err != nil {
-		return
+		return err
 	}
 
 	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) < 0 {
-		return // for older versions, this is where pinging ends
+		return nil // for older versions, this is where pinging ends
 	}
 
-	// if both peers are >= 1.2.0,
-	// we'll also guarantee that the connection is between 2 different peers,
-	// and the peers are on the same network
-	wantConnect := false
-	// we're pinging, so we don't care if other side wants to connect or not
-	err = connectSessionHandshake(conn, g.id, wantConnect)
-	return
+	// Send our header.
+	// NOTE: since we don't intend to complete the connection, we can send an
+	// inaccurate NetAddress.
+	ourHeader := sessionHeader{
+		GenesisID:  types.GenesisID,
+		UniqueID:   g.id,
+		NetAddress: modules.NetAddress(conn.LocalAddr().String()),
+	}
+	if err := writeSessionHeader(conn, ourHeader); err != nil {
+		return err
+	}
+
+	// Read remote header.
+	var remoteHeader sessionHeader
+	if err := encoding.ReadObject(conn, &remoteHeader, maxEncodedSessionHeaderSize); err != nil {
+		return fmt.Errorf("failed to read remote header: %v", err)
+	} else if err := acceptableSessionHeader(ourHeader, remoteHeader, conn.RemoteAddr().String()); err != nil {
+		return err
+	}
+
+	// Send special rejection string.
+	if err := encoding.WriteObject(conn, modules.StopResponse); err != nil {
+		return fmt.Errorf("failed to write header rejection: %v", err)
+	}
+	return nil
 }
 
 // removeNode will remove a node from the gateway.
