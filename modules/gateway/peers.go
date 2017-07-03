@@ -177,13 +177,12 @@ func acceptableSessionHeader(ourHeader, remoteHeader sessionHeader, remoteAddr s
 // a nil error is returned.
 func (g *Gateway) managedAcceptConnv140Peer(conn net.Conn, remoteVersion string) error {
 	// Perform header handshake.
-	g.mu.RLock()
+	host, _, _ := net.SplitHostPort(conn.LocalAddr().String())
 	ourHeader := sessionHeader{
 		GenesisID:  types.GenesisID,
 		UniqueID:   g.id,
-		NetAddress: g.myAddr,
+		NetAddress: modules.NetAddress(net.JoinHostPort(host, g.port)),
 	}
-	g.mu.RUnlock()
 	remoteHeader, err := readSessionHeader(conn, ourHeader)
 	if err != nil {
 		return err
@@ -442,13 +441,12 @@ func readSessionHeader(conn net.Conn, ourHeader sessionHeader) (sessionHeader, e
 // node and a peer. The peer is only added if a nil error is returned.
 func (g *Gateway) managedConnectv140Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
 	// Perform header handshake.
-	g.mu.RLock()
+	host, _, _ := net.SplitHostPort(conn.LocalAddr().String())
 	ourHeader := sessionHeader{
 		GenesisID:  types.GenesisID,
 		UniqueID:   g.id,
-		NetAddress: g.myAddr,
+		NetAddress: modules.NetAddress(net.JoinHostPort(host, g.port)),
 	}
-	g.mu.RUnlock()
 	if err := writeSessionHeader(conn, ourHeader); err != nil {
 		return err
 	} else if _, err := readSessionHeader(conn, ourHeader); err != nil {
