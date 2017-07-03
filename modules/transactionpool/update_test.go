@@ -56,7 +56,7 @@ func TestFindSets(t *testing.T) {
 	}
 	sets = findSets(append(graph1, graph2...))
 	if len(sets) != 2 {
-		//t.Fatal("there should be two sets")
+		t.Fatal("there should be two sets")
 	}
 	lens := []int{len(sets[0]), len(sets[1])}
 	sort.Ints(lens)
@@ -93,7 +93,6 @@ func TestFindSets(t *testing.T) {
 	}
 	sort.Ints(lens)
 	expected = []int{1, 1, 1, 1, 5, 6}
-
 	for i := 0; i < len(expected); i++ {
 		if lens[i] != expected[i] {
 			t.Error("Resulting sets do not have the right lengths")
@@ -103,7 +102,6 @@ func TestFindSets(t *testing.T) {
 	// Sporadically weave the transactions and make sure the set finder still
 	// parses the sets correctly (sets can assumed to be ordered, but not all in
 	// a row).
-
 	var sporadic []types.Transaction
 	for len(graph1) > 0 || len(graph2) > 0 || len(graph3) > 0 {
 		if len(graph1) > 0 {
@@ -133,7 +131,6 @@ func TestFindSets(t *testing.T) {
 	}
 	sort.Ints(lens)
 	expected = []int{1, 1, 1, 1, 5, 6}
-
 	for i := 0; i < len(expected); i++ {
 		if lens[i] != expected[i] {
 			t.Error("Resulting sets do not have the right lengths")
@@ -180,7 +177,6 @@ func TestFindSetsMerging(t *testing.T) {
 	sort.Slice(feesReceived, func(i int, j int) bool {
 		return feesReceived[i].Cmp(feesReceived[j]) < 0
 	})
-
 	if feesReceived[0].Cmp(types.SiacoinPrecision.Mul64(4)) != 0 || feesReceived[1].Cmp(types.SiacoinPrecision.Mul64(110)) != 0 {
 		t.Fatal("got wrong fees from set")
 	}

@@ -29,20 +29,10 @@ import (
 // no longer in its own set, but instead has been merged with other sets.
 //
 // Some transactions will have parents from multiple distinct sets. If a
-// transaction has parents in multiple distinct sets, those sets get merged
-// together and the transaction gets added to the result. One of the sets is
-// nominated (arbitrarily) as the official set, and the integer id of the other
-// set and the new transaction get forwarded to the official set.
-//
-// TODO: Set merging currently occurs any time that there is a child. But
-// really, it should only occur if the child increases the average fee value of
-// the set that it is merging with (which it will if and only if it has a higher
-// average fee than that set). If the child has multiple parent sets, it should
-// be compared with the parent set that has the lowest fee value. Then, after it
-// is merged with that parent, the result should be merged with the next
-// lowest-fee parent set if and only if the new set has a higher average fee
-// than the parent set. And this continues until either all of the sets have
-// been merged, or until the remaining parent sets have higher values.
+// transaction has parents in multiple distinct sets, those sets get sorted by
+// their average transaction fee. Then, in increasing order of fee, we merge
+// each parent to the transaction if and only if that merge increases the
+// average fee of the parent.
 func findSets(ts []types.Transaction) [][]types.Transaction {
 	// txMap marks what set each transaction is in. If two sets get combined,
 	// this number will not be updated. The 'forwards' map defined further on
@@ -147,39 +137,36 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 				}
 				return iAvgFee.Cmp(jAvgFee) < 0
 			})
-
 			tSize := t.MarshalSiaSize()
 			var tFee types.Currency
 			for _, fee := range t.MinerFees {
 				tFee = tFee.Add(fee)
 			}
 
+			// The baseSet is the set to which other sets will be merged (maybe).
 			var baseSet int
 			baseSetFee := tFee
 			baseSetSize := tSize
-			// False until the current tx has been merged with some parent set.
-			var merged bool // (This is kinda gross...)
-
+			var merged bool
 			for _, j := range parentsSlice {
 				parentFee := setTotalFeeMap[j]
 				parentSize := setTotalSizeMap[j]
 				parentAvgFee := parentFee.Div64(uint64(parentSize))
 
-				// Check if merging the current set to its parent set will
-				// increase the average fee.
 				mergedFee := baseSetFee.Add(parentFee)
 				mergedSize := baseSetSize + parentSize
 				mergedAvgFee := mergedFee.Div64(uint64(mergedSize))
-
+				// Check if merging the current set to its parent set will
+				// increase the average fee.
 				if mergedAvgFee.Cmp(parentAvgFee) >= 0 {
-					// If this is the first merge, then set this parent to
-					// be the base of merges for this transaction.
+					// If this is the first merge, then set this parent to be
+					// the base of merges for this transaction.
 					if !merged {
 						baseSet = j
 						baseSetFee = mergedFee
 						baseSetSize = mergedSize
-						// Add this transaction to the base set, and adjust
-						// its fee and size.
+						// Add this transaction to the base set, and adjust //
+						// its fee // and size.
 						txMap[tid] = baseSet
 						setMap[baseSet] = append(setMap[baseSet], []types.Transaction{t}...)
 						setTotalFeeMap[baseSet] = baseSetFee
@@ -191,8 +178,8 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 					// base set.
 					forwards[j] = baseSet
 
-					// Combine the transactions in this set with the transactions in
-					// the base set.
+					// Combine the transactions in this set with the
+					// transactions in the base set.
 					setMap[baseSet] = append(setMap[baseSet], setMap[j]...)
 
 					// Increment total fee and size of baseSet.
@@ -204,9 +191,10 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 					delete(setTotalFeeMap, j)
 					delete(setTotalSizeMap, j)
 				} else {
-					// Since we're iterating through the parentSlice in increasing
-					// order average transaction fee if the baseSet doesn't
-					// merge with the next parent, it won't merge with the others.
+					// Since we're iterating through the parentSlice in
+					// increasing order average transaction fee if the baseSet
+					// doesn't merge with the next parent, it won't merge with
+					// the others.
 					break
 				}
 			}
