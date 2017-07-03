@@ -70,17 +70,17 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			defer c.tg.Done()
 
+			// Perform the contract maintenance in a separate thread.
+			//
+			// TODO: The maintenance will eventually cover forming new contracts
+			// as well.
+			go c.threadedContractMaintenance()
+
 			// Only one goroutine should be editing contracts at a time.
-			if !c.editLock.TryLock() {
+			if !c.maintenanceLock.TryLock() {
 				return
 			}
-			defer c.editLock.Unlock()
-
-			// Renew any (online) contracts that have entered the renew window.
-			err = c.managedRenewContracts()
-			if err != nil {
-				c.log.Debugln("WARN: failed to renew contracts after processing a consensus chage:", err)
-			}
+			defer c.maintenanceLock.Unlock()
 
 			// If we don't have enough (online) contracts, form new ones.
 			c.mu.RLock()

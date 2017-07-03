@@ -71,6 +71,10 @@ func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, er
 
 // contractEndHeight returns the height at which the Contractor's contracts
 // end. If there are no contracts, it returns zero.
+//
+// TODO: The contract end height should be picked based on the current period
+// start plus the period duration, not based on the end heights of the existing
+// contracts.
 func (c *Contractor) contractEndHeight() types.BlockHeight {
 	var endHeight types.BlockHeight
 	for _, contract := range c.contracts {
@@ -317,14 +321,27 @@ func (c *Contractor) managedRenewAllowanceContracts(a modules.Allowance, periodS
 	return newContracts, renewedIDs, remaining
 }
 
-// managedRenewContracts renews any contracts that are up for renewal, using
-// the current allowance.
-func (c *Contractor) managedRenewContracts() error {
+// threadedContractMaintenance checks the set of contracts that the contractor
+// has against the allownace, renewing any contracts that need to be renewed,
+// dropping contracts which are no longer worthwhile, and adding contracts if
+// there are not enough.
+func (c *Contractor) threadedContractMaintenance() {
+	// Threading protection.
+	err := c.tg.Add()
+	if err != nil {
+		return
+	}
+	defer c.tg.Done()
+	// Only one instance of this thread should be running at a time.
+	if !c.maintenanceLock.TryLock() {
+		return
+	}
+	defer c.maintenanceLock.Unlock()
+
+	// Renew any contracts that need to be renewed.
+	//
+	// TODO: Put in some controls so that only useful contracts get renewed.
 	c.mu.RLock()
-	// Renew contracts when they enter the renew window.
-	// NOTE: offline contracts are not considered here, since we may have
-	// replaced them (and we probably won't be able to connect to their host
-	// anyway)
 	var renewSet []types.FileContractID
 	for _, contract := range c.onlineContracts() {
 		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
@@ -332,102 +349,120 @@ func (c *Contractor) managedRenewContracts() error {
 		}
 	}
 	c.mu.RUnlock()
-	if len(renewSet) == 0 {
-		// nothing to do
-		return nil
+	if len(renewSet) != 0 {
+		c.log.Printf("renewing %v contracts", len(renewSet))
 	}
 
-	c.log.Printf("renewing %v contracts", len(renewSet))
 
+	// Figure out the end height and target sector count for the contracts being
+	// renewed.
+	//
+	// TODO: EndHeight should be global, and it should be picked based on the
+	// current period start, not based on the current height plus the allowance
+	// period.
 	c.mu.RLock()
 	endHeight := c.blockHeight + c.allowance.Period
 	max, err := maxSectors(c.allowance, c.hdb, c.tpool)
 	c.mu.RUnlock()
 	if err != nil {
-		return err
+		return
 	}
 	// Only allocate half as many sectors as the max. This leaves some leeway
 	// for replacing contracts, transaction fees, etc.
 	numSectors := max / 2
 	// check that this is sufficient to store at least one sector
 	if numSectors == 0 {
-		return ErrInsufficientAllowance
+		return
 	}
 
-	// invalidate all active editors/downloaders for the contracts we want to
-	// renew
-	c.mu.Lock()
+	// Loop through the contracts and renew them one-by-one.
 	for _, id := range renewSet {
-		c.renewing[id] = true
+		// Quit / return in the event of shutdown.
+		select{
+		case <-c.tg.StopChan():
+			return
+		default:
+		}
+
+		// Renew one contract.
+		func() {
+			// Mark the contract as being renewed, and defer logic to unmark it
+			// once renewing is complete.
+			c.mu.Lock()
+			c.renewing[id] = true
+			c.mu.Unlock()
+			defer func() {
+				c.mu.Lock()
+				delete(c.renewing, id)
+				c.mu.Unlock()
+			}()
+
+			// Wait for any active editors and downloaders to finish for this
+			// contract, and then grab the latest revision.
+			c.mu.RLock()
+			e, eok := c.editors[id]
+			d, dok := c.downloaders[id]
+			c.mu.RUnlock()
+			if eok {
+				e.invalidate()
+			}
+			if dok {
+				d.invalidate()
+			}
+
+			c.mu.RLock()
+			oldContract, ok := c.contracts[id]
+			c.mu.RUnlock()
+			if !ok {
+				c.log.Println("WARN: no record of contract previously added to the renew set:", id)
+				return
+			}
+
+			// Create the new contract.
+			newContract, err := c.managedRenew(oldContract, numSectors, endHeight)
+			if err != nil {
+				c.log.Printf("WARN: failed to renew contract %v with %v: %v\n", id, oldContract.NetAddress, err)
+				return
+			} else {
+				c.log.Printf("Renewed contract %v with %v\n", id, oldContract.NetAddress)
+			}
+
+
+			// Lock the contractor as we update it to use the new contract
+			// instead of the old contract.
+			c.mu.Lock()
+			defer c.mu.Unlock()
+
+			// Store the contract in the record of historic contracts.
+			_, exists := c.contracts[oldContract.ID]
+			if exists {
+				c.oldContracts[oldContract.ID] = oldContract
+				delete(c.contracts, oldContract.ID)
+			}
+
+			// Add the new contract, including a mapping from the old
+			// contract to the new contract.
+			c.contracts[newContract.ID] = newContract
+			c.renewedIDs[oldContract.ID] = newContract.ID
+			c.cachedRevisions[newContract.ID] = c.cachedRevisions[oldContract.ID]
+			delete(c.cachedRevisions, oldContract.ID)
+
+			// Save the contractor.
+			err = c.saveSync()
+			if err != nil {
+				c.log.Println("Failed to save the contractor after creating a new contract.")
+			}
+		}()
+
+		// Soft sleep for a minute to allow all of the transactions to propagate
+		// the network.
+		select {
+		case <-c.tg.StopChan():
+			return
+		case <-time.After(contractFormationInterval):
+		}
 	}
-	c.mu.Unlock()
 
-	// after we finish renewing, unset the 'renewing' flag on each contract
-	defer func() {
-		c.mu.Lock()
-		for _, id := range renewSet {
-			delete(c.renewing, id)
-		}
-		c.mu.Unlock()
-	}()
-
-	// wait for all active editors and downloaders to finish, then grab the
-	// latest revision of each contract
-	var oldContracts []modules.RenterContract
-	for _, id := range renewSet {
-		c.mu.RLock()
-		e, eok := c.editors[id]
-		d, dok := c.downloaders[id]
-		c.mu.RUnlock()
-		if eok {
-			e.invalidate()
-		}
-		if dok {
-			d.invalidate()
-		}
-
-		c.mu.RLock()
-		contract, ok := c.contracts[id]
-		c.mu.RUnlock()
-		if !ok {
-			c.log.Printf("WARN: no record of contract previously added to the renew set (ID: %v)", id)
-			continue
-		}
-		oldContracts = append(oldContracts, contract)
-	}
-
-	// map old ID to new contract, for easy replacement later
-	newContracts := make(map[types.FileContractID]modules.RenterContract)
-	for _, contract := range oldContracts {
-		newContract, err := c.managedRenew(contract, numSectors, endHeight)
-		if err != nil {
-			c.log.Printf("WARN: failed to renew contract with %v: %v", contract.NetAddress, err)
-		} else {
-			newContracts[contract.ID] = newContract
-			c.log.Printf("renewed contract %v -> %v", contract.ID, newContract.ID)
-		}
-		// sleep between renewing each contract to alleviate potential block
-		// propagation issues
-		time.Sleep(contractFormationInterval)
-	}
-
-	// replace old contracts with renewed ones
-	c.mu.Lock()
-	for oldID, contract := range newContracts {
-		// archive the old contract
-		if oldContract, ok := c.contracts[oldID]; ok {
-			c.oldContracts[oldID] = oldContract
-			delete(c.contracts, oldID)
-		}
-		// insert the new contract
-		c.contracts[contract.ID] = contract
-		// add a mapping from old->new contract
-		c.renewedIDs[oldID] = contract.ID
-		// move the cachedRevision entry to the new ID
-		c.cachedRevisions[contract.ID] = c.cachedRevisions[oldID]
-		delete(c.cachedRevisions, oldID)
-	}
-	err = c.saveSync()
-	c.mu.Unlock()
-	return err
+	// TODO: Count the number of uploading contracts, and create a few more if a
+	// few more are needed.
 }
