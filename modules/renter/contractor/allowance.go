@@ -71,72 +71,17 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	}
 
 	c.log.Println("INFO: setting allowance to", a)
-
-	c.mu.RLock()
-	shouldRenew := a.Period != c.allowance.Period || !a.Funds.Equals(c.allowance.Funds)
-	shouldWait := c.blockHeight+a.Period < c.contractEndHeight()
-	remaining := int(a.Hosts) - len(c.contracts)
-	c.mu.RUnlock()
-
-	if !shouldRenew {
-		// If no contracts need renewing, just form new contracts.
-		return c.managedFormAllowanceContracts(remaining, numSectors, a)
-	} else if shouldWait {
-		// If the new period would result in an earlier endHeight, we can't
-		// renew; instead, set the allowance without modifying any contracts.
-		// They will be renewed with the new allowance when they expire.
-		c.mu.Lock()
-		c.allowance = a
-		err = c.saveSync()
-		c.mu.Unlock()
-		return err
-	}
-
-	// Renew what contracts we currently have.
-	periodStart := c.blockHeight
-	endHeight := periodStart + a.Period
-	newContracts, renewedIDs, remaining := c.managedRenewAllowanceContracts(a, periodStart, endHeight, numSectors, remaining)
-	if err != nil {
-		return err
-	}
-
-	// if we did not renew enough contracts, form new ones
-	if remaining > 0 {
-		formed, err := c.managedFormContracts(remaining, numSectors, endHeight)
-		if err != nil {
-			return err
-		}
-		for _, contract := range formed {
-			newContracts[contract.ID] = contract
-		}
-	}
-
-	// if we weren't able to form anything, return an error
-	if len(newContracts) == 0 {
-		return errors.New("unable to form or renew any contracts")
-	}
-
 	c.mu.Lock()
-	// update the allowance
 	c.allowance = a
-	// archive the current contract set
-	for id, contract := range c.contracts {
-		c.oldContracts[id] = contract
-	}
-	// replace the current contract set with new contracts
-	c.contracts = newContracts
-	// link the contracts that were renewed
-	for oldID, newID := range renewedIDs {
-		c.renewedIDs[oldID] = newID
-	}
-	// if the currentPeriod was previously unset, set it now
-	if c.currentPeriod == 0 {
-		c.currentPeriod = periodStart
-	}
 	err = c.saveSync()
 	c.mu.Unlock()
+	if err != nil {
+		c.log.Println("Unable to save contractor after setting allowance:", err)
+	}
 
-	return err
+	// Initiate maintenance on the contracts, and then return.
+	go c.threadedContractMaintenance()
+	return nil
 }
 
 // managedCancelAllowance handles the special case where the allowance is empty.

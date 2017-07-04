@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 
@@ -45,7 +46,9 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	defer h.Close()
 
 	// override IsOffline to always return true for h
+	c.mu.Lock()
 	c.hdb = offlineHostDB{c.hdb, h.PublicKey()}
+	c.mu.Unlock()
 
 	// create another host
 	dir := build.TempDir("contractor", t.Name(), "Host2")
@@ -63,10 +66,23 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	})
 	// we should have a contract, but it will be marked as offline due to the
 	// hocked hostDB
-	if len(c.contracts) != 1 {
-		t.Fatal("contract not formed")
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		c.mu.Lock()
+		lenC := len(c.contracts)
+		c.mu.Unlock()
+		if lenC < 1 {
+			return errors.New("allowance forming seems to have failed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Log(len(c.Contracts()))
+		t.Error(err)
 	}
-	if len(c.onlineContracts()) != 0 {
+	c.mu.Lock()
+	oc := len(c.onlineContracts())
+	c.mu.Unlock()
+	if oc != 0 {
 		t.Fatal("contract should not be reported as online")
 	}
 
