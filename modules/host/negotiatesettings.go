@@ -31,10 +31,15 @@ func (h *Host) adjustHostPricing() types.Currency {
 		return h.settings.MinContractPrice
 	}
 
-	// Update contract price
-	// TODO: change to estimation of last 144 blocks instead of last 6
-	_, max := h.tpool.FeeEstimation()
-	contractPrice := max.Mul64(10e3) // 10kb * (max estimated price by tpool)
+	// Adjust contract price
+	_, contractPrice := h.tpool.FeeEstimation()
+	contractPrice = contractPrice.Mul64(10e3)
+	// See if there was an estimation in the past that is higher than the initial contractPrice
+	for _, estimate := range h.recentContractPrices {
+		if estimate.Cmp(contractPrice) > 0 {
+			contractPrice = estimate
+		}
+	}
 
 	// Do not go below the user set price
 	if contractPrice.Cmp(h.settings.MinContractPrice) < 0 {

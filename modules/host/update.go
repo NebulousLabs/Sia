@@ -300,6 +300,13 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 		go h.threadedHandleActionItem(actionItems[i])
 	}
 
+	// Update the contract price estimates
+	_, max := h.tpool.FeeEstimation()
+	h.recentContractPrices = append(h.recentContractPrices, max.Mul64(10e3))
+	for len(h.recentContractPrices) > 144 {
+		h.recentContractPrices = h.recentContractPrices[1:]
+	}
+
 	// Update the host's recent change pointer to point to the most recent
 	// change.
 	h.recentChange = cc.ID

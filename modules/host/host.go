@@ -165,6 +165,9 @@ type Host struct {
 	// be locked separately.
 	lockedStorageObligations map[types.FileContractID]*siasync.TryMutex
 
+	// A list of the last 144 contract price estimations
+	recentContractPrices []types.Currency
+
 	// Utilities.
 	db         *persist.BoltDatabase
 	listener   net.Listener

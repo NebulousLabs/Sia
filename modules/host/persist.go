@@ -29,6 +29,8 @@ type persistence struct {
 	SecretKey        crypto.SecretKey             `json:"secretkey"`
 	Settings         modules.HostInternalSettings `json:"settings"`
 	UnlockHash       types.UnlockHash             `json:"unlockhash"`
+
+	RecentContractPrices []types.Currency `json:"recentContractPrices"`
 }
 
 // persistData returns the data in the Host that will be saved to disk.
@@ -47,6 +49,8 @@ func (h *Host) persistData() persistence {
 		SecretKey:        h.secretKey,
 		Settings:         h.settings,
 		UnlockHash:       h.unlockHash,
+
+		RecentContractPrices: h.recentContractPrices,
 	}
 }
 
