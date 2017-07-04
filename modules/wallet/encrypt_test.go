@@ -252,6 +252,7 @@ func TestLock(t *testing.T) {
 // TestInitFromSeedConcurrentUnlock verifies that calling InitFromSeed and
 // then Unlock() concurrently results in the correct balance.
 func TestInitFromSeedConcurrentUnlock(t *testing.T) {
+	t.Skip("Test has poor concurrency design")
 	if testing.Short() {
 		t.SkipNow()
 	}
