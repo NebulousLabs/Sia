@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -62,7 +63,7 @@ func TestPortForwardBlocking(t *testing.T) {
 // TestHostWorkingStatus checks that the host properly updates its working
 // state
 func TestHostWorkingStatus(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

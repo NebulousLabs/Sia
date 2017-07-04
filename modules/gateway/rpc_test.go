@@ -362,7 +362,7 @@ func TestBroadcast(t *testing.T) {
 	select {
 	case <-bothDoneChan:
 		// Both g2 and g3 should receive the broadcast.
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("broadcasting to gateway.Peers() should broadcast to all peers")
 	}
 	if g2Payload != "bar" || g3Payload != "bar" {

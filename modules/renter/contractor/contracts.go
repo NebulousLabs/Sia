@@ -115,7 +115,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 	// create transaction builder
 	txnBuilder := c.wallet.StartTransaction()
 
-	contract, err := proto.FormContract(params, txnBuilder, c.tpool, c.tg.StopChan())
+	contract, err := proto.FormContract(params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if err != nil {
 		txnBuilder.Drop()
 		return modules.RenterContract{}, err
@@ -163,7 +163,7 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 
 	// execute negotiation protocol
 	txnBuilder := c.wallet.StartTransaction()
-	newContract, err := proto.Renew(contract, params, txnBuilder, c.tpool, c.tg.StopChan())
+	newContract, err := proto.Renew(contract, params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if proto.IsRevisionMismatch(err) {
 		// return unused outputs to wallet
 		txnBuilder.Drop()
@@ -180,7 +180,7 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 		contract.LastRevision = cached.Revision
 		// need to start a new transaction
 		txnBuilder = c.wallet.StartTransaction()
-		newContract, err = proto.Renew(contract, params, txnBuilder, c.tpool, c.tg.StopChan())
+		newContract, err = proto.Renew(contract, params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	}
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet

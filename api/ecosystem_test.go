@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -22,7 +23,7 @@ import (
 // host must get a file contract to the blockchain despite not getting any of
 // the dependencies into the transaction pool from the flood network.
 func TestHostPoorConnectivity(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

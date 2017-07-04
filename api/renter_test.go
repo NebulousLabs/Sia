@@ -298,7 +298,7 @@ func runDownloadParamTest(t *testing.T, length, offset, filesize int) error {
 }
 
 func TestInvalidDownloadParameters(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -1215,7 +1215,7 @@ func TestRenterPricesHandler(t *testing.T) {
 // TestRenterPricesHandlerCheap checks that the prices command returns
 // reasonable values given the settings of the hosts.
 func TestRenterPricesHandlerCheap(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -1318,7 +1318,7 @@ func TestRenterPricesHandlerCheap(t *testing.T) {
 // TestRenterPricesHandlerIgnorePricey checks that the prices command returns
 // reasonable values given the settings of the hosts.
 func TestRenterPricesHandlerIgnorePricey(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
