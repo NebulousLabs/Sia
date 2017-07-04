@@ -19,7 +19,17 @@ func (b Block) MarshalSia(w io.Writer) error {
 	w.Write(b.ParentID[:])
 	w.Write(b.Nonce[:])
 	encoding.WriteUint64(w, uint64(b.Timestamp))
-	return encoding.NewEncoder(w).EncodeAll(b.MinerPayouts, b.Transactions)
+	encoding.WriteInt(w, len(b.MinerPayouts))
+	for i := range b.MinerPayouts {
+		b.MinerPayouts[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len(b.Transactions))
+	for i := range b.Transactions {
+		if err := b.Transactions[i].MarshalSia(w); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // UnmarshalSia implements the encoding.SiaUnmarshaler interface.
@@ -49,7 +59,11 @@ func (bid *BlockID) UnmarshalJSON(b []byte) error {
 
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (cf CoveredFields) MarshalSia(w io.Writer) error {
-	encoding.NewEncoder(w).Encode(cf.WholeTransaction)
+	if cf.WholeTransaction {
+		w.Write([]byte{1})
+	} else {
+		w.Write([]byte{0})
+	}
 	fields := [][]uint64{
 		cf.SiacoinInputs,
 		cf.SiacoinOutputs,
@@ -432,8 +446,20 @@ func (s *Specifier) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalSia implements the encoding.SiaMarshaler interface.
+func (sp *StorageProof) MarshalSia(w io.Writer) error {
+	w.Write(sp.ParentID[:])
+	w.Write(sp.Segment[:])
+	encoding.WriteInt(w, len(sp.HashSet))
+	for i := range sp.HashSet {
+		if _, err := w.Write(sp.HashSet[i][:]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// MarshalSia implements the encoding.SiaMarshaler interface.
 func (t Transaction) MarshalSia(w io.Writer) error {
-	enc := encoding.NewEncoder(w)
 	encoding.WriteInt(w, len((t.SiacoinInputs)))
 	for i := range t.SiacoinInputs {
 		t.SiacoinInputs[i].MarshalSia(w)
@@ -452,11 +478,11 @@ func (t Transaction) MarshalSia(w io.Writer) error {
 	}
 	encoding.WriteInt(w, len((t.StorageProofs)))
 	for i := range t.StorageProofs {
-		enc.Encode(t.StorageProofs[i])
+		t.StorageProofs[i].MarshalSia(w)
 	}
 	encoding.WriteInt(w, len((t.SiafundInputs)))
 	for i := range t.SiafundInputs {
-		enc.Encode(t.SiafundInputs[i])
+		t.SiafundInputs[i].MarshalSia(w)
 	}
 	encoding.WriteInt(w, len((t.SiafundOutputs)))
 	for i := range t.SiafundOutputs {
@@ -478,6 +504,47 @@ func (t Transaction) MarshalSia(w io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// marshalSiaNoSignatures is a helper function for calculating certain hashes
+// that do not include the transaction's signatures.
+func (t Transaction) marshalSiaNoSignatures(w io.Writer) {
+	encoding.WriteInt(w, len((t.SiacoinInputs)))
+	for i := range t.SiacoinInputs {
+		t.SiacoinInputs[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.SiacoinOutputs)))
+	for i := range t.SiacoinOutputs {
+		t.SiacoinOutputs[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.FileContracts)))
+	for i := range t.FileContracts {
+		t.FileContracts[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.FileContractRevisions)))
+	for i := range t.FileContractRevisions {
+		t.FileContractRevisions[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.StorageProofs)))
+	for i := range t.StorageProofs {
+		t.StorageProofs[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.SiafundInputs)))
+	for i := range t.SiafundInputs {
+		t.SiafundInputs[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.SiafundOutputs)))
+	for i := range t.SiafundOutputs {
+		t.SiafundOutputs[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.MinerFees)))
+	for i := range t.MinerFees {
+		t.MinerFees[i].MarshalSia(w)
+	}
+	encoding.WriteInt(w, len((t.ArbitraryData)))
+	for i := range t.ArbitraryData {
+		encoding.WritePrefix(w, t.ArbitraryData[i])
+	}
 }
 
 // MarshalSiaSize returns the encoded size of t.
@@ -502,9 +569,9 @@ func (t Transaction) MarshalSiaSize() (size int) {
 	}
 	size += 8
 	for _, sp := range t.StorageProofs {
-		size += 8 + len(sp.HashSet)*crypto.HashSize
 		size += len(sp.ParentID)
-		size += 8 + len(sp.Segment)
+		size += len(sp.Segment)
+		size += 8 + len(sp.HashSet)*crypto.HashSize
 	}
 	size += 8
 	for _, sfi := range t.SiafundInputs {
@@ -530,9 +597,11 @@ func (t Transaction) MarshalSiaSize() (size int) {
 	for _, ts := range t.TransactionSignatures {
 		size += len(ts.ParentID)
 		size += 8 // ts.PublicKeyIndex
+		size += 8 // ts.Timelock
 		size += ts.CoveredFields.MarshalSiaSize()
 		size += 8 + len(ts.Signature)
 	}
+
 	// Sanity check against the slower method.
 	if build.DEBUG {
 		expectedSize := len(encoding.Marshal(t))
