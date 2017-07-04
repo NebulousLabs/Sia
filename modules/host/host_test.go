@@ -422,6 +422,56 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 	ht.host = rebootHost
 }
 
+// TestRecentContractPricesLength checks
+func TestRecentContractPricesLength(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	ht, err := newHostTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get initial length of recentContractPrices
+	initialLength := len(ht.host.recentContractPrices)
+
+	// Add a block
+	ht.miner.AddBlock()
+
+	// check if recentContractPrices grew by 1 entry
+	if len(ht.host.recentContractPrices) != initialLength+1 {
+		t.Error("recentContractPrices doesn't contain additional entry after new block")
+	}
+
+	// add 150 more blocks
+	for i := 0; i < 150; i++ {
+		ht.miner.AddBlock()
+	}
+
+	// recentContractPrices should have length 144
+	if len(ht.host.recentContractPrices) != 144 {
+		t.Errorf("len(recentContractPrices): expected %v but was %v",
+			144, len(ht.host.recentContractPrices))
+	}
+
+	// Reboot host
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// recentContractPrices should have length 144 right away
+	if len(rebootHost.recentContractPrices) != 144 {
+		t.Errorf("len(recentContractPrices) after reboot: expected %d but was %d",
+			144, len(rebootHost.recentContractPrices))
+	}
+}
+
 /*
 // TestSetAndGetSettings checks that the functions for interacting with the
 // hosts settings object are working as expected.

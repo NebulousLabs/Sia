@@ -111,6 +111,7 @@ func (h *Host) loadPersistObject(p *persistence) {
 		h.settings.NetAddress = ""
 	}
 	h.unlockHash = p.UnlockHash
+	h.recentContractPrices = p.RecentContractPrices
 }
 
 // initDB will check that the database has been initialized and if not, will
