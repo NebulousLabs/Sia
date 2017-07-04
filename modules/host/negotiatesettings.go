@@ -7,6 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // capacity returns the amount of storage still available on the machine. The
@@ -23,6 +24,25 @@ func (h *Host) capacity() (total, remaining uint64) {
 	return total, remaining
 }
 
+// adjustHostPricing adjusts the host's internal pricing to better match the current market
+func (h *Host) adjustHostPricing() types.Currency {
+	// Check if adjustHostPricing was disabled for testing
+	if h.dependencies.disrupt("disablePriceAdjustment") {
+		return h.settings.MinContractPrice
+	}
+
+	// Update contract price
+	// TODO: change to estimation of last 144 blocks instead of last 6
+	_, max := h.tpool.FeeEstimation()
+	contractPrice := max.Mul64(10e3) // 10kb * (max estimated price by tpool)
+
+	// Do not go below the user set price
+	if contractPrice.Cmp(h.settings.MinContractPrice) < 0 {
+		return h.settings.MinContractPrice
+	}
+	return contractPrice
+}
+
 // externalSettings compiles and returns the external settings for the host.
 func (h *Host) externalSettings() modules.HostExternalSettings {
 	totalStorage, remainingStorage := h.capacity()
@@ -32,6 +52,10 @@ func (h *Host) externalSettings() modules.HostExternalSettings {
 	} else {
 		netAddr = h.autoAddress
 	}
+
+	// Get adjusted pricing
+	contractPrice := h.adjustHostPricing()
+
 	return modules.HostExternalSettings{
 		AcceptingContracts:   h.settings.AcceptingContracts,
 		MaxDownloadBatchSize: h.settings.MaxDownloadBatchSize,
@@ -47,7 +71,7 @@ func (h *Host) externalSettings() modules.HostExternalSettings {
 		Collateral:    h.settings.Collateral,
 		MaxCollateral: h.settings.MaxCollateral,
 
-		ContractPrice:          h.settings.MinContractPrice,
+		ContractPrice:          contractPrice,
 		DownloadBandwidthPrice: h.settings.MinDownloadBandwidthPrice,
 		StoragePrice:           h.settings.MinStoragePrice,
 		UploadBandwidthPrice:   h.settings.MinUploadBandwidthPrice,
