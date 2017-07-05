@@ -247,13 +247,6 @@ func (c *Contractor) threadedContractMaintenance() {
 
 	// Loop through the contracts and renew them one-by-one.
 	for _, id := range renewSet {
-		// Quit / return in the event of shutdown.
-		select {
-		case <-c.tg.StopChan():
-			return
-		default:
-		}
-
 		// Renew one contract.
 		func() {
 			// Mark the contract as being renewed, and defer logic to unmark it
@@ -331,6 +324,13 @@ func (c *Contractor) threadedContractMaintenance() {
 		}
 	}
 
+	// Quit in the event of shutdown.
+	select {
+	case <-c.tg.StopChan():
+		return
+	default:
+	}
+
 	// Count the number of contracts, and add more where they are needed.
 	//
 	// TODO: Use the IsGoodForUpload logic.
@@ -338,7 +338,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	neededContracts := int(c.allowance.Hosts) - len(c.onlineContracts())
 	c.mu.Unlock()
 	// Nothing to do if there are no needed contracts.
-	if neededContracts < 1 {
+	if neededContracts <= 0 {
 		return
 	}
 
@@ -356,13 +356,6 @@ func (c *Contractor) threadedContractMaintenance() {
 	// Form contracts with the hosts one at a time, until we have enough
 	// contracts.
 	for _, host := range hosts {
-		// Quit in the event of shutdown.
-		select {
-		case <-c.tg.StopChan():
-			return
-		default:
-		}
-
 		// Attempt forming a contract with htis host.
 		newContract, err := c.managedNewContract(host, numSectors, endHeight)
 		if err != nil {
@@ -381,7 +374,7 @@ func (c *Contractor) threadedContractMaintenance() {
 
 		// Quit the loop if we've replaced all needed contracts.
 		neededContracts--
-		if neededContracts < 1 {
+		if neededContracts <= 0 {
 			break
 		}
 
