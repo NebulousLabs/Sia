@@ -47,7 +47,7 @@ var (
 	OakDecayDenom           int64
 	OakMaxRise              *big.Rat
 	OakMaxDrop              *big.Rat
-	OakHardforkTxnSizeLimit = uint64(65536) // 64 KiB
+	OakHardforkTxnSizeLimit = uint64(64e3) // 64 KB
 )
 
 // init checks which build constant is in place and initializes the variables
