@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	// LogDir, an optional cli flag, sets the directory for log files
+	// LogDir is an optional cli flag which sets the directory for log files
 	LogDir string
 )
 
