@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"testing"
 
+	"fmt"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -107,5 +109,76 @@ func TestConsensusValidateTransactionSet(t *testing.T) {
 	defer resp.Body.Close()
 	if !non2xx(resp.StatusCode) {
 		t.Fatal("expected validation error")
+	}
+}
+
+// TestConsensusChange probes the GET call to /consensus/change.
+func TestConsensusChange(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	// Request the consensus change beginning
+	requestedID := modules.ConsensusChangeBeginning
+	cc, nextID, err := st.cs.GetConsensusChange(requestedID)
+
+	// Send the GET request
+	var ccg ConsensusChangeGet
+	err = st.getAPI(fmt.Sprintf("/consensus/change/%x", requestedID[:]), &ccg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Compare the values of the returned consensus change with the retrieved one
+	var replyIDBytes []byte
+	var replyNextIDBytes []byte
+	var replyID modules.ConsensusChangeID
+	var replyNextID modules.ConsensusChangeID
+
+	// Parse the ids of the request
+	_, err = fmt.Sscanf(ccg.ID, "%x", &replyIDBytes)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = fmt.Sscanf(ccg.NextID, "%x", &replyNextIDBytes)
+	if err != nil {
+		t.Error(err)
+	}
+	copy(replyID[:], replyIDBytes)
+	copy(replyNextID[:], replyNextIDBytes)
+
+	// Check if values match
+	if replyID != cc.ID {
+		t.Errorf("ID mismatch: expected %v but was %v", cc.ID, ccg.ID)
+	}
+	if replyNextID != nextID {
+		t.Errorf("NextID mismatch: expected %v but was %v", nextID, ccg.NextID)
+	}
+
+	// Request the next change
+	var ccg2 ConsensusChangeGet
+	err = st.getAPI("/consensus/change/"+ccg.NextID, &ccg2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check if the id of the next change matches the NextID of the previous change
+	var replyIDBytes2 []byte
+	var replyID2 modules.ConsensusChangeID
+
+	_, err = fmt.Sscanf(ccg2.ID, "%x", &replyIDBytes2)
+	if err != nil {
+		t.Error(err)
+	}
+
+	copy(replyID2[:], replyIDBytes2)
+	if replyID2 != replyNextID {
+		t.Errorf("ID mismatch: expected %v but was %v", replyNextID, replyID2)
 	}
 }

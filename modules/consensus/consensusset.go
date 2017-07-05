@@ -358,3 +358,45 @@ func (cs *ConsensusSet) StorageProofSegment(fcid types.FileContractID) (index ui
 	})
 	return index, err
 }
+
+// GetConsensusChange returns the ConsensusChange that corresponds to a given ConsensusChangeID. Primarily used for API
+// calls as modules should Subscribe to the Consensus Set instead
+func (cs *ConsensusSet) GetConsensusChange(id modules.ConsensusChangeID) (change modules.ConsensusChange,
+	next modules.ConsensusChangeID, err error) {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
+	err = cs.db.View(func(tx *bolt.Tx) error {
+
+		// get corresponding entry
+		var entry changeEntry
+		var exists bool
+		if id == modules.ConsensusChangeBeginning {
+			entry = cs.genesisEntry()
+			exists = true
+		} else {
+			entry, exists = getEntry(tx, id)
+		}
+		if !exists {
+			return errors.New("changeEntry doesn't exist for specified id")
+		}
+
+		// compute change for this entry
+		cc, err := cs.computeConsensusChange(tx, entry)
+		if err != nil {
+			return err
+		}
+
+		// get id of next entry
+		nextEntry, exists := entry.NextEntry(tx)
+		if !exists {
+			next = modules.ConsensusChangeBeginning
+		} else {
+			next = nextEntry.ID()
+		}
+
+		change = cc
+		return nil
+	})
+	return
+}

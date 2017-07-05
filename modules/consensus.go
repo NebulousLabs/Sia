@@ -243,6 +243,11 @@ type (
 		// allowing for garbage collection and rescanning. If the subscriber is
 		// not found in the subscriber database, no action is taken.
 		Unsubscribe(ConsensusSetSubscriber)
+
+		// GetConsensusChange returns the ConsensusChange that corresponds to
+		// a given ConsensusChangeID. Primarily used for API calls as modules
+		// should Subscribe to the Consensus Set instead
+		GetConsensusChange(id ConsensusChangeID) (ConsensusChange, ConsensusChangeID, error)
 	}
 )
 
