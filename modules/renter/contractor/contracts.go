@@ -83,6 +83,104 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 	return endHeight
 }
 
+// managedMarkContractsUtility checks every active contract in the contractor and
+// figures out whether the contract is useful for uploading, and whehter the
+// contract should be renewed.
+func (c *Contractor) managedMarkContractsUtility() {
+	// Pull a new set of hosts from the hostdb that could be used as a new set
+	// to match the allowance. The lowest scoring host of these new hosts will
+	// be used as a baseline for determining whether our existing contracts are
+	// worthwhile.
+	c.mu.RLock()
+	hostCount := int(c.allowance.Hosts)
+	c.mu.RUnlock()
+	hosts := c.hdb.RandomHosts(hostCount+5, nil)
+
+	// Find the lowest score of this batch of hosts.
+	if len(hosts) <= 0 {
+		return
+	}
+	lowestScore := c.hdb.ScoreBreakdown(hosts[0]).Score
+	for i := 1; i < len(hosts); i++ {
+		score := c.hdb.ScoreBreakdown(hosts[i]).Score
+		if score.Cmp(lowestScore) < 0 {
+			lowestScore = score
+		}
+
+	}
+	// Set the minimum acceptable score to a factor of the lowest score.
+	minScore := lowestScore.Div(scoreLeeway)
+
+	// Pull together the set of contracts.
+	c.mu.RLock()
+	contracts := make([]modules.RenterContract, 0, len(c.contracts))
+	for _, contract := range c.contracts {
+		contracts = append(contracts, contract)
+	}
+	c.mu.RUnlock()
+
+	// Go through and figure out if the utility fields need to be changed.
+	for i := 0; i < len(contracts); i++ {
+		// Start the contract in good standing.
+		contracts[i].GoodForUpload = true
+		contracts[i].GoodForRenew = true
+
+		host, exists := c.hdb.Host(contracts[i].HostPublicKey)
+		// Contract has no utility if the host is not in the database.
+		if !exists {
+			contracts[i].GoodForUpload = false
+			contracts[i].GoodForRenew = false
+			continue
+		}
+		// Contract has no utility if the score is poor.
+		if c.hdb.ScoreBreakdown(host).Score.Cmp(minScore) < 0 {
+			contracts[i].GoodForUpload = false
+			contracts[i].GoodForRenew = false
+			continue
+		}
+		// Contract has no utility if the host is offline.
+		c.mu.Lock()
+		offline := c.isOffline(contracts[i].ID)
+		c.mu.Unlock()
+		if offline {
+			contracts[i].GoodForUpload = false
+			contracts[i].GoodForRenew = false
+			continue
+		}
+
+		// Contract should not be used for upload if the number of Merkle roots
+		// exceeds 25e3 - this is in place because the current hosts do not
+		// really perform well beyond this number of sectors in a single
+		// contract. Future updates will fix this, at which point this limit
+		// will change and also have to switch based on host version.
+		if len(contracts[i].MerkleRoots) > 25e3 {
+			// Contract is still fine to be renewed, we just shouldn't keep
+			// adding data to this contract.
+			contracts[i].GoodForUpload = false
+		}
+		// Contract should not be used for uploading if the time has come to
+		// renew the contract.
+		c.mu.RLock()
+		if c.blockHeight+c.allowance.RenewWindow >= contracts[i].EndHeight() {
+			contracts[i].GoodForUpload = false
+		}
+		c.mu.RUnlock()
+	}
+
+	// Update the contractor to reflect the new state for each of the contracts.
+	c.mu.Lock()
+	for i := 0; i < len(contracts); i++ {
+		contract, exists := c.contracts[contracts[i].ID]
+		if !exists {
+			continue
+		}
+		contract.GoodForUpload = contracts[i].GoodForUpload
+		contract.GoodForRenew = contracts[i].GoodForRenew
+		c.contracts[contracts[i].ID] = contract
+	}
+	c.mu.Unlock()
+}
+
 // managedNewContract negotiates an initial file contract with the specified
 // host, saves it, and returns it.
 func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uint64, endHeight types.BlockHeight) (modules.RenterContract, error) {
@@ -207,22 +305,26 @@ func (c *Contractor) threadedContractMaintenance() {
 	}
 	defer c.maintenanceLock.Unlock()
 
+	// Update the utility fields for this contract based on the most recent
+	// hostdb.
+	c.managedMarkContractsUtility()
+
 	// Renew any contracts that need to be renewed.
-	//
-	// TODO: Include checking if the contract needs more money.
-	//
-	// TODO: Add the IsGoodForRenew logic.
-	c.mu.Lock()
+	c.mu.RLock()
 	var renewSet []types.FileContractID
-	for _, contract := range c.onlineContracts() {
-		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
+	for _, contract := range c.contracts {
+		if contract.GoodForRenew && c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
 			renewSet = append(renewSet, contract.ID)
 		}
 	}
-	c.mu.Unlock()
+	c.mu.RUnlock()
 	if len(renewSet) != 0 {
 		c.log.Printf("renewing %v contracts", len(renewSet))
 	}
+
+	// TODO: Need some loop somewhere that renews contracts which haven't gone
+	// through the full period yet, but are out of money (yet the allowance
+	// still has room to refill some contracts)
 
 	// Figure out the end height and target sector count for the contracts being
 	// renewed.
@@ -331,13 +433,18 @@ func (c *Contractor) threadedContractMaintenance() {
 	default:
 	}
 
-	// Count the number of contracts, and add more where they are needed.
-	//
-	// TODO: Use the IsGoodForUpload logic.
-	c.mu.Lock()
-	neededContracts := int(c.allowance.Hosts) - len(c.onlineContracts())
-	c.mu.Unlock()
-	// Nothing to do if there are no needed contracts.
+	// Count the number of contracts which are good for uploading, and then make
+	// more as needed to fill the gap.
+	// Renew any contracts that need to be renewed.
+	c.mu.RLock()
+	uploadContracts := 0
+	for _, contract := range c.contracts {
+		if contract.GoodForUpload || (contract.GoodForRenew && c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight()) {
+			uploadContracts++
+		}
+	}
+	neededContracts := int(c.allowance.Hosts) - uploadContracts
+	c.mu.RUnlock()
 	if neededContracts <= 0 {
 		return
 	}
@@ -356,7 +463,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	// Form contracts with the hosts one at a time, until we have enough
 	// contracts.
 	for _, host := range hosts {
-		// Attempt forming a contract with htis host.
+		// Attempt forming a contract with this host.
 		newContract, err := c.managedNewContract(host, numSectors, endHeight)
 		if err != nil {
 			c.log.Printf("Attempted to form a contract with %v, but if failed: %v\n", host.NetAddress, err)

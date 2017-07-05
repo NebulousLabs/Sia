@@ -55,4 +55,11 @@ var (
 	maxDownloadPrice = maxStoragePrice.Mul64(3 * 4320)
 	maxStoragePrice  = types.SiacoinPrecision.Mul64(30e3).Div(modules.BlockBytesPerMonthTerabyte) // 30k SC / TB / Month
 	maxUploadPrice   = maxStoragePrice.Mul64(4320)
+
+	// scoreLeeway defines the factor by which a host can miss the goal score
+	// for a set of hosts. To determine the goal score, a new set of hosts is
+	// queried from the hostdb and the lowest scoring among them is selected.
+	// That score is then divided by scoreLeeway to get the minimum score that a
+	// host is allowed to have before being marked as !GoodForUpload.
+	scoreLeeway = types.NewCurrency64(25)
 )

@@ -224,6 +224,11 @@ type RenterContract struct {
 	ContractFee types.Currency `json:"contractfee"`
 	TxnFee      types.Currency `json:"txnfee"`
 	SiafundFee  types.Currency `json:"siafundfee"`
+
+	// GoodForUpload indicates whether the contract should be used to upload new
+	// data or not.
+	GoodForUpload bool
+	GoodForRenew  bool
 }
 
 // EndHeight returns the height at which the host is no longer obligated to
