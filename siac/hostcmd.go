@@ -367,7 +367,7 @@ func hostconfigcmd(param, value string) {
 	if err != nil {
 		die("could not get host score estimate:", err)
 	}
-	fmt.Printf("Estimated conversion rate: %v%\n", eg.ConversionRate)
+	fmt.Printf("Estimated conversion rate: %v%%\n", eg.ConversionRate)
 	fmt.Println("Host settings updated.")
 }
 
