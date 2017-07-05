@@ -2,8 +2,6 @@ package modules
 
 import (
 	"errors"
-	"encoding/json"
-	"encoding/hex"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -270,29 +268,21 @@ func (cc ConsensusChange) Append(cc2 ConsensusChange) ConsensusChange {
 
 // String prints the ConsensusChangeID in hex.
 func (ccid ConsensusChangeID) String() string {
-	return hex.EncodeToString(ccid[:])
+	return (*crypto.Hash)(&ccid).String()
+}
+
+// LoadString takes a string, parses the hash value of the string, and sets the
+// value of the ConsensusChangeID equal to the hash value of the string.
+func (ccid *ConsensusChangeID) LoadString(s string) error {
+	return (*crypto.Hash)(ccid).LoadString(s)
 }
 
 // MarshalJSON marshales a ConsensusChangeID as a hex string.
 func (ccid ConsensusChangeID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(ccid.String())
+	return (*crypto.Hash)(&ccid).MarshalJSON()
 }
 
 // UnmarshalJSON decodes the json hex string of the ConsensusChangeID.
 func (ccid *ConsensusChangeID) UnmarshalJSON(b []byte) error {
-	// *2 because there are 2 hex characters per byte.
-	// +2 because the encoded JSON string has a `"` added at the beginning and end.
-	if len(b) != crypto.HashSize*2+2 {
-		return crypto.ErrHashWrongLen
-	}
-
-	// b[1 : len(b)-1] cuts off the leading and trailing `"` in the JSON string.
-	hBytes, err := hex.DecodeString(string(b[1 : len(b)-1]))
-	if err != nil {
-		return errors.New("could not unmarshal ConsensusChangeID: " + err.Error())
-	}
-	copy(ccid[:], hBytes)
-	return nil
+	return (*crypto.Hash)(ccid).UnmarshalJSON(b)
 }
-
-

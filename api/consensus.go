@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -69,17 +68,13 @@ func (api *API) consensusValidateTransactionsetHandler(w http.ResponseWriter, re
 // consensusChange handles the API calls to /consensus/change
 func (api *API) consensusChange(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	// Parse the changeid that's being requested.
-	var idBytes []byte
 	var id modules.ConsensusChangeID
-
-	_, err := fmt.Sscanf(ps.ByName("id"), "%x", &idBytes)
+	err := id.LoadString(ps.ByName("id"))
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
-	// Get the consensus change
-	copy(id[:], idBytes)
 	cc, next, err := api.cs.ConsensusChange(id)
 	if err != nil {
 		http.NotFound(w, req)
