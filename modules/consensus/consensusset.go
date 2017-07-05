@@ -359,10 +359,9 @@ func (cs *ConsensusSet) StorageProofSegment(fcid types.FileContractID) (index ui
 	return index, err
 }
 
-// GetConsensusChange returns the ConsensusChange that corresponds to a given ConsensusChangeID. Primarily used for API
+// ConsensusChange returns the ConsensusChange that corresponds to a given ConsensusChangeID. Primarily used for API
 // calls as modules should Subscribe to the Consensus Set instead
-func (cs *ConsensusSet) GetConsensusChange(id modules.ConsensusChangeID) (change modules.ConsensusChange,
-	next modules.ConsensusChangeID, err error) {
+func (cs *ConsensusSet) ConsensusChange(id modules.ConsensusChangeID) (change modules.ConsensusChange, next modules.ConsensusChangeID, err error) {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 

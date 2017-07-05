@@ -2,12 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
-	"fmt"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -23,8 +23,8 @@ type ConsensusGET struct {
 
 // ConsensusChangeGet contains a raw consensus set with tags to support idiomatic json encodings.
 type ConsensusChangeGet struct {
-	ID                         string                             `json:"id"`
-	NextID                     string                             `json:"nextid"`
+	ID                         modules.ConsensusChangeID          `json:"id"`
+	NextID                     modules.ConsensusChangeID          `json:"nextid"`
 	RevertedBlocks             []types.Block                      `json:"revertedblocks"`
 	AppliedBlocks              []types.Block                      `json:"appliedblocks"`
 	SiacoinOutputDiffs         []modules.SiacoinOutputDiff        `json:"siacoinoutputdiffs"`
@@ -80,7 +80,7 @@ func (api *API) consensusChange(w http.ResponseWriter, req *http.Request, ps htt
 
 	// Get the consensus change
 	copy(id[:], idBytes)
-	cc, next, err := api.cs.GetConsensusChange(id)
+	cc, next, err := api.cs.ConsensusChange(id)
 	if err != nil {
 		http.NotFound(w, req)
 		return
@@ -88,8 +88,8 @@ func (api *API) consensusChange(w http.ResponseWriter, req *http.Request, ps htt
 
 	// Return the consensus change
 	WriteJSON(w, ConsensusChangeGet{
-		ID:                         fmt.Sprintf("%x", cc.ID[:]),
-		NextID:                     fmt.Sprintf("%x", next[:]),
+		ID:                         cc.ID,
+		NextID:                     next,
 		RevertedBlocks:             cc.RevertedBlocks,
 		AppliedBlocks:              cc.AppliedBlocks,
 		SiacoinOutputDiffs:         cc.SiacoinOutputDiffs,

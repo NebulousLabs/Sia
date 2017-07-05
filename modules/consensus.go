@@ -2,6 +2,8 @@ package modules
 
 import (
 	"errors"
+	"encoding/json"
+	"encoding/hex"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -244,10 +246,10 @@ type (
 		// not found in the subscriber database, no action is taken.
 		Unsubscribe(ConsensusSetSubscriber)
 
-		// GetConsensusChange returns the ConsensusChange that corresponds to
+		// ConsensusChange returns the ConsensusChange that corresponds to
 		// a given ConsensusChangeID. Primarily used for API calls as modules
 		// should Subscribe to the Consensus Set instead
-		GetConsensusChange(id ConsensusChangeID) (ConsensusChange, ConsensusChangeID, error)
+		ConsensusChange(id ConsensusChangeID) (ConsensusChange, ConsensusChangeID, error)
 	}
 )
 
@@ -265,3 +267,32 @@ func (cc ConsensusChange) Append(cc2 ConsensusChange) ConsensusChange {
 		DelayedSiacoinOutputDiffs: append(cc.DelayedSiacoinOutputDiffs, cc2.DelayedSiacoinOutputDiffs...),
 	}
 }
+
+// String prints the ConsensusChangeID in hex.
+func (ccid ConsensusChangeID) String() string {
+	return hex.EncodeToString(ccid[:])
+}
+
+// MarshalJSON marshales a ConsensusChangeID as a hex string.
+func (ccid ConsensusChangeID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(ccid.String())
+}
+
+// UnmarshalJSON decodes the json hex string of the ConsensusChangeID.
+func (ccid *ConsensusChangeID) UnmarshalJSON(b []byte) error {
+	// *2 because there are 2 hex characters per byte.
+	// +2 because the encoded JSON string has a `"` added at the beginning and end.
+	if len(b) != crypto.HashSize*2+2 {
+		return crypto.ErrHashWrongLen
+	}
+
+	// b[1 : len(b)-1] cuts off the leading and trailing `"` in the JSON string.
+	hBytes, err := hex.DecodeString(string(b[1 : len(b)-1]))
+	if err != nil {
+		return errors.New("could not unmarshal ConsensusChangeID: " + err.Error())
+	}
+	copy(ccid[:], hBytes)
+	return nil
+}
+
+
