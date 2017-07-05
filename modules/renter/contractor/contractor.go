@@ -46,9 +46,8 @@ type Contractor struct {
 	tpool   transactionPool
 	wallet  wallet
 
-	// in addition to mu, a separate lock enforces that multiple goroutines
-	// won't try to simultaneously edit the contract set.
-	editLock siasync.TryMutex
+	// Only one thread should be performing contract maintenance at a time.
+	maintenanceLock siasync.TryMutex
 
 	allowance     modules.Allowance
 	blockHeight   types.BlockHeight

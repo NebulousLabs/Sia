@@ -270,6 +270,22 @@ func TestHostAndRentVanilla(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
+	}
+
 	// Check the host, who should now be reporting file contracts.
 	//
 	// TODO: Switch to using an API call.
@@ -782,6 +798,22 @@ func TestRenterUploadDownload(t *testing.T) {
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
 	}
 
 	// Check financial metrics; coins should have been spent on contracts
