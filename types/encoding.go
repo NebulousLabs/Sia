@@ -487,42 +487,25 @@ func (sp *StorageProof) MarshalSia(w io.Writer) error {
 
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (t Transaction) MarshalSia(w io.Writer) error {
-	encoding.WriteInt(w, len((t.SiacoinInputs)))
-	for i := range t.SiacoinInputs {
-		t.SiacoinInputs[i].MarshalSia(w)
+	if build.DEBUG {
+		// Sanity check: compare against the old encoding
+		buf := new(bytes.Buffer)
+		encoding.NewEncoder(buf).EncodeAll(
+			t.SiacoinInputs,
+			t.SiacoinOutputs,
+			t.FileContracts,
+			t.FileContractRevisions,
+			t.StorageProofs,
+			t.SiafundInputs,
+			t.SiafundOutputs,
+			t.MinerFees,
+			t.ArbitraryData,
+			t.TransactionSignatures,
+		)
+		w = sanityCheckWriter{w, buf}
 	}
-	encoding.WriteInt(w, len((t.SiacoinOutputs)))
-	for i := range t.SiacoinOutputs {
-		t.SiacoinOutputs[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.FileContracts)))
-	for i := range t.FileContracts {
-		t.FileContracts[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.FileContractRevisions)))
-	for i := range t.FileContractRevisions {
-		t.FileContractRevisions[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.StorageProofs)))
-	for i := range t.StorageProofs {
-		t.StorageProofs[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.SiafundInputs)))
-	for i := range t.SiafundInputs {
-		t.SiafundInputs[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.SiafundOutputs)))
-	for i := range t.SiafundOutputs {
-		t.SiafundOutputs[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.MinerFees)))
-	for i := range t.MinerFees {
-		t.MinerFees[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.ArbitraryData)))
-	for i := range t.ArbitraryData {
-		encoding.WritePrefix(w, t.ArbitraryData[i])
-	}
+
+	t.marshalSiaNoSignatures(w)
 	encoding.WriteInt(w, len((t.TransactionSignatures)))
 	for i := range t.TransactionSignatures {
 		err := t.TransactionSignatures[i].MarshalSia(w)
