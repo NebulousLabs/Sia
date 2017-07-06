@@ -94,7 +94,7 @@ func (c *Contractor) managedMarkContractsUtility() {
 	c.mu.RLock()
 	hostCount := int(c.allowance.Hosts)
 	c.mu.RUnlock()
-	hosts := c.hdb.RandomHosts(hostCount+5, nil)
+	hosts := c.hdb.RandomHosts(hostCount+minScoreHostBuffer, nil)
 
 	// Find the lowest score of this batch of hosts.
 	if len(hosts) <= 0 {

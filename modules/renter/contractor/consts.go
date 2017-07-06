@@ -17,6 +17,14 @@ const (
 
 // Constants related to contract formation parameters.
 var (
+	// To alleviate potential block propagation issues, the contractor sleeps
+	// between each contract formation.
+	contractFormationInterval = build.Select(build.Var{
+		Dev:      10 * time.Second,
+		Standard: 60 * time.Second,
+		Testing:  10 * time.Millisecond,
+	}).(time.Duration)
+
 	// minHostsForEstimations describes the minimum number of hosts that
 	// are needed to make broad estimations such as the number of sectors
 	// that you can store on the network for a given allowance.
@@ -39,13 +47,13 @@ var (
 		Testing: 4,
 	}).(int)
 
-	// To alleviate potential block propagation issues, the contractor sleeps
-	// between each contract formation.
-	contractFormationInterval = build.Select(build.Var{
-		Dev:      10 * time.Second,
-		Standard: 60 * time.Second,
-		Testing:  10 * time.Millisecond,
-	}).(time.Duration)
+	// minScoreHostBuffer defines how many extra hosts are queried when trying
+	// to figure out an appropriate minimum score for the hosts that we have.
+	minScoreHostBuffer = build.Select(build.Var{
+		Dev:      2,
+		Standard: 10,
+		Testing:  1,
+	}).(int)
 )
 
 // Constants related to the safety values for when the contractor is forming
