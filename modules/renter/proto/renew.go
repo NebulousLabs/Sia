@@ -116,7 +116,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 		return modules.RenterContract{}, errors.New("couldn't initiate RPC: " + err.Error())
 	}
 	// verify that both parties are renewing the same contract
-	if err = verifyRecentRevision(conn, contract); err != nil {
+	if err = verifyRecentRevision(conn, contract, host.Version); err != nil {
 		// don't add context; want to preserve the original error type so that
 		// callers can check using IsRevisionMismatch
 		return modules.RenterContract{}, err
