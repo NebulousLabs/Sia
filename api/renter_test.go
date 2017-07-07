@@ -1593,6 +1593,10 @@ func TestContractorHostRemoval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	origBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// upload the file
 	uploadValues := url.Values{}
@@ -1620,6 +1624,13 @@ func TestContractorHostRemoval(t *testing.T) {
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
 	if err != nil {
 		t.Fatal(err)
+	}
+	downloadBytes, err := ioutil.ReadFile(downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(downloadBytes, origBytes) {
+		t.Fatal("downloaded file and uploaded file do not match")
 	}
 
 	// Get the values of the first and second contract.
@@ -1761,7 +1772,17 @@ func TestContractorHostRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO: Block until redundancy is 2.
+	// Block until redundancy is 2.
+	err = retry(120, 250*time.Millisecond, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+			return nil
+		}
+		return errors.New("file not uploaded to full redundancy")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Mine out the rest of the blocks so that the bad contracts expire.
 	for i := 0; i < 5; i++ {
@@ -1797,6 +1818,18 @@ func TestContractorHostRemoval(t *testing.T) {
 		t.Error("renter is renewing the wrong contracts", rc.Contracts[1].HostPublicKey.String())
 	}
 
-	// TODO: Try again to download the file we uploaded. It should still be
+	// Try again to download the file we uploaded. It should still be
 	// retrievable.
+	downloadPath2 := filepath.Join(st.dir, "test-downloaded-verify-2.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloadBytes2, err := ioutil.ReadFile(downloadPath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(downloadBytes2, origBytes) {
+		t.Fatal("downloaded file and uploaded file do not match")
+	}
 }
