@@ -84,6 +84,12 @@ func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContra
 	return modules.RenterContract{}, false
 }
 
+// ContractByID returns the contract with the id specified, if it exists.
+func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContract, bool) {
+	contract, exists := c.contracts[id]
+	return contract, exists
+}
+
 // Contracts returns the contracts formed by the contractor in the current
 // allowance period. Only contracts formed with currently online hosts are
 // returned.

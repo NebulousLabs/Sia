@@ -204,6 +204,14 @@ func (r *Renter) FileList() []modules.FileInfo {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
+	isOffline := func(id types.FileContractID) bool {
+		offline := r.hostContractor.IsOffline(id)
+		contract, exists := r.hostContractor.ContractByID(id)
+		if !exists {
+			return offline
+		}
+		return offline || !contract.GoodForRenew
+	}
 	files := make([]modules.FileInfo, 0, len(r.files))
 	for _, f := range r.files {
 		f.mu.RLock()
@@ -211,8 +219,8 @@ func (r *Renter) FileList() []modules.FileInfo {
 		files = append(files, modules.FileInfo{
 			SiaPath:        f.name,
 			Filesize:       f.size,
-			Available:      f.available(r.hostContractor.IsOffline),
-			Redundancy:     f.redundancy(r.hostContractor.IsOffline),
+			Available:      f.available(isOffline),
+			Redundancy:     f.redundancy(isOffline),
 			Renewing:       renewing,
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),

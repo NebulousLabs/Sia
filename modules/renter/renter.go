@@ -93,6 +93,9 @@ type hostContractor interface {
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
+	// ContractByID returns the contract associated with the file contract id.
+	ContractByID(types.FileContractID) (modules.RenterContract, bool)
+
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
 	CurrentPeriod() types.BlockHeight
