@@ -1706,7 +1706,7 @@ func TestRedundancyReporting(t *testing.T) {
 	}
 
 	// redundancy should increment back to 2
-	err = retry(60, time.Second, func() error {
+	err = retry(200, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
 			return nil
