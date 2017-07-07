@@ -86,6 +86,9 @@ func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContra
 
 // ContractByID returns the contract with the id specified, if it exists.
 func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContract, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	contract, exists := c.contracts[id]
 	return contract, exists
 }
