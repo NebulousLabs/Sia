@@ -99,6 +99,9 @@ func (c *Contractor) managedMarkContractsUtility() {
 		return
 	}
 	hosts := c.hdb.RandomHosts(hostCount+minScoreHostBuffer, nil)
+	if len(hosts) <= 0 {
+		return
+	}
 
 	// Find the lowest score of this batch of hosts.
 	lowestScore := c.hdb.ScoreBreakdown(hosts[0]).Score
@@ -321,7 +324,6 @@ func (c *Contractor) threadedContractMaintenance() {
 	}
 	defer c.maintenanceLock.Unlock()
 
-
 	// Update the utility fields for this contract based on the most recent
 	// hostdb.
 	c.managedMarkContractsUtility()
@@ -488,7 +490,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			c.log.Printf("Attempted to form a contract with %v, but if failed: %v\n", host.NetAddress, err)
 			continue
 		}
-		// newContract.GoodForUpload = true
+		newContract.GoodForUpload = true
 		newContract.GoodForRenew = true
 
 		// Add this contract to the contractor and save.
