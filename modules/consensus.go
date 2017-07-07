@@ -3,9 +3,9 @@ package modules
 import (
 	"errors"
 
+	"encoding/json"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
-	"encoding/json"
 )
 
 const (

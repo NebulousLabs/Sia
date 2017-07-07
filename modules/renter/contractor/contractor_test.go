@@ -1,6 +1,7 @@
 package contractor
 
 import (
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -253,8 +254,14 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.contracts) != 1 {
-		t.Error("expected 1 contract, got", len(c.contracts))
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		if len(c.Contracts()) != 1 {
+			return errors.New("allowance forming seems to have failed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
 	}
 
 	// set same allowance; should no-op
@@ -274,8 +281,14 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.contracts) != 2 {
-		t.Fatal("expected 2 contracts, got", len(c.contracts))
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		if len(c.Contracts()) != 2 {
+			return errors.New("allowance forming seems to have failed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// set allowance with Funds*2; should trigger renewal of both contracts
@@ -284,9 +297,14 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if len(c.contracts) != 2 {
-		t.Fatal("expected 2 contracts, got", len(c.contracts))
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		if len(c.Contracts()) != 2 {
+			return errors.New("allowance forming seems to have failed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
 	}
 
 	// delete one of the contracts and set allowance with Funds*2; should
@@ -303,8 +321,14 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.contracts) != 2 {
-		t.Fatal("expected 2 contracts, got", len(c.contracts))
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		if len(c.Contracts()) != 2 {
+			return errors.New("allowance forming seems to have failed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// make one of the contracts un-renewable and set allowance with Funds*2; should

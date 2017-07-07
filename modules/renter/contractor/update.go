@@ -62,46 +62,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// (harmless if not synced, since hosts will reject our renewal attempts,
 	// but very slow).
 	if cc.Synced {
-		go func() {
-			// Add the goroutine to the thread group.
-			err := c.tg.Add()
-			if err != nil {
-				return
-			}
-			defer c.tg.Done()
-
-			// Only one goroutine should be editing contracts at a time.
-			if !c.editLock.TryLock() {
-				return
-			}
-			defer c.editLock.Unlock()
-
-			// Renew any (online) contracts that have entered the renew window.
-			err = c.managedRenewContracts()
-			if err != nil {
-				c.log.Debugln("WARN: failed to renew contracts after processing a consensus chage:", err)
-			}
-
-			// If we don't have enough (online) contracts, form new ones.
-			c.mu.RLock()
-			a := c.allowance
-			remaining := int(a.Hosts) - len(c.onlineContracts())
-			c.mu.RUnlock()
-			if remaining <= 0 {
-				return
-			}
-			max, err := maxSectors(a, c.hdb, c.tpool)
-			if err != nil {
-				c.log.Debugln("ERROR: couldn't calculate maxSectors after processing a consensus change:", err)
-				return
-			}
-			// Only allocate half as many sectors as the max. This leaves some leeway
-			// for replacing contracts, transaction fees, etc.
-			numSectors := max / 2
-			err = c.managedFormAllowanceContracts(remaining, numSectors, a)
-			if err != nil {
-				c.log.Debugln("WARN: failed to form contracts after processing a consensus change:", err)
-			}
-		}()
+		// Perform the contract maintenance in a separate thread.
+		go c.threadedContractMaintenance()
 	}
 }
