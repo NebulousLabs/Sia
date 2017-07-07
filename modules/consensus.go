@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+	"encoding/json"
 )
 
 const (
@@ -284,5 +285,12 @@ func (ccid ConsensusChangeID) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON decodes the json hex string of the ConsensusChangeID.
 func (ccid *ConsensusChangeID) UnmarshalJSON(b []byte) error {
-	return (*crypto.Hash)(ccid).UnmarshalJSON(b)
+	err := (*crypto.Hash)(ccid).UnmarshalJSON(b)
+	if err != nil {
+		// COMPATv1.0.0: try decoding into byte array
+		var id [crypto.HashSize]byte
+		err = json.Unmarshal(b, &id)
+		copy(ccid[:], id[:])
+	}
+	return err
 }
