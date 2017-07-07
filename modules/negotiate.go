@@ -26,6 +26,7 @@ const (
 	// host have to negotiate a download request batch. The time is set high
 	// enough that two nodes behind Tor have a reasonable chance of completing
 	// the negotiation.
+	// COMPATv1.3.0
 	NegotiateDownloadTime = 600 * time.Second
 
 	// NegotiateFileContractTime defines the amount of time that the renter and
@@ -115,6 +116,10 @@ var (
 	// data.
 	ActionModify = types.Specifier{'M', 'o', 'd', 'i', 'f', 'y'}
 
+	// ActionDownload is the specifier for a RevisionAction that downloads sector
+	// data.
+	ActionDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd'}
+
 	// ErrAnnNotAnnouncement indicates that the provided host announcement does
 	// not use a recognized specifier, indicating that it's either not a host
 	// announcement or it's not a recognized version of a host announcement.
@@ -153,8 +158,11 @@ var (
 	RPCRenewContract = types.Specifier{'R', 'e', 'n', 'e', 'w', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
 	// RPCReviseContract is the specifier for revising an existing file
+	RPCReviseContract = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 3}
+
+	// V130RPCReviseContract is the specifier for revising an existing file
 	// contract.
-	RPCReviseContract = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
+	V130RPCReviseContract = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
 	// RPCRecentRevision is the specifier for getting the most recent file
 	// contract revision for a given file contract.
@@ -258,7 +266,7 @@ type (
 		Version        string `json:"version"`
 	}
 
-	// A RevisionAction is a description of an edit to be performed on a file
+	// A V130RevisionAction is a description of an edit to be performed on a file
 	// contract. Three types are allowed, 'ActionDelete', 'ActionInsert', and
 	// 'ActionModify'. ActionDelete just takes a sector index, indicating which
 	// sector is going to be deleted. ActionInsert takes a sector index, and a
@@ -270,11 +278,43 @@ type (
 	// Modify could be simulated with an insert and a delete, however an insert
 	// requires a full sector to be uploaded, and a modify can be just a few
 	// kb, which can be significantly faster.
-	RevisionAction struct {
+	V130RevisionAction struct {
 		Type        types.Specifier
 		SectorIndex uint64
 		Offset      uint64
 		Data        []byte
+	}
+
+	// A RevisionAction is a description of an edit to be performed on a file
+	// contract and also contains the signed contract for the proposed change.
+	// Four types are allowed, 'ActionDelete', 'ActionInsert', 'ActionModify'
+	// and 'ActionDownload'. ActionDelete just takes a sector index, indicating which
+	// sector is going to be deleted. ActionInsert takes a sector index, and a
+	// full sector of data, indicating that a sector at the index should be
+	// inserted with the provided data. ActionDownload downloads length bytes from
+	// the sector with the root described by MerkleRoot starting at offset.
+	// 'Modify' revises the sector at the given index, rewriting it with the
+	// provided data starting from the 'offset' within the sector.
+	//
+	// Modify could be simulated with an insert and a delete, however an insert
+	// requires a full sector to be uploaded, and a modify can be just a few
+	// kb, which can be significantly faster.
+	RevisionAction struct {
+		Data        []byte
+		Length      uint64
+		MerkleRoot  crypto.Hash
+		Offset      uint64
+		SectorIndex uint64
+		Type        types.Specifier
+	}
+
+	// RevisionRequest is a description of multiple edits performed on a file contract
+	// containing the revision and signature of the renter which are used to pay
+	// for the modifications
+	RevisionRequest struct {
+		Revision  types.FileContractRevision
+		Signature types.TransactionSignature
+		Actions   []RevisionAction
 	}
 )
 

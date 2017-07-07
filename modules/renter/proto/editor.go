@@ -76,7 +76,7 @@ func (he *Editor) Close() error {
 // runRevisionIteration submits actions and their accompanying revision to the
 // host for approval. If negotiation is successful, it updates the underlying
 // Contract.
-func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) (err error) {
+func (he *Editor) runRevisionIteration(actions []modules.V130RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) (err error) {
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
 		if err != nil {
@@ -161,7 +161,7 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 	merkleRoot := cachedMerkleRoot(newRoots)
 
 	// create the action and revision
-	actions := []modules.RevisionAction{{
+	actions := []modules.V130RevisionAction{{
 		Type:        modules.ActionInsert,
 		SectorIndex: uint64(len(he.contract.MerkleRoots)),
 		Data:        data,
@@ -202,7 +202,7 @@ func (he *Editor) Delete(root crypto.Hash) (modules.RenterContract, error) {
 	merkleRoot := cachedMerkleRoot(newRoots)
 
 	// create the action and accompanying revision
-	actions := []modules.RevisionAction{{
+	actions := []modules.V130RevisionAction{{
 		Type:        modules.ActionDelete,
 		SectorIndex: uint64(index),
 	}}
@@ -244,7 +244,7 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 	merkleRoot := cachedMerkleRoot(newRoots)
 
 	// create the action and revision
-	actions := []modules.RevisionAction{{
+	actions := []modules.V130RevisionAction{{
 		Type:        modules.ActionModify,
 		SectorIndex: uint64(index),
 		Offset:      offset,

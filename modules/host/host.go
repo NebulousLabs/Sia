@@ -120,6 +120,7 @@ type Host struct {
 	atomicErroredCalls        uint64
 	atomicFormContractCalls   uint64
 	atomicRenewCalls          uint64
+	v130atomicReviseCalls     uint64
 	atomicReviseCalls         uint64
 	atomicRecentRevisionCalls uint64
 	atomicSettingsCalls       uint64

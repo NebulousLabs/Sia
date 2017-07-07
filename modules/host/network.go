@@ -287,6 +287,9 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	case modules.RPCFormContract:
 		atomic.AddUint64(&h.atomicFormContractCalls, 1)
 		err = extendErr("incoming RPCFormContract failed: ", h.managedRPCFormContract(conn))
+	case modules.V130RPCReviseContract:
+		atomic.AddUint64(&h.v130atomicReviseCalls, 1)
+		err = extendErr("incoming RPCReviseContractDeprecated failed: ", h.v130managedRPCReviseContract(conn))
 	case modules.RPCReviseContract:
 		atomic.AddUint64(&h.atomicReviseCalls, 1)
 		err = extendErr("incoming RPCReviseContract failed: ", h.managedRPCReviseContract(conn))
@@ -360,7 +363,7 @@ func (h *Host) NetworkMetrics() modules.HostNetworkMetrics {
 		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
 		FormContractCalls: atomic.LoadUint64(&h.atomicFormContractCalls),
 		RenewCalls:        atomic.LoadUint64(&h.atomicRenewCalls),
-		ReviseCalls:       atomic.LoadUint64(&h.atomicReviseCalls),
+		ReviseCalls:       atomic.LoadUint64(&h.v130atomicReviseCalls),
 		SettingsCalls:     atomic.LoadUint64(&h.atomicSettingsCalls),
 		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
 	}
