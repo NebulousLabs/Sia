@@ -1108,7 +1108,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
-		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
 	}
 
 	// Use a relative destination, which should fail.

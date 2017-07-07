@@ -230,7 +230,9 @@ func (r *Renter) updateWorkerPool() {
 	// Get a map of all the contracts in the contractor.
 	newContracts := make(map[types.FileContractID]struct{})
 	for _, nc := range r.hostContractor.Contracts() {
-		newContracts[nc.ID] = struct{}{}
+		if nc.GoodForUpload {
+			newContracts[nc.ID] = struct{}{}
+		}
 	}
 
 	// Add a worker for any contract that does not already have a worker.
