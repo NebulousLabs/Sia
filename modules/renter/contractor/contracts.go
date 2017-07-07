@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
@@ -94,12 +95,12 @@ func (c *Contractor) managedMarkContractsUtility() {
 	c.mu.RLock()
 	hostCount := int(c.allowance.Hosts)
 	c.mu.RUnlock()
+	if hostCount <= 0 {
+		return
+	}
 	hosts := c.hdb.RandomHosts(hostCount+minScoreHostBuffer, nil)
 
 	// Find the lowest score of this batch of hosts.
-	if len(hosts) <= 0 {
-		return
-	}
 	lowestScore := c.hdb.ScoreBreakdown(hosts[0]).Score
 	for i := 1; i < len(hosts); i++ {
 		score := c.hdb.ScoreBreakdown(hosts[i]).Score
@@ -299,11 +300,27 @@ func (c *Contractor) threadedContractMaintenance() {
 		return
 	}
 	defer c.tg.Done()
-	// Only one instance of this thread should be running at a time.
-	if !c.maintenanceLock.TryLock() {
+	// Nohting to do if there are no hosts.
+	c.mu.RLock()
+	wantedHosts := c.allowance.Hosts
+	c.mu.RUnlock()
+	if wantedHosts <= 0 {
 		return
 	}
+	// Only one instance of this thread should be running at a time. Under
+	// normal conditions, fine to return early if another thread is already
+	// doing maintenance. The next block will trigger another round. Under
+	// testing, control is insufficient if the maintenance loop isn't guaranteed
+	// to run.
+	if build.Release == "testing" {
+		c.maintenanceLock.Lock()
+	} else {
+		if !c.maintenanceLock.TryLock() {
+			return
+		}
+	}
 	defer c.maintenanceLock.Unlock()
+
 
 	// Update the utility fields for this contract based on the most recent
 	// hostdb.
@@ -390,6 +407,8 @@ func (c *Contractor) threadedContractMaintenance() {
 				return
 			}
 			c.log.Printf("Renewed contract %v with %v\n", id, oldContract.NetAddress)
+			newContract.GoodForUpload = true
+			newContract.GoodForRenew = true
 
 			// Lock the contractor as we update it to use the new contract
 			// instead of the old contract.
@@ -469,6 +488,8 @@ func (c *Contractor) threadedContractMaintenance() {
 			c.log.Printf("Attempted to form a contract with %v, but if failed: %v\n", host.NetAddress, err)
 			continue
 		}
+		// newContract.GoodForUpload = true
+		newContract.GoodForRenew = true
 
 		// Add this contract to the contractor and save.
 		c.mu.Lock()

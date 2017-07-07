@@ -1520,3 +1520,283 @@ func TestRenterPricesHandlerPricey(t *testing.T) {
 		t.Error("price did not drop from single to multi")
 	}
 }
+
+// TestContractorHostRemoval checks that the contractor properly migrates away
+// from low quality hosts when there are higher quality hosts available.
+func TestContractorHostRemoval(t *testing.T) {
+	// Create a renter and 2 hosts. Connect to the hosts and start uploading.
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester(t.Name() + "renter")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+	stH1, err := blankServerTester(t.Name() + " - Host 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH1.server.Close()
+	testGroup := []*serverTester{st, stH1}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add storage to every host.
+	err = addStorageToAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Raise the prices significantly for the two hosts.
+	raisedPrice := url.Values{}
+	raisedPrice.Set("mincontractprice", "5000000000000000000000000000") // 5 KS
+	// raisedPrice.Set("minstorageprice", "500000000000")                  // ~500 SC / TB / Mo
+	raisedPrice.Set("period", testPeriod)
+	err = st.stdPostAPI("/host", raisedPrice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stH1.stdPostAPI("/host", raisedPrice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Anounce the hosts.
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance with two hosts.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "500000000000000000000000000000") // 500k SC
+	allowanceValues.Set("hosts", "2")
+	allowanceValues.Set("period", "10")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file to upload.
+	filesize := int(100)
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, filesize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// upload the file
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// redundancy should reach 2
+	var rf RenterFiles
+	err = retry(120, 250*time.Millisecond, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+			return nil
+		}
+		return errors.New("file not uploaded")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify we can download
+	downloadPath := filepath.Join(st.dir, "test-downloaded-verify.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the values of the first and second contract.
+	var rc RenterContracts
+	err = st.getAPI("/renter/contracts", &rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rc.Contracts) != 2 {
+		t.Fatal("wrong contract count")
+	}
+	rc1Host := rc.Contracts[0].HostPublicKey.String()
+	rc2Host := rc.Contracts[1].HostPublicKey.String()
+
+	// Add 3 new hosts that will be competing with the expensive hosts.
+	stH2, err := blankServerTester(t.Name() + " - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH2.server.Close()
+	stH3, err := blankServerTester(t.Name() + " - Host 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH3.server.Close()
+	stH4, err := blankServerTester(t.Name() + " - Host 4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH4.server.Close()
+	testGroup = []*serverTester{st, stH1, stH2, stH3, stH4}
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Add storage to every host.
+	err = addStorageToAllHosts([]*serverTester{stH2, stH3, stH4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Anounce the hosts.
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Block until the hostdb reaches five hosts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var ah HostdbActiveGET
+		err = st.getAPI("/hostdb/active", &ah)
+		if err != nil {
+			return err
+		}
+		if len(ah.Hosts) < 5 {
+			return errors.New("new hosts never appeared in hostdb")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine a block to trigger a second run of threadedContractMaintenance.
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that st and stH1 are dropped in favor of the newer, better hosts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 4 {
+			return fmt.Errorf("contracts: %v", len(rc.Contracts))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Grab the old contracts, then mine blocks to trigger a renew, and then
+	// wait until the renew is complete.
+	err = st.getAPI("/renter/contracts", &rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = synchronizationCheck(testGroup)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Give the renter time to renew. Two of the contracts should renew.
+	var rc2 RenterContracts
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		err = st.getAPI("/renter/contracts", &rc2)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc2.Contracts) != 4 {
+			return fmt.Errorf("%v", len(rc2.Contracts))
+		}
+
+		// Check that at least 2 contracts are different between rc and rc2.
+		tracker := make(map[types.FileContractID]struct{})
+		// Add all the contracts.
+		for _, contract := range rc.Contracts {
+			tracker[contract.ID] = struct{}{}
+		}
+		// Count the number of matches. Looking for 2.
+		var matches int
+		for _, contract := range rc2.Contracts {
+			_, exists := tracker[contract.ID]
+			if exists {
+				matches++
+			}
+		}
+		if matches != 2 {
+			return fmt.Errorf("doesn't seem like renewal completed: %v", matches)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// TODO: Block until redundancy is 2.
+
+	// Mine out the rest of the blocks so that the bad contracts expire.
+	for i := 0; i < 5; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = synchronizationCheck(testGroup)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Should be back down to 2 contracts now, with the new hosts.
+	// Verify that st and stH1 are dropped in favor of the newer, better hosts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 2 {
+			return fmt.Errorf("renewing seems to have failed: %v", len(rc.Contracts))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rc.Contracts[0].HostPublicKey.String() == rc1Host || rc.Contracts[0].HostPublicKey.String() == rc2Host {
+		t.Error("renter is renewing the wrong contracts", rc.Contracts[0].HostPublicKey.String())
+	}
+	if rc.Contracts[1].HostPublicKey.String() == rc1Host || rc.Contracts[1].HostPublicKey.String() == rc2Host {
+		t.Error("renter is renewing the wrong contracts", rc.Contracts[1].HostPublicKey.String())
+	}
+
+	// TODO: Try again to download the file we uploaded. It should still be
+	// retrievable.
+}
