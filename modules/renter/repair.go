@@ -225,13 +225,6 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 			continue
 		}
 
-		// TODO: Prune workers that do not provide value. The biggest flag is
-		// an increase in the price of storage cost. If there are more workers
-		// available than needed and upload bandwidth is saturated, the slow
-		// workers can be pruned as well (up to the point where you can no
-		// longer hit full redundancy). Some of this is already implemented
-		// above.
-
 		rs.availableWorkers[id] = worker
 	}
 	r.mu.Unlock(id)
