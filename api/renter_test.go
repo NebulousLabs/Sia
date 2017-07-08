@@ -1560,7 +1560,6 @@ func TestContractorHostRemoval(t *testing.T) {
 	// Raise the prices significantly for the two hosts.
 	raisedPrice := url.Values{}
 	raisedPrice.Set("mincontractprice", "5000000000000000000000000000") // 5 KS
-	// raisedPrice.Set("minstorageprice", "500000000000")                  // ~500 SC / TB / Mo
 	raisedPrice.Set("period", testPeriod)
 	err = st.stdPostAPI("/host", raisedPrice)
 	if err != nil {
@@ -1601,6 +1600,8 @@ func TestContractorHostRemoval(t *testing.T) {
 	// upload the file
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
+	uploadValues.Set("datapieces", "1")
+	uploadValues.Set("paritypieces", "5")
 	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
@@ -1772,7 +1773,7 @@ func TestContractorHostRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Block until redundancy is 2.
+	// Block until redundancy is 2. Redundancy should not go above 2.
 	err = retry(120, 250*time.Millisecond, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
@@ -1785,7 +1786,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	}
 
 	// Mine out the rest of the blocks so that the bad contracts expire.
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		_, err := st.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -1816,6 +1817,18 @@ func TestContractorHostRemoval(t *testing.T) {
 	}
 	if rc.Contracts[1].HostPublicKey.String() == rc1Host || rc.Contracts[1].HostPublicKey.String() == rc2Host {
 		t.Error("renter is renewing the wrong contracts", rc.Contracts[1].HostPublicKey.String())
+	}
+
+	// Redundancy should still be 2.
+	err = retry(120, 250*time.Millisecond, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+			return nil
+		}
+		return errors.New("file not uploaded to full redundancy")
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Try again to download the file we uploaded. It should still be
