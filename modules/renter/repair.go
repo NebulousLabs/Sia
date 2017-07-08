@@ -203,6 +203,11 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 	r.updateWorkerPool()
 	rs.availableWorkers = make(map[types.FileContractID]*worker)
 	for id, worker := range r.workerPool {
+		// Ignore the workers that are not good for uploading.
+		if !worker.contract.GoodForUpload {
+			continue
+		}
+
 		// Ignore workers that are already in the active set of workers.
 		_, exists := rs.activeWorkers[worker.contractID]
 		if exists {
