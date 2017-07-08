@@ -83,7 +83,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	}()
 
 	// send the revision to the host for approval
-	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
+	signedTxn, err := v130negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
 		// cause the next download to fail. However, we must delay closing

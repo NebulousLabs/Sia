@@ -40,6 +40,10 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 		return extendErr("RPCSettings failed: ", err)
 	}
 
+	// Reset deadline after managedRPCSettings shortened it
+	// TODO: think about a better way to do that
+	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractRevisionTime))
+
 	// Verify that the signature is valid and get the host's signature.
 	txn, err := createRevisionSignature(request.Revision, request.Signature, secretKey, blockHeight)
 	if err != nil {
@@ -80,12 +84,14 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 			if totalPayloadSize > settings.MaxDownloadBatchSize {
 				return extendErr("download iteration batch failed: ", errLargeDownloadBatch)
 			}
-
+			// If the Merkle root changed we need to verify it later
+			if action.Type != modules.ActionDownload {
+				merkleRootChange = true
+			}
 			switch action.Type {
 			case modules.ActionDelete:
 				so.SectorRoots = append(so.SectorRoots[0:action.SectorIndex], so.SectorRoots[action.SectorIndex+1:]...)
 				sectorsRemoved = append(sectorsRemoved, so.SectorRoots[action.SectorIndex])
-				merkleRootChange = true
 
 			case modules.ActionInsert:
 				// Check that the sector size is correct.
@@ -105,7 +111,6 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 				sectorsGained = append(sectorsGained, newRoot)
 				gainedSectorData = append(gainedSectorData, action.Data)
 				so.SectorRoots = append(so.SectorRoots[:action.SectorIndex], append([]crypto.Hash{newRoot}, so.SectorRoots[action.SectorIndex:]...)...)
-				merkleRootChange = true
 
 			case modules.ActionModify:
 				// Check that the offset and length are okay. Length is already
@@ -133,7 +138,6 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 				sectorsGained = append(sectorsGained, newRoot)
 				gainedSectorData = append(gainedSectorData, sector)
 				so.SectorRoots[action.SectorIndex] = newRoot
-				merkleRootChange = true
 
 			case modules.ActionDownload:
 				// Check that the length of each file is in-bounds, and that the total
@@ -165,11 +169,6 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
 		return extendErr("rejected proposed modifications: ", err)
 	}
-	// Revision is acceptable, write an acceptance string.
-	err = modules.WriteNegotiationAcceptance(conn)
-	if err != nil {
-		return extendErr("could not accept revision modifications: ", ErrorConnection(err.Error()))
-	}
 
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(storageRevenue)
 	so.RiskedCollateral = so.RiskedCollateral.Add(newCollateral)
@@ -196,6 +195,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	if err != nil {
 		return extendErr("iteration signal failed to send: ", ErrorConnection(err.Error()))
 	}
+	// Send the signature
 	err = encoding.WriteObject(conn, txn.TransactionSignatures[1])
 	if err != nil {
 		return extendErr("failed to write revision signatures: ", ErrorConnection(err.Error()))
@@ -207,7 +207,6 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 			return extendErr("failed to write payload: ", ErrorConnection(err.Error()))
 		}
 	}
-
 	return nil
 }
 

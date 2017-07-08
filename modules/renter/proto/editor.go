@@ -58,9 +58,13 @@ type Editor struct {
 // shutdown terminates the revision loop and signals the goroutine spawned in
 // NewEditor to return.
 func (he *Editor) shutdown() {
-	extendDeadline(he.conn, modules.NegotiateSettingsTime)
-	// don't care about these errors
-	_, _ = verifySettings(he.conn, he.host)
+	// COMPATv1.3.0
+	// TODO change version before merging
+	if build.VersionCmp(he.host.Version, build.Version) < 0 {
+		extendDeadline(he.conn, modules.NegotiateSettingsTime)
+		// don't care about these errors
+		_, _ = verifySettings(he.conn, he.host)
+	}
 	_ = modules.WriteNegotiationStop(he.conn)
 	close(he.closeChan)
 }
@@ -73,10 +77,52 @@ func (he *Editor) Close() error {
 	return he.conn.Close()
 }
 
-// runRevisionIteration submits actions and their accompanying revision to the
+// v130runRevisionIteration submits actions and their accompanying revision to the
 // host for approval. If negotiation is successful, it updates the underlying
 // Contract.
-func (he *Editor) runRevisionIteration(actions []modules.V130RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) (err error) {
+func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) (err error) {
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			he.hdb.IncrementFailedInteractions(he.contract.HostPublicKey)
+		} else {
+			he.hdb.IncrementSuccessfulInteractions(he.contract.HostPublicKey)
+		}
+	}()
+
+	// Before we continue, save the revision. Unexpected termination (e.g.
+	// power failure) during the signature transfer leaves in an ambiguous
+	// state: the host may or may not have received the signature, and thus
+	// may report either revision as being the most recent. To mitigate this,
+	// we save the old revision as a fallback.
+	if he.SaveFn != nil {
+		if err := he.SaveFn(rev, newRoots); err != nil {
+			return err
+		}
+	}
+
+	// send revision to host and exchange signatures
+	signedTxn, err := negotiateRevision(he.host, he.conn, rev, he.contract.SecretKey, actions)
+	if err == modules.ErrStopResponse {
+		// if host gracefully closed, close our connection as well; this will
+		// cause the next operation to fail
+		he.conn.Close()
+	} else if err != nil {
+		return err
+	}
+
+	// update host contract
+	he.contract.LastRevision = rev
+	he.contract.LastRevisionTxn = signedTxn
+	he.contract.MerkleRoots = newRoots
+
+	return nil
+}
+
+// v130runRevisionIteration submits actions and their accompanying revision to the
+// host for approval. If negotiation is successful, it updates the underlying
+// Contract.
+func (he *Editor) v130runRevisionIteration(actions []modules.V130RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) (err error) {
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
 		if err != nil {
@@ -108,7 +154,7 @@ func (he *Editor) runRevisionIteration(actions []modules.V130RevisionAction, rev
 	}
 
 	// send revision to host and exchange signatures
-	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey)
+	signedTxn, err := v130negotiateRevision(he.conn, rev, he.contract.SecretKey)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
 		// cause the next operation to fail
@@ -160,16 +206,29 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 	newRoots := append(he.contract.MerkleRoots, sectorRoot)
 	merkleRoot := cachedMerkleRoot(newRoots)
 
-	// create the action and revision
-	actions := []modules.V130RevisionAction{{
-		Type:        modules.ActionInsert,
-		SectorIndex: uint64(len(he.contract.MerkleRoots)),
-		Data:        data,
-	}}
+	// create the revision
 	rev := newUploadRevision(he.contract.LastRevision, merkleRoot, sectorPrice, sectorCollateral)
 
 	// run the revision iteration
-	if err := he.runRevisionIteration(actions, rev, newRoots); err != nil {
+	// TODO Change version before merging
+	// COMPATv1.3.0
+	var err error
+	if build.VersionCmp(he.host.Version, build.Version) < 0 {
+		actions := []modules.V130RevisionAction{{
+			Type:        modules.ActionInsert,
+			SectorIndex: uint64(len(he.contract.MerkleRoots)),
+			Data:        data,
+		}}
+		err = he.v130runRevisionIteration(actions, rev, newRoots)
+	} else {
+		actions := []modules.RevisionAction{{
+			Type:        modules.ActionInsert,
+			SectorIndex: uint64(len(he.contract.MerkleRoots)),
+			Data:        data,
+		}}
+		err = he.runRevisionIteration(actions, rev, newRoots)
+	}
+	if err != nil {
 		return modules.RenterContract{}, crypto.Hash{}, err
 	}
 
@@ -201,15 +260,26 @@ func (he *Editor) Delete(root crypto.Hash) (modules.RenterContract, error) {
 	}
 	merkleRoot := cachedMerkleRoot(newRoots)
 
-	// create the action and accompanying revision
-	actions := []modules.V130RevisionAction{{
-		Type:        modules.ActionDelete,
-		SectorIndex: uint64(index),
-	}}
+	// create the revision
 	rev := newDeleteRevision(he.contract.LastRevision, merkleRoot)
 
 	// run the revision iteration
-	if err := he.runRevisionIteration(actions, rev, newRoots); err != nil {
+	// COMPATv1.3.0
+	var err error
+	if build.VersionCmp(he.host.Version, build.Version) < 0 {
+		actions := []modules.V130RevisionAction{{
+			Type:        modules.ActionDelete,
+			SectorIndex: uint64(index),
+		}}
+		err = he.v130runRevisionIteration(actions, rev, newRoots)
+	} else {
+		actions := []modules.RevisionAction{{
+			Type:        modules.ActionDelete,
+			SectorIndex: uint64(index),
+		}}
+		err = he.runRevisionIteration(actions, rev, newRoots)
+	}
+	if err != nil {
 		return modules.RenterContract{}, err
 	}
 	return he.contract, nil
@@ -243,17 +313,30 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 	}
 	merkleRoot := cachedMerkleRoot(newRoots)
 
-	// create the action and revision
-	actions := []modules.V130RevisionAction{{
-		Type:        modules.ActionModify,
-		SectorIndex: uint64(index),
-		Offset:      offset,
-		Data:        newData,
-	}}
+	// create the revision
 	rev := newModifyRevision(he.contract.LastRevision, merkleRoot, sectorBandwidthPrice)
 
 	// run the revision iteration
-	if err := he.runRevisionIteration(actions, rev, newRoots); err != nil {
+	// COMPATv1.3.0
+	var err error
+	if build.VersionCmp(he.host.Version, build.Version) < 0 {
+		actions := []modules.V130RevisionAction{{
+			Type:        modules.ActionModify,
+			SectorIndex: uint64(index),
+			Offset:      offset,
+			Data:        newData,
+		}}
+		err = he.v130runRevisionIteration(actions, rev, newRoots)
+	} else {
+		actions := []modules.RevisionAction{{
+			Type:        modules.ActionModify,
+			SectorIndex: uint64(index),
+			Offset:      offset,
+			Data:        newData,
+		}}
+		err = he.runRevisionIteration(actions, rev, newRoots)
+	}
+	if err != nil {
 		return modules.RenterContract{}, err
 	}
 
