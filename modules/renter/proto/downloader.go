@@ -133,12 +133,17 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 // shutdown terminates the revision loop and signals the goroutine spawned in
 // NewDownloader to return.
 func (hd *Downloader) shutdown() {
+	// COMPATv1.3.0
+	// TODO change version before merging
+	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
 	if build.VersionCmp(hd.host.Version, build.Version) < 0 {
-		extendDeadline(hd.conn, modules.NegotiateSettingsTime)
-		// don't care about these errors
 		_, _ = verifySettings(hd.conn, hd.host)
+		_ = modules.WriteNegotiationStop(hd.conn)
+	}  else {
+		_ = encoding.WriteObject(hd.conn, modules.RevisionRequest{
+			Stop: true,
+		})
 	}
-	_ = modules.WriteNegotiationStop(hd.conn)
 	close(hd.closeChan)
 }
 

@@ -31,6 +31,9 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	if err != nil {
 		return extendErr("unable to read revision modifications: ", ErrorConnection(err.Error()))
 	}
+	if request.Stop {
+		return modules.ErrStopResponse // managedRPCReviseContract will catch this and exit gracefully
+	}
 
 	// Send the settings to the renter. The host will keep going even if it is
 	// not accepting contracts, because in this case the contract already

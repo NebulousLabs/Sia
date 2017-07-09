@@ -315,6 +315,7 @@ type (
 		Revision  types.FileContractRevision
 		Signature types.TransactionSignature
 		Actions   []RevisionAction
+		Stop      bool
 	}
 )
 

@@ -60,12 +60,15 @@ type Editor struct {
 func (he *Editor) shutdown() {
 	// COMPATv1.3.0
 	// TODO change version before merging
+	extendDeadline(he.conn, modules.NegotiateSettingsTime)
 	if build.VersionCmp(he.host.Version, build.Version) < 0 {
-		extendDeadline(he.conn, modules.NegotiateSettingsTime)
-		// don't care about these errors
 		_, _ = verifySettings(he.conn, he.host)
+		_ = modules.WriteNegotiationStop(he.conn)
+	} else {
+		_ = encoding.WriteObject(he.conn, modules.RevisionRequest{
+			Stop: true,
+		})
 	}
-	_ = modules.WriteNegotiationStop(he.conn)
 	close(he.closeChan)
 }
 
