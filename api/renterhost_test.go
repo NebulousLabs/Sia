@@ -1702,8 +1702,35 @@ func TestRedundancyReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Wait until the host shows back up in the hostdb.
+	var ah HostdbActiveGET
+	err = retry(200, 100*time.Millisecond, func() error {
+		err := st.getAPI("/hostdb/active", &ah)
+		if err != nil {
+			return err
+		}
+		if len(ah.Hosts) != 2 {
+			return errors.New("not enough hosts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine another block so that the contract checker updates the IsGood status
+	// of the contracts.
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Redundancy should re-report at 2.
-	err = retry(100, 500*time.Millisecond, func() error {
+	err = retry(250, 100*time.Millisecond, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
 			return nil
