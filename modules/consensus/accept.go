@@ -260,6 +260,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			// Try adding the block to consnesus.
 			changeEntry, err := cs.addBlockToTree(tx, blocks[i], parent)
 			if err == nil {
+				changes = append(changes, changeEntry)
 				chainExtended = true
 			}
 			if err == modules.ErrNonExtendingBlock {
@@ -274,7 +275,6 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 				panic("after adding a change entry, there are no applied blocks but there are reverted blocks")
 			}
 			// Append to the set of changes, and append the valid block.
-			changes = append(changes, changeEntry)
 			validBlocks = append(validBlocks, blocks[i])
 			parents = append(parents, parent)
 		}
@@ -322,7 +322,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 	}
 
 	// Sanity check - if we get here, len(changes) should be non-zero.
-	if build.DEBUG && len(changes) == 0 || len(changes) != len(validBlocks) {
+	if build.DEBUG && len(changes) == 0 {
 		panic("changes is empty, but this code should not be reached if no blocks got added")
 	}
 
