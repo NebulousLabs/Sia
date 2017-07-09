@@ -102,6 +102,7 @@ func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev typ
 	}
 
 	// send revision to host and exchange signatures
+	// TODO This might fail due to outdated host settings.Maybe try again with the newer ones received in negotiateRevision
 	signedTxn, err := negotiateRevision(he.host, he.conn, rev, he.contract.SecretKey, actions)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
@@ -385,7 +386,16 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 	// allot 2 minutes for RPC request + revision exchange
 	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
 	defer extendDeadline(conn, time.Hour)
-	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
+
+	// COMPATv1.3.0 choose the right specifier depending on the host version
+	var rpcSpecifier types.Specifier
+	if build.VersionCmp(host.Version, build.Version) < 0 {
+		rpcSpecifier = modules.V130RPCReviseContract
+	} else {
+		rpcSpecifier = modules.RPCReviseContract
+	}
+
+	if err := encoding.WriteObject(conn, rpcSpecifier); err != nil {
 		conn.Close()
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
