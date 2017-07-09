@@ -328,34 +328,9 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 
 	// Update the subscribers with all of the consensus changes. First combine
 	// the changes into a single set.
-	fullChange := changes[0]
-	for i := 1; i < len(changes); i++ {
-		// The consistency model of the modules will break if two different
-		// changes have reverted blocks in them, the modules strictly expect all
-		// the reverted blocks to be in order, followed by all of the applied
-		// blocks. This check ensures that rule is being followed.
-		if len(fullChange.RevertedBlocks) == 0 && len(fullChange.AppliedBlocks) == 0 {
-			// Only add reverted blocks if there have been no reverted blocks or
-			// applied blocks previously.
-			fullChange.RevertedBlocks = append(fullChange.RevertedBlocks, changes[i].RevertedBlocks...)
-		} else if build.DEBUG && len(changes[i].RevertedBlocks) != 0 {
-			// Sanity Check - if the aggregate change has reverted blocks, no
-			// more reverted blocks should appear in the set of changes. This is
-			// because the blocks are strictly children of eachother - the first
-			// one that extends the chain could cause reverted blocks, but the
-			// rest should not be able to.
-			panic("multi-block acceptance failed - reverted blocks on the final change?")
-		}
-
-		// Add all of the applied blocks.
-		fullChange.AppliedBlocks = append(fullChange.AppliedBlocks, changes[i].AppliedBlocks...)
+	for _, change := range changes {
+		cs.updateSubscribers(change)
 	}
-	// Sanity check - if we got here, the number of applied blocks should be
-	// non-zero.
-	if build.DEBUG && len(fullChange.AppliedBlocks) == 0 {
-		panic("should not be updating subscribers witha blank change")
-	}
-	cs.updateSubscribers(fullChange)
 
 	// If there were valid blocks and invalid blocks in the set that was
 	// provided, then the setErr is not going to be nil. Return the set error to

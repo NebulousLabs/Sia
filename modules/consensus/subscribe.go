@@ -207,7 +207,7 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 
 	// Add the module to the list of subscribers.
 	cs.mu.Lock()
-	// Check that this subscriber is not already subscribed.
+	// Sanity check - subscriber should not be already subscribed.
 	for _, s := range cs.subscribers {
 		if s == subscriber {
 			build.Critical("refusing to double-subscribe subscriber")
