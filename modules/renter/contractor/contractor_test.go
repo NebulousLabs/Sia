@@ -355,7 +355,7 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	clen := len(c.contracts)
+	clen = len(c.contracts)
 	c.mu.Unlock()
 	if clen != 2 {
 		t.Fatal("expected 2 contracts, got", len(c.contracts))
