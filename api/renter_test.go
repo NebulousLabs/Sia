@@ -1729,7 +1729,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 4; i++ {
 		_, err := st.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
