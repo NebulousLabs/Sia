@@ -70,9 +70,12 @@ func TestSynchronize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = cst2.gateway.Disconnect(cst1.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
 	for cst2.cs.dbBlockHeight() < cst1.cs.dbBlockHeight()+3+MaxCatchUpBlocks {
-		b, _ := cst2.miner.FindBlock()
-		err = cst2.cs.AcceptBlock(b)
+		_, err := cst2.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
