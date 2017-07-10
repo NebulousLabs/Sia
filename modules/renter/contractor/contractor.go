@@ -128,8 +128,13 @@ func (c *Contractor) CurrentPeriod() types.BlockHeight {
 
 // ResolveID returns the ID of the most recent renewal of id.
 func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
-	if newID, ok := c.renewedIDs[id]; ok && newID != id {
-		return c.ResolveID(newID)
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	newID, exists := c.renewedIDs[id]
+	for exists {
+		id = newID
+		newID, exists = c.renewedIDs[id]
 	}
 	return id
 }
