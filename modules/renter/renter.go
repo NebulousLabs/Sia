@@ -104,6 +104,10 @@ type hostContractor interface {
 	// insertion, deletion, and modification of sectors.
 	Editor(types.FileContractID, <-chan struct{}) (contractor.Editor, error)
 
+	// GoodForRenew indicates whether the contract line of the provided contract
+	// is actively being renewed.
+	GoodForRenew(types.FileContractID) bool
+
 	// IsOffline reports whether the specified host is considered offline.
 	IsOffline(types.FileContractID) bool
 

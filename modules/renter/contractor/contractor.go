@@ -139,6 +139,25 @@ func (c *Contractor) Close() error {
 	return c.tg.Stop()
 }
 
+// GoodForRenew indicates whether a contract line is currently being renewed.
+// The value returned is the value for the latest contract in the contract line.
+func (c *Contractor) GoodForRenew(id types.FileContractID) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	newID, exists := c.renewedIDs[id]
+	for exists {
+		id = newID
+		newID, exists = c.renewedIDs[id]
+	}
+
+	contract, exists := c.contracts[id]
+	if !exists {
+		return false
+	}
+	return contract.GoodForRenew
+}
+
 // New returns a new Contractor.
 func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, persistDir string) (*Contractor, error) {
 	// Check for nil inputs.

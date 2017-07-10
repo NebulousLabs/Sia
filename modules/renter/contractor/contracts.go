@@ -421,8 +421,12 @@ func (c *Contractor) threadedContractMaintenance() {
 				return
 			}
 			c.log.Printf("Renewed contract %v with %v\n", id, oldContract.NetAddress)
+			// Update the utility values for the new contract, and for the old
+			// contract.
 			newContract.GoodForUpload = true
 			newContract.GoodForRenew = true
+			oldContract.GoodForRenew = false
+			oldContract.GoodForUpload = false
 
 			// Lock the contractor as we update it to use the new contract
 			// instead of the old contract.
