@@ -36,6 +36,11 @@ var (
 	// consensus set, and blocks that may not have been fully validated yet.
 	BlockMap = []byte("BlockMap")
 
+	// HeaderMap is a database bucket containing all of the processed headers,
+	// keyed by their id. This includes headers that are not currently in the
+	// consensus set, and headers that may not have been fully validated yet.
+	HeaderMap = []byte("HeaderMap")
+
 	// BlockPath is a database bucket containing a mapping from the height of a
 	// block to the id of the block at that height. BlockPath only includes
 	// blocks in the current path.
@@ -87,6 +92,7 @@ func (cs *ConsensusSet) createConsensusDB(tx *bolt.Tx) error {
 	buckets := [][]byte{
 		BlockHeight,
 		BlockMap,
+		HeaderMap,
 		BlockPath,
 		Consistency,
 		SiacoinOutputs,
@@ -134,6 +140,11 @@ func (cs *ConsensusSet) createConsensusDB(tx *bolt.Tx) error {
 		cs.blockRoot.ConsensusChecksum = consensusChecksum(tx)
 	}
 	addBlockMap(tx, &cs.blockRoot)
+	addHeaderMap(tx, &processedHeader{
+		BlockHeader: cs.blockRoot.Block.Header(),
+		Height:      cs.blockRoot.Height,
+		Depth:       cs.blockRoot.Depth,
+	})
 	return nil
 }
 
@@ -179,6 +190,32 @@ func currentProcessedBlock(tx *bolt.Tx) *processedBlock {
 	return pb
 }
 
+// currentProcessedHeader returns the most recent header in the consensus set
+func currentProcessedHeader(tx *bolt.Tx) *processedHeader {
+	ph, err := getHeaderMap(tx, currentBlockID(tx))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return ph
+}
+
+// getHeaderMap returns a processed header with the input id.
+func getHeaderMap(tx *bolt.Tx, id types.BlockID) (*processedHeader, error) {
+	//look up the encoded header.
+	phBytes := tx.Bucket(HeaderMap).Get(id[:])
+	if phBytes == nil {
+		return nil, errNilItem
+	}
+
+	//Decode the header - should never fail.
+	var ph processedHeader
+	err := encoding.Unmarshal(phBytes, &ph)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return &ph, nil
+}
+
 // getBlockMap returns a processed block with the input id.
 func getBlockMap(tx *bolt.Tx, id types.BlockID) (*processedBlock, error) {
 	// Look up the encoded block.
@@ -200,6 +237,15 @@ func getBlockMap(tx *bolt.Tx, id types.BlockID) (*processedBlock, error) {
 func addBlockMap(tx *bolt.Tx, pb *processedBlock) {
 	id := pb.Block.ID()
 	err := tx.Bucket(BlockMap).Put(id[:], encoding.Marshal(*pb))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// addHeaderMap adds a processedHeader to the header map.
+func addHeaderMap(tx *bolt.Tx, ph *processedHeader) {
+	id := ph.BlockHeader.ID()
+	err := tx.Bucket(HeaderMap).Put(id[:], encoding.Marshal(*ph))
 	if build.DEBUG && err != nil {
 		panic(err)
 	}

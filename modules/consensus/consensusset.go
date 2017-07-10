@@ -23,6 +23,11 @@ var (
 	errNilGateway = errors.New("cannot have a nil gateway as input")
 )
 
+const (
+	sendHeaders = "SendHdrs"
+	sendHeader  = "SndHdr"
+)
+
 // marshaler marshals objects into byte slices and unmarshals byte
 // slices into objects.
 type marshaler interface {
@@ -92,12 +97,19 @@ type ConsensusSet struct {
 	mu         demotemutex.DemoteMutex
 	persistDir string
 	tg         sync.ThreadGroup
+
+	// If using Simplified Payment Verification mode
+	spv bool
+}
+
+func New(gateway modules.Gateway, bootstrap bool, persistDir string) (*ConsensusSet, error) {
+	return NewConsensus(gateway, bootstrap, persistDir, false)
 }
 
 // New returns a new ConsensusSet, containing at least the genesis block. If
 // there is an existing block database present in the persist directory, it
 // will be loaded.
-func New(gateway modules.Gateway, bootstrap bool, persistDir string) (*ConsensusSet, error) {
+func NewConsensus(gateway modules.Gateway, bootstrap bool, persistDir string, spv bool) (*ConsensusSet, error) {
 	// Check for nil dependencies.
 	if gateway == nil {
 		return nil, errNilGateway
@@ -122,6 +134,8 @@ func New(gateway modules.Gateway, bootstrap bool, persistDir string) (*Consensus
 		blockValidator:  NewBlockValidator(),
 
 		persistDir: persistDir,
+
+		spv: spv,
 	}
 
 	// Create the diffs for the genesis siafund outputs.
@@ -164,15 +178,32 @@ func New(gateway modules.Gateway, bootstrap bool, persistDir string) (*Consensus
 		defer cs.tg.Done()
 
 		// Register RPCs
-		gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)
+		if spv {
+			// If SPV mode, only register the header receiver RPC
+			gateway.RegisterConnectCall(sendHeaders, cs.threadedReceiveHeaders)
+		} else {
+			// If running a full node, register the full blockchain RPCs
+			gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)
+			gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
+			gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
+		}
+
+		// SPV nodes and full nodes will send headers and relay headers
+		gateway.RegisterRPC(sendHeaders, cs.rpcSendHeaders)
+		gateway.RegisterRPC(sendHeader, cs.rpcSendHeader)
 		gateway.RegisterRPC("RelayHeader", cs.threadedRPCRelayHeader)
-		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
-		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
+
 		cs.tg.OnStop(func() {
-			cs.gateway.UnregisterRPC("SendBlocks")
+			if spv {
+				cs.gateway.UnregisterConnectCall(sendHeaders)
+			} else {
+				cs.gateway.UnregisterRPC("SendBlocks")
+				cs.gateway.UnregisterRPC("SendBlk")
+				cs.gateway.UnregisterConnectCall("SendBlocks")
+			}
+			cs.gateway.UnregisterRPC(sendHeaders)
+			cs.gateway.UnregisterRPC(sendHeader)
 			cs.gateway.UnregisterRPC("RelayHeader")
-			cs.gateway.UnregisterRPC("SendBlk")
-			cs.gateway.UnregisterConnectCall("SendBlocks")
 		})
 
 		// Mark that we are synced with the network.
@@ -239,6 +270,19 @@ func (cs *ConsensusSet) managedCurrentBlock() (block types.Block) {
 		return nil
 	})
 	return block
+}
+
+// managedCurrentBlock returns the latest block in the heaviest known blockchain.
+func (cs *ConsensusSet) managedCurrentHeader() (header types.BlockHeader) {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		ph := currentProcessedHeader(tx)
+		header = ph.BlockHeader
+		return nil
+	})
+	return header
 }
 
 // CurrentBlock returns the latest block in the heaviest known blockchain.
@@ -335,7 +379,7 @@ func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp 
 		if err != nil {
 			return err
 		}
-		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb)
+		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb.Block.ID(), pb.Block.Timestamp)
 		exists = true
 		return nil
 	})

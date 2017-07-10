@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-
 	"github.com/NebulousLabs/bolt"
 )
 
@@ -43,6 +43,36 @@ func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 	return path
 }
 
+// backtrackToCurrentPath traces backwards from 'pb' until it reaches a block
+// in the ConsensusSet's current path (the "common parent"). It returns the
+// (inclusive) set of blocks between the common parent and 'pb', starting from
+// the former.
+func backtrackHeadersToCurrentPath(tx *bolt.Tx, ph *processedHeader) []*processedHeader {
+	path := []*processedHeader{ph}
+	for {
+		// Error is not checked in production code - an error can only indicate
+		// that pb.Height > blockHeight(tx).
+		currentPathID, err := getPath(tx, ph.Height)
+		if currentPathID == ph.BlockHeader.ID() {
+			break
+		}
+		// Sanity check - an error should only indicate that pb.Height >
+		// blockHeight(tx).
+		if build.DEBUG && err != nil && ph.Height <= blockHeight(tx) {
+			panic(err)
+		}
+
+		// Prepend the next block to the list of blocks leading from the
+		// current path to the input block.
+		ph, err = getHeaderMap(tx, ph.BlockHeader.ParentID)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
+		path = append([]*processedHeader{ph}, path...)
+	}
+	return path
+}
+
 // revertToBlock will revert blocks from the ConsensusSet's current path until
 // 'pb' is the current block. Blocks are returned in the order that they were
 // reverted.  'pb' is not reverted.
@@ -68,6 +98,33 @@ func (cs *ConsensusSet) revertToBlock(tx *bolt.Tx, pb *processedBlock) (reverted
 		}
 	}
 	return revertedBlocks
+}
+
+// revertToBlock will revert blocks from the ConsensusSet's current path until
+// 'ph' is the current block. Blocks are returned in the order that they were
+// reverted.  'ph' is not reverted.
+func (cs *ConsensusSet) revertToHeader(tx *bolt.Tx, ph *processedHeader) (revertedHeaders []*processedHeader) {
+	// Sanity check - make sure that pb is in the current path.
+	currentPathID, err := getPath(tx, ph.Height)
+	if build.DEBUG && (err != nil || currentPathID != ph.BlockHeader.ID()) {
+		panic(errExternalRevert)
+	}
+
+	// Rewind blocks until 'ph' is the current block.
+	curr := currentBlockID(tx)
+	for curr != ph.BlockHeader.ID() {
+		header := currentProcessedHeader(tx)
+		revertedHeaders = append(revertedHeaders, header)
+
+		// Sanity check - after removing a block, check that the consensus set
+		// has maintained consistency.
+		if build.Release == "testing" {
+			cs.checkConsistency(tx)
+		} else {
+			cs.maybeCheckConsistency(tx)
+		}
+	}
+	return revertedHeaders
 }
 
 // applyUntilBlock will successively apply the blocks between the consensus
@@ -101,6 +158,29 @@ func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (applie
 	return appliedBlocks, nil
 }
 
+// applyUntilBlock will successively apply the blocks between the consensus
+// set's current path and 'ph'.
+func (cs *ConsensusSet) applyUntilHeader(tx *bolt.Tx, ph *processedHeader) (headers []*processedHeader) {
+	// Backtrack to the common parent of 'bn' and current path and then apply the new blocks.
+	newPath := backtrackHeadersToCurrentPath(tx, ph)
+	for _, header := range newPath[1:] {
+		headerMap := tx.Bucket(HeaderMap)
+		id := ph.BlockHeader.ID()
+
+		headerMap.Put(id[:], encoding.Marshal(*header))
+		headers = append(headers, header)
+
+		// Sanity check - after applying a block, check that the consensus set
+		// has maintained consistency.
+		if build.Release == "testing" {
+			cs.checkConsistency(tx)
+		} else {
+			cs.maybeCheckConsistency(tx)
+		}
+	}
+	return headers
+}
+
 // forkBlockchain will move the consensus set onto the 'newBlock' fork. An
 // error will be returned if any of the blocks applied in the transition are
 // found to be invalid. forkBlockchain is atomic; the ConsensusSet is only
@@ -113,4 +193,15 @@ func (cs *ConsensusSet) forkBlockchain(tx *bolt.Tx, newBlock *processedBlock) (r
 		return nil, nil, err
 	}
 	return revertedBlocks, appliedBlocks, nil
+}
+
+// forkBlockchain will move the consensus set onto the 'newHeaders' fork. An
+// error will be returned if any of the blocks headers in the transition are
+// found to be invalid. forkHeadersBlockchain is atomic; the ConsensusSet is only
+// updated if the function returns nil.
+func (cs *ConsensusSet) forkHeadersBlockchain(tx *bolt.Tx, newHeader *processedHeader) (revertedBlocks, appliedHeaders []*processedHeader) {
+	commonParent := backtrackHeadersToCurrentPath(tx, newHeader)[0]
+	revertedBlocks = cs.revertToHeader(tx, commonParent)
+	appliedHeaders = cs.applyUntilHeader(tx, newHeader)
+	return revertedBlocks, appliedHeaders
 }
