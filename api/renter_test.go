@@ -1733,6 +1733,18 @@ func TestContractorHostRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Block until redundancy is restored to 2.
+	err = retry(120, 250*time.Millisecond, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+			return nil
+		}
+		return errors.New("file not uploaded to full redundancy")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Grab the old contracts, then mine blocks to trigger a renew, and then
 	// wait until the renew is complete.
 	err = st.getAPI("/renter/contracts", &rc)
