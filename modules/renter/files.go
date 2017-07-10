@@ -212,7 +212,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 		offline := r.hostContractor.IsOffline(id)
 		contract, exists := r.hostContractor.ContractByID(id)
 		if !exists {
-			return false
+			return true
 		}
 		return offline || !contract.GoodForRenew
 	}

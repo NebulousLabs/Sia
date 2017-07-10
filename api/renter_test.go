@@ -1736,7 +1736,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	// Block until redundancy is restored to 2.
 	err = retry(120, 250*time.Millisecond, func() error {
 		st.getAPI("/renter/files", &rf)
-		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+		if len(rf.Files) == 1 && rf.Files[0].Redundancy == 2 {
 			return nil
 		}
 		return errors.New("file not uploaded to full redundancy")
@@ -1751,7 +1751,13 @@ func TestContractorHostRemoval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 6; i++ {
+	// Check the amount of data in each contract.
+	for _, contract := range rc.Contracts {
+		if contract.Size != modules.SectorSize {
+			t.Error("Each contrat should have 1 sector:", contract.Size, contract.ID)
+		}
+	}
+	for i := 0; i < 5; i++ {
 		_, err := st.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -1797,17 +1803,12 @@ func TestContractorHostRemoval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Block until redundancy is 2. Redundancy should not go above 2.
-	err = retry(120, 250*time.Millisecond, func() error {
-		st.getAPI("/renter/files", &rf)
-		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
-			return nil
+	// The renewing process should not have resulted in additional data being
+	// uploaded - it should be the same data in the contracts.
+	for _, contract := range rc2.Contracts {
+		if contract.Size != modules.SectorSize {
+			t.Error("Contract has the wrong size:", contract.Size)
 		}
-		return errors.New("file not uploaded to full redundancy")
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	// Try again to download the file we uploaded. It should still be
