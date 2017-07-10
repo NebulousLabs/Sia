@@ -87,8 +87,8 @@ func announceAllHosts(sts []*serverTester) error {
 		}
 		time.Sleep(time.Millisecond * 100)
 	}
-	if len(sts[0].tpool.TransactionList()) != len(sts)*2+initialTpoolSize {
-		return fmt.Errorf("Host announcements do not seem to have propagated to the leader's tpool: %v, %v", len(sts), len(sts[0].tpool.TransactionList())+initialTpoolSize)
+	if len(sts[0].tpool.TransactionList()) < len(sts)*2+initialTpoolSize {
+		return fmt.Errorf("Host announcements do not seem to have propagated to the leader's tpool: %v, %v, %v", len(sts), len(sts[0].tpool.TransactionList())+initialTpoolSize, initialTpoolSize)
 	}
 
 	// Mine a block and then wait for all of the nodes to syncrhonize to it.
