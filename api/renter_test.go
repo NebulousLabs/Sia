@@ -1601,7 +1601,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
 	uploadValues.Set("datapieces", "1")
-	uploadValues.Set("paritypieces", "5")
+	uploadValues.Set("paritypieces", "1")
 	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
@@ -1869,7 +1869,7 @@ func TestContractorHostRemoval(t *testing.T) {
 		return errors.New("file not uploaded to full redundancy")
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, "::", rf.Files[0].Redundancy)
 	}
 
 	// Try again to download the file we uploaded. It should still be
@@ -1885,5 +1885,17 @@ func TestContractorHostRemoval(t *testing.T) {
 	}
 	if !bytes.Equal(downloadBytes3, origBytes) {
 		t.Fatal("downloaded file and uploaded file do not match")
+	}
+
+	// Check that the amount of data in each contract has remained at the
+	// correct amount - just one sector each.
+	err = st.getAPI("/renter/contracts", &rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, contract := range rc.Contracts {
+		if contract.Size != modules.SectorSize {
+			t.Error("Each contrat should have 1 sector:", contract.Size, contract.ID)
+		}
 	}
 }

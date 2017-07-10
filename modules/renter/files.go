@@ -209,6 +209,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 	r.mu.RUnlock(lockID)
 
 	isOffline := func(id types.FileContractID) bool {
+		id = r.hostContractor.ResolveID(id)
 		offline := r.hostContractor.IsOffline(id)
 		contract, exists := r.hostContractor.ContractByID(id)
 		if !exists {

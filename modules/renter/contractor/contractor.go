@@ -139,17 +139,10 @@ func (c *Contractor) Close() error {
 	return c.tg.Stop()
 }
 
-// GoodForRenew indicates whether a contract line is currently being renewed.
-// The value returned is the value for the latest contract in the contract line.
+// GoodForRenew indicates whether a contract is intended to be renewed.
 func (c *Contractor) GoodForRenew(id types.FileContractID) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-
-	newID, exists := c.renewedIDs[id]
-	for exists {
-		id = newID
-		newID, exists = c.renewedIDs[id]
-	}
 
 	contract, exists := c.contracts[id]
 	if !exists {
