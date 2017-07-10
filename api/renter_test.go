@@ -1709,13 +1709,23 @@ func TestContractorHostRemoval(t *testing.T) {
 
 	// Verify that st and stH1 are dropped in favor of the newer, better hosts.
 	err = build.Retry(50, time.Millisecond*250, func() error {
-		var rc RenterContracts
+		var newContracts int
 		err = st.getAPI("/renter/contracts", &rc)
 		if err != nil {
 			return errors.New("couldn't get renter stats")
 		}
-		if len(rc.Contracts) != 4 {
-			return fmt.Errorf("contracts: %v", len(rc.Contracts))
+		hostMap := make(map[string]struct{})
+		hostMap[rc1Host] = struct{}{}
+		hostMap[rc2Host] = struct{}{}
+		for _, contract := range rc.Contracts {
+			_, exists := hostMap[contract.HostPublicKey.String()]
+			if !exists {
+				newContracts++
+				hostMap[contract.HostPublicKey.String()] = struct{}{}
+			}
+		}
+		if newContracts != 2 {
+			return fmt.Errorf("not the right number of new contracts: %v", newContracts)
 		}
 		return nil
 	})
@@ -1729,7 +1739,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 6; i++ {
 		_, err := st.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -1746,9 +1756,6 @@ func TestContractorHostRemoval(t *testing.T) {
 		if err != nil {
 			return errors.New("couldn't get renter stats")
 		}
-		if len(rc2.Contracts) != 4 {
-			return fmt.Errorf("%v", len(rc2.Contracts))
-		}
 
 		// Check that at least 2 contracts are different between rc and rc2.
 		tracker := make(map[types.FileContractID]struct{})
@@ -1756,16 +1763,22 @@ func TestContractorHostRemoval(t *testing.T) {
 		for _, contract := range rc.Contracts {
 			tracker[contract.ID] = struct{}{}
 		}
-		// Count the number of matches. Looking for 2.
-		var matches int
+		// Count the number of contracts that were not seen in the previous
+		// batch of contracts, and check that the new contracts are not with the
+		// expensive hosts.
+		var unseen int
 		for _, contract := range rc2.Contracts {
 			_, exists := tracker[contract.ID]
-			if exists {
-				matches++
+			if !exists {
+				unseen++
+				tracker[contract.ID] = struct{}{}
+				if contract.HostPublicKey.String() == rc1Host || contract.HostPublicKey.String() == rc2Host {
+					return errors.New("the wrong contracts are being renewed")
+				}
 			}
 		}
-		if matches != 2 {
-			return fmt.Errorf("doesn't seem like renewal completed: %v", matches)
+		if unseen != 2 {
+			return fmt.Errorf("the wrong number of contracts seem to be getting renewed")
 		}
 		return nil
 	})
@@ -1785,8 +1798,8 @@ func TestContractorHostRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Mine out the rest of the blocks so that the bad contracts expire.
-	for i := 0; i < 10; i++ {
+	// Mine out another set of the blocks so that the bad contracts expire.
+	for i := 0; i < 6; i++ {
 		_, err := st.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
