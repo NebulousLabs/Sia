@@ -205,29 +205,9 @@ type journalUpdate interface {
 }
 
 type marshaledUpdate struct {
-	Type     string      `json:"type"`
-	Data     rawJSON     `json:"data"`
-	Checksum crypto.Hash `json:"checksum"`
-}
-
-// TODO: replace with json.RawMessage after upgrading to Go 1.8
-type rawJSON []byte
-
-// MarshalJSON returns r as the JSON encoding of r.
-func (r rawJSON) MarshalJSON() ([]byte, error) {
-	if r == nil {
-		return []byte("null"), nil
-	}
-	return r, nil
-}
-
-// UnmarshalJSON sets *r to a copy of data.
-func (r *rawJSON) UnmarshalJSON(data []byte) error {
-	if r == nil {
-		return errors.New("rawJSON: UnmarshalJSON on nil pointer")
-	}
-	*r = append((*r)[:0], data...)
-	return nil
+	Type     string          `json:"type"`
+	Data     json.RawMessage `json:"data"`
+	Checksum crypto.Hash     `json:"checksum"`
 }
 
 type updateSet []journalUpdate
