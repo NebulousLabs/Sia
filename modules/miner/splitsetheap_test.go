@@ -18,14 +18,12 @@ func TestMapHeapSimple(t *testing.T) {
 		size:     0,
 		minHeap:  false,
 	}
-
 	min := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
 		data:     make([]*mapElement, 0),
 		size:     0,
 		minHeap:  true,
 	}
-
 	max.Init()
 	min.Init()
 
@@ -62,15 +60,12 @@ func TestMapHeapSimple(t *testing.T) {
 		if int(maxPop.id) != 999-i {
 			t.Error("Unexpected splitSetID in result from max-heap pop.")
 		}
-
 		if int(minPop.id) != i {
 			t.Error("Unexpected splitSetID in result from min-heap pop.")
 		}
-
 		if maxPop.set.averageFee.Cmp(types.SiacoinPrecision.Mul64(uint64(999-i))) != 0 {
 			t.Error("Unexpected currency value in result from max-heap pop.")
 		}
-
 		if minPop.set.averageFee.Cmp(types.SiacoinPrecision.Mul64(uint64(i))) != 0 {
 			t.Error("Unexpected currency value in result from min-heap pop.")
 		}
@@ -87,14 +82,12 @@ func TestMapHeapSize(t *testing.T) {
 		size:     0,
 		minHeap:  false,
 	}
-
 	min := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
 		data:     make([]*mapElement, 0),
 		size:     0,
 		minHeap:  true,
 	}
-
 	max.Init()
 	min.Init()
 
@@ -142,7 +135,6 @@ func TestMapHeapSize(t *testing.T) {
 			t.Log(i)
 			t.Error("Unexpected set size in result from max-heap pop.")
 		}
-
 		if minPop.set.size != uint64(100*i) {
 			t.Log(i)
 			t.Error("Unexpected set size in result from min-heap pop.")
@@ -161,14 +153,12 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 		size:     0,
 		minHeap:  false,
 	}
-
 	min := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
 		data:     make([]*mapElement, 0),
 		size:     0,
 		minHeap:  true,
 	}
-
 	max.Init()
 	min.Init()
 
@@ -222,27 +212,22 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 	if !inMinHeap || !inMaxHeap {
 		t.Error("Element not found in heap(s) before being removed by splitSetID.")
 	}
-
 	if max.selectID[randID] == nil || min.selectID[randID] == nil {
 		t.Error("Element not found in map(s) before being removed by splitSetID")
 	}
 
 	minSizeBefore := min.size
 	maxSizeBefore := max.size
-
 	minRemovedSetSize := min.selectID[randID].set.size
 	maxRemovedSetSize := max.selectID[randID].set.size
 
 	max.RemoveSetByID(randID)
 	min.RemoveSetByID(randID)
-
 	minSizeAfter := min.size
 	maxSizeAfter := max.size
-
 	if minSizeBefore-minRemovedSetSize != minSizeAfter {
 		t.Error("unexpected difference in size after removing from min heap.")
 	}
-
 	if maxSizeBefore-maxRemovedSetSize != maxSizeAfter {
 		t.Error("unexpected difference in size after removing from max heap.")
 	}
@@ -263,15 +248,12 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 			break
 		}
 	}
-
 	if !removedFromMin {
 		t.Error("Element found in  min heap(s) after being removed by splitSetID.")
 	}
-
 	if !removedFromMax {
 		t.Error("Element found in  max heap(s) after being removed by splitSetID.")
 	}
-
 	_, inMinMap := min.selectID[randID]
 	_, inMaxMap := max.selectID[randID]
 	if inMinMap {
@@ -280,7 +262,6 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 	if inMaxMap {
 		t.Error("Element found in max map(s) after being removed by splitSetID")
 	}
-
 }
 
 // TestMapHeapPeek test the Peek method. First, on an empty heap Peek should
@@ -293,14 +274,12 @@ func TestMapHeapPeek(t *testing.T) {
 		size:     0,
 		minHeap:  false,
 	}
-
 	min := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
 		data:     make([]*mapElement, 0),
 		size:     0,
 		minHeap:  true,
 	}
-
 	max.Init()
 	min.Init()
 
@@ -309,18 +288,14 @@ func TestMapHeapPeek(t *testing.T) {
 
 	_, maxNotEmpty := max.Peek()
 	_, minNotEmpty := min.Peek()
-
 	minSizeAfter := min.size
 	maxSizeAfter := max.size
-
 	if maxNotEmpty {
 		t.Error("Unexpected result from max.Peek(), heap not empty")
 	}
-
 	if minNotEmpty {
 		t.Error("Unexpected result from max.Peek(), heap not empty")
 	}
-
 	if minSizeBefore != minSizeAfter || maxSizeBefore != maxSizeAfter {
 		t.Error("expected heap size not to change from peek.")
 	}
@@ -356,40 +331,31 @@ func TestMapHeapPeek(t *testing.T) {
 
 		maxPeek, maxNotEmpty := max.Peek()
 		minPeek, minNotEmpty := min.Peek()
-
 		minSizeAfter := min.size
 		maxSizeAfter := max.size
-
 		if minSizeBefore != minSizeAfter || maxSizeBefore != maxSizeAfter {
 			t.Error("expected heap size not to change from peek.")
 		}
-
 		if !maxNotEmpty {
 			t.Error("Unexpected result from max.Peek(), heap empty after pushes")
 		}
-
 		if !minNotEmpty {
 			t.Error("Unexpected result from max.Peek(), heap empty after pushes")
 		}
 
 		maxPop := max.Pop()
 		minPop := min.Pop()
-
 		if int(maxPop.id) != int(maxPeek.id) {
 			t.Error("Unexpected splitSetID in result from max-heap Peek.")
 		}
-
 		if int(minPop.id) != int(minPeek.id) {
 			t.Error("Unexpected splitSetID in result from min-heap Peek.")
 		}
-
 		if maxPop.set.averageFee.Cmp(maxPeek.set.averageFee) != 0 {
 			t.Error("Unexpected currency value in result from max-heap Peek.")
 		}
-
 		if minPop.set.averageFee.Cmp(minPeek.set.averageFee) != 0 {
 			t.Error("Unexpected currency value in result from min-heap Peek.")
 		}
 	}
-
 }

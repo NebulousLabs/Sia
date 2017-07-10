@@ -58,7 +58,6 @@ func (mh *mapHeap) down(i0, n int) bool {
 		// If the right child (j2) of the element at index i (the sibling of j),
 		// is within the bounds of the heap and satisfies
 		if j2 := j1 + 1; j2 < n && !mh.Less(j1, j2) {
-
 			j = j2 // = 2*i + 2  // right child
 		}
 

@@ -88,10 +88,10 @@ type Miner struct {
 
 	// Transaction pool variables.
 	fullSets        map[modules.TransactionSetID][]int
-	setCounter      int
-	splitSets       map[splitSetID]*splitSet
 	blockMapHeap    *mapHeap
 	overflowMapHeap *mapHeap
+	setCounter      int
+	splitSets       map[splitSetID]*splitSet
 
 	// CPUMiner variables.
 	miningOn bool  // indicates if the miner is supposed to be running
@@ -173,13 +173,11 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		blockMapHeap: &mapHeap{
 			selectID: make(map[splitSetID]*mapElement),
 			data:     make([]*mapElement, 0),
-			size:     uint64(0),
 			minHeap:  true,
 		},
 		overflowMapHeap: &mapHeap{
 			selectID: make(map[splitSetID]*mapElement),
 			data:     make([]*mapElement, 0),
-			size:     uint64(0),
 			minHeap:  false,
 		},
 

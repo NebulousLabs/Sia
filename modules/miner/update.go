@@ -6,8 +6,7 @@ import (
 )
 
 // getNewSplitSets creates split sets from a transaction pool diff, returns them
-// in a slice of map elements, and adjusts the miner's data to reflect the new
-// additions.
+// in a slice of map elements. Does not update the miner's global state.
 func (m *Miner) getNewSplitSets(diff *modules.TransactionPoolDiff) []*mapElement {
 	// Split the new sets and add the splits to the list of transactions we pull
 	// form.
@@ -39,8 +38,6 @@ func (m *Miner) getNewSplitSets(diff *modules.TransactionPoolDiff) []*mapElement
 			id:    splitSetID(m.setCounter),
 			index: 0,
 		}
-
-		m.splitSets[splitSetID(m.setCounter)] = s
 		newElements = append(newElements, elem)
 	}
 	return newElements
@@ -72,7 +69,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 			// Place candidate into block,
 			m.blockMapHeap.Push(elem)
 
-			// Places transactions removed from block heap into
+			// Place transactions removed from block heap into
 			// the overflow heap.
 			for _, v := range bottomSets {
 				m.overflowMapHeap.Push(v)
@@ -91,7 +88,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 			for _, v := range bottomSets {
 				m.blockMapHeap.Push(v)
 			}
-			// Go to the next candidate set.
+			// Finished with this candidate set.
 			break
 		}
 		// Add the set to the bottomSets slice. Note that we don't increase
@@ -115,21 +112,24 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 			for _, v := range bottomSets {
 				m.blockMapHeap.Push(v)
 			}
-			// Go to the next candidate set.
+			// Finished with this candidate set.
 			break
 		}
-
 	}
 }
 
 // addNewTxns adds new unconfirmed transactions to the miner's transaction
-// selection.
+// selection and updates the splitSet and mapElement state of the miner.
 func (m *Miner) addNewTxns(diff *modules.TransactionPoolDiff) {
 	// Get new splitSets (in form of mapElement)
 	newElements := m.getNewSplitSets(diff)
 
 	// Place each elem in one of the MapHeaps.
 	for i := 0; i < len(newElements); i++ {
+		// Add splitSet to miner's global state using pointer and ID stored in
+		// the mapElement and then add the mapElement to the miner's global
+		// state.
+		m.splitSets[newElements[i].id] = newElements[i].set
 		m.addMapElementTxns(newElements[i])
 	}
 }

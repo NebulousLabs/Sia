@@ -633,33 +633,25 @@ func TestHeapFees(t *testing.T) {
 		t.Error("totalFee2 different than expected fee.", totalFee2.String(), expectedFee2.String())
 		//t.Log(totalFee2.Sub(expectedFee2).HumanString())
 	}
-
 	if avgFee1.Cmp(avgFee2) <= 0 {
 		t.Error("Expected average fee from first block to be greater than average fee from second block.")
 	}
-
 	if totalFee1.Cmp(totalFee2) <= 0 {
 		t.Error("Expected total fee from first block to be greater than total fee from second block.")
 	}
-
 	if numTxns1 < numTxns2 {
 		t.Error("Expected more transactions in the first block than second block.")
 	}
-
 	if maxFee1.Cmp(maxFee2) <= 0 {
 		t.Error("Expected highest fee from first block to be greater than highest fee from second block.")
 	}
-
 	if minFee1.Cmp(maxFee2) < 0 {
 		t.Error("Expected lowest fee from first block to be greater than or equal to than highest fee from second block.")
 	}
-
 	if maxFee1.Cmp(minFee1) <= 0 {
 		t.Error("Expected highest fee from first block to be greater than lowest fee from first block.")
 	}
-
 	if maxFee2.Cmp(minFee2) <= 0 {
 		t.Error("Expected highest fee from second block to be greater than lowest fee from second block.")
 	}
-
 }
