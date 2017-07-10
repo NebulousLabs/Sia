@@ -35,8 +35,19 @@ func (c *Contractor) IsOffline(id types.FileContractID) bool {
 }
 
 // isOffline indicates whether a contract's host should be considered offline,
-// based on its scan metrics.
+// based on its scan metrics. The whole contract line will be considered.
 func (c *Contractor) isOffline(id types.FileContractID) bool {
+	// Update the ID to follow to the most recent contract in this contract
+	// line.
+	newID, exists := c.renewedIDs[id]
+	for exists {
+		id = newID
+		newID, exists = c.renewedIDs[id]
+	}
+
+	// Fetch the corresponding contract in the contractor. If the most recent
+	// contract is not in the contractors set of active contracts, this contract
+	// line is dead, and thus the contract should be considered 'offline'.
 	contract, ok := c.contracts[id]
 	if !ok {
 		return true
