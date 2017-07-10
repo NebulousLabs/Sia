@@ -273,9 +273,9 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		// Determine the set of useful workers - workers that are both
 		// available and able to repair this chunk.
 		var usefulWorkers []types.FileContractID
-		for workerID := range rs.availableWorkers {
+		for workerID, worker := range rs.availableWorkers {
 			_, exists := chunkStatus.contracts[workerID]
-			if !exists {
+			if !exists && worker.contract.GoodForUpload {
 				usefulWorkers = append(usefulWorkers, workerID)
 			}
 		}
