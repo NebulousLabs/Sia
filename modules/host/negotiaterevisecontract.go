@@ -94,11 +94,9 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 			}
 
 			// If the action requires additional data request it from the renter
-			// TODO should we reply with ACCEPT here?
 			var data []byte
 			if action.Type == modules.ActionInsert || action.Type == modules.ActionModify {
-				err := encoding.ReadObject(conn, &data, modules.SectorSize + 8)
-				if err != nil {
+				if err := encoding.ReadObject(conn, &data, modules.SectorSize + 8); err != nil {
 					return extendErr("unable to read data for action: ", ErrorConnection(err.Error()))
 				}
 			}
@@ -175,6 +173,12 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 
 			default:
 				return errUnknownModification
+			}
+			// If the action required additional data let the renter know that it was valid
+			if action.Type == modules.ActionInsert || action.Type == modules.ActionModify {
+				if err := modules.WriteNegotiationAcceptance(conn); err != nil {
+					return extendErr("unable to send acceptance for data: ", ErrorConnection(err.Error()))
+				}
 			}
 		}
 		newRevenue := storageRevenue.Add(uploadRevenue).Add(downloadRevenue)

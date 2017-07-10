@@ -152,6 +152,10 @@ func negotiateRevision(host modules.HostDBEntry, conn net.Conn, rev types.FileCo
 		if err := encoding.WriteObject(conn, d); err != nil {
 			return types.Transaction{}, errors.New("couldn't send data: " + err.Error())
 		}
+		// check if host accepted the data
+		if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+			return types.Transaction{}, errors.New("host didn't accept send data: " + err.Error())
+		}
 	}
 
 	// read the host's acceptance and transaction signature
