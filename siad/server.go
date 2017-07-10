@@ -399,7 +399,7 @@ func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, e
 
 			// IdleTimeout defines the maximum duration a HTTP Keep-Alive connection
 			// the API is kept open with no activity before closing.
-			IdleTimeout: time.Minute * 5,
+			IdleTimeout: time.Second * 20,
 		},
 	}
 
