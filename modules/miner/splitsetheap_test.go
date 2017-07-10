@@ -132,11 +132,9 @@ func TestMapHeapSize(t *testing.T) {
 		minPop := min.Pop()
 
 		if maxPop.set.size != uint64(100*(999-i)) {
-			t.Log(i)
 			t.Error("Unexpected set size in result from max-heap pop.")
 		}
 		if minPop.set.size != uint64(100*i) {
-			t.Log(i)
 			t.Error("Unexpected set size in result from min-heap pop.")
 		}
 
@@ -196,14 +194,12 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 	inMinHeap := false
 	for _, v := range max.data {
 		if v.id == firstToBeRemoved.id {
-			t.Log(v)
 			inMaxHeap = true
 			break
 		}
 	}
 	for _, v := range min.data {
 		if v.id == firstToBeRemoved.id {
-			t.Log(v)
 			inMinHeap = true
 			break
 		}
