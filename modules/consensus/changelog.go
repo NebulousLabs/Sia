@@ -40,8 +40,8 @@ var (
 type (
 	// changeEntry records a single atomic change to the consensus set.
 	changeEntry struct {
-		RevertedBlocks []types.BlockID
-		AppliedBlocks  []types.BlockID
+		RevertedBlockIDs []types.BlockID
+		AppliedBlockIDs  []types.BlockID
 	}
 
 	// changeNode contains a change entry and a pointer to the next change
@@ -157,6 +157,6 @@ func (cs *ConsensusSet) createChangeLog(tx *bolt.Tx) error {
 // genesisEntry returns the id of the genesis block log entry.
 func (cs *ConsensusSet) genesisEntry() changeEntry {
 	return changeEntry{
-		AppliedBlocks: []types.BlockID{cs.blockRoot.Block.ID()},
+		AppliedBlockIDs: []types.BlockID{cs.blockRoot.Block.ID()},
 	}
 }

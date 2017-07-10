@@ -13,7 +13,7 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 	cc := modules.ConsensusChange{
 		ID: ce.ID(),
 	}
-	for _, revertedBlockID := range ce.RevertedBlocks {
+	for _, revertedBlockID := range ce.RevertedBlockIDs {
 		revertedBlock, err := getBlockMap(tx, revertedBlockID)
 		if err != nil {
 			cs.log.Critical("getBlockMap failed in computeConsensusChange:", err)
@@ -49,7 +49,7 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
-	for _, appliedBlockID := range ce.AppliedBlocks {
+	for _, appliedBlockID := range ce.AppliedBlockIDs {
 		appliedBlock, err := getBlockMap(tx, appliedBlockID)
 		if err != nil {
 			cs.log.Critical("getBlockMap failed in computeConsensusChange:", err)
@@ -75,13 +75,13 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 	}
 
 	// Grab the child target and the minimum valid child timestamp.
-	recentBlock := ce.AppliedBlocks[len(ce.AppliedBlocks)-1]
+	recentBlock := ce.AppliedBlockIDs[len(ce.AppliedBlockIDs)-1]
 	pb, err := getBlockMap(tx, recentBlock)
 	if err != nil {
 		cs.log.Critical("could not find process block for known block")
 	}
 	cc.ChildTarget = pb.ChildTarget
-	cc.MinimumValidChildTimestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb)
+	cc.MinimumValidChildTimestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb.Block.ID(), pb.Block.Timestamp)
 
 	currentBlock := currentBlockID(tx)
 	if cs.synced && recentBlock == currentBlock {

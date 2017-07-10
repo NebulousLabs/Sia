@@ -45,6 +45,7 @@ type Config struct {
 		Profile    string
 		ProfileDir string
 		SiaDir     string
+		Spv        bool
 	}
 }
 
@@ -168,6 +169,7 @@ func main() {
 	root.Flags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghrtw", "enabled modules, see 'siad modules' for more info")
 	root.Flags().BoolVarP(&globalConfig.Siad.AuthenticateAPI, "authenticate-api", "", false, "enable API password protection")
 	root.Flags().BoolVarP(&globalConfig.Siad.AllowAPIBind, "disable-api-security", "", false, "allow siad to listen on a non-localhost address (DANGEROUS)")
+	root.Flags().BoolVarP(&globalConfig.Siad.Spv, "spv", "", false, "enable SPV mode")
 
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.

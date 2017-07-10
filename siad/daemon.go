@@ -167,7 +167,7 @@ func startDaemon(config Config) (err error) {
 	if strings.Contains(config.Siad.Modules, "c") {
 		i++
 		fmt.Printf("(%d/%d) Loading consensus...\n", i, len(config.Siad.Modules))
-		cs, err = consensus.New(g, !config.Siad.NoBootstrap, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
+		cs, err = consensus.NewConsensus(g, !config.Siad.NoBootstrap, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir), config.Siad.Spv)
 		if err != nil {
 			return err
 		}

@@ -10,7 +10,7 @@ import (
 // blockRuleHelper assists with block validity checks by calculating values
 // on blocks that are relevant to validity rules.
 type blockRuleHelper interface {
-	minimumValidChildTimestamp(dbBucket, *processedBlock) types.Timestamp
+	minimumValidChildTimestamp(blockMap dbBucket, parentID types.BlockID, blockTimestamp types.Timestamp) types.Timestamp
 }
 
 // stdBlockRuleHelper is the standard implementation of blockRuleHelper.
@@ -22,15 +22,14 @@ type stdBlockRuleHelper struct{}
 //
 // To boost performance, minimumValidChildTimestamp is passed a bucket that it
 // can use from inside of a boltdb transaction.
-func (rh stdBlockRuleHelper) minimumValidChildTimestamp(blockMap dbBucket, pb *processedBlock) types.Timestamp {
+func (rh stdBlockRuleHelper) minimumValidChildTimestamp(blockMap dbBucket, parentID types.BlockID, blockTimestamp types.Timestamp) types.Timestamp {
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
-	windowTimes[0] = pb.Block.Timestamp
-	parent := pb.Block.ParentID
+	windowTimes[0] = blockTimestamp
 	for i := uint64(1); i < types.MedianTimestampWindow; i++ {
 		// If the genesis block is 'parent', use the genesis block timestamp
 		// for all remaining times.
-		if parent == (types.BlockID{}) {
+		if parentID == (types.BlockID{}) {
 			windowTimes[i] = windowTimes[i-1]
 			continue
 		}
@@ -40,8 +39,8 @@ func (rh stdBlockRuleHelper) minimumValidChildTimestamp(blockMap dbBucket, pb *p
 		// information. This provides a performance boost. The id of the next
 		// parent lies at the first 32 bytes, and the timestamp of the block
 		// lies at bytes 40-48.
-		parentBytes := blockMap.Get(parent[:])
-		copy(parent[:], parentBytes[:32])
+		parentBytes := blockMap.Get(parentID[:])
+		copy(parentID[:], parentBytes[:32])
 		windowTimes[i] = types.Timestamp(encoding.DecUint64(parentBytes[40:48]))
 	}
 	sort.Sort(windowTimes)
