@@ -306,7 +306,7 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 		conn.Close()
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
-	if err := verifyRecentRevision(conn, contract); err != nil {
+	if err := verifyRecentRevision(conn, contract, host.Version); err != nil {
 		conn.Close() // TODO: close gracefully if host has entered revision loop
 		return nil, err
 	}
