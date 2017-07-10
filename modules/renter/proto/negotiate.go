@@ -114,7 +114,7 @@ func verifyRecentRevision(conn net.Conn, contract modules.RenterContract, hostVe
 
 // negotiateRevision sends a revision and actions to the host for approval,
 // completing one iteration of the revision loop.
-func negotiateRevision(host modules.HostDBEntry, conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, actions []modules.RevisionAction) (types.Transaction, error) {
+func negotiateRevision(host modules.HostDBEntry, conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, actions []modules.RevisionAction, data [][]byte) (types.Transaction, error) {
 	// create transaction containing the revision
 	signedTxn := types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{rev},
@@ -132,15 +132,26 @@ func negotiateRevision(host modules.HostDBEntry, conn net.Conn, rev types.FileCo
 	request := modules.RevisionRequest{
 		Revision:  rev,
 		Signature: signedTxn.TransactionSignatures[0],
-		Actions:   actions,
 	}
 	if err := encoding.WriteObject(conn, request); err != nil {
 		return types.Transaction{}, errors.New("couldn't send request: " + err.Error())
 	}
 
+	// send the actions
+	if err := encoding.WriteObject(conn, actions); err != nil {
+		return types.Transaction{}, errors.New("couldn't send actions: " + err.Error())
+	}
+
 	// read the host's settings and confirm that the new values are acceptable
 	if _, err := verifySettings(conn, host); err != nil {
 		return types.Transaction{}, errors.New("couldn't verify host's settings: " + err.Error())
+	}
+
+	// send additional data if necessary
+	for _, d := range data {
+		if err := encoding.WriteObject(conn, d); err != nil {
+			return types.Transaction{}, errors.New("couldn't send data: " + err.Error())
+		}
 	}
 
 	// read the host's acceptance and transaction signature

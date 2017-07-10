@@ -300,7 +300,6 @@ type (
 	// requires a full sector to be uploaded, and a modify can be just a few
 	// kb, which can be significantly faster.
 	RevisionAction struct {
-		Data        []byte
 		Length      uint64
 		MerkleRoot  crypto.Hash
 		Offset      uint64
@@ -314,7 +313,6 @@ type (
 	RevisionRequest struct {
 		Revision  types.FileContractRevision
 		Signature types.TransactionSignature
-		Actions   []RevisionAction
 		Stop      bool
 	}
 )

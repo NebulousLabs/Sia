@@ -96,7 +96,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 			MerkleRoot: root,
 			Offset:     0,
 			Length:     modules.SectorSize,
-		}})
+		}}, nil)
 	}
 
 	if err == modules.ErrStopResponse {
@@ -139,7 +139,7 @@ func (hd *Downloader) shutdown() {
 	if build.VersionCmp(hd.host.Version, build.Version) < 0 {
 		_, _ = verifySettings(hd.conn, hd.host)
 		_ = modules.WriteNegotiationStop(hd.conn)
-	}  else {
+	} else {
 		_ = encoding.WriteObject(hd.conn, modules.RevisionRequest{
 			Stop: true,
 		})

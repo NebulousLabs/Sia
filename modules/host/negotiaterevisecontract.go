@@ -25,15 +25,27 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	// Set the negotiation deadline.
 	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractRevisionTime))
 
-	// Get the proposed action + signed transaction
+	// Get the signed revision
 	var request modules.RevisionRequest
-	err := encoding.ReadObject(conn, &request, settings.MaxReviseBatchSize+modules.NegotiateMaxFileContractRevisionSize+modules.NegotiateMaxTransactionSignatureSize)
+	err := encoding.ReadObject(conn, &request, modules.NegotiateMaxFileContractRevisionSize+modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
 		return extendErr("unable to read revision modifications: ", ErrorConnection(err.Error()))
 	}
 	if request.Stop {
 		return modules.ErrStopResponse // managedRPCReviseContract will catch this and exit gracefully
 	}
+
+	// Verify that the signature is valid and get the host's signature.
+	txn, err := createRevisionSignature(request.Revision, request.Signature, secretKey, blockHeight)
+	if err != nil {
+		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
+		return extendErr("could not create revision signature: ", err)
+	}
+
+	// Get the proposed actions
+	// TODO change size. MaxReviseBatchSize is too much
+	var actions []modules.RevisionAction
+	err = encoding.ReadObject(conn, &actions, settings.MaxReviseBatchSize)
 
 	// Send the settings to the renter. The host will keep going even if it is
 	// not accepting contracts, because in this case the contract already
@@ -46,13 +58,6 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	// Reset deadline after managedRPCSettings shortened it
 	// TODO: think about a better way to do that
 	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractRevisionTime))
-
-	// Verify that the signature is valid and get the host's signature.
-	txn, err := createRevisionSignature(request.Revision, request.Signature, secretKey, blockHeight)
-	if err != nil {
-		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
-		return extendErr("could not create revision signature: ", err)
-	}
 
 	// First read all of the modifications. Then make the modifications, but
 	// with the ability to reverse them. Then verify the file contract revision
@@ -67,9 +72,9 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	var gainedSectorData [][]byte
 	var payload [][]byte
 	var totalPayloadSize uint64
-	var merkleRootChange bool = false
+	var merkleRootChange = false
 	err = func() error {
-		for _, action := range request.Actions {
+		for _, action := range actions {
 			// Check that the index points to an existing sector root. If the type
 			// is ActionInsert, we permit inserting at the end.
 			if action.Type == modules.ActionInsert {
@@ -79,10 +84,6 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 			} else if action.SectorIndex >= uint64(len(so.SectorRoots)) {
 				return errBadModificationIndex
 			}
-			// Check that the data sent for the sector is not too large.
-			if uint64(len(action.Data)) > modules.SectorSize {
-				return errLargeSector
-			}
 			// Check that the total requested payload is not too large
 			if totalPayloadSize > settings.MaxDownloadBatchSize {
 				return extendErr("download iteration batch failed: ", errLargeDownloadBatch)
@@ -91,6 +92,17 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 			if action.Type != modules.ActionDownload {
 				merkleRootChange = true
 			}
+
+			// If the action requires additional data request it from the renter
+			// TODO should we reply with ACCEPT here?
+			var data []byte
+			if action.Type == modules.ActionInsert || action.Type == modules.ActionModify {
+				err := encoding.ReadObject(conn, &data, modules.SectorSize + 8)
+				if err != nil {
+					return extendErr("unable to read data for action: ", ErrorConnection(err.Error()))
+				}
+			}
+
 			switch action.Type {
 			case modules.ActionDelete:
 				so.SectorRoots = append(so.SectorRoots[0:action.SectorIndex], so.SectorRoots[action.SectorIndex+1:]...)
@@ -98,7 +110,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 
 			case modules.ActionInsert:
 				// Check that the sector size is correct.
-				if uint64(len(action.Data)) != modules.SectorSize {
+				if uint64(len(data)) != modules.SectorSize {
 					return errBadSectorSize
 				}
 
@@ -110,9 +122,9 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 				newCollateral = newCollateral.Add(settings.Collateral.Mul(blockBytesCurrency))
 
 				// Insert the sector into the root list.
-				newRoot := crypto.MerkleRoot(action.Data)
+				newRoot := crypto.MerkleRoot(data)
 				sectorsGained = append(sectorsGained, newRoot)
-				gainedSectorData = append(gainedSectorData, action.Data)
+				gainedSectorData = append(gainedSectorData, data)
 				so.SectorRoots = append(so.SectorRoots[:action.SectorIndex], append([]crypto.Hash{newRoot}, so.SectorRoots[action.SectorIndex:]...)...)
 
 			case modules.ActionModify:
@@ -120,7 +132,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 				// known to be appropriately small, but the offset needs to be
 				// checked for being appropriately small as well otherwise there is
 				// a risk of overflow.
-				if action.Offset > modules.SectorSize || action.Offset+uint64(len(action.Data)) > modules.SectorSize {
+				if action.Offset > modules.SectorSize || action.Offset+uint64(len(data)) > modules.SectorSize {
 					return errIllegalOffsetAndLength
 				}
 
@@ -129,10 +141,10 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 				if err != nil {
 					return extendErr("could not read sector: ", ErrorInternal(err.Error()))
 				}
-				copy(sector[action.Offset:], action.Data)
+				copy(sector[action.Offset:], data)
 
 				// Update finances.
-				uploadRevenue = uploadRevenue.Add(settings.UploadBandwidthPrice.Mul64(uint64(len(action.Data))))
+				uploadRevenue = uploadRevenue.Add(settings.UploadBandwidthPrice.Mul64(uint64(len(data))))
 
 				// Update the sectors removed and gained to indicate that the old
 				// sector has been replaced with a new sector.

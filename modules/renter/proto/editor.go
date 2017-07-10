@@ -80,10 +80,10 @@ func (he *Editor) Close() error {
 	return he.conn.Close()
 }
 
-// v130runRevisionIteration submits actions and their accompanying revision to the
+// runRevisionIteration submits actions and their accompanying revision to the
 // host for approval. If negotiation is successful, it updates the underlying
 // Contract.
-func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) (err error) {
+func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, data [][]byte, rev types.FileContractRevision, newRoots []crypto.Hash) (err error) {
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
 		if err != nil {
@@ -106,7 +106,7 @@ func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev typ
 
 	// send revision to host and exchange signatures
 	// TODO This might fail due to outdated host settings.Maybe try again with the newer ones received in negotiateRevision
-	signedTxn, err := negotiateRevision(he.host, he.conn, rev, he.contract.SecretKey, actions)
+	signedTxn, err := negotiateRevision(he.host, he.conn, rev, he.contract.SecretKey, actions, data)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
 		// cause the next operation to fail
@@ -228,9 +228,8 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 		actions := []modules.RevisionAction{{
 			Type:        modules.ActionInsert,
 			SectorIndex: uint64(len(he.contract.MerkleRoots)),
-			Data:        data,
 		}}
-		err = he.runRevisionIteration(actions, rev, newRoots)
+		err = he.runRevisionIteration(actions, [][]byte{data}, rev, newRoots)
 	}
 	if err != nil {
 		return modules.RenterContract{}, crypto.Hash{}, err
@@ -281,7 +280,7 @@ func (he *Editor) Delete(root crypto.Hash) (modules.RenterContract, error) {
 			Type:        modules.ActionDelete,
 			SectorIndex: uint64(index),
 		}}
-		err = he.runRevisionIteration(actions, rev, newRoots)
+		err = he.runRevisionIteration(actions, nil, rev, newRoots)
 	}
 	if err != nil {
 		return modules.RenterContract{}, err
@@ -336,9 +335,8 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 			Type:        modules.ActionModify,
 			SectorIndex: uint64(index),
 			Offset:      offset,
-			Data:        newData,
 		}}
-		err = he.runRevisionIteration(actions, rev, newRoots)
+		err = he.runRevisionIteration(actions, [][]byte{newData}, rev, newRoots)
 	}
 	if err != nil {
 		return modules.RenterContract{}, err
