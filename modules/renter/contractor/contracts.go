@@ -151,6 +151,18 @@ func (c *Contractor) managedMarkContractsUtility() {
 			contracts[i].GoodForRenew = false
 			continue
 		}
+		// Contract has no utility if renew has already completed. (grab some
+		// extra values while we have the mutex)
+		c.mu.RLock()
+		blockHeight := c.blockHeight
+		renewWindow := c.allowance.RenewWindow
+		_, renewedPreviously := c.renewedIDs[contracts[i].ID]
+		c.mu.RUnlock()
+		if renewedPreviously {
+			contracts[i].GoodForUpload = false
+			contracts[i].GoodForRenew = false
+			continue
+		}
 
 		// Contract should not be used for upload if the number of Merkle roots
 		// exceeds 25e3 - this is in place because the current hosts do not
@@ -161,14 +173,14 @@ func (c *Contractor) managedMarkContractsUtility() {
 			// Contract is still fine to be renewed, we just shouldn't keep
 			// adding data to this contract.
 			contracts[i].GoodForUpload = false
+			continue
 		}
 		// Contract should not be used for uploading if the time has come to
 		// renew the contract.
-		c.mu.RLock()
-		if c.blockHeight+c.allowance.RenewWindow >= contracts[i].EndHeight() {
+		if blockHeight+renewWindow >= contracts[i].EndHeight() {
 			contracts[i].GoodForUpload = false
+			continue
 		}
-		c.mu.RUnlock()
 	}
 
 	// Update the contractor to reflect the new state for each of the contracts.
