@@ -1810,6 +1810,21 @@ func TestContractorHostRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Try again to download the file we uploaded. It should still be
+	// retrievable.
+	downloadPath2 := filepath.Join(st.dir, "test-downloaded-verify-2.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloadBytes2, err := ioutil.ReadFile(downloadPath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(downloadBytes2, origBytes) {
+		t.Fatal("downloaded file and uploaded file do not match")
+	}
+
 	// Mine out another set of the blocks so that the bad contracts expire.
 	for i := 0; i < 6; i++ {
 		_, err := st.miner.AddBlock()
@@ -1858,16 +1873,16 @@ func TestContractorHostRemoval(t *testing.T) {
 
 	// Try again to download the file we uploaded. It should still be
 	// retrievable.
-	downloadPath2 := filepath.Join(st.dir, "test-downloaded-verify-2.dat")
-	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath2)
+	downloadPath3 := filepath.Join(st.dir, "test-downloaded-verify-3.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath3)
 	if err != nil {
 		t.Fatal(err)
 	}
-	downloadBytes2, err := ioutil.ReadFile(downloadPath2)
+	downloadBytes3, err := ioutil.ReadFile(downloadPath3)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(downloadBytes2, origBytes) {
+	if !bytes.Equal(downloadBytes3, origBytes) {
 		t.Fatal("downloaded file and uploaded file do not match")
 	}
 }
