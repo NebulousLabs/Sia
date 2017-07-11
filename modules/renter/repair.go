@@ -135,18 +135,15 @@ func (r *Renter) addFileToRepairState(rs *repairState, file *file) {
 		// Check whether this contract is offline. Even if the contract is
 		// offline, we want to record that the chunk has attempted to use this
 		// contract.
-		offline := r.hostContractor.IsOffline(contract.ID)
+		id := r.hostContractor.ResolveID(contract.ID)
+		stable := !r.hostContractor.IsOffline(id) && r.hostContractor.GoodForRenew(id)
 
 		// Scan all of the pieces of the contract.
 		for _, piece := range contract.Pieces {
-			utilizedContracts[piece.Chunk][contract.ID] = struct{}{}
+			utilizedContracts[piece.Chunk][id] = struct{}{}
 
 			// Only mark the piece as complete if the piece can be recovered.
-			//
-			// TODO: Add an 'unavailable' flag to the piece that gets set to
-			// true if the host loses the piece, and only add the piece to the
-			// 'availablePieces' set if !unavailable.
-			if !offline {
+			if stable {
 				availablePieces[piece.Chunk][piece.Piece] = struct{}{}
 			}
 		}
@@ -203,6 +200,11 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 	r.updateWorkerPool()
 	rs.availableWorkers = make(map[types.FileContractID]*worker)
 	for id, worker := range r.workerPool {
+		// Ignore the workers that are not good for uploading.
+		if !worker.contract.GoodForUpload {
+			continue
+		}
+
 		// Ignore workers that are already in the active set of workers.
 		_, exists := rs.activeWorkers[worker.contractID]
 		if exists {
@@ -219,13 +221,6 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		if time.Since(worker.recentUploadFailure) < uploadFailureCooldown*(1<<penalty) {
 			continue
 		}
-
-		// TODO: Prune workers that do not provide value. The biggest flag is
-		// an increase in the price of storage cost. If there are more workers
-		// available than needed and upload bandwidth is saturated, the slow
-		// workers can be pruned as well (up to the point where you can no
-		// longer hit full redundancy). Some of this is already implemented
-		// above.
 
 		rs.availableWorkers[id] = worker
 	}
@@ -275,9 +270,9 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		// Determine the set of useful workers - workers that are both
 		// available and able to repair this chunk.
 		var usefulWorkers []types.FileContractID
-		for workerID := range rs.availableWorkers {
+		for workerID, worker := range rs.availableWorkers {
 			_, exists := chunkStatus.contracts[workerID]
-			if !exists {
+			if !exists && worker.contract.GoodForUpload {
 				usefulWorkers = append(usefulWorkers, workerID)
 			}
 		}

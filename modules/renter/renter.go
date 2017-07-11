@@ -93,6 +93,9 @@ type hostContractor interface {
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
+	// ContractByID returns the contract associated with the file contract id.
+	ContractByID(types.FileContractID) (modules.RenterContract, bool)
+
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
 	CurrentPeriod() types.BlockHeight
@@ -100,6 +103,10 @@ type hostContractor interface {
 	// Editor creates an Editor from the specified contract ID, allowing the
 	// insertion, deletion, and modification of sectors.
 	Editor(types.FileContractID, <-chan struct{}) (contractor.Editor, error)
+
+	// GoodForRenew indicates whether the contract line of the provided contract
+	// is actively being renewed.
+	GoodForRenew(types.FileContractID) bool
 
 	// IsOffline reports whether the specified host is considered offline.
 	IsOffline(types.FileContractID) bool

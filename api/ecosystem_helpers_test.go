@@ -44,6 +44,10 @@ func announceAllHosts(sts []*serverTester) error {
 		return err
 	}
 
+	// Grab the inital transaction pool size to know how many total transactions
+	// there should be after announcement.
+	initialTpoolSize := len(sts[0].tpool.TransactionList())
+
 	// Announce each host.
 	for _, st := range sts {
 		// Set the host to be accepting contracts.
@@ -78,13 +82,13 @@ func announceAllHosts(sts []*serverTester) error {
 	// TODO: At some point the number of transactions needed to make an
 	// announcement may change. Currently its 2.
 	for i := 0; i < 50; i++ {
-		if len(sts[0].tpool.TransactionList()) == len(sts)*2 {
+		if len(sts[0].tpool.TransactionList()) == len(sts)*2+initialTpoolSize {
 			break
 		}
 		time.Sleep(time.Millisecond * 100)
 	}
-	if len(sts[0].tpool.TransactionList()) != len(sts)*2 {
-		return errors.New("Host announcements do not seem to have propagated to the leader's tpool")
+	if len(sts[0].tpool.TransactionList()) < len(sts)*2+initialTpoolSize {
+		return fmt.Errorf("Host announcements do not seem to have propagated to the leader's tpool: %v, %v, %v", len(sts), len(sts[0].tpool.TransactionList())+initialTpoolSize, initialTpoolSize)
 	}
 
 	// Mine a block and then wait for all of the nodes to syncrhonize to it.
@@ -136,7 +140,7 @@ func fullyConnectNodes(sts []*serverTester) error {
 		for _, stb := range sts[i+1:] {
 			// Try connecting to the other node until both have the other in
 			// their peer list.
-			err = retry(50, time.Millisecond*50, func() error {
+			err = retry(100, time.Millisecond*100, func() error {
 				// NOTE: this check depends on string-matching an error in the
 				// gateway. If that error changes at all, this string will need to
 				// be updated.

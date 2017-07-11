@@ -26,19 +26,15 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	if p.Async && isHttpResp {
 		return errors.New("cannot async download to http response")
 	}
-
 	if isHttpResp && p.Destination != "" {
 		return errors.New("destination cannot be specified when downloading to http response")
 	}
-
 	if !isHttpResp && p.Destination == "" {
 		return errors.New("destination not supplied")
 	}
-
 	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
 		return errors.New("destination must be an absolute path")
 	}
-
 	if p.Offset == file.size {
 		return errors.New("offset equals filesize")
 	}
@@ -62,7 +58,6 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	if p.Length == 0 {
 		p.Length = file.size - p.Offset
 	}
-
 	// Check whether offset and length is valid.
 	if p.Offset < 0 || p.Offset+p.Length > file.size {
 		return fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)

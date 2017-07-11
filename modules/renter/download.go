@@ -182,19 +182,10 @@ func (d *download) initPieceSet(f *file,
 
 	f.mu.RLock()
 	for _, contract := range f.contracts {
-		// Get latest contract ID.
-		id, ok := currentContracts[contract.IP]
-		if !ok {
-			// No matching NetAddress; try using a revised ID.
-			id = r.hostContractor.ResolveID(contract.ID)
-			if id == contract.ID {
-				continue
-			}
-		}
-
+		id := r.hostContractor.ResolveID(contract.ID)
 		for i := range contract.Pieces {
-			m, exists := d.pieceSet[contract.Pieces[i].Chunk]
 			// Only add pieceSet entries for chunks that are going to be downloaded.
+			m, exists := d.pieceSet[contract.Pieces[i].Chunk]
 			if exists {
 				m[id] = contract.Pieces[i]
 			}
