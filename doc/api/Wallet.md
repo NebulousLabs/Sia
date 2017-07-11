@@ -141,7 +141,10 @@ be returned if the wallet is locked.
 
 #### /wallet/addresses [GET]
 
-fetches the list of addresses from the wallet.
+fetches the list of addresses from the wallet. If the wallet has not been
+created or unlocked, no addresses will be returned. After the wallet is
+unlocked, this call will continue to return its addresses even after the
+wallet is locked again.
 
 ###### JSON Response
 ```javascript
