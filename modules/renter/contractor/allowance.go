@@ -152,6 +152,8 @@ func (c *Contractor) FormDownloadOnlyContract(host modules.HostDBEntry) (modules
 	}
 
 	c.mu.Lock()
+	// set GoodForUpload false to prevent upload to it accidentally
+	contract.GoodForUpload = false
 	c.contracts[contract.ID] = contract
 	err = c.saveSync()
 	c.mu.Unlock()
