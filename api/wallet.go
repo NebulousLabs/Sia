@@ -172,10 +172,6 @@ func (api *API) walletAddressHandler(w http.ResponseWriter, req *http.Request, _
 
 // walletAddressHandler handles API calls to /wallet/addresses.
 func (api *API) walletAddressesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	if api.wallet.Unlocked() {
-		WriteError(w, Error{"error when calling /wallet/addresses: wallet is locked"}, http.StatusBadRequest)
-		return
-	}
 	WriteJSON(w, WalletAddressesGET{
 		Addresses: api.wallet.AllAddresses(),
 	})
