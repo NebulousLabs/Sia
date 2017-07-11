@@ -130,3 +130,31 @@ func (c *Contractor) managedCancelAllowance(a modules.Allowance) error {
 	c.mu.Unlock()
 	return err
 }
+
+// FormDownloadOnlyContract form download only contract to share file
+func (c *Contractor) FormDownloadOnlyContract(host modules.HostDBEntry) (modules.RenterContract, error) {
+	a := c.allowance
+	c.mu.RLock()
+	var endHeight types.BlockHeight
+	if a.Period > 0 {
+		endHeight = c.blockHeight + a.Period
+	} else {
+		endHeight = c.blockHeight + 1008 // 6x24x7 which should be a week
+	}
+	if len(c.contracts) > 0 {
+		endHeight = c.contractEndHeight()
+	}
+	c.mu.RUnlock()
+
+	contract, err := c.managedNewContract(host, 1, endHeight)
+	if err != nil {
+		return contract, err
+	}
+
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	err = c.saveSync()
+	c.mu.Unlock()
+
+	return contract, err
+}

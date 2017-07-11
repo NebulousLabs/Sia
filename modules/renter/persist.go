@@ -47,8 +47,8 @@ func resolveShareFromContracts(contracts map[types.FileContractID]fileContract, 
 				PublicKey := oc.HostPublicKey
 				sfc := shareFileContract{
 					PublicKeyString: PublicKey.String(),
-					Pieces:  c.Pieces,
-					WindowStart: c.WindowStart,
+					Pieces:          c.Pieces,
+					WindowStart:     c.WindowStart,
 				}
 				shareContracts[sfc.PublicKeyString] = sfc
 				break
@@ -99,7 +99,7 @@ func (f *file) MarshalSia(w io.Writer, renter *Renter) error {
 		return errors.New("unknown erasure code")
 	}
 
-	shareContracts := make(map[string]shareFileContract, len(f.contracts))
+	shareContracts := make(map[string]shareFileContract)
 	if err := resolveShareFromContracts(f.contracts, shareContracts, renter); err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func resolveInfoFromPublicKey(pks string, contract *fileContract, renter *Renter
 			return nil
 		}
 	}
-	return errors.New("no contract found for publickey:"+pks)
+	return errors.New("no contract found for publickey:" + pks)
 }
 
 // UnmarshalSia implements the encoding.SiaUnmarshaller interface,
@@ -183,6 +183,7 @@ func (f *file) UnmarshalSia(r io.Reader, renter *Renter) error {
 	f.contracts = make(map[types.FileContractID]fileContract)
 	var contract fileContract
 	var shareContract shareFileContract
+	noContractHosts := make(map[string]shareFileContract)
 	for i := uint64(0); i < nContracts; i++ {
 		if err := dec.Decode(&shareContract); err != nil {
 			return err
@@ -190,17 +191,46 @@ func (f *file) UnmarshalSia(r io.Reader, renter *Renter) error {
 		// figure out contract id & net address from publickey here
 		err := resolveInfoFromPublicKey(shareContract.PublicKeyString, &contract, renter)
 		if err != nil {
-			renter.log.Println("some error with:", f.name, " ", shareContract.PublicKeyString)
 			renter.log.Println(err)
+			noContractHosts[shareContract.PublicKeyString] = shareContract
 			continue
 		}
 		contract.Pieces = shareContract.Pieces
 		contract.WindowStart = shareContract.WindowStart
 		f.contracts[contract.ID] = contract
 	}
+
 	// check if enough contract founded
 	if !f.available(renter.hostContractor.IsOffline) {
-		renter.log.Println("should form more download only contract here")
+		hosts := renter.ActiveHosts()
+		filtedHosts := make([]modules.HostDBEntry, 0)
+		for _, host := range hosts {
+			for _, shareContract := range noContractHosts {
+				// filter it in hostdb
+				if shareContract.PublicKeyString == host.PublicKey.String() {
+					filtedHosts = append(filtedHosts, host)
+				}
+			}
+		}
+		// TODO: sort the not-found hosts by rank
+		// #1 make contracts with hosts till available         [ ]
+		// #2 try hard to make sure the file is downloadable   [x]
+		for _, host := range filtedHosts {
+			renter.log.Println("try to form contract:", f.name, " ", host.PublicKey.String())
+			shareContract = noContractHosts[host.PublicKey.String()]
+			renterContract, err := renter.hostContractor.FormDownloadOnlyContract(host)
+			if err != nil {
+				renter.log.Println("error in forming download only contract:", err)
+				continue
+			}
+			contract.ID = renterContract.ID
+			contract.Pieces = shareContract.Pieces
+			contract.WindowStart = shareContract.WindowStart
+			f.contracts[contract.ID] = contract
+		}
+	}
+	if !f.available(renter.hostContractor.IsOffline) {
+		return errors.New("can't load this file")
 	}
 
 	return nil
