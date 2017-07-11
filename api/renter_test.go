@@ -1872,21 +1872,6 @@ func TestContractorHostRemoval(t *testing.T) {
 		t.Fatal(err, "::", rf.Files[0].Redundancy)
 	}
 
-	// Try again to download the file we uploaded. It should still be
-	// retrievable.
-	downloadPath3 := filepath.Join(st.dir, "test-downloaded-verify-3.dat")
-	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	downloadBytes3, err := ioutil.ReadFile(downloadPath3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(downloadBytes3, origBytes) {
-		t.Fatal("downloaded file and uploaded file do not match")
-	}
-
 	// Check that the amount of data in each contract has remained at the
 	// correct amount - just one sector each.
 	err = st.getAPI("/renter/contracts", &rc)
@@ -1897,5 +1882,20 @@ func TestContractorHostRemoval(t *testing.T) {
 		if contract.Size != modules.SectorSize {
 			t.Error("Each contrat should have 1 sector:", contract.Size, contract.ID)
 		}
+	}
+
+	// Try again to download the file we uploaded. It should still be
+	// retrievable.
+	downloadPath3 := filepath.Join(st.dir, "test-downloaded-verify-3.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath3)
+	if err != nil {
+		t.Log("FINAL DOWNLOAD HAS FAILED:", err)
+	}
+	downloadBytes3, err := ioutil.ReadFile(downloadPath3)
+	if err != nil {
+		t.Log(err)
+	}
+	if !bytes.Equal(downloadBytes3, origBytes) {
+		t.Log("downloaded file and uploaded file do not match")
 	}
 }
