@@ -391,15 +391,15 @@ func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, e
 			// ReadTimeout defines the maximum amount of time allowed to fully read
 			// the request body. This timeout is applied to every handler in the
 			// server.
-			ReadTimeout: time.Minute,
+			ReadTimeout: time.Minute * 5,
 
 			// ReadHeaderTimeout defines the amount of time allowed to fully read the
 			// request headers.
-			ReadHeaderTimeout: time.Second * 15,
+			ReadHeaderTimeout: time.Minute * 2,
 
 			// IdleTimeout defines the maximum duration a HTTP Keep-Alive connection
 			// the API is kept open with no activity before closing.
-			IdleTimeout: time.Second * 20,
+			IdleTimeout: time.Minute * 5,
 		},
 	}
 
