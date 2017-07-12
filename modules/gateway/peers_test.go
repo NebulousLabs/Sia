@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
@@ -192,7 +194,7 @@ func TestListen(t *testing.T) {
 	// a simple 'conn.Close' would not obey the stream disconnect protocol
 	newClientStream(conn, build.Version).Close()
 
-	// compliant connect with invalid port
+	// compliant connect with invalid net address
 	conn, err = net.Dial("tcp", string(g.Address()))
 	if err != nil {
 		t.Fatal("dial failed:", err)
@@ -205,22 +207,18 @@ func TestListen(t *testing.T) {
 	if ack != build.Version {
 		t.Fatal("gateway should have given ack")
 	}
-	err = connectPortHandshake(conn, "0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i := 0; i < 10; i++ {
-		g.mu.RLock()
-		_, ok := g.peers[addr]
-		g.mu.RUnlock()
-		if ok {
-			t.Fatal("gateway should not have added a peer with an invalid port")
-		}
-		time.Sleep(20 * time.Millisecond)
+
+	header := sessionHeader{
+		GenesisID:  types.GenesisID,
+		UniqueID:   gatewayID{},
+		NetAddress: "fake",
 	}
 
-	// a simple 'conn.Close' would not obey the stream disconnect protocol
-	newClientStream(conn, build.Version).Close()
+	err = writeSessionHeader(conn, header)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	conn.Close()
 
 	// compliant connect
 	conn, err = net.Dial("tcp", string(g.Address()))
@@ -236,38 +234,46 @@ func TestListen(t *testing.T) {
 		t.Fatal("gateway should have given ack")
 	}
 
-	if build.VersionCmp(build.Version, sessionUpgradeVersion) >= 0 {
-		// generate fake ID
-		var gID gatewayID
-		fastrand.Read(gID[:])
-		wantConnect := true
-		// continue handshake protocol, this time exchanging the session header
-		err = connectSessionHandshake(conn, gID, wantConnect)
-		if err != nil {
-			t.Fatal(err)
-		}
+	header.NetAddress = modules.NetAddress(conn.LocalAddr().String())
+	err = writeSessionHeader(conn, header)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	err = connectPortHandshake(conn, addr.Port())
+	_, err = readSessionHeader(conn, header)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// g should add the peer
-	var ok bool
-	for !ok {
+	err = build.Retry(50, 100*time.Millisecond, func() error {
 		g.mu.RLock()
-		_, ok = g.peers[addr]
+		_, ok := g.peers[addr]
 		g.mu.RUnlock()
+		if !ok {
+			return errors.New("g should have added the peer")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
+	// Disconnect. Now that connection has been established, need to shutdown
+	// via the stream multiplexer.
 	newClientStream(conn, build.Version).Close()
 
 	// g should remove the peer
-	for ok {
+	err = build.Retry(50, 100*time.Millisecond, func() error {
 		g.mu.RLock()
-		_, ok = g.peers[addr]
+		_, ok := g.peers[addr]
 		g.mu.RUnlock()
+		if ok {
+			return errors.New("g should have removed the peer")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// uncompliant connect
@@ -512,8 +518,8 @@ func TestConnectRejectsVersions(t *testing.T) {
 
 	tests := []struct {
 		version             string
-		errWant             error
-		localErrWant        error
+		errWant             string
+		localErrWant        string
 		invalidVersion      bool
 		insufficientVersion bool
 		msg                 string
@@ -526,7 +532,7 @@ func TestConnectRejectsVersions(t *testing.T) {
 		// Test that Connect fails when the remote peer's version is "reject".
 		{
 			version: "reject",
-			errWant: errPeerRejectedConn,
+			errWant: errPeerRejectedConn.Error(),
 			msg:     "Connect should fail when the remote peer rejects the connection",
 		},
 		// Test that Connect fails when the remote peer's version is ascii gibberish.
@@ -595,8 +601,8 @@ func TestConnectRejectsVersions(t *testing.T) {
 			msg:             "Connect should not succeed when peer is connecting to itself",
 			uniqueID:        g.id,
 			genesisID:       types.GenesisID,
-			errWant:         errOurAddress,
-			localErrWant:    errOurAddress,
+			errWant:         errOurAddress.Error(),
+			localErrWant:    errOurAddress.Error(),
 			versionRequired: sessionUpgradeVersion,
 		},
 	}
@@ -605,6 +611,7 @@ func TestConnectRejectsVersions(t *testing.T) {
 			continue // skip, as we do not meet the required version
 		}
 
+		// create the listener
 		doneChan := make(chan struct{})
 		go func() {
 			defer close(doneChan)
@@ -612,22 +619,30 @@ func TestConnectRejectsVersions(t *testing.T) {
 			if err != nil {
 				panic(fmt.Sprintf("test #%d failed: %s", testIndex, err))
 			}
-			remoteVersion, err := acceptConnVersionHandshake(conn, tt.version)
+			remoteVersion, err := acceptVersionHandshake(conn, tt.version)
 			if err != nil {
 				panic(fmt.Sprintf("test #%d failed: %s", testIndex, err))
 			}
 			if remoteVersion != build.Version {
 				panic(fmt.Sprintf("test #%d failed: remoteVersion != build.Version", testIndex))
 			}
-			if !build.IsVersion(tt.version) || build.VersionCmp(tt.version, sessionUpgradeVersion) < 0 {
-				return // in case test version is invalid or < 1.2.0
-			}
 
-			if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 &&
-				build.VersionCmp(build.Version, sessionUpgradeVersion) >= 0 {
-				if err := acceptConnSessionHandshake(conn, tt.uniqueID); err != tt.localErrWant {
-					panic(fmt.Sprintf("test #%d failed: %v != %v", testIndex, tt.localErrWant, err))
+			if build.VersionCmp(tt.version, sessionUpgradeVersion) >= 0 {
+				ourHeader := sessionHeader{
+					GenesisID:  tt.genesisID,
+					UniqueID:   tt.uniqueID,
+					NetAddress: modules.NetAddress(conn.LocalAddr().String()),
 				}
+				_, err = readSessionHeader(conn, ourHeader)
+				writeSessionHeader(conn, ourHeader)
+			} else if build.VersionCmp(tt.version, handshakeUpgradeVersion) >= 0 {
+				var dialbackPort string
+				err = encoding.ReadObject(conn, &dialbackPort, 13)
+			} else {
+				// no action taken for old peers
+			}
+			if (err == nil && tt.localErrWant != "") || (err != nil && !strings.Contains(err.Error(), tt.localErrWant)) {
+				panic(fmt.Sprintf("test #%d failed: %v != %v", testIndex, tt.localErrWant, err))
 			}
 		}()
 		err = g.Connect(modules.NetAddress(listener.Addr().String()))
@@ -644,7 +659,7 @@ func TestConnectRejectsVersions(t *testing.T) {
 			}
 		default:
 			// Check that the error is the expected error.
-			if err != tt.errWant {
+			if (err == nil && tt.errWant != "") || (err != nil && !strings.Contains(err.Error(), tt.errWant)) {
 				t.Fatalf("expected Connect to error with '%v', but got '%v': %s", tt.errWant, err, tt.msg)
 			}
 		}
