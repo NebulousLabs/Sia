@@ -245,7 +245,7 @@ func TestListen(t *testing.T) {
 	}
 
 	// g should add the peer
-	err = build.Retry(10, 20*time.Millisecond, func() error {
+	err = build.Retry(50, 100*time.Millisecond, func() error {
 		g.mu.RLock()
 		_, ok := g.peers[addr]
 		g.mu.RUnlock()
@@ -263,7 +263,7 @@ func TestListen(t *testing.T) {
 	newClientStream(conn, build.Version).Close()
 
 	// g should remove the peer
-	err = build.Retry(10, 20*time.Millisecond, func() error {
+	err = build.Retry(50, 100*time.Millisecond, func() error {
 		g.mu.RLock()
 		_, ok := g.peers[addr]
 		g.mu.RUnlock()
