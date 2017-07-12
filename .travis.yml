@@ -20,7 +20,6 @@ branches:
   only:
     - master
     - staging
-    - gateway-proto
 
 notifications:
   email: false
