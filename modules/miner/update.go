@@ -50,7 +50,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 
 	// Check if heap for highest fee transactions has space.
 	if m.blockMapHeap.size+candidateSet.size < types.BlockSizeLimit-5e3 {
-		m.blockMapHeap.Push(elem)
+		m.blockMapHeap.push(elem)
 		return
 	}
 
@@ -67,12 +67,12 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 		// Check if the candidateSet can fit in the block.
 		if m.blockMapHeap.size-sizeOfBottomSets+candidateSet.size < types.BlockSizeLimit-5e3 {
 			// Place candidate into block,
-			m.blockMapHeap.Push(elem)
+			m.blockMapHeap.push(elem)
 
 			// Place transactions removed from block heap into
 			// the overflow heap.
 			for _, v := range bottomSets {
-				m.overflowMapHeap.Push(v)
+				m.overflowMapHeap.push(v)
 			}
 			break
 		}
@@ -81,19 +81,19 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 		// in, and place the candidate set into the overflow. This should never
 		// happen since transaction sets are much smaller than the max block
 		// size.
-		_, exists := m.blockMapHeap.Peek()
+		_, exists := m.blockMapHeap.peek()
 		if !exists {
-			m.overflowMapHeap.Push(elem)
+			m.overflowMapHeap.push(elem)
 			// Put back in transactions removed.
 			for _, v := range bottomSets {
-				m.blockMapHeap.Push(v)
+				m.blockMapHeap.push(v)
 			}
 			// Finished with this candidate set.
 			break
 		}
 		// Add the set to the bottomSets slice. Note that we don't increase
 		// sizeOfBottomSets until after calculating the average.
-		nextSet := m.blockMapHeap.Pop()
+		nextSet := m.blockMapHeap.pop()
 		bottomSets = append(bottomSets, nextSet)
 
 		// Calculating fees to compare total fee from those sets removed and the current set s.
@@ -107,10 +107,10 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 		// MapHeap.
 		if averageFeeOfBottomSets.Cmp(candidateSet.averageFee) == 1 {
 			// CandidateSet goes into the overflow.
-			m.overflowMapHeap.Push(elem)
+			m.overflowMapHeap.push(elem)
 			// Put transaction sets from bottom back into the blockMapHeap.
 			for _, v := range bottomSets {
-				m.blockMapHeap.Push(v)
+				m.blockMapHeap.push(v)
 			}
 			// Finished with this candidate set.
 			break
@@ -187,15 +187,15 @@ func (m *Miner) deleteMapElementTxns(id splitSetID) {
 
 	// If the transaction set is in the overflow, we can just delete it.
 	if inOverflowMapHeap {
-		m.overflowMapHeap.RemoveSetByID(id)
+		m.overflowMapHeap.removeSetByID(id)
 	} else if inBlockMapHeap {
 		// Remove from blockMapHeap.
-		m.blockMapHeap.RemoveSetByID(id)
+		m.blockMapHeap.removeSetByID(id)
 
 		// Promote sets from overflow heap to block if possible.
-		for overflowElem, canPromote := m.overflowMapHeap.Peek(); canPromote && m.blockMapHeap.size+overflowElem.set.size < types.BlockSizeLimit-5e3; {
-			promotedElem := m.overflowMapHeap.Pop()
-			m.blockMapHeap.Push(promotedElem)
+		for overflowElem, canPromote := m.overflowMapHeap.peek(); canPromote && m.blockMapHeap.size+overflowElem.set.size < types.BlockSizeLimit-5e3; {
+			promotedElem := m.overflowMapHeap.pop()
+			m.blockMapHeap.push(promotedElem)
 		}
 	}
 	delete(m.splitSets, id)

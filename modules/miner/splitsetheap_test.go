@@ -14,18 +14,18 @@ import (
 func TestMapHeapSimple(t *testing.T) {
 	max := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
-		data:     make([]*mapElement, 0),
+		data:     nil,
 		size:     0,
 		minHeap:  false,
 	}
 	min := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
-		data:     make([]*mapElement, 0),
+		data:     nil,
 		size:     0,
 		minHeap:  true,
 	}
-	max.Init()
-	min.Init()
+	max.init()
+	min.init()
 
 	randSlice := fastrand.Perm(1000)
 	for _, i := range randSlice {
@@ -49,13 +49,13 @@ func TestMapHeapSimple(t *testing.T) {
 			id:    splitSetID(i),
 			index: 0,
 		}
-		max.Push(e1)
-		min.Push(e2)
+		max.push(e1)
+		min.push(e2)
 	}
 
 	for i := 0; i < 1000; i++ {
-		maxPop := max.Pop()
-		minPop := min.Pop()
+		maxPop := max.pop()
+		minPop := min.pop()
 
 		if int(maxPop.id) != 999-i {
 			t.Error("Unexpected splitSetID in result from max-heap pop.")
@@ -78,18 +78,18 @@ func TestMapHeapSimple(t *testing.T) {
 func TestMapHeapSize(t *testing.T) {
 	max := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
-		data:     make([]*mapElement, 0),
+		data:     nil,
 		size:     0,
 		minHeap:  false,
 	}
 	min := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
-		data:     make([]*mapElement, 0),
+		data:     nil,
 		size:     0,
 		minHeap:  true,
 	}
-	max.Init()
-	min.Init()
+	max.init()
+	min.init()
 
 	var expectedSize uint64
 
@@ -115,8 +115,8 @@ func TestMapHeapSize(t *testing.T) {
 			id:    splitSetID(i),
 			index: 0,
 		}
-		max.Push(e1)
-		min.Push(e2)
+		max.push(e1)
+		min.push(e2)
 		expectedSize += e1.set.size
 	}
 
@@ -128,8 +128,8 @@ func TestMapHeapSize(t *testing.T) {
 	}
 
 	for i := 0; i < 1000; i++ {
-		maxPop := max.Pop()
-		minPop := min.Pop()
+		maxPop := max.pop()
+		minPop := min.pop()
 
 		if maxPop.set.size != uint64(100*(999-i)) {
 			t.Error("Unexpected set size in result from max-heap pop.")
@@ -147,18 +147,18 @@ func TestMapHeapSize(t *testing.T) {
 func TestMapHeapRemoveBySetID(t *testing.T) {
 	max := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
-		data:     make([]*mapElement, 0),
+		data:     nil,
 		size:     0,
 		minHeap:  false,
 	}
 	min := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
-		data:     make([]*mapElement, 0),
+		data:     nil,
 		size:     0,
 		minHeap:  true,
 	}
-	max.Init()
-	min.Init()
+	max.init()
+	min.init()
 
 	for i := 0; i < 5000; i++ {
 		e1 := &mapElement{
@@ -181,8 +181,8 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 			id:    splitSetID(i),
 			index: 0,
 		}
-		max.Push(e1)
-		min.Push(e2)
+		max.push(e1)
+		min.push(e2)
 	}
 
 	randID := splitSetID(rand.Intn(5000))
@@ -217,8 +217,8 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 	minRemovedSetSize := min.selectID[randID].set.size
 	maxRemovedSetSize := max.selectID[randID].set.size
 
-	max.RemoveSetByID(randID)
-	min.RemoveSetByID(randID)
+	max.removeSetByID(randID)
+	min.removeSetByID(randID)
 	minSizeAfter := min.size
 	maxSizeAfter := max.size
 	if minSizeBefore-minRemovedSetSize != minSizeAfter {
@@ -266,24 +266,24 @@ func TestMapHeapRemoveBySetID(t *testing.T) {
 func TestMapHeapPeek(t *testing.T) {
 	max := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
-		data:     make([]*mapElement, 0),
+		data:     nil,
 		size:     0,
 		minHeap:  false,
 	}
 	min := &mapHeap{
 		selectID: make(map[splitSetID]*mapElement),
-		data:     make([]*mapElement, 0),
+		data:     nil,
 		size:     0,
 		minHeap:  true,
 	}
-	max.Init()
-	min.Init()
+	max.init()
+	min.init()
 
 	minSizeBefore := min.size
 	maxSizeBefore := max.size
 
-	_, maxNotEmpty := max.Peek()
-	_, minNotEmpty := min.Peek()
+	_, maxNotEmpty := max.peek()
+	_, minNotEmpty := min.peek()
 	minSizeAfter := min.size
 	maxSizeAfter := max.size
 	if maxNotEmpty {
@@ -317,16 +317,16 @@ func TestMapHeapPeek(t *testing.T) {
 			id:    splitSetID(i),
 			index: 0,
 		}
-		max.Push(e1)
-		min.Push(e2)
+		max.push(e1)
+		min.push(e2)
 	}
 
 	for i := 0; i < 10; i++ {
 		minSizeBefore := min.size
 		maxSizeBefore := max.size
 
-		maxPeek, maxNotEmpty := max.Peek()
-		minPeek, minNotEmpty := min.Peek()
+		maxPeek, maxNotEmpty := max.peek()
+		minPeek, minNotEmpty := min.peek()
 		minSizeAfter := min.size
 		maxSizeAfter := max.size
 		if minSizeBefore != minSizeAfter || maxSizeBefore != maxSizeAfter {
@@ -339,8 +339,8 @@ func TestMapHeapPeek(t *testing.T) {
 			t.Error("Unexpected result from max.Peek(), heap empty after pushes")
 		}
 
-		maxPop := max.Pop()
-		minPop := min.Pop()
+		maxPop := max.pop()
+		minPop := min.pop()
 		if int(maxPop.id) != int(maxPeek.id) {
 			t.Error("Unexpected splitSetID in result from max-heap Peek.")
 		}

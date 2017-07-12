@@ -172,12 +172,12 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		splitSets: make(map[splitSetID]*splitSet),
 		blockMapHeap: &mapHeap{
 			selectID: make(map[splitSetID]*mapElement),
-			data:     make([]*mapElement, 0),
+			data:     nil,
 			minHeap:  true,
 		},
 		overflowMapHeap: &mapHeap{
 			selectID: make(map[splitSetID]*mapElement),
-			data:     make([]*mapElement, 0),
+			data:     nil,
 			minHeap:  false,
 		},
 
