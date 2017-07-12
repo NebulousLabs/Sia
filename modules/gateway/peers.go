@@ -136,7 +136,7 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 	}
 
 	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
-		err = g.managedAcceptConnv140Peer(conn, remoteVersion)
+		err = g.managedAcceptConnv130Peer(conn, remoteVersion)
 	} else if build.VersionCmp(remoteVersion, handshakeUpgradeVersion) >= 0 {
 		err = g.managedAcceptConnv100Peer(conn, remoteVersion)
 	} else {
@@ -172,10 +172,10 @@ func acceptableSessionHeader(ourHeader, remoteHeader sessionHeader, remoteAddr s
 	return nil
 }
 
-// managedAcceptConnv100Peer accepts connection requests from peers >= v1.4.0.
+// managedAcceptConnv130Peer accepts connection requests from peers >= v1.3.0.
 // The requesting peer is added as a node and a peer. The peer is only added if
 // a nil error is returned.
-func (g *Gateway) managedAcceptConnv140Peer(conn net.Conn, remoteVersion string) error {
+func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string) error {
 	// Perform header handshake.
 	host, _, _ := net.SplitHostPort(conn.LocalAddr().String())
 	ourHeader := sessionHeader{
@@ -437,9 +437,9 @@ func readSessionHeader(conn net.Conn, ourHeader sessionHeader) (sessionHeader, e
 	return remoteHeader, nil
 }
 
-// managedConnectv140Peer connects to peers >= v1.4.0. The peer is added as a
+// managedConnectv130Peer connects to peers >= v1.3.0. The peer is added as a
 // node and a peer. The peer is only added if a nil error is returned.
-func (g *Gateway) managedConnectv140Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
+func (g *Gateway) managedConnectv130Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
 	// Perform header handshake.
 	host, _, _ := net.SplitHostPort(conn.LocalAddr().String())
 	ourHeader := sessionHeader{
@@ -455,7 +455,7 @@ func (g *Gateway) managedConnectv140Peer(conn net.Conn, remoteVersion string, re
 	return nil
 }
 
-// managedConnectv100Peer connects to peers >= v1.0.0 and < v1.4.0. The peer is added as a
+// managedConnectv100Peer connects to peers >= v1.0.0 and < v1.3.0. The peer is added as a
 // node and a peer. The peer is only added if a nil error is returned.
 func (g *Gateway) managedConnectv100Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
 	g.mu.RLock()
@@ -506,7 +506,7 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	}
 
 	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
-		err = g.managedConnectv140Peer(conn, remoteVersion, addr)
+		err = g.managedConnectv130Peer(conn, remoteVersion, addr)
 	} else if build.VersionCmp(remoteVersion, handshakeUpgradeVersion) >= 0 {
 		err = g.managedConnectv100Peer(conn, remoteVersion, addr)
 	} else {

@@ -195,11 +195,8 @@ func storageRemainingAdjustments(entry modules.HostDBEntry) float64 {
 // version reported by the host.
 func versionAdjustments(entry modules.HostDBEntry) float64 {
 	base := float64(1)
-	if build.VersionCmp(entry.Version, "1.4.1") < 0 {
-		base = base * 0.99999 // Safety value to make sure we update the version penalties every time we update the host.
-	}
 	if build.VersionCmp(entry.Version, "1.3.1") < 0 {
-		base = base * 0.9
+		base = base * 0.99999 // Safety value to make sure we update the version penalties every time we update the host.
 	}
 	if build.VersionCmp(entry.Version, "1.3.0") < 0 {
 		base = base * 0.9
