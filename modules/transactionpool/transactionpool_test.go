@@ -476,7 +476,7 @@ func TestTpoolScalability(t *testing.T) {
 // value. Then it checks that those sets with higher value transaction fees are
 // prioritized for placement in blocks.
 func TestHeapFees(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	tpt, err := createTpoolTester(t.Name())
