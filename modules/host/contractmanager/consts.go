@@ -1,6 +1,8 @@
 package contractmanager
 
 import (
+	"time"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/persist"
 )
@@ -102,4 +104,24 @@ var (
 		Standard: uint64(1 << 6), // 512 MiB
 		Testing:  uint64(1 << 6), // 256 KiB
 	}).(uint64)
+)
+
+var (
+	// folderRecheckInitialInterval specifies the amount of time that the
+	// contract manager will initially wait when checking to see if an
+	// unavailable storage folder has become available.
+	folderRecheckInitialInterval = build.Select(build.Var{
+		Dev:      time.Second,
+		Standard: time.Second * 5,
+		Testing:  time.Second,
+	}).(time.Duration)
+
+	// maxFolderRecheckInterval specifies the maximum amount of time that the
+	// contract manager will wait between checking if an unavailable storage
+	// folder has become available.
+	maxFolderRecheckInterval = build.Select(build.Var{
+		Dev:      time.Second * 30,
+		Standard: time.Second * 60 * 5,
+		Testing:  time.Second * 8,
+	}).(time.Duration)
 )

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -64,12 +65,12 @@ type (
 	worker struct {
 		// contractID specifies which contract the worker specifically works
 		// with.
+		contract   modules.RenterContract
 		contractID types.FileContractID
 
 		// If there is work on all three channels, the worker will first do all
-		// of the work in the download chan, then all of the work in the
-		// priority upload chan, and finally all of the work in the upload
-		// chan.
+		// of the work in the priority download chan, then all of the work in the
+		// download chan, and finally all of the work in the upload chan.
 		//
 		// A busy higher priority channel is able to entirely starve all of the
 		// channels with lower priority.
@@ -229,16 +230,17 @@ func (w *worker) threadedWorkLoop() {
 // update the worker pool to match.
 func (r *Renter) updateWorkerPool() {
 	// Get a map of all the contracts in the contractor.
-	newContracts := make(map[types.FileContractID]struct{})
+	newContracts := make(map[types.FileContractID]modules.RenterContract)
 	for _, nc := range r.hostContractor.Contracts() {
-		newContracts[nc.ID] = struct{}{}
+		newContracts[nc.ID] = nc
 	}
 
 	// Add a worker for any contract that does not already have a worker.
-	for id := range newContracts {
+	for id, contract := range newContracts {
 		_, exists := r.workerPool[id]
 		if !exists {
 			worker := &worker{
+				contract:   contract,
 				contractID: id,
 
 				downloadChan:         make(chan downloadWork, 1),

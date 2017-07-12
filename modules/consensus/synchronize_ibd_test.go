@@ -14,13 +14,14 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestSimpleInitialBlockchainDownload tests that
 // threadedInitialBlockchainDownload synchronizes with peers in the simple case
 // where there are 8 outbound peers with the same blockchain.
 func TestSimpleInitialBlockchainDownload(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 
@@ -71,8 +72,8 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlock(b)
-			if err != nil && err != modules.ErrBlockKnown {
+			_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
+			if err != nil && err != modules.ErrBlockKnown && err != modules.ErrNonExtendingBlock {
 				t.Fatal(err)
 			}
 		}
@@ -97,7 +98,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlock(b)
+			_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown {
 				t.Fatal(err)
 			}
@@ -122,7 +123,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = localCST.cs.managedAcceptBlock(b)
+		_, err = localCST.cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,7 +134,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlock(b)
+			_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown {
 				t.Log(i)
 				t.Fatal(err)
@@ -159,7 +160,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = localCST.cs.managedAcceptBlock(b)
+		_, err = localCST.cs.managedAcceptBlocks([]types.Block{b})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -170,7 +171,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cst := range remoteCSTs {
-			err = cst.cs.managedAcceptBlock(b)
+			_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 			if err != nil && err != modules.ErrBlockKnown {
 				t.Log(i)
 				t.Fatal(err)
@@ -283,7 +284,7 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 //  - at least minNumOutbound synced outbound peers
 //  - or at least 1 synced outbound peer and minIBDWaitTime has passed since beginning IBD.
 func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	testdir := build.TempDir(modules.ConsensusDir, t.Name())
@@ -383,7 +384,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	// Add a peer that is synced to the peer that is not synced. IBD should not
 	// be considered completed when there is a tie between synced and
 	// not-synced peers.
-	gatewayNoTimeout, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
+	gatewayNoTimeout, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout1", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +405,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	// Test when there is 2 peers that are synced and one that is not synced.
 	// There is now a majority synced peers and the minIBDWaitTime has passed,
 	// so the IBD function should finish.
-	gatewayNoTimeout2, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
+	gatewayNoTimeout2, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout2", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +426,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	// Test when there are >= minNumOutbound peers and >= minNumOutbound peers are synced.
 	gatewayNoTimeouts := make([]modules.Gateway, minNumOutbound-1)
 	for i := 0; i < len(gatewayNoTimeouts); i++ {
-		tmpG, err := gateway.New("localhost:0", false, filepath.Join(testdir, fmt.Sprintf("remote - no timeout %v", i), modules.GatewayDir))
+		tmpG, err := gateway.New("localhost:0", false, filepath.Join(testdir, fmt.Sprintf("remote - no timeout-auto-%v", i+3), modules.GatewayDir))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -456,7 +457,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 // eachother as they would report EOF instead of performing correct block
 // exchange.
 func TestGenesisBlockSync(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 

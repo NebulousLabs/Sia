@@ -183,6 +183,7 @@ func (r *Renter) saveSync() error {
 	data := struct {
 		Tracking map[string]trackedFile
 	}{r.tracking}
+
 	return persist.SaveJSON(saveMetadata, data, filepath.Join(r.persistDir, PersistFilename))
 }
 

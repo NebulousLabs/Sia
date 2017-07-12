@@ -25,7 +25,6 @@ import (
 	"io"
 	"os"
 	"reflect"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -43,14 +42,11 @@ var journalMeta = persist.Metadata{
 type journal struct {
 	f        *os.File
 	filename string
-	mu       sync.Mutex
 }
 
 // update applies the updateSet atomically to j. It syncs the underlying file
 // before returning.
 func (j *journal) update(us updateSet) error {
-	j.mu.Lock()
-	defer j.mu.Unlock()
 	if err := json.NewEncoder(j.f).Encode(us); err != nil {
 		return err
 	}
@@ -60,8 +56,6 @@ func (j *journal) update(us updateSet) error {
 // Checkpoint refreshes the journal with a new initial object. It syncs the
 // underlying file before returning.
 func (j *journal) checkpoint(data contractorPersist) error {
-	j.mu.Lock()
-	defer j.mu.Unlock()
 	if build.DEBUG {
 		// Sanity check - applying the updates to the initial object should
 		// result in a contractorPersist that matches data.
@@ -125,29 +119,27 @@ func (j *journal) checkpoint(data contractorPersist) error {
 
 // Close closes the underlying file.
 func (j *journal) Close() error {
-	j.mu.Lock()
-	defer j.mu.Unlock()
 	return j.f.Close()
 }
 
 // newJournal creates a new journal, using data as the initial object.
 func newJournal(filename string, data contractorPersist) (*journal, error) {
+	// safely create the journal
 	f, err := os.Create(filename)
 	if err != nil {
 		return nil, err
 	}
-	// Write metadata.
 	enc := json.NewEncoder(f)
 	if err := enc.Encode(journalMeta); err != nil {
 		return nil, err
 	}
-	// Write initial object.
 	if err := enc.Encode(data); err != nil {
 		return nil, err
 	}
 	if err := f.Sync(); err != nil {
 		return nil, err
 	}
+
 	return &journal{f: f, filename: filename}, nil
 }
 
@@ -213,29 +205,9 @@ type journalUpdate interface {
 }
 
 type marshaledUpdate struct {
-	Type     string      `json:"type"`
-	Data     rawJSON     `json:"data"`
-	Checksum crypto.Hash `json:"checksum"`
-}
-
-// TODO: replace with json.RawMessage after upgrading to Go 1.8
-type rawJSON []byte
-
-// MarshalJSON returns r as the JSON encoding of r.
-func (r rawJSON) MarshalJSON() ([]byte, error) {
-	if r == nil {
-		return []byte("null"), nil
-	}
-	return r, nil
-}
-
-// UnmarshalJSON sets *r to a copy of data.
-func (r *rawJSON) UnmarshalJSON(data []byte) error {
-	if r == nil {
-		return errors.New("rawJSON: UnmarshalJSON on nil pointer")
-	}
-	*r = append((*r)[:0], data...)
-	return nil
+	Type     string          `json:"type"`
+	Data     json.RawMessage `json:"data"`
+	Checksum crypto.Hash     `json:"checksum"`
 }
 
 type updateSet []journalUpdate

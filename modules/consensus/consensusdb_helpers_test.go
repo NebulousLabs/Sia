@@ -23,19 +23,6 @@ func (cs *ConsensusSet) dbBlockHeight() (bh types.BlockHeight) {
 	return bh
 }
 
-// dbCurrentBlockID is a convenience function allowing currentBlockID to be
-// called without a bolt.Tx.
-func (cs *ConsensusSet) dbCurrentBlockID() (id types.BlockID) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
-		id = currentBlockID(tx)
-		return nil
-	})
-	if dbErr != nil {
-		panic(dbErr)
-	}
-	return id
-}
-
 // dbCurrentProcessedBlock is a convenience function allowing
 // currentProcessedBlock to be called without a bolt.Tx.
 func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *processedBlock) {

@@ -189,7 +189,7 @@ Host Internal Settings:
 	windowsize:           %v Hours
 
 	collateral:       %v / TB / Month
-	collateralbudget: %v 
+	collateralbudget: %v
 	maxcollateral:    %v Per Contract
 
 	mincontractprice:          %v
@@ -212,7 +212,7 @@ Host Financials:
 
 	Download Revenue:           %v
 	Potential Download Revenue: %v
-	Upload Revenue :            %v
+	Upload Revenue:             %v
 	Potential Upload Revenue:   %v
 
 RPC Stats:
@@ -362,6 +362,12 @@ func hostconfigcmd(param, value string) {
 	if err != nil {
 		die("Could not update host settings:", err)
 	}
+	var eg api.HostEstimateScoreGET
+	err = getAPI(fmt.Sprintf("/host/estimatescore?%v=%v", param, value), &eg)
+	if err != nil {
+		die("could not get host score estimate:", err)
+	}
+	fmt.Printf("Estimated conversion rate: %v%%\n", eg.ConversionRate)
 	fmt.Println("Host settings updated.")
 }
 

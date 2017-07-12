@@ -21,7 +21,7 @@ var (
 type blockValidator interface {
 	// ValidateBlock validates a block against a minimum timestamp, a block
 	// target, and a block height.
-	ValidateBlock(types.Block, types.Timestamp, types.Target, types.BlockHeight, *persist.Logger) error
+	ValidateBlock(types.Block, types.BlockID, types.Timestamp, types.Target, types.BlockHeight, *persist.Logger) error
 }
 
 // stdBlockValidator is the standard implementation of blockValidator.
@@ -56,22 +56,21 @@ func checkMinerPayouts(b types.Block, height types.BlockHeight) bool {
 }
 
 // checkTarget returns true if the block's ID meets the given target.
-func checkTarget(b types.Block, target types.Target) bool {
-	blockHash := b.ID()
-	return bytes.Compare(target[:], blockHash[:]) >= 0
+func checkTarget(b types.Block, id types.BlockID, target types.Target) bool {
+	return bytes.Compare(target[:], id[:]) >= 0
 }
 
 // ValidateBlock validates a block against a minimum timestamp, a block target,
 // and a block height. Returns nil if the block is valid and an appropriate
 // error otherwise.
-func (bv stdBlockValidator) ValidateBlock(b types.Block, minTimestamp types.Timestamp, target types.Target, height types.BlockHeight, log *persist.Logger) error {
+func (bv stdBlockValidator) ValidateBlock(b types.Block, id types.BlockID, minTimestamp types.Timestamp, target types.Target, height types.BlockHeight, log *persist.Logger) error {
 	// Check that the timestamp is not too far in the past to be acceptable.
 	if minTimestamp > b.Timestamp {
 		return errEarlyTimestamp
 	}
 
 	// Check that the target of the new block is sufficient.
-	if !checkTarget(b, target) {
+	if !checkTarget(b, id, target) {
 		return modules.ErrBlockUnsolved
 	}
 

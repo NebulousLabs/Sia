@@ -15,7 +15,7 @@ func TestApiClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	c := NewClient(st.server.listener.Addr().String(), "")
 	var gatewayInfo GatewayGET
@@ -38,7 +38,7 @@ func TestAuthenticatedApiClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	c := NewClient(st.server.listener.Addr().String(), "")
 	var walletAddress WalletAddressGET

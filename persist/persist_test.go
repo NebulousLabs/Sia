@@ -93,10 +93,10 @@ func TestRelativePathSafeFile(t *testing.T) {
 
 	// Create safe file.
 	sf, err := NewSafeFile(relPath)
-	defer sf.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer sf.Close()
 
 	// Check that the path of the file is not equal to the final path of the
 	// file.

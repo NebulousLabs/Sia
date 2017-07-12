@@ -529,3 +529,55 @@ func TestUnlockHashStringMarshalling(t *testing.T) {
 		t.Error("Got wrong error:", err)
 	}
 }
+
+// TestCurrencyHumanString checks that the HumanString method of the currency
+// type is correctly formatting values.
+func TestCurrencyUnits(t *testing.T) {
+	tests := []struct {
+		in  Currency
+		out string
+	}{
+		{NewCurrency64(1), "1 H"},
+		{NewCurrency64(1000), "1000 H"},
+		{NewCurrency64(100000000000), "100000000000 H"},
+		{NewCurrency64(1000000000000), "1 pS"},
+		{NewCurrency64(1234560000000), "1.235 pS"},
+		{NewCurrency64(12345600000000), "12.35 pS"},
+		{NewCurrency64(123456000000000), "123.5 pS"},
+		{NewCurrency64(1000000000000000), "1 nS"},
+		{NewCurrency64(1000000000000000000), "1 uS"},
+		{NewCurrency64(1000000000).Mul64(1000000000000), "1 mS"},
+		{NewCurrency64(1).Mul(SiacoinPrecision), "1 SC"},
+		{NewCurrency64(1000).Mul(SiacoinPrecision), "1 KS"},
+		{NewCurrency64(1000000).Mul(SiacoinPrecision), "1 MS"},
+		{NewCurrency64(1000000000).Mul(SiacoinPrecision), "1 GS"},
+		{NewCurrency64(1000000000000).Mul(SiacoinPrecision), "1 TS"},
+		{NewCurrency64(1234560000000).Mul(SiacoinPrecision), "1.235 TS"},
+		{NewCurrency64(1234560000000000).Mul(SiacoinPrecision), "1235 TS"},
+	}
+	for _, test := range tests {
+		if test.in.HumanString() != test.out {
+			t.Errorf("currencyUnits(%v): expected %v, got %v", test.in, test.out, test.in.HumanString())
+		}
+	}
+}
+
+// TestTransactionMarshalSiaSize tests that the txn.MarshalSiaSize method is
+// always consistent with len(encoding.Marshal(txn)).
+func TestTransactionMarshalSiaSize(t *testing.T) {
+	txn := Transaction{
+		SiacoinInputs:         []SiacoinInput{{}},
+		SiacoinOutputs:        []SiacoinOutput{{}},
+		FileContracts:         []FileContract{{}},
+		FileContractRevisions: []FileContractRevision{{}},
+		StorageProofs:         []StorageProof{{}},
+		SiafundInputs:         []SiafundInput{{}},
+		SiafundOutputs:        []SiafundOutput{{}},
+		MinerFees:             []Currency{{}},
+		ArbitraryData:         [][]byte{{}},
+		TransactionSignatures: []TransactionSignature{{}},
+	}
+	if txn.MarshalSiaSize() != len(encoding.Marshal(txn)) {
+		t.Errorf("sizes do not match: expected %v, got %v", len(encoding.Marshal(txn)), txn.MarshalSiaSize())
+	}
+}

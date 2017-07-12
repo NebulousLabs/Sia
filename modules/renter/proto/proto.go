@@ -27,6 +27,11 @@ type (
 		AcceptTransactionSet([]types.Transaction) error
 		FeeEstimation() (min types.Currency, max types.Currency)
 	}
+
+	hostDB interface {
+		IncrementSuccessfulInteractions(key types.SiaPublicKey)
+		IncrementFailedInteractions(key types.SiaPublicKey)
+	}
 )
 
 // ContractParams are supplied as an argument to FormContract.

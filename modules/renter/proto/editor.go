@@ -47,6 +47,7 @@ type Editor struct {
 	closeChan chan struct{}
 	once      sync.Once
 	host      modules.HostDBEntry
+	hdb       hostDB
 
 	height   types.BlockHeight
 	contract modules.RenterContract // updated after each revision
@@ -75,7 +76,16 @@ func (he *Editor) Close() error {
 // runRevisionIteration submits actions and their accompanying revision to the
 // host for approval. If negotiation is successful, it updates the underlying
 // Contract.
-func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) error {
+func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) (err error) {
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			he.hdb.IncrementFailedInteractions(he.contract.HostPublicKey)
+		} else {
+			he.hdb.IncrementSuccessfulInteractions(he.contract.HostPublicKey)
+		}
+	}()
+
 	// initiate revision
 	if err := startRevision(he.conn, he.host); err != nil {
 		return err
@@ -255,11 +265,21 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 
 // NewEditor initiates the contract revision process with a host, and returns
 // an Editor.
-func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, currentHeight types.BlockHeight, cancel <-chan struct{}) (*Editor, error) {
+func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}) (_ *Editor, err error) {
 	// check that contract has enough value to support an upload
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
 	}
+
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		// a revision mismatch is not necessarily the host's fault
+		if err != nil && !IsRevisionMismatch(err) {
+			hdb.IncrementFailedInteractions(contract.HostPublicKey)
+		} else if err == nil {
+			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+		}
+	}()
 
 	// initiate revision loop
 	conn, err := (&net.Dialer{
@@ -286,7 +306,7 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 		conn.Close()
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
-	if err := verifyRecentRevision(conn, contract); err != nil {
+	if err := verifyRecentRevision(conn, contract, host.Version); err != nil {
 		conn.Close() // TODO: close gracefully if host has entered revision loop
 		return nil, err
 	}
@@ -294,6 +314,7 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 	// the host is now ready to accept revisions
 	return &Editor{
 		host:      host,
+		hdb:       hdb,
 		height:    currentHeight,
 		contract:  contract,
 		conn:      conn,

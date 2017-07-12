@@ -3,6 +3,7 @@ package api
 import (
 	"math/big"
 
+	"errors"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -34,4 +35,15 @@ func scanHash(s string) (h crypto.Hash, err error) {
 		return crypto.Hash{}, err
 	}
 	return h, nil
+}
+
+// scanBool converts "true" and "false" strings to their respective
+// boolean value and returns an error if conversion is not possible.
+func scanBool(param string) (bool, error) {
+	if param == "true" {
+		return true, nil
+	} else if param == "false" || len(param) == 0 {
+		return false, nil
+	}
+	return false, errors.New("could not decode boolean: value was not true or false")
 }

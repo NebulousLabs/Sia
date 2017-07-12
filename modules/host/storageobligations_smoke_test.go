@@ -678,6 +678,10 @@ func TestAutoRevisionSubmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = ht.host.tg.Flush()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = ht.host.db.View(func(tx *bolt.Tx) error {
 		so, err = getStorageObligation(tx, so.id())

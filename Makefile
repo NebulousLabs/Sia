@@ -14,6 +14,7 @@ dependencies:
 	go get -u golang.org/x/crypto/ed25519
 	# Module + Daemon Dependencies
 	go get -u github.com/NebulousLabs/entropy-mnemonics
+	go get -u github.com/NebulousLabs/errors
 	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/muxado
 	go get -u github.com/klauspost/reedsolomon
@@ -22,10 +23,11 @@ dependencies:
 	go get -u github.com/kardianos/osext
 	# Frontend Dependencies
 	go get -u github.com/bgentry/speakeasy
-	go get -u github.com/spf13/cobra
+	go get -u github.com/spf13/cobra/...
 	# Developer Dependencies
 	go install -race std
 	go get -u github.com/golang/lint/golint
+	go get -u github.com/NebulousLabs/glyphcheck
 
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
@@ -63,7 +65,7 @@ release:
 release-race:
 	go install -race -tags='debug profile' $(pkgs)
 release-std:
-	go install $(pkgs)
+	go install -ldflags='-s -w' $(pkgs)
 
 # clean removes all directories that get automatically created during
 # development.
@@ -76,6 +78,12 @@ test-v:
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint
 	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
+test-vlong: clean fmt vet lint
+	go test -v -race -tags='testing debug vlong' -timeout=1000s $(pkgs) -run=$(run)
+test-cpu:
+	go test -v -tags='testing debug' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)
+test-mem:
+	go test -v -tags='testing debug' -timeout=500s -memprofile mem.prof $(pkgs) -run=$(run)
 bench: clean fmt
 	go test -tags='debug testing' -timeout=500s -run=XXX -bench=$(run) $(pkgs)
 cover: clean

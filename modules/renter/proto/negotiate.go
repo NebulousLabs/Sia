@@ -68,7 +68,7 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry) (modules.HostDBEntr
 
 // verifyRecentRevision confirms that the host and contractor agree upon the current
 // state of the contract being revised.
-func verifyRecentRevision(conn net.Conn, contract modules.RenterContract) error {
+func verifyRecentRevision(conn net.Conn, contract modules.RenterContract, hostVersion string) error {
 	// send contract ID
 	if err := encoding.WriteObject(conn, contract.ID); err != nil {
 		return errors.New("couldn't send contract ID: " + err.Error())
@@ -77,6 +77,9 @@ func verifyRecentRevision(conn net.Conn, contract modules.RenterContract) error 
 	var challenge crypto.Hash
 	if err := encoding.ReadObject(conn, &challenge, 32); err != nil {
 		return errors.New("couldn't read challenge: " + err.Error())
+	}
+	if build.VersionCmp(hostVersion, "1.3.0") >= 0 {
+		crypto.SecureWipe(challenge[:16])
 	}
 	// sign and return
 	sig := crypto.SignHash(challenge, contract.SecretKey)

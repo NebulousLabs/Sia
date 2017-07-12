@@ -13,17 +13,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	dbFilename = "transactionpool.db"
-	logFile    = "transactionpool.log"
-)
-
 var (
-	dbMetadata = persist.Metadata{
-		Header:  "Sia Transaction Pool DB",
-		Version: "0.6.0",
-	}
-
 	errNilCS      = errors.New("transaction pool cannot initialize with a nil consensus set")
 	errNilGateway = errors.New("transaction pool cannot initialize with a nil gateway")
 )
@@ -56,14 +46,16 @@ type (
 		// transactionSetDiffs map form a transaction set id to the set of
 		// diffs that resulted from the transaction set.
 		knownObjects        map[ObjectID]TransactionSetID
+		subscriberSets      map[TransactionSetID]*modules.UnconfirmedTransactionSet
+		transactionHeights  map[types.TransactionID]types.BlockHeight
 		transactionSets     map[TransactionSetID][]types.Transaction
-		transactionSetDiffs map[TransactionSetID]modules.ConsensusChange
+		transactionSetDiffs map[TransactionSetID]*modules.ConsensusChange
 		transactionListSize int
-		// TODO: Write a consistency check comparing transactionSets,
-		// transactionSetDiffs.
-		//
-		// TODO: Write a consistency check making sure that all unconfirmedIDs
-		// point to the right place, and that all UnconfirmedIDs are accounted for.
+
+		// Variables related to the blockchain.
+		blockHeight     types.BlockHeight
+		recentMedians   []types.Currency
+		recentMedianFee types.Currency // SC per byte
 
 		// The consensus change index tracks how many consensus changes have
 		// been sent to the transaction pool. When a new subscriber joins the
@@ -97,8 +89,10 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 		gateway:      g,
 
 		knownObjects:        make(map[ObjectID]TransactionSetID),
+		subscriberSets:      make(map[TransactionSetID]*modules.UnconfirmedTransactionSet),
+		transactionHeights:  make(map[types.TransactionID]types.BlockHeight),
 		transactionSets:     make(map[TransactionSetID][]types.Transaction),
-		transactionSetDiffs: make(map[TransactionSetID]modules.ConsensusChange),
+		transactionSetDiffs: make(map[TransactionSetID]*modules.ConsensusChange),
 
 		persistDir: persistDir,
 	}
@@ -117,6 +111,8 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 	return tp, nil
 }
 
+// Close releases any resources held by the transaction pool, stopping all of
+// its worker threads.
 func (tp *TransactionPool) Close() error {
 	return tp.tg.Stop()
 }
@@ -124,18 +120,52 @@ func (tp *TransactionPool) Close() error {
 // FeeEstimation returns an estimation for what fee should be applied to
 // transactions.
 func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
-	// TODO: The fee estimation tool should look at the recent blocks and use
-	// them to gauge what sort of fee should be required, as opposed to just
-	// guessing blindly.
+	err := tp.tg.Add()
+	if err != nil {
+		return
+	}
+	defer tp.tg.Done()
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	// Use three methods to determine an acceptable fee, and then take the
+	// largest result of the two methods. The first method checks the historic
+	// blocks, to make sure that we don't under-estimate the number of fees
+	// needed in the event that we just purged the tpool.
 	//
-	// TODO: The current minimum has been reduced significantly to account for
-	// legacy renters that are not correctly adding transaction fees. The
-	// minimum has been set to 1 siacoin per kb (or 1/1000 SC per byte), but
-	// really should look more like 10 SC per kb. But, legacy renters are using
-	// a much lower value, which means hosts would be incompatible if the
-	// minimum recommended were set to 10. The value has been set to 1, which
-	// should be okay temporarily while the renters are given time to upgrade.
-	return types.SiacoinPrecision.Mul64(1).Div64(3).Div64(1e3), types.SiacoinPrecision.Mul64(1).Div64(1e3)
+	// The second method looks at the existing tpool. Sudden congestion won't be
+	// represented on the blockchain right away, but should be immediately
+	// influencing how you set fees. Using the current tpool fullness will help
+	// pick appropriate fees in the event of sudden congestion.
+	//
+	// The third method just has hardcoded minimums as a sanity check. In the
+	// event of empty blocks, there should still be some fees being added to the
+	// chain.
+
+	// Set the minimum fee to the numbers recommended by the blockchain.
+	min = tp.recentMedianFee
+	max = tp.recentMedianFee.Mul64(maxMultiplier)
+
+	// Method two: use 'requiredFeesToExtendPool'.
+	required := tp.requiredFeesToExtendTpool()
+	requiredMin := required.MulFloat(minExtendMultiplier) // Clear the local requirement by a little bit.
+	requiredMax := requiredMin.MulFloat(maxMultiplier)    // Clear the local requirement by a lot.
+	if min.Cmp(requiredMin) < 0 {
+		min = requiredMin
+	}
+	if max.Cmp(requiredMax) < 0 {
+		max = requiredMax
+	}
+
+	// Method three: sane mimimums.
+	if min.Cmp(minEstimation) < 0 {
+		min = minEstimation
+	}
+	if max.Cmp(minEstimation.Mul64(maxMultiplier)) < 0 {
+		max = minEstimation.Mul64(maxMultiplier)
+	}
+
+	return
 }
 
 // TransactionList returns a list of all transactions in the transaction pool.
@@ -150,4 +180,83 @@ func (tp *TransactionPool) TransactionList() []types.Transaction {
 		txns = append(txns, tSet...)
 	}
 	return txns
+}
+
+// Transaction returns the transaction with the provided txid, its parents, and
+// a bool indicating if it exists in the transaction pool.
+func (tp *TransactionPool) Transaction(id types.TransactionID) (types.Transaction, []types.Transaction, bool) {
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	// find the transaction
+	exists := false
+	var txn types.Transaction
+	var allParents []types.Transaction
+	for _, tSet := range tp.transactionSets {
+		for i, t := range tSet {
+			if t.ID() == id {
+				txn = t
+				allParents = tSet[:i]
+				exists = true
+				break
+			}
+		}
+	}
+
+	// prune unneeded parents
+	parentIDs := make(map[types.OutputID]struct{})
+	addOutputIDs := func(txn types.Transaction) {
+		for _, input := range txn.SiacoinInputs {
+			parentIDs[types.OutputID(input.ParentID)] = struct{}{}
+		}
+		for _, fcr := range txn.FileContractRevisions {
+			parentIDs[types.OutputID(fcr.ParentID)] = struct{}{}
+		}
+		for _, input := range txn.SiafundInputs {
+			parentIDs[types.OutputID(input.ParentID)] = struct{}{}
+		}
+		for _, proof := range txn.StorageProofs {
+			parentIDs[types.OutputID(proof.ParentID)] = struct{}{}
+		}
+		for _, sig := range txn.TransactionSignatures {
+			parentIDs[types.OutputID(sig.ParentID)] = struct{}{}
+		}
+	}
+	isParent := func(t types.Transaction) bool {
+		for i := range t.SiacoinOutputs {
+			if _, exists := parentIDs[types.OutputID(t.SiacoinOutputID(uint64(i)))]; exists {
+				return true
+			}
+		}
+		for i := range t.FileContracts {
+			if _, exists := parentIDs[types.OutputID(t.SiacoinOutputID(uint64(i)))]; exists {
+				return true
+			}
+		}
+		for i := range t.SiafundOutputs {
+			if _, exists := parentIDs[types.OutputID(t.SiacoinOutputID(uint64(i)))]; exists {
+				return true
+			}
+		}
+		return false
+	}
+
+	addOutputIDs(txn)
+	var necessaryParents []types.Transaction
+	for i := len(allParents) - 1; i >= 0; i-- {
+		parent := allParents[i]
+
+		if isParent(parent) {
+			necessaryParents = append([]types.Transaction{parent}, necessaryParents...)
+			addOutputIDs(parent)
+		}
+	}
+
+	return txn, necessaryParents, exists
+}
+
+// Broadcast broadcasts a transaction set to all of the transaction pool's
+// peers.
+func (tp *TransactionPool) Broadcast(ts []types.Transaction) {
+	go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 }

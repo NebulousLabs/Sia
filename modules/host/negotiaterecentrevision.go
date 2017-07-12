@@ -105,7 +105,7 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, st
 	// Send a challenge to the renter to verify that the renter has write
 	// access to the revision being opened.
 	var challenge crypto.Hash
-	fastrand.Read(challenge[:])
+	fastrand.Read(challenge[16:])
 	err = encoding.WriteObject(conn, challenge)
 	if err != nil {
 		return types.FileContractID{}, storageObligation{}, extendErr("cound not write challenge: ", ErrorConnection(err.Error()))

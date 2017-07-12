@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -248,6 +249,100 @@ func TestLock(t *testing.T) {
 	}
 }
 
+// TestInitFromSeedConcurrentUnlock verifies that calling InitFromSeed and
+// then Unlock() concurrently results in the correct balance.
+func TestInitFromSeedConcurrentUnlock(t *testing.T) {
+	t.Skip("Test has poor concurrency design")
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create a wallet with some money
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+	seed, _, err := wt.wallet.PrimarySeed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	origBal, _, _ := wt.wallet.ConfirmedBalance()
+
+	// create a blank wallet
+	dir := filepath.Join(build.TempDir(modules.WalletDir, t.Name()+"-new"), modules.WalletDir)
+	w, err := New(wt.cs, wt.tpool, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// spawn an initfromseed goroutine
+	go w.InitFromSeed(crypto.TwofishKey{}, seed)
+
+	// pause for 10ms to allow the seed sweeper to start
+	time.Sleep(time.Millisecond * 10)
+
+	// unlock should now return an error
+	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+	if err != errScanInProgress {
+		t.Fatal("expected errScanInProgress, got", err)
+	}
+	// wait for init to finish
+	for i := 0; i < 100; i++ {
+		time.Sleep(time.Millisecond * 10)
+		err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+		if err == nil {
+			break
+		}
+	}
+
+	// starting balance should match the original wallet
+	newBal, _, _ := w.ConfirmedBalance()
+	if newBal.Cmp(origBal) != 0 {
+		t.Log(w.UnconfirmedBalance())
+		t.Fatalf("wallet should have correct balance after loading seed: wanted %v, got %v", origBal, newBal)
+	}
+}
+
+// TestUnlockConcurrent verifies that calling unlock multiple times
+// concurrently results in only one unlock operation.
+func TestUnlockConcurrent(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create a wallet with some money
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// lock the wallet
+	wt.wallet.Lock()
+
+	// spawn an unlock goroutine
+	errChan := make(chan error)
+	go func() {
+		// acquire the write lock so that Unlock acquires the trymutex, but
+		// cannot proceed further
+		wt.wallet.mu.Lock()
+		errChan <- wt.wallet.Unlock(wt.walletMasterKey)
+	}()
+
+	// wait for goroutine to start
+	time.Sleep(time.Millisecond * 10)
+
+	// unlock should now return an error
+	err = wt.wallet.Unlock(wt.walletMasterKey)
+	if err != errScanInProgress {
+		t.Fatal("expected errScanInProgress, got", err)
+	}
+
+	wt.wallet.mu.Unlock()
+	if err := <-errChan; err != nil {
+		t.Fatal("first unlock failed:", err)
+	}
+}
+
 // TestInitFromSeed tests creating a wallet from a preexisting seed.
 func TestInitFromSeed(t *testing.T) {
 	if testing.Short() {
@@ -331,6 +426,54 @@ func TestReset(t *testing.T) {
 	var newKey crypto.TwofishKey
 	fastrand.Read(newKey[:])
 	_, err = wt.wallet.Encrypt(newKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	postEncryptionTesting(wt.miner, wt.wallet, newKey)
+}
+
+// TestChangeKey tests that a wallet can only be unlocked with the new key
+// after changing it and that it shows the same balance as before
+func TestChangeKey(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	var newKey crypto.TwofishKey
+	fastrand.Read(newKey[:])
+	origBal, _, _ := wt.wallet.ConfirmedBalance()
+
+	err = wt.wallet.ChangeKey(wt.walletMasterKey, newKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wt.wallet.Lock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wt.wallet.Unlock(wt.walletMasterKey)
+	if err == nil {
+		t.Fatal("expected unlock to fail with the original key")
+	}
+
+	err = wt.wallet.Unlock(newKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newBal, _, _ := wt.wallet.ConfirmedBalance()
+	if newBal.Cmp(origBal) != 0 {
+		t.Fatal("wallet with changed key did not have the same balance")
+	}
+
+	err = wt.wallet.Lock()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -31,7 +32,7 @@ func TestHostDBHostsActiveHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Try the call with numhosts unset, and set to -1, 0, and 1.
 	var ah HostdbActiveGET
@@ -120,7 +121,7 @@ func TestHostDBHostsAllHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Try the call before any hosts have been declared.
 	var ah HostdbAllGET
@@ -151,7 +152,7 @@ func TestHostDBHostsHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and then get the list of hosts.
 	var ah HostdbActiveGET
@@ -317,7 +318,7 @@ func assembleHostPort(key crypto.TwofishKey, hostHostname string, testdir string
 // TestHostDBScanOnlineOffline checks that both online and offline hosts get
 // scanned in the hostdb.
 func TestHostDBScanOnlineOffline(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -325,6 +326,7 @@ func TestHostDBScanOnlineOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
@@ -393,6 +395,7 @@ func TestHostDBScanOnlineOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost.panicClose()
 	sts[1] = stHost
 	err = fullyConnectNodes(sts)
 	if err != nil {
@@ -417,7 +420,7 @@ func TestHostDBScanOnlineOffline(t *testing.T) {
 // successfully able to follow a host that has changed IP addresses and then
 // re-announced.
 func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -425,6 +428,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
@@ -519,7 +523,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -546,6 +550,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost.panicClose()
 	sts[1] = stHost
 	err = fullyConnectNodes(sts)
 	if err != nil {
@@ -556,7 +561,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Pull the host's net address and pubkey from the hostdb.
-	err = retry(50, time.Millisecond*100, func() error {
+	err = retry(100, time.Millisecond*200, func() error {
 		// Get the hostdb internals.
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			return err
@@ -596,7 +601,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -612,22 +617,25 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Give time for the upgrade to happen.
-		time.Sleep(time.Second * 3)
 	}
-
-	// Try downloading the file.
-	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+	err = retry(100, time.Millisecond*100, func() error {
+		err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+		if err != nil {
+			return err
+		}
+		// Try downloading the file.
+		// Check that the download has the right contents.
+		download, err = ioutil.ReadFile(downpath)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(orig, download) {
+			return errors.New("downloaded file does not equal the original")
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	// Check that the download has the right contents.
-	download, err = ioutil.ReadFile(downpath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if bytes.Compare(orig, download) != 0 {
-		t.Fatal("data mismatch when downloading a file")
 	}
 }
 
@@ -635,7 +643,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 // successfully able to follow a host that has changed IP addresses and then
 // re-announced.
 func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -643,6 +651,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
@@ -745,6 +754,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost.panicClose()
 	sts[1] = stHost
 	err = fullyConnectNodes(sts)
 	if err != nil {
@@ -822,7 +832,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig2, download2) != 0 {
+	if !bytes.Equal(orig2, download2) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -857,7 +867,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -875,7 +885,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig2, download2) != 0 {
+	if !bytes.Equal(orig2, download2) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 }
@@ -884,7 +894,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 // successfully able to follow a host that has changed IP addresses and then
 // re-announced.
 func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -892,6 +902,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
@@ -960,6 +971,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost.panicClose()
 	sts[1] = stHost
 	err = fullyConnectNodes(sts)
 	if err != nil {
@@ -1049,7 +1061,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -1079,7 +1091,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 }
@@ -1088,7 +1100,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 // successfully able to follow a host that has changed IP addresses and then
 // re-announced.
 func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -1096,6 +1108,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.panicClose()
 	stHost, err := blankServerTester(t.Name() + "-Host")
 	if err != nil {
 		t.Fatal(err)
@@ -1183,7 +1196,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
@@ -1210,6 +1223,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stHost.panicClose()
 	sts[1] = stHost
 	err = fullyConnectNodes(sts)
 	if err != nil {
@@ -1218,6 +1232,10 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	err = stHost.announceHost()
 	if err != nil {
 		t.Fatal(err)
+	}
+	err = waitForBlock(stHost.cs.CurrentBlock().ID(), st)
+	if err != nil {
+		t.Fatal()
 	}
 	// Pull the host's net address and pubkey from the hostdb.
 	err = retry(50, time.Millisecond*100, func() error {
@@ -1269,7 +1287,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(orig, download) != 0 {
+	if !bytes.Equal(orig, download) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 }

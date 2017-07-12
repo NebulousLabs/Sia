@@ -181,8 +181,8 @@ func (g *Gateway) Close() error {
 	if err := g.threads.Stop(); err != nil {
 		return err
 	}
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	return g.saveSync()
 }
 

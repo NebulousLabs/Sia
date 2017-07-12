@@ -81,9 +81,12 @@ func (f *file) numChunks() uint64 {
 }
 
 // available indicates whether the file is ready to be downloaded.
-func (f *file) available() bool {
+func (f *file) available(isOffline func(types.FileContractID) bool) bool {
 	chunkPieces := make([]int, f.numChunks())
 	for _, fc := range f.contracts {
+		if isOffline(fc.ID) {
+			continue
+		}
 		for _, p := range fc.Pieces {
 			chunkPieces[p.Chunk]++
 		}
@@ -111,8 +114,9 @@ func (f *file) uploadProgress() float64 {
 
 // redundancy returns the redundancy of the least redundant chunk. A file
 // becomes available when this redundancy is >= 1. Assumes that every piece is
-// unique within a file contract. -1 is returned if the file has size 0.
-func (f *file) redundancy() float64 {
+// unique within a file contract. -1 is returned if the file has size 0. It
+// takes one argument, a map of offline contracts for this file.
+func (f *file) redundancy(isOffline func(types.FileContractID) bool) float64 {
 	if f.size == 0 {
 		return -1
 	}
@@ -125,6 +129,10 @@ func (f *file) redundancy() float64 {
 		return -1
 	}
 	for _, fc := range f.contracts {
+		// do not count pieces from the contract if the contract is offline
+		if isOffline(fc.ID) {
+			continue
+		}
 		for _, p := range fc.Pieces {
 			piecesPerChunk[p.Chunk]++
 		}
@@ -193,25 +201,39 @@ func (r *Renter) DeleteFile(nickname string) error {
 
 // FileList returns all of the files that the renter has.
 func (r *Renter) FileList() []modules.FileInfo {
+	var files []*file
 	lockID := r.mu.RLock()
-	defer r.mu.RUnlock(lockID)
-
-	files := make([]modules.FileInfo, 0, len(r.files))
 	for _, f := range r.files {
+		files = append(files, f)
+	}
+	r.mu.RUnlock(lockID)
+
+	isOffline := func(id types.FileContractID) bool {
+		id = r.hostContractor.ResolveID(id)
+		offline := r.hostContractor.IsOffline(id)
+		contract, exists := r.hostContractor.ContractByID(id)
+		if !exists {
+			return true
+		}
+		return offline || !contract.GoodForRenew
+	}
+
+	var fileList []modules.FileInfo
+	for _, f := range files {
 		f.mu.RLock()
 		renewing := true
-		files = append(files, modules.FileInfo{
+		fileList = append(fileList, modules.FileInfo{
 			SiaPath:        f.name,
 			Filesize:       f.size,
-			Available:      f.available(),
-			Redundancy:     f.redundancy(),
 			Renewing:       renewing,
+			Available:      f.available(isOffline),
+			Redundancy:     f.redundancy(isOffline),
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
 		})
 		f.mu.RUnlock()
 	}
-	return files
+	return fileList
 }
 
 // RenameFile takes an existing file and changes the nickname. The original

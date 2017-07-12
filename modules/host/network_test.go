@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -62,41 +63,51 @@ func TestPortForwardBlocking(t *testing.T) {
 // TestHostWorkingStatus checks that the host properly updates its working
 // state
 func TestHostWorkingStatus(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
+
 	ht, err := newHostTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
-	if ht.host.WorkingStatus() != modules.HostWorkingStatusChecking {
-		t.Fatal("expected working state to initially be modules.HostWorkingStatusChecking")
-	}
+	// TODO: this causes an ndf, because it relies on the host tester starting up
+	// and fully returning faster than the first check, which isnt always the
+	// case.  This check is disabled for now, but can be fixed by using the
+	// disrupt() pattern.
+	// if ht.host.WorkingStatus() != modules.HostWorkingStatusChecking {
+	// 	t.Fatal("expected working state to initially be modules.HostWorkingStatusChecking")
+	// }
 
-	// Simulate some setting calls, and see if the host picks up on it.
-	atomic.AddUint64(&ht.host.atomicSettingsCalls, workingStatusThreshold+1)
-	time.Sleep(workingStatusFirstCheck + time.Second)
-	if ht.host.WorkingStatus() != modules.HostWorkingStatusWorking {
-		t.Fatal("expected host working status to be modules.HostWorkingStatusWorking after incrementing status calls")
-	}
+	for i := 0; i < 5; i++ {
+		// Simulate some setting calls, and see if the host picks up on it.
+		atomic.AddUint64(&ht.host.atomicSettingsCalls, workingStatusThreshold+1)
 
-	// No more settings calls, host should believe it is not working now.
-	time.Sleep(workingStatusFrequency + time.Second)
-	if ht.host.WorkingStatus() != modules.HostWorkingStatusNotWorking {
-		t.Fatal("expected host working status to be modules.HostWorkingStatusNotWorking after waiting workingStatusFrequency with no settings calls")
-	}
+		success := false
+		for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
+			if ht.host.WorkingStatus() == modules.HostWorkingStatusWorking {
+				success = true
+				break
+			}
+		}
+		if !success {
+			t.Fatal("expected working state to flip to HostWorkingStatusWorking after incrementing settings calls")
+		}
 
-	// Simulate some setting calls, and see if the host picks up on it.
-	atomic.AddUint64(&ht.host.atomicSettingsCalls, workingStatusThreshold+1)
-	time.Sleep(workingStatusFirstCheck + time.Second)
-	if ht.host.WorkingStatus() != modules.HostWorkingStatusNotWorking {
-		t.Fatal("expected host working status to be modules.HostWorkingStatusWorking after incrementing status calls")
-	}
-	time.Sleep(workingStatusFrequency - workingStatusFirstCheck)
-	if ht.host.WorkingStatus() != modules.HostWorkingStatusWorking {
-		t.Fatal("expected host working status to be modules.HostWorkingStatusWorking after incrementing status calls")
+		// make no settins calls, host should flip back to NotWorking
+		success = false
+		for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
+			if ht.host.WorkingStatus() == modules.HostWorkingStatusNotWorking {
+				success = true
+				break
+			}
+		}
+		if !success {
+			t.Fatal("expected working state to flip to HostStatusNotWorking if no settings calls occur")
+		}
 	}
 }
 
@@ -111,12 +122,24 @@ func TestHostConnectabilityStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
-	if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusChecking {
-		t.Fatal("expected connectability state to initially be ConnectablityStateChecking")
+	// TODO: this causes an ndf, because it relies on the host tester starting up
+	// and fully returning faster than the first check, which isnt always the
+	// case.  This check is disabled for now, but can be fixed by using the
+	// disrupt() pattern.
+	// if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusChecking {
+	// 		t.Fatal("expected connectability state to initially be ConnectablityStateChecking")
+	// }
+
+	success := false
+	for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
+		if ht.host.ConnectabilityStatus() == modules.HostConnectabilityStatusConnectable {
+			success = true
+			break
+		}
 	}
-	time.Sleep(connectabilityCheckFirstWait + time.Second)
-	if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusConnectable {
-		t.Fatal("expected connectability state to be modules.HostConnectabilityStatusConnectable")
+	if !success {
+		t.Fatal("expected connectability state to flip to HostConnectabilityStatusConnectable")
 	}
 }

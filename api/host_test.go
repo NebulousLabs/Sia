@@ -1,16 +1,21 @@
 package api
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/host/contractmanager"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -47,7 +52,112 @@ var (
 	}
 )
 
-// TestWorkingStatus tests that the host's WorkingStatus field is set correctly.
+// TestEstimateWeight tests that /host/estimatescore works correctly.
+func TestEstimateWeight(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	// announce a host, create an allowance, upload some data.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.acceptContracts(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	var eg HostEstimateScoreGET
+	if err := st.getAPI("/host/estimatescore", &eg); err != nil {
+		t.Fatal(err)
+	}
+	originalEstimate := eg.EstimatedScore
+
+	// verify that the estimate is being correctly updated by setting a massively
+	// increased min contract price and verifying that the score decreases.
+	is := st.host.InternalSettings()
+	is.MinContractPrice = is.MinContractPrice.Add(types.SiacoinPrecision.Mul64(9999999999))
+	if err := st.host.SetInternalSettings(is); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.getAPI("/host/estimatescore", &eg); err != nil {
+		t.Fatal(err)
+	}
+	if eg.EstimatedScore.Cmp(originalEstimate) != -1 {
+		t.Fatal("score estimate did not decrease after incrementing mincontractprice")
+	}
+
+	// add a few hosts to the hostdb and verify that the conversion rate is
+	// reflected correctly
+	st2, err := blankServerTester(t.Name() + "-st2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.panicClose()
+	st3, err := blankServerTester(t.Name() + "-st3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st3.panicClose()
+	st4, err := blankServerTester(t.Name() + "-st4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st4.panicClose()
+	sts := []*serverTester{st, st2, st3, st4}
+	err = fullyConnectNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fundAllNodes(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, tester := range sts {
+		is = tester.host.InternalSettings()
+		is.MinContractPrice = types.SiacoinPrecision.Mul64(1000 + (1000 * uint64(i)))
+		err = tester.host.SetInternalSettings(is)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = announceAllHosts(sts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		price             types.Currency
+		minConversionRate float64
+	}{
+		{types.SiacoinPrecision, 100},
+		{types.SiacoinPrecision.Mul64(50), 98},
+		{types.SiacoinPrecision.Mul64(2500), 50},
+		{types.SiacoinPrecision.Mul64(3000), 10},
+		{types.SiacoinPrecision.Mul64(30000), 0.00001},
+	}
+	for i, test := range tests {
+		err = st.getAPI(fmt.Sprintf("/host/estimatescore?mincontractprice=%v", test.price.String()), &eg)
+		if err != nil {
+			t.Fatal("test", i, "failed:", err)
+		}
+		if eg.ConversionRate < test.minConversionRate {
+			t.Fatalf("test %v: incorrect conversion rate: got %v wanted %v\n", i, eg.ConversionRate, test.minConversionRate)
+		}
+	}
+}
+
+// TestWorkingStatus tests that the host's WorkingStatus field is set
+// correctly.
 func TestWorkingStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -58,7 +168,7 @@ func TestWorkingStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// announce a host, create an allowance, upload some data.
 	if err := st.announceHost(); err != nil {
@@ -104,13 +214,17 @@ func TestWorkingStatus(t *testing.T) {
 		t.Fatal("uploading has failed")
 	}
 
-	time.Sleep(time.Second * 31)
+	err = retry(30, time.Second, func() error {
+		var hg HostGET
+		st.getAPI("/host", &hg)
 
-	var hg HostGET
-	st.getAPI("/host", &hg)
-
-	if hg.WorkingStatus != modules.HostWorkingStatusWorking {
-		t.Fatal("expected host to be working")
+		if hg.WorkingStatus != modules.HostWorkingStatusWorking {
+			return errors.New("expected host to be working")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -127,21 +241,23 @@ func TestConnectabilityStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	if err := st.announceHost(); err != nil {
 		t.Fatal(err)
 	}
 
-	// wait a bit for the check to run
-	time.Sleep(time.Second * 31)
+	err = retry(30, time.Second, func() error {
+		var hg HostGET
+		st.getAPI("/host", &hg)
 
-	// check that the field was set correctly
-	var hg HostGET
-	st.getAPI("/host", &hg)
-
-	if hg.ConnectabilityStatus != modules.HostConnectabilityStatusConnectable {
-		t.Fatal("expected host to be connectable")
+		if hg.ConnectabilityStatus != modules.HostConnectabilityStatusConnectable {
+			return errors.New("expected host to be connectable")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -155,7 +271,7 @@ func TestStorageHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -227,7 +343,7 @@ func TestAddFolderNoPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Try adding a storage folder without setting "path" in the API call.
 	addValues := url.Values{}
@@ -256,7 +372,7 @@ func TestAddFolderNoSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Try adding a storage folder without setting "size" in the API call.
 	addValues := url.Values{}
@@ -278,7 +394,7 @@ func TestAddSameFolderTwice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Make the call to add a storage folder twice.
 	addValues := url.Values{}
@@ -305,7 +421,7 @@ func TestResizeEmptyStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -387,7 +503,7 @@ func TestResizeNonemptyStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host and start accepting contracts.
 	if err := st.announceHost(); err != nil {
@@ -500,7 +616,7 @@ func TestResizeNonexistentFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// No folder has been created yet at st.dir, so using it as the path for
 	// the resize call should trigger an error.
@@ -510,6 +626,128 @@ func TestResizeNonexistentFolder(t *testing.T) {
 	err = st.stdPostAPI("/host/storage/folders/resize", resizeValues)
 	if err == nil || err.Error() != errStorageFolderNotFound.Error() {
 		t.Fatalf("expected error to be %v, got %v", errStorageFolderNotFound, err)
+	}
+}
+
+// TestStorageFolderUnavailable simulates the situation where a storage folder
+// is not available to the host when the host starts, verifying that it sets
+// FailedWrites and FailedReads correctly and eventually finds the storage
+// folder when it is made available to the host again.
+func TestStorageFolderUnavailable(t *testing.T) {
+	if testing.Short() || !build.VLONG {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// add a storage folder
+	sfPath := build.TempDir(t.Name(), "storagefolder")
+	err = os.MkdirAll(sfPath, 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sfValues := url.Values{}
+	sfValues.Set("path", sfPath)
+	sfValues.Set("size", "1048576")
+	err = st.stdPostAPI("/host/storage/folders/add", sfValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var sfs StorageGET
+	err = st.getAPI("/host/storage", &sfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if sfs.Folders[0].FailedReads != 0 || sfs.Folders[0].FailedWrites != 0 {
+		t.Fatal("newly added folder has failed reads or writes")
+	}
+
+	// remove the folder on disk
+	st.server.Close()
+	sfPath2 := build.TempDir(t.Name(), "storagefolder-old")
+	err = os.Rename(sfPath, sfPath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// reload the host
+	st, err = st.reloadedServerTester()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	err = st.getAPI("/host/storage", &sfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sfs.Folders[0].FailedWrites < 999 {
+		t.Fatal("storage folder should have lots of failed writes after being moved on disk")
+	}
+	if sfs.Folders[0].FailedReads < 999 {
+		t.Fatal("storage folder should have lots of failed reads after being moved on disk")
+	}
+
+	// try some actions on the dead storage folder
+	// resize
+	sfValues.Set("size", "2097152")
+	err = st.stdPostAPI("/host/storage/folders/resize", sfValues)
+	if err == nil {
+		t.Fatal("expected resize on unavailable storage folder to fail")
+	}
+	// remove
+	err = st.stdPostAPI("/host/storage/folders/remove", sfValues)
+	if err == nil {
+		t.Fatal("expected remove on unavailable storage folder to fail")
+	}
+
+	// move the folder back
+	err = os.Rename(sfPath2, sfPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the contract manager to recheck the storage folder
+	// NOTE: this is a hard-coded constant based on the contractmanager's maxFolderRecheckInterval constant.
+	time.Sleep(time.Second * 10)
+
+	// verify the storage folder is reset to normal
+	err = st.getAPI("/host/storage", &sfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sfs.Folders[0].FailedWrites > 0 {
+		t.Fatal("storage folder should have no failed writes after being moved back")
+	}
+	if sfs.Folders[0].FailedReads > 0 {
+		t.Fatal("storage folder should have no failed reads after being moved back")
+	}
+
+	// reload the host and verify the storage folder is still good
+	st.server.Close()
+	st, err = st.reloadedServerTester()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// storage folder should still be good
+	err = st.getAPI("/host/storage", &sfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sfs.Folders[0].FailedWrites > 0 {
+		t.Fatal("storage folder should have no failed writes after being moved back")
+	}
+	if sfs.Folders[0].FailedReads > 0 {
+		t.Fatal("storage folder should have no failed reads after being moved back")
 	}
 }
 
@@ -524,7 +762,7 @@ func TestResizeFolderNoPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// The call to resize should fail if no path has been provided.
 	resizeValues := url.Values{}
@@ -546,7 +784,7 @@ func TestRemoveEmptyStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Set up a storage folder for the host.
 	if err := st.setHostStorage(); err != nil {
@@ -572,7 +810,7 @@ func TestRemoveStorageFolderError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Set up a storage folder for the host.
 	if err := st.setHostStorage(); err != nil {
@@ -607,7 +845,7 @@ func TestRemoveStorageFolderForced(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Announce the host.
 	if err := st.announceHost(); err != nil {
@@ -678,7 +916,7 @@ func TestDeleteSector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// Set up the host for forming contracts.
 	if err := st.announceHost(); err != nil {
@@ -746,7 +984,7 @@ func TestDeleteNonexistentSector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	defer st.server.panicClose()
 
 	// These calls to delete imaginary sectors should fail for a few reasons:
 	// - the given sector root strings are invalid

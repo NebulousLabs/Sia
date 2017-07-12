@@ -189,7 +189,7 @@ func checkSiafundCount(tx *bolt.Tx) {
 		manageErr(tx, err)
 	}
 	if !total.Equals(types.SiafundCount) {
-		manageErr(tx, errors.New("wrong number if siafunds in the consensus set"))
+		manageErr(tx, errors.New("wrong number of siafunds in the consensus set"))
 	}
 }
 
@@ -316,6 +316,7 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
 	if cs.checkingConsistency {
 		return
 	}
+
 	cs.checkingConsistency = true
 	checkDSCOs(tx)
 	checkSiacoinCount(tx)

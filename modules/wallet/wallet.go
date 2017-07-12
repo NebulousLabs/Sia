@@ -68,10 +68,17 @@ type Wallet struct {
 	// from the seeds, when checking new outputs or spending outputs, the seeds
 	// are not referenced at all. The seeds are only stored so that the user
 	// may access them.
-	seeds []modules.Seed
-	keys  map[types.UnlockHash]spendableKey
+	seeds     []modules.Seed
+	keys      map[types.UnlockHash]spendableKey
+	lookahead map[types.UnlockHash]uint64
 
 	// unconfirmedProcessedTransactions tracks unconfirmed transactions.
+	//
+	// TODO: Replace this field with a linked list. Currently when a new
+	// transaction set diff is provided, the entire array needs to be
+	// reallocated. Since this can happen tens of times per second, and the
+	// array can have tens of thousands of elements, it's a performance issue.
+	unconfirmedSets                  map[modules.TransactionSetID][]types.TransactionID
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
 
 	// The wallet's database tracks its seeds, keys, outputs, and
@@ -84,6 +91,11 @@ type Wallet struct {
 	persistDir string
 	log        *persist.Logger
 	mu         sync.RWMutex
+
+	// A separate TryMutex is used to protect against concurrent unlocking or
+	// initialization.
+	scanLock siasync.TryMutex
+
 	// The wallet's ThreadGroup tells tracked functions to shut down and
 	// blocks until they have all exited before returning from Close.
 	tg siasync.ThreadGroup
@@ -107,7 +119,10 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		cs:    cs,
 		tpool: tpool,
 
-		keys: make(map[types.UnlockHash]spendableKey),
+		keys:      make(map[types.UnlockHash]spendableKey),
+		lookahead: make(map[types.UnlockHash]uint64),
+
+		unconfirmedSets: make(map[modules.TransactionSetID][]types.TransactionID),
 
 		persistDir: persistDir,
 	}
@@ -175,4 +190,14 @@ func (w *Wallet) AllAddresses() []types.UnlockHash {
 		return bytes.Compare(addrs[i][:], addrs[j][:]) < 0
 	})
 	return addrs
+}
+
+// Rescanning reports whether the wallet is currently rescanning the
+// blockchain.
+func (w *Wallet) Rescanning() bool {
+	rescanning := !w.scanLock.TryLock()
+	if !rescanning {
+		w.scanLock.Unlock()
+	}
+	return rescanning
 }

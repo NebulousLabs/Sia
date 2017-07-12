@@ -97,7 +97,9 @@ type (
 		// RemoveStorageFolder will remove a storage folder from the manager.
 		// All storage on the folder will be moved to other storage folders,
 		// meaning that no data will be lost. If the manager is unable to save
-		// data, an error will be returned and the operation will be stopped.
+		// data, an error will be returned and the operation will be stopped. If
+		// the force flag is set to true, errors will be ignored and the remove
+		// operation will be completed, meaning that data will be lost.
 		RemoveStorageFolder(index uint16, force bool) error
 
 		// ResetStorageFolderHealth will reset the health statistics on a

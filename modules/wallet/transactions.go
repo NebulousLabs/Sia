@@ -3,7 +3,6 @@ package wallet
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -20,7 +19,9 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 	defer w.mu.Unlock()
 	w.syncDB()
 
-	dbForEachProcessedTransaction(w.dbTx, func(pt modules.ProcessedTransaction) {
+	it := dbProcessedTransactionsIterator(w.dbTx)
+	for it.next() {
+		pt := it.value()
 		relevant := false
 		for _, input := range pt.Inputs {
 			relevant = relevant || input.RelatedAddress == uh
@@ -31,7 +32,7 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 		if relevant {
 			pts = append(pts, pt)
 		}
-	})
+	}
 
 	return pts
 }
@@ -75,20 +76,14 @@ func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTran
 	defer w.mu.Unlock()
 	w.syncDB()
 
-	c := w.dbTx.Bucket(bucketProcessedTransactions).Cursor()
-	for key, val := c.First(); key != nil; key, val = c.Next() {
-		if err := encoding.Unmarshal(val, &pt); err != nil {
-			if err != nil {
-				w.log.Severe("ERROR: failed to decode database entry:", err)
-			}
-			return
-		}
+	it := dbProcessedTransactionsIterator(w.dbTx)
+	for it.next() {
+		pt := it.value()
 		if pt.TransactionID == txid {
 			return pt, true
 		}
 	}
-
-	return
+	return modules.ProcessedTransaction{}, false
 }
 
 // Transactions returns all transactions relevant to the wallet that were
@@ -106,12 +101,9 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 		return nil, errOutOfBounds
 	}
 
-	c := w.dbTx.Bucket(bucketProcessedTransactions).Cursor()
-	for key, val := c.First(); key != nil; key, val = c.Next() {
-		var pt modules.ProcessedTransaction
-		if err = encoding.Unmarshal(val, &pt); err != nil {
-			return
-		}
+	it := dbProcessedTransactionsIterator(w.dbTx)
+	for it.next() {
+		pt := it.value()
 		if pt.ConfirmationHeight < startHeight {
 			continue
 		} else if pt.ConfirmationHeight > endHeight {

@@ -50,12 +50,18 @@ type Allowance struct {
 // DownloadInfo provides information about a file that has been requested for
 // download.
 type DownloadInfo struct {
-	SiaPath     string    `json:"siapath"`
-	Destination string    `json:"destination"`
-	Filesize    uint64    `json:"filesize"`
-	Received    uint64    `json:"received"`
-	StartTime   time.Time `json:"starttime"`
-	Error       string    `json:"error"`
+	SiaPath     string         `json:"siapath"`
+	Destination DownloadWriter `json:"destination"`
+	Filesize    uint64         `json:"filesize"`
+	Received    uint64         `json:"received"`
+	StartTime   time.Time      `json:"starttime"`
+	Error       string         `json:"error"`
+}
+
+// DownloadWriter provides an interface which all output writers have to implement.
+type DownloadWriter interface {
+	WriteAt(b []byte, off int64) (int, error)
+	Destination() string
 }
 
 // FileUploadParams contains the information used by the Renter to upload a
@@ -92,6 +98,13 @@ type HostDBEntry struct {
 	HistoricUptime   time.Duration `json:"historicuptime"`
 	ScanHistory      HostDBScans   `json:"scanhistory"`
 
+	HistoricSuccessfulInteractions uint64 `json:"historicSuccessfulInteractions"`
+	HistoricFailedInteractions     uint64 `json:"historicFailedInteractions"`
+	RecentSuccessfulInteractions   uint64 `json:"recentSuccessfulInteractions"`
+	RecentFailedInteractions       uint64 `json:"recentFailedInteractions"`
+
+	LastHistoricUpdate types.BlockHeight
+
 	// The public key of the host, stored separately to minimize risk of certain
 	// MitM based vulnerabilities.
 	PublicKey types.SiaPublicKey `json:"publickey"`
@@ -111,7 +124,8 @@ type HostDBScan struct {
 // results provided by this struct can only be used as a guide, and may vary
 // significantly from machine to machine.
 type HostScoreBreakdown struct {
-	Score types.Currency `json:"score"`
+	Score          types.Currency `json:"score"`
+	ConversionRate float64        `json:"conversionrate"`
 
 	AgeAdjustment              float64 `json:"ageadjustment"`
 	BurnAdjustment             float64 `json:"burnadjustment"`
@@ -210,6 +224,12 @@ type RenterContract struct {
 	ContractFee types.Currency `json:"contractfee"`
 	TxnFee      types.Currency `json:"txnfee"`
 	SiafundFee  types.Currency `json:"siafundfee"`
+
+	// GoodForUpload indicates whether the contract should be used to upload new
+	// data or not, and GoodForRenew indicates whether or not the contract
+	// should be renewed.
+	GoodForRenew  bool
+	GoodForUpload bool
 }
 
 // EndHeight returns the height at which the host is no longer obligated to
@@ -251,8 +271,9 @@ type Renter interface {
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error
 
-	// Download downloads a file to the given destination.
-	Download(path, destination string) error
+	// Download performs a download according to the parameters passed, including
+	// downloads of `offset` and `length` type.
+	Download(params RenterDownloadParameters) error
 
 	// DownloadQueue lists all the files that have been scheduled for download.
 	DownloadQueue() []DownloadInfo
@@ -278,6 +299,10 @@ type Renter interface {
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error
 
+	// EstimateHostScore will return the score for a host with the provided
+	// settings, assuming perfect age and uptime adjustments
+	EstimateHostScore(entry HostDBEntry) HostScoreBreakdown
+
 	// ScoreBreakdown will return the score for a host db entry using the
 	// hostdb's weighting algorithm.
 	ScoreBreakdown(entry HostDBEntry) HostScoreBreakdown
@@ -296,4 +321,15 @@ type Renter interface {
 
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error
+}
+
+// RenterDownloadParameters defines the parameters passed to the Renter's
+// Download method.
+type RenterDownloadParameters struct {
+	Async       bool
+	Httpwriter  io.Writer
+	Length      uint64
+	Offset      uint64
+	Siapath     string
+	Destination string
 }

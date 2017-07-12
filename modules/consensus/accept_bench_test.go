@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -15,7 +16,7 @@ import (
 //
 // i7-4770, 1d60d69: 1.356 ms / op
 func BenchmarkAcceptEmptyBlocks(b *testing.B) {
-	cst, err := createConsensusSetTester(b.Name())
+	cst, err := createConsensusSetTester(b.Name() + strconv.Itoa(b.N))
 	if err != nil {
 		b.Fatal("Error creating tester: " + err.Error())
 	}
@@ -77,7 +78,7 @@ func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 //
 // i7-4770, 1d60d69: 3.579 ms / op
 func BenchmarkAcceptSmallBlocks(b *testing.B) {
-	cst, err := createConsensusSetTester(b.Name())
+	cst, err := createConsensusSetTester(b.Name() + strconv.Itoa(b.N))
 	if err != nil {
 		b.Fatal(err)
 	}

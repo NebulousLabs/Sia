@@ -8,7 +8,9 @@ package types
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 const (
@@ -143,17 +145,33 @@ type (
 // ID returns the id of a transaction, which is taken by marshalling all of the
 // fields except for the signatures and taking the hash of the result.
 func (t Transaction) ID() TransactionID {
-	return TransactionID(crypto.HashAll(
-		t.SiacoinInputs,
-		t.SiacoinOutputs,
-		t.FileContracts,
-		t.FileContractRevisions,
-		t.StorageProofs,
-		t.SiafundInputs,
-		t.SiafundOutputs,
-		t.MinerFees,
-		t.ArbitraryData,
-	))
+	// Get the transaction id by hashing all data minus the signatures.
+	var txid TransactionID
+	h := crypto.NewHash()
+	t.marshalSiaNoSignatures(h)
+	h.Sum(txid[:0])
+
+	// Sanity check in debug builds to make sure that the ids are going to be
+	// the same.
+	if build.DEBUG {
+		verify := TransactionID(crypto.HashAll(
+			t.SiacoinInputs,
+			t.SiacoinOutputs,
+			t.FileContracts,
+			t.FileContractRevisions,
+			t.StorageProofs,
+			t.SiafundInputs,
+			t.SiafundOutputs,
+			t.MinerFees,
+			t.ArbitraryData,
+		))
+
+		if verify != txid {
+			panic("TransactionID is not marshalling correctly")
+		}
+	}
+
+	return txid
 }
 
 // SiacoinOutputID returns the ID of a siacoin output at the given index,
@@ -161,19 +179,36 @@ func (t Transaction) ID() TransactionID {
 // Specifier, all of the fields in the transaction (except the signatures),
 // and output index.
 func (t Transaction) SiacoinOutputID(i uint64) SiacoinOutputID {
-	return SiacoinOutputID(crypto.HashAll(
-		SpecifierSiacoinOutput,
-		t.SiacoinInputs,
-		t.SiacoinOutputs,
-		t.FileContracts,
-		t.FileContractRevisions,
-		t.StorageProofs,
-		t.SiafundInputs,
-		t.SiafundOutputs,
-		t.MinerFees,
-		t.ArbitraryData,
-		i,
-	))
+	// Create the id.
+	var id SiacoinOutputID
+	h := crypto.NewHash()
+	h.Write(SpecifierSiacoinOutput[:])
+	t.marshalSiaNoSignatures(h) // Encode non-signature fields into hash.
+	encoding.WriteUint64(h, i)  // Writes index of this output.
+	h.Sum(id[:0])
+
+	// Sanity check - verify that the optimized code is always returning the
+	// same ids as the unoptimized code.
+	if build.DEBUG {
+		verificationID := SiacoinOutputID(crypto.HashAll(
+			SpecifierSiacoinOutput,
+			t.SiacoinInputs,
+			t.SiacoinOutputs,
+			t.FileContracts,
+			t.FileContractRevisions,
+			t.StorageProofs,
+			t.SiafundInputs,
+			t.SiafundOutputs,
+			t.MinerFees,
+			t.ArbitraryData,
+			i,
+		))
+		if id != verificationID {
+			panic("SiacoinOutputID is not marshalling correctly")
+		}
+	}
+
+	return id
 }
 
 // FileContractID returns the ID of a file contract at the given index, which
@@ -181,19 +216,35 @@ func (t Transaction) SiacoinOutputID(i uint64) SiacoinOutputID {
 // all of the fields in the transaction (except the signatures), and the
 // contract index.
 func (t Transaction) FileContractID(i uint64) FileContractID {
-	return FileContractID(crypto.HashAll(
-		SpecifierFileContract,
-		t.SiacoinInputs,
-		t.SiacoinOutputs,
-		t.FileContracts,
-		t.FileContractRevisions,
-		t.StorageProofs,
-		t.SiafundInputs,
-		t.SiafundOutputs,
-		t.MinerFees,
-		t.ArbitraryData,
-		i,
-	))
+	var id FileContractID
+	h := crypto.NewHash()
+	h.Write(SpecifierFileContract[:])
+	t.marshalSiaNoSignatures(h) // Encode non-signature fields into hash.
+	encoding.WriteUint64(h, i)  // Writes index of this output.
+	h.Sum(id[:0])
+
+	// Sanity check - verify that the optimized code is always returning the
+	// same ids as the unoptimized code.
+	if build.DEBUG {
+		verificationID := FileContractID(crypto.HashAll(
+			SpecifierFileContract,
+			t.SiacoinInputs,
+			t.SiacoinOutputs,
+			t.FileContracts,
+			t.FileContractRevisions,
+			t.StorageProofs,
+			t.SiafundInputs,
+			t.SiafundOutputs,
+			t.MinerFees,
+			t.ArbitraryData,
+			i,
+		))
+		if id != verificationID {
+			panic("FileContractID is not marshalling correctly")
+		}
+	}
+
+	return id
 }
 
 // SiafundOutputID returns the ID of a SiafundOutput at the given index, which
@@ -201,19 +252,34 @@ func (t Transaction) FileContractID(i uint64) FileContractID {
 // all of the fields in the transaction (except the signatures), and output
 // index.
 func (t Transaction) SiafundOutputID(i uint64) SiafundOutputID {
-	return SiafundOutputID(crypto.HashAll(
-		SpecifierSiafundOutput,
-		t.SiacoinInputs,
-		t.SiacoinOutputs,
-		t.FileContracts,
-		t.FileContractRevisions,
-		t.StorageProofs,
-		t.SiafundInputs,
-		t.SiafundOutputs,
-		t.MinerFees,
-		t.ArbitraryData,
-		i,
-	))
+	var id SiafundOutputID
+	h := crypto.NewHash()
+	h.Write(SpecifierSiafundOutput[:])
+	t.marshalSiaNoSignatures(h) // Encode non-signature fields into hash.
+	encoding.WriteUint64(h, i)  // Writes index of this output.
+	h.Sum(id[:0])
+
+	// Sanity check - verify that the optimized code is always returning the
+	// same ids as the unoptimized code.
+	if build.DEBUG {
+		verificationID := SiafundOutputID(crypto.HashAll(
+			SpecifierSiafundOutput,
+			t.SiacoinInputs,
+			t.SiacoinOutputs,
+			t.FileContracts,
+			t.FileContractRevisions,
+			t.StorageProofs,
+			t.SiafundInputs,
+			t.SiafundOutputs,
+			t.MinerFees,
+			t.ArbitraryData,
+			i,
+		))
+		if id != verificationID {
+			panic("SiafundOutputID is not marshalling correctly")
+		}
+	}
+	return id
 }
 
 // SiacoinOutputSum returns the sum of all the siacoin outputs in the
