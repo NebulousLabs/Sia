@@ -287,17 +287,18 @@ func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) []module
 // IncrementSuccessfulInteractions increments the number of successful
 // interactions with a host for a given key
 func (hdb *HostDB) IncrementSuccessfulInteractions(key types.SiaPublicKey) {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-
 	// Fetch the host.
 	host, haveHost := hdb.hostTree.Select(key)
 	if !haveHost {
 		return
 	}
 
+	hdb.mu.Lock()
+	height := hdb.blockHeight
+	hdb.mu.Unlock()
+
 	// Update historic values if necessary
-	updateHostHistoricInteractions(&host, hdb.blockHeight)
+	updateHostHistoricInteractions(&host, height)
 
 	// Increment the successful interactions
 	host.RecentSuccessfulInteractions++
@@ -308,17 +309,19 @@ func (hdb *HostDB) IncrementSuccessfulInteractions(key types.SiaPublicKey) {
 // a host for a given key
 func (hdb *HostDB) IncrementFailedInteractions(key types.SiaPublicKey) {
 	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
+	height := hdb.blockHeight
+	online := hdb.online
+	hdb.mu.Unlock()
 
 	// Fetch the host.
 	host, haveHost := hdb.hostTree.Select(key)
-	if !haveHost || !hdb.online {
+	if !haveHost || !online {
 		// If we are offline it probably wasn't the host's fault
 		return
 	}
 
 	// Update historic values if necessary
-	updateHostHistoricInteractions(&host, hdb.blockHeight)
+	updateHostHistoricInteractions(&host, height)
 
 	// Increment the failed interactions
 	host.RecentFailedInteractions++
