@@ -1044,8 +1044,8 @@ func TestPeerManagerPriority(t *testing.T) {
 	}
 
 	// Disconnect everyone.
-	g1.Disconnect(g2.Address())
-	g1.Disconnect(g3.Address())
+	g2.Disconnect(g1.Address())
+	g3.Disconnect(g1.Address())
 
 	// Shutdown g1.
 	err := g1.Close()
