@@ -417,7 +417,7 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 		return cs.validateHeader(boltTxWrapper{tx}, h)
 	})
 	cs.mu.RUnlock()
-	// WARNING Orphan Multithreading Logic (dangerous area)
+	// WARN: orphan multithreading logic (dangerous areas, see below)
 	//
 	// If the header is valid and extends the heaviest chain, fetch the
 	// corresponding block. Call needs to be made in a separate goroutine
@@ -429,7 +429,7 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 	// Because it is not, we have to do weird threading to prevent
 	// deadlocks, and we also have to be concerned every time the code in
 	// managedReceiveBlock is adjusted.
-	if err == errOrphan { // warning orphan multithreading logic case #1
+	if err == errOrphan { // WARN: orphan multithreading logic case #1
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -443,7 +443,7 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 		return err
 	}
 
-	// warning orphan multithreading logic case #2
+	// WARN: orphan multithreading logic case #2
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
