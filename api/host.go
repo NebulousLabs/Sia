@@ -202,7 +202,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 func (api *API) hostEstimateScoreGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// This call requires a renter, check that it is present.
 	if api.renter == nil {
-		WriteError(w, Error("cannot call /host/estimatescore without the renter module"), http.StatusBadRequest)
+		WriteError(w, Error{"cannot call /host/estimatescore without the renter module"}, http.StatusBadRequest)
 		return
 	}
 
