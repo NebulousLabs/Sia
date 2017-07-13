@@ -141,14 +141,16 @@ func (w *worker) upload(uw uploadWork) {
 	w.consecutiveUploadFailures = 0
 
 	// Update the renter metadata.
+	addr := e.Address()
+	endHeight := e.EndHeight()
 	id := w.renter.mu.Lock()
 	uw.file.mu.Lock()
 	contract, exists := uw.file.contracts[w.contractID]
 	if !exists {
 		contract = fileContract{
 			ID:          w.contractID,
-			IP:          e.Address(),
-			WindowStart: e.EndHeight(),
+			IP:          addr,
+			WindowStart: endHeight,
 		}
 	}
 	contract.Pieces = append(contract.Pieces, pieceData{
