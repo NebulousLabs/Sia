@@ -118,6 +118,23 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 	}
 }
 
+// cleanCloseHandler wraps the entire API, ensuring that underlying conns are
+// not leaked if the rmeote end closes the connection before the underlying
+// handler finishes.
+func cleanCloseHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		done := make(chan struct{})
+		go func(w http.ResponseWriter, r *http.Request) {
+			defer close(done)
+			next.ServeHTTP(w, r)
+		}(w, r)
+		select {
+		case <-done:
+		case <-r.Context().Done():
+		}
+	})
+}
+
 // API encapsulates a collection of modules and implements a http.Handler
 // to access their methods.
 type API struct {
@@ -266,7 +283,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	}
 
 	// Apply UserAgent middleware and return the API
-	api.router = RequireUserAgent(router, requiredUserAgent)
+	api.router = cleanCloseHandler(RequireUserAgent(router, requiredUserAgent))
 	return api
 }
 
