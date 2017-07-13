@@ -73,7 +73,7 @@ func (g *Gateway) pingNode(addr modules.NetAddress) error {
 		UniqueID:   g.id,
 		NetAddress: modules.NetAddress(conn.LocalAddr().String()),
 	}
-	if err := writeSessionHeader(conn, ourHeader); err != nil {
+	if err := exchangeOurHeader(conn, ourHeader); err != nil {
 		return err
 	}
 

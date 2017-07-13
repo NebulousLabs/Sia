@@ -183,11 +183,11 @@ func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string)
 		UniqueID:   g.id,
 		NetAddress: modules.NetAddress(net.JoinHostPort(host, g.port)),
 	}
-	remoteHeader, err := readSessionHeader(conn, ourHeader)
+	remoteHeader, err := exchangeRemoteHeader(conn, ourHeader)
 	if err != nil {
 		return err
 	}
-	if err := writeSessionHeader(conn, ourHeader); err != nil {
+	if err := exchangeOurHeader(conn, ourHeader); err != nil {
 		return err
 	}
 
@@ -400,7 +400,8 @@ func acceptVersionHandshake(conn net.Conn, version string) (remoteVersion string
 	return remoteVersion, nil
 }
 
-func writeSessionHeader(conn net.Conn, ourHeader sessionHeader) error {
+// exchangeOurHeader writes ourHeader and reads the remote's error response.
+func exchangeOurHeader(conn net.Conn, ourHeader sessionHeader) error {
 	// Send our header.
 	if err := encoding.WriteObject(conn, ourHeader); err != nil {
 		return fmt.Errorf("failed to write header: %v", err)
@@ -418,7 +419,8 @@ func writeSessionHeader(conn net.Conn, ourHeader sessionHeader) error {
 	return nil
 }
 
-func readSessionHeader(conn net.Conn, ourHeader sessionHeader) (sessionHeader, error) {
+// exchangeRemoteHeader reads the remote header and writes an error response.
+func exchangeRemoteHeader(conn net.Conn, ourHeader sessionHeader) (sessionHeader, error) {
 	// Read remote header.
 	var remoteHeader sessionHeader
 	if err := encoding.ReadObject(conn, &remoteHeader, maxEncodedSessionHeaderSize); err != nil {
@@ -447,9 +449,9 @@ func (g *Gateway) managedConnectv130Peer(conn net.Conn, remoteVersion string, re
 		UniqueID:   g.id,
 		NetAddress: modules.NetAddress(net.JoinHostPort(host, g.port)),
 	}
-	if err := writeSessionHeader(conn, ourHeader); err != nil {
+	if err := exchangeOurHeader(conn, ourHeader); err != nil {
 		return err
-	} else if _, err := readSessionHeader(conn, ourHeader); err != nil {
+	} else if _, err := exchangeRemoteHeader(conn, ourHeader); err != nil {
 		return err
 	}
 	return nil

@@ -214,7 +214,7 @@ func TestListen(t *testing.T) {
 		NetAddress: "fake",
 	}
 
-	err = writeSessionHeader(conn, header)
+	err = exchangeOurHeader(conn, header)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -235,11 +235,11 @@ func TestListen(t *testing.T) {
 	}
 
 	header.NetAddress = modules.NetAddress(conn.LocalAddr().String())
-	err = writeSessionHeader(conn, header)
+	err = exchangeOurHeader(conn, header)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = readSessionHeader(conn, header)
+	_, err = exchangeRemoteHeader(conn, header)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -633,8 +633,8 @@ func TestConnectRejectsVersions(t *testing.T) {
 					UniqueID:   tt.uniqueID,
 					NetAddress: modules.NetAddress(conn.LocalAddr().String()),
 				}
-				_, err = readSessionHeader(conn, ourHeader)
-				writeSessionHeader(conn, ourHeader)
+				_, err = exchangeRemoteHeader(conn, ourHeader)
+				exchangeOurHeader(conn, ourHeader)
 			} else if build.VersionCmp(tt.version, handshakeUpgradeVersion) >= 0 {
 				var dialbackPort string
 				err = encoding.ReadObject(conn, &dialbackPort, 13)

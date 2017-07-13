@@ -36,7 +36,7 @@ func (g *Gateway) load() error {
 	var nodes []*node
 	err := persist.LoadJSON(persistMetadata, &nodes, filepath.Join(g.persistDir, nodesFile))
 	if err != nil {
-		// COMPATv1.2.1
+		// COMPATv1.3.0
 		return g.loadv033persist()
 	}
 	for i := range nodes {
