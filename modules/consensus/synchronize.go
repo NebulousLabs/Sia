@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	"net"
 	"sync"
 	"time"
 
@@ -76,6 +77,19 @@ var (
 	errSendBlocksStalled = errors.New("SendBlocks RPC timed and never received any blocks")
 )
 
+// isTimeoutErr is a helper function that returns true if err was caused by a
+// network timeout.
+func isTimeoutErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		return true
+	}
+	// COMPATv1.3.0
+	return (err.Error() == "Read timeout" || err.Error() == "Write timeout")
+}
+
 // blockHistory returns up to 32 block ids, starting with recent blocks and
 // then proving exponentially increasingly less recent blocks. The genesis
 // block is always included as the last block. This block history can be used
@@ -143,12 +157,7 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 	// needs to be chosen.
 	stalled := true
 	defer func() {
-		// TODO: Timeout errors returned by muxado do not conform to the net.Error
-		// interface and therefore we cannot check if the error is a timeout using
-		// the Timeout() method. Once muxado issue #14 is resolved change the below
-		// condition to:
-		//     if netErr, ok := returnErr.(net.Error); ok && netErr.Timeout() && stalled { ... }
-		if stalled && returnErr != nil && (returnErr.Error() == "Read timeout" || returnErr.Error() == "Write timeout") {
+		if isTimeoutErr(returnErr) && stalled {
 			returnErr = errSendBlocksStalled
 		}
 	}()
@@ -583,12 +592,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 					return nil
 				}
 				numOutboundNotSynced++
-				// TODO: Timeout errors returned by muxado do not conform to the net.Error
-				// interface and therefore we cannot check if the error is a timeout using
-				// the Timeout() method. Once muxado issue #14 is resolved change the below
-				// condition to:
-				//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
-				if err.Error() != "Read timeout" && err.Error() != "Write timeout" && err.Error() != "Session closed" {
+				if !isTimeoutErr(err) {
 					cs.log.Printf("WARN: disconnecting from peer %v because IBD failed: %v", p.NetAddress, err)
 					// Disconnect if there is an unexpected error (not a timeout). This
 					// includes errSendBlocksStalled.

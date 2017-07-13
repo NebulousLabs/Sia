@@ -20,12 +20,12 @@ const (
 // gateway persist file.
 var persistMetadata = persist.Metadata{
 	Header:  "Sia Node List",
-	Version: "0.3.3",
+	Version: "1.3.0",
 }
 
 // persistData returns the data in the Gateway that will be saved to disk.
-func (g *Gateway) persistData() (nodes []modules.NetAddress) {
-	for node := range g.nodes {
+func (g *Gateway) persistData() (nodes []*node) {
+	for _, node := range g.nodes {
 		nodes = append(nodes, node)
 	}
 	return
@@ -33,16 +33,14 @@ func (g *Gateway) persistData() (nodes []modules.NetAddress) {
 
 // load loads the Gateway's persistent data from disk.
 func (g *Gateway) load() error {
-	var nodes []modules.NetAddress
+	var nodes []*node
 	err := persist.LoadJSON(persistMetadata, &nodes, filepath.Join(g.persistDir, nodesFile))
 	if err != nil {
-		return err
+		// COMPATv1.3.0
+		return g.loadv033persist()
 	}
-	for _, node := range nodes {
-		err := g.addNode(node)
-		if err != nil {
-			g.log.Printf("WARN: error loading node '%v' from persist: %v", node, err)
-		}
+	for i := range nodes {
+		g.nodes[nodes[i].NetAddress] = nodes[i]
 	}
 	return nil
 }
@@ -77,4 +75,23 @@ func (g *Gateway) threadedSaveLoop() {
 			}
 		}()
 	}
+}
+
+// loadv033persist loads the v0.3.3 Gateway's persistent data from disk.
+func (g *Gateway) loadv033persist() error {
+	var nodes []modules.NetAddress
+	err := persist.LoadJSON(persist.Metadata{
+		Header:  "Sia Node List",
+		Version: "0.3.3",
+	}, &nodes, filepath.Join(g.persistDir, nodesFile))
+	if err != nil {
+		return err
+	}
+	for _, addr := range nodes {
+		err := g.addNode(addr)
+		if err != nil {
+			g.log.Printf("WARN: error loading node '%v' from persist: %v", addr, err)
+		}
+	}
+	return nil
 }
