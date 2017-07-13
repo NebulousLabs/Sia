@@ -214,7 +214,8 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	}
 
 	// Spin up the workers for the work pool.
-	r.updateWorkerPool()
+	contracts := r.hostContractor.Contracts()
+	r.updateWorkerPool(contracts)
 	go r.threadedRepairLoop()
 	go r.threadedDownloadLoop()
 	go r.threadedQueueRepairs()
@@ -302,8 +303,9 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		return err
 	}
 
+	contracts := r.hostContractor.Contracts()
 	id := r.mu.Lock()
-	r.updateWorkerPool()
+	r.updateWorkerPool(contracts)
 	r.mu.Unlock(id)
 	return nil
 }

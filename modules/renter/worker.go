@@ -228,10 +228,10 @@ func (w *worker) threadedWorkLoop() {
 
 // updateWorkerPool will grab the set of contracts from the contractor and
 // update the worker pool to match.
-func (r *Renter) updateWorkerPool() {
+func (r *Renter) updateWorkerPool(contracts []modules.RenterContract) {
 	// Get a map of all the contracts in the contractor.
 	newContracts := make(map[types.FileContractID]modules.RenterContract)
-	for _, nc := range r.hostContractor.Contracts() {
+	for _, nc := range contracts {
 		newContracts[nc.ID] = nc
 	}
 
