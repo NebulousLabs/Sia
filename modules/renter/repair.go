@@ -196,8 +196,9 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 	}
 
 	// Reset the available workers.
+	contracts := r.hostContractor.Contracts()
 	id := r.mu.Lock()
-	r.updateWorkerPool()
+	r.updateWorkerPool(contracts)
 	rs.availableWorkers = make(map[types.FileContractID]*worker)
 	for id, worker := range r.workerPool {
 		// Ignore the workers that are not good for uploading.
