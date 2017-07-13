@@ -99,18 +99,10 @@ func (cs *chunkStatus) numGaps(rs *repairState) int {
 	return pieceGaps
 }
 
-// addFileToRepairState will take a file and add each of the incomplete chunks
-// to the repair state, along with data about which pieces need attention.
-func (r *Renter) addFileToRepairState(rs *repairState, file *file) {
-	// Check that the file is being tracked, and therefor candidate for repair.
-	file.mu.Lock()
-	_, exists := r.tracking[file.name]
-	file.mu.Unlock()
-	if !exists {
-		// File is not being tracked, don't add it to the repair state.
-		return
-	}
-
+// managedAddFileToRepairState will take a file and add each of the incomplete
+// chunks to the repair state, along with data about which pieces need
+// attention.
+func (r *Renter) managedAddFileToRepairState(rs *repairState, file *file) {
 	// Fetch the list of potential contracts from the repair state.
 	contracts := make([]types.FileContractID, 0)
 	for contract := range rs.activeWorkers {
@@ -187,9 +179,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		case <-r.tg.StopChan():
 			return
 		case file := <-r.newRepairs:
-			id := r.mu.Lock()
-			r.addFileToRepairState(rs, file)
-			r.mu.Unlock(id)
+			r.managedAddFileToRepairState(rs, file)
 			return
 		}
 	}
@@ -473,9 +463,7 @@ func (r *Renter) managedWaitOnRepairWork(rs *repairState) {
 	select {
 	case finishedUpload = <-rs.resultChan:
 	case file := <-r.newRepairs:
-		id := r.mu.Lock()
-		r.addFileToRepairState(rs, file)
-		r.mu.Unlock(id)
+		r.managedAddFileToRepairState(rs, file)
 		return
 	case <-r.tg.StopChan():
 		return
@@ -522,7 +510,10 @@ func (r *Renter) threadedQueueRepairs() {
 		id := r.mu.RLock()
 		var files []*file
 		for _, file := range r.files {
-			files = append(files, file)
+			if _, ok := r.tracking[file.name]; ok {
+				// Only repair files that are being tracked.
+				files = append(files, file)
+			}
 		}
 		r.mu.RUnlock(id)
 
