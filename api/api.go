@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -123,6 +124,8 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 // handler finishes.
 func cleanCloseHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Close this file handle either when the function completes or when the
+		// connection is done.
 		done := make(chan struct{})
 		go func(w http.ResponseWriter, r *http.Request) {
 			defer close(done)
@@ -131,6 +134,13 @@ func cleanCloseHandler(next http.Handler) http.Handler {
 		select {
 		case <-done:
 		case <-r.Context().Done():
+		}
+
+		// Sanity check - thread should not take more than an hour to return.
+		select {
+		case <-done:
+		case <-time.After(time.Minute * 60):
+			build.Severe("api call is taking more than 20 minutes to return:", r.URL.Path)
 		}
 	})
 }
