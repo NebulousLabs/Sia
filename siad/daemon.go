@@ -18,7 +18,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/miner"
-	pool "github.com/NebulousLabs/Sia/modules/miningpool"
+	pool "github.com/petabyte-storage/Sia/modules/miningpool"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
