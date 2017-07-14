@@ -18,6 +18,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/miner"
+	pool "github.com/NebulousLabs/Sia/modules/miningpool"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
@@ -66,7 +67,7 @@ func processNetAddr(addr string) string {
 // invalid module character.
 func processModules(modules string) (string, error) {
 	modules = strings.ToLower(modules)
-	validModules := "cghmrtwe"
+	validModules := "cghmrtwep"
 	invalidModules := modules
 	for _, m := range validModules {
 		invalidModules = strings.Replace(invalidModules, string(m), "", 1)
@@ -276,6 +277,22 @@ func startDaemon(config Config) (err error) {
 		}()
 	}
 
+	var p modules.Pool
+	if strings.Contains(config.Siad.Modules, "p") {
+		i++
+		fmt.Printf("(%d/%d) Loading pool...\n", i, len(config.Siad.Modules))
+		p, err = pool.New(cs, tpool, w, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.PoolDir))
+		if err != nil {
+			return err
+		}
+		defer func() {
+			fmt.Println("Closing pool...")
+			err := p.Close()
+			if err != nil {
+				fmt.Println("Error during pool shutdown:", err)
+			}
+		}()
+	}
 	// Create the Sia API
 	a := api.New(
 		config.Siad.RequiredUserAgent,
@@ -288,6 +305,7 @@ func startDaemon(config Config) (err error) {
 		r,
 		tpool,
 		w,
+		p,
 	)
 
 	// connect the API to the server
