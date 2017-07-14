@@ -675,9 +675,9 @@ func TestBigTpool(t *testing.T) {
 	}
 
 	// Create transaction graph setup.
-	coinFrac := types.SiacoinPrecision.Div64(10)
-	feeFrac := types.SiacoinPrecision.Div64(10000)
-	numGraphsPerChunk := 5500
+	coinFrac := types.SiacoinPrecision.Div64(1)
+	feeFrac := types.SiacoinPrecision.Div64(10)
+	numGraphsPerChunk := 1000
 
 	graphFund1 := types.SiacoinPrecision.Mul64(8).Add(coinFrac.Mul64(2))  //80.02 SC for chunk 1
 	graphFund2 := types.SiacoinPrecision.Mul64(44).Add(coinFrac.Mul64(2)) //200.02 SC for chunk 2
@@ -690,7 +690,7 @@ func TestBigTpool(t *testing.T) {
 	var val1 types.Currency
 	// Create outputs to be spent in the first chunk
 	for i := 1; i <= numGraphsPerChunk; i++ {
-		value := coinFrac.Add(feeFrac.Mul64(uint64(i))).Mul64(2)
+		value := coinFrac.Mul64(25).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
 		outputs1 = append(outputs1, types.SiacoinOutput{
 			UnlockHash: types.UnlockConditions{}.UnlockHash(),
 			Value:      value,
@@ -719,24 +719,32 @@ func TestBigTpool(t *testing.T) {
 		finalTxn := output[len(output)-1]
 		for i := 0; i < 500; i++ { //500 is the the number of outputs
 			var edges []types.TransactionGraphEdge
-			totalValue := coinFrac.Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
-			fee := totalValue.Div64(100)
-			leftOver := totalValue.Sub(fee)
-			//	/println("\nFEE:")
-			//	println(fee.HumanString())
-			edges = append(edges, types.TransactionGraphEdge{
-				Dest:   1,
-				Fee:    fee,
-				Source: 0,
-				Value:  leftOver,
-			})
-			edges = append(edges, types.TransactionGraphEdge{
-				Dest:   2,
-				Fee:    leftOver.Div64(2),
-				Source: 1,
-				Value:  leftOver.Div64(2),
-			})
+			totalValue := coinFrac.Mul64(25).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
 
+			setSize := 10
+			txTotalVal := totalValue.Div64(uint64(setSize))
+			txFee := txTotalVal.Div64(5)
+			txVal := txTotalVal.Sub(txFee)
+
+			txFee2 := txVal.Div64(2)
+			txVal2 := txVal.Sub(txFee2)
+
+			for i := 0; i < setSize; i++ {
+				edges = append(edges, types.TransactionGraphEdge{
+					Dest:   i + 1,
+					Fee:    txFee,
+					Source: 0,
+					Value:  txVal,
+				})
+			}
+			for i := 0; i < setSize; i++ {
+				edges = append(edges, types.TransactionGraphEdge{
+					Dest:   i + 1 + setSize,
+					Fee:    txFee2,
+					Source: i + 1,
+					Value:  txVal2,
+				})
+			}
 			graph, err := types.TransactionGraph(finalTxn.SiacoinOutputID(uint64(i)), edges)
 			if err != nil {
 				t.Fatal(err)
@@ -753,7 +761,7 @@ func TestBigTpool(t *testing.T) {
 	var val2 types.Currency
 	// Create outputs to be spent in the second chunk
 	for i := 1; i <= numGraphsPerChunk; i++ {
-		value := coinFrac.Mul64(10).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
+		value := coinFrac.Mul64(60).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
 		outputs2 = append(outputs2, types.SiacoinOutput{
 			UnlockHash: types.UnlockConditions{}.UnlockHash(),
 			Value:      value,
@@ -780,21 +788,31 @@ func TestBigTpool(t *testing.T) {
 		finalTxn := output[len(output)-1]
 		for i := 0; i < 500; i++ { //500 is the the number of outputs
 			var edges []types.TransactionGraphEdge
-			totalValue := coinFrac.Mul64(10).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
-			fee := totalValue.Div64(100)
-			leftOver := totalValue.Sub(fee)
-			edges = append(edges, types.TransactionGraphEdge{
-				Dest:   1,
-				Fee:    fee,
-				Source: 0,
-				Value:  leftOver,
-			})
-			edges = append(edges, types.TransactionGraphEdge{
-				Dest:   2,
-				Fee:    leftOver.Div64(2),
-				Source: 1,
-				Value:  leftOver.Div64(2),
-			})
+			totalValue := coinFrac.Mul64(60).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
+			setSize := 10
+			txTotalVal := totalValue.Div64(uint64(setSize))
+			txFee := txTotalVal.Div64(5)
+			txVal := txTotalVal.Sub(txFee)
+
+			txFee2 := txVal.Div64(2)
+			txVal2 := txVal.Sub(txFee2)
+
+			for i := 0; i < setSize; i++ {
+				edges = append(edges, types.TransactionGraphEdge{
+					Dest:   i + 1,
+					Fee:    txFee,
+					Source: 0,
+					Value:  txVal,
+				})
+			}
+			for i := 0; i < setSize; i++ {
+				edges = append(edges, types.TransactionGraphEdge{
+					Dest:   i + 1 + setSize,
+					Fee:    txFee2,
+					Source: i + 1,
+					Value:  txVal2,
+				})
+			}
 
 			graph, err := types.TransactionGraph(finalTxn.SiacoinOutputID(uint64(i)), edges)
 			if err != nil {
@@ -812,7 +830,7 @@ func TestBigTpool(t *testing.T) {
 	var val3 types.Currency
 	// Create outputs to be spent in the third chunk
 	for i := 1; i <= numGraphsPerChunk; i++ {
-		value := coinFrac.Mul64(20).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
+		value := coinFrac.Mul64(110).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
 		outputs3 = append(outputs3, types.SiacoinOutput{
 			UnlockHash: types.UnlockConditions{}.UnlockHash(),
 			Value:      value,
@@ -839,21 +857,31 @@ func TestBigTpool(t *testing.T) {
 		finalTxn := output[len(output)-1]
 		for i := 0; i < 500; i++ { //500 is the the number of outputs
 			var edges []types.TransactionGraphEdge
-			totalValue := coinFrac.Mul64(20).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
-			fee := totalValue.Div64(100)
-			leftOver := totalValue.Sub(fee)
-			edges = append(edges, types.TransactionGraphEdge{
-				Dest:   1,
-				Fee:    fee,
-				Source: 0,
-				Value:  leftOver,
-			})
-			edges = append(edges, types.TransactionGraphEdge{
-				Dest:   2,
-				Fee:    leftOver.Div64(2),
-				Source: 1,
-				Value:  leftOver.Div64(2),
-			})
+			totalValue := coinFrac.Mul64(110).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
+			setSize := 10
+			txTotalVal := totalValue.Div64(uint64(setSize))
+			txFee := txTotalVal.Div64(5)
+			txVal := txTotalVal.Sub(txFee)
+
+			txFee2 := txVal.Div64(2)
+			txVal2 := txVal.Sub(txFee2)
+
+			for i := 0; i < setSize; i++ {
+				edges = append(edges, types.TransactionGraphEdge{
+					Dest:   i + 1,
+					Fee:    txFee,
+					Source: 0,
+					Value:  txVal,
+				})
+			}
+			for i := 0; i < setSize; i++ {
+				edges = append(edges, types.TransactionGraphEdge{
+					Dest:   i + 1 + setSize,
+					Fee:    txFee2,
+					Source: i + 1,
+					Value:  txVal2,
+				})
+			}
 
 			graph, err := types.TransactionGraph(finalTxn.SiacoinOutputID(uint64(i)), edges)
 			if err != nil {
@@ -909,7 +937,7 @@ func TestBigTpool(t *testing.T) {
 	}
 
 	// Accept the first half of the first chunk of transactions in a random order.
-	firstIndices := fastrand.Perm(2750)
+	firstIndices := fastrand.Perm(numGraphsPerChunk / 2)
 	for _, i := range firstIndices {
 		graph := graphs[i]
 		for _, txn := range graph[1:] {
@@ -919,8 +947,8 @@ func TestBigTpool(t *testing.T) {
 			}
 		}
 	}
-	// Accept the first 2000 transactions of the second chunk in a random order.
-	mixSecond := fastrand.Perm(2000)
+	// Accept the first half transactions of the second chunk in a random order.
+	mixSecond := fastrand.Perm(numGraphsPerChunk / 2)
 	for _, i := range mixSecond {
 		graph := graphs2[i]
 		for _, txn := range graph[1:] {
@@ -931,9 +959,9 @@ func TestBigTpool(t *testing.T) {
 		}
 	}
 	// Accept the rest of the first chunk in random order.
-	finishFirstChunk := fastrand.Perm(2750)
+	finishFirstChunk := fastrand.Perm(numGraphsPerChunk / 2)
 	for _, i := range finishFirstChunk {
-		graph := graphs[i+2750]
+		graph := graphs[i+(numGraphsPerChunk/2)]
 		for _, txn := range graph[1:] {
 			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
 			if err != nil {
@@ -941,10 +969,10 @@ func TestBigTpool(t *testing.T) {
 			}
 		}
 	}
-	// Accept the next 1000 transactions of the second chunk in a random order.
-	moreSecond := fastrand.Perm(1000)
+	// Accept the next fourth of the transactions of the second chunk in a random order.
+	moreSecond := fastrand.Perm(numGraphsPerChunk / 4)
 	for _, i := range moreSecond {
-		graph := graphs2[i+2000]
+		graph := graphs2[i+numGraphsPerChunk/2]
 		for _, txn := range graph[1:] {
 			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
 			if err != nil {
@@ -952,8 +980,8 @@ func TestBigTpool(t *testing.T) {
 			}
 		}
 	}
-	// Mix in the first 1000 transactions of the third chunk in a random order.
-	mixThird := fastrand.Perm(1000)
+	// Mix in the first half transactions of the third chunk in a random order.
+	mixThird := fastrand.Perm(numGraphsPerChunk / 2)
 	for _, i := range mixThird {
 		graph := graphs3[i]
 		for _, txn := range graph[1:] {
@@ -964,9 +992,9 @@ func TestBigTpool(t *testing.T) {
 		}
 	}
 	// Accept the last remaining transactions of the second chunk in a random order.
-	finishSecond := fastrand.Perm(2500)
+	finishSecond := fastrand.Perm(numGraphsPerChunk / 4)
 	for _, i := range finishSecond {
-		graph := graphs2[i+3000]
+		graph := graphs2[i+(numGraphsPerChunk/2)+(numGraphsPerChunk/4)]
 		for _, txn := range graph[1:] {
 			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
 			if err != nil {
@@ -975,9 +1003,9 @@ func TestBigTpool(t *testing.T) {
 		}
 	}
 	// Accept the remaining transactions from the last chunk.
-	finishThird := fastrand.Perm(4500)
+	finishThird := fastrand.Perm(numGraphsPerChunk / 2)
 	for _, i := range finishThird {
-		graph := graphs3[i+1000]
+		graph := graphs3[i+(numGraphsPerChunk/2)]
 		for _, txn := range graph[1:] {
 			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
 			if err != nil {
@@ -991,6 +1019,7 @@ func TestBigTpool(t *testing.T) {
 	var size int
 	var numTxns int
 	var totalFee types.Currency
+	maxFee := types.ZeroCurrency
 	minFee := types.SiacoinPrecision.Mul64(10000000000) // All the fees are much smaller than 1 SC.
 	for _, tx := range block.Transactions {
 		for _, fee := range tx.MinerFees {
@@ -998,11 +1027,15 @@ func TestBigTpool(t *testing.T) {
 			if fee.Cmp(minFee) < 0 {
 				minFee = fee
 			}
+			if fee.Cmp(maxFee) > 0 {
+				maxFee = fee
+			}
 		}
 		size += tx.MarshalSiaSize()
 		numTxns++
 	}
 	println("TOTAL: " + totalFee.HumanString())
+	println("Max fee: " + maxFee.HumanString())
 	println("Min fee: " + minFee.HumanString())
 	println("NUMTXNS: ")
 	println(numTxns)
@@ -1013,7 +1046,7 @@ func TestBigTpool(t *testing.T) {
 	size = 0
 	numTxns = 0
 	totalFee = types.ZeroCurrency
-	maxFee := types.ZeroCurrency
+	maxFee = types.ZeroCurrency
 	minFee = types.SiacoinPrecision.Mul64(10000000000) // All the fees are much smaller than this.
 	for _, tx := range block.Transactions {
 		for _, fee := range tx.MinerFees {
