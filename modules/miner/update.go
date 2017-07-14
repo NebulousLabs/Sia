@@ -95,7 +95,6 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 		// Add the set to the bottomSets slice. Note that we don't increase
 		// sizeOfBottomSets until after calculating the average.
 		nextSet := m.popFromBlock()
-
 		bottomSets = append(bottomSets, nextSet)
 
 		// Calculating fees to compare total fee from those sets removed and the current set s.

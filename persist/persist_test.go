@@ -90,6 +90,9 @@ func TestRelativePathSafeFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	relPath, err := filepath.Rel(wd, absPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create safe file.
 	sf, err := NewSafeFile(relPath)

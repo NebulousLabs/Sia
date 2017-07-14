@@ -93,6 +93,9 @@ type hostContractor interface {
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
+	// ContractByID returns the contract associated with the file contract id.
+	ContractByID(types.FileContractID) (modules.RenterContract, bool)
+
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
 	CurrentPeriod() types.BlockHeight
@@ -100,6 +103,10 @@ type hostContractor interface {
 	// Editor creates an Editor from the specified contract ID, allowing the
 	// insertion, deletion, and modification of sectors.
 	Editor(types.FileContractID, <-chan struct{}) (contractor.Editor, error)
+
+	// GoodForRenew indicates whether the contract line of the provided contract
+	// is actively being renewed.
+	GoodForRenew(types.FileContractID) bool
 
 	// IsOffline reports whether the specified host is considered offline.
 	IsOffline(types.FileContractID) bool
@@ -207,7 +214,8 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	}
 
 	// Spin up the workers for the work pool.
-	r.updateWorkerPool()
+	contracts := r.hostContractor.Contracts()
+	r.updateWorkerPool(contracts)
 	go r.threadedRepairLoop()
 	go r.threadedDownloadLoop()
 	go r.threadedQueueRepairs()
@@ -295,8 +303,9 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		return err
 	}
 
+	contracts := r.hostContractor.Contracts()
 	id := r.mu.Lock()
-	r.updateWorkerPool()
+	r.updateWorkerPool(contracts)
 	r.mu.Unlock(id)
 	return nil
 }

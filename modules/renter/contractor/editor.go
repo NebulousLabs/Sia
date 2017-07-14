@@ -173,8 +173,8 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 // Editor returns a Editor object that can be used to upload, modify, and
 // delete sectors on a host.
 func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ Editor, err error) {
-	c.mu.RLock()
 	id = c.ResolveID(id)
+	c.mu.RLock()
 	cachedEditor, haveEditor := c.editors[id]
 	height := c.blockHeight
 	contract, haveContract := c.contracts[id]
