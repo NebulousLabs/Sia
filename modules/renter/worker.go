@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -64,6 +65,7 @@ type (
 	worker struct {
 		// contractID specifies which contract the worker specifically works
 		// with.
+		contract   modules.RenterContract
 		contractID types.FileContractID
 
 		// If there is work on all three channels, the worker will first do all
@@ -139,14 +141,16 @@ func (w *worker) upload(uw uploadWork) {
 	w.consecutiveUploadFailures = 0
 
 	// Update the renter metadata.
+	addr := e.Address()
+	endHeight := e.EndHeight()
 	id := w.renter.mu.Lock()
 	uw.file.mu.Lock()
 	contract, exists := uw.file.contracts[w.contractID]
 	if !exists {
 		contract = fileContract{
 			ID:          w.contractID,
-			IP:          e.Address(),
-			WindowStart: e.EndHeight(),
+			IP:          addr,
+			WindowStart: endHeight,
 		}
 	}
 	contract.Pieces = append(contract.Pieces, pieceData{
@@ -226,18 +230,19 @@ func (w *worker) threadedWorkLoop() {
 
 // updateWorkerPool will grab the set of contracts from the contractor and
 // update the worker pool to match.
-func (r *Renter) updateWorkerPool() {
+func (r *Renter) updateWorkerPool(contracts []modules.RenterContract) {
 	// Get a map of all the contracts in the contractor.
-	newContracts := make(map[types.FileContractID]struct{})
-	for _, nc := range r.hostContractor.Contracts() {
-		newContracts[nc.ID] = struct{}{}
+	newContracts := make(map[types.FileContractID]modules.RenterContract)
+	for _, nc := range contracts {
+		newContracts[nc.ID] = nc
 	}
 
 	// Add a worker for any contract that does not already have a worker.
-	for id := range newContracts {
+	for id, contract := range newContracts {
 		_, exists := r.workerPool[id]
 		if !exists {
 			worker := &worker{
+				contract:   contract,
 				contractID: id,
 
 				downloadChan:         make(chan downloadWork, 1),

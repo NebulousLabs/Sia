@@ -313,7 +313,6 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		cs.threadedInitialBlockchainDownload()
 		doneChan <- struct{}{}
 	}()
-	defer close(doneChan)
 	select {
 	case <-doneChan:
 		t.Error("threadedInitialBlockchainDownload finished with 0 synced peers")
