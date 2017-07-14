@@ -1597,6 +1597,7 @@ func TestRedundancyReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stH1.server.Close()
 	testGroup := []*serverTester{st, stH1}
 
 	// Connect the testers to eachother so that they are all on the same
@@ -1687,50 +1688,25 @@ func TestRedundancyReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add a block to clear the transaction pool and give the host an output to
-	// make an announcement, and then make the announcement.
-	_, err = st.miner.AddBlock()
+	// add a block, without this this test fails with `wallet has coins spent in incomplete transactions`
+	b, err := st.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = synchronizationCheck(testGroup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = announceAllHosts(testGroup)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Wait until the host shows back up in the hostdb.
-	var ah HostdbActiveGET
-	err = retry(200, 100*time.Millisecond, func() error {
-		err := st.getAPI("/hostdb/active", &ah)
+	for _, tester := range testGroup {
+		err = waitForBlock(b.ID(), tester)
 		if err != nil {
-			return err
+			t.Fatal(err)
 		}
-		if len(ah.Hosts) != 2 {
-			return errors.New("not enough hosts")
-		}
-		return nil
-	})
+	}
+
+	err = stH1.announceHost()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Mine another block so that the contract checker updates the IsGood status
-	// of the contracts.
-	_, err = st.miner.AddBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = synchronizationCheck(testGroup)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Redundancy should re-report at 2.
-	err = retry(250, 100*time.Millisecond, func() error {
+	// redundancy should increment back to 2
+	err = retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
 			return nil

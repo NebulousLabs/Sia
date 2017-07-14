@@ -412,9 +412,6 @@ func (hdb *HostDB) EstimateHostScore(entry modules.HostDBEntry) modules.HostScor
 // ScoreBreakdown provdes a detailed set of scalars and bools indicating
 // elements of the host's overall score.
 func (hdb *HostDB) ScoreBreakdown(entry modules.HostDBEntry) modules.HostScoreBreakdown {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-
 	score := hdb.calculateHostWeight(entry)
 	return modules.HostScoreBreakdown{
 		Score:          score,

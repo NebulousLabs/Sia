@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -119,32 +118,6 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 	}
 }
 
-// cleanCloseHandler wraps the entire API, ensuring that underlying conns are
-// not leaked if the rmeote end closes the connection before the underlying
-// handler finishes.
-func cleanCloseHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Close this file handle either when the function completes or when the
-		// connection is done.
-		done := make(chan struct{})
-		go func(w http.ResponseWriter, r *http.Request) {
-			defer close(done)
-			next.ServeHTTP(w, r)
-		}(w, r)
-		select {
-		case <-done:
-		case <-r.Context().Done():
-		}
-
-		// Sanity check - thread should not take more than an hour to return.
-		select {
-		case <-done:
-		case <-time.After(time.Minute * 60):
-			build.Severe("api call is taking more than 20 minutes to return:", r.URL.Path)
-		}
-	})
-}
-
 // API encapsulates a collection of modules and implements a http.Handler
 // to access their methods.
 type API struct {
@@ -156,6 +129,7 @@ type API struct {
 	renter   modules.Renter
 	tpool    modules.TransactionPool
 	wallet   modules.Wallet
+	pool     modules.Pool
 
 	router http.Handler
 }
@@ -168,7 +142,7 @@ func (api *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // New creates a new Sia API from the provided modules.  The API will require
 // authentication using HTTP basic auth for certain endpoints of the supplied
 // password is not the empty string.  Usernames are ignored for authentication.
-func New(requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) *API {
+func New(requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, p modules.Pool) *API {
 	api := &API{
 		cs:       cs,
 		explorer: e,
@@ -178,6 +152,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		renter:   r,
 		tpool:    tp,
 		wallet:   w,
+		pool:     p,
 	}
 
 	// Register API handlers
@@ -228,6 +203,13 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.POST("/miner/header", RequirePassword(api.minerHeaderHandlerPOST, requiredPassword))
 		router.GET("/miner/start", RequirePassword(api.minerStartHandler, requiredPassword))
 		router.GET("/miner/stop", RequirePassword(api.minerStopHandler, requiredPassword))
+	}
+
+	// Mining pool API Calls
+	if api.pool != nil {
+		router.GET("/pool", api.poolHandler)
+		router.GET("/pool/start", RequirePassword(api.poolStartHandler, requiredPassword))
+		router.GET("/pool/stop", RequirePassword(api.poolStopHandler, requiredPassword))
 	}
 
 	// Renter API Calls
@@ -293,7 +275,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	}
 
 	// Apply UserAgent middleware and return the API
-	api.router = cleanCloseHandler(RequireUserAgent(router, requiredUserAgent))
+	api.router = RequireUserAgent(router, requiredUserAgent)
 	return api
 }
 

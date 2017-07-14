@@ -84,15 +84,6 @@ func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContra
 	return modules.RenterContract{}, false
 }
 
-// ContractByID returns the contract with the id specified, if it exists.
-func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContract, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	contract, exists := c.contracts[id]
-	return contract, exists
-}
-
 // Contracts returns the contracts formed by the contractor in the current
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
@@ -128,13 +119,8 @@ func (c *Contractor) CurrentPeriod() types.BlockHeight {
 
 // ResolveID returns the ID of the most recent renewal of id.
 func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	newID, exists := c.renewedIDs[id]
-	for exists {
-		id = newID
-		newID, exists = c.renewedIDs[id]
+	if newID, ok := c.renewedIDs[id]; ok && newID != id {
+		return c.ResolveID(newID)
 	}
 	return id
 }
@@ -142,18 +128,6 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 // Close closes the Contractor.
 func (c *Contractor) Close() error {
 	return c.tg.Stop()
-}
-
-// GoodForRenew indicates whether a contract is intended to be renewed.
-func (c *Contractor) GoodForRenew(id types.FileContractID) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	contract, exists := c.contracts[id]
-	if !exists {
-		return false
-	}
-	return contract.GoodForRenew
 }
 
 // New returns a new Contractor.

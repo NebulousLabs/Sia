@@ -182,10 +182,19 @@ func (d *download) initPieceSet(f *file,
 
 	f.mu.RLock()
 	for _, contract := range f.contracts {
-		id := r.hostContractor.ResolveID(contract.ID)
+		// Get latest contract ID.
+		id, ok := currentContracts[contract.IP]
+		if !ok {
+			// No matching NetAddress; try using a revised ID.
+			id = r.hostContractor.ResolveID(contract.ID)
+			if id == contract.ID {
+				continue
+			}
+		}
+
 		for i := range contract.Pieces {
-			// Only add pieceSet entries for chunks that are going to be downloaded.
 			m, exists := d.pieceSet[contract.Pieces[i].Chunk]
+			// Only add pieceSet entries for chunks that are going to be downloaded.
 			if exists {
 				m[id] = contract.Pieces[i]
 			}
@@ -371,9 +380,8 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 	}
 
 	// Update the set of workers to include everyone in the worker pool.
-	contracts := r.hostContractor.Contracts()
 	id := r.mu.Lock()
-	r.updateWorkerPool(contracts)
+	r.updateWorkerPool()
 	ds.availableWorkers = make([]*worker, 0, len(r.workerPool))
 	for _, worker := range r.workerPool {
 		// Ignore workers that are already in the active set of workers.

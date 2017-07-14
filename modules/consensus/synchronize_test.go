@@ -66,10 +66,13 @@ func TestSynchronize(t *testing.T) {
 	// Mine on cst2 until it is more than 'MaxCatchUpBlocks' ahead of cst1.
 	// NOTE: we have to disconnect prior to this, otherwise cst2 will relay
 	// blocks to cst1.
-	cst1.gateway.Disconnect(cst2.gateway.Address())
-	cst2.gateway.Disconnect(cst1.gateway.Address())
+	err = cst1.gateway.Disconnect(cst2.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
 	for cst2.cs.dbBlockHeight() < cst1.cs.dbBlockHeight()+3+MaxCatchUpBlocks {
-		_, err := cst2.miner.AddBlock()
+		b, _ := cst2.miner.FindBlock()
+		err = cst2.cs.AcceptBlock(b)
 		if err != nil {
 			t.Fatal(err)
 		}

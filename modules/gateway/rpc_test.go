@@ -475,8 +475,8 @@ func TestOutboundAndInboundRPCs(t *testing.T) {
 	// Call the "recv" RPC on g1. We don't know g1's address as g2 sees it, so we
 	// get it from the first address in g2's peer list.
 	var addr modules.NetAddress
-	for pAddr := range g2.peers {
-		addr = pAddr
+	for p_addr := range g2.peers {
+		addr = p_addr
 		break
 	}
 	err = g2.RPC(addr, "recv", func(conn modules.PeerConn) error { return nil })

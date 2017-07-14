@@ -2,29 +2,19 @@ package gateway
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 )
 
 var (
-	errNodeExists    = errors.New("node already added")
-	errNoNodes       = errors.New("no nodes in the node list")
-	errOurAddress    = errors.New("can't add our own address")
-	errPeerGenesisID = errors.New("peer has different genesis ID")
+	errNodeExists = errors.New("node already added")
+	errNoNodes    = errors.New("no nodes in the node list")
+	errOurAddress = errors.New("can't add our own address")
 )
-
-// A node represents a potential peer on the Sia network.
-type node struct {
-	NetAddress      modules.NetAddress `json:"netaddress"`
-	WasOutboundPeer bool               `json:"wasoutboundpeer"`
-}
 
 // addNode adds an address to the set of nodes on the network.
 func (g *Gateway) addNode(addr modules.NetAddress) error {
@@ -37,10 +27,7 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 	} else if net.ParseIP(addr.Host()) == nil {
 		return errors.New("address must be an IP address: " + string(addr))
 	}
-	g.nodes[addr] = &node{
-		NetAddress:      addr,
-		WasOutboundPeer: false,
-	}
+	g.nodes[addr] = struct{}{}
 	return nil
 }
 
@@ -54,42 +41,16 @@ func (g *Gateway) pingNode(addr modules.NetAddress) error {
 		return err
 	}
 	defer conn.Close()
-
-	// Read the node's version.
-	remoteVersion, err := connectVersionHandshake(conn, build.Version)
-	if err != nil {
-		return err
+	// If connection succeeds, supply an unacceptable version so that we
+	// will not be added as a peer.
+	//
+	// NOTE: this is a somewhat clunky way of specifying that you didn't
+	// actually want a connection.
+	_, err = connectVersionHandshake(conn, "0.0.0")
+	if err == errPeerRejectedConn {
+		err = nil // we expect this error
 	}
-
-	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) < 0 {
-		return nil // for older versions, this is where pinging ends
-	}
-
-	// Send our header.
-	// NOTE: since we don't intend to complete the connection, we can send an
-	// inaccurate NetAddress.
-	ourHeader := sessionHeader{
-		GenesisID:  types.GenesisID,
-		UniqueID:   g.id,
-		NetAddress: modules.NetAddress(conn.LocalAddr().String()),
-	}
-	if err := exchangeOurHeader(conn, ourHeader); err != nil {
-		return err
-	}
-
-	// Read remote header.
-	var remoteHeader sessionHeader
-	if err := encoding.ReadObject(conn, &remoteHeader, maxEncodedSessionHeaderSize); err != nil {
-		return fmt.Errorf("failed to read remote header: %v", err)
-	} else if err := acceptableSessionHeader(ourHeader, remoteHeader, conn.RemoteAddr().String()); err != nil {
-		return err
-	}
-
-	// Send special rejection string.
-	if err := encoding.WriteObject(conn, modules.StopResponse); err != nil {
-		return fmt.Errorf("failed to write header rejection: %v", err)
-	}
-	return nil
+	return err
 }
 
 // removeNode will remove a node from the gateway.
@@ -261,7 +222,8 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		// through, which would cause the node to be pruned even though it may
 		// be a good node. Because nodes are plentiful, this is an acceptable
 		// bug.
-		if err = g.pingNode(node); err != nil {
+		err = g.pingNode(node)
+		if err != nil {
 			g.mu.Lock()
 			g.removeNode(node)
 			g.mu.Unlock()

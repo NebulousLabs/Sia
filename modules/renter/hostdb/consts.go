@@ -32,7 +32,7 @@ const (
 
 	// historicInteractionDecay defines the decay of the HistoricSuccessfulInteractions
 	// and HistoricFailedInteractions after every block
-	historicInteractionDecay = 0.999
+	historicInteractionDecay = 0.997
 )
 
 var (
