@@ -73,7 +73,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 			// Place transactions removed from block heap into
 			// the overflow heap.
 			for _, v := range bottomSets {
-				m.overflowMapHeap.push(v)
+				m.pushToOverflow(v)
 			}
 			break
 		}
@@ -84,7 +84,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 		// size.
 		_, exists := m.blockMapHeap.peek()
 		if !exists {
-			m.overflowMapHeap.push(elem)
+			m.pushToOverflow(elem)
 			// Put back in transactions removed.
 			for _, v := range bottomSets {
 				m.pushToBlock(v)
@@ -109,7 +109,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 		// MapHeap.
 		if averageFeeOfBottomSets.Cmp(candidateSet.averageFee) == 1 {
 			// CandidateSet goes into the overflow.
-			m.overflowMapHeap.push(elem)
+			m.pushToOverflow(elem)
 			// Put transaction sets from bottom back into the blockMapHeap.
 			for _, v := range bottomSets {
 				m.pushToBlock(v)
@@ -171,33 +171,12 @@ func (m *Miner) deleteMapElementTxns(id splitSetID) {
 		m.blockMapHeap.removeSetByID(id)
 
 		// Promote sets from overflow heap to block if possible.
-		for overflowElem, canPromote := m.overflowMapHeap.peek(); canPromote && m.blockMapHeap.size+overflowElem.set.size < types.BlockSizeLimit-5e3; {
-			promotedElem := m.overflowMapHeap.pop()
+		for overflowElem, canPromote := m.peekAtOverflow(); canPromote && m.blockMapHeap.size+overflowElem.set.size < types.BlockSizeLimit-5e3; {
+			promotedElem := m.popFromOverflow()
 			m.pushToBlock(promotedElem)
 		}
 		m.removeSplitSetFromUnsolvedBlock(id)
 	}
-}
-
-// pushToBlock pushes a mapElement onto the blockMapHeap and appends it to the
-// unsolved block in the miner's global state.
-func (m *Miner) pushToBlock(elem *mapElement) {
-	m.blockMapHeap.push(elem)
-	transactions := elem.set.transactions
-
-	// Place the transactions from this set into the block and store their indices.
-	for i := 0; i < len(transactions); i++ {
-		m.unsolvedBlockIndex[transactions[i].ID()] = len(m.persist.UnsolvedBlock.Transactions)
-		m.persist.UnsolvedBlock.Transactions = append(m.persist.UnsolvedBlock.Transactions, transactions[i])
-	}
-}
-
-// popFromBlock pops an element from the blockMapHeap, removes it from the
-// miner's unsolved block, and maintains proper set ordering within the block.
-func (m *Miner) popFromBlock() *mapElement {
-	elem := m.blockMapHeap.pop()
-	m.removeSplitSetFromUnsolvedBlock(elem.id)
-	return elem
 }
 
 // removeSplitSetFromUnsolvedBlock removes a split set from the miner's unsolved
@@ -298,6 +277,49 @@ func (m *Miner) fixSplitSetOrdering(id splitSetID) {
 			m.unsolvedBlockIndex[setTxIDs[i]] = expectedIndex
 		}
 	}
+}
+
+// peekAtBlock checks top of the blockMapHeap, and returns the top element (but
+// does not remove it from the heap). Returns false if the heap is empty.
+func (m *Miner) peekAtBlock() (*mapElement, bool) {
+	return m.blockMapHeap.peek()
+}
+
+// peekAtOverflow checks top of the overflowMapHeap, and returns the top element
+// (but does not remove it from the heap). Returns false if the heap is empty.
+func (m *Miner) peekAtOverflow() (*mapElement, bool) {
+	return m.overflowMapHeap.peek()
+}
+
+// popFromBlock pops an element from the blockMapHeap, removes it from the
+// miner's unsolved block, and maintains proper set ordering within the block.
+func (m *Miner) popFromBlock() *mapElement {
+	elem := m.blockMapHeap.pop()
+	m.removeSplitSetFromUnsolvedBlock(elem.id)
+	return elem
+}
+
+// popFromBlock pops an element from the overflowMapHeap.
+func (m *Miner) popFromOverflow() *mapElement {
+	return m.overflowMapHeap.pop()
+}
+
+// pushToBlock pushes a mapElement onto the blockMapHeap and appends it to the
+// unsolved block in the miner's global state.
+func (m *Miner) pushToBlock(elem *mapElement) {
+	m.blockMapHeap.push(elem)
+	transactions := elem.set.transactions
+
+	// Place the transactions from this set into the block and store their indices.
+	for i := 0; i < len(transactions); i++ {
+		m.unsolvedBlockIndex[transactions[i].ID()] = len(m.persist.UnsolvedBlock.Transactions)
+		m.persist.UnsolvedBlock.Transactions = append(m.persist.UnsolvedBlock.Transactions, transactions[i])
+	}
+}
+
+// pushToOverflow pushes a mapElement onto the overflowMapHeap.
+func (m *Miner) pushToOverflow(elem *mapElement) {
+	m.overflowMapHeap.push(elem)
 }
 
 // ProcessConsensusDigest will update the miner's most recent block.
