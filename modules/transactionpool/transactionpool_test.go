@@ -656,6 +656,13 @@ func TestHeapFees(t *testing.T) {
 	}
 }
 
+// TestBigTpool creates 3 chunks of 10,000 transactions such that the second
+// chunk has much greater fees than the first chunk, and the third chunk has
+// much greater fees than the second chunk. The fees in each chunk are also
+// increasing. Then, to induce move lots of movement of transactions in and out
+// of the miner's unsolved block, we make the tester accept the transactions by
+// interleaving subsets of the chunks. We then check that the miner produces the
+// expected sequence of blocks.
 func TestBigTpool(t *testing.T) {
 	if testing.Short() || !build.VLONG {
 		t.SkipNow()
@@ -679,15 +686,10 @@ func TestBigTpool(t *testing.T) {
 	feeFrac := types.SiacoinPrecision.Div64(10)
 	numGraphsPerChunk := 1000
 
-	graphFund1 := types.SiacoinPrecision.Mul64(8).Add(coinFrac.Mul64(2))  //80.02 SC for chunk 1
-	graphFund2 := types.SiacoinPrecision.Mul64(44).Add(coinFrac.Mul64(2)) //200.02 SC for chunk 2
-	graphFund3 := types.SiacoinPrecision.Mul64(64).Add(coinFrac.Mul64(2)) //320.02 SC for chunk 1
-
 	var outputs1 []types.SiacoinOutput
 	var outputs2 []types.SiacoinOutput
 	var outputs3 []types.SiacoinOutput
 
-	var val1 types.Currency
 	// Create outputs to be spent in the first chunk
 	for i := 1; i <= numGraphsPerChunk; i++ {
 		value := coinFrac.Mul64(25).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
@@ -695,13 +697,7 @@ func TestBigTpool(t *testing.T) {
 			UnlockHash: types.UnlockConditions{}.UnlockHash(),
 			Value:      value,
 		})
-		val1 = val1.Add(value)
 	}
-
-	if val1.Cmp(graphFund1) != 0 {
-		t.Log("Got: " + val1.String() + "\nExpected: " + graphFund1.String() + "\n")
-	}
-
 	// There's so many outputs that they need to be put into multiple
 	// transactions. We can fit around 500 outputs per transaction.
 	var outputTxns1 [][]types.Transaction
@@ -720,12 +716,10 @@ func TestBigTpool(t *testing.T) {
 		for i := 0; i < 500; i++ { //500 is the the number of outputs
 			var edges []types.TransactionGraphEdge
 			totalValue := coinFrac.Mul64(25).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
-
 			setSize := 10
 			txTotalVal := totalValue.Div64(uint64(setSize))
 			txFee := txTotalVal.Div64(5)
 			txVal := txTotalVal.Sub(txFee)
-
 			txFee2 := txVal.Div64(2)
 			txVal2 := txVal.Sub(txFee2)
 
@@ -750,15 +744,12 @@ func TestBigTpool(t *testing.T) {
 				t.Fatal(err)
 			}
 			graphs = append(graphs, graph)
-
 			counter++
 		}
 	}
-
 	////////////////////////////////////////////////////////////////////////////
 	//						Chunk 2
 	////////////////////////////////////////////////////////////////////////////
-	var val2 types.Currency
 	// Create outputs to be spent in the second chunk
 	for i := 1; i <= numGraphsPerChunk; i++ {
 		value := coinFrac.Mul64(60).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
@@ -766,10 +757,6 @@ func TestBigTpool(t *testing.T) {
 			UnlockHash: types.UnlockConditions{}.UnlockHash(),
 			Value:      value,
 		})
-		val2 = val2.Add(value)
-	}
-	if val2.Cmp(graphFund2) != 0 {
-		t.Log("Got: " + val2.String() + "\nExpected: " + graphFund2.String() + "\n")
 	}
 	// There's so many outputs that they need to be put into multiple
 	// transactions. We can fit around 500 outputs per transaction.
@@ -793,7 +780,6 @@ func TestBigTpool(t *testing.T) {
 			txTotalVal := totalValue.Div64(uint64(setSize))
 			txFee := txTotalVal.Div64(5)
 			txVal := txTotalVal.Sub(txFee)
-
 			txFee2 := txVal.Div64(2)
 			txVal2 := txVal.Sub(txFee2)
 
@@ -813,21 +799,17 @@ func TestBigTpool(t *testing.T) {
 					Value:  txVal2,
 				})
 			}
-
 			graph, err := types.TransactionGraph(finalTxn.SiacoinOutputID(uint64(i)), edges)
 			if err != nil {
 				t.Fatal(err)
 			}
 			graphs2 = append(graphs2, graph)
-
 			counter++
 		}
 	}
-
 	////////////////////////////////////////////////////////////////////////////
 	//						Chunk 3
 	////////////////////////////////////////////////////////////////////////////
-	var val3 types.Currency
 	// Create outputs to be spent in the third chunk
 	for i := 1; i <= numGraphsPerChunk; i++ {
 		value := coinFrac.Mul64(110).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
@@ -835,10 +817,6 @@ func TestBigTpool(t *testing.T) {
 			UnlockHash: types.UnlockConditions{}.UnlockHash(),
 			Value:      value,
 		})
-		val3 = val3.Add(value)
-	}
-	if val3.Cmp(graphFund3) != 0 {
-		t.Log("Got: " + val3.String() + "\nExpected: " + graphFund3.String() + "\n")
 	}
 	// There's so many outputs that they need to be put into multiple
 	// transactions. We can fit around 500 outputs per transaction.
@@ -862,7 +840,6 @@ func TestBigTpool(t *testing.T) {
 			txTotalVal := totalValue.Div64(uint64(setSize))
 			txFee := txTotalVal.Div64(5)
 			txVal := txTotalVal.Sub(txFee)
-
 			txFee2 := txVal.Div64(2)
 			txVal2 := txVal.Sub(txFee2)
 
@@ -882,13 +859,11 @@ func TestBigTpool(t *testing.T) {
 					Value:  txVal2,
 				})
 			}
-
 			graph, err := types.TransactionGraph(finalTxn.SiacoinOutputID(uint64(i)), edges)
 			if err != nil {
 				t.Fatal(err)
 			}
 			graphs3 = append(graphs3, graph)
-
 			counter++
 		}
 	}
@@ -904,9 +879,6 @@ func TestBigTpool(t *testing.T) {
 	for _, graph := range graphs {
 		err := tpt.tpool.AcceptTransactionSet([]types.Transaction{graph[0]})
 		if err != nil {
-			println("\nSUP")
-			println(len(graphs))
-			println(c)
 			t.Fatal(err)
 		}
 		c++
@@ -1015,84 +987,328 @@ func TestBigTpool(t *testing.T) {
 	}
 
 	block, err = tpt.miner.AddBlock()
-
-	var size int
-	var numTxns int
-	var totalFee types.Currency
-	maxFee := types.ZeroCurrency
-	minFee := types.SiacoinPrecision.Mul64(10000000000) // All the fees are much smaller than 1 SC.
+	if err != nil {
+		t.Fatal(err)
+	}
+	var totalFee1 types.Currency
+	minFee1 := types.SiacoinPrecision.Mul64(10000000000) // All the fees are much smaller than 1 SC.
 	for _, tx := range block.Transactions {
 		for _, fee := range tx.MinerFees {
-			totalFee = totalFee.Add(fee)
-			if fee.Cmp(minFee) < 0 {
-				minFee = fee
-			}
-			if fee.Cmp(maxFee) > 0 {
-				maxFee = fee
+			totalFee1 = totalFee1.Add(fee)
+			if fee.Cmp(minFee1) < 0 {
+				minFee1 = fee
 			}
 		}
-		size += tx.MarshalSiaSize()
-		numTxns++
 	}
-	println("TOTAL: " + totalFee.HumanString())
-	println("Max fee: " + maxFee.HumanString())
-	println("Min fee: " + minFee.HumanString())
-	println("NUMTXNS: ")
-	println(numTxns)
-	println(size)
 
 	block, err = tpt.miner.AddBlock()
-
-	size = 0
-	numTxns = 0
-	totalFee = types.ZeroCurrency
-	maxFee = types.ZeroCurrency
-	minFee = types.SiacoinPrecision.Mul64(10000000000) // All the fees are much smaller than this.
+	if err != nil {
+		t.Fatal(err)
+	}
+	var totalFee2 types.Currency
+	maxFee2 := types.ZeroCurrency
+	minFee2 := types.SiacoinPrecision.Mul64(10000000000) // All the fees are much smaller than 1 SC.
 	for _, tx := range block.Transactions {
 		for _, fee := range tx.MinerFees {
-			totalFee = totalFee.Add(fee)
-			if fee.Cmp(minFee) < 0 {
-				minFee = fee
+			totalFee2 = totalFee2.Add(fee)
+			if fee.Cmp(minFee2) < 0 {
+				minFee2 = fee
 			}
-			if fee.Cmp(maxFee) > 0 {
-				maxFee = fee
+			if fee.Cmp(maxFee2) > 0 {
+				maxFee2 = fee
 			}
 		}
-		size += tx.MarshalSiaSize()
-		numTxns++
 	}
-	println("\nTOTAL: " + totalFee.HumanString())
-	println("Min fee: " + minFee.HumanString())
-	println("Max fee: " + maxFee.HumanString())
-	println("NUMTXNS: ")
-	println(numTxns)
-	println(size)
 
 	block, err = tpt.miner.AddBlock()
-
-	size = 0
-	numTxns = 0
-	totalFee = types.ZeroCurrency
-	maxFee = types.ZeroCurrency
-	minFee = types.SiacoinPrecision.Mul64(10000000000) // All the fees are much smaller than this.
+	if err != nil {
+		t.Fatal(err)
+	}
+	var totalFee3 types.Currency
+	maxFee3 := types.ZeroCurrency
+	minFee3 := types.SiacoinPrecision.Mul64(10000000000) // All the fees are much smaller than 1 SC.
 	for _, tx := range block.Transactions {
 		for _, fee := range tx.MinerFees {
-			totalFee = totalFee.Add(fee)
-			if fee.Cmp(minFee) < 0 {
-				minFee = fee
+			totalFee3 = totalFee3.Add(fee)
+			if fee.Cmp(minFee3) < 0 {
+				minFee3 = fee
 			}
-			if fee.Cmp(maxFee) > 0 {
-				maxFee = fee
+			if fee.Cmp(maxFee3) > 0 {
+				maxFee3 = fee
 			}
 		}
-		size += tx.MarshalSiaSize()
-		numTxns++
 	}
-	println("\nTOTAL: " + totalFee.HumanString())
-	println("Min fee: " + minFee.HumanString())
-	println("Max fee: " + maxFee.HumanString())
-	println("NUMTXNS: ")
-	println(numTxns)
-	println(size)
 
+	block, err = tpt.miner.AddBlock()
+	totalFee4 := types.ZeroCurrency
+	maxFee4 := types.ZeroCurrency
+	for _, tx := range block.Transactions {
+		for _, fee := range tx.MinerFees {
+			totalFee4 = totalFee4.Add(fee)
+			if fee.Cmp(maxFee4) > 0 {
+				maxFee4 = fee
+			}
+		}
+	}
+
+	// Check that the total fees from each block are decreasing.
+	if totalFee1.Cmp(totalFee2) < 0 {
+		t.Error("Expected fees from the first block to be greater than from the second block.")
+	}
+	if totalFee2.Cmp(totalFee3) < 0 {
+		t.Error("Expected fees from the second block to be greater than from the third block.")
+	}
+	if totalFee3.Cmp(totalFee4) < 0 {
+		t.Error("Expected fees from the third block to be greater than from the fourth block.")
+	}
+	// Check that the min fees from each block is greater than or equal to the max fee for
+	// the block mined after it.
+	if minFee1.Cmp(maxFee2) < 0 {
+		t.Error("Expected min fee from the first block to be greater than the max fee from the second block.")
+	}
+	if minFee2.Cmp(maxFee3) < 0 {
+		t.Error("Expected min fee from the second block to be greater than the max fee from the third block.")
+	}
+	if minFee3.Cmp(maxFee4) < 0 {
+		t.Error("Expected min fee from the third block to be greater than the max fee from the fourth block.")
+	}
+}
+
+// TestTpoolRevert tests proper transaction pool reverts. In this test we create
+// two testers who set up the same outputs for a group of transaction sets. Then
+// one accepts a small subset of those sets, mines a block, and passes that
+// block to the other tester. Then that tester mines two blocks. We check that
+// the total fee for all 3 blocks is as expected, and that the last block only
+// has transactions with fees less than those in the block prior.
+func TestTpoolRevert(t *testing.T) {
+	if testing.Short() || !build.VLONG {
+		t.SkipNow()
+	}
+
+	tpt, err := blankTpoolTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpt2, err := blankTpoolTester(t.Name() + "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpt.Close()
+	defer tpt2.Close()
+
+	// Mine blocks until there is money in the wallet. We have to make sure they
+	// are on the same chain by feeding all blocks to the other tester.
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		b, _ := tpt.miner.FindBlock()
+		err = tpt.cs.AcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = tpt2.cs.AcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		b, _ := tpt2.miner.FindBlock()
+		err = tpt2.cs.AcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = tpt.cs.AcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Mine a few more blocks to get some extra funding.
+	for i := 0; i < 4; i++ {
+		block, err := tpt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = tpt2.cs.AcceptBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Create transaction graph setup.
+	coinFrac := types.SiacoinPrecision
+	numGraphs := 110
+	graphFund := coinFrac.Mul64(12210)
+	var outputs []types.SiacoinOutput
+	for i := 0; i < numGraphs; i++ {
+		outputs = append(outputs, types.SiacoinOutput{
+			UnlockHash: types.UnlockConditions{}.UnlockHash(),
+			Value:      graphFund,
+		})
+	}
+	txns, err := tpt.wallet.SendSiacoinsMulti(outputs)
+	if err != nil {
+		t.Error(err)
+	}
+	// Mine the graph setup in the consensus set so that the graph outputs are
+	// transaction sets. This guarantees that the parent of every graph will be
+	// its own output.
+	block, err := tpt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tpt2.cs.AcceptBlock(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	finalTxn := txns[len(txns)-1]
+	// For each output, create 250 transactions
+	var graphs [][]types.Transaction
+	for i := 0; i < numGraphs; i++ {
+		var edges []types.TransactionGraphEdge
+		var cumFee types.Currency
+		for j := 0; j < numGraphs; j++ {
+			fee := coinFrac.Mul64(uint64((j + 1)))
+			cumFee = cumFee.Add(fee)
+			edges = append(edges, types.TransactionGraphEdge{
+				Dest:   j + 1,
+				Fee:    fee,
+				Source: 0,
+				Value:  fee,
+			})
+		}
+		for k := 0; k < numGraphs; k++ {
+			fee := coinFrac.Mul64(uint64(k + 1)).Div64(2)
+			cumFee = cumFee.Add(fee)
+			edges = append(edges, types.TransactionGraphEdge{
+				Dest:   k + 251,
+				Fee:    fee,
+				Source: k + 1,
+				Value:  fee,
+			})
+		}
+		graph, err := types.TransactionGraph(finalTxn.SiacoinOutputID(uint64(i)), edges)
+		if err != nil {
+			t.Fatal(err)
+		}
+		graphs = append(graphs, graph)
+
+	}
+	// Accept the parent node of each graph so that its outputs we can test
+	// spending its outputs after mining the next block.
+	for _, graph := range graphs {
+		err := tpt.tpool.AcceptTransactionSet([]types.Transaction{graph[0]})
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = tpt2.tpool.AcceptTransactionSet([]types.Transaction{graph[0]})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	block, err = tpt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tpt2.cs.AcceptBlock(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Now accept all the other nodes of each graph.
+	for _, graph := range graphs {
+		for _, txn := range graph[1:] {
+			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	// Accept a randomly selected subset of transactions with the other tester.
+	randSet := fastrand.Perm(len(graphs))
+	for i := 0; i < len(randSet)/10; i++ {
+		graph := graphs[randSet[i]]
+		for _, txn := range graph[1:] {
+			err := tpt2.tpool.AcceptTransactionSet([]types.Transaction{txn})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// Now the second tester mines the random subset, and gives the block to the
+	// first tester.
+	block, err = tpt2.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tpt.cs.AcceptBlock(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//Now we add up all the fees from this first block.
+	var totalFeeRandBlock types.Currency
+	for _, tx := range block.Transactions {
+		for _, fee := range tx.MinerFees {
+			totalFeeRandBlock = totalFeeRandBlock.Add(fee)
+		}
+	}
+
+	// Mine the next block so we can check the transactions inside
+	block, err = tpt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var totalFee1 types.Currency
+	maxFee1 := types.SiacoinPrecision.Div64(1000000)
+	minFee1 := types.SiacoinPrecision.Mul64(1000000)
+	for _, txn := range block.Transactions {
+		for _, fee := range txn.MinerFees {
+			if fee.Cmp(maxFee1) >= 0 {
+				maxFee1 = fee
+			}
+			if fee.Cmp(minFee1) <= 0 {
+				minFee1 = fee
+			}
+			totalFee1 = totalFee1.Add(fee)
+		}
+	}
+
+	// Mine the next block so we can check the transactions inside
+	block, err = tpt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var totalFee2 types.Currency
+	maxFee2 := types.SiacoinPrecision.Div64(1000000)
+	minFee2 := types.SiacoinPrecision.Mul64(1000000)
+	for _, txn := range block.Transactions {
+		for _, fee := range txn.MinerFees {
+			if fee.Cmp(maxFee2) >= 0 {
+				maxFee2 = fee
+			}
+			if fee.Cmp(minFee2) <= 0 {
+				minFee2 = fee
+			}
+			totalFee2 = totalFee2.Add(fee)
+		}
+	}
+
+	totalFeeAcrossBlocks := totalFeeRandBlock.Add(totalFee1).Add(totalFee2)
+	totalExpectedFee := types.SiacoinPrecision.Mul64(13860).Add(types.SiacoinPrecision.Mul64(321915))
+	if totalFeeAcrossBlocks.Cmp(totalExpectedFee) != 0 {
+		t.Error("Fee different from expected.")
+	}
+	if maxFee1.Cmp(maxFee2) <= 0 {
+		t.Error("Expected highest fee from first block to be greater than highest fee from second block.")
+	}
+	if minFee1.Cmp(maxFee2) < 0 {
+		t.Error("Expected lowest fee from first block to be greater than or equal to than highest fee from second block.")
+	}
+	if maxFee1.Cmp(minFee1) < 0 {
+		t.Error("Expected highest fee from first block to be greater than lowest fee from first block.")
+	}
+	if maxFee2.Cmp(minFee2) < 0 {
+		t.Error("Expected highest fee from second block to be greater than lowest fee from second block.")
+	}
 }
