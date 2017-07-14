@@ -199,11 +199,6 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	pubKey := entry.PublicKey
 	hdb.log.Debugf("Scanning host %v at %v", pubKey, netAddr)
 
-	// Update historic interactions of entry if necessary
-	hdb.mu.RLock()
-	updateHostHistoricInteractions(&entry, hdb.blockHeight)
-	hdb.mu.RUnlock()
-
 	var settings modules.HostExternalSettings
 	err := func() error {
 		dialer := &net.Dialer{
@@ -233,6 +228,9 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 		copy(pubkey[:], pubKey.Key)
 		return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 	}()
+	// Update historic interactions of entry if necessary
+	updateHostsHistoricInteractions(&entry, hdb.cs.Height())
+
 	if err != nil {
 		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
 		if hdb.online {

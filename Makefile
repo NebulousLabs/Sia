@@ -35,8 +35,8 @@ run = .
 pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus                                  \
        ./modules/explorer ./modules/gateway ./modules/host ./modules/host/contractmanager                               \
        ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb ./modules/renter/hostdb/hosttree            \
-       ./modules/renter/proto ./modules/miner ./modules/wallet ./modules/transactionpool ./persist ./siac               \
-       ./siad ./sync ./types
+       ./modules/renter/proto ./modules/miner ./modules/wallet ./modules/transactionpool ./modules/miningpool ./persist \
+	   ./siac ./siad ./sync ./types
 
 # fmt calls go fmt on all packages.
 fmt:
@@ -79,7 +79,7 @@ test-v:
 test-long: clean fmt vet lint
 	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
 test-vlong: clean fmt vet lint
-	go test -v -race -tags='testing debug vlong' -timeout=5000s $(pkgs) -run=$(run)
+	go test -v -race -tags='testing debug vlong' -timeout=1000s $(pkgs) -run=$(run)
 test-cpu:
 	go test -v -tags='testing debug' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)
 test-mem:

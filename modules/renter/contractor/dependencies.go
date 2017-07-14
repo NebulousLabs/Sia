@@ -49,10 +49,9 @@ type (
 		AllHosts() []modules.HostDBEntry
 		ActiveHosts() []modules.HostDBEntry
 		Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
+		RandomHosts(n int, exclude []types.SiaPublicKey) []modules.HostDBEntry
 		IncrementSuccessfulInteractions(key types.SiaPublicKey)
 		IncrementFailedInteractions(key types.SiaPublicKey)
-		RandomHosts(n int, exclude []types.SiaPublicKey) []modules.HostDBEntry
-		ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
 	}
 
 	persister interface {

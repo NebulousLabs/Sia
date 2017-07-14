@@ -112,8 +112,8 @@ func (hd *hostDownloader) Close() error {
 // Downloader returns a Downloader object that can be used to download sectors
 // from a host.
 func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{}) (_ Downloader, err error) {
-	id = c.ResolveID(id)
 	c.mu.RLock()
+	id = c.ResolveID(id)
 	cachedDownloader, haveDownloader := c.downloaders[id]
 	height := c.blockHeight
 	contract, haveContract := c.contracts[id]
