@@ -121,6 +121,12 @@ Miner (m):
 	The miner requires the consensus set, transaction pool, and wallet.
 	Example:
 		siad -M gctwm
+Mining Pool (p):
+	The pool provides a decentralized pool as well as an API for external
+	clients (web pages) to access for user stats.
+	The pool requires the gateway,consensus set, transactions pool and wallet.
+	Example:
+		siad -Mgctwp
 Explorer (e):
 	The explorer provides statistics about the blockchain and can be
 	queried for information about specific transactions or other objects on
