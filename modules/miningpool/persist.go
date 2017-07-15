@@ -26,6 +26,11 @@ type persistence struct {
 	RevisionNumber uint64                       `json:"revisionnumber"`
 	Settings       modules.PoolInternalSettings `json:"settings"`
 	UnlockHash     types.UnlockHash             `json:"unlockhash"`
+	Height         types.BlockHeight
+	Target         types.Target
+	Address        types.UnlockHash
+	BlocksFound    []types.BlockID
+	UnsolvedBlock  types.Block
 }
 
 // persistData returns the data in the Host that will be saved to disk.
