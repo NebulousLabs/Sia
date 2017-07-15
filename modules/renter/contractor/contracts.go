@@ -503,7 +503,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		// Attempt forming a contract with this host.
 		newContract, err := c.managedNewContract(host, numSectors, endHeight)
 		if err != nil {
-			c.log.Printf("Attempted to form a contract with %v, but if failed: %v\n", host.NetAddress, err)
+			c.log.Printf("Attempted to form a contract with %v, but negotiation failed: %v\n", host.NetAddress, err)
 			continue
 		}
 		newContract.GoodForUpload = true
