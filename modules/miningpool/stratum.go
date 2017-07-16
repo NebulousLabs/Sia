@@ -2,6 +2,7 @@ package pool
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -17,16 +18,10 @@ type StratumRequestMsg struct {
 	Params []interface{} `json:"params"`
 }
 
-type StratumResponseResult struct {
-	Details     [2][]string `json:"-,"`
-	Extranonse1 string      `json:""`
-	Extranonse2 int         `json:""`
-}
-
 type StratumResponseMsg struct {
-	ID     int                   `json:"id"`
-	Result StratumResponseResult `json:"result"`
-	Error  string                `json:"error"`
+	ID     int             `json:"id"`
+	Result json.RawMessage `json:"result"`
+	Error  json.RawMessage `json:"error"`
 }
 
 // Handler represents the status (open/closed) of each connection
@@ -82,15 +77,13 @@ func (h *Handler) handleStratumSubscribe(m StratumRequestMsg) {
 
 	r := StratumResponseMsg{ID: m.ID}
 
-	diff := []string{"mining.set_difficulty", "b4b6693b72a50c7116db18d6497cac52"}
-	notify := []string{"mining.notify", "ae6812eb4cd7735a302a8a9dd95cf71f"}
+	diff := fmt.Sprintf(`"mining.set_difficulty", "%s"`, "b4b6693b72a50c7116db18d6497cac52")
+	notify := fmt.Sprintf(`"mining.notify", "%s"`, "ae6812eb4cd7735a302a8a9dd95cf71f")
 	extranonse1 := "08000002"
 	extranonse2 := 4
-	r.Result.Details[0] = diff
-	r.Result.Details[1] = notify
-	r.Result.Extranonse1 = extranonse1
-	r.Result.Extranonse2 = extranonse2
-	r.Error = ""
+	raw := fmt.Sprintf(`[ [ [%s], [%s]], "%s", %d]`, diff, notify, extranonse1, extranonse2)
+	r.Result = json.RawMessage(raw)
+	r.Error = json.RawMessage(`null`)
 	// {"id": 1, "result": [ [ ["mining.set_difficulty", "b4b6693b72a50c7116db18d6497cac52"], ["mining.notify", "ae6812eb4cd7735a302a8a9dd95cf71f"]], "08000002", 4], "error": null}\n
 	h.sendResponse(r)
 }
