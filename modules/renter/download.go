@@ -274,7 +274,8 @@ func (cd *chunkDownload) recoverChunk() error {
 		lowerBound = int(offsetInBlock) // If the offset is within the block, part of the block will be ignored
 	}
 
-	// Truncate b if writing the whole buffer at the specified offset would exceed the maximum file size.
+	// Truncate b if writing the whole buffer at the specified offset would
+	// exceed the maximum file size.
 	upperBound := cd.download.chunkSize
 	if chunkTopAddress > cd.download.length+cd.download.offset {
 		diff := chunkTopAddress - (cd.download.length + cd.download.offset)
