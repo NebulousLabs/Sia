@@ -337,8 +337,13 @@ func (r *Renter) managedGetChunkData(rs *repairState, file *file, trackedFile tr
 
 		// create the download object and push it on to the download queue
 		d := r.newSectionDownload(file, buf, currentContracts, offset, downloadSize)
+		done := make(chan struct{})
+		defer close(done)
 		go func() {
-			r.newDownloads <- d
+			select {
+			case r.newDownloads <- d:
+			case <-done:
+			}
 		}()
 
 		// wait for the download to complete and return the data
