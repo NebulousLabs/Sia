@@ -305,6 +305,48 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 	r.managedWaitOnRepairWork(rs)
 }
 
+// managedDownloadChunkData downloads the requested chunk from Sia, for use in
+// the repair loop.
+func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset uint64, chunkIndex uint64, chunkID chunkID) ([]byte, error) {
+	rs.downloadingChunks[chunkID] = struct{}{}
+	defer delete(rs.downloadingChunks, chunkID)
+
+	// build current contracts map
+	currentContracts := make(map[modules.NetAddress]types.FileContractID)
+	for _, contract := range r.hostContractor.Contracts() {
+		currentContracts[contract.NetAddress] = contract.ID
+	}
+
+	downloadSize := file.chunkSize()
+	if offset+downloadSize > file.size {
+		downloadSize = file.size - offset
+	}
+
+	// create a DownloadBufferWriter for the chunk
+	buf := NewDownloadBufferWriter(file.chunkSize())
+
+	// create the download object and push it on to the download queue
+	d := r.newSectionDownload(file, buf, currentContracts, offset, downloadSize)
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case r.newDownloads <- d:
+		case <-done:
+		}
+	}()
+
+	// wait for the download to complete and return the data
+	select {
+	case <-d.downloadFinished:
+		return buf.Bytes(), d.Err()
+	case <-r.tg.StopChan():
+		return nil, errors.New("chunk download interrupted by shutdown")
+	case <-time.After(chunkDownloadTimeout):
+		return nil, errors.New("chunk download timed out")
+	}
+}
+
 // managedGetChunkData grabs the requested `chunkID` from the file, in order to
 // repair the file. If the `trackedFile` can be found on disk, grab the chunk
 // from the file, otherwise attempt to queue a new download for only that chunk
@@ -317,44 +359,7 @@ func (r *Renter) managedGetChunkData(rs *repairState, file *file, trackedFile tr
 	f, err := os.Open(trackedFile.RepairPath)
 	if err != nil {
 		// if that fails, try to download the chunk
-		// mark the chunk as being downloaded
-		rs.downloadingChunks[chunkID] = struct{}{}
-		defer delete(rs.downloadingChunks, chunkID)
-
-		// build current contracts map
-		currentContracts := make(map[modules.NetAddress]types.FileContractID)
-		for _, contract := range r.hostContractor.Contracts() {
-			currentContracts[contract.NetAddress] = contract.ID
-		}
-
-		downloadSize := file.chunkSize()
-		if offset+downloadSize > file.size {
-			downloadSize = file.size - offset
-		}
-
-		// create a DownloadBufferWriter for the chunk
-		buf := NewDownloadBufferWriter(file.chunkSize())
-
-		// create the download object and push it on to the download queue
-		d := r.newSectionDownload(file, buf, currentContracts, offset, downloadSize)
-		done := make(chan struct{})
-		defer close(done)
-		go func() {
-			select {
-			case r.newDownloads <- d:
-			case <-done:
-			}
-		}()
-
-		// wait for the download to complete and return the data
-		select {
-		case <-d.downloadFinished:
-			return buf.Bytes(), d.Err()
-		case <-r.tg.StopChan():
-			return nil, errors.New("chunk download interrupted by shutdown")
-		case <-time.After(chunkDownloadTimeout):
-			return nil, errors.New("chunk download timed out")
-		}
+		return r.managedDownloadChunkData(rs, file, offset, chunkIndex, chunkID)
 	}
 	defer f.Close()
 
