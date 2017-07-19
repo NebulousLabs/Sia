@@ -422,7 +422,9 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 	ht.host = rebootHost
 }
 
-// TestRecentContractPricesLength checks
+// TestRecentContractPricesLength checks that the length of recentContractPrices never
+// exceeds 144, that it is persisted correctly and that changing the minContractPrice is
+// handled correctly
 func TestRecentContractPricesLength(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -455,6 +457,18 @@ func TestRecentContractPricesLength(t *testing.T) {
 			144, len(ht.host.recentContractPrices))
 	}
 
+	// set the MinContractPrice to a value above the current adjustedContractPrice
+	// and check if it is adjusted immediately
+	ht.host.settings.MinContractPrice = ht.host.adjustedContractPrice.Mul64(2)
+	ht.host.SetInternalSettings(ht.host.settings)
+	if ht.host.adjustedContractPrice.Cmp(ht.host.settings.MinContractPrice) != 0 {
+		t.Errorf("failed to update contract price after setting new MinContractPrice. expected %v but was %v",
+			ht.host.settings.MinContractPrice, ht.host.adjustedContractPrice)
+	}
+
+	// get adjusted contract price to see if it is the same after the reboot
+	contractPrice := ht.host.adjustedContractPrice
+
 	// Reboot host
 	err = ht.host.Close()
 	if err != nil {
@@ -469,6 +483,12 @@ func TestRecentContractPricesLength(t *testing.T) {
 	if len(rebootHost.recentContractPrices) != 144 {
 		t.Errorf("len(recentContractPrices) after reboot: expected %d but was %d",
 			144, len(rebootHost.recentContractPrices))
+	}
+
+	// adjustedContractPrice should be the same as before
+	if contractPrice.Cmp(ht.host.adjustedContractPrice) != 0 {
+		t.Errorf("adjustedContractPrice after reboot: expected %v but was %v",
+			contractPrice, ht.host.adjustedContractPrice)
 	}
 }
 

@@ -77,9 +77,9 @@ var (
 	// furious for losing access to it for a few weeks.
 	defaultCollateralBudget = types.SiacoinPrecision.Mul64(100e3)
 
-	// with the host. The default is set to 0.05 siacoins and will be adjusted
+	// with the host. The default is set to 0 siacoins and will be adjusted
 	// automatically if it needs to be higher
-	defaultContractPrice = types.SiacoinPrecision.Mul64(5).Div64(100) // 0.05 siacoins
+	defaultContractPrice = types.ZeroCurrency
 
 	// defaultDownloadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 10 siacoins per gigabyte, because

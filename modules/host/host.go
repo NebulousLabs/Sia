@@ -165,8 +165,10 @@ type Host struct {
 	// be locked separately.
 	lockedStorageObligations map[types.FileContractID]*siasync.TryMutex
 
-	// A list of the last 144 contract price estimations
-	recentContractPrices []types.Currency
+	// A list of the last 144 contract price estimations of which the maximum is
+	// stored in adjustedContractPrice
+	recentContractPrices  []types.Currency
+	adjustedContractPrice types.Currency
 
 	// Utilities.
 	db         *persist.BoltDatabase
@@ -396,6 +398,11 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 	// another blockchain announcement.
 	if h.settings.NetAddress != settings.NetAddress && settings.NetAddress != h.autoAddress {
 		h.announced = false
+	}
+
+	// Check if the the MinContractPrice changed to a value above the current adjustedContractPrice
+	if h.adjustedContractPrice.Cmp(settings.MinContractPrice) < 0 {
+		h.adjustedContractPrice = settings.MinContractPrice
 	}
 
 	h.settings = settings

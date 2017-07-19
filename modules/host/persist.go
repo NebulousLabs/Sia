@@ -30,7 +30,8 @@ type persistence struct {
 	Settings         modules.HostInternalSettings `json:"settings"`
 	UnlockHash       types.UnlockHash             `json:"unlockhash"`
 
-	RecentContractPrices []types.Currency `json:"recentContractPrices"`
+	RecentContractPrices  []types.Currency `json:"recentContractPrices"`
+	AdjustedContractPrice types.Currency   `json:"adjustedContractPrice"`
 }
 
 // persistData returns the data in the Host that will be saved to disk.
@@ -50,7 +51,8 @@ func (h *Host) persistData() persistence {
 		Settings:         h.settings,
 		UnlockHash:       h.unlockHash,
 
-		RecentContractPrices: h.recentContractPrices,
+		RecentContractPrices:  h.recentContractPrices,
+		AdjustedContractPrice: h.adjustedContractPrice,
 	}
 }
 
@@ -112,6 +114,7 @@ func (h *Host) loadPersistObject(p *persistence) {
 	}
 	h.unlockHash = p.UnlockHash
 	h.recentContractPrices = p.RecentContractPrices
+	h.adjustedContractPrice = p.AdjustedContractPrice
 }
 
 // initDB will check that the database has been initialized and if not, will

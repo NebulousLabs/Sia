@@ -7,7 +7,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // capacity returns the amount of storage still available on the machine. The
@@ -24,30 +23,6 @@ func (h *Host) capacity() (total, remaining uint64) {
 	return total, remaining
 }
 
-// adjustHostPricing adjusts the host's internal pricing to better match the current market
-func (h *Host) adjustHostPricing() types.Currency {
-	// Check if adjustHostPricing was disabled for testing
-	if h.dependencies.disrupt("disablePriceAdjustment") {
-		return h.settings.MinContractPrice
-	}
-
-	// Adjust contract price
-	_, contractPrice := h.tpool.FeeEstimation()
-	contractPrice = contractPrice.Mul64(10e3)
-	// See if there was an estimation in the past that is higher than the initial contractPrice
-	for _, estimate := range h.recentContractPrices {
-		if estimate.Cmp(contractPrice) > 0 {
-			contractPrice = estimate
-		}
-	}
-
-	// Do not go below the user set price
-	if contractPrice.Cmp(h.settings.MinContractPrice) < 0 {
-		return h.settings.MinContractPrice
-	}
-	return contractPrice
-}
-
 // externalSettings compiles and returns the external settings for the host.
 func (h *Host) externalSettings() modules.HostExternalSettings {
 	totalStorage, remainingStorage := h.capacity()
@@ -57,9 +32,6 @@ func (h *Host) externalSettings() modules.HostExternalSettings {
 	} else {
 		netAddr = h.autoAddress
 	}
-
-	// Get adjusted pricing
-	contractPrice := h.adjustHostPricing()
 
 	return modules.HostExternalSettings{
 		AcceptingContracts:   h.settings.AcceptingContracts,
@@ -76,7 +48,7 @@ func (h *Host) externalSettings() modules.HostExternalSettings {
 		Collateral:    h.settings.Collateral,
 		MaxCollateral: h.settings.MaxCollateral,
 
-		ContractPrice:          contractPrice,
+		ContractPrice:          h.adjustedContractPrice,
 		DownloadBandwidthPrice: h.settings.MinDownloadBandwidthPrice,
 		StoragePrice:           h.settings.MinStoragePrice,
 		UploadBandwidthPrice:   h.settings.MinUploadBandwidthPrice,
