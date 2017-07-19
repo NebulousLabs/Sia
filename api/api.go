@@ -136,12 +136,16 @@ func cleanCloseHandler(next http.Handler) http.Handler {
 		case <-r.Context().Done():
 		}
 
-		// Sanity check - thread should not take more than an hour to return.
-		select {
-		case <-done:
-		case <-time.After(time.Minute * 60):
-			build.Severe("api call is taking more than 20 minutes to return:", r.URL.Path)
-		}
+		// Sanity check - thread should not take more than an hour to return. This
+		// must be done in a goroutine, otherwise the server will not close the
+		// underlying socket for this API call.
+		go func() {
+			select {
+			case <-done:
+			case <-time.After(time.Minute * 60):
+				build.Severe("api call is taking more than 60 minutes to return:", r.URL.Path)
+			}
+		}()
 	})
 }
 
