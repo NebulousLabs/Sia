@@ -357,12 +357,12 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 		// If the above conditions are true, it should also be the case that
 		// the number of active pieces is zero.
 		if ds.activePieces != 0 {
-			r.log.Critical("ERROR: the renter is idle , but tracking active pieces:", ds.activePieces)
+			r.log.Critical("ERROR: the renter is idle, but tracking %v active pieces; resetting to zero", ds.activePieces)
+			ds.activePieces = 0
 		}
 
 		// Nothing to do. Sleep until there is something to do, or until
-		// shutdown. Dislodge occasionally in case r.newDownloads misses a new
-		// download.
+		// shutdown.
 		select {
 		case d := <-r.newDownloads:
 			r.addDownloadToChunkQueue(d)
@@ -569,6 +569,7 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	worker, exists := r.workerPool[workerID]
 	r.mu.RUnlock(id)
 	if !exists {
+		ds.incompleteChunks = append(ds.incompleteChunks, finishedDownload.chunkDownload)
 		return
 	}
 
@@ -584,6 +585,12 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	// Add this returned piece to the appropriate chunk.
 	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
 	atomic.AddUint64(&cd.download.atomicDataReceived, cd.download.reportedPieceSize)
+
+	if cd.download.downloadErr != nil {
+		r.log.Debugln("Piece succeeded but download failed; removing active piece")
+		ds.activePieces--
+		return
+	}
 
 	// If the chunk has completed, perform chunk recovery.
 	if len(cd.completedPieces) == cd.download.erasureCode.MinPieces() {
