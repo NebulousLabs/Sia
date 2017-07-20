@@ -6,6 +6,7 @@ package api
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -1739,5 +1740,179 @@ func TestRedundancyReporting(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestRenterMissingHosts verifies that if hosts are taken offline, downloads
+// fail.
+func TestRenterMissingHosts(t *testing.T) {
+	if testing.Short() || !build.VLONG {
+		t.SkipNow()
+	}
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+	stH1, err := blankServerTester(t.Name() + " - Host 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH1.server.Close()
+	stH2, err := blankServerTester(t.Name() + " - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH2.server.Close()
+	stH3, err := blankServerTester(t.Name() + " - Host 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH3.server.Close()
+	testGroup := []*serverTester{st, stH1, stH2, stH3}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add storage to every host.
+	err = addStorageToAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance with two hosts.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
+	allowanceValues.Set("hosts", "3")
+	allowanceValues.Set("period", "10")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file to upload.
+	filesize := int(100)
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, filesize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// upload the file
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("datapieces", "2")
+	uploadValues.Set("paritypieces", "1")
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// redundancy should reach 1.5
+	var rf RenterFiles
+	err = retry(20, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1.5 {
+			return nil
+		}
+		return errors.New("file not uploaded")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify we can download
+	downloadPath := filepath.Join(st.dir, "test-downloaded-verify.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// take down one of the hosts
+	err = stH1.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the redundancy to decrement
+	err = retry(60, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
+			return nil
+		}
+		return errors.New("file redundancy not decremented: " + fmt.Sprint(rf.Files[0].Redundancy))
+	})
+	if err != nil {
+		t.Log(err)
+	}
+
+	// verify we still can download
+	downloadPath = filepath.Join(st.dir, "test-downloaded-verify2.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// take down another host
+	err = stH2.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the redundancy to decrement
+	err = retry(60, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 0.5 {
+			return nil
+		}
+		return errors.New("file redundancy not decremented: " + fmt.Sprint(rf.Files[0].Redundancy))
+	})
+	if err != nil {
+		t.Log(err)
+	}
+
+	// verify that the download fails
+	downloadPath = filepath.Join(st.dir, "test-downloaded-verify3.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err == nil {
+		t.Fatal("expected download to fail with redundancy <1")
+	}
+
+	// take down another host
+	err = stH3.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the redundancy to decrement
+	err = retry(60, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 0 {
+			return nil
+		}
+		return errors.New("file redundancy not decremented: " + fmt.Sprint(rf.Files[0].Redundancy))
+	})
+	if err != nil {
+		t.Log(err)
+	}
+
+	// verify that the download fails
+	downloadPath = filepath.Join(st.dir, "test-downloaded-verify4.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err == nil {
+		t.Fatal("expected download to fail with redundancy <1")
 	}
 }
