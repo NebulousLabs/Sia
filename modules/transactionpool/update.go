@@ -164,6 +164,7 @@ func (tp *TransactionPool) purge() {
 	tp.transactionSets = make(map[TransactionSetID][]types.Transaction)
 	tp.transactionSetDiffs = make(map[TransactionSetID]*modules.ConsensusChange)
 	tp.transactionListSize = 0
+	tp.updateSubscribersTransactions()
 }
 
 // ProcessConsensusChange gets called to inform the transaction pool of changes
