@@ -103,6 +103,15 @@ func (cs *chunkStatus) numGaps(rs *repairState) int {
 // chunks to the repair state, along with data about which pieces need
 // attention.
 func (r *Renter) managedAddFileToRepairState(rs *repairState, file *file) {
+	// Check that the file is being tracked, and therefore candidate for
+	// repair.
+	file.mu.Lock()
+	_, exists := r.tracking[file.name]
+	file.mu.Unlock()
+	if !exists {
+		return
+	}
+
 	// Fetch the list of potential contracts from the repair state.
 	contracts := make([]types.FileContractID, 0)
 	for contract := range rs.activeWorkers {
