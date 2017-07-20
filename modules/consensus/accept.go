@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"errors"
+	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -280,6 +281,11 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 		}
 		return nil
 	})
+	if _, ok := setErr.(bolt.MmapError); ok {
+		cs.log.Println("ERROR: Bolt mmap failed:", setErr)
+		println("Blockchain database has run out of disk space!")
+		os.Exit(1)
+	}
 	if setErr != nil {
 		// Check if any blocks were valid.
 		if len(validBlocks) < 1 {
