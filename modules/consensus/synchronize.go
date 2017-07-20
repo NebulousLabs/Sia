@@ -426,17 +426,19 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 		return cs.validateHeader(boltTxWrapper{tx}, h)
 	})
 	cs.mu.RUnlock()
-	if err == errOrphan {
-		// If the header is an orphan, try to find the parents. Call needs to
-		// be made in a separate goroutine as execution requires calling an
-		// exported gateway method - threadedRPCRelayHeader was likely called
-		// from an exported gateway function.
-		//
-		// NOTE: In general this is bad design. Rather than recycling other
-		// calls, the whole protocol should have been kept in a single RPC.
-		// Because it is not, we have to do weird threading to prevent
-		// deadlocks, and we also have to be concerned every time the code in
-		// managedReceiveBlocks is adjusted.
+	// WARN: orphan multithreading logic (dangerous areas, see below)
+	//
+	// If the header is valid and extends the heaviest chain, fetch the
+	// corresponding block. Call needs to be made in a separate goroutine
+	// because an exported call to the gateway is used, which is a deadlock
+	// risk given that rpcRelayHeader is called from the gateway.
+	//
+	// NOTE: In general this is bad design. Rather than recycling other
+	// calls, the whole protocol should have been kept in a single RPC.
+	// Because it is not, we have to do weird threading to prevent
+	// deadlocks, and we also have to be concerned every time the code in
+	// managedReceiveBlock is adjusted.
+	if err == errOrphan { // WARN: orphan multithreading logic case #1
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -450,16 +452,7 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 		return err
 	}
 
-	// If the header is valid and extends the heaviest chain, fetch the
-	// corresponding block. Call needs to be made in a separate goroutine
-	// because an exported call to the gateway is used, which is a deadlock
-	// risk given that rpcRelayHeader is called from the gateway.
-	//
-	// NOTE: In general this is bad design. Rather than recycling other calls,
-	// the whole protocol should have been kept in a single RPC. Because it is
-	// not, we have to do weird threading to prevent deadlocks, and we also
-	// have to be concerned every time the code in managedReceiveBlock is
-	// adjusted.
+	// WARN: orphan multithreading logic case #2
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
