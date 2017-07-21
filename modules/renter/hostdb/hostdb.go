@@ -7,7 +7,6 @@ package hostdb
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -184,50 +183,6 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	return hdb, nil
 }
 
-// updateHostDBEntry updates a HostDBEntries's historic interactions if more
-// than one block passed since the last update. This should be called every time
-// before the recent interactions are updated.  if passedTime is e.g. 10, this
-// means that the recent interactions were updated 10 blocks ago but never
-// since. So we need to apply the decay of 1 block before we append the recent
-// interactions from 10 blocks ago and then apply the decay of 9 more blocks in
-// which the recent interactions have been 0
-func updateHostHistoricInteractions(host *modules.HostDBEntry, bh types.BlockHeight) {
-	passedTime := bh - host.LastHistoricUpdate
-	if passedTime == 0 {
-		// no time passed. nothing to do.
-		return
-	}
-
-	// tmp float64 values for more accurate decay
-	hsi := float64(host.HistoricSuccessfulInteractions)
-	hfi := float64(host.HistoricFailedInteractions)
-
-	// Apply the decay of a single block
-	decay := historicInteractionDecay
-	hsi *= decay
-	hfi *= decay
-
-	// Apply the recent interactions of that single block
-	hsi += float64(host.RecentSuccessfulInteractions)
-	hfi += float64(host.RecentFailedInteractions)
-
-	// Apply the decay of the rest of the blocks
-	if passedTime > 1 {
-		decay = math.Pow(historicInteractionDecay, float64(passedTime-1))
-		hsi *= decay
-		hfi *= decay
-	}
-
-	// Set new values
-	host.HistoricSuccessfulInteractions = uint64(hsi)
-	host.HistoricFailedInteractions = uint64(hfi)
-	host.RecentSuccessfulInteractions = 0
-	host.RecentFailedInteractions = 0
-
-	// Update the time of the last update
-	host.LastHistoricUpdate = bh
-}
-
 // ActiveHosts returns a list of hosts that are currently online, sorted by
 // weight.
 func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostDBEntry) {
@@ -274,7 +229,14 @@ func (hdb *HostDB) Close() error {
 // Host returns the HostSettings associated with the specified NetAddress. If
 // no matching host is found, Host returns false.
 func (hdb *HostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
-	return hdb.hostTree.Select(spk)
+	host, exists := hdb.hostTree.Select(spk)
+	if !exists {
+		return host, exists
+	}
+	hdb.mu.RLock()
+	updateHostHistoricInteractions(&host, hdb.blockHeight)
+	hdb.mu.RUnlock()
+	return host, exists
 }
 
 // RandomHosts implements the HostDB interface's RandomHosts() method. It takes
@@ -282,45 +244,4 @@ func (hdb *HostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
 // returns a slice of entries.
 func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) []modules.HostDBEntry {
 	return hdb.hostTree.SelectRandom(n, excludeKeys)
-}
-
-// IncrementSuccessfulInteractions increments the number of successful
-// interactions with a host for a given key
-func (hdb *HostDB) IncrementSuccessfulInteractions(key types.SiaPublicKey) {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-
-	// Fetch the host.
-	host, haveHost := hdb.hostTree.Select(key)
-	if !haveHost {
-		return
-	}
-
-	// Update historic values if necessary
-	updateHostHistoricInteractions(&host, hdb.blockHeight)
-
-	// Increment the successful interactions
-	host.RecentSuccessfulInteractions++
-	hdb.hostTree.Modify(host)
-}
-
-// IncrementFailedInteractions increments the number of failed interactions with
-// a host for a given key
-func (hdb *HostDB) IncrementFailedInteractions(key types.SiaPublicKey) {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-
-	// Fetch the host.
-	host, haveHost := hdb.hostTree.Select(key)
-	if !haveHost || !hdb.online {
-		// If we are offline it probably wasn't the host's fault
-		return
-	}
-
-	// Update historic values if necessary
-	updateHostHistoricInteractions(&host, hdb.blockHeight)
-
-	// Increment the failed interactions
-	host.RecentFailedInteractions++
-	hdb.hostTree.Modify(host)
 }

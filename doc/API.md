@@ -630,6 +630,7 @@ overall.
     "ageadjustment":              0.1234,
     "burnadjustment":             0.1234,
     "collateraladjustment":       23.456,
+    "interactionadjustment":      0.1234,
     "priceadjustment":            0.1234,
     "storageremainingadjustment": 0.1234,
     "uptimeadjustment":           0.1234,
