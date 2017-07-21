@@ -101,22 +101,17 @@ func (hdb *HostDB) interactionAdjustments(entry modules.HostDBEntry) float64 {
 	// interactions with them. The two failed interactions will become
 	// irrelevant after sufficient interactions with the host.
 	hsi := entry.HistoricSuccessfulInteractions + 30
-	hfi := entry.HistoricFailedInteractions + 2
+	hfi := entry.HistoricFailedInteractions + 1
 
 	// Determine the intraction ratio based off of the historic interactions.
 	ratio := float64(hsi) / float64(hsi+hfi)
 
-	// Raise the ratio to the 6th power and return that.
-	//
-	// 98% = 0.885
-	// 95% = 0.735
-	// 93% = 0.646 - this is roughly the penalty applied to fresh hosts
-	// 90% = 0.531
-	// 85% = 0.377
-	// 75% = 0.177
-	// 60% = 0.046
-	// 50% = 0.015
-	return math.Pow(ratio, 6)
+	// Raise the ratio to the 15th power and return that. The exponentiation is
+	// very high because the renter will already intentionally avoid hosts that
+	// do not have many successful interactions, meaning that the bad points do
+	// not rack up very quickly. We want to signal a bad score for the host
+	// nonetheless.
+	return math.Pow(ratio, 15)
 }
 
 // priceAdjustments will adjust the weight of the entry according to the prices
