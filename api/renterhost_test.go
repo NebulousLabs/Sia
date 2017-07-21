@@ -110,6 +110,93 @@ func TestRenterLocalRepair(t *testing.T) {
 	if rg.FinancialMetrics.DownloadSpending.Cmp(types.NewCurrency64(0)) > 0 {
 		t.Fatalf("expected no download spending, got %v instead\n", rg.FinancialMetrics.DownloadSpending)
 	}
+
+	// take down one of the hosts
+	err = stH1.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the redundancy to decrement
+	err = retry(60, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
+			return nil
+		}
+		return errors.New("file redundancy not decremented")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// bring up a new host
+	stNewHost, err := blankServerTester(t.Name() + "-newhost")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stNewHost.server.Close()
+
+	testGroup = []*serverTester{st, stNewHost}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = stNewHost.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stNewHost.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = waitForBlock(stNewHost.cs.CurrentBlock().ID(), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// add a few new blocks in order to cause the renter to form contracts with the new host
+	for i := 0; i < 10; i++ {
+		b, err := stNewHost.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tester := range testGroup {
+			err = waitForBlock(b.ID(), tester)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// redundancy should increment back to 2 as the renter uploads to the new
+	// host using the download-to-upload strategy
+	err = retry(240, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
+			return nil
+		}
+		return errors.New("file redundancy not incremented")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rg.FinancialMetrics.DownloadSpending.Cmp(types.NewCurrency64(0)) > 0 {
+		t.Fatalf("expected no download spending, got %v instead\n", rg.FinancialMetrics.DownloadSpending)
+	}
 }
 
 // TestRemoteFileRepair verifies that if a trackedFile is made unavailable
