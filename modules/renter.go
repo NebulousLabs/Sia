@@ -98,10 +98,10 @@ type HostDBEntry struct {
 	HistoricUptime   time.Duration `json:"historicuptime"`
 	ScanHistory      HostDBScans   `json:"scanhistory"`
 
-	HistoricFailedInteractions     uint64 `json:"historicfailedinteractions"`
-	HistoricSuccessfulInteractions uint64 `json:"historicsuccessfulinteractions"`
-	RecentFailedInteractions       uint64 `json:"recentfailedinteractions"`
-	RecentSuccessfulInteractions   uint64 `json:"recentsuccessfulinteractions"`
+	HistoricFailedInteractions     float64 `json:"historicfailedinteractions"`
+	HistoricSuccessfulInteractions float64 `json:"historicsuccessfulinteractions"`
+	RecentFailedInteractions       float64 `json:"recentfailedinteractions"`
+	RecentSuccessfulInteractions   float64 `json:"recentsuccessfulinteractions"`
 
 	LastHistoricUpdate types.BlockHeight
 

@@ -24,16 +24,13 @@ func updateHostHistoricInteractions(host *modules.HostDBEntry, bh types.BlockHei
 	passedTime := bh - host.LastHistoricUpdate
 
 	// tmp float64 values for more accurate decay
-	hsi := float64(host.HistoricSuccessfulInteractions)
-	hfi := float64(host.HistoricFailedInteractions)
+	hsi := host.HistoricSuccessfulInteractions
+	hfi := host.HistoricFailedInteractions
 
-	// Apply the decay of a single block, but only if there are more than
-	// historicInteractionDecalyLimit datapoints total.
-	if hsi+hfi > historicInteractionDecayLimit {
-		decay := historicInteractionDecay
-		hsi *= decay
-		hfi *= decay
-	}
+	// Apply the decay of a single block.
+	decay := historicInteractionDecay
+	hsi *= decay
+	hfi *= decay
 
 	// Apply the recent interactions of that single block. Recent interactions
 	// cannot represent more than recentInteractionWeightLimit of historic
@@ -66,8 +63,8 @@ func updateHostHistoricInteractions(host *modules.HostDBEntry, bh types.BlockHei
 	}
 
 	// Set new values
-	host.HistoricSuccessfulInteractions = uint64(hsi)
-	host.HistoricFailedInteractions = uint64(hfi)
+	host.HistoricSuccessfulInteractions = hsi
+	host.HistoricFailedInteractions = hfi
 	host.RecentSuccessfulInteractions = 0
 	host.RecentFailedInteractions = 0
 

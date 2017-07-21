@@ -340,7 +340,7 @@ func rentercontractsviewcmd(cid string) {
 			if err != nil {
 				die("Could not fetch details of host: ", err)
 			}
-      fmt.Printf(`
+			fmt.Printf(`
 Contract %v
   Host: %v (Public Key: %v)
 
@@ -365,7 +365,7 @@ Contract %v
 				currencyUnits(rc.RenterFunds),
 				filesizeUnits(int64(rc.Size)))
 
-				printScoreBreakdown(&hostInfo)
+			printScoreBreakdown(&hostInfo)
 			return
 		}
 	}
