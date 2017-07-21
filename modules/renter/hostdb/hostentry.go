@@ -15,11 +15,13 @@ import (
 // interactions from 10 blocks ago and then apply the decay of 9 more blocks in
 // which the recent interactions have been 0
 func updateHostHistoricInteractions(host *modules.HostDBEntry, bh types.BlockHeight) {
-	passedTime := bh - host.LastHistoricUpdate
-	if passedTime == 0 {
-		// no time passed. nothing to do.
+	// Check that the last historic update was not in the future.
+	if host.LastHistoricUpdate >= bh {
+		// The hostdb may be performing a rescan, or maybe no time has passed
+		// since the last update, so there is nothing to do.
 		return
 	}
+	passedTime := bh - host.LastHistoricUpdate
 
 	// tmp float64 values for more accurate decay
 	hsi := float64(host.HistoricSuccessfulInteractions)
