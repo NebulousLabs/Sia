@@ -304,10 +304,12 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 	defer extendDeadline(conn, time.Hour)
 	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
 		conn.Close()
+		close(closeChan)
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
 	if err := verifyRecentRevision(conn, contract, host.Version); err != nil {
 		conn.Close() // TODO: close gracefully if host has entered revision loop
+		close(closeChan)
 		return nil, err
 	}
 
