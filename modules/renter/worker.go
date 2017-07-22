@@ -97,19 +97,23 @@ type (
 func (w *worker) download(dw downloadWork) {
 	d, err := w.renter.hostContractor.Downloader(w.contractID, w.renter.tg.StopChan())
 	if err != nil {
-		select {
-		case dw.resultChan <- finishedDownload{dw.chunkDownload, nil, err, dw.pieceIndex, w.contractID}:
-		case <-w.renter.tg.StopChan():
-		}
+		go func() {
+			select {
+			case dw.resultChan <- finishedDownload{dw.chunkDownload, nil, err, dw.pieceIndex, w.contractID}:
+			case <-w.renter.tg.StopChan():
+			}
+		}()
 		return
 	}
 	defer d.Close()
 
 	data, err := d.Sector(dw.dataRoot)
-	select {
-	case dw.resultChan <- finishedDownload{dw.chunkDownload, data, err, dw.pieceIndex, w.contractID}:
-	case <-w.renter.tg.StopChan():
-	}
+	go func() {
+		select {
+		case dw.resultChan <- finishedDownload{dw.chunkDownload, data, err, dw.pieceIndex, w.contractID}:
+		case <-w.renter.tg.StopChan():
+		}
+	}()
 }
 
 // upload will perform some upload work.
@@ -118,10 +122,12 @@ func (w *worker) upload(uw uploadWork) {
 	if err != nil {
 		w.recentUploadFailure = time.Now()
 		w.consecutiveUploadFailures++
-		select {
-		case uw.resultChan <- finishedUpload{uw.chunkID, crypto.Hash{}, err, uw.pieceIndex, w.contractID}:
-		case <-w.renter.tg.StopChan():
-		}
+		go func() {
+			select {
+			case uw.resultChan <- finishedUpload{uw.chunkID, crypto.Hash{}, err, uw.pieceIndex, w.contractID}:
+			case <-w.renter.tg.StopChan():
+			}
+		}()
 		return
 	}
 	defer e.Close()
@@ -130,10 +136,12 @@ func (w *worker) upload(uw uploadWork) {
 	if err != nil {
 		w.recentUploadFailure = time.Now()
 		w.consecutiveUploadFailures++
-		select {
-		case uw.resultChan <- finishedUpload{uw.chunkID, root, err, uw.pieceIndex, w.contractID}:
-		case <-w.renter.tg.StopChan():
-		}
+		go func() {
+			select {
+			case uw.resultChan <- finishedUpload{uw.chunkID, root, err, uw.pieceIndex, w.contractID}:
+			case <-w.renter.tg.StopChan():
+			}
+		}()
 		return
 	}
 
@@ -163,10 +171,12 @@ func (w *worker) upload(uw uploadWork) {
 	uw.file.mu.Unlock()
 	w.renter.mu.Unlock(id)
 
-	select {
-	case uw.resultChan <- finishedUpload{uw.chunkID, root, err, uw.pieceIndex, w.contractID}:
-	case <-w.renter.tg.StopChan():
-	}
+	go func() {
+		select {
+		case uw.resultChan <- finishedUpload{uw.chunkID, root, err, uw.pieceIndex, w.contractID}:
+		case <-w.renter.tg.StopChan():
+		}
+	}()
 }
 
 // work will perform one unit of work, exiting early if there is a kill signal
