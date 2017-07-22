@@ -105,9 +105,11 @@ func (cs *chunkStatus) numGaps(rs *repairState) int {
 func (r *Renter) managedAddFileToRepairState(rs *repairState, file *file) {
 	// Check that the file is being tracked, and therefore candidate for
 	// repair.
-	file.mu.Lock()
+	id := r.mu.RLock()
+	file.mu.RLock()
 	_, exists := r.tracking[file.name]
-	file.mu.Unlock()
+	file.mu.RUnlock()
+	r.mu.RUnlock(id)
 	if !exists {
 		return
 	}
@@ -132,7 +134,13 @@ func (r *Renter) managedAddFileToRepairState(rs *repairState, file *file) {
 	}
 
 	// Iterate through each contract and figure out which pieces are available.
-	for _, contract := range file.contracts {
+	file.mu.RLock()
+	var fileContracts []fileContract
+	for _, c := range file.contracts {
+		fileContracts = append(fileContracts, c)
+	}
+	file.mu.RUnlock()
+	for _, contract := range fileContracts {
 		// Check whether this contract is offline. Even if the contract is
 		// offline, we want to record that the chunk has attempted to use this
 		// contract.
