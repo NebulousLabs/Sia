@@ -96,9 +96,9 @@ func (hdb *HostDB) collateralAdjustments(entry modules.HostDBEntry) float64 {
 // historic and currnet interactions with that host. This function focuses on
 // historic interactions and ignores recent interactions.
 func (hdb *HostDB) interactionAdjustments(entry modules.HostDBEntry) float64 {
-	// Give the host a baseline of 30 successful interactions and two failed
-	// interactions. This gives the host a baseline if we've had few
-	// interactions with them. The two failed interactions will become
+	// Give the host a baseline of 30 successful interactions and 1 failed
+	// interaction. This gives the host a baseline if we've had few
+	// interactions with them. The 1 failed interaction will become
 	// irrelevant after sufficient interactions with the host.
 	hsi := entry.HistoricSuccessfulInteractions + 30
 	hfi := entry.HistoricFailedInteractions + 1
