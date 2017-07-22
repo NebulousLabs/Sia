@@ -105,9 +105,11 @@ func (cs *chunkStatus) numGaps(rs *repairState) int {
 func (r *Renter) managedAddFileToRepairState(rs *repairState, file *file) {
 	// Check that the file is being tracked, and therefore candidate for
 	// repair.
+	id := r.mu.RLock()
 	file.mu.RLock()
 	_, exists := r.tracking[file.name]
 	file.mu.RUnlock()
+	r.mu.RUnlock(id)
 	if !exists {
 		return
 	}
