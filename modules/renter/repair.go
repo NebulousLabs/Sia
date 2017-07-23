@@ -331,7 +331,7 @@ func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset ui
 	}
 
 	// create a DownloadBufferWriter for the chunk
-	buf := NewDownloadBufferWriter(file.chunkSize())
+	buf := NewDownloadBufferWriter(file.chunkSize(), int64(offset))
 
 	// create the download object and push it on to the download queue
 	d := r.newSectionDownload(file, buf, currentContracts, offset, downloadSize)
