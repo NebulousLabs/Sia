@@ -635,13 +635,15 @@ func (r *Renter) threadedDownloadLoop() {
 
 // DownloadBufferWriter is a buffer-backed implementation of DownloadWriter.
 type DownloadBufferWriter struct {
-	data []byte
+	data   []byte
+	offset int64
 }
 
 // NewDownloadBufferWriter creates a new DownloadWriter that writes to a buffer.
-func NewDownloadBufferWriter(size uint64) *DownloadBufferWriter {
+func NewDownloadBufferWriter(size uint64, offset int64) *DownloadBufferWriter {
 	return &DownloadBufferWriter{
-		data: make([]byte, size),
+		data:   make([]byte, size),
+		offset: offset,
 	}
 }
 
@@ -654,7 +656,8 @@ func (dw *DownloadBufferWriter) Destination() string {
 
 // WriteAt writes the passed bytes to the DownloadBuffer.
 func (dw *DownloadBufferWriter) WriteAt(bytes []byte, off int64) (int, error) {
-	if len(bytes)+int(off) > len(dw.data) {
+	off -= dw.offset
+	if len(bytes)+int(off) > len(dw.data) || off < 0 {
 		return 0, errors.New("write at specified offset exceeds buffer size")
 	}
 

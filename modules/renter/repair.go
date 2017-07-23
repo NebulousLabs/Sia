@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -44,8 +45,8 @@ type (
 	// chunkID can be used to uniquely identify a chunk within the repair
 	// matrix.
 	chunkID struct {
-		index    uint64 // the index of the chunk within its file.
-		filename string
+		index     uint64 // the index of the chunk within its file.
+		masterkey crypto.TwofishKey
 	}
 
 	// repairState tracks a bunch of chunks that are being actively repaired.
@@ -167,7 +168,7 @@ func (r *Renter) managedAddFileToRepairState(rs *repairState, file *file) {
 		}
 
 		// Skip this chunk if it's already in the set of incomplete chunks.
-		cid := chunkID{i, file.name}
+		cid := chunkID{i, file.masterKey}
 		_, exists := rs.incompleteChunks[cid]
 		if exists {
 			continue
@@ -330,7 +331,7 @@ func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset ui
 	}
 
 	// create a DownloadBufferWriter for the chunk
-	buf := NewDownloadBufferWriter(file.chunkSize())
+	buf := NewDownloadBufferWriter(file.chunkSize(), int64(offset))
 
 	// create the download object and push it on to the download queue
 	d := r.newSectionDownload(file, buf, currentContracts, offset, downloadSize)
@@ -388,12 +389,21 @@ func (r *Renter) managedGetChunkData(rs *repairState, file *file, trackedFile tr
 // chunk using the chunk state and a list of workers.
 func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, chunkStatus *chunkStatus, usefulWorkers []types.FileContractID) error {
 	// Check that the file is still in the renter.
-	filename := chunkID.filename
 	id := r.mu.RLock()
-	file, exists1 := r.files[filename]
-	meta, exists2 := r.tracking[filename]
+	var file *file
+	for _, f := range r.files {
+		if f.masterKey == chunkID.masterkey {
+			file = f
+			break
+		}
+	}
+	var meta trackedFile
+	var exists bool
+	if file != nil {
+		meta, exists = r.tracking[file.name]
+	}
 	r.mu.RUnlock(id)
-	if !exists1 || !exists2 {
+	if !exists {
 		return errFileDeleted
 	}
 
