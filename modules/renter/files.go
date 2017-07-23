@@ -186,7 +186,11 @@ func (r *Renter) DeleteFile(nickname string) error {
 		return ErrUnknownPath
 	}
 	delete(r.files, nickname)
-	os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension))
+	delete(r.tracking, nickname)
+	err := os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension))
+	if err != nil {
+		r.log.Println("WARN: couldn't remove .sia file during delete:", err)
+	}
 	r.saveSync()
 	r.mu.Unlock(lockID)
 
