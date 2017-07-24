@@ -588,14 +588,13 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	}
 
 	// Add this returned piece to the appropriate chunk.
-	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
-	atomic.AddUint64(&cd.download.atomicDataReceived, cd.download.reportedPieceSize)
-
-	if cd.download.downloadErr != nil {
-		r.log.Debugln("Piece succeeded but download failed; removing active piece")
-		ds.activePieces--
+	if _, ok := cd.completedPieces[finishedDownload.pieceIndex]; ok {
+		r.log.Debugln("Piece", finishedDownload.pieceIndex, "already added")
+		ds.incompleteChunks = append(ds.incompleteChunks, cd)
 		return
 	}
+	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
+	atomic.AddUint64(&cd.download.atomicDataReceived, cd.download.reportedPieceSize)
 
 	// If the chunk has completed, perform chunk recovery.
 	if len(cd.completedPieces) == cd.download.erasureCode.MinPieces() {
