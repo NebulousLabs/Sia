@@ -126,13 +126,19 @@ type (
 func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID, offset, length uint64) *download {
 	d := newDownload(f, destination)
 
+	if length == 0 {
+		build.Critical("download length should not be zero")
+		d.fail(errors.New("download length should not be zero"))
+		return d
+	}
+
 	// Settings specific to a chunk download.
 	d.offset = offset
 	d.length = length
 
 	// Calculate chunks to download.
 	minChunk := offset / f.chunkSize()
-	maxChunk := (offset + length) / f.chunkSize()
+	maxChunk := (offset + length - 1) / f.chunkSize() // maxChunk is 1-indexed
 
 	// mark the chunks as not being downloaded yet
 	for i := minChunk; i <= maxChunk; i++ {
