@@ -13,7 +13,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -319,12 +318,6 @@ func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset ui
 	rs.downloadingChunks[chunkID] = struct{}{}
 	defer delete(rs.downloadingChunks, chunkID)
 
-	// build current contracts map
-	currentContracts := make(map[modules.NetAddress]types.FileContractID)
-	for _, contract := range r.hostContractor.Contracts() {
-		currentContracts[contract.NetAddress] = contract.ID
-	}
-
 	downloadSize := file.chunkSize()
 	if offset+downloadSize > file.size {
 		downloadSize = file.size - offset
@@ -334,7 +327,7 @@ func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset ui
 	buf := NewDownloadBufferWriter(file.chunkSize(), int64(offset))
 
 	// create the download object and push it on to the download queue
-	d := r.newSectionDownload(file, buf, currentContracts, offset, downloadSize)
+	d := r.newSectionDownload(file, buf, offset, downloadSize)
 	done := make(chan struct{})
 	defer close(done)
 	go func() {

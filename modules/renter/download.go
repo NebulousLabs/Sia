@@ -123,8 +123,14 @@ type (
 )
 
 // newSectionDownload initialises and returns a download object for the specified chunk.
-func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID, offset, length uint64) *download {
+func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, offset, length uint64) *download {
 	d := newDownload(f, destination)
+
+	if length == 0 {
+		build.Critical("download length should not be zero")
+		d.fail(errors.New("download length should not be zero"))
+		return d
+	}
 
 	// Settings specific to a chunk download.
 	d.offset = offset
@@ -132,14 +138,14 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 
 	// Calculate chunks to download.
 	minChunk := offset / f.chunkSize()
-	maxChunk := (offset + length) / f.chunkSize()
+	maxChunk := (offset + length - 1) / f.chunkSize() // maxChunk is 1-indexed
 
 	// mark the chunks as not being downloaded yet
 	for i := minChunk; i <= maxChunk; i++ {
 		d.finishedChunks[i] = false
 	}
 
-	d.initPieceSet(f, currentContracts, r)
+	d.initPieceSet(f, r)
 	return d
 }
 
@@ -160,8 +166,7 @@ func newDownload(f *file, destination modules.DownloadWriter) *download {
 }
 
 // initPieceSet initialises the piece set, including calculations of the total download size.
-func (d *download) initPieceSet(f *file,
-	currentContracts map[modules.NetAddress]types.FileContractID, r *Renter) {
+func (d *download) initPieceSet(f *file, r *Renter) {
 	// Allocate the piece size and progress bar so that the download will
 	// finish at exactly 100%. Due to rounding error and padding, there is not
 	// a strict mapping between 'progress' and 'bytes downloaded' - it is
@@ -583,14 +588,13 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	}
 
 	// Add this returned piece to the appropriate chunk.
-	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
-	atomic.AddUint64(&cd.download.atomicDataReceived, cd.download.reportedPieceSize)
-
-	if cd.download.downloadErr != nil {
-		r.log.Debugln("Piece succeeded but download failed; removing active piece")
-		ds.activePieces--
+	if _, ok := cd.completedPieces[finishedDownload.pieceIndex]; ok {
+		r.log.Debugln("Piece", finishedDownload.pieceIndex, "already added")
+		ds.incompleteChunks = append(ds.incompleteChunks, cd)
 		return
 	}
+	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
+	atomic.AddUint64(&cd.download.atomicDataReceived, cd.download.reportedPieceSize)
 
 	// If the chunk has completed, perform chunk recovery.
 	if len(cd.completedPieces) == cd.download.erasureCode.MinPieces() {
