@@ -123,7 +123,7 @@ type (
 )
 
 // newSectionDownload initialises and returns a download object for the specified chunk.
-func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID, offset, length uint64) *download {
+func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, offset, length uint64) *download {
 	d := newDownload(f, destination)
 
 	if length == 0 {
@@ -145,7 +145,7 @@ func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter,
 		d.finishedChunks[i] = false
 	}
 
-	d.initPieceSet(f, currentContracts, r)
+	d.initPieceSet(f, r)
 	return d
 }
 
@@ -166,8 +166,7 @@ func newDownload(f *file, destination modules.DownloadWriter) *download {
 }
 
 // initPieceSet initialises the piece set, including calculations of the total download size.
-func (d *download) initPieceSet(f *file,
-	currentContracts map[modules.NetAddress]types.FileContractID, r *Renter) {
+func (d *download) initPieceSet(f *file, r *Renter) {
 	// Allocate the piece size and progress bar so that the download will
 	// finish at exactly 100%. Due to rounding error and padding, there is not
 	// a strict mapping between 'progress' and 'bytes downloaded' - it is
