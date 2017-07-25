@@ -1,7 +1,7 @@
 Version History
 ---------------
 
-June 2017:
+July 2017:
 
 v1.3.0 (minor release)
 - Add remote file repair
