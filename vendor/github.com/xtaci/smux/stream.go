@@ -52,14 +52,6 @@ func (s *Stream) Read(b []byte) (n int, err error) {
 	}
 
 READ:
-	select {
-	case <-s.die:
-		return 0, errors.New(errBrokenPipe)
-	case <-deadline:
-		return n, errTimeout
-	default:
-	}
-
 	s.bufferLock.Lock()
 	n, err = s.buffer.Read(b)
 	s.bufferLock.Unlock()
