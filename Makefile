@@ -24,6 +24,7 @@ dependencies:
 	# Frontend Dependencies
 	go get -u github.com/bgentry/speakeasy
 	go get -u github.com/spf13/cobra/...
+	go get -u github.com/inconshreveable/mousetrap
 	# Developer Dependencies
 	go install -race std
 	go get -u github.com/golang/lint/golint
