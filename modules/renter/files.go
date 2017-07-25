@@ -186,7 +186,11 @@ func (r *Renter) DeleteFile(nickname string) error {
 		return ErrUnknownPath
 	}
 	delete(r.files, nickname)
-	os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension))
+	delete(r.tracking, nickname)
+	err := os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension))
+	if err != nil {
+		r.log.Println("WARN: couldn't remove .sia file during delete:", err)
+	}
 	r.saveSync()
 	r.mu.Unlock(lockID)
 
@@ -201,25 +205,39 @@ func (r *Renter) DeleteFile(nickname string) error {
 
 // FileList returns all of the files that the renter has.
 func (r *Renter) FileList() []modules.FileInfo {
+	var files []*file
 	lockID := r.mu.RLock()
-	defer r.mu.RUnlock(lockID)
-
-	files := make([]modules.FileInfo, 0, len(r.files))
 	for _, f := range r.files {
+		files = append(files, f)
+	}
+	r.mu.RUnlock(lockID)
+
+	isOffline := func(id types.FileContractID) bool {
+		id = r.hostContractor.ResolveID(id)
+		offline := r.hostContractor.IsOffline(id)
+		contract, exists := r.hostContractor.ContractByID(id)
+		if !exists {
+			return true
+		}
+		return offline || !contract.GoodForRenew
+	}
+
+	var fileList []modules.FileInfo
+	for _, f := range files {
 		f.mu.RLock()
 		renewing := true
-		files = append(files, modules.FileInfo{
+		fileList = append(fileList, modules.FileInfo{
 			SiaPath:        f.name,
 			Filesize:       f.size,
-			Available:      f.available(r.hostContractor.IsOffline),
-			Redundancy:     f.redundancy(r.hostContractor.IsOffline),
 			Renewing:       renewing,
+			Available:      f.available(isOffline),
+			Redundancy:     f.redundancy(isOffline),
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
 		})
 		f.mu.RUnlock()
 	}
-	return files
+	return fileList
 }
 
 // RenameFile takes an existing file and changes the nickname. The original

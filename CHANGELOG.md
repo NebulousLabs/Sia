@@ -1,6 +1,13 @@
 Version History
 ---------------
 
+July 2017:
+
+v1.3.0 (minor release)
+- Add remote file repair
+- Add wallet 'lookahead'
+- Introduce difficulty hardfork
+
 May 2017:
 
 v1.2.2 (patch release)

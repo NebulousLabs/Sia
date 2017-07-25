@@ -30,6 +30,10 @@ var (
 // threadedRegularSync will make sure that sync gets called on the database
 // every once in a while.
 func (tp *TransactionPool) threadedRegularSync() {
+	if err := tp.tg.Add(); err != nil {
+		return
+	}
+	defer tp.tg.Done()
 	for {
 		select {
 		case <-tp.tg.StopChan():
@@ -149,12 +153,14 @@ func (tp *TransactionPool) initPersist() error {
 	// Get the most recent block height
 	bh, err := tp.getBlockHeight(tp.dbTx)
 	if err != nil {
+		tp.log.Println("Block height is reporting as zero, setting up to subscribe from the beginning.")
 		err = tp.putBlockHeight(tp.dbTx, types.BlockHeight(0))
 		if err != nil {
 			return build.ExtendErr("unable to initialize the block height in the tpool", err)
 		}
 		err = tp.putRecentConsensusChange(tp.dbTx, modules.ConsensusChangeBeginning)
 	} else {
+		tp.log.Debugln("Transaction pool is loading from height:", bh)
 		tp.blockHeight = bh
 	}
 	if err != nil {
@@ -169,14 +175,14 @@ func (tp *TransactionPool) initPersist() error {
 	// Just leave the fields empty if no fee median was found. They will be
 	// filled out.
 	if err != errNilFeeMedian {
-		tp.recentConfirmedFees = mp.RecentConfirmedFees
-		tp.txnsPerBlock = mp.TxnsPerBlock
+		tp.recentMedians = mp.RecentMedians
 		tp.recentMedianFee = mp.RecentMedianFee
 	}
 
 	// Subscribe to the consensus set using the most recent consensus change.
 	err = tp.consensusSet.ConsensusSetSubscribe(tp, cc)
 	if err == modules.ErrInvalidConsensusChangeID {
+		tp.log.Println("Invalid consensus change loaded; resetting. This can take a while.")
 		// Reset and rescan because the consensus set does not recognize the
 		// provided consensus change id.
 		resetErr := tp.resetDB(tp.dbTx)

@@ -13,6 +13,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"time"
 
@@ -42,6 +43,10 @@ func announceAllHosts(sts []*serverTester) error {
 	if err != nil {
 		return err
 	}
+
+	// Grab the inital transaction pool size to know how many total transactions
+	// there should be after announcement.
+	initialTpoolSize := len(sts[0].tpool.TransactionList())
 
 	// Announce each host.
 	for _, st := range sts {
@@ -77,13 +82,13 @@ func announceAllHosts(sts []*serverTester) error {
 	// TODO: At some point the number of transactions needed to make an
 	// announcement may change. Currently its 2.
 	for i := 0; i < 50; i++ {
-		if len(sts[0].tpool.TransactionList()) == len(sts)*2 {
+		if len(sts[0].tpool.TransactionList()) == len(sts)*2+initialTpoolSize {
 			break
 		}
 		time.Sleep(time.Millisecond * 100)
 	}
-	if len(sts[0].tpool.TransactionList()) != len(sts)*2 {
-		return errors.New("Host announcements do not seem to have propagated to the leader's tpool")
+	if len(sts[0].tpool.TransactionList()) < len(sts)*2+initialTpoolSize {
+		return fmt.Errorf("Host announcements do not seem to have propagated to the leader's tpool: %v, %v, %v", len(sts), len(sts[0].tpool.TransactionList())+initialTpoolSize, initialTpoolSize)
 	}
 
 	// Mine a block and then wait for all of the nodes to syncrhonize to it.
@@ -133,11 +138,48 @@ func fullyConnectNodes(sts []*serverTester) error {
 
 		// Connect this node to every other node.
 		for _, stb := range sts[i+1:] {
-			// NOTE: this check depends on string-matching an error in the
-			// gateway. If that error changes at all, this string will need to
-			// be updated.
-			err := stb.stdPostAPI("/gateway/connect/"+string(gg.NetAddress), nil)
-			if err != nil && err.Error() != "already connected to this peer" {
+			// Try connecting to the other node until both have the other in
+			// their peer list.
+			err = retry(100, time.Millisecond*100, func() error {
+				// NOTE: this check depends on string-matching an error in the
+				// gateway. If that error changes at all, this string will need to
+				// be updated.
+				err := stb.stdPostAPI("/gateway/connect/"+string(gg.NetAddress), nil)
+				if err != nil && err.Error() != "already connected to this peer" {
+					return err
+				}
+
+				// Check that the gateways are connected.
+				bToA := false
+				aToB := false
+				var ggb GatewayGET
+				err = stb.getAPI("/gateway", &ggb)
+				if err != nil {
+					return err
+				}
+				for _, peer := range ggb.Peers {
+					if peer.NetAddress == gg.NetAddress {
+						bToA = true
+						break
+					}
+				}
+				err = sta.getAPI("/gateway", &gg)
+				if err != nil {
+					return err
+				}
+				for _, peer := range gg.Peers {
+					if peer.NetAddress == ggb.NetAddress {
+						aToB = true
+						break
+					}
+				}
+				if !aToB || !bToA {
+					return fmt.Errorf("called connect between two nodes, but they are not peers: %v %v %v %v %v %v", aToB, bToA, gg.NetAddress, ggb.NetAddress, gg.Peers, ggb.Peers)
+				}
+				return nil
+
+			})
+			if err != nil {
 				return err
 			}
 		}

@@ -18,12 +18,12 @@ the siad instance launched on the local machine with `siad -a :9000`.
 
 Common tasks
 ------------
-* `siac status` view block height
+* `siac consensus` view block height
 
 Wallet:
 * `siac wallet init [-p]` initilize a wallet
 * `siac wallet unlock` unlock a wallet
-* `siac wallet status` retrieve wallet balance
+* `siac wallet balance` retrieve wallet balance
 * `siac wallet address` get a wallet address
 * `siac wallet send [amount] [dest]` sends siacoin to an address
 
@@ -31,8 +31,6 @@ Renter:
 * `siac renter list` list all renter files
 * `siac renter upload [filepath] [nickname]` upload a file
 * `siac renter download [nickname] [filepath]` download a file
-* `siac renter share [nickname] [filepath]` create a .sia file
-* `siac renter load [filepath]` load a .sia file
 
 
 Full Descriptions
@@ -68,11 +66,11 @@ Wallet encrypted with given password
 to the wallet, supplied by the `init` command. The wallet must be
 initialized and unlocked before any actions can take place.
 
-* `siac wallet status` prints information about your wallet.
+* `siac wallet balance` prints information about your wallet.
 
 Example:
 ```bash
-user@hostname:~$ siac wallet status
+user@hostname:~$ siac wallet balance
 Wallet status:
 Encrypted, Unlocked
 Confirmed Balance:   61516458.00 SC
@@ -103,14 +101,19 @@ seed into itself. This can be used for wallet recovery and merging.
 
 is used to configure hosting.
 
-| Setting      | Value                                            |
-| ------------ | ------------------------------------------------ |
-| totalstorage | The total size you will be hosting from in bytes |
-| minfilesize  | The minimum file size you can host in bytes      |
-| maxfilesize  | The maximum file size you can host in bytes      |
-| minduration  | The smallest duration you can host for in blocks |
-| maxduration  | The largest duration you can host for in blocks  |
-| price        | Number of Siacoins per Gigabyte per month.       |
+In version `1.2.2`, sia hosting is configured as follows:
+
+| Setting                  | Value                                           |
+| -------------------------|-------------------------------------------------|
+| acceptingcontracts       | Yes or No                                       |
+| maxduration              | in weeks, at least 12                           |
+| collateral               | in SC / TB / Month, 10-1000                     |
+| collateralbudget         | in SC                                           |
+| maxcollateral            | in SC, max per contract                         |
+| mincontractprice         | minimum price in SC per contract                |
+| mindownloadbandwidthprice| in SC / TB                                      |
+| minstorageprice          | in SC / TB                                      |
+| minuploadbandwidthprice  | in SC / TB                                      |
 
 You can call this many times to configure you host before
 announcing. Alternatively, you can manually adjust these parameters
@@ -121,11 +124,11 @@ supply a specific address to be announced; this allows you to announce a domain
 name. Announcing a second time after changing settings is not necessary, as the
 announcement only contains enough information to reach your host.
 
-* `siac host status` outputs some of your hosting settings.
+* `siac host -v` outputs some of your hosting settings.
 
 Example:
 ```bash
-user@hostname:~$ siac host status
+user@hostname:~$ siac host -v
 Host settings:
 Storage:      2.0000 TB (1.524 GB used)
 Price:        0.000 SC per GB per month
@@ -135,8 +138,8 @@ Max Duration: 8640
 Contracts:    32
 ```
 
-* `siac host hostdb` prints a list of all the know active hosts on the
-network. It can also be called through `siac hostdb`
+* `siac hostdb -v` prints a list of all the know active hosts on the
+network.
 
 #### Renter tasks
 * `siac renter upload [filename] [nickname]` uploads a file to the sia
@@ -156,22 +159,6 @@ will be overwritten.
 
 * `siac renter rename [nickname] [newname]` changes the nickname of a
   file.
-
-* `siac renter share [nickname] [filepath]` writes a .sia file
-pointing to the file specified by `nickname` on the network. The file
-is written to `filepath`. Note that the `.sia` extension will not be
-automatically added, and must be part of the path.
-
-* `siac renter shareascii [nickname]` writes the .sia file specified
-  by `nickname` to stdout base64 encoded.
-
-* `siac renter load [filename]` parses the .sia file at `filename` and
-adds it to the renters collection of files, so that it can be
-downloaded.
-
-* `siac renter loadascii [data]` parses the siafile passed as an
-argument and adds it to your collection of files for download. Data
-will be a very large field.
 
 * `siac renter delete [nickname]` removes a file from your list of
 stored files. This does not remove it from the network, but only from
@@ -202,7 +189,7 @@ is virtually useless outside of debugging.
 * `siac miner stop` halts the CPU miner.
 
 #### General commands
-* `siac status` prints the current block ID, current block height, and
+* `siac consensus` prints the current block ID, current block height, and
 current target.
 
 * `siac stop` sends the stop signal to siad to safely terminate. This

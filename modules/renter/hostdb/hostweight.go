@@ -92,6 +92,28 @@ func (hdb *HostDB) collateralAdjustments(entry modules.HostDBEntry) float64 {
 	return weight
 }
 
+// interactionAdjustments determine the penalty to be applied to a host for the
+// historic and currnet interactions with that host. This function focuses on
+// historic interactions and ignores recent interactions.
+func (hdb *HostDB) interactionAdjustments(entry modules.HostDBEntry) float64 {
+	// Give the host a baseline of 30 successful interactions and 1 failed
+	// interaction. This gives the host a baseline if we've had few
+	// interactions with them. The 1 failed interaction will become
+	// irrelevant after sufficient interactions with the host.
+	hsi := entry.HistoricSuccessfulInteractions + 30
+	hfi := entry.HistoricFailedInteractions + 1
+
+	// Determine the intraction ratio based off of the historic interactions.
+	ratio := float64(hsi) / float64(hsi+hfi)
+
+	// Raise the ratio to the 15th power and return that. The exponentiation is
+	// very high because the renter will already intentionally avoid hosts that
+	// do not have many successful interactions, meaning that the bad points do
+	// not rack up very quickly. We want to signal a bad score for the host
+	// nonetheless.
+	return math.Pow(ratio, 15)
+}
+
 // priceAdjustments will adjust the weight of the entry according to the prices
 // that it has set.
 func (hdb *HostDB) priceAdjustments(entry modules.HostDBEntry) float64 {
@@ -195,8 +217,11 @@ func storageRemainingAdjustments(entry modules.HostDBEntry) float64 {
 // version reported by the host.
 func versionAdjustments(entry modules.HostDBEntry) float64 {
 	base := float64(1)
-	if build.VersionCmp(entry.Version, "1.3.0") < 0 {
+	if build.VersionCmp(entry.Version, "1.4.0") < 0 {
 		base = base * 0.99999 // Safety value to make sure we update the version penalties every time we update the host.
+	}
+	if build.VersionCmp(entry.Version, "1.3.0") < 0 {
+		base = base * 0.9
 	}
 	if build.VersionCmp(entry.Version, "1.2.2") < 0 {
 		base = base * 0.9
@@ -339,17 +364,19 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 }
 
 // calculateHostWeight returns the weight of a host according to the settings of
-// the host database entry. Currently, only the price is considered.
+// the host database entry.
 func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency {
 	collateralReward := hdb.collateralAdjustments(entry)
+	interactionPenalty := hdb.interactionAdjustments(entry)
+	lifetimePenalty := hdb.lifetimeAdjustments(entry)
 	pricePenalty := hdb.priceAdjustments(entry)
 	storageRemainingPenalty := storageRemainingAdjustments(entry)
-	versionPenalty := versionAdjustments(entry)
-	lifetimePenalty := hdb.lifetimeAdjustments(entry)
 	uptimePenalty := hdb.uptimeAdjustments(entry)
+	versionPenalty := versionAdjustments(entry)
 
 	// Combine the adjustments.
-	fullPenalty := collateralReward * pricePenalty * storageRemainingPenalty * versionPenalty * lifetimePenalty * uptimePenalty
+	fullPenalty := collateralReward * interactionPenalty * lifetimePenalty *
+		pricePenalty * storageRemainingPenalty * uptimePenalty * versionPenalty
 
 	// Return a types.Currency.
 	weight := baseWeight.MulFloat(fullPenalty)
@@ -360,15 +387,72 @@ func (hdb *HostDB) calculateHostWeight(entry modules.HostDBEntry) types.Currency
 	return weight
 }
 
+// calculateConversionRate calculates the conversion rate of the provided
+// host score, comparing it to the hosts in the database and returning what
+// percentage of contracts it is likely to participate in.
+func (hdb *HostDB) calculateConversionRate(score types.Currency) float64 {
+	var totalScore types.Currency
+	for _, h := range hdb.ActiveHosts() {
+		totalScore = totalScore.Add(hdb.calculateHostWeight(h))
+	}
+	if totalScore.IsZero() {
+		totalScore = types.NewCurrency64(1)
+	}
+	conversionRate, _ := big.NewRat(0, 1).SetFrac(score.Mul64(50).Big(), totalScore.Big()).Float64()
+	if conversionRate > 100 {
+		conversionRate = 100
+	}
+	return conversionRate
+}
+
+// EstimateHostScore takes a HostExternalSettings and returns the estimated
+// score of that host in the hostdb, assuming no penalties for age or uptime.
+func (hdb *HostDB) EstimateHostScore(entry modules.HostDBEntry) modules.HostScoreBreakdown {
+	// Grab the adjustments. Age, and uptime penalties are set to '1', to
+	// assume best behavior from the host.
+	collateralReward := hdb.collateralAdjustments(entry)
+	pricePenalty := hdb.priceAdjustments(entry)
+	storageRemainingPenalty := storageRemainingAdjustments(entry)
+	versionPenalty := versionAdjustments(entry)
+
+	// Combine into a full penalty, then determine the resulting estimated
+	// score.
+	fullPenalty := collateralReward * pricePenalty * storageRemainingPenalty * versionPenalty
+	estimatedScore := baseWeight.MulFloat(fullPenalty)
+	if estimatedScore.IsZero() {
+		estimatedScore = types.NewCurrency64(1)
+	}
+
+	// Compile the estimates into a host score breakdown.
+	return modules.HostScoreBreakdown{
+		Score:          estimatedScore,
+		ConversionRate: hdb.calculateConversionRate(estimatedScore),
+
+		AgeAdjustment:              1,
+		BurnAdjustment:             1,
+		CollateralAdjustment:       collateralReward,
+		PriceAdjustment:            pricePenalty,
+		StorageRemainingAdjustment: storageRemainingPenalty,
+		UptimeAdjustment:           1,
+		VersionAdjustment:          versionPenalty,
+	}
+}
+
 // ScoreBreakdown provdes a detailed set of scalars and bools indicating
 // elements of the host's overall score.
 func (hdb *HostDB) ScoreBreakdown(entry modules.HostDBEntry) modules.HostScoreBreakdown {
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+
+	score := hdb.calculateHostWeight(entry)
 	return modules.HostScoreBreakdown{
-		Score: hdb.calculateHostWeight(entry),
+		Score:          score,
+		ConversionRate: hdb.calculateConversionRate(score),
 
 		AgeAdjustment:              hdb.lifetimeAdjustments(entry),
 		BurnAdjustment:             1,
 		CollateralAdjustment:       hdb.collateralAdjustments(entry),
+		InteractionAdjustment:      hdb.interactionAdjustments(entry),
 		PriceAdjustment:            hdb.priceAdjustments(entry),
 		StorageRemainingAdjustment: storageRemainingAdjustments(entry),
 		UptimeAdjustment:           hdb.uptimeAdjustments(entry),

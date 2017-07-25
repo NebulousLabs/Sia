@@ -87,160 +87,6 @@ func TestWalletGETEncrypted(t *testing.T) {
 	}
 }
 
-// TestWalletChangePasswordDeep is a more through validation test of the
-// /wallet/changepassword endpoint.
-func TestWalletChangePasswordDeep(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	st, err := createServerTester(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.server.panicClose()
-
-	st2, err := blankServerTester(t.Name() + "-wallet1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st2.server.Close()
-
-	st3, err := blankServerTester(t.Name() + "-wallet2")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st3.server.Close()
-
-	st4Dir := build.TempDir("api", t.Name()+"-wallet3-data")
-	key := crypto.TwofishKey(crypto.HashObject("wallet3 unlock key"))
-	st4, err := assembleServerTester(key, st4Dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st4.server.Close()
-
-	st5, err := blankServerTester(t.Name() + "-wallet4")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st5.server.Close()
-
-	wallets := []*serverTester{st, st2, st3, st4, st5}
-	err = fullyConnectNodes(wallets)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// send 10KS to each of the blank wallets
-	sendSiacoins := func(srcST *serverTester, destST *serverTester, amount uint64) {
-		var wag WalletAddressGET
-		err = destST.getAPI("/wallet/address", &wag)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var wg WalletGET
-		err = destST.getAPI("/wallet", &wg)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		sendValue := types.SiacoinPrecision.Mul64(amount)
-		sendSiacoinsValues := url.Values{}
-		sendSiacoinsValues.Set("amount", sendValue.String())
-		sendSiacoinsValues.Set("destination", wag.Address.String())
-		if err = srcST.stdPostAPI("/wallet/siacoins", sendSiacoinsValues); err != nil {
-			t.Fatal(err)
-		}
-
-		// mine blocks until the send is confirmed
-		originalBalance := wg.ConfirmedSiacoinBalance
-		for i := 0; i < 5; i++ {
-			b, err := st.miner.AddBlock()
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, wallet := range wallets {
-				waitForBlock(b.ID(), wallet)
-			}
-			err = destST.getAPI("/wallet", &wg)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if wg.ConfirmedSiacoinBalance.Cmp(originalBalance) > 0 {
-				break
-			}
-		}
-		if wg.ConfirmedSiacoinBalance.Cmp(originalBalance) <= 0 {
-			t.Fatal("siacoins send failed")
-		}
-	}
-	for _, wallet := range wallets[1:4] {
-		sendSiacoins(st, wallet, 10000)
-	}
-
-	st2seed, _, err := st2.wallet.PrimarySeed()
-	if err != nil {
-		t.Fatal(err)
-	}
-	st3seed, _, err := st3.wallet.PrimarySeed()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// close 2 of the 3 blank wallets
-	err = st2.server.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = st3.server.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// load their seeds into the third wallet
-	loadSeed := func(seed modules.Seed, st *serverTester) {
-		err = st.wallet.LoadSeed(st.walletKey, seed)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	loadSeed(st2seed, st4)
-	loadSeed(st3seed, st4)
-
-	// restart the third wallet
-	err = st4.server.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	st4, err = assembleServerTester(st4.walletKey, st4.dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// send all of the money from the third wallet to the fourth wallet
-	sendSiacoins(st4, st5, 27000)
-
-	// changekey the third wallet, should work with spaces
-	newPassword := "test password with spaces"
-	oldPassword := "wallet3 unlock key"
-	changeKeyValues := url.Values{}
-	changeKeyValues.Set("encryptionpassword", oldPassword)
-	changeKeyValues.Set("newpassword", newPassword)
-	err = st4.stdPostAPI("/wallet/changepassword", changeKeyValues)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// verify the money went through
-	minExpectedBalance := types.SiacoinPrecision.Mul64(26900)
-	balance, _, _ := st5.wallet.ConfirmedBalance()
-	if balance.Cmp(minExpectedBalance) < 0 {
-		t.Fatalf("balance should end up in the final wallet, wanted %v got %v\n", minExpectedBalance.Div(types.SiacoinPrecision), balance.Div(types.SiacoinPrecision))
-	}
-}
-
 // TestWalletEncrypt tries to encrypt and unlock the wallet through the api
 // using a provided encryption key.
 func TestWalletEncrypt(t *testing.T) {
@@ -680,7 +526,7 @@ func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
 	}
 }
 
-// TestWalletTransactionGETid queries the /wallet/transaction/$(id)
+// TestWalletTransactionGETid queries the /wallet/transaction/:id
 // api call.
 func TestWalletTransactionGETid(t *testing.T) {
 	if testing.Short() {
@@ -714,7 +560,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 	}
 
 	// Query the details of the first transaction using
-	// /wallet/transaction/$(id)
+	// /wallet/transaction/:id
 	var wtgid WalletTransactionGETid
 	wtgidQuery := fmt.Sprintf("/wallet/transaction/%s", wtg.ConfirmedTransactions[0].TransactionID)
 	err = st.getAPI(wtgidQuery, &wtgid)
@@ -1293,6 +1139,22 @@ func TestWalletSiafunds(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Block until allowance has finished forming.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
+	}
+
 	// mine a block so that the file contract makes it into the blockchain
 	_, err = st.miner.AddBlock()
 	if err != nil {
@@ -1442,7 +1304,7 @@ func TestWalletChangePassword(t *testing.T) {
 // TestWalletSiacoins tests the /wallet/siacoins endpoint, including sending
 // to multiple addresses.
 func TestWalletSiacoins(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

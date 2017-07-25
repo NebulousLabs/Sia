@@ -21,14 +21,27 @@ Index
 
 | Route                           | HTTP verb |
 | ------------------------------- | --------- |
+| [/tpool/fee](#tpoolfee-get)     | GET       |
 | [/tpool/raw/:id](#tpoolraw-get) | GET       |
 | [/tpool/raw](#tpoolraw-post)    | POST      |
+
+#### /tpool/fee [GET]
+
+returns the minimum and maximum estimated fees expected by the transaction pool.
+
+###### JSON Response
+```javascript
+{
+  "minimum": "1234", // hastings / byte
+  "maximum": "5678"  // hastings / byte
+}
+```
 
 #### /tpool/raw/:id [GET]
 
 returns the ID for the requested transaction and its raw encoded parents and transaction data.
 
-###### JSON Response [(with comments)](/doc/api/Transactionpool.md#json-response)
+###### JSON Response
 ```javascript
 {
 	// id of the transaction

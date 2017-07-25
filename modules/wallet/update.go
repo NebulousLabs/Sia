@@ -10,19 +10,91 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// historicOutput defines a historic output as recognized by the wallet. This
-// struct is primarily used to sort the historic outputs before inserting them
-// into the bolt database.
-type historicOutput struct {
-	id  types.OutputID
-	val types.Currency
+// threadedResetSubscriptions unsubscribes the wallet from the consensus set and transaction pool
+// and subscribes again.
+func (w *Wallet) threadedResetSubscriptions() error {
+	if !w.scanLock.TryLock() {
+		return errScanInProgress
+	}
+	defer w.scanLock.Unlock()
+
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
+	err := w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	if err != nil {
+		return err
+	}
+	w.tpool.TransactionPoolSubscribe(w)
+	return nil
+}
+
+// advanceSeedLookahead generates all keys from the current primary seed progress up to index
+// and adds them to the set of spendable keys.  Therefore the new primary seed progress will
+// be index+1 and new lookahead keys will be generated starting from index+1
+// Returns true if a blockchain rescan is required
+func (w *Wallet) advanceSeedLookahead(index uint64) (bool, error) {
+	progress, err := dbGetPrimarySeedProgress(w.dbTx)
+	if err != nil {
+		return false, err
+	}
+	newProgress := index + 1
+
+	// Add spendable keys and remove them from lookahead
+	spendableKeys := generateKeys(w.primarySeed, progress, newProgress-progress)
+	for _, key := range spendableKeys {
+		w.keys[key.UnlockConditions.UnlockHash()] = key
+		delete(w.lookahead, key.UnlockConditions.UnlockHash())
+	}
+
+	// Update the primarySeedProgress
+	dbPutPrimarySeedProgress(w.dbTx, newProgress)
+	if err != nil {
+		return false, err
+	}
+
+	// Regenerate lookahead
+	w.regenerateLookahead(newProgress)
+
+	// If more than lookaheadRescanThreshold keys were generated
+	// also initialize a rescan just to be safe.
+	if uint64(len(spendableKeys)) > lookaheadRescanThreshold {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // isWalletAddress is a helper function that checks if an UnlockHash is
-// derived from one of the wallet's spendable keys.
+// derived from one of the wallet's spendable keys or future keys.
 func (w *Wallet) isWalletAddress(uh types.UnlockHash) bool {
 	_, exists := w.keys[uh]
 	return exists
+}
+
+// updateLookahead uses a consensus change to update the seed progress if one of the outputs
+// contains an unlock hash of the lookahead set. Returns true if a blockchain rescan is required
+func (w *Wallet) updateLookahead(tx *bolt.Tx, cc modules.ConsensusChange) (bool, error) {
+	var largestIndex uint64
+	for _, diff := range cc.SiacoinOutputDiffs {
+		if index, ok := w.lookahead[diff.SiacoinOutput.UnlockHash]; ok {
+			if index > largestIndex {
+				largestIndex = index
+			}
+		}
+	}
+	for _, diff := range cc.SiafundOutputDiffs {
+		if index, ok := w.lookahead[diff.SiafundOutput.UnlockHash]; ok {
+			if index > largestIndex {
+				largestIndex = index
+			}
+		}
+	}
+	if largestIndex > 0 {
+		return w.advanceSeedLookahead(largestIndex)
+	}
+
+	return false, nil
 }
 
 // updateConfirmedSet uses a consensus change to update the confirmed set of
@@ -36,7 +108,7 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 
 		var err error
 		if diff.Direction == modules.DiffApply {
-			w.log.Println("Wallet has gained a spandable siacoin output:", diff.ID, "::", diff.SiacoinOutput.Value.HumanString())
+			w.log.Println("Wallet has gained a spendable siacoin output:", diff.ID, "::", diff.SiacoinOutput.Value.HumanString())
 			err = dbPutSiacoinOutput(tx, diff.ID, diff.SiacoinOutput)
 		} else {
 			w.log.Println("Wallet has lost a spendable siacoin output:", diff.ID, "::", diff.SiacoinOutput.Value.HumanString())
@@ -324,6 +396,11 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	if needRescan, err := w.updateLookahead(w.dbTx, cc); err != nil {
+		w.log.Println("ERROR: failed to update lookahead:", err)
+	} else if needRescan {
+		go w.threadedResetSubscriptions()
+	}
 	if err := w.updateConfirmedSet(w.dbTx, cc); err != nil {
 		w.log.Println("ERROR: failed to update confirmed set:", err)
 	}
@@ -344,66 +421,109 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
 // transaction set.
-func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction, cc modules.ConsensusChange) {
+func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.TransactionPoolDiff) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// compute spent outputs
-	spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
-	for _, diff := range cc.SiacoinOutputDiffs {
-		if diff.Direction == modules.DiffRevert {
-			// revert means spent
-			spentSiacoinOutputs[diff.ID] = diff.SiacoinOutput
+	// Do the pruning first. If there are any pruned transactions, we will need
+	// to re-allocate the whole processed transactions array.
+	droppedTransactions := make(map[types.TransactionID]struct{})
+	for i := range diff.RevertedTransactions {
+		txids := w.unconfirmedSets[diff.RevertedTransactions[i]]
+		for i := range txids {
+			droppedTransactions[txids[i]] = struct{}{}
 		}
+		delete(w.unconfirmedSets, diff.RevertedTransactions[i])
 	}
 
-	w.unconfirmedProcessedTransactions = nil
-	for _, txn := range txns {
-		// determine whether transaction is relevant to the wallet
-		relevant := false
-		for _, sci := range txn.SiacoinInputs {
-			relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
-		}
-		for _, sco := range txn.SiacoinOutputs {
-			relevant = relevant || w.isWalletAddress(sco.UnlockHash)
+	// Skip the reallocation if we can, otherwise reallocate the
+	// unconfirmedProcessedTransactions to no longer have the dropped
+	// transactions.
+	if len(droppedTransactions) != 0 {
+		// Capacity can't be reduced, because we have no way of knowing if the
+		// dropped transactions are relevant to the wallet or not, and some will
+		// not be relevant to the wallet, meaning they don't have a counterpart
+		// in w.unconfirmedProcessedTransactions.
+		newUPT := make([]modules.ProcessedTransaction, 0, len(w.unconfirmedProcessedTransactions))
+		for _, txn := range w.unconfirmedProcessedTransactions {
+			_, exists := droppedTransactions[txn.TransactionID]
+			if !exists {
+				// Transaction was not dropped, add it to the new unconfirmed
+				// transactions.
+				newUPT = append(newUPT, txn)
+			}
 		}
 
-		// only create a ProcessedTransaction if txn is relevant
-		if !relevant {
-			continue
+		// Set the unconfirmed preocessed transactions to the pruned set.
+		w.unconfirmedProcessedTransactions = newUPT
+	}
+
+	// Scroll through all of the diffs and add any new transactions.
+	for _, unconfirmedTxnSet := range diff.AppliedTransactions {
+		// Mark all of the transactions that appeared in this set.
+		//
+		// TODO: Technically only necessary to mark the ones that are relevant
+		// to the wallet, but overhead should be low.
+		w.unconfirmedSets[unconfirmedTxnSet.ID] = unconfirmedTxnSet.IDs
+
+		// Get the values for the spent outputs.
+		spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
+		for _, scod := range unconfirmedTxnSet.Change.SiacoinOutputDiffs {
+			// Only need to grab the reverted ones, because only reverted ones
+			// have the possibility of having been spent.
+			if scod.Direction == modules.DiffRevert {
+				spentSiacoinOutputs[scod.ID] = scod.SiacoinOutput
+			}
 		}
 
-		pt := modules.ProcessedTransaction{
-			Transaction:           txn,
-			TransactionID:         txn.ID(),
-			ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
-			ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
+		// Add each transaction to our set of unconfirmed transactions.
+		for i, txn := range unconfirmedTxnSet.Transactions {
+			// determine whether transaction is relevant to the wallet
+			relevant := false
+			for _, sci := range txn.SiacoinInputs {
+				relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
+			}
+			for _, sco := range txn.SiacoinOutputs {
+				relevant = relevant || w.isWalletAddress(sco.UnlockHash)
+			}
+
+			// only create a ProcessedTransaction if txn is relevant
+			if !relevant {
+				continue
+			}
+
+			pt := modules.ProcessedTransaction{
+				Transaction:           txn,
+				TransactionID:         unconfirmedTxnSet.IDs[i],
+				ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
+				ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
+			}
+			for _, sci := range txn.SiacoinInputs {
+				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+					ParentID:       types.OutputID(sci.ParentID),
+					FundType:       types.SpecifierSiacoinInput,
+					WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
+					RelatedAddress: sci.UnlockConditions.UnlockHash(),
+					Value:          spentSiacoinOutputs[sci.ParentID].Value,
+				})
+			}
+			for i, sco := range txn.SiacoinOutputs {
+				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					ID:             types.OutputID(txn.SiacoinOutputID(uint64(i))),
+					FundType:       types.SpecifierSiacoinOutput,
+					MaturityHeight: types.BlockHeight(math.MaxUint64),
+					WalletAddress:  w.isWalletAddress(sco.UnlockHash),
+					RelatedAddress: sco.UnlockHash,
+					Value:          sco.Value,
+				})
+			}
+			for _, fee := range txn.MinerFees {
+				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					FundType: types.SpecifierMinerFee,
+					Value:    fee,
+				})
+			}
+			w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
 		}
-		for _, sci := range txn.SiacoinInputs {
-			pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
-				ParentID:       types.OutputID(sci.ParentID),
-				FundType:       types.SpecifierSiacoinInput,
-				WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
-				RelatedAddress: sci.UnlockConditions.UnlockHash(),
-				Value:          spentSiacoinOutputs[sci.ParentID].Value,
-			})
-		}
-		for i, sco := range txn.SiacoinOutputs {
-			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
-				ID:             types.OutputID(txn.SiacoinOutputID(uint64(i))),
-				FundType:       types.SpecifierSiacoinOutput,
-				MaturityHeight: types.BlockHeight(math.MaxUint64),
-				WalletAddress:  w.isWalletAddress(sco.UnlockHash),
-				RelatedAddress: sco.UnlockHash,
-				Value:          sco.Value,
-			})
-		}
-		for _, fee := range txn.MinerFees {
-			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
-				FundType: types.SpecifierMinerFee,
-				Value:    fee,
-			})
-		}
-		w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
 	}
 }

@@ -14,6 +14,7 @@ dependencies:
 	go get -u golang.org/x/crypto/ed25519
 	# Module + Daemon Dependencies
 	go get -u github.com/NebulousLabs/entropy-mnemonics
+	go get -u github.com/NebulousLabs/errors
 	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/muxado
 	go get -u github.com/klauspost/reedsolomon
@@ -77,6 +78,12 @@ test-v:
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint
 	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
+test-vlong: clean fmt vet lint
+	go test -v -race -tags='testing debug vlong' -timeout=5000s $(pkgs) -run=$(run)
+test-cpu:
+	go test -v -tags='testing debug' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)
+test-mem:
+	go test -v -tags='testing debug' -timeout=500s -memprofile mem.prof $(pkgs) -run=$(run)
 bench: clean fmt
 	go test -tags='debug testing' -timeout=500s -run=XXX -bench=$(run) $(pkgs)
 cover: clean

@@ -3,7 +3,6 @@ package proto
 import (
 	"errors"
 	"net"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -19,7 +18,7 @@ const (
 
 // FormContract forms a contract with a host and submits the contract
 // transaction to tpool.
-func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, cancel <-chan struct{}) (modules.RenterContract, error) {
+func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (modules.RenterContract, error) {
 	// Extract vars from params, for convenience.
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
 
@@ -95,10 +94,19 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	txn, parentTxns := txnBuilder.View()
 	txnSet := append(parentTxns, txn)
 
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			hdb.IncrementFailedInteractions(host.PublicKey)
+		} else {
+			hdb.IncrementSuccessfulInteractions(host.PublicKey)
+		}
+	}()
+
 	// Initiate connection.
 	dialer := &net.Dialer{
 		Cancel:  cancel,
-		Timeout: 15 * time.Second,
+		Timeout: connTimeout,
 	}
 	conn, err := dialer.Dial("tcp", string(host.NetAddress))
 	if err != nil {

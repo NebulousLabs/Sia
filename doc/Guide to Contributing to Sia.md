@@ -15,10 +15,13 @@
 * [Contact us](#contact)
 
 <a name="go"/>
+
 ## Get started with Go
 
 <a name="install-go"/>
+
 ### Install Go
+
 To install Go on your computer, follow the 
 [official installation guide][install-go].  
 
@@ -40,14 +43,18 @@ $ echo 'export PATH=$PATH:$GOPATH/bin' >> $HOME/.profile
 ```
 
 <a name="learn-go"/>
+
 ### Learn Go
+
 * To get familiar with the language, start with the official [Tour of Go][tour].
 * Move onto [How to Write Go Code][how] to learn how to organize Go packages 
 and use the go tool.
 * Finish with the [Effective Go][effective] guide.
 
 <a name="build-sia"/>
+
 ## Build Sia
+
 To build Sia on your machine, enter the following on the command line:
 
 ```bash
@@ -70,9 +77,13 @@ $ make
 ```
 
 <a name="contribute"/>
+
 ## Contribute to the codebase
+
 <a name="setup-git"/>
+
 ### Set up git
+
 Install git on your machine according to [these instructions][install-git] in 
 the Pro Git book.
 
@@ -89,7 +100,9 @@ $ git config --global credential.helper "cache --timeout=[seconds]"
 
 ```
 <a name="fork"/>
+
 ### Fork the Sia repository
+
 While logged into your Github account, navigate to the [Sia repository][sia] 
 and click the 'Fork' button in the upper righthand corner.  Your account now 
 has a 'forked' copy of the original repo at 
@@ -106,8 +119,10 @@ $ cd $GOPATH/src/github.com/NebulousLabs/Sia
 $ git remote add <remote name> https://github.com/<username>/Sia.git
 ```
 
-<a name="write">
+<a name="write"/>
+
 ### Write some code
+
 Right now your git local repository only has one branch (called 'master' by 
 default). If you want to make changes, add a new branch and make your changes 
 there. You should maintain master as an up-to-date copy of the NebulousLabs/Sia 
@@ -181,7 +196,9 @@ $ git commit -m "Add new tests for CommitSync method"
 $ git push <fork remote> <branch>
 ```
 <a name="pull"/>
+
 ### Submit your code for review
+
 Once you've tested your new code and pushed changes to your fork, navigate to 
 your fork at `https://github.com/<username>/Sia` in your browser.  
 Switch to the branch you've made changes on by selecting it from the list on 
@@ -214,17 +231,23 @@ $ git push <fork remote> :<branch>
 $ git push <fork remote> master
 ```
 <a name="git-resources"/>
+
 ### More Git resources
+
   * [How to into git (and Github)][luke] by Luke Champine
   * [Official resources for learning Git][git]
 
 <a name="where-to-start"/>
+
 ## Where to start
+
 If you'd like to contribute to Sia but don't have any specific ideas, writing 
-tests is a good way to get your feet wet.  See [doc/Running and Writing Tests for Sia.md](Running\ and\ Writing\ Tests\ for\ Sia.md) to get started. 
+tests is a good way to get your feet wet.  See [doc/Running and Writing Tests for Sia.md](Running%20and%20Writing%20Tests%20for%20Sia.md) to get started.
 
 <a name="contact"/>
+
 ## Contact us
+
 Feel free to ask for help on the #dev channel on [Slack][slack].
 
 [cross]: http://dave.cheney.net/2015/08/22/cross-compilation-with-go-1-5

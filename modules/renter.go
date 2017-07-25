@@ -98,6 +98,13 @@ type HostDBEntry struct {
 	HistoricUptime   time.Duration `json:"historicuptime"`
 	ScanHistory      HostDBScans   `json:"scanhistory"`
 
+	HistoricFailedInteractions     float64 `json:"historicfailedinteractions"`
+	HistoricSuccessfulInteractions float64 `json:"historicsuccessfulinteractions"`
+	RecentFailedInteractions       float64 `json:"recentfailedinteractions"`
+	RecentSuccessfulInteractions   float64 `json:"recentsuccessfulinteractions"`
+
+	LastHistoricUpdate types.BlockHeight
+
 	// The public key of the host, stored separately to minimize risk of certain
 	// MitM based vulnerabilities.
 	PublicKey types.SiaPublicKey `json:"publickey"`
@@ -117,11 +124,13 @@ type HostDBScan struct {
 // results provided by this struct can only be used as a guide, and may vary
 // significantly from machine to machine.
 type HostScoreBreakdown struct {
-	Score types.Currency `json:"score"`
+	Score          types.Currency `json:"score"`
+	ConversionRate float64        `json:"conversionrate"`
 
 	AgeAdjustment              float64 `json:"ageadjustment"`
 	BurnAdjustment             float64 `json:"burnadjustment"`
 	CollateralAdjustment       float64 `json:"collateraladjustment"`
+	InteractionAdjustment      float64 `json:"interactionadjustment"`
 	PriceAdjustment            float64 `json:"pricesmultiplier"`
 	StorageRemainingAdjustment float64 `json:"storageremainingadjustment"`
 	UptimeAdjustment           float64 `json:"uptimeadjustment"`
@@ -216,6 +225,12 @@ type RenterContract struct {
 	ContractFee types.Currency `json:"contractfee"`
 	TxnFee      types.Currency `json:"txnfee"`
 	SiafundFee  types.Currency `json:"siafundfee"`
+
+	// GoodForUpload indicates whether the contract should be used to upload new
+	// data or not, and GoodForRenew indicates whether or not the contract
+	// should be renewed.
+	GoodForRenew  bool
+	GoodForUpload bool
 }
 
 // EndHeight returns the height at which the host is no longer obligated to
@@ -284,6 +299,10 @@ type Renter interface {
 
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error
+
+	// EstimateHostScore will return the score for a host with the provided
+	// settings, assuming perfect age and uptime adjustments
+	EstimateHostScore(entry HostDBEntry) HostScoreBreakdown
 
 	// ScoreBreakdown will return the score for a host db entry using the
 	// hostdb's weighting algorithm.

@@ -45,14 +45,23 @@ func (g *Gateway) managedRPC(addr modules.NetAddress, name string, fn modules.RP
 
 	conn, err := peer.open()
 	if err != nil {
+		// peer probably disconnected without sending a shutdown signal;
+		// disconnect from them
+		g.log.Debugf("Could not initiate RPC with %v; disconnecting", addr)
+		peer.sess.Close()
+		g.mu.Lock()
+		delete(g.peers, addr)
+		g.mu.Unlock()
 		return err
 	}
 	defer conn.Close()
 
 	// write header
+	conn.SetDeadline(time.Now().Add(rpcStdDeadline))
 	if err := encoding.WriteObject(conn, handlerName(name)); err != nil {
 		return err
 	}
+	conn.SetDeadline(time.Time{})
 	// call fn
 	return fn(conn)
 }
@@ -146,13 +155,11 @@ func (g *Gateway) threadedListenPeer(p *peer) {
 		case <-peerCloseChan:
 		}
 
-		// Can't call Disconnect because it could return sync.ErrStopped.
+		// Close the session and remove p from the peer list.
+		p.sess.Close()
 		g.mu.Lock()
 		delete(g.peers, p.NetAddress)
 		g.mu.Unlock()
-		if err := p.sess.Close(); err != nil {
-			g.log.Debugf("WARN: error disconnecting from peer %q: %v", p.NetAddress, err)
-		}
 	}()
 
 	for {

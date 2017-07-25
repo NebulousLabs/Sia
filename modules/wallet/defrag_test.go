@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -120,7 +121,7 @@ func TestDefragWalletDust(t *testing.T) {
 // TestDefragOutputExhaustion verifies that sending transactions still succeeds
 // even when the defragger is under heavy stress.
 func TestDefragOutputExhaustion(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

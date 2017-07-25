@@ -83,17 +83,17 @@ func (cs *ConsensusSet) openDB(filename string) (err error) {
 	return nil
 }
 
-// dbInitialized returns true if the database appears to be initialized, false
-// if not. Checking for the existence of the siafund pool bucket is typically
-// sufficient to determine whether the database has gone through the
-// initialization process.
-func dbInitialized(tx *bolt.Tx) bool {
-	return tx.Bucket(SiafundPool) != nil
-}
-
 // initDB is run if there is no existing consensus database, creating a
 // database with all the required buckets and sane initial values.
 func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
+	// If the database has already been initialized, there is nothing to do.
+	// Initialization can be detected by looking for the presense of the siafund
+	// pool bucket. (legacy design chioce - ultimately probably not the best way
+	// ot tell).
+	if tx.Bucket(SiafundPool) != nil {
+		return nil
+	}
+
 	// Create the compononents of the database.
 	err := cs.createConsensusDB(tx)
 	if err != nil {
@@ -111,17 +111,6 @@ func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 		return err
 	}
 	return nil
-}
-
-// inconsistencyDetected indicates whether inconsistency has been detected
-// within the database.
-func inconsistencyDetected(tx *bolt.Tx) (detected bool) {
-	inconsistencyBytes := tx.Bucket(Consistency).Get(Consistency)
-	err := encoding.Unmarshal(inconsistencyBytes, &detected)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return detected
 }
 
 // markInconsistency flags the database to indicate that inconsistency has been

@@ -252,6 +252,7 @@ func TestLock(t *testing.T) {
 // TestInitFromSeedConcurrentUnlock verifies that calling InitFromSeed and
 // then Unlock() concurrently results in the correct balance.
 func TestInitFromSeedConcurrentUnlock(t *testing.T) {
+	t.Skip("Test has poor concurrency design")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -431,6 +432,8 @@ func TestReset(t *testing.T) {
 	postEncryptionTesting(wt.miner, wt.wallet, newKey)
 }
 
+// TestChangeKey tests that a wallet can only be unlocked with the new key
+// after changing it and that it shows the same balance as before
 func TestChangeKey(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

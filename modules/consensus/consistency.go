@@ -189,7 +189,7 @@ func checkSiafundCount(tx *bolt.Tx) {
 		manageErr(tx, err)
 	}
 	if !total.Equals(types.SiafundCount) {
-		manageErr(tx, errors.New("wrong number if siafunds in the consensus set"))
+		manageErr(tx, errors.New("wrong number of siafunds in the consensus set"))
 	}
 }
 
@@ -313,9 +313,6 @@ func (cs *ConsensusSet) checkRevertApply(tx *bolt.Tx) {
 // checkConsistency runs a series of checks to make sure that the consensus set
 // is consistent with some rules that should always be true.
 func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
-	if fastrand.Intn(25) == 0 {
-		return
-	}
 	if cs.checkingConsistency {
 		return
 	}

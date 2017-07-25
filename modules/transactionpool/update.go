@@ -1,18 +1,168 @@
 package transactionpool
 
 import (
+	"bytes"
 	"sort"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// findSets takes a bunch of transactions (presumably from a block) and finds
+// all of the separate transaction sets within it. Set does not check for
+// conflicts.
+//
+// The algorithm goes through one transaction at a time. All of the outputs of
+// that transaction are added to the objMap, pointing to the transaction to
+// indicate that the transaction contains those outputs. The transaction is
+// assigned an integer id (each transaction will have a unique id) and added to
+// the txMap.
+//
+// The transaction's inputs are then checked against the objMap to see if there
+// are any parents of the transaction in the graph. If there are, the
+// transaction is added to the parent set instead of its own set. If not, the
+// transaction is added as its own set.
+//
+// The forwards map contains a list of ints indicating when a transaction has
+// been merged with a set. When a transaction gets merged with a parent set, its
+// integer id gets added to the forwards map, indicating that the transaction is
+// no longer in its own set, but instead has been merged with other sets.
+//
+// Some transactions will have parents from multiple distinct sets. If a
+// transaction has parents in multiple distinct sets, those sets get merged
+// together and the transaction gets added to the result. One of the sets is
+// nominated (arbitrarily) as the official set, and the integer id of the other
+// set and the new transaction get forwarded to the official set.
+//
+// TODO: Set merging currently occurs any time that there is a child. But
+// really, it should only occur if the child increases the average fee value of
+// the set that it is merging with (which it will if and only if it has a higher
+// average fee than that set). If the child has multiple parent sets, it should
+// be compared with the parent set that has the lowest fee value. Then, after it
+// is merged with that parent, the result should be merged with the next
+// lowest-fee parent set if and only if the new set has a higher average fee
+// than the parent set. And this continues until either all of the sets have
+// been merged, or until the remaining parent sets have higher values.
+func findSets(ts []types.Transaction) [][]types.Transaction {
+	// txMap marks what set each transaction is in. If two sets get combined,
+	// this number will not be updated. The 'forwards' map defined further on
+	// will help to discover which sets have been combined.
+	txMap := make(map[types.TransactionID]int)
+	setMap := make(map[int][]types.Transaction)
+	objMap := make(map[ObjectID]types.TransactionID)
+	forwards := make(map[int]int)
+
+	// Define a function to follow and collapse any update chain.
+	forward := func(prev int) (ret int) {
+		ret = prev
+		next, exists := forwards[prev]
+		for exists {
+			ret = next
+			forwards[prev] = next // collapse the forwards function to prevent quadratic runtime of findSets.
+			next, exists = forwards[next]
+		}
+		return ret
+	}
+
+	// Add the transactions to the setup one-by-one, merging them as they belong
+	// to a set.
+	for i, t := range ts {
+		// Check if the inputs depend on any previous transaction outputs.
+		tid := t.ID()
+		parentSets := make(map[int]struct{})
+		for _, obj := range t.SiacoinInputs {
+			txid, exists := objMap[ObjectID(obj.ParentID)]
+			if exists {
+				parentSet := forward(txMap[txid])
+				parentSets[parentSet] = struct{}{}
+			}
+		}
+		for _, obj := range t.FileContractRevisions {
+			txid, exists := objMap[ObjectID(obj.ParentID)]
+			if exists {
+				parentSet := forward(txMap[txid])
+				parentSets[parentSet] = struct{}{}
+			}
+		}
+		for _, obj := range t.StorageProofs {
+			txid, exists := objMap[ObjectID(obj.ParentID)]
+			if exists {
+				parentSet := forward(txMap[txid])
+				parentSets[parentSet] = struct{}{}
+			}
+		}
+		for _, obj := range t.SiafundInputs {
+			txid, exists := objMap[ObjectID(obj.ParentID)]
+			if exists {
+				parentSet := forward(txMap[txid])
+				parentSets[parentSet] = struct{}{}
+			}
+		}
+
+		// Determine the new counter for this transaction.
+		if len(parentSets) == 0 {
+			// No parent sets. Make a new set for this transaction.
+			txMap[tid] = i
+			setMap[i] = []types.Transaction{t}
+			// Don't need to add anything for the file contract outputs, storage
+			// proof outputs, siafund claim outputs; these outputs are not
+			// allowed to be spent until 50 confirmations.
+		} else {
+			// There are parent sets, pick one as the base and then merge the
+			// rest into it.
+			parentsSlice := make([]int, 0, len(parentSets))
+			for j := range parentSets {
+				parentsSlice = append(parentsSlice, j)
+			}
+			base := parentsSlice[0]
+			txMap[tid] = base
+			for _, j := range parentsSlice[1:] {
+				// Forward any future transactions pointing at this set to the
+				// base set.
+				forwards[j] = base
+				// Combine the transactions in this set with the transactions in
+				// the base set.
+				setMap[base] = append(setMap[base], setMap[j]...)
+				// Delete this set map, it has been merged with the base set.
+				delete(setMap, j)
+			}
+			// Add this transaction to the base set.
+			setMap[base] = append(setMap[base], t)
+		}
+
+		// Mark this transaction's outputs as potential inputs to future
+		// transactions.
+		for j := range t.SiacoinOutputs {
+			scoid := t.SiacoinOutputID(uint64(j))
+			objMap[ObjectID(scoid)] = tid
+		}
+		for j := range t.FileContracts {
+			fcid := t.FileContractID(uint64(j))
+			objMap[ObjectID(fcid)] = tid
+		}
+		for j := range t.FileContractRevisions {
+			fcid := t.FileContractRevisions[j].ParentID
+			objMap[ObjectID(fcid)] = tid
+		}
+		for j := range t.SiafundOutputs {
+			sfoid := t.SiafundOutputID(uint64(j))
+			objMap[ObjectID(sfoid)] = tid
+		}
+	}
+
+	// Compile the final group of sets.
+	ret := make([][]types.Transaction, 0, len(setMap))
+	for _, set := range setMap {
+		ret = append(ret, set)
+	}
+	return ret
+}
 
 // purge removes all transactions from the transaction pool.
 func (tp *TransactionPool) purge() {
 	tp.knownObjects = make(map[ObjectID]TransactionSetID)
 	tp.transactionSets = make(map[TransactionSetID][]types.Transaction)
-	tp.transactionSetDiffs = make(map[TransactionSetID]modules.ConsensusChange)
+	tp.transactionSetDiffs = make(map[TransactionSetID]*modules.ConsensusChange)
 	tp.transactionListSize = 0
 }
 
@@ -37,16 +187,9 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// over 10 blocks, it is extermely likely that there will be more
 		// applied blocks than reverted blocks, and if there aren't (a height
 		// decreasing reorg), there will be more than 10 applied blocks.
-		if len(tp.txnsPerBlock) > 0 {
-			tailOffset := uint64(0)
-			for i := 0; i < len(tp.txnsPerBlock)-1; i++ {
-				tailOffset += tp.txnsPerBlock[i]
-			}
-
+		if len(tp.recentMedians) > 0 {
 			// Strip out all of the transactions in this block.
-			tp.recentConfirmedFees = tp.recentConfirmedFees[:tailOffset]
-			// Strip off the tail offset.
-			tp.txnsPerBlock = tp.txnsPerBlock[:len(tp.txnsPerBlock)-1]
+			tp.recentMedians = tp.recentMedians[:len(tp.recentMedians)-1]
 		}
 	}
 	for _, block := range cc.AppliedBlocks {
@@ -60,60 +203,72 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 		}
 
-		// Add the transactions from this block.
-		var totalSize uint64
-		for _, txn := range block.Transactions {
+		// Find the median transaction fee for this block.
+		type feeSummary struct {
+			fee  types.Currency
+			size int
+		}
+		var fees []feeSummary
+		var totalSize int
+		txnSets := findSets(block.Transactions)
+		for _, set := range txnSets {
+			// Compile the fees for this set.
 			var feeSum types.Currency
-			size := uint64(len(encoding.Marshal(txn)))
-			for _, fee := range txn.MinerFees {
-				feeSum = feeSum.Add(fee)
+			var sizeSum int
+			b := new(bytes.Buffer)
+			for _, txn := range set {
+				txn.MarshalSia(b)
+				sizeSum += b.Len()
+				b.Reset()
+				for _, fee := range txn.MinerFees {
+					feeSum = feeSum.Add(fee)
+				}
 			}
-			feeAvg := feeSum.Div64(size)
-			tp.recentConfirmedFees = append(tp.recentConfirmedFees, feeSummary{
-				Fee:  feeAvg,
-				Size: size,
+			feeAvg := feeSum.Div64(uint64(sizeSum))
+			fees = append(fees, feeSummary{
+				fee:  feeAvg,
+				size: sizeSum,
 			})
-			totalSize += size
+			totalSize += sizeSum
 		}
 		// Add an extra zero-fee tranasction for any unused block space.
-		remaining := types.BlockSizeLimit - totalSize
-		tp.recentConfirmedFees = append(tp.recentConfirmedFees, feeSummary{
-			Fee:  types.ZeroCurrency,
-			Size: remaining, // fine if remaining is zero.
+		remaining := int(types.BlockSizeLimit) - totalSize
+		fees = append(fees, feeSummary{
+			fee:  types.ZeroCurrency,
+			size: remaining, // fine if remaining is zero.
 		})
-		// Mark the number of fee transactions in this block.
-		tp.txnsPerBlock = append(tp.txnsPerBlock, uint64(len(block.Transactions)+1))
-
-		// If there are more than 10 blocks recorded in the txnsPerBlock, strip
-		// off the oldest blocks.
-		for len(tp.txnsPerBlock) > blockFeeEstimationDepth {
-			tp.recentConfirmedFees = tp.recentConfirmedFees[tp.txnsPerBlock[0]:]
-			tp.txnsPerBlock = tp.txnsPerBlock[1:]
-		}
-
-		// Sort the recent confirmed fees, then scroll forward 10MB and set the
-		// median to that txn. First we need to create and copy the fees into a
-		// new slice so that the don't get jumbled.
-		//
-		// TODO: Sort can be altered for quickSelect, which can grab the median
-		// in constant time. When counting the number of elements on either side
-		// of the pivot, use the 'size' field instead of counting each element
-		// as one.
-		replica := make([]feeSummary, len(tp.recentConfirmedFees))
-		copy(replica, tp.recentConfirmedFees)
-		sort.Slice(replica, func(i, j int) bool {
-			return replica[i].Fee.Cmp(replica[j].Fee) < 0
+		// Sort the fees by value and then scroll until the median.
+		sort.Slice(fees, func(i, j int) bool {
+			return fees[i].fee.Cmp(fees[j].fee) < 0
 		})
-		// Scroll through the sorted fees until hitting the median.
-		var progress uint64
-		for i := range replica {
-			progress += replica[i].Size
-			if progress > (uint64(len(tp.txnsPerBlock))*types.BlockSizeLimit)/2 {
-				tp.recentMedianFee = replica[i].Fee
+		var progress int
+		for i := range fees {
+			progress += fees[i].size
+			// Instead of grabbing the full median, look at the 75%-ile. It's
+			// going to be cheaper than the 50%-ile, but it still got into a
+			// block.
+			if uint64(progress) > types.BlockSizeLimit/4 {
+				tp.recentMedians = append(tp.recentMedians, fees[i].fee)
 				break
 			}
 		}
+
+		// If there are more than 10 blocks recorded in the txnsPerBlock, strip
+		// off the oldest blocks.
+		for len(tp.recentMedians) > blockFeeEstimationDepth {
+			tp.recentMedians = tp.recentMedians[1:]
+		}
 	}
+	// Grab the median of the recent medians. Copy to a new slice so the sorting
+	// doesn't screw up the slice.
+	safeMedians := make([]types.Currency, len(tp.recentMedians))
+	copy(safeMedians, tp.recentMedians)
+	sort.Slice(safeMedians, func(i, j int) bool {
+		return safeMedians[i].Cmp(safeMedians[j]) < 0
+	})
+	tp.recentMedianFee = safeMedians[len(safeMedians)/2]
+
+	// Update all the on-disk structures.
 	err := tp.putRecentConsensusChange(tp.dbTx, cc.ID)
 	if err != nil {
 		tp.log.Println("ERROR: could not update the recent consensus change:", err)
@@ -123,9 +278,8 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		tp.log.Println("ERROR: could not update the block height:", err)
 	}
 	err = tp.putFeeMedian(tp.dbTx, medianPersist{
-		RecentConfirmedFees: tp.recentConfirmedFees,
-		TxnsPerBlock:        tp.txnsPerBlock,
-		RecentMedianFee:     tp.recentMedianFee,
+		RecentMedians:   tp.recentMedians,
+		RecentMedianFee: tp.recentMedianFee,
 	})
 	if err != nil {
 		tp.log.Println("ERROR: could not update the transaction pool median fee information:", err)
