@@ -18,7 +18,7 @@ type persistence struct {
 	BlockHeight  types.BlockHeight         `json:"blockheight"`
 	RecentChange modules.ConsensusChangeID `json:"recentchange"`
 
-	// Host Identity.
+	// Pool Identity.
 	Announced      bool                         `json:"announced"`
 	AutoAddress    modules.NetAddress           `json:"autoaddress"`
 	MiningMetrics  modules.PoolMiningMetrics    `json:"miningmetrics"`
@@ -26,21 +26,22 @@ type persistence struct {
 	RevisionNumber uint64                       `json:"revisionnumber"`
 	Settings       modules.PoolInternalSettings `json:"settings"`
 	UnlockHash     types.UnlockHash             `json:"unlockhash"`
-	Height         types.BlockHeight
-	Target         types.Target
-	Address        types.UnlockHash
-	BlocksFound    []types.BlockID
-	UnsolvedBlock  types.Block
+
+	// Block info
+	Target        types.Target     `json:"blocktarget"`
+	Address       types.UnlockHash `json:"pooladdress"`
+	BlocksFound   []types.BlockID
+	UnsolvedBlock types.Block `json:"unsolvedblock"`
 }
 
-// persistData returns the data in the Host that will be saved to disk.
+// persistData returns the data in the Pool that will be saved to disk.
 func (mp *Pool) persistData() persistence {
 	return persistence{
 		// Consensus Tracking.
 		BlockHeight:  mp.blockHeight,
 		RecentChange: mp.recentChange,
 
-		// Host Identity.
+		// Pool Identity.
 		Announced:      mp.announced,
 		AutoAddress:    mp.autoAddress,
 		MiningMetrics:  mp.miningMetrics,
@@ -48,6 +49,11 @@ func (mp *Pool) persistData() persistence {
 		RevisionNumber: mp.revisionNumber,
 		Settings:       mp.settings,
 		UnlockHash:     mp.unlockHash,
+
+		// Block info
+		Target:        mp.target,
+		Address:       mp.address,
+		UnsolvedBlock: mp.unsolvedBlock,
 	}
 }
 
@@ -58,7 +64,7 @@ func (mp *Pool) establishDefaults() error {
 	mp.settings = modules.PoolInternalSettings{
 		AcceptingShares:     false,
 		PoolOwnerPercentage: 0.0,
-		PoolOwnerWallet:     "",
+		PoolOperatorWallet:  types.UnlockHash{},
 
 		PoolNetworkPort: 0,
 	}

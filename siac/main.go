@@ -263,7 +263,7 @@ func main() {
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd)
 
 	root.AddCommand(poolCmd)
-	poolCmd.AddCommand(poolStartCmd, poolStopCmd)
+	poolCmd.AddCommand(poolConfigCmd, poolStartCmd, poolStopCmd)
 
 	root.AddCommand(walletCmd)
 	walletCmd.AddCommand(walletAddressCmd, walletAddressesCmd, walletChangepasswordCmd, walletInitCmd, walletInitSeedCmd,

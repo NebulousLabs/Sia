@@ -27,13 +27,13 @@ func (p *Pool) blockForWork() types.Block {
 	}
 
 	// Update the address + payouts.
-	err := p.checkAddress()
-	if err != nil {
-		p.log.Println(err)
-	}
+	// err := p.checkAddress()
+	// if err != nil {
+	// 	p.log.Println(err)
+	// }
 	b.MinerPayouts = []types.SiacoinOutput{{
-		Value:      b.CalculateSubsidy(p.persist.Height + 1),
-		UnlockHash: p.persist.Address,
+		Value:      b.CalculateSubsidy(p.persist.BlockHeight + 1),
+		UnlockHash: p.settings.PoolOperatorWallet,
 	}}
 
 	// Add an arb-data txn to the block to create a unique merkle root.
@@ -80,23 +80,23 @@ func (p *Pool) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Return a blank header with an error if the wallet is locked.
-	if !p.wallet.Unlocked() {
-		return types.BlockHeader{}, types.Target{}, modules.ErrLockedWallet
-	}
+	// // Return a blank header with an error if the wallet is locked.
+	// if !p.wallet.Unlocked() {
+	// 	return types.BlockHeader{}, types.Target{}, modules.ErrLockedWallet
+	// }
 
 	// Check that the wallet has been initialized, and that the pool has
 	// successfully fetched an address.
-	err := p.checkAddress()
-	if err != nil {
-		return types.BlockHeader{}, types.Target{}, err
-	}
+	// err := p.checkAddress()
+	// if err != nil {
+	// 	return types.BlockHeader{}, types.Target{}, err
+	// }
 
 	// If too much time has elapsed since the last source block, get a new one.
 	// This typically only happens if the pool has just turned on after being
 	// off for a while. If the current block has been used for too many
 	// requests, fetch a new source block.
-	if time.Since(p.sourceBlockTime) > MaxSourceBlockAge || p.memProgress%(HeaderMemory/BlockMemory) == 0 {
+	if time.Since(p.sourceBlockTime) > MaxSourceBlockAge || p.memProgress%(HeaderMemory/BlockMemory) == 0 || p.sourceBlockTime.IsZero() {
 		p.newSourceBlock()
 	}
 

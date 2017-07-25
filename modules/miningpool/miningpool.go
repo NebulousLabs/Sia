@@ -49,9 +49,12 @@ var (
 	errPoolClosed = errors.New("call is disabled because the pool is closed")
 
 	// Nil dependency errors.
-	errNilCS     = errors.New("pool cannot use a nil consensus state")
-	errNilTpool  = errors.New("pool cannot use a nil transaction pool")
-	errNilWallet = errors.New("pool cannot use a nil wallet")
+	errNilCS    = errors.New("pool cannot use a nil consensus state")
+	errNilTpool = errors.New("pool cannot use a nil transaction pool")
+	//	errNilWallet = errors.New("pool cannot use a nil wallet")
+
+	// Required settings to run pool
+	errNoAddressSet = errors.New("pool operators address must be set")
 
 	miningpool bool  // indicates if the mining pool is actually running
 	hashRate   int64 // indicates hashes per second
@@ -161,7 +164,9 @@ type Pool struct {
 	secretKey         crypto.SecretKey
 	recentChange      modules.ConsensusChangeID
 	unlockHash        types.UnlockHash // A wallet address that can receive coins.
-
+	target            types.Target
+	address           types.UnlockHash
+	unsolvedBlock     types.Block
 	// Pool transient fields - these fields are either determined at startup or
 	// otherwise are not critical to always be correct.
 	autoAddress          modules.NetAddress // Determined using automatic tooling in network.go
@@ -206,6 +211,40 @@ func (p *Pool) checkUnlockHash() error {
 	return nil
 }
 
+// startupRescan will rescan the blockchain in the event that the pool
+// persistence layer has become desynchronized from the consensus persistence
+// layer. This might happen if a user replaces any of the folders with backups
+// or deletes any of the folders.
+func (p *Pool) startupRescan() error {
+	// Reset all of the variables that have relevance to the consensus set. The
+	// operations are wrapped by an anonymous function so that the locking can
+	// be handled using a defer statement.
+	err := func() error {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+
+		p.log.Println("Performing a pool rescan.")
+		p.persist.RecentChange = modules.ConsensusChangeBeginning
+		p.persist.BlockHeight = 0
+		p.persist.Target = types.Target{}
+		return p.saveSync()
+	}()
+	if err != nil {
+		return err
+	}
+
+	// Subscribe to the consensus set. This is a blocking call that will not
+	// return until the pool has fully caught up to the current block.
+	err = p.cs.ConsensusSetSubscribe(p, modules.ConsensusChangeBeginning)
+	if err != nil {
+		return err
+	}
+	p.tg.OnStop(func() {
+		p.cs.Unsubscribe(p)
+	})
+	return nil
+}
+
 // newPool returns an initialized Pool, taking a set of dependencies as input.
 // By making the dependencies an argument of the 'new' call, the pool can be
 // mocked such that the dependencies can return unexpected errors or unique
@@ -219,16 +258,32 @@ func newPool(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 	if tpool == nil {
 		return nil, errNilTpool
 	}
-	if wallet == nil {
-		return nil, errNilWallet
-	}
+	// if wallet == nil {
+	// 	return nil, errNilWallet
+	// }
 
 	// Create the pool object.
 	p := &Pool{
-		cs:           cs,
-		tpool:        tpool,
-		wallet:       wallet,
+		cs:    cs,
+		tpool: tpool,
+		//		wallet:       wallet,
 		dependencies: dependencies,
+		blockMem:     make(map[types.BlockHeader]*types.Block),
+		arbDataMem:   make(map[types.BlockHeader][crypto.EntropySize]byte),
+		headerMem:    make([]types.BlockHeader, HeaderMemory),
+
+		fullSets:  make(map[modules.TransactionSetID][]int),
+		splitSets: make(map[splitSetID]*splitSet),
+		blockMapHeap: &mapHeap{
+			selectID: make(map[splitSetID]*mapElement),
+			data:     nil,
+			minHeap:  true,
+		},
+		overflowMapHeap: &mapHeap{
+			selectID: make(map[splitSetID]*mapElement),
+			data:     nil,
+			minHeap:  false,
+		},
 
 		persistDir: persistDir,
 	}
@@ -274,19 +329,37 @@ func newPool(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 			p.log.Println("Could not save pool upon shutdown:", err)
 		}
 	})
+	err = p.cs.ConsensusSetSubscribe(p, p.persist.RecentChange)
+	if err == modules.ErrInvalidConsensusChangeID {
+		// Perform a rescan of the consensus set if the change id is not found.
+		// The id will only be not found if there has been desynchronization
+		// between the miner and the consensus package.
+		err = p.startupRescan()
+		if err != nil {
+			return nil, errors.New("mining pool startup failed - rescanning failed: " + err.Error())
+		}
+	} else if err != nil {
+		return nil, errors.New("mining pool subscription failed: " + err.Error())
+	}
+	p.tg.OnStop(func() {
+		p.cs.Unsubscribe(p)
+	})
 
-	// TODO:  We need this to listen for the stratum data - look at network.go in host directory for hints
-	// Initialize the networking.
-	// err = p.initNetworking(listenerAddress)
-	// if err != nil {
-	// 	p.log.Println("Could not initialize pool networking:", err)
-	// 	return nil, err
-	// }
-	p.dispatcher = &Dispatcher{make(map[string]*Handler), sync.RWMutex{}, p}
+	p.tpool.TransactionPoolSubscribe(p)
+	p.tg.OnStop(func() {
+		p.tpool.Unsubscribe(p)
+	})
+	fmt.Println("      Starting Stratum Server")
+
+	p.dispatcher = &Dispatcher{handlers: make(map[string]*Handler), mu: sync.RWMutex{}, p: p}
 	// la := modules.NetAddress(listenerAddress)
 	// p.dispatcher.ListenHandlers(la.Port())
 	port := strconv.Itoa(3333)
-	p.dispatcher.ListenHandlers(port) // This will become a persistent config option
+	go p.dispatcher.ListenHandlers(port) // This will become a persistent config option
+	p.tg.OnStop(func() {
+		p.dispatcher.ln.Close()
+	})
+
 	return p, nil
 }
 
@@ -358,9 +431,9 @@ func (p *Pool) SetInternalSettings(settings modules.PoolInternalSettings) error 
 	// The pool should not be open for business if it does not have an
 	// unlock hash.
 	if settings.AcceptingShares {
-		err := p.checkUnlockHash()
+		err := p.checkAddress()
 		if err != nil {
-			return errors.New("internal settings not updated, no unlock hash: " + err.Error())
+			return errors.New("internal settings not updated, no operator wallet set: " + err.Error())
 		}
 	}
 
@@ -389,13 +462,14 @@ func (p *Pool) InternalSettings() modules.PoolInternalSettings {
 // checkAddress checks that the miner has an address, fetching an address from
 // the wallet if not.
 func (p *Pool) checkAddress() error {
-	if p.persist.Address != (types.UnlockHash{}) {
+	if p.InternalSettings().PoolOperatorWallet != (types.UnlockHash{}) {
 		return nil
 	}
-	uc, err := p.wallet.NextAddress()
-	if err != nil {
-		return err
-	}
-	p.persist.Address = uc.UnlockHash()
-	return nil
+	// uc, err := p.wallet.NextAddress()
+	// if err != nil {
+	// 	return err
+	// }
+	// p.persist.Address = uc.UnlockHash()
+	// return nil
+	return errNoAddressSet
 }

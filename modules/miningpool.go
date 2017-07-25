@@ -1,5 +1,7 @@
 package modules
 
+import "github.com/NebulousLabs/Sia/types"
+
 const (
 	// PoolDir names the directory that contains the pool persistence.
 	PoolDir = "pool"
@@ -16,12 +18,10 @@ type (
 
 	// PoolInternalSettings contains a list of settings that can be changed.
 	PoolInternalSettings struct {
-		AcceptingShares bool `json:"acceptingshares"`
-
-		PoolOwnerPercentage float32 `json:"poolownerpercentage"`
-		PoolOwnerWallet     string  `json:"poolowneraddress"`
-
-		PoolNetworkPort uint16 `json:"poolnetworkport"`
+		AcceptingShares     bool             `json:"acceptingshares"`
+		PoolOwnerPercentage float32          `json:"poolownerpercentage"`
+		PoolNetworkPort     uint16           `json:"poolnetworkport"`
+		PoolOperatorWallet  types.UnlockHash `json:"pooloperatorwallet"`
 	}
 
 	// PoolWorkingStatus reports the working state of a pool. Can be one of
