@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // Download performs a file download using the passed parameters.
@@ -26,19 +25,15 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	if p.Async && isHttpResp {
 		return errors.New("cannot async download to http response")
 	}
-
 	if isHttpResp && p.Destination != "" {
 		return errors.New("destination cannot be specified when downloading to http response")
 	}
-
 	if !isHttpResp && p.Destination == "" {
 		return errors.New("destination not supplied")
 	}
-
 	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
 		return errors.New("destination must be an absolute path")
 	}
-
 	if p.Offset == file.size {
 		return errors.New("offset equals filesize")
 	}
@@ -52,24 +47,17 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 		dw = NewDownloadFileWriter(p.Destination, p.Offset, p.Length)
 	}
 
-	// Build current contracts map.
-	currentContracts := make(map[modules.NetAddress]types.FileContractID)
-	for _, contract := range r.hostContractor.Contracts() {
-		currentContracts[contract.NetAddress] = contract.ID
-	}
-
 	// sentinel: if length == 0, download the entire file
 	if p.Length == 0 {
 		p.Length = file.size - p.Offset
 	}
-
 	// Check whether offset and length is valid.
 	if p.Offset < 0 || p.Offset+p.Length > file.size {
 		return fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
 	}
 
 	// Create the download object and add it to the queue.
-	d := r.newSectionDownload(file, dw, currentContracts, p.Offset, p.Length)
+	d := r.newSectionDownload(file, dw, p.Offset, p.Length)
 
 	lockID = r.mu.Lock()
 	r.downloadQueue = append(r.downloadQueue, d)

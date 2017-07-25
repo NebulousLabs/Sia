@@ -200,6 +200,12 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 // hostEstimateScoreGET handles the POST request to /host/estimatescore and
 // computes an estimated HostDB score for the provided settings.
 func (api *API) hostEstimateScoreGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// This call requires a renter, check that it is present.
+	if api.renter == nil {
+		WriteError(w, Error{"cannot call /host/estimatescore without the renter module"}, http.StatusBadRequest)
+		return
+	}
+
 	settings, err := api.parseHostSettings(req)
 	if err != nil {
 		WriteError(w, Error{"error parsing host settings: " + err.Error()}, http.StatusBadRequest)

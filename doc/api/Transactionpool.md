@@ -32,8 +32,8 @@ returns the minimum and maximum estimated fees expected by the transaction pool.
 ###### JSON Response
 ```javascript
 {
-  "minimum": "1234", // hastings
-  "maximum": "5678"  // hastings
+  "minimum": "1234", // hastings / byte
+  "maximum": "5678"  // hastings / byte
 }
 ```
 

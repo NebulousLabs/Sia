@@ -112,8 +112,8 @@ func (hd *hostDownloader) Close() error {
 // Downloader returns a Downloader object that can be used to download sectors
 // from a host.
 func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{}) (_ Downloader, err error) {
-	c.mu.RLock()
 	id = c.ResolveID(id)
+	c.mu.RLock()
 	cachedDownloader, haveDownloader := c.downloaders[id]
 	height := c.blockHeight
 	contract, haveContract := c.contracts[id]
@@ -176,7 +176,7 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	}
 
 	// create downloader
-	d, err := proto.NewDownloader(host, contract, cancel)
+	d, err := proto.NewDownloader(host, contract, c.hdb, cancel)
 	if proto.IsRevisionMismatch(err) {
 		// try again with the cached revision
 		c.mu.RLock()
@@ -189,7 +189,11 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
 		contract.LastRevision = cached.Revision
-		d, err = proto.NewDownloader(host, contract, cancel)
+		d, err = proto.NewDownloader(host, contract, c.hdb, cancel)
+		// needs to be handled separately since a revision mismatch is not automatically a failed interaction
+		if proto.IsRevisionMismatch(err) {
+			c.hdb.IncrementFailedInteractions(host.PublicKey)
+		}
 	}
 	if err != nil {
 		return nil, err

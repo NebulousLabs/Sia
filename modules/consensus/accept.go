@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"errors"
+	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -17,6 +18,7 @@ var (
 	errNoBlockMap      = errors.New("block map is not in database")
 	errInconsistentSet = errors.New("consensus set is not in a consistent state")
 	errOrphan          = errors.New("block has no known parent")
+	errNonLinearChain  = errors.New("block set is not a contiguous chain")
 )
 
 // managedBroadcastBlock will broadcast a block to the consensus set's peers.
@@ -28,10 +30,9 @@ func (cs *ConsensusSet) managedBroadcastBlock(b types.Block) {
 // validateHeaderAndBlock does some early, low computation verification on the
 // block. Callers should not assume that validation will happen in a particular
 // order.
-func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) (parent *processedBlock, err error) {
+func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block, id types.BlockID) (parent *processedBlock, err error) {
 	// Check if the block is a DoS block - a known invalid block that is expensive
 	// to validate.
-	id := b.ID()
 	_, exists := cs.dosBlocks[id]
 	if exists {
 		return nil, errDoSBlock
@@ -60,7 +61,7 @@ func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) (parent *
 	// Check that the timestamp is not too far in the past to be acceptable.
 	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, parent)
 
-	err = cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1, cs.log)
+	err = cs.blockValidator.ValidateBlock(b, id, minTimestamp, parent.ChildTarget, parent.Height+1, cs.log)
 	if err != nil {
 		return nil, err
 	}
@@ -141,64 +142,74 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
 //
-// addBlockToTree must use its own database update because it might need to
-// modify the database while returning an error on the block. To prevent error
-// tracking complexity, the error is handled inside the function so that 'nil'
-// can be appropriately returned by the database and the transaction can be
-// committed. Switching to a managed tx through bolt will make this complexity
+// addBlockToTree might need to modify the database while returning an error
+// on the block. Such errors are handled outside of the transaction by the
+// caller. Switching to a managed tx through bolt will make this complexity
 // unneeded.
-func (cs *ConsensusSet) addBlockToTree(b types.Block, parent *processedBlock) (ce changeEntry, err error) {
-	var nonExtending bool
-	err = cs.db.Update(func(tx *bolt.Tx) error {
-		currentNode := currentProcessedBlock(tx)
-		newNode := cs.newChild(tx, parent, b)
+func (cs *ConsensusSet) addBlockToTree(tx *bolt.Tx, b types.Block, parent *processedBlock) (ce changeEntry, err error) {
+	// Prepare the child processed block associated with the parent block.
+	newNode := cs.newChild(tx, parent, b)
 
-		// modules.ErrNonExtendingBlock should be returned if the block does
-		// not extend the current blockchain, however the changes from newChild
-		// should be committed (which means 'nil' must be returned). A flag is
-		// set to indicate that modules.ErrNonExtending should be returned.
-		nonExtending = !newNode.heavierThan(currentNode)
-		if nonExtending {
-			return nil
-		}
-		var revertedBlocks, appliedBlocks []*processedBlock
-		revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, newNode)
-		if err != nil {
-			return err
-		}
-		for _, rn := range revertedBlocks {
-			ce.RevertedBlocks = append(ce.RevertedBlocks, rn.Block.ID())
-		}
-		for _, an := range appliedBlocks {
-			ce.AppliedBlocks = append(ce.AppliedBlocks, an.Block.ID())
-		}
-		// To have correct error handling, appendChangeLog must be called
-		// before appending to the in-memory changelog. If this call fails, the
-		// change is going to be reverted, but the in-memory changelog is not
-		// going to be reverted.
-		//
-		// Technically, if bolt fails for some other reason (such as a
-		// filesystem error), the in-memory changelog will be incorrect anyway.
-		// Restarting Sia will fix it. The in-memory changelog is being phased
-		// out.
-		err = appendChangeLog(tx, ce)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	// Check whether the new node is part of a chain that is heavier than the
+	// current node. If not, return ErrNonExtending and don't fork the
+	// blockchain.
+	currentNode := currentProcessedBlock(tx)
+	if !newNode.heavierThan(currentNode) {
+		return changeEntry{}, modules.ErrNonExtendingBlock
+	}
+
+	// Fork the blockchain and put the new heaviest block at the tip of the
+	// chain.
+	var revertedBlocks, appliedBlocks []*processedBlock
+	revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, newNode)
 	if err != nil {
 		return changeEntry{}, err
 	}
-	if nonExtending {
-		return changeEntry{}, modules.ErrNonExtendingBlock
+	for _, rn := range revertedBlocks {
+		ce.RevertedBlocks = append(ce.RevertedBlocks, rn.Block.ID())
+	}
+	for _, an := range appliedBlocks {
+		ce.AppliedBlocks = append(ce.AppliedBlocks, an.Block.ID())
+	}
+	err = appendChangeLog(tx, ce)
+	if err != nil {
+		return changeEntry{}, err
 	}
 	return ce, nil
 }
 
-// managedAcceptBlock will try to add a block to the consensus set. If the
-// block does not extend the longest currently known chain, an error is
-// returned but the block is still kept in memory. If the block extends a fork
+// threadedSleepOnFutureBlock will sleep until the timestamp of a future block
+// has arrived.
+//
+// TODO: An attacker can broadcast a future block multiple times, resulting in a
+// goroutine spinup for each future block.  Need to prevent that.
+//
+// TODO: An attacker could produce a very large number of future blocks,
+// consuming memory. Need to prevent that.
+func (cs *ConsensusSet) threadedSleepOnFutureBlock(b types.Block) {
+	// Add this thread to the threadgroup.
+	err := cs.tg.Add()
+	if err != nil {
+		return
+	}
+	defer cs.tg.Done()
+
+	// Perform a soft-sleep while we wait for the block to become valid.
+	select {
+	case <-cs.tg.StopChan():
+		return
+	case <-time.After(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second):
+		_, err := cs.managedAcceptBlocks([]types.Block{b})
+		if err != nil {
+			cs.log.Debugln("WARN: failed to accept a future block:", err)
+		}
+		cs.managedBroadcastBlock(b)
+	}
+}
+
+// managedAcceptBlocks will try to add blocks to the consensus set. If the
+// blocks do not extend the longest currently known chain, an error is
+// returned but the blocks are still kept in memory. If the blocks extend a fork
 // such that the fork becomes the longest currently known chain, the consensus
 // set will reorganize itself to recognize the new longest fork. Accepted
 // blocks are not relayed.
@@ -207,80 +218,133 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block, parent *processedBlock) (c
 // This method is typically only be used when there would otherwise be multiple
 // consecutive calls to AcceptBlock with each successive call accepting the
 // child block of the previous call.
-func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
-	// Grab a lock on the consensus set. Lock is demoted later in the function,
-	// failure to unlock before returning an error will cause a deadlock.
+func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExtended bool, err error) {
+	// Grab a lock on the consensus set.
 	cs.mu.Lock()
+	defer cs.mu.Unlock()
 
-	// Start verification inside of a bolt View tx.
-	var parent *processedBlock
-	err := cs.db.View(func(tx *bolt.Tx) error {
-		// Do not accept a block if the database is inconsistent.
-		if inconsistencyDetected(tx) {
-			return errInconsistentSet
+	// Make sure that blocks are consecutive. Though this isn't a strict
+	// requirement, if blocks are not consecutive then it becomes a lot harder
+	// to maintain correcetness when adding multiple blocks in a single tx.
+	//
+	// This is the first time that IDs on the blocks have been computed.
+	blockIDs := make([]types.BlockID, 0, len(blocks))
+	for i := 0; i < len(blocks); i++ {
+		blockIDs = append(blockIDs, blocks[i].ID())
+		if i > 0 && blocks[i].ParentID != blockIDs[i-1] {
+			return false, errNonLinearChain
 		}
+	}
 
-		// Do some relatively inexpensive checks to validate the header and block.
-		// Validation generally occurs in the order of least expensive validation
-		// first.
-		var err error
-		parent, err = cs.validateHeaderAndBlock(boltTxWrapper{tx}, b)
-		if err != nil {
-			// If the block is in the near future, but too far to be acceptable, then
-			// save the block and add it to the consensus set after it is no longer
-			// too far in the future.
-			//
-			// TODO: an attacker could mine many blocks off the genesis block all in the
-			// future and we would spawn a goroutine per each block. To fix this, either
-			// ban peers that send lots of future blocks and stop spawning goroutines
-			// after we are already waiting on a large number of future blocks.
-			//
-			// TODO: an attacker could broadcast a future block many times and we would
-			// spawn a goroutine for each broadcast. To fix this we should create a
-			// cache of future blocks, like we already do for DoS blocks, and only spawn
-			// a goroutine if we haven't already spawned one for that block. To limit
-			// the size of the cache of future blocks, make it a constant size (say 50)
-			// over which we would evict the block furthest in the future before adding
-			// a new block to the cache.
-			if err == errFutureTimestamp {
-				go func() {
-					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
-					err := cs.managedAcceptBlock(b)
-					if err != nil {
-						cs.log.Debugln("WARN: failed to accept a future block:", err)
-					}
-					cs.managedBroadcastBlock(b)
-				}()
+	// Verify the headers for every block, throw out known blocks, and the
+	// invalid blocks (which includes the children of invalid blocks).
+	chainExtended := false
+	changes := make([]changeEntry, 0, len(blocks))
+	validBlocks := make([]types.Block, 0, len(blocks))
+	parents := make([]*processedBlock, 0, len(blocks))
+	setErr := cs.db.Update(func(tx *bolt.Tx) error {
+		for i := 0; i < len(blocks); i++ {
+			// Start by checking the header of the block.
+			parent, err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, blocks[i], blockIDs[i])
+			if err == modules.ErrBlockKnown {
+				// Skip over known blocks.
+				continue
 			}
-			return err
+			if err == errFutureTimestamp {
+				// Queue the block to be tried again if it is a future block.
+				go cs.threadedSleepOnFutureBlock(blocks[i])
+			}
+			if err != nil {
+				return err
+			}
+
+			// Try adding the block to consnesus.
+			changeEntry, err := cs.addBlockToTree(tx, blocks[i], parent)
+			if err == nil {
+				changes = append(changes, changeEntry)
+				chainExtended = true
+			}
+			if err == modules.ErrNonExtendingBlock {
+				err = nil
+			}
+			if err != nil {
+				return err
+			}
+			// Sanity check - If reverted blocks is zero, applied blocks should also
+			// be zero.
+			if build.DEBUG && len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
+				panic("after adding a change entry, there are no applied blocks but there are reverted blocks")
+			}
+			// Append to the set of changes, and append the valid block.
+			validBlocks = append(validBlocks, blocks[i])
+			parents = append(parents, parent)
 		}
 		return nil
 	})
-	if err != nil {
-		cs.mu.Unlock()
-		return err
+	if _, ok := setErr.(bolt.MmapError); ok {
+		cs.log.Println("ERROR: Bolt mmap failed:", setErr)
+		println("Blockchain database has run out of disk space!")
+		os.Exit(1)
+	}
+	if setErr != nil {
+		// Check if any blocks were valid.
+		if len(validBlocks) < 1 {
+			// Nothing more to do, the first block was invalid.
+			return false, setErr
+		}
+
+		// At least some of the blocks were valid. Add the valid blocks before
+		// returning, since we've already done the downloading and header
+		// validation.
+		verifyExtended := false
+		err := cs.db.Update(func(tx *bolt.Tx) error {
+			for i := 0; i < len(validBlocks); i++ {
+				_, err := cs.addBlockToTree(tx, validBlocks[i], parents[i])
+				if err == nil {
+					verifyExtended = true
+				}
+				if err != modules.ErrNonExtendingBlock && err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		// Sanity check - verifyExtended should match chainExtended.
+		if build.DEBUG && verifyExtended != chainExtended {
+			panic("chain extension logic does not match up between first and last attempt")
+		}
+		// Something has gone wrong. Maybe the filesystem is having errors for
+		// example. But under normal conditions, this code should not be
+		// reached. If it is, return early because both attempts to add blocks
+		// have failed.
+		if err != nil {
+			return false, err
+		}
 	}
 
-	// Try adding the block to the block tree. This call will perform
-	// verification on the block before adding the block to the block tree. An
-	// error is returned if verification fails or if the block does not extend
-	// the longest fork.
-	changeEntry, err := cs.addBlockToTree(b, parent)
-	if err != nil {
-		cs.mu.Unlock()
-		return err
-	}
-	// If appliedBlocks is 0, revertedBlocks will also be 0.
-	if build.DEBUG && len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
-		panic("appliedBlocks and revertedBlocks are mismatched!")
+	// Stop here if the blocks did not extend the longest blockchain.
+	if !chainExtended {
+		return false, modules.ErrNonExtendingBlock
 	}
 
-	// Updates complete, demote the lock.
-	if len(changeEntry.AppliedBlocks) > 0 {
-		cs.readlockUpdateSubscribers(changeEntry)
+	// Sanity check - if we get here, len(changes) should be non-zero.
+	if build.DEBUG && len(changes) == 0 {
+		panic("changes is empty, but this code should not be reached if no blocks got added")
 	}
-	cs.mu.Unlock()
-	return nil
+
+	// Update the subscribers with all of the consensus changes. First combine
+	// the changes into a single set.
+	for _, change := range changes {
+		cs.updateSubscribers(change)
+	}
+
+	// If there were valid blocks and invalid blocks in the set that was
+	// provided, then the setErr is not going to be nil. Return the set error to
+	// the caller.
+	if setErr != nil {
+		return chainExtended, setErr
+	}
+	return chainExtended, nil
 }
 
 // AcceptBlock will try to add a block to the consensus set. If the block does
@@ -297,10 +361,12 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	}
 	defer cs.tg.Done()
 
-	err = cs.managedAcceptBlock(b)
+	chainExtended, err := cs.managedAcceptBlocks([]types.Block{b})
 	if err != nil {
 		return err
 	}
-	cs.managedBroadcastBlock(b)
+	if chainExtended {
+		cs.managedBroadcastBlock(b)
+	}
 	return nil
 }

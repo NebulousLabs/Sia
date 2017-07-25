@@ -630,6 +630,7 @@ overall.
     "ageadjustment":              0.1234,
     "burnadjustment":             0.1234,
     "collateraladjustment":       23.456,
+    "interactionadjustment":      0.1234,
     "priceadjustment":            0.1234,
     "storageremainingadjustment": 0.1234,
     "uptimeadjustment":           0.1234,
@@ -990,8 +991,8 @@ returns the minimum and maximum estimated fees expected by the transaction pool.
 ###### JSON Response [(with comments)](/doc/api/Transactionpool.md#json-response-1)
 ```javascript
 {
-  "minimum": "1234", // hastings
-  "maximum": "5678"  // hastings
+  "minimum": "1234", // hastings / byte
+  "maximum": "5678"  // hastings / byte
 }
 ```
 
@@ -1107,7 +1108,10 @@ be returned if the wallet is locked.
 
 #### /wallet/addresses [GET]
 
-fetches the list of addresses from the wallet.
+fetches the list of addresses from the wallet. If the wallet has not been
+created or unlocked, no addresses will be returned. After the wallet is
+unlocked, this call will continue to return its addresses even after the
+wallet is locked again.
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-2)
 ```javascript

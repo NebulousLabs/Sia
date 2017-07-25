@@ -9,6 +9,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 var (
@@ -164,7 +166,7 @@ func (brh mockBlockRuleHelper) minimumValidChildTimestamp(blockMap dbBucket, pb 
 
 // ValidateBlock stores the parameters it receives and returns the mock error
 // defined by mockBlockValidator.err.
-func (bv mockBlockValidator) ValidateBlock(b types.Block, minTimestamp types.Timestamp, target types.Target, height types.BlockHeight, log *persist.Logger) error {
+func (bv mockBlockValidator) ValidateBlock(b types.Block, id types.BlockID, minTimestamp types.Timestamp, target types.Target, height types.BlockHeight, log *persist.Logger) error {
 	validateBlockParamsGot = validateBlockParams{true, b, minTimestamp, target, height}
 	return bv.err
 }
@@ -294,7 +296,7 @@ func TestUnitValidateHeaderAndBlock(t *testing.T) {
 		}
 		// Reset the stored parameters to ValidateBlock.
 		validateBlockParamsGot = validateBlockParams{}
-		_, err := cs.validateHeaderAndBlock(tx, tt.block)
+		_, err := cs.validateHeaderAndBlock(tx, tt.block, tt.block.ID())
 		if err != tt.errWant {
 			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
 		}
@@ -331,7 +333,7 @@ func TestCheckHeaderTarget(t *testing.T) {
 		if checkHeaderTarget(h, tt.target) != tt.expected {
 			t.Error(tt.msg)
 		}
-		if checkHeaderTarget(h, tt.target) != checkTarget(b, tt.target) {
+		if checkHeaderTarget(h, tt.target) != checkTarget(b, b.ID(), tt.target) {
 			t.Errorf("checkHeaderTarget and checkTarget do not match for target %v", tt.target)
 		}
 	}
@@ -570,16 +572,16 @@ func TestBlockKnownHandling(t *testing.T) {
 
 	// Submit all the blocks again, looking for a 'stale block' error.
 	err = cst.cs.AcceptBlock(block1)
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	if err == nil {
+		t.Fatal("expected an error upon submitting the block")
 	}
 	err = cst.cs.AcceptBlock(block2)
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	if err == nil {
+		t.Fatal("expected an error upon submitting the block")
 	}
 	err = cst.cs.AcceptBlock(staleBlock)
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	if err == nil {
+		t.Fatal("expected an error upon submitting the block")
 	}
 
 	// Try submitting the genesis block.
@@ -592,8 +594,8 @@ func TestBlockKnownHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cst.cs.AcceptBlock(genesisBlock.Block)
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	if err == nil {
+		t.Fatal("expected an error upon submitting the block")
 	}
 }
 
@@ -640,10 +642,10 @@ func TestMissedTarget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for checkTarget(block, target) && block.Nonce[0] != 255 {
+	for checkTarget(block, block.ID(), target) && block.Nonce[0] != 255 {
 		block.Nonce[0]++
 	}
-	if checkTarget(block, target) {
+	if checkTarget(block, block.ID(), target) {
 		t.Fatal("unable to find a failing target")
 	}
 	err = cst.cs.AcceptBlock(block)
@@ -1020,7 +1022,7 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 
 	// Test that Broadcast is not called in managedAcceptBlock.
 	b, _ = cst.miner.FindBlock()
-	err = cst.cs.managedAcceptBlock(b)
+	_, err = cst.cs.managedAcceptBlocks([]types.Block{b})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1028,5 +1030,140 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 	case <-mg.broadcastCalled:
 		t.Errorf("managedAcceptBlock should not broadcast blocks")
 	case <-time.After(10 * time.Millisecond):
+	}
+}
+
+// blockCountingSubscriber counts the number of blocks that get submitted to the
+// subscriber, as well as the number of times that the subscriber has been given
+// changes at all.
+type blockCountingSubscriber struct {
+	changes []modules.ConsensusChangeID
+
+	appliedBlocks  int
+	revertedBlocks int
+}
+
+// ProcessConsensusChange fills the subscription interface for the
+// blockCountingSubscriber.
+func (bcs *blockCountingSubscriber) ProcessConsensusChange(cc modules.ConsensusChange) {
+	bcs.changes = append(bcs.changes, cc.ID)
+	bcs.revertedBlocks += len(cc.RevertedBlocks)
+	bcs.appliedBlocks += len(cc.AppliedBlocks)
+}
+
+// TestChainedAcceptBlock creates series of blocks, some of which are valid,
+// some invalid, and submits them to the consensus set, verifying that the
+// consensus set updates correctly each time.
+func TestChainedAcceptBlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// Create a tester to send blocks in a batch to the other tester.
+	cst, err := createConsensusSetTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+	cst2, err := blankConsensusSetTester(t.Name() + "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst2.Close()
+	// Subscribe a blockCountingSubscriber to cst2.
+	var bcs blockCountingSubscriber
+	cst2.cs.ConsensusSetSubscribe(&bcs, modules.ConsensusChangeBeginning)
+	if len(bcs.changes) != 1 || bcs.appliedBlocks != 1 || bcs.revertedBlocks != 0 {
+		t.Error("consensus changes do not seem to be getting passed to subscribers correctly")
+	}
+
+	// Grab all of the blocks in cst, with the intention of giving them to cst2.
+	var blocks []types.Block
+	height := cst.cs.Height()
+	for i := types.BlockHeight(0); i <= height; i++ {
+		id, err := cst.cs.dbGetPath(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pb, err := cst.cs.dbGetBlockMap(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		blocks = append(blocks, pb.Block)
+	}
+
+	// Create a jumbling of the blocks, so that the set is not in order.
+	jumble := make([]types.Block, len(blocks))
+	jumble[0] = blocks[0]
+	jumble[1] = blocks[2]
+	jumble[2] = blocks[1]
+	for i := 3; i < len(jumble); i++ {
+		jumble[i] = blocks[i]
+	}
+	// Try to submit the blocks out-of-order, which would violate one of the
+	// assumptions in managedAcceptBlocks.
+	_, err = cst2.cs.managedAcceptBlocks(jumble)
+	if err != errNonLinearChain {
+		t.Fatal(err)
+	}
+	if cst2.cs.Height() != 0 {
+		t.Fatal("blocks added even though the inputs were jumbled")
+	}
+	if len(bcs.changes) != 1 || bcs.appliedBlocks != 1 || bcs.revertedBlocks != 0 {
+		t.Error("consensus changes do not seem to be getting passed to subscribers correctly")
+	}
+
+	// Tag an invalid block onto the end of blocks.
+	block, err := cst.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Adding an invalid transaction to make the block invalid.
+	badBlock := block
+	badBlock.Transactions = append(badBlock.Transactions, types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID: types.SiacoinOutputID{1},
+		}},
+	})
+	// Append the invalid transaction to the block.
+	blocks = append(blocks, badBlock)
+	// Submit the whole invalid set. Result should be that the valid ones get
+	// added, and the invalid ones get dropped.
+	_, err = cst2.cs.managedAcceptBlocks(blocks)
+	if err == nil {
+		t.Fatal(err)
+	}
+	if cst2.cs.Height() != cst.cs.Height()-1 {
+		t.Log(cst2.cs.Height())
+		t.Log(cst.cs.Height())
+		t.Fatal("height is not correct, does not seem that the blocks were added")
+	}
+	if bcs.appliedBlocks != int(cst2.cs.Height()+1) || bcs.revertedBlocks != 0 {
+		t.Error("consensus changes do not seem to be getting passed to subscribers correctly")
+	}
+
+	// Try submitting the good block. It should succeed because the other good
+	// blocks should have been added.
+	err = cst2.cs.AcceptBlock(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bcs.appliedBlocks != int(cst2.cs.Height()+1) || bcs.revertedBlocks != 0 {
+		t.Error("consensus changes do not seem to be getting passed to subscribers correctly")
+	}
+
+	// Check that every change recorded in 'bcs' is also available in the
+	// consensus set.
+	for _, change := range bcs.changes {
+		err := cst2.cs.db.Update(func(tx *bolt.Tx) error {
+			_, exists := getEntry(tx, change)
+			if !exists {
+				t.Error("an entry was provided that doesn't exist")
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }

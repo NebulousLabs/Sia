@@ -229,7 +229,14 @@ func (hdb *HostDB) Close() error {
 // Host returns the HostSettings associated with the specified NetAddress. If
 // no matching host is found, Host returns false.
 func (hdb *HostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
-	return hdb.hostTree.Select(spk)
+	host, exists := hdb.hostTree.Select(spk)
+	if !exists {
+		return host, exists
+	}
+	hdb.mu.RLock()
+	updateHostHistoricInteractions(&host, hdb.blockHeight)
+	hdb.mu.RUnlock()
+	return host, exists
 }
 
 // RandomHosts implements the HostDB interface's RandomHosts() method. It takes
