@@ -21,6 +21,7 @@ dependencies:
 	go get -u github.com/julienschmidt/httprouter
 	go get -u github.com/inconshreveable/go-update
 	go get -u github.com/kardianos/osext
+	go get -u github.com/inconshreveable/mousetrap
 	# Frontend Dependencies
 	go get -u github.com/bgentry/speakeasy
 	go get -u github.com/spf13/cobra/...
