@@ -34,9 +34,12 @@ func (newStub) FeeEstimation() (a types.Currency, b types.Currency) { return }
 func (newStub) AllHosts() []modules.HostDBEntry                                 { return nil }
 func (newStub) ActiveHosts() []modules.HostDBEntry                              { return nil }
 func (newStub) Host(types.SiaPublicKey) (settings modules.HostDBEntry, ok bool) { return }
-func (newStub) RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry     { return nil }
 func (newStub) IncrementSuccessfulInteractions(key types.SiaPublicKey)          { return }
 func (newStub) IncrementFailedInteractions(key types.SiaPublicKey)              { return }
+func (newStub) RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry     { return nil }
+func (newStub) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown {
+	return modules.HostScoreBreakdown{}
+}
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
@@ -187,10 +190,13 @@ type stubHostDB struct{}
 func (stubHostDB) AllHosts() (hs []modules.HostDBEntry)                             { return }
 func (stubHostDB) ActiveHosts() (hs []modules.HostDBEntry)                          { return }
 func (stubHostDB) Host(types.SiaPublicKey) (h modules.HostDBEntry, ok bool)         { return }
-func (stubHostDB) PublicKey() (spk types.SiaPublicKey)                              { return }
-func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) (hs []modules.HostDBEntry) { return }
 func (stubHostDB) IncrementSuccessfulInteractions(key types.SiaPublicKey)           { return }
 func (stubHostDB) IncrementFailedInteractions(key types.SiaPublicKey)               { return }
+func (stubHostDB) PublicKey() (spk types.SiaPublicKey)                              { return }
+func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) (hs []modules.HostDBEntry) { return }
+func (stubHostDB) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown {
+	return modules.HostScoreBreakdown{}
+}
 
 // TestIntegrationSetAllowance tests the SetAllowance method.
 func TestIntegrationSetAllowance(t *testing.T) {
@@ -269,7 +275,10 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.contracts) != 1 {
+	c.mu.Lock()
+	clen := len(c.contracts)
+	c.mu.Unlock()
+	if clen != 1 {
 		t.Fatal("expected 1 contract, got", len(c.contracts))
 	}
 
@@ -345,7 +354,10 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.contracts) != 2 {
+	c.mu.Lock()
+	clen = len(c.contracts)
+	c.mu.Unlock()
+	if clen != 2 {
 		t.Fatal("expected 2 contracts, got", len(c.contracts))
 	}
 }

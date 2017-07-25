@@ -96,7 +96,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 			// If the action requires additional data request it from the renter
 			var data []byte
 			if action.Type == modules.ActionInsert || action.Type == modules.ActionModify {
-				if err := encoding.ReadObject(conn, &data, modules.SectorSize + 8); err != nil {
+				if err := encoding.ReadObject(conn, &data, modules.SectorSize+8); err != nil {
 					return extendErr("unable to read data for action: ", ErrorConnection(err.Error()))
 				}
 			}

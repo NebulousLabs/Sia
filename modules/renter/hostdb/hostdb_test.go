@@ -435,8 +435,8 @@ func TestUpdateHistoricInteractions(t *testing.T) {
 	}
 
 	// increment successful and failed interactions by 100
-	interactions := uint64(100)
-	for i := uint64(0); i < interactions; i++ {
+	interactions := 100.0
+	for i := 0.0; i < interactions; i++ {
 		hdbt.hdb.IncrementSuccessfulInteractions(host.PublicKey)
 		hdbt.hdb.IncrementFailedInteractions(host.PublicKey)
 	}
@@ -458,10 +458,13 @@ func TestUpdateHistoricInteractions(t *testing.T) {
 	}
 
 	// add single block to consensus
-	hdbt.miner.AddBlock()
+	_, err = hdbt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// increment interactions again by 100
-	for i := uint64(0); i < interactions; i++ {
+	for i := 0.0; i < interactions; i++ {
 		hdbt.hdb.IncrementSuccessfulInteractions(host.PublicKey)
 		hdbt.hdb.IncrementFailedInteractions(host.PublicKey)
 	}
@@ -472,24 +475,34 @@ func TestUpdateHistoricInteractions(t *testing.T) {
 		t.Fatal("Modified host not found in hostdb")
 	}
 
-	// check that recent interactions are exactly 100 again and historic interactions are also exactly 100
+	// historic actions should have incremented slightly, due to the clamp the
+	// full interactions should not have made it into the historic group.
 	if host.RecentFailedInteractions != interactions || host.RecentSuccessfulInteractions != interactions {
 		t.Errorf("Interactions should be %v but were %v and %v", interactions,
 			host.RecentFailedInteractions, host.RecentSuccessfulInteractions)
 	}
-	if host.HistoricFailedInteractions != interactions || host.HistoricSuccessfulInteractions != interactions {
-		t.Errorf("Historic Interactions should be %v but were %v and %v", interactions,
-			host.HistoricFailedInteractions, host.HistoricSuccessfulInteractions)
+	if host.HistoricFailedInteractions == 0 || host.HistoricSuccessfulInteractions == 0 {
+		t.Error("historic actions should have updated")
 	}
 
-	// add 10 blocks to consensus
-	for i := 0; i < 10; i++ {
-		hdbt.miner.AddBlock()
+	// add 200 blocks to consensus, adding large numbers of historic actions
+	// each time, so that the clamp does not need to be in effect anymore.
+	for i := 0; i < 200; i++ {
+		for j := uint64(0); j < 10; j++ {
+			hdbt.hdb.IncrementSuccessfulInteractions(host.PublicKey)
+			hdbt.hdb.IncrementFailedInteractions(host.PublicKey)
+		}
+		_, err = hdbt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	// add a single interaction
-	hdbt.hdb.IncrementSuccessfulInteractions(host.PublicKey)
-	hdbt.hdb.IncrementFailedInteractions(host.PublicKey)
+	// Add five interactions
+	for i := 0; i < 5; i++ {
+		hdbt.hdb.IncrementSuccessfulInteractions(host.PublicKey)
+		hdbt.hdb.IncrementFailedInteractions(host.PublicKey)
+	}
 
 	// get updated host from hostdb
 	host, ok = hdbt.hdb.Host(host.PublicKey)
@@ -497,14 +510,49 @@ func TestUpdateHistoricInteractions(t *testing.T) {
 		t.Fatal("Modified host not found in hostdb")
 	}
 
-	// check that recent interactions are exactly 1 and historic interactions are (100*0.997 + 100)*0.997^9
-	if host.RecentFailedInteractions != 1 || host.RecentSuccessfulInteractions != 1 {
+	// check that recent interactions are exactly 5. Save the historic actions
+	// to check that decay is being handled correctly, and that the recent
+	// interactions are moved over correctly.
+	if host.RecentFailedInteractions != 5 || host.RecentSuccessfulInteractions != 5 {
 		t.Errorf("Interactions should be %v but were %v and %v", interactions,
 			host.RecentFailedInteractions, host.RecentSuccessfulInteractions)
 	}
+	historicFailed := host.HistoricFailedInteractions
+	if host.HistoricFailedInteractions != host.HistoricSuccessfulInteractions {
+		t.Error("historic failed and successful should have the same values")
+	}
 
-	// Those two lines need to be split because
-	expected := uint64((100.0*historicInteractionDecay + 100.0) * math.Pow(historicInteractionDecay, 9))
+	// Add a single block to apply one round of decay.
+	_, err = hdbt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, ok = hdbt.hdb.Host(host.PublicKey)
+	if !ok {
+		t.Fatal("Modified host not found in hostdb")
+	}
+
+	// Get the historic successful and failed interactions, and see that they
+	// are decaying properly.
+	expected := historicFailed*math.Pow(historicInteractionDecay, 1) + 5
+	if host.HistoricFailedInteractions != expected || host.HistoricSuccessfulInteractions != expected {
+		t.Errorf("Historic Interactions should be %v but were %v and %v", expected,
+			host.HistoricFailedInteractions, host.HistoricSuccessfulInteractions)
+	}
+
+	// Add 10 more blocks and check the decay again, make sure it's being
+	// applied correctly.
+	for i := 0; i < 10; i++ {
+		_, err := hdbt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	host, ok = hdbt.hdb.Host(host.PublicKey)
+	if !ok {
+		t.Fatal("Modified host not found in hostdb")
+	}
+	expected = expected * math.Pow(historicInteractionDecay, 10)
 	if host.HistoricFailedInteractions != expected || host.HistoricSuccessfulInteractions != expected {
 		t.Errorf("Historic Interactions should be %v but were %v and %v", expected,
 			host.HistoricFailedInteractions, host.HistoricSuccessfulInteractions)

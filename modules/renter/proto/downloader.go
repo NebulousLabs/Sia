@@ -30,7 +30,6 @@ type Downloader struct {
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
 func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []byte, err error) {
-	extendDeadline(hd.conn, modules.NegotiateDownloadTime)
 	defer extendDeadline(hd.conn, time.Hour) // reset deadline when finished
 
 	// calculate price
@@ -50,6 +49,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 
 	// COMPATv1.3.0 initiate download by confirming host settings
 	if build.VersionCmp(hd.host.Version, build.Version) < 0 {
+		extendDeadline(hd.conn, modules.NegotiateSettingsTime)
 		err = startDownload(hd.conn, hd.host)
 	}
 	if err != nil {
@@ -78,6 +78,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	// COMPATv1.3.0
 	// send download action
 	var signedTxn types.Transaction
+	extendDeadline(hd.conn, 2*time.Minute)
 	if build.VersionCmp(hd.host.Version, build.Version) < 0 {
 		err = encoding.WriteObject(hd.conn, []modules.DownloadAction{{
 			MerkleRoot: root,
@@ -88,6 +89,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 			return modules.RenterContract{}, nil, err
 		}
 		// send the revision to the host for approval
+		extendDeadline(hd.conn, 2*time.Minute)
 		signedTxn, err = v130negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
 	} else {
 		// TODO This might fail due to outdated host settings.Maybe try again with the newer ones received in negotiateRevision
@@ -109,6 +111,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	}
 
 	// read sector data, completing one iteration of the download loop
+	extendDeadline(hd.conn, modules.NegotiateDownloadTime)
 	var sectors [][]byte
 	if err := encoding.ReadObject(hd.conn, &sectors, modules.SectorSize+16); err != nil {
 		return modules.RenterContract{}, nil, err
@@ -208,10 +211,12 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, hd
 	defer extendDeadline(conn, time.Hour)
 	if err := encoding.WriteObject(conn, rpcSpecifier); err != nil {
 		conn.Close()
+		close(closeChan)
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
 	if err := verifyRecentRevision(conn, contract, host.Version); err != nil {
 		conn.Close() // TODO: close gracefully if host has entered revision loop
+		close(closeChan)
 		return nil, err
 	}
 

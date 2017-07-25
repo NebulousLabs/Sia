@@ -197,10 +197,10 @@ func TestShareNodes(t *testing.T) {
 
 	// remove all nodes from both peers
 	g1.mu.Lock()
-	g1.nodes = map[modules.NetAddress]struct{}{}
+	g1.nodes = map[modules.NetAddress]*node{}
 	g1.mu.Unlock()
 	g2.mu.Lock()
-	g2.nodes = map[modules.NetAddress]struct{}{}
+	g2.nodes = map[modules.NetAddress]*node{}
 	g2.mu.Unlock()
 
 	// SharePeers should now return no peers

@@ -98,10 +98,10 @@ type HostDBEntry struct {
 	HistoricUptime   time.Duration `json:"historicuptime"`
 	ScanHistory      HostDBScans   `json:"scanhistory"`
 
-	HistoricSuccessfulInteractions uint64 `json:"historicSuccessfulInteractions"`
-	HistoricFailedInteractions     uint64 `json:"historicFailedInteractions"`
-	RecentSuccessfulInteractions   uint64 `json:"recentSuccessfulInteractions"`
-	RecentFailedInteractions       uint64 `json:"recentFailedInteractions"`
+	HistoricFailedInteractions     float64 `json:"historicfailedinteractions"`
+	HistoricSuccessfulInteractions float64 `json:"historicsuccessfulinteractions"`
+	RecentFailedInteractions       float64 `json:"recentfailedinteractions"`
+	RecentSuccessfulInteractions   float64 `json:"recentsuccessfulinteractions"`
 
 	LastHistoricUpdate types.BlockHeight
 
@@ -130,6 +130,7 @@ type HostScoreBreakdown struct {
 	AgeAdjustment              float64 `json:"ageadjustment"`
 	BurnAdjustment             float64 `json:"burnadjustment"`
 	CollateralAdjustment       float64 `json:"collateraladjustment"`
+	InteractionAdjustment      float64 `json:"interactionadjustment"`
 	PriceAdjustment            float64 `json:"pricesmultiplier"`
 	StorageRemainingAdjustment float64 `json:"storageremainingadjustment"`
 	UptimeAdjustment           float64 `json:"uptimeadjustment"`
@@ -224,6 +225,12 @@ type RenterContract struct {
 	ContractFee types.Currency `json:"contractfee"`
 	TxnFee      types.Currency `json:"txnfee"`
 	SiafundFee  types.Currency `json:"siafundfee"`
+
+	// GoodForUpload indicates whether the contract should be used to upload new
+	// data or not, and GoodForRenew indicates whether or not the contract
+	// should be renewed.
+	GoodForRenew  bool
+	GoodForUpload bool
 }
 
 // EndHeight returns the height at which the host is no longer obligated to
