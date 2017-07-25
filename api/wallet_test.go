@@ -526,7 +526,7 @@ func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
 	}
 }
 
-// TestWalletTransactionGETid queries the /wallet/transaction/$(id)
+// TestWalletTransactionGETid queries the /wallet/transaction/:id
 // api call.
 func TestWalletTransactionGETid(t *testing.T) {
 	if testing.Short() {
@@ -560,7 +560,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 	}
 
 	// Query the details of the first transaction using
-	// /wallet/transaction/$(id)
+	// /wallet/transaction/:id
 	var wtgid WalletTransactionGETid
 	wtgidQuery := fmt.Sprintf("/wallet/transaction/%s", wtg.ConfirmedTransactions[0].TransactionID)
 	err = st.getAPI(wtgidQuery, &wtgid)
@@ -1139,6 +1139,22 @@ func TestWalletSiafunds(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Block until allowance has finished forming.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
+	}
+
 	// mine a block so that the file contract makes it into the blockchain
 	_, err = st.miner.AddBlock()
 	if err != nil {
@@ -1288,7 +1304,7 @@ func TestWalletChangePassword(t *testing.T) {
 // TestWalletSiacoins tests the /wallet/siacoins endpoint, including sending
 // to multiple addresses.
 func TestWalletSiacoins(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

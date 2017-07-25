@@ -53,7 +53,11 @@ returns information about the gateway, including the list of connected peers.
         // inbound is true when the peer initiated the connection. This field
         // is exposed as outbound peers are generally trusted more than inbound
         // peers, as inbound peers are easily manipulated by an adversary.
-        "inbound":    Boolean
+        "inbound":    Boolean,
+
+        // local is true if the peer's IP address belongs to a local address
+        // range such as 192.168.x.x or 127.x.x.x
+        "local":      Boolean
     }
 }
 ```

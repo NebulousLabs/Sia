@@ -1,11 +1,13 @@
 package gateway
 
 import (
+	"errors"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/fastrand"
@@ -171,6 +173,19 @@ func TestShareNodes(t *testing.T) {
 		t.Fatal("couldn't connect:", err)
 	}
 
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		g1.mu.Lock()
+		_, exists := g1.nodes[dummyNode]
+		g1.mu.Unlock()
+		if !exists {
+			return errors.New("node not added")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// g1 should have received the node
 	time.Sleep(100 * time.Millisecond)
 	g1.mu.Lock()
@@ -182,10 +197,10 @@ func TestShareNodes(t *testing.T) {
 
 	// remove all nodes from both peers
 	g1.mu.Lock()
-	g1.nodes = map[modules.NetAddress]struct{}{}
+	g1.nodes = map[modules.NetAddress]*node{}
 	g1.mu.Unlock()
 	g2.mu.Lock()
-	g2.nodes = map[modules.NetAddress]struct{}{}
+	g2.nodes = map[modules.NetAddress]*node{}
 	g2.mu.Unlock()
 
 	// SharePeers should now return no peers

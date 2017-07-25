@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"math"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -124,23 +123,29 @@ type (
 )
 
 // newSectionDownload initialises and returns a download object for the specified chunk.
-func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, currentContracts map[modules.NetAddress]types.FileContractID, offset, length uint64) *download {
+func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, offset, length uint64) *download {
 	d := newDownload(f, destination)
+
+	if length == 0 {
+		build.Critical("download length should not be zero")
+		d.fail(errors.New("download length should not be zero"))
+		return d
+	}
 
 	// Settings specific to a chunk download.
 	d.offset = offset
 	d.length = length
 
 	// Calculate chunks to download.
-	minChunk := uint64(math.Floor(float64(offset / f.chunkSize())))
-	maxChunk := uint64(math.Floor(float64((offset + length) / f.chunkSize())))
+	minChunk := offset / f.chunkSize()
+	maxChunk := (offset + length - 1) / f.chunkSize() // maxChunk is 1-indexed
 
 	// mark the chunks as not being downloaded yet
 	for i := minChunk; i <= maxChunk; i++ {
 		d.finishedChunks[i] = false
 	}
 
-	d.initPieceSet(f, currentContracts, r)
+	d.initPieceSet(f, r)
 	return d
 }
 
@@ -161,8 +166,7 @@ func newDownload(f *file, destination modules.DownloadWriter) *download {
 }
 
 // initPieceSet initialises the piece set, including calculations of the total download size.
-func (d *download) initPieceSet(f *file,
-	currentContracts map[modules.NetAddress]types.FileContractID, r *Renter) {
+func (d *download) initPieceSet(f *file, r *Renter) {
 	// Allocate the piece size and progress bar so that the download will
 	// finish at exactly 100%. Due to rounding error and padding, there is not
 	// a strict mapping between 'progress' and 'bytes downloaded' - it is
@@ -183,19 +187,10 @@ func (d *download) initPieceSet(f *file,
 
 	f.mu.RLock()
 	for _, contract := range f.contracts {
-		// Get latest contract ID.
-		id, ok := currentContracts[contract.IP]
-		if !ok {
-			// No matching NetAddress; try using a revised ID.
-			id = r.hostContractor.ResolveID(contract.ID)
-			if id == contract.ID {
-				continue
-			}
-		}
-
+		id := r.hostContractor.ResolveID(contract.ID)
 		for i := range contract.Pieces {
-			m, exists := d.pieceSet[contract.Pieces[i].Chunk]
 			// Only add pieceSet entries for chunks that are going to be downloaded.
+			m, exists := d.pieceSet[contract.Pieces[i].Chunk]
 			if exists {
 				m[id] = contract.Pieces[i]
 			}
@@ -284,7 +279,8 @@ func (cd *chunkDownload) recoverChunk() error {
 		lowerBound = int(offsetInBlock) // If the offset is within the block, part of the block will be ignored
 	}
 
-	// Truncate b if writing the whole buffer at the specified offset would exceed the maximum file size.
+	// Truncate b if writing the whole buffer at the specified offset would
+	// exceed the maximum file size.
 	upperBound := cd.download.chunkSize
 	if chunkTopAddress > cd.download.length+cd.download.offset {
 		diff := chunkTopAddress - (cd.download.length + cd.download.offset)
@@ -366,12 +362,12 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 		// If the above conditions are true, it should also be the case that
 		// the number of active pieces is zero.
 		if ds.activePieces != 0 {
-			r.log.Critical("ERROR: the renter is idle , but tracking active pieces:", ds.activePieces)
+			r.log.Critical("ERROR: the renter is idle, but tracking", ds.activePieces, "active pieces; resetting to zero")
+			ds.activePieces = 0
 		}
 
 		// Nothing to do. Sleep until there is something to do, or until
-		// shutdown. Dislodge occasionally in case r.newDownloads misses a new
-		// download.
+		// shutdown.
 		select {
 		case d := <-r.newDownloads:
 			r.addDownloadToChunkQueue(d)
@@ -381,8 +377,9 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 	}
 
 	// Update the set of workers to include everyone in the worker pool.
+	contracts := r.hostContractor.Contracts()
 	id := r.mu.Lock()
-	r.updateWorkerPool()
+	r.updateWorkerPool(contracts)
 	ds.availableWorkers = make([]*worker, 0, len(r.workerPool))
 	for _, worker := range r.workerPool {
 		// Ignore workers that are already in the active set of workers.
@@ -577,6 +574,7 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	worker, exists := r.workerPool[workerID]
 	r.mu.RUnlock(id)
 	if !exists {
+		ds.incompleteChunks = append(ds.incompleteChunks, finishedDownload.chunkDownload)
 		return
 	}
 
@@ -590,6 +588,11 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	}
 
 	// Add this returned piece to the appropriate chunk.
+	if _, ok := cd.completedPieces[finishedDownload.pieceIndex]; ok {
+		r.log.Debugln("Piece", finishedDownload.pieceIndex, "already added")
+		ds.incompleteChunks = append(ds.incompleteChunks, cd)
+		return
+	}
 	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
 	atomic.AddUint64(&cd.download.atomicDataReceived, cd.download.reportedPieceSize)
 
@@ -636,13 +639,15 @@ func (r *Renter) threadedDownloadLoop() {
 
 // DownloadBufferWriter is a buffer-backed implementation of DownloadWriter.
 type DownloadBufferWriter struct {
-	data []byte
+	data   []byte
+	offset int64
 }
 
 // NewDownloadBufferWriter creates a new DownloadWriter that writes to a buffer.
-func NewDownloadBufferWriter(size uint64) *DownloadBufferWriter {
+func NewDownloadBufferWriter(size uint64, offset int64) *DownloadBufferWriter {
 	return &DownloadBufferWriter{
-		data: make([]byte, size),
+		data:   make([]byte, size),
+		offset: offset,
 	}
 }
 
@@ -655,7 +660,8 @@ func (dw *DownloadBufferWriter) Destination() string {
 
 // WriteAt writes the passed bytes to the DownloadBuffer.
 func (dw *DownloadBufferWriter) WriteAt(bytes []byte, off int64) (int, error) {
-	if len(bytes)+int(off) > len(dw.data) {
+	off -= dw.offset
+	if len(bytes)+int(off) > len(dw.data) || off < 0 {
 		return 0, errors.New("write at specified offset exceeds buffer size")
 	}
 

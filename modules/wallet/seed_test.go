@@ -393,7 +393,7 @@ func TestSweepSeedSentFunds(t *testing.T) {
 // TestSweepSeedCoinsAndFunds tests that sweeping a seed results in the
 // transfer of its siacoin and siafund outputs to the wallet.
 func TestSweepSeedCoinsAndFunds(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()

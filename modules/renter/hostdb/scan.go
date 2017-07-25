@@ -199,6 +199,11 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	pubKey := entry.PublicKey
 	hdb.log.Debugf("Scanning host %v at %v", pubKey, netAddr)
 
+	// Update historic interactions of entry if necessary
+	hdb.mu.RLock()
+	updateHostHistoricInteractions(&entry, hdb.blockHeight)
+	hdb.mu.RUnlock()
+
 	var settings modules.HostExternalSettings
 	err := func() error {
 		dialer := &net.Dialer{
@@ -230,9 +235,17 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	}()
 	if err != nil {
 		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
+		if hdb.online {
+			// Increment failed host interactions
+			entry.RecentFailedInteractions++
+		}
+
 	} else {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 		entry.HostExternalSettings = settings
+
+		// Increment successful host interactions
+		entry.RecentSuccessfulInteractions++
 	}
 
 	// Update the host tree to have a new entry, including the new error. Then

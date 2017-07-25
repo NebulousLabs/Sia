@@ -78,7 +78,7 @@ func TestUnitValidateBlock(t *testing.T) {
 				now: tt.now,
 			},
 		}
-		err := blockValidator.ValidateBlock(b, tt.minTimestamp, types.RootDepth, 0, nil)
+		err := blockValidator.ValidateBlock(b, b.ID(), tt.minTimestamp, types.RootDepth, 0, nil)
 		if err != tt.errWant {
 			t.Errorf("%s: got %v, want %v", tt.msg, err, tt.errWant)
 		}
@@ -151,13 +151,13 @@ func TestCheckTarget(t *testing.T) {
 	highTarget := types.Target{}
 	sameTarget := types.Target(b.ID())
 
-	if !checkTarget(b, lowTarget) {
+	if !checkTarget(b, b.ID(), lowTarget) {
 		t.Error("CheckTarget failed for a low target")
 	}
-	if checkTarget(b, highTarget) {
+	if checkTarget(b, b.ID(), highTarget) {
 		t.Error("CheckTarget passed for a high target")
 	}
-	if !checkTarget(b, sameTarget) {
+	if !checkTarget(b, b.ID(), sameTarget) {
 		t.Error("CheckTarget failed for a same target")
 	}
 }

@@ -362,7 +362,7 @@ func TestBroadcast(t *testing.T) {
 	select {
 	case <-bothDoneChan:
 		// Both g2 and g3 should receive the broadcast.
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("broadcasting to gateway.Peers() should broadcast to all peers")
 	}
 	if g2Payload != "bar" || g3Payload != "bar" {
@@ -475,8 +475,8 @@ func TestOutboundAndInboundRPCs(t *testing.T) {
 	// Call the "recv" RPC on g1. We don't know g1's address as g2 sees it, so we
 	// get it from the first address in g2's peer list.
 	var addr modules.NetAddress
-	for p_addr := range g2.peers {
-		addr = p_addr
+	for pAddr := range g2.peers {
+		addr = pAddr
 		break
 	}
 	err = g2.RPC(addr, "recv", func(conn modules.PeerConn) error { return nil })

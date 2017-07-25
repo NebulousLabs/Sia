@@ -154,54 +154,43 @@ func (uc UnlockConditions) UnlockHash() UnlockHash {
 func (t Transaction) SigHash(i int) (hash crypto.Hash) {
 	cf := t.TransactionSignatures[i].CoveredFields
 	h := crypto.NewHash()
-	enc := encoding.NewEncoder(h)
 	if cf.WholeTransaction {
-		enc.EncodeAll(
-			t.SiacoinInputs,
-			t.SiacoinOutputs,
-			t.FileContracts,
-			t.FileContractRevisions,
-			t.StorageProofs,
-			t.SiafundInputs,
-			t.SiafundOutputs,
-			t.MinerFees,
-			t.ArbitraryData,
-			t.TransactionSignatures[i].ParentID,
-			t.TransactionSignatures[i].PublicKeyIndex,
-			t.TransactionSignatures[i].Timelock,
-		)
+		t.marshalSiaNoSignatures(h)
+		h.Write(t.TransactionSignatures[i].ParentID[:])
+		encoding.WriteUint64(h, t.TransactionSignatures[i].PublicKeyIndex)
+		encoding.WriteUint64(h, uint64(t.TransactionSignatures[i].Timelock))
 	} else {
 		for _, input := range cf.SiacoinInputs {
-			enc.Encode(t.SiacoinInputs[input])
+			t.SiacoinInputs[input].MarshalSia(h)
 		}
 		for _, output := range cf.SiacoinOutputs {
-			enc.Encode(t.SiacoinOutputs[output])
+			t.SiacoinOutputs[output].MarshalSia(h)
 		}
 		for _, contract := range cf.FileContracts {
-			enc.Encode(t.FileContracts[contract])
+			t.FileContracts[contract].MarshalSia(h)
 		}
 		for _, revision := range cf.FileContractRevisions {
-			enc.Encode(t.FileContractRevisions[revision])
+			t.FileContractRevisions[revision].MarshalSia(h)
 		}
 		for _, storageProof := range cf.StorageProofs {
-			enc.Encode(t.StorageProofs[storageProof])
+			t.StorageProofs[storageProof].MarshalSia(h)
 		}
 		for _, siafundInput := range cf.SiafundInputs {
-			enc.Encode(t.SiafundInputs[siafundInput])
+			t.SiafundInputs[siafundInput].MarshalSia(h)
 		}
 		for _, siafundOutput := range cf.SiafundOutputs {
-			enc.Encode(t.SiafundOutputs[siafundOutput])
+			t.SiafundOutputs[siafundOutput].MarshalSia(h)
 		}
 		for _, minerFee := range cf.MinerFees {
-			enc.Encode(t.MinerFees[minerFee])
+			t.MinerFees[minerFee].MarshalSia(h)
 		}
 		for _, arbData := range cf.ArbitraryData {
-			enc.Encode(t.ArbitraryData[arbData])
+			encoding.WritePrefix(h, t.ArbitraryData[arbData])
 		}
 	}
 
 	for _, sig := range cf.TransactionSignatures {
-		enc.Encode(t.TransactionSignatures[sig])
+		t.TransactionSignatures[sig].MarshalSia(h)
 	}
 
 	h.Sum(hash[:0])

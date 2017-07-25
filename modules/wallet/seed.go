@@ -93,6 +93,17 @@ func decryptSeedFile(masterKey crypto.TwofishKey, sf seedFile) (seed modules.See
 	return seed, nil
 }
 
+// regenerateLookahead creates future keys up to a maximum of maxKeys keys
+func (w *Wallet) regenerateLookahead(start uint64) {
+	// Check how many keys need to be generated
+	maxKeys := maxLookahead(start)
+	existingKeys := uint64(len(w.lookahead))
+
+	for i, k := range generateKeys(w.primarySeed, start+existingKeys, maxKeys-existingKeys) {
+		w.lookahead[k.UnlockConditions.UnlockHash()] = start + existingKeys + uint64(i)
+	}
+}
+
 // integrateSeed generates n spendableKeys from the seed and loads them into
 // the wallet.
 func (w *Wallet) integrateSeed(seed modules.Seed, n uint64) {
@@ -120,6 +131,11 @@ func (w *Wallet) nextPrimarySeedAddress(tx *bolt.Tx) (types.UnlockConditions, er
 	// conditions.
 	spendableKey := generateSpendableKey(w.primarySeed, progress)
 	w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
+
+	// Remove new key from the future keys and update them according to new progress
+	delete(w.lookahead, spendableKey.UnlockConditions.UnlockHash())
+	w.regenerateLookahead(progress + 1)
+
 	return spendableKey.UnlockConditions, nil
 }
 
@@ -217,10 +233,10 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	if err := s.scan(w.cs); err != nil {
 		return err
 	}
-	// Add 10% as a buffer because the seed may have addresses in the wild
+	// Add 4% as a buffer because the seed may have addresses in the wild
 	// that have not appeared in the blockchain yet.
-	seedProgress := s.largestIndexSeen + 1
-	seedProgress += seedProgress / 10
+	seedProgress := s.largestIndexSeen + 500
+	seedProgress += seedProgress / 25
 	w.log.Printf("INFO: found key index %v in blockchain. Setting auxiliary seed progress to %v", s.largestIndexSeen, seedProgress)
 
 	err := func() error {

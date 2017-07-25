@@ -12,7 +12,7 @@ import (
 
 // Renew negotiates a new contract for data already stored with a host, and
 // submits the new contract transaction to tpool.
-func Renew(contract modules.RenterContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, cancel <-chan struct{}) (modules.RenterContract, error) {
+func Renew(contract modules.RenterContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (modules.RenterContract, error) {
 	// extract vars from params, for convenience
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
 	ourSK := contract.SecretKey
@@ -89,6 +89,16 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	txn, parentTxns := txnBuilder.View()
 	txnSet := append(parentTxns, txn)
 
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		// A revision mismatch might not be the host's fault.
+		if err != nil && !IsRevisionMismatch(err) {
+			hdb.IncrementFailedInteractions(contract.HostPublicKey)
+		} else if err == nil {
+			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+		}
+	}()
+
 	// initiate connection
 	dialer := &net.Dialer{
 		Cancel:  cancel,
@@ -106,7 +116,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 		return modules.RenterContract{}, errors.New("couldn't initiate RPC: " + err.Error())
 	}
 	// verify that both parties are renewing the same contract
-	if err = verifyRecentRevision(conn, contract); err != nil {
+	if err = verifyRecentRevision(conn, contract, host.Version); err != nil {
 		// don't add context; want to preserve the original error type so that
 		// callers can check using IsRevisionMismatch
 		return modules.RenterContract{}, err
