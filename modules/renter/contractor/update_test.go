@@ -1,10 +1,12 @@
 package contractor
 
 import (
+	"errors"
 	"io/ioutil"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -74,6 +76,15 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		if len(c.Contracts()) == 0 {
+			return errors.New("contracts were not formed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	contract := c.Contracts()[0]
 
 	// revise the contract
@@ -102,8 +113,8 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	}
 	// wait for goroutine in ProcessConsensusChange to finish
 	time.Sleep(100 * time.Millisecond)
-	c.editLock.Lock()
-	c.editLock.Unlock()
+	c.maintenanceLock.Lock()
+	c.maintenanceLock.Unlock()
 
 	// check renewed contract
 	contract = c.Contracts()[0]
@@ -142,6 +153,15 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		if len(c.Contracts()) == 0 {
+			return errors.New("contracts were not formed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	contract := c.Contracts()[0]
 
 	// revise the contract
@@ -166,8 +186,8 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	}
 	// wait for goroutine in ProcessConsensusChange to finish
 	time.Sleep(100 * time.Millisecond)
-	c.editLock.Lock()
-	c.editLock.Unlock()
+	c.maintenanceLock.Lock()
+	c.maintenanceLock.Unlock()
 
 	// check renewed contract
 	contract = c.Contracts()[0]
@@ -203,8 +223,8 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	}
 	// wait for goroutine in ProcessConsensusChange to finish
 	time.Sleep(100 * time.Millisecond)
-	c.editLock.Lock()
-	c.editLock.Unlock()
+	c.maintenanceLock.Lock()
+	c.maintenanceLock.Unlock()
 
 	// downloader should have been invalidated
 	_, err = downloader.Sector(crypto.Hash{})

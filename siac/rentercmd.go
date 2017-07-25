@@ -335,22 +335,27 @@ func rentercontractsviewcmd(cid string) {
 
 	for _, rc := range rc.Contracts {
 		if rc.ID.String() == cid {
+			var hostInfo api.HostdbHostsGET
+			err = getAPI("/hostdb/hosts/"+rc.HostPublicKey.String(), &hostInfo)
+			if err != nil {
+				die("Could not fetch details of host: ", err)
+			}
 			fmt.Printf(`
 Contract %v
-Host: %v (Public Key: %v)
+  Host: %v (Public Key: %v)
 
-Start Height: %v
-End Height:   %v
+  Start Height: %v
+  End Height:   %v
 
-Total cost:        %v (Fees: %v)
-Funds Allocated:   %v
-Upload Spending:   %v
-Storage Spending:  %v
-Download Spending: %v
-Remaining Funds:   %v
+  Total cost:        %v (Fees: %v)
+  Funds Allocated:   %v
+  Upload Spending:   %v
+  Storage Spending:  %v
+  Download Spending: %v
+  Remaining Funds:   %v
 
-File Size: %v
-`, rc.ID, rc.NetAddress, rc.HostPublicKey, rc.StartHeight, rc.EndHeight,
+  File Size: %v
+`, rc.ID, rc.NetAddress, rc.HostPublicKey.String(), rc.StartHeight, rc.EndHeight,
 				currencyUnits(rc.TotalCost),
 				currencyUnits(rc.Fees),
 				currencyUnits(rc.TotalCost.Sub(rc.Fees)),
@@ -359,6 +364,8 @@ File Size: %v
 				currencyUnits(rc.DownloadSpending),
 				currencyUnits(rc.RenterFunds),
 				filesizeUnits(int64(rc.Size)))
+
+			printScoreBreakdown(&hostInfo)
 			return
 		}
 	}

@@ -7,7 +7,6 @@ package types
 
 import (
 	"errors"
-	"io"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -142,47 +141,6 @@ type (
 	// UnlockHash is constructed.
 	UnlockHash crypto.Hash
 )
-
-func (t Transaction) marshalSiaNoSignatures(w io.Writer) {
-	enc := encoding.NewEncoder(w)
-
-	encoding.WriteInt(w, len((t.SiacoinInputs)))
-	for i := range t.SiacoinInputs {
-		t.SiacoinInputs[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.SiacoinOutputs)))
-	for i := range t.SiacoinOutputs {
-		t.SiacoinOutputs[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.FileContracts)))
-	for i := range t.FileContracts {
-		enc.Encode(t.FileContracts[i])
-	}
-	encoding.WriteInt(w, len((t.FileContractRevisions)))
-	for i := range t.FileContractRevisions {
-		enc.Encode(t.FileContractRevisions[i])
-	}
-	encoding.WriteInt(w, len((t.StorageProofs)))
-	for i := range t.StorageProofs {
-		enc.Encode(t.StorageProofs[i])
-	}
-	encoding.WriteInt(w, len((t.SiafundInputs)))
-	for i := range t.SiafundInputs {
-		enc.Encode(t.SiafundInputs[i])
-	}
-	encoding.WriteInt(w, len((t.SiafundOutputs)))
-	for i := range t.SiafundOutputs {
-		t.SiafundOutputs[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.MinerFees)))
-	for i := range t.MinerFees {
-		t.MinerFees[i].MarshalSia(w)
-	}
-	encoding.WriteInt(w, len((t.ArbitraryData)))
-	for i := range t.ArbitraryData {
-		encoding.WritePrefix(w, t.ArbitraryData[i])
-	}
-}
 
 // ID returns the id of a transaction, which is taken by marshalling all of the
 // fields except for the signatures and taking the hash of the result.

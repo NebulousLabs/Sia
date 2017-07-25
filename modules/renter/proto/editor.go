@@ -47,6 +47,7 @@ type Editor struct {
 	closeChan chan struct{}
 	once      sync.Once
 	host      modules.HostDBEntry
+	hdb       hostDB
 
 	height   types.BlockHeight
 	contract modules.RenterContract // updated after each revision
@@ -75,8 +76,21 @@ func (he *Editor) Close() error {
 // runRevisionIteration submits actions and their accompanying revision to the
 // host for approval. If negotiation is successful, it updates the underlying
 // Contract.
-func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) error {
+func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) (err error) {
+	defer func() {
+		// Increase Successful/Failed interactions accordingly
+		if err != nil {
+			he.hdb.IncrementFailedInteractions(he.contract.HostPublicKey)
+		} else {
+			he.hdb.IncrementSuccessfulInteractions(he.contract.HostPublicKey)
+		}
+
+		// reset deadline
+		extendDeadline(he.conn, time.Hour)
+	}()
+
 	// initiate revision
+	extendDeadline(he.conn, modules.NegotiateSettingsTime)
 	if err := startRevision(he.conn, he.host); err != nil {
 		return err
 	}
@@ -93,11 +107,13 @@ func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev typ
 	}
 
 	// send actions
+	extendDeadline(he.conn, modules.NegotiateFileContractRevisionTime)
 	if err := encoding.WriteObject(he.conn, actions); err != nil {
 		return err
 	}
 
 	// send revision to host and exchange signatures
+	extendDeadline(he.conn, 2*time.Minute)
 	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
@@ -117,10 +133,6 @@ func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev typ
 
 // Upload negotiates a revision that adds a sector to a file contract.
 func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, error) {
-	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
-	extendDeadline(he.conn, modules.NegotiateFileContractRevisionTime)
-	defer extendDeadline(he.conn, time.Hour) // reset deadline
-
 	// calculate price
 	// TODO: height is never updated, so we'll wind up overpaying on long-running uploads
 	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowEnd-he.height))
@@ -172,10 +184,6 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 
 // Delete negotiates a revision that removes a sector from a file contract.
 func (he *Editor) Delete(root crypto.Hash) (modules.RenterContract, error) {
-	// allot 2 minutes for this exchange
-	extendDeadline(he.conn, 120*time.Second)
-	defer extendDeadline(he.conn, time.Hour) // reset deadline
-
 	// calculate the new Merkle root
 	newRoots := make([]crypto.Hash, 0, len(he.contract.MerkleRoots))
 	index := -1
@@ -207,10 +215,6 @@ func (he *Editor) Delete(root crypto.Hash) (modules.RenterContract, error) {
 
 // Modify negotiates a revision that edits a sector in a file contract.
 func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) (modules.RenterContract, error) {
-	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
-	extendDeadline(he.conn, modules.NegotiateFileContractRevisionTime)
-	defer extendDeadline(he.conn, time.Hour) // reset deadline
-
 	// calculate price
 	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(uint64(len(newData)))
 	if he.contract.RenterFunds().Cmp(sectorBandwidthPrice) < 0 {
@@ -255,11 +259,21 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 
 // NewEditor initiates the contract revision process with a host, and returns
 // an Editor.
-func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, currentHeight types.BlockHeight, cancel <-chan struct{}) (*Editor, error) {
+func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}) (_ *Editor, err error) {
 	// check that contract has enough value to support an upload
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
 	}
+
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		// a revision mismatch is not necessarily the host's fault
+		if err != nil && !IsRevisionMismatch(err) {
+			hdb.IncrementFailedInteractions(contract.HostPublicKey)
+		} else if err == nil {
+			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+		}
+	}()
 
 	// initiate revision loop
 	conn, err := (&net.Dialer{
@@ -284,16 +298,19 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 	defer extendDeadline(conn, time.Hour)
 	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
 		conn.Close()
+		close(closeChan)
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
-	if err := verifyRecentRevision(conn, contract); err != nil {
+	if err := verifyRecentRevision(conn, contract, host.Version); err != nil {
 		conn.Close() // TODO: close gracefully if host has entered revision loop
+		close(closeChan)
 		return nil, err
 	}
 
 	// the host is now ready to accept revisions
 	return &Editor{
 		host:      host,
+		hdb:       hdb,
 		height:    currentHeight,
 		contract:  contract,
 		conn:      conn,

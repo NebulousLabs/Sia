@@ -21,7 +21,7 @@ import (
 // threadedInitialBlockchainDownload synchronizes with peers in the simple case
 // where there are 8 outbound peers with the same blockchain.
 func TestSimpleInitialBlockchainDownload(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 
@@ -284,7 +284,7 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 //  - at least minNumOutbound synced outbound peers
 //  - or at least 1 synced outbound peer and minIBDWaitTime has passed since beginning IBD.
 func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	testdir := build.TempDir(modules.ConsensusDir, t.Name())
@@ -313,7 +313,6 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		cs.threadedInitialBlockchainDownload()
 		doneChan <- struct{}{}
 	}()
-	defer close(doneChan)
 	select {
 	case <-doneChan:
 		t.Error("threadedInitialBlockchainDownload finished with 0 synced peers")
@@ -458,7 +457,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 // eachother as they would report EOF instead of performing correct block
 // exchange.
 func TestGenesisBlockSync(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 

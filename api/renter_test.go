@@ -298,7 +298,7 @@ func runDownloadParamTest(t *testing.T, length, offset, filesize int) error {
 }
 
 func TestInvalidDownloadParameters(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -637,6 +637,22 @@ func TestRenterHandlerContracts(t *testing.T) {
 	allowanceValues.Set("period", testPeriod)
 	if err = st.stdPostAPI("/renter", allowanceValues); err != nil {
 		t.Fatal(err)
+	}
+
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
 	}
 
 	// The renter should now have 1 contract.
@@ -1092,7 +1108,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
-		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
 	}
 
 	// Use a relative destination, which should fail.
@@ -1199,7 +1215,7 @@ func TestRenterPricesHandler(t *testing.T) {
 // TestRenterPricesHandlerCheap checks that the prices command returns
 // reasonable values given the settings of the hosts.
 func TestRenterPricesHandlerCheap(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -1302,7 +1318,7 @@ func TestRenterPricesHandlerCheap(t *testing.T) {
 // TestRenterPricesHandlerIgnorePricey checks that the prices command returns
 // reasonable values given the settings of the hosts.
 func TestRenterPricesHandlerIgnorePricey(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -1502,5 +1518,384 @@ func TestRenterPricesHandlerPricey(t *testing.T) {
 	}
 	if !(rpeMulti.UploadTerabyte.Cmp(rpeSingle.UploadTerabyte) > 0) {
 		t.Error("price did not drop from single to multi")
+	}
+}
+
+// TestContractorHostRemoval checks that the contractor properly migrates away
+// from low quality hosts when there are higher quality hosts available.
+func TestContractorHostRemoval(t *testing.T) {
+	// Create a renter and 2 hosts. Connect to the hosts and start uploading.
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester(t.Name() + "renter")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+	stH1, err := blankServerTester(t.Name() + " - Host 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH1.server.Close()
+	testGroup := []*serverTester{st, stH1}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add storage to every host.
+	err = addStorageToAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Raise the prices significantly for the two hosts.
+	raisedPrice := url.Values{}
+	raisedPrice.Set("mincontractprice", "5000000000000000000000000000") // 5 KS
+	raisedPrice.Set("period", testPeriod)
+	err = st.stdPostAPI("/host", raisedPrice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stH1.stdPostAPI("/host", raisedPrice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Anounce the hosts.
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance with two hosts.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "500000000000000000000000000000") // 500k SC
+	allowanceValues.Set("hosts", "2")
+	allowanceValues.Set("period", "10")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file to upload.
+	filesize := int(100)
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, filesize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	origBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// upload the file
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("datapieces", "1")
+	uploadValues.Set("paritypieces", "1")
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// redundancy should reach 2
+	var rf RenterFiles
+	err = retry(120, 250*time.Millisecond, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+			return nil
+		}
+		return errors.New("file not uploaded")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify we can download
+	downloadPath := filepath.Join(st.dir, "test-downloaded-verify.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloadBytes, err := ioutil.ReadFile(downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(downloadBytes, origBytes) {
+		t.Fatal("downloaded file and uploaded file do not match")
+	}
+
+	// Get the values of the first and second contract.
+	var rc RenterContracts
+	err = st.getAPI("/renter/contracts", &rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rc.Contracts) != 2 {
+		t.Fatal("wrong contract count")
+	}
+	rc1Host := rc.Contracts[0].HostPublicKey.String()
+	rc2Host := rc.Contracts[1].HostPublicKey.String()
+
+	// Add 3 new hosts that will be competing with the expensive hosts.
+	stH2, err := blankServerTester(t.Name() + " - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH2.server.Close()
+	stH3, err := blankServerTester(t.Name() + " - Host 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH3.server.Close()
+	stH4, err := blankServerTester(t.Name() + " - Host 4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH4.server.Close()
+	testGroup = []*serverTester{st, stH1, stH2, stH3, stH4}
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Add storage to every host.
+	err = addStorageToAllHosts([]*serverTester{stH2, stH3, stH4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Anounce the hosts.
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Block until the hostdb reaches five hosts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var ah HostdbActiveGET
+		err = st.getAPI("/hostdb/active", &ah)
+		if err != nil {
+			return err
+		}
+		if len(ah.Hosts) < 5 {
+			return errors.New("new hosts never appeared in hostdb")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine a block to trigger a second run of threadedContractMaintenance.
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that st and stH1 are dropped in favor of the newer, better hosts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var newContracts int
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		hostMap := make(map[string]struct{})
+		hostMap[rc1Host] = struct{}{}
+		hostMap[rc2Host] = struct{}{}
+		for _, contract := range rc.Contracts {
+			_, exists := hostMap[contract.HostPublicKey.String()]
+			if !exists {
+				newContracts++
+				hostMap[contract.HostPublicKey.String()] = struct{}{}
+			}
+		}
+		if newContracts != 2 {
+			return fmt.Errorf("not the right number of new contracts: %v", newContracts)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Block until redundancy is restored to 2.
+	err = retry(120, 250*time.Millisecond, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) == 1 && rf.Files[0].Redundancy == 2 {
+			return nil
+		}
+		return errors.New("file not uploaded to full redundancy")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Grab the old contracts, then mine blocks to trigger a renew, and then
+	// wait until the renew is complete.
+	err = st.getAPI("/renter/contracts", &rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check the amount of data in each contract.
+	for _, contract := range rc.Contracts {
+		if contract.Size != modules.SectorSize {
+			t.Error("Each contrat should have 1 sector:", contract.Size, contract.ID)
+		}
+	}
+	for i := 0; i < 5; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = synchronizationCheck(testGroup)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Give the renter time to renew. Two of the contracts should renew.
+	var rc2 RenterContracts
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		err = st.getAPI("/renter/contracts", &rc2)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+
+		// Check that at least 2 contracts are different between rc and rc2.
+		tracker := make(map[types.FileContractID]struct{})
+		// Add all the contracts.
+		for _, contract := range rc.Contracts {
+			tracker[contract.ID] = struct{}{}
+		}
+		// Count the number of contracts that were not seen in the previous
+		// batch of contracts, and check that the new contracts are not with the
+		// expensive hosts.
+		var unseen int
+		for _, contract := range rc2.Contracts {
+			_, exists := tracker[contract.ID]
+			if !exists {
+				unseen++
+				tracker[contract.ID] = struct{}{}
+				if contract.HostPublicKey.String() == rc1Host || contract.HostPublicKey.String() == rc2Host {
+					return errors.New("the wrong contracts are being renewed")
+				}
+			}
+		}
+		if unseen != 2 {
+			return fmt.Errorf("the wrong number of contracts seem to be getting renewed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The renewing process should not have resulted in additional data being
+	// uploaded - it should be the same data in the contracts.
+	for _, contract := range rc2.Contracts {
+		if contract.Size != modules.SectorSize {
+			t.Error("Contract has the wrong size:", contract.Size)
+		}
+	}
+
+	// Try again to download the file we uploaded. It should still be
+	// retrievable.
+	downloadPath2 := filepath.Join(st.dir, "test-downloaded-verify-2.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloadBytes2, err := ioutil.ReadFile(downloadPath2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(downloadBytes2, origBytes) {
+		t.Fatal("downloaded file and uploaded file do not match")
+	}
+
+	// Mine out another set of the blocks so that the bad contracts expire.
+	for i := 0; i < 6; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = synchronizationCheck(testGroup)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Should be back down to 2 contracts now, with the new hosts.
+	// Verify that st and stH1 are dropped in favor of the newer, better hosts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 2 {
+			return fmt.Errorf("renewing seems to have failed: %v", len(rc.Contracts))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rc.Contracts[0].HostPublicKey.String() == rc1Host || rc.Contracts[0].HostPublicKey.String() == rc2Host {
+		t.Error("renter is renewing the wrong contracts", rc.Contracts[0].HostPublicKey.String())
+	}
+	if rc.Contracts[1].HostPublicKey.String() == rc1Host || rc.Contracts[1].HostPublicKey.String() == rc2Host {
+		t.Error("renter is renewing the wrong contracts", rc.Contracts[1].HostPublicKey.String())
+	}
+
+	// Redundancy should still be 2.
+	err = retry(120, 250*time.Millisecond, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+			return nil
+		}
+		return errors.New("file not uploaded to full redundancy")
+	})
+	if err != nil {
+		t.Fatal(err, "::", rf.Files[0].Redundancy)
+	}
+
+	// Check that the amount of data in each contract has remained at the
+	// correct amount - just one sector each.
+	err = st.getAPI("/renter/contracts", &rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, contract := range rc.Contracts {
+		if contract.Size != modules.SectorSize {
+			t.Error("Each contrat should have 1 sector:", contract.Size, contract.ID)
+		}
+	}
+
+	// Try again to download the file we uploaded. It should still be
+	// retrievable.
+	downloadPath3 := filepath.Join(st.dir, "test-downloaded-verify-3.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath3)
+	if err != nil {
+		t.Log("FINAL DOWNLOAD HAS FAILED:", err)
+	}
+	downloadBytes3, err := ioutil.ReadFile(downloadPath3)
+	if err != nil {
+		t.Log(err)
+	}
+	if !bytes.Equal(downloadBytes3, origBytes) {
+		t.Log("downloaded file and uploaded file do not match")
 	}
 }

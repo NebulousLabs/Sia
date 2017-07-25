@@ -66,13 +66,10 @@ func TestSynchronize(t *testing.T) {
 	// Mine on cst2 until it is more than 'MaxCatchUpBlocks' ahead of cst1.
 	// NOTE: we have to disconnect prior to this, otherwise cst2 will relay
 	// blocks to cst1.
-	err = cst1.gateway.Disconnect(cst2.gateway.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
+	cst1.gateway.Disconnect(cst2.gateway.Address())
+	cst2.gateway.Disconnect(cst1.gateway.Address())
 	for cst2.cs.dbBlockHeight() < cst1.cs.dbBlockHeight()+3+MaxCatchUpBlocks {
-		b, _ := cst2.miner.FindBlock()
-		err = cst2.cs.AcceptBlock(b)
+		_, err := cst2.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -319,7 +316,7 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 // the consensus set, and that the consensus set catches with the remote peer
 // and possibly reorgs.
 func TestIntegrationRPCSendBlocks(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 

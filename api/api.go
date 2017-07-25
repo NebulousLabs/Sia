@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -116,6 +117,36 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 		}
 		h(w, req, ps)
 	}
+}
+
+// cleanCloseHandler wraps the entire API, ensuring that underlying conns are
+// not leaked if the rmeote end closes the connection before the underlying
+// handler finishes.
+func cleanCloseHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Close this file handle either when the function completes or when the
+		// connection is done.
+		done := make(chan struct{})
+		go func(w http.ResponseWriter, r *http.Request) {
+			defer close(done)
+			next.ServeHTTP(w, r)
+		}(w, r)
+		select {
+		case <-done:
+		case <-r.Context().Done():
+		}
+
+		// Sanity check - thread should not take more than an hour to return. This
+		// must be done in a goroutine, otherwise the server will not close the
+		// underlying socket for this API call.
+		go func() {
+			select {
+			case <-done:
+			case <-time.After(time.Minute * 60):
+				build.Severe("api call is taking more than 60 minutes to return:", r.URL.Path)
+			}
+		}()
+	})
 }
 
 // API encapsulates a collection of modules and implements a http.Handler
@@ -266,7 +297,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	}
 
 	// Apply UserAgent middleware and return the API
-	api.router = RequireUserAgent(router, requiredUserAgent)
+	api.router = cleanCloseHandler(RequireUserAgent(router, requiredUserAgent))
 	return api
 }
 
