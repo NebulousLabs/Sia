@@ -353,6 +353,11 @@ func (api *API) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ h
 	})
 }
 
+// renterFilesDetailHandler handles the API call to show renter files repairing detail
+func (api *API) renterFilesDetailHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	WriteJSON(w, api.renter.FilesDetail())
+}
+
 // renterPricesHandler reports the expected costs of various actions given the
 // renter settings and the set of available hosts.
 func (api *API) renterPricesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {

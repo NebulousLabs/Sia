@@ -146,6 +146,47 @@ func (f *file) redundancy(isOffline func(types.FileContractID) bool) float64 {
 	return float64(minPieces) / float64(f.erasureCode.MinPieces())
 }
 
+// detail returns the detail of this file,
+// with info about each piece is storing by which host(IP)
+// offline or not
+func (f *file) detail(isOffline func(types.FileContractID) bool) [][]*modules.FileDetail {
+	if f.size == 0 {
+		return nil
+	}
+	piecesInChunk := make([][]*modules.FileDetail, f.numChunks())
+	// If the file has non-0 size then the number of chunks should also be
+	// non-0. Therefore the f.size == 0 conditional block above must appear
+	// before this check.
+	if len(piecesInChunk) == 0 {
+		build.Critical("cannot get detail of a file with 0 chunks")
+		return nil
+	}
+
+	emptyDetail := &modules.FileDetail{
+		IP:        "",
+		IsOffline: true,
+	}
+	for i := 0; i < len(piecesInChunk); i++ {
+		p := make([]*modules.FileDetail, f.erasureCode.NumPieces())
+		for j := 0; j < f.erasureCode.NumPieces(); j++ {
+			p[j] = emptyDetail
+		}
+		piecesInChunk[i] = p
+	}
+	for _, fc := range f.contracts {
+		// do not count pieces from the contract if the contract is offline
+		isoffline := isOffline(fc.ID)
+		for _, p := range fc.Pieces {
+			fd := &modules.FileDetail{
+				IP:        fc.IP,
+				IsOffline: isoffline,
+			}
+			piecesInChunk[p.Chunk][p.Piece] = fd
+		}
+	}
+	return piecesInChunk
+}
+
 // expiration returns the lowest height at which any of the file's contracts
 // will expire.
 func (f *file) expiration() types.BlockHeight {
@@ -234,6 +275,44 @@ func (r *Renter) FileList() []modules.FileInfo {
 			Redundancy:     f.redundancy(isOffline),
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
+		})
+		f.mu.RUnlock()
+	}
+	return fileList
+}
+
+// FilesDetail returns all of the files repairing detail
+func (r *Renter) FilesDetail() []modules.FileDetailInfo {
+	var files []*file
+	lockID := r.mu.RLock()
+	for _, f := range r.files {
+		files = append(files, f)
+	}
+	r.mu.RUnlock(lockID)
+
+	isOffline := func(id types.FileContractID) bool {
+		id = r.hostContractor.ResolveID(id)
+		offline := r.hostContractor.IsOffline(id)
+		contract, exists := r.hostContractor.ContractByID(id)
+		if !exists {
+			return true
+		}
+		return offline || !contract.GoodForRenew
+	}
+
+	var fileList []modules.FileDetailInfo
+	for _, f := range files {
+		f.mu.RLock()
+		renewing := true
+		fileList = append(fileList, modules.FileDetailInfo{
+			SiaPath:        f.name,
+			Filesize:       f.size,
+			Renewing:       renewing,
+			Available:      f.available(isOffline),
+			Redundancy:     f.redundancy(isOffline),
+			UploadProgress: f.uploadProgress(),
+			Expiration:     f.expiration(),
+			Details:        f.detail(isOffline),
 		})
 		f.mu.RUnlock()
 	}

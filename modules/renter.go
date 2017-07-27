@@ -83,6 +83,25 @@ type FileInfo struct {
 	Expiration     types.BlockHeight `json:"expiration"`
 }
 
+// FileDetailInfo provides detail information about a file.
+// first dimension of details is chunk id, second is chunk redundency hosts
+type FileDetailInfo struct {
+	SiaPath        string            `json:"siapath"`
+	Filesize       uint64            `json:"filesize"`
+	Available      bool              `json:"available"`
+	Renewing       bool              `json:"renewing"`
+	Redundancy     float64           `json:"redundancy"`
+	UploadProgress float64           `json:"uploadprogress"`
+	Expiration     types.BlockHeight `json:"expiration"`
+	Details        [][]*FileDetail   `json:"details"`
+}
+
+// FileDetail is the detail of pieces
+type FileDetail struct {
+	IP        NetAddress `json:"host"`
+	IsOffline bool       `json:"isoffline"`
+}
+
 // A HostDBEntry represents one host entry in the Renter's host DB. It
 // aggregates the host's external settings and metrics with its public key.
 type HostDBEntry struct {
@@ -281,6 +300,9 @@ type Renter interface {
 
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
+
+	// FilesDetail returns all of the files repairing detail.
+	FilesDetail() []FileDetailInfo
 
 	// Host provides the DB entry and score breakdown for the requested host.
 	Host(pk types.SiaPublicKey) (HostDBEntry, bool)
