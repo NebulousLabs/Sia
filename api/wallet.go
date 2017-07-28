@@ -98,7 +98,7 @@ type (
 	// WalletVerifyAddressGET contains a bool indicating if the address passed to
 	// /wallet/verify/address/:addr is a valid address.
 	WalletVerifyAddressGET struct {
-		Valid bool
+		Valid bool `json:"valid"`
 	}
 )
 
