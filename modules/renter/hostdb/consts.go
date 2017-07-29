@@ -61,8 +61,8 @@ var (
 	// their settings and checking for reliability.
 	maxScanningThreads = build.Select(build.Var{
 		Standard: int(40),
-		Dev:      int(8),
-		Testing:  int(6),
+		Dev:      int(4),
+		Testing:  int(3),
 	}).(int)
 )
 

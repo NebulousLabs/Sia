@@ -77,7 +77,12 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			// Create new worker thread
 			if hdb.scanningThreads < maxScanningThreads {
 				hdb.scanningThreads++
-				go hdb.threadedProbeHosts(scanPool)
+				go func() {
+					hdb.threadedProbeHosts(scanPool)
+					hdb.mu.Lock()
+					hdb.scanningThreads--
+					hdb.mu.Unlock()
+				}()
 			}
 			hdb.mu.Unlock()
 
@@ -293,9 +298,6 @@ func (hdb *HostDB) threadedProbeHosts(scanPool <-chan modules.HostDBEntry) {
 		// scan.
 		hdb.managedScanHost(hostEntry)
 	}
-	hdb.mu.Lock()
-	hdb.scanningThreads--
-	hdb.mu.Unlock()
 }
 
 // threadedScan is an ongoing function which will query the full set of hosts
