@@ -690,7 +690,7 @@ func TestBigTpool(t *testing.T) {
 	var outputs2 []types.SiacoinOutput
 	var outputs3 []types.SiacoinOutput
 
-	// Create outputs to be spent in the first chunk
+	// Create outputs to be spent in the first chunk.
 	for i := 1; i <= numGraphsPerChunk; i++ {
 		value := coinFrac.Mul64(25).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
 		outputs1 = append(outputs1, types.SiacoinOutput{
@@ -713,7 +713,7 @@ func TestBigTpool(t *testing.T) {
 	var graphs [][]types.Transaction
 	for _, output := range outputTxns1 {
 		finalTxn := output[len(output)-1]
-		for i := 0; i < 500; i++ { //500 is the the number of outputs
+		for i := 0; i < 500; i++ { // 500 is the the number of outputs
 			var edges []types.TransactionGraphEdge
 			totalValue := coinFrac.Mul64(25).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
 			setSize := 10
@@ -748,9 +748,9 @@ func TestBigTpool(t *testing.T) {
 		}
 	}
 	////////////////////////////////////////////////////////////////////////////
-	//						Chunk 2
+	// Chunk 2
 	////////////////////////////////////////////////////////////////////////////
-	// Create outputs to be spent in the second chunk
+	// Create outputs to be spent in the second chunk.
 	for i := 1; i <= numGraphsPerChunk; i++ {
 		value := coinFrac.Mul64(60).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
 		outputs2 = append(outputs2, types.SiacoinOutput{
@@ -773,7 +773,7 @@ func TestBigTpool(t *testing.T) {
 	var graphs2 [][]types.Transaction
 	for _, output := range outputTxns2 {
 		finalTxn := output[len(output)-1]
-		for i := 0; i < 500; i++ { //500 is the the number of outputs
+		for i := 0; i < 500; i++ { // 500 is the the number of outputs.
 			var edges []types.TransactionGraphEdge
 			totalValue := coinFrac.Mul64(60).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
 			setSize := 10
@@ -808,9 +808,9 @@ func TestBigTpool(t *testing.T) {
 		}
 	}
 	////////////////////////////////////////////////////////////////////////////
-	//						Chunk 3
+	// Chunk 3
 	////////////////////////////////////////////////////////////////////////////
-	// Create outputs to be spent in the third chunk
+	// Create outputs to be spent in the third chunk.
 	for i := 1; i <= numGraphsPerChunk; i++ {
 		value := coinFrac.Mul64(110).Add(feeFrac.Mul64(uint64(i))).Mul64(2)
 		outputs3 = append(outputs3, types.SiacoinOutput{
@@ -833,7 +833,7 @@ func TestBigTpool(t *testing.T) {
 	var graphs3 [][]types.Transaction
 	for _, output := range outputTxns3 {
 		finalTxn := output[len(output)-1]
-		for i := 0; i < 500; i++ { //500 is the the number of outputs
+		for i := 0; i < 500; i++ { // 500 is the the number of outputs.
 			var edges []types.TransactionGraphEdge
 			totalValue := coinFrac.Mul64(110).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
 			setSize := 10
