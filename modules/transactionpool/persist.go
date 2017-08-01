@@ -27,6 +27,18 @@ var (
 	errNilFeeMedian = errors.New("no fee median found")
 )
 
+func (tp *TransactionPool) statsLogger() {
+	if !build.MEMLOGGING {
+		return
+	}
+	tp.log.Println("Logging memory usage:")
+	tp.log.Println("knownObjects size: ", len(tp.knownObjects))
+	tp.log.Println("subscriberSets size: ", len(tp.subscriberSets))
+	tp.log.Println("transactionHeights size: ", len(tp.transactionHeights))
+	tp.log.Println("transactionSets size: ", len(tp.transactionSets))
+	tp.log.Println("transactionSetDiffs size: ", len(tp.transactionSetDiffs))
+}
+
 // threadedRegularSync will make sure that sync gets called on the database
 // every once in a while.
 func (tp *TransactionPool) threadedRegularSync() {
@@ -42,6 +54,7 @@ func (tp *TransactionPool) threadedRegularSync() {
 		case <-time.After(tpoolSyncRate):
 			tp.mu.Lock()
 			tp.syncDB()
+			tp.statsLogger()
 			tp.mu.Unlock()
 		}
 	}

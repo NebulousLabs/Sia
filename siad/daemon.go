@@ -123,6 +123,10 @@ func startDaemon(config Config) (err error) {
 		}
 	}
 
+	if config.Siad.MemLogging {
+		build.MEMLOGGING = true
+	}
+
 	// Process the config variables after they are parsed by cobra.
 	config, err = processConfig(config)
 	if err != nil {

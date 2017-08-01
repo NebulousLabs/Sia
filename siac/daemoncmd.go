@@ -8,6 +8,20 @@ import (
 )
 
 var (
+	daemonCmd = &cobra.Command{
+		Use:   "daemon",
+		Short: "Change daemon settings",
+		Long:  "View or modify daemon settings.",
+		Run:   wrap(daemoncmd),
+	}
+
+	memloggingCmd = &cobra.Command{
+		Use:   "memlogging [flag]",
+		Short: "Check or set memlogging setting",
+		Long:  "Pass the values 'true', or 'false' to change the memlogging setting. No params gives the current setting.",
+		Run:   memloggingcmd,
+	}
+
 	stopCmd = &cobra.Command{
 		Use:   "stop",
 		Short: "Stop the Sia daemon",
@@ -44,6 +58,29 @@ type updateInfo struct {
 
 type daemonVersion struct {
 	Version string
+}
+
+func daemoncmd() {
+	fmt.Printf("Try the command 'daemon memlogging'")
+}
+
+func memloggingcmd(cmd *cobra.Command, args []string) {
+	switch len(args) {
+	case 0:
+		var get string
+		err := getAPI("/daemon/memlogging", &get)
+		fmt.Println(err)
+		fmt.Println(get)
+
+	case 1:
+		err := post("/daemon/memlogging", "set="+args[0])
+		if err != nil {
+			die("Could not update memlogging settings:", err)
+		}
+
+	default:
+		fmt.Println("Error: expected 0 or 1 params to this command")
+	}
 }
 
 // version prints the version of siac and siad.
