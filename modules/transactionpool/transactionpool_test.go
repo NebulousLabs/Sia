@@ -685,6 +685,7 @@ func TestBigTpool(t *testing.T) {
 	coinFrac := types.SiacoinPrecision.Div64(1)
 	feeFrac := types.SiacoinPrecision.Div64(10)
 	numGraphsPerChunk := 1000
+	transactionSetSizes := []int{1, 2, 5, 10, 20}
 
 	var outputs1 []types.SiacoinOutput
 	var outputs2 []types.SiacoinOutput
@@ -716,7 +717,7 @@ func TestBigTpool(t *testing.T) {
 		for i := 0; i < 500; i++ { // 500 is the the number of outputs
 			var edges []types.TransactionGraphEdge
 			totalValue := coinFrac.Mul64(25).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
-			setSize := 10
+			setSize := transactionSetSizes[fastrand.Intn(5)] // 1, 2, 5, 10, or 20 with equal probability
 			txTotalVal := totalValue.Div64(uint64(setSize))
 			txFee := txTotalVal.Div64(5)
 			txVal := txTotalVal.Sub(txFee)
@@ -776,7 +777,7 @@ func TestBigTpool(t *testing.T) {
 		for i := 0; i < 500; i++ { // 500 is the the number of outputs.
 			var edges []types.TransactionGraphEdge
 			totalValue := coinFrac.Mul64(60).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
-			setSize := 10
+			setSize := transactionSetSizes[fastrand.Intn(5)] // 1, 2, 5, 10, or 20 with equal probability
 			txTotalVal := totalValue.Div64(uint64(setSize))
 			txFee := txTotalVal.Div64(5)
 			txVal := txTotalVal.Sub(txFee)
@@ -836,7 +837,7 @@ func TestBigTpool(t *testing.T) {
 		for i := 0; i < 500; i++ { // 500 is the the number of outputs.
 			var edges []types.TransactionGraphEdge
 			totalValue := coinFrac.Mul64(110).Add(feeFrac.Mul64(uint64(counter))).Mul64(2)
-			setSize := 10
+			setSize := transactionSetSizes[fastrand.Intn(5)] // 1, 2, 5, 10, or 20 with equal probability
 			txTotalVal := totalValue.Div64(uint64(setSize))
 			txFee := txTotalVal.Div64(5)
 			txVal := txTotalVal.Sub(txFee)
@@ -908,10 +909,20 @@ func TestBigTpool(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Accept the first half of the first chunk of transactions in a random order.
-	firstIndices := fastrand.Perm(numGraphsPerChunk / 2)
-	for _, i := range firstIndices {
-		graph := graphs[i]
+	var totalGraph [][]types.Transaction
+	totalGraph = append(totalGraph, graphs...)
+	totalGraph = append(totalGraph, graphs2...)
+	totalGraph = append(totalGraph, graphs3...)
+
+	//  Add transactions one megabyte at a time.
+	firstMix := fastrand.Perm(670) // around 670 graphs make 1MB of transactions
+	secondMix := fastrand.Perm(670)
+	thirdMix := fastrand.Perm(670)
+	fourthMix := fastrand.Perm(670)
+	fifthMix := fastrand.Perm(320)
+
+	for _, i := range firstMix {
+		graph := totalGraph[i]
 		for _, txn := range graph[1:] {
 			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
 			if err != nil {
@@ -919,10 +930,8 @@ func TestBigTpool(t *testing.T) {
 			}
 		}
 	}
-	// Accept the first half transactions of the second chunk in a random order.
-	mixSecond := fastrand.Perm(numGraphsPerChunk / 2)
-	for _, i := range mixSecond {
-		graph := graphs2[i]
+	for _, i := range secondMix {
+		graph := totalGraph[i+670]
 		for _, txn := range graph[1:] {
 			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
 			if err != nil {
@@ -930,10 +939,8 @@ func TestBigTpool(t *testing.T) {
 			}
 		}
 	}
-	// Accept the rest of the first chunk in random order.
-	finishFirstChunk := fastrand.Perm(numGraphsPerChunk / 2)
-	for _, i := range finishFirstChunk {
-		graph := graphs[i+(numGraphsPerChunk/2)]
+	for _, i := range thirdMix {
+		graph := totalGraph[i+670+670]
 		for _, txn := range graph[1:] {
 			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
 			if err != nil {
@@ -941,10 +948,8 @@ func TestBigTpool(t *testing.T) {
 			}
 		}
 	}
-	// Accept the next fourth of the transactions of the second chunk in a random order.
-	moreSecond := fastrand.Perm(numGraphsPerChunk / 4)
-	for _, i := range moreSecond {
-		graph := graphs2[i+numGraphsPerChunk/2]
+	for _, i := range fourthMix {
+		graph := totalGraph[i+670+670+670]
 		for _, txn := range graph[1:] {
 			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
 			if err != nil {
@@ -952,32 +957,8 @@ func TestBigTpool(t *testing.T) {
 			}
 		}
 	}
-	// Mix in the first half transactions of the third chunk in a random order.
-	mixThird := fastrand.Perm(numGraphsPerChunk / 2)
-	for _, i := range mixThird {
-		graph := graphs3[i]
-		for _, txn := range graph[1:] {
-			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	// Accept the last remaining transactions of the second chunk in a random order.
-	finishSecond := fastrand.Perm(numGraphsPerChunk / 4)
-	for _, i := range finishSecond {
-		graph := graphs2[i+(numGraphsPerChunk/2)+(numGraphsPerChunk/4)]
-		for _, txn := range graph[1:] {
-			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	// Accept the remaining transactions from the last chunk.
-	finishThird := fastrand.Perm(numGraphsPerChunk / 2)
-	for _, i := range finishThird {
-		graph := graphs3[i+(numGraphsPerChunk/2)]
+	for _, i := range fifthMix {
+		graph := totalGraph[i+670+670+670+670]
 		for _, txn := range graph[1:] {
 			err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
 			if err != nil {
