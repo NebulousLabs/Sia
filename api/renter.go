@@ -135,6 +135,11 @@ type (
 		Files []modules.FileInfo `json:"files"`
 	}
 
+	// RenterFilesDetail lists the files with detail known to the renter.
+	RenterFilesDetail struct {
+		Files []modules.FileDetailInfo `json:"files"`
+	}
+
 	// RenterLoad lists files that were loaded into the renter.
 	RenterLoad struct {
 		FilesAdded []string `json:"filesadded"`
@@ -355,7 +360,9 @@ func (api *API) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ h
 
 // renterFilesDetailHandler handles the API call to show renter files repairing detail
 func (api *API) renterFilesDetailHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	WriteJSON(w, api.renter.FilesDetail())
+	WriteJSON(w, RenterFilesDetail{
+		Files: api.renter.FilesDetail(),
+	})
 }
 
 // renterPricesHandler reports the expected costs of various actions given the
