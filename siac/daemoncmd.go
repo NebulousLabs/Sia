@@ -16,7 +16,7 @@ var (
 	}
 
 	memloggingCmd = &cobra.Command{
-		Use:   "memlogging [flag]",
+		Use:   "memlogging",
 		Short: "Check or set memlogging setting",
 		Long:  "Pass the values 'true', or 'false' to change the memlogging setting. No params gives the current setting.",
 		Run:   memloggingcmd,

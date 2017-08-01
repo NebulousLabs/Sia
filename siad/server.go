@@ -357,6 +357,9 @@ func (srv *Server) daemonStopHandler(w http.ResponseWriter, _ *http.Request, _ h
 func (srv *Server) daemonHandler(password string) http.Handler {
 	router := httprouter.New()
 
+	router.GET("/daemon/memlogging", srv.memloggingGET)
+	router.POST("/daemon/memlogging", srv.memloggingPOST)
+
 	router.GET("/daemon/constants", srv.daemonConstantsHandler)
 	router.GET("/daemon/version", srv.daemonVersionHandler)
 	router.GET("/daemon/update", srv.daemonUpdateHandlerGET)
@@ -364,6 +367,31 @@ func (srv *Server) daemonHandler(password string) http.Handler {
 	router.GET("/daemon/stop", api.RequirePassword(srv.daemonStopHandler, password))
 
 	return router
+}
+
+func (srv *Server) memloggingGET(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	if build.MEMLOGGING {
+		w.Write([]byte("memlogging enabled"))
+	} else {
+		w.Write([]byte("memlogging disabled"))
+	}
+}
+
+func (srv *Server) memloggingPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	val := strings.ToLower(req.FormValue("set")) // response is case-insensitive
+	if val == "true" {
+		build.MEMLOGGING = true
+		api.WriteSuccess(w)
+		println("api SUCCESS true")
+		return
+	}
+	if val == "false" {
+		build.MEMLOGGING = false
+		api.WriteSuccess(w)
+		println("api SUCCESS false")
+		return
+	}
+	api.WriteError(w, api.Error{Message: "error when calling /daemon/memlogging: expected param 'set' to be 'true' or 'false'"}, http.StatusBadRequest)
 }
 
 // NewServer creates a new net.http server listening on bindAddr.  Only the
