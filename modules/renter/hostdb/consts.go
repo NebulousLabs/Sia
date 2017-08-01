@@ -52,7 +52,7 @@ var (
 	// hostCheckupQuantity specifies the number of hosts that get scanned every
 	// time there is a regular scanning operation.
 	hostCheckupQuantity = build.Select(build.Var{
-		Standard: int(200),
+		Standard: int(500),
 		Dev:      int(6),
 		Testing:  int(5),
 	}).(int)
@@ -78,7 +78,7 @@ var (
 	// maxScanSleep is the maximum amount of time that the hostdb will sleep
 	// between performing scans of the hosts.
 	maxScanSleep = build.Select(build.Var{
-		Standard: time.Hour * 8,
+		Standard: time.Hour * 6,
 		Dev:      time.Minute * 10,
 		Testing:  time.Second * 15,
 	}).(time.Duration)
