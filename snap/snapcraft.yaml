@@ -1,0 +1,30 @@
+name: sia
+version: git
+summary: Blockchain-based marketplace for file storage
+description: |
+  Sia is a new decentralized cloud storage platform that radically alters the
+  landscape of cloud storage. By leveraging smart contracts, client-side
+  encryption, and sophisticated redundancy (via Reed-Solomon codes), Sia allows
+  users to safely store their data with hosts that they do not know or trust.
+
+grade: devel # must be 'stable' to release into candidate/stable channels
+confinement: strict
+
+apps:
+  daemon:
+    command: siad
+    plugs: [network, network-bind]
+    aliases: [siad]
+  client:
+    command: siac
+    plugs: [network]
+    aliases: [siac]
+
+parts:
+  sia:
+    source: .
+    plugin: go
+    go-importpath: github.com/NebulousLabs/Sia
+    after: [go]
+  go:
+    source-tag: go1.8

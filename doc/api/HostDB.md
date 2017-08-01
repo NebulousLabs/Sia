@@ -277,6 +277,14 @@ overall.
     // a point it can be detrimental.
     "collateraladjustment":       23.456,
 
+    // The multipler that gets applied to a host based on previous interactions
+    // with the host. A high ratio of successful interactions will improve this
+    // hosts score, and a high ratio of failed interactions will hurt this
+    // hosts score. This adjustment helps account for hosts that are on
+    // unstable connections, don't keep their wallets unlocked, ran out of
+    // funds, etc.
+    "interactionadjustment":      0.1234,
+
     // The multiplier that gets applied to a host based on the host's price.
     // Lower prices are almost always better. Below a certain, very low price,
     // there is no advantage.

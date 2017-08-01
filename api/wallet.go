@@ -98,7 +98,7 @@ type (
 	// WalletVerifyAddressGET contains a bool indicating if the address passed to
 	// /wallet/verify/address/:addr is a valid address.
 	WalletVerifyAddressGET struct {
-		Valid bool
+		Valid bool `json:"valid"`
 	}
 )
 
@@ -162,7 +162,7 @@ func (api *API) wallet033xHandler(w http.ResponseWriter, req *http.Request, _ ht
 func (api *API) walletAddressHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	unlockConditions, err := api.wallet.NextAddress()
 	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/addresses: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/addresses: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	WriteJSON(w, WalletAddressGET{
@@ -187,7 +187,7 @@ func (api *API) walletBackupHandler(w http.ResponseWriter, req *http.Request, _ 
 	}
 	err := api.wallet.CreateBackup(destination)
 	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/backup: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/backup: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	WriteSuccess(w)
@@ -335,26 +335,26 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 	// Get the primary seed information.
 	primarySeed, addrsRemaining, err := api.wallet.PrimarySeed()
 	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	primarySeedStr, err := modules.SeedToString(primarySeed, dictionary)
 	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	// Get the list of seeds known to the wallet.
 	allSeeds, err := api.wallet.AllSeeds()
 	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	var allSeedsStrs []string
 	for _, seed := range allSeeds {
 		str, err := modules.SeedToString(seed, dictionary)
 		if err != nil {
-			WriteError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"error when calling /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 		allSeedsStrs = append(allSeedsStrs, str)
@@ -384,7 +384,7 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 		}
 		txns, err = api.wallet.SendSiacoinsMulti(outputs)
 		if err != nil {
-			WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
+			WriteError(w, Error{"error when calling /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 			return
 		}
 	} else {
@@ -402,7 +402,7 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 
 		txns, err = api.wallet.SendSiacoins(amount, dest)
 		if err != nil {
-			WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
+			WriteError(w, Error{"error when calling /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 			return
 		}
 
@@ -426,13 +426,13 @@ func (api *API) walletSiafundsHandler(w http.ResponseWriter, req *http.Request, 
 	}
 	dest, err := scanAddress(req.FormValue("destination"))
 	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/siafunds: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/siafunds: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	txns, err := api.wallet.SendSiafunds(amount, dest)
 	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/siafunds: " + err.Error()}, http.StatusInternalServerError)
+		WriteError(w, Error{"error when calling /wallet/siafunds: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 	var txids []types.TransactionID
@@ -475,7 +475,7 @@ func (api *API) walletTransactionHandler(w http.ResponseWriter, req *http.Reques
 	jsonID := "\"" + ps.ByName("id") + "\""
 	err := id.UnmarshalJSON([]byte(jsonID))
 	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/history: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/history: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -509,7 +509,7 @@ func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Reque
 	}
 	confirmedTxns, err := api.wallet.Transactions(types.BlockHeight(start), types.BlockHeight(end))
 	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/transactions: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/transactions: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	unconfirmedTxns := api.wallet.UnconfirmedTransactions()
@@ -528,7 +528,7 @@ func (api *API) walletTransactionsAddrHandler(w http.ResponseWriter, req *http.R
 	var addr types.UnlockHash
 	err := addr.UnmarshalJSON([]byte(jsonAddr))
 	if err != nil {
-		WriteError(w, Error{"error after call to /wallet/transactions: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/transactions: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 

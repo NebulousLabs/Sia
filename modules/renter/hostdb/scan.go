@@ -34,12 +34,16 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 
 	// Sanity check - the scan map and the scan list should have the same
 	// length.
-	if build.DEBUG && len(hdb.scanMap) > len(hdb.scanList)+scanningThreads {
-		hdb.log.Critical("The hostdb scan map has seemingly grown too large:", len(hdb.scanMap), len(hdb.scanList), scanningThreads)
+	if build.DEBUG && len(hdb.scanMap) > len(hdb.scanList)+maxScanningThreads {
+		hdb.log.Critical("The hostdb scan map has seemingly grown too large:", len(hdb.scanMap), len(hdb.scanList), maxScanningThreads)
 	}
 
 	hdb.scanWait = true
+	scanPool := make(chan modules.HostDBEntry)
+
 	go func() {
+		defer close(scanPool)
+
 		// Nobody is emptying the scan list, volunteer.
 		if hdb.tg.Add() != nil {
 			// Hostdb is shutting down, don't spin up another thread.  It is
@@ -69,12 +73,23 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			if exists {
 				entry = recentEntry
 			}
+
+			// Create new worker thread
+			if hdb.scanningThreads < maxScanningThreads {
+				hdb.scanningThreads++
+				go func() {
+					hdb.threadedProbeHosts(scanPool)
+					hdb.mu.Lock()
+					hdb.scanningThreads--
+					hdb.mu.Unlock()
+				}()
+			}
 			hdb.mu.Unlock()
 
 			// Block while waiting for an opening in the scan pool.
 			hdb.log.Debugf("Sending host %v for scan, %v hosts remain", entry.PublicKey.String(), scansRemaining)
 			select {
-			case hdb.scanPool <- entry:
+			case scanPool <- entry:
 				// iterate again
 			case <-hdb.tg.StopChan():
 				// quit
@@ -199,6 +214,11 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	pubKey := entry.PublicKey
 	hdb.log.Debugf("Scanning host %v at %v", pubKey, netAddr)
 
+	// Update historic interactions of entry if necessary
+	hdb.mu.RLock()
+	updateHostHistoricInteractions(&entry, hdb.blockHeight)
+	hdb.mu.RUnlock()
+
 	var settings modules.HostExternalSettings
 	err := func() error {
 		dialer := &net.Dialer{
@@ -228,9 +248,6 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 		copy(pubkey[:], pubKey.Key)
 		return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 	}()
-	// Update historic interactions of entry if necessary
-	updateHostsHistoricInteractions(&entry, hdb.cs.Height())
-
 	if err != nil {
 		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
 		if hdb.online {
@@ -254,40 +271,32 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 }
 
 // threadedProbeHosts pulls hosts from the thread pool and runs a scan on them.
-func (hdb *HostDB) threadedProbeHosts() {
+func (hdb *HostDB) threadedProbeHosts(scanPool <-chan modules.HostDBEntry) {
 	err := hdb.tg.Add()
 	if err != nil {
 		return
 	}
 	defer hdb.tg.Done()
-
-	for {
-		select {
-		case <-hdb.tg.StopChan():
-			return
-		case hostEntry := <-hdb.scanPool:
-			// Block the scan until the host is online.
-			for {
-				hdb.mu.RLock()
-				online := hdb.online
-				hdb.mu.RUnlock()
-				if online {
-					break
-				}
-
-				// Check again in 30 seconds.
-				select {
-				case <-time.After(time.Second * 30):
-					continue
-				case <-hdb.tg.StopChan():
-					return
-				}
+	for hostEntry := range scanPool {
+		// Block until hostdb has internet connectivity.
+		for {
+			hdb.mu.RLock()
+			online := hdb.online
+			hdb.mu.RUnlock()
+			if online {
+				break
 			}
-
-			// There appears to be internet connectivity, continue with the
-			// scan.
-			hdb.managedScanHost(hostEntry)
+			select {
+			case <-time.After(time.Second * 30):
+				continue
+			case <-hdb.tg.StopChan():
+				return
+			}
 		}
+
+		// There appears to be internet connectivity, continue with the
+		// scan.
+		hdb.managedScanHost(hostEntry)
 	}
 }
 

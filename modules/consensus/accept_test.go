@@ -9,6 +9,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 var (
@@ -1035,15 +1037,16 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 // subscriber, as well as the number of times that the subscriber has been given
 // changes at all.
 type blockCountingSubscriber struct {
+	changes []modules.ConsensusChangeID
+
 	appliedBlocks  int
 	revertedBlocks int
-	changes        int
 }
 
 // ProcessConsensusChange fills the subscription interface for the
 // blockCountingSubscriber.
 func (bcs *blockCountingSubscriber) ProcessConsensusChange(cc modules.ConsensusChange) {
-	bcs.changes++
+	bcs.changes = append(bcs.changes, cc.ID)
 	bcs.revertedBlocks += len(cc.RevertedBlocks)
 	bcs.appliedBlocks += len(cc.AppliedBlocks)
 }
@@ -1070,7 +1073,7 @@ func TestChainedAcceptBlock(t *testing.T) {
 	// Subscribe a blockCountingSubscriber to cst2.
 	var bcs blockCountingSubscriber
 	cst2.cs.ConsensusSetSubscribe(&bcs, modules.ConsensusChangeBeginning)
-	if bcs.changes != 1 || bcs.appliedBlocks != 1 || bcs.revertedBlocks != 0 {
+	if len(bcs.changes) != 1 || bcs.appliedBlocks != 1 || bcs.revertedBlocks != 0 {
 		t.Error("consensus changes do not seem to be getting passed to subscribers correctly")
 	}
 
@@ -1106,7 +1109,7 @@ func TestChainedAcceptBlock(t *testing.T) {
 	if cst2.cs.Height() != 0 {
 		t.Fatal("blocks added even though the inputs were jumbled")
 	}
-	if bcs.changes != 1 || bcs.appliedBlocks != 1 || bcs.revertedBlocks != 0 {
+	if len(bcs.changes) != 1 || bcs.appliedBlocks != 1 || bcs.revertedBlocks != 0 {
 		t.Error("consensus changes do not seem to be getting passed to subscribers correctly")
 	}
 
@@ -1135,7 +1138,7 @@ func TestChainedAcceptBlock(t *testing.T) {
 		t.Log(cst.cs.Height())
 		t.Fatal("height is not correct, does not seem that the blocks were added")
 	}
-	if bcs.changes != 2 || bcs.appliedBlocks != int(cst2.cs.Height()+1) || bcs.revertedBlocks != 0 {
+	if bcs.appliedBlocks != int(cst2.cs.Height()+1) || bcs.revertedBlocks != 0 {
 		t.Error("consensus changes do not seem to be getting passed to subscribers correctly")
 	}
 
@@ -1145,7 +1148,22 @@ func TestChainedAcceptBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bcs.changes != 3 || bcs.appliedBlocks != int(cst2.cs.Height()+1) || bcs.revertedBlocks != 0 {
+	if bcs.appliedBlocks != int(cst2.cs.Height()+1) || bcs.revertedBlocks != 0 {
 		t.Error("consensus changes do not seem to be getting passed to subscribers correctly")
+	}
+
+	// Check that every change recorded in 'bcs' is also available in the
+	// consensus set.
+	for _, change := range bcs.changes {
+		err := cst2.cs.db.Update(func(tx *bolt.Tx) error {
+			_, exists := getEntry(tx, change)
+			if !exists {
+				t.Error("an entry was provided that doesn't exist")
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }

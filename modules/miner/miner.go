@@ -58,6 +58,8 @@ type splitSet struct {
 	transactions []types.Transaction
 }
 
+type splitSetID int
+
 // Miner struct contains all variables the miner needs
 // in order to create and submit blocks.
 type Miner struct {
@@ -85,9 +87,13 @@ type Miner struct {
 	memProgress     int                                            // The index of the most recent header used in headerMem.
 
 	// Transaction pool variables.
-	fullSets   map[modules.TransactionSetID][]int
-	setCounter int
-	splitSets  map[int]*splitSet
+	fullSets           map[modules.TransactionSetID][]int
+	blockMapHeap       *mapHeap
+	overflowMapHeap    *mapHeap
+	setCounter         int
+	splitSets          map[splitSetID]*splitSet
+	splitSetIDFromTxID map[types.TransactionID]splitSetID
+	unsolvedBlockIndex map[types.TransactionID]int
 
 	// CPUMiner variables.
 	miningOn bool  // indicates if the miner is supposed to be running
@@ -165,7 +171,19 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		headerMem:  make([]types.BlockHeader, HeaderMemory),
 
 		fullSets:  make(map[modules.TransactionSetID][]int),
-		splitSets: make(map[int]*splitSet),
+		splitSets: make(map[splitSetID]*splitSet),
+		blockMapHeap: &mapHeap{
+			selectID: make(map[splitSetID]*mapElement),
+			data:     nil,
+			minHeap:  true,
+		},
+		overflowMapHeap: &mapHeap{
+			selectID: make(map[splitSetID]*mapElement),
+			data:     nil,
+			minHeap:  false,
+		},
+		splitSetIDFromTxID: make(map[types.TransactionID]splitSetID),
+		unsolvedBlockIndex: make(map[types.TransactionID]int),
 
 		persistDir: persistDir,
 	}

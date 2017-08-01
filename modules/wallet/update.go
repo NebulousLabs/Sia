@@ -393,6 +393,11 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 // ProcessConsensusChange parses a consensus change to update the set of
 // confirmed outputs known to the wallet.
 func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
+	if err := w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -422,6 +427,11 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
 // transaction set.
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.TransactionPoolDiff) {
+	if err := w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -459,16 +469,16 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 	}
 
 	// Scroll through all of the diffs and add any new transactions.
-	for _, uts := range diff.AppliedTransactions {
+	for _, unconfirmedTxnSet := range diff.AppliedTransactions {
 		// Mark all of the transactions that appeared in this set.
 		//
 		// TODO: Technically only necessary to mark the ones that are relevant
 		// to the wallet, but overhead should be low.
-		w.unconfirmedSets[uts.ID] = uts.IDs
+		w.unconfirmedSets[unconfirmedTxnSet.ID] = unconfirmedTxnSet.IDs
 
 		// Get the values for the spent outputs.
 		spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
-		for _, scod := range uts.Change.SiacoinOutputDiffs {
+		for _, scod := range unconfirmedTxnSet.Change.SiacoinOutputDiffs {
 			// Only need to grab the reverted ones, because only reverted ones
 			// have the possibility of having been spent.
 			if scod.Direction == modules.DiffRevert {
@@ -477,7 +487,7 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 		}
 
 		// Add each transaction to our set of unconfirmed transactions.
-		for i, txn := range uts.Transactions {
+		for i, txn := range unconfirmedTxnSet.Transactions {
 			// determine whether transaction is relevant to the wallet
 			relevant := false
 			for _, sci := range txn.SiacoinInputs {
@@ -494,7 +504,7 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 
 			pt := modules.ProcessedTransaction{
 				Transaction:           txn,
-				TransactionID:         uts.IDs[i],
+				TransactionID:         unconfirmedTxnSet.IDs[i],
 				ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
 				ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
 			}

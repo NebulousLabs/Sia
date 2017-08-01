@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
@@ -382,6 +383,23 @@ func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, e
 		listener: l,
 		httpServer: &http.Server{
 			Handler: mux,
+
+			// set reasonable timeout windows for requests, to prevent the Sia API
+			// server from leaking file descriptors due to slow, disappearing, or
+			// unreliable API clients.
+
+			// ReadTimeout defines the maximum amount of time allowed to fully read
+			// the request body. This timeout is applied to every handler in the
+			// server.
+			ReadTimeout: time.Minute * 5,
+
+			// ReadHeaderTimeout defines the amount of time allowed to fully read the
+			// request headers.
+			ReadHeaderTimeout: time.Minute * 2,
+
+			// IdleTimeout defines the maximum duration a HTTP Keep-Alive connection
+			// the API is kept open with no activity before closing.
+			IdleTimeout: time.Minute * 5,
 		},
 	}
 
