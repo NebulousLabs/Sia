@@ -60,6 +60,10 @@ type daemonVersion struct {
 	Version string
 }
 
+type memloggingInfo struct {
+	Active bool `json:"active"`
+}
+
 func daemoncmd() {
 	fmt.Printf("Try the command 'daemon memlogging'")
 }
@@ -67,17 +71,18 @@ func daemoncmd() {
 func memloggingcmd(cmd *cobra.Command, args []string) {
 	switch len(args) {
 	case 0:
-		var get string
-		err := getAPI("/daemon/memlogging", &get)
-		fmt.Println(err)
-		fmt.Println(get)
+		var loggingInfo memloggingInfo
+		err := getAPI("/daemon/memlogging", &loggingInfo)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println("Memlogging Active: ", loggingInfo.Active)
 
 	case 1:
-		err := post("/daemon/memlogging", "set="+args[0])
+		err := post("/daemon/memlogging", "active="+args[0])
 		if err != nil {
 			die("Could not update memlogging settings:", err)
 		}
-
 	default:
 		fmt.Println("Error: expected 0 or 1 params to this command")
 	}

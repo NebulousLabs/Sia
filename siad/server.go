@@ -65,6 +65,9 @@ type (
 	DaemonVersion struct {
 		Version string `json:"version"`
 	}
+	MemloggingInfo struct {
+		Active bool `json:"active"`
+	}
 	// UpdateInfo indicates whether an update is available, and to what
 	// version.
 	UpdateInfo struct {
@@ -369,26 +372,24 @@ func (srv *Server) daemonHandler(password string) http.Handler {
 	return router
 }
 
+// memloggingGET returns a json response containing a bool that tells whether or
+// not memlogging is active or not.
 func (srv *Server) memloggingGET(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	if build.MEMLOGGING {
-		w.Write([]byte("memlogging enabled"))
-	} else {
-		w.Write([]byte("memlogging disabled"))
-	}
+	api.WriteJSON(w, MemloggingInfo{Active: build.MEMLOGGING})
 }
 
+// memloggingPOST makes a POST request with a boolean param `active` that sets
+// memlogging on if true, off if false.
 func (srv *Server) memloggingPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	val := strings.ToLower(req.FormValue("set")) // response is case-insensitive
+	val := strings.ToLower(req.FormValue("active")) // response is case-insensitive
 	if val == "true" {
 		build.MEMLOGGING = true
 		api.WriteSuccess(w)
-		println("api SUCCESS true")
 		return
 	}
 	if val == "false" {
 		build.MEMLOGGING = false
 		api.WriteSuccess(w)
-		println("api SUCCESS false")
 		return
 	}
 	api.WriteError(w, api.Error{Message: "error when calling /daemon/memlogging: expected param 'set' to be 'true' or 'false'"}, http.StatusBadRequest)

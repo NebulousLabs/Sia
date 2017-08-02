@@ -189,10 +189,6 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	router.NotFound = http.HandlerFunc(UnrecognizedCallHandler)
 	router.RedirectTrailingSlash = false
 
-	// Daemon API Calls
-	router.GET("/daemon/memlogging", api.memloggingGET)
-	router.POST("/daemon/memlogging", api.memloggingPOST)
-
 	// Consensus API Calls
 	if api.cs != nil {
 		router.GET("/consensus", api.consensusHandler)
