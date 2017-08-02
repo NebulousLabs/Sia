@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 )
@@ -51,6 +52,15 @@ func (g *Gateway) saveSync() error {
 	return persist.SaveJSON(persistMetadata, g.persistData(), filepath.Join(g.persistDir, nodesFile))
 }
 
+func (g *Gateway) statsLogger() {
+	if !build.MEMLOGGING {
+		return
+	}
+	g.log.Println("Logging memory usage:")
+	g.log.Println("nodes size: ", len(g.nodes))
+	g.log.Println("peers size: ", len(g.peers))
+}
+
 // threadedSaveLoop periodically saves the gateway.
 func (g *Gateway) threadedSaveLoop() {
 	for {
@@ -69,6 +79,7 @@ func (g *Gateway) threadedSaveLoop() {
 
 			g.mu.Lock()
 			err = g.saveSync()
+			g.statsLogger()
 			g.mu.Unlock()
 			if err != nil {
 				g.log.Println("ERROR: Unable to save gateway persist:", err)

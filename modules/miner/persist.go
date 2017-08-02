@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
@@ -74,6 +75,19 @@ func (m *Miner) load() error {
 // saveSync saves the miner persistence to disk, and then syncs to disk.
 func (m *Miner) saveSync() error {
 	return persist.SaveJSON(settingsMetadata, m.persist, filepath.Join(m.persistDir, settingsFile))
+}
+
+func (m *Miner) statsLogger() {
+	if !build.MEMLOGGING {
+		return
+	}
+	m.log.Println("Logging memory usage:")
+	m.log.Println("blockMem size: ", len(m.blockMem))
+	m.log.Println("arbDataMem size: ", len(m.arbDataMem))
+	m.log.Println("fullSets size: ", len(m.fullSets))
+	m.log.Println("splitSets size: ", len(m.splitSets))
+	m.log.Println("blockMapHeap size: ", m.blockMapHeap.len())
+	m.log.Println("overflowMapHeap size: ", m.overflowMapHeap.len())
 }
 
 // threadedSaveLoop periodically saves the miner persist.
