@@ -341,7 +341,7 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 		// Notify subscribers of an accepted transaction set
 		tp.updateSubscribersTransactions()
-		tp.subscriberSanityCheck(tp.sanitycheck) // Probabilistic sanity check.
+		tp.subscriberSanityCheck() // Probabilistic sanity check.
 		return nil
 	})
 }

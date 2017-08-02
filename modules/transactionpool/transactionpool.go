@@ -63,7 +63,7 @@ type (
 		// transaction pool, all prior consensus changes are sent to the new
 		// subscriber.
 		subscribers []modules.TransactionPoolSubscriber
-		sanitycheck *sanityCheckSubscriber
+		sanityCheck *sanityCheckSubscriber
 
 		// Utilities.
 		db         *persist.BoltDatabase
@@ -102,7 +102,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 	if build.DEBUG {
 		sub := newSanityCheckSubscriber()
 		tp.subscribers = append(tp.subscribers, sub)
-		tp.sanitycheck = sub
+		tp.sanityCheck = sub
 	}
 
 	// Open the tpool database.

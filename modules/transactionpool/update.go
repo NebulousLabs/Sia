@@ -378,7 +378,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Inform subscribers that an update has executed.
 	tp.mu.Demote()
 	tp.updateSubscribersTransactions()
-	tp.subscriberSanityCheck(tp.sanitycheck) // Probabilistic sanity check.
+	tp.subscriberSanityCheck() // Probabilistic sanity check.
 	tp.mu.DemotedUnlock()
 }
 

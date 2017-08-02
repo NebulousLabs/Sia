@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
@@ -33,18 +34,18 @@ func (s *sanityCheckSubscriber) ReceiveUpdatedUnconfirmedTransactions(diff *modu
 // subscriberSanityCheck performs a sanity check on the transaction pool. It
 // panics if the map of transaction sets in the subscriber's state is not
 // exactly the same as the map of transaction sets in the transaction pool.
-func (tp *TransactionPool) subscriberSanityCheck(s *sanityCheckSubscriber) {
+func (tp *TransactionPool) subscriberSanityCheck() {
 	// 1/30 chance of running this check because it is expensive
-	if fastrand.Intn(30) != 0 {
+	if fastrand.Intn(30) != 0 || !build.DEBUG {
 		return
 	}
 
-	if len(tp.transactionSets) != len(s.transactionSets) {
+	if len(tp.transactionSets) != len(tp.sanityCheck.transactionSets) {
 		panic("length of tp transactions sets different from sanityCheckSubscriber's ")
 	}
 
 	for tpoolSetID, tpoolSet := range tp.transactionSets {
-		subscriberSet, ok := s.transactionSets[tpoolSetID]
+		subscriberSet, ok := tp.sanityCheck.transactionSets[tpoolSetID]
 		if !ok {
 			// Doesn't contain a set the tpool contains.
 			panic("sanityCheckSubscriber doesn't contain same transaction set as tpool")
