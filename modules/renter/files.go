@@ -149,11 +149,11 @@ func (f *file) redundancy(isOffline func(types.FileContractID) bool) float64 {
 // detail returns the detail of this file,
 // with info about each piece is storing by which host(IP)
 // offline or not
-func (f *file) detail(isOffline func(types.FileContractID) bool) [][]*modules.FileDetail {
+func (f *file) detail(isOffline func(types.FileContractID) bool) [][][]*modules.FileDetail {
 	if f.size == 0 {
 		return nil
 	}
-	piecesInChunk := make([][]*modules.FileDetail, f.numChunks())
+	piecesInChunk := make([][][]*modules.FileDetail, f.numChunks())
 	// If the file has non-0 size then the number of chunks should also be
 	// non-0. Therefore the f.size == 0 conditional block above must appear
 	// before this check.
@@ -162,15 +162,8 @@ func (f *file) detail(isOffline func(types.FileContractID) bool) [][]*modules.Fi
 		return nil
 	}
 
-	emptyDetail := &modules.FileDetail{
-		IP:        "",
-		IsOffline: true,
-	}
 	for i := 0; i < len(piecesInChunk); i++ {
-		p := make([]*modules.FileDetail, f.erasureCode.NumPieces())
-		for j := 0; j < f.erasureCode.NumPieces(); j++ {
-			p[j] = emptyDetail
-		}
+		p := make([][]*modules.FileDetail, f.erasureCode.NumPieces())
 		piecesInChunk[i] = p
 	}
 	for _, fc := range f.contracts {
@@ -181,7 +174,10 @@ func (f *file) detail(isOffline func(types.FileContractID) bool) [][]*modules.Fi
 				IP:        fc.IP,
 				IsOffline: isoffline,
 			}
-			piecesInChunk[p.Chunk][p.Piece] = fd
+			if piecesInChunk[p.Chunk][p.Piece] == nil {
+				piecesInChunk[p.Chunk][p.Piece] = make([]*modules.FileDetail, 0)
+			}
+			piecesInChunk[p.Chunk][p.Piece] = append(piecesInChunk[p.Chunk][p.Piece], fd)
 		}
 	}
 	return piecesInChunk

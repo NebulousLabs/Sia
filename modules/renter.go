@@ -93,7 +93,7 @@ type FileDetailInfo struct {
 	Redundancy     float64           `json:"redundancy"`
 	UploadProgress float64           `json:"uploadprogress"`
 	Expiration     types.BlockHeight `json:"expiration"`
-	Details        [][]*FileDetail   `json:"details"`
+	Details        [][][]*FileDetail `json:"details"`
 }
 
 // FileDetail is the detail of pieces
