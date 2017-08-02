@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -58,6 +59,17 @@ var (
 	errNoKey = errors.New("key does not exist")
 )
 
+func (w *Wallet) statsLogger() {
+	if !build.MEMLOGGING {
+		return
+	}
+	w.log.Println("Logging memory usage:")
+	w.log.Println("unconfirmedSets size: ", len(w.unconfirmedSets))
+	w.log.Println("unconfirmedProcessedTransactions size: ", len(w.unconfirmedProcessedTransactions))
+	w.log.Println("keys size: ", len(w.keys))
+	w.log.Println("lookahead size: ", len(w.lookahead))
+}
+
 // threadedDBUpdate commits the active database transaction and starts a new
 // transaction.
 func (w *Wallet) threadedDBUpdate() {
@@ -74,6 +86,7 @@ func (w *Wallet) threadedDBUpdate() {
 		}
 		w.mu.Lock()
 		w.syncDB()
+		w.statsLogger()
 		w.mu.Unlock()
 	}
 }
