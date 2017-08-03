@@ -61,7 +61,7 @@ func (h *Host) initRescan() error {
 	// it happens while blocking, and because there is no actual host lock held
 	// at this time, none of the host external functions are exposed, so it is
 	// save to make the exported call.
-	err = h.cs.ConsensusSetSubscribe(h, modules.ConsensusChangeBeginning)
+	err = h.cs.ConsensusSetSubscribe(h, modules.ConsensusChangeBeginning, h.tg.StopChan())
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (h *Host) initConsensusSubscription() error {
 	// it happens while blocking, and because there is no actual host lock held
 	// at this time, none of the host external functions are exposed, so it is
 	// save to make the exported call.
-	err := h.cs.ConsensusSetSubscribe(h, h.recentChange)
+	err := h.cs.ConsensusSetSubscribe(h, h.recentChange, h.tg.StopChan())
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Perform a rescan of the consensus set if the change id that the host
 		// has is unrecognized by the consensus set. This will typically only

@@ -134,7 +134,7 @@ func (m *Miner) startupRescan() error {
 
 	// Subscribe to the consensus set. This is a blocking call that will not
 	// return until the miner has fully caught up to the current block.
-	err = m.cs.ConsensusSetSubscribe(m, modules.ConsensusChangeBeginning)
+	err = m.cs.ConsensusSetSubscribe(m, modules.ConsensusChangeBeginning, m.tg.StopChan())
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		return nil, errors.New("miner persistence startup failed: " + err.Error())
 	}
 
-	err = m.cs.ConsensusSetSubscribe(m, m.persist.RecentChange)
+	err = m.cs.ConsensusSetSubscribe(m, m.persist.RecentChange, m.tg.StopChan())
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Perform a rescan of the consensus set if the change id is not found.
 		// The id will only be not found if there has been desynchronization

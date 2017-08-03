@@ -81,7 +81,7 @@ func (c *Contractor) load() error {
 	// contract's NetAddress.
 	for _, contract := range data.Contracts {
 		if len(contract.HostPublicKey.Key) == 0 {
-			data.Contracts = addPubKeys(c.cs, data.Contracts)
+			data.Contracts = addPubKeys(c.cs, data.Contracts, c.tg.StopChan())
 			break // only need to rescan once
 		}
 	}
@@ -163,12 +163,12 @@ func (c *Contractor) saveDownloadRevision(id types.FileContractID) func(types.Fi
 
 // addPubKeys rescans the blockchain to fill in the HostPublicKey of
 // contracts, identified by their NetAddress.
-func addPubKeys(cs consensusSet, contracts map[string]modules.RenterContract) map[string]modules.RenterContract {
+func addPubKeys(cs consensusSet, contracts map[string]modules.RenterContract, cancel <-chan struct{}) map[string]modules.RenterContract {
 	pubkeys := make(pubkeyScanner)
 	for _, c := range contracts {
 		pubkeys[c.NetAddress] = types.SiaPublicKey{}
 	}
-	cs.ConsensusSetSubscribe(pubkeys, modules.ConsensusChangeBeginning)
+	cs.ConsensusSetSubscribe(pubkeys, modules.ConsensusChangeBeginning, cancel)
 	for id, c := range contracts {
 		c.HostPublicKey = pubkeys[c.NetAddress]
 		contracts[id] = c

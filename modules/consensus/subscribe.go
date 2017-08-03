@@ -4,6 +4,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/bolt"
 )
 
@@ -120,7 +121,9 @@ func (cs *ConsensusSet) updateSubscribers(ce changeEntry) {
 //
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.
-func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID,
+	cancel <-chan struct{}) error {
+
 	if start == modules.ConsensusChangeRecent {
 		return nil
 	}
@@ -169,6 +172,11 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 		cs.mu.RLock()
 		err = cs.db.View(func(tx *bolt.Tx) error {
 			for i := 0; i < 100 && exists; i++ {
+				select {
+				case <-cancel:
+					return siasync.ErrStopped
+				default:
+				}
 				cc, err := cs.computeConsensusChange(tx, entry)
 				if err != nil {
 					return err
@@ -192,7 +200,9 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 //
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.
-func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID,
+	cancel <-chan struct{}) error {
+
 	err := cs.tg.Add()
 	if err != nil {
 		return err
@@ -200,7 +210,7 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 	defer cs.tg.Done()
 
 	// Get the input module caught up to the current consensus set.
-	err = cs.managedInitializeSubscribe(subscriber, start)
+	err = cs.managedInitializeSubscribe(subscriber, start, cancel)
 	if err != nil {
 		return err
 	}

@@ -225,12 +225,12 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 	})
 
 	// Subscribe to the consensus set.
-	err = cs.ConsensusSetSubscribe(c, c.lastChange)
+	err = cs.ConsensusSetSubscribe(c, c.lastChange, c.tg.StopChan())
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Reset the contractor consensus variables and try rescanning.
 		c.blockHeight = 0
 		c.lastChange = modules.ConsensusChangeBeginning
-		err = cs.ConsensusSetSubscribe(c, c.lastChange)
+		err = cs.ConsensusSetSubscribe(c, c.lastChange, c.tg.StopChan())
 	}
 	if err != nil {
 		return nil, errors.New("contractor subscription failed: " + err.Error())

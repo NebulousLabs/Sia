@@ -11,7 +11,7 @@ import (
 // interface possible makes it easier to mock these dependencies in testing.
 type (
 	consensusSet interface {
-		ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error
+		ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID, <-chan struct{}) error
 		Synced() bool
 		Unsubscribe(modules.ConsensusSetSubscriber)
 	}
