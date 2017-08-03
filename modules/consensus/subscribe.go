@@ -176,13 +176,13 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 				case <-cancel:
 					return siasync.ErrStopped
 				default:
-					cc, err := cs.computeConsensusChange(tx, entry)
-					if err != nil {
-						return err
-					}
-					subscriber.ProcessConsensusChange(cc)
-					entry, exists = entry.NextEntry(tx)
 				}
+				cc, err := cs.computeConsensusChange(tx, entry)
+				if err != nil {
+					return err
+				}
+				subscriber.ProcessConsensusChange(cc)
+				entry, exists = entry.NextEntry(tx)
 			}
 			return nil
 		})

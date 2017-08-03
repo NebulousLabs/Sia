@@ -203,6 +203,7 @@ type (
 		// and gives them every consensus change that has occurred since the
 		// change with the provided id. There are a few special cases,
 		// described by the ConsensusChangeX variables in this package.
+		// A channel can be provided to abort the subscription process.
 		ConsensusSetSubscribe(ConsensusSetSubscriber, ConsensusChangeID, <-chan struct{}) error
 
 		// CurrentBlock returns the latest block in the heaviest known
