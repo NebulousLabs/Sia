@@ -36,7 +36,7 @@ func (s *sanityCheckSubscriber) ReceiveUpdatedUnconfirmedTransactions(diff *modu
 // exactly the same as the map of transaction sets in the transaction pool.
 func (tp *TransactionPool) subscriberSanityCheck() {
 	// 1/30 chance of running this check because it is expensive
-	if fastrand.Intn(30) != 0 || !build.DEBUG {
+	if !build.DEBUG || fastrand.Intn(30) != 0 {
 		return
 	}
 
