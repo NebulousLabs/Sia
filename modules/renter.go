@@ -102,6 +102,13 @@ type FileDetail struct {
 	IsOffline bool       `json:"isoffline"`
 }
 
+// FileDetails represents a sortable slice of FileDetail.
+type FileDetails []*FileDetail
+
+func (s FileDetails) Len() int           { return len(s) }
+func (s FileDetails) Less(i, j int) bool { return s[i].IP < s[j].IP }
+func (s FileDetails) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
 // A HostDBEntry represents one host entry in the Renter's host DB. It
 // aggregates the host's external settings and metrics with its public key.
 type HostDBEntry struct {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -178,6 +179,13 @@ func (f *file) detail(isOffline func(types.FileContractID) bool) [][][]*modules.
 				piecesInChunk[p.Chunk][p.Piece] = make([]*modules.FileDetail, 0)
 			}
 			piecesInChunk[p.Chunk][p.Piece] = append(piecesInChunk[p.Chunk][p.Piece], fd)
+		}
+	}
+	for i := 0; i < len(piecesInChunk); i++ {
+		for j := 0; j < len(piecesInChunk[i]); j++ {
+			if len(piecesInChunk[i][j]) > 1 {
+				sort.Sort(modules.FileDetails(piecesInChunk[i][j]))
+			}
 		}
 	}
 	return piecesInChunk
