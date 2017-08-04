@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -375,7 +376,8 @@ func (srv *Server) daemonHandler(password string) http.Handler {
 // memloggingGET returns a json response containing a bool that tells whether or
 // not memlogging is active or not.
 func (srv *Server) memloggingGET(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	api.WriteJSON(w, MemloggingInfo{Active: build.MEMLOGGING})
+	active := atomic.LoadUint64(&build.AtomicMemLogging) != 0
+	api.WriteJSON(w, MemloggingInfo{Active: active})
 }
 
 // memloggingPOST makes a POST request with a boolean param `active` that sets
@@ -383,12 +385,12 @@ func (srv *Server) memloggingGET(w http.ResponseWriter, req *http.Request, ps ht
 func (srv *Server) memloggingPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	val := strings.ToLower(req.FormValue("active")) // response is case-insensitive
 	if val == "true" {
-		build.MEMLOGGING = true
+		atomic.StoreUint64(&build.AtomicMemLogging, 1)
 		api.WriteSuccess(w)
 		return
 	}
 	if val == "false" {
-		build.MEMLOGGING = false
+		atomic.StoreUint64(&build.AtomicMemLogging, 0)
 		api.WriteSuccess(w)
 		return
 	}

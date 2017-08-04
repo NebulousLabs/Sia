@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -52,8 +53,10 @@ func (g *Gateway) saveSync() error {
 	return persist.SaveJSON(persistMetadata, g.persistData(), filepath.Join(g.persistDir, nodesFile))
 }
 
+// statsLogger logs the number of nodes and peers in the gateway's log.
 func (g *Gateway) statsLogger() {
-	if !build.MEMLOGGING {
+	// If MemLogging is not on, return.
+	if atomic.LoadUint64(&build.AtomicMemLogging) == 0 {
 		return
 	}
 	g.log.Println("Logging memory usage:")

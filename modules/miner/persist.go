@@ -3,6 +3,7 @@ package miner
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -77,8 +78,11 @@ func (m *Miner) saveSync() error {
 	return persist.SaveJSON(settingsMetadata, m.persist, filepath.Join(m.persistDir, settingsFile))
 }
 
+// statsLogger logs the sizes of various data structures kept in the miner's
+// state, in the miner's log.
 func (m *Miner) statsLogger() {
-	if !build.MEMLOGGING {
+	// If MemLogging is not on, return.
+	if atomic.LoadUint64(&build.AtomicMemLogging) == 0 {
 		return
 	}
 	m.log.Println("Logging memory usage:")

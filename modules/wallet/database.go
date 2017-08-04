@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"reflect"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -59,8 +60,11 @@ var (
 	errNoKey = errors.New("key does not exist")
 )
 
+// statsLogger logs the sizes of various data structures kept in the wallet's
+// state, in the wallet's log.
 func (w *Wallet) statsLogger() {
-	if !build.MEMLOGGING {
+	// If MemLogging is not on, return.
+	if atomic.LoadUint64(&build.AtomicMemLogging) == 0 {
 		return
 	}
 	w.log.Println("Logging memory usage:")

@@ -64,10 +64,15 @@ type memloggingInfo struct {
 	Active bool `json:"active"`
 }
 
+// daemoncmd doesn't do anything currently. It is needed for memlogging command
+// functionality.
 func daemoncmd() {
 	fmt.Printf("Try the command 'daemon memlogging'")
 }
 
+// memloggingcmd returns memlogging information if given no parameters. If
+// passed a parameter, it will active or deactivate memlogging based on the
+// parameters given.
 func memloggingcmd(cmd *cobra.Command, args []string) {
 	switch len(args) {
 	case 0:

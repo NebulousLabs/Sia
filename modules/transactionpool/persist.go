@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -27,8 +28,11 @@ var (
 	errNilFeeMedian = errors.New("no fee median found")
 )
 
+// statsLogger logs the sizes of various data structures kept in the tpool's
+// state, in the tpool's log.
 func (tp *TransactionPool) statsLogger() {
-	if !build.MEMLOGGING {
+	// If MemLogging is not on, return.
+	if atomic.LoadUint64(&build.AtomicMemLogging) == 0 {
 		return
 	}
 	tp.log.Println("Logging memory usage:")
