@@ -16,7 +16,6 @@ import (
 var (
 	mockErrListen       = errors.New("simulated Listen failure")
 	mockErrLoadFile     = errors.New("simulated LoadFile failure")
-	mockErrMkdirAll     = errors.New("simulated MkdirAll failure")
 	mockErrNewLogger    = errors.New("simulated NewLogger failure")
 	mockErrOpenDatabase = errors.New("simulated OpenDatabase failure")
 	mockErrReadFile     = errors.New("simulated ReadFile failure")
@@ -62,10 +61,6 @@ type (
 
 		// loadFile allows the host to load a persistence structure form disk.
 		loadFile(persist.Metadata, interface{}, string) error
-
-		// mkdirAll gives the host the ability to create chains of folders
-		// within the filesystem.
-		mkdirAll(string, os.FileMode) error
 
 		// newLogger creates a logger that the host can use to log messages and
 		// write critical statements.
@@ -186,12 +181,6 @@ func (pd *productionDependencies) init() {
 // loadFile allows the host to load a persistence structure form disk.
 func (productionDependencies) loadFile(m persist.Metadata, i interface{}, s string) error {
 	return persist.LoadJSON(m, i, s)
-}
-
-// mkdirAll gives the host the ability to create chains of folders within the
-// filesystem.
-func (productionDependencies) mkdirAll(s string, fm os.FileMode) error {
-	return os.MkdirAll(s, fm)
 }
 
 // newLogger creates a logger that the host can use to log messages and write
