@@ -48,7 +48,7 @@ type (
 
 		// newLogger creates a logger that the host can use to log messages and
 		// write critical statements.
-		newLogger(string) (*persist.Logger, error)
+		newLogger(string, string) (*persist.Logger, error)
 
 		// openDatabase creates a database that the host can use to interact
 		// with large volumes of persistent data.
@@ -101,8 +101,8 @@ func (productionDependencies) mkdirAll(s string, fm os.FileMode) error {
 
 // newLogger creates a logger that the host can use to log messages and write
 // critical statements.
-func (productionDependencies) newLogger(s string) (*persist.Logger, error) {
-	return persist.NewFileLogger(s)
+func (productionDependencies) newLogger(fileName, defaultLogPath string) (*persist.Logger, error) {
+	return persist.NewFileLogger(fileName, defaultLogPath)
 }
 
 // openDatabase creates a database that the host can use to interact with large

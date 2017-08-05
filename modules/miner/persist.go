@@ -51,14 +51,10 @@ func (m *Miner) initSettings() error {
 
 // initPersist initializes the persistence of the miner.
 func (m *Miner) initPersist() error {
-	// Create the miner directory.
-	err := os.MkdirAll(m.persistDir, 0700)
-	if err != nil {
-		return err
-	}
+	var err error
 
 	// Add a logger.
-	m.log, err = persist.NewFileLogger(filepath.Join(m.persistDir, logFile))
+	m.log, err = persist.NewFileLogger(logFile, m.persistDir)
 	if err != nil {
 		return err
 	}

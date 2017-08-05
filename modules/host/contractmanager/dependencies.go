@@ -69,7 +69,7 @@ type (
 
 		// newLogger creates a logger that the host can use to log messages and
 		// write critical statements.
-		newLogger(string) (*persist.Logger, error)
+		newLogger(string, string) (*persist.Logger, error)
 
 		// openFile opens a file for the host.
 		openFile(string, int, os.FileMode) (file, error)
@@ -196,8 +196,8 @@ func (productionDependencies) mkdirAll(s string, fm os.FileMode) error {
 
 // newLogger creates a logger that the host can use to log messages and write
 // critical statements.
-func (productionDependencies) newLogger(s string) (*persist.Logger, error) {
-	return persist.NewFileLogger(s)
+func (productionDependencies) newLogger(fileName, defaultLogPath string) (*persist.Logger, error) {
+	return persist.NewFileLogger(fileName, defaultLogPath)
 }
 
 // openFile opens a file for the contract manager.

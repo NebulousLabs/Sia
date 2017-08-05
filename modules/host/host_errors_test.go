@@ -57,7 +57,7 @@ type dependencyErrNewLogger struct {
 	productionDependencies
 }
 
-func (dependencyErrNewLogger) newLogger(string) (*persist.Logger, error) {
+func (dependencyErrNewLogger) newLogger(string, string) (*persist.Logger, error) {
 	return nil, mockErrNewLogger
 }
 

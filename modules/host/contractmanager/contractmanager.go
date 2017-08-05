@@ -27,7 +27,6 @@ package contractmanager
 
 import (
 	"errors"
-	"path/filepath"
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -134,14 +133,8 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		}
 	}()
 
-	// Create the perist directory if it does not yet exist.
-	err = dependencies.mkdirAll(cm.persistDir, 0700)
-	if err != nil {
-		return nil, build.ExtendErr("error while creating the persist directory for the contract manager", err)
-	}
-
 	// Logger is always the first thing initialized.
-	cm.log, err = dependencies.newLogger(filepath.Join(cm.persistDir, logFile))
+	cm.log, err = dependencies.newLogger(logFile, cm.persistDir)
 	if err != nil {
 		return nil, build.ExtendErr("error while creating the logger for the contract manager", err)
 	}

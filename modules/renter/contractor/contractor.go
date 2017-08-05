@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -143,14 +142,8 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	if tpool == nil {
 		return nil, errNilTpool
 	}
-
-	// Create the persist directory if it does not yet exist.
-	err := os.MkdirAll(persistDir, 0700)
-	if err != nil {
-		return nil, err
-	}
 	// Create the logger.
-	logger, err := persist.NewFileLogger(filepath.Join(persistDir, "contractor.log"))
+	logger, err := persist.NewFileLogger("contractor.log", persistDir)
 	if err != nil {
 		return nil, err
 	}

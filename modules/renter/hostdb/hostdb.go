@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -85,14 +84,8 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		scanPool: make(chan modules.HostDBEntry),
 	}
 
-	// Create the persist directory if it does not yet exist.
-	err := os.MkdirAll(persistDir, 0700)
-	if err != nil {
-		return nil, err
-	}
-
 	// Create the logger.
-	logger, err := persist.NewFileLogger(filepath.Join(persistDir, "hostdb.log"))
+	logger, err := persist.NewFileLogger("hostdb.log", persistDir)
 	if err != nil {
 		return nil, err
 	}
