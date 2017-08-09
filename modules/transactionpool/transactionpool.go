@@ -62,8 +62,8 @@ type (
 		// been sent to the transaction pool. When a new subscriber joins the
 		// transaction pool, all prior consensus changes are sent to the new
 		// subscriber.
-		subscribers     []modules.TransactionPoolSubscriber
-		basicSubscriber *sanityCheckSubscriber
+		subscribers               []modules.TransactionPoolSubscriber
+		diffConsistencySubscriber *diffConsistencySubscriber
 
 		// Utilities.
 		db         *persist.BoltDatabase
@@ -100,7 +100,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 	}
 
 	if build.DEBUG {
-		tp.newSanityCheckSubscriber()
+		tp.newDiffConsistencySubscriber()
 	}
 
 	// Open the tpool database.
