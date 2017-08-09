@@ -21,7 +21,7 @@ func (w *Wallet) threadedResetSubscriptions() error {
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
 
-	err := w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	err := w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning, w.tg.StopChan())
 	if err != nil {
 		return err
 	}
@@ -393,6 +393,11 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 // ProcessConsensusChange parses a consensus change to update the set of
 // confirmed outputs known to the wallet.
 func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
+	if err := w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -422,6 +427,11 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
 // transaction set.
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.TransactionPoolDiff) {
+	if err := w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 

@@ -40,8 +40,6 @@ type hdbTester struct {
 func bareHostDB() *HostDB {
 	hdb := &HostDB{
 		log: persist.NewLogger(ioutil.Discard),
-
-		scanPool: make(chan modules.HostDBEntry),
 	}
 	hdb.hostTree = hosttree.New(hdb.calculateHostWeight)
 	return hdb

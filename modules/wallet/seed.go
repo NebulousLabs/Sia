@@ -230,7 +230,7 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 
 	// scan blockchain to determine how many keys to generate for the seed
 	s := newSeedScanner(seed, w.log)
-	if err := s.scan(w.cs); err != nil {
+	if err := s.scan(w.cs, w.tg.StopChan()); err != nil {
 		return err
 	}
 	// Add 4% as a buffer because the seed may have addresses in the wild
@@ -295,7 +295,7 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	go w.rescanMessage(done)
 	defer close(done)
 
-	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
+	err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning, w.tg.StopChan())
 	if err != nil {
 		return err
 	}
@@ -344,7 +344,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 	const outputSize = 350 // approx. size in bytes of an output and accompanying signature
 	const maxOutputs = 50  // approx. number of outputs that a transaction can handle
 	s.dustThreshold = maxFee.Mul64(outputSize)
-	if err = s.scan(w.cs); err != nil {
+	if err = s.scan(w.cs, w.tg.StopChan()); err != nil {
 		return
 	}
 

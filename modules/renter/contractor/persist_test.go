@@ -138,7 +138,7 @@ type blockCS struct {
 	blocks []types.Block
 }
 
-func (cs blockCS) ConsensusSetSubscribe(s modules.ConsensusSetSubscriber, _ modules.ConsensusChangeID) error {
+func (cs blockCS) ConsensusSetSubscribe(s modules.ConsensusSetSubscriber, _ modules.ConsensusChangeID, _ <-chan struct{}) error {
 	s.ProcessConsensusChange(modules.ConsensusChange{
 		AppliedBlocks: cs.blocks,
 	})

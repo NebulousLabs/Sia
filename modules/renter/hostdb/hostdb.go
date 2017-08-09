@@ -46,11 +46,11 @@ type HostDB struct {
 	// handful of goroutines constantly waiting on the channel for hosts to
 	// scan. The scan map is used to prevent duplicates from entering the scan
 	// pool.
-	scanList []modules.HostDBEntry
-	scanMap  map[string]struct{}
-	scanPool chan modules.HostDBEntry
-	scanWait bool
-	online   bool
+	scanList        []modules.HostDBEntry
+	scanMap         map[string]struct{}
+	scanWait        bool
+	online          bool
+	scanningThreads int
 
 	blockHeight types.BlockHeight
 	lastChange  modules.ConsensusChangeID
@@ -80,8 +80,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		gateway:    g,
 		persistDir: persistDir,
 
-		scanMap:  make(map[string]struct{}),
-		scanPool: make(chan modules.HostDBEntry),
+		scanMap: make(map[string]struct{}),
 	}
 
 	// Create the persist directory if it does not yet exist.
@@ -142,7 +141,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	}
 	hdb.mu.Unlock()
 
-	err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
+	err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange, hdb.tg.StopChan())
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Subscribe again using the new ID. This will cause a triggered scan
 		// on all of the hosts, but that should be acceptable.
@@ -150,7 +149,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		hdb.blockHeight = 0
 		hdb.lastChange = modules.ConsensusChangeBeginning
 		hdb.mu.Unlock()
-		err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
+		err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange, hdb.tg.StopChan())
 	}
 	if err != nil {
 		return nil, errors.New("hostdb subscription failed: " + err.Error())
@@ -168,9 +167,6 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 		hdb.mu.Lock()
 		hdb.online = true
 		hdb.mu.Unlock()
-	}
-	for i := 0; i < scanningThreads; i++ {
-		go hdb.threadedProbeHosts()
 	}
 
 	// Spawn the scan loop during production, but allow it to be disrupted

@@ -16,7 +16,7 @@ import (
 type newStub struct{}
 
 // consensus set stubs
-func (newStub) ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error {
+func (newStub) ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID, <-chan struct{}) error {
 	return nil
 }
 func (newStub) Synced() bool                               { return true }

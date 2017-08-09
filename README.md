@@ -50,8 +50,8 @@ keys.
 At the core of Sia is a blockchain that closely resembles Bitcoin.
 Transactions are conducted in Siacoin, a cryptocurrency. The blockchain is
 what allows Sia to enforce its smart contracts without relying on centralized
-authority. To acquire siacoins, use an exchange such as [Poloniex](https://poloniex.com), [Yunbi](https://yunbi.com), or
-[Bitsquare](https://bitsquare.io).
+authority. To acquire siacoins, use an exchange such as [Bittrex](https://bittrex.com), [Yunbi](https://yunbi.com), or
+[Bisq](https://www.bisq.io).
 
 To get started with Sia, check out the guides below:
 
