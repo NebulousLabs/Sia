@@ -15,7 +15,7 @@ import (
 
 var hostPriceLeeway = build.Select(build.Var{
 	Dev:      0.05,
-	Standard: 0.002,
+	Standard: 0.0035,
 	Testing:  0.002,
 }).(float64)
 
