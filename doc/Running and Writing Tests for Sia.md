@@ -19,14 +19,14 @@ standards.
   * [Table-driven tests](#table)
 * [Questions?](#questions)
 
-<a name="existing"/>
+<a name="existing"></a>
 ## Running tests for Sia
 Go's comprehensive [test package][pkg/testing] makes testing straightforward,
 particularly when you use the bundled tools included in the
 [Sia makefile][makefile], including `make test`, `make cover`, `make bench`,
 and their variants.
 
-<a name="update"/>
+<a name="update"></a>
 ### Updating code before testing
 If you just want to run existing tests on the codebase as is, you just need to
 pull the latest version of the original repo to your master branch.  (If that 
@@ -74,7 +74,7 @@ When you call `rebase`, you may run into some merge conflicts.  Luke Champine's
 
 Once the branch you want to test is up to date, you're ready to run some tests.
 
-<a name="entire"/>
+<a name="entire"></a>
 ### Testing the entire build
 The `make test` command runs all tests (functions starting with `Test` in
 `_test.go` files) for each package, setting off a panic for any test that runs
@@ -93,7 +93,7 @@ example, here's part of the html file generated for the persist package:
 Meanwhile, `make bench` will call `gofmt` on all packages, then run all
 benchmarks (functions starting with `Benchmark` in `_test.go` files).
 
-<a name="particular"/>
+<a name="particular"></a>
 ### Testing a particular package or function
 To run tests for just a certain package, run `make test pkgs=./<package>`. To run 
 a certain test function, run `make test pkgs=./<package> run=<function>`. The same
@@ -131,12 +131,12 @@ ok  	github.com/NebulousLabs/Sia/persist	1.485s
 $
 ``` 
 
-<a name="write"/>
+<a name="write"></a>
 ## Writing new tests for Sia
 When you run `make cover`, you'll notice that many files have pretty low
 coverage.  We're working on fixing that, but we could use your help.
 
-<a name="naming"/>
+<a name="naming"></a>
 ### A few guidelines
 * The test functions for `filename.go` should go in `filename_test.go` in the
     same directory and package.
@@ -148,7 +148,7 @@ coverage.  We're working on fixing that, but we could use your help.
 * As always, code should adhere to the standards and conventions laid out in
     [doc/Developers.md][developers].
 
-<a name="basic"/>
+<a name="basic"></a>
 ### Basic test format
 Suppose we'd like to test the Bar method belonging to type Foo.  
 
@@ -180,7 +180,7 @@ func TestFoo(t *testing.T) {
 
 ```
 
-<a name="table"/>
+<a name="table"></a>
 ### Table-driven tests in Go
 If you're looking to test a bunch of inputs, write a [table-driven test][table]
 with a slice of anonymous structs. For example, see `TestParseFileSize` in 
@@ -225,7 +225,7 @@ func TestParseFilesize(t *testing.T) {
 	}
 }
 ```
-<a name="questions"/>
+<a name="questions"></a>
 ## Questions?
 Read these if you haven't already:
 * [doc/Guide to Contributing to Sia.md][guide]: getting started with Go, Sia,
