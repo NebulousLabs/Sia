@@ -14,7 +14,7 @@ var (
 
 // createDefragTransaction creates a transaction that spends multiple existing
 // wallet outputs into a single new address.
-func (w *Wallet) createDefragTransaction() ([]types.Transaction, error) {
+func (w *Wallet) createDefragTransaction(fee types.Currency) ([]types.Transaction, error) {
 	consensusHeight, err := dbGetConsensusHeight(w.dbTx)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,6 @@ func (w *Wallet) createDefragTransaction() ([]types.Transaction, error) {
 	}
 
 	// Create the defrag transaction.
-	fee := defragFee()
 	refundAddr, err := w.nextPrimarySeedAddress(w.dbTx)
 	if err != nil {
 		return nil, err
@@ -130,9 +129,16 @@ func (w *Wallet) threadedDefragWallet() {
 		w.mu.Unlock()
 		return
 	}
+	w.mu.Unlock()
+
+	// get the required fee for the defrag transaction
+	// 35 outputs at an estimated 250 bytes needed per output means about a 10kb
+	// total transaction.
+	fee := w.defragFee(10000)
 
 	// Create the defrag transaction.
-	txnSet, err := w.createDefragTransaction()
+	w.mu.Lock()
+	txnSet, err := w.createDefragTransaction(fee)
 	w.mu.Unlock()
 	if err == errDefragNotNeeded {
 		// benign

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -197,4 +198,46 @@ func TestDefragOutputExhaustion(t *testing.T) {
 
 	close(closechan)
 	<-donechan
+}
+
+type mockTpool struct {
+	minFee types.Currency
+	maxFee types.Currency
+}
+
+func (t *mockTpool) AcceptTransactionSet(_ []types.Transaction) error  { return nil }
+func (t *mockTpool) Broadcast(_ []types.Transaction)                   {}
+func (t *mockTpool) Close() error                                      { return nil }
+func (t *mockTpool) FeeEstimation() (types.Currency, types.Currency)   { return t.minFee, t.maxFee }
+func (t *mockTpool) ProcessConsensusChange(cc modules.ConsensusChange) {}
+func (t *mockTpool) PurgeTransactionPool()                             {}
+func (t *mockTpool) Transaction(id types.TransactionID) (types.Transaction, []types.Transaction, bool) {
+	return types.Transaction{}, []types.Transaction{}, true
+}
+func (t *mockTpool) TransactionList() []types.Transaction                                  { return []types.Transaction{} }
+func (t *mockTpool) TransactionPoolSubscribe(subscriber modules.TransactionPoolSubscriber) {}
+func (t *mockTpool) Unsubscribe(subscriber modules.TransactionPoolSubscriber)              {}
+
+// TestDefragFeeEstimation verifies that defragFee returns the expected value,
+// determined by the tpool's min fee.
+func TestDefragFeeEstimation(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+	minFee := types.SiacoinPrecision.Mul64(100)
+	maxFee := types.SiacoinPrecision.Mul64(10000)
+	txnSize := uint64(10000)
+	expectedFees := minFee.Mul64(txnSize)
+	wt.wallet.mu.Lock()
+	wt.wallet.tpool = &mockTpool{minFee, maxFee}
+	wt.wallet.mu.Unlock()
+	if wt.wallet.defragFee(txnSize).Cmp(expectedFees) != 0 {
+		t.Fatal("got incorrect estimated fees: got ", wt.wallet.defragFee(txnSize), " wanted ", expectedFees)
+	}
 }

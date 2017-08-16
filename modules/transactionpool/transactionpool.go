@@ -118,7 +118,8 @@ func (tp *TransactionPool) Close() error {
 }
 
 // FeeEstimation returns an estimation for what fee should be applied to
-// transactions.
+// transactions. It returns a minimum and maximum estimated fee per transaction
+// byte.
 func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	err := tp.tg.Add()
 	if err != nil {
