@@ -387,3 +387,185 @@ func (tp *TransactionPool) PurgeTransactionPool() {
 	tp.purge()
 	tp.mu.Unlock()
 }
+
+// objectLocations are used to pinpoint the exact locations of an object in a
+// transaction set so as to avoid recomputing ObjectIDs when searching for
+// objects.
+type objectLocation struct {
+	setID   TransactionSetID
+	txIndex int
+}
+
+// findObjectLocation returns the location of an object from its object id and
+// true if it has been found. If the object's set or transaction is not found,
+// the returned bool will be false.
+func (tp *TransactionPool) findObjectLocation(oid ObjectID) ([]*objectLocation, bool) {
+	setID, ok := tp.knownObjects[oid]
+	if !ok {
+		return nil, false
+	}
+	set := tp.transactionSets[setID]
+
+	var location *objectLocation
+	location.setID = setID
+	// Iterate over all objects in all transactions the set until you find
+	// the transaction containing this object.
+	for i := 0; i < len(set); i++ {
+		for _, sci := range set[i].SiacoinInputs {
+			id := ObjectID(sci.ParentID)
+			if id == oid {
+				location.txIndex = i
+				return location, true
+			}
+		}
+		for i := range set[i].SiacoinOutputs {
+			id := ObjectID(set[i].SiacoinOutputID(uint64(i)))
+			if id == oid {
+				location.txIndex = i
+				return location, true
+			}
+		}
+		for i := range set[i].FileContracts {
+			id := ObjectID(set[i].FileContractID(uint64(i)))
+			if id == oid {
+				location.txIndex = i
+				return location, true
+			}
+		}
+		for _, fcr := range set[i].FileContractRevisions {
+			id := ObjectID(fcr.ParentID)
+			if id == oid {
+				location.txIndex = i
+				return location, true
+			}
+		}
+		for _, sp := range set[i].StorageProofs {
+			id := ObjectID(sp.ParentID)
+			if id == oid {
+				location.txIndex = i
+				return location, true
+			}
+		}
+		for _, sfi := range set[i].SiafundInputs {
+			id := ObjectID(sfi.ParentID)
+			if id == oid {
+				location.txIndex = i
+				return location, true
+			}
+		}
+		for i := range set[i].SiafundOutputs {
+			id := ObjectID(set[i].SiafundOutputID(uint64(i)))
+			if id == oid {
+				location.txIndex = i
+				return location, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func (tp *TransactionPool) removeTransaction(txn types.Transaction) {
+	// removedTxnIndices is used to keep track of which need to be removed from
+	// which sets. Sets are changed (and a diff is created) once all changes
+	// have been finalized. objectLocations are used to pinpoint txn indices
+	// quickly. removedTxnIndices are kept in sorted order.
+	removedTxnIndices := make(map[TransactionSetID][]int)
+	objectLocations := make(map[ObjectID][]*objectLocation)
+
+	// removedObjects stores all object IDs of objects in transactions removed,
+	// or put in the stack to be removed.
+	removedObjects := make(map[ObjectID]struct{})
+	// removalStack is a stack of objects from removed transactions that
+	// need to be removed from other transactions.
+	var removalStack []ObjectID
+
+	// addTxnToRemovalStack adds all outputs of a transaction into the removal
+	// stack.
+	addTxnToRemovalStack := func(txn types.Transaction) {
+		for i := range txn.SiacoinOutputs {
+			id := ObjectID(txn.SiacoinOutputID(uint64(i)))
+			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
+				removedObjects[id] = struct{}{}
+				removalStack = append(removalStack, id)
+			}
+		}
+		for i := range txn.FileContracts {
+			id := ObjectID(txn.FileContractID(uint64(i)))
+			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
+				removedObjects[id] = struct{}{}
+				removalStack = append(removalStack, id)
+			}
+		}
+		for _, fcr := range txn.FileContractRevisions {
+			id := ObjectID(fcr.ParentID)
+			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
+				removedObjects[id] = struct{}{}
+				removalStack = append(removalStack, id)
+			}
+		}
+		for _, sp := range txn.StorageProofs {
+			id := ObjectID(sp.ParentID)
+			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
+				removedObjects[id] = struct{}{}
+				removalStack = append(removalStack, id)
+			}
+		}
+		for i := range txn.SiafundOutputs {
+			id := ObjectID(txn.SiafundOutputID(uint64(i)))
+			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
+				removedObjects[id] = struct{}{}
+				removalStack = append(removalStack, id)
+			}
+		}
+	}
+
+	// Add the given transaction's objects to the stack.
+	addTxnToRemovalStack(txn)
+
+	for n := len(removalStack); n != 0; {
+		// Pop off next object ID from the stack.
+		nextObjectID := removalStack[n-1]
+		removalStack = removalStack[:n-1]
+
+		// Get the location of the object just popped from the stack.
+		// TODO: this needs to be a func that gets locations from inputs that refer to
+		// outputs in the stack
+		nextObjectLocations, ok := objectLocations[nextObjectID]
+		if !ok {
+			nextObjectLocations, ok = tp.findObjectLocation(nextObjectID)
+			if !ok {
+				//TODO: Decide: Is this correct behavior? should this ever happen?
+				continue
+			}
+		}
+
+		for _, loc := range nextObjectLocations {
+			set := tp.transactionSets[loc.setID]
+			removedIndices := removedTxnIndices[loc.setID]
+
+			i := sort.SearchInts(removedIndices, loc.txIndex)
+			if i < len(removedIndices) && removedIndices[i] == loc.txIndex {
+				// The tx index is present at removedIndices[i], therefore this
+				// transaction has already been marked for removal, along with
+				// any of its output objects.
+				continue
+			}
+			// The tx index is not present in data, but i is the index where
+			// it would be inserted.
+
+			// Insert the index into the slice marking removed transactions.
+			removedIndices = removedIndices[0 : len(removedIndices)+1]
+			copy(removedIndices[i+1:], removedIndices[i:])
+			removedIndices[i] = loc.txIndex
+
+			// Add all output objects to the removal stack.
+			addTxnToRemovalStack(set[loc.txIndex])
+		}
+	}
+
+	// At this point all transaction sets which have had transactions removed,
+	// will be marked in removedTxnIndices. Now we clean up each set
+	// individually, creating new transaction sets following cP4P and checking
+	// transaction set consistency. This can be
+
+}
