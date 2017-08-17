@@ -458,6 +458,8 @@ func (tp *TransactionPool) findObjectLocations(oid ObjectID) ([]*objectLocation,
 	return locations, true
 }
 
+// removeTransaction removes a transaction and any transactions that spend its
+// outputs from the tpool.
 func (tp *TransactionPool) removeTransaction(txn types.Transaction, cc *modules.ConsensusChange) {
 	// removedTxnIndices is used to keep track of which need to be removed from
 	// which sets. Sets are changed (and a diff is created) once all changes
