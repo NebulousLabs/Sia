@@ -415,8 +415,47 @@ func (tp *TransactionPool) findObjectLocations(oid ObjectID) ([]*objectLocation,
 		Currently this implementation relies on the fact that an output will be
 		spent in an input in the same transaction set.
 	*/
+	var locations []*objectLocation
 
-	return nil, false
+	setID := tp.knownObjects[oid]
+	set := tp.transactionSets[setID]
+	for i := 0; i < len(set); i++ {
+		var found bool
+		var location objectLocation
+		location.setID = setID
+		for _, sci := range set[i].SiacoinInputs {
+			if oid == ObjectID(sci.ParentID) {
+				found = true
+				location.txIndex = i
+			}
+		}
+		for _, sfi := range set[i].SiafundInputs {
+			if oid == ObjectID(sfi.ParentID) {
+				found = true
+				location.txIndex = i
+			}
+		}
+		for _, fcr := range set[i].FileContractRevisions {
+			if oid == ObjectID(fcr.ParentID) {
+				found = true
+				location.txIndex = i
+			}
+		}
+		for _, sp := range set[i].StorageProofs {
+			if oid == ObjectID(sp.ParentID) {
+				found = true
+				location.txIndex = i
+			}
+		}
+		if found {
+			locations = append(locations, &location)
+		}
+	}
+
+	if len(locations) == 0 {
+		return nil, false
+	}
+	return locations, true
 }
 
 func (tp *TransactionPool) removeTransaction(txn types.Transaction, cc *modules.ConsensusChange) {
@@ -439,17 +478,7 @@ func (tp *TransactionPool) removeTransaction(txn types.Transaction, cc *modules.
 	// ensure that references to those objects don't remain in the
 	// transactionpool state and incur a memory-leak.
 	addTxnToRemovalStack := func(txn types.Transaction) {
-		// Mark all inputs for removal from tpool state.
-		for _, sci := range txn.SiacoinInputs {
-			id := ObjectID(sci.ParentID)
-			removedObjects[id] = struct{}{}
-		}
-		for _, sfi := range txn.SiafundInputs {
-			id := ObjectID(sfi.ParentID)
-			removedObjects[id] = struct{}{}
-		}
-
-		// Now add all output fields to the set of objects to remove and add
+		// Add all output fields to the set of objects to remove and add
 		// them to the removal stack.
 		for i := range txn.SiacoinOutputs {
 			id := ObjectID(txn.SiacoinOutputID(uint64(i)))
@@ -478,14 +507,14 @@ func (tp *TransactionPool) removeTransaction(txn types.Transaction, cc *modules.
 			}
 		}
 		for _, fcr := range txn.FileContractRevisions {
-			id := ObjectID(fcr.ParentID)
+			id := ObjectID(crypto.HashObject(fcr))
 			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
 				removedObjects[id] = struct{}{}
 				removalStack = append(removalStack, id)
 			}
 		}
 		for _, sp := range txn.StorageProofs {
-			id := ObjectID(sp.ParentID)
+			id := ObjectID(crypto.HashObject(sp))
 			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
 				removedObjects[id] = struct{}{}
 				removalStack = append(removalStack, id)
