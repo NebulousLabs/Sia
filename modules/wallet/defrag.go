@@ -12,9 +12,12 @@ var (
 	errDefragNotNeeded = errors.New("defragging not needed, wallet is already sufficiently defragged")
 )
 
-// createDefragTransaction creates a transaction that spends multiple existing
+// managedCreateDefragTransaction creates a transaction that spends multiple existing
 // wallet outputs into a single new address.
-func (w *Wallet) createDefragTransaction(fee types.Currency) ([]types.Transaction, error) {
+func (w *Wallet) managedCreateDefragTransaction() ([]types.Transaction, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	consensusHeight, err := dbGetConsensusHeight(w.dbTx)
 	if err != nil {
 		return nil, err
@@ -82,6 +85,14 @@ func (w *Wallet) createDefragTransaction(fee types.Currency) ([]types.Transactio
 	if err != nil {
 		return nil, err
 	}
+
+	// get the transaction fee
+	w.mu.Unlock()
+	minFee, _ := w.tpool.FeeEstimation()
+	sizeAvgOutput := uint64(250)
+	fee := minFee.Mul64(sizeAvgOutput * defragBatchSize)
+	w.mu.Lock()
+
 	txn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
 			ParentID:         parentTxn.SiacoinOutputID(0),
@@ -131,15 +142,8 @@ func (w *Wallet) threadedDefragWallet() {
 	}
 	w.mu.Unlock()
 
-	// get the required fee for the defrag transaction
-	// 35 outputs at an estimated 250 bytes needed per output means about a 10kb
-	// total transaction.
-	fee := w.defragFee(10000)
-
 	// Create the defrag transaction.
-	w.mu.Lock()
-	txnSet, err := w.createDefragTransaction(fee)
-	w.mu.Unlock()
+	txnSet, err := w.managedCreateDefragTransaction()
 	if err == errDefragNotNeeded {
 		// benign
 		return

@@ -44,13 +44,6 @@ func dustValue() types.Currency {
 	return types.SiacoinPrecision
 }
 
-// defragFee is the miner fee paid to miners when performing a defrag
-// transaction.
-func (w *Wallet) defragFee(txnSize uint64) types.Currency {
-	minFee, _ := w.tpool.FeeEstimation()
-	return minFee.Mul64(txnSize)
-}
-
 func init() {
 	// Sanity check - the defrag threshold needs to be higher than the batch
 	// size plus the start index.
