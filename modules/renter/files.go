@@ -4,13 +4,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/Unknwon/paginater"
 )
 
 var (
@@ -149,46 +150,57 @@ func (f *file) redundancy(isOffline func(types.FileContractID) bool) float64 {
 
 // detail returns the detail of this file,
 // with info about each piece is storing by which host(IP)
-// offline or not
-func (f *file) detail(isOffline func(types.FileContractID) bool) [][][]*modules.FileDetail {
+// offline or not. There are three level Chunks, Pieces, Hosts
+func (f *file) detail(isOffline func(types.FileContractID) bool) *modules.FileDetail {
 	if f.size == 0 {
-		return nil
+		return &modules.FileDetail{}
 	}
-	piecesInChunk := make([][][]*modules.FileDetail, f.numChunks())
+
 	// If the file has non-0 size then the number of chunks should also be
 	// non-0. Therefore the f.size == 0 conditional block above must appear
 	// before this check.
-	if len(piecesInChunk) == 0 {
+	if f.numChunks() == 0 {
 		build.Critical("cannot get detail of a file with 0 chunks")
-		return nil
+		return &modules.FileDetail{}
 	}
 
-	for i := 0; i < len(piecesInChunk); i++ {
-		p := make([][]*modules.FileDetail, f.erasureCode.NumPieces())
-		piecesInChunk[i] = p
+	fd := &modules.FileDetail{
+		Hosts:  make([]*modules.HostDetail, 0),
+		Chunks: make([][][]int, f.numChunks()),
+	}
+	hostMap := make(map[string]int)
+
+	for i := 0; i < len(fd.Chunks); i++ {
+		p := make([][]int, f.erasureCode.NumPieces())
+		fd.Chunks[i] = p
 	}
 	for _, fc := range f.contracts {
-		// do not count pieces from the contract if the contract is offline
 		isoffline := isOffline(fc.ID)
-		for _, p := range fc.Pieces {
-			fd := &modules.FileDetail{
+		_, exists := hostMap[string(fc.IP)]
+		if !exists {
+			hd := &modules.HostDetail{
 				IP:        fc.IP,
 				IsOffline: isoffline,
 			}
-			if piecesInChunk[p.Chunk][p.Piece] == nil {
-				piecesInChunk[p.Chunk][p.Piece] = make([]*modules.FileDetail, 0)
+			hostMap[string(hd.IP)] = len(fd.Hosts)
+			fd.Hosts = append(fd.Hosts, hd)
+		}
+
+		for _, p := range fc.Pieces {
+			if fd.Chunks[p.Chunk][p.Piece] == nil {
+				fd.Chunks[p.Chunk][p.Piece] = make([]int, 0)
 			}
-			piecesInChunk[p.Chunk][p.Piece] = append(piecesInChunk[p.Chunk][p.Piece], fd)
+			fd.Chunks[p.Chunk][p.Piece] = append(fd.Chunks[p.Chunk][p.Piece], hostMap[string(fc.IP)])
 		}
 	}
-	for i := 0; i < len(piecesInChunk); i++ {
-		for j := 0; j < len(piecesInChunk[i]); j++ {
-			if len(piecesInChunk[i][j]) > 1 {
-				sort.Sort(modules.FileDetails(piecesInChunk[i][j]))
-			}
-		}
-	}
-	return piecesInChunk
+	// for i := 0; i < len(piecesInChunk); i++ {
+	// 	for j := 0; j < len(piecesInChunk[i]); j++ {
+	// 		if len(piecesInChunk[i][j]) > 1 {
+	// 			sort.Sort(modules.FileDetails(piecesInChunk[i][j]))
+	// 		}
+	// 	}
+	// }
+	return fd
 }
 
 // expiration returns the lowest height at which any of the file's contracts
@@ -285,14 +297,15 @@ func (r *Renter) FileList() []modules.FileInfo {
 	return fileList
 }
 
-// FilesDetail returns all of the files repairing detail
-func (r *Renter) FilesDetail() []modules.FileDetailInfo {
-	var files []*file
+// FileDetail returns all of the files repairing detail
+func (r *Renter) FileDetail(siapath string, pagingNum int, current int) (modules.FileDetailInfo, error) {
 	lockID := r.mu.RLock()
-	for _, f := range r.files {
-		files = append(files, f)
-	}
 	r.mu.RUnlock(lockID)
+
+	file, exists := r.files[siapath]
+	if !exists {
+		return modules.FileDetailInfo{}, ErrUnknownPath
+	}
 
 	isOffline := func(id types.FileContractID) bool {
 		id = r.hostContractor.ResolveID(id)
@@ -304,23 +317,28 @@ func (r *Renter) FilesDetail() []modules.FileDetailInfo {
 		return offline || !contract.GoodForRenew
 	}
 
-	var fileList []modules.FileDetailInfo
-	for _, f := range files {
-		f.mu.RLock()
-		renewing := true
-		fileList = append(fileList, modules.FileDetailInfo{
-			SiaPath:        f.name,
-			Filesize:       f.size,
-			Renewing:       renewing,
-			Available:      f.available(isOffline),
-			Redundancy:     f.redundancy(isOffline),
-			UploadProgress: f.uploadProgress(),
-			Expiration:     f.expiration(),
-			Details:        f.detail(isOffline),
-		})
-		f.mu.RUnlock()
+	fd := file.detail(isOffline)
+	p := paginater.New(len(fd.Chunks), pagingNum, current, 5)
+	endIndex := len(fd.Chunks) - 1
+	if p.Current()-1+pagingNum <= len(fd.Chunks) {
+		endIndex = p.Current() - 1 + pagingNum
 	}
-	return fileList
+	fd.Chunks = fd.Chunks[p.Current()-1 : endIndex]
+
+	file.mu.RLock()
+	fileDetail := modules.FileDetailInfo{
+		SiaPath:        file.name,
+		Filesize:       file.size,
+		Renewing:       true,
+		Available:      file.available(isOffline),
+		Redundancy:     file.redundancy(isOffline),
+		UploadProgress: file.uploadProgress(),
+		Expiration:     file.expiration(),
+		Details:        fd,
+	}
+	file.mu.RUnlock()
+
+	return fileDetail, nil
 }
 
 // RenameFile takes an existing file and changes the nickname. The original

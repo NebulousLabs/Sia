@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -359,10 +360,26 @@ func (api *API) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ h
 }
 
 // renterFilesDetailHandler handles the API call to show renter files repairing detail
-func (api *API) renterFilesDetailHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	WriteJSON(w, RenterFilesDetail{
-		Files: api.renter.FilesDetail(),
-	})
+func (api *API) renterFileDetailHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	pagingNum, err := strconv.Atoi(ps.ByName("pagingNum"))
+	if err != nil {
+		WriteError(w, Error{"pagingNum " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+
+	current, err := strconv.Atoi(ps.ByName("current"))
+	if err != nil {
+		WriteError(w, Error{"current " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+
+	detail, err := api.renter.FileDetail(strings.TrimPrefix(ps.ByName("siapath"), "/"), pagingNum, current)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+
+	WriteJSON(w, detail)
 }
 
 // renterPricesHandler reports the expected costs of various actions given the

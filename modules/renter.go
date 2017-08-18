@@ -93,21 +93,26 @@ type FileDetailInfo struct {
 	Redundancy     float64           `json:"redundancy"`
 	UploadProgress float64           `json:"uploadprogress"`
 	Expiration     types.BlockHeight `json:"expiration"`
-	Details        [][][]*FileDetail `json:"details"`
+	Details        *FileDetail       `json:"details"`
 }
 
-// FileDetail is the detail of pieces
-type FileDetail struct {
+type HostDetail struct {
 	IP        NetAddress `json:"host"`
 	IsOffline bool       `json:"isoffline"`
 }
 
-// FileDetails represents a sortable slice of FileDetail.
-type FileDetails []*FileDetail
+// FileDetail is the detail of pieces
+type FileDetail struct {
+	Hosts  []*HostDetail `json:"hosts"`
+	Chunks [][][]int     `json:"chunks"`
+}
 
-func (s FileDetails) Len() int           { return len(s) }
-func (s FileDetails) Less(i, j int) bool { return s[i].IP < s[j].IP }
-func (s FileDetails) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+// FileDetails represents a sortable slice of FileDetail.
+// type FileDetails []*FileDetail
+
+// func (s FileDetails) Len() int           { return len(s) }
+// func (s FileDetails) Less(i, j int) bool { return s[i].IP < s[j].IP }
+// func (s FileDetails) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // A HostDBEntry represents one host entry in the Renter's host DB. It
 // aggregates the host's external settings and metrics with its public key.
@@ -309,7 +314,7 @@ type Renter interface {
 	FileList() []FileInfo
 
 	// FilesDetail returns all of the files repairing detail.
-	FilesDetail() []FileDetailInfo
+	FileDetail(siapath string, pagingNum int, current int) (FileDetailInfo, error)
 
 	// Host provides the DB entry and score breakdown for the requested host.
 	Host(pk types.SiaPublicKey) (HostDBEntry, bool)
