@@ -361,13 +361,13 @@ func (api *API) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ h
 
 // renterFilesDetailHandler handles the API call to show renter files repairing detail
 func (api *API) renterFileDetailHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	pagingNum, err := strconv.Atoi(ps.ByName("pagingNum"))
+	pagingNum, err := strconv.Atoi(req.FormValue("pagingNum"))
 	if err != nil {
 		WriteError(w, Error{"pagingNum " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
-	current, err := strconv.Atoi(ps.ByName("current"))
+	current, err := strconv.Atoi(req.FormValue("current"))
 	if err != nil {
 		WriteError(w, Error{"current " + err.Error()}, http.StatusBadRequest)
 		return

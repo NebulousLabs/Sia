@@ -94,6 +94,7 @@ type FileDetailInfo struct {
 	UploadProgress float64           `json:"uploadprogress"`
 	Expiration     types.BlockHeight `json:"expiration"`
 	Details        *FileDetail       `json:"details"`
+	TotalPages     int               `json:"totalpages"`
 }
 
 type HostDetail struct {

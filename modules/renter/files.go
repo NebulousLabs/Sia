@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -193,13 +194,7 @@ func (f *file) detail(isOffline func(types.FileContractID) bool) *modules.FileDe
 			fd.Chunks[p.Chunk][p.Piece] = append(fd.Chunks[p.Chunk][p.Piece], hostMap[string(fc.IP)])
 		}
 	}
-	// for i := 0; i < len(piecesInChunk); i++ {
-	// 	for j := 0; j < len(piecesInChunk[i]); j++ {
-	// 		if len(piecesInChunk[i][j]) > 1 {
-	// 			sort.Sort(modules.FileDetails(piecesInChunk[i][j]))
-	// 		}
-	// 	}
-	// }
+
 	return fd
 }
 
@@ -297,6 +292,16 @@ func (r *Renter) FileList() []modules.FileInfo {
 	return fileList
 }
 
+// ByHost sort hosts in pieces by ip or host name
+type ByHost struct {
+	PieceHosts []int
+	Hosts      []*modules.HostDetail
+}
+
+func (s ByHost) Len() int           { return len(s.PieceHosts) }
+func (s ByHost) Swap(i, j int)      { s.PieceHosts[i], s.PieceHosts[j] = s.PieceHosts[j], s.PieceHosts[i] }
+func (s ByHost) Less(i, j int) bool { return s.Hosts[s.PieceHosts[i]].IP < s.Hosts[s.PieceHosts[j]].IP }
+
 // FileDetail returns all of the files repairing detail
 func (r *Renter) FileDetail(siapath string, pagingNum int, current int) (modules.FileDetailInfo, error) {
 	lockID := r.mu.RLock()
@@ -325,6 +330,15 @@ func (r *Renter) FileDetail(siapath string, pagingNum int, current int) (modules
 	}
 	fd.Chunks = fd.Chunks[p.Current()-1 : endIndex]
 
+	for i := 0; i < len(fd.Chunks); i++ {
+		for j := 0; j < len(fd.Chunks[i]); j++ {
+			sort.Sort(ByHost{
+				PieceHosts: fd.Chunks[i][j],
+				Hosts:      fd.Hosts,
+			})
+		}
+	}
+
 	file.mu.RLock()
 	fileDetail := modules.FileDetailInfo{
 		SiaPath:        file.name,
@@ -335,6 +349,7 @@ func (r *Renter) FileDetail(siapath string, pagingNum int, current int) (modules
 		UploadProgress: file.uploadProgress(),
 		Expiration:     file.expiration(),
 		Details:        fd,
+		TotalPages:     p.TotalPages(),
 	}
 	file.mu.RUnlock()
 
