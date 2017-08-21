@@ -29,6 +29,7 @@ dependencies:
 	go install -race std
 	go get -u github.com/golang/lint/golint
 	go get -u github.com/NebulousLabs/glyphcheck
+	go get -u github.com/Unknwon/paginater
 
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
