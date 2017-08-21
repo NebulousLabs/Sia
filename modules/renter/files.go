@@ -324,11 +324,13 @@ func (r *Renter) FileDetail(siapath string, pagingNum int, current int) (modules
 
 	fd := file.detail(isOffline)
 	p := paginater.New(len(fd.Chunks), pagingNum, current, 5)
-	endIndex := len(fd.Chunks) - 1
-	if p.Current()-1+pagingNum <= len(fd.Chunks) {
-		endIndex = p.Current() - 1 + pagingNum
+	startIndex := (p.Current() - 1) * pagingNum
+	endIndex := p.Current() * pagingNum
+	if endIndex > len(fd.Chunks) {
+		endIndex = len(fd.Chunks)
 	}
-	fd.Chunks = fd.Chunks[p.Current()-1 : endIndex]
+
+	fd.Chunks = fd.Chunks[startIndex:endIndex]
 
 	for i := 0; i < len(fd.Chunks); i++ {
 		for j := 0; j < len(fd.Chunks[i]); j++ {
