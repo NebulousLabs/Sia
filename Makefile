@@ -22,6 +22,7 @@ dependencies:
 	go get -u github.com/inconshreveable/go-update
 	go get -u github.com/kardianos/osext
 	go get -u github.com/inconshreveable/mousetrap
+	go get -u github.com/Unknwon/paginater
 	# Frontend Dependencies
 	go get -u github.com/bgentry/speakeasy
 	go get -u github.com/spf13/cobra/...
@@ -29,7 +30,6 @@ dependencies:
 	go install -race std
 	go get -u github.com/golang/lint/golint
 	go get -u github.com/NebulousLabs/glyphcheck
-	go get -u github.com/Unknwon/paginater
 
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
