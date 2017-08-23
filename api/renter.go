@@ -136,11 +136,6 @@ type (
 		Files []modules.FileInfo `json:"files"`
 	}
 
-	// RenterFilesDetail lists the files with detail known to the renter.
-	RenterFilesDetail struct {
-		Files []modules.FileDetailInfo `json:"files"`
-	}
-
 	// RenterLoad lists files that were loaded into the renter.
 	RenterLoad struct {
 		FilesAdded []string `json:"filesadded"`
