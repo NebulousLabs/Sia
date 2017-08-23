@@ -833,8 +833,8 @@ func TestHostAndRentFileDetail(t *testing.T) {
 	if rfi.TotalPages != 1 || rfi.SiaPath != "test" {
 		t.Fatal("/renter/filedetail did not return correct file:", rfi)
 	}
-	if len(rfi.Details.Chunks) != 5 {
-		t.Fatal("/renter/filedetail did not return correct chunk count:", rfi, len(rfi.Details.Chunks))
+	if len(rfi.Details.Chunks) != 6 {
+		t.Fatal("/renter/filedetail did not return correct chunk count:", len(rfi.Details.Chunks), "\n", rfi)
 	}
 }
 
