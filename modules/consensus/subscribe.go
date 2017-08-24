@@ -190,6 +190,16 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 		if err != nil {
 			return err
 		}
+		// Flush DB pages from memory. Caching the pages doesn't improve
+		// performance much anyway, since they are only read once.
+		cs.mu.Lock()
+		err = cs.db.Update(func(tx *bolt.Tx) error {
+			return tx.FlushDBPages()
+		})
+		cs.mu.Unlock()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
