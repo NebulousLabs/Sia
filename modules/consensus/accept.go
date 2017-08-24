@@ -279,7 +279,8 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			validBlocks = append(validBlocks, blocks[i])
 			parents = append(parents, parent)
 		}
-		return nil
+		// Flush DB pages
+		return tx.FlushDBPages()
 	})
 	if _, ok := setErr.(bolt.MmapError); ok {
 		cs.log.Println("ERROR: Bolt mmap failed:", setErr)
@@ -307,7 +308,8 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 					return err
 				}
 			}
-			return nil
+			// Flush DB pages
+			return tx.FlushDBPages()
 		})
 		// Sanity check - verifyExtended should match chainExtended.
 		if build.DEBUG && verifyExtended != chainExtended {
