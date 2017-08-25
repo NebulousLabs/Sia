@@ -358,6 +358,22 @@ func (w *Wallet) computeProcessedTransactionsFromBlock(tx *bolt.Tx, block types.
 			if po.WalletAddress {
 				w.log.Println("\tClaim Output:", po.ID, "::", po.Value.HumanString())
 			}
+
+			for _, sci := range txn.SiacoinInputs {
+				pi := modules.ProcessedInput{
+					ParentID:       types.OutputID(sci.ParentID),
+					FundType:       types.SpecifierSiacoinInput,
+					WalletAddress:  w.isWalletAddress(sci.UnlockConditions.UnlockHash()),
+					RelatedAddress: sci.UnlockConditions.UnlockHash(),
+					Value:          spentSiacoinOutputs[sci.ParentID].Value,
+				}
+				pt.Inputs = append(pt.Inputs, pi)
+
+				// Log any wallet-relevant inputs.
+				if pi.WalletAddress {
+					w.log.Println("\tSiacoin Input:", pi.ParentID, "::", pi.Value.HumanString())
+				}
+			}
 		}
 
 		for i, sfo := range txn.SiafundOutputs {
@@ -409,6 +425,9 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 
 		pts := w.computeProcessedTransactionsFromBlock(tx, block, spentSiacoinOutputs, spentSiafundOutputs, consensusHeight)
 		for _, pt := range pts {
+			for _, output := range pt.Outputs {
+				output.Context = dbGetOutputContext(w.dbTx, output.ID)
+			}
 			err := dbAppendProcessedTransaction(tx, pt)
 			if err != nil {
 				return fmt.Errorf("could not put processed transaction: %v", err)

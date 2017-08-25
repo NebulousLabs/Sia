@@ -152,7 +152,7 @@ func (m *Miner) managedSubmitBlock(b types.Block) error {
 	// or if the wallet addresses have been exhausted.
 	m.persist.BlocksFound = append(m.persist.BlocksFound, b.ID())
 	var uc types.UnlockConditions
-	uc, err = m.wallet.NextAddress()
+	uc, err = m.wallet.NextAddress(modules.DefaultWalletContext)
 	if err != nil {
 		return err
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 )
@@ -49,11 +50,11 @@ func TestScanLargeIndex(t *testing.T) {
 
 	// send money to ourselves so that we sweep a real output (instead of just
 	// a miner payout)
-	uc, err := wt.wallet.NextAddress()
+	uc, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash())
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash(), modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,11 +108,11 @@ func TestScanLoop(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		uc, err := wt.wallet.NextAddress()
+		uc, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash())
+		_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash(), modules.DefaultWalletContext)
 		if err != nil {
 			t.Fatal(err)
 		}

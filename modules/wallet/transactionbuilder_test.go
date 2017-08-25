@@ -188,7 +188,7 @@ func TestConcurrentBuilders(t *testing.T) {
 	}
 
 	// Get a baseline balance for the wallet.
-	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
 	if !startingOutgoing.IsZero() {
 		t.Fatal(startingOutgoing)
@@ -213,7 +213,7 @@ func TestConcurrentBuilders(t *testing.T) {
 	}
 
 	// Get a second reading on the wallet's balance.
-	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	if !startingSCConfirmed.Equals(fundedSCConfirmed) {
 		t.Fatal("confirmed siacoin balance changed when no blocks have been mined", startingSCConfirmed, fundedSCConfirmed)
 	}
@@ -277,8 +277,8 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	}
 
 	// Send all coins to a single confirmed output for the wallet.
-	unlockConditions, err := wt.wallet.NextAddress()
-	scBal, _, _ := wt.wallet.ConfirmedBalance()
+	unlockConditions, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
+	scBal, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	// Use a custom builder so that there is no transaction fee.
 	builder := wt.wallet.StartTransaction()
 	err = builder.FundSiacoins(scBal)
@@ -306,7 +306,7 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	}
 
 	// Get a baseline balance for the wallet.
-	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
 	if !startingOutgoing.IsZero() {
 		t.Fatal(startingOutgoing)
@@ -331,7 +331,7 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	}
 
 	// Get a second reading on the wallet's balance.
-	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	if !startingSCConfirmed.Equals(fundedSCConfirmed) {
 		t.Fatal("confirmed siacoin balance changed when no blocks have been mined", startingSCConfirmed, fundedSCConfirmed)
 	}
@@ -391,7 +391,7 @@ func TestParallelBuilders(t *testing.T) {
 	}
 
 	// Get a baseline balance for the wallet.
-	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
 	if !startingOutgoing.IsZero() {
 		t.Fatal(startingOutgoing)
@@ -438,7 +438,7 @@ func TestParallelBuilders(t *testing.T) {
 	}
 
 	// Check the final balance.
-	endingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	endingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	expected := startingSCConfirmed.Sub(funding.Mul(types.NewCurrency64(uint64(outputsDesired))))
 	if !expected.Equals(endingSCConfirmed) {
 		t.Fatal("did not get the expected ending balance", expected, endingSCConfirmed, startingSCConfirmed)

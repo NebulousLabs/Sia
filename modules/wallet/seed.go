@@ -174,7 +174,7 @@ func (w *Wallet) PrimarySeed() (modules.Seed, uint64, error) {
 
 // NextAddress returns an unlock hash that is ready to receive siacoins or
 // siafunds. The address is generated using the primary address seed.
-func (w *Wallet) NextAddress() (types.UnlockConditions, error) {
+func (w *Wallet) NextAddress(context string) (types.UnlockConditions, error) {
 	if err := w.tg.Add(); err != nil {
 		return types.UnlockConditions{}, err
 	}
@@ -189,6 +189,9 @@ func (w *Wallet) NextAddress() (types.UnlockConditions, error) {
 	if err != nil {
 		return types.UnlockConditions{}, err
 	}
+	w.mu.Lock()
+	err = dbPutAddressContext(w.dbTx, uc.UnlockHash(), context)
+	w.mu.Unlock()
 
 	return uc, err
 }

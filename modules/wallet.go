@@ -41,6 +41,10 @@ var (
 	// ErrLowBalance is returned if the wallet does not have enough funds to
 	// complete the desired action.
 	ErrLowBalance = errors.New("insufficient balance")
+
+	// DefaultWalletContext defines the default `context` to be used with the
+	// wallet.
+	DefaultWalletContext = ""
 )
 
 type (
@@ -131,6 +135,8 @@ type (
 		// double-spends, because the wallet will assume the transaction
 		// failed.
 		FundSiafunds(amount types.Currency) error
+
+		SetContext(string, string)
 
 		// AddParents adds a set of parents to the transaction.
 		AddParents([]types.Transaction)
@@ -307,7 +313,7 @@ type (
 
 		// NextAddress returns a new coin addresses generated from the
 		// primary seed.
-		NextAddress() (types.UnlockConditions, error)
+		NextAddress(context string) (types.UnlockConditions, error)
 
 		// PrimarySeed returns the unencrypted primary seed of the wallet,
 		// along with a uint64 indicating how many addresses may be safely
@@ -335,7 +341,7 @@ type (
 		// ConfirmedBalance returns the confirmed balance of the wallet, minus
 		// any outgoing transactions. ConfirmedBalance will include unconfirmed
 		// refund transactions.
-		ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siacoinClaimBalance types.Currency)
+		ConfirmedBalance(context string) (siacoinBalance types.Currency, siafundBalance types.Currency, siacoinClaimBalance types.Currency)
 
 		// UnconfirmedBalance returns the unconfirmed balance of the wallet.
 		// Outgoing funds and incoming funds are reported separately. Refund
@@ -367,7 +373,7 @@ type (
 		UnconfirmedTransactions() []ProcessedTransaction
 
 		// RegisterTransaction takes a transaction and its parents and returns
-		// a TransactionBuilder which can be used to expand the transaction.
+		// a jransactionBuilder which can be used to expand the transaction.
 		RegisterTransaction(t types.Transaction, parents []types.Transaction) TransactionBuilder
 
 		// Rescanning reports whether the wallet is currently rescanning the
@@ -382,7 +388,7 @@ type (
 		// address. Sending money usually results in multiple transactions. The
 		// transactions are automatically given to the transaction pool, and
 		// are also returned to the caller.
-		SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
+		SendSiacoins(amount types.Currency, dest types.UnlockHash, context string) ([]types.Transaction, error)
 
 		// SendSiacoinsMulti sends coins to multiple addresses.
 		SendSiacoinsMulti(outputs []types.SiacoinOutput) ([]types.Transaction, error)

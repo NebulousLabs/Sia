@@ -38,6 +38,8 @@ type transactionBuilder struct {
 	parents     []types.Transaction
 	signed      bool
 	transaction types.Transaction
+	destContext string
+	srcContext  string
 
 	newParents            []int
 	siacoinInputs         []int
@@ -112,6 +114,11 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 	return nil
 }
 
+func (tb *transactionBuilder) SetContext(srcContext string, destContext string) {
+	tb.srcContext = srcContext
+	tb.destContext = destContext
+}
+
 // FundSiacoins will add a siacoin input of exactly 'amount' to the
 // transaction. A parent transaction may be needed to achieve an input with the
 // correct value. The siacoin input will not be signed until 'Sign' is called
@@ -169,6 +176,9 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 			if err == errSpendHeightTooHigh {
 				potentialFund = potentialFund.Add(sco.Value)
 			}
+			continue
+		}
+		if ctx := dbGetOutputContext(tb.wallet.dbTx, types.OutputID(scoid)); ctx != tb.srcContext {
 			continue
 		}
 
@@ -543,6 +553,9 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 	// and must be covered manually.
 	for i := range tb.transaction.TransactionSignatures {
 		coveredFields.TransactionSignatures = append(coveredFields.TransactionSignatures, uint64(i))
+	}
+	for i := range tb.transaction.SiacoinOutputs {
+		dbPutOutputContext(tb.wallet.dbTx, types.OutputID(tb.transaction.SiacoinOutputID(uint64(i))), tb.destContext)
 	}
 
 	// For each siacoin input in the transaction that we added, provide a

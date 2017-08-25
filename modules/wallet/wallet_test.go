@@ -222,6 +222,71 @@ func TestCloseWallet(t *testing.T) {
 	}
 }
 
+// TestWalletContextBalance verifies that the wallet sends and receives, and
+// reports contextual balance correctly.
+func TestWalletContextBalance(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	scbContext, _, _ := wt.wallet.ConfirmedBalance("TestContext")
+	if scbContext.Cmp(types.SiacoinPrecision.Mul64(0)) != 0 {
+		t.Fatal("TestContext balance should be empty initially, got ", scbContext.HumanString(), " instead")
+	}
+
+	addr, err := wt.wallet.NextAddress("TestContext")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), addr.UnlockHash(), modules.DefaultWalletContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	scbContext, _, _ = wt.wallet.ConfirmedBalance("TestContext")
+	if scbContext.Cmp(types.SiacoinPrecision.Mul64(100)) != 0 {
+		t.Fatal("expected confirmed contextual balance to be 100 SC after sending 100 SC, got ", scbContext.HumanString(), " instead")
+	}
+	scb, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
+	if scb.Cmp(scbContext) <= 0 {
+		t.Fatal("default context should have more money than test context")
+	}
+
+	// try to send from this context to another context.
+
+	// send too many coins for TestContext, but enough to be covered by the
+	// DefaultContext. Should give an insufficient balance error
+	addr, err = wt.wallet.NextAddress("TestContext2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(1000), addr.UnlockHash(), "TestContext")
+	if err == nil {
+		t.Fatal("expected ErrLowBalance sending from context with not enough coins, got", err, "instead.")
+	}
+
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(50), addr.UnlockHash(), "TestContext")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	scbContext2, _, _ := wt.wallet.ConfirmedBalance("TestContext2")
+	if scbContext2.Cmp(types.SiacoinPrecision.Mul64(50)) != 0 {
+		t.Fatal("expected TestContext2 to have 50 SC, got", scbContext2.HumanString())
+	}
+}
+
 // TestRescanning verifies that calling Rescanning during a scan operation
 // returns true, and false otherwise.
 func TestRescanning(t *testing.T) {
@@ -297,7 +362,7 @@ func TestLookaheadGeneration(t *testing.T) {
 
 	// Generate some more keys
 	for i := 0; i < 100; i++ {
-		wt.wallet.NextAddress()
+		wt.wallet.NextAddress(modules.DefaultWalletContext)
 	}
 
 	// Lock and unlock
@@ -423,7 +488,7 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 	if err != nil {
 		t.Fatal("Couldn't fetch primary seed from db")
 	}
-	startBal, _, _ := wt.wallet.ConfirmedBalance()
+	startBal, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 
 	// Send coins to an address with a high seed index, just outside the
 	// lookahead range. It will not be initially detected, but later the
@@ -452,7 +517,7 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 		t.Fatal(err)
 	}
 	wt.addBlockNoPayout()
-	newBal, _, _ := wt.wallet.ConfirmedBalance()
+	newBal, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	if !startBal.Sub(newBal).Equals(farPayout) {
 		t.Fatal("wallet should not recognize coins sent to very high seed index")
 	}
@@ -500,7 +565,7 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 	time.Sleep(time.Second * 2)
 
 	// Check that high seed index txn was discovered in the rescan
-	rescanBal, _, _ := wt.wallet.ConfirmedBalance()
+	rescanBal, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	if !rescanBal.Equals(startBal) {
 		t.Fatal("wallet did not discover txn after rescan")
 	}
@@ -549,7 +614,7 @@ func TestDistantWallets(t *testing.T) {
 
 	// Use the first wallet.
 	for i := uint64(0); i < lookaheadBuffer/2; i++ {
-		_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, types.UnlockHash{})
+		_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, types.UnlockHash{}, modules.DefaultWalletContext)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -557,8 +622,8 @@ func TestDistantWallets(t *testing.T) {
 	}
 
 	// The second wallet's balance should update accordingly.
-	w1bal, _, _ := wt.wallet.ConfirmedBalance()
-	w2bal, _, _ := w2.ConfirmedBalance()
+	w1bal, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
+	w2bal, _, _ := w2.ConfirmedBalance(modules.DefaultWalletContext)
 
 	if !w1bal.Equals(w2bal) {
 		t.Fatal("balances do not match:", w1bal, w2bal)
@@ -587,7 +652,7 @@ func TestDistantWallets(t *testing.T) {
 	}
 	wt.addBlockNoPayout()
 
-	if newBal, _, _ := w2.ConfirmedBalance(); !newBal.Equals(w2bal.Sub(value)) {
+	if newBal, _, _ := w2.ConfirmedBalance(modules.DefaultWalletContext); !newBal.Equals(w2bal.Sub(value)) {
 		t.Fatal("wallet should not recognize coins sent to very high seed index")
 	}
 }

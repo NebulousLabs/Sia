@@ -32,6 +32,12 @@ var (
 	// these outputs so that it can reuse them if they are not confirmed on
 	// the blockchain.
 	bucketSpentOutputs = []byte("bucketSpentOutputs")
+	// bucketOutputContexts maps an OutputID to a context assigned to that
+	// output.
+	bucketOutputContexts = []byte("bucketOutputContexts")
+
+	bucketAddressContexts = []byte("bucketAddressContexts")
+
 	// bucketWallet contains various fields needed by the wallet, such as its
 	// UID, EncryptionVerification, and PrimarySeedFile.
 	bucketWallet = []byte("bucketWallet")
@@ -40,6 +46,8 @@ var (
 		bucketProcessedTransactions,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
+		bucketOutputContexts,
+		bucketAddressContexts,
 		bucketSpentOutputs,
 		bucketWallet,
 	}
@@ -202,6 +210,26 @@ func dbGetSpentOutput(tx *bolt.Tx, id types.OutputID) (height types.BlockHeight,
 }
 func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
+}
+func dbGetOutputContext(tx *bolt.Tx, id types.OutputID) string {
+	valBytes := tx.Bucket(bucketOutputContexts).Get(encoding.Marshal(id))
+	if valBytes == nil {
+		return ""
+	}
+	return string(valBytes)
+}
+func dbPutOutputContext(tx *bolt.Tx, id types.OutputID, context string) error {
+	return tx.Bucket(bucketOutputContexts).Put(encoding.Marshal(id), []byte(context))
+}
+func dbPutAddressContext(tx *bolt.Tx, addr types.UnlockHash, context string) error {
+	return tx.Bucket(bucketAddressContexts).Put(encoding.Marshal(addr), []byte(context))
+}
+func dbGetAddressContext(tx *bolt.Tx, addr types.UnlockHash) string {
+	valBytes := tx.Bucket(bucketAddressContexts).Get(encoding.Marshal(addr))
+	if valBytes == nil {
+		return ""
+	}
+	return string(valBytes)
 }
 
 // bucketProcessedTransactions works a little differently: the key is

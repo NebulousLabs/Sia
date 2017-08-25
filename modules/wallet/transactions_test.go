@@ -3,6 +3,7 @@ package wallet
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -30,7 +31,7 @@ func TestIntegrationTransactions(t *testing.T) {
 		t.Error("unexpected transaction history length")
 	}
 	sentValue := types.NewCurrency64(5000)
-	_, err = wt.wallet.SendSiacoins(sentValue, types.UnlockHash{})
+	_, err = wt.wallet.SendSiacoins(sentValue, types.UnlockHash{}, modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +95,7 @@ func TestIntegrationTransaction(t *testing.T) {
 
 	// test sending siacoins
 	sentValue := types.NewCurrency64(5000)
-	sendTxns, err := wt.wallet.SendSiacoins(sentValue, types.UnlockHash{})
+	sendTxns, err := wt.wallet.SendSiacoins(sentValue, types.UnlockHash{}, modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,12 +160,12 @@ func TestIntegrationAddressTransactions(t *testing.T) {
 	defer wt.closeWt()
 
 	// Grab an address and send it money.
-	uc, err := wt.wallet.NextAddress()
+	uc, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
 	addr := uc.UnlockHash()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr)
+	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr, modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,12 +213,12 @@ func TestTransactionInputOutputIDs(t *testing.T) {
 	}
 
 	// create some siacoin outputs
-	uc, err := wt.wallet.NextAddress()
+	uc, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
 	addr := uc.UnlockHash()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr)
+	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr, modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}

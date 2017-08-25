@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -197,7 +198,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 	// fragmented outputs
 	for i := 0; i < 30; i++ {
 		sendAmount := types.SiacoinPrecision.Mul64(2000)
-		_, err = wt.wallet.SendSiacoins(sendAmount, types.UnlockHash{})
+		_, err = wt.wallet.SendSiacoins(sendAmount, types.UnlockHash{}, modules.DefaultWalletContext)
 		if err != nil {
 			t.Errorf("%v: %v", i, err)
 		}
