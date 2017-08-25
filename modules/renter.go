@@ -314,6 +314,9 @@ type Renter interface {
 	// SetSettings sets the Renter's settings.
 	SetSettings(RenterSettings) error
 
+	// SetDebugFlag sets a debug flag to induce a certain behaviour in the renter
+	SetDebugFlag(flag string)
+
 	// ShareFiles creates a '.sia' file that can be shared with others.
 	ShareFiles(paths []string, shareDest string) error
 

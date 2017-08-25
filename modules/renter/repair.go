@@ -360,6 +360,12 @@ func (r *Renter) managedGetChunkData(rs *repairState, file *file, trackedFile tr
 	f, err := os.Open(trackedFile.RepairPath)
 	if err != nil {
 		// if that fails, try to download the chunk
+		if r.debugFlags["BlockRemoteRepair"] {
+			// Block the download if the flag is set
+			select {
+			case <-r.tg.StopChan():
+			}
+		}
 		return r.managedDownloadChunkData(rs, file, offset, chunkIndex, chunkID)
 	}
 	defer f.Close()
@@ -411,7 +417,10 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 			return build.ExtendErr("unable to get repair chunk:", err)
 		}
 		chunkData = data
-		rs.cachedChunks[chunkID] = data
+
+		if !r.debugFlags["NoChunkCaching"] {
+			rs.cachedChunks[chunkID] = data
+		}
 	}
 
 	// Erasure code the pieces.

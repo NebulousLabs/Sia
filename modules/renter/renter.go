@@ -161,6 +161,9 @@ type Renter struct {
 	mu             *sync.RWMutex
 	tg             *sync.ThreadGroup
 	tpool          modules.TransactionPool
+
+	// Testing utilities
+	debugFlags map[string]bool
 }
 
 // New returns an initialized renter.
@@ -173,7 +176,6 @@ func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpoo
 	if err != nil {
 		return nil, err
 	}
-
 	return newRenter(cs, tpool, hdb, hc, persistDir)
 }
 
@@ -208,6 +210,8 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		mu:             sync.New(modules.SafeMutexDelay, 1),
 		tg:             new(sync.ThreadGroup),
 		tpool:          tpool,
+
+		debugFlags: make(map[string]bool),
 	}
 	if err := r.initPersist(); err != nil {
 		return nil, err
@@ -237,6 +241,11 @@ func (r *Renter) Close() error {
 	r.tg.Stop()
 	r.hostDB.Close()
 	return r.hostContractor.Close()
+}
+
+// SetDebugFlag sets a debug flag to induce a certain behaviour in the renter
+func (r *Renter) SetDebugFlag(flag string) {
+	r.debugFlags[flag] = true
 }
 
 // PriceEstimation estimates the cost in siacoins of performing various storage
