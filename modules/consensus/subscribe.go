@@ -253,6 +253,10 @@ func (cs *ConsensusSet) Unsubscribe(subscriber modules.ConsensusSetSubscriber) {
 	// found.
 	for i := range cs.subscribers {
 		if cs.subscribers[i] == subscriber {
+			// nil the subscriber entry (otherwise it will not be GC'd if it's
+			// at the end of the subscribers slice).
+			cs.subscribers[i] = nil
+			// Delete the entry from the slice.
 			cs.subscribers = append(cs.subscribers[0:i], cs.subscribers[i+1:]...)
 			break
 		}
