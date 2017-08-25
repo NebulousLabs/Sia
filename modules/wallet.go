@@ -81,6 +81,7 @@ type (
 		WalletAddress  bool              `json:"walletaddress"`
 		RelatedAddress types.UnlockHash  `json:"relatedaddress"`
 		Value          types.Currency    `json:"value"`
+		Context        string            `json:"context"`
 	}
 
 	// A ProcessedTransaction is a transaction that has been processed into
