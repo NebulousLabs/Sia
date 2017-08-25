@@ -173,7 +173,7 @@ func (s *seedScanner) scan(cs modules.ConsensusSet, cancel <-chan struct{}) erro
 func newSeedScanner(seed modules.Seed, log *persist.Logger) *seedScanner {
 	return &seedScanner{
 		seed:           seed,
-		keys:           make(map[types.UnlockHash]uint64),
+		keys:           make(map[types.UnlockHash]uint64, numInitialKeys),
 		siacoinOutputs: make(map[types.SiacoinOutputID]scannedOutput),
 		siafundOutputs: make(map[types.SiafundOutputID]scannedOutput),
 
