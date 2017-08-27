@@ -2,6 +2,7 @@ package host
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"testing"
 )
@@ -31,34 +32,31 @@ func init() {
 func TestShannonEntropy(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
-		name      string
-		low, high float64
+		name string
+		want float64
 	}{
 		{
 			name: "all zeros",
-			low:  0.0,
-			high: 0.00000001,
+			want: 0.0,
 		},
 		{
 			name: "uniform",
-			low:  0.9999999,
-			high: 1.0,
+			want: 1.0,
 		},
 		{
 			name: "almost uniform",
-			low:  0.98,
-			high: 0.99,
+			want: 0.981419,
 		},
 		{
 			name: "random",
-			low:  0.9999941,
-			high: 0.9999942,
+			want: 0.999994,
 		},
 	}
+	maxDelta := 0.000001
 	for _, ts := range testCases {
 		got := shannonEntropy(inputs[ts.name])
-		if got < ts.low || got > ts.high {
-			t.Errorf("shannonEntropy(%s): %#v, want between %#v and %#v", ts.name, got, ts.low, ts.high)
+		if math.Abs(got-ts.want) > maxDelta {
+			t.Errorf("shannonEntropy(%s): %#v, want %#v", ts.name, got, ts.want)
 		}
 	}
 }
