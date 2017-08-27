@@ -1,6 +1,8 @@
 package host
 
 import (
+	"fmt"
+	"math/rand"
 	"testing"
 )
 
@@ -18,6 +20,11 @@ func init() {
 	inputs["almost uniform"] = make([]byte, 256)
 	for i := 0; i < 256-10; i++ {
 		inputs["almost uniform"][i] = byte(i)
+	}
+	inputs["random"] = make([]byte, 1<<22)
+	n, err := rand.New(rand.NewSource(42)).Read(inputs["random"])
+	if n != len(inputs["random"]) || err != nil {
+		panic(fmt.Errorf("failed to initialize 'random': n=%d err=%v", n, err))
 	}
 }
 
@@ -41,6 +48,11 @@ func TestShannonEntropy(t *testing.T) {
 			name: "almost uniform",
 			low:  0.98,
 			high: 0.99,
+		},
+		{
+			name: "random",
+			low:  0.9999941,
+			high: 0.9999942,
 		},
 	}
 	for _, ts := range testCases {
@@ -69,6 +81,10 @@ func TestRandomnessTest(t *testing.T) {
 		{
 			name:      "almost uniform",
 			wantError: true,
+		},
+		{
+			name:      "random",
+			wantError: false,
 		},
 	}
 	for _, ts := range testCases {
