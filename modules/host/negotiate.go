@@ -132,6 +132,9 @@ var (
 	// errUnknownModification is returned if the host receives a modification
 	// action from the renter that it does not understand.
 	errUnknownModification = ErrorCommunication("renter is attempting an action that the host does not understand")
+
+	// errLowEntropy is returned if the data has too low Shannon entropy.
+	errLowEntropy = ErrorCommunication("entropy of the data is too low. Is the data encrypted?")
 )
 
 // createRevisionSignature creates a signature for a file contract revision

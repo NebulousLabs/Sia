@@ -173,6 +173,14 @@ var (
 		Standard: uint64(1 << 22), // 4 MiB
 		Testing:  uint64(1 << 12), // 4 KiB
 	}).(uint64)
+
+	// MinimumEntropy defines the minimum value of Shannon entropy of a
+	// uploaded sector. See https://github.com/NebulousLabs/Sia/issues/2260
+	MinimumEntropy = build.Select(build.Var{
+		Dev:      0.9998,
+		Standard: 0.999992,
+		Testing:  0.991,
+	}).(float64)
 )
 
 type (
