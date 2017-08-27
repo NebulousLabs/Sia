@@ -2,6 +2,7 @@ package host
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"time"
 
@@ -92,6 +93,9 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 				if uint64(len(modification.Data)) != modules.SectorSize {
 					return errBadSectorSize
 				}
+				if err := randomnessTest(modification.Data); err != nil {
+					return err
+				}
 
 				// Update finances.
 				blocksRemaining := so.proofDeadline() - blockHeight
@@ -120,6 +124,10 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 					return extendErr("could not read sector: ", ErrorInternal(err.Error()))
 				}
 				copy(sector[modification.Offset:], modification.Data)
+
+				if err := randomnessTest(sector); err != nil {
+					return err
+				}
 
 				// Update finances.
 				bandwidthRevenue = bandwidthRevenue.Add(settings.MinUploadBandwidthPrice.Mul64(uint64(len(modification.Data))))
@@ -322,5 +330,30 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 		return errBadFileMerkleRoot
 	}
 
+	return nil
+}
+
+// shannonEntropy returns Shannon entropy of the data.
+func shannonEntropy(data []byte) float64 {
+	var frq [256]int
+	for _, v := range data {
+		frq[v]++
+	}
+	var sum float64
+	den := float64(len(data))
+	for _, v := range frq {
+		if v > 0 {
+			f := float64(v) / den
+			sum -= f * math.Log2(f)
+		}
+	}
+	return sum / 8
+}
+
+// randomnessTest checks that the data looks random.
+func randomnessTest(data []byte) error {
+	if shannonEntropy(data) < modules.MinimumEntropy {
+		return errLowEntropy
+	}
 	return nil
 }
