@@ -32,9 +32,11 @@ var (
 	// these outputs so that it can reuse them if they are not confirmed on
 	// the blockchain.
 	bucketSpentOutputs = []byte("bucketSpentOutputs")
-
+	// bucketContextBalances maps a context to the remaining balance of that
+	// context.
 	bucketContextBalances = []byte("bucketContextBalances")
-
+	// bucketTransactionContexts maps a transaction id to the context which it
+	// belongs.
 	bucketTransactionContexts = []byte("bucketTransactionContexts")
 
 	// bucketWallet contains various fields needed by the wallet, such as its

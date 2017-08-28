@@ -201,3 +201,21 @@ func (w *Wallet) Rescanning() bool {
 	}
 	return rescanning
 }
+
+// Contexts returns every WalletContext currently in use by the wallet.
+func (w *Wallet) Contexts() []modules.WalletContext {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	var contexts []modules.WalletContext
+	err := dbForEach(w.dbTx.Bucket(bucketContextBalances), func(ctx string, bal types.Currency) {
+		contexts = append(contexts, modules.WalletContext{
+			Name:    ctx,
+			Balance: bal,
+		})
+	})
+	if err != nil {
+		build.Severe("error getting contexts from database:", err)
+	}
+	return contexts
+}

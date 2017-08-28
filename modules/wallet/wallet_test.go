@@ -222,6 +222,32 @@ func TestCloseWallet(t *testing.T) {
 	}
 }
 
+// TestWalletContexts verifies that the wallet's Contexts() and
+// SetContextLimit() methods work correctly.
+func TestWalletContexts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	contexts := wt.wallet.Contexts()
+	if len(contexts) != 0 {
+		t.Fatal("fresh wallet should have one context")
+	}
+	wt.wallet.SetContextLimit("TestContext", types.SiacoinPrecision.Mul64(100))
+	contexts = wt.wallet.Contexts()
+	if len(contexts) != 1 {
+		t.Fatal("expected one context")
+	}
+	if contexts[0].Name != "TestContext" || contexts[0].Balance.Cmp(types.SiacoinPrecision.Mul64(100)) != 0 {
+		t.Fatal("expected context with correct name and value")
+	}
+}
+
 // TestWalletContextBalance verifies that the wallet sends and receives, and
 // reports contextual balance correctly.
 func TestWalletContextBalance(t *testing.T) {

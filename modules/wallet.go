@@ -105,6 +105,12 @@ type (
 		Outputs []ProcessedOutput `json:"outputs"`
 	}
 
+	// WalletContext defines a context inside the wallet.
+	WalletContext struct {
+		Name    string         `json:"name"`
+		Balance types.Currency `json:"balance"`
+	}
+
 	// TransactionBuilder is used to construct custom transactions. A transaction
 	// builder is initialized via 'RegisterTransaction' and then can be modified by
 	// adding funds or other fields. The transaction is completed by calling
@@ -343,7 +349,14 @@ type (
 		// refund transactions.
 		ConfirmedBalance(context string) (siacoinBalance types.Currency, siafundBalance types.Currency, siacoinClaimBalance types.Currency)
 
+		// SetContextLimit sets the spending limit for a wallet context to the
+		// value specified by limit. Transactions which use the specified context
+		// will be limited to `limit` spending. Calling SetContextLimit again on
+		// the same context resets the spending limit to the value provided.
 		SetContextLimit(context string, limit types.Currency)
+
+		// Contexts returns every WalletContext currently in use by the wallet.
+		Contexts() []WalletContext
 
 		// UnconfirmedBalance returns the unconfirmed balance of the wallet.
 		// Outgoing funds and incoming funds are reported separately. Refund
