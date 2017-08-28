@@ -566,28 +566,38 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 
 	// For each siacoin input in the transaction that we added, provide a
 	// signature.
-	tb.wallet.mu.RLock()
-	defer tb.wallet.mu.RUnlock()
-	for _, inputIndex := range tb.siacoinInputs {
-		input := tb.transaction.SiacoinInputs[inputIndex]
-		key, ok := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
-		if !ok {
-			return nil, errors.New("transaction builder added an input that it cannot sign")
+	err := func() error {
+		tb.wallet.mu.RLock()
+		defer tb.wallet.mu.RUnlock()
+		for _, inputIndex := range tb.siacoinInputs {
+			input := tb.transaction.SiacoinInputs[inputIndex]
+			key, ok := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+			if !ok {
+				return errors.New("transaction builder added an input that it cannot sign")
+			}
+			newSigIndices := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
+			tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
+			tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
 		}
-		newSigIndices := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
-		tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
-		tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
-	}
-	for _, inputIndex := range tb.siafundInputs {
-		input := tb.transaction.SiafundInputs[inputIndex]
-		key, ok := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
-		if !ok {
-			return nil, errors.New("transaction builder added an input that it cannot sign")
+		for _, inputIndex := range tb.siafundInputs {
+			input := tb.transaction.SiafundInputs[inputIndex]
+			key, ok := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+			if !ok {
+				return errors.New("transaction builder added an input that it cannot sign")
+			}
+			newSigIndices := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
+			tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
+			tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
 		}
-		newSigIndices := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
-		tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
-		tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
+		return nil
+	}()
+	if err != nil {
+		return nil, err
 	}
+
+	tb.wallet.mu.Lock()
+	dbPutTransactionContext(tb.wallet.dbTx, tb.transaction.ID(), tb.context)
+	tb.wallet.mu.Unlock()
 
 	// Get the transaction set and delete the transaction from the registry.
 	txnSet := append(tb.parents, tb.transaction)

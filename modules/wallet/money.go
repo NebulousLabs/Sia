@@ -1,8 +1,6 @@
 package wallet
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -109,21 +107,6 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash, cont
 		return nil, modules.ErrLockedWallet
 	}
 
-	// check that this context has enough funds
-	if context != modules.DefaultWalletContext {
-		ctxBalance, err := dbGetContextBalance(w.dbTx, context)
-		if err != nil {
-			return []types.Transaction{}, err
-		}
-		if ctxBalance.Cmp(amount) < 0 {
-			return []types.Transaction{}, errors.New("supplied context has insufficient balance")
-		}
-		err = dbPutContextBalance(w.dbTx, context, ctxBalance.Sub(amount))
-		if err != nil {
-			return []types.Transaction{}, err
-		}
-	}
-
 	_, tpoolFee := w.tpool.FeeEstimation()
 	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
 	output := types.SiacoinOutput{
@@ -132,6 +115,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash, cont
 	}
 
 	txnBuilder := w.StartTransaction()
+	txnBuilder.SetContext(context)
 	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)

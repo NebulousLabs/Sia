@@ -258,7 +258,7 @@ func TestWalletContextBalance(t *testing.T) {
 		t.Fatal(err)
 	}
 	scbContext, _, _ = wt.wallet.ConfirmedBalance("TestContext")
-	if scbContext.Cmp(types.SiacoinPrecision.Mul64(50)) != 0 {
+	if scbContext.Cmp(types.SiacoinPrecision.Mul64(49)) < 0 {
 		t.Fatal("expected confirmed contextual balance to be 50SC after sending 50SC, got ", scbContext.HumanString(), " instead")
 	}
 
@@ -270,7 +270,7 @@ func TestWalletContextBalance(t *testing.T) {
 	}
 
 	scbContext, _, _ = wt.wallet.ConfirmedBalance("TestContext")
-	if scbContext.Cmp(types.SiacoinPrecision.Mul64(50)) != 0 {
+	if scbContext.Cmp(types.SiacoinPrecision.Mul64(49)) < 0 {
 		t.Fatal("expected confirmed contextual balance to be 50SC after sending 50SC, got ", scbContext.HumanString(), " instead")
 	}
 }

@@ -99,6 +99,7 @@ type (
 		TransactionID         types.TransactionID `json:"transactionid"`
 		ConfirmationHeight    types.BlockHeight   `json:"confirmationheight"`
 		ConfirmationTimestamp types.Timestamp     `json:"confirmationtimestamp"`
+		Context               string              `json:"context"`
 
 		Inputs  []ProcessedInput  `json:"inputs"`
 		Outputs []ProcessedOutput `json:"outputs"`

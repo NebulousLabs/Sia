@@ -35,6 +35,8 @@ var (
 
 	bucketContextBalances = []byte("bucketContextBalances")
 
+	bucketTransactionContexts = []byte("bucketTransactionContexts")
+
 	// bucketWallet contains various fields needed by the wallet, such as its
 	// UID, EncryptionVerification, and PrimarySeedFile.
 	bucketWallet = []byte("bucketWallet")
@@ -44,6 +46,7 @@ var (
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
 		bucketContextBalances,
+		bucketTransactionContexts,
 		bucketSpentOutputs,
 		bucketWallet,
 	}
@@ -217,6 +220,17 @@ func dbGetContextBalance(tx *bolt.Tx, context string) (balance types.Currency, e
 }
 func dbPutContextBalance(tx *bolt.Tx, context string, balance types.Currency) error {
 	return dbPut(tx.Bucket(bucketContextBalances), context, balance)
+}
+func dbGetTransactionContext(tx *bolt.Tx, id types.TransactionID) (context string, err error) {
+	err = dbGet(tx.Bucket(bucketTransactionContexts), id, &context)
+	if err == errNoKey {
+		context = modules.DefaultWalletContext
+		err = nil
+	}
+	return
+}
+func dbPutTransactionContext(tx *bolt.Tx, id types.TransactionID, context string) error {
+	return dbPut(tx.Bucket(bucketTransactionContexts), id, context)
 }
 
 // bucketProcessedTransactions works a little differently: the key is
