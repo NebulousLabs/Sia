@@ -160,7 +160,7 @@ func TestIntegrationAddressTransactions(t *testing.T) {
 	defer wt.closeWt()
 
 	// Grab an address and send it money.
-	uc, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
+	uc, err := wt.wallet.NextAddress()
 	addr := uc.UnlockHash()
 	if err != nil {
 		t.Fatal(err)
@@ -213,7 +213,7 @@ func TestTransactionInputOutputIDs(t *testing.T) {
 	}
 
 	// create some siacoin outputs
-	uc, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
+	uc, err := wt.wallet.NextAddress()
 	addr := uc.UnlockHash()
 	if err != nil {
 		t.Fatal(err)

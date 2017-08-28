@@ -42,7 +42,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	// create a transaction
-	addr, _ := wt.wallet.NextAddress(modules.DefaultWalletContext)
+	addr, _ := wt.wallet.NextAddress()
 	txnSet, err := wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(10), addr.UnlockHash(), modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)

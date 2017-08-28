@@ -32,11 +32,8 @@ var (
 	// these outputs so that it can reuse them if they are not confirmed on
 	// the blockchain.
 	bucketSpentOutputs = []byte("bucketSpentOutputs")
-	// bucketOutputContexts maps an OutputID to a context assigned to that
-	// output.
-	bucketOutputContexts = []byte("bucketOutputContexts")
 
-	bucketAddressContexts = []byte("bucketAddressContexts")
+	bucketContextBalances = []byte("bucketContextBalances")
 
 	// bucketWallet contains various fields needed by the wallet, such as its
 	// UID, EncryptionVerification, and PrimarySeedFile.
@@ -46,8 +43,7 @@ var (
 		bucketProcessedTransactions,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
-		bucketOutputContexts,
-		bucketAddressContexts,
+		bucketContextBalances,
 		bucketSpentOutputs,
 		bucketWallet,
 	}
@@ -211,25 +207,16 @@ func dbGetSpentOutput(tx *bolt.Tx, id types.OutputID) (height types.BlockHeight,
 func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
 }
-func dbGetOutputContext(tx *bolt.Tx, id types.OutputID) string {
-	valBytes := tx.Bucket(bucketOutputContexts).Get(encoding.Marshal(id))
-	if valBytes == nil {
-		return ""
+func dbGetContextBalance(tx *bolt.Tx, context string) (balance types.Currency, err error) {
+	err = dbGet(tx.Bucket(bucketContextBalances), context, &balance)
+	if err == errNoKey {
+		balance = types.NewCurrency64(0)
+		err = nil
 	}
-	return string(valBytes)
+	return
 }
-func dbPutOutputContext(tx *bolt.Tx, id types.OutputID, context string) error {
-	return tx.Bucket(bucketOutputContexts).Put(encoding.Marshal(id), []byte(context))
-}
-func dbPutAddressContext(tx *bolt.Tx, addr types.UnlockHash, context string) error {
-	return tx.Bucket(bucketAddressContexts).Put(encoding.Marshal(addr), []byte(context))
-}
-func dbGetAddressContext(tx *bolt.Tx, addr types.UnlockHash) string {
-	valBytes := tx.Bucket(bucketAddressContexts).Get(encoding.Marshal(addr))
-	if valBytes == nil {
-		return ""
-	}
-	return string(valBytes)
+func dbPutContextBalance(tx *bolt.Tx, context string, balance types.Currency) error {
+	return dbPut(tx.Bucket(bucketContextBalances), context, balance)
 }
 
 // bucketProcessedTransactions works a little differently: the key is

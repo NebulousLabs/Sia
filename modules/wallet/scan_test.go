@@ -50,7 +50,7 @@ func TestScanLargeIndex(t *testing.T) {
 
 	// send money to ourselves so that we sweep a real output (instead of just
 	// a miner payout)
-	uc, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
+	uc, err := wt.wallet.NextAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestScanLoop(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		uc, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
+		uc, err := wt.wallet.NextAddress()
 		if err != nil {
 			t.Fatal(err)
 		}

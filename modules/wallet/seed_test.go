@@ -47,7 +47,7 @@ func TestPrimarySeed(t *testing.T) {
 	if remaining != maxScanKeys {
 		t.Error("primary seed is returning the wrong number of remaining addresses")
 	}
-	_, err = wt.wallet.NextAddress(modules.DefaultWalletContext)
+	_, err = wt.wallet.NextAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestSweepSeedCoins(t *testing.T) {
 	}
 	// send money to ourselves, so that we sweep a real output (instead of
 	// just a miner payout)
-	uc, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
+	uc, err := wt.wallet.NextAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +337,7 @@ func TestSweepSeedSentFunds(t *testing.T) {
 
 	// send funds to ourself a few times
 	for i := 0; i < 10; i++ {
-		uc, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
+		uc, err := wt.wallet.NextAddress()
 		if err != nil {
 			t.Fatal(err)
 		}

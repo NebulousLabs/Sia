@@ -277,7 +277,7 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	}
 
 	// Send all coins to a single confirmed output for the wallet.
-	unlockConditions, err := wt.wallet.NextAddress(modules.DefaultWalletContext)
+	unlockConditions, err := wt.wallet.NextAddress()
 	scBal, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	// Use a custom builder so that there is no transaction fee.
 	builder := wt.wallet.StartTransaction()

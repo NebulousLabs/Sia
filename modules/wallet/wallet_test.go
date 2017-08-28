@@ -236,43 +236,19 @@ func TestWalletContextBalance(t *testing.T) {
 
 	scbContext, _, _ := wt.wallet.ConfirmedBalance("TestContext")
 	if scbContext.Cmp(types.SiacoinPrecision.Mul64(0)) != 0 {
-		t.Fatal("TestContext balance should be empty initially, got ", scbContext.HumanString(), " instead")
+		t.Fatal("TestContext balance should be empty initially, got", scbContext.HumanString(), "instead")
 	}
 
-	addr, err := wt.wallet.NextAddress("TestContext")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), addr.UnlockHash(), modules.DefaultWalletContext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = wt.miner.AddBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	wt.wallet.SetContextLimit("TestContext", types.SiacoinPrecision.Mul64(100))
 	scbContext, _, _ = wt.wallet.ConfirmedBalance("TestContext")
 	if scbContext.Cmp(types.SiacoinPrecision.Mul64(100)) != 0 {
-		t.Fatal("expected confirmed contextual balance to be 100 SC after sending 100 SC, got ", scbContext.HumanString(), " instead")
-	}
-	scb, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
-	if scb.Cmp(scbContext) <= 0 {
-		t.Fatal("default context should have more money than test context")
+		t.Fatal("TestContext balance should be 100SC, got", scbContext.HumanString(), "instead")
 	}
 
-	// try to send from this context to another context.
-
-	// send too many coins for TestContext, but enough to be covered by the
-	// DefaultContext. Should give an insufficient balance error
-	addr, err = wt.wallet.NextAddress("TestContext2")
+	addr, err := wt.wallet.NextAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(1000), addr.UnlockHash(), "TestContext")
-	if err == nil {
-		t.Fatal("expected ErrLowBalance sending from context with not enough coins, got", err, "instead.")
-	}
-
 	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(50), addr.UnlockHash(), "TestContext")
 	if err != nil {
 		t.Fatal(err)
@@ -281,9 +257,21 @@ func TestWalletContextBalance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scbContext2, _, _ := wt.wallet.ConfirmedBalance("TestContext2")
-	if scbContext2.Cmp(types.SiacoinPrecision.Mul64(50)) != 0 {
-		t.Fatal("expected TestContext2 to have 50 SC, got", scbContext2.HumanString())
+	scbContext, _, _ = wt.wallet.ConfirmedBalance("TestContext")
+	if scbContext.Cmp(types.SiacoinPrecision.Mul64(50)) != 0 {
+		t.Fatal("expected confirmed contextual balance to be 50SC after sending 50SC, got ", scbContext.HumanString(), " instead")
+	}
+
+	// send too many coins for TestContext, but enough to be covered by the
+	// DefaultContext. Should give an insufficient balance error
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(1000), addr.UnlockHash(), "TestContext")
+	if err == nil {
+		t.Fatal("expected ErrLowBalance sending from context with not enough coins, got", err, "instead.")
+	}
+
+	scbContext, _, _ = wt.wallet.ConfirmedBalance("TestContext")
+	if scbContext.Cmp(types.SiacoinPrecision.Mul64(50)) != 0 {
+		t.Fatal("expected confirmed contextual balance to be 50SC after sending 50SC, got ", scbContext.HumanString(), " instead")
 	}
 }
 
@@ -362,7 +350,7 @@ func TestLookaheadGeneration(t *testing.T) {
 
 	// Generate some more keys
 	for i := 0; i < 100; i++ {
-		wt.wallet.NextAddress(modules.DefaultWalletContext)
+		wt.wallet.NextAddress()
 	}
 
 	// Lock and unlock

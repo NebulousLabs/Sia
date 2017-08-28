@@ -85,7 +85,6 @@ type (
 		WalletAddress  bool              `json:"walletaddress"`
 		RelatedAddress types.UnlockHash  `json:"relatedaddress"`
 		Value          types.Currency    `json:"value"`
-		Context        string            `json:"context"`
 	}
 
 	// A ProcessedTransaction is a transaction that has been processed into
@@ -135,8 +134,6 @@ type (
 		// double-spends, because the wallet will assume the transaction
 		// failed.
 		FundSiafunds(amount types.Currency) error
-
-		SetContext(string, string)
 
 		// AddParents adds a set of parents to the transaction.
 		AddParents([]types.Transaction)
@@ -313,7 +310,7 @@ type (
 
 		// NextAddress returns a new coin addresses generated from the
 		// primary seed.
-		NextAddress(context string) (types.UnlockConditions, error)
+		NextAddress() (types.UnlockConditions, error)
 
 		// PrimarySeed returns the unencrypted primary seed of the wallet,
 		// along with a uint64 indicating how many addresses may be safely
@@ -342,6 +339,8 @@ type (
 		// any outgoing transactions. ConfirmedBalance will include unconfirmed
 		// refund transactions.
 		ConfirmedBalance(context string) (siacoinBalance types.Currency, siafundBalance types.Currency, siacoinClaimBalance types.Currency)
+
+		SetContextLimit(context string, limit types.Currency)
 
 		// UnconfirmedBalance returns the unconfirmed balance of the wallet.
 		// Outgoing funds and incoming funds are reported separately. Refund
