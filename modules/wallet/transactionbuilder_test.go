@@ -128,6 +128,52 @@ func TestViewAdded(t *testing.T) {
 	}
 }
 
+// TestTbuilderContext verifies that the transaction builder uses the wallet's
+// contextual balances correctly.
+func TestTbuilderContext(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// create a context with a low limit, try to use a tbuilder to create a
+	// transaction that exceeds this limit. tbuilder should fail.
+	wt.wallet.SetContextLimit(t.Name()+"-context", types.SiacoinPrecision.Mul64(100))
+	b := wt.wallet.StartTransaction()
+	b.SetContext(t.Name() + "-context")
+	err = b.FundSiacoins(types.SiacoinPrecision.Mul64(101))
+	if err == nil {
+		t.Fatal("expected fundsiacoins to fail when a context with too-low limit is used")
+	}
+	err = b.FundSiacoins(types.SiacoinPrecision.Mul64(50))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.AddSiacoinOutput(types.SiacoinOutput{
+		Value:      types.SiacoinPrecision.Mul64(50),
+		UnlockHash: types.UnlockHash{},
+	})
+	txnSet, err := b.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bal, err := dbGetContextBalance(wt.wallet.dbTx, t.Name()+"-context")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bal.Cmp(types.SiacoinPrecision.Mul64(50)) != 0 {
+		t.Fatal("expected contextual balance to be 50SC after using tbuilder to send money, got", bal.HumanString(), "instead.")
+	}
+}
+
 // TestDoubleSignError checks that an error is returned if there is a problem
 // when trying to call 'Sign' on a transaction twice.
 func TestDoubleSignError(t *testing.T) {

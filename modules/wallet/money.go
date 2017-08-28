@@ -46,11 +46,13 @@ func (w *Wallet) ConfirmedBalance(context string) (siacoinBalance types.Currency
 		}
 	})
 
-	contextBalance, err := dbGetContextBalance(w.dbTx, context)
-	if err != nil {
-		w.log.Debugf("couldnt get context balance: %v\n", err)
-	} else if contextBalance.Cmp(siacoinBalance) < 0 {
-		siacoinBalance = contextBalance
+	if context != modules.DefaultWalletContext {
+		contextBalance, err := dbGetContextBalance(w.dbTx, context)
+		if err != nil {
+			w.log.Debugf("couldnt get context balance: %v\n", err)
+		} else if contextBalance.Cmp(siacoinBalance) < 0 {
+			siacoinBalance = contextBalance
+		}
 	}
 
 	siafundPool, err := dbGetSiafundPool(w.dbTx)
@@ -108,14 +110,19 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash, cont
 	}
 
 	// check that this context has enough funds
-	ctxBalance, err := dbGetContextBalance(w.dbTx, context)
-	if err != nil {
-		return []types.Transaction{}, err
+	if context != modules.DefaultWalletContext {
+		ctxBalance, err := dbGetContextBalance(w.dbTx, context)
+		if err != nil {
+			return []types.Transaction{}, err
+		}
+		if ctxBalance.Cmp(amount) < 0 {
+			return []types.Transaction{}, errors.New("supplied context has insufficient balance")
+		}
+		err = dbPutContextBalance(w.dbTx, context, ctxBalance.Sub(amount))
+		if err != nil {
+			return []types.Transaction{}, err
+		}
 	}
-	if ctxBalance.Cmp(amount) < 0 {
-		return []types.Transaction{}, errors.New("supplied context has insufficient balance")
-	}
-	dbPutContextBalance(w.dbTx, context, ctxBalance.Sub(amount))
 
 	_, tpoolFee := w.tpool.FeeEstimation()
 	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
@@ -125,7 +132,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash, cont
 	}
 
 	txnBuilder := w.StartTransaction()
-	err = txnBuilder.FundSiacoins(amount.Add(tpoolFee))
+	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
 		return nil, build.ExtendErr("unable to fund transaction", err)

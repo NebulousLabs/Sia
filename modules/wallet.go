@@ -135,6 +135,8 @@ type (
 		// failed.
 		FundSiafunds(amount types.Currency) error
 
+		SetContext(context string)
+
 		// AddParents adds a set of parents to the transaction.
 		AddParents([]types.Transaction)
 

@@ -38,8 +38,7 @@ type transactionBuilder struct {
 	parents     []types.Transaction
 	signed      bool
 	transaction types.Transaction
-	destContext string
-	srcContext  string
+	context     string
 
 	newParents            []int
 	siacoinInputs         []int
@@ -114,9 +113,8 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 	return nil
 }
 
-func (tb *transactionBuilder) SetContext(srcContext string, destContext string) {
-	tb.srcContext = srcContext
-	tb.destContext = destContext
+func (tb *transactionBuilder) SetContext(context string) {
+	tb.context = context
 }
 
 // FundSiacoins will add a siacoin input of exactly 'amount' to the
@@ -133,6 +131,20 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	consensusHeight, err := dbGetConsensusHeight(tb.wallet.dbTx)
 	if err != nil {
 		return err
+	}
+
+	if tb.context != modules.DefaultWalletContext {
+		ctxBalance, err := dbGetContextBalance(tb.wallet.dbTx, tb.context)
+		if err != nil {
+			return err
+		}
+		if ctxBalance.Cmp(amount) < 0 {
+			return modules.ErrLowBalance
+		}
+		err = dbPutContextBalance(tb.wallet.dbTx, tb.context, ctxBalance.Sub(amount))
+		if err != nil {
+			return err
+		}
 	}
 
 	// Collect a value-sorted set of siacoin outputs.
