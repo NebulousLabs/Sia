@@ -27,7 +27,7 @@ func TestAcceptTransactionSet(t *testing.T) {
 	}
 
 	// Create a valid transaction set using the wallet.
-	txns, err := tpt.wallet.SendSiacoins(types.NewCurrency64(100), types.UnlockHash{})
+	txns, err := tpt.wallet.SendSiacoins(types.NewCurrency64(100), types.UnlockHash{}, modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestCheckMinerFees(t *testing.T) {
 	}
 
 	// Add a transaction that has sufficient fees.
-	_, err = tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(50), types.UnlockHash{})
+	_, err = tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(50), types.UnlockHash{}, modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestTransactionGraph(t *testing.T) {
 
 	// Create a transaction sending money to an output that TransactionGraph can
 	// spent (the empty UnlockConditions).
-	txns, err := tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), types.UnlockConditions{}.UnlockHash())
+	txns, err := tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), types.UnlockConditions{}.UnlockHash(), modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +287,7 @@ func TestTransactionGraphDiamond(t *testing.T) {
 
 	// Create a transaction sending money to an output that TransactionGraph can
 	// spent (the empty UnlockConditions).
-	txns, err := tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), types.UnlockConditions{}.UnlockHash())
+	txns, err := tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), types.UnlockConditions{}.UnlockHash(), modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}
