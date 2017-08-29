@@ -87,6 +87,81 @@ func TestWalletGETEncrypted(t *testing.T) {
 	}
 }
 
+// TestWalletTransactionsContext verifies that /wallet/siacoins
+// /wallet/transactions takes and uses a `context` parameter correctly.
+func TestWalletTransactionsContext(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	contextValues := url.Values{}
+	contextValues.Set("context", "testctx")
+	contextValues.Set("limit", types.SiacoinPrecision.Mul64(100).String())
+	err = st.stdPostAPI("/wallet/contexts", contextValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wcg WalletContextsGET
+	err = st.getAPI("/wallet/contexts", &wcg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wcg.Contexts) != 1 {
+		t.Fatal("expected one context from /wallet/contexts")
+	}
+	if wcg.Contexts[0].Balance.Cmp(types.SiacoinPrecision.Mul64(100)) != 0 {
+		t.Fatal("context had wrong balance, got", wcg.Contexts[0].Balance.HumanString(), "wanted 100SC")
+	}
+
+	var wag WalletAddressGET
+	err = st.getAPI("/wallet/address", &wag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sendSiacoinsValues := url.Values{}
+	sendSiacoinsValues.Set("amount", types.SiacoinPrecision.Mul64(50).String())
+	sendSiacoinsValues.Set("destination", wag.Address.String())
+	sendSiacoinsValues.Set("context", "testctx")
+	err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mine a bunch of blocks to both confirm the above transaction and add
+	// context-unrelated transactions
+	for i := 0; i < 25; i++ {
+		_, err = st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var wtg WalletTransactionsGET
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=100&context=testctx", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtg.ConfirmedTransactions) == 0 {
+		t.Error("expecting a few wallet transactions")
+	}
+	hasOtherTxns := false
+	for _, txn := range wtg.ConfirmedTransactions {
+		if txn.Context != "testctx" {
+			hasOtherTxns = true
+			break
+		}
+	}
+	if hasOtherTxns {
+		t.Fatal("transaction list contained unrelated contextual transactions")
+	}
+}
+
 // TestWalletEncrypt tries to encrypt and unlock the wallet through the api
 // using a provided encryption key.
 func TestWalletEncrypt(t *testing.T) {
@@ -423,7 +498,7 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 		t.Fatal(err)
 	}
 	addr, _ := w.NextAddress()
-	st.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), addr.UnlockHash())
+	st.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), addr.UnlockHash(), modules.DefaultWalletContext)
 	_, err = st.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
@@ -515,8 +590,8 @@ func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
 	}
 
 	// Record starting balances.
-	oldBal, _, _ := st.wallet.ConfirmedBalance()
-	w2bal, _, _ := w2.ConfirmedBalance()
+	oldBal, _, _ := st.wallet.ConfirmedBalance(modules.DefaultWalletContext)
+	w2bal, _, _ := w2.ConfirmedBalance(modules.DefaultWalletContext)
 	if w2bal.IsZero() {
 		t.Fatal("second wallet's balance should not be zero")
 	}
@@ -532,7 +607,7 @@ func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
 		t.Fatal(err)
 	}
 	// First wallet should now have balance of both wallets
-	bal, _, _ := st.wallet.ConfirmedBalance()
+	bal, _, _ := st.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	if exp := oldBal.Add(w2bal); !bal.Equals(exp) {
 		t.Fatalf("wallet did not load seed correctly: expected %v coins, got %v", exp, bal)
 	}
@@ -597,7 +672,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 	// NOTE: We call the SendSiacoins method directly to get convenient access
 	// to the txid.
 	sentValue := types.SiacoinPrecision.Mul64(3)
-	txns, err := st.wallet.SendSiacoins(sentValue, types.UnlockHash{})
+	txns, err := st.wallet.SendSiacoins(sentValue, types.UnlockHash{}, modules.DefaultWalletContext)
 	if err != nil {
 		t.Fatal(err)
 	}

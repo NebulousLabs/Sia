@@ -122,7 +122,6 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 
 	// Register API handlers
 	api.buildHttpRoutes(requiredUserAgent, requiredPassword)
-
 	return api
 }
 

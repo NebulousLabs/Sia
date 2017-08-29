@@ -388,7 +388,7 @@ type (
 		UnconfirmedTransactions() []ProcessedTransaction
 
 		// RegisterTransaction takes a transaction and its parents and returns
-		// a jransactionBuilder which can be used to expand the transaction.
+		// a TransactionBuilder which can be used to expand the transaction.
 		RegisterTransaction(t types.Transaction, parents []types.Transaction) TransactionBuilder
 
 		// Rescanning reports whether the wallet is currently rescanning the
