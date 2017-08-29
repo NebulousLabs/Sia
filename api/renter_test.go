@@ -1899,3 +1899,92 @@ func TestContractorHostRemoval(t *testing.T) {
 		t.Log("downloaded file and uploaded file do not match")
 	}
 }
+
+// TestExhaustedContracts verifies that the contractor renews contracts which
+// run out of funds before the period elapses.
+func TestExhaustedContracts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	// set a very high price for the host so we use up the entire funds of the
+	// contract
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := st.host.InternalSettings()
+	settings.MinUploadBandwidthPrice = types.SiacoinPrecision.Div64(10)
+	err = st.host.SetInternalSettings(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testPeriod := "1000"
+	allowanceValues.Set("funds", types.SiacoinPrecision.Mul64(1000).String())
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait until we have a contract
+	err = retry(500, time.Millisecond*50, func() error {
+		if len(st.renter.Contracts()) >= 1 {
+			return nil
+		}
+		return errors.New("no renter contracts")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// upload a file. the high upload cost will cause the underlying contract to
+	// require premature renewal. If premature renewal never happens, the upload
+	// will never complete.
+	tmpfile, err := ioutil.TempFile("", t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+	_, err = io.CopyN(tmpfile, fastrand.Reader, int64(modules.SectorSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	uploadValues := url.Values{}
+	uploadValues.Set("source", tmpfile.Name())
+	uploadValues.Set("renew", "true")
+	uploadValues.Set("datapieces", "1")
+	uploadValues.Set("paritypieces", "1")
+	err = st.stdPostAPI("/renter/upload"+tmpfile.Name(), uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = retry(100, time.Millisecond*500, func() error {
+		// mine blocks each iteration to trigger contract maintainence
+		st.miner.AddBlock()
+		if !st.renter.FileList()[0].Available {
+			return errors.New("file did not complete uploading")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

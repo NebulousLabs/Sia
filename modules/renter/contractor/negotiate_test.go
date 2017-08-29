@@ -31,10 +31,14 @@ type contractorTester struct {
 
 // Close shuts down the contractor tester.
 func (rt *contractorTester) Close() error {
-	rt.wallet.Lock()
-	rt.cs.Close()
-	rt.gateway.Close()
-	return nil
+	errs := []error{
+		rt.gateway.Close(),
+		rt.cs.Close(),
+		rt.tpool.Close(),
+		rt.miner.Close(),
+		rt.wallet.Close(),
+	}
+	return build.JoinErrors(errs, ": ")
 }
 
 // newContractorTester creates a ready-to-use contractor tester with money in the
@@ -111,6 +115,7 @@ func TestNegotiateContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ct.Close()
 
 	payout := types.NewCurrency64(1e16)
 
@@ -161,6 +166,7 @@ func TestReviseContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ct.Close()
 
 	// get an address
 	ourAddr, err := ct.wallet.NextAddress()
