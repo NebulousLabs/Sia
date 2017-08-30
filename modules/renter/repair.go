@@ -82,8 +82,8 @@ type (
 	// downloadingChunk tracks the download progress of a remote repair download
 	downloadingChunk struct {
 		startTime time.Time
-		buffer *DownloadBufferWriter
-		d *download
+		buffer    *DownloadBufferWriter
+		d         *download
 	}
 )
 
@@ -208,12 +208,12 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		}
 	}
 
-	// Accept work non-blocking if there is any
+	// Accept work if there is any
 	select {
 	case file := <-r.newRepairs:
 		r.managedAddFileToRepairState(rs, file)
 		return
-		default:
+	default:
 	}
 
 	// Reset the available workers.
@@ -348,17 +348,17 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 // the repair loop.
 func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset uint64, chunkIndex uint64, chunkID chunkID) ([]byte, error) {
 	// If the download finished return the data
-	if dc, exists := rs.downloadingChunks[chunkID]; exists{
-			// Check if download finished
-			select {
-			default:
-				// Nothing to do if the chunk is still downloading
-				return nil, nil
-			case <-dc.d.downloadFinished:
-			}
-			// Download finished. Delete it from the state and return the data
-			delete(rs.downloadingChunks, chunkID)
-			return dc.buffer.Bytes(), dc.d.Err()
+	if dc, exists := rs.downloadingChunks[chunkID]; exists {
+		// Check if download finished
+		select {
+		default:
+			// Nothing to do if the chunk is still downloading
+			return nil, nil
+		case <-dc.d.downloadFinished:
+		}
+		// Download finished. Delete it from the state and return the data
+		delete(rs.downloadingChunks, chunkID)
+		return dc.buffer.Bytes(), dc.d.Err()
 	}
 
 	// If the data is not yet downloaded initialize a new download
@@ -385,8 +385,8 @@ func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset ui
 	// remember download in repair state
 	rs.downloadingChunks[chunkID] = &downloadingChunk{
 		startTime: time.Now(),
-		buffer: buf,
-		d: d,
+		buffer:    buf,
+		d:         d,
 	}
 	return nil, nil
 }
