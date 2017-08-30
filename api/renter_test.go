@@ -1972,7 +1972,7 @@ func TestExhaustedContracts(t *testing.T) {
 	uploadValues.Set("renew", "true")
 	uploadValues.Set("datapieces", "1")
 	uploadValues.Set("paritypieces", "1")
-	err = st.stdPostAPI("/renter/upload"+tmpfile.Name(), uploadValues)
+	err = st.stdPostAPI("/renter/upload/"+filepath.Base(tmpfile.Name()), uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2052,7 +2052,7 @@ func TestAdversarialPriceRenewal(t *testing.T) {
 	uploadValues.Set("renew", "true")
 	uploadValues.Set("datapieces", "1")
 	uploadValues.Set("paritypieces", "1")
-	err = st.stdPostAPI("/renter/upload"+tmpfile.Name(), uploadValues)
+	err = st.stdPostAPI("/renter/upload/"+filepath.Base(tmpfile.Name()), uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}

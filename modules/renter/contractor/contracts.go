@@ -349,7 +349,9 @@ func (c *Contractor) threadedContractMaintenance() {
 				renewSet = append(renewSet, contract.ID)
 			} else {
 				// check if the contract has exhausted its funding and requires premature renewal.
+				c.mu.RUnlock()
 				host, _ := c.hdb.Host(contract.HostPublicKey)
+				c.mu.RLock()
 				if host.StoragePrice.Cmp(maxStoragePrice) > 0 || host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
 					// skip this host if its prices are too high
 					continue
