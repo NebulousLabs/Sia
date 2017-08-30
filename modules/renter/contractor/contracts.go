@@ -350,10 +350,14 @@ func (c *Contractor) threadedContractMaintenance() {
 			} else {
 				// check if the contract has exhausted its funding and requires premature renewal.
 				host, _ := c.hdb.Host(contract.HostPublicKey)
+				if host.StoragePrice.Cmp(maxStoragePrice) > 0 || host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
+					// skip this host if its prices are too high
+					continue
+				}
+
 				blockBytes := types.NewCurrency64(modules.SectorSize * uint64(contract.EndHeight()-c.blockHeight))
 				sectorStoragePrice := host.StoragePrice.Mul(blockBytes)
 				sectorBandwidthPrice := host.UploadBandwidthPrice.Mul64(modules.SectorSize)
-
 				sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
 				percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds().Big(), contract.TotalCost.Big()).Float64()
 				if contract.RenterFunds().Cmp(sectorPrice) < 0 || percentRemaining < minContractFundRenewalThreshold {

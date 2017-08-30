@@ -1988,3 +1988,104 @@ func TestExhaustedContracts(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestAdversarialPriceRenewal verifies that host cannot maliciously raise
+// their storage price in order to trigger a premature file contract renewal.
+func TestAdversarialPriceRenewal(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	// announce our host
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	testPeriod := "10000"
+	allowanceValues.Set("funds", types.SiacoinPrecision.Mul64(10000).String())
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait until we have a contract
+	err = retry(500, time.Millisecond*50, func() error {
+		if len(st.renter.Contracts()) >= 1 {
+			return nil
+		}
+		return errors.New("no renter contracts")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// upload a file
+	tmpfile, err := ioutil.TempFile("", t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+	_, err = io.CopyN(tmpfile, fastrand.Reader, int64(modules.SectorSize*10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	uploadValues := url.Values{}
+	uploadValues.Set("source", tmpfile.Name())
+	uploadValues.Set("renew", "true")
+	uploadValues.Set("datapieces", "1")
+	uploadValues.Set("paritypieces", "1")
+	err = st.stdPostAPI("/renter/upload"+tmpfile.Name(), uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = retry(100, time.Millisecond*500, func() error {
+		// mine blocks each iteration to trigger contract maintainence
+		st.miner.AddBlock()
+		if !st.renter.FileList()[0].Available {
+			return errors.New("file did not complete uploading")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialRevision := st.renter.Contracts()[0].LastRevision.NewRevisionNumber
+
+	// jack up the host's storage price to try to trigger a renew
+	settings := st.host.InternalSettings()
+	settings.MinStoragePrice = settings.MinStoragePrice.Mul64(10800000000)
+	err = st.host.SetInternalSettings(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 100; i++ {
+		st.miner.AddBlock()
+		if st.renter.Contracts()[0].LastRevision.NewRevisionNumber != initialRevision {
+			t.Fatal("changing host price caused renew")
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+}
