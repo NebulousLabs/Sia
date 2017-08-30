@@ -113,6 +113,8 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 	return nil
 }
 
+// SetContext configures the transaction builder to use the specified
+// wallet context for the transaction.
 func (tb *transactionBuilder) SetContext(context string) {
 	tb.context = context
 }

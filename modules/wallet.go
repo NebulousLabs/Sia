@@ -142,6 +142,8 @@ type (
 		// failed.
 		FundSiafunds(amount types.Currency) error
 
+		// SetContext configures the transaction builder to use the specified
+		// wallet context for the transaction.
 		SetContext(context string)
 
 		// AddParents adds a set of parents to the transaction.
