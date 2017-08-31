@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -72,7 +71,7 @@ func TestTransactionPoolRawHandlerPOST(t *testing.T) {
 
 	// Create a transaction on one node and fetch it.
 	sentValue := types.SiacoinPrecision.Mul64(1000)
-	txns, err := st.wallet.SendSiacoins(sentValue, types.UnlockHash{}, modules.DefaultWalletContext)
+	txns, err := st.wallet.SendSiacoins(sentValue, types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}

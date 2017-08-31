@@ -275,7 +275,22 @@ func TestWalletContextBalance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(50), addr.UnlockHash(), "TestContext")
+	output := types.SiacoinOutput{
+		Value:      types.SiacoinPrecision.Mul64(50),
+		UnlockHash: addr.UnlockHash(),
+	}
+	txnBuilder := wt.wallet.StartTransaction()
+	txnBuilder.SetContext("TestContext")
+	err = txnBuilder.FundSiacoins(types.SiacoinPrecision.Mul64(50))
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnBuilder.AddSiacoinOutput(output)
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.wallet.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,13 +305,19 @@ func TestWalletContextBalance(t *testing.T) {
 
 	// send too many coins for TestContext, but enough to be covered by the
 	// DefaultContext. Should give an insufficient balance error
-	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(1000), addr.UnlockHash(), "TestContext")
+	output = types.SiacoinOutput{
+		Value:      types.SiacoinPrecision.Mul64(1000),
+		UnlockHash: addr.UnlockHash(),
+	}
+	txnBuilder = wt.wallet.StartTransaction()
+	txnBuilder.SetContext("TestContext")
+	err = txnBuilder.FundSiacoins(types.SiacoinPrecision.Mul64(1000))
 	if err == nil {
 		t.Fatal("expected ErrLowBalance sending from context with not enough coins, got", err, "instead.")
 	}
 
 	scbContext, _, _ = wt.wallet.ConfirmedBalance("TestContext")
-	if scbContext.Cmp(types.SiacoinPrecision.Mul64(49)) < 0 {
+	if scbContext.Cmp(types.SiacoinPrecision.Mul64(50)) != 0 {
 		t.Fatal("expected confirmed contextual balance to be 50SC after sending 50SC, got ", scbContext.HumanString(), " instead")
 	}
 }
@@ -628,7 +649,7 @@ func TestDistantWallets(t *testing.T) {
 
 	// Use the first wallet.
 	for i := uint64(0); i < lookaheadBuffer/2; i++ {
-		_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, types.UnlockHash{}, modules.DefaultWalletContext)
+		_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, types.UnlockHash{})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -5,7 +5,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 
@@ -27,7 +26,7 @@ func TestTryValidTransactionSet(t *testing.T) {
 	initialHash := cst.cs.dbConsensusChecksum()
 
 	// Try a valid transaction.
-	_, err = cst.wallet.SendSiacoins(types.NewCurrency64(1), types.UnlockHash{}, modules.DefaultWalletContext)
+	_, err = cst.wallet.SendSiacoins(types.NewCurrency64(1), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +58,7 @@ func TestTryInvalidTransactionSet(t *testing.T) {
 	initialHash := cst.cs.dbConsensusChecksum()
 
 	// Try a valid transaction followed by an invalid transaction.
-	_, err = cst.wallet.SendSiacoins(types.NewCurrency64(1), types.UnlockHash{}, modules.DefaultWalletContext)
+	_, err = cst.wallet.SendSiacoins(types.NewCurrency64(1), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}

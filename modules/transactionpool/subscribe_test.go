@@ -61,7 +61,7 @@ func TestSubscription(t *testing.T) {
 
 	// Create a valid transaction set and check that the mock subscriber's
 	// transaction list is updated.
-	_, err = tpt.wallet.SendSiacoins(types.NewCurrency64(100), types.UnlockHash{}, modules.DefaultWalletContext)
+	_, err = tpt.wallet.SendSiacoins(types.NewCurrency64(100), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}

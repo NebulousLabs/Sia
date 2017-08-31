@@ -31,7 +31,7 @@ func TestIntegrationTransactions(t *testing.T) {
 		t.Error("unexpected transaction history length")
 	}
 	sentValue := types.NewCurrency64(5000)
-	_, err = wt.wallet.SendSiacoins(sentValue, types.UnlockHash{}, modules.DefaultWalletContext)
+	_, err = wt.wallet.SendSiacoins(sentValue, types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestIntegrationTransaction(t *testing.T) {
 
 	// test sending siacoins
 	sentValue := types.NewCurrency64(5000)
-	sendTxns, err := wt.wallet.SendSiacoins(sentValue, types.UnlockHash{}, modules.DefaultWalletContext)
+	sendTxns, err := wt.wallet.SendSiacoins(sentValue, types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +165,7 @@ func TestIntegrationAddressTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr, modules.DefaultWalletContext)
+	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestTransactionInputOutputIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr, modules.DefaultWalletContext)
+	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +270,22 @@ func TestWalletTransactionsContext(t *testing.T) {
 	defer wt.closeWt()
 
 	wt.wallet.SetContextLimit("TestContext", types.SiacoinPrecision.Mul64(100))
-	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(50), types.UnlockHash{}, "TestContext")
+	output := types.SiacoinOutput{
+		Value:      types.SiacoinPrecision.Mul64(50),
+		UnlockHash: types.UnlockHash{},
+	}
+	txnBuilder := wt.wallet.StartTransaction()
+	txnBuilder.SetContext("TestContext")
+	err = txnBuilder.FundSiacoins(types.SiacoinPrecision.Mul64(50))
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnBuilder.AddSiacoinOutput(output)
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.wallet.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal(err)
 	}

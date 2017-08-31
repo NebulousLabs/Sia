@@ -362,7 +362,7 @@ func TestAllowanceSpending(t *testing.T) {
 			}
 		}
 	}
-	balance, _, _ := w.ConfirmedBalance()
+	balance, _, _ := w.ConfirmedBalance(modules.DefaultWalletContext)
 	spent := minerRewards.Sub(balance)
 	if spent.Cmp(testAllowance.Funds) > 0 {
 		t.Fatal("contractor spent too much money: spent", spent.HumanString(), "allowance funds:", testAllowance.Funds.HumanString())

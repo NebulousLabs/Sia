@@ -75,7 +75,7 @@ func postEncryptionTesting(m modules.TestMiner, w *Wallet, masterKey crypto.Twof
 	}
 	// Verify that the secret keys have been restored by sending coins to the
 	// void. Send more coins than are received by mining a block.
-	_, err = w.SendSiacoins(types.CalculateCoinbase(0), types.UnlockHash{}, modules.DefaultWalletContext)
+	_, err = w.SendSiacoins(types.CalculateCoinbase(0), types.UnlockHash{})
 	if err != nil {
 		panic(err)
 	}

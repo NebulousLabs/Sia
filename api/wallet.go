@@ -409,7 +409,7 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 			WriteError(w, Error{"could not read address from POST call to /wallet/siacoins"}, http.StatusBadRequest)
 			return
 		}
-		txns, err = api.wallet.SendSiacoins(amount, dest, req.FormValue("context"))
+		txns, err = api.wallet.SendSiacoins(amount, dest)
 		if err != nil {
 			WriteError(w, Error{"error when calling /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 			return
