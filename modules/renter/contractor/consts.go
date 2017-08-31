@@ -58,7 +58,7 @@ var (
 	// minContractFundRenewalThreshold defines the ratio of remaining funds to
 	// total contract cost below which the contractor will prematurely renew a
 	// contract.
-	minContractFundRenewalThreshold = float64(0.10) // 10%
+	minContractFundRenewalThreshold = float64(0.03) // 3%
 )
 
 // Constants related to the safety values for when the contractor is forming
@@ -70,7 +70,7 @@ var (
 	maxUploadPrice   = build.Select(build.Var{
 		Standard: maxStoragePrice.Mul64(4320),
 		Dev:      maxStoragePrice.Mul64(4320),
-		Testing:  types.SiacoinPrecision,
+		Testing:  maxStoragePrice.Mul64(4320e8),
 	}).(types.Currency)
 
 	// scoreLeeway defines the factor by which a host can miss the goal score
