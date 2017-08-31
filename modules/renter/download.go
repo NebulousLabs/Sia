@@ -680,16 +680,23 @@ type DownloadFileWriter struct {
 	f        *os.File
 	location string
 	offset   uint64
+	written  uint64
+	length   uint64
 }
 
 // NewDownloadFileWriter creates a new instance of a DownloadWriter backed by the file named.
-func NewDownloadFileWriter(fname string, offset, length uint64) *DownloadFileWriter {
-	l, _ := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+func NewDownloadFileWriter(fname string, offset, length uint64) (*DownloadFileWriter, error) {
+	l, err := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+	if err != nil {
+		return nil, err
+	}
 	return &DownloadFileWriter{
 		f:        l,
 		location: fname,
 		offset:   offset,
-	}
+		written:  0,
+		length:   length,
+	}, nil
 }
 
 // Destination implements the Location method of the DownloadWriter interface
@@ -700,7 +707,15 @@ func (dw *DownloadFileWriter) Destination() string {
 
 // WriteAt writes the passed bytes at the specified offset.
 func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
-	return dw.f.WriteAt(b, off-int64(dw.offset))
+	n, err := dw.f.WriteAt(b, off-int64(dw.offset))
+	if err != nil {
+		return n, err
+	}
+	dw.written += uint64(n)
+	if dw.written == dw.length {
+		return n, dw.f.Close()
+	}
+	return n, err
 }
 
 // DownloadHttpWriter is a http response writer-backed implementation of

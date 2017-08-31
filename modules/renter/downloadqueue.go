@@ -44,7 +44,11 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	if isHttpResp {
 		dw = NewDownloadHttpWriter(p.Httpwriter, p.Offset, p.Length)
 	} else {
-		dw = NewDownloadFileWriter(p.Destination, p.Offset, p.Length)
+		dfw, err := NewDownloadFileWriter(p.Destination, p.Offset, p.Length)
+		if err != nil {
+			return err
+		}
+		dw = dfw
 	}
 
 	// sentinel: if length == 0, download the entire file
