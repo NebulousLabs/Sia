@@ -491,7 +491,7 @@ func wallettransactionscmd() {
 // walletunlockcmd unlocks a saved wallet
 func walletunlockcmd() {
 	env_password := os.Getenv("SIA_WALLET_PASSWORD")
-	if len(env_password) > 0 {
+	if env_password != "" {
 		qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s",
 			env_password, "english")
 		err := post("/wallet/unlock", qs)
