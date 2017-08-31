@@ -253,7 +253,7 @@ func (d *Decoder) decode(val reflect.Value) {
 	// check for UnmarshalSia interface first
 	if val.CanAddr() && val.Addr().CanInterface() {
 		if u, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
-			err := u.UnmarshalSia(d)
+			err := u.UnmarshalSia(d.r)
 			if err != nil {
 				panic(err)
 			}
