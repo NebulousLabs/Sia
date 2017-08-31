@@ -133,13 +133,13 @@ func (w *Wallet) threadedDefragWallet() {
 	defer w.tg.Done()
 
 	// Check that a defrag makes sense.
-	w.mu.Lock()
-	if !w.unlocked {
+	w.mu.RLock()
+	unlocked := w.unlocked
+	w.mu.RUnlock()
+	if !unlocked {
 		// Can't defrag if the wallet is locked.
-		w.mu.Unlock()
 		return
 	}
-	w.mu.Unlock()
 
 	// Create the defrag transaction.
 	txnSet, err := w.managedCreateDefragTransaction()
