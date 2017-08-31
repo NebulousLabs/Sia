@@ -228,17 +228,18 @@ func (d *Decoder) DecodeAll(vs ...interface{}) error {
 
 // readN reads n bytes and panics if the read fails.
 func (d *Decoder) readN(n int) []byte {
+	if buf, ok := d.r.(*bytes.Buffer); ok {
+		b := buf.Next(n)
+		if len(b) != n {
+			panic(io.ErrUnexpectedEOF)
+		}
+		if d.n += n; d.n > maxDecodeLen {
+			panic("encoded type exceeds size limit")
+		}
+		return b
+	}
 	b := make([]byte, n)
 	_, err := io.ReadFull(d, b)
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
-// readPrefix reads a length-prefixed byte slice and panics if the read fails.
-func (d *Decoder) readPrefix() []byte {
-	b, err := ReadPrefix(d, maxSliceLen)
 	if err != nil {
 		panic(err)
 	}
@@ -284,7 +285,11 @@ func (d *Decoder) decode(val reflect.Value) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		val.SetUint(DecUint64(d.readN(8)))
 	case reflect.String:
-		val.SetString(string(d.readPrefix()))
+		strLen := DecUint64(d.readN(8))
+		if strLen > maxSliceLen {
+			panic("string is too large")
+		}
+		val.SetString(string(d.readN(int(strLen))))
 	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
@@ -333,14 +338,14 @@ func NewDecoder(r io.Reader) *Decoder {
 // pointer. The decoding rules are the inverse of those specified in the
 // package docstring for marshaling.
 func Unmarshal(b []byte, v interface{}) error {
-	r := bytes.NewReader(b)
+	r := bytes.NewBuffer(b)
 	return NewDecoder(r).Decode(v)
 }
 
 // UnmarshalAll decodes the encoded values in b and stores them in vs, which
 // must be pointers.
 func UnmarshalAll(b []byte, vs ...interface{}) error {
-	dec := NewDecoder(bytes.NewReader(b))
+	dec := NewDecoder(bytes.NewBuffer(b))
 	return dec.DecodeAll(vs...)
 }
 
