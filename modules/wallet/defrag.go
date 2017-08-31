@@ -15,6 +15,8 @@ var (
 // managedCreateDefragTransaction creates a transaction that spends multiple existing
 // wallet outputs into a single new address.
 func (w *Wallet) managedCreateDefragTransaction() ([]types.Transaction, error) {
+	minFee, _ := w.tpool.FeeEstimation()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -86,12 +88,9 @@ func (w *Wallet) managedCreateDefragTransaction() ([]types.Transaction, error) {
 		return nil, err
 	}
 
-	// get the transaction fee
-	w.mu.Unlock()
-	minFee, _ := w.tpool.FeeEstimation()
+	// compute the transaction fee.
 	sizeAvgOutput := uint64(250)
 	fee := minFee.Mul64(sizeAvgOutput * defragBatchSize)
-	w.mu.Lock()
 
 	txn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
