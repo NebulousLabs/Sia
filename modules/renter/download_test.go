@@ -8,10 +8,9 @@ import (
 	"testing"
 )
 
-// TestRenterDownloadFileWriterClose verifies that the renter's
-// DownloadFileWriter closes the underlying file handle when the entire file
-// has been written.
-func TestRenterDownloadFileWriterClose(t *testing.T) {
+// TestRenterDownloadFileWriter verifies that the renter's DownloadFileWriter
+// has the correct behavior.
+func TestRenterDownloadFileWriter(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -28,6 +27,18 @@ func TestRenterDownloadFileWriterClose(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// writing a too-large slice should fail
+	func() {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatal("expected too-large slice to error")
+			}
+		}()
+		df.WriteAt(make([]byte, 200), 0)
+	}()
+
+	// underlying file handle should be closed if we write the entirety of the
+	// file
 	b := make([]byte, 100)
 	_, err = df.WriteAt(b, 0)
 	if err != nil {

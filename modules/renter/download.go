@@ -707,12 +707,15 @@ func (dw *DownloadFileWriter) Destination() string {
 
 // WriteAt writes the passed bytes at the specified offset.
 func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
+	if dw.written+uint64(len(b)) > dw.length {
+		build.Critical("DownloadFileWriter write exceeds file length")
+	}
 	n, err := dw.f.WriteAt(b, off-int64(dw.offset))
 	if err != nil {
 		return n, err
 	}
 	dw.written += uint64(n)
-	if dw.written == dw.length {
+	if dw.written >= dw.length {
 		return n, dw.f.Close()
 	}
 	return n, err
@@ -743,7 +746,7 @@ func NewDownloadHttpWriter(w io.Writer, offset, length uint64) *DownloadHttpWrit
 	}
 }
 
-// Destination implements the Location method of the DownloadWriter
+// Destination implements the Destination method of the DownloadWriter
 // interface and informs callers where this download writer is
 // being written to.
 func (dw *DownloadHttpWriter) Destination() string {
