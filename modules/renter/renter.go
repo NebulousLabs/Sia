@@ -163,7 +163,7 @@ type Renter struct {
 	tpool          modules.TransactionPool
 
 	// Testing utilities
-	debugFlags map[string]bool
+	deps dependencies
 }
 
 // New returns an initialized renter.
@@ -176,11 +176,11 @@ func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpoo
 	if err != nil {
 		return nil, err
 	}
-	return newRenter(cs, tpool, hdb, hc, persistDir)
+	return newRenter(cs, tpool, hdb, hc, persistDir, prodDependencies{})
 }
 
 // newRenter initializes a renter and returns it.
-func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
+func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string, deps dependencies) (*Renter, error) {
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -211,7 +211,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		tg:             new(sync.ThreadGroup),
 		tpool:          tpool,
 
-		debugFlags: make(map[string]bool),
+		deps: deps,
 	}
 	if err := r.initPersist(); err != nil {
 		return nil, err
@@ -241,11 +241,6 @@ func (r *Renter) Close() error {
 	r.tg.Stop()
 	r.hostDB.Close()
 	return r.hostContractor.Close()
-}
-
-// SetDebugFlag sets a debug flag to induce a certain behaviour in the renter
-func (r *Renter) SetDebugFlag(flag string) {
-	r.debugFlags[flag] = true
 }
 
 // PriceEstimation estimates the cost in siacoins of performing various storage
