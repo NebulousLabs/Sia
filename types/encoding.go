@@ -144,6 +144,29 @@ func (b Block) MarshalSia(w io.Writer) error {
 
 // UnmarshalSia implements the encoding.SiaUnmarshaler interface.
 func (b *Block) UnmarshalSia(r io.Reader) error {
+	if build.DEBUG {
+		// Sanity check: compare against the old decoding
+		buf := new(bytes.Buffer)
+		r = io.TeeReader(r, buf)
+
+		defer func() {
+			checkB := new(Block)
+			if err := encoding.UnmarshalAll(buf.Bytes(),
+				&checkB.ParentID,
+				&checkB.Nonce,
+				&checkB.Timestamp,
+				&checkB.MinerPayouts,
+				&checkB.Transactions,
+			); err != nil {
+				// don't check invalid blocks
+				return
+			}
+			if crypto.HashObject(b) != crypto.HashObject(checkB) {
+				panic("decoding differs!")
+			}
+		}()
+	}
+
 	d := decoder(r)
 	d.ReadFull(b.ParentID[:])
 	d.ReadFull(b.Nonce[:])
