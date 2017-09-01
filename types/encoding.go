@@ -34,23 +34,38 @@ type decHelper struct {
 	err error
 }
 
-func (d *decHelper) Read(p []byte) (n int, _ error) {
-	n, d.err = d.Reader.Read(p)
-	return n, d.err
+func (d *decHelper) Read(p []byte) (int, error) {
+	if d.err != nil {
+		return 0, d.err
+	}
+	n, err := d.Reader.Read(p)
+	if d.err == nil {
+		d.err = err
+	}
+	return n, err
 }
 
 func (d *decHelper) ReadFull(p []byte) {
-	_, d.err = io.ReadFull(d, p)
+	if d.err != nil {
+		return
+	}
+	io.ReadFull(d, p)
 }
 
 func (d *decHelper) ReadPrefix() []byte {
+	if d.err != nil {
+		return nil
+	}
 	b := make([]byte, d.NextUint64())
 	d.ReadFull(b)
 	return b
 }
 
 func (d *decHelper) NextUint64() uint64 {
-	_, d.err = d.Read(d.buf[:])
+	if d.err != nil {
+		return 0
+	}
+	d.Read(d.buf[:])
 	return encoding.DecUint64(d.buf[:])
 }
 
