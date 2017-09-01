@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
 	"strings"
+	"unsafe"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -58,12 +60,14 @@ func (d *decHelper) ReadFull(p []byte) {
 }
 
 // ReadPrefix reads a length-prefix, allocates a byte slice with that length,
-// reads into the byte slice, and returns it.
+// reads into the byte slice, and returns it. If the length prefix exceeds
+// encoding.MaxSliceSize, ReadPrefix returns nil and sets d.Err().
 func (d *decHelper) ReadPrefix() []byte {
 	if d.err != nil {
 		return nil
 	}
-	b := make([]byte, d.NextUint64())
+	n := d.NextPrefix(unsafe.Sizeof(byte(0))) // if too large, n == 0
+	b := make([]byte, n)
 	d.ReadFull(b)
 	return b
 }
@@ -75,6 +79,18 @@ func (d *decHelper) NextUint64() uint64 {
 	}
 	d.Read(d.buf[:])
 	return encoding.DecUint64(d.buf[:])
+}
+
+// NextPrefix is like NextUint64, but performs sanity checks on the prefix.
+// Specifically, if the prefix multiplied by elemSize exceeds
+// encoding.MaxSliceSize, NextPrefix returns 0 and sets d.Err().
+func (d *decHelper) NextPrefix(elemSize uintptr) uint64 {
+	n := d.NextUint64()
+	if n > sliceLen > 1<<31-1 || n*uint64(elemSize) > encoding.MaxSliceSize {
+		d.err = errors.New("slice is too large")
+		return 0
+	}
+	return n
 }
 
 // Err returns the first non-nil error encountered by d.
@@ -129,12 +145,12 @@ func (b *Block) UnmarshalSia(r io.Reader) error {
 	d.ReadFull(b.Nonce[:])
 	b.Timestamp = Timestamp(d.NextUint64())
 	// MinerPayouts
-	b.MinerPayouts = make([]SiacoinOutput, d.NextUint64())
+	b.MinerPayouts = make([]SiacoinOutput, d.NextPrefix(unsafe.Sizeof(SiacoinOutput{})))
 	for i := range b.MinerPayouts {
 		b.MinerPayouts[i].UnmarshalSia(d)
 	}
 	// Transactions
-	b.Transactions = make([]Transaction, d.NextUint64())
+	b.Transactions = make([]Transaction, d.NextPrefix(unsafe.Sizeof(Transaction{})))
 	for i := range b.Transactions {
 		b.Transactions[i].UnmarshalSia(d)
 	}
@@ -221,7 +237,7 @@ func (cf *CoveredFields) UnmarshalSia(r io.Reader) error {
 		&cf.TransactionSignatures,
 	}
 	for i := range fields {
-		f := make([]uint64, d.NextUint64())
+		f := make([]uint64, d.NextPrefix(unsafe.Sizeof(uint64(0))))
 		for i := range f {
 			f[i] = d.NextUint64()
 		}
@@ -392,11 +408,11 @@ func (fc *FileContract) UnmarshalSia(r io.Reader) error {
 	fc.WindowStart = BlockHeight(d.NextUint64())
 	fc.WindowEnd = BlockHeight(d.NextUint64())
 	fc.Payout.UnmarshalSia(d)
-	fc.ValidProofOutputs = make([]SiacoinOutput, d.NextUint64())
+	fc.ValidProofOutputs = make([]SiacoinOutput, d.NextPrefix(unsafe.Sizeof(SiacoinOutput{})))
 	for i := range fc.ValidProofOutputs {
 		fc.ValidProofOutputs[i].UnmarshalSia(d)
 	}
-	fc.MissedProofOutputs = make([]SiacoinOutput, d.NextUint64())
+	fc.MissedProofOutputs = make([]SiacoinOutput, d.NextPrefix(unsafe.Sizeof(SiacoinOutput{})))
 	for i := range fc.MissedProofOutputs {
 		fc.MissedProofOutputs[i].UnmarshalSia(d)
 	}
@@ -458,11 +474,11 @@ func (fcr *FileContractRevision) UnmarshalSia(r io.Reader) error {
 	d.ReadFull(fcr.NewFileMerkleRoot[:])
 	fcr.NewWindowStart = BlockHeight(d.NextUint64())
 	fcr.NewWindowEnd = BlockHeight(d.NextUint64())
-	fcr.NewValidProofOutputs = make([]SiacoinOutput, d.NextUint64())
+	fcr.NewValidProofOutputs = make([]SiacoinOutput, d.NextPrefix(unsafe.Sizeof(SiacoinOutput{})))
 	for i := range fcr.NewValidProofOutputs {
 		fcr.NewValidProofOutputs[i].UnmarshalSia(d)
 	}
-	fcr.NewMissedProofOutputs = make([]SiacoinOutput, d.NextUint64())
+	fcr.NewMissedProofOutputs = make([]SiacoinOutput, d.NextPrefix(unsafe.Sizeof(SiacoinOutput{})))
 	for i := range fcr.NewMissedProofOutputs {
 		fcr.NewMissedProofOutputs[i].UnmarshalSia(d)
 	}
@@ -672,7 +688,7 @@ func (sp *StorageProof) UnmarshalSia(r io.Reader) error {
 	d := decoder(r)
 	d.ReadFull(sp.ParentID[:])
 	d.ReadFull(sp.Segment[:])
-	sp.HashSet = make([]crypto.Hash, d.NextUint64())
+	sp.HashSet = make([]crypto.Hash, d.NextPrefix(unsafe.Sizeof(crypto.Hash{})))
 	for i := range sp.HashSet {
 		d.ReadFull(sp.HashSet[i][:])
 	}
@@ -819,43 +835,43 @@ func (t Transaction) MarshalSiaSize() (size int) {
 // UnmarshalSia implements the encoding.SiaUnmarshaler interface.
 func (t *Transaction) UnmarshalSia(r io.Reader) error {
 	d := decoder(r)
-	t.SiacoinInputs = make([]SiacoinInput, d.NextUint64())
+	t.SiacoinInputs = make([]SiacoinInput, d.NextPrefix(unsafe.Sizeof(SiacoinInput{})))
 	for i := range t.SiacoinInputs {
 		t.SiacoinInputs[i].UnmarshalSia(d)
 	}
-	t.SiacoinOutputs = make([]SiacoinOutput, d.NextUint64())
+	t.SiacoinOutputs = make([]SiacoinOutput, d.NextPrefix(unsafe.Sizeof(SiacoinOutput{})))
 	for i := range t.SiacoinOutputs {
 		t.SiacoinOutputs[i].UnmarshalSia(d)
 	}
-	t.FileContracts = make([]FileContract, d.NextUint64())
+	t.FileContracts = make([]FileContract, d.NextPrefix(unsafe.Sizeof(FileContract{})))
 	for i := range t.FileContracts {
 		t.FileContracts[i].UnmarshalSia(d)
 	}
-	t.FileContractRevisions = make([]FileContractRevision, d.NextUint64())
+	t.FileContractRevisions = make([]FileContractRevision, d.NextPrefix(unsafe.Sizeof(FileContractRevision{})))
 	for i := range t.FileContractRevisions {
 		t.FileContractRevisions[i].UnmarshalSia(d)
 	}
-	t.StorageProofs = make([]StorageProof, d.NextUint64())
+	t.StorageProofs = make([]StorageProof, d.NextPrefix(unsafe.Sizeof(StorageProof{})))
 	for i := range t.StorageProofs {
 		t.StorageProofs[i].UnmarshalSia(d)
 	}
-	t.SiafundInputs = make([]SiafundInput, d.NextUint64())
+	t.SiafundInputs = make([]SiafundInput, d.NextPrefix(unsafe.Sizeof(SiafundInput{})))
 	for i := range t.SiafundInputs {
 		t.SiafundInputs[i].UnmarshalSia(d)
 	}
-	t.SiafundOutputs = make([]SiafundOutput, d.NextUint64())
+	t.SiafundOutputs = make([]SiafundOutput, d.NextPrefix(unsafe.Sizeof(SiafundOutput{})))
 	for i := range t.SiafundOutputs {
 		t.SiafundOutputs[i].UnmarshalSia(d)
 	}
-	t.MinerFees = make([]Currency, d.NextUint64())
+	t.MinerFees = make([]Currency, d.NextPrefix(unsafe.Sizeof(Currency{})))
 	for i := range t.MinerFees {
 		t.MinerFees[i].UnmarshalSia(d)
 	}
-	t.ArbitraryData = make([][]byte, d.NextUint64())
+	t.ArbitraryData = make([][]byte, d.NextPrefix(unsafe.Sizeof([]byte{})))
 	for i := range t.ArbitraryData {
 		t.ArbitraryData[i] = d.ReadPrefix()
 	}
-	t.TransactionSignatures = make([]TransactionSignature, d.NextUint64())
+	t.TransactionSignatures = make([]TransactionSignature, d.NextPrefix(unsafe.Sizeof(TransactionSignature{})))
 	for i := range t.TransactionSignatures {
 		t.TransactionSignatures[i].UnmarshalSia(d)
 	}
@@ -923,7 +939,7 @@ func (uc UnlockConditions) MarshalSiaSize() (size int) {
 func (uc *UnlockConditions) UnmarshalSia(r io.Reader) error {
 	d := decoder(r)
 	uc.Timelock = BlockHeight(d.NextUint64())
-	uc.PublicKeys = make([]SiaPublicKey, d.NextUint64())
+	uc.PublicKeys = make([]SiaPublicKey, d.NextPrefix(unsafe.Sizeof(SiaPublicKey{})))
 	for i := range uc.PublicKeys {
 		uc.PublicKeys[i].UnmarshalSia(d)
 	}

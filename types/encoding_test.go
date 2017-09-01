@@ -136,6 +136,19 @@ func TestBlockEncoding(t *testing.T) {
 	}
 }
 
+// TestTooLargeDecoder tests that the decoder catches allocations that are too
+// large.
+func TestTooLargeDecoder(t *testing.T) {
+	enc := encoding.Marshal(Block{})
+	// change number of transactions to large number
+	copy(enc[len(enc)-8:], encoding.EncUint64(^uint64(0)))
+	var block Block
+	err := encoding.Unmarshal(enc, &block)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 // TestCurrencyMarshalJSON probes the MarshalJSON and UnmarshalJSON functions
 // of the currency type.
 func TestCurrencyMarshalJSON(t *testing.T) {
