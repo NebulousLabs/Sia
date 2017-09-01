@@ -28,6 +28,43 @@ func (s sanityCheckWriter) Write(p []byte) (int, error) {
 	return s.w.Write(p)
 }
 
+type decHelper struct {
+	io.Reader
+	buf [8]byte
+	err error
+}
+
+func (d *decHelper) Read(p []byte) (n int, _ error) {
+	n, d.err = d.Reader.Read(p)
+	return n, d.err
+}
+
+func (d *decHelper) ReadFull(p []byte) {
+	_, d.err = io.ReadFull(d, p)
+}
+
+func (d *decHelper) ReadPrefix() []byte {
+	b := make([]byte, d.NextUint64())
+	d.ReadFull(b)
+	return b
+}
+
+func (d *decHelper) NextUint64() uint64 {
+	_, d.err = d.Read(d.buf[:])
+	return encoding.DecUint64(d.buf[:])
+}
+
+func (d *decHelper) Err() error {
+	return d.err
+}
+
+func decoder(r io.Reader) *decHelper {
+	if d, ok := r.(*decHelper); ok {
+		return d
+	}
+	return &decHelper{Reader: r}
+}
+
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (b Block) MarshalSia(w io.Writer) error {
 	if build.DEBUG {
@@ -61,12 +98,21 @@ func (b Block) MarshalSia(w io.Writer) error {
 
 // UnmarshalSia implements the encoding.SiaUnmarshaler interface.
 func (b *Block) UnmarshalSia(r io.Reader) error {
-	io.ReadFull(r, b.ParentID[:])
-	io.ReadFull(r, b.Nonce[:])
-	tsBytes := make([]byte, 8)
-	io.ReadFull(r, tsBytes)
-	b.Timestamp = Timestamp(encoding.DecUint64(tsBytes))
-	return encoding.NewDecoder(r).DecodeAll(&b.MinerPayouts, &b.Transactions)
+	d := decoder(r)
+	d.ReadFull(b.ParentID[:])
+	d.ReadFull(b.Nonce[:])
+	b.Timestamp = Timestamp(d.NextUint64())
+	// MinerPayouts
+	b.MinerPayouts = make([]SiacoinOutput, d.NextUint64())
+	for i := range b.MinerPayouts {
+		b.MinerPayouts[i].UnmarshalSia(d)
+	}
+	// Transactions
+	b.Transactions = make([]Transaction, d.NextUint64())
+	for i := range b.Transactions {
+		b.Transactions[i].UnmarshalSia(d)
+	}
+	return d.Err()
 }
 
 // MarshalJSON marshales a block id as a hex string.
@@ -130,6 +176,34 @@ func (cf CoveredFields) MarshalSiaSize() (size int) {
 	return
 }
 
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (cf *CoveredFields) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	buf := make([]byte, 1)
+	d.ReadFull(buf)
+	cf.WholeTransaction = (buf[0] == 1)
+	fields := []*[]uint64{
+		&cf.SiacoinInputs,
+		&cf.SiacoinOutputs,
+		&cf.FileContracts,
+		&cf.FileContractRevisions,
+		&cf.StorageProofs,
+		&cf.SiafundInputs,
+		&cf.SiafundOutputs,
+		&cf.MinerFees,
+		&cf.ArbitraryData,
+		&cf.TransactionSignatures,
+	}
+	for i := range fields {
+		f := make([]uint64, d.NextUint64())
+		for i := range f {
+			f[i] = d.NextUint64()
+		}
+		*fields[i] = f
+	}
+	return d.Err()
+}
+
 // MarshalJSON implements the json.Marshaler interface.
 func (c Currency) MarshalJSON() ([]byte, error) {
 	// Must enclosed the value in quotes; otherwise JS will convert it to a
@@ -188,14 +262,11 @@ zeros:
 
 // UnmarshalSia implements the encoding.SiaUnmarshaler interface.
 func (c *Currency) UnmarshalSia(r io.Reader) error {
-	b, err := encoding.ReadPrefix(r, 256)
-	if err != nil {
-		return err
-	}
+	d := decoder(r)
 	var dec Currency
-	dec.i.SetBytes(b)
+	dec.i.SetBytes(d.ReadPrefix())
 	*c = dec
-	return nil
+	return d.Err()
 }
 
 // HumanString prints the Currency using human readable units. The unit used
@@ -287,6 +358,27 @@ func (fc FileContract) MarshalSiaSize() (size int) {
 	return
 }
 
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (fc *FileContract) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	fc.FileSize = d.NextUint64()
+	d.ReadFull(fc.FileMerkleRoot[:])
+	fc.WindowStart = BlockHeight(d.NextUint64())
+	fc.WindowEnd = BlockHeight(d.NextUint64())
+	fc.Payout.UnmarshalSia(d)
+	fc.ValidProofOutputs = make([]SiacoinOutput, d.NextUint64())
+	for i := range fc.ValidProofOutputs {
+		fc.ValidProofOutputs[i].UnmarshalSia(d)
+	}
+	fc.MissedProofOutputs = make([]SiacoinOutput, d.NextUint64())
+	for i := range fc.MissedProofOutputs {
+		fc.MissedProofOutputs[i].UnmarshalSia(d)
+	}
+	d.ReadFull(fc.UnlockHash[:])
+	fc.RevisionNumber = d.NextUint64()
+	return d.Err()
+}
+
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (fcr FileContractRevision) MarshalSia(w io.Writer) error {
 	w.Write(fcr.ParentID[:])
@@ -330,6 +422,28 @@ func (fcr FileContractRevision) MarshalSiaSize() (size int) {
 	return
 }
 
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (fcr *FileContractRevision) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	d.ReadFull(fcr.ParentID[:])
+	fcr.UnlockConditions.UnmarshalSia(d)
+	fcr.NewRevisionNumber = d.NextUint64()
+	fcr.NewFileSize = d.NextUint64()
+	d.ReadFull(fcr.NewFileMerkleRoot[:])
+	fcr.NewWindowStart = BlockHeight(d.NextUint64())
+	fcr.NewWindowEnd = BlockHeight(d.NextUint64())
+	fcr.NewValidProofOutputs = make([]SiacoinOutput, d.NextUint64())
+	for i := range fcr.NewValidProofOutputs {
+		fcr.NewValidProofOutputs[i].UnmarshalSia(d)
+	}
+	fcr.NewMissedProofOutputs = make([]SiacoinOutput, d.NextUint64())
+	for i := range fcr.NewMissedProofOutputs {
+		fcr.NewMissedProofOutputs[i].UnmarshalSia(d)
+	}
+	d.ReadFull(fcr.NewUnlockHash[:])
+	return d.Err()
+}
+
 // MarshalJSON marshals an id as a hex string.
 func (fcid FileContractID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(fcid.String())
@@ -366,11 +480,27 @@ func (sci SiacoinInput) MarshalSia(w io.Writer) error {
 	return sci.UnlockConditions.MarshalSia(w)
 }
 
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (sci *SiacoinInput) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	d.ReadFull(sci.ParentID[:])
+	sci.UnlockConditions.UnmarshalSia(d)
+	return d.Err()
+}
+
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (sco SiacoinOutput) MarshalSia(w io.Writer) error {
 	sco.Value.MarshalSia(w)
 	_, err := w.Write(sco.UnlockHash[:])
 	return err
+}
+
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (sco *SiacoinOutput) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	sco.Value.UnmarshalSia(d)
+	d.ReadFull(sco.UnlockHash[:])
+	return d.Err()
 }
 
 // MarshalJSON marshals an id as a hex string.
@@ -396,11 +526,29 @@ func (sfi SiafundInput) MarshalSia(w io.Writer) error {
 	return err
 }
 
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (sfi *SiafundInput) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	d.ReadFull(sfi.ParentID[:])
+	sfi.UnlockConditions.UnmarshalSia(d)
+	d.ReadFull(sfi.ClaimUnlockHash[:])
+	return d.Err()
+}
+
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (sfo SiafundOutput) MarshalSia(w io.Writer) error {
 	sfo.Value.MarshalSia(w)
 	w.Write(sfo.UnlockHash[:])
 	return sfo.ClaimStart.MarshalSia(w)
+}
+
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (sfo *SiafundOutput) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	sfo.Value.UnmarshalSia(d)
+	d.ReadFull(sfo.UnlockHash[:])
+	sfo.ClaimStart.UnmarshalSia(d)
+	return d.Err()
 }
 
 // MarshalJSON marshals an id as a hex string.
@@ -422,6 +570,14 @@ func (sfoid *SiafundOutputID) UnmarshalJSON(b []byte) error {
 func (spk SiaPublicKey) MarshalSia(w io.Writer) error {
 	w.Write(spk.Algorithm[:])
 	return encoding.WritePrefix(w, spk.Key)
+}
+
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (spk *SiaPublicKey) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	d.ReadFull(spk.Algorithm[:])
+	spk.Key = d.ReadPrefix()
+	return d.Err()
 }
 
 // LoadString is the inverse of SiaPublicKey.String().
@@ -483,6 +639,18 @@ func (sp *StorageProof) MarshalSia(w io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (sp *StorageProof) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	d.ReadFull(sp.ParentID[:])
+	d.ReadFull(sp.Segment[:])
+	sp.HashSet = make([]crypto.Hash, d.NextUint64())
+	for i := range sp.HashSet {
+		d.ReadFull(sp.HashSet[i][:])
+	}
+	return d.Err()
 }
 
 // MarshalSia implements the encoding.SiaMarshaler interface.
@@ -622,6 +790,52 @@ func (t Transaction) MarshalSiaSize() (size int) {
 	return
 }
 
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (t *Transaction) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	t.SiacoinInputs = make([]SiacoinInput, d.NextUint64())
+	for i := range t.SiacoinInputs {
+		t.SiacoinInputs[i].UnmarshalSia(d)
+	}
+	t.SiacoinOutputs = make([]SiacoinOutput, d.NextUint64())
+	for i := range t.SiacoinOutputs {
+		t.SiacoinOutputs[i].UnmarshalSia(d)
+	}
+	t.FileContracts = make([]FileContract, d.NextUint64())
+	for i := range t.FileContracts {
+		t.FileContracts[i].UnmarshalSia(d)
+	}
+	t.FileContractRevisions = make([]FileContractRevision, d.NextUint64())
+	for i := range t.FileContractRevisions {
+		t.FileContractRevisions[i].UnmarshalSia(d)
+	}
+	t.StorageProofs = make([]StorageProof, d.NextUint64())
+	for i := range t.StorageProofs {
+		t.StorageProofs[i].UnmarshalSia(d)
+	}
+	t.SiafundInputs = make([]SiafundInput, d.NextUint64())
+	for i := range t.SiafundInputs {
+		t.SiafundInputs[i].UnmarshalSia(d)
+	}
+	t.SiafundOutputs = make([]SiafundOutput, d.NextUint64())
+	for i := range t.SiafundOutputs {
+		t.SiafundOutputs[i].UnmarshalSia(d)
+	}
+	t.MinerFees = make([]Currency, d.NextUint64())
+	for i := range t.MinerFees {
+		t.MinerFees[i].UnmarshalSia(d)
+	}
+	t.ArbitraryData = make([][]byte, d.NextUint64())
+	for i := range t.ArbitraryData {
+		t.ArbitraryData[i] = d.ReadPrefix()
+	}
+	t.TransactionSignatures = make([]TransactionSignature, d.NextUint64())
+	for i := range t.TransactionSignatures {
+		t.TransactionSignatures[i].UnmarshalSia(d)
+	}
+	return d.Err()
+}
+
 // MarshalJSON marshals an id as a hex string.
 func (tid TransactionID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(tid.String())
@@ -646,6 +860,17 @@ func (ts TransactionSignature) MarshalSia(w io.Writer) error {
 	return encoding.WritePrefix(w, ts.Signature)
 }
 
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (ts *TransactionSignature) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	d.ReadFull(ts.ParentID[:])
+	ts.PublicKeyIndex = d.NextUint64()
+	ts.Timelock = BlockHeight(d.NextUint64())
+	ts.CoveredFields.UnmarshalSia(d)
+	ts.Signature = d.ReadPrefix()
+	return d.Err()
+}
+
 // MarshalSia implements the encoding.SiaMarshaler interface.
 func (uc UnlockConditions) MarshalSia(w io.Writer) error {
 	encoding.WriteUint64(w, uint64(uc.Timelock))
@@ -666,6 +891,18 @@ func (uc UnlockConditions) MarshalSiaSize() (size int) {
 	}
 	size += 8 // SignaturesRequired
 	return
+}
+
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (uc *UnlockConditions) UnmarshalSia(r io.Reader) error {
+	d := decoder(r)
+	uc.Timelock = BlockHeight(d.NextUint64())
+	uc.PublicKeys = make([]SiaPublicKey, d.NextUint64())
+	for i := range uc.PublicKeys {
+		uc.PublicKeys[i].UnmarshalSia(d)
+	}
+	uc.SignaturesRequired = d.NextUint64()
+	return d.Err()
 }
 
 // MarshalJSON is implemented on the unlock hash to always produce a hex string
