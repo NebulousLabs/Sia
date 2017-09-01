@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -37,6 +36,7 @@ type decHelper struct {
 	io.Reader
 	buf [8]byte
 	err error
+	n   int // total number of bytes read
 }
 
 // Read implements the io.Reader interface.
@@ -48,7 +48,11 @@ func (d *decHelper) Read(p []byte) (int, error) {
 	if d.err == nil {
 		d.err = err
 	}
-	return n, err
+	d.n += n
+	if d.n > encoding.MaxObjectSize {
+		d.err = encoding.ErrObjectTooLarge
+	}
+	return n, d.err
 }
 
 // ReadFull is shorthand for io.ReadFull(d, p).
@@ -86,8 +90,8 @@ func (d *decHelper) NextUint64() uint64 {
 // encoding.MaxSliceSize, NextPrefix returns 0 and sets d.Err().
 func (d *decHelper) NextPrefix(elemSize uintptr) uint64 {
 	n := d.NextUint64()
-	if n > sliceLen > 1<<31-1 || n*uint64(elemSize) > encoding.MaxSliceSize {
-		d.err = errors.New("slice is too large")
+	if n > 1<<31-1 || n*uint64(elemSize) > encoding.MaxSliceSize {
+		d.err = encoding.ErrSliceTooLarge
 		return 0
 	}
 	return n

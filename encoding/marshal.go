@@ -13,12 +13,14 @@ import (
 )
 
 const (
-	MaxDecodeSize = 12e6 // 12 MB
+	MaxObjectSize = 12e6 // 12 MB
 	MaxSliceSize  = 5e6  // 5 MB
 )
 
 var (
-	errBadPointer = errors.New("cannot decode into invalid pointer")
+	errBadPointer     = errors.New("cannot decode into invalid pointer")
+	ErrObjectTooLarge = errors.New("encoded object exceeds size limit")
+	ErrSliceTooLarge  = errors.New("encoded slice is too large")
 )
 
 type (
@@ -185,8 +187,8 @@ type Decoder struct {
 func (d *Decoder) Read(p []byte) (int, error) {
 	n, err := d.r.Read(p)
 	// enforce an absolute maximum size limit
-	if d.n += n; d.n > MaxDecodeSize {
-		panic("encoded type exceeds size limit")
+	if d.n += n; d.n > MaxObjectSize {
+		panic(ErrObjectTooLarge)
 	}
 	return n, err
 }
@@ -233,8 +235,8 @@ func (d *Decoder) readN(n int) []byte {
 		if len(b) != n {
 			panic(io.ErrUnexpectedEOF)
 		}
-		if d.n += n; d.n > MaxDecodeSize {
-			panic("encoded type exceeds size limit")
+		if d.n += n; d.n > MaxObjectSize {
+			panic(ErrObjectTooLarge)
 		}
 		return b
 	}
@@ -297,7 +299,7 @@ func (d *Decoder) decode(val reflect.Value) {
 		// sanity-check the sliceLen, otherwise you can crash a peer by making
 		// them allocate a massive slice
 		if sliceLen > 1<<31-1 || sliceLen*uint64(val.Type().Elem().Size()) > MaxSliceSize {
-			panic("slice is too large")
+			panic(ErrSliceTooLarge)
 		} else if sliceLen == 0 {
 			return
 		}
