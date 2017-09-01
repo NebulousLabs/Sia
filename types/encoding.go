@@ -28,12 +28,16 @@ func (s sanityCheckWriter) Write(p []byte) (int, error) {
 	return s.w.Write(p)
 }
 
+// A decHelper provides convenience methods and reduces allocations during
+// decoding. All of its methods become no-ops after the decHelper encounters a
+// Read error.
 type decHelper struct {
 	io.Reader
 	buf [8]byte
 	err error
 }
 
+// Read implements the io.Reader interface.
 func (d *decHelper) Read(p []byte) (int, error) {
 	if d.err != nil {
 		return 0, d.err
@@ -45,6 +49,7 @@ func (d *decHelper) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// ReadFull is shorthand for io.ReadFull(d, p).
 func (d *decHelper) ReadFull(p []byte) {
 	if d.err != nil {
 		return
@@ -52,6 +57,8 @@ func (d *decHelper) ReadFull(p []byte) {
 	io.ReadFull(d, p)
 }
 
+// ReadPrefix reads a length-prefix, allocates a byte slice with that length,
+// reads into the byte slice, and returns it.
 func (d *decHelper) ReadPrefix() []byte {
 	if d.err != nil {
 		return nil
@@ -61,6 +68,7 @@ func (d *decHelper) ReadPrefix() []byte {
 	return b
 }
 
+// NextUint64 reads the next 8 bytes and returns them as a uint64.
 func (d *decHelper) NextUint64() uint64 {
 	if d.err != nil {
 		return 0
@@ -69,10 +77,13 @@ func (d *decHelper) NextUint64() uint64 {
 	return encoding.DecUint64(d.buf[:])
 }
 
+// Err returns the first non-nil error encountered by d.
 func (d *decHelper) Err() error {
 	return d.err
 }
 
+// decoder converts r to a decHelper. If r's underlying type is already
+// *decHelper, it is returned; otherwise, a new decHelper is allocated.
 func decoder(r io.Reader) *decHelper {
 	if d, ok := r.(*decHelper); ok {
 		return d
