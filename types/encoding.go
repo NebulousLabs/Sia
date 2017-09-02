@@ -375,10 +375,6 @@ func (c *Currency) UnmarshalJSON(b []byte) error {
 // that as the bytes of the big.Int correspond to the absolute value of the
 // integer, there is no way to marshal a negative Currency.
 func (c Currency) MarshalSia(w io.Writer) error {
-	e := encoder(w)
-	size := c.MarshalSiaSize() - 8
-	e.WriteInt(size)
-
 	// from math/big/arith.go
 	const (
 		_m    = ^big.Word(0)
@@ -386,12 +382,25 @@ func (c Currency) MarshalSia(w io.Writer) error {
 		_S    = 1 << _logS // number of bytes per big.Word
 	)
 
-	e.reset()
 	bits := c.i.Bits()
-	off := (len(bits) * _S) - size
-	for j := off; j < len(bits)*_S; j++ {
-		d := bits[j/_S] >> (64 - 8*(1+(uint(j)%_S)))
-		e.append(byte(d))
+	byteAt := func(i int) byte {
+		return (*[_S]byte)(unsafe.Pointer(&bits[i/_S]))[i%_S]
+	}
+
+	// seek until first non-zero byte
+	i := (len(bits) * _S) - 1
+	for i >= 0 && byteAt(i) == 0 {
+		i--
+	}
+
+	// write length prefix
+	e := encoder(w)
+	e.WriteInt(i + 1)
+
+	// write bytes
+	e.reset()
+	for ; i >= 0; i-- {
+		e.append(byteAt(i))
 	}
 	e.flush()
 	return e.Err()
