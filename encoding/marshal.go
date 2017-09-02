@@ -13,12 +13,14 @@ import (
 )
 
 const (
-	maxDecodeLen = 12e6 // 12 MB
-	maxSliceLen  = 5e6  // 5 MB
+	MaxObjectSize = 12e6 // 12 MB
+	MaxSliceSize  = 5e6  // 5 MB
 )
 
 var (
-	errBadPointer = errors.New("cannot decode into invalid pointer")
+	errBadPointer     = errors.New("cannot decode into invalid pointer")
+	ErrObjectTooLarge = errors.New("encoded object exceeds size limit")
+	ErrSliceTooLarge  = errors.New("encoded slice is too large")
 )
 
 type (
@@ -185,8 +187,8 @@ type Decoder struct {
 func (d *Decoder) Read(p []byte) (int, error) {
 	n, err := d.r.Read(p)
 	// enforce an absolute maximum size limit
-	if d.n += n; d.n > maxDecodeLen {
-		panic("encoded type exceeds size limit")
+	if d.n += n; d.n > MaxObjectSize {
+		panic(ErrObjectTooLarge)
 	}
 	return n, err
 }
@@ -228,17 +230,18 @@ func (d *Decoder) DecodeAll(vs ...interface{}) error {
 
 // readN reads n bytes and panics if the read fails.
 func (d *Decoder) readN(n int) []byte {
+	if buf, ok := d.r.(*bytes.Buffer); ok {
+		b := buf.Next(n)
+		if len(b) != n {
+			panic(io.ErrUnexpectedEOF)
+		}
+		if d.n += n; d.n > MaxObjectSize {
+			panic(ErrObjectTooLarge)
+		}
+		return b
+	}
 	b := make([]byte, n)
 	_, err := io.ReadFull(d, b)
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
-// readPrefix reads a length-prefixed byte slice and panics if the read fails.
-func (d *Decoder) readPrefix() []byte {
-	b, err := ReadPrefix(d, maxSliceLen)
 	if err != nil {
 		panic(err)
 	}
@@ -252,7 +255,7 @@ func (d *Decoder) decode(val reflect.Value) {
 	// check for UnmarshalSia interface first
 	if val.CanAddr() && val.Addr().CanInterface() {
 		if u, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
-			err := u.UnmarshalSia(d)
+			err := u.UnmarshalSia(d.r)
 			if err != nil {
 				panic(err)
 			}
@@ -284,15 +287,19 @@ func (d *Decoder) decode(val reflect.Value) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		val.SetUint(DecUint64(d.readN(8)))
 	case reflect.String:
-		val.SetString(string(d.readPrefix()))
+		strLen := DecUint64(d.readN(8))
+		if strLen > MaxSliceSize {
+			panic("string is too large")
+		}
+		val.SetString(string(d.readN(int(strLen))))
 	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
 		sliceLen := DecUint64(d.readN(8))
 		// sanity-check the sliceLen, otherwise you can crash a peer by making
 		// them allocate a massive slice
-		if sliceLen > 1<<31-1 || sliceLen*uint64(val.Type().Elem().Size()) > maxSliceLen {
-			panic("slice is too large")
+		if sliceLen > 1<<31-1 || sliceLen*uint64(val.Type().Elem().Size()) > MaxSliceSize {
+			panic(ErrSliceTooLarge)
 		} else if sliceLen == 0 {
 			return
 		}
@@ -333,14 +340,14 @@ func NewDecoder(r io.Reader) *Decoder {
 // pointer. The decoding rules are the inverse of those specified in the
 // package docstring for marshaling.
 func Unmarshal(b []byte, v interface{}) error {
-	r := bytes.NewReader(b)
+	r := bytes.NewBuffer(b)
 	return NewDecoder(r).Decode(v)
 }
 
 // UnmarshalAll decodes the encoded values in b and stores them in vs, which
 // must be pointers.
 func UnmarshalAll(b []byte, vs ...interface{}) error {
-	dec := NewDecoder(bytes.NewReader(b))
+	dec := NewDecoder(bytes.NewBuffer(b))
 	return dec.DecodeAll(vs...)
 }
 

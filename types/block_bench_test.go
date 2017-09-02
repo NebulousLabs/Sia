@@ -9,9 +9,11 @@ import (
 // BenchmarkEncodeEmptyBlock benchmarks encoding an empty block.
 //
 // i5-4670K, 9a90f86: 48 MB/s
-func BenchmarkEncodeBlock(b *testing.B) {
+// i5-4670K, f8f2df2: 211 MB/s
+func BenchmarkEncodeEmptyBlock(b *testing.B) {
 	var block Block
 	b.SetBytes(int64(len(encoding.Marshal(block))))
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		encoding.Marshal(block)
 	}
@@ -21,10 +23,41 @@ func BenchmarkEncodeBlock(b *testing.B) {
 //
 // i7-4770,  b0b162d: 38 MB/s
 // i5-4670K, 9a90f86: 55 MB/s
+// i5-4670K, f8f2df2: 166 MB/s
 func BenchmarkDecodeEmptyBlock(b *testing.B) {
 	var block Block
 	encodedBlock := encoding.Marshal(block)
 	b.SetBytes(int64(len(encodedBlock)))
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		err := encoding.Unmarshal(encodedBlock, &block)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkEncodeHeavyBlock benchmarks encoding a "heavy" block.
+//
+// i5-4670K, f8f2df2: 250 MB/s
+func BenchmarkEncodeHeavyBlock(b *testing.B) {
+	b.SetBytes(int64(len(encoding.Marshal(heavyBlock))))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		encoding.Marshal(heavyBlock)
+	}
+}
+
+// BenchmarkDecodeHeavyBlock benchmarks decoding a "heavy" block.
+//
+// i5-4670K, f8f2df2: 326 MB/s
+func BenchmarkDecodeHeavyBlock(b *testing.B) {
+	var block Block
+	encodedBlock := encoding.Marshal(heavyBlock)
+	b.SetBytes(int64(len(encodedBlock)))
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		err := encoding.Unmarshal(encodedBlock, &block)
 		if err != nil {

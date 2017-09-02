@@ -18,24 +18,150 @@ func hashStr(v interface{}) string {
 	return fmt.Sprintf("%x", h[:])
 }
 
-// TestBlockEncodes probes the MarshalSia and UnmarshalSia methods of the
-// Block type.
-func TestBlockEncoding(t *testing.T) {
+// heavyBlock is a complex block that fills every possible field with data.
+var heavyBlock = func() Block {
 	b := Block{
 		MinerPayouts: []SiacoinOutput{
 			{Value: CalculateCoinbase(0)},
-			{Value: CalculateCoinbase(0)},
+			{Value: CalculateCoinbase(1)},
+		},
+		Transactions: []Transaction{
+			{
+				SiacoinInputs: []SiacoinInput{{
+					UnlockConditions: UnlockConditions{
+						PublicKeys: []SiaPublicKey{{
+							Algorithm: SignatureEd25519,
+							Key:       fastrand.Bytes(32),
+						}},
+						SignaturesRequired: 6,
+					},
+				}},
+				SiacoinOutputs: []SiacoinOutput{{
+					Value: NewCurrency64(20),
+				}},
+				FileContracts: []FileContract{{
+					FileSize:       12,
+					Payout:         NewCurrency64(100),
+					RevisionNumber: 8,
+					ValidProofOutputs: []SiacoinOutput{{
+						Value: NewCurrency64(2),
+					}},
+					MissedProofOutputs: []SiacoinOutput{{
+						Value: NewCurrency64(3),
+					}},
+				}},
+				FileContractRevisions: []FileContractRevision{{
+					NewFileSize:       13,
+					NewRevisionNumber: 9,
+					UnlockConditions: UnlockConditions{
+						PublicKeys: []SiaPublicKey{{
+							Algorithm: SignatureEd25519,
+							Key:       fastrand.Bytes(32),
+						}},
+					},
+					NewValidProofOutputs: []SiacoinOutput{{
+						Value: NewCurrency64(4),
+					}},
+					NewMissedProofOutputs: []SiacoinOutput{{
+						Value: NewCurrency64(5),
+					}},
+				}},
+				StorageProofs: []StorageProof{{
+					HashSet: []crypto.Hash{{}},
+				}},
+				SiafundInputs: []SiafundInput{{
+					UnlockConditions: UnlockConditions{
+						PublicKeys: []SiaPublicKey{{
+							Algorithm: SignatureEd25519,
+							Key:       fastrand.Bytes(32),
+						}},
+					},
+				}},
+				SiafundOutputs: []SiafundOutput{{
+					ClaimStart: NewCurrency64(99),
+					Value:      NewCurrency64(25),
+				}},
+				MinerFees:     []Currency{NewCurrency64(215)},
+				ArbitraryData: [][]byte{fastrand.Bytes(10)},
+				TransactionSignatures: []TransactionSignature{{
+					PublicKeyIndex: 5,
+					Timelock:       80,
+					CoveredFields: CoveredFields{
+						WholeTransaction:      true,
+						SiacoinInputs:         []uint64{0},
+						SiacoinOutputs:        []uint64{1},
+						FileContracts:         []uint64{2},
+						FileContractRevisions: []uint64{3},
+						StorageProofs:         []uint64{4},
+						SiafundInputs:         []uint64{5},
+						SiafundOutputs:        []uint64{6},
+						MinerFees:             []uint64{7},
+						ArbitraryData:         []uint64{8},
+						TransactionSignatures: []uint64{9},
+					},
+					Signature: fastrand.Bytes(32),
+				}},
+			},
 		},
 	}
+	fastrand.Read(b.Transactions[0].SiacoinInputs[0].ParentID[:])
+	fastrand.Read(b.Transactions[0].SiacoinOutputs[0].UnlockHash[:])
+	fastrand.Read(b.Transactions[0].FileContracts[0].FileMerkleRoot[:])
+	fastrand.Read(b.Transactions[0].FileContracts[0].ValidProofOutputs[0].UnlockHash[:])
+	fastrand.Read(b.Transactions[0].FileContracts[0].MissedProofOutputs[0].UnlockHash[:])
+	fastrand.Read(b.Transactions[0].FileContractRevisions[0].ParentID[:])
+	fastrand.Read(b.Transactions[0].FileContractRevisions[0].NewFileMerkleRoot[:])
+	fastrand.Read(b.Transactions[0].FileContractRevisions[0].NewValidProofOutputs[0].UnlockHash[:])
+	fastrand.Read(b.Transactions[0].FileContractRevisions[0].NewMissedProofOutputs[0].UnlockHash[:])
+	fastrand.Read(b.Transactions[0].StorageProofs[0].ParentID[:])
+	fastrand.Read(b.Transactions[0].StorageProofs[0].HashSet[0][:])
+	fastrand.Read(b.Transactions[0].StorageProofs[0].Segment[:])
+	fastrand.Read(b.Transactions[0].SiafundInputs[0].ParentID[:])
+	fastrand.Read(b.Transactions[0].SiafundInputs[0].ClaimUnlockHash[:])
+	fastrand.Read(b.Transactions[0].SiafundOutputs[0].UnlockHash[:])
+	fastrand.Read(b.Transactions[0].TransactionSignatures[0].ParentID[:])
+	return b
+}()
+
+// TestBlockEncodes probes the MarshalSia and UnmarshalSia methods of the
+// Block type.
+func TestBlockEncoding(t *testing.T) {
 	var decB Block
-	err := encoding.Unmarshal(encoding.Marshal(b), &decB)
+	err := encoding.Unmarshal(encoding.Marshal(heavyBlock), &decB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(decB.MinerPayouts) != len(b.MinerPayouts) ||
-		decB.MinerPayouts[0].Value.Cmp(b.MinerPayouts[0].Value) != 0 ||
-		decB.MinerPayouts[1].Value.Cmp(b.MinerPayouts[1].Value) != 0 {
-		t.Fatal("block changed after encode/decode:", b, decB)
+	if hashStr(heavyBlock) != hashStr(decB) {
+		t.Fatal("block changed after encode/decode:", heavyBlock, decB)
+	}
+}
+
+// TestTooLargeDecoder tests that the decoder catches allocations that are too
+// large.
+func TestTooLargeDecoder(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	enc := encoding.Marshal(Block{})
+	// change number of transactions to large number
+	copy(enc[len(enc)-8:], encoding.EncUint64(^uint64(0)))
+	var block Block
+	err := encoding.Unmarshal(enc, &block)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var arb [][]byte
+	for i := 0; i < 4; i++ {
+		arb = append(arb, make([]byte, encoding.MaxSliceSize-1))
+	}
+	block.Transactions = []Transaction{{
+		ArbitraryData: arb,
+	}}
+	enc = encoding.Marshal(block)
+	err = encoding.Unmarshal(enc, &block)
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }
 
