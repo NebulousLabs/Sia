@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"reflect"
 	"strings"
 	"unsafe"
 
@@ -382,25 +383,26 @@ func (c Currency) MarshalSia(w io.Writer) error {
 		_S    = 1 << _logS // number of bytes per big.Word
 	)
 
+	// get raw bits ([]big.Word) and cast to []byte
 	bits := c.i.Bits()
-	byteAt := func(i int) byte {
-		return (*[_S]byte)(unsafe.Pointer(&bits[i/_S]))[i%_S]
-	}
+	bytes := *(*[]byte)(unsafe.Pointer(&bits))
+	// len and cap must be extended
+	(*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Len *= _S
+	(*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Cap *= _S
 
-	// seek until first non-zero byte
-	i := (len(bits) * _S) - 1
-	for i >= 0 && byteAt(i) == 0 {
-		i--
+	// trim trailing zeros
+	for len(bytes) > 0 && bytes[len(bytes)-1] == 0 {
+		bytes = bytes[:len(bytes)-1]
 	}
 
 	// write length prefix
 	e := encoder(w)
-	e.WriteInt(i + 1)
+	e.WriteInt(len(bytes))
 
-	// write bytes
+	// write bytes in reverse order
 	e.reset()
-	for ; i >= 0; i-- {
-		e.append(byteAt(i))
+	for i := range bytes {
+		e.append(bytes[len(bytes)-i-1])
 	}
 	e.flush()
 	return e.Err()
