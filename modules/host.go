@@ -99,13 +99,14 @@ type (
 	// HostNetworkMetrics reports the quantity of each type of RPC call that
 	// has been made to the host.
 	HostNetworkMetrics struct {
-		DownloadCalls     uint64 `json:"downloadcalls"`
-		ErrorCalls        uint64 `json:"errorcalls"`
-		FormContractCalls uint64 `json:"formcontractcalls"`
-		RenewCalls        uint64 `json:"renewcalls"`
-		ReviseCalls       uint64 `json:"revisecalls"`
-		SettingsCalls     uint64 `json:"settingscalls"`
-		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
+		DownloadCalls       uint64 `json:"downloadcalls"`
+		ErrorCalls          uint64 `json:"errorcalls"`
+		FormContractCalls   uint64 `json:"formcontractcalls"`
+		RenewCalls          uint64 `json:"renewcalls"`
+		ReviseCalls         uint64 `json:"revisecalls"`
+		RecentRevisionCalls uint64 `json:"recentrevisioncalls"`
+		SettingsCalls       uint64 `json:"settingscalls"`
+		UnrecognizedCalls   uint64 `json:"unrecognizedcalls"`
 	}
 
 	// StorageObligation contains information about a storage obligation that
