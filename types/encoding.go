@@ -96,9 +96,8 @@ func encoder(w io.Writer) *encHelper {
 		return e
 	}
 	return &encHelper{
-		w: w,
-		// 32 bytes is large enough for everything except StorageProof.Segment
-		buf: make([]byte, 32),
+		w:   w,
+		buf: make([]byte, 64), // large enough for everything but ArbitraryData
 	}
 }
 
