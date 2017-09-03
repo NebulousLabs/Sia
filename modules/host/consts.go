@@ -2,7 +2,6 @@ package host
 
 import (
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -239,9 +238,6 @@ var (
 	// bucketStorageObligations contains a set of serialized
 	// 'storageObligations' sorted by their file contract id.
 	bucketStorageObligations = []byte("BucketStorageObligations")
-
-	// log2SectorSize is the height of Merkle tree inside a cached element.
-	log2SectorSize = makeLog2SectorSize()
 )
 
 // init runs a series of sanity checks to verify that the constants have sane
@@ -253,13 +249,4 @@ func init() {
 	if revisionSubmissionBuffer < resubmissionTimeout {
 		build.Critical("revision submission buffer needs to be larger than or equal to the resubmission timeout")
 	}
-}
-
-// makeLog2SectorSize calculates the height of Merkle tree inside a cached element.
-func makeLog2SectorSize() uint64 {
-	result := uint64(0)
-	for 1<<result < (modules.SectorSize / crypto.SegmentSize) {
-		result++
-	}
-	return result
 }

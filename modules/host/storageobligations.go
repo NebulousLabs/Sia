@@ -777,7 +777,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		base, cachedHashSet := crypto.MerkleProof(sectorBytes, sectorSegment)
 
 		// Using the sector, build a cached root.
-		ct := crypto.NewCachedTree(log2SectorSize)
+		ct := modules.NewCachedTree()
 		ct.SetIndex(segmentIndex)
 		for _, root := range so.SectorRoots {
 			ct.Push(root)
