@@ -75,7 +75,7 @@ func (l *Logger) Severe(v ...interface{}) {
 // the logger after 'Close' has been called.
 func NewLogger(w io.Writer) *Logger {
 	l := log.New(w, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LUTC)
-	l.Output(3, "STARTUP: Logging has started.") // Call depth is 3 because NewLogger is usually called by NewFileLogger
+	l.Output(3, "STARTUP: Logging has started. Siad Version "+build.Version) // Call depth is 3 because NewLogger is usually called by NewFileLogger
 	return &Logger{l, w}
 }
 

@@ -129,6 +129,8 @@ func startDaemon(config Config) (err error) {
 		return err
 	}
 
+	// Print the Siad Version
+	fmt.Println("Sia Daemon v" + build.Version)
 	// Print a startup message.
 	fmt.Println("Loading...")
 	loadStart := time.Now()
