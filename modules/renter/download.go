@@ -217,6 +217,7 @@ func (d *download) fail(err error) {
 	d.downloadComplete = true
 	d.downloadErr = err
 	close(d.downloadFinished)
+	d.destination.Close()
 }
 
 // recoverChunk takes a chunk that has had a sufficient number of pieces
@@ -317,6 +318,7 @@ func (cd *chunkDownload) recoverChunk() error {
 		// Signal that the download is complete.
 		cd.download.downloadComplete = true
 		close(cd.download.downloadFinished)
+		cd.download.destination.Close()
 	}
 	return nil
 }
@@ -675,6 +677,11 @@ func (dw *DownloadBufferWriter) Bytes() []byte {
 	return dw.data
 }
 
+// Close() implements DownloadWriter's Close method.
+func (dw *DownloadBufferWriter) Close() error {
+	return nil
+}
+
 // DownloadFileWriter is a file-backed implementation of DownloadWriter.
 type DownloadFileWriter struct {
 	f        *os.File
@@ -715,10 +722,13 @@ func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
 		return n, err
 	}
 	dw.written += uint64(n)
-	if dw.written >= dw.length {
-		return n, dw.f.Close()
-	}
 	return n, err
+}
+
+// Close implements DownloadWriter's Close method and releases the file opened
+// by the DownloadFileWriter.
+func (dw *DownloadFileWriter) Close() error {
+	return dw.f.Close()
 }
 
 // DownloadHttpWriter is a http response writer-backed implementation of
@@ -751,6 +761,11 @@ func NewDownloadHttpWriter(w io.Writer, offset, length uint64) *DownloadHttpWrit
 // being written to.
 func (dw *DownloadHttpWriter) Destination() string {
 	return "httpresp"
+}
+
+// Cloes implements DownloadWriter's Close method.
+func (dw *DownloadHttpWriter) Close() error {
+	return nil
 }
 
 // WriteAt buffers parts of the file until the entire file can be

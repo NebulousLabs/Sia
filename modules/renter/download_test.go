@@ -37,14 +37,12 @@ func TestRenterDownloadFileWriter(t *testing.T) {
 		df.WriteAt(make([]byte, 200), 0)
 	}()
 
-	// underlying file handle should be closed if we write the entirety of the
-	// file
-	b := make([]byte, 100)
-	_, err = df.WriteAt(b, 0)
+	// Close should close the file handle
+	err = df.f.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = df.f.Read(b)
+	_, err = df.f.Read(make([]byte, 100))
 	if err == nil {
 		t.Fatal("expected read to fail after writing full length")
 	}

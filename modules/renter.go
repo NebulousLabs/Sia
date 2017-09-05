@@ -62,6 +62,7 @@ type DownloadInfo struct {
 type DownloadWriter interface {
 	WriteAt(b []byte, off int64) (int, error)
 	Destination() string
+	Close() error
 }
 
 // FileUploadParams contains the information used by the Renter to upload a
