@@ -163,7 +163,7 @@ type Renter struct {
 	tpool          modules.TransactionPool
 
 	// Testing utilities
-	deps dependencies
+	deps modules.Dependencies
 }
 
 // New returns an initialized renter.
@@ -180,7 +180,7 @@ func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpoo
 }
 
 // newRenter initializes a renter and returns it.
-func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string, deps dependencies) (*Renter, error) {
+func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string, deps modules.Dependencies) (*Renter, error) {
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -312,6 +312,11 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	r.updateWorkerPool(contracts)
 	r.mu.Unlock(id)
 	return nil
+}
+
+// SetDependencies replaces the renter's dependencies with new ones
+func (r *Renter) SetDependencies(deps modules.Dependencies) {
+	r.deps = deps
 }
 
 // hostdb passthroughs

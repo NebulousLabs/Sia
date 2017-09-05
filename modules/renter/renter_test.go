@@ -38,7 +38,7 @@ func (rt *renterTester) Close() error {
 
 // newRenterTesterDeps creates a ready-to-use renter tester with money in the
 // wallet and custom dependencies.
-func newRenterTesterDeps(name string, deps dependencies) (*renterTester, error) {
+func newRenterTesterDeps(name string, deps modules.Dependencies) (*renterTester, error) {
 	// Create the modules.
 	testdir := build.TempDir("renter", name)
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
@@ -113,7 +113,7 @@ func newRenterTester(name string) (*renterTester, error) {
 
 // newContractorTester creates a renterTester, but with the supplied
 // hostContractor.
-func newContractorTester(name string, hdb hostDB, hc hostContractor, deps dependencies) (*renterTester, error) {
+func newContractorTester(name string, hdb hostDB, hc hostContractor, deps modules.Dependencies) (*renterTester, error) {
 	// Create the modules.
 	testdir := build.TempDir("renter", name)
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
