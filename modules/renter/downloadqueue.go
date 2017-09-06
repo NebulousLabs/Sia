@@ -37,16 +37,6 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	if p.Offset == file.size {
 		return errors.New("offset equals filesize")
 	}
-
-	// Instantiate the correct DownloadWriter implementation
-	// (e.g. content written to file or response body).
-	var dw modules.DownloadWriter
-	if isHttpResp {
-		dw = NewDownloadHttpWriter(p.Httpwriter, p.Offset, p.Length)
-	} else {
-		dw = NewDownloadFileWriter(p.Destination, p.Offset, p.Length)
-	}
-
 	// sentinel: if length == 0, download the entire file
 	if p.Length == 0 {
 		p.Length = file.size - p.Offset
@@ -54,6 +44,19 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	// Check whether offset and length is valid.
 	if p.Offset < 0 || p.Offset+p.Length > file.size {
 		return fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
+	}
+
+	// Instantiate the correct DownloadWriter implementation
+	// (e.g. content written to file or response body).
+	var dw modules.DownloadWriter
+	if isHttpResp {
+		dw = NewDownloadHttpWriter(p.Httpwriter, p.Offset, p.Length)
+	} else {
+		dfw, err := NewDownloadFileWriter(p.Destination, p.Offset, p.Length)
+		if err != nil {
+			return err
+		}
+		dw = dfw
 	}
 
 	// Create the download object and add it to the queue.

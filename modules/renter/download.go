@@ -217,6 +217,8 @@ func (d *download) fail(err error) {
 	d.downloadComplete = true
 	d.downloadErr = err
 	close(d.downloadFinished)
+	// TODO: log the error from Close().
+	d.destination.Close()
 }
 
 // recoverChunk takes a chunk that has had a sufficient number of pieces
@@ -317,6 +319,10 @@ func (cd *chunkDownload) recoverChunk() error {
 		// Signal that the download is complete.
 		cd.download.downloadComplete = true
 		close(cd.download.downloadFinished)
+		err = cd.download.destination.Close()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -675,21 +681,33 @@ func (dw *DownloadBufferWriter) Bytes() []byte {
 	return dw.data
 }
 
+// Close() implements DownloadWriter's Close method.
+func (dw *DownloadBufferWriter) Close() error {
+	return nil
+}
+
 // DownloadFileWriter is a file-backed implementation of DownloadWriter.
 type DownloadFileWriter struct {
 	f        *os.File
 	location string
 	offset   uint64
+	written  uint64
+	length   uint64
 }
 
 // NewDownloadFileWriter creates a new instance of a DownloadWriter backed by the file named.
-func NewDownloadFileWriter(fname string, offset, length uint64) *DownloadFileWriter {
-	l, _ := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+func NewDownloadFileWriter(fname string, offset, length uint64) (*DownloadFileWriter, error) {
+	l, err := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+	if err != nil {
+		return nil, err
+	}
 	return &DownloadFileWriter{
 		f:        l,
 		location: fname,
 		offset:   offset,
-	}
+		written:  0,
+		length:   length,
+	}, nil
 }
 
 // Destination implements the Location method of the DownloadWriter interface
@@ -700,7 +718,21 @@ func (dw *DownloadFileWriter) Destination() string {
 
 // WriteAt writes the passed bytes at the specified offset.
 func (dw *DownloadFileWriter) WriteAt(b []byte, off int64) (int, error) {
-	return dw.f.WriteAt(b, off-int64(dw.offset))
+	if dw.written+uint64(len(b)) > dw.length {
+		build.Critical("DownloadFileWriter write exceeds file length")
+	}
+	n, err := dw.f.WriteAt(b, off-int64(dw.offset))
+	if err != nil {
+		return n, err
+	}
+	dw.written += uint64(n)
+	return n, err
+}
+
+// Close implements DownloadWriter's Close method and releases the file opened
+// by the DownloadFileWriter.
+func (dw *DownloadFileWriter) Close() error {
+	return dw.f.Close()
 }
 
 // DownloadHttpWriter is a http response writer-backed implementation of
@@ -728,11 +760,16 @@ func NewDownloadHttpWriter(w io.Writer, offset, length uint64) *DownloadHttpWrit
 	}
 }
 
-// Destination implements the Location method of the DownloadWriter
+// Destination implements the Destination method of the DownloadWriter
 // interface and informs callers where this download writer is
 // being written to.
 func (dw *DownloadHttpWriter) Destination() string {
 	return "httpresp"
+}
+
+// Cloes implements DownloadWriter's Close method.
+func (dw *DownloadHttpWriter) Close() error {
+	return nil
 }
 
 // WriteAt buffers parts of the file until the entire file can be
