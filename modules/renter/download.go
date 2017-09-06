@@ -217,6 +217,7 @@ func (d *download) fail(err error) {
 	d.downloadComplete = true
 	d.downloadErr = err
 	close(d.downloadFinished)
+	// TODO: log the error from Close().
 	d.destination.Close()
 }
 
@@ -318,7 +319,10 @@ func (cd *chunkDownload) recoverChunk() error {
 		// Signal that the download is complete.
 		cd.download.downloadComplete = true
 		close(cd.download.downloadFinished)
-		cd.download.destination.Close()
+		err = cd.download.destination.Close()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
