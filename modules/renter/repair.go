@@ -373,12 +373,9 @@ func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset ui
 	// create the download object and push it on to the download queue
 	d := r.newSectionDownload(file, buf, offset, downloadSize)
 	go func() {
-		// Block the download if the flag is set by not pushing it in the queue
-		if !r.deps.Disrupt("BlockRemoteRepair") {
-			select {
-			case r.newDownloads <- d:
-			case <-r.tg.StopChan():
-			}
+		select {
+		case r.newDownloads <- d:
+		case <-r.tg.StopChan():
 		}
 	}()
 
@@ -459,10 +456,7 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 		}
 
 		chunkData = data
-
-		if !r.deps.Disrupt("NoChunkCaching") {
-			rs.cachedChunks[chunkID] = data
-		}
+		rs.cachedChunks[chunkID] = data
 	}
 
 	// Erasure code the pieces.

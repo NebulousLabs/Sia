@@ -314,9 +314,6 @@ type Renter interface {
 	// SetSettings sets the Renter's settings.
 	SetSettings(RenterSettings) error
 
-	// SetDependencies replaces the Renter's dependencies
-	SetDependencies(Dependencies)
-
 	// ShareFiles creates a '.sia' file that can be shared with others.
 	ShareFiles(paths []string, shareDest string) error
 

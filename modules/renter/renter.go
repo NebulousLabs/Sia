@@ -161,9 +161,6 @@ type Renter struct {
 	mu             *sync.RWMutex
 	tg             *sync.ThreadGroup
 	tpool          modules.TransactionPool
-
-	// Testing utilities
-	deps modules.Dependencies
 }
 
 // New returns an initialized renter.
@@ -176,11 +173,12 @@ func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpoo
 	if err != nil {
 		return nil, err
 	}
-	return newRenter(cs, tpool, hdb, hc, persistDir, prodDependencies{})
+
+	return newRenter(cs, tpool, hdb, hc, persistDir)
 }
 
 // newRenter initializes a renter and returns it.
-func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string, deps modules.Dependencies) (*Renter, error) {
+func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -210,8 +208,6 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		mu:             sync.New(modules.SafeMutexDelay, 1),
 		tg:             new(sync.ThreadGroup),
 		tpool:          tpool,
-
-		deps: deps,
 	}
 	if err := r.initPersist(); err != nil {
 		return nil, err
@@ -312,11 +308,6 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	r.updateWorkerPool(contracts)
 	r.mu.Unlock(id)
 	return nil
-}
-
-// SetDependencies replaces the renter's dependencies with new ones
-func (r *Renter) SetDependencies(deps modules.Dependencies) {
-	r.deps = deps
 }
 
 // hostdb passthroughs

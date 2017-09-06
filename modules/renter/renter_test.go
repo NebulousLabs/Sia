@@ -10,7 +10,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
-	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -36,9 +35,9 @@ func (rt *renterTester) Close() error {
 	return nil
 }
 
-// newRenterTesterDeps creates a ready-to-use renter tester with money in the
-// wallet and custom dependencies.
-func newRenterTesterDeps(name string, deps modules.Dependencies) (*renterTester, error) {
+// newRenterTester creates a ready-to-use renter tester with money in the
+// wallet.
+func newRenterTester(name string) (*renterTester, error) {
 	// Create the modules.
 	testdir := build.TempDir("renter", name)
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
@@ -66,16 +65,7 @@ func newRenterTesterDeps(name string, deps modules.Dependencies) (*renterTester,
 	if err != nil {
 		return nil, err
 	}
-	rd := filepath.Join(testdir, modules.RenterDir)
-	hdb, err := hostdb.New(g, cs, rd)
-	if err != nil {
-		return nil, err
-	}
-	hc, err := contractor.New(cs, w, tp, hdb, rd)
-	if err != nil {
-		return nil, err
-	}
-	r, err := newRenter(cs, tp, hdb, hc, rd, deps)
+	r, err := New(g, cs, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
@@ -105,15 +95,9 @@ func newRenterTesterDeps(name string, deps modules.Dependencies) (*renterTester,
 	return rt, nil
 }
 
-// newRenterTester creates a ready-to-use renter tester with money in the
-// wallet.
-func newRenterTester(name string) (*renterTester, error) {
-	return newRenterTesterDeps(name, prodDependencies{})
-}
-
 // newContractorTester creates a renterTester, but with the supplied
 // hostContractor.
-func newContractorTester(name string, hdb hostDB, hc hostContractor, deps modules.Dependencies) (*renterTester, error) {
+func newContractorTester(name string, hdb hostDB, hc hostContractor) (*renterTester, error) {
 	// Create the modules.
 	testdir := build.TempDir("renter", name)
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
@@ -141,7 +125,7 @@ func newContractorTester(name string, hdb hostDB, hc hostContractor, deps module
 	if err != nil {
 		return nil, err
 	}
-	r, err := newRenter(cs, tp, hdb, hc, filepath.Join(testdir, modules.RenterDir), deps)
+	r, err := newRenter(cs, tp, hdb, hc, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
