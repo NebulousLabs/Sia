@@ -534,7 +534,7 @@ func TestIntegrationRenew(t *testing.T) {
 
 	// renew the contract
 	oldContract := c.contracts[contract.ID]
-	contract, err = c.managedRenew(oldContract, modules.SectorSize*10, c.blockHeight+200)
+	contract, err = c.managedRenew(oldContract, modules.SectorSize*10, c.blockHeight, c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -576,7 +576,7 @@ func TestIntegrationRenew(t *testing.T) {
 
 	// renew to a lower height
 	oldContract = c.contracts[contract.ID]
-	contract, err = c.managedRenew(oldContract, modules.SectorSize*10, c.blockHeight+100)
+	contract, err = c.managedRenew(oldContract, modules.SectorSize*10, c.blockHeight, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1007,7 +1007,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	c.mu.Unlock()
 
 	// Renew should fail with the bad contract + cachedRevision
-	_, err = c.managedRenew(badContract, 20, c.blockHeight+200)
+	_, err = c.managedRenew(badContract, 20, c.blockHeight, c.blockHeight+200)
 	if !proto.IsRevisionMismatch(err) {
 		t.Fatal("expected revision mismatch, got", err)
 	}
@@ -1019,7 +1019,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	c.mu.Unlock()
 
 	// Renew should now succeed after loading the cachedRevision
-	_, err = c.managedRenew(badContract, 20, c.blockHeight+200)
+	_, err = c.managedRenew(badContract, 20, c.blockHeight, c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
 	}

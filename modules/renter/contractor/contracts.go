@@ -243,7 +243,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 // managedRenew negotiates a new contract for data already stored with a host.
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
-func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
+func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newStartHeight, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
 	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
 		return modules.RenterContract{}, errors.New("no record of that host")
@@ -265,15 +265,13 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 	}
 
 	// create contract params
-	c.mu.RLock()
 	params := proto.ContractParams{
 		Host:          host,
 		Filesize:      numSectors * modules.SectorSize,
-		StartHeight:   c.blockHeight,
+		StartHeight:   newStartHeight,
 		EndHeight:     newEndHeight,
 		RefundAddress: uc.UnlockHash(),
 	}
-	c.mu.RUnlock()
 
 	// execute negotiation protocol
 	txnBuilder := c.wallet.StartTransaction()
@@ -343,6 +341,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	// Renew any contracts that need to be renewed.
 	c.mu.RLock()
 	var renewSet []types.FileContractID
+	refundSet := make(map[types.FileContractID]struct{})
 	for _, contract := range c.contracts {
 		if contract.GoodForRenew {
 			if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
@@ -364,6 +363,7 @@ func (c *Contractor) threadedContractMaintenance() {
 				percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds().Big(), contract.TotalCost.Big()).Float64()
 				if contract.RenterFunds().Cmp(sectorPrice) < 0 || percentRemaining < minContractFundRenewalThreshold {
 					renewSet = append(renewSet, contract.ID)
+					refundSet[contract.ID] = struct{}{}
 				}
 			}
 		}
@@ -424,6 +424,7 @@ func (c *Contractor) threadedContractMaintenance() {
 
 			c.mu.RLock()
 			oldContract, ok := c.contracts[id]
+			currentHeight := c.blockHeight
 			c.mu.RUnlock()
 			if !ok {
 				c.log.Println("WARN: no record of contract previously added to the renew set:", id)
@@ -431,7 +432,13 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 
 			// Create the new contract.
-			newContract, err := c.managedRenew(oldContract, numSectors, endHeight)
+			var newContract modules.RenterContract
+			var err error
+			if _, refund := refundSet[id]; refund {
+				newContract, err = c.managedRenew(oldContract, numSectors, oldContract.StartHeight, oldContract.EndHeight())
+			} else {
+				newContract, err = c.managedRenew(oldContract, numSectors, currentHeight, endHeight)
+			}
 			if err != nil {
 				c.log.Printf("WARN: failed to renew contract %v with %v: %v\n", id, oldContract.NetAddress, err)
 				return

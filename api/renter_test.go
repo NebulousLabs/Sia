@@ -1954,6 +1954,7 @@ func TestExhaustedContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	initialContract := st.renter.Contracts()[0]
 
 	// upload a file. the high upload cost will cause the underlying contract to
 	// require premature renewal. If premature renewal never happens, the upload
@@ -1986,6 +1987,24 @@ func TestExhaustedContracts(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// verify that the window did not change
+	newWindowStart := st.renter.Contracts()[0].LastRevision.NewWindowStart
+	newWindowEnd := st.renter.Contracts()[0].LastRevision.NewWindowEnd
+	startHeight := st.renter.Contracts()[0].StartHeight
+	endHeight := st.renter.Contracts()[0].EndHeight()
+	if startHeight != initialContract.StartHeight {
+		t.Fatal("contract start height changed, wanted", initialContract.StartHeight, "got", startHeight)
+	}
+	if endHeight != initialContract.EndHeight() {
+		t.Fatal("contract end height changed, wanted", initialContract.EndHeight(), "got", endHeight)
+	}
+	if newWindowEnd != initialContract.LastRevision.NewWindowEnd {
+		t.Fatal("contract windowEnd changed, wanted", initialContract.LastRevision.NewWindowEnd, "got", newWindowEnd)
+	}
+	if newWindowStart != initialContract.LastRevision.NewWindowStart {
+		t.Fatal("contract windowStart changed, wanted", initialContract.LastRevision.NewWindowStart, "got", newWindowStart)
 	}
 }
 
