@@ -74,9 +74,16 @@ type (
 		availableWorkers  map[types.FileContractID]*worker
 		gapCounts         map[int]int
 		incompleteChunks  map[chunkID]*chunkStatus
-		downloadingChunks map[chunkID]struct{}
+		downloadingChunks map[chunkID]*downloadingChunk
 		cachedChunks      map[chunkID][]byte
 		resultChan        chan finishedUpload
+	}
+
+	// downloadingChunk tracks the download progress of a remote repair download
+	downloadingChunk struct {
+		startTime time.Time
+		buffer    *DownloadBufferWriter
+		d         *download
 	}
 )
 
@@ -201,6 +208,14 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		}
 	}
 
+	// Accept work if there is any
+	select {
+	case file := <-r.newRepairs:
+		r.managedAddFileToRepairState(rs, file)
+		return
+	default:
+	}
+
 	// Reset the available workers.
 	contracts := r.hostContractor.Contracts()
 	id := r.mu.Lock()
@@ -253,14 +268,36 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 	var chunksToDelete []chunkID
 	for chunkID, chunkStatus := range rs.incompleteChunks {
 		// check if the chunk is currently being downloaded for recovery
-		if _, downloading := rs.downloadingChunks[chunkID]; downloading {
-			continue
+		dc, downloading := rs.downloadingChunks[chunkID]
+		if downloading {
+			// Check if download finished
+			select {
+			default:
+				// Check if download timed out
+				if time.Now().After(dc.startTime.Add(chunkDownloadTimeout)) {
+					r.log.Println("Download of chunk to repair timed out")
+
+					// Let the download fail
+					dc.d.fail(errors.New("Download timeout reached"))
+
+					// Mark the chunk for deletion and remove it from the map of downloading chunks
+					chunksToDelete = append(chunksToDelete, chunkID)
+					delete(rs.downloadingChunks, chunkID)
+				}
+				continue
+			case <-dc.d.downloadFinished:
+				// Download finished, continue repairing the chunk.
+			}
 		}
-		// Update the number of gaps for this chunk.
+
+		// Don't update gaps for downloaded chunks twice
 		numGaps := chunkStatus.numGaps(rs)
-		rs.gapCounts[chunkStatus.recordedGaps]--
-		rs.gapCounts[numGaps]++
-		chunkStatus.recordedGaps = numGaps
+		if !downloading {
+			// Update the number of gaps for this chunk.
+			rs.gapCounts[chunkStatus.recordedGaps]--
+			rs.gapCounts[numGaps]++
+			chunkStatus.recordedGaps = numGaps
+		}
 
 		// Remove this chunk from the set of incomplete chunks if it has been
 		// completed and there are no workers still working on it.
@@ -315,9 +352,21 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 // managedDownloadChunkData downloads the requested chunk from Sia, for use in
 // the repair loop.
 func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset uint64, chunkIndex uint64, chunkID chunkID) ([]byte, error) {
-	rs.downloadingChunks[chunkID] = struct{}{}
-	defer delete(rs.downloadingChunks, chunkID)
+	// If the download finished return the data
+	if dc, exists := rs.downloadingChunks[chunkID]; exists {
+		// Check if download finished
+		select {
+		default:
+			// Nothing to do if the chunk is still downloading
+			return nil, nil
+		case <-dc.d.downloadFinished:
+		}
+		// Download finished. Delete it from the state and return the data
+		delete(rs.downloadingChunks, chunkID)
+		return dc.buffer.Bytes(), dc.d.Err()
+	}
 
+	// If the data is not yet downloaded initialize a new download
 	downloadSize := file.chunkSize()
 	if offset+downloadSize > file.size {
 		downloadSize = file.size - offset
@@ -328,24 +377,20 @@ func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset ui
 
 	// create the download object and push it on to the download queue
 	d := r.newSectionDownload(file, buf, offset, downloadSize)
-	done := make(chan struct{})
-	defer close(done)
 	go func() {
 		select {
 		case r.newDownloads <- d:
-		case <-done:
+		case <-r.tg.StopChan():
 		}
 	}()
 
-	// wait for the download to complete and return the data
-	select {
-	case <-d.downloadFinished:
-		return buf.Bytes(), d.Err()
-	case <-r.tg.StopChan():
-		return nil, errors.New("chunk download interrupted by shutdown")
-	case <-time.After(chunkDownloadTimeout):
-		return nil, errors.New("chunk download timed out")
+	// remember download in repair state
+	rs.downloadingChunks[chunkID] = &downloadingChunk{
+		startTime: time.Now(),
+		buffer:    buf,
+		d:         d,
 	}
+	return nil, nil
 }
 
 // managedGetChunkData grabs the requested `chunkID` from the file, in order to
@@ -410,6 +455,11 @@ func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, ch
 		if err != nil {
 			return build.ExtendErr("unable to get repair chunk:", err)
 		}
+		if data == nil && err == nil {
+			// Data is being downloaded in the background. Do nothing.
+			return nil
+		}
+
 		chunkData = data
 		rs.cachedChunks[chunkID] = data
 	}
@@ -577,7 +627,7 @@ func (r *Renter) threadedRepairLoop() {
 		gapCounts:         make(map[int]int),
 		incompleteChunks:  make(map[chunkID]*chunkStatus),
 		cachedChunks:      make(map[chunkID][]byte),
-		downloadingChunks: make(map[chunkID]struct{}),
+		downloadingChunks: make(map[chunkID]*downloadingChunk),
 		resultChan:        make(chan finishedUpload),
 	}
 	for {
