@@ -356,12 +356,13 @@ func (h *Host) NetworkMetrics() modules.HostNetworkMetrics {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return modules.HostNetworkMetrics{
-		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
-		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
-		FormContractCalls: atomic.LoadUint64(&h.atomicFormContractCalls),
-		RenewCalls:        atomic.LoadUint64(&h.atomicRenewCalls),
-		ReviseCalls:       atomic.LoadUint64(&h.atomicReviseCalls),
-		SettingsCalls:     atomic.LoadUint64(&h.atomicSettingsCalls),
-		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
+		DownloadCalls:       atomic.LoadUint64(&h.atomicDownloadCalls),
+		ErrorCalls:          atomic.LoadUint64(&h.atomicErroredCalls),
+		FormContractCalls:   atomic.LoadUint64(&h.atomicFormContractCalls),
+		RenewCalls:          atomic.LoadUint64(&h.atomicRenewCalls),
+		ReviseCalls:         atomic.LoadUint64(&h.atomicReviseCalls),
+		RecentRevisionCalls: atomic.LoadUint64(&h.atomicRecentRevisionCalls),
+		SettingsCalls:       atomic.LoadUint64(&h.atomicSettingsCalls),
+		UnrecognizedCalls:   atomic.LoadUint64(&h.atomicUnrecognizedCalls),
 	}
 }
