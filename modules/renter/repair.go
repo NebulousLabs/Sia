@@ -276,6 +276,11 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 				// Check if download timed out
 				if time.Now().After(dc.startTime.Add(chunkDownloadTimeout)) {
 					r.log.Println("Download of chunk to repair timed out")
+
+					// Let the download fail
+					dc.d.fail(errors.New("Download timeout reached"))
+
+					// Mark the chunk for deletion and remove it from the map of downloading chunks
 					chunksToDelete = append(chunksToDelete, chunkID)
 					delete(rs.downloadingChunks, chunkID)
 				}
