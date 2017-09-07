@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A Downloader retrieves sectors by calling the download RPC on a host.
@@ -46,9 +47,12 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	// create the download revision
 	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
 
-	// initiate download by confirming host settings
-	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
-	if err := startDownload(hd.conn, hd.host); err != nil {
+	// COMPATv1.3.0 initiate download by confirming host settings
+	if build.VersionCmp(hd.host.Version, build.Version) < 0 {
+		extendDeadline(hd.conn, modules.NegotiateSettingsTime)
+		err = startDownload(hd.conn, hd.host)
+	}
+	if err != nil {
 		return modules.RenterContract{}, nil, err
 	}
 
@@ -63,17 +67,6 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 		}
 	}
 
-	// send download action
-	extendDeadline(hd.conn, 2*time.Minute)
-	err = encoding.WriteObject(hd.conn, []modules.DownloadAction{{
-		MerkleRoot: root,
-		Offset:     0,
-		Length:     modules.SectorSize,
-	}})
-	if err != nil {
-		return modules.RenterContract{}, nil, err
-	}
-
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
 		if err != nil {
@@ -82,10 +75,32 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 			hd.hdb.IncrementSuccessfulInteractions(hd.contract.HostPublicKey)
 		}
 	}()
-
-	// send the revision to the host for approval
+	// COMPATv1.3.0
+	// send download action
+	var signedTxn types.Transaction
 	extendDeadline(hd.conn, 2*time.Minute)
-	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
+	if build.VersionCmp(hd.host.Version, build.Version) < 0 {
+		err = encoding.WriteObject(hd.conn, []modules.DownloadAction{{
+			MerkleRoot: root,
+			Offset:     0,
+			Length:     modules.SectorSize,
+		}})
+		if err != nil {
+			return modules.RenterContract{}, nil, err
+		}
+		// send the revision to the host for approval
+		extendDeadline(hd.conn, 2*time.Minute)
+		signedTxn, err = v130negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
+	} else {
+		// TODO This might fail due to outdated host settings.Maybe try again with the newer ones received in negotiateRevision
+		signedTxn, err = negotiateRevision(hd.host, hd.conn, rev, hd.contract.SecretKey, []modules.RevisionAction{{
+			Type:       modules.ActionDownload,
+			MerkleRoot: root,
+			Offset:     0,
+			Length:     modules.SectorSize,
+		}}, nil)
+	}
+
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
 		// cause the next download to fail. However, we must delay closing
@@ -121,10 +136,17 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 // shutdown terminates the revision loop and signals the goroutine spawned in
 // NewDownloader to return.
 func (hd *Downloader) shutdown() {
+	// COMPATv1.3.0
+	// TODO change version before merging
 	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
-	// don't care about these errors
-	_, _ = verifySettings(hd.conn, hd.host)
-	_ = modules.WriteNegotiationStop(hd.conn)
+	if build.VersionCmp(hd.host.Version, build.Version) < 0 {
+		_, _ = verifySettings(hd.conn, hd.host)
+		_ = modules.WriteNegotiationStop(hd.conn)
+	} else {
+		_ = encoding.WriteObject(hd.conn, modules.RevisionRequest{
+			Stop: true,
+		})
+	}
 	close(hd.closeChan)
 }
 
@@ -176,10 +198,18 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, hd
 		}
 	}()
 
+	// COMPATv1.3.0 choose the right specifier depending on the host version
+	var rpcSpecifier types.Specifier
+	if build.VersionCmp(host.Version, build.Version) < 0 {
+		rpcSpecifier = modules.RPCDownload
+	} else {
+		rpcSpecifier = modules.RPCReviseContract
+	}
+
 	// allot 2 minutes for RPC request + revision exchange
 	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
 	defer extendDeadline(conn, time.Hour)
-	if err := encoding.WriteObject(conn, modules.RPCDownload); err != nil {
+	if err := encoding.WriteObject(conn, rpcSpecifier); err != nil {
 		conn.Close()
 		close(closeChan)
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())

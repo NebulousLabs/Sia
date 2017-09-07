@@ -36,14 +36,14 @@ func TestNegotiateRevisionStopResponse(t *testing.T) {
 	// since the host wrote StopResponse, we should proceed to validating the
 	// transaction. This will return a known error because we are supplying an
 	// empty revision.
-	_, err := negotiateRevision(rConn, types.FileContractRevision{}, crypto.SecretKey{})
+	_, err := v130negotiateRevision(rConn, types.FileContractRevision{}, crypto.SecretKey{})
 	if err != types.ErrFileContractWindowStartViolation {
 		t.Fatalf("expected %q, got \"%v\"", types.ErrFileContractWindowStartViolation, err)
 	}
 	rConn.Close()
 
 	// same as above, but send an error instead of StopResponse. The error
-	// should be returned by negotiateRevision immediately (if it is not, we
+	// should be returned by v130negotiateRevision immediately (if it is not, we
 	// should expect to see a transaction validation error instead).
 	rConn, hConn = net.Pipe()
 	go func() {
@@ -56,7 +56,7 @@ func TestNegotiateRevisionStopResponse(t *testing.T) {
 		encoding.WriteObject(hConn, types.TransactionSignature{})
 	}()
 	expectedErr := "host did not accept transaction signature: sentinel"
-	_, err = negotiateRevision(rConn, types.FileContractRevision{}, crypto.SecretKey{})
+	_, err = v130negotiateRevision(rConn, types.FileContractRevision{}, crypto.SecretKey{})
 	if err == nil || err.Error() != expectedErr {
 		t.Fatalf("expected %q, got \"%v\"", expectedErr, err)
 	}

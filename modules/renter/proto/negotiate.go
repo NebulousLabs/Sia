@@ -114,7 +114,79 @@ func verifyRecentRevision(conn net.Conn, contract modules.RenterContract, hostVe
 
 // negotiateRevision sends a revision and actions to the host for approval,
 // completing one iteration of the revision loop.
-func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey) (types.Transaction, error) {
+func negotiateRevision(host modules.HostDBEntry, conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, actions []modules.RevisionAction, data [][]byte) (types.Transaction, error) {
+	// create transaction containing the revision
+	signedTxn := types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{rev},
+		TransactionSignatures: []types.TransactionSignature{{
+			ParentID:       crypto.Hash(rev.ParentID),
+			CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
+			PublicKeyIndex: 0, // renter key is always first -- see formContract
+		}},
+	}
+	// sign the transaction
+	encodedSig := crypto.SignHash(signedTxn.SigHash(0), secretKey)
+	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
+
+	// send the request
+	request := modules.RevisionRequest{
+		Revision:  rev,
+		Signature: signedTxn.TransactionSignatures[0],
+	}
+	if err := encoding.WriteObject(conn, request); err != nil {
+		return types.Transaction{}, errors.New("couldn't send request: " + err.Error())
+	}
+
+	// send the actions
+	if err := encoding.WriteObject(conn, actions); err != nil {
+		return types.Transaction{}, errors.New("couldn't send actions: " + err.Error())
+	}
+
+	// read the host's settings and confirm that the new values are acceptable
+	if _, err := verifySettings(conn, host); err != nil {
+		return types.Transaction{}, errors.New("couldn't verify host's settings: " + err.Error())
+	}
+
+	// send additional data if necessary
+	for _, d := range data {
+		if err := encoding.WriteObject(conn, d); err != nil {
+			return types.Transaction{}, errors.New("couldn't send data: " + err.Error())
+		}
+		// check if host accepted the data
+		if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+			return types.Transaction{}, errors.New("host didn't accept send data: " + err.Error())
+		}
+	}
+
+	// read the host's acceptance and transaction signature
+	// NOTE: if the host sends ErrStopResponse, we should continue processing
+	// the revision, but return the error anyway.
+	responseErr := modules.ReadNegotiationAcceptance(conn)
+	if responseErr != nil && responseErr != modules.ErrStopResponse {
+		return types.Transaction{}, errors.New("host did not accept transaction signature: " + responseErr.Error())
+	}
+	var hostSig types.TransactionSignature
+	if err := encoding.ReadObject(conn, &hostSig, 16e3); err != nil {
+		return types.Transaction{}, errors.New("couldn't read host's signature: " + err.Error())
+	}
+
+	// add the signature to the transaction and verify it
+	// NOTE: we can fake the blockheight here because it doesn't affect
+	// verification; it just needs to be above the fork height and below the
+	// contract expiration (which was checked earlier).
+	verificationHeight := rev.NewWindowStart - 1
+	signedTxn.TransactionSignatures = append(signedTxn.TransactionSignatures, hostSig)
+	if err := signedTxn.StandaloneValid(verificationHeight); err != nil {
+		return types.Transaction{}, err
+	}
+
+	// if the host sent ErrStopResponse, return it
+	return signedTxn, responseErr
+}
+
+// v130negotiateRevision sends a revision and actions to the host for approval,
+// completing one iteration of the revision loop.
+func v130negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey) (types.Transaction, error) {
 	// create transaction containing the revision
 	signedTxn := types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{rev},
