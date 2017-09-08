@@ -1989,11 +1989,12 @@ func TestExhaustedContracts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// verify that the window did not change
-	newWindowStart := st.renter.Contracts()[0].LastRevision.NewWindowStart
-	newWindowEnd := st.renter.Contracts()[0].LastRevision.NewWindowEnd
-	startHeight := st.renter.Contracts()[0].StartHeight
-	endHeight := st.renter.Contracts()[0].EndHeight()
+	// verify that the window did not change and the contract ID did change
+	newContract := st.renter.Contracts()[0]
+	newWindowStart := newContract.LastRevision.NewWindowStart
+	newWindowEnd := newContract.LastRevision.NewWindowEnd
+	startHeight := newContract.StartHeight
+	endHeight := newContract.EndHeight()
 	if startHeight != initialContract.StartHeight {
 		t.Fatal("contract start height changed, wanted", initialContract.StartHeight, "got", startHeight)
 	}
@@ -2005,6 +2006,9 @@ func TestExhaustedContracts(t *testing.T) {
 	}
 	if newWindowStart != initialContract.LastRevision.NewWindowStart {
 		t.Fatal("contract windowStart changed, wanted", initialContract.LastRevision.NewWindowStart, "got", newWindowStart)
+	}
+	if newContract.ID == initialContract.ID {
+		t.Fatal("renew did not occur")
 	}
 }
 
