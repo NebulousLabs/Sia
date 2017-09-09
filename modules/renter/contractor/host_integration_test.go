@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -1022,5 +1023,41 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	_, err = c.managedRenew(badContract, 20, c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestIntegrationRecentRevision tests that the host returns recent revision.
+func TestIntegrationRecentRevision(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// create testing trio
+	h, c, _, err := newTestingTrio(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Close()
+	defer c.Close()
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+	// form a contract with the host
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
+	// Get recent contract revision from the host.
+	hostRevision, err := proto.RecentRevision(hostEntry, contract, c.hdb, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(hostRevision, contract.LastRevision) {
+		t.Fatalf("Last revision reported by host does not match last revision in contractor. In host: %#v. In contractor: %#v.", hostRevision, contract.LastRevision)
 	}
 }

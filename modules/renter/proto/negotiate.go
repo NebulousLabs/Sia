@@ -242,3 +242,45 @@ func newModifyRevision(current types.FileContractRevision, merkleRoot crypto.Has
 	rev.NewFileMerkleRoot = merkleRoot
 	return rev
 }
+
+// RecentRevision downloads the current revision from the host.
+func RecentRevision(host modules.HostDBEntry, contract modules.RenterContract, hdb hostDB, cancel <-chan struct{}) (lastRevision types.FileContractRevision, err error) {
+	// Increase Successful/Failed interactions accordingly
+	defer func() {
+		if err != nil {
+			hdb.IncrementFailedInteractions(contract.HostPublicKey)
+		} else {
+			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+		}
+	}()
+	// initiate download loop
+	conn, err := (&net.Dialer{
+		Cancel:  cancel,
+		Timeout: 15 * time.Second,
+	}).Dial("tcp", string(contract.NetAddress))
+	if err != nil {
+		return types.FileContractRevision{}, err
+	}
+	closeChan := make(chan struct{})
+	go func() {
+		select {
+		case <-cancel:
+			conn.Close()
+		case <-closeChan:
+		}
+	}()
+	// allot 2 minutes for RPC request + revision exchange
+	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
+	if err := encoding.WriteObject(conn, modules.RPCRecentRevision); err != nil {
+		conn.Close()
+		close(closeChan)
+		return types.FileContractRevision{}, errors.New("couldn't initiate RPC: " + err.Error())
+	}
+	lastRevision, err = getRecentRevision(conn, contract, host.Version)
+	if err != nil {
+		conn.Close()
+		close(closeChan)
+		return types.FileContractRevision{}, err
+	}
+	return lastRevision, nil
+}
