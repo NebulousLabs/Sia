@@ -1052,12 +1052,15 @@ func TestIntegrationRecentRevision(t *testing.T) {
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
 	c.mu.Unlock()
-	// Get recent contract revision from the host.
-	hostRevision, err := proto.RecentRevision(hostEntry, contract, c.hdb, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(hostRevision, contract.LastRevision) {
-		t.Fatalf("Last revision reported by host does not match last revision in contractor. In host: %#v. In contractor: %#v.", hostRevision, contract.LastRevision)
+	// Run RPCRecentRevision multiple times to catch locking errors.
+	for i := 0; i < 10; i++ {
+		// Get recent contract revision from the host.
+		hostRevision, err := proto.RecentRevision(hostEntry, contract, c.hdb, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(hostRevision, contract.LastRevision) {
+			t.Fatalf("Last revision reported by host does not match last revision in contractor. In host: %#v. In contractor: %#v.", hostRevision, contract.LastRevision)
+		}
 	}
 }
