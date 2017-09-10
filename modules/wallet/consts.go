@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -35,14 +34,6 @@ var (
 		Testing:  uint64(40),
 	}).(uint64)
 )
-
-// dustValue is the quantity below which a Currency is considered to be Dust.
-//
-// TODO: These need to be functions of the wallet that interact with the
-// transaction pool.
-func dustValue() types.Currency {
-	return types.SiacoinPrecision
-}
 
 func init() {
 	// Sanity check - the defrag threshold needs to be higher than the batch
