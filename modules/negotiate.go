@@ -156,10 +156,6 @@ var (
 	// contract.
 	RPCReviseContract = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
-	// RPCRecentRevision is the specifier for getting the most recent file
-	// contract revision for a given file contract.
-	RPCRecentRevision = types.Specifier{'R', 'e', 'c', 'e', 'n', 't', 'R', 'e', 'v', 'i', 's', 'i', 'o', 'n', 2}
-
 	// RPCSettings is the specifier for requesting settings from the host.
 	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
 

@@ -290,16 +290,6 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	case modules.RPCReviseContract:
 		atomic.AddUint64(&h.atomicReviseCalls, 1)
 		err = extendErr("incoming RPCReviseContract failed: ", h.managedRPCReviseContract(conn))
-	case modules.RPCRecentRevision:
-		atomic.AddUint64(&h.atomicRecentRevisionCalls, 1)
-		var so storageObligation
-		_, so, err = h.managedRPCRecentRevision(conn)
-		err = extendErr("incoming RPCRecentRevision failed: ", err)
-		if err != nil {
-			// The unlock can be called immediately, as no action is taken with
-			// the storage obligation that gets returned.
-			h.managedUnlockStorageObligation(so.id())
-		}
 	case modules.RPCSettings:
 		atomic.AddUint64(&h.atomicSettingsCalls, 1)
 		err = extendErr("incoming RPCSettings failed: ", h.managedRPCSettings(conn))
