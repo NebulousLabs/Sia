@@ -3,6 +3,7 @@ package contractor
 import (
 	"bytes"
 	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -1025,5 +1027,70 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	_, err = c.managedRenew(badContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestContractPresenceLeak tests that a renter can not tell from the response
+// of the host to RPCs if the host has the contract if the renter doesn't
+// own this contract. See https://github.com/NebulousLabs/Sia/issues/2327.
+func TestContractPresenceLeak(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// create testing trio
+	h, c, _, err := newTestingTrio(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Close()
+	defer c.Close()
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(10), c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
+
+	// Connect with bad challenge response. Try correct
+	// and incorrect contract IDs. Compare errors.
+	wrongID := contract.ID
+	wrongID[0] ^= 0x01
+	fcids := []types.FileContractID{contract.ID, wrongID}
+	var errors []error
+
+	for _, fcid := range fcids {
+		var challenge crypto.Hash
+		var signature crypto.Signature
+		conn, err := net.Dial("tcp", string(contract.NetAddress))
+		if err := encoding.WriteObject(conn, modules.RPCDownload); err != nil {
+			t.Fatalf("Couldn't initiate RPC: %v.", err)
+		}
+		if err := encoding.WriteObject(conn, fcid); err != nil {
+			t.Fatalf("Couldn't send fcid: %v.", err)
+		}
+		if err := encoding.ReadObject(conn, &challenge, 32); err != nil {
+			t.Fatalf("Couldn't read challenge: %v.", err)
+		}
+		if err := encoding.WriteObject(conn, signature); err != nil {
+			t.Fatalf("Couldn't send signature: %v.", err)
+		}
+		err = modules.ReadNegotiationAcceptance(conn)
+		if err == nil {
+			t.Fatal("Expected an error, got success.")
+		}
+		errors = append(errors, err)
+	}
+	if errors[0].Error() != errors[1].Error() {
+		t.Fatalf("Expected to get equal errors, got %q and %q.", errors[0], errors[1])
 	}
 }
