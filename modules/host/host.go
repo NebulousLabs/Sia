@@ -116,14 +116,13 @@ var (
 type Host struct {
 	// RPC Metrics - atomic variables need to be placed at the top to preserve
 	// compatibility with 32bit systems. These values are not persistent.
-	atomicDownloadCalls       uint64
-	atomicErroredCalls        uint64
-	atomicFormContractCalls   uint64
-	atomicRenewCalls          uint64
-	atomicReviseCalls         uint64
-	atomicRecentRevisionCalls uint64
-	atomicSettingsCalls       uint64
-	atomicUnrecognizedCalls   uint64
+	atomicDownloadCalls     uint64
+	atomicErroredCalls      uint64
+	atomicFormContractCalls uint64
+	atomicRenewCalls        uint64
+	atomicReviseCalls       uint64
+	atomicSettingsCalls     uint64
+	atomicUnrecognizedCalls uint64
 
 	// Error management. There are a few different types of errors returned by
 	// the host. These errors intentionally not persistent, so that the logging
