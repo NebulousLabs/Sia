@@ -198,9 +198,9 @@ func (stubHostDB) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
 	return modules.HostScoreBreakdown{}
 }
 
-// TestContractorOverspend verifies that the contractor will not spend more
+// TestAllowanceOverspend verifies that the contractor will not spend more
 // than the allowance if contracts need to be renewed early.
-func TestContractorOverspend(t *testing.T) {
+func TestAllowanceOverspend(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}

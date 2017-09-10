@@ -343,28 +343,31 @@ func (c *Contractor) threadedContractMaintenance() {
 	var renewSet []types.FileContractID
 	refundSet := make(map[types.FileContractID]struct{})
 	for _, contract := range c.contracts {
-		if contract.GoodForRenew {
-			if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
-				renewSet = append(renewSet, contract.ID)
-			} else {
-				// check if the contract has exhausted its funding and requires premature renewal.
-				c.mu.RUnlock()
-				host, _ := c.hdb.Host(contract.HostPublicKey)
-				c.mu.RLock()
-				if host.StoragePrice.Cmp(maxStoragePrice) > 0 || host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
-					// skip this host if its prices are too high
-					continue
-				}
+		if !contract.GoodForRenew {
+			continue
+		}
+		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
+			renewSet = append(renewSet, contract.ID)
+		} else {
+			// check if the contract has exhausted its funding and requires premature renewal.
+			c.mu.RUnlock()
+			host, _ := c.hdb.Host(contract.HostPublicKey)
+			c.mu.RLock()
 
-				blockBytes := types.NewCurrency64(modules.SectorSize * uint64(contract.EndHeight()-c.blockHeight))
-				sectorStoragePrice := host.StoragePrice.Mul(blockBytes)
-				sectorBandwidthPrice := host.UploadBandwidthPrice.Mul64(modules.SectorSize)
-				sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
-				percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds().Big(), contract.TotalCost.Big()).Float64()
-				if contract.RenterFunds().Cmp(sectorPrice) < 0 || percentRemaining < minContractFundRenewalThreshold {
-					renewSet = append(renewSet, contract.ID)
-					refundSet[contract.ID] = struct{}{}
-				}
+			// skip this host if its prices are too high. managedMarkContractsUtility
+			// should make this redundant, but this is here for extra safety.
+			if host.StoragePrice.Cmp(maxStoragePrice) > 0 || host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
+				continue
+			}
+
+			blockBytes := types.NewCurrency64(modules.SectorSize * uint64(contract.EndHeight()-c.blockHeight))
+			sectorStoragePrice := host.StoragePrice.Mul(blockBytes)
+			sectorBandwidthPrice := host.UploadBandwidthPrice.Mul64(modules.SectorSize)
+			sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
+			percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds().Big(), contract.TotalCost.Big()).Float64()
+			if contract.RenterFunds().Cmp(sectorPrice) < 0 || percentRemaining < minContractFundRenewalThreshold {
+				renewSet = append(renewSet, contract.ID)
+				refundSet[contract.ID] = struct{}{}
 			}
 		}
 	}
