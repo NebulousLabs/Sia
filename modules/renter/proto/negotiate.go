@@ -282,5 +282,6 @@ func RecentRevision(host modules.HostDBEntry, contract modules.RenterContract, h
 		close(closeChan)
 		return types.FileContractRevision{}, err
 	}
+	conn.Close()
 	return lastRevision, nil
 }
