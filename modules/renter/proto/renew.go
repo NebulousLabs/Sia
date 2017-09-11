@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -68,6 +69,18 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 			// void gets the spent storage fees, plus the collateral being risked
 			{Value: basePrice.Add(baseCollateral), UnlockHash: types.UnlockHash{}},
 		},
+	}
+	if build.VersionCmp(host.Version, "1.3.0") >= 0 {
+		// After version 1.3.1, file contracts will have an extra void output
+		// in MissedProofOutputs. The renter moves voided coins to
+		// MissedProofOutputs[2], and the host moves voided coins to
+		// MissedProofOutputs[3]. This allows us to calculate the original
+		// amount of funds paid into the contract by the renter and host.
+		//
+		// TODO: is 0 the correct Value here?
+		fc.MissedProofOutputs = append(fc.MissedProofOutputs, types.SiacoinOutput{
+			Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{},
+		})
 	}
 
 	// calculate transaction fee

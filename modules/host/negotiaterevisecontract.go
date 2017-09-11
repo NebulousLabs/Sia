@@ -228,7 +228,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 // the revision does not attempt any malicious or unexpected changes.
 func verifyRevision(so storageObligation, revision types.FileContractRevision, blockHeight types.BlockHeight, expectedExchange, expectedCollateral types.Currency) error {
 	// Check that the revision is well-formed.
-	if len(revision.NewValidProofOutputs) != 2 || len(revision.NewMissedProofOutputs) != 3 {
+	if len(revision.NewValidProofOutputs) != 2 || (len(revision.NewMissedProofOutputs) != 3 && len(revision.NewMissedProofOutputs) != 4) {
 		return errBadContractOutputCounts
 	}
 

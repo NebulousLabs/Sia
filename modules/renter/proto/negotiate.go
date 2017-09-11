@@ -173,10 +173,8 @@ func newRevision(current types.FileContractRevision, cost types.Currency) types.
 	rev := current
 
 	// need to manually copy slice memory
-	rev.NewValidProofOutputs = make([]types.SiacoinOutput, 2)
-	rev.NewMissedProofOutputs = make([]types.SiacoinOutput, 3)
-	copy(rev.NewValidProofOutputs, current.NewValidProofOutputs)
-	copy(rev.NewMissedProofOutputs, current.NewMissedProofOutputs)
+	rev.NewValidProofOutputs = append([]types.SiacoinOutput(nil), current.NewValidProofOutputs...)
+	rev.NewMissedProofOutputs = append([]types.SiacoinOutput(nil), current.NewMissedProofOutputs...)
 
 	// move valid payout from renter to host
 	rev.NewValidProofOutputs[0].Value = current.NewValidProofOutputs[0].Value.Sub(cost)
@@ -204,8 +202,10 @@ func newUploadRevision(current types.FileContractRevision, merkleRoot crypto.Has
 	rev := newRevision(current, price)
 
 	// move collateral from host to void
+	// NOTE: as of v1.3.1, there are 2 void outputs; the host's is the latter.
+	i := len(rev.NewMissedProofOutputs) - 1
 	rev.NewMissedProofOutputs[1].Value = rev.NewMissedProofOutputs[1].Value.Sub(collateral)
-	rev.NewMissedProofOutputs[2].Value = rev.NewMissedProofOutputs[2].Value.Add(collateral)
+	rev.NewMissedProofOutputs[i].Value = rev.NewMissedProofOutputs[i].Value.Add(collateral)
 
 	// set new filesize and Merkle root
 	rev.NewFileSize += modules.SectorSize
