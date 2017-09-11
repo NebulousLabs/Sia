@@ -15,6 +15,7 @@ var (
 // managedCreateDefragTransaction creates a transaction that spends multiple existing
 // wallet outputs into a single new address.
 func (w *Wallet) managedCreateDefragTransaction() ([]types.Transaction, error) {
+	// dustThreshold and minFee have to be obtained separate from the lock
 	dustThreshold := w.managedDustThreshold()
 	minFee, _ := w.tpool.FeeEstimation()
 

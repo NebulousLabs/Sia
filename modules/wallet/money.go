@@ -22,6 +22,7 @@ func (w *Wallet) managedDustThreshold() types.Currency {
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
 func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
+	// dustThreshold has to be obtained separate from the lock
 	dustThreshold := w.managedDustThreshold()
 
 	w.mu.Lock()
@@ -57,6 +58,7 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 // the unconfirmed transaction set. Refund outputs are included in this
 // reporting.
 func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency) {
+	// dustThreshold has to be obtained separate from the lock
 	dustThreshold := w.managedDustThreshold()
 
 	w.mu.Lock()

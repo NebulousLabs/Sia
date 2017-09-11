@@ -117,6 +117,7 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 // correct value. The siacoin input will not be signed until 'Sign' is called
 // on the transaction builder.
 func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
+	// dustThreshold has to be obtained separate from the lock
 	dustThreshold := tb.wallet.managedDustThreshold()
 
 	tb.wallet.mu.Lock()
