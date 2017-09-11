@@ -1945,7 +1945,7 @@ func TestExhaustedContracts(t *testing.T) {
 	}
 
 	// wait until we have a contract
-	err = retry(500, time.Millisecond*50, func() error {
+	err = build.Retry(500, time.Millisecond*50, func() error {
 		if len(st.renter.Contracts()) >= 1 {
 			return nil
 		}
@@ -1977,7 +1977,7 @@ func TestExhaustedContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = retry(100, time.Millisecond*500, func() error {
+	err = build.Retry(100, time.Millisecond*500, func() error {
 		// mine blocks each iteration to trigger contract maintainence
 		st.miner.AddBlock()
 		if !st.renter.FileList()[0].Available {
@@ -2050,7 +2050,7 @@ func TestAdversarialPriceRenewal(t *testing.T) {
 	}
 
 	// wait until we have a contract
-	err = retry(500, time.Millisecond*50, func() error {
+	err = build.Retry(500, time.Millisecond*50, func() error {
 		if len(st.renter.Contracts()) >= 1 {
 			return nil
 		}
@@ -2079,7 +2079,7 @@ func TestAdversarialPriceRenewal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = retry(100, time.Millisecond*500, func() error {
+	err = build.Retry(100, time.Millisecond*500, func() error {
 		// mine blocks each iteration to trigger contract maintainence
 		st.miner.AddBlock()
 		if !st.renter.FileList()[0].Available {
