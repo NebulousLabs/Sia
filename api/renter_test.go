@@ -1924,7 +1924,7 @@ func TestExhaustedContracts(t *testing.T) {
 		t.Fatal(err)
 	}
 	settings := st.host.InternalSettings()
-	settings.MinUploadBandwidthPrice = types.SiacoinPrecision.Div64(10)
+	settings.MinUploadBandwidthPrice = types.SiacoinPrecision.Div64(200)
 	err = st.host.SetInternalSettings(settings)
 	if err != nil {
 		t.Fatal(err)
@@ -1937,7 +1937,7 @@ func TestExhaustedContracts(t *testing.T) {
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
 	testPeriod := "1000"
-	allowanceValues.Set("funds", types.SiacoinPrecision.Mul64(1000).String())
+	allowanceValues.Set("funds", types.SiacoinPrecision.Mul64(2000).String())
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
@@ -1964,7 +1964,7 @@ func TestExhaustedContracts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
-	_, err = io.CopyN(tmpfile, fastrand.Reader, int64(modules.SectorSize))
+	_, err = io.CopyN(tmpfile, fastrand.Reader, int64(modules.SectorSize)*50)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1993,11 +1993,7 @@ func TestExhaustedContracts(t *testing.T) {
 	newContract := st.renter.Contracts()[0]
 	newWindowStart := newContract.LastRevision.NewWindowStart
 	newWindowEnd := newContract.LastRevision.NewWindowEnd
-	startHeight := newContract.StartHeight
 	endHeight := newContract.EndHeight()
-	if startHeight != initialContract.StartHeight {
-		t.Fatal("contract start height changed, wanted", initialContract.StartHeight, "got", startHeight)
-	}
 	if endHeight != initialContract.EndHeight() {
 		t.Fatal("contract end height changed, wanted", initialContract.EndHeight(), "got", endHeight)
 	}
