@@ -1,6 +1,7 @@
 package types
 
 import (
+	"io/ioutil"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -15,7 +16,7 @@ func BenchmarkEncodeEmptyBlock(b *testing.B) {
 	b.SetBytes(int64(len(encoding.Marshal(block))))
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		encoding.Marshal(block)
+		block.MarshalSia(ioutil.Discard)
 	}
 }
 
@@ -45,7 +46,7 @@ func BenchmarkEncodeHeavyBlock(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		encoding.Marshal(heavyBlock)
+		heavyBlock.MarshalSia(ioutil.Discard)
 	}
 }
 

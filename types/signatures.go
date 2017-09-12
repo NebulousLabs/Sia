@@ -7,6 +7,7 @@ package types
 // called 'UnlockConditions'.
 
 import (
+	"bytes"
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -140,12 +141,19 @@ func Ed25519PublicKey(pk crypto.PublicKey) SiaPublicKey {
 // Timelock and SignaturesRequired are both low entropy fields; they can be
 // protected by having random public keys next to them.
 func (uc UnlockConditions) UnlockHash() UnlockHash {
+	var buf bytes.Buffer
+	e := encoder(&buf)
 	tree := crypto.NewTree()
-	tree.PushObject(uc.Timelock)
-	for i := range uc.PublicKeys {
-		tree.PushObject(uc.PublicKeys[i])
+	e.WriteUint64(uint64(uc.Timelock))
+	tree.Push(buf.Bytes())
+	buf.Reset()
+	for _, key := range uc.PublicKeys {
+		key.MarshalSia(e)
+		tree.Push(buf.Bytes())
+		buf.Reset()
 	}
-	tree.PushObject(uc.SignaturesRequired)
+	e.WriteUint64(uc.SignaturesRequired)
+	tree.Push(buf.Bytes())
 	return UnlockHash(tree.Root())
 }
 
