@@ -163,12 +163,6 @@ func acceptableSessionHeader(ourHeader, remoteHeader sessionHeader, remoteAddr s
 	} else if err := remoteHeader.NetAddress.IsStdValid(); err != nil {
 		return fmt.Errorf("invalid remote address: %v", err)
 	}
-	// Check that claimed NetAddress matches remoteAddr
-	connHost, _, _ := net.SplitHostPort(remoteAddr)
-	claimedHost, _, _ := net.SplitHostPort(string(remoteHeader.NetAddress))
-	if connHost != claimedHost {
-		return fmt.Errorf("claimed hostname (%v) does not match conn.RemoteAddr (%v)", claimedHost, connHost)
-	}
 	return nil
 }
 
