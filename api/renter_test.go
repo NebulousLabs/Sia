@@ -1923,8 +1923,11 @@ func TestExhaustedContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Increase the storage and bandwidth prices to drain the allowance faster.
 	settings := st.host.InternalSettings()
-	settings.MinUploadBandwidthPrice = types.SiacoinPrecision.Div64(200)
+	settings.MinUploadBandwidthPrice = settings.MinUploadBandwidthPrice.Mul64(2)
+	settings.MinStoragePrice = settings.MinUploadBandwidthPrice.Mul64(2)
+	settings.MaxDuration = 1e6 // set a high max duration to allow an expensive storage price
 	err = st.host.SetInternalSettings(settings)
 	if err != nil {
 		t.Fatal(err)
@@ -1936,8 +1939,8 @@ func TestExhaustedContracts(t *testing.T) {
 
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
-	testPeriod := "1000"
-	allowanceValues.Set("funds", types.SiacoinPrecision.Mul64(2000).String())
+	testPeriod := "950000" // large period to cause an expensive test, exhausting the allowance faster
+	allowanceValues.Set("funds", types.SiacoinPrecision.Mul64(5).String())
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
@@ -1959,21 +1962,18 @@ func TestExhaustedContracts(t *testing.T) {
 	// upload a file. the high upload cost will cause the underlying contract to
 	// require premature renewal. If premature renewal never happens, the upload
 	// will never complete.
-	tmpfile, err := ioutil.TempFile("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(tmpfile.Name())
-	_, err = io.CopyN(tmpfile, fastrand.Reader, int64(modules.SectorSize)*50)
+	path := filepath.Join(st.dir, "randUploadFile")
+	size := int(modules.SectorSize * 75)
+	err = createRandFile(path, size)
 	if err != nil {
 		t.Fatal(err)
 	}
 	uploadValues := url.Values{}
-	uploadValues.Set("source", tmpfile.Name())
+	uploadValues.Set("source", path)
 	uploadValues.Set("renew", "true")
 	uploadValues.Set("datapieces", "1")
 	uploadValues.Set("paritypieces", "1")
-	err = st.stdPostAPI("/renter/upload/"+filepath.Base(tmpfile.Name()), uploadValues)
+	err = st.stdPostAPI("/renter/upload/"+filepath.Base(path), uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2057,21 +2057,18 @@ func TestAdversarialPriceRenewal(t *testing.T) {
 	}
 
 	// upload a file
-	tmpfile, err := ioutil.TempFile("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(tmpfile.Name())
-	_, err = io.CopyN(tmpfile, fastrand.Reader, int64(modules.SectorSize*10))
+	path := filepath.Join(st.dir, "randUploadFile")
+	size := int(modules.SectorSize * 50)
+	err = createRandFile(path, size)
 	if err != nil {
 		t.Fatal(err)
 	}
 	uploadValues := url.Values{}
-	uploadValues.Set("source", tmpfile.Name())
+	uploadValues.Set("source", path)
 	uploadValues.Set("renew", "true")
 	uploadValues.Set("datapieces", "1")
 	uploadValues.Set("paritypieces", "1")
-	err = st.stdPostAPI("/renter/upload/"+filepath.Base(tmpfile.Name()), uploadValues)
+	err = st.stdPostAPI("/renter/upload/"+filepath.Base(path), uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
