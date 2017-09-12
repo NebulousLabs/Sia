@@ -198,6 +198,114 @@ func (stubHostDB) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
 	return modules.HostScoreBreakdown{}
 }
 
+// TestAllowanceOverspend verifies that the contractor will not spend more
+// than the allowance if contracts need to be renewed early.
+func TestAllowanceOverspend(t *testing.T) {
+	t.Skip("FIXME: test requires better money management to pass")
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// create testing trio
+	h, c, m, err := newTestingTrio(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make the host's upload price very high so this test requires less
+	// computation
+	settings := h.InternalSettings()
+	settings.MinUploadBandwidthPrice = types.SiacoinPrecision.Div64(10)
+	err = h.SetInternalSettings(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = h.Announce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = m.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		if len(c.hdb.RandomHosts(1, nil)) == 0 {
+			return errors.New("host has not been scanned yet")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// set an allowance
+	testAllowance := modules.Allowance{
+		Funds:       types.SiacoinPrecision.Mul64(6000),
+		RenewWindow: 100,
+		Hosts:       1,
+		Period:      200,
+	}
+	err = c.SetAllowance(testAllowance)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		if len(c.Contracts()) != 1 {
+			return errors.New("allowance forming seems to have failed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	// exhaust a contract and add a block several times. Despite repeatedly
+	// running out of funds, the contractor should not spend more than the
+	// allowance.
+	for i := 0; i < 15; i++ {
+		for _, contract := range c.Contracts() {
+			ed, err := c.Editor(contract.ID, nil)
+			if err != nil {
+				continue
+			}
+
+			// upload 10 sectors to the contract
+			for sec := 0; sec < 10; sec++ {
+				ed.Upload(make([]byte, modules.SectorSize))
+			}
+			err = ed.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		_, err := m.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// TODO: replace this logic with wallet contexts
+	var minerRewards types.Currency
+	w := c.wallet.(*walletBridge).w.(modules.Wallet)
+	txns, err := w.Transactions(0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, txn := range txns {
+		for _, so := range txn.Outputs {
+			if so.FundType == types.SpecifierMinerPayout {
+				minerRewards = minerRewards.Add(so.Value)
+			}
+		}
+	}
+	balance, _, _ := w.ConfirmedBalance()
+	spent := minerRewards.Sub(balance).Sub(h.FinancialMetrics().LockedStorageCollateral)
+	if spent.Cmp(testAllowance.Funds) > 0 {
+		t.Fatal("contractor spent too much money: spent", spent.HumanString(), "allowance funds:", testAllowance.Funds.HumanString())
+	}
+}
+
 // TestIntegrationSetAllowance tests the SetAllowance method.
 func TestIntegrationSetAllowance(t *testing.T) {
 	if testing.Short() {

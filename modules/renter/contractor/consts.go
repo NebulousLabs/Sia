@@ -54,6 +54,11 @@ var (
 		Standard: 10,
 		Testing:  1,
 	}).(int)
+
+	// minContractFundRenewalThreshold defines the ratio of remaining funds to
+	// total contract cost below which the contractor will prematurely renew a
+	// contract.
+	minContractFundRenewalThreshold = float64(0.03) // 3%
 )
 
 // Constants related to the safety values for when the contractor is forming
@@ -62,7 +67,7 @@ var (
 	maxCollateral    = types.SiacoinPrecision.Mul64(1e3) // 1k SC
 	maxDownloadPrice = maxStoragePrice.Mul64(3 * 4320)
 	maxStoragePrice  = types.SiacoinPrecision.Mul64(30e3).Div(modules.BlockBytesPerMonthTerabyte) // 30k SC / TB / Month
-	maxUploadPrice   = maxStoragePrice.Mul64(4320)
+	maxUploadPrice   = maxStoragePrice.Mul64(3 * 4320)                                            // 3 months of storage
 
 	// scoreLeeway defines the factor by which a host can miss the goal score
 	// for a set of hosts. To determine the goal score, a new set of hosts is

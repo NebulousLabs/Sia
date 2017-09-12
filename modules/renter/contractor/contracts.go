@@ -7,6 +7,7 @@ package contractor
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -110,7 +111,6 @@ func (c *Contractor) managedMarkContractsUtility() {
 		if score.Cmp(lowestScore) < 0 {
 			lowestScore = score
 		}
-
 	}
 	// Set the minimum acceptable score to a factor of the lowest score.
 	minScore := lowestScore.Div(scoreLeeway)
@@ -236,7 +236,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 	}
 
 	contractValue := contract.RenterFunds()
-	c.log.Printf("Formed contract with %v for %v SC", host.NetAddress, contractValue.Div(types.SiacoinPrecision))
+	c.log.Printf("Formed contract with %v for %v", host.NetAddress, contractValue.HumanString())
 	return contract, nil
 }
 
@@ -343,19 +343,42 @@ func (c *Contractor) threadedContractMaintenance() {
 	// Renew any contracts that need to be renewed.
 	c.mu.RLock()
 	var renewSet []types.FileContractID
+	// refundSet is used to mark contract that we want to 'refund': contracts we
+	// want to renew but leave the end heights unchanged.
+	refundSet := make(map[types.FileContractID]struct{})
 	for _, contract := range c.contracts {
-		if contract.GoodForRenew && c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
+		if !contract.GoodForRenew {
+			continue
+		}
+		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
 			renewSet = append(renewSet, contract.ID)
+		} else {
+			// check if the contract has exhausted its funding and requires premature renewal.
+			c.mu.RUnlock()
+			host, _ := c.hdb.Host(contract.HostPublicKey)
+			c.mu.RLock()
+
+			// skip this host if its prices are too high. managedMarkContractsUtility
+			// should make this redundant, but this is here for extra safety.
+			if host.StoragePrice.Cmp(maxStoragePrice) > 0 || host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
+				continue
+			}
+
+			blockBytes := types.NewCurrency64(modules.SectorSize * uint64(contract.EndHeight()-c.blockHeight))
+			sectorStoragePrice := host.StoragePrice.Mul(blockBytes)
+			sectorBandwidthPrice := host.UploadBandwidthPrice.Mul64(modules.SectorSize)
+			sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
+			percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds().Big(), contract.TotalCost.Big()).Float64()
+			if contract.RenterFunds().Cmp(sectorPrice.Mul64(3)) < 0 || percentRemaining < minContractFundRenewalThreshold {
+				renewSet = append(renewSet, contract.ID)
+				refundSet[contract.ID] = struct{}{}
+			}
 		}
 	}
 	c.mu.RUnlock()
 	if len(renewSet) != 0 {
 		c.log.Printf("renewing %v contracts", len(renewSet))
 	}
-
-	// TODO: Need some loop somewhere that renews contracts which haven't gone
-	// through the full period yet, but are out of money (yet the allowance
-	// still has room to refill some contracts)
 
 	// Figure out the end height and target sector count for the contracts being
 	// renewed.
@@ -415,7 +438,17 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 
 			// Create the new contract.
-			newContract, err := c.managedRenew(oldContract, numSectors, endHeight)
+			var newContract modules.RenterContract
+			var err error
+			if _, refund := refundSet[id]; refund {
+				// TODO: When the allowance targeting is implemented, this logic
+				// should target 2x the money so far spend in this cycle, while
+				// the other branch should target 1.33x the money spent in the
+				// previous cycle.
+				newContract, err = c.managedRenew(oldContract, numSectors, oldContract.EndHeight())
+			} else {
+				newContract, err = c.managedRenew(oldContract, numSectors, endHeight)
+			}
 			if err != nil {
 				c.log.Printf("WARN: failed to renew contract %v with %v: %v\n", id, oldContract.NetAddress, err)
 				return
