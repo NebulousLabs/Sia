@@ -163,8 +163,11 @@ will be sent to your wallet.`,
 	walletUnlockCmd = &cobra.Command{
 		Use:   `unlock`,
 		Short: "Unlock the wallet",
-		Long:  "Decrypt and load the wallet into memory",
-		Run:   wrap(walletunlockcmd),
+		Long: `Decrypt and load the wallet into memory.
+Automatic unlocking is also supported via environment variable: if the
+SIA_WALLET_PASSWORD environment variable is set, the unlock command will
+use it instead of displaying the typical interactive prompt.`,
+		Run: wrap(walletunlockcmd),
 	}
 )
 
@@ -490,14 +493,15 @@ func wallettransactionscmd() {
 
 // walletunlockcmd unlocks a saved wallet
 func walletunlockcmd() {
-	env_password := os.Getenv("SIA_WALLET_PASSWORD")
-	if env_password != "" {
-		qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s",
-			env_password, "english")
+	// try reading from environment variable first, then fallback to
+	// interactive method. Also allow overriding auto-unlock via -p
+	password := os.Getenv("SIA_WALLET_PASSWORD")
+	if password != "" && !initPassword {
+		fmt.Println("Using SIA_WALLET_PASSWORD environment variable")
+		qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
 		err := post("/wallet/unlock", qs)
 		if err != nil {
-			fmt.Println("Warning: SIA_WALLET_PASSWORD unlock failed")
-			fmt.Println("Trying interactive console input method next...")
+			fmt.Println("Automatic unlock failed!")
 		} else {
 			fmt.Println("Wallet unlocked")
 			return
@@ -512,5 +516,4 @@ func walletunlockcmd() {
 	if err != nil {
 		die("Could not unlock wallet:", err)
 	}
-	fmt.Println("Wallet unlocked")
 }
