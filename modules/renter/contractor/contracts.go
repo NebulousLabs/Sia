@@ -369,7 +369,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			sectorBandwidthPrice := host.UploadBandwidthPrice.Mul64(modules.SectorSize)
 			sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
 			percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds().Big(), contract.TotalCost.Big()).Float64()
-			if contract.RenterFunds().Cmp(sectorPrice) < 0 || percentRemaining < minContractFundRenewalThreshold {
+			if contract.RenterFunds().Cmp(sectorPrice.Mul64(3)) < 0 || percentRemaining < minContractFundRenewalThreshold {
 				renewSet = append(renewSet, contract.ID)
 				refundSet[contract.ID] = struct{}{}
 			}
@@ -441,6 +441,10 @@ func (c *Contractor) threadedContractMaintenance() {
 			var newContract modules.RenterContract
 			var err error
 			if _, refund := refundSet[id]; refund {
+				// TODO: When the allowance targeting is implemented, this logic
+				// should target 2x the money so far spend in this cycle, while
+				// the other branch should target 1.33x the money spent in the
+				// previous cycle.
 				newContract, err = c.managedRenew(oldContract, numSectors, oldContract.EndHeight())
 			} else {
 				newContract, err = c.managedRenew(oldContract, numSectors, endHeight)
