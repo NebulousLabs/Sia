@@ -13,9 +13,18 @@ type sortedOutputs struct {
 	outputs []types.SiacoinOutput
 }
 
+// managedDustThreshold returns the quantity below which a Currency is considered to be Dust.
+func (w *Wallet) managedDustThreshold() types.Currency {
+	minFee, _ := w.tpool.FeeEstimation()
+	return minFee.Mul64(3)
+}
+
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
 func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
+	// dustThreshold has to be obtained separate from the lock
+	dustThreshold := w.managedDustThreshold()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -23,7 +32,7 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 	w.syncDB()
 
 	dbForEachSiacoinOutput(w.dbTx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
-		if sco.Value.Cmp(dustValue()) > 0 {
+		if sco.Value.Cmp(dustThreshold) > 0 {
 			siacoinBalance = siacoinBalance.Add(sco.Value)
 		}
 	})
@@ -49,6 +58,9 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 // the unconfirmed transaction set. Refund outputs are included in this
 // reporting.
 func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency) {
+	// dustThreshold has to be obtained separate from the lock
+	dustThreshold := w.managedDustThreshold()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -59,7 +71,7 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 			}
 		}
 		for _, output := range upt.Outputs {
-			if output.FundType == types.SpecifierSiacoinOutput && output.WalletAddress && output.Value.Cmp(dustValue()) > 0 {
+			if output.FundType == types.SpecifierSiacoinOutput && output.WalletAddress && output.Value.Cmp(dustThreshold) > 0 {
 				incomingSiacoins = incomingSiacoins.Add(output.Value)
 			}
 		}

@@ -15,6 +15,8 @@ var (
 // managedCreateDefragTransaction creates a transaction that spends multiple existing
 // wallet outputs into a single new address.
 func (w *Wallet) managedCreateDefragTransaction() ([]types.Transaction, error) {
+	// dustThreshold and minFee have to be obtained separate from the lock
+	dustThreshold := w.managedDustThreshold()
 	minFee, _ := w.tpool.FeeEstimation()
 
 	w.mu.Lock()
@@ -28,7 +30,7 @@ func (w *Wallet) managedCreateDefragTransaction() ([]types.Transaction, error) {
 	// Collect a value-sorted set of siacoin outputs.
 	var so sortedOutputs
 	err = dbForEachSiacoinOutput(w.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		if w.checkOutput(w.dbTx, consensusHeight, scoid, sco) == nil {
+		if w.checkOutput(w.dbTx, consensusHeight, scoid, sco, dustThreshold) == nil {
 			so.ids = append(so.ids, scoid)
 			so.outputs = append(so.outputs, sco)
 		}

@@ -92,9 +92,9 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 }
 
 // checkOutput is a helper function used to determine if an output is usable.
-func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id types.SiacoinOutputID, output types.SiacoinOutput) error {
+func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id types.SiacoinOutputID, output types.SiacoinOutput, dustThreshold types.Currency) error {
 	// Check that an output is not dust
-	if output.Value.Cmp(dustValue()) < 0 {
+	if output.Value.Cmp(dustThreshold) < 0 {
 		return errDustOutput
 	}
 	// Check that this output has not recently been spent by the wallet.
@@ -117,6 +117,9 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 // correct value. The siacoin input will not be signed until 'Sign' is called
 // on the transaction builder.
 func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
+	// dustThreshold has to be obtained separate from the lock
+	dustThreshold := tb.wallet.managedDustThreshold()
+
 	tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock()
 
@@ -162,7 +165,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		scoid := so.ids[i]
 		sco := so.outputs[i]
 		// Check that the output can be spent.
-		if err := tb.wallet.checkOutput(tb.wallet.dbTx, consensusHeight, scoid, sco); err != nil {
+		if err := tb.wallet.checkOutput(tb.wallet.dbTx, consensusHeight, scoid, sco, dustThreshold); err != nil {
 			if err == errSpendHeightTooHigh {
 				potentialFund = potentialFund.Add(sco.Value)
 			}
