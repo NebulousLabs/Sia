@@ -79,7 +79,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// revised.
 	_, so, err := h.managedRPCRecentRevision(conn)
 	if err != nil {
-		return extendErr("RPCRecentRevision failed: ", err)
+		return extendErr("failed RPCRecentRevision during RPCRenewContract: ", err)
 	}
 	// The storage obligation is received with a lock. Defer a call to unlock
 	// the storage obligation.
