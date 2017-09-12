@@ -118,7 +118,7 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 // on the transaction builder.
 func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	// dustThreshold has to be obtained separate from the lock
-	dustThreshold := tb.wallet.managedDustThreshold()
+	dustThreshold := tb.wallet.DustThreshold()
 
 	tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock()
