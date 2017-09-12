@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"os"
 
 	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
@@ -489,6 +490,19 @@ func wallettransactionscmd() {
 
 // walletunlockcmd unlocks a saved wallet
 func walletunlockcmd() {
+	env_password := os.Getenv("SIA_WALLET_PASSWORD")
+	if env_password != "" {
+		qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s",
+			env_password, "english")
+		err := post("/wallet/unlock", qs)
+		if err != nil {
+			fmt.Println("Warning: SIA_WALLET_PASSWORD unlock failed")
+			fmt.Println("Trying interactive console input method next...")
+		} else {
+			fmt.Println("Wallet unlocked")
+			return
+		}
+	}
 	password, err := speakeasy.Ask("Wallet password: ")
 	if err != nil {
 		die("Reading password failed:", err)
