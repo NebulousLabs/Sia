@@ -1903,7 +1903,7 @@ func TestContractorHostRemoval(t *testing.T) {
 // TestExhaustedContracts verifies that the contractor renews contracts which
 // run out of funds before the period elapses.
 func TestExhaustedContracts(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -2011,7 +2011,7 @@ func TestExhaustedContracts(t *testing.T) {
 // TestAdversarialPriceRenewal verifies that host cannot maliciously raise
 // their storage price in order to trigger a premature file contract renewal.
 func TestAdversarialPriceRenewal(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
