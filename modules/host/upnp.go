@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -43,8 +44,17 @@ func (h *Host) managedLearnHostname() {
 	h.log.Println("No manually set net address. Scanning to automatically determine address.")
 
 	// try UPnP first, then fallback to myexternalip.com
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		select {
+		case <-h.tg.StopChan():
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 	var hostname string
-	d, err := upnp.Discover()
+	d, err := upnp.DiscoverCtx(ctx)
 	if err == nil {
 		hostname, err = d.ExternalIP()
 	}
@@ -117,7 +127,16 @@ func (h *Host) managedForwardPort(port string) error {
 		return err
 	}
 
-	d, err := upnp.Discover()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		select {
+		case <-h.tg.StopChan():
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	d, err := upnp.DiscoverCtx(ctx)
 	if err != nil {
 		h.log.Printf("WARN: could not automatically forward port %s: %v", port, err)
 		return err
@@ -152,7 +171,16 @@ func (h *Host) managedClearPort() error {
 		return err
 	}
 
-	d, err := upnp.Discover()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		select {
+		case <-h.tg.StopChan():
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	d, err := upnp.DiscoverCtx(ctx)
 	if err != nil {
 		return err
 	}
