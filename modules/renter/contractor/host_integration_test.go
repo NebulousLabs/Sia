@@ -191,7 +191,7 @@ func TestIntegrationFormContract(t *testing.T) {
 	}
 
 	// form a contract with the host
-	_, err = c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	_, err = c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +219,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +265,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ func TestIntegrationDelete(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,7 +387,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +443,7 @@ func TestIntegrationModify(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -508,7 +508,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -534,7 +534,7 @@ func TestIntegrationRenew(t *testing.T) {
 
 	// renew the contract
 	oldContract := c.contracts[contract.ID]
-	contract, err = c.managedRenew(oldContract, modules.SectorSize*10, c.blockHeight+200)
+	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -576,7 +576,7 @@ func TestIntegrationRenew(t *testing.T) {
 
 	// renew to a lower height
 	oldContract = c.contracts[contract.ID]
-	contract, err = c.managedRenew(oldContract, modules.SectorSize*10, c.blockHeight+100)
+	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -630,7 +630,7 @@ func TestIntegrationResync(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -766,7 +766,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -860,7 +860,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -953,7 +953,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1007,7 +1007,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	c.mu.Unlock()
 
 	// Renew should fail with the bad contract + cachedRevision
-	_, err = c.managedRenew(badContract, 20, c.blockHeight+200)
+	_, err = c.managedRenew(badContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if !proto.IsRevisionMismatch(err) {
 		t.Fatal("expected revision mismatch, got", err)
 	}
@@ -1019,7 +1019,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	c.mu.Unlock()
 
 	// Renew should now succeed after loading the cachedRevision
-	_, err = c.managedRenew(badContract, 20, c.blockHeight+200)
+	_, err = c.managedRenew(badContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
 	}

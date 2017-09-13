@@ -222,6 +222,22 @@ type RenterContract struct {
 	StorageSpending  types.Currency `json:"storagespending"`
 	UploadSpending   types.Currency `json:"uploadspending"`
 
+	// TotalCost indicates the amount of money that the renter spent and/or
+	// locked up while forming a contract. This includes fees, and includes
+	// funds which were allocated (but not necessarily committed) to spend on
+	// uploads/downloads/storage.
+	//
+	// ContractFee is the amount of money paid to the host to cover potential
+	// future transaction fees that the host may incur, and to cover any other
+	// overheads the host may have.
+	//
+	// TxnFee is the amount of money spent on the transaction fee when putting
+	// the renter contract on the blockchain.
+	//
+	// SiafundFee is the amount of money spent on siafund fees when creating the
+	// contract. The siafund fee that the renter pays covers both the renter and
+	// the host portions of the contract, and therefore can be unexpectedly high
+	// if the the host collateral is high.
 	TotalCost   types.Currency `json:"totalcost"`
 	ContractFee types.Currency `json:"contractfee"`
 	TxnFee      types.Currency `json:"txnfee"`
@@ -232,6 +248,13 @@ type RenterContract struct {
 	// should be renewed.
 	GoodForRenew  bool
 	GoodForUpload bool
+
+	// PreviousContracts contains the list of contracts which were previously
+	// rewned **for the same billing cylce**. This is not a full history of the
+	// contract line, but only a history within the billing cycle. The primary
+	// purpose of keeping these contracts is to be able to easily find a full
+	// spending breakdown within a billing cycle.
+	PreviousContracts []RenterContract
 }
 
 // EndHeight returns the height at which the host is no longer obligated to
