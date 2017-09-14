@@ -89,6 +89,22 @@ func (hdb *HostDB) collateralAdjustments(entry modules.HostDBEntry) float64 {
 	for i := 0; i < collateralExponentiation; i++ {
 		weight *= actual / base
 	}
+
+	// Add in penalties for low MaxCollateral. Hosts should be willing to pay
+	// for at least 100 GB of collateral on a contract.
+	gigaByte := types.NewCurrency64(1e9)
+	if entry.MaxCollateral.Cmp(entry.Collateral.Mul(gigaByte).Mul64(100)) < 0 {
+		weight = weight / 2 // 2x total penalty
+	}
+	if entry.MaxCollateral.Cmp(entry.Collateral.Mul(gigaByte).Mul64(33)) < 0 {
+		weight = weight / 5 // 10x total penalty
+	}
+	if entry.MaxCollateral.Cmp(entry.Collateral.Mul(gigaByte).Mul64(10)) < 0 {
+		weight = weight / 10 // 100x total penalty
+	}
+	if entry.MaxCollateral.Cmp(entry.Collateral.Mul(gigaByte).Mul64(3)) < 0 {
+		weight = weight / 10 // 1000x total penalty
+	}
 	return weight
 }
 
