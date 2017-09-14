@@ -37,7 +37,7 @@ type (
 // ContractParams are supplied as an argument to FormContract.
 type ContractParams struct {
 	Host          modules.HostDBEntry
-	Filesize      uint64
+	Funding       types.Currency
 	StartHeight   types.BlockHeight
 	EndHeight     types.BlockHeight
 	RefundAddress types.UnlockHash

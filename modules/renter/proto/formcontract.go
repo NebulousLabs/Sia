@@ -20,7 +20,7 @@ const (
 // transaction to tpool.
 func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (modules.RenterContract, error) {
 	// Extract vars from params, for convenience.
-	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
+	host, funding, startHeight, endHeight, refundAddress := params.Host, params.Funding, params.StartHeight, params.EndHeight, params.RefundAddress
 
 	// Create our key.
 	ourSK, ourPK := crypto.GenerateKeyPair()
@@ -33,41 +33,48 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		SignaturesRequired: 2,
 	}
 
-	// Calculate cost to renter and cost to host.
-	// TODO: clarify/abstract this math
-	storageAllocation := host.StoragePrice.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
-	hostCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
+	// Calculate the anticipated transaction fee.
+	_, maxFee := tpool.FeeEstimation()
+	txnFee := maxFee.Mul64(estTxnSize)
+
+	// Divide by zero checks.
+	if funding.Cmp(host.ContractPrice.Add(txnFee)) <= 0 {
+		return modules.RenterContract{}, errors.New("insufficient funds to cover contract fee and transaction fee during contract formation")
+	}
+
+	// Calculate the payouts for the renter, host, and whole contract.
+	renterPayout := funding.Sub(host.ContractPrice).Sub(txnFee) // renter payout is pre-tax
+	maxStorageSize := renterPayout.Div(host.StoragePrice)
+	hostCollateral := maxStorageSize.Mul(host.Collateral)
 	if hostCollateral.Cmp(host.MaxCollateral) > 0 {
-		// TODO: if we have to cap the collateral, it probably means we shouldn't be using this host
-		// (ok within a factor of 2)
 		hostCollateral = host.MaxCollateral
 	}
+	// Calculate the initial host payout.
 	hostPayout := hostCollateral.Add(host.ContractPrice)
-	payout := storageAllocation.Add(hostPayout).Mul64(10406).Div64(10000) // renter pays for siafund fee
+	totalPayout := renterPayout.Add(hostPayout)
 
 	// Check for negative currency.
-	if types.PostTax(startHeight, payout).Cmp(hostPayout) < 0 {
-		return modules.RenterContract{}, errors.New("payout smaller than host payout")
+	if types.PostTax(startHeight, totalPayout).Cmp(hostPayout) < 0 {
+		return modules.RenterContract{}, errors.New("not enough money to pay both siafund fee and also host payout")
 	}
-
 	// Create file contract.
 	fc := types.FileContract{
 		FileSize:       0,
 		FileMerkleRoot: crypto.Hash{}, // no proof possible without data
 		WindowStart:    endHeight,
 		WindowEnd:      endHeight + host.WindowSize,
-		Payout:         payout,
+		Payout:         totalPayout,
 		UnlockHash:     uc.UnlockHash(),
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
 			// Outputs need to account for tax.
-			{Value: types.PostTax(startHeight, payout).Sub(hostPayout), UnlockHash: refundAddress},
+			{Value: types.PostTax(startHeight, totalPayout).Sub(hostPayout), UnlockHash: refundAddress}, // This is the renter payout, but with tax applied.
 			// Collateral is returned to host.
 			{Value: hostPayout, UnlockHash: host.UnlockHash},
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
 			// Same as above.
-			{Value: types.PostTax(startHeight, payout).Sub(hostPayout), UnlockHash: refundAddress},
+			{Value: types.PostTax(startHeight, totalPayout).Sub(hostPayout), UnlockHash: refundAddress},
 			// Same as above.
 			{Value: hostPayout, UnlockHash: host.UnlockHash},
 			// Once we start doing revisions, we'll move some coins to the host and some to the void.
@@ -75,18 +82,12 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		},
 	}
 
-	// Calculate transaction fee.
-	_, maxFee := tpool.FeeEstimation()
-	txnFee := maxFee.Mul64(estTxnSize)
-
 	// Build transaction containing fc, e.g. the File Contract.
-	renterCost := payout.Sub(hostCollateral).Add(txnFee)
-	err := txnBuilder.FundSiacoins(renterCost)
+	err := txnBuilder.FundSiacoins(funding)
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
 	txnBuilder.AddFileContract(fc)
-
 	// Add miner fee.
 	txnBuilder.AddMinerFee(txnFee)
 
@@ -268,7 +269,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		SecretKey:       ourSK,
 		StartHeight:     startHeight,
 
-		TotalCost:   renterCost,
+		TotalCost:   funding,
 		ContractFee: host.ContractPrice,
 		TxnFee:      txnFee,
 		SiafundFee:  types.Tax(startHeight, fc.Payout),

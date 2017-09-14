@@ -199,7 +199,7 @@ func (c *Contractor) managedMarkContractsUtility() {
 
 // managedNewContract negotiates an initial file contract with the specified
 // host, saves it, and returns it.
-func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uint64, endHeight types.BlockHeight) (modules.RenterContract, error) {
+func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFunding types.Currency, endHeight types.BlockHeight) (modules.RenterContract, error) {
 	// reject hosts that are too expensive
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return modules.RenterContract{}, errTooExpensive
@@ -219,7 +219,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 	c.mu.RLock()
 	params := proto.ContractParams{
 		Host:          host,
-		Filesize:      numSectors * modules.SectorSize,
+		Funding:       contractFunding,
 		StartHeight:   c.blockHeight,
 		EndHeight:     endHeight,
 		RefundAddress: uc.UnlockHash(),
@@ -243,7 +243,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 // managedRenew negotiates a new contract for data already stored with a host.
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
-func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
+func (c *Contractor) managedRenew(contract modules.RenterContract, contractFunding types.Currency, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
 	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
 		return modules.RenterContract{}, errors.New("no record of that host")
@@ -268,7 +268,7 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 	c.mu.RLock()
 	params := proto.ContractParams{
 		Host:          host,
-		Filesize:      numSectors * modules.SectorSize,
+		Funding:       contractFunding,
 		StartHeight:   c.blockHeight,
 		EndHeight:     newEndHeight,
 		RefundAddress: uc.UnlockHash(),
@@ -340,69 +340,174 @@ func (c *Contractor) threadedContractMaintenance() {
 	// hostdb.
 	c.managedMarkContractsUtility()
 
-	// Renew any contracts that need to be renewed.
-	c.mu.RLock()
-	var renewSet []types.FileContractID
-	// refundSet is used to mark contract that we want to 'refund': contracts we
-	// want to renew but leave the end heights unchanged.
-	refundSet := make(map[types.FileContractID]struct{})
-	for _, contract := range c.contracts {
-		if !contract.GoodForRenew {
-			continue
-		}
-		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
-			renewSet = append(renewSet, contract.ID)
-		} else {
-			// check if the contract has exhausted its funding and requires premature renewal.
-			c.mu.RUnlock()
-			host, _ := c.hdb.Host(contract.HostPublicKey)
-			c.mu.RLock()
+	// Figure out which contracts need to be renewed, and while we have the
+	// lock, figure out the end height for the new contracts and also the amount
+	// to spend on each contract.
+	//
+	// refreshSet is used to mark contracts that need to be refreshed because
+	// they have run out of money. The refreshSet indicates how much currency
+	// was used in the previous contract which got exhausted, so that we know to
+	// put more money towards the refreshed contract.
+	//
+	// The actions inside this RLock are complex enough to merit wrapping them
+	// in a function where we can defer the unlock.
+	type renewal struct {
+		id     types.FileContractID
+		amount types.Currency
+	}
+	var endHeight types.BlockHeight
+	var fundsAvailable types.Currency
+	var renewSet []renewal
+	refreshSet := make(map[types.FileContractID]struct{})
+	func() {
+		c.mu.RLock()
+		defer c.mu.RUnlock()
 
-			// skip this host if its prices are too high. managedMarkContractsUtility
-			// should make this redundant, but this is here for extra safety.
-			if host.StoragePrice.Cmp(maxStoragePrice) > 0 || host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
+		// Grab the end height that should be used for the contracts.
+		//
+		// TODO: End height should be calculated using the billing cycle, and
+		// not by just adding the period to the current height.
+		endHeight = c.blockHeight + c.allowance.Period
+
+		// Determine how many funds have been used already in this billing
+		// cycle, and how many funds are remaining. We have to calculate these
+		// numbers separately to avoid underflow, and then re-join them later to
+		// get the full picture for how many funds are available.
+		var fundsUsed types.Currency
+		for _, contract := range c.contracts {
+			// Calculate the cost of the contract line.
+			contractLineCost := contract.TotalCost
+			for _, pre := range contract.PreviousContracts {
+				contractLineCost = contractLineCost.Add(pre.TotalCost)
+			}
+
+			// Check if the contract is expiring. The funds in the contract are
+			// handled differently based on this information.
+			if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
+				// The contract is expiring. Some of the funds are locked down
+				// to renew the contract, and then the remaining funds can be
+				// allocated to 'availableFunds'.
+				fundsUsed = fundsUsed.Add(contractLineCost).Sub(contract.RenterFunds())
+				fundsAvailable = fundsAvailable.Add(contract.RenterFunds())
+			} else {
+				// The contract is not expiring. None of the funds in the
+				// contract are available to renew or form contracts.
+				fundsUsed = fundsUsed.Add(contractLineCost)
+			}
+		}
+
+		// Add any unspent funds from the allowance to the available funds. If
+		// the allowance has been decreased, it's possible that we actually need
+		// to reduce the number of funds available to compensate.
+		if fundsAvailable.Add(c.allowance.Funds).Cmp(fundsUsed) > 0 {
+			fundsAvailable = fundsAvailable.Add(c.allowance.Funds).Sub(fundsUsed)
+		} else {
+			// Figure out how much we need to remove from fundsAvailable to
+			// clear the allowance.
+			overspend := fundsUsed.Sub(c.allowance.Funds).Sub(fundsAvailable)
+			if fundsAvailable.Cmp(overspend) > 0 {
+				// We still have some funds available.
+				fundsAvailable = fundsAvailable.Sub(overspend)
+			} else {
+				// The overspend exceeds the available funds, set available
+				// funds to zero.
+				fundsAvailable = types.ZeroCurrency
+			}
+		}
+
+		// Iterate through the contracts again, figuring out which contracts to
+		// renew and how much extra funds to renew them with.
+		for _, contract := range c.contracts {
+			if !contract.GoodForRenew {
 				continue
 			}
+			if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
+				// This contract needs to be renewed because it is going to
+				// expire soon. First step is to calculate how much money should
+				// be used in the renewal, based on how much of the contract
+				// funds (including previous contracts this billing cycle due to
+				// financial resets) were spent throughout this billing cycle.
+				//
+				// The amount we care about is the total amount that was spent
+				// on uploading, downloading, and storage throughout the billing
+				// cycle. This is calculated by starting with the total cost and
+				// subtracting out all of the fees, and then all of the unused
+				// money that was allocated (the RenterFunds()).
+				renewAmount := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee).Sub(contract.RenterFunds())
+				for _, pre := range contract.PreviousContracts {
+					renewAmount = renewAmount.Add(pre.TotalCost).Sub(pre.ContractFee).Sub(pre.TxnFee).Sub(pre.SiafundFee).Sub(contract.RenterFunds())
+				}
 
-			blockBytes := types.NewCurrency64(modules.SectorSize * uint64(contract.EndHeight()-c.blockHeight))
-			sectorStoragePrice := host.StoragePrice.Mul(blockBytes)
-			sectorBandwidthPrice := host.UploadBandwidthPrice.Mul64(modules.SectorSize)
-			sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
-			percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds().Big(), contract.TotalCost.Big()).Float64()
-			if contract.RenterFunds().Cmp(sectorPrice.Mul64(3)) < 0 || percentRemaining < minContractFundRenewalThreshold {
-				renewSet = append(renewSet, contract.ID)
-				refundSet[contract.ID] = struct{}{}
+				// Get an estimate for how much the fees will cost.
+				//
+				// TODO: A better estimate would come from looking at the host
+				// and hostdb, and calculating the actual cost of renewing with
+				// the host. The current method doesn't even take into account
+				// potential discounts from not renewing as much money.
+				estimatedFees := contract.ContractFee.Add(contract.TxnFee).Add(contract.SiafundFee)
+				renewAmount = renewAmount.Add(estimatedFees)
+
+				// Determine if there is enough funds available to suppliement
+				// with a 33% bonus, and if there is, add a 33% bonus.
+				moneyBuffer := renewAmount.Div64(3)
+				if moneyBuffer.Cmp(fundsAvailable) < 0 {
+					renewAmount = renewAmount.Add(moneyBuffer)
+					fundsAvailable = fundsAvailable.Sub(moneyBuffer)
+				} else {
+					c.log.Println("WARN: performing a limited renew due to low allowance")
+				}
+
+				// The contract needs to be renewed because it is going to
+				// expire soon, and we need to refresh the time.
+				renewSet = append(renewSet, renewal{
+					id:     contract.ID,
+					amount: renewAmount,
+				})
+			} else {
+				// check if the contract has exhausted its funding and requires premature renewal.
+				c.mu.RUnlock()
+				host, _ := c.hdb.Host(contract.HostPublicKey)
+				c.mu.RLock()
+
+				// skip this host if its prices are too high. managedMarkContractsUtility
+				// should make this redundant, but this is here for extra safety.
+				if host.StoragePrice.Cmp(maxStoragePrice) > 0 || host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
+					continue
+				}
+
+				blockBytes := types.NewCurrency64(modules.SectorSize * uint64(contract.EndHeight()-c.blockHeight))
+				sectorStoragePrice := host.StoragePrice.Mul(blockBytes)
+				sectorBandwidthPrice := host.UploadBandwidthPrice.Mul64(modules.SectorSize)
+				sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
+				percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds().Big(), contract.TotalCost.Big()).Float64()
+				if contract.RenterFunds().Cmp(sectorPrice.Mul64(3)) < 0 || percentRemaining < minContractFundRenewalThreshold {
+					// This contract does need to be refreshed. Make sure there
+					// are enough funds available to perform the refresh, and
+					// then execute.
+					refreshAmount := contract.TotalCost.Mul64(2)
+					if refreshAmount.Cmp(fundsAvailable) < 0 {
+						refreshSet[contract.ID] = struct{}{}
+						renewSet = append(renewSet, renewal{
+							id:     contract.ID,
+							amount: refreshAmount,
+						})
+					} else {
+						c.log.Println("WARN: cannot refresh empty contract due to low allowance.")
+					}
+				}
 			}
 		}
-	}
-	c.mu.RUnlock()
+	}()
 	if len(renewSet) != 0 {
 		c.log.Printf("renewing %v contracts", len(renewSet))
 	}
 
-	// Figure out the end height and target sector count for the contracts being
-	// renewed.
-	//
-	// TODO: EndHeight should be global, and it should be picked based on the
-	// current period start, not based on the current height plus the allowance
-	// period.
-	c.mu.RLock()
-	endHeight := c.blockHeight + c.allowance.Period
-	max, err := maxSectors(c.allowance, c.hdb, c.tpool)
-	c.mu.RUnlock()
-	if err != nil {
-		return
-	}
-	// Only allocate half as many sectors as the max. This leaves some leeway
-	// for replacing contracts, transaction fees, etc.
-	numSectors := max / 2
-	// check that this is sufficient to store at least one sector
-	if numSectors == 0 {
-		return
-	}
-
 	// Loop through the contracts and renew them one-by-one.
-	for _, id := range renewSet {
+	for _, renewal := range renewSet {
+		// Pull the variables out of the renewal.
+		id := renewal.id
+		amount := renewal.amount
+
 		// Renew one contract.
 		func() {
 			// Mark the contract as being renewed, and defer logic to unmark it
@@ -438,17 +543,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 
 			// Create the new contract.
-			var newContract modules.RenterContract
-			var err error
-			if _, refund := refundSet[id]; refund {
-				// TODO: When the allowance targeting is implemented, this logic
-				// should target 2x the money so far spend in this cycle, while
-				// the other branch should target 1.33x the money spent in the
-				// previous cycle.
-				newContract, err = c.managedRenew(oldContract, numSectors, oldContract.EndHeight())
-			} else {
-				newContract, err = c.managedRenew(oldContract, numSectors, endHeight)
-			}
+			newContract, err := c.managedRenew(oldContract, amount, endHeight)
 			if err != nil {
 				c.log.Printf("WARN: failed to renew contract %v with %v: %v\n", id, oldContract.NetAddress, err)
 				return
@@ -460,6 +555,14 @@ func (c *Contractor) threadedContractMaintenance() {
 			newContract.GoodForRenew = true
 			oldContract.GoodForRenew = false
 			oldContract.GoodForUpload = false
+			// If the contract is a mid-cycle renew, add the contract line to
+			// the new contract. The contract line is not included/extended if
+			// we are just renewing because the contract is expiring.
+			if _, exists := refreshSet[id]; exists {
+				newContract.PreviousContracts = oldContract.PreviousContracts
+				oldContract.PreviousContracts = nil
+				newContract.PreviousContracts = append(newContract.PreviousContracts, oldContract)
+			}
 
 			// Lock the contractor as we update it to use the new contract
 			// instead of the old contract.
@@ -527,14 +630,21 @@ func (c *Contractor) threadedContractMaintenance() {
 	for _, contract := range c.contracts {
 		exclude = append(exclude, contract.HostPublicKey)
 	}
+	initialContractFunds := c.allowance.Funds.Div64(c.allowance.Hosts).Div64(3)
 	c.mu.RUnlock()
 	hosts := c.hdb.RandomHosts(neededContracts*2+10, exclude)
 
 	// Form contracts with the hosts one at a time, until we have enough
 	// contracts.
 	for _, host := range hosts {
+		// Determine if we have enough money to form a new contract.
+		if fundsAvailable.Cmp(initialContractFunds) < 0 {
+			c.log.Println("WARN: need to form new contracts, but unable to because of a low allowance")
+			break
+		}
+
 		// Attempt forming a contract with this host.
-		newContract, err := c.managedNewContract(host, numSectors, endHeight)
+		newContract, err := c.managedNewContract(host, initialContractFunds, endHeight)
 		if err != nil {
 			c.log.Printf("Attempted to form a contract with %v, but negotiation failed: %v\n", host.NetAddress, err)
 			continue
