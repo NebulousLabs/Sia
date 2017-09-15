@@ -37,9 +37,13 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	_, maxFee := tpool.FeeEstimation()
 	txnFee := maxFee.Mul64(estTxnSize)
 
-	// Divide by zero checks.
+	// Underflow check.
 	if funding.Cmp(host.ContractPrice.Add(txnFee)) <= 0 {
 		return modules.RenterContract{}, errors.New("insufficient funds to cover contract fee and transaction fee during contract formation")
+	}
+	// Divide by zero check.
+	if host.StoragePrice.IsZero() {
+		host.StoragePrice = types.NewCurrency64(1)
 	}
 
 	// Calculate the payouts for the renter, host, and whole contract.

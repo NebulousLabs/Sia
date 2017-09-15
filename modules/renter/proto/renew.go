@@ -30,9 +30,13 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	_, maxFee := tpool.FeeEstimation()
 	txnFee := maxFee.Mul64(estTxnSize)
 
-	// Divide by zero checks.
-	if funding.Cmp(host.ContractPrice.Add(txnFee)) <= 0 {
+	// Underflow check.
+	if funding.Cmp(host.ContractPrice.Add(txnFee).Add(basePrice)) <= 0 {
 		return modules.RenterContract{}, errors.New("insufficient funds to cover contract fee and transaction fee during contract renewal")
+	}
+	// Divide by zero check.
+	if host.StoragePrice.IsZero() {
+		host.StoragePrice = types.NewCurrency64(1)
 	}
 
 	// Calculate the payouts for the renter, host, and whole contract.
