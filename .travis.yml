@@ -10,7 +10,7 @@ install:
   - make dependencies
   - test -z "$(go fmt ./...)"
   - glyphcheck ./...
-  - make
+  - make dev
 
 script: make test && make test-long && make cover && make bench
 

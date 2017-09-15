@@ -1,6 +1,6 @@
 # all will build and install developer binaries, which have debugging enabled
 # and much faster mining and block constants.
-all: install
+all: release-std
 
 # dependencies installs all of the dependencies that are required for building
 # Sia.
@@ -56,8 +56,8 @@ lint:
 		&& test -z $$(golint -min_confidence=1.0 $$package) ; \
 	done
 
-# install builds and installs developer binaries.
-install:
+# dev builds and installs developer binaries.
+dev:
 	go install -race -tags='dev debug profile' $(pkgs)
 
 # release builds and installs release binaries.
