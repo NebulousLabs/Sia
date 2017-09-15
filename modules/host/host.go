@@ -122,6 +122,7 @@ type Host struct {
 	atomicRenewCalls        uint64
 	atomicReviseCalls       uint64
 	atomicSettingsCalls     uint64
+	atomicMetadataCalls     uint64
 	atomicUnrecognizedCalls uint64
 
 	// Error management. There are a few different types of errors returned by
