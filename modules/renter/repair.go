@@ -1,7 +1,5 @@
 package renter
 
-// TODO: There are no download-to-reupload strategies implemented.
-
 // TODO: The chunkStatus stuff needs to recognize when two different contract
 // ids are actually a part of the same file contract.
 
