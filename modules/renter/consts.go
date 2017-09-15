@@ -38,9 +38,18 @@ var (
 	// maxChunkCacheSize determines the maximum number of chunks that will be
 	// cached in memory.
 	maxChunkCacheSize = build.Select(build.Var{
-		Dev:      50,
-		Standard: 30,
-		Testing:  60,
+		Dev:      10,
+		Standard: 10,
+		Testing:  5,
+	}).(int)
+
+	// maxScheduledDownloads specifies the number of chunks that can be downloaded
+	// for auto repair at once. If the limit is reached new ones will only be scheduled
+	// once old ones are scheduled for upload
+	maxScheduledDownloads = build.Select(build.Var{
+		Dev:      5,
+		Standard: 10,
+		Testing:  5,
 	}).(int)
 
 	// chunkDownloadTimeout defines the maximum amount of time to wait for a

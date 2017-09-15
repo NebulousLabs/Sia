@@ -290,14 +290,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 			}
 		}
 
-		// Don't update gaps for downloaded chunks twice
 		numGaps := chunkStatus.numGaps(rs)
-		if !downloading {
-			// Update the number of gaps for this chunk.
-			rs.gapCounts[chunkStatus.recordedGaps]--
-			rs.gapCounts[numGaps]++
-			chunkStatus.recordedGaps = numGaps
-		}
 
 		// Remove this chunk from the set of incomplete chunks if it has been
 		// completed and there are no workers still working on it.
@@ -352,6 +345,11 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 // managedDownloadChunkData downloads the requested chunk from Sia, for use in
 // the repair loop.
 func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset uint64, chunkIndex uint64, chunkID chunkID) ([]byte, error) {
+	// Don't initiate too many downloads to avoid using up all memory
+	if len(rs.downloadingChunks) >= maxScheduledDownloads {
+		return nil, nil
+	}
+
 	// If the download finished return the data
 	if dc, exists := rs.downloadingChunks[chunkID]; exists {
 		// Check if download finished
