@@ -147,6 +147,7 @@ func (c *SafeContract) Metadata() modules.RenterContract {
 		ID:               h.ID(),
 		Transaction:      h.copyTransaction(),
 		HostPublicKey:    h.HostPublicKey(),
+		SecretKey:        h.SecretKey,
 		StartHeight:      h.StartHeight,
 		EndHeight:        h.EndHeight(),
 		RenterFunds:      h.RenterFunds(),
