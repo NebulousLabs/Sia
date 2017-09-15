@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -1095,5 +1096,63 @@ func TestContractPresenceLeak(t *testing.T) {
 	}
 	if errors[0].Error() != errors[1].Error() {
 		t.Fatalf("Expected to get equal errors, got %q and %q.", errors[0], errors[1])
+	}
+}
+
+// TestIntegrationMetadata tests the Metadata RPC.
+func TestIntegrationMetadata(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// create testing trio
+	h, c, _, err := newTestingTrio(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Close()
+	defer c.Close()
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(10), c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
+
+	// revise the contract
+	editor, err := c.Editor(contract.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []crypto.Hash
+	for i := 0; i < 10; i++ {
+		data := fastrand.Bytes(int(modules.SectorSize))
+		root, err := editor.Upload(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want = append(want, root)
+	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get sector roots from the host.
+	got, err := proto.GetMetadata(hostEntry, contract, nil)
+	if err != nil {
+		t.Fatalf("RPCMetadata returned error: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("RPCMetadata returned wrong data")
 	}
 }

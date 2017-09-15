@@ -105,6 +105,7 @@ type (
 		RenewCalls        uint64 `json:"renewcalls"`
 		ReviseCalls       uint64 `json:"revisecalls"`
 		SettingsCalls     uint64 `json:"settingscalls"`
+		MetadataCalls     uint64 `json:"metadatacalls"`
 		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
 	}
 
