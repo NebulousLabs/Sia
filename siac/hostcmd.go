@@ -362,13 +362,19 @@ func hostconfigcmd(param, value string) {
 	if err != nil {
 		die("Could not update host settings:", err)
 	}
+	fmt.Println("Host settings updated.")
+
+	// get the estimated conversion rate.
 	var eg api.HostEstimateScoreGET
 	err = getAPI(fmt.Sprintf("/host/estimatescore?%v=%v", param, value), &eg)
 	if err != nil {
+		if err.Error() == "cannot call /host/estimatescore without the renter module" {
+			// score estimate requires the renter module
+			return
+		}
 		die("could not get host score estimate:", err)
 	}
 	fmt.Printf("Estimated conversion rate: %v%%\n", eg.ConversionRate)
-	fmt.Println("Host settings updated.")
 }
 
 // hostannouncecmd is the handler for the command `siac host announce`.
