@@ -288,7 +288,11 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 			}
 		}
 
+		// Update the number of gaps for this chunk.
 		numGaps := chunkStatus.numGaps(rs)
+		rs.gapCounts[chunkStatus.recordedGaps]--
+		rs.gapCounts[numGaps]++
+		chunkStatus.recordedGaps = numGaps
 
 		// Remove this chunk from the set of incomplete chunks if it has been
 		// completed and there are no workers still working on it.
@@ -538,10 +542,17 @@ func (r *Renter) managedWaitOnRepairWork(rs *repairState) {
 		return
 	}
 
+	// Create a channel to get notified if a download finished
+	stopWaiting := make(chan struct{})
+	defer close(stopWaiting)
+	finishedDownload := waitOnDownload(rs, stopWaiting)
+
 	// Wait for an upload to finish.
 	var finishedUpload finishedUpload
 	select {
 	case finishedUpload = <-rs.resultChan:
+	case <-finishedDownload:
+		return
 	case file := <-r.newRepairs:
 		r.managedAddFileToRepairState(rs, file)
 		return
@@ -637,4 +648,35 @@ func (r *Renter) threadedRepairLoop() {
 		r.managedRepairIteration(rs)
 		r.tg.Done()
 	}
+}
+
+// waitOnDownload starts a thread that periodically checks if a download
+// finished until it is stopped by closing the provided stop channel. It
+// returns a channel that is closed once a download finished.
+func waitOnDownload(rs *repairState, stop <-chan struct{}) chan struct{} {
+	downloadFinished := make(chan struct{})
+
+	// Start background routine to check if a download finished
+	go func() {
+		defer close(downloadFinished)
+		for {
+			// Check every download
+			for _, dc := range rs.downloadingChunks {
+				select {
+				case <-dc.d.downloadFinished:
+					return
+				default:
+				}
+			}
+
+			// If no download is finished try again after some time
+			select {
+			case <-stop:
+				return
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+	}()
+
+	return downloadFinished
 }
