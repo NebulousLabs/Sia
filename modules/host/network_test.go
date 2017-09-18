@@ -97,7 +97,7 @@ func TestHostWorkingStatus(t *testing.T) {
 			t.Fatal("expected working state to flip to HostWorkingStatusWorking after incrementing settings calls")
 		}
 
-		// make no settins calls, host should flip back to NotWorking
+		// make no settings calls, host should flip back to NotWorking
 		success = false
 		for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(time.Millisecond * 10) {
 			if ht.host.WorkingStatus() == modules.HostWorkingStatusNotWorking {

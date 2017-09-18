@@ -27,6 +27,7 @@ dependencies:
 	go get -u github.com/spf13/cobra/...
 	# Developer Dependencies
 	go install -race std
+	go get -u github.com/client9/misspell/cmd/misspell
 	go get -u github.com/golang/lint/golint
 	go get -u github.com/NebulousLabs/glyphcheck
 
@@ -56,6 +57,10 @@ lint:
 		&& test -z $$(golint -min_confidence=1.0 $$package) ; \
 	done
 
+# spellcheck checks for misspelled words in comments or strings.
+spellcheck:
+	misspell -error -locale US -i "marshalled,marshalling,Marshalling,Marshalled" .
+
 # dev builds and installs developer binaries.
 dev:
 	go install -race -tags='dev debug profile' $(pkgs)
@@ -77,9 +82,9 @@ test:
 	go test -short -tags='debug testing' -timeout=5s $(pkgs) -run=$(run)
 test-v:
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
-test-long: clean fmt vet lint
+test-long: clean fmt vet lint spellcheck
 	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
-test-vlong: clean fmt vet lint
+test-vlong: clean fmt vet lint spellcheck
 	go test -v -race -tags='testing debug vlong' -timeout=5000s $(pkgs) -run=$(run)
 test-cpu:
 	go test -v -tags='testing debug' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)

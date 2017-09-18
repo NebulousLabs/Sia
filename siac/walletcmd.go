@@ -214,7 +214,7 @@ func walletchangepasswordcmd() {
 	if err != nil {
 		die("Changing the password failed:", err)
 	}
-	fmt.Println("Password changed sucessfully.")
+	fmt.Println("Password changed successfully.")
 }
 
 // walletinitcmd encrypts the wallet with the given password

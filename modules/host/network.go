@@ -108,7 +108,7 @@ func (h *Host) threadedTrackWorkingStatus(closeChan chan struct{}) {
 func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 	defer close(closeChan)
 
-	// Wait breifly before checking the first time. This gives time for any port
+	// Wait briefly before checking the first time. This gives time for any port
 	// forwarding to complete.
 	select {
 	case <-h.tg.StopChan():

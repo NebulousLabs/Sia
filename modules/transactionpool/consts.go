@@ -67,7 +67,7 @@ var (
 // Variables related to the size and ease-of-entry of the transaction pool.
 var (
 	// minEstimation defines a sane minimum fee per byte for transactions.  This
-	// will typically be only suggested as a fee in the absense of congestion.
+	// will typically be only suggested as a fee in the absence of congestion.
 	minEstimation = types.SiacoinPrecision.Div64(100).Div64(1e3)
 )
 

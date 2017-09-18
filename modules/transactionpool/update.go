@@ -184,7 +184,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 
 		// Pull the transactions out of the fee summary. For estimating only
-		// over 10 blocks, it is extermely likely that there will be more
+		// over 10 blocks, it is extremely likely that there will be more
 		// applied blocks than reverted blocks, and if there aren't (a height
 		// decreasing reorg), there will be more than 10 applied blocks.
 		if len(tp.recentMedians) > 0 {

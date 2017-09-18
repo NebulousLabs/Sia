@@ -678,7 +678,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 			t.Fatal("transaction should have an input")
 		}
 		if len(txn.Outputs) < 1 {
-			t.Fatal("transaciton should have outputs")
+			t.Fatal("transactions should have outputs")
 		}
 		for _, input := range txn.Inputs {
 			if input.Value.IsZero() {
@@ -737,7 +737,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 			t.Fatal("transaction should have an input")
 		}
 		if len(txn.Outputs) < 1 {
-			t.Fatal("transaciton should have outputs")
+			t.Fatal("transactions should have outputs")
 		}
 		for _, input := range txn.Inputs {
 			if input.Value.IsZero() {
@@ -775,7 +775,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 			t.Fatal("transaction should have an input")
 		}
 		if len(txn.Outputs) < 1 {
-			t.Fatal("transaciton should have outputs")
+			t.Fatal("transactions should have outputs")
 		}
 		for _, input := range txn.Inputs {
 			if input.Value.IsZero() {

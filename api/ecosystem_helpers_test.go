@@ -44,7 +44,7 @@ func announceAllHosts(sts []*serverTester) error {
 		return err
 	}
 
-	// Grab the inital transaction pool size to know how many total transactions
+	// Grab the initial transaction pool size to know how many total transactions
 	// there should be after announcement.
 	initialTpoolSize := len(sts[0].tpool.TransactionList())
 
