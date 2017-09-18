@@ -51,7 +51,6 @@ func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
 	wal.mu.Lock()
 	storageFolders := wal.cm.availableStorageFolders()
 	wal.mu.Unlock()
-	var syncChan chan struct{}
 	for len(storageFolders) >= 1 {
 		var storageFolderIndex int
 		err := func() error {
@@ -134,7 +133,6 @@ func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
 			delete(wal.cm.sectorLocations, oldSU.ID)
 			delete(sf.availableSectors, id)
 			wal.cm.sectorLocations[id] = sl
-			syncChan = wal.syncChan
 			wal.mu.Unlock()
 			return nil
 		}()
