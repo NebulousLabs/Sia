@@ -329,7 +329,10 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	}
 
 	// mine a block, processing the announcement
-	m.AddBlock()
+	_, err = m.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// wait for hostdb to scan host
 	for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
@@ -389,7 +392,10 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal("expected 1 contract, got", len(c.contracts))
 	}
 
-	m.AddBlock()
+	_, err = m.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// set allowance with Hosts = 2; should only form one new contract
 	a.Hosts = 2

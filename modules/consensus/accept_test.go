@@ -855,7 +855,10 @@ func TestInconsistentCheck(t *testing.T) {
 			t.Fatalf("inconsistency panic not triggered by corrupted database")
 		}
 	}()
-	cst.miner.AddBlock()
+	_, err = cst.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // COMPATv0.4.0

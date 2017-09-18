@@ -424,7 +424,10 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 	}
 	addr, _ := w.NextAddress()
 	st.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(100), addr.UnlockHash())
-	st.miner.AddBlock()
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	seed, _, _ := w.PrimarySeed()
 	seedStr, _ := modules.SeedToString(seed, "english")
@@ -443,7 +446,10 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 	}
 
 	// Add a block so that the sweep transaction is processed
-	st.miner.AddBlock()
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Sweep again; should find no coins. An error will be returned because
 	// the found coins cannot cover the transaction fee.
@@ -476,7 +482,10 @@ func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
 	defer st.panicClose()
 	// Mine blocks until the wallet has confirmed money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		st.miner.AddBlock()
+		_, err = st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Create a wallet to load coins from.
@@ -499,7 +508,10 @@ func TestIntegrationWalletLoadSeedPOST(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		m.AddBlock()
+		_, err = m.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Record starting balances.
@@ -589,7 +601,10 @@ func TestWalletTransactionGETid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.miner.AddBlock()
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var wtgid2 WalletTransactionGETid
 	err = st.getAPI(fmt.Sprintf("/wallet/transaction/%s", txns[1].ID()), &wtgid2)
