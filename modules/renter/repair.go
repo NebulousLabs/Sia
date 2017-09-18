@@ -197,6 +197,10 @@ func (r *Renter) managedAddFileToRepairState(rs *repairState, file *file) {
 func (r *Renter) managedRepairIteration(rs *repairState) {
 	// Wait for work if there is nothing to do.
 	if len(rs.activeWorkers) == 0 && len(rs.incompleteChunks) == 0 {
+		if build.DEBUG && len(rs.downloadingChunks) > 0 {
+			panic("Sanity check failed. Repair loop shouldn't sleep while downloads are active")
+		}
+
 		select {
 		case <-r.tg.StopChan():
 			return
