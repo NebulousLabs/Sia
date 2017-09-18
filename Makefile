@@ -59,7 +59,7 @@ lint:
 
 # spellcheck checks for misspelled words in comments or strings.
 spellcheck:
-	misspell -error -locale US -i "marshalled,marshalling,Marshalling,Marshalled" .
+	misspell -error -i "marshalled,marshalling,Marshalling,Marshalled" .
 
 # dev builds and installs developer binaries.
 dev:

@@ -24,7 +24,7 @@ func yesErrors(at, depth int) error {
 }
 
 // GlobalE is an exported global to store the result of benchmark results,
-// preventing the compiler from optimizing the benchmark functions away.
+// preventing the compiler from optimising the benchmark functions away.
 var GlobalE error
 
 func BenchmarkErrors(b *testing.B) {
