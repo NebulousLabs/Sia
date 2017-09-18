@@ -1021,6 +1021,9 @@ func TestBigTpool(t *testing.T) {
 	}
 
 	block, err = tpt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 	totalFee4 := types.ZeroCurrency
 	maxFee4 := types.ZeroCurrency
 	for _, tx := range block.Transactions {
