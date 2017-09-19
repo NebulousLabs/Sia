@@ -58,6 +58,6 @@ var (
 	chunkDownloadTimeout = build.Select(build.Var{
 		Dev:      15 * time.Minute,
 		Standard: 15 * time.Minute,
-		Testing:  40 * time.Second,
+		Testing:  1 * time.Minute,
 	}).(time.Duration)
 )
