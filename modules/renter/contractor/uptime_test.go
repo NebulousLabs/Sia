@@ -93,7 +93,10 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	}
 
 	// mine a block, processing the announcement
-	m.AddBlock()
+	_, err = m.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// wait for hostdb to scan host
 	for i := 0; i < 100 && len(c.hdb.RandomHosts(2, nil)) != 2; i++ {
@@ -106,7 +109,10 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	// mine a block and wait for a new contract is formed. ProcessConsensusChange will
 	// trigger managedFormAllowanceContracts, which should form a new contract
 	// with h2
-	m.AddBlock()
+	_, err = m.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < 100 && len(c.Contracts()) != 1; i++ {
 		time.Sleep(100 * time.Millisecond)
 	}

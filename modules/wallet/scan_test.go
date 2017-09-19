@@ -40,7 +40,11 @@ func TestScanLargeIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		wt.miner.AddBlock()
+		_, err = wt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+
 	}
 
 	// send money to ourselves so that we sweep a real output (instead of just
@@ -53,7 +57,10 @@ func TestScanLargeIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wt.miner.AddBlock()
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// create seed scanner and scan the block
 	seed, _, _ := wt.wallet.PrimarySeed()
@@ -109,7 +116,10 @@ func TestScanLoop(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	wt.miner.AddBlock()
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// create seed scanner and scan the block
 	seed, _, _ := wt.wallet.PrimarySeed()

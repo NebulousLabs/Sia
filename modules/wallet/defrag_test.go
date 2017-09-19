@@ -139,7 +139,10 @@ func TestDefragOutputExhaustion(t *testing.T) {
 	}
 	wt.wallet.mu.Unlock()
 
-	wt.miner.AddBlock()
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// concurrently make a bunch of transactions with lots of outputs to keep the
 	// defragger running
@@ -152,7 +155,10 @@ func TestDefragOutputExhaustion(t *testing.T) {
 			case <-closechan:
 				return
 			case <-time.After(time.Millisecond * 100):
-				wt.miner.AddBlock()
+				_, err = wt.miner.AddBlock()
+				if err != nil {
+					t.Fatal(err)
+				}
 				txnValue := types.SiacoinPrecision.Mul64(3000)
 				fee := types.SiacoinPrecision.Mul64(10)
 				numOutputs := defragThreshold + 1
@@ -177,7 +183,10 @@ func TestDefragOutputExhaustion(t *testing.T) {
 				if err != nil {
 					t.Error("Error accepting fragmenting transaction:", err)
 				}
-				wt.miner.AddBlock()
+				_, err = wt.miner.AddBlock()
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 	}()

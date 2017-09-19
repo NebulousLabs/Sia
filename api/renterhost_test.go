@@ -1358,7 +1358,10 @@ func TestRenterRenew(t *testing.T) {
 	// Mine enough blocks to enter the renewal window.
 	testWindow := testPeriod / 2
 	for i := 0; i < testWindow+1; i++ {
-		st.miner.AddBlock()
+		_, err = st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	// Wait for the contract to be renewed.
 	for i := 0; i < 200 && (len(rc.Contracts) != 1 || rc.Contracts[0].ID == contractID); i++ {
@@ -1719,7 +1722,10 @@ func TestHostAndRenterRenewInterrupt(t *testing.T) {
 	// Mine enough blocks to enter the renewal window.
 	testWindow := testPeriodInt / 2
 	for i := 0; i < testWindow+1; i++ {
-		st.miner.AddBlock()
+		_, err = st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	// Wait for the contract to be renewed.
 	for i := 0; i < 200 && (len(rc.Contracts) != 1 || rc.Contracts[0].ID == contractID); i++ {

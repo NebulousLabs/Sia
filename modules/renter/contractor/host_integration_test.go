@@ -157,7 +157,10 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	}
 
 	// mine a block, processing the announcement
-	m.AddBlock()
+	_, err = m.AddBlock()
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	// wait for hostdb to scan host
 	for i := 0; i < 50 && len(c.hdb.ActiveHosts()) == 0; i++ {
