@@ -163,7 +163,7 @@ func (d *decHelper) NextUint64() uint64 {
 	if d.err != nil {
 		return 0
 	}
-	d.Read(d.buf[:])
+	io.ReadFull(d, d.buf[:])
 	return encoding.DecUint64(d.buf[:])
 }
 
@@ -171,6 +171,9 @@ func (d *decHelper) NextUint64() uint64 {
 // Specifically, if the prefix multiplied by elemSize exceeds
 // encoding.MaxSliceSize, NextPrefix returns 0 and sets d.Err().
 func (d *decHelper) NextPrefix(elemSize uintptr) uint64 {
+	if d.err != nil {
+		return 0
+	}
 	n := d.NextUint64()
 	if n > 1<<31-1 || n*uint64(elemSize) > encoding.MaxSliceSize {
 		d.err = encoding.ErrSliceTooLarge
