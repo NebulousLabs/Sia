@@ -149,21 +149,21 @@ func (d *decHelper) ReadFull(p []byte) {
 // reads into the byte slice, and returns it. If the length prefix exceeds
 // encoding.MaxSliceSize, ReadPrefix returns nil and sets d.Err().
 func (d *decHelper) ReadPrefix() []byte {
-	if d.err != nil {
-		return nil
-	}
 	n := d.NextPrefix(unsafe.Sizeof(byte(0))) // if too large, n == 0
 	b := make([]byte, n)
 	d.ReadFull(b)
+	if d.err != nil {
+		return nil
+	}
 	return b
 }
 
 // NextUint64 reads the next 8 bytes and returns them as a uint64.
 func (d *decHelper) NextUint64() uint64 {
+	d.ReadFull(d.buf[:])
 	if d.err != nil {
 		return 0
 	}
-	io.ReadFull(d, d.buf[:])
 	return encoding.DecUint64(d.buf[:])
 }
 
@@ -171,10 +171,10 @@ func (d *decHelper) NextUint64() uint64 {
 // Specifically, if the prefix multiplied by elemSize exceeds
 // encoding.MaxSliceSize, NextPrefix returns 0 and sets d.Err().
 func (d *decHelper) NextPrefix(elemSize uintptr) uint64 {
+	n := d.NextUint64()
 	if d.err != nil {
 		return 0
 	}
-	n := d.NextUint64()
 	if n > 1<<31-1 || n*uint64(elemSize) > encoding.MaxSliceSize {
 		d.err = encoding.ErrSliceTooLarge
 		return 0
