@@ -378,12 +378,12 @@ Use _amount_ and _destination_ parameters.
 
 
 #### Send to set of addresses
-Use _outputs_ parameter which is a URL encoded JSON string. _amount_ and _destination_ parameters must be empty.
+Use _outputs_ parameter in the form of a JSON array. _amount_ and _destination_ parameters must be empty.
 
 
 ###### Example POST Request
 ```
-/wallet/siacoins?outputs=[%7B%22unlockhash%22:%221234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab%22,%22value%22:%221000000000000000000000000%22%7D,%7B%22unlockhash%22:%22abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab1234567890%22,%22value%22:%228000000000000000000000000%22%7D,%7B%22unlockhash%22:%22cdef0123456789abcdef0123456789abcdef0123456789ab1234567890abcdef0123456789ab%22,%22value%22:%2220000000000000000000000000%22%7D]
+/wallet/siacoins?outputs=[{"unlockhash":"1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab","value":"1000000000000000000000000"},{"unlockhash":"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab1234567890","value":"8000000000000000000000000"},{"unlockhash":"cdef0123456789abcdef0123456789abcdef0123456789ab1234567890abcdef0123456789ab","value":"5000000000000000000000000"}]
 ```
 
 ###### (sample JSON request body for reference)
