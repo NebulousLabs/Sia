@@ -85,7 +85,9 @@ func BenchmarkRSRecover(b *testing.B) {
 	b.SetBytes(1 << 20)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		pieces[0] = nil
+		for j := 0; j < len(pieces)/2; j += 2 {
+			pieces[j] = nil
+		}
 		rsc.Recover(pieces, 1<<20, ioutil.Discard)
 	}
 }

@@ -29,12 +29,11 @@ type ErasureCoder interface {
 	// containing parity data.
 	Encode(data []byte) ([][]byte, error)
 
-	// Recover recovers the original data from pieces (including parity) and
-	// writes it to w. pieces should be identical to the slice returned by
-	// Encode (length and order must be preserved), but with missing elements
-	// set to nil. n is the number of bytes to be written to w; this is
-	// necessary because pieces may have been padded with zeros during
-	// encoding.
+	// Recover recovers the original data from pieces and writes it to w.
+	// pieces should be identical to the slice returned by Encode (length and
+	// order must be preserved), but with missing elements set to nil. n is
+	// the number of bytes to be written to w; this is necessary because
+	// pieces may have been padded with zeros during encoding.
 	Recover(pieces [][]byte, n uint64, w io.Writer) error
 }
 
