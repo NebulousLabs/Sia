@@ -136,6 +136,17 @@ func TestBlockEncoding(t *testing.T) {
 	}
 }
 
+// TestBadBlock tests that a known invalid encoding is not successfully
+// decoded.
+func TestBadBlock(t *testing.T) {
+	badData := "000000000000000000000000000000000000000000000000\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+	var block Block
+	err := encoding.Unmarshal([]byte(badData), &block)
+	if err == nil {
+		t.Fatal("invalid block decoded successfully")
+	}
+}
+
 // TestTooLargeDecoder tests that the decoder catches allocations that are too
 // large.
 func TestTooLargeDecoder(t *testing.T) {
