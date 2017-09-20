@@ -216,14 +216,6 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		}
 	}
 
-	// Accept work if there is any
-	select {
-	case file := <-r.newRepairs:
-		r.managedAddFileToRepairState(rs, file)
-		return
-	default:
-	}
-
 	// Reset the available workers.
 	contracts := r.hostContractor.Contracts()
 	id := r.mu.Lock()
