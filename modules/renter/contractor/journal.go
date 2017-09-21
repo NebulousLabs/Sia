@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"syscall"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -105,10 +106,22 @@ func (j *journal) checkpoint(data contractorPersist) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	if err := j.f.Close(); err != nil {
-		return err
+
+	// If rename or close failed in a previous call, fd will be invalid, 
+	//	so don't try to close
+	if fd := j.f.Fd(); fd != uintptr(syscall.InvalidHandle) {
+		if err := j.f.Close(); err != nil {
+			return err
+		}
 	}
-	if err := os.Rename(tmp.Name(), j.filename); err != nil {
+
+	// Attempt rename up to 5 times to prevent issues with anti-virus software
+	renamed := false
+	for i := 0; !renamed && i < 5; i++ {
+		err := os.Rename(tmp.Name(), j.filename)
+		renamed = err == nil
+	}
+	if err != nil {
 		return err
 	}
 
