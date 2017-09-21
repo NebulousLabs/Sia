@@ -19,7 +19,6 @@ package contractor
 // simply ignored when reading the journal.
 
 import (
-	"build"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,6 +26,7 @@ import (
 	"os"
 	"reflect"
 	"syscall"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -117,7 +117,9 @@ func (j *journal) checkpoint(data contractorPersist) error {
 	}
 
 	// Attempt rename up to 5 times to prevent issues with anti-virus software
-	err = build.Retry(5, 1000*Millisecond, func() error { return os.Rename(tmp.Name(), j.filename) })
+	err = build.Retry(5, 100*time.Millisecond, func() error {
+		return os.Rename(tmp.Name(), j.filename)
+	})
 	if err != nil {
 		return err
 	}
