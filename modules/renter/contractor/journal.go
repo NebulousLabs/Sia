@@ -25,7 +25,6 @@ import (
 	"io"
 	"os"
 	"reflect"
-	"syscall"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -107,21 +106,17 @@ func (j *journal) checkpoint(data contractorPersist) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-
-	// If rename or close failed in a previous call, fd will be invalid,
-	//	so don't try to close
-	if fd := j.f.Fd(); fd != uintptr(syscall.InvalidHandle) {
-		if err := j.f.Close(); err != nil {
-			return err
-		}
+	if err := j.f.Close(); err != nil {
+		return err
 	}
 
-	// Attempt rename up to 5 times to prevent issues with anti-virus software
+	// Attempt rename up to 5 times to prevent issues with anti-virus software.
+	// If after 5 attempts file cannot be renamed, raise critical failure
 	err = build.Retry(5, 100*time.Millisecond, func() error {
 		return os.Rename(tmp.Name(), j.filename)
 	})
 	if err != nil {
-		return err
+		build.Critical("Unable to rename contractor.journal:", err)
 	}
 
 	// Reopen the journal.
