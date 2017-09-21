@@ -122,7 +122,7 @@ type (
 	}
 )
 
-// newSectionDownload initialises and returns a download object for the specified chunk.
+// newSectionDownload initializes and returns a download object for the specified chunk.
 func (r *Renter) newSectionDownload(f *file, destination modules.DownloadWriter, offset, length uint64) *download {
 	d := newDownload(f, destination)
 
@@ -165,7 +165,7 @@ func newDownload(f *file, destination modules.DownloadWriter) *download {
 	}
 }
 
-// initPieceSet initialises the piece set, including calculations of the total download size.
+// initPieceSet initializes the piece set, including calculations of the total download size.
 func (d *download) initPieceSet(f *file, r *Renter) {
 	// Allocate the piece size and progress bar so that the download will
 	// finish at exactly 100%. Due to rounding error and padding, there is not
@@ -419,7 +419,7 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 
 // managedScheduleIncompleteChunks iterates through all of the incomplete
 // chunks and finds workers to complete the chunks.
-// managedScheduleIncompleteChunks also checks wheter a chunk is unable to be
+// managedScheduleIncompleteChunks also checks whether a chunk is unable to be
 // completed.
 func (r *Renter) managedScheduleIncompleteChunks(ds *downloadState) {
 	var newIncompleteChunks []*chunkDownload

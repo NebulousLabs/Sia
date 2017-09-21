@@ -259,9 +259,9 @@ func renterallowancecmd() {
 func renterallowancecancelcmd() {
 	err := post("/renter", "hosts=0&funds=0&period=0&renewwindow=0")
 	if err != nil {
-		die("error cancelling allowance:", err)
+		die("error canceling allowance:", err)
 	}
-	fmt.Println("Allowance cancelled.")
+	fmt.Println("Allowance canceled.")
 }
 
 // rentersetallowancecmd allows the user to set the allowance.

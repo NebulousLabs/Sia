@@ -72,7 +72,7 @@ type (
 	}
 
 	// UnconfirmedTransactionSet defines a new unconfirmed transaction that has
-	// been added to the transaction pool. ID is the ID of the set, IDs contians
+	// been added to the transaction pool. ID is the ID of the set, IDs contains
 	// an ID for each transaction, eliminating the need to recompute it (because
 	// that's an expensive operation).
 	UnconfirmedTransactionSet struct {

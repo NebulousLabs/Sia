@@ -10,7 +10,7 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// TestChildTargetOak checks the childTargetOak function, espeically for edge
+// TestChildTargetOak checks the childTargetOak function, especially for edge
 // cases like overflows and underflows.
 func TestChildTargetOak(t *testing.T) {
 	// NOTE: Test must not be run in parallel.

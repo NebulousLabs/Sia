@@ -48,7 +48,7 @@ var (
 	}).(time.Duration)
 )
 
-// splitSet defines a transaction set that can be added componenet-wise to a
+// splitSet defines a transaction set that can be added components-wise to a
 // block. It's split because it doesn't necessarily represent the full set
 // prpovided by the transaction pool. Splits can be sorted so that the largest
 // and most valuable sets can be selected when picking transactions.

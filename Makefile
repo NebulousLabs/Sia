@@ -27,6 +27,7 @@ dependencies:
 	go get -u github.com/spf13/cobra/...
 	# Developer Dependencies
 	go install -race std
+	go get -u github.com/client9/misspell/cmd/misspell
 	go get -u github.com/golang/lint/golint
 	go get -u github.com/NebulousLabs/glyphcheck
 
@@ -55,6 +56,10 @@ lint:
 		golint -min_confidence=1.0 $$package                  \
 		&& test -z $$(golint -min_confidence=1.0 $$package) ; \
 	done
+
+# spellcheck checks for misspelled words in comments or strings.
+spellcheck:
+	misspell -error -i "marshalled,marshalling,Marshalling,Marshalled" .
 
 # dev builds and installs developer binaries.
 dev:
