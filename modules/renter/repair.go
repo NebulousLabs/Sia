@@ -1,7 +1,5 @@
 package renter
 
-// TODO: There are no download-to-reupload strategies implemented.
-
 // TODO: The chunkStatus stuff needs to recognize when two different contract
 // ids are actually a part of the same file contract.
 
@@ -199,21 +197,23 @@ func (r *Renter) managedAddFileToRepairState(rs *repairState, file *file) {
 func (r *Renter) managedRepairIteration(rs *repairState) {
 	// Wait for work if there is nothing to do.
 	if len(rs.activeWorkers) == 0 && len(rs.incompleteChunks) == 0 {
+		// Create a channel to get notified if a download finished
+		finishedDownload, stopWaiting := waitOnDownload(rs)
+		defer func() {
+			// always wait for the loop to finish to avoid race conditions
+			close(stopWaiting)
+			<-finishedDownload
+		}()
+
 		select {
 		case <-r.tg.StopChan():
 			return
 		case file := <-r.newRepairs:
 			r.managedAddFileToRepairState(rs, file)
 			return
+		case <-finishedDownload:
+			return
 		}
-	}
-
-	// Accept work if there is any
-	select {
-	case file := <-r.newRepairs:
-		r.managedAddFileToRepairState(rs, file)
-		return
-	default:
 	}
 
 	// Reset the available workers.
@@ -269,6 +269,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 	for chunkID, chunkStatus := range rs.incompleteChunks {
 		// check if the chunk is currently being downloaded for recovery
 		dc, downloading := rs.downloadingChunks[chunkID]
+		downloadFinished := false
 		if downloading {
 			// Check if download finished
 			select {
@@ -286,18 +287,18 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 				}
 				continue
 			case <-dc.d.downloadFinished:
-				// Download finished, continue repairing the chunk.
+				// Download finished, continue repairing the chunk even if it
+				// doesn't have enough gaps anymore. If we don't it might cause
+				// deadlocks.
+				downloadFinished = true
 			}
 		}
 
-		// Don't update gaps for downloaded chunks twice
+		// Update the number of gaps for this chunk.
 		numGaps := chunkStatus.numGaps(rs)
-		if !downloading {
-			// Update the number of gaps for this chunk.
-			rs.gapCounts[chunkStatus.recordedGaps]--
-			rs.gapCounts[numGaps]++
-			chunkStatus.recordedGaps = numGaps
-		}
+		rs.gapCounts[chunkStatus.recordedGaps]--
+		rs.gapCounts[numGaps]++
+		chunkStatus.recordedGaps = numGaps
 
 		// Remove this chunk from the set of incomplete chunks if it has been
 		// completed and there are no workers still working on it.
@@ -307,7 +308,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		}
 
 		// Skip this chunk if it does not have enough gaps.
-		if maxGaps >= minPiecesRepair && numGaps < minPiecesRepair {
+		if maxGaps >= minPiecesRepair && numGaps < minPiecesRepair && !downloadFinished {
 			continue
 		}
 
@@ -323,13 +324,13 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 
 		// Skip this chunk if the set of useful workers does not meet the
 		// minimum pieces requirement.
-		if maxGaps >= minPiecesRepair && len(usefulWorkers) < minPiecesRepair {
+		if maxGaps >= minPiecesRepair && len(usefulWorkers) < minPiecesRepair && !downloadFinished {
 			continue
 		}
 
 		// Skip this chunk if the set of useful workers is not complete, and
 		// the maxGaps value is less than the minPiecesRepair value.
-		if maxGaps < minPiecesRepair && len(usefulWorkers) < numGaps {
+		if maxGaps < minPiecesRepair && len(usefulWorkers) < numGaps && !downloadFinished {
 			continue
 		}
 
@@ -342,6 +343,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 		}
 	}
 	for _, cid := range chunksToDelete {
+		delete(rs.downloadingChunks, cid)
 		delete(rs.incompleteChunks, cid)
 	}
 
@@ -361,11 +363,16 @@ func (r *Renter) managedDownloadChunkData(rs *repairState, file *file, offset ui
 			return nil, nil
 		case <-dc.d.downloadFinished:
 		}
+
 		// Download finished. Delete it from the state and return the data
 		delete(rs.downloadingChunks, chunkID)
 		return dc.buffer.Bytes(), dc.d.Err()
 	}
 
+	// Don't initiate too many downloads to avoid using up all memory
+	if len(rs.downloadingChunks) >= maxScheduledDownloads {
+		return nil, nil
+	}
 	// If the data is not yet downloaded initialize a new download
 	downloadSize := file.chunkSize()
 	if offset+downloadSize > file.size {
@@ -542,10 +549,20 @@ func (r *Renter) managedWaitOnRepairWork(rs *repairState) {
 		return
 	}
 
+	// Create a channel to get notified if a download finished
+	finishedDownload, stopWaiting := waitOnDownload(rs)
+	defer func() {
+		// always wait for the loop to finish to avoid race conditions
+		close(stopWaiting)
+		<-finishedDownload
+	}()
+
 	// Wait for an upload to finish.
 	var finishedUpload finishedUpload
 	select {
 	case finishedUpload = <-rs.resultChan:
+	case <-finishedDownload:
+		return
 	case file := <-r.newRepairs:
 		r.managedAddFileToRepairState(rs, file)
 		return
@@ -641,4 +658,36 @@ func (r *Renter) threadedRepairLoop() {
 		r.managedRepairIteration(rs)
 		r.tg.Done()
 	}
+}
+
+// waitOnDownload starts a thread that periodically checks if a download
+// finished until it is stopped by closing the provided stop channel. It
+// returns a channel that is closed once a download finished.
+func waitOnDownload(rs *repairState) (chan struct{}, chan struct{}) {
+	downloadFinished := make(chan struct{})
+	stop := make(chan struct{})
+
+	// Start background routine to check if a download finished
+	go func() {
+		defer close(downloadFinished)
+		for {
+			// Check every download
+			for _, dc := range rs.downloadingChunks {
+				select {
+				case <-dc.d.downloadFinished:
+					return
+				default:
+				}
+			}
+
+			// If no download is finished try again after some time
+			select {
+			case <-stop:
+				return
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+	}()
+
+	return downloadFinished, stop
 }

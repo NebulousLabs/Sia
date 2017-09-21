@@ -2331,3 +2331,192 @@ func TestRepairLoopBlocking(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestRemoteFileRepairMassive is similar to TestRemoteFileRepair but uploads
+// more files to find potential deadlocks or crashes
+func TestRemoteFileRepairMassive(t *testing.T) {
+	if testing.Short() || !build.VLONG {
+		t.SkipNow()
+	}
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+	stH1, err := blankServerTester(t.Name() + " - Host 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH1.server.Close()
+	testGroup := []*serverTester{st, stH1}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add storage to every host.
+	err = addStorageToAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance with two hosts.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
+	allowanceValues.Set("hosts", "2")
+	allowanceValues.Set("period", "10")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file to upload.
+	filesize := int(4000)
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, filesize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// upload the file numUploads times
+	numUploads := 10
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+
+	for i := 0; i < numUploads; i++ {
+		err = st.stdPostAPI(fmt.Sprintf("/renter/upload/test%v", i), uploadValues)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// redundancy should reach 2 for all files
+	var rf RenterFiles
+	err = retry(600, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) != numUploads {
+			return errors.New("file not uploaded")
+		}
+		for i, f := range rf.Files {
+			if f.Redundancy != 2 {
+				return errors.New(fmt.Sprintf("file %v only reached %v redundancy", i, f.Redundancy))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// remove the local copy of the file
+	err = os.Remove(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// take down one of the hosts
+	err = stH1.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the redundancy to decrement
+	err = retry(60, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) != numUploads {
+			return errors.New("file not uploaded")
+		}
+		for _, f := range rf.Files {
+			if f.Redundancy != 1 {
+				return errors.New("file redudancy didn't decrement to x1")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// bring up a new host
+	stNewHost, err := blankServerTester(t.Name() + "-newhost")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stNewHost.server.Close()
+
+	testGroup = []*serverTester{st, stNewHost}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = stNewHost.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stNewHost.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = waitForBlock(stNewHost.cs.CurrentBlock().ID(), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// add a few new blocks in order to cause the renter to form contracts with the new host
+	for i := 0; i < 10; i++ {
+		b, err := stNewHost.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tester := range testGroup {
+			err = waitForBlock(b.ID(), tester)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// redundancy should increment back to 2 as the renter uploads to the new
+	// host using the download-to-upload strategy
+	err = retry(300, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) != numUploads {
+			return errors.New("file not uploaded")
+		}
+		for i, f := range rf.Files {
+			if f.Redundancy != 2 {
+				return errors.New(fmt.Sprintf("file %v only reached %v redundancy", i, f.Redundancy))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
