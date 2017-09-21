@@ -19,6 +19,7 @@ package contractor
 // simply ignored when reading the journal.
 
 import (
+	"build"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -107,7 +108,7 @@ func (j *journal) checkpoint(data contractorPersist) error {
 		return err
 	}
 
-	// If rename or close failed in a previous call, fd will be invalid, 
+	// If rename or close failed in a previous call, fd will be invalid,
 	//	so don't try to close
 	if fd := j.f.Fd(); fd != uintptr(syscall.InvalidHandle) {
 		if err := j.f.Close(); err != nil {
@@ -116,11 +117,7 @@ func (j *journal) checkpoint(data contractorPersist) error {
 	}
 
 	// Attempt rename up to 5 times to prevent issues with anti-virus software
-	renamed := false
-	for i := 0; !renamed && i < 5; i++ {
-		err := os.Rename(tmp.Name(), j.filename)
-		renamed = err == nil
-	}
+	err = build.Retry(5, 1000*Millisecond, func() error { return os.Rename(tmp.Name(), j.filename) })
 	if err != nil {
 		return err
 	}
