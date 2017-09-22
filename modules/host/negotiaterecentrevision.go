@@ -19,6 +19,12 @@ var (
 	// revision does not have enough public keys - such a situation should
 	// never happen, and is a critical / developer error.
 	errRevisionWrongPublicKeyCount = errors.New("wrong number of public keys in the unlock conditions of the file contract revision")
+
+	// errVerifyChallenge is returned to renter instead of any error
+	// returned by managedVerifyChallengeResponse. It is used instead
+	// of the original error not to leak if the host has the contract
+	// with the ID sent by renter.
+	errVerifyChallenge = errors.New("bad signature from renter or no such contract")
 )
 
 // managedVerifyChallengeResponse will verify that the renter's response to the
@@ -121,7 +127,9 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, st
 	// obligation, file contract revision, and transaction signatures.
 	so, recentRevision, revisionSigs, err := h.managedVerifyChallengeResponse(fcid, challenge, challengeResponse)
 	if err != nil {
-		modules.WriteNegotiationRejection(conn, err) // Error not reported to preserve error type in extendErr.
+		// Do not disclose the original error to renter not to leak
+		// if the host has the contract with the ID sent by renter.
+		modules.WriteNegotiationRejection(conn, errVerifyChallenge)
 		return types.FileContractID{}, storageObligation{}, extendErr("challenge failed: ", err)
 	}
 	// Defer a call to unlock the storage obligation in the event of an error.
