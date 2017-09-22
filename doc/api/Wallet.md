@@ -351,6 +351,80 @@ outputs
 }
 ```
 
+### Examples
+
+#### Send to single address
+
+###### Example POST Request
+Use _amount_ and _destination_ parameters.
+```
+/wallet/siacoins?amount=1000000000000000000000000&destination=1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
+```
+
+###### Expected Response Code
+```
+200 OK
+```
+
+###### Example Response Body
+```json
+{
+  "transactionids": [
+    "3918e4a4b4cee46b3e5b28b8a1cc41c064a6f6002d162d396f296c201e6edc13",
+    "18b85b7d20f8a87bdadacf11e135ad44db1d93efd0613d23116e8cf255502762"
+  ]
+}
+```
+
+
+#### Send to set of addresses
+Use _outputs_ parameter in the form of a JSON array. _amount_ and _destination_ parameters must be empty.
+
+
+###### Example POST Request
+```
+/wallet/siacoins?outputs=[{"unlockhash":"1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab","value":"1000000000000000000000000"},{"unlockhash":"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab1234567890","value":"8000000000000000000000000"},{"unlockhash":"cdef0123456789abcdef0123456789abcdef0123456789ab1234567890abcdef0123456789ab","value":"5000000000000000000000000"}]
+```
+
+###### (sample JSON request body for reference)
+```json
+{
+  "outputs": [
+    {
+      "unlockhash":
+"1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "value": "1000000000000000000000000"
+    },
+    {
+      "unlockhash":
+"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab1234567890",
+      "value": "8000000000000000000000000"
+    },
+    {
+      "unlockhash":
+"cdef0123456789abcdef0123456789abcdef0123456789ab1234567890abcdef0123456789ab",
+      "value": "20000000000000000000000000"
+    }
+  ]
+}
+
+```
+
+###### Expected Response Code
+```
+200 OK
+```
+
+###### Example Response Body
+```json
+{
+  "transactionids": [
+    "21962e0118f3ca5d6fab0262c65bca0220fbcc828c499974d86e7cc4047a0ce5",
+    "f2471d550823f2c0616565d8476a7fea5f2b9a841612bf109923c3a54e760721"
+  ]
+}
+```
+
 #### /wallet/siafunds [POST]
 
 sends siafunds to an address. The outputs are arbitrarily selected from
