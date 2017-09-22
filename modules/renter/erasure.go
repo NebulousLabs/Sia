@@ -40,12 +40,11 @@ func (rs *rsCode) Encode(data []byte) ([][]byte, error) {
 	return pieces, nil
 }
 
-// Recover recovers the original data from pieces (including parity) and
-// writes it to w. pieces should be identical to the slice returned by
-// Encode (length and order must be preserved), but with missing elements
-// set to nil.
+// Recover recovers the original data from pieces and writes it to w.
+// pieces should be identical to the slice returned by Encode (length and
+// order must be preserved), but with missing elements set to nil.
 func (rs *rsCode) Recover(pieces [][]byte, n uint64, w io.Writer) error {
-	err := rs.enc.Reconstruct(pieces)
+	err := rs.enc.ReconstructData(pieces)
 	if err != nil {
 		return err
 	}
