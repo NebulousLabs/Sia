@@ -555,7 +555,7 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 	}
 	if sos == obligationSucceeded {
 		// Remove the obligation statistics as potential risk and income.
-		h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", h.financialMetrics.PotentialContractCompensation.Add(h.financialMetrics.PotentialStorageRevenue).Add(h.financialMetrics.PotentialDownloadBandwidthRevenue).Add(h.financialMetrics.PotentialUploadBandwidthRevenue))
+		h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue))
 		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
 		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
 		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
@@ -571,7 +571,7 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 	}
 	if sos == obligationFailed {
 		// Remove the obligation statistics as potential risk and income.
-		h.log.Printf("Missed storage proof. Revenue would have been %v.\n", h.financialMetrics.PotentialContractCompensation.Add(h.financialMetrics.PotentialStorageRevenue).Add(h.financialMetrics.PotentialDownloadBandwidthRevenue).Add(h.financialMetrics.PotentialUploadBandwidthRevenue))
+		h.log.Printf("Missed storage proof. Revenue would have been %v.\n", so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue))
 		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
 		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
 		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
