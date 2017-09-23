@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -107,6 +110,85 @@ func processConfig(config Config) (Config, error) {
 		return Config{}, err
 	}
 	return config, nil
+}
+
+// decodeError returns the api.Error from a API response. This method should
+// only be called if the response's status code is non-2xx. The error returned
+// may not be of type api.Error in the event of an error unmarshalling the
+// JSON.
+func decodeError(resp *http.Response) error {
+	var apiErr api.Error
+	err := json.NewDecoder(resp.Body).Decode(&apiErr)
+	if err != nil {
+		return err
+	}
+	return apiErr
+}
+
+// non2xx returns true for non-success HTTP status codes.
+func non2xx(code int) bool {
+	return code < 200 || code > 299
+}
+
+// apiPost wraps a POST request with a status code check, such that if the POST
+// does not return 2xx, the error will be read and returned. The response body
+// is not closed.
+func apiPost(call, vals string, config Config) (*http.Response, error) {
+	addr := config.Siad.APIaddr
+	if host, port, _ := net.SplitHostPort(config.Siad.APIaddr); host == "" {
+		addr = net.JoinHostPort("localhost", port)
+	}
+
+	if config.APIPassword != "" {
+		resp, err := api.HttpPOSTAuthenticated("http://"+addr+call, vals, config.APIPassword)
+		if err != nil {
+			return nil, errors.New("no response from daemon - authentication failed")
+		}
+		return resp, nil
+	}
+	resp, err := api.HttpPOST("http://"+addr+call, vals)
+
+	if err != nil {
+		return nil, errors.New("no response from daemon")
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		resp.Body.Close()
+		return nil, errors.New("API call not recognized: " + call)
+	}
+	if non2xx(resp.StatusCode) {
+		err := decodeError(resp)
+		resp.Body.Close()
+		return nil, err
+	}
+	return resp, nil
+}
+
+// post makes an API call and discards the response. An error is returned if
+// the response status is not 2xx.
+func post(call, vals string, config Config) error {
+	resp, err := apiPost(call, vals, config)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
+// walletAutoUnlock is called on siad startup and attempts to automatically
+// unlock the wallet if the SIA_WALLET_PASSWORD env exists on the machine.
+func walletAutoUnlock(config Config) {
+	password := os.Getenv("SIA_WALLET_PASSWORD")
+	if password != "" {
+		fmt.Println("Sia Wallet Password found, attempting to auto-unlock wallet")
+		qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
+		err := post("/wallet/unlock", qs, config)
+		if err != nil {
+			fmt.Println("Automatic unlock failed!")
+		} else {
+			fmt.Println("Wallet unlocked")
+		}
+	}
 }
 
 // startDaemon uses the config parameters to initialize Sia modules and start
@@ -294,6 +376,9 @@ func startDaemon(config Config) (err error) {
 
 	// connect the API to the server
 	srv.mux.Handle("/", a)
+
+	// Attempt to auto-unlock the wallet
+	walletAutoUnlock(config)
 
 	// stop the server if a kill signal is caught
 	sigChan := make(chan os.Signal, 1)
