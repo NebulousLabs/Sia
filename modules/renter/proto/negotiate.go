@@ -172,24 +172,27 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 func newRevision(current types.FileContractRevision, cost types.Currency) types.FileContractRevision {
 	rev := current
 
-	// need to manually copy slice memory
-	rev.NewValidProofOutputs = make([]types.SiacoinOutput, 2)
-	rev.NewMissedProofOutputs = make([]types.SiacoinOutput, 3)
-	copy(rev.NewValidProofOutputs, current.NewValidProofOutputs)
-	copy(rev.NewMissedProofOutputs, current.NewMissedProofOutputs)
-
 	// move valid payout from renter to host
-	rev.NewValidProofOutputs[0].Value = current.NewValidProofOutputs[0].Value.Sub(cost)
-	rev.NewValidProofOutputs[1].Value = current.NewValidProofOutputs[1].Value.Add(cost)
-
+	rev.NewValidProofOutputs = newRevisionWithAdjustedPayout(current.NewValidProofOutputs, 2, 0, 1, cost)
 	// move missed payout from renter to void
-	rev.NewMissedProofOutputs[0].Value = current.NewMissedProofOutputs[0].Value.Sub(cost)
-	rev.NewMissedProofOutputs[2].Value = current.NewMissedProofOutputs[2].Value.Add(cost)
+	rev.NewMissedProofOutputs = newRevisionWithAdjustedPayout(current.NewMissedProofOutputs, 3, 0, 2, cost)
 
 	// increment revision number
 	rev.NewRevisionNumber++
 
 	return rev
+}
+
+// return a new revision that fixed-size copies an old SiacoinOutput and
+// makes one payout adjustment on the resulting copy.
+// TODO: figure out if we can use unsafeSize to eliminate "howBig" param
+func newRevisionWithAdjustedPayout(outputs []types.SiacoinOutput, howBig int,
+	losingIndex int, winningIndex int, cost types.Currency) []types.SiacoinOutput {
+	result := make([]types.SiacoinOutput, howBig)
+	copy(result, outputs)
+	result[losingIndex].Value = outputs[losingIndex].Value.Sub(cost)
+	result[winningIndex].Value = outputs[winningIndex].Value.Add(cost)
+	return result
 }
 
 // newDownloadRevision revises the current revision to cover the cost of
