@@ -19,8 +19,8 @@ import (
 // amountPaid is the amount of Siacoin transferred
 type payoutAdjustmentInput struct {
 	outputs    []types.SiacoinOutput
-	payerIndex uint
-	payeeIndex uint
+	payerIndex types.FileContractIndex
+	payeeIndex types.FileContractIndex
 	amountPaid types.Currency
 }
 
@@ -186,14 +186,14 @@ func newRevision(current types.FileContractRevision, cost types.Currency) types.
 
 	rev.NewValidProofOutputs = newPayoutAdjustment(payoutAdjustmentInput{
 		outputs:    current.NewValidProofOutputs,
-		payerIndex: types.FileContractRenterIndex,
-		payeeIndex: types.FileContractHostIndex,
+		payerIndex: types.FileContractIndexRenter,
+		payeeIndex: types.FileContractIndexHost,
 		amountPaid: cost})
 
 	rev.NewMissedProofOutputs = newPayoutAdjustment(payoutAdjustmentInput{
 		outputs:    current.NewMissedProofOutputs,
-		payerIndex: types.FileContractRenterIndex,
-		payeeIndex: types.FileContractVoidIndex,
+		payerIndex: types.FileContractIndexRenter,
+		payeeIndex: types.FileContractIndexVoid,
 		amountPaid: cost})
 
 	// increment revision number
@@ -208,8 +208,8 @@ func newPayoutAdjustment(args payoutAdjustmentInput) []types.SiacoinOutput {
 	cost, outputs := args.amountPaid, args.outputs
 	result := make([]types.SiacoinOutput, len(outputs))
 	copy(result, outputs)
-	result[args.payerIndex].Value = outputs[args.payerIndex].Value.Sub(cost)
-	result[args.payeeIndex].Value = outputs[args.payeeIndex].Value.Add(cost)
+	result[args.payerIndex.Index].Value = outputs[args.payerIndex.Index].Value.Sub(cost)
+	result[args.payeeIndex.Index].Value = outputs[args.payeeIndex.Index].Value.Add(cost)
 	return result
 }
 

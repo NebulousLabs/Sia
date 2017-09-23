@@ -48,10 +48,6 @@ var (
 	OakMaxRise              *big.Rat
 	OakMaxDrop              *big.Rat
 	OakHardforkTxnSizeLimit = uint64(64e3) // 64 KB
-
-	FileContractRenterIndex = uint(0)
-	FileContractHostIndex   = uint(1)
-	FileContractVoidIndex   = uint(2)
 )
 
 // init checks which build constant is in place and initializes the variables
