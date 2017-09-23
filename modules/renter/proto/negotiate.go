@@ -12,6 +12,12 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// payoutAdjustmentInput aggregates parameters for a newPayoutAdjustment
+// outputs is the original unmodified SiacoinOutput used as a basis
+// numOutputs is how many must be copied
+// payerIndex is the person paying the Siacoin
+// payeeIndex is the one receiving the Siacoin
+// amountPaid is the amount of Siacoin transferred
 type payoutAdjustmentInput struct {
 	outputs    []types.SiacoinOutput
 	numOutputs uint
