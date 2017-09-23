@@ -14,13 +14,11 @@ import (
 
 // payoutAdjustmentInput aggregates parameters for a newPayoutAdjustment
 // outputs is the original unmodified SiacoinOutput used as a basis
-// numOutputs is how many must be copied
 // payerIndex is the person paying the Siacoin
 // payeeIndex is the one receiving the Siacoin
 // amountPaid is the amount of Siacoin transferred
 type payoutAdjustmentInput struct {
 	outputs    []types.SiacoinOutput
-	numOutputs uint
 	payerIndex uint
 	payeeIndex uint
 	amountPaid types.Currency
@@ -186,8 +184,17 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 func newRevision(current types.FileContractRevision, cost types.Currency) types.FileContractRevision {
 	rev := current
 
-	rev.NewValidProofOutputs = newPayoutAdjustment(payoutAdjustmentInput{outputs: current.NewValidProofOutputs, numOutputs: 2, payerIndex: types.FileContractRenterIndex, payeeIndex: types.FileContractHostIndex, amountPaid: cost})
-	rev.NewMissedProofOutputs = newPayoutAdjustment(payoutAdjustmentInput{outputs: current.NewMissedProofOutputs, numOutputs: 3, payerIndex: types.FileContractRenterIndex, payeeIndex: types.FileContractVoidIndex, amountPaid: cost})
+	rev.NewValidProofOutputs = newPayoutAdjustment(payoutAdjustmentInput{
+		outputs:    current.NewValidProofOutputs,
+		payerIndex: types.FileContractRenterIndex,
+		payeeIndex: types.FileContractHostIndex,
+		amountPaid: cost})
+
+	rev.NewMissedProofOutputs = newPayoutAdjustment(payoutAdjustmentInput{
+		outputs:    current.NewMissedProofOutputs,
+		payerIndex: types.FileContractRenterIndex,
+		payeeIndex: types.FileContractVoidIndex,
+		amountPaid: cost})
 
 	// increment revision number
 	rev.NewRevisionNumber++
@@ -199,7 +206,7 @@ func newRevision(current types.FileContractRevision, cost types.Currency) types.
 // makes one payout adjustment on the resulting copy.
 func newPayoutAdjustment(args payoutAdjustmentInput) []types.SiacoinOutput {
 	cost, outputs := args.amountPaid, args.outputs
-	result := make([]types.SiacoinOutput, args.numOutputs)
+	result := make([]types.SiacoinOutput, len(outputs))
 	copy(result, outputs)
 	result[args.payerIndex].Value = outputs[args.payerIndex].Value.Sub(cost)
 	result[args.payeeIndex].Value = outputs[args.payeeIndex].Value.Add(cost)
