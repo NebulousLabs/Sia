@@ -12,6 +12,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+type payoutAdjustmentInput struct {
+	outputs    []types.SiacoinOutput
+	numOutputs uint
+	payerIndex uint
+	payeeIndex uint
+	amountPaid types.Currency
+}
+
 // extendDeadline is a helper function for extending the connection timeout.
 func extendDeadline(conn net.Conn, d time.Duration) { _ = conn.SetDeadline(time.Now().Add(d)) }
 
@@ -172,10 +180,8 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 func newRevision(current types.FileContractRevision, cost types.Currency) types.FileContractRevision {
 	rev := current
 
-	// move valid payout from renter to host
-	rev.NewValidProofOutputs = newRevisionWithAdjustedPayout(current.NewValidProofOutputs, 2, 0, 1, cost)
-	// move missed payout from renter to void
-	rev.NewMissedProofOutputs = newRevisionWithAdjustedPayout(current.NewMissedProofOutputs, 3, 0, 2, cost)
+	rev.NewValidProofOutputs = newPayoutAdjustment(payoutAdjustmentInput{outputs: current.NewValidProofOutputs, numOutputs: 2, payerIndex: types.FileContractRenterIndex, payeeIndex: types.FileContractHostIndex, amountPaid: cost})
+	rev.NewMissedProofOutputs = newPayoutAdjustment(payoutAdjustmentInput{outputs: current.NewMissedProofOutputs, numOutputs: 3, payerIndex: types.FileContractRenterIndex, payeeIndex: types.FileContractVoidIndex, amountPaid: cost})
 
 	// increment revision number
 	rev.NewRevisionNumber++
@@ -185,13 +191,12 @@ func newRevision(current types.FileContractRevision, cost types.Currency) types.
 
 // return a new revision that fixed-size copies an old SiacoinOutput and
 // makes one payout adjustment on the resulting copy.
-// TODO: figure out if we can use unsafeSize to eliminate "howBig" param
-func newRevisionWithAdjustedPayout(outputs []types.SiacoinOutput, howBig int,
-	losingIndex int, winningIndex int, cost types.Currency) []types.SiacoinOutput {
-	result := make([]types.SiacoinOutput, howBig)
+func newPayoutAdjustment(args payoutAdjustmentInput) []types.SiacoinOutput {
+	cost, outputs := args.amountPaid, args.outputs
+	result := make([]types.SiacoinOutput, args.numOutputs)
 	copy(result, outputs)
-	result[losingIndex].Value = outputs[losingIndex].Value.Sub(cost)
-	result[winningIndex].Value = outputs[winningIndex].Value.Add(cost)
+	result[args.payerIndex].Value = outputs[args.payerIndex].Value.Sub(cost)
+	result[args.payeeIndex].Value = outputs[args.payeeIndex].Value.Add(cost)
 	return result
 }
 
