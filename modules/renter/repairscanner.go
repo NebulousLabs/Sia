@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -232,45 +231,26 @@ func (r *Renter) threadedRepairScan() {
 	defer r.tg.Done()
 
 	for {
-		// Grab the set of renewed ids and contracts. Then use them to create a
-		// table that connects any historic FileContractID to the corresponding
-		// HostPublicKey.
+		// Grab the current set of contracts and a lookup table from file
+		// contract ids to host public keys. The lookup table has a mapping from
+		// all historic file contract ids, which is necessary when using the
+		// renter to perform downloads.
 		//
 		// TODO / NOTE: This code can be removed once files store the HostPubKey
 		// of the hosts they are using, instead of just the FileContractID.
-		renewedIDs, currentContracts := r.hostContractor.ContractLookups()
-		fcidToHPK := make(map[types.FileContractID]types.SiaPublicKey)
-		for oldID, newID := range renewedIDs {
-			// First resolve the oldID into the most recent file contract id
-			// available.
-			finalID := newID
-			nextID, exists := renewedIDs[newID]
-			for exists {
-				finalID = nextID
-				nextID, exists = renewedIDs[nextID]
-			}
-
-			// Determine if the final id is available in the current set of
-			// contracts. If it is available, add oldID to the fcidToHPK map.
-			contract, exists := currentContracts[finalID]
-			if exists {
-				fcidToHPK[oldID] = contract.HostPublicKey
-			}
-		}
+		currentContracts, fcidToHPK := r.managedCurrentContractsAndHistoricFCIDLookup()
 
 		// Pull together a list of hosts that are available for uploading. We
 		// assemble them into a map where the key is the String() representation
 		// of a types.SiaPublicKey (which cannot be used as a map key itself).
 		hosts := make(map[string]struct{})
-		sliceContracts := make([]modules.RenterContract, 0, len(currentContracts))
 		for _, contract := range currentContracts {
 			hosts[contract.HostPublicKey.String()] = struct{}{}
-			sliceContracts = append(sliceContracts, contract)
 		}
 		// Build a min-heap of chunks organized by upload progress.
 		chunkHeap := r.managedBuildChunkHeap(hosts, fcidToHPK)
 
-		// Update the worker pool based on the current contracts.
+		// Refresh the worker pool before beginning uploads.
 		r.managedUpdateWorkerPool()
 
 		// Work through the heap. As the heap is processed, frequent checks are
@@ -304,12 +284,15 @@ func (r *Renter) threadedRepairScan() {
 				go r.managedFetchAndRepairChunk(nextChunk)
 			} else {
 				// The chunk heap is empty. Block until there's either a new
-				// file, or until we
+				// file, or until enough time has elapsed that the chunk heap
+				// should be rebuilt.
 				select {
 				case newFile := <-r.newUploads:
 					r.managedInsertFileIntoChunkHeap(newFile, hosts, fcidToHPK, chunkHeap)
 					continue
 				case <-rebuildHeapSignal:
+					// This will break into the outer loop, which will rebuild
+					// the heap.
 					break
 				case <-r.tg.StopChan():
 					return

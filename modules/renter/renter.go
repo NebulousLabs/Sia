@@ -247,6 +247,37 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	return r, nil
 }
 
+// managedCurrentContractsAndHosts will provide a list of contracts, as well as
+// a mapping from all historic file contract ids to the public keys of the hosts
+// that the contracts were formed with. If the renter no longer has a contract
+// with a particular host, that host is omitted.
+//
+// TODO / NOTE: Updates to the persisted data of the renter should make lookup
+// map to convert a file contract id to a host public key unnecessary - the
+// metadata will store the pubkey directly instead of the contract id.
+func (r *Renter) managedCurrentContractsAndHistoricFCIDLookup() (map[types.FileContractID]modules.RenterContract, map[types.FileContractID]types.SiaPublicKey) {
+	renewedIDs, currentContracts := r.hostContractor.ContractLookups()
+	fcidToHPK := make(map[types.FileContractID]types.SiaPublicKey)
+	for oldID, newID := range renewedIDs {
+		// First resolve the oldID into the most recent file contract id
+		// available.
+		finalID := newID
+		nextID, exists := renewedIDs[newID]
+		for exists {
+			finalID = nextID
+			nextID, exists = renewedIDs[nextID]
+		}
+
+		// Determine if the final id is available in the current set of
+		// contracts. If it is available, add oldID to the fcidToHPK map.
+		contract, exists := currentContracts[finalID]
+		if exists {
+			fcidToHPK[oldID] = contract.HostPublicKey
+		}
+	}
+	return currentContracts, fcidToHPK
+}
+
 // Close closes the Renter and its dependencies
 func (r *Renter) Close() error {
 	r.tg.Stop()

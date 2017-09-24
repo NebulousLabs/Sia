@@ -360,41 +360,16 @@ func (w *worker) threadedWorkLoop() {
 // updateWorkerPool will grab the set of contracts from the contractor and
 // update the worker pool to match.
 func (r *Renter) managedUpdateWorkerPool() {
-	// Grab the set of renewed ids and contracts. Then use them to create a
-	// table that connects any historic FileContractID to the corresponding
-	// HostPublicKey.
-	//
-	// TODO / NOTE: This code can be removed once files store the HostPubKey of
-	// the hosts they are using, instead of just the FileContractID.
-	renewedIDs, currentContracts := r.hostContractor.ContractLookups()
-	fcidToHPK := make(map[types.FileContractID]types.SiaPublicKey)
-	for oldID, newID := range renewedIDs {
-		// First resolve the oldID into the most recent file contract id
-		// available.
-		finalID := newID
-		nextID, exists := renewedIDs[newID]
-		for exists {
-			finalID = nextID
-			nextID, exists = renewedIDs[nextID]
-		}
-
-		// Determine if the final id is available in the current set of
-		// contracts. If it is available, add oldID to the fcidToHPK map.
-		contract, exists := currentContracts[finalID]
-		if exists {
-			fcidToHPK[oldID] = contract.HostPublicKey
-		}
-	}
+	_, currentContracts := r.hostContractor.ContractLookups()
 
 	// Add a worker for any contract that does not already have a worker.
 	for id, contract := range currentContracts {
 		_, exists := r.workerPool[id]
-		_, exists2 := fcidToHPK[id]
-		if !exists && exists2 {
+		if !exists {
 			worker := &worker{
 				contract:   contract,
 				contractID: id,
-				hostPubKey: fcidToHPK[id],
+				hostPubKey: contract.HostPublicKey,
 
 				downloadChan:         make(chan downloadWork, 1),
 				killChan:             make(chan struct{}),
@@ -411,8 +386,7 @@ func (r *Renter) managedUpdateWorkerPool() {
 	// Remove a worker for any worker that is not in the set of new contracts.
 	for id, worker := range r.workerPool {
 		_, exists := currentContracts[id]
-		_, exists2 := fcidToHPK[id]
-		if !exists || !exists2 {
+		if !exists {
 			delete(r.workerPool, id)
 			close(worker.killChan)
 		}
