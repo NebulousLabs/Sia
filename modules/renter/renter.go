@@ -247,6 +247,31 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	return r, nil
 }
 
+// managedMemoryAvailableAdd adds the amount provided to the renter's total
+// memory available.
+func (r *Renter) managedMemoryAvailableAdd(amt uint64) {
+	id := r.mu.Lock()
+	r.memoryAvailable += amt
+	r.mu.Unlock(id)
+}
+
+// managedMemoryAvailableGet returns the current amount of memory available to
+// the renter.
+func (r *Renter) managedMemoryAvailableGet() uint64 {
+	id := r.mu.RLock()
+	memAvail := r.memoryAvailable
+	r.mu.RUnlock(id)
+	return memAvail
+}
+
+// managedMemoryAvailableSub subtracts the amount provided from the renter's
+// total memory available.
+func (r *Renter) managedMemoryAvailableSub(amt uint64) {
+	id := r.mu.Lock()
+	r.memoryAvailable -= amt
+	r.mu.Unlock(id)
+}
+
 // managedCurrentContractsAndHosts will provide a list of contracts, as well as
 // a mapping from all historic file contract ids to the public keys of the hosts
 // that the contracts were formed with. If the renter no longer has a contract

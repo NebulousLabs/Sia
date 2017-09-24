@@ -76,24 +76,6 @@ func (ch *chunkHeap) Pop() interface{} {
 	return x
 }
 
-// managedBuildChunkHeap will iterate through all of the files in the renter and
-// construct a chunk heap.
-func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}, fcidToHPK map[types.FileContractID]types.SiaPublicKey) *chunkHeap {
-	id := r.mu.Lock()
-	defer r.mu.Unlock(id)
-
-	// Loop through the whole set of files to build the chunk heap.
-	var ch chunkHeap
-	for _, file := range r.files {
-		unfinishedChunks := r.buildUnfinishedChunks(file, hosts, fcidToHPK)
-		ch = append(ch, unfinishedChunks...)
-	}
-
-	// Init the heap.
-	heap.Init(&ch)
-	return &ch
-}
-
 // buildUnfinishedChunks will pull all of the unfinished chunks out of a file.
 //
 // TODO / NOTE: This code can be substantially simplified once the files store
@@ -204,9 +186,26 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}, fcidT
 	return newUnfinishedChunks
 }
 
+// managedBuildChunkHeap will iterate through all of the files in the renter and
+// construct a chunk heap.
+func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}, fcidToHPK map[types.FileContractID]types.SiaPublicKey) *chunkHeap {
+	// Loop through the whole set of files to build the chunk heap.
+	var ch chunkHeap
+	id := r.mu.Lock()
+	for _, file := range r.files {
+		unfinishedChunks := r.buildUnfinishedChunks(file, hosts, fcidToHPK)
+		ch = append(ch, unfinishedChunks...)
+	}
+	r.mu.Unlock(id)
+
+	// Init the heap.
+	heap.Init(&ch)
+	return &ch
+}
+
 // managedInsertFileIntoChunkHeap will insert all of the chunks of a file into the
 // chunk heap.
-func (r *Renter) managedInsertFileIntoChunkHeap(f *file, hosts map[string]struct{}, fcidToHPK map[types.FileContractID]types.SiaPublicKey, ch *chunkHeap) {
+func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts map[string]struct{}, fcidToHPK map[types.FileContractID]types.SiaPublicKey) {
 	id := r.mu.Lock()
 	unfinishedChunks := r.buildUnfinishedChunks(f, hosts, fcidToHPK)
 	for i := 0; i < len(unfinishedChunks); i++ {
@@ -215,13 +214,36 @@ func (r *Renter) managedInsertFileIntoChunkHeap(f *file, hosts map[string]struct
 	r.mu.Unlock(id)
 }
 
+// managedPrepareNextChunk takes the next chunk from the chunk heap and prepares
+// it for upload. Preparation includes blocking until enough memory is
+// available, fetching the logical data for the chunk (either from the disk or
+// from the network), erasure coding the logical data into the physical data,
+// and then finally passing the work onto the workers.
+func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{}, fcidToHPK map[types.FileContractID]types.SiaPublicKey) {
+	// Grab the next chunk, loop until we have enough memory, update the amount
+	// of memory available, and then spin up a thread to asynchronously handle
+	// the rest of the chunk tasks.
+	memoryAvailable := r.managedMemoryAvailableGet()
+	nextChunk := ch.Pop().(*unfinishedChunk)
+	for nextChunk.memoryNeeded > memoryAvailable {
+		select {
+		case newFile := <-r.newUploads:
+			r.managedInsertFileIntoChunkHeap(newFile, ch, hosts, fcidToHPK)
+		case <-r.newMemory:
+		case <-r.tg.StopChan():
+		}
+	}
+	r.managedMemoryAvailableSub(nextChunk.memoryNeeded)
+	go r.managedFetchAndRepairChunk(nextChunk)
+}
+
 // threadedRepairScan is a background thread that checks on the health of files,
 // tracking the least healthy files and queuing the worst ones for repair.
 //
-// Once we have upgraded the filesystem, we can replace this with the
-// tree-diving technique discussed in Sprint 5. For now we just iterate through
-// all of our in-memory files and chunks, and maintain a finite list of the
-// worst ones, and then iterate through it again when we need to find more
+// TODO / NOTE: Once we have upgraded the filesystem, we can replace this with
+// the tree-diving technique discussed in Sprint 5. For now we just iterate
+// through all of our in-memory files and chunks, and maintain a finite list of
+// the worst ones, and then iterate through it again when we need to find more
 // things to repair.
 func (r *Renter) threadedRepairScan() {
 	err := r.tg.Add()
@@ -231,6 +253,13 @@ func (r *Renter) threadedRepairScan() {
 	defer r.tg.Done()
 
 	for {
+		// Return if the renter has shut down.
+		select{
+		case <-r.tg.StopChan():
+			return
+		default:
+		}
+
 		// Grab the current set of contracts and a lookup table from file
 		// contract ids to host public keys. The lookup table has a mapping from
 		// all historic file contract ids, which is necessary when using the
@@ -247,54 +276,44 @@ func (r *Renter) threadedRepairScan() {
 		for _, contract := range currentContracts {
 			hosts[contract.HostPublicKey.String()] = struct{}{}
 		}
+
 		// Build a min-heap of chunks organized by upload progress.
 		chunkHeap := r.managedBuildChunkHeap(hosts, fcidToHPK)
 
 		// Refresh the worker pool before beginning uploads.
 		r.managedUpdateWorkerPool()
 
-		// Work through the heap. As the heap is processed, frequent checks are
-		// made for new files being uploaded. When the heap is fully processed,
-		// sleep until until the next heap rebuild is required, though that
-		// sleep should still be receiving and processing new chunks.
+		// Work through the heap. Chunks will be processed one at a time until
+		// the heap is whittled down. When the heap is empty, we wait for new
+		// files in a loop and then process those. When the rebuild signal is
+		// received, we start over with the outer loop that rebuilds the heap
+		// and re-checks the health of all the files.
 		rebuildHeapSignal := time.After(rebuildChunkHeapInterval)
 		for {
-			// If there is a next chunk in the heap, grab it and block until
-			// there's enough memory. Otherwise, block until a new file appears
-			// or until we get the rebuild heap signal.
+			// Return if the renter has shut down.
+			select{
+			case <-r.tg.StopChan():
+				return
+			default:
+			}
+
 			if chunkHeap.Len() > 0 {
-				// There is a chunk in the heap. Grab it, block until we have
-				// enough memory to repair it, and then perform the repair.
-				id := r.mu.RLock()
-				memoryAvailable := r.memoryAvailable
-				r.mu.RUnlock(id)
-				nextChunk := chunkHeap.Pop().(*unfinishedChunk)
-				for nextChunk.memoryNeeded > memoryAvailable {
-					select {
-					case newFile := <-r.newUploads:
-						r.managedInsertFileIntoChunkHeap(newFile, hosts, fcidToHPK, chunkHeap)
-					case <-r.newMemory:
-					case <-r.tg.StopChan():
-						return
-					}
-				}
-				id = r.mu.Lock()
-				memoryAvailable -= nextChunk.memoryNeeded
-				r.mu.Unlock(id)
-				go r.managedFetchAndRepairChunk(nextChunk)
+				r.managedPrepareNextChunk(chunkHeap, hosts, fcidToHPK)
 			} else {
-				// The chunk heap is empty. Block until there's either a new
-				// file, or until enough time has elapsed that the chunk heap
-				// should be rebuilt.
+				// Block until the rebuild signal is received.
 				select {
 				case newFile := <-r.newUploads:
-					r.managedInsertFileIntoChunkHeap(newFile, hosts, fcidToHPK, chunkHeap)
+					// If a new file is received, add its chunks to the repair
+					// heap and loop to start working through those chunks.
+					r.managedInsertFileIntoChunkHeap(newFile, chunkHeap, hosts, fcidToHPK)
 					continue
 				case <-rebuildHeapSignal:
-					// This will break into the outer loop, which will rebuild
-					// the heap.
+					// If the rebuild heap signal is received, break out to the
+					// outer loop which will check the health of all filess
+					// again and then rebuild the heap.
 					break
 				case <-r.tg.StopChan():
+					// If the stop signal is received, quit entirely.
 					return
 				}
 			}
