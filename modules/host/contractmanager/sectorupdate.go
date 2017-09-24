@@ -166,7 +166,7 @@ func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLo
 	if location.count == 65535 {
 		return errMaxVirtualSectors
 	}
-	location.count += 1
+	location.count++
 
 	// Prepare the sector update.
 	su := sectorUpdate{
