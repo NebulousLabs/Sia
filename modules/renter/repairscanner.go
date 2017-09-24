@@ -132,6 +132,12 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}, fcidT
 	// map, also increment the 'piecesCompleted' value.
 	saveFile := false
 	for fcid, fileContract := range f.contracts {
+		// TODO: Need to figure out whether this contract line is still being
+		// used. And even worse, need to figure out whether this particular
+		// piece is still available in the contract, as hosts may drop
+		// particular pieces or lose particular drives, resulting in the
+		// contract line continuing to be valid but the data being gone.
+
 		// Convert the FileContractID into a host pubkey using the host pubkey
 		// lookup.
 		hpk, exists := fcidToHPK[fileContract.ID]
