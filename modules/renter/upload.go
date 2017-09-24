@@ -90,7 +90,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	if err := validateSiapath(up.SiaPath); err != nil {
 		return err
 	}
-
 	// Enforce source rules.
 	if err := validateSource(up.Source); err != nil {
 		return err
@@ -138,6 +137,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Send the upload to the repair loop.
-	r.newRepairs <- f
+	r.newUploads <- f
 	return nil
 }

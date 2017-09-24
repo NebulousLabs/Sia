@@ -117,7 +117,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
 	}
 	// Update the renter to indicate how much memory was freed.
 	id := r.mu.Lock()
-	r.uploadMemoryAvailable += memoryFreed
+	r.memoryAvailable += memoryFreed
 	r.mu.Unlock(id)
 	// Notify the repair thread that more memory is available. If the channel is
 	// full, the repair thread will already see that there is more memory, no

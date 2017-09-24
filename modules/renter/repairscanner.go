@@ -15,13 +15,17 @@ package renter
 // on problem areas instead of doing everything all at once every iteration.
 // This should boost scalability.
 
+// TODO: If the original file would need to be downloaded to be repaired, don't
+// repair data that has less than 25% of its redundant pieces. (so in a
+// 10-of-110 situation, you repair when the piece count drops to 85 or lower).
+
 import (
 	"container/heap"
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // ChunkHeap is a bunch of chunks sorted by percentage-completion for uploading.
@@ -61,9 +65,9 @@ type unfinishedChunk struct {
 	mu sync.Mutex
 }
 
-func (ch chunkHeap) Len() int           { return len(ch) }
-func (ch chunkHeap) Less(i, j int) bool { return ch[i].progress < ch[j].progress }
-func (ch chunkHeap) Swap(i, j int)      { ch[i], ch[j] = ch[j], ch[i] }
+func (ch chunkHeap) Len() int            { return len(ch) }
+func (ch chunkHeap) Less(i, j int) bool  { return ch[i].progress < ch[j].progress }
+func (ch chunkHeap) Swap(i, j int)       { ch[i], ch[j] = ch[j], ch[i] }
 func (ch *chunkHeap) Push(x interface{}) { *ch = append(*ch, x.(*unfinishedChunk)) }
 func (ch *chunkHeap) Pop() interface{} {
 	old := *ch
@@ -273,7 +277,7 @@ func (r *Renter) threadedRepairScan() {
 		// made for new files being uploaded. When the heap is fully processed,
 		// sleep until until the next heap rebuild is required, though that
 		// sleep should still be receiving and processing new chunks.
-		rebuildHeapSignal := time.After(repairQueueInterval)
+		rebuildHeapSignal := time.After(rebuildChunkHeapInterval)
 		for {
 			// If there is a next chunk in the heap, grab it and block until
 			// there's enough memory. Otherwise, block until a new file appears
@@ -282,12 +286,12 @@ func (r *Renter) threadedRepairScan() {
 				// There is a chunk in the heap. Grab it, block until we have
 				// enough memory to repair it, and then perform the repair.
 				id := r.mu.RLock()
-				memoryAvailable := r.uploadMemoryAvailable
+				memoryAvailable := r.memoryAvailable
 				r.mu.RUnlock(id)
 				nextChunk := chunkHeap.Pop().(*unfinishedChunk)
 				for nextChunk.memoryNeeded > memoryAvailable {
 					select {
-					case newFile := <-r.newRepairs:
+					case newFile := <-r.newUploads:
 						r.managedInsertFileIntoChunkHeap(newFile, hosts, fcidToHPK, chunkHeap)
 					case <-r.newMemory:
 					case <-r.tg.StopChan():
@@ -302,7 +306,7 @@ func (r *Renter) threadedRepairScan() {
 				// The chunk heap is empty. Block until there's either a new
 				// file, or until we
 				select {
-				case newFile := <-r.newRepairs:
+				case newFile := <-r.newUploads:
 					r.managedInsertFileIntoChunkHeap(newFile, hosts, fcidToHPK, chunkHeap)
 					continue
 				case <-rebuildHeapSignal:

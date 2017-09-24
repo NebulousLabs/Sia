@@ -4,9 +4,11 @@ package renter
 // host, which could potentially happen over renewals because the contract ids
 // will be different.
 
+// TODO: Add failure cooldowns to the workers, particulary for uploading tasks.
+
 import (
-	"time"
 	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -60,7 +62,7 @@ type (
 		downloadChan         chan downloadWork // higher priority than all uploads
 		killChan             chan struct{}     // highest priority
 		priorityDownloadChan chan downloadWork // higher priority than downloads (used for user-initiated downloads)
-		uploadChan           chan struct{} // lowest priority
+		uploadChan           chan struct{}     // lowest priority
 
 		// recentUploadFailure documents the most recent time that an upload
 		// has failed.
@@ -125,9 +127,6 @@ func (w *worker) queueChunkRepair(chunk *unfinishedChunk) {
 }
 
 // upload will perform some upload work.
-//
-// TODO: After getting errors, we have to update the chunk to say that the piece
-// has failed.
 func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	// Open an editing connection to the host.
 	//
@@ -143,6 +142,10 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	if err != nil {
 		w.recentUploadFailure = time.Now()
 		w.consecutiveUploadFailures++
+		uc.mu.Lock()
+		uc.piecesRegistered--
+		uc.pieceUsage[pieceIndex] = false
+		uc.mu.Unlock()
 		return
 	}
 	defer e.Close()
@@ -153,6 +156,10 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	if err != nil {
 		w.recentUploadFailure = time.Now()
 		w.consecutiveUploadFailures++
+		uc.mu.Lock()
+		uc.piecesRegistered--
+		uc.pieceUsage[pieceIndex] = false
+		uc.mu.Unlock()
 		return
 	}
 	w.consecutiveUploadFailures = 0
@@ -180,7 +187,7 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.renterFile.mu.Unlock()
 
 	// Clear memory in the renter now that we're done.
-	w.renter.uploadMemoryAvailable += uint64(len(uc.physicalChunkData[pieceIndex]))
+	w.renter.memoryAvailable += uint64(len(uc.physicalChunkData[pieceIndex]))
 	w.renter.mu.Unlock(id)
 	select {
 	case w.renter.newMemory <- struct{}{}:

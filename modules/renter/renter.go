@@ -7,6 +7,8 @@ package renter
 // listen on the channel for new files, so that they can go directly into the
 // matrix.
 
+// TODO: Allow the 'baseMemory' to be set by the user.
+
 import (
 	"errors"
 
@@ -151,13 +153,17 @@ type Renter struct {
 	chunkQueue    []*chunkDownload // Accessed without locks.
 	downloadQueue []*download
 	newDownloads  chan *download
-	newMemory     chan struct{}
-	newRepairs    chan *file
+	newUploads    chan *file
 	workerPool    map[types.FileContractID]*worker
 
-	// Memory management
-	newUploadMemory       chan struct{} // an item is sent down this chan whenever memory has been freed up
-	uploadMemoryAvailable uint64
+	// Memory management - baseMemory tracks how much memory the renter is
+	// allowed to consume, memoryAvailable tracks how much more memory the
+	// renter can allocate before hitting the cap, and newMemory is a channel
+	// used to inform sleeping threads (the download loop and upload loop) that
+	// memory has become available.
+	baseMemory      uint64
+	memoryAvailable uint64
+	newMemory       chan struct{}
 
 	// Utilities.
 	cs             modules.ConsensusSet
@@ -201,16 +207,16 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	}
 
 	r := &Renter{
-		newRepairs: make(chan *file),
-		files:      make(map[string]*file),
-		tracking:   make(map[string]trackedFile),
+		files:    make(map[string]*file),
+		tracking: make(map[string]trackedFile),
 
 		newDownloads: make(chan *download),
-		newMemory:    make(chan struct{}, 1),
+		newUploads:   make(chan *file),
 		workerPool:   make(map[types.FileContractID]*worker),
 
-		newUploadMemory:       make(chan struct{}),
-		uploadMemoryAvailable: defaultUploadMemory,
+		baseMemory:      defaultMemory,
+		memoryAvailable: defaultMemory,
+		newMemory:       make(chan struct{}),
 
 		cs:             cs,
 		hostDB:         hdb,
