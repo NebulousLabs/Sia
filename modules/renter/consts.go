@@ -7,6 +7,10 @@ import (
 )
 
 var (
+	// defaultUploadMemory is a const that defines how much memory the renter is
+	// allowed to use when uploading as set by default.
+	defaultUploadMemory uint64 = 1 << 29 // 512 MiB
+
 	// Prime to avoid intersecting with regular events.
 	uploadFailureCooldown = build.Select(build.Var{
 		Dev:      time.Second * 7,
@@ -29,6 +33,8 @@ var (
 		Testing:  3,
 	}).(int)
 
+	// repairQueueInterval defines how long the renter sleeps between checking
+	// on the filesystem health.
 	repairQueueInterval = build.Select(build.Var{
 		Dev:      30 * time.Second,
 		Standard: time.Minute * 15,

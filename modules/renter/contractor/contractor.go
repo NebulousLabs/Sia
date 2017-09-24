@@ -118,6 +118,24 @@ func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
 	return
 }
 
+// ContractLookups returns the renewedIDs as well as the contracts map to the
+// caller, enabling the caller to convert arbitrary file contract ids into the
+// corresponding host pubkeys.
+func (c *Contractor) ContractLookups() (renewedIDs map[types.FileContractID]types.FileContractID, contracts map[types.FileContractID]modules.RenterContract) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	renewedIDs = make(map[types.FileContractID]types.FileContractID)
+	for k, v := range c.renewedIDs {
+		renewedIDs[k] = v
+	}
+	contracts = make(map[types.FileContractID]modules.RenterContract)
+	for k, v := range c.contracts {
+		contracts[k] = v
+	}
+	return renewedIDs, contracts
+}
+
 // CurrentPeriod returns the height at which the current allowance period
 // began.
 func (c *Contractor) CurrentPeriod() types.BlockHeight {

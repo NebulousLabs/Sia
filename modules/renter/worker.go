@@ -6,6 +6,7 @@ package renter
 
 import (
 	"time"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -37,36 +38,18 @@ type (
 		workerID      types.FileContractID
 	}
 
-	// finishedUpload contains the Merkle root and error from performing an
-	// upload.
-	finishedUpload struct {
-		chunkID    chunkID
-		dataRoot   crypto.Hash
-		err        error
-		pieceIndex uint64
-		workerID   types.FileContractID
-	}
-
-	// uploadWork contains instructions to upload a piece to a host, and a
-	// channel for returning the results.
-	uploadWork struct {
-		// data is the payload of the upload.
-		chunkID    chunkID
-		data       []byte
-		file       *file
-		pieceIndex uint64
-
-		// resultChan is a channel that the worker will use to return the
-		// results of the upload.
-		resultChan chan finishedUpload
-	}
-
 	// A worker listens for work on a certain host.
+	//
+	// The mutex of the worker only protects the 'unprocessedChunks' and the
+	// 'standbyChunks' fields of the worker. The rest of the fields are only
+	// interacted with exclusively by the primary worker thread, and only one of
+	// those ever exists at a time.
 	worker struct {
 		// contractID specifies which contract the worker specifically works
 		// with.
 		contract   modules.RenterContract
 		contractID types.FileContractID
+		hostPubKey types.SiaPublicKey
 
 		// If there is work on all three channels, the worker will first do all
 		// of the work in the priority download chan, then all of the work in the
@@ -77,7 +60,7 @@ type (
 		downloadChan         chan downloadWork // higher priority than all uploads
 		killChan             chan struct{}     // highest priority
 		priorityDownloadChan chan downloadWork // higher priority than downloads (used for user-initiated downloads)
-		uploadChan           chan uploadWork   // lowest priority
+		uploadChan           chan struct{} // lowest priority
 
 		// recentUploadFailure documents the most recent time that an upload
 		// has failed.
@@ -88,8 +71,18 @@ type (
 		// has failed.
 		recentDownloadFailure time.Time // Only modified by the primary download loop.
 
+		// Two lists of chunks that relate to worker upload tasks. The first
+		// list is the set of chunks that the worker hasn't examined yet. The
+		// second list is the list of chunks that the worker examined, but was
+		// unable to process because other workers had taken on all of the work
+		// already. This list is maintained in case any of the other workers
+		// fail - this worker will be able to pick up the slack.
+		unprocessedChunks []*unfinishedChunk
+		standbyChunks     []*unfinishedChunk
+
 		// Utilities.
 		renter *Renter
+		mu     sync.Mutex
 	}
 )
 
@@ -116,44 +109,60 @@ func (w *worker) download(dw downloadWork) {
 	}()
 }
 
+// queueChunkRepair will take a chunk and add it to the worker's repair stack.
+func (w *worker) queueChunkRepair(chunk *unfinishedChunk) {
+	// Add the new chunk to our list of unprocessed chunks.
+	w.mu.Lock()
+	w.unprocessedChunks = append(w.unprocessedChunks, chunk)
+	w.mu.Unlock()
+
+	// Send a signal informing the work thread that there is work (in the event
+	// that it is sleeping).
+	select {
+	case w.uploadChan <- struct{}{}:
+	default:
+	}
+}
+
 // upload will perform some upload work.
-func (w *worker) upload(uw uploadWork) {
+//
+// TODO: After getting errors, we have to update the chunk to say that the piece
+// has failed.
+func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
+	// Open an editing connection to the host.
+	//
+	// TODO / NOTE: Currently editing connections and downloading connections
+	// run different protocols. There are future plans to merge these protocols
+	// via an upgrade into a single connection.
+	//
+	// TODO / NOTE: Currently we query the host by using the contract id,
+	// however in the future we will query the host with a host public key, and
+	// the contractor will figure out which contract should be used to complete
+	// the operation.
 	e, err := w.renter.hostContractor.Editor(w.contractID, w.renter.tg.StopChan())
 	if err != nil {
 		w.recentUploadFailure = time.Now()
 		w.consecutiveUploadFailures++
-		go func() {
-			select {
-			case uw.resultChan <- finishedUpload{uw.chunkID, crypto.Hash{}, err, uw.pieceIndex, w.contractID}:
-			case <-w.renter.tg.StopChan():
-			}
-		}()
 		return
 	}
 	defer e.Close()
 
-	root, err := e.Upload(uw.data)
+	// Perform the upload, and update the failure stats based on the success of
+	// the upload attempt.
+	root, err := e.Upload(uc.physicalChunkData[pieceIndex])
 	if err != nil {
 		w.recentUploadFailure = time.Now()
 		w.consecutiveUploadFailures++
-		go func() {
-			select {
-			case uw.resultChan <- finishedUpload{uw.chunkID, root, err, uw.pieceIndex, w.contractID}:
-			case <-w.renter.tg.StopChan():
-			}
-		}()
 		return
 	}
-
-	// Success - reset the consecutive upload failures count.
 	w.consecutiveUploadFailures = 0
 
 	// Update the renter metadata.
 	addr := e.Address()
 	endHeight := e.EndHeight()
 	id := w.renter.mu.Lock()
-	uw.file.mu.Lock()
-	contract, exists := uw.file.contracts[w.contractID]
+	uc.renterFile.mu.Lock()
+	contract, exists := uc.renterFile.contracts[w.contractID]
 	if !exists {
 		contract = fileContract{
 			ID:          w.contractID,
@@ -162,21 +171,107 @@ func (w *worker) upload(uw uploadWork) {
 		}
 	}
 	contract.Pieces = append(contract.Pieces, pieceData{
-		Chunk:      uw.chunkID.index,
-		Piece:      uw.pieceIndex,
+		Chunk:      uc.index,
+		Piece:      pieceIndex,
 		MerkleRoot: root,
 	})
-	uw.file.contracts[w.contractID] = contract
-	w.renter.saveFile(uw.file)
-	uw.file.mu.Unlock()
-	w.renter.mu.Unlock(id)
+	uc.renterFile.contracts[w.contractID] = contract
+	w.renter.saveFile(uc.renterFile)
+	uc.renterFile.mu.Unlock()
 
-	go func() {
-		select {
-		case uw.resultChan <- finishedUpload{uw.chunkID, root, err, uw.pieceIndex, w.contractID}:
-		case <-w.renter.tg.StopChan():
+	// Clear memory in the renter now that we're done.
+	w.renter.uploadMemoryAvailable += uint64(len(uc.physicalChunkData[pieceIndex]))
+	w.renter.mu.Unlock(id)
+	select {
+	case w.renter.newMemory <- struct{}{}:
+	default:
+	}
+}
+
+// nextChunk will pull the next potential chunk out of the worker's work queue
+// for uploading.
+func (w *worker) nextChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Loop through the unprocessed chunks and find some work to do.
+	for i := 0; i < len(w.unprocessedChunks); i++ {
+		// Pull a chunk off of the unprocessed chunks stack.
+		nextChunk := w.unprocessedChunks[0]
+		w.unprocessedChunks = w.unprocessedChunks[1:]
+
+		// See if we are a candidate host for this chunk, and also if this
+		// chunk still needs work performed on it.
+		nextChunk.mu.Lock()
+		_, candidateHost := nextChunk.unusedHosts[w.hostPubKey.String()]
+		chunkComplete := nextChunk.piecesNeeded <= nextChunk.piecesCompleted
+		needsHelp := nextChunk.piecesNeeded > nextChunk.piecesCompleted+nextChunk.piecesRegistered
+		pieceIndex := 0
+		if candidateHost && needsHelp {
+			// Select a piece and mark that a piece has been selected.
+			for i := 0; i < len(nextChunk.pieceUsage); i++ {
+				if !nextChunk.pieceUsage[i] {
+					pieceIndex = i
+					nextChunk.pieceUsage[i] = true
+					break
+				}
+			}
+			delete(nextChunk.unusedHosts, w.hostPubKey.String())
+			nextChunk.piecesRegistered++
 		}
-	}()
+		nextChunk.mu.Unlock()
+
+		// Return this chunk for work if the worker is able to help.
+		if candidateHost && needsHelp {
+			return nextChunk, uint64(pieceIndex)
+		}
+
+		// Add this chunk to the standby chunks if this chunk may need help,
+		// but is already being helped.
+		if !chunkComplete && candidateHost {
+			w.standbyChunks = append(w.standbyChunks, nextChunk)
+		}
+	}
+
+	// Loop through the standby chunks to see if there is work to do.
+	for i := 0; i < len(w.standbyChunks); i++ {
+		nextChunk := w.standbyChunks[0]
+		w.standbyChunks = w.standbyChunks[1:]
+
+		// See if we are a candidate host for this chunk, and also if this
+		// chunk still needs work performed on it.
+		nextChunk.mu.Lock()
+		chunkComplete := nextChunk.piecesNeeded <= nextChunk.piecesCompleted
+		needsHelp := nextChunk.piecesNeeded > nextChunk.piecesCompleted+nextChunk.piecesRegistered
+		pieceIndex := 0
+		if needsHelp {
+			// Select a piece and mark that a piece has been selected.
+			for i := 0; i < len(nextChunk.pieceUsage); i++ {
+				if !nextChunk.pieceUsage[i] {
+					pieceIndex = i
+					nextChunk.pieceUsage[i] = true
+					break
+				}
+			}
+			delete(nextChunk.unusedHosts, w.hostPubKey.String())
+			nextChunk.piecesRegistered++
+		}
+		nextChunk.mu.Unlock()
+
+		// Return this chunk for work if the worker is able to help.
+		if needsHelp {
+			return nextChunk, uint64(pieceIndex)
+		}
+
+		// Add this chunk to the standby chunks if this chunk may need help,
+		// but is already being helped.
+		if !chunkComplete {
+			w.standbyChunks = append(w.standbyChunks, nextChunk)
+		}
+	}
+
+	// No work found, try again later.
+	return nil, 0
 }
 
 // work will perform one unit of work, exiting early if there is a kill signal
@@ -200,20 +295,37 @@ func (w *worker) work() {
 		// do nothing
 	}
 
-	// None of the priority channels have work, listen on all channels.
+	// Perform one step of processing upload work.
+	chunk, pieceIndex := w.nextChunk()
+	if chunk != nil {
+		w.upload(chunk, pieceIndex)
+	}
+
+	// None of the priority channels have work, listen on all channels. If there
+	// are any standbyChunks, sleep for only a little while.
+	var sleepDuration time.Duration
+	w.mu.Lock()
+	numStandby := len(w.standbyChunks)
+	w.mu.Unlock()
+	if numStandby > 0 {
+		sleepDuration = time.Second * 3 // TODO: Constant
+	} else {
+		sleepDuration = time.Hour // TODO: Constant
+	}
 	select {
 	case d := <-w.downloadChan:
 		w.download(d)
 		return
 	case <-w.killChan:
 		return
+	case <-w.uploadChan:
+		return
 	case d := <-w.priorityDownloadChan:
 		w.download(d)
 		return
-	case u := <-w.uploadChan:
-		w.upload(u)
-		return
 	case <-w.renter.tg.StopChan():
+		return
+	case <-time.After(sleepDuration):
 		return
 	}
 }
@@ -240,25 +352,47 @@ func (w *worker) threadedWorkLoop() {
 
 // updateWorkerPool will grab the set of contracts from the contractor and
 // update the worker pool to match.
-func (r *Renter) updateWorkerPool(contracts []modules.RenterContract) {
-	// Get a map of all the contracts in the contractor.
-	newContracts := make(map[types.FileContractID]modules.RenterContract)
-	for _, nc := range contracts {
-		newContracts[nc.ID] = nc
+func (r *Renter) managedUpdateWorkerPool() {
+	// Grab the set of renewed ids and contracts. Then use them to create a
+	// table that connects any historic FileContractID to the corresponding
+	// HostPublicKey.
+	//
+	// TODO / NOTE: This code can be removed once files store the HostPubKey of
+	// the hosts they are using, instead of just the FileContractID.
+	renewedIDs, currentContracts := r.hostContractor.ContractLookups()
+	fcidToHPK := make(map[types.FileContractID]types.SiaPublicKey)
+	for oldID, newID := range renewedIDs {
+		// First resolve the oldID into the most recent file contract id
+		// available.
+		finalID := newID
+		nextID, exists := renewedIDs[newID]
+		for exists {
+			finalID = nextID
+			nextID, exists = renewedIDs[nextID]
+		}
+
+		// Determine if the final id is available in the current set of
+		// contracts. If it is available, add oldID to the fcidToHPK map.
+		contract, exists := currentContracts[finalID]
+		if exists {
+			fcidToHPK[oldID] = contract.HostPublicKey
+		}
 	}
 
 	// Add a worker for any contract that does not already have a worker.
-	for id, contract := range newContracts {
+	for id, contract := range currentContracts {
 		_, exists := r.workerPool[id]
-		if !exists {
+		_, exists2 := fcidToHPK[id]
+		if !exists && exists2 {
 			worker := &worker{
 				contract:   contract,
 				contractID: id,
+				hostPubKey: fcidToHPK[id],
 
 				downloadChan:         make(chan downloadWork, 1),
 				killChan:             make(chan struct{}),
 				priorityDownloadChan: make(chan downloadWork, 1),
-				uploadChan:           make(chan uploadWork, 1),
+				uploadChan:           make(chan struct{}, 1),
 
 				renter: r,
 			}
@@ -269,8 +403,9 @@ func (r *Renter) updateWorkerPool(contracts []modules.RenterContract) {
 
 	// Remove a worker for any worker that is not in the set of new contracts.
 	for id, worker := range r.workerPool {
-		_, exists := newContracts[id]
-		if !exists {
+		_, exists := currentContracts[id]
+		_, exists2 := fcidToHPK[id]
+		if !exists || !exists2 {
 			delete(r.workerPool, id)
 			close(worker.killChan)
 		}

@@ -171,15 +171,16 @@ func TestRenterLocalRepair(t *testing.T) {
 
 	// add a few new blocks in order to cause the renter to form contracts with the new host
 	for i := 0; i < 10; i++ {
-		b, err := stNewHost.miner.AddBlock()
+		b, err := testGroup[0].miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, tester := range testGroup {
-			err = waitForBlock(b.ID(), tester)
-			if err != nil {
-				t.Fatal(err)
-			}
+		tipID, err := synchronizationCheck(testGroup)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if b.ID() != tipID {
+			t.Fatal("test group does not have the tip block")
 		}
 	}
 
@@ -365,15 +366,16 @@ func TestRemoteFileRepair(t *testing.T) {
 
 	// add a few new blocks in order to cause the renter to form contracts with the new host
 	for i := 0; i < 10; i++ {
-		b, err := stNewHost.miner.AddBlock()
+		b, err := testGroup[0].miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, tester := range testGroup {
-			err = waitForBlock(b.ID(), tester)
-			if err != nil {
-				t.Fatal(err)
-			}
+		tipID, err := synchronizationCheck(testGroup)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if b.ID() != tipID {
+			t.Fatal("test group does not have the tip block")
 		}
 	}
 
@@ -2265,15 +2267,16 @@ func TestRepairLoopBlocking(t *testing.T) {
 
 		// add a few new blocks in order to cause the renter to form contracts with the new host
 		for i := 0; i < 10; i++ {
-			b, err := stNewHost.miner.AddBlock()
+			b, err := testGroup[0].miner.AddBlock()
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, tester := range testGroup {
-				err = waitForBlock(b.ID(), tester)
-				if err != nil {
-					t.Fatal(err)
-				}
+			tipID, err := synchronizationCheck(testGroup)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if b.ID() != tipID {
+				t.Fatal("test group does not have the tip block")
 			}
 		}
 	}
@@ -2490,15 +2493,16 @@ func TestRemoteFileRepairMassive(t *testing.T) {
 
 	// add a few new blocks in order to cause the renter to form contracts with the new host
 	for i := 0; i < 10; i++ {
-		b, err := stNewHost.miner.AddBlock()
+		b, err := testGroup[0].miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, tester := range testGroup {
-			err = waitForBlock(b.ID(), tester)
-			if err != nil {
-				t.Fatal(err)
-			}
+		tipID, err := synchronizationCheck(testGroup)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if b.ID() != tipID {
+			t.Fatal("test group does not have the tip block")
 		}
 	}
 

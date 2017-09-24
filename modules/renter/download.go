@@ -383,9 +383,8 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 	}
 
 	// Update the set of workers to include everyone in the worker pool.
-	contracts := r.hostContractor.Contracts()
+	r.managedUpdateWorkerPool()
 	id := r.mu.Lock()
-	r.updateWorkerPool(contracts)
 	ds.availableWorkers = make([]*worker, 0, len(r.workerPool))
 	for _, worker := range r.workerPool {
 		// Ignore workers that are already in the active set of workers.

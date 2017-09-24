@@ -90,6 +90,8 @@ type hostContractor interface {
 	// Contract returns the latest contract formed with the specified host.
 	Contract(modules.NetAddress) (modules.RenterContract, bool)
 
+	ContractLookups() (renewedIDs map[types.FileContractID]types.FileContractID, contracts map[types.FileContractID]modules.RenterContract)
+
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
@@ -149,8 +151,13 @@ type Renter struct {
 	chunkQueue    []*chunkDownload // Accessed without locks.
 	downloadQueue []*download
 	newDownloads  chan *download
+	newMemory     chan struct{}
 	newRepairs    chan *file
 	workerPool    map[types.FileContractID]*worker
+
+	// Memory management
+	newUploadMemory       chan struct{} // an item is sent down this chan whenever memory has been freed up
+	uploadMemoryAvailable uint64
 
 	// Utilities.
 	cs             modules.ConsensusSet
@@ -199,7 +206,11 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		tracking:   make(map[string]trackedFile),
 
 		newDownloads: make(chan *download),
+		newMemory:    make(chan struct{}, 1),
 		workerPool:   make(map[types.FileContractID]*worker),
+
+		newUploadMemory:       make(chan struct{}),
+		uploadMemoryAvailable: defaultUploadMemory,
 
 		cs:             cs,
 		hostDB:         hdb,
@@ -214,11 +225,9 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	}
 
 	// Spin up the workers for the work pool.
-	contracts := r.hostContractor.Contracts()
-	r.updateWorkerPool(contracts)
-	go r.threadedRepairLoop()
+	r.managedUpdateWorkerPool()
+	go r.threadedRepairScan()
 	go r.threadedDownloadLoop()
-	go r.threadedQueueRepairs()
 
 	// Kill workers on shutdown.
 	r.tg.OnStop(func() {
@@ -303,10 +312,7 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		return err
 	}
 
-	contracts := r.hostContractor.Contracts()
-	id := r.mu.Lock()
-	r.updateWorkerPool(contracts)
-	r.mu.Unlock(id)
+	r.managedUpdateWorkerPool()
 	return nil
 }
 
