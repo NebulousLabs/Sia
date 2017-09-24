@@ -63,15 +63,15 @@ spellcheck:
 
 # dev builds and installs developer binaries.
 dev:
-	go install -race -tags='dev debug profile' $(pkgs)
+	go install -race -tags='dev debug profile netgo' $(pkgs)
 
 # release builds and installs release binaries.
 release:
-	go install -tags='debug profile' $(pkgs)
+	go install -tags='debug profile netgo' $(pkgs)
 release-race:
-	go install -race -tags='debug profile' $(pkgs)
+	go install -race -tags='debug profile netgo' $(pkgs)
 release-std:
-	go install -ldflags='-s -w' $(pkgs)
+	go install -tags 'netgo' -ldflags='-s -w' $(pkgs)
 
 # clean removes all directories that get automatically created during
 # development.
@@ -79,19 +79,19 @@ clean:
 	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
 
 test:
-	go test -short -tags='debug testing' -timeout=5s $(pkgs) -run=$(run)
+	go test -short -tags='debug testing netgo' -timeout=5s $(pkgs) -run=$(run)
 test-v:
-	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
+	go test -race -v -short -tags='debug testing netgo' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint
-	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
+	go test -v -race -tags='testing debug netgo' -timeout=500s $(pkgs) -run=$(run)
 test-vlong: clean fmt vet lint
-	go test -v -race -tags='testing debug vlong' -timeout=5000s $(pkgs) -run=$(run)
+	go test -v -race -tags='testing debug vlong netgo' -timeout=5000s $(pkgs) -run=$(run)
 test-cpu:
-	go test -v -tags='testing debug' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)
+	go test -v -tags='testing debug netgo' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)
 test-mem:
-	go test -v -tags='testing debug' -timeout=500s -memprofile mem.prof $(pkgs) -run=$(run)
+	go test -v -tags='testing debug netgo' -timeout=500s -memprofile mem.prof $(pkgs) -run=$(run)
 bench: clean fmt
-	go test -tags='debug testing' -timeout=500s -run=XXX -bench=$(run) $(pkgs)
+	go test -tags='debug testing netgo' -timeout=500s -run=XXX -bench=$(run) $(pkgs)
 cover: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
