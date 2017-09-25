@@ -3,6 +3,7 @@ package contractmanager
 import (
 	"encoding/json"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,6 +25,11 @@ func (wal *writeAheadLog) syncResources() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		if wal.fileSettingsTmp == nil {
+			// nothing to sync
+			return
+		}
 
 		tmpFilename := filepath.Join(wal.cm.persistDir, settingsFileTmp)
 		filename := filepath.Join(wal.cm.persistDir, settingsFile)
@@ -159,6 +165,14 @@ func (wal *writeAheadLog) commit() {
 	go func() {
 		defer wg.Done()
 
+		newSettings := wal.cm.savedSettings()
+		if reflect.DeepEqual(newSettings, wal.committedSettings) {
+			// no need to write the settings file
+			wal.fileSettingsTmp = nil
+			return
+		}
+		wal.committedSettings = newSettings
+
 		// Begin writing to the settings file, which will be synced during the
 		// next iteration of the sync loop.
 		var err error
@@ -166,8 +180,7 @@ func (wal *writeAheadLog) commit() {
 		if err != nil {
 			wal.cm.log.Severe("Unable to open temporary settings file for writing:", err)
 		}
-		ss := wal.cm.savedSettings()
-		b, err := json.MarshalIndent(ss, "", "\t")
+		b, err := json.MarshalIndent(newSettings, "", "\t")
 		if err != nil {
 			build.ExtendErr("unable to marshal settings data", err)
 		}
@@ -202,10 +215,12 @@ func (wal *writeAheadLog) commit() {
 		}
 
 		// Append all of the remaining long running uncommitted changes to the WAL.
-		wal.appendChange(stateChange{
-			UnfinishedStorageFolderAdditions:  unfinishedAdditions,
-			UnfinishedStorageFolderExtensions: unfinishedExtensions,
-		})
+		if len(unfinishedAdditions)+len(unfinishedExtensions) > 0 {
+			wal.appendChange(stateChange{
+				UnfinishedStorageFolderAdditions:  unfinishedAdditions,
+				UnfinishedStorageFolderExtensions: unfinishedExtensions,
+			})
+		}
 	}()
 	wg.Wait()
 }
