@@ -166,7 +166,7 @@ func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLo
 	if location.count == 65535 {
 		return errMaxVirtualSectors
 	}
-	location.count += 1
+	location.count++
 
 	// Prepare the sector update.
 	su := sectorUpdate{
@@ -201,6 +201,7 @@ func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLo
 		// Revert the sector update in the WAL to reflect the fact that adding
 		// the sector has failed.
 		su.Count--
+		location.count--
 		wal.mu.Lock()
 		wal.appendChange(stateChange{
 			SectorUpdates: []sectorUpdate{su},
