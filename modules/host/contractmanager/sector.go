@@ -3,6 +3,7 @@ package contractmanager
 import (
 	"encoding/binary"
 	"errors"
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -94,17 +95,48 @@ func writeSector(f file, sectorIndex uint32, data []byte) error {
 	return nil
 }
 
+// writeSectorMetadatas will take a sector update and write the related metadata
+// to disk.
+func writeSectorMetadatas(f file, updates []sectorUpdate) error {
+	// Sort updates by sectorIndex.
+	sort.Slice(updates, func(i, j int) bool {
+		return updates[i].Index < updates[j].Index
+	})
+	// Make groups of adjacent updates to optimize writes.
+	var groups [][]sectorUpdate
+	for i, su := range updates {
+		if len(groups) == 0 || su.Index != updates[i-1].Index+1 {
+			groups = append(groups, []sectorUpdate{su})
+		} else {
+			groups[len(groups)-1] = append(groups[len(groups)-1], su)
+		}
+	}
+	// Write groups.
+	for _, group := range groups {
+		writeData := make([]byte, sectorMetadataDiskSize*len(group))
+		for i, su := range group {
+			update := writeData[i*sectorMetadataDiskSize:]
+			copy(update, su.ID[:])
+			binary.LittleEndian.PutUint16(update[12:], su.Count)
+		}
+		offset := sectorMetadataDiskSize * int64(group[0].Index)
+		if _, err := f.WriteAt(writeData, offset); err != nil {
+			return build.ExtendErr("unable to write in given file", err)
+		}
+	}
+	return nil
+}
+
 // writeSectorMetadata will take a sector update and write the related metadata
 // to disk.
 func writeSectorMetadata(f file, sectorIndex uint32, id sectorID, count uint16) error {
-	writeData := make([]byte, sectorMetadataDiskSize)
-	copy(writeData, id[:])
-	binary.LittleEndian.PutUint16(writeData[12:], count)
-	_, err := f.WriteAt(writeData, sectorMetadataDiskSize*int64(sectorIndex))
-	if err != nil {
-		return build.ExtendErr("unable to write in given file", err)
+	su := sectorUpdate{
+		Count: count,
+		ID:    id,
+		Index: sectorIndex,
+		// Folder field is not set and not used.
 	}
-	return nil
+	return writeSectorMetadatas(f, []sectorUpdate{su})
 }
 
 // sectorID returns the id that should be used when referring to a sector.
