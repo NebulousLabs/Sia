@@ -38,7 +38,7 @@ type unfinishedChunk struct {
 	// Information about the file. localPath may be the empty string if the file
 	// is known not to exist locally.
 	renterFile *file
-	localPath string
+	localPath  string
 
 	// Information about the chunk, namely where it exists within the file.
 	//
@@ -57,20 +57,22 @@ type unfinishedChunk struct {
 	physicalChunkData [][]byte
 
 	// Fields for tracking the current progress of the chunk and all the pieces.
-	memoryNeeded     uint64 // memory needed in bytes
-	piecesNeeded     int // number of pieces to achieve a 100% complete upload
-	piecesCompleted  int // number of pieces that have been fully uploaded.
-	piecesRegistered int // number of pieces that are being uploaded, but aren't finished yet.
-	pieceUsage       []bool // one per piece. 'false' = piece not uploaded. 'true' = piece uploaded.
-	progress         float64 // percent complete at the moment uploading started
+	memoryNeeded     uint64              // memory needed in bytes
+	piecesNeeded     int                 // number of pieces to achieve a 100% complete upload
+	piecesCompleted  int                 // number of pieces that have been fully uploaded.
+	piecesRegistered int                 // number of pieces that are being uploaded, but aren't finished yet.
+	pieceUsage       []bool              // one per piece. 'false' = piece not uploaded. 'true' = piece uploaded.
 	unusedHosts      map[string]struct{} // hosts that aren't yet storing any pieces
 
 	// Utilities.
 	mu sync.Mutex
 }
 
-func (ch chunkHeap) Len() int            { return len(ch) }
-func (ch chunkHeap) Less(i, j int) bool  { return ch[i].progress < ch[j].progress }
+// Implementation of heap.Interface for chunkHeap.
+func (ch chunkHeap) Len() int { return len(ch) }
+func (ch chunkHeap) Less(i, j int) bool {
+	return float64(ch[i].piecesCompleted)/float64(ch[i].piecesNeeded) < float64(ch[j].piecesCompleted)/float64(ch[j].piecesNeeded)
+}
 func (ch chunkHeap) Swap(i, j int)       { ch[i], ch[j] = ch[j], ch[i] }
 func (ch *chunkHeap) Push(x interface{}) { *ch = append(*ch, x.(*unfinishedChunk)) }
 func (ch *chunkHeap) Pop() interface{} {
@@ -104,29 +106,21 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}, fcidT
 	// and the fact that chunks are going to be different sizes.
 	chunkCount := f.numChunks()
 	newUnfinishedChunks := make([]*unfinishedChunk, chunkCount)
-	// Add a separate unusedHosts map for each chunk, as every chunk will have a
-	// different set of unused hosts.
 	for i := uint64(0); i < chunkCount; i++ {
-		newUnfinishedChunks[i] = new(unfinishedChunk)
-		newUnfinishedChunks[i].index = i
-		newUnfinishedChunks[i].localPath = trackedFile.RepairPath
+		newUnfinishedChunks[i] = &unfinishedChunk{
+			renterFile: f,
+			localPath:  trackedFile.RepairPath,
 
-		// Mark the number of pieces needed for this chunk.
-		newUnfinishedChunks[i].piecesNeeded = f.erasureCode.NumPieces()
-		newUnfinishedChunks[i].memoryNeeded = f.pieceSize * uint64(f.erasureCode.NumPieces())
+			index:  i,
+			length: f.chunkSize(),
+			offset: int64(i * f.chunkSize()),
 
-		// TODO / NOTE: Offset and length are going to have to be derived using
-		// alternate means once chunks are no longer constant size within a
-		// file. Likely the chunk metadata will contain this information, but we
-		// also want to make sure that files are random-access, and don't
-		// require seeking through a ton of chunk headers to get to an arbitrary
-		// position. It's currently an open problem.
-		newUnfinishedChunks[i].offset = int64(i * f.chunkSize())
-		newUnfinishedChunks[i].length = f.chunkSize()
-
-		// Fill out the set of unused hosts.
-		newUnfinishedChunks[i].pieceUsage = make([]bool, f.erasureCode.NumPieces())
-		newUnfinishedChunks[i].unusedHosts = make(map[string]struct{})
+			memoryNeeded: f.pieceSize * uint64(f.erasureCode.NumPieces()),
+			piecesNeeded: f.erasureCode.NumPieces(),
+			pieceUsage:   make([]bool, f.erasureCode.NumPieces()),
+			unusedHosts:  make(map[string]struct{}),
+		}
+		// Every chunk can have a different set of unused hosts.
 		for host := range hosts {
 			newUnfinishedChunks[i].unusedHosts[host] = struct{}{}
 		}
@@ -137,11 +131,9 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}, fcidT
 	// map, also increment the 'piecesCompleted' value.
 	saveFile := false
 	for fcid, fileContract := range f.contracts {
-		// TODO: Need to figure out whether this contract line is still being
-		// used. And even worse, need to figure out whether this particular
-		// piece is still available in the contract, as hosts may drop
-		// particular pieces or lose particular drives, resulting in the
-		// contract line continuing to be valid but the data being gone.
+		// TODO: Need to figure out whether this host is still GoodForRenew, and
+		// also need to figure out whether each piece protected by the file
+		// contract is still available within the file contract.
 
 		// Convert the FileContractID into a host pubkey using the host pubkey
 		// lookup.
@@ -185,16 +177,13 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}, fcidT
 
 	// Iterate through the set of newUnfinishedChunks and remove any that are
 	// completed.
-	totalIncomplete := 0
+	incompleteChunks := newUnfinishedChunks[:0]
 	for i := 0; i < len(newUnfinishedChunks); i++ {
 		if newUnfinishedChunks[i].piecesCompleted < newUnfinishedChunks[i].piecesNeeded {
-			newUnfinishedChunks[totalIncomplete] = newUnfinishedChunks[i]
-			newUnfinishedChunks[i].progress = float64(newUnfinishedChunks[i].piecesCompleted) / float64(newUnfinishedChunks[i].piecesNeeded)
-			totalIncomplete++
+			incompleteChunks = append(incompleteChunks, newUnfinishedChunks[i])
 		}
 	}
-	newUnfinishedChunks = newUnfinishedChunks[:totalIncomplete]
-	return newUnfinishedChunks
+	return incompleteChunks
 }
 
 // managedBuildChunkHeap will iterate through all of the files in the renter and
@@ -241,6 +230,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 		case newFile := <-r.newUploads:
 			r.managedInsertFileIntoChunkHeap(newFile, ch, hosts, fcidToHPK)
 		case <-r.newMemory:
+			memoryAvailable = r.managedMemoryAvailableGet()
 		case <-r.tg.StopChan():
 		}
 	}
@@ -265,7 +255,7 @@ func (r *Renter) threadedRepairScan() {
 
 	for {
 		// Return if the renter has shut down.
-		select{
+		select {
 		case <-r.tg.StopChan():
 			return
 		default:
@@ -302,7 +292,7 @@ func (r *Renter) threadedRepairScan() {
 		rebuildHeapSignal := time.After(rebuildChunkHeapInterval)
 		for {
 			// Return if the renter has shut down.
-			select{
+			select {
 			case <-r.tg.StopChan():
 				return
 			default:
