@@ -126,17 +126,23 @@ func (w *worker) queueChunkRepair(chunk *unfinishedChunk) {
 	}
 }
 
+// uploadFailed is called if a worker failed to upload part of an unfinished
+// chunk.
+func (w *worker) uploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
+	w.recentUploadFailure = time.Now()
+	w.consecutiveUploadFailures++
+	uc.mu.Lock()
+	uc.piecesRegistered--
+	uc.pieceUsage[pieceIndex] = false
+	uc.mu.Unlock()
+}
+
 // upload will perform some upload work.
 func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	// Open an editing connection to the host.
 	e, err := w.renter.hostContractor.Editor(w.contractID, w.renter.tg.StopChan())
 	if err != nil {
-		w.recentUploadFailure = time.Now()
-		w.consecutiveUploadFailures++
-		uc.mu.Lock()
-		uc.piecesRegistered--
-		uc.pieceUsage[pieceIndex] = false
-		uc.mu.Unlock()
+		w.uploadFailed(uc, pieceIndex)
 		return
 	}
 	defer e.Close()
@@ -145,12 +151,7 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	// the upload attempt.
 	root, err := e.Upload(uc.physicalChunkData[pieceIndex])
 	if err != nil {
-		w.recentUploadFailure = time.Now()
-		w.consecutiveUploadFailures++
-		uc.mu.Lock()
-		uc.piecesRegistered--
-		uc.pieceUsage[pieceIndex] = false
-		uc.mu.Unlock()
+		w.uploadFailed(uc, pieceIndex)
 		return
 	}
 	w.consecutiveUploadFailures = 0
@@ -182,6 +183,42 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	w.renter.managedMemoryAvailableAdd(uint64(len(uc.physicalChunkData[pieceIndex])))
 }
 
+// processChunk will process a chunk from the worker chunk queue.
+func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, pieceIndex uint64) {
+	// See if we are a candidate host for this chunk, and also if this
+	// chunk still needs work performed on it.
+	uc.mu.Lock()
+	_, candidateHost := uc.unusedHosts[w.hostPubKey.String()]
+	chunkComplete := uc.piecesNeeded <= uc.piecesCompleted
+	needsHelp := uc.piecesNeeded > uc.piecesCompleted+uc.piecesRegistered
+	index := 0
+	if candidateHost && needsHelp {
+		// Select a piece and mark that a piece has been selected.
+		for i := 0; i < len(uc.pieceUsage); i++ {
+			if !uc.pieceUsage[i] {
+				index = i
+				uc.pieceUsage[i] = true
+				break
+			}
+		}
+		delete(uc.unusedHosts, w.hostPubKey.String())
+		uc.piecesRegistered++
+	}
+	uc.mu.Unlock()
+
+	// Return this chunk for work if the worker is able to help.
+	if candidateHost && needsHelp {
+		return uc, uint64(index)
+	}
+
+	// Add this chunk to the standby chunks if this chunk may need help,
+	// but is already being helped.
+	if !chunkComplete && candidateHost {
+		w.standbyChunks = append(w.standbyChunks, nextChunk)
+	}
+	return nil, 0
+}
+
 // nextChunk will pull the next potential chunk out of the worker's work queue
 // for uploading.
 func (w *worker) nextChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
@@ -189,78 +226,23 @@ func (w *worker) nextChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
 	defer w.mu.Unlock()
 
 	// Loop through the unprocessed chunks and find some work to do.
-	for i := 0; i < len(w.unprocessedChunks); i++ {
+	for range w.unprocessedChunks {
 		// Pull a chunk off of the unprocessed chunks stack.
-		nextChunk := w.unprocessedChunks[0]
+		chunk := w.unprocessedChunks[0]
 		w.unprocessedChunks = w.unprocessedChunks[1:]
-
-		// See if we are a candidate host for this chunk, and also if this
-		// chunk still needs work performed on it.
-		nextChunk.mu.Lock()
-		_, candidateHost := nextChunk.unusedHosts[w.hostPubKey.String()]
-		chunkComplete := nextChunk.piecesNeeded <= nextChunk.piecesCompleted
-		needsHelp := nextChunk.piecesNeeded > nextChunk.piecesCompleted+nextChunk.piecesRegistered
-		pieceIndex := 0
-		if candidateHost && needsHelp {
-			// Select a piece and mark that a piece has been selected.
-			for i := 0; i < len(nextChunk.pieceUsage); i++ {
-				if !nextChunk.pieceUsage[i] {
-					pieceIndex = i
-					nextChunk.pieceUsage[i] = true
-					break
-				}
-			}
-			delete(nextChunk.unusedHosts, w.hostPubKey.String())
-			nextChunk.piecesRegistered++
-		}
-		nextChunk.mu.Unlock()
-
-		// Return this chunk for work if the worker is able to help.
-		if candidateHost && needsHelp {
-			return nextChunk, uint64(pieceIndex)
-		}
-
-		// Add this chunk to the standby chunks if this chunk may need help,
-		// but is already being helped.
-		if !chunkComplete && candidateHost {
-			w.standbyChunks = append(w.standbyChunks, nextChunk)
+		nextChunk, pieceIndex := w.processChunk(chunk)
+		if nextChunk != nil {
+			return nextChunk, pieceIndex
 		}
 	}
 
 	// Loop through the standby chunks to see if there is work to do.
-	for i := 0; i < len(w.standbyChunks); i++ {
-		nextChunk := w.standbyChunks[0]
+	for range w.standbyChunks {
+		chunk := w.standbyChunks[0]
 		w.standbyChunks = w.standbyChunks[1:]
-
-		// See if we are a candidate host for this chunk, and also if this
-		// chunk still needs work performed on it.
-		nextChunk.mu.Lock()
-		chunkComplete := nextChunk.piecesNeeded <= nextChunk.piecesCompleted
-		needsHelp := nextChunk.piecesNeeded > nextChunk.piecesCompleted+nextChunk.piecesRegistered
-		pieceIndex := 0
-		if needsHelp {
-			// Select a piece and mark that a piece has been selected.
-			for i := 0; i < len(nextChunk.pieceUsage); i++ {
-				if !nextChunk.pieceUsage[i] {
-					pieceIndex = i
-					nextChunk.pieceUsage[i] = true
-					break
-				}
-			}
-			delete(nextChunk.unusedHosts, w.hostPubKey.String())
-			nextChunk.piecesRegistered++
-		}
-		nextChunk.mu.Unlock()
-
-		// Return this chunk for work if the worker is able to help.
-		if needsHelp {
-			return nextChunk, uint64(pieceIndex)
-		}
-
-		// Add this chunk to the standby chunks if this chunk may need help,
-		// but is already being helped.
-		if !chunkComplete {
-			w.standbyChunks = append(w.standbyChunks, nextChunk)
+		nextChunk, pieceIndex := w.processChunk(chunk)
+		if nextChunk != nil {
+			return nextChunk, pieceIndex
 		}
 	}
 
