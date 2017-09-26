@@ -281,79 +281,70 @@ func (w *worker) nextChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
 	return nil, 0
 }
 
-// work will perform one unit of work, exiting early if there is a kill signal
-// given before work is completed.
-func (w *worker) work() {
-	// Check for priority downloads.
-	select {
-	case d := <-w.priorityDownloadChan:
-		w.download(d)
-		return
-	default:
-		// do nothing
-	}
-
-	// Check for standard downloads.
-	select {
-	case d := <-w.downloadChan:
-		w.download(d)
-		return
-	default:
-		// do nothing
-	}
-
-	// Perform one step of processing upload work.
-	chunk, pieceIndex := w.nextChunk()
-	if chunk != nil {
-		w.upload(chunk, pieceIndex)
-	}
-
-	// None of the priority channels have work, listen on all channels. If there
-	// are any standbyChunks, sleep for only a little while.
-	var sleepDuration time.Duration
-	w.mu.Lock()
-	numStandby := len(w.standbyChunks)
-	w.mu.Unlock()
-	if numStandby > 0 {
-		sleepDuration = time.Second * 3 // TODO: Constant
-	} else {
-		sleepDuration = time.Hour // TODO: Constant
-	}
-	select {
-	case d := <-w.downloadChan:
-		w.download(d)
-		return
-	case <-w.killChan:
-		return
-	case <-w.uploadChan:
-		return
-	case d := <-w.priorityDownloadChan:
-		w.download(d)
-		return
-	case <-w.renter.tg.StopChan():
-		return
-	case <-time.After(sleepDuration):
-		return
-	}
-}
-
-// threadedWorkLoop repeatedly issues work to a worker, stopping when the
-// thread group is closed.
+// threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
+// is killed or when the thread group is closed.
 func (w *worker) threadedWorkLoop() {
+	err := w.renter.tg.Add()
+	if err != nil {
+		return
+	}
+	defer w.renter.tg.Done()
+
 	for {
-		// Check if the worker has been killed individually.
+		// Check for priority downloads.
 		select {
+		case d := <-w.priorityDownloadChan:
+			w.download(d)
+			continue
+		default:
+		}
+
+		// Check for standard downloads.
+		select {
+		case d := <-w.downloadChan:
+			w.download(d)
+			continue
+		default:
+		}
+
+		// Perform one step of processing upload work.
+		chunk, pieceIndex := w.nextChunk()
+		if chunk != nil {
+			w.upload(chunk, pieceIndex)
+			continue
+		}
+
+		// Determine the maximum amount of time to wait for any standby chunks.
+		var sleepDuration time.Duration
+		w.mu.Lock()
+		numStandby := len(w.standbyChunks)
+		w.mu.Unlock()
+		if numStandby > 0 {
+			// TODO: Pick a random time instead of just a constant time.
+			sleepDuration = time.Second * 3 // TODO: Constant
+		} else {
+			sleepDuration = time.Hour // TODO: Constant
+		}
+
+		// Block until new work is received via the upload or download channels,
+		// or until the standby chunks are ready to be revisited, or until a
+		// kill signal is received.
+		select {
+		case d := <-w.priorityDownloadChan:
+			w.download(d)
+			continue
+		case d := <-w.downloadChan:
+			w.download(d)
+			continue
+		case <-w.uploadChan:
+			continue
+		case <-time.After(sleepDuration):
+			continue
 		case <-w.killChan:
 			return
-		default:
-			// do nothing
-		}
-
-		if w.renter.tg.Add() != nil {
+		case <-w.renter.tg.StopChan():
 			return
 		}
-		w.work()
-		w.renter.tg.Done()
 	}
 }
 

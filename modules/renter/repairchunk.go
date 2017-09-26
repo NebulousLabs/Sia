@@ -93,6 +93,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
 		return
 	}
 	// Nil out the logical chunk data so that it can be garbage collected.
+	memoryFreed := uint64(len(chunk.logicalChunkData))
 	chunk.logicalChunkData = nil
 
 	// Sanity check - we should have at least as many physical data pieces as we
@@ -103,7 +104,6 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
 	}
 	// Loop through the pieces and nil out any that are not needed, making note
 	// of how much memory is freed so we can update the amount of memory in use.
-	memoryFreed := uint64(0)
 	for i := 0; i < len(chunk.pieceUsage); i++ {
 		if chunk.pieceUsage[i] {
 			memoryFreed += uint64(len(chunk.physicalChunkData[i]))
@@ -114,7 +114,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
 	r.managedMemoryAvailableAdd(memoryFreed)
 
 	// Distribute the chunk to all of the workers.
-	id = r.mu.RLock()
+	id := r.mu.RLock()
 	for _, worker := range r.workerPool {
 		worker.queueChunkRepair(chunk)
 	}

@@ -109,7 +109,8 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			length: f.chunkSize(),
 			offset: int64(i * f.chunkSize()),
 
-			memoryNeeded:  f.pieceSize * uint64(f.erasureCode.NumPieces()),
+			// memoryNeeded has to also include the logical data
+			memoryNeeded:  f.pieceSize*uint64(f.erasureCode.NumPieces()) + f.pieceSize*uint64(f.erasureCode.MinPieces()),
 			minimumPieces: f.erasureCode.MinPieces(),
 			piecesNeeded:  f.erasureCode.NumPieces(),
 			pieceUsage:    make([]bool, f.erasureCode.NumPieces()),
