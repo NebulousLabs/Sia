@@ -9,10 +9,6 @@ package renter
 // on problem areas instead of doing everything all at once every iteration.
 // This should boost scalability.
 
-// TODO: If the original file would need to be downloaded to be repaired, don't
-// repair data that has less than 25% of its redundant pieces. (so in a
-// 10-of-110 situation, you repair when the piece count drops to 85 or lower).
-
 // TODO: We need to upgrade the contractor before we can do this, but we need to
 // be checking for every piece within a contract, and checking that the piece is
 // still available in the contract that we have, that the host did not lose or
@@ -55,6 +51,7 @@ type unfinishedChunk struct {
 
 	// Fields for tracking the current progress of the chunk and all the pieces.
 	memoryNeeded     uint64              // memory needed in bytes
+	minimumPieces    int                 // number of pieces required to recover the file.
 	piecesNeeded     int                 // number of pieces to achieve a 100% complete upload
 	piecesCompleted  int                 // number of pieces that have been fully uploaded.
 	piecesRegistered int                 // number of pieces that are being uploaded, but aren't finished yet.
@@ -113,6 +110,7 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			offset: int64(i * f.chunkSize()),
 
 			memoryNeeded: f.pieceSize * uint64(f.erasureCode.NumPieces()),
+			minimumPieces: f.erasureCode.MinPieces(),
 			piecesNeeded: f.erasureCode.NumPieces(),
 			pieceUsage:   make([]bool, f.erasureCode.NumPieces()),
 			unusedHosts:  make(map[string]struct{}),

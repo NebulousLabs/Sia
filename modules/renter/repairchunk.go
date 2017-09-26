@@ -37,10 +37,12 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 //
 // chunk.data should be passed as 'nil' to the download, to keep memory usage as
 // light as possible.
-func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk) error {
+func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk, download bool) error {
 	// Download the chunk if it's not on disk.
-	if chunk.localPath == "" {
+	if chunk.localPath == "" && download {
 		return r.managedDownloadLogicalChunkData(chunk)
+	} else if chunk.localPath == "" {
+		return errors.New("file not available locally")
 	}
 
 	// Try to read the data from disk. If that fails at any point, prefer to
@@ -50,14 +52,18 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk) error {
 	// loading fails.
 	chunk.logicalChunkData = make([]byte, chunk.length)
 	osFile, err := os.Open(chunk.localPath)
-	if err != nil {
+	if err != nil && download {
 		chunk.logicalChunkData = nil
 		return r.managedDownloadLogicalChunkData(chunk)
+	} else if err != nil {
+		return errors.Extend(err, errors.New("failed to open file locally"))
 	}
 	_, err = osFile.ReadAt(chunk.logicalChunkData, chunk.offset)
-	if err != nil {
+	if err != nil && download {
 		chunk.logicalChunkData = nil
 		return r.managedDownloadLogicalChunkData(chunk)
+	} else if err != nil {
+		return errors.Extend(err, errors.New("failed to read file locally"))
 	}
 
 	// Data successfully read from disk.
@@ -67,8 +73,12 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk) error {
 // managedFetchAndRepairChunk will fetch the logical data for a chunk, create the
 // physical pieces for the chunk, and then distribute them.
 func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
+	// Only download this file if more than 25% of the redundancy is missing.
+	minMissingPiecesToDownload := (chunk.piecesNeeded - chunk.minimumPieces) / 4
+	download := chunk.piecesCompleted + minMissingPiecesToDownload < chunk.piecesNeeded
+
 	// Fetch the logical data for the chunk.
-	err := r.managedFetchLogicalChunkData(chunk)
+	err := r.managedFetchLogicalChunkData(chunk, download)
 	if err != nil {
 		// Logical data is not available, nothing to do.
 		//
