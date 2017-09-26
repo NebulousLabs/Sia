@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -83,16 +82,4 @@ func (c *Contractor) isOffline(id types.FileContractID) bool {
 		}
 	}
 	return windowEnd.Sub(windowStart) >= uptimeWindow
-}
-
-// onlineContracts returns the subset of the Contractor's contracts whose
-// hosts are considered online.
-func (c *Contractor) onlineContracts() []modules.RenterContract {
-	var cs []modules.RenterContract
-	for _, contract := range c.contracts {
-		if !c.isOffline(contract.ID) {
-			cs = append(cs, contract)
-		}
-	}
-	return cs
 }

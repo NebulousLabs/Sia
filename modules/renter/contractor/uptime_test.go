@@ -80,11 +80,13 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		t.Error(err)
 	}
 	c.mu.Lock()
-	oc := len(c.onlineContracts())
-	c.mu.Unlock()
-	if oc != 0 {
-		t.Fatal("contract should not be reported as online")
+	for _, contract := range c.contracts {
+		if !c.isOffline(contract.ID) {
+			t.Fatal("contract should not be reported as online")
+		}
+
 	}
+	c.mu.Unlock()
 
 	// announce the second host
 	err = h2.Announce()

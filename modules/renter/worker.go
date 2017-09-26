@@ -360,10 +360,14 @@ func (w *worker) threadedWorkLoop() {
 // updateWorkerPool will grab the set of contracts from the contractor and
 // update the worker pool to match.
 func (r *Renter) managedUpdateWorkerPool() {
-	_, currentContracts := r.hostContractor.ContractLookups()
+	contractSlice := r.hostContractor.Contracts()
+	contractMap := make(map[types.FileContractID]modules.RenterContract)
+	for i := 0; i < len(contractSlice); i++ {
+		contractMap[contractSlice[i].ID] = contractSlice[i]
+	}
 
 	// Add a worker for any contract that does not already have a worker.
-	for id, contract := range currentContracts {
+	for id, contract := range contractMap {
 		_, exists := r.workerPool[id]
 		if !exists {
 			worker := &worker{
@@ -385,7 +389,7 @@ func (r *Renter) managedUpdateWorkerPool() {
 
 	// Remove a worker for any worker that is not in the set of new contracts.
 	for id, worker := range r.workerPool {
-		_, exists := currentContracts[id]
+		_, exists := contractMap[id]
 		if !exists {
 			delete(r.workerPool, id)
 			close(worker.killChan)

@@ -1,5 +1,12 @@
 package contractor
 
+// TODO: We are in the middle of migrating the contractor to a new concurrency
+// model. The contractor should never call out to another package while under a
+// lock (except for the proto package). This is because the renter is going to
+// start calling contractor methods while holding the renter lock, so we need to
+// be absolutely confident that no contractor thread will attempt to grab a
+// renter lock.
+
 import (
 	"errors"
 	"fmt"
@@ -96,10 +103,14 @@ func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContra
 // Contracts returns the contracts formed by the contractor in the current
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
-func (c *Contractor) Contracts() (cs []modules.RenterContract) {
+func (c *Contractor) Contracts() []modules.RenterContract {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.onlineContracts()
+	cs := make([]modules.RenterContract, 0, len(c.contracts))
+	for _, contract := range c.contracts {
+		cs = append(cs, contract)
+	}
+	return cs
 }
 
 // AllContracts returns the contracts formed by the contractor in the current
@@ -116,24 +127,6 @@ func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
 		cs = append(cs, contract)
 	}
 	return
-}
-
-// ContractLookups returns the renewedIDs as well as the contracts map to the
-// caller, enabling the caller to convert arbitrary file contract ids into the
-// corresponding host pubkeys.
-func (c *Contractor) ContractLookups() (renewedIDs map[types.FileContractID]types.FileContractID, contracts map[types.FileContractID]modules.RenterContract) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	renewedIDs = make(map[types.FileContractID]types.FileContractID)
-	for k, v := range c.renewedIDs {
-		renewedIDs[k] = v
-	}
-	contracts = make(map[types.FileContractID]modules.RenterContract)
-	for k, v := range c.contracts {
-		contracts[k] = v
-	}
-	return renewedIDs, contracts
 }
 
 // CurrentPeriod returns the height at which the current allowance period
@@ -157,21 +150,25 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	return id
 }
 
-// Close closes the Contractor.
-func (c *Contractor) Close() error {
-	return c.tg.Stop()
-}
-
-// GoodForRenew indicates whether a contract is intended to be renewed.
-func (c *Contractor) GoodForRenew(id types.FileContractID) bool {
+// ResolveContract returns the current contract associated with the provided
+// contract id. It is equivalent to calling 'ResolveID' and then calling
+// 'ContractByID' with the result.
+func (c *Contractor) ResolveContract(id types.FileContractID) (contract modules.RenterContract, exists bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	contract, exists := c.contracts[id]
-	if !exists {
-		return false
+	newID, exists := c.renewedIDs[id]
+	for exists {
+		id = newID
+		newID, exists = c.renewedIDs[id]
 	}
-	return contract.GoodForRenew
+	contract, exists = c.contracts[id]
+	return contract, exists
+}
+
+// Close closes the Contractor.
+func (c *Contractor) Close() error {
+	return c.tg.Stop()
 }
 
 // New returns a new Contractor.

@@ -1,11 +1,5 @@
 package renter
 
-// TODO: Make sure the `newMemory` channel for the renter is buffered out to one
-// element.
-
-// TODO: When building the chunk, need to also include a list of pieces that
-// aren't properly replicated yet.
-
 // TODO / NOTE: Once the filesystem is tree-based, instead of continually
 // looping through the whole filesystem we can add values to the file metadata
 // indicating the health of each folder + file, and the time of the last scan
@@ -19,12 +13,15 @@ package renter
 // repair data that has less than 25% of its redundant pieces. (so in a
 // 10-of-110 situation, you repair when the piece count drops to 85 or lower).
 
+// TODO: We need to upgrade the contractor before we can do this, but we need to
+// be checking for every piece within a contract, and checking that the piece is
+// still available in the contract that we have, that the host did not lose or
+// nullify the piece.
+
 import (
 	"container/heap"
 	"sync"
 	"time"
-
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // ChunkHeap is a bunch of chunks sorted by percentage-completion for uploading.
@@ -88,7 +85,7 @@ func (ch *chunkHeap) Pop() interface{} {
 // TODO / NOTE: This code can be substantially simplified once the files store
 // the HostPubKey instead of the FileContractID, and can be simplified even
 // further once the layout is per-chunk instead of per-filecontract.
-func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}, fcidToHPK map[types.FileContractID]types.SiaPublicKey) []*unfinishedChunk {
+func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*unfinishedChunk {
 	// Files are not threadsafe.
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -131,13 +128,7 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}, fcidT
 	// map, also increment the 'piecesCompleted' value.
 	saveFile := false
 	for fcid, fileContract := range f.contracts {
-		// TODO: Need to figure out whether this host is still GoodForRenew, and
-		// also need to figure out whether each piece protected by the file
-		// contract is still available within the file contract.
-
-		// Convert the FileContractID into a host pubkey using the host pubkey
-		// lookup.
-		hpk, exists := fcidToHPK[fileContract.ID]
+		recentContract, exists := r.hostContractor.ResolveContract(fileContract.ID)
 		if !exists {
 			// File contract does not seem to be part of the host anymore.
 			// Delete this contract and mark the file to be saved.
@@ -145,6 +136,12 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}, fcidT
 			saveFile = true
 			continue
 		}
+		if !recentContract.GoodForRenew {
+			// We are no longer renewing with this contract, so it does not
+			// count for redundancy.
+			continue
+		}
+		hpk := recentContract.HostPublicKey
 
 		// Mark the chunk set based on the pieces in this contract.
 		for _, piece := range fileContract.Pieces {
@@ -188,12 +185,12 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}, fcidT
 
 // managedBuildChunkHeap will iterate through all of the files in the renter and
 // construct a chunk heap.
-func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}, fcidToHPK map[types.FileContractID]types.SiaPublicKey) *chunkHeap {
+func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}) *chunkHeap {
 	// Loop through the whole set of files to build the chunk heap.
 	var ch chunkHeap
 	id := r.mu.Lock()
 	for _, file := range r.files {
-		unfinishedChunks := r.buildUnfinishedChunks(file, hosts, fcidToHPK)
+		unfinishedChunks := r.buildUnfinishedChunks(file, hosts)
 		ch = append(ch, unfinishedChunks...)
 	}
 	r.mu.Unlock(id)
@@ -205,9 +202,9 @@ func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}, fcidToHPK map[
 
 // managedInsertFileIntoChunkHeap will insert all of the chunks of a file into the
 // chunk heap.
-func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts map[string]struct{}, fcidToHPK map[types.FileContractID]types.SiaPublicKey) {
+func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts map[string]struct{}) {
 	id := r.mu.Lock()
-	unfinishedChunks := r.buildUnfinishedChunks(f, hosts, fcidToHPK)
+	unfinishedChunks := r.buildUnfinishedChunks(f, hosts)
 	for i := 0; i < len(unfinishedChunks); i++ {
 		heap.Push(ch, unfinishedChunks)
 	}
@@ -219,7 +216,7 @@ func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts ma
 // available, fetching the logical data for the chunk (either from the disk or
 // from the network), erasure coding the logical data into the physical data,
 // and then finally passing the work onto the workers.
-func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{}, fcidToHPK map[types.FileContractID]types.SiaPublicKey) {
+func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{}) {
 	// Grab the next chunk, loop until we have enough memory, update the amount
 	// of memory available, and then spin up a thread to asynchronously handle
 	// the rest of the chunk tasks.
@@ -228,7 +225,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 	for nextChunk.memoryNeeded > memoryAvailable {
 		select {
 		case newFile := <-r.newUploads:
-			r.managedInsertFileIntoChunkHeap(newFile, ch, hosts, fcidToHPK)
+			r.managedInsertFileIntoChunkHeap(newFile, ch, hosts)
 		case <-r.newMemory:
 			memoryAvailable = r.managedMemoryAvailableGet()
 		case <-r.tg.StopChan():
@@ -268,7 +265,7 @@ func (r *Renter) threadedRepairScan() {
 		//
 		// TODO / NOTE: This code can be removed once files store the HostPubKey
 		// of the hosts they are using, instead of just the FileContractID.
-		currentContracts, fcidToHPK := r.managedCurrentContractsAndHistoricFCIDLookup()
+		currentContracts := r.hostContractor.Contracts()
 
 		// Pull together a list of hosts that are available for uploading. We
 		// assemble them into a map where the key is the String() representation
@@ -279,7 +276,7 @@ func (r *Renter) threadedRepairScan() {
 		}
 
 		// Build a min-heap of chunks organized by upload progress.
-		chunkHeap := r.managedBuildChunkHeap(hosts, fcidToHPK)
+		chunkHeap := r.managedBuildChunkHeap(hosts)
 
 		// Refresh the worker pool before beginning uploads.
 		r.managedUpdateWorkerPool()
@@ -299,14 +296,14 @@ func (r *Renter) threadedRepairScan() {
 			}
 
 			if chunkHeap.Len() > 0 {
-				r.managedPrepareNextChunk(chunkHeap, hosts, fcidToHPK)
+				r.managedPrepareNextChunk(chunkHeap, hosts)
 			} else {
 				// Block until the rebuild signal is received.
 				select {
 				case newFile := <-r.newUploads:
 					// If a new file is received, add its chunks to the repair
 					// heap and loop to start working through those chunks.
-					r.managedInsertFileIntoChunkHeap(newFile, chunkHeap, hosts, fcidToHPK)
+					r.managedInsertFileIntoChunkHeap(newFile, chunkHeap, hosts)
 					continue
 				case <-rebuildHeapSignal:
 					// If the rebuild heap signal is received, break out to the

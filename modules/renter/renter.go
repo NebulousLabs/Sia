@@ -92,8 +92,6 @@ type hostContractor interface {
 	// Contract returns the latest contract formed with the specified host.
 	Contract(modules.NetAddress) (modules.RenterContract, bool)
 
-	ContractLookups() (renewedIDs map[types.FileContractID]types.FileContractID, contracts map[types.FileContractID]modules.RenterContract)
-
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
@@ -108,10 +106,6 @@ type hostContractor interface {
 	// insertion, deletion, and modification of sectors.
 	Editor(types.FileContractID, <-chan struct{}) (contractor.Editor, error)
 
-	// GoodForRenew indicates whether the contract line of the provided contract
-	// is actively being renewed.
-	GoodForRenew(types.FileContractID) bool
-
 	// IsOffline reports whether the specified host is considered offline.
 	IsOffline(types.FileContractID) bool
 
@@ -121,6 +115,11 @@ type hostContractor interface {
 
 	// ResolveID returns the most recent renewal of the specified ID.
 	ResolveID(types.FileContractID) types.FileContractID
+
+	// ResovleContract returns the current contract associated with the provided
+	// contract id. It is equivalent to calling 'ResolveID' and then using the
+	// result to call 'ContractByID'.
+	ResolveContract(types.FileContractID) (modules.RenterContract, bool)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
@@ -216,7 +215,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 
 		baseMemory:      defaultMemory,
 		memoryAvailable: defaultMemory,
-		newMemory:       make(chan struct{}),
+		newMemory:       make(chan struct{}, 1),
 
 		cs:             cs,
 		hostDB:         hdb,
@@ -270,37 +269,6 @@ func (r *Renter) managedMemoryAvailableSub(amt uint64) {
 	id := r.mu.Lock()
 	r.memoryAvailable -= amt
 	r.mu.Unlock(id)
-}
-
-// managedCurrentContractsAndHosts will provide a list of contracts, as well as
-// a mapping from all historic file contract ids to the public keys of the hosts
-// that the contracts were formed with. If the renter no longer has a contract
-// with a particular host, that host is omitted.
-//
-// TODO / NOTE: Updates to the persisted data of the renter should make lookup
-// map to convert a file contract id to a host public key unnecessary - the
-// metadata will store the pubkey directly instead of the contract id.
-func (r *Renter) managedCurrentContractsAndHistoricFCIDLookup() (map[types.FileContractID]modules.RenterContract, map[types.FileContractID]types.SiaPublicKey) {
-	renewedIDs, currentContracts := r.hostContractor.ContractLookups()
-	fcidToHPK := make(map[types.FileContractID]types.SiaPublicKey)
-	for oldID, newID := range renewedIDs {
-		// First resolve the oldID into the most recent file contract id
-		// available.
-		finalID := newID
-		nextID, exists := renewedIDs[newID]
-		for exists {
-			finalID = nextID
-			nextID, exists = renewedIDs[nextID]
-		}
-
-		// Determine if the final id is available in the current set of
-		// contracts. If it is available, add oldID to the fcidToHPK map.
-		contract, exists := currentContracts[finalID]
-		if exists {
-			fcidToHPK[oldID] = contract.HostPublicKey
-		}
-	}
-	return currentContracts, fcidToHPK
 }
 
 // Close closes the Renter and its dependencies
