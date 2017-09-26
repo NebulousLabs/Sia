@@ -251,6 +251,11 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 func (r *Renter) managedMemoryAvailableAdd(amt uint64) {
 	id := r.mu.Lock()
 	r.memoryAvailable += amt
+	if r.memoryAvailable > r.baseMemory {
+		r.mu.Unlock(id)
+		r.log.Critical("Memory available now exceeds base memory:", r.memoryAvailable, r.baseMemory)
+		return
+	}
 	r.mu.Unlock(id)
 
 	// Create a notification that more memory is available.
@@ -273,6 +278,11 @@ func (r *Renter) managedMemoryAvailableGet() uint64 {
 // total memory available.
 func (r *Renter) managedMemoryAvailableSub(amt uint64) {
 	id := r.mu.Lock()
+	if r.memoryAvailable < amt {
+		r.mu.Unlock(id)
+		r.log.Critical("Memory available is underflowing", r.memoryAvailable, amt)
+		return
+	}
 	r.memoryAvailable -= amt
 	r.mu.Unlock(id)
 }

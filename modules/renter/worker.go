@@ -129,15 +129,6 @@ func (w *worker) queueChunkRepair(chunk *unfinishedChunk) {
 // upload will perform some upload work.
 func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	// Open an editing connection to the host.
-	//
-	// TODO / NOTE: Currently editing connections and downloading connections
-	// run different protocols. There are future plans to merge these protocols
-	// via an upgrade into a single connection.
-	//
-	// TODO / NOTE: Currently we query the host by using the contract id,
-	// however in the future we will query the host with a host public key, and
-	// the contractor will figure out which contract should be used to complete
-	// the operation.
 	e, err := w.renter.hostContractor.Editor(w.contractID, w.renter.tg.StopChan())
 	if err != nil {
 		w.recentUploadFailure = time.Now()
@@ -185,14 +176,10 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.renterFile.contracts[w.contractID] = contract
 	w.renter.saveFile(uc.renterFile)
 	uc.renterFile.mu.Unlock()
+	w.renter.mu.Unlock(id)
 
 	// Clear memory in the renter now that we're done.
-	w.renter.memoryAvailable += uint64(len(uc.physicalChunkData[pieceIndex]))
-	w.renter.mu.Unlock(id)
-	select {
-	case w.renter.newMemory <- struct{}{}:
-	default:
-	}
+	w.renter.managedMemoryAvailableAdd(uint64(len(uc.physicalChunkData[pieceIndex])))
 }
 
 // nextChunk will pull the next potential chunk out of the worker's work queue
