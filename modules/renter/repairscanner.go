@@ -35,32 +35,37 @@ type chunkHeap []*unfinishedChunk
 // unfinishedChunk contains a chunk from the filesystem that has not finished
 // uploading, including knowledge of the progress.
 type unfinishedChunk struct {
+	// Information about the file. localPath may be the empty string if the file
+	// is known not to exist locally.
 	renterFile *file
-
 	localPath string
 
+	// Information about the chunk, namely where it exists within the file.
+	//
+	// TODO / NOTE: As we change the file mapper, we're probably going to have
+	// to update these fields. Compatibility shouldn't be an issue because this
+	// struct is not persisted anywhere, it's always built from other
+	// structures.
 	index  uint64
 	length uint64
 	offset int64
 
+	// The logical data is the data that is presented to the user when the user
+	// requests the chunk. The physical data is all of the pieces that get
+	// stored across the network.
 	logicalChunkData  []byte
 	physicalChunkData [][]byte
 
-	// progress is used to sort the chunks in the chunkHeap. '0' indicates a
-	// completely unfinished file, and '1' indicates a completely finished file,
-	// meaning it's not actually an unfinished chunk.
-	progress float64
+	// Fields for tracking the current progress of the chunk and all the pieces.
+	memoryNeeded     uint64 // memory needed in bytes
+	piecesNeeded     int // number of pieces to achieve a 100% complete upload
+	piecesCompleted  int // number of pieces that have been fully uploaded.
+	piecesRegistered int // number of pieces that are being uploaded, but aren't finished yet.
+	pieceUsage       []bool // one per piece. 'false' = piece not uploaded. 'true' = piece uploaded.
+	progress         float64 // percent complete at the moment uploading started
+	unusedHosts      map[string]struct{} // hosts that aren't yet storing any pieces
 
-	// unusedHosts is a list of hosts by pubkey that have not contributed to
-	// this chunk yet. The key is the String() representation of a SiaPublicKey,
-	// as a SiaPublicKey cannot be used as a map key directly.
-	memoryNeeded     uint64
-	piecesNeeded     int
-	piecesCompleted  int
-	piecesRegistered int
-	pieceUsage       []bool // one element per piece. 'false' = piece not uploaded to a host. 'true' = piece uploaded to a host.
-	unusedHosts      map[string]struct{}
-
+	// Utilities.
 	mu sync.Mutex
 }
 
