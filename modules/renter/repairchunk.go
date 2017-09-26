@@ -75,36 +75,21 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk, download b
 func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
 	// Only download this file if more than 25% of the redundancy is missing.
 	minMissingPiecesToDownload := (chunk.piecesNeeded - chunk.minimumPieces) / 4
-	download := chunk.piecesCompleted + minMissingPiecesToDownload < chunk.piecesNeeded
+	download := chunk.piecesCompleted+minMissingPiecesToDownload < chunk.piecesNeeded
 
 	// Fetch the logical data for the chunk.
 	err := r.managedFetchLogicalChunkData(chunk, download)
 	if err != nil {
 		// Logical data is not available, nothing to do.
-		//
-		// TODO: Log something here?
+		r.log.Debugln("Fetching logical data of a chunk failed:", err)
 		return
 	}
 
-	// TODO: This operation ends up with extra memory, because we start with all
-	// of the logical data in memory, and then at one point we have both all of
-	// the logical data and also all of the physical data in memory, and there
-	// is surely some way to avoid this.
-	//
-	// TODO: Currently the memoryNeeded stuff doesn't account for that extra bit
-	// of memory which we potentially need after encoding the chunk. If we can't
-	// find some way to eliminate the overhead, we need to update the code to
-	// properly account for the temporary up-blip of memory.
-	//
-	// TODO: Even if we do fix that bit, right now we are currently encoding all
-	// the pieces, and then immediately deleting the ones we don't need. We
-	// could potentially save memory even more if we just didn't encode the ones
-	// that we don't need.
+	// Create the phsyical pieces for the data.
 	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.Encode(chunk.logicalChunkData)
 	if err != nil {
 		// Logical data is not available, nothing to do.
-		//
-		// TODO: Log something here?
+		r.log.Debugln("Fetching physical data of a chunk failed:", err)
 		return
 	}
 	// Nil out the logical chunk data so that it can be garbage collected.
@@ -126,16 +111,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
 		}
 	}
 	// Update the renter to indicate how much memory was freed.
-	id := r.mu.Lock()
-	r.memoryAvailable += memoryFreed
-	r.mu.Unlock(id)
-	// Notify the repair thread that more memory is available. If the channel is
-	// full, the repair thread will already see that there is more memory, no
-	// need to block.
-	select {
-	case r.newMemory <- struct{}{}:
-	default:
-	}
+	r.managedMemoryAvailableAdd(memoryFreed)
 
 	// Distribute the chunk to all of the workers.
 	id = r.mu.RLock()

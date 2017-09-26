@@ -109,11 +109,11 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			length: f.chunkSize(),
 			offset: int64(i * f.chunkSize()),
 
-			memoryNeeded: f.pieceSize * uint64(f.erasureCode.NumPieces()),
+			memoryNeeded:  f.pieceSize * uint64(f.erasureCode.NumPieces()),
 			minimumPieces: f.erasureCode.MinPieces(),
-			piecesNeeded: f.erasureCode.NumPieces(),
-			pieceUsage:   make([]bool, f.erasureCode.NumPieces()),
-			unusedHosts:  make(map[string]struct{}),
+			piecesNeeded:  f.erasureCode.NumPieces(),
+			pieceUsage:    make([]bool, f.erasureCode.NumPieces()),
+			unusedHosts:   make(map[string]struct{}),
 		}
 		// Every chunk can have a different set of unused hosts.
 		for host := range hosts {
@@ -285,7 +285,7 @@ func (r *Renter) threadedRepairScan() {
 		// received, we start over with the outer loop that rebuilds the heap
 		// and re-checks the health of all the files.
 		rebuildHeapSignal := time.After(rebuildChunkHeapInterval)
-LOOP:
+	LOOP:
 		for {
 			// Return if the renter has shut down.
 			select {

@@ -252,6 +252,12 @@ func (r *Renter) managedMemoryAvailableAdd(amt uint64) {
 	id := r.mu.Lock()
 	r.memoryAvailable += amt
 	r.mu.Unlock(id)
+
+	// Create a notification that more memory is available.
+	select{
+	case r.newMemory <- struct{}{}:
+	default:
+	}
 }
 
 // managedMemoryAvailableGet returns the current amount of memory available to
