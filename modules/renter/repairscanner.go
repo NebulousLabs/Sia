@@ -285,6 +285,7 @@ func (r *Renter) threadedRepairScan() {
 		// received, we start over with the outer loop that rebuilds the heap
 		// and re-checks the health of all the files.
 		rebuildHeapSignal := time.After(rebuildChunkHeapInterval)
+LOOP:
 		for {
 			// Return if the renter has shut down.
 			select {
@@ -307,7 +308,7 @@ func (r *Renter) threadedRepairScan() {
 					// If the rebuild heap signal is received, break out to the
 					// outer loop which will check the health of all filess
 					// again and then rebuild the heap.
-					break
+					break LOOP
 				case <-r.tg.StopChan():
 					// If the stop signal is received, quit entirely.
 					return
