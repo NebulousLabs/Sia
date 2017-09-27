@@ -15,7 +15,7 @@ func (r *Renter) managedDistributeChunkToWorkers(uc *unfinishedChunk) {
 	id := r.mu.RLock()
 	uc.workersRemaining += len(r.workerPool)
 	for _, worker := range r.workerPool {
-		worker.queueChunkRepair(uc)
+		worker.managedQueueChunkRepair(uc)
 	}
 	r.mu.RUnlock(id)
 

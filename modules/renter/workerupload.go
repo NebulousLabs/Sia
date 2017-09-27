@@ -88,18 +88,18 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 		uc.mu.Unlock()
 		return uc, uint64(index)
 	}
+	uc.mu.Unlock()
 
 	// The chunk could need help from this worker, but only if other workers who
 	// are performing uploads experience failures. Put this chunk on standby.
 	if !chunkComplete && candidateHost {
-		w.standbyChunks = append(w.standbyChunks, nextChunk)
+		w.standbyChunks = append(w.standbyChunks, uc)
 	}
-	uc.mu.Unlock()
 	return nil, 0
 }
 
-// queueChunkRepair will take a chunk and add it to the worker's repair stack.
-func (w *worker) queueChunkRepair(chunk *unfinishedChunk) {
+// managedQueueChunkRepair will take a chunk and add it to the worker's repair stack.
+func (w *worker) managedQueueChunkRepair(chunk *unfinishedChunk) {
 	// Add the new chunk to our list of unprocessed chunks.
 	w.mu.Lock()
 	w.unprocessedChunks = append(w.unprocessedChunks, chunk)
