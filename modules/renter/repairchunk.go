@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"io"
 	"os"
 
 	"github.com/NebulousLabs/errors"
@@ -58,11 +59,14 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk, download b
 	} else if err != nil {
 		return errors.Extend(err, errors.New("failed to open file locally"))
 	}
+	// TODO: Once we have enabled support for small chunks, we should stop
+	// needing to ignore the EOF errors, because the chunk size should always
+	// match the tail end of the file. Until then, we ignore io.EOF.
 	_, err = osFile.ReadAt(chunk.logicalChunkData, chunk.offset)
-	if err != nil && download {
+	if err != nil && err != io.EOF && download {
 		chunk.logicalChunkData = nil
 		return r.managedDownloadLogicalChunkData(chunk)
-	} else if err != nil {
+	} else if err != nil && err != io.EOF {
 		return errors.Extend(err, errors.New("failed to read file locally"))
 	}
 
@@ -108,6 +112,10 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
 		if chunk.pieceUsage[i] {
 			memoryFreed += uint64(len(chunk.physicalChunkData[i]))
 			chunk.physicalChunkData[i] = nil
+		} else {
+			// Encrypt the piece.
+			key := deriveKey(chunk.renterFile.masterKey, chunk.index, uint64(i))
+			chunk.physicalChunkData[i] = key.EncryptBytes(chunk.physicalChunkData[i])
 		}
 	}
 	// Update the renter to indicate how much memory was freed.

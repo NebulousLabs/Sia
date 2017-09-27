@@ -14,6 +14,13 @@ package renter
 // still available in the contract that we have, that the host did not lose or
 // nullify the piece.
 
+// TODO: Need to make sure that we wa it for all standing upload jobs to
+// complete in some way before we send off the next round of upload jobs.
+// Otherwise we might end up with simultenously overlapping repair jobs.
+
+// TODO: Need to make sure that we're accounting for encryption properly when we
+// allocate and release memory.
+
 import (
 	"container/heap"
 	"sync"
@@ -215,6 +222,12 @@ func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts ma
 // available, fetching the logical data for the chunk (either from the disk or
 // from the network), erasure coding the logical data into the physical data,
 // and then finally passing the work onto the workers.
+//
+// TODO: Need to turn this into a smarter memory pool construction - this
+// construction as it stands has a race condition. Instead of blocking until a
+// memory refresh signal is received, it should just call 'AcquireMemory' on a
+// pool object or something, and then that object can worry about breaking and
+// stuff, and can also make sure that the memory goes to only one place.
 func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{}) {
 	// Grab the next chunk, loop until we have enough memory, update the amount
 	// of memory available, and then spin up a thread to asynchronously handle
@@ -303,6 +316,9 @@ func (r *Renter) threadedRepairScan() {
 				case newFile := <-r.newUploads:
 					// If a new file is received, add its chunks to the repair
 					// heap and loop to start working through those chunks.
+					// Update the worker pool before processing the file, as it
+					// may have been a while since the previous update.
+					r.managedUpdateWorkerPool()
 					r.managedInsertFileIntoChunkHeap(newFile, chunkHeap, hosts)
 					continue
 				case <-rebuildHeapSignal:

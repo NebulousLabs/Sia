@@ -142,6 +142,7 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	// Open an editing connection to the host.
 	e, err := w.renter.hostContractor.Editor(w.contractID, w.renter.tg.StopChan())
 	if err != nil {
+		w.renter.log.Debugln("Worker failed to acquire an editor:", err)
 		w.uploadFailed(uc, pieceIndex)
 		return
 	}
@@ -151,6 +152,7 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	// the upload attempt.
 	root, err := e.Upload(uc.physicalChunkData[pieceIndex])
 	if err != nil {
+		w.renter.log.Debugln("Worker failed to upload via the editor:", err)
 		w.uploadFailed(uc, pieceIndex)
 		return
 	}
@@ -219,9 +221,9 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 	return nil, 0
 }
 
-// nextChunk will pull the next potential chunk out of the worker's work queue
+// managedNextChunk will pull the next potential chunk out of the worker's work queue
 // for uploading.
-func (w *worker) nextChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
+func (w *worker) managedNextChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -277,7 +279,7 @@ func (w *worker) threadedWorkLoop() {
 		}
 
 		// Perform one step of processing upload work.
-		chunk, pieceIndex := w.nextChunk()
+		chunk, pieceIndex := w.managedNextChunk()
 		if chunk != nil {
 			w.upload(chunk, pieceIndex)
 			continue
