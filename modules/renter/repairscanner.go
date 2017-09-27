@@ -205,7 +205,7 @@ func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts ma
 	id := r.mu.Lock()
 	unfinishedChunks := r.buildUnfinishedChunks(f, hosts)
 	for i := 0; i < len(unfinishedChunks); i++ {
-		heap.Push(ch, unfinishedChunks)
+		heap.Push(ch, unfinishedChunks[i])
 	}
 	r.mu.Unlock(id)
 }
