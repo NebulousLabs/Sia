@@ -198,9 +198,9 @@ func (stubHostDB) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
 	return modules.HostScoreBreakdown{}
 }
 
-// TestAllowanceOverspend verifies that the contractor will not spend more
-// than the allowance if contracts need to be renewed early.
-func TestAllowanceOverspend(t *testing.T) {
+// TestAllowanceSpending verifies that the contractor will not spend more or
+// less than the allowance if uploading causes repeated early renewal.
+func TestAllowanceSpending(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -299,9 +299,16 @@ func TestAllowanceOverspend(t *testing.T) {
 		}
 	}
 	balance, _, _ := w.ConfirmedBalance()
-	spent := minerRewards.Sub(balance).Sub(h.FinancialMetrics().LockedStorageCollateral)
+	spent := minerRewards.Sub(balance).Add(h.FinancialMetrics().LockedStorageCollateral)
 	if spent.Cmp(testAllowance.Funds) > 0 {
 		t.Fatal("contractor spent too much money: spent", spent.HumanString(), "allowance funds:", testAllowance.Funds.HumanString())
+	}
+
+	// we should have spent at least the allowance minus the cost of one more refresh
+	refreshCost := c.Contracts()[0].TotalCost.Mul64(2)
+	expectedMinSpending := testAllowance.Funds.Sub(refreshCost)
+	if spent.Cmp(expectedMinSpending) < 0 {
+		t.Fatal("contractor spent to little money: spent", spent.HumanString(), "expected at least:", expectedMinSpending.HumanString())
 	}
 }
 
