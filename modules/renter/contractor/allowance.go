@@ -73,6 +73,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	c.log.Println("INFO: setting allowance to", a)
 	c.mu.Lock()
 	c.allowance = a
+	c.currentPeriod = c.blockHeight
 	err = c.saveSync()
 	c.mu.Unlock()
 	if err != nil {
