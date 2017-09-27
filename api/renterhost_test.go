@@ -415,7 +415,7 @@ func TestRemoteFileRepair(t *testing.T) {
 // TestHostAndRentVanilla sets up an integration test where a host and renter
 // do basic uploads and downloads.
 func TestHostAndRentVanilla(t *testing.T) {
-	if testing.Short() || !build.VLONG {
+	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
