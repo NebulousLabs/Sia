@@ -160,35 +160,51 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 	return nil
 }
 
-// managedAddVirtualSector will add a virtual sector to the contract manager.
-func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLocation) error {
-	// Update the location count.
-	if location.count == 65535 {
-		return errMaxVirtualSectors
-	}
-	location.count++
-
-	// Prepare the sector update.
-	su := sectorUpdate{
-		Count:  location.count,
-		ID:     id,
-		Folder: location.storageFolder,
-		Index:  location.index,
+// managedAddVirtualSectors will add virtual sectors to the contract manager.
+func (wal *writeAheadLog) managedAddVirtualSectors(sectors []sectorUpdate) error {
+	folder2sectors := make(map[uint16][]sectorUpdate)
+	for _, sector := range sectors {
+		// Update the location count.
+		if sector.Count == 65535 {
+			return errMaxVirtualSectors
+		}
+		sector.Count++
+		folder2sectors[sector.Folder] = append(folder2sectors[sector.Folder], sector)
 	}
 
-	// Append the sector update to the WAL.
 	wal.mu.Lock()
-	sf, exists := wal.cm.storageFolders[su.Folder]
-	if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
-		// Need to check that the storage folder exists before syncing the
-		// commit that increases the virtual sector count.
-		wal.mu.Unlock()
-		return errStorageFolderNotFound
+
+	// Check that all the storage folders exist.
+	folder2sf := make(map[uint16]*storageFolder)
+	for folder := range folder2sectors {
+		sf, exists := wal.cm.storageFolders[folder]
+		if !exists || atomic.LoadUint64(&sf.atomicUnavailable) == 1 {
+			// Need to check that the storage folder exists before syncing the
+			// commit that increases the virtual sector count.
+			wal.mu.Unlock()
+			return errStorageFolderNotFound
+		}
+		folder2sf[folder] = sf
 	}
-	wal.appendChange(stateChange{
-		SectorUpdates: []sectorUpdate{su},
-	})
-	wal.cm.sectorLocations[id] = location
+
+	// Append to WAL and update sectorLocations.
+	folder2updates := make(map[uint16][]sectorUpdate)
+	for folder, folderSectors := range folder2sectors {
+		updates := make([]sectorUpdate, 0, len(folderSectors))
+		for _, sector := range folderSectors {
+			updates = append(updates, sector)
+			wal.cm.sectorLocations[sector.ID] = sectorLocation{
+				index:         sector.Index,
+				storageFolder: folder,
+				count:         sector.Count,
+			}
+		}
+		wal.appendChange(stateChange{
+			SectorUpdates: updates,
+		})
+		folder2updates[folder] = updates
+	}
+
 	syncChan := wal.syncChan
 	wal.mu.Unlock()
 	<-syncChan
@@ -196,22 +212,38 @@ func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLo
 	// Update the metadata on disk. Metadata is updated on disk after the sync
 	// so that there is no risk of obliterating the previous count in the event
 	// that the change is not fully committed during unclean shutdown.
-	err := wal.writeSectorMetadata(sf, su)
-	if err != nil {
-		// Revert the sector update in the WAL to reflect the fact that adding
-		// the sector has failed.
-		su.Count--
-		location.count--
-		wal.mu.Lock()
-		wal.appendChange(stateChange{
-			SectorUpdates: []sectorUpdate{su},
-		})
-		wal.cm.sectorLocations[id] = location
-		wal.mu.Unlock()
-		<-syncChan
-		return build.ExtendErr("unable to write sector metadata during addSector call", err)
+	for folder, updates := range folder2updates {
+		if err := wal.writeSectorMetadatas(folder2sf[folder], updates); err != nil {
+			// Revert the sector update in the WAL to reflect the fact that adding
+			// the sector has failed. Write initial values of counters.
+			wal.mu.Lock()
+			wal.appendChange(stateChange{
+				SectorUpdates: sectors,
+			})
+			for _, sector := range sectors {
+				wal.cm.sectorLocations[sector.ID] = sectorLocation{
+					index:         sector.Index,
+					storageFolder: folder,
+					count:         sector.Count,
+				}
+			}
+			wal.mu.Unlock()
+			<-syncChan
+			return build.ExtendErr("unable to write sector metadata during addSector call", err)
+		}
 	}
 	return nil
+}
+
+// managedAddVirtualSector will add a virtual sector to the contract manager.
+func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLocation) error {
+	su := sectorUpdate{
+		Count:  location.count,
+		ID:     id,
+		Folder: location.storageFolder,
+		Index:  location.index,
+	}
+	return wal.managedAddVirtualSectors([]sectorUpdate{su})
 }
 
 // managedDeleteSector will delete a sector (physical) from the contract manager.
@@ -353,17 +385,23 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 	return nil
 }
 
-// writeSectorMetadata will take a sector update and write the related metadata
+// writeSectorMetadatas will take sector updates and write the related metadata
 // to disk.
-func (wal *writeAheadLog) writeSectorMetadata(sf *storageFolder, su sectorUpdate) error {
-	err := writeSectorMetadata(sf.metadataFile, su.Index, su.ID, su.Count)
+func (wal *writeAheadLog) writeSectorMetadatas(sf *storageFolder, updates []sectorUpdate) error {
+	err := writeSectorMetadatas(sf.metadataFile, updates)
 	if err != nil {
-		wal.cm.log.Printf("ERROR: unable to write sector metadata to folder %v when adding sector: %v\n", su.Folder, err)
+		wal.cm.log.Printf("ERROR: unable to write sector metadata to folder %v when adding sector: %v\n", sf.index, err)
 		atomic.AddUint64(&sf.atomicFailedWrites, 1)
 		return err
 	}
 	atomic.AddUint64(&sf.atomicSuccessfulWrites, 1)
 	return nil
+}
+
+// writeSectorMetadata will take a sector update and write the related metadata
+// to disk.
+func (wal *writeAheadLog) writeSectorMetadata(sf *storageFolder, su sectorUpdate) error {
+	return wal.writeSectorMetadatas(sf, []sectorUpdate{su})
 }
 
 // AddSector will add a sector to the contract manager.
@@ -397,10 +435,7 @@ func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error 
 	return nil
 }
 
-// AddSectorBatch is a non-ACID call to add a bunch of sectors at once.
-// Necessary for compatibility with old renters.
-//
-// TODO: Make ACID, and definitely improve the performance as well.
+// AddSectorBatch is a call to add a bunch of sectors at once.
 func (cm *ContractManager) AddSectorBatch(sectorRoots []crypto.Hash) error {
 	// Prevent shutdown until this function completes.
 	err := cm.tg.Add()
@@ -409,30 +444,34 @@ func (cm *ContractManager) AddSectorBatch(sectorRoots []crypto.Hash) error {
 	}
 	defer cm.tg.Done()
 
-	// Add each sector in a separate goroutine.
-	var wg sync.WaitGroup
+	var updates []sectorUpdate
+	var ids []sectorID
+	defer func() {
+		for _, id := range ids {
+			cm.wal.managedUnlockSector(id)
+		}
+	}()
 	for _, root := range sectorRoots {
-		wg.Add(1)
-		go func(root crypto.Hash) {
-			defer wg.Done()
-
-			// Hold a sector lock throughout the duration of the function, but release
-			// before syncing.
-			id := cm.managedSectorID(root)
-			cm.wal.managedLockSector(id)
-			defer cm.wal.managedUnlockSector(id)
-
-			// Add the sector as virtual.
-			cm.wal.mu.Lock()
-			location, exists := cm.sectorLocations[id]
-			cm.wal.mu.Unlock()
-			if exists {
-				cm.wal.managedAddVirtualSector(id, location)
-			}
-		}(root)
+		id := cm.managedSectorID(root)
+		cm.wal.managedLockSector(id)
+		ids = append(ids, id)
 	}
-	wg.Wait()
-	return nil
+	cm.wal.mu.Lock()
+	for _, id := range ids {
+		location, exists := cm.sectorLocations[id]
+		if exists {
+			updates = append(updates, sectorUpdate{
+				Count:  location.count,
+				ID:     id,
+				Folder: location.storageFolder,
+				Index:  location.index,
+			})
+		}
+	}
+	cm.wal.mu.Unlock()
+
+	// Add the sectors as virtual.
+	return cm.wal.managedAddVirtualSectors(updates)
 }
 
 // DeleteSector will delete a sector from the contract manager. If multiple
