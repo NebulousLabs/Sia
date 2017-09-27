@@ -41,9 +41,9 @@ var (
 	// rebuildChunkHeapInterval defines how long the renter sleeps between
 	// checking on the filesystem health.
 	rebuildChunkHeapInterval = build.Select(build.Var{
-		Dev:      30 * time.Second,
+		Dev:      90 * time.Second,
 		Standard: 15 * time.Minute,
-		Testing:  10 * time.Second,
+		Testing:  30 * time.Second,
 	}).(time.Duration)
 
 	// Prime to avoid intersecting with regular events.

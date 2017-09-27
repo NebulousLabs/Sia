@@ -7,6 +7,22 @@ import (
 	"github.com/NebulousLabs/errors"
 )
 
+// managedDistributeChunkToWorkers will take a chunk with fully prepared
+// physical data and distribute it to the worker pool.
+func (r *Renter) managedDistributeChunkToWorkers(uc *unfinishedChunk) {
+	// Give the chunk to each worker, marking the number of workers that have
+	// received the chunk.
+	id := r.mu.RLock()
+	uc.workersRemaining += len(r.workerPool)
+	for _, worker := range r.workerPool {
+		worker.queueChunkRepair(uc)
+	}
+	r.mu.RUnlock(id)
+
+	// Perform cleanup for any pieces that will never be used by a worker.
+	r.managedReleaseIdleChunkPieces(uc)
+}
+
 // managedDownloadLogicalChunkData will fetch the logical chunk data by sending a
 // download to the renter's downloader, and then using the data that gets
 // returned.
@@ -31,6 +47,57 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 	}
 	chunk.logicalChunkData = buf.Bytes()
 	return d.Err()
+}
+
+// managedFetchAndRepairChunk will fetch the logical data for a chunk, create the
+// physical pieces for the chunk, and then distribute them.
+func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
+	// Only download this file if more than 25% of the redundancy is missing.
+	minMissingPiecesToDownload := (chunk.piecesNeeded - chunk.minimumPieces) / 4
+	download := chunk.piecesCompleted+minMissingPiecesToDownload < chunk.piecesNeeded
+
+	// Fetch the logical data for the chunk.
+	err := r.managedFetchLogicalChunkData(chunk, download)
+	if err != nil {
+		// Logical data is not available, nothing to do.
+		r.log.Debugln("Fetching logical data of a chunk failed:", err)
+		return
+	}
+
+	// Create the phsyical pieces for the data.
+	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.Encode(chunk.logicalChunkData)
+	if err != nil {
+		// Logical data is not available, nothing to do.
+		r.log.Debugln("Fetching physical data of a chunk failed:", err)
+		return
+	}
+	// Nil out the logical chunk data so that it can be garbage collected.
+	memoryFreed := uint64(len(chunk.logicalChunkData))
+	chunk.logicalChunkData = nil
+
+	// Sanity check - we should have at least as many physical data pieces as we
+	// do elements in our piece usage.
+	if len(chunk.physicalChunkData) < len(chunk.pieceUsage) {
+		r.log.Critical("not enough physical pieces to match the upload settings of the file")
+		return
+	}
+	// Loop through the pieces and encrypt any that our needed, while dropping
+	// any pieces that are not needed.
+	for i := 0; i < len(chunk.pieceUsage); i++ {
+		if chunk.pieceUsage[i] {
+			memoryFreed += uint64(len(chunk.physicalChunkData[i]))
+			chunk.physicalChunkData[i] = nil
+		} else {
+			// Encrypt the piece.
+			key := deriveKey(chunk.renterFile.masterKey, chunk.index, uint64(i))
+			chunk.physicalChunkData[i] = key.EncryptBytes(chunk.physicalChunkData[i])
+		}
+	}
+	// Update the renter to indicate how much memory was freed.
+	r.managedMemoryAvailableAdd(memoryFreed)
+
+	// Distribute the chunk to the workers.
+	r.managedDistributeChunkToWorkers(chunk)
 }
 
 // managedFetchLogicalChunkData will get the raw data for a chunk, pulling it from disk if
@@ -74,57 +141,33 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk, download b
 	return nil
 }
 
-// managedFetchAndRepairChunk will fetch the logical data for a chunk, create the
-// physical pieces for the chunk, and then distribute them.
-func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
-	// Only download this file if more than 25% of the redundancy is missing.
-	minMissingPiecesToDownload := (chunk.piecesNeeded - chunk.minimumPieces) / 4
-	download := chunk.piecesCompleted+minMissingPiecesToDownload < chunk.piecesNeeded
+// releaseIdleChunkPieces will drop any chunk pieces that are no longer going to
+// be used by workers because the number of remaining pieces is greater than the
+// number of remaining workers. The memory will be returned to the renter.
+func (r *Renter) managedReleaseIdleChunkPieces(uc *unfinishedChunk) {
+	uc.mu.Lock()
+	piecesAvailable := 0
+	memoryReleased := 0
+	for i := 0; i < len(uc.pieceUsage); i++ {
+		// Skip the piece if it's not available.
+		if uc.pieceUsage[i] {
+			continue
+		}
 
-	// Fetch the logical data for the chunk.
-	err := r.managedFetchLogicalChunkData(chunk, download)
-	if err != nil {
-		// Logical data is not available, nothing to do.
-		r.log.Debugln("Fetching logical data of a chunk failed:", err)
-		return
-	}
-
-	// Create the phsyical pieces for the data.
-	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.Encode(chunk.logicalChunkData)
-	if err != nil {
-		// Logical data is not available, nothing to do.
-		r.log.Debugln("Fetching physical data of a chunk failed:", err)
-		return
-	}
-	// Nil out the logical chunk data so that it can be garbage collected.
-	memoryFreed := uint64(len(chunk.logicalChunkData))
-	chunk.logicalChunkData = nil
-
-	// Sanity check - we should have at least as many physical data pieces as we
-	// do elements in our piece usage.
-	if len(chunk.physicalChunkData) < len(chunk.pieceUsage) {
-		r.log.Critical("not enough physical pieces to match the upload settings of the file")
-		return
-	}
-	// Loop through the pieces and nil out any that are not needed, making note
-	// of how much memory is freed so we can update the amount of memory in use.
-	for i := 0; i < len(chunk.pieceUsage); i++ {
-		if chunk.pieceUsage[i] {
-			memoryFreed += uint64(len(chunk.physicalChunkData[i]))
-			chunk.physicalChunkData[i] = nil
+		// If we have all the available pieces we need, release this piece.
+		// Otherwise, mark that there's another piece available. This algorithm
+		// will prefer releasing later pieces, which improves computational
+		// complexity for erasure coding.
+		if piecesAvailable >= uc.workersRemaining {
+			uc.pieceUsage[i] = false
+			memoryReleased += len(uc.physicalChunkData[i])
+			uc.physicalChunkData[i] = nil
 		} else {
-			// Encrypt the piece.
-			key := deriveKey(chunk.renterFile.masterKey, chunk.index, uint64(i))
-			chunk.physicalChunkData[i] = key.EncryptBytes(chunk.physicalChunkData[i])
+			piecesAvailable++
 		}
 	}
-	// Update the renter to indicate how much memory was freed.
-	r.managedMemoryAvailableAdd(memoryFreed)
-
-	// Distribute the chunk to all of the workers.
-	id := r.mu.RLock()
-	for _, worker := range r.workerPool {
-		worker.queueChunkRepair(chunk)
+	uc.mu.Unlock()
+	if memoryReleased > 0 {
+		r.managedMemoryAvailableAdd(uint64(memoryReleased))
 	}
-	r.mu.RUnlock(id)
 }

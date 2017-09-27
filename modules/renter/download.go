@@ -388,13 +388,13 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 	ds.availableWorkers = make([]*worker, 0, len(r.workerPool))
 	for _, worker := range r.workerPool {
 		// Ignore workers that are already in the active set of workers.
-		_, exists := ds.activeWorkers[worker.contractID]
+		_, exists := ds.activeWorkers[worker.contract.ID]
 		if exists {
 			continue
 		}
 
 		// Ignore workers that have a download failure recently.
-		if time.Since(worker.recentDownloadFailure) < downloadFailureCooldown {
+		if time.Since(worker.downloadRecentFailure) < downloadFailureCooldown {
 			continue
 		}
 
@@ -443,7 +443,7 @@ loop:
 		// Try to find a worker that is able to pick up the slack on the
 		// incomplete download from the set of available workers.
 		for i, worker := range ds.availableWorkers {
-			scheduled, exists := incompleteChunk.workerAttempts[worker.contractID]
+			scheduled, exists := incompleteChunk.workerAttempts[worker.contract.ID]
 			if scheduled || !exists {
 				// Either this worker does not contain a piece of this chunk,
 				// or this worker has already been scheduled to download a
@@ -451,7 +451,7 @@ loop:
 				continue
 			}
 
-			piece, exists := incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contractID]
+			piece, exists := incompleteChunk.download.pieceSet[incompleteChunk.index][worker.contract.ID]
 			if !exists {
 				continue
 			}
@@ -462,9 +462,9 @@ loop:
 				chunkDownload: incompleteChunk,
 				resultChan:    ds.resultChan,
 			}
-			incompleteChunk.workerAttempts[worker.contractID] = true
+			incompleteChunk.workerAttempts[worker.contract.ID] = true
 			ds.availableWorkers = append(ds.availableWorkers[:i], ds.availableWorkers[i+1:]...)
-			ds.activeWorkers[worker.contractID] = struct{}{}
+			ds.activeWorkers[worker.contract.ID] = struct{}{}
 			select {
 			case worker.priorityDownloadChan <- dw:
 			default:
@@ -587,7 +587,7 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 	cd := finishedDownload.chunkDownload
 	if finishedDownload.err != nil {
 		r.log.Debugln("Error when downloading a piece:", finishedDownload.err)
-		worker.recentDownloadFailure = time.Now()
+		worker.downloadRecentFailure = time.Now()
 		ds.incompleteChunks = append(ds.incompleteChunks, cd)
 		return
 	}

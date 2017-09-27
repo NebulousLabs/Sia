@@ -21,10 +21,16 @@ package renter
 // TODO: Need to make sure that we're accounting for encryption properly when we
 // allocate and release memory.
 
+// TODO: Memory management currently ignores encryption overhead. Leaving it
+// this way for now, as the overhead is just 32 bytes per piece and not likely
+// to make a huge difference.
+
 import (
 	"container/heap"
 	"sync"
 	"time"
+
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // ChunkHeap is a bunch of chunks sorted by percentage-completion for uploading.
@@ -64,6 +70,7 @@ type unfinishedChunk struct {
 	piecesRegistered int                 // number of pieces that are being uploaded, but aren't finished yet.
 	pieceUsage       []bool              // one per piece. 'false' = piece not uploaded. 'true' = piece uploaded.
 	unusedHosts      map[string]struct{} // hosts that aren't yet storing any pieces
+	workersRemaining int                 // number of workers who have received the chunk, but haven't finished processing it.
 
 	// Utilities.
 	mu sync.Mutex
@@ -116,8 +123,12 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			length: f.chunkSize(),
 			offset: int64(i * f.chunkSize()),
 
-			// memoryNeeded has to also include the logical data
-			memoryNeeded:  f.pieceSize*uint64(f.erasureCode.NumPieces()) + f.pieceSize*uint64(f.erasureCode.MinPieces()),
+			// memoryNeeded has to also include the logical data, and also
+			// include the overhead for encryption.
+			//
+			// TODO / NOTE: If we adjust the file to have a flexible encryption
+			// scheme, we'll need to adjust the overhead stuff too.
+			memoryNeeded: f.pieceSize*uint64(f.erasureCode.NumPieces()+f.erasureCode.MinPieces())+uint64(f.erasureCode.NumPieces()*crypto.TwofishOverhead),
 			minimumPieces: f.erasureCode.MinPieces(),
 			piecesNeeded:  f.erasureCode.NumPieces(),
 			pieceUsage:    make([]bool, f.erasureCode.NumPieces()),
@@ -247,6 +258,26 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 	go r.managedFetchAndRepairChunk(nextChunk)
 }
 
+// managedRefreshHostsAndWorkers will reset the set of hosts and the set of
+// workers for the renter.
+func (r *Renter) managedRefreshHostsAndWorkers() map[string]struct{} {
+	// Grab the current set of contracts and use them to build a list of hosts
+	// that are available for uploading. The hosts are assembled into a map
+	// where the key is the String() representation of the host's SiaPublicKey.
+	//
+	// TODO / NOTE: This code can be removed once files store the HostPubKey
+	// of the hosts they are using, instead of just the FileContractID.
+	currentContracts := r.hostContractor.Contracts()
+	hosts := make(map[string]struct{})
+	for _, contract := range currentContracts {
+		hosts[contract.HostPublicKey.String()] = struct{}{}
+	}
+
+	// Refresh the worker pool as well.
+	r.managedUpdateWorkerPool()
+	return hosts
+}
+
 // threadedRepairScan is a background thread that checks on the health of files,
 // tracking the least healthy files and queuing the worst ones for repair.
 //
@@ -270,28 +301,12 @@ func (r *Renter) threadedRepairScan() {
 		default:
 		}
 
-		// Grab the current set of contracts and a lookup table from file
-		// contract ids to host public keys. The lookup table has a mapping from
-		// all historic file contract ids, which is necessary when using the
-		// renter to perform downloads.
-		//
-		// TODO / NOTE: This code can be removed once files store the HostPubKey
-		// of the hosts they are using, instead of just the FileContractID.
-		currentContracts := r.hostContractor.Contracts()
-
-		// Pull together a list of hosts that are available for uploading. We
-		// assemble them into a map where the key is the String() representation
-		// of a types.SiaPublicKey (which cannot be used as a map key itself).
-		hosts := make(map[string]struct{})
-		for _, contract := range currentContracts {
-			hosts[contract.HostPublicKey.String()] = struct{}{}
-		}
+		// Refresh the worker pool and get the set of hosts that are currently
+		// useful for uploading.
+		hosts := r.managedRefreshHostsAndWorkers()
 
 		// Build a min-heap of chunks organized by upload progress.
 		chunkHeap := r.managedBuildChunkHeap(hosts)
-
-		// Refresh the worker pool before beginning uploads.
-		r.managedUpdateWorkerPool()
 
 		// Work through the heap. Chunks will be processed one at a time until
 		// the heap is whittled down. When the heap is empty, we wait for new
@@ -318,7 +333,7 @@ func (r *Renter) threadedRepairScan() {
 					// heap and loop to start working through those chunks.
 					// Update the worker pool before processing the file, as it
 					// may have been a while since the previous update.
-					r.managedUpdateWorkerPool()
+					hosts = r.managedRefreshHostsAndWorkers()
 					r.managedInsertFileIntoChunkHeap(newFile, chunkHeap, hosts)
 					continue
 				case <-rebuildHeapSignal:
