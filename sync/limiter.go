@@ -5,6 +5,19 @@ import (
 )
 
 // A Limiter restricts access to a resource.
+//
+// Units of the resource are reserved via Request and returned via Release.
+// Conventionally, a caller who reserves n units is responsible for ensuring
+// that all n are eventually returned. Once the number of reserved units
+// exceeds the Limiters limit, further calls to Request will block until
+// sufficient units are returned via Release.
+//
+// This Limiter differs from others in that it allows requesting more than the
+// limit. This request is only fulfilled once all other units have been
+// returned. Once the request is fulfilled, calls to Request will block until
+// enough units have been returned to bring the total outlay below the limit.
+// This design choice prevents any call to Request from blocking forever,
+// striking a balance between precise resource management and flexibility.
 type Limiter struct {
 	limit    int
 	current  int
