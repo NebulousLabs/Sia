@@ -76,6 +76,7 @@ func (l *Limiter) Release(n int) {
 	l.cond.L.Lock()
 	l.current -= n
 	if l.current < 0 {
+		l.cond.L.Unlock()
 		panic("units released exceeds units requested")
 	}
 	l.cond.L.Unlock()
