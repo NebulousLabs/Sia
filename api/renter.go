@@ -69,24 +69,9 @@ var (
 type (
 	// RenterGET contains various renter metrics.
 	RenterGET struct {
-		Settings         modules.RenterSettings `json:"settings"`
-		FinancialMetrics RenterFinancialMetrics `json:"financialmetrics"`
-		CurrentPeriod    types.BlockHeight      `json:"currentperiod"`
-	}
-
-	// RenterFinancialMetrics contains metrics about how much the Renter has
-	// spent on storage, uploads, and downloads.
-	RenterFinancialMetrics struct {
-		// Amount of money in the allowance spent on file contracts including
-		// fees.
-		ContractSpending types.Currency `json:"contractspending"`
-
-		DownloadSpending types.Currency `json:"downloadspending"`
-		StorageSpending  types.Currency `json:"storagespending"`
-		UploadSpending   types.Currency `json:"uploadspending"`
-
-		// Amount of money in the allowance that has not been spent.
-		Unspent types.Currency `json:"unspent"`
+		Settings         modules.RenterSettings     `json:"settings"`
+		FinancialMetrics modules.ContractorSpending `json:"financialmetrics"`
+		CurrentPeriod    types.BlockHeight          `json:"currentperiod"`
 	}
 
 	// RenterContract represents a contract formed by the renter.
@@ -166,31 +151,9 @@ type (
 func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	settings := api.renter.Settings()
 	periodStart := api.renter.CurrentPeriod()
-	// calculate financial metrics from contracts. We use the special
-	// AllContracts method to include contracts that are offline.
-	var fm RenterFinancialMetrics
-	fm.Unspent = settings.Allowance.Funds
-	contracts := api.renter.(interface {
-		AllContracts() []modules.RenterContract
-	}).AllContracts()
-	for _, c := range contracts {
-		if c.StartHeight < periodStart {
-			continue
-		}
-		fm.ContractSpending = fm.ContractSpending.Add(c.TotalCost)
-		fm.DownloadSpending = fm.DownloadSpending.Add(c.DownloadSpending)
-		fm.UploadSpending = fm.UploadSpending.Add(c.UploadSpending)
-		fm.StorageSpending = fm.StorageSpending.Add(c.StorageSpending)
-		// total unspent is:
-		//    allowance - (cost to form contracts) + (money left in contracts)
-		if fm.Unspent.Add(c.RenterFunds()).Cmp(c.TotalCost) > 0 {
-			fm.Unspent = fm.Unspent.Add(c.RenterFunds()).Sub(c.TotalCost)
-		}
-	}
-
 	WriteJSON(w, RenterGET{
 		Settings:         settings,
-		FinancialMetrics: fm,
+		FinancialMetrics: api.renter.PeriodSpending(),
 		CurrentPeriod:    periodStart,
 	})
 }

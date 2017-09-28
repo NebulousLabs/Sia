@@ -256,6 +256,16 @@ type RenterContract struct {
 	PreviousContracts []RenterContract
 }
 
+// ContractorSpending contains the metrics about how much the Contractor has
+// spent during the current billing period.
+type ContractorSpending struct {
+	ContractSpending types.Currency `json:"contractspending"`
+	UploadSpending   types.Currency `json:"uploadspending"`
+	DownloadSpending types.Currency `json:"downloadspending"`
+	StorageSpending  types.Currency `json:"storagespending"`
+	Unspent          types.Currency `json:"unspent"`
+}
+
 // EndHeight returns the height at which the host is no longer obligated to
 // store contract data.
 func (rc *RenterContract) EndHeight() types.BlockHeight {
@@ -291,6 +301,10 @@ type Renter interface {
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
 	CurrentPeriod() types.BlockHeight
+
+	// PeriodSpending returns the amount spent on contracts in the current
+	// billing period.
+	PeriodSpending() ContractorSpending
 
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error

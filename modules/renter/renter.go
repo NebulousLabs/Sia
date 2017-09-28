@@ -120,6 +120,10 @@ type hostContractor interface {
 	// began.
 	CurrentPeriod() types.BlockHeight
 
+	// PeriodSpending returns the amount spent on contracts during the current
+	// billing period.
+	PeriodSpending() modules.ContractorSpending
+
 	// Editor creates an Editor from the specified contract ID, allowing the
 	// insertion, deletion, and modification of sectors.
 	Editor(types.FileContractID, <-chan struct{}) (contractor.Editor, error)
@@ -393,8 +397,9 @@ func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreak
 }
 
 // contractor passthroughs
-func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
-func (r *Renter) CurrentPeriod() types.BlockHeight    { return r.hostContractor.CurrentPeriod() }
+func (r *Renter) Contracts() []modules.RenterContract        { return r.hostContractor.Contracts() }
+func (r *Renter) CurrentPeriod() types.BlockHeight           { return r.hostContractor.CurrentPeriod() }
+func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostContractor.PeriodSpending() }
 func (r *Renter) Settings() modules.RenterSettings {
 	return modules.RenterSettings{
 		Allowance: r.hostContractor.Allowance(),

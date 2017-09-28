@@ -3,6 +3,7 @@ package contractor
 import (
 	"errors"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -199,7 +200,8 @@ func (stubHostDB) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
 }
 
 // TestAllowanceSpending verifies that the contractor will not spend more or
-// less than the allowance if uploading causes repeated early renewal.
+// less than the allowance if uploading causes repeated early renewal, and that
+// correct spending metrics are returned, even across renewals.
 func TestAllowanceSpending(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -284,7 +286,6 @@ func TestAllowanceSpending(t *testing.T) {
 		}
 	}
 
-	// TODO: replace this logic with wallet contexts
 	var minerRewards types.Currency
 	w := c.wallet.(*walletBridge).w.(modules.Wallet)
 	txns, err := w.Transactions(0, 1000)
@@ -299,7 +300,7 @@ func TestAllowanceSpending(t *testing.T) {
 		}
 	}
 	balance, _, _ := w.ConfirmedBalance()
-	spent := minerRewards.Sub(balance).Add(h.FinancialMetrics().LockedStorageCollateral)
+	spent := minerRewards.Sub(balance)
 	if spent.Cmp(testAllowance.Funds) > 0 {
 		t.Fatal("contractor spent too much money: spent", spent.HumanString(), "allowance funds:", testAllowance.Funds.HumanString())
 	}
@@ -309,6 +310,31 @@ func TestAllowanceSpending(t *testing.T) {
 	expectedMinSpending := testAllowance.Funds.Sub(refreshCost)
 	if spent.Cmp(expectedMinSpending) < 0 {
 		t.Fatal("contractor spent to little money: spent", spent.HumanString(), "expected at least:", expectedMinSpending.HumanString())
+	}
+
+	// PeriodSpending should reflect the amount of spending accurately
+	reportedSpending := c.PeriodSpending()
+	if reportedSpending.ContractSpending.Cmp(spent) != 0 {
+		t.Fatal("reported incorrect spending for this billing cycle: got", reportedSpending.ContractSpending.HumanString(), "wanted", spent.HumanString())
+	}
+
+	// enter a new period. PeriodSpending should reset.
+	c.mu.Lock()
+	renewHeight := c.blockHeight + c.allowance.RenewWindow
+	blocksToMine := renewHeight - c.blockHeight
+	c.mu.Unlock()
+	for i := types.BlockHeight(0); i < blocksToMine; i++ {
+		_, err = m.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	newReportedSpending := c.PeriodSpending()
+	if reflect.DeepEqual(newReportedSpending, reportedSpending) {
+		t.Fatal("reported spending was identical after entering a renew period")
+	}
+	if newReportedSpending.Unspent.Cmp(reportedSpending.Unspent) <= 0 {
+		t.Fatal("expected newReportedSpending to have more unspent")
 	}
 }
 
