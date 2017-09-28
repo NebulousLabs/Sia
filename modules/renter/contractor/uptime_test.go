@@ -1,7 +1,6 @@
 package contractor
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 	"time"
@@ -10,27 +9,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// offlineHostDB overrides an existing hostDB so that it returns a modified
-// scan history for a specific host.
-type offlineHostDB struct {
-	hostDB
-	spk types.SiaPublicKey
-}
-
-// Host returns the host with address addr. If addr matches hdb.addr, the
-// host's scan history will be modified to make the host appear offline.
-func (hdb offlineHostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
-	host, ok := hdb.hostDB.Host(spk)
-	if ok && bytes.Equal(spk.Key, hdb.spk.Key) {
-		// fake three scans over the past uptimeWindow, all of which failed
-		badScan1 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow * 2), Success: false}
-		badScan2 := modules.HostDBScan{Timestamp: time.Now().Add(-uptimeWindow), Success: false}
-		badScan3 := modules.HostDBScan{Timestamp: time.Now(), Success: false}
-		host.ScanHistory = []modules.HostDBScan{badScan1, badScan2, badScan3}
-	}
-	return host, ok
-}
 
 // TestIntegrationReplaceOffline tests that when a host goes offline, its
 // contract is eventually replaced.
@@ -44,11 +22,6 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
-
-	// override IsOffline to always return true for h
-	c.mu.Lock()
-	c.hdb = offlineHostDB{c.hdb, h.PublicKey()}
-	c.mu.Unlock()
 
 	// create another host
 	dir := build.TempDir("contractor", t.Name(), "Host2")
@@ -79,50 +52,66 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		t.Log(len(c.Contracts()))
 		t.Error(err)
 	}
-	c.mu.Lock()
-	for _, contract := range c.contracts {
-		if !c.isOffline(contract.ID) {
-			t.Fatal("contract should not be reported as online")
-		}
 
+	// Take the first host offline.
+	err = h.Close()
+	if err != nil {
+		t.Error(err)
 	}
-	c.mu.Unlock()
+	// Block until the host is seen as offline.
+	err = build.Retry(150, 250*time.Millisecond, func() error {
+		hosts := c.hdb.AllHosts()
+		if len(hosts) != 1 {
+			return errors.New("only expecting one host")
+		}
+		sh := hosts[0].ScanHistory
+		if sh[len(sh)-1].Success {
+			return errors.New("host is reporting as online")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// announce the second host
+	// Announce the second host.
 	err = h2.Announce()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// mine a block, processing the announcement
+	// Mine a block to get the announcement on-chain.
 	_, err = m.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// wait for hostdb to scan host
-	for i := 0; i < 100 && len(c.hdb.RandomHosts(2, nil)) != 2; i++ {
-		time.Sleep(50 * time.Millisecond)
-	}
-	if len(c.hdb.RandomHosts(2, nil)) != 2 {
-		t.Fatal("host did not make it into the contractor hostdb in time", c.hdb.RandomHosts(2, nil))
+	// Wait for a scan of the host to complete.
+	err = build.Retry(150, 250*time.Millisecond, func() error {
+		hosts := c.hdb.AllHosts()
+		if len(hosts) < 2 {
+			return errors.New("waiting for at least two hosts to show up")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// mine a block and wait for a new contract is formed. ProcessConsensusChange will
-	// trigger managedFormAllowanceContracts, which should form a new contract
-	// with h2
+	// Mine a block to trigger an allowance refresh, which should cause the
+	// second, online host to be picked up.
 	_, err = m.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 100 && len(c.Contracts()) != 1; i++ {
-		time.Sleep(100 * time.Millisecond)
-	}
-	if len(c.Contracts()) != 1 {
-		t.Fatal("contract was not replaced:", len(c.Contracts()))
-	}
-	if c.Contracts()[0].NetAddress != h2.ExternalSettings().NetAddress {
-		t.Fatal("contractor formed replacement contract with wrong host")
+	err = build.Retry(150, 250*time.Millisecond, func() error {
+		numContracts := len(c.Contracts())
+		if numContracts < 2 {
+			return errors.New("still waiting to form the second contract")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -43,7 +43,7 @@ var (
 	rebuildChunkHeapInterval = build.Select(build.Var{
 		Dev:      90 * time.Second,
 		Standard: 15 * time.Minute,
-		Testing:  30 * time.Second,
+		Testing:  3 * time.Second,
 	}).(time.Duration)
 
 	// Prime to avoid intersecting with regular events.
