@@ -75,7 +75,7 @@ func apiGet(call string) (*http.Response, error) {
 		resp.Body.Close()
 		if apiPassword == "" {
 			apiPassword = os.Getenv("SIA_API_PASSWORD")
-			if apiPassword != nil {
+			if apiPassword != "" {
 				fmt.Println("Using SIA_API_PASSWORD environment variable")
 			} else {
 				// prompt for password and store it in a global var for subsequent
