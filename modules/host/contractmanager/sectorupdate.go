@@ -411,10 +411,16 @@ func (cm *ContractManager) AddSectorBatch(sectorRoots []crypto.Hash) error {
 
 	// Add each sector in a separate goroutine.
 	var wg sync.WaitGroup
+	// Ensure only 'maxAddSectorBatchThreads' goroutines are running at a time.
+	semaphore := make(chan struct{}, maxAddSectorBatchThreads)
 	for _, root := range sectorRoots {
 		wg.Add(1)
+		semaphore <- struct{}{}
 		go func(root crypto.Hash) {
 			defer wg.Done()
+			defer func() {
+				<-semaphore
+			}()
 
 			// Hold a sector lock throughout the duration of the function, but release
 			// before syncing.

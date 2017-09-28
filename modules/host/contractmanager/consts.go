@@ -60,6 +60,10 @@ const (
 	// which is a high granluarity relative the to the TiBs of storage that
 	// hosts are expected to provide.
 	storageFolderGranularity = 64
+
+	// maxAddSectorBatchThreads is the maximum number of threads updating
+	// sector counters on disk in AddSectorBatch.
+	maxAddSectorBatchThreads = 100
 )
 
 var (
