@@ -91,4 +91,13 @@ func TestLimiter(t *testing.T) {
 	if !cancelled {
 		t.Fatal("expected Request to be cancelled")
 	}
+	l.Release(1)
+
+	// setting a higher limit should wake up blocked requests
+	l.Request(5, nil)
+	time.AfterFunc(10*time.Millisecond, func() { l.SetLimit(10) })
+	cancelled = l.Request(5, cancelAfter(100*time.Millisecond))
+	if cancelled {
+		t.Fatal("expected Request to succeed")
+	}
 }
