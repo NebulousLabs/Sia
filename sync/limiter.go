@@ -19,10 +19,10 @@ import (
 // This design choice prevents any call to Request from blocking forever,
 // striking a balance between precise resource management and flexibility.
 type Limiter struct {
-	limit    int
-	current  int
-	requests chan struct{}
-	cond     *sync.Cond
+	limit   int
+	current int
+	mu      chan struct{} // can't select on sync.Mutex
+	cond    *sync.Cond
 }
 
 // Request blocks until n units are available. If n is greater than m's limit,
@@ -33,13 +33,13 @@ type Limiter struct {
 //
 // Request returns true if the request was canceled, and false otherwise.
 func (l *Limiter) Request(n int, cancel <-chan struct{}) bool {
-	// wait until our request is "first in line"
+	// acquire mutex
 	select {
 	case <-cancel:
 		return true
-	case token := <-l.requests:
-		// return token when we're done
-		defer func() { l.requests <- token }()
+	case lock := <-l.mu:
+		// unlock
+		defer func() { l.mu <- lock }()
 	}
 
 	// spawn goroutine to handle cancellation
@@ -94,10 +94,10 @@ func (l *Limiter) SetLimit(limit int) {
 // NewLimiter returns a Limiter with the supplied limit.
 func NewLimiter(limit int) *Limiter {
 	l := &Limiter{
-		limit:    limit,
-		requests: make(chan struct{}, 1),
-		cond:     sync.NewCond(new(sync.Mutex)),
+		limit: limit,
+		mu:    make(chan struct{}, 1),
+		cond:  sync.NewCond(new(sync.Mutex)),
 	}
-	l.requests <- struct{}{}
+	l.mu <- struct{}{}
 	return l
 }
