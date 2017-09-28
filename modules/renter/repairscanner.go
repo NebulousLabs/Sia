@@ -121,7 +121,7 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			//
 			// TODO / NOTE: If we adjust the file to have a flexible encryption
 			// scheme, we'll need to adjust the overhead stuff too.
-			memoryNeeded: f.pieceSize*uint64(f.erasureCode.NumPieces()+f.erasureCode.MinPieces())+uint64(f.erasureCode.NumPieces()*crypto.TwofishOverhead),
+			memoryNeeded:  f.pieceSize*uint64(f.erasureCode.NumPieces()+f.erasureCode.MinPieces()) + uint64(f.erasureCode.NumPieces()*crypto.TwofishOverhead),
 			minimumPieces: f.erasureCode.MinPieces(),
 			piecesNeeded:  f.erasureCode.NumPieces(),
 			pieceUsage:    make([]bool, f.erasureCode.NumPieces()),

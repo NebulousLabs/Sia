@@ -72,6 +72,16 @@ type Contractor struct {
 	renewedIDs      map[types.FileContractID]types.FileContractID
 }
 
+// resolveID returns the ID of the most recent renewal of id.
+func (c *Contractor) resolveID(id types.FileContractID) types.FileContractID {
+	newID, exists := c.renewedIDs[id]
+	for exists {
+		id = newID
+		newID, exists = c.renewedIDs[id]
+	}
+	return id
+}
+
 // Allowance returns the current allowance.
 func (c *Contractor) Allowance() modules.Allowance {
 	c.mu.RLock()
@@ -140,14 +150,9 @@ func (c *Contractor) CurrentPeriod() types.BlockHeight {
 // ResolveID returns the ID of the most recent renewal of id.
 func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	newID, exists := c.renewedIDs[id]
-	for exists {
-		id = newID
-		newID, exists = c.renewedIDs[id]
-	}
-	return id
+	newID := c.resolveID(id)
+	c.mu.RUnlock()
+	return newID
 }
 
 // ResolveContract returns the current contract associated with the provided

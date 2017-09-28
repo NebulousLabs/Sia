@@ -152,19 +152,19 @@ func TestIsOffline(t *testing.T) {
 		offline bool
 	}{
 		// no data
-		{nil, false},
+		{nil, true},
 		// not enough data
 		{[]modules.HostDBScan{oldBadScan, newGoodScan}, false},
 		// data covers small range
-		{[]modules.HostDBScan{oldBadScan, oldBadScan, oldBadScan}, false},
+		{[]modules.HostDBScan{oldBadScan, oldBadScan, oldBadScan}, true},
 		// data covers large range, but at least 1 scan succeeded
-		{[]modules.HostDBScan{oldBadScan, newGoodScan, currentBadScan}, false},
+		{[]modules.HostDBScan{oldBadScan, newGoodScan, currentBadScan}, true},
 		// data covers large range, no scans succeeded
 		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan}, true},
 		// old scan was good, recent scans are bad.
 		{[]modules.HostDBScan{oldGoodScan, newBadScan, newBadScan, currentBadScan}, true},
 		// recent scan was good, with many recent bad scans.
-		{[]modules.HostDBScan{oldBadScan, newGoodScan, newBadScan, currentBadScan, currentBadScan}, false},
+		{[]modules.HostDBScan{oldBadScan, newGoodScan, newBadScan, currentBadScan, currentBadScan}, true},
 		// recent scan was good, old scans were bad.
 		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan, currentGoodScan}, false},
 	}

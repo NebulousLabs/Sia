@@ -1,7 +1,6 @@
 package contractor
 
 import (
-	"sort"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -36,19 +35,26 @@ func (c *Contractor) IsOffline(id types.FileContractID) bool {
 // isOffline indicates whether a contract's host should be considered offline,
 // based on its scan metrics.
 func (c *Contractor) isOffline(id types.FileContractID) bool {
-	// Fetch the corresponding contract in the contractor. If the most recent
-	// contract is not in the contractors set of active contracts, this contract
-	// line is dead, and thus the contract should be considered 'offline'.
+	// See if there is a contract to match the id in the current set of
+	// contracts.
+	id = c.resolveID(id)
 	contract, ok := c.contracts[id]
 	if !ok {
+		// No contract, assume offline.
 		return true
 	}
+	// See if there is a host that corresponds to this contract.
 	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
+		// No host, assume offline.
 		return true
 	}
+	// See if the host has a scan history.
 	if len(host.ScanHistory) < 1 {
+		// No scan history, assume offline.
 		return true
 	}
-	return host.ScanHistory[len(host.ScanHistory)-1].Success
+	// Return 'true' if the most recent scan of the host failed, false
+	// otherwise.
+	return !host.ScanHistory[len(host.ScanHistory)-1].Success
 }

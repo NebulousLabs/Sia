@@ -28,8 +28,8 @@ type worker struct {
 	uploadChan           chan struct{}     // lowest priority
 
 	// Operation failure statistics for the worker.
-	downloadRecentFailure time.Time // Only modified by the primary download loop.
-	uploadRecentFailure time.Time // Only modified by primary repair loop.
+	downloadRecentFailure     time.Time // Only modified by the primary download loop.
+	uploadRecentFailure       time.Time // Only modified by primary repair loop.
 	uploadConsecutiveFailures time.Duration
 
 	// Two lists of chunks that relate to worker upload tasks. The first list is
