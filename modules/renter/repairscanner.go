@@ -9,21 +9,14 @@ package renter
 // on problem areas instead of doing everything all at once every iteration.
 // This should boost scalability.
 
-// TODO: We need to upgrade the contractor before we can do this, but we need to
-// be checking for every piece within a contract, and checking that the piece is
-// still available in the contract that we have, that the host did not lose or
-// nullify the piece.
+// TODO / NOTE: We need to upgrade the contractor before we can do this, but we
+// need to be checking for every piece within a contract, and checking that the
+// piece is still available in the contract that we have, that the host did not
+// lose or nullify the piece.
 
-// TODO: Need to make sure that we wa it for all standing upload jobs to
+// TODO: Need to make sure that we wait for all standing upload jobs to
 // complete in some way before we send off the next round of upload jobs.
 // Otherwise we might end up with simultenously overlapping repair jobs.
-
-// TODO: Need to make sure that we're accounting for encryption properly when we
-// allocate and release memory.
-
-// TODO: Memory management currently ignores encryption overhead. Leaving it
-// this way for now, as the overhead is just 32 bytes per piece and not likely
-// to make a huge difference.
 
 import (
 	"container/heap"
