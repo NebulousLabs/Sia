@@ -62,6 +62,9 @@ func (l *Limiter) Request(n int, cancel <-chan struct{}) bool {
 func (l *Limiter) Release(n int) {
 	l.cond.L.Lock()
 	l.current -= n
+	if l.current < 0 {
+		panic("units released exceeds units requested")
+	}
 	l.cond.L.Unlock()
 	l.cond.Signal()
 }
