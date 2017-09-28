@@ -47,39 +47,8 @@ func (c *Contractor) isOffline(id types.FileContractID) bool {
 	if !ok {
 		return true
 	}
-
-	// Sanity check - ScanHistory should always be ordered from oldest to
-	// newest.
-	if build.DEBUG && !sort.IsSorted(host.ScanHistory) {
-		sort.Sort(host.ScanHistory)
-		build.Critical("host's scan history was not sorted")
+	if len(host.ScanHistory) < 1 {
+		return true
 	}
-
-	// Consider a host offline if:
-	// 1) The host has been scanned at least three times, and
-	// 2) The three most recent scans have all failed, and
-	// 3) The time between the most recent scan and the last successful scan
-	//    (or first scan) is at least uptimeWindow
-	numScans := len(host.ScanHistory)
-	if numScans < uptimeMinScans {
-		// Not enough data to make a fair judgment.
-		return false
-	}
-	recent := host.ScanHistory[numScans-uptimeMinScans:]
-	for _, scan := range recent {
-		if scan.Success {
-			// One of the scans succeeded.
-			return false
-		}
-	}
-	// Initialize window bounds.
-	windowStart, windowEnd := host.ScanHistory[0].Timestamp, host.ScanHistory[numScans-1].Timestamp
-	// Iterate from newest-oldest, seeking to last successful scan.
-	for i := numScans - 1; i >= 0; i-- {
-		if scan := host.ScanHistory[i]; scan.Success {
-			windowStart = scan.Timestamp
-			break
-		}
-	}
-	return windowEnd.Sub(windowStart) >= uptimeWindow
+	return host.ScanHistory[len(host.ScanHistory)-1].Success
 }
