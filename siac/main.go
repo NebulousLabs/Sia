@@ -74,11 +74,16 @@ func apiGet(call string) (*http.Response, error) {
 		// retry request with authentication.
 		resp.Body.Close()
 		if apiPassword == "" {
-			// prompt for password and store it in a global var for subsequent
-			// calls
-			apiPassword, err = speakeasy.Ask("API password: ")
-			if err != nil {
-				return nil, err
+			apiPassword = os.Getenv("SIA_API_PASSWORD")
+			if apiPassword != nil {
+				fmt.Println("Using SIA_API_PASSWORD environment variable")
+			} else {
+				// prompt for password and store it in a global var for subsequent
+				// calls
+				apiPassword, err = speakeasy.Ask("API password: ")
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 		resp, err = api.HttpGETAuthenticated("http://"+addr+call, apiPassword)
