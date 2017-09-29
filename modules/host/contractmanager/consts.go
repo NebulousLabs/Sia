@@ -46,6 +46,10 @@ const (
 	// a storageFolderGrow.
 	folderAllocationStepSize = 1 << 35
 
+	// maxSectorBatchThreads is the maximum number of threads updating
+	// sector counters on disk in AddSectorBatch and RemoveSectorBatch.
+	maxSectorBatchThreads = 100
+
 	// sectorMetadataDiskSize defines the number of bytes it takes to store the
 	// metadata of a single sector on disk.
 	sectorMetadataDiskSize = 14
@@ -60,10 +64,6 @@ const (
 	// which is a high granluarity relative the to the TiBs of storage that
 	// hosts are expected to provide.
 	storageFolderGranularity = 64
-
-	// maxAddSectorBatchThreads is the maximum number of threads updating
-	// sector counters on disk in AddSectorBatch.
-	maxAddSectorBatchThreads = 100
 )
 
 var (
