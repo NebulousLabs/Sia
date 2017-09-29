@@ -125,6 +125,7 @@ func (r *Renter) managedUpdateWorkerPool() {
 
 	// Add a worker for any contract that does not already have a worker.
 	for id, contract := range contractMap {
+		lockID := r.mu.Lock()
 		_, exists := r.workerPool[id]
 		if !exists {
 			worker := &worker{
@@ -141,9 +142,11 @@ func (r *Renter) managedUpdateWorkerPool() {
 			r.workerPool[id] = worker
 			go worker.threadedWorkLoop()
 		}
+		r.mu.Unlock(lockID)
 	}
 
 	// Remove a worker for any worker that is not in the set of new contracts.
+	lockID := r.mu.Lock()
 	for id, worker := range r.workerPool {
 		_, exists := contractMap[id]
 		if !exists {
@@ -151,4 +154,5 @@ func (r *Renter) managedUpdateWorkerPool() {
 			close(worker.killChan)
 		}
 	}
+	r.mu.Unlock(lockID)
 }

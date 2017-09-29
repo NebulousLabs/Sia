@@ -144,7 +144,7 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			saveFile = true
 			continue
 		}
-		if !recentContract.GoodForRenew {
+		if !recentContract.GoodForUpload {
 			// We are no longer renewing with this contract, so it does not
 			// count for redundancy.
 			continue

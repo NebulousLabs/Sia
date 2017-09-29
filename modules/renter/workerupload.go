@@ -65,7 +65,7 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 	needsHelp := uc.piecesNeeded > uc.piecesCompleted+uc.piecesRegistered
 
 	// If the chunk does not need help from this worker, release the chunk.
-	if chunkComplete || !candidateHost || !w.contract.GoodForRenew {
+	if chunkComplete || !candidateHost || !w.contract.GoodForUpload {
 		// This worker no longer needs to track this chunk.
 		uc.workersRemaining--
 		uc.mu.Unlock()
@@ -103,7 +103,7 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 func (w *worker) managedQueueChunkRepair(chunk *unfinishedChunk) {
 	// Check that the worker is allowed to be uploading.
 	contract, exists := w.renter.hostContractor.ContractByID(w.contract.ID)
-	if !exists || !contract.GoodForRenew {
+	if !exists || !contract.GoodForUpload {
 		// The worker should not be uploading, remove the chunk.
 		chunk.mu.Lock()
 		chunk.workersRemaining--
