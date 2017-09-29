@@ -193,7 +193,7 @@ func (r *Renter) DeleteFile(nickname string) error {
 	}
 
 	// delete the temporary file
-	err := os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension+"_temp"))
+	err = os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension+"_temp"))
 	if err != nil {
 		r.log.Println("WARN: couldn't remove .sia_temp file during delete:", err)
 	}
