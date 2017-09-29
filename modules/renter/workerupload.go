@@ -13,12 +13,14 @@ func (w *worker) managedDumpUploadChunks() {
 		w.unprocessedChunks[i].workersRemaining--
 		w.unprocessedChunks[i].mu.Unlock()
 		w.renter.managedReleaseIdleChunkPieces(w.unprocessedChunks[i])
+		w.renter.heapWG.Done()
 	}
 	for i := 0; i < len(w.standbyChunks); i++ {
 		w.standbyChunks[i].mu.Lock()
 		w.standbyChunks[i].workersRemaining--
 		w.standbyChunks[i].mu.Unlock()
 		w.renter.managedReleaseIdleChunkPieces(w.standbyChunks[i])
+		w.renter.heapWG.Done()
 	}
 	w.mu.Unlock()
 }
@@ -63,18 +65,19 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 	needsHelp := uc.piecesNeeded > uc.piecesCompleted+uc.piecesRegistered
 
 	// If the chunk does not need help from this worker, release the chunk.
-	if chunkComplete || !candidateHost {
+	if chunkComplete || !candidateHost || !w.contract.GoodForRenew {
 		// This worker no longer needs to track this chunk.
 		uc.workersRemaining--
 		uc.mu.Unlock()
 		w.renter.managedReleaseIdleChunkPieces(uc)
+		w.renter.heapWG.Done()
 		return nil, 0
 	}
 
 	// If the chunk needs help from this worker, find a piece to upload and
 	// return the stats for that piece.
 	index := 0
-	if candidateHost && needsHelp {
+	if needsHelp {
 		// Select a piece and mark that a piece has been selected.
 		for i := 0; i < len(uc.pieceUsage); i++ {
 			if !uc.pieceUsage[i] {
@@ -92,14 +95,24 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 
 	// The chunk could need help from this worker, but only if other workers who
 	// are performing uploads experience failures. Put this chunk on standby.
-	if !chunkComplete && candidateHost {
-		w.standbyChunks = append(w.standbyChunks, uc)
-	}
+	w.standbyChunks = append(w.standbyChunks, uc)
 	return nil, 0
 }
 
 // managedQueueChunkRepair will take a chunk and add it to the worker's repair stack.
 func (w *worker) managedQueueChunkRepair(chunk *unfinishedChunk) {
+	// Check that the worker is allowed to be uploading.
+	contract, exists := w.renter.hostContractor.ContractByID(w.contract.ID)
+	if !exists || !contract.GoodForRenew {
+		// The worker should not be uploading, remove the chunk.
+		chunk.mu.Lock()
+		chunk.workersRemaining--
+		chunk.mu.Unlock()
+		w.renter.managedReleaseIdleChunkPieces(chunk)
+		w.renter.heapWG.Done()
+		return
+	}
+
 	// Add the new chunk to our list of unprocessed chunks.
 	w.mu.Lock()
 	w.unprocessedChunks = append(w.unprocessedChunks, chunk)
@@ -123,6 +136,7 @@ func (w *worker) uploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.pieceUsage[pieceIndex] = false
 	uc.mu.Unlock()
 	w.renter.managedReleaseIdleChunkPieces(uc)
+	w.renter.heapWG.Done()
 }
 
 // upload will perform some upload work.
@@ -179,4 +193,5 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.physicalChunkData[pieceIndex] = nil
 	uc.mu.Unlock()
 	w.renter.managedMemoryAvailableAdd(uint64(releaseSize))
+	w.renter.heapWG.Done()
 }

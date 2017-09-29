@@ -11,13 +11,22 @@ import (
 // physical data and distribute it to the worker pool.
 func (r *Renter) managedDistributeChunkToWorkers(uc *unfinishedChunk) {
 	// Give the chunk to each worker, marking the number of workers that have
-	// received the chunk.
+	// received the chunk. The workers cannot be interacted with while the
+	// renter is holding a lock, so we need to build a list of workers while
+	// under lock and then launch work jobs after that.
 	id := r.mu.RLock()
 	uc.workersRemaining += len(r.workerPool)
+	r.heapWG.Add(len(r.workerPool))
+	workers := make([]*worker, 0, len(r.workerPool))
 	for _, worker := range r.workerPool {
-		worker.managedQueueChunkRepair(uc)
+		workers = append(workers, worker)
 	}
 	r.mu.RUnlock(id)
+	for _, worker := range workers {
+		worker.managedQueueChunkRepair(uc)
+	}
+	// Worker threads have been added, can call done.
+	r.heapWG.Done()
 
 	// Perform cleanup for any pieces that will never be used by a worker.
 	r.managedReleaseIdleChunkPieces(uc)

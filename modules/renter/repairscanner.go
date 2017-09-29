@@ -45,9 +45,12 @@ type unfinishedChunk struct {
 	// to update these fields. Compatibility shouldn't be an issue because this
 	// struct is not persisted anywhere, it's always built from other
 	// structures.
-	index  uint64
-	length uint64
-	offset int64
+	index         uint64
+	length        uint64
+	memoryNeeded  uint64 // memory needed in bytes
+	minimumPieces int    // number of pieces required to recover the file.
+	offset        int64
+	piecesNeeded  int // number of pieces to achieve a 100% complete upload
 
 	// The logical data is the data that is presented to the user when the user
 	// requests the chunk. The physical data is all of the pieces that get
@@ -55,18 +58,13 @@ type unfinishedChunk struct {
 	logicalChunkData  []byte
 	physicalChunkData [][]byte
 
-	// Fields for tracking the current progress of the chunk and all the pieces.
-	memoryNeeded     uint64              // memory needed in bytes
-	minimumPieces    int                 // number of pieces required to recover the file.
-	piecesNeeded     int                 // number of pieces to achieve a 100% complete upload
+	// Worker synchronization fields. The mutex only protects these fields.
+	mu               sync.Mutex
+	pieceUsage       []bool              // one per piece. 'false' = piece not uploaded. 'true' = piece uploaded.
 	piecesCompleted  int                 // number of pieces that have been fully uploaded.
 	piecesRegistered int                 // number of pieces that are being uploaded, but aren't finished yet.
-	pieceUsage       []bool              // one per piece. 'false' = piece not uploaded. 'true' = piece uploaded.
 	unusedHosts      map[string]struct{} // hosts that aren't yet storing any pieces
 	workersRemaining int                 // number of workers who have received the chunk, but haven't finished processing it.
-
-	// Utilities.
-	mu sync.Mutex
 }
 
 // Implementation of heap.Interface for chunkHeap.
@@ -138,7 +136,7 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	// map, also increment the 'piecesCompleted' value.
 	saveFile := false
 	for fcid, fileContract := range f.contracts {
-		recentContract, exists := r.hostContractor.ResolveContract(fileContract.ID)
+		recentContract, exists := r.hostContractor.ResolveContract(fcid)
 		if !exists {
 			// File contract does not seem to be part of the host anymore.
 			// Delete this contract and mark the file to be saved.
@@ -156,8 +154,8 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 		// Mark the chunk set based on the pieces in this contract.
 		for _, piece := range fileContract.Pieces {
 			_, exists := newUnfinishedChunks[piece.Chunk].unusedHosts[hpk.String()]
-			nonRedundantPiece := newUnfinishedChunks[piece.Chunk].pieceUsage[piece.Piece]
-			if exists && nonRedundantPiece {
+			redundantPiece := newUnfinishedChunks[piece.Chunk].pieceUsage[piece.Piece]
+			if exists && !redundantPiece {
 				newUnfinishedChunks[piece.Chunk].pieceUsage[piece.Piece] = true
 				newUnfinishedChunks[piece.Chunk].piecesCompleted++
 				delete(newUnfinishedChunks[piece.Chunk].unusedHosts, hpk.String())
@@ -248,6 +246,9 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 		}
 	}
 	r.managedMemoryAvailableSub(nextChunk.memoryNeeded)
+	// Add this thread to the waitgroup. This Add will be released once the
+	// worker threads have been added to the wg.
+	r.heapWG.Add(1)
 	go r.managedFetchAndRepairChunk(nextChunk)
 }
 
@@ -333,6 +334,7 @@ func (r *Renter) threadedRepairScan() {
 					// If the rebuild heap signal is received, break out to the
 					// outer loop which will check the health of all filess
 					// again and then rebuild the heap.
+					r.heapWG.Wait()
 					break LOOP
 				case <-r.tg.StopChan():
 					// If the stop signal is received, quit entirely.

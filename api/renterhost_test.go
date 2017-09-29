@@ -109,7 +109,7 @@ func TestRenterLocalRepair(t *testing.T) {
 	var rf RenterFiles
 	err = retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
-		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy >= 2 {
 			return nil
 		}
 		return errors.New("file not uploaded")

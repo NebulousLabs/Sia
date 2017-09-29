@@ -1,5 +1,20 @@
 package renter
 
+// CONCURRENCY PATTERNS: The renter has some complex concurrency patterns.
+// Preventing race conditions and deadlocks requires understanding the patterns.
+//
+// The renter itself has a lock that protects all internal state. The renter is
+// allowed to call out to the hostContractor while under lock, which means that
+// calls within the hostContractor should not ever leave the hostContractor -
+// external calls should be able to complete quickly, and without making any
+// external calls or calls that may acquire external locks.
+//
+// The renter has a bunch of worker objects. The worker objects have mutexes
+// which protect them, and the workers need to interact with the renter,
+// sometimes changing state which is prevented by locks. This means that the
+// renter itself can never interact with a worker while the renter is under
+// lock.
+
 // TODO: Change the upload loop to have an upload state, and make it so that
 // instead of occasionally rebuilding the whole file matrix it has just a
 // single matrix that it's constantly pulling chunks from. Have a separate loop
@@ -11,13 +26,14 @@ package renter
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/sync"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -170,8 +186,9 @@ type Renter struct {
 	hostDB         hostDB
 	log            *persist.Logger
 	persistDir     string
-	mu             *sync.RWMutex
-	tg             *sync.ThreadGroup
+	mu             *siasync.RWMutex
+	heapWG         sync.WaitGroup // in-progress chunks join this waitgroup
+	tg             siasync.ThreadGroup
 	tpool          modules.TransactionPool
 }
 
@@ -221,8 +238,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		hostDB:         hdb,
 		hostContractor: hc,
 		persistDir:     persistDir,
-		mu:             sync.New(modules.SafeMutexDelay, 1),
-		tg:             new(sync.ThreadGroup),
+		mu:             siasync.New(modules.SafeMutexDelay, 1),
 		tpool:          tpool,
 	}
 	if err := r.initPersist(); err != nil {
