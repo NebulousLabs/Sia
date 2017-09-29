@@ -4,24 +4,26 @@ import (
 	"time"
 )
 
-// managedDumpUploadChunks will release all of the upload chunks that the worker
+// dropChunk will remove a worker from the responsibility of tracking a chunk.
+func (w *worker) dropChunk(uc *unfinishedChunk) {
+	uc.mu.Lock()
+	uc.workersRemaining--
+	uc.mu.Unlock()
+	w.renter.managedReleaseIdleChunkPieces(uc)
+	w.renter.heapWG.Done()
+}
+
+// managedDropUploadChunks will release all of the upload chunks that the worker
 // has received.
-func (w *worker) managedDumpUploadChunks() {
+func (w *worker) managedDropUploadChunks() {
 	w.mu.Lock()
 	for i := 0; i < len(w.unprocessedChunks); i++ {
-		w.unprocessedChunks[i].mu.Lock()
-		w.unprocessedChunks[i].workersRemaining--
-		w.unprocessedChunks[i].mu.Unlock()
-		w.renter.managedReleaseIdleChunkPieces(w.unprocessedChunks[i])
-		w.renter.heapWG.Done()
+		w.dropChunk(w.unprocessedChunks[i])
 	}
 	for i := 0; i < len(w.standbyChunks); i++ {
-		w.standbyChunks[i].mu.Lock()
-		w.standbyChunks[i].workersRemaining--
-		w.standbyChunks[i].mu.Unlock()
-		w.renter.managedReleaseIdleChunkPieces(w.standbyChunks[i])
-		w.renter.heapWG.Done()
+		w.dropChunk(w.standbyChunks[i])
 	}
+	w.terminated = true
 	w.mu.Unlock()
 }
 
@@ -67,10 +69,8 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 	// If the chunk does not need help from this worker, release the chunk.
 	if chunkComplete || !candidateHost || !w.contract.GoodForUpload {
 		// This worker no longer needs to track this chunk.
-		uc.workersRemaining--
 		uc.mu.Unlock()
-		w.renter.managedReleaseIdleChunkPieces(uc)
-		w.renter.heapWG.Done()
+		w.dropChunk(uc)
 		return nil, 0
 	}
 
@@ -100,22 +100,18 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 }
 
 // managedQueueChunkRepair will take a chunk and add it to the worker's repair stack.
-func (w *worker) managedQueueChunkRepair(chunk *unfinishedChunk) {
+func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 	// Check that the worker is allowed to be uploading.
 	contract, exists := w.renter.hostContractor.ContractByID(w.contract.ID)
-	if !exists || !contract.GoodForUpload {
+	if !exists || !contract.GoodForUpload || w.terminated {
 		// The worker should not be uploading, remove the chunk.
-		chunk.mu.Lock()
-		chunk.workersRemaining--
-		chunk.mu.Unlock()
-		w.renter.managedReleaseIdleChunkPieces(chunk)
-		w.renter.heapWG.Done()
+		w.mu.Lock()
+		w.dropChunk(uc)
+		w.mu.Unlock()
 		return
 	}
-
-	// Add the new chunk to our list of unprocessed chunks.
 	w.mu.Lock()
-	w.unprocessedChunks = append(w.unprocessedChunks, chunk)
+	w.unprocessedChunks = append(w.unprocessedChunks, uc)
 	w.mu.Unlock()
 
 	// Send a signal informing the work thread that there is work.
@@ -132,11 +128,9 @@ func (w *worker) uploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
 	w.uploadConsecutiveFailures++
 	uc.mu.Lock()
 	uc.piecesRegistered--
-	uc.workersRemaining--
 	uc.pieceUsage[pieceIndex] = false
 	uc.mu.Unlock()
-	w.renter.managedReleaseIdleChunkPieces(uc)
-	w.renter.heapWG.Done()
+	w.dropChunk(uc)
 }
 
 // upload will perform some upload work.
@@ -188,10 +182,9 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.mu.Lock()
 	releaseSize := len(uc.physicalChunkData[pieceIndex])
 	uc.piecesRegistered--
-	uc.workersRemaining--
 	uc.piecesCompleted++
 	uc.physicalChunkData[pieceIndex] = nil
 	uc.mu.Unlock()
 	w.renter.managedMemoryAvailableAdd(uint64(releaseSize))
-	w.renter.heapWG.Done()
+	w.dropChunk(uc)
 }

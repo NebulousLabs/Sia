@@ -25,8 +25,6 @@ func (r *Renter) managedDistributeChunkToWorkers(uc *unfinishedChunk) {
 	for _, worker := range workers {
 		worker.managedQueueChunkRepair(uc)
 	}
-	// Worker threads have been added, can call done.
-	r.heapWG.Done()
 
 	// Perform cleanup for any pieces that will never be used by a worker.
 	r.managedReleaseIdleChunkPieces(uc)
@@ -50,6 +48,11 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 	// the offset.
 	d := r.newSectionDownload(chunk.renterFile, buf, uint64(chunk.offset), chunk.length)
 	select {
+	case r.newDownloads <- d:
+	case <-r.tg.StopChan():
+		return errors.New("repair download queing interrupted by stop call")
+	}
+	select {
 	case <-d.downloadFinished:
 	case <-r.tg.StopChan():
 		return errors.New("repair download interrupted by stop call")
@@ -61,6 +64,10 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 // managedFetchAndRepairChunk will fetch the logical data for a chunk, create the
 // physical pieces for the chunk, and then distribute them.
 func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
+	// Clear the heapWG once we've successfully added this chunk to the work
+	// queue.
+	defer r.heapWG.Done()
+
 	// Only download this file if more than 25% of the redundancy is missing.
 	minMissingPiecesToDownload := (chunk.piecesNeeded - chunk.minimumPieces) / 4
 	download := chunk.piecesCompleted+minMissingPiecesToDownload < chunk.piecesNeeded
@@ -71,6 +78,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
 		// Logical data is not available, nothing to do.
 		r.log.Debugln("Fetching logical data of a chunk failed:", err)
 		return
+	} else {
 	}
 
 	// Create the phsyical pieces for the data.

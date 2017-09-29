@@ -20,6 +20,7 @@ type worker struct {
 	// The contract and host used by this worker.
 	contract   modules.RenterContract
 	hostPubKey types.SiaPublicKey
+	renter *Renter
 
 	// Channels that inform the worker of kill signals and of new work.
 	downloadChan         chan downloadWork // higher priority than all uploads
@@ -38,12 +39,10 @@ type worker struct {
 	// because other workers had taken on all of the work already. This list is
 	// maintained in case any of the other workers fail - this worker will be
 	// able to pick up the slack.
-	standbyChunks     []*unfinishedChunk
-	unprocessedChunks []*unfinishedChunk
-
-	// Utilities.
 	mu     sync.Mutex
-	renter *Renter
+	standbyChunks     []*unfinishedChunk
+	terminated bool
+	unprocessedChunks []*unfinishedChunk
 }
 
 // threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
@@ -54,6 +53,9 @@ func (w *worker) threadedWorkLoop() {
 		return
 	}
 	defer w.renter.tg.Done()
+	// The worker may have upload chunks and it needs to drop them before
+	// terminating.
+	defer w.managedDropUploadChunks()
 
 	for {
 		// Check for priority downloads.
@@ -106,7 +108,6 @@ func (w *worker) threadedWorkLoop() {
 		case <-time.After(sleepDuration):
 			continue
 		case <-w.killChan:
-			w.managedDumpUploadChunks()
 			return
 		case <-w.renter.tg.StopChan():
 			return

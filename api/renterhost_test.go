@@ -397,9 +397,9 @@ func TestRemoteFileRepair(t *testing.T) {
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
-	err = retry(240, time.Second, func() error {
+	err = retry(240, time.Millisecond*250, func() error {
 		st.getAPI("/renter/files", &rf)
-		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy >= 2 && rf.Files[0].Available {
 			return nil
 		}
 		return errors.New("file redundancy not incremented")

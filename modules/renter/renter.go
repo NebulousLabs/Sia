@@ -35,6 +35,8 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/threadgroup"
 )
 
 var (
@@ -188,7 +190,7 @@ type Renter struct {
 	persistDir     string
 	mu             *siasync.RWMutex
 	heapWG         sync.WaitGroup // in-progress chunks join this waitgroup
-	tg             siasync.ThreadGroup
+	tg             threadgroup.ThreadGroup
 	tpool          modules.TransactionPool
 }
 
@@ -251,12 +253,13 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	go r.threadedDownloadLoop()
 
 	// Kill workers on shutdown.
-	r.tg.OnStop(func() {
+	r.tg.OnStop(func() error {
 		id := r.mu.RLock()
 		for _, worker := range r.workerPool {
 			close(worker.killChan)
 		}
 		r.mu.RUnlock(id)
+		return nil
 	})
 
 	return r, nil
