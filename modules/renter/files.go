@@ -9,7 +9,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -194,7 +193,7 @@ func (r *Renter) DeleteFile(nickname string) error {
 	}
 
 	// delete the temporary file
-	err := os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension+tempSuffix))
+	err := os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension+"_temp"))
 	if err != nil {
 		r.log.Println("WARN: couldn't remove .sia_temp file during delete:", err)
 	}
