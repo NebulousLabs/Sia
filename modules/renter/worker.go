@@ -20,7 +20,7 @@ type worker struct {
 	// The contract and host used by this worker.
 	contract   modules.RenterContract
 	hostPubKey types.SiaPublicKey
-	renter *Renter
+	renter     *Renter
 
 	// Channels that inform the worker of kill signals and of new work.
 	downloadChan         chan downloadWork // higher priority than all uploads
@@ -39,9 +39,9 @@ type worker struct {
 	// because other workers had taken on all of the work already. This list is
 	// maintained in case any of the other workers fail - this worker will be
 	// able to pick up the slack.
-	mu     sync.Mutex
+	mu                sync.Mutex
 	standbyChunks     []*unfinishedChunk
-	terminated bool
+	terminated        bool
 	unprocessedChunks []*unfinishedChunk
 }
 
