@@ -288,6 +288,9 @@ func (cd *chunkDownload) recoverChunk() error {
 		diff := chunkTopAddress - (cd.download.length + cd.download.offset)
 		upperBound -= diff + 1
 	}
+	if upperBound > uint64(len(result)) {
+		upperBound = uint64(len(result))
+	}
 
 	result = result[lowerBound:upperBound]
 
