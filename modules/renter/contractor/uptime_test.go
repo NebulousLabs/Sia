@@ -37,8 +37,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		Period:      100,
 		RenewWindow: 10,
 	})
-	// we should have a contract, but it will be marked as offline due to the
-	// hocked hostDB
+	// Block until the contract is registered.
 	err = build.Retry(50, 100*time.Millisecond, func() error {
 		c.mu.Lock()
 		lenC := len(c.contracts)
@@ -59,7 +58,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		t.Error(err)
 	}
 	// Block until the host is seen as offline.
-	err = build.Retry(150, 250*time.Millisecond, func() error {
+	err = build.Retry(250, 250*time.Millisecond, func() error {
 		hosts := c.hdb.AllHosts()
 		if len(hosts) != 1 {
 			return errors.New("only expecting one host")
@@ -103,7 +102,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = build.Retry(150, 250*time.Millisecond, func() error {
+	err = build.Retry(250, 250*time.Millisecond, func() error {
 		numContracts := len(c.Contracts())
 		if numContracts < 2 {
 			return errors.New("still waiting to form the second contract")
