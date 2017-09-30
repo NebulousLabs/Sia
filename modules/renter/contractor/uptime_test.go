@@ -85,7 +85,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	}
 
 	// Wait for a scan of the host to complete.
-	err = build.Retry(150, 250*time.Millisecond, func() error {
+	err = build.Retry(250, 250*time.Millisecond, func() error {
 		hosts := c.hdb.AllHosts()
 		if len(hosts) < 2 {
 			return errors.New("waiting for at least two hosts to show up")
