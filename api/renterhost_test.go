@@ -329,7 +329,9 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// remove the local copy of the file
-	err = os.Remove(path)
+	err = build.Retry(25, time.Millisecond*100, func() error {
+		return os.Remove(path)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
