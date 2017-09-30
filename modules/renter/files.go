@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -187,10 +188,12 @@ func (r *Renter) DeleteFile(nickname string) error {
 	}
 	delete(r.files, nickname)
 	delete(r.tracking, nickname)
-	err := os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension))
+
+	err := persist.RemoveFile(filepath.Join(r.persistDir, f.name+ShareExtension))
 	if err != nil {
-		r.log.Println("WARN: couldn't remove .sia file during delete:", err)
+		r.log.Println("WARN: couldn't remove file :", err)
 	}
+
 	r.saveSync()
 	r.mu.Unlock(lockID)
 
