@@ -221,7 +221,7 @@ func TestRenterLocalRepair(t *testing.T) {
 // locally by being deleted, the repair loop will download the necessary chunks
 // from the living hosts and upload them to new hosts.
 func TestRemoteFileRepair(t *testing.T) {
-	if testing.Short() || !build.VLONG {
+	if testing.Short() {
 		t.SkipNow()
 	}
 	st, err := createServerTester(t.Name())
@@ -399,7 +399,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	// host using the download-to-upload strategy
 	err = retry(240, time.Millisecond*250, func() error {
 		st.getAPI("/renter/files", &rf)
-		if len(rf.Files) >= 1 && rf.Files[0].Redundancy >= 2 && rf.Files[0].Available {
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
 		}
 		return errors.New("file redundancy not incremented")
