@@ -103,14 +103,13 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 	// Check that the worker is allowed to be uploading.
 	contract, exists := w.renter.hostContractor.ContractByID(w.contract.ID)
+	w.mu.Lock()
 	if !exists || !contract.GoodForUpload || w.terminated {
 		// The worker should not be uploading, remove the chunk.
-		w.mu.Lock()
 		w.dropChunk(uc)
 		w.mu.Unlock()
 		return
 	}
-	w.mu.Lock()
 	w.unprocessedChunks = append(w.unprocessedChunks, uc)
 	w.mu.Unlock()
 

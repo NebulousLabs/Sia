@@ -2063,10 +2063,26 @@ func TestRenterMissingHosts(t *testing.T) {
 	allowanceValues := url.Values{}
 	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
 	allowanceValues.Set("hosts", "3")
-	allowanceValues.Set("period", "10")
+	allowanceValues.Set("period", "20")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 3 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed:", err)
 	}
 
 	// Create a file to upload.
@@ -2113,10 +2129,10 @@ func TestRenterMissingHosts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// wait for the redundancy to decrement
+	// redundancy should not decrement, we have a backup host we can use.
 	err = retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
-		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1.5 {
 			return nil
 		}
 		return errors.New("file redundancy not decremented: " + fmt.Sprint(rf.Files[0].Redundancy))
@@ -2141,7 +2157,7 @@ func TestRenterMissingHosts(t *testing.T) {
 	// wait for the redundancy to decrement
 	err = retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
-		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 0.5 {
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
 			return nil
 		}
 		return errors.New("file redundancy not decremented: " + fmt.Sprint(rf.Files[0].Redundancy))
@@ -2150,11 +2166,11 @@ func TestRenterMissingHosts(t *testing.T) {
 		t.Log(err)
 	}
 
-	// verify that the download fails
-	downloadPath = filepath.Join(st.dir, "test-downloaded-verify3.dat")
+	// verify we still can download
+	downloadPath = filepath.Join(st.dir, "test-downloaded-verify2.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
-	if err == nil {
-		t.Fatal("expected download to fail with redundancy <1")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// take down another host
