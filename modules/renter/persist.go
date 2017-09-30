@@ -18,9 +18,9 @@ import (
 )
 
 const (
+	logFile         = modules.RenterDir + ".log"
 	PersistFilename = "renter.json"
 	ShareExtension  = ".sia"
-	logFile         = modules.RenterDir + ".log"
 )
 
 var (

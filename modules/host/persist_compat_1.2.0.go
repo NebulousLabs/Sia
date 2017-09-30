@@ -26,8 +26,8 @@ const (
 	contractManagerStorageFolderGranularity = 64
 
 	// The directory names and filenames of legacy storage manager files.
-	v112StorageManagerDir             = "storagemanager"
 	v112StorageManagerDBFilename      = "storagemanager.db"
+	v112StorageManagerDir             = "storagemanager"
 	v112StorageManagerPersistFilename = "storagemanager.json"
 )
 

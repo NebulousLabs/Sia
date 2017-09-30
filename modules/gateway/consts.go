@@ -12,11 +12,9 @@ const (
 	// was altered to include additional information transfer.
 	handshakeUpgradeVersion = "1.0.0"
 
-	// sessionUpgradeVersion is the version where the gateway handshake RPC
-	// was altered to include the ID of the genesis block, the gateway's
-	// unique ID, and whether a connection is desired. This version also uses
-	// smux instead of muxado for stream multiplexing.
-	sessionUpgradeVersion = "1.3.0"
+	// maxEncodedSessionHeaderSize is the maximum allowed size of an encoded
+	// sessionHeader object.
+	maxEncodedSessionHeaderSize = 40 + modules.MaxEncodedNetAddressLength
 
 	// maxLocalOutbound is currently set to 3, meaning the gateway will not
 	// consider a local node to be an outbound peer if the gateway already has
@@ -34,12 +32,14 @@ const (
 	// pre-hardfork.
 	minAcceptableVersion = "0.4.0"
 
-	// maxEncodedSessionHeaderSize is the maximum allowed size of an encoded
-	// sessionHeader object.
-	maxEncodedSessionHeaderSize = 40 + modules.MaxEncodedNetAddressLength
-
 	// saveFrequency defines how often the gateway saves its persistence.
 	saveFrequency = time.Minute * 2
+
+	// sessionUpgradeVersion is the version where the gateway handshake RPC
+	// was altered to include the ID of the genesis block, the gateway's
+	// unique ID, and whether a connection is desired. This version also uses
+	// smux instead of muxado for stream multiplexing.
+	sessionUpgradeVersion = "1.3.0"
 )
 
 var (

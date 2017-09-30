@@ -11,12 +11,14 @@ import (
 )
 
 const (
+	SiagFileExtension = ".siakey"
+
 	// The header for all siag files. Do not change. Because siag was created
 	// early in development, compatibility with siag requires manually handling
 	// the headers and version instead of using the persist package.
-	SiagFileHeader    = "siag"
-	SiagFileExtension = ".siakey"
-	SiagFileVersion   = "1.0"
+	SiagFileHeader = "siag"
+
+	SiagFileVersion = "1.0"
 )
 
 var (

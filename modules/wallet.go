@@ -11,16 +11,16 @@ import (
 )
 
 const (
-	// WalletDir is the directory that contains the wallet persistence.
-	WalletDir = "wallet"
+	// PublicKeysPerSeed define the number of public keys that get pregenerated
+	// for a seed at startup when searching for balances in the blockchain.
+	PublicKeysPerSeed = 2500
 
 	// SeedChecksumSize is the number of bytes that are used to checksum
 	// addresses to prevent accidental spending.
 	SeedChecksumSize = 6
 
-	// PublicKeysPerSeed define the number of public keys that get pregenerated
-	// for a seed at startup when searching for balances in the blockchain.
-	PublicKeysPerSeed = 2500
+	// WalletDir is the directory that contains the wallet persistence.
+	WalletDir = "wallet"
 )
 
 var (

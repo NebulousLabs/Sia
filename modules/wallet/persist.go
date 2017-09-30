@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	logFile    = modules.WalletDir + ".log"
-	dbFile     = modules.WalletDir + ".db"
 	compatFile = modules.WalletDir + ".json"
+	dbFile     = modules.WalletDir + ".db"
+	logFile    = modules.WalletDir + ".log"
 )
 
 var (
