@@ -210,6 +210,9 @@ func TestRenterLocalRepair(t *testing.T) {
 		return errors.New("file redundancy not incremented")
 	})
 	if err != nil {
+		t.Log(len(rf.Files))
+		t.Log(rf.Files[0].Redundancy)
+		t.Log(rf.Files[0].Available)
 		t.Fatal(err)
 	}
 	if rg.FinancialMetrics.DownloadSpending.Cmp(types.NewCurrency64(0)) > 0 {
@@ -397,7 +400,7 @@ func TestRemoteFileRepair(t *testing.T) {
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
-	err = retry(240, time.Millisecond*250, func() error {
+	err = retry(300, time.Millisecond*250, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
@@ -405,13 +408,16 @@ func TestRemoteFileRepair(t *testing.T) {
 		return errors.New("file redundancy not incremented")
 	})
 	if err != nil {
+		t.Log(len(rf.Files))
+		t.Log(rf.Files[0].Redundancy)
+		t.Log(rf.Files[0].Available)
 		t.Fatal(err)
 	}
 
 	// we have to wait a bit for the download loop to update with the new
 	// contracts. retry the download for up to 90 seconds.
 	downloadPath = filepath.Join(st.dir, "test-downloaded.dat")
-	err = retry(90, time.Second, func() error {
+	err = retry(300, time.Millisecond*250, func() error {
 		return st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
 	})
 	if err != nil {

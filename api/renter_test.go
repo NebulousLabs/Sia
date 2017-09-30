@@ -1702,7 +1702,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	}
 
 	// Block until the hostdb reaches five hosts.
-	err = build.Retry(50, time.Millisecond*250, func() error {
+	err = build.Retry(150, time.Millisecond*250, func() error {
 		var ah HostdbActiveGET
 		err = st.getAPI("/hostdb/active", &ah)
 		if err != nil {
@@ -1724,7 +1724,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	}
 
 	// Verify that st and stH1 are dropped in favor of the newer, better hosts.
-	err = build.Retry(50, time.Millisecond*250, func() error {
+	err = build.Retry(150, time.Millisecond*250, func() error {
 		var newContracts int
 		err = st.getAPI("/renter/contracts", &rc)
 		if err != nil {
