@@ -191,12 +191,7 @@ func (r *Renter) DeleteFile(nickname string) error {
 
 	err := persist.RemoveFile(filepath.Join(r.persistDir, f.name+ShareExtension))
 	if err != nil {
-		r.log.Println("WARN: couldn't remove .sia file :", err)
-	}
-
-	err = persist.RemoveFile(filepath.Join(r.persistDir, f.name+ShareExtension+"_temp"))
-	if err != nil {
-		r.log.Println("WARN: couldn't remove .sia_temp file :", err)
+		r.log.Println("WARN: couldn't remove file :", err)
 	}
 
 	r.saveSync()
