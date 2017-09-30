@@ -32,10 +32,10 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 
 	// form a contract with h
 	c.SetAllowance(modules.Allowance{
-		Funds:       types.SiacoinPrecision.Mul64(100),
+		Funds:       types.SiacoinPrecision.Mul64(250),
 		Hosts:       1,
-		Period:      100,
-		RenewWindow: 10,
+		Period:      50,
+		RenewWindow: 20,
 	})
 	// Block until the contract is registered.
 	err = build.Retry(50, 100*time.Millisecond, func() error {
@@ -96,21 +96,26 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Mine a block to trigger an allowance refresh, which should cause the
-	// second, online host to be picked up.
-	_, err = m.AddBlock()
-	if err != nil {
-		t.Fatal(err)
+	// Mine 3 blocks to trigger an allowance refresh, which should cause the
+	// second, online host to be picked up. Three are mined because mining just
+	// one was causing NDFs.
+	for i := 0; i < 3; i++ {
+		_, err = m.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Millisecond * 100)
 	}
+	var numContracts int
 	err = build.Retry(250, 250*time.Millisecond, func() error {
-		numContracts := len(c.Contracts())
+		numContracts = len(c.Contracts())
 		if numContracts < 2 {
 			return errors.New("still waiting to form the second contract")
 		}
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, numContracts)
 	}
 }
 
