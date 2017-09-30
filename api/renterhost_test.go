@@ -185,6 +185,21 @@ func TestRenterLocalRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Wait for host to be seen in renter's hostdb
+	var ah HostdbActiveGET
+	err = build.Retry(250, time.Millisecond*250, func() error {
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			t.Fatal(err)
+		}
+		if len(ah.Hosts) == 2 {
+			return nil
+		}
+		return errors.New("not enough hosts in hostdb")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// add a few new blocks in order to cause the renter to form contracts with the new host
 	for i := 0; i < 10; i++ {
 		b, err := testGroup[0].miner.AddBlock()
@@ -379,6 +394,21 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = waitForBlock(stNewHost.cs.CurrentBlock().ID(), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for host to be seen in renter's hostdb
+	var ah HostdbActiveGET
+	err = build.Retry(250, time.Millisecond*250, func() error {
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			t.Fatal(err)
+		}
+		if len(ah.Hosts) == 2 {
+			return nil
+		}
+		return errors.New("not enough hosts in hostdb")
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
