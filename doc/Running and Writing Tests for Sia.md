@@ -239,7 +239,7 @@ Some other useful resources, some of which have been linked to already:
 * [How to Write Benchmarks in Go][cheney-benchmarks]
 * [How to into git and GitHub][luke]: an essential introduction to git
 
-And feel free to ask questions on the [#dev channel][slack] on the Sia Slack. 
+And feel free to ask questions on the [#core-dev channel][discord] on the Sia Discord. 
 Odds are, someone else is wondering the same thing.
 
 [pkg/testing]: https://golang.org/pkg/testing/
@@ -251,6 +251,6 @@ Odds are, someone else is wondering the same thing.
 [boltdb_test.go]: https://github.com/NebulousLabs/Sia/blob/master/persist/boltdb_test.go
 [cheney-benchmarks]: http://dave.cheney.net/2013/06/30/how-to-write-benchmarks-in-go
 [pkg/testing]: https://golang.org/pkg/testing/
-[slack]: https://siatalk.slack.com/messages/dev/
+[discord]: https://discord.gg/sia
 [parse_test]: https://github.com/NebulousLabs/Sia/blob/master/siac/parse_test.go
 [global]: http://c2.com/cgi/wiki?GlobalVariablesAreBad
