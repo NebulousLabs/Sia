@@ -16,16 +16,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	h, c, m, err := newTestingTrio(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer h.Close()
-
-	// create another host
-	dir := build.TempDir("contractor", t.Name(), "Host2")
-	h2, err := newTestingHost(dir, c.cs.(modules.ConsensusSet), c.tpool.(modules.TransactionPool))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,8 +49,9 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		t.Error(err)
 	}
 	// Block until the host is seen as offline.
+	hosts := c.hdb.AllHosts()
 	err = build.Retry(250, 250*time.Millisecond, func() error {
-		hosts := c.hdb.AllHosts()
+		hosts = c.hdb.AllHosts()
 		if len(hosts) != 1 {
 			return errors.New("only expecting one host")
 		}
@@ -73,6 +65,12 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// create another host
+	dir := build.TempDir("contractor", t.Name(), "Host2")
+	h2, err := newTestingHost(dir, c.cs.(modules.ConsensusSet), c.tpool.(modules.TransactionPool))
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Announce the second host.
 	err = h2.Announce()
 	if err != nil {
@@ -86,9 +84,14 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 
 	// Wait for a scan of the host to complete.
 	err = build.Retry(250, 250*time.Millisecond, func() error {
-		hosts := c.hdb.AllHosts()
+		hosts = c.hdb.AllHosts()
 		if len(hosts) < 2 {
 			return errors.New("waiting for at least two hosts to show up")
+		}
+		for _, host := range hosts {
+			if len(host.ScanHistory) < 2 {
+				return errors.New("waiting for the hosts to have been scanned")
+			}
 		}
 		return nil
 	})
@@ -99,12 +102,9 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	// Mine 3 blocks to trigger an allowance refresh, which should cause the
 	// second, online host to be picked up. Three are mined because mining just
 	// one was causing NDFs.
-	for i := 0; i < 3; i++ {
-		_, err = m.AddBlock()
-		if err != nil {
-			t.Fatal(err)
-		}
-		time.Sleep(time.Millisecond * 100)
+	_, err = m.AddBlock()
+	if err != nil {
+		t.Fatal(err)
 	}
 	var numContracts int
 	err = build.Retry(250, 250*time.Millisecond, func() error {

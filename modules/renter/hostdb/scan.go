@@ -111,12 +111,19 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 		return
 	}
 
-	// Grab the host from the host tree.
+	// Grab the host from the host tree, and update it with the neew settings.
 	newEntry, exists := hdb.hostTree.Select(entry.PublicKey)
 	if exists {
 		newEntry.HostExternalSettings = entry.HostExternalSettings
 	} else {
 		newEntry = entry
+	}
+
+	// Update the recent interactions with this host.
+	if netErr == nil {
+		newEntry.RecentSuccessfulInteractions++
+	} else {
+		newEntry.RecentFailedInteractions++
 	}
 
 	// Add the datapoints for the scan.
@@ -250,17 +257,10 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	}()
 	if err != nil {
 		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
-		if hdb.online {
-			// Increment failed host interactions
-			entry.RecentFailedInteractions++
-		}
 
 	} else {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 		entry.HostExternalSettings = settings
-
-		// Increment successful host interactions
-		entry.RecentSuccessfulInteractions++
 	}
 
 	// Update the host tree to have a new entry, including the new error. Then

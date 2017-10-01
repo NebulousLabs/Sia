@@ -28,7 +28,6 @@ func TestRenterLocalRepair(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 	st, err := createServerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -184,6 +183,10 @@ func TestRenterLocalRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Wait for host to be seen in renter's hostdb
 	var ah HostdbActiveGET
@@ -197,7 +200,7 @@ func TestRenterLocalRepair(t *testing.T) {
 		return errors.New("not enough hosts in hostdb")
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, ah)
 	}
 
 	// add a few new blocks in order to cause the renter to form contracts with the new host
