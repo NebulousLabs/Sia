@@ -134,14 +134,14 @@ func startContinuousLog(dir string, sleepCap time.Duration, restart func()) {
 			return
 		}
 		// Collect statistics in an infinite loop.
-		sleepTime := time.Second * 20
+		sleepTime := time.Second * 10
 		for {
 			// Sleep for an exponential amount of time each iteration, this
 			// keeps the size of the log small while still providing lots of
 			// information.
 			restart()
 			time.Sleep(sleepTime)
-			sleepTime = time.Duration(1.5 * float64(sleepTime))
+			sleepTime = time.Duration(1.2 * float64(sleepTime))
 			if sleepCap != 0*time.Second && sleepTime > sleepCap {
 				sleepTime = sleepCap
 			}
