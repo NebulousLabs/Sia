@@ -141,9 +141,9 @@ func cleanCloseHandler(next http.Handler) http.Handler {
 		// underlying socket for this API call.
 		timer := time.NewTimer(time.Minute * 60)
 		go func() {
+			defer timer.Stop()
 			select {
 			case <-done:
-				timer.Stop()
 			case <-timer.C:
 				build.Severe("api call is taking more than 60 minutes to return:", r.URL.Path)
 			}
