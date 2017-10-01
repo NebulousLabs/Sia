@@ -188,16 +188,12 @@ func (r *Renter) DeleteFile(nickname string) error {
 	}
 	delete(r.files, nickname)
 	delete(r.tracking, nickname)
-	err := os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension))
+
+	err := persist.RemoveFile(filepath.Join(r.persistDir, f.name+ShareExtension))
 	if err != nil {
-		r.log.Println("WARN: couldn't remove .sia file during delete:", err)
+		r.log.Println("WARN: couldn't remove file :", err)
 	}
 
-	// delete the temporary file
-	err := os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension+tempSuffix))
-	if err != nil {
-		r.log.Println("WARN: couldn't remove .sia_temp file during delete:", err)
-	}
 	r.saveSync()
 	r.mu.Unlock(lockID)
 
