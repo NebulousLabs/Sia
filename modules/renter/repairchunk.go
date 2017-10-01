@@ -60,11 +60,11 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 		return errors.New("repair download interrupted by stop call")
 	}
 	if d.Err() != nil {
-		chunk.logicalChunkData = buf.Bytes()
-		return nil
-	} else {
 		buf.data = nil
 		return d.Err()
+	} else {
+		chunk.logicalChunkData = buf.Bytes()
+		return nil
 	}
 }
 
@@ -108,7 +108,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) bool {
 	// any pieces that are not needed.
 	for i := 0; i < len(chunk.pieceUsage); i++ {
 		if chunk.pieceUsage[i] {
-			memoryFreed += uint64(len(chunk.physicalChunkData[i])+crypto.TwofishOverhead)
+			memoryFreed += uint64(len(chunk.physicalChunkData[i]) + crypto.TwofishOverhead)
 			chunk.physicalChunkData[i] = nil
 		} else {
 			// Encrypt the piece.

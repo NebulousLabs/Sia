@@ -45,13 +45,13 @@ type unfinishedChunk struct {
 	// to update these fields. Compatibility shouldn't be an issue because this
 	// struct is not persisted anywhere, it's always built from other
 	// structures.
-	index         uint64
-	length        uint64
-	memoryNeeded  uint64 // memory needed in bytes
+	index          uint64
+	length         uint64
+	memoryNeeded   uint64 // memory needed in bytes
 	memoryReleased uint64 // memory that has been returned of memoryNeeded
-	minimumPieces int    // number of pieces required to recover the file.
-	offset        int64
-	piecesNeeded  int // number of pieces to achieve a 100% complete upload
+	minimumPieces  int    // number of pieces required to recover the file.
+	offset         int64
+	piecesNeeded   int // number of pieces to achieve a 100% complete upload
 
 	// The logical data is the data that is presented to the user when the user
 	// requests the chunk. The physical data is all of the pieces that get
@@ -196,17 +196,19 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 // construct a chunk heap.
 func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}) *chunkHeap {
 	// Loop through the whole set of files to build the chunk heap.
-	var ch chunkHeap
+	ch := new(chunkHeap)
+	heap.Init(ch)
 	id := r.mu.Lock()
 	for _, file := range r.files {
 		unfinishedChunks := r.buildUnfinishedChunks(file, hosts)
-		ch = append(ch, unfinishedChunks...)
+		for i := 0; i < len(unfinishedChunks); i++ {
+			heap.Push(ch, unfinishedChunks[i])
+		}
 	}
 	r.mu.Unlock(id)
 
 	// Init the heap.
-	heap.Init(&ch)
-	return &ch
+	return ch
 }
 
 // managedInsertFileIntoChunkHeap will insert all of the chunks of a file into the
@@ -236,7 +238,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 	// of memory available, and then spin up a thread to asynchronously handle
 	// the rest of the chunk tasks.
 	memoryAvailable := r.managedMemoryAvailableGet()
-	nextChunk := ch.Pop().(*unfinishedChunk)
+	nextChunk := heap.Pop(ch).(*unfinishedChunk)
 	for nextChunk.memoryNeeded > memoryAvailable {
 		select {
 		case newFile := <-r.newUploads:
@@ -255,10 +257,9 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 		r.heapWG.Done()
 		if !workDistributed {
 			// Release any data that did not get distributed to workers.
-			r.managedMemoryAvailableAdd(nextChunk.memoryNeeded-nextChunk.memoryReleased)
+			r.managedMemoryAvailableAdd(nextChunk.memoryNeeded - nextChunk.memoryReleased)
 		} else {
 			nextChunk.mu.Lock()
-			println("distributed work for ", nextChunk.renterFile.name, " for ", nextChunk.piecesNeeded-nextChunk.piecesCompleted, " ratio ", float64(nextChunk.piecesCompleted) / float64(nextChunk.piecesNeeded))
 			nextChunk.mu.Unlock()
 		}
 
@@ -268,7 +269,6 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 			r.log.Critical("logical chunk data was not cleaned up correctly")
 		}
 	}()
-	time.Sleep(time.Millisecond * 500)
 }
 
 // managedRefreshHostsAndWorkers will reset the set of hosts and the set of
