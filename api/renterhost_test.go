@@ -409,10 +409,15 @@ func TestRemoteFileRepair(t *testing.T) {
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			t.Fatal(err)
 		}
-		if len(ah.Hosts) == 2 {
-			return nil
+		if len(ah.Hosts) != 2 {
+			return errors.New("not enough hosts in hostdb")
 		}
-		return errors.New("not enough hosts in hostdb")
+		for _, host := range ah.Hosts {
+			if len(host.ScanHistory) < 2 {
+				return errors.New("hosts are not scanned")
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)

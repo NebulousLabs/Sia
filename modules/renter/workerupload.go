@@ -183,6 +183,7 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.piecesRegistered--
 	uc.piecesCompleted++
 	uc.physicalChunkData[pieceIndex] = nil
+	uc.memoryReleased += uint64(releaseSize)
 	uc.mu.Unlock()
 	w.renter.managedMemoryAvailableAdd(uint64(releaseSize))
 	w.dropChunk(uc)

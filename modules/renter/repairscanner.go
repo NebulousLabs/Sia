@@ -48,6 +48,7 @@ type unfinishedChunk struct {
 	index         uint64
 	length        uint64
 	memoryNeeded  uint64 // memory needed in bytes
+	memoryReleased uint64 // memory that has been returned of memoryNeeded
 	minimumPieces int    // number of pieces required to recover the file.
 	offset        int64
 	piecesNeeded  int // number of pieces to achieve a 100% complete upload
@@ -249,7 +250,25 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 	// Add this thread to the waitgroup. This Add will be released once the
 	// worker threads have been added to the wg.
 	r.heapWG.Add(1)
-	go r.managedFetchAndRepairChunk(nextChunk)
+	go func() {
+		workDistributed := r.managedFetchAndRepairChunk(nextChunk)
+		r.heapWG.Done()
+		if !workDistributed {
+			// Release any data that did not get distributed to workers.
+			r.managedMemoryAvailableAdd(nextChunk.memoryNeeded-nextChunk.memoryReleased)
+		} else {
+			nextChunk.mu.Lock()
+			println("distributed work for ", nextChunk.renterFile.name, " for ", nextChunk.piecesNeeded-nextChunk.piecesCompleted, " ratio ", float64(nextChunk.piecesCompleted) / float64(nextChunk.piecesNeeded))
+			nextChunk.mu.Unlock()
+		}
+
+		// Sanity check, make sure memory was returned properly.
+		if nextChunk.logicalChunkData != nil {
+			nextChunk.logicalChunkData = nil
+			r.log.Critical("logical chunk data was not cleaned up correctly")
+		}
+	}()
+	time.Sleep(time.Millisecond * 500)
 }
 
 // managedRefreshHostsAndWorkers will reset the set of hosts and the set of

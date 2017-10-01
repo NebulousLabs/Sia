@@ -4,6 +4,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/NebulousLabs/Sia/crypto"
+
 	"github.com/NebulousLabs/errors"
 )
 
@@ -57,17 +59,19 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 	case <-r.tg.StopChan():
 		return errors.New("repair download interrupted by stop call")
 	}
-	chunk.logicalChunkData = buf.Bytes()
-	return d.Err()
+	if d.Err() != nil {
+		chunk.logicalChunkData = buf.Bytes()
+		return nil
+	} else {
+		buf.data = nil
+		return d.Err()
+	}
 }
 
-// managedFetchAndRepairChunk will fetch the logical data for a chunk, create the
-// physical pieces for the chunk, and then distribute them.
-func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
-	// Clear the heapWG once we've successfully added this chunk to the work
-	// queue.
-	defer r.heapWG.Done()
-
+// managedFetchAndRepairChunk will fetch the logical data for a chunk, create
+// the physical pieces for the chunk, and then distribute them. The returned
+// bool indicates whether the chunk was successfully distributed to workers.
+func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) bool {
 	// Only download this file if more than 25% of the redundancy is missing.
 	minMissingPiecesToDownload := (chunk.piecesNeeded - chunk.minimumPieces) / 4
 	download := chunk.piecesCompleted+minMissingPiecesToDownload < chunk.piecesNeeded
@@ -77,32 +81,34 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
 	if err != nil {
 		// Logical data is not available, nothing to do.
 		r.log.Debugln("Fetching logical data of a chunk failed:", err)
-		return
-	} else {
+		return false
 	}
 
-	// Create the phsyical pieces for the data.
+	// Create the physical pieces for the data. Immediately release the logical
+	// data.
 	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.Encode(chunk.logicalChunkData)
+	memoryFreed := uint64(len(chunk.logicalChunkData))
+	chunk.logicalChunkData = nil
+	r.managedMemoryAvailableAdd(memoryFreed)
+	chunk.memoryReleased += memoryFreed
+	memoryFreed = 0
 	if err != nil {
 		// Logical data is not available, nothing to do.
 		r.log.Debugln("Fetching physical data of a chunk failed:", err)
-		return
+		return false
 	}
-	// Nil out the logical chunk data so that it can be garbage collected.
-	memoryFreed := uint64(len(chunk.logicalChunkData))
-	chunk.logicalChunkData = nil
 
 	// Sanity check - we should have at least as many physical data pieces as we
 	// do elements in our piece usage.
 	if len(chunk.physicalChunkData) < len(chunk.pieceUsage) {
 		r.log.Critical("not enough physical pieces to match the upload settings of the file")
-		return
+		return false
 	}
 	// Loop through the pieces and encrypt any that our needed, while dropping
 	// any pieces that are not needed.
 	for i := 0; i < len(chunk.pieceUsage); i++ {
 		if chunk.pieceUsage[i] {
-			memoryFreed += uint64(len(chunk.physicalChunkData[i]))
+			memoryFreed += uint64(len(chunk.physicalChunkData[i])+crypto.TwofishOverhead)
 			chunk.physicalChunkData[i] = nil
 		} else {
 			// Encrypt the piece.
@@ -110,11 +116,13 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) {
 			chunk.physicalChunkData[i] = key.EncryptBytes(chunk.physicalChunkData[i])
 		}
 	}
-	// Update the renter to indicate how much memory was freed.
+	// Return the released memory.
 	r.managedMemoryAvailableAdd(memoryFreed)
+	chunk.memoryReleased += memoryFreed
 
 	// Distribute the chunk to the workers.
 	r.managedDistributeChunkToWorkers(chunk)
+	return true
 }
 
 // managedFetchLogicalChunkData will get the raw data for a chunk, pulling it from disk if
@@ -135,10 +143,8 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk, download b
 	//
 	// TODO: Might want to remove the file from the renter tracking if the disk
 	// loading fails.
-	chunk.logicalChunkData = make([]byte, chunk.length)
 	osFile, err := os.Open(chunk.localPath)
 	if err != nil && download {
-		chunk.logicalChunkData = nil
 		return r.managedDownloadLogicalChunkData(chunk)
 	} else if err != nil {
 		return errors.Extend(err, errors.New("failed to open file locally"))
@@ -146,11 +152,13 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk, download b
 	// TODO: Once we have enabled support for small chunks, we should stop
 	// needing to ignore the EOF errors, because the chunk size should always
 	// match the tail end of the file. Until then, we ignore io.EOF.
+	chunk.logicalChunkData = make([]byte, chunk.length)
 	_, err = osFile.ReadAt(chunk.logicalChunkData, chunk.offset)
 	if err != nil && err != io.EOF && download {
 		chunk.logicalChunkData = nil
 		return r.managedDownloadLogicalChunkData(chunk)
 	} else if err != nil && err != io.EOF {
+		chunk.logicalChunkData = nil
 		return errors.Extend(err, errors.New("failed to read file locally"))
 	}
 
@@ -182,6 +190,12 @@ func (r *Renter) managedReleaseIdleChunkPieces(uc *unfinishedChunk) {
 		} else {
 			piecesAvailable++
 		}
+	}
+	uc.memoryReleased += uint64(memoryReleased)
+	// Sanity check - if there are no workers remaining, we should have released
+	// all of the memory by now.
+	if uc.workersRemaining == 0 && uc.memoryReleased != uc.memoryNeeded {
+		r.log.Critical("No workers remaining, but not all memory released:", uc.workersRemaining, uc.memoryReleased, uc.memoryNeeded)
 	}
 	uc.mu.Unlock()
 	if memoryReleased > 0 {
