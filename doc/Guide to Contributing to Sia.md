@@ -266,7 +266,7 @@ Feel free to ask for help on the #core-dev channel on [discord][discord].
 [developers.md]: https://github.com/NebulousLabs/Sia/blob/master/doc/Developers.md
 [gofmt]: https://golang.org/cmd/gofmt/
 [nutshell]: https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell
-[discord]: https://discordapp.com/channels/341359001797132308/347026783750717450
+[discord]: https://discord.gg/sia
 [install-git]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
 [test-doc]: https://github.com/NebulousLabs/Sia/blob/master/doc/Testing.md
 [stashing]: https://git-scm.com/book/en/v2/Git-Tools-Stashing-and-Cleaning
