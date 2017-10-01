@@ -94,13 +94,6 @@ var (
 		Version: "0.5.2",
 	}
 
-	// persistMetadata is the header that gets written to the persist file, and is
-	// used to recognize other persist files.
-	persistMetadata = persist.Metadata{
-		Header:  "Sia Host",
-		Version: "1.2.0",
-	}
-
 	// errHostClosed gets returned when a call is rejected due to the host
 	// having been closed.
 	errHostClosed = errors.New("call is disabled because the host is closed")
@@ -109,6 +102,13 @@ var (
 	errNilCS     = errors.New("host cannot use a nil state")
 	errNilTpool  = errors.New("host cannot use a nil transaction pool")
 	errNilWallet = errors.New("host cannot use a nil wallet")
+
+	// persistMetadata is the header that gets written to the persist file, and is
+	// used to recognize other persist files.
+	persistMetadata = persist.Metadata{
+		Header:  "Sia Host",
+		Version: "1.2.0",
+	}
 )
 
 // A Host contains all the fields necessary for storing files for clients and

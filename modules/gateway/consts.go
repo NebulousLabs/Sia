@@ -68,19 +68,19 @@ var (
 		Testing:  uint64(3),
 	}).(uint64)
 
-	// nodePurgeDelay defines the amount of time that is waited between each
-	// iteration of the node purge loop.
-	nodePurgeDelay = build.Select(build.Var{
-		Standard: 10 * time.Minute,
-		Dev:      20 * time.Second,
-		Testing:  500 * time.Millisecond,
-	}).(time.Duration)
-
 	// nodeListDelay defines the amount of time that is waited between each
 	// iteration of the node list loop.
 	nodeListDelay = build.Select(build.Var{
 		Standard: 5 * time.Second,
 		Dev:      3 * time.Second,
+		Testing:  500 * time.Millisecond,
+	}).(time.Duration)
+
+	// nodePurgeDelay defines the amount of time that is waited between each
+	// iteration of the node purge loop.
+	nodePurgeDelay = build.Select(build.Var{
+		Standard: 10 * time.Minute,
+		Dev:      20 * time.Second,
 		Testing:  500 * time.Millisecond,
 	}).(time.Duration)
 

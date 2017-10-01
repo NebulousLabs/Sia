@@ -22,14 +22,14 @@ const (
 )
 
 var (
+	errAllDuplicates         = errors.New("old wallet has no new seeds")
+	errDuplicateSpendableKey = errors.New("key has already been loaded into the wallet")
+
 	ErrInconsistentKeys = errors.New("keyfiles provided that are for different addresses")
 	ErrInsufficientKeys = errors.New("not enough keys provided to spend the siafunds")
 	ErrNoKeyfile        = errors.New("no keyfile has been presented")
 	ErrUnknownHeader    = errors.New("file contains the wrong header")
 	ErrUnknownVersion   = errors.New("file has an unknown version number")
-
-	errAllDuplicates         = errors.New("old wallet has no new seeds")
-	errDuplicateSpendableKey = errors.New("key has already been loaded into the wallet")
 )
 
 // A siagKeyPair is the struct representation of the bytes that get saved to

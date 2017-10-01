@@ -12,12 +12,6 @@ import (
 )
 
 var (
-	errInsufficientContracts = errors.New("not enough contracts to upload file")
-	errUploadDirectory       = errors.New("cannot upload directory")
-
-	// Erasure-coded piece size
-	pieceSize = modules.SectorSize - crypto.TwofishOverhead
-
 	// defaultDataPieces is the number of data pieces per erasure-coded chunk
 	defaultDataPieces = func() int {
 		switch build.Release {
@@ -44,6 +38,12 @@ var (
 		}
 		panic("undefined defaultParityPieces")
 	}()
+
+	errInsufficientContracts = errors.New("not enough contracts to upload file")
+	errUploadDirectory       = errors.New("cannot upload directory")
+
+	// Erasure-coded piece size
+	pieceSize = modules.SectorSize - crypto.TwofishOverhead
 )
 
 // validateSiapath checks that a Siapath is a legal filename.

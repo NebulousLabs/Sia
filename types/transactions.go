@@ -27,19 +27,19 @@ const (
 // These Specifiers are used internally when calculating a type's ID. See
 // Specifier for more details.
 var (
+	ErrTransactionIDWrongLen = errors.New("input has wrong length to be an encoded transaction id")
+
+	SpecifierClaimOutput          = Specifier{'c', 'l', 'a', 'i', 'm', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+	SpecifierFileContract         = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
+	SpecifierFileContractRevision = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't', ' ', 'r', 'e'}
+	SpecifierMinerFee             = Specifier{'m', 'i', 'n', 'e', 'r', ' ', 'f', 'e', 'e'}
 	SpecifierMinerPayout          = Specifier{'m', 'i', 'n', 'e', 'r', ' ', 'p', 'a', 'y', 'o', 'u', 't'}
 	SpecifierSiacoinInput         = Specifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'i', 'n', 'p', 'u', 't'}
 	SpecifierSiacoinOutput        = Specifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'}
-	SpecifierFileContract         = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
-	SpecifierFileContractRevision = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't', ' ', 'r', 'e'}
-	SpecifierStorageProof         = Specifier{'s', 't', 'o', 'r', 'a', 'g', 'e', ' ', 'p', 'r', 'o', 'o', 'f'}
-	SpecifierStorageProofOutput   = Specifier{'s', 't', 'o', 'r', 'a', 'g', 'e', ' ', 'p', 'r', 'o', 'o', 'f'}
 	SpecifierSiafundInput         = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'i', 'n', 'p', 'u', 't'}
 	SpecifierSiafundOutput        = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
-	SpecifierClaimOutput          = Specifier{'c', 'l', 'a', 'i', 'm', ' ', 'o', 'u', 't', 'p', 'u', 't'}
-	SpecifierMinerFee             = Specifier{'m', 'i', 'n', 'e', 'r', ' ', 'f', 'e', 'e'}
-
-	ErrTransactionIDWrongLen = errors.New("input has wrong length to be an encoded transaction id")
+	SpecifierStorageProof         = Specifier{'s', 't', 'o', 'r', 'a', 'g', 'e', ' ', 'p', 'r', 'o', 'o', 'f'}
+	SpecifierStorageProofOutput   = Specifier{'s', 't', 'o', 'r', 'a', 'g', 'e', ' ', 'p', 'r', 'o', 'o', 'f'}
 )
 
 type (

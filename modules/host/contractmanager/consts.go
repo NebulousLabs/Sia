@@ -83,14 +83,6 @@ var (
 )
 
 var (
-	// maximumStorageFolders defines the maximum number of storage folders that
-	// the host can support.
-	maximumStorageFolders = build.Select(build.Var{
-		Dev:      uint64(1 << 5),
-		Standard: uint64(1 << 16),
-		Testing:  uint64(1 << 3),
-	}).(uint64)
-
 	// MaximumSectorsPerStorageFolder sets an upper bound on how large storage
 	// folders in the host are allowed to be. There is a hard limit at 4
 	// billion sectors because the sector location map only uses 4 bytes to
@@ -99,6 +91,14 @@ var (
 		Dev:      uint64(1 << 20), // 4 TiB
 		Standard: uint64(1 << 32), // 32 PiB
 		Testing:  uint64(1 << 12), // 16 MiB
+	}).(uint64)
+
+	// maximumStorageFolders defines the maximum number of storage folders that
+	// the host can support.
+	maximumStorageFolders = build.Select(build.Var{
+		Dev:      uint64(1 << 5),
+		Standard: uint64(1 << 16),
+		Testing:  uint64(1 << 3),
 	}).(uint64)
 
 	// MinimumSectorsPerStorageFolder defines the minimum number of sectors

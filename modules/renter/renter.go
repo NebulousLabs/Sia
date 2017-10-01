@@ -42,8 +42,8 @@ import (
 var (
 	errNilContractor = errors.New("cannot create renter with nil contractor")
 	errNilCS         = errors.New("cannot create renter with nil consensus set")
-	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
 	errNilHdb        = errors.New("cannot create renter with nil hostdb")
+	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
 )
 
 var (

@@ -15,18 +15,18 @@ var (
 		Run:   wrap(stopcmd),
 	}
 
-	updateCmd = &cobra.Command{
-		Use:   "update",
-		Short: "Update Sia",
-		Long:  "Check for (and/or download) available updates for Sia.",
-		Run:   wrap(updatecmd),
-	}
-
 	updateCheckCmd = &cobra.Command{
 		Use:   "check",
 		Short: "Check for available updates",
 		Long:  "Check for available updates.",
 		Run:   wrap(updatecheckcmd),
+	}
+
+	updateCmd = &cobra.Command{
+		Use:   "update",
+		Short: "Update Sia",
+		Long:  "Check for (and/or download) available updates for Sia.",
+		Run:   wrap(updatecmd),
 	}
 
 	versionCmd = &cobra.Command{

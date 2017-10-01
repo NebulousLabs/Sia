@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	// errWeightTooHeavy is returned from a SelectRandom() call if a weight that exceeds
-	// the total weight of the tree is requested.
-	errWeightTooHeavy = errors.New("requested a too-heavy weight")
+	// errHostExists is returned if an Insert is called with a public key that
+	// already exists in the tree.
+	errHostExists = errors.New("host already exists in the tree")
 
 	// errNegativeWeight is returned from an Insert() call if an entry with a
 	// negative weight is added to the tree. Entries must always have a positive
@@ -25,13 +25,13 @@ var (
 	// should always have a non-nil entry, unless they have been Delete()ed.
 	errNilEntry = errors.New("node has a nil entry")
 
-	// errHostExists is returned if an Insert is called with a public key that
-	// already exists in the tree.
-	errHostExists = errors.New("host already exists in the tree")
-
 	// errNoSuchHost is returned if Remove is called with a public key that does
 	// not exist in the tree.
 	errNoSuchHost = errors.New("no host with specified public key")
+
+	// errWeightTooHeavy is returned from a SelectRandom() call if a weight that exceeds
+	// the total weight of the tree is requested.
+	errWeightTooHeavy = errors.New("requested a too-heavy weight")
 )
 
 type (

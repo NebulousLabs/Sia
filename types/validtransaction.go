@@ -11,9 +11,9 @@ import (
 
 var (
 	ErrDoubleSpend                      = errors.New("transaction uses a parent object twice")
+	ErrFileContractOutputSumViolation   = errors.New("file contract has invalid output sums")
 	ErrFileContractWindowEndViolation   = errors.New("file contract window must end at least one block after it starts")
 	ErrFileContractWindowStartViolation = errors.New("file contract window must start in the future")
-	ErrFileContractOutputSumViolation   = errors.New("file contract has invalid output sums")
 	ErrNonZeroClaimStart                = errors.New("transaction has a siafund output with a non-zero siafund claim")
 	ErrNonZeroRevision                  = errors.New("new file contract has a nonzero revision number")
 	ErrStorageProofWithOutputs          = errors.New("transaction has both a storage proof and other outputs")

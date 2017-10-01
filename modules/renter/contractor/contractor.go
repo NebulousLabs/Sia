@@ -22,8 +22,8 @@ import (
 
 var (
 	errNilCS     = errors.New("cannot create contractor with nil consensus set")
-	errNilWallet = errors.New("cannot create contractor with nil wallet")
 	errNilTpool  = errors.New("cannot create contractor with nil transaction pool")
+	errNilWallet = errors.New("cannot create contractor with nil wallet")
 
 	// COMPATv1.0.4-lts
 	// metricsContractID identifies a special contract that contains aggregate

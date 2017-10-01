@@ -28,10 +28,6 @@ var (
 	// file is provided.
 	ErrBadEncryptionKey = errors.New("provided encryption key is incorrect")
 
-	// ErrLowBalance is returned if the wallet does not have enough funds to
-	// complete the desired action.
-	ErrLowBalance = errors.New("insufficient balance")
-
 	// ErrIncompleteTransactions is returned if the wallet has incomplete
 	// transactions being built that are using all of the current outputs, and
 	// therefore the wallet is unable to spend money despite it not technically
@@ -41,6 +37,10 @@ var (
 	// ErrLockedWallet is returned when an action cannot be performed due to
 	// the wallet being locked.
 	ErrLockedWallet = errors.New("wallet must be unlocked before it can be used")
+
+	// ErrLowBalance is returned if the wallet does not have enough funds to
+	// complete the desired action.
+	ErrLowBalance = errors.New("insufficient balance")
 )
 
 type (
