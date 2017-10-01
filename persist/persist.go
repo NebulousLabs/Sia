@@ -89,7 +89,7 @@ func (sf *safeFile) CommitSync() error {
 // NewSafeFile returns a file that can atomically be written to disk,
 // minimizing the risk of corruption.
 func NewSafeFile(filename string) (*safeFile, error) {
-	file, err := os.Create(filename + "_temp")
+	file, err := os.Create(filename + tempSuffix)
 	if err != nil {
 		return nil, err
 	}
@@ -103,4 +103,18 @@ func NewSafeFile(filename string) (*safeFile, error) {
 	}
 
 	return &safeFile{file, absFilename}, nil
+}
+
+// RemoveFile removes an atomic file from disk, along with any uncommitted
+// or temporary files.
+func RemoveFile(filename string) error {
+	err := os.RemoveAll(filename)
+	if err != nil {
+		return err
+	}
+	err = os.RemoveAll(filename + tempSuffix)
+	if err != nil {
+		return err
+	}
+	return nil
 }
