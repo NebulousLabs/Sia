@@ -142,7 +142,9 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk, download b
 	// download the chunk.
 	//
 	// TODO: Might want to remove the file from the renter tracking if the disk
-	// loading fails.
+	// loading fails. Should do this after we swap the file format, the tracking
+	// data for the file should reside in the file metadata and not in a
+	// separate struct.
 	osFile, err := os.Open(chunk.localPath)
 	if err != nil && download {
 		return r.managedDownloadLogicalChunkData(chunk)
