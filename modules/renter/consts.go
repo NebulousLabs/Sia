@@ -20,7 +20,11 @@ var (
 	// will use when performing uploads and downloads. Const should be a factor
 	// of 4 MiB, since most operations will be on data pieces that are 4 MiB
 	// each.
-	defaultMemory uint64 = 1 << 29 // 512 MiB
+	defaultMemory = build.Select(build.Var{
+		Dev:      uint64(1 << 28),     // 256 MiB
+		Standard: uint64(3 * 1 << 28), // 768 MiB
+		Testing:  uint64(1 << 17),     // 128 KiB - 4 KiB sector size, need to test memory exhaustion
+	}).(uint64)
 
 	// Limit the number of doublings to prevent overflows.
 	maxConsecutivePenalty = build.Select(build.Var{
