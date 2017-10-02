@@ -225,16 +225,6 @@ var (
 // All of the following variables define the names of buckets used by the host
 // in the database.
 var (
-	// bucketActionItems maps a blockchain height to a list of storage
-	// obligations that need to be managed in some way at that height. The
-	// height is stored as a big endian uint64, which means that bolt will
-	// store the heights sorted in numerical order. The action item itself is
-	// an array of file contract ids. The host is able to contextually figure
-	// out what the necessary actions for that item are based on the file
-	// contract id and the associated storage obligation that can be retrieved
-	// using the id.
-	bucketActionItems = []byte("BucketActionItems")
-
 	// bucketStorageObligations contains a set of serialized
 	// 'storageObligations' sorted by their file contract id.
 	bucketStorageObligations = []byte("BucketStorageObligations")

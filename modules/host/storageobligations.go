@@ -28,7 +28,6 @@ package host
 // TODO: Make sure that not too many action items are being created.
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 
@@ -251,7 +250,7 @@ func (so storageObligation) merkleRoot() crypto.Hash {
 	return so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].FileMerkleRoot
 }
 
-// payous returns the set of valid payouts and missed payouts that represent
+// payouts returns the set of valid payouts and missed payouts that represent
 // the latest revision for the storage obligation.
 func (so storageObligation) payouts() (valid []types.SiacoinOutput, missed []types.SiacoinOutput) {
 	valid = make([]types.SiacoinOutput, 2)
@@ -278,30 +277,6 @@ func (so storageObligation) proofDeadline() types.BlockHeight {
 // value returns the value of fulfilling the storage obligation to the host.
 func (so storageObligation) value() types.Currency {
 	return so.ContractCost.Add(so.PotentialDownloadRevenue).Add(so.PotentialStorageRevenue).Add(so.PotentialUploadRevenue).Add(so.RiskedCollateral)
-}
-
-// queueActionItem adds an action item to the host at the input height so that
-// the host knows to perform maintenance on the associated storage obligation
-// when that height is reached.
-func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID) error {
-	// Sanity check - action item should be at a higher height than the current
-	// block height.
-	if height <= h.blockHeight {
-		h.log.Critical("action item queued improperly")
-	}
-	return h.db.Update(func(tx *bolt.Tx) error {
-		// Translate the height into a byte slice.
-		heightBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(heightBytes, uint64(height))
-
-		// Get the list of action items already at this height and extend it.
-		bai := tx.Bucket(bucketActionItems)
-		existingItems := bai.Get(heightBytes)
-		var extendedItems = make([]byte, len(existingItems), len(existingItems)+len(id[:]))
-		copy(extendedItems, existingItems)
-		extendedItems = append(extendedItems, id[:]...)
-		return bai.Put(heightBytes, extendedItems)
-	})
 }
 
 // managedAddStorageObligation adds a storage obligation to the host. Because
@@ -393,27 +368,6 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 		return err
 	}
 
-	// Queue the action items.
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	// The file contract was already submitted to the blockchain, need to check
-	// after the resubmission timeout that it was submitted successfully.
-	err1 := h.queueActionItem(h.blockHeight+resubmissionTimeout, soid)
-	err2 := h.queueActionItem(h.blockHeight+resubmissionTimeout*2, soid) // Paranoia
-	// Queue an action item to submit the file contract revision - if there is
-	// never a file contract revision, the handling of this action item will be
-	// a no-op.
-	err3 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer, soid)
-	err4 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer+resubmissionTimeout, soid) // Paranoia
-	// The storage proof should be submitted
-	err5 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
-	err6 := h.queueActionItem(so.expiration()+resubmissionTimeout*2, soid) // Paranoia
-	err = composeErrors(err1, err2, err3, err4, err5, err6)
-	if err != nil {
-		h.log.Println("Error with transaction set, redacting obligation, id", so.id())
-		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
-	}
 	return nil
 }
 
@@ -596,9 +550,9 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 	})
 }
 
-// threadedHandleActionItem will look at a storage obligation and determine
+// threadedHandleStorageObligation will look at a storage obligation and determine
 // which action is necessary for the storage obligation to succeed.
-func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
+func (h *Host) threadedHandleStorageObligation(soid types.FileContractID) {
 	err := h.tg.Add()
 	if err != nil {
 		return
@@ -661,14 +615,6 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 				return
 			}
 		}
-
-		// Queue another action item to check the status of the transaction.
-		h.mu.Lock()
-		err = h.queueActionItem(h.blockHeight+resubmissionTimeout, so.id())
-		h.mu.Unlock()
-		if err != nil {
-			h.log.Println("Error queuing action item:", err)
-		}
 	}
 
 	// Check if the file contract revision is ready for submission. Check for death.
@@ -693,14 +639,6 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 			h.removeStorageObligation(so, obligationRejected)
 			h.mu.Unlock()
 			return
-		}
-
-		// Queue another action item to check the status of the transaction.
-		h.mu.Lock()
-		err := h.queueActionItem(blockHeight+resubmissionTimeout, so.id())
-		h.mu.Unlock()
-		if err != nil {
-			h.log.Println("Error queuing action item:", err)
 		}
 
 		// Add a miner fee to the transaction and submit it to the blockchain.
@@ -822,15 +760,6 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 			return
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)
-
-		// Queue another action item to check whether the storage proof
-		// got confirmed.
-		h.mu.Lock()
-		err = h.queueActionItem(so.proofDeadline(), so.id())
-		h.mu.Unlock()
-		if err != nil {
-			h.log.Println("Error queuing action item:", err)
-		}
 	}
 
 	// Save the storage obligation to account for any fee changes.
