@@ -332,7 +332,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// remove the local copy of the file
-	err = build.Retry(25, time.Millisecond*100, func() error {
+	err = build.Retry(50, time.Millisecond*200, func() error {
 		return os.Remove(path)
 	})
 	if err != nil {
@@ -346,7 +346,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// wait for the redundancy to decrement
-	err = retry(60, time.Second, func() error {
+	err = retry(120, time.Millisecond*250, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
 			return nil
