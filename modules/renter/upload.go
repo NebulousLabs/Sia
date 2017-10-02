@@ -141,3 +141,34 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.newRepairs <- f
 	return nil
 }
+
+// Write performs a sector upload using the passed parameters.
+func (r *Renter) Write(p modules.RenterWriteParameters) (crypto.Hash, error) {
+	contractID := r.hostContractor.ResolveID(p.ContractID)
+	worker, has := r.workerPool[contractID]
+	if !has {
+		id := r.mu.Lock()
+		r.updateWorkerPool()
+		r.mu.Unlock(id)
+		worker, has = r.workerPool[contractID]
+	}
+	if !has {
+		return crypto.Hash{}, errors.New("worker is not active")
+	}
+	ww := writeWork{
+		data:       p.Data,
+		resultChan: make(chan finishedWrite),
+	}
+	select {
+	case worker.writeChan <- ww:
+	case <-r.tg.StopChan():
+		return crypto.Hash{}, errors.New("write interrupted by shutdown")
+	}
+	// Block until the write has completed.
+	select {
+	case result := <-ww.resultChan:
+		return result.sectorRoot, result.err
+	case <-r.tg.StopChan():
+		return crypto.Hash{}, errors.New("write interrupted by shutdown")
+	}
+}

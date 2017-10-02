@@ -79,6 +79,37 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	}
 }
 
+// Read performs a sector download using the passed parameters.
+func (r *Renter) Read(p modules.RenterReadParameters) ([]byte, error) {
+	contractID := r.hostContractor.ResolveID(p.ContractID)
+	worker, has := r.workerPool[contractID]
+	if !has {
+		id := r.mu.Lock()
+		r.updateWorkerPool()
+		r.mu.Unlock(id)
+		worker, has = r.workerPool[contractID]
+	}
+	if !has {
+		return nil, errors.New("worker is not active")
+	}
+	rw := readWork{
+		sectorRoot: p.SectorRoot,
+		resultChan: make(chan finishedRead),
+	}
+	select {
+	case worker.priorityReadChan <- rw:
+	case <-r.tg.StopChan():
+		return nil, errors.New("read interrupted by shutdown")
+	}
+	// Block until the read has completed.
+	select {
+	case result := <-rw.resultChan:
+		return result.data, result.err
+	case <-r.tg.StopChan():
+		return nil, errors.New("read interrupted by shutdown")
+	}
+}
+
 // DownloadQueue returns the list of downloads in the queue.
 func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	lockID := r.mu.RLock()
