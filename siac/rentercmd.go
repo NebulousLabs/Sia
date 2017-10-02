@@ -125,6 +125,34 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Long:  "Display the estimated prices of storing files, retrieving files, and creating a set of contracts",
 		Run:   wrap(renterpricescmd),
 	}
+
+	renterShareASCIICmd = &cobra.Command{
+		Use:   "shareascii [nicknames]",
+		Short: "share a file in base64",
+		Long:  "writes the .sia file specified by `nickname` to stdout base64 encoded.",
+		Run:   wrap(rentershareasciicmd),
+	}
+
+	renterLoadASCIICmd = &cobra.Command{
+		Use:   "loadascii [data]",
+		Short: "load a file in base64",
+		Long:  "load sia file base64 encoded.",
+		Run:   wrap(renterloadasciicmd),
+	}
+
+	renterShareCmd = &cobra.Command{
+		Use:   "share [nicknames filepath]",
+		Short: "write share file to .sia file",
+		Long:  "writes the .sia file specified by `nickname` to `filepath`.",
+		Run:   wrap(rentersharecmd),
+	}
+
+	renterLoadCmd = &cobra.Command{
+		Use:   "load [filename]",
+		Short: "load a file in filename",
+		Long:  "load sia file from filename.",
+		Run:   wrap(renterloadcmd),
+	}
 )
 
 // abs returns the absolute representation of a path.
@@ -556,4 +584,41 @@ func renterpricescmd() {
 	fmt.Fprintln(w, "\tStore 1 TB for 1 Month:\t", currencyUnits(rpg.StorageTerabyteMonth))
 	fmt.Fprintln(w, "\tUpload 1 TB:\t", currencyUnits(rpg.UploadTerabyte))
 	w.Flush()
+}
+
+func rentershareasciicmd(nicknames string) {
+	var rsa api.RenterShareASCII
+	err := getAPI("/renter/shareascii?siapaths="+nicknames, &rsa)
+	if err != nil {
+		die("Could not get share code:", err)
+	}
+	fmt.Printf("share code: %s\n", rsa.ASCIIsia)
+}
+
+func renterloadasciicmd(data string) {
+	var rl api.RenterLoad
+	qs := "asciisia=" + data
+	err := postResp("/renter/loadascii", qs, &rl)
+	if err != nil {
+		die("Could not load data:", err)
+	}
+	fmt.Printf("Files Added '%s'.\n", rl.FilesAdded)
+}
+
+func rentersharecmd(nicknames string, filepath string) {
+	err := get("/renter/share?siapaths=" + nicknames + "&destination=" + filepath)
+	if err != nil {
+		die("Could share file:", err)
+	}
+	fmt.Printf("write share file success:'%s'.\n", filepath)
+}
+
+func renterloadcmd(filename string) {
+	var rl api.RenterLoad
+	qs := "source=" + filename
+	err := postResp("/renter/load", qs, &rl)
+	if err != nil {
+		die("Could not load sia file:", err)
+	}
+	fmt.Printf("Files Added '%s'.\n", rl.FilesAdded)
 }

@@ -30,7 +30,7 @@ var (
 	ErrIncompatible   = errors.New("file is not compatible with current version")
 
 	shareHeader  = [15]byte{'S', 'i', 'a', ' ', 'S', 'h', 'a', 'r', 'e', 'd', ' ', 'F', 'i', 'l', 'e'}
-	shareVersion = "0.4"
+	shareVersion = "0.5"
 
 	saveMetadata = persist.Metadata{
 		Header:  "Renter Persistence",
@@ -38,9 +38,29 @@ var (
 	}
 )
 
+func resolveShareFromContracts(contracts map[types.FileContractID]fileContract, shareContracts map[string]shareFileContract, renter *Renter) error {
+	ocs := renter.hostContractor.Contracts()
+	for _, c := range contracts {
+		newId := renter.hostContractor.ResolveID(c.ID)
+		for _, oc := range ocs {
+			if oc.ID == newId {
+				PublicKey := oc.HostPublicKey
+				sfc := shareFileContract{
+					PublicKeyString: PublicKey.String(),
+					Pieces:          c.Pieces,
+					WindowStart:     c.WindowStart,
+				}
+				shareContracts[sfc.PublicKeyString] = sfc
+				break
+			}
+		}
+	}
+	return nil
+}
+
 // MarshalSia implements the encoding.SiaMarshaller interface, writing the
 // file data to w.
-func (f *file) MarshalSia(w io.Writer) error {
+func (f *file) MarshalSia(w io.Writer, renter *Renter) error {
 	enc := encoding.NewEncoder(w)
 
 	// encode easy fields
@@ -78,11 +98,18 @@ func (f *file) MarshalSia(w io.Writer) error {
 		}
 		return errors.New("unknown erasure code")
 	}
-	// encode contracts
-	if err := enc.Encode(uint64(len(f.contracts))); err != nil {
+
+	shareContracts := make(map[string]shareFileContract)
+	if err := resolveShareFromContracts(f.contracts, shareContracts, renter); err != nil {
 		return err
 	}
-	for _, c := range f.contracts {
+
+	// encode contracts
+	if err := enc.Encode(uint64(len(shareContracts))); err != nil {
+		return err
+	}
+
+	for _, c := range shareContracts {
 		if err := enc.Encode(c); err != nil {
 			return err
 		}
@@ -90,14 +117,25 @@ func (f *file) MarshalSia(w io.Writer) error {
 	return nil
 }
 
+func resolveInfoFromPublicKey(pks string, contract *fileContract, renter *Renter) error {
+	//loop contrcts
+	ocs := renter.hostContractor.Contracts()
+	for _, oc := range ocs {
+		if oc.HostPublicKey.String() == pks {
+			contract.ID = oc.ID
+			contract.IP = oc.NetAddress
+			return nil
+		}
+	}
+	return errors.New("no contract found for publickey:" + pks)
+}
+
 // UnmarshalSia implements the encoding.SiaUnmarshaller interface,
 // reconstructing a file from the encoded bytes read from r.
-func (f *file) UnmarshalSia(r io.Reader) error {
+func (f *file) UnmarshalSia(r io.Reader, renter *Renter) error {
 	dec := encoding.NewDecoder(r)
-
 	// COMPATv0.4.3 - decode bytesUploaded and chunksUploaded into dummy vars.
 	var bytesUploaded, chunksUploaded uint64
-
 	// Decode easy fields.
 	err := dec.DecodeAll(
 		&f.name,
@@ -108,6 +146,7 @@ func (f *file) UnmarshalSia(r io.Reader) error {
 		&bytesUploaded,
 		&chunksUploaded,
 	)
+
 	if err != nil {
 		return err
 	}
@@ -143,12 +182,57 @@ func (f *file) UnmarshalSia(r io.Reader) error {
 	}
 	f.contracts = make(map[types.FileContractID]fileContract)
 	var contract fileContract
+	var shareContract shareFileContract
+	noContractHosts := make(map[string]shareFileContract)
 	for i := uint64(0); i < nContracts; i++ {
-		if err := dec.Decode(&contract); err != nil {
+		if err := dec.Decode(&shareContract); err != nil {
 			return err
 		}
+		// figure out contract id & net address from publickey here
+		err := resolveInfoFromPublicKey(shareContract.PublicKeyString, &contract, renter)
+		if err != nil {
+			renter.log.Println(err)
+			noContractHosts[shareContract.PublicKeyString] = shareContract
+			continue
+		}
+		contract.Pieces = shareContract.Pieces
+		contract.WindowStart = shareContract.WindowStart
 		f.contracts[contract.ID] = contract
 	}
+
+	// check if enough contract founded
+	if !f.available(renter.hostContractor.IsOffline) {
+		hosts := renter.ActiveHosts()
+		filtedHosts := make([]modules.HostDBEntry, 0)
+		for _, host := range hosts {
+			for _, shareContract := range noContractHosts {
+				// filter it in hostdb
+				if shareContract.PublicKeyString == host.PublicKey.String() {
+					filtedHosts = append(filtedHosts, host)
+				}
+			}
+		}
+		// TODO: sort the not-found hosts by rank
+		// #1 make contracts with hosts till available         [ ]
+		// #2 try hard to make sure the file is downloadable   [x]
+		for _, host := range filtedHosts {
+			renter.log.Println("try to form contract:", f.name, " ", host.PublicKey.String())
+			shareContract = noContractHosts[host.PublicKey.String()]
+			renterContract, err := renter.hostContractor.FormDownloadOnlyContract(host)
+			if err != nil {
+				renter.log.Println("error in forming download only contract:", err)
+				continue
+			}
+			contract.ID = renterContract.ID
+			contract.Pieces = shareContract.Pieces
+			contract.WindowStart = shareContract.WindowStart
+			f.contracts[contract.ID] = contract
+		}
+	}
+	if !f.available(renter.hostContractor.IsOffline) {
+		return errors.New("can't load this file")
+	}
+
 	return nil
 }
 
@@ -169,7 +253,7 @@ func (r *Renter) saveFile(f *file) error {
 	defer handle.Close()
 
 	// Write file data.
-	err = shareFiles([]*file{f}, handle)
+	err = shareFiles([]*file{f}, handle, r)
 	if err != nil {
 		return err
 	}
@@ -242,7 +326,7 @@ func (r *Renter) load() error {
 
 // shareFiles writes the specified files to w. First a header is written,
 // followed by the gzipped concatenation of each file.
-func shareFiles(files []*file, w io.Writer) error {
+func shareFiles(files []*file, w io.Writer, r *Renter) error {
 	// Write header.
 	err := encoding.NewEncoder(w).EncodeAll(
 		shareHeader,
@@ -255,11 +339,10 @@ func shareFiles(files []*file, w io.Writer) error {
 
 	// Create compressor.
 	zip, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
-	enc := encoding.NewEncoder(zip)
 
 	// Encode each file.
 	for _, f := range files {
-		err = enc.Encode(f)
+		err = f.MarshalSia(zip, r)
 		if err != nil {
 			return err
 		}
@@ -294,7 +377,7 @@ func (r *Renter) ShareFiles(nicknames []string, shareDest string) error {
 		files[i] = f
 	}
 
-	err = shareFiles(files, handle)
+	err = shareFiles(files, handle, r)
 	if err != nil {
 		os.Remove(shareDest)
 		return err
@@ -319,7 +402,7 @@ func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 	}
 
 	buf := new(bytes.Buffer)
-	err := shareFiles(files, base64.NewEncoder(base64.URLEncoding, buf))
+	err := shareFiles(files, base64.NewEncoder(base64.URLEncoding, buf), r)
 	if err != nil {
 		return "", err
 	}
@@ -352,13 +435,12 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	dec := encoding.NewDecoder(unzip)
 
 	// Read each file.
 	files := make([]*file, numFiles)
 	for i := range files {
 		files[i] = new(file)
-		err := dec.Decode(files[i])
+		err := files[i].UnmarshalSia(unzip, r)
 		if err != nil {
 			return nil, err
 		}

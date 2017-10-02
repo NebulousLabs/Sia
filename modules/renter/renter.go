@@ -117,6 +117,9 @@ type hostContractor interface {
 
 	// ResolveID returns the most recent renewal of the specified ID.
 	ResolveID(types.FileContractID) types.FileContractID
+
+	// make new download only contract
+	FormDownloadOnlyContract(host modules.HostDBEntry) (modules.RenterContract, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.

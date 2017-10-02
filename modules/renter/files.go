@@ -57,6 +57,13 @@ type pieceData struct {
 	MerkleRoot crypto.Hash // the Merkle root of the piece
 }
 
+type shareFileContract struct {
+	PublicKeyString string
+	Pieces          []pieceData
+
+	WindowStart types.BlockHeight
+}
+
 // deriveKey derives the key used to encrypt and decrypt a specific file piece.
 func deriveKey(masterKey crypto.TwofishKey, chunkIndex, pieceIndex uint64) crypto.TwofishKey {
 	return crypto.TwofishKey(crypto.HashAll(masterKey, chunkIndex, pieceIndex))
