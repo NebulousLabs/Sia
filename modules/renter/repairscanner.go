@@ -320,6 +320,7 @@ func (r *Renter) threadedRepairScan() {
 
 		// Build a min-heap of chunks organized by upload progress.
 		chunkHeap := r.managedBuildChunkHeap(hosts)
+		r.log.Println("Repairing", chunkHeap.Len(), "chunks")
 
 		// Work through the heap. Chunks will be processed one at a time until
 		// the heap is whittled down. When the heap is empty, we wait for new

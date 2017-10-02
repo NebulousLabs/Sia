@@ -13,16 +13,23 @@ func (w *worker) dropChunk(uc *unfinishedChunk) {
 	w.renter.heapWG.Done()
 }
 
-// managedDropUploadChunks will release all of the upload chunks that the worker
-// has received.
-func (w *worker) managedDropUploadChunks() {
-	w.mu.Lock()
+// dropUploadChunks will release all of the upload chunks that the worker has
+// received.
+func (w *worker) dropUploadChunks() {
 	for i := 0; i < len(w.unprocessedChunks); i++ {
 		w.dropChunk(w.unprocessedChunks[i])
 	}
+	w.unprocessedChunks = w.unprocessedChunks[:0]
 	for i := 0; i < len(w.standbyChunks); i++ {
 		w.dropChunk(w.standbyChunks[i])
 	}
+	w.standbyChunks = w.standbyChunks[:0]
+}
+
+// managedKillUploading will disable all uploading for the worker.
+func (w *worker) managedKillUploading() {
+	w.mu.Lock()
+	w.dropUploadChunks()
 	w.terminated = true
 	w.mu.Unlock()
 }
@@ -104,7 +111,13 @@ func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 	// Check that the worker is allowed to be uploading.
 	contract, exists := w.renter.hostContractor.ContractByID(w.contract.ID)
 	w.mu.Lock()
-	if !exists || !contract.GoodForUpload || w.terminated {
+	// Figure out how long the worker would need to be on cooldown.
+	requiredCooldown := uploadFailureCooldown
+	for i := 0; i < w.uploadConsecutiveFailures && i < maxConsecutivePenalty; i++ {
+		requiredCooldown *= 2
+	}
+	onCooldown := time.Now().Before(w.uploadRecentFailure.Add(requiredCooldown))
+	if !exists || !contract.GoodForUpload || w.terminated || onCooldown {
 		// The worker should not be uploading, remove the chunk.
 		w.dropChunk(uc)
 		w.mu.Unlock()
@@ -130,10 +143,11 @@ func (w *worker) uploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.pieceUsage[pieceIndex] = false
 	uc.mu.Unlock()
 	w.dropChunk(uc)
+	w.dropUploadChunks()
 }
 
-// upload will perform some upload work.
-func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
+// managedUpload will perform some upload work.
+func (w *worker) managedUpload(uc *unfinishedChunk, pieceIndex uint64) {
 	// Open an editing connection to the host.
 	e, err := w.renter.hostContractor.Editor(w.contract.ID, w.renter.tg.StopChan())
 	if err != nil {
@@ -151,7 +165,9 @@ func (w *worker) upload(uc *unfinishedChunk, pieceIndex uint64) {
 		w.uploadFailed(uc, pieceIndex)
 		return
 	}
+	w.mu.Lock()
 	w.uploadConsecutiveFailures = 0
+	w.mu.Unlock()
 
 	// Update the renter metadata.
 	addr := e.Address()

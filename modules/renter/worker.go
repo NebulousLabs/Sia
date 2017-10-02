@@ -31,7 +31,7 @@ type worker struct {
 	// Operation failure statistics for the worker.
 	downloadRecentFailure     time.Time // Only modified by the primary download loop.
 	uploadRecentFailure       time.Time // Only modified by primary repair loop.
-	uploadConsecutiveFailures time.Duration
+	uploadConsecutiveFailures int
 
 	// Two lists of chunks that relate to worker upload tasks. The first list is
 	// the set of chunks that the worker hasn't examined yet. The second list is
@@ -55,7 +55,7 @@ func (w *worker) threadedWorkLoop() {
 	defer w.renter.tg.Done()
 	// The worker may have upload chunks and it needs to drop them before
 	// terminating.
-	defer w.managedDropUploadChunks()
+	defer w.managedKillUploading()
 
 	for {
 		// Check for priority downloads.
@@ -77,7 +77,7 @@ func (w *worker) threadedWorkLoop() {
 		// Perform one step of processing upload work.
 		chunk, pieceIndex := w.managedNextChunk()
 		if chunk != nil {
-			w.upload(chunk, pieceIndex)
+			w.managedUpload(chunk, pieceIndex)
 			continue
 		}
 
