@@ -149,6 +149,7 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk, download b
 	} else if err != nil {
 		return errors.Extend(err, errors.New("failed to open file locally"))
 	}
+	defer osFile.Close()
 	// TODO: Once we have enabled support for small chunks, we should stop
 	// needing to ignore the EOF errors, because the chunk size should always
 	// match the tail end of the file. Until then, we ignore io.EOF.
