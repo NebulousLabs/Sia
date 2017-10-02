@@ -2,14 +2,20 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/julienschmidt/httprouter"
+)
+
+var (
+	errCleanClosed = errors.New("Client closed connection")
 )
 
 // Error is a type that is encoded as JSON and returned in an API response in
@@ -119,6 +125,45 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 	}
 }
 
+type cleanResponseWriter struct {
+	impl   http.ResponseWriter
+	m      sync.Mutex
+	closed bool
+}
+
+func (c *cleanResponseWriter) Close() {
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.closed = true
+}
+
+func (c *cleanResponseWriter) Header() http.Header {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.closed {
+		return http.Header{}
+	}
+	return c.impl.Header()
+}
+
+func (c *cleanResponseWriter) Write(buffer []byte) (int, error) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.closed {
+		return 0, errCleanClosed
+	}
+	return c.impl.Write(buffer)
+}
+
+func (c *cleanResponseWriter) WriteHeader(code int) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.closed {
+		return
+	}
+	c.impl.WriteHeader(code)
+}
+
 // cleanCloseHandler wraps the entire API, ensuring that underlying conns are
 // not leaked if the remote end closes the connection before the underlying
 // handler finishes.
@@ -127,9 +172,16 @@ func cleanCloseHandler(next http.Handler) http.Handler {
 		// Close this file handle either when the function completes or when the
 		// connection is done.
 		done := make(chan struct{})
+		cw := &cleanResponseWriter{
+			impl: w,
+		}
+		// Stop all operations on the response writer after
+		// the connection is done.
+		// See https://github.com/NebulousLabs/Sia/issues/2385
+		defer cw.Close()
 		go func(w http.ResponseWriter, r *http.Request) {
 			defer close(done)
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(cw, r)
 		}(w, r)
 
 		// Sanity check - thread should not take more than an hour to return. This
