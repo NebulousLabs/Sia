@@ -142,7 +142,7 @@ func TestRenterLocalRepair(t *testing.T) {
 		return errors.New("file redundancy not decremented")
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, len(rf.Files), rf.Files[9].Redundancy)
 	}
 
 	// bring up a new host
