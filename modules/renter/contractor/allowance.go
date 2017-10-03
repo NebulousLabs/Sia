@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"errors"
+	"reflect"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -40,7 +41,7 @@ var (
 // NOTE: At this time, transaction fees are not counted towards the allowance.
 // This means the contractor may spend more than allowance.Funds.
 func (c *Contractor) SetAllowance(a modules.Allowance) error {
-	if a.Funds.IsZero() && a.Hosts == 0 && a.Period == 0 && a.RenewWindow == 0 {
+	if reflect.DeepEqual(a, modules.Allowance{}) {
 		return c.managedCancelAllowance(a)
 	}
 
@@ -74,7 +75,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	c.mu.Lock()
 	// set the current period to the blockheight if the existing allowance is
 	// empty
-	if c.allowance.Funds.IsZero() && c.allowance.Hosts == 0 && c.allowance.Period == 0 && c.allowance.RenewWindow == 0 {
+	if reflect.DeepEqual(c.allowance, modules.Allowance{}) {
 		c.currentPeriod = c.blockHeight
 	}
 	c.allowance = a
