@@ -108,7 +108,6 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 	defer c.mu.RUnlock()
 
 	spending := modules.ContractorSpending{}
-	allSpending := types.ZeroCurrency
 	for _, contract := range c.contracts {
 		spending.ContractSpending = spending.ContractSpending.Add(contract.TotalCost)
 		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
@@ -120,8 +119,8 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 			spending.UploadSpending = spending.UploadSpending.Add(pre.UploadSpending)
 			spending.StorageSpending = spending.StorageSpending.Add(pre.StorageSpending)
 		}
-		allSpending = allSpending.Add(spending.ContractSpending).Add(spending.DownloadSpending).Add(spending.UploadSpending).Add(spending.StorageSpending)
 	}
+	allSpending := spending.ContractSpending.Add(spending.DownloadSpending).Add(spending.UploadSpending).Add(spending.StorageSpending)
 	spending.Unspent = c.allowance.Funds.Sub(allSpending)
 	return spending
 }

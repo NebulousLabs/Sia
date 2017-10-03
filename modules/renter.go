@@ -260,9 +260,9 @@ type RenterContract struct {
 // spent during the current billing period.
 type ContractorSpending struct {
 	ContractSpending types.Currency `json:"contractspending"`
-	UploadSpending   types.Currency `json:"uploadspending"`
 	DownloadSpending types.Currency `json:"downloadspending"`
 	StorageSpending  types.Currency `json:"storagespending"`
+	UploadSpending   types.Currency `json:"uploadspending"`
 	Unspent          types.Currency `json:"unspent"`
 }
 
