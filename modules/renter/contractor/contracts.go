@@ -244,6 +244,12 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
 func (c *Contractor) managedRenew(contract modules.RenterContract, contractFunding types.Currency, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
+	// Sanity check - should not be renewing a bad contract.
+	if !contract.GoodForRenew {
+		c.log.Critical("Renewing a contract that has been marked as !GoodForRenew")
+	}
+
+	// Fetch the host associated with this contract.
 	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
 		return modules.RenterContract{}, errors.New("no record of that host")
@@ -535,10 +541,10 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 
 			c.mu.RLock()
-			oldContract, ok := c.contracts[id]
+			oldContract, exists := c.contracts[id]
 			c.mu.RUnlock()
-			if !ok {
-				c.log.Println("WARN: no record of contract previously added to the renew set:", id)
+			if !exists || !oldContract.GoodForRenew {
+				c.log.Println("Contract slated for renew has to be skipped:", exists, oldContract.GoodForRenew)
 				return
 			}
 
@@ -570,7 +576,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			defer c.mu.Unlock()
 
 			// Store the contract in the record of historic contracts.
-			_, exists := c.contracts[oldContract.ID]
+			_, exists = c.contracts[oldContract.ID]
 			if exists {
 				c.oldContracts[oldContract.ID] = oldContract
 				delete(c.contracts, oldContract.ID)

@@ -411,8 +411,8 @@ func (cm *ContractManager) AddSectorBatch(sectorRoots []crypto.Hash) error {
 
 	// Add each sector in a separate goroutine.
 	var wg sync.WaitGroup
-	// Ensure only 'maxAddSectorBatchThreads' goroutines are running at a time.
-	semaphore := make(chan struct{}, maxAddSectorBatchThreads)
+	// Ensure only 'maxSectorBatchThreads' goroutines are running at a time.
+	semaphore := make(chan struct{}, maxSectorBatchThreads)
 	for _, root := range sectorRoots {
 		wg.Add(1)
 		semaphore <- struct{}{}
@@ -483,13 +483,17 @@ func (cm *ContractManager) RemoveSectorBatch(sectorRoots []crypto.Hash) error {
 
 	// Add each sector in a separate goroutine.
 	var wg sync.WaitGroup
+	// Ensure only 'maxSectorBatchThreads' goroutines are running at a time.
+	semaphore := make(chan struct{}, maxSectorBatchThreads)
 	for _, root := range sectorRoots {
 		wg.Add(1)
+		semaphore <- struct{}{}
 		go func(root crypto.Hash) {
 			id := cm.managedSectorID(root)
 			cm.wal.managedLockSector(id)
 			cm.wal.managedRemoveSector(id) // Error is ignored.
 			cm.wal.managedUnlockSector(id)
+			<-semaphore
 			wg.Done()
 		}(root)
 	}
