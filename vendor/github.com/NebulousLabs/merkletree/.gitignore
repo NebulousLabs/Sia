@@ -1,0 +1,5 @@
+fuzz
+*.swp
+*.out
+*.html
+*.zip

@@ -29,9 +29,8 @@ type Session struct {
 	dataWasRead int32            // used to determine if KeepAlive has failed
 	sendMu      siasync.TryMutex // ensures only one thread sends at a time
 
-	config           *Config
-	nextStreamID     uint32 // next stream identifier
-	nextStreamIDLock sync.Mutex
+	config       *Config
+	nextStreamID uint32 // next stream identifier
 
 	bucket       int32         // token bucket
 	bucketNotify chan struct{} // used for waiting for tokens
@@ -61,7 +60,7 @@ func newSession(config *Config, conn net.Conn, client bool) *Session {
 	if client {
 		s.nextStreamID = 1
 	} else {
-		s.nextStreamID = 0
+		s.nextStreamID = 2
 	}
 
 	go s.recvLoop()
