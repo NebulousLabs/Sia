@@ -189,6 +189,22 @@ func TestWorkingStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
+	}
+
 	// Create a file.
 	path := filepath.Join(st.dir, "test.dat")
 	fileBytes := 1024
@@ -290,6 +306,22 @@ func TestStorageHandler(t *testing.T) {
 	allowanceValues.Set("period", testPeriod)
 	if err = st.stdPostAPI("/renter", allowanceValues); err != nil {
 		t.Fatal(err)
+	}
+
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
 	}
 
 	// Create a file.
@@ -522,6 +554,22 @@ func TestResizeNonemptyStorageFolder(t *testing.T) {
 	allowanceValues.Set("period", testPeriod)
 	if err = st.stdPostAPI("/renter", allowanceValues); err != nil {
 		t.Fatal(err)
+	}
+
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
 	}
 
 	// Create a file.
@@ -866,6 +914,22 @@ func TestRemoveStorageFolderForced(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
+	}
+
 	// Create a file for upload.
 	path := filepath.Join(st.dir, "test.dat")
 	if err := createRandFile(path, 512); err != nil {
@@ -935,6 +999,22 @@ func TestDeleteSector(t *testing.T) {
 	allowanceValues.Set("period", testPeriod)
 	if err = st.stdPostAPI("/renter", allowanceValues); err != nil {
 		t.Fatal(err)
+	}
+
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
 	}
 
 	// Create a file.

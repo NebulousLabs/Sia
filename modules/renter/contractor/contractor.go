@@ -1,5 +1,12 @@
 package contractor
 
+// TODO: We are in the middle of migrating the contractor to a new concurrency
+// model. The contractor should never call out to another package while under a
+// lock (except for the proto package). This is because the renter is going to
+// start calling contractor methods while holding the renter lock, so we need to
+// be absolutely confident that no contractor thread will attempt to grab a
+// renter lock.
+
 import (
 	"errors"
 	"fmt"
@@ -65,6 +72,16 @@ type Contractor struct {
 	renewedIDs      map[types.FileContractID]types.FileContractID
 }
 
+// resolveID returns the ID of the most recent renewal of id.
+func (c *Contractor) resolveID(id types.FileContractID) types.FileContractID {
+	newID, exists := c.renewedIDs[id]
+	for exists {
+		id = newID
+		newID, exists = c.renewedIDs[id]
+	}
+	return id
+}
+
 // Allowance returns the current allowance.
 func (c *Contractor) Allowance() modules.Allowance {
 	c.mu.RLock()
@@ -96,10 +113,14 @@ func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContra
 // Contracts returns the contracts formed by the contractor in the current
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
-func (c *Contractor) Contracts() (cs []modules.RenterContract) {
+func (c *Contractor) Contracts() []modules.RenterContract {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.onlineContracts()
+	cs := make([]modules.RenterContract, 0, len(c.contracts))
+	for _, contract := range c.contracts {
+		cs = append(cs, contract)
+	}
+	return cs
 }
 
 // AllContracts returns the contracts formed by the contractor in the current
@@ -129,6 +150,16 @@ func (c *Contractor) CurrentPeriod() types.BlockHeight {
 // ResolveID returns the ID of the most recent renewal of id.
 func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	c.mu.RLock()
+	newID := c.resolveID(id)
+	c.mu.RUnlock()
+	return newID
+}
+
+// ResolveContract returns the current contract associated with the provided
+// contract id. It is equivalent to calling 'ResolveID' and then calling
+// 'ContractByID' with the result.
+func (c *Contractor) ResolveContract(id types.FileContractID) (contract modules.RenterContract, exists bool) {
+	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	newID, exists := c.renewedIDs[id]
@@ -136,24 +167,13 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 		id = newID
 		newID, exists = c.renewedIDs[id]
 	}
-	return id
+	contract, exists = c.contracts[id]
+	return contract, exists
 }
 
 // Close closes the Contractor.
 func (c *Contractor) Close() error {
 	return c.tg.Stop()
-}
-
-// GoodForRenew indicates whether a contract is intended to be renewed.
-func (c *Contractor) GoodForRenew(id types.FileContractID) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	contract, exists := c.contracts[id]
-	if !exists {
-		return false
-	}
-	return contract.GoodForRenew
 }
 
 // New returns a new Contractor.

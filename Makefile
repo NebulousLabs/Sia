@@ -17,6 +17,7 @@ dependencies:
 	go get -u github.com/NebulousLabs/errors
 	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/muxado
+	go get -u github.com/NebulousLabs/threadgroup
 	go get -u github.com/klauspost/reedsolomon
 	go get -u github.com/julienschmidt/httprouter
 	go get -u github.com/inconshreveable/go-update

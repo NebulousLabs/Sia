@@ -287,7 +287,7 @@ func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID
 	// Sanity check - action item should be at a higher height than the current
 	// block height.
 	if height <= h.blockHeight {
-		h.log.Critical("action item queued improperly")
+		h.log.Println("action item queued improperly")
 	}
 	return h.db.Update(func(tx *bolt.Tx) error {
 		// Translate the height into a byte slice.

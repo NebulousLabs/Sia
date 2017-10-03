@@ -539,6 +539,7 @@ func TestIntegrationRenew(t *testing.T) {
 
 	// renew the contract
 	oldContract := c.contracts[contract.ID]
+	oldContract.GoodForRenew = true
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
@@ -581,6 +582,7 @@ func TestIntegrationRenew(t *testing.T) {
 
 	// renew to a lower height
 	oldContract = c.contracts[contract.ID]
+	oldContract.GoodForRenew = true
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
@@ -1001,6 +1003,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 
 	// corrupt the contract and cachedRevision
 	badContract := contract
+	badContract.GoodForRenew = true
 	badContract.LastRevision.NewRevisionNumber--
 	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
 	c.mu.Lock()
