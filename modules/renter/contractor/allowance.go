@@ -72,8 +72,12 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 	c.log.Println("INFO: setting allowance to", a)
 	c.mu.Lock()
+	// set the current period to the blockheight if the existing allowance is
+	// empty
+	if c.allowance.Funds.IsZero() && c.allowance.Hosts == 0 && c.allowance.Period == 0 && c.allowance.RenewWindow == 0 {
+		c.currentPeriod = c.blockHeight
+	}
 	c.allowance = a
-	c.currentPeriod = c.blockHeight
 	err = c.saveSync()
 	c.mu.Unlock()
 	if err != nil {
