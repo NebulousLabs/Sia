@@ -567,6 +567,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			if _, exists := refreshSet[id]; exists {
 				newContract.PreviousContracts = oldContract.PreviousContracts
 				oldContract.PreviousContracts = nil
+				oldContract.MerkleRoots = nil
 				newContract.PreviousContracts = append(newContract.PreviousContracts, oldContract)
 			}
 
