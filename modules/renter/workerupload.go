@@ -162,7 +162,9 @@ func (w *worker) managedUpload(uc *unfinishedChunk, pieceIndex uint64) {
 	root, err := e.Upload(uc.physicalChunkData[pieceIndex])
 	if err != nil {
 		w.renter.log.Debugln("Worker failed to upload via the editor:", err)
+		w.mu.Lock()
 		w.uploadFailed(uc, pieceIndex)
+		w.mu.Unlock()
 		return
 	}
 	w.mu.Lock()
