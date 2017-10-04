@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"text/tabwriter"
 	"time"
 
@@ -103,7 +104,7 @@ var (
 	}
 
 	renterSetAllowanceCmd = &cobra.Command{
-		Use:   "setallowance [amount] [period]",
+		Use:   "setallowance [amount] [period] [hosts] [renew window]",
 		Short: "Set the allowance",
 		Long: `Set the amount of money that can be spent over a given period.
 
@@ -264,7 +265,7 @@ func renterallowancecancelcmd() {
 }
 
 // rentersetallowancecmd allows the user to set the allowance.
-func rentersetallowancecmd(amount, period string) {
+func rentersetallowancecmd(amount, period, hosts, renewWindow string) {
 	hastings, err := parseCurrency(amount)
 	if err != nil {
 		die("Could not parse amount:", err)
@@ -273,7 +274,15 @@ func rentersetallowancecmd(amount, period string) {
 	if err != nil {
 		die("Could not parse period")
 	}
-	err = post("/renter", fmt.Sprintf("funds=%s&period=%s", hastings, blocks))
+	_, err = strconv.Atoi(hosts)
+	if err != nil {
+		die("Count not parse host count")
+	}
+	_, err = parsePeriod(renewWindow)
+	if err != nil {
+		die("Could not parse renew window")
+	}
+	err = post("/renter", fmt.Sprintf("funds=%s&period=%s&hosts=%s&renewwindow=%s", hastings, blocks, hosts, renewWindow))
 	if err != nil {
 		die("Could not set allowance:", err)
 	}
