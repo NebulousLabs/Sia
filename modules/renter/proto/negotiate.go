@@ -12,6 +12,18 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// payoutAdjustmentInput aggregates parameters for a newPayoutAdjustment
+// outputs is the original unmodified SiacoinOutput used as a basis
+// payerIndex is the person paying the Siacoin
+// payeeIndex is the one receiving the Siacoin
+// amountPaid is the amount of Siacoin transferred
+type payoutAdjustmentInput struct {
+	outputs    []types.SiacoinOutput
+	payerIndex uint
+	payeeIndex uint
+	amountPaid types.Currency
+}
+
 // extendDeadline is a helper function for extending the connection timeout.
 func extendDeadline(conn net.Conn, d time.Duration) { _ = conn.SetDeadline(time.Now().Add(d)) }
 
@@ -172,24 +184,33 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 func newRevision(current types.FileContractRevision, cost types.Currency) types.FileContractRevision {
 	rev := current
 
-	// need to manually copy slice memory
-	rev.NewValidProofOutputs = make([]types.SiacoinOutput, 2)
-	rev.NewMissedProofOutputs = make([]types.SiacoinOutput, 3)
-	copy(rev.NewValidProofOutputs, current.NewValidProofOutputs)
-	copy(rev.NewMissedProofOutputs, current.NewMissedProofOutputs)
+	rev.NewValidProofOutputs = newPayoutAdjustment(payoutAdjustmentInput{
+		outputs:    current.NewValidProofOutputs,
+		payerIndex: types.FileContractRenterIndex,
+		payeeIndex: types.FileContractHostIndex,
+		amountPaid: cost})
 
-	// move valid payout from renter to host
-	rev.NewValidProofOutputs[0].Value = current.NewValidProofOutputs[0].Value.Sub(cost)
-	rev.NewValidProofOutputs[1].Value = current.NewValidProofOutputs[1].Value.Add(cost)
-
-	// move missed payout from renter to void
-	rev.NewMissedProofOutputs[0].Value = current.NewMissedProofOutputs[0].Value.Sub(cost)
-	rev.NewMissedProofOutputs[2].Value = current.NewMissedProofOutputs[2].Value.Add(cost)
+	rev.NewMissedProofOutputs = newPayoutAdjustment(payoutAdjustmentInput{
+		outputs:    current.NewMissedProofOutputs,
+		payerIndex: types.FileContractRenterIndex,
+		payeeIndex: types.FileContractVoidIndex,
+		amountPaid: cost})
 
 	// increment revision number
 	rev.NewRevisionNumber++
 
 	return rev
+}
+
+// return a new revision that fixed-size copies an old SiacoinOutput and
+// makes one payout adjustment on the resulting copy.
+func newPayoutAdjustment(args payoutAdjustmentInput) []types.SiacoinOutput {
+	cost, outputs := args.amountPaid, args.outputs
+	result := make([]types.SiacoinOutput, len(outputs))
+	copy(result, outputs)
+	result[args.payerIndex].Value = outputs[args.payerIndex].Value.Sub(cost)
+	result[args.payeeIndex].Value = outputs[args.payeeIndex].Value.Add(cost)
+	return result
 }
 
 // newDownloadRevision revises the current revision to cover the cost of
