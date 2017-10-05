@@ -391,6 +391,9 @@ type (
 		// transactions are automatically given to the transaction pool, and
 		// are also returned to the caller.
 		SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
+
+		// DustThreshold returns the quantity below which a Currency is considered to be Dust.
+		DustThreshold() types.Currency
 	}
 )
 
