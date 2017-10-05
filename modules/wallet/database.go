@@ -44,18 +44,18 @@ var (
 		bucketWallet,
 	}
 
+	errNoKey = errors.New("key does not exist")
+
 	// these keys are used in bucketWallet
-	keyUID                    = []byte("keyUID")
+	keyAuxiliarySeedFiles     = []byte("keyAuxiliarySeedFiles")
+	keyConsensusChange        = []byte("keyConsensusChange")
+	keyConsensusHeight        = []byte("keyConsensusHeight")
 	keyEncryptionVerification = []byte("keyEncryptionVerification")
 	keyPrimarySeedFile        = []byte("keyPrimarySeedFile")
 	keyPrimarySeedProgress    = []byte("keyPrimarySeedProgress")
-	keyConsensusChange        = []byte("keyConsensusChange")
-	keyConsensusHeight        = []byte("keyConsensusHeight")
-	keySpendableKeyFiles      = []byte("keySpendableKeyFiles")
-	keyAuxiliarySeedFiles     = []byte("keyAuxiliarySeedFiles")
 	keySiafundPool            = []byte("keySiafundPool")
-
-	errNoKey = errors.New("key does not exist")
+	keySpendableKeyFiles      = []byte("keySpendableKeyFiles")
+	keyUID                    = []byte("keyUID")
 )
 
 // threadedDBUpdate commits the active database transaction and starts a new

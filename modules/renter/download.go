@@ -25,9 +25,9 @@ const (
 )
 
 var (
-	errPrevErr            = errors.New("download could not be completed due to a previous error")
 	errInsufficientHosts  = errors.New("insufficient hosts to recover file")
 	errInsufficientPieces = errors.New("couldn't fetch enough pieces to recover data")
+	errPrevErr            = errors.New("download could not be completed due to a previous error")
 
 	// maxActiveDownloadPieces determines the maximum number of pieces that are
 	// allowed to be concurrently downloading. More pieces means more

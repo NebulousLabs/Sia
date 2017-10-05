@@ -8,10 +8,9 @@ import (
 
 const (
 	readOffset  = uint64(1)
-	writeOffset = uint64(1 << 20)
+	tryMask     = uint64(1099511627775) // equivalent to setting the first 39 bits to '1'.
 	tryOffset   = uint64(1 << 40)
-
-	tryMask = uint64(1099511627775) // equivalent to setting the first 39 bits to '1'.
+	writeOffset = uint64(1 << 20)
 )
 
 // TryRWMutex allows you to try to grab a RWMutex, failing if the mutex is

@@ -11,10 +11,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var errInvalidEditor = errors.New("editor has been invalidated because its contract is being renewed")
+
 // the contractor will cap host's MaxCollateral setting to this value
 var maxUploadCollateral = types.SiacoinPrecision.Mul64(1e3).Div(modules.BlockBytesPerMonthTerabyte) // 1k SC / TB / Month
-
-var errInvalidEditor = errors.New("editor has been invalidated because its contract is being renewed")
 
 // An Editor modifies a Contract by communicating with a host. It uses the
 // contract revision protocol to send modification requests to the host.

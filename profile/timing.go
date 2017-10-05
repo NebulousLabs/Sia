@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	uptime       int64
-	times        = make(map[string]int64)
 	activeTimers = make(map[string]int64)
+	times        = make(map[string]int64)
+	uptime       int64
 )
 
 // Uptime() returns the number of nanoseconds that have passed since the first

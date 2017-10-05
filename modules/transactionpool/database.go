@@ -36,10 +36,6 @@ var (
 
 // Explicitly named fields in the database.
 var (
-	// fieldRecentConsensusChange is the field in bucketRecentConsensusChange
-	// that holds the value of the most recent consensus change.
-	fieldRecentConsensusChange = []byte("RecentConsensusChange")
-
 	// fieldBlockHeight is the field in bucketBlockHeight that holds the value of
 	// the most recent block height.
 	fieldBlockHeight = []byte("BlockHeight")
@@ -47,6 +43,10 @@ var (
 	// fieldFeeMedian is the fee median persist data stored in a fee median
 	// field.
 	fieldFeeMedian = []byte("FeeMedian")
+
+	// fieldRecentConsensusChange is the field in bucketRecentConsensusChange
+	// that holds the value of the most recent consensus change.
+	fieldRecentConsensusChange = []byte("RecentConsensusChange")
 )
 
 // Complex objects that get stored in database fields.

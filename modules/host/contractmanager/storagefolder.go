@@ -52,6 +52,9 @@ var (
 	// that is the same as the current size of the storage folder.
 	ErrNoResize = errors.New("storage folder selected for resize, but new size is same as current size")
 
+	// errRelativePath is returned if a path must be absolute.
+	errRelativePath = errors.New("storage folder paths must be absolute")
+
 	// ErrRepeatFolder is returned if a storage folder is added which links to
 	// a path that is already in use by another storage folder. Only exact path
 	// matches will trigger the error.
@@ -73,9 +76,6 @@ var (
 	// errStorageFolderNotFound is returned if a storage folder cannot be
 	// found.
 	errStorageFolderNotFound = errors.New("could not find storage folder with that id")
-
-	// errRelativePath is returned if a path must be absolute.
-	errRelativePath = errors.New("storage folder paths must be absolute")
 )
 
 // storageFolder contains the metadata for a storage folder, including where

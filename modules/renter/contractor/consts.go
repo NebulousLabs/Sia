@@ -25,6 +25,11 @@ var (
 		Testing:  10 * time.Millisecond,
 	}).(time.Duration)
 
+	// minContractFundRenewalThreshold defines the ratio of remaining funds to
+	// total contract cost below which the contractor will prematurely renew a
+	// contract.
+	minContractFundRenewalThreshold = float64(0.03) // 3%
+
 	// minHostsForEstimations describes the minimum number of hosts that
 	// are needed to make broad estimations such as the number of sectors
 	// that you can store on the network for a given allowance.
@@ -54,11 +59,6 @@ var (
 		Standard: 10,
 		Testing:  1,
 	}).(int)
-
-	// minContractFundRenewalThreshold defines the ratio of remaining funds to
-	// total contract cost below which the contractor will prematurely renew a
-	// contract.
-	minContractFundRenewalThreshold = float64(0.03) // 3%
 )
 
 // Constants related to the safety values for when the contractor is forming

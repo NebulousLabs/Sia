@@ -9,9 +9,9 @@ import (
 
 var (
 	errAllowanceNoHosts    = errors.New("hosts must be non-zero")
-	errAllowanceZeroPeriod = errors.New("period must be non-zero")
-	errAllowanceWindowSize = errors.New("renew window must be less than period")
 	errAllowanceNotSynced  = errors.New("you must be synced to set an allowance")
+	errAllowanceWindowSize = errors.New("renew window must be less than period")
+	errAllowanceZeroPeriod = errors.New("period must be non-zero")
 
 	// ErrAllowanceZeroWindow is returned when the caller requests a
 	// zero-length renewal window. This will happen if the caller sets the

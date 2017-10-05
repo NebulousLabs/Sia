@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ProofValid  ProofStatus = true
 	ProofMissed ProofStatus = false
+	ProofValid  ProofStatus = true
 )
 
 type (

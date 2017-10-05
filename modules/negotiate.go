@@ -21,18 +21,14 @@ const (
 	// termination, i.e. that the sender wishes to cease communication, but
 	// not due to an error.
 	StopResponse = "stop"
+)
 
+const (
 	// NegotiateDownloadTime defines the amount of time that the renter and
 	// host have to negotiate a download request batch. The time is set high
 	// enough that two nodes behind Tor have a reasonable chance of completing
 	// the negotiation.
 	NegotiateDownloadTime = 600 * time.Second
-
-	// NegotiateFileContractTime defines the amount of time that the renter and
-	// host have to negotiate a file contract. The time is set high enough that
-	// a node behind Tor has a reasonable chance at making the multiple
-	// required round trips to complete the negotiation.
-	NegotiateFileContractTime = 360 * time.Second
 
 	// NegotiateFileContractRevisionTime defines the minimum amount of time
 	// that the renter and host have to negotiate a file contract revision. The
@@ -40,25 +36,11 @@ const (
 	// connection that is running over Tor.
 	NegotiateFileContractRevisionTime = 600 * time.Second
 
-	// NegotiateRecentRevisionTime establishes the minimum amount of time that
-	// the connection deadline is expected to be set to when a recent file
-	// contract revision is being requested from the host. The deadline is long
-	// enough that the connection should be successful even if both parties are
-	// running Tor.
-	NegotiateRecentRevisionTime = 120 * time.Second
-
-	// NegotiateRenewContractTime defines the minimum amount of time that the
-	// renter and host have to negotiate a final contract renewal. The time is
-	// high enough that the negotiation can occur over a Tor connection, and
-	// that both the host and the renter can have time to process large Merkle
-	// tree calculations that may be involved with renewing a file contract.
-	NegotiateRenewContractTime = 600 * time.Second
-
-	// NegotiateSettingsTime establishes the minimum amount of time that the
-	// connection deadline is expected to be set to when settings are being
-	// requested from the host. The deadline is long enough that the connection
-	// should be successful even if both parties are on Tor.
-	NegotiateSettingsTime = 120 * time.Second
+	// NegotiateFileContractTime defines the amount of time that the renter and
+	// host have to negotiate a file contract. The time is set high enough that
+	// a node behind Tor has a reasonable chance at making the multiple
+	// required round trips to complete the negotiation.
+	NegotiateFileContractTime = 360 * time.Second
 
 	// NegotiateMaxDownloadActionRequestSize defines the maximum size that a
 	// download request can be. Note, this is not a max size for the data that
@@ -100,6 +82,26 @@ const (
 	// transaction signature slice is allowed to be when being sent over the
 	// wire during negotiation.
 	NegotiateMaxTransactionSignaturesSize = 5e3
+
+	// NegotiateRecentRevisionTime establishes the minimum amount of time that
+	// the connection deadline is expected to be set to when a recent file
+	// contract revision is being requested from the host. The deadline is long
+	// enough that the connection should be successful even if both parties are
+	// running Tor.
+	NegotiateRecentRevisionTime = 120 * time.Second
+
+	// NegotiateRenewContractTime defines the minimum amount of time that the
+	// renter and host have to negotiate a final contract renewal. The time is
+	// high enough that the negotiation can occur over a Tor connection, and
+	// that both the host and the renter can have time to process large Merkle
+	// tree calculations that may be involved with renewing a file contract.
+	NegotiateRenewContractTime = 600 * time.Second
+
+	// NegotiateSettingsTime establishes the minimum amount of time that the
+	// connection deadline is expected to be set to when settings are being
+	// requested from the host. The deadline is long enough that the connection
+	// should be successful even if both parties are on Tor.
+	NegotiateSettingsTime = 120 * time.Second
 )
 
 var (

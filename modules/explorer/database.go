@@ -10,8 +10,6 @@ import (
 )
 
 var (
-	errNotExist = errors.New("entry does not exist")
-
 	// database buckets
 	bucketBlockFacts            = []byte("BlockFacts")
 	bucketBlockIDs              = []byte("BlockIDs")
@@ -19,15 +17,16 @@ var (
 	bucketBlockTargets          = []byte("BlockTargets")
 	bucketFileContractHistories = []byte("FileContractHistories")
 	bucketFileContractIDs       = []byte("FileContractIDs")
-	bucketSiacoinOutputIDs      = []byte("SiacoinOutputIDs")
-	bucketSiacoinOutputs        = []byte("SiacoinOutputs")
-	bucketSiafundOutputIDs      = []byte("SiafundOutputIDs")
-	bucketSiafundOutputs        = []byte("SiafundOutputs")
-	bucketTransactionIDs        = []byte("TransactionIDs")
-	bucketUnlockHashes          = []byte("UnlockHashes")
-
 	// bucketInternal is used to store values internal to the explorer
-	bucketInternal = []byte("Internal")
+	bucketInternal         = []byte("Internal")
+	bucketSiacoinOutputIDs = []byte("SiacoinOutputIDs")
+	bucketSiacoinOutputs   = []byte("SiacoinOutputs")
+	bucketSiafundOutputIDs = []byte("SiafundOutputIDs")
+	bucketSiafundOutputs   = []byte("SiafundOutputs")
+	bucketTransactionIDs   = []byte("TransactionIDs")
+	bucketUnlockHashes     = []byte("UnlockHashes")
+
+	errNotExist = errors.New("entry does not exist")
 
 	// keys for bucketInternal
 	internalBlockHeight  = []byte("BlockHeight")

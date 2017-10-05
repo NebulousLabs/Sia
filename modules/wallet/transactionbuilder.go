@@ -19,15 +19,15 @@ var (
 	// meaning that future calls to Sign will result in an invalid transaction.
 	errBuilderAlreadySigned = errors.New("sign has already been called on this transaction builder, multiple calls can cause issues")
 
-	// errSpendHeightTooHigh indicates an output's spend height is greater than
-	// the allowed height.
-	errSpendHeightTooHigh = errors.New("output spend height exceeds the allowed height")
+	// errDustOutput indicates an output is not spendable because it is dust.
+	errDustOutput = errors.New("output is too small")
 
 	// errOutputTimelock indicates an output's timelock is still active.
 	errOutputTimelock = errors.New("wallet consensus set height is lower than the output timelock")
 
-	// errDustOutput indicates an output is not spendable because it is dust.
-	errDustOutput = errors.New("output is too small")
+	// errSpendHeightTooHigh indicates an output's spend height is greater than
+	// the allowed height.
+	errSpendHeightTooHigh = errors.New("output spend height exceeds the allowed height")
 )
 
 // transactionBuilder allows transactions to be manually constructed, including
