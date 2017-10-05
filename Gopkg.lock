@@ -34,8 +34,8 @@
 [[projects]]
   branch = "master"
   name = "github.com/NebulousLabs/go-upnp"
-  packages = ["."]
-  revision = "620e2354265f67dbe3ecf41244ea49e6f267b7ad"
+  packages = [".","goupnp","goupnp/dcps/internetgateway1","goupnp/httpu","goupnp/scpd","goupnp/soap","goupnp/ssdp"]
+  revision = "1be4557baab2f9e7b29a892cd9eb1ae96fdf091d"
 
 [[projects]]
   branch = "master"
@@ -50,6 +50,12 @@
   revision = "b4de4d8a34c7ca6e2f597ccfd33ec88224af5ad0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/NebulousLabs/threadgroup"
+  packages = ["."]
+  revision = "d137120f1e2837732baa67b3e8a3c199043f876a"
+
+[[projects]]
   name = "github.com/bgentry/speakeasy"
   packages = ["."]
   revision = "4aabc24848ce5fd31929f7d1e4ea74d3709c14cd"
@@ -60,12 +66,6 @@
   packages = ["md2man"]
   revision = "1d903dcb749992f3741d744c0f8376b4bd7eb3e1"
   version = "v1.0.7"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/huin/goupnp"
-  packages = [".","dcps/internetgateway1","httpu","scpd","soap","ssdp"]
-  revision = "5b7801abd885f2f7458add715aee47e7df5370a0"
 
 [[projects]]
   branch = "master"
@@ -166,6 +166,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "841f3897e44b1c39477c54aba14b67689b00e812451c2aca3b9e710b4da3161a"
+  inputs-digest = "9bd7ea793f59701502e8148f165399b03914d6a385228cb66a4c535d93e2ae0f"
   solver-name = "gps-cdcl"
   solver-version = 1

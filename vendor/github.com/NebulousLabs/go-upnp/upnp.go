@@ -33,8 +33,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/fastrand"
-	"github.com/huin/goupnp"
-	"github.com/huin/goupnp/dcps/internetgateway1"
+	"github.com/NebulousLabs/go-upnp/goupnp"
+	"github.com/NebulousLabs/go-upnp/goupnp/dcps/internetgateway1"
 )
 
 // An IGD provides an interface to the most commonly used functions of an

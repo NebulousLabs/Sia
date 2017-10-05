@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/huin/goupnp/httpu"
+	"github.com/NebulousLabs/go-upnp/goupnp/httpu"
 )
 
 const (
