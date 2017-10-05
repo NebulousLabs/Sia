@@ -130,37 +130,6 @@ func buildHttpRoutes(api *API, requiredUserAgent string, requiredPassword string
 	return router
 }
 
-// RequireUserAgent is middleware that requires all requests to set a
-// UserAgent that contains the specified string.
-func RequireUserAgent(h http.Handler, ua string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if !strings.Contains(req.UserAgent(), ua) {
-			WriteError(w, Error{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
-			return
-		}
-		h.ServeHTTP(w, req)
-	})
-}
-
-// RequirePassword is middleware that requires a request to authenticate with a
-// password using HTTP basic auth. Usernames are ignored. Empty passwords
-// indicate no authentication is required.
-func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
-	// An empty password is equivalent to no password.
-	if password == "" {
-		return h
-	}
-	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-		_, pass, ok := req.BasicAuth()
-		if !ok || pass != password {
-			w.Header().Set("WWW-Authenticate", "Basic realm=\"SiaAPI\"")
-			WriteError(w, Error{"API authentication failed."}, http.StatusUnauthorized)
-			return
-		}
-		h(w, req, ps)
-	}
-}
-
 // cleanCloseHandler wraps the entire API, ensuring that underlying conns are
 // not leaked if the rmeote end closes the connection before the underlying
 // handler finishes.
@@ -191,4 +160,35 @@ func cleanCloseHandler(next http.Handler) http.Handler {
 			}
 		}()
 	})
+}
+
+// RequireUserAgent is middleware that requires all requests to set a
+// UserAgent that contains the specified string.
+func RequireUserAgent(h http.Handler, ua string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !strings.Contains(req.UserAgent(), ua) {
+			WriteError(w, Error{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
+			return
+		}
+		h.ServeHTTP(w, req)
+	})
+}
+
+// RequirePassword is middleware that requires a request to authenticate with a
+// password using HTTP basic auth. Usernames are ignored. Empty passwords
+// indicate no authentication is required.
+func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
+	// An empty password is equivalent to no password.
+	if password == "" {
+		return h
+	}
+	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		_, pass, ok := req.BasicAuth()
+		if !ok || pass != password {
+			w.Header().Set("WWW-Authenticate", "Basic realm=\"SiaAPI\"")
+			WriteError(w, Error{"API authentication failed."}, http.StatusUnauthorized)
+			return
+		}
+		h(w, req, ps)
+	}
 }
