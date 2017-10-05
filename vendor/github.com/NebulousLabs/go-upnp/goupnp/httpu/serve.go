@@ -3,7 +3,6 @@ package httpu
 import (
 	"bufio"
 	"bytes"
-	"log"
 	"net"
 	"net/http"
 	"regexp"
@@ -50,7 +49,7 @@ func (srv *Server) ListenAndServe() error {
 
 	var addr *net.UDPAddr
 	if addr, err = net.ResolveUDPAddr("udp", srv.Addr); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	var conn net.PacketConn
@@ -88,7 +87,6 @@ func (srv *Server) Serve(l net.PacketConn) error {
 
 			req, err := http.ReadRequest(bufio.NewReader(bytes.NewBuffer(buf)))
 			if err != nil {
-				log.Printf("httpu: Failed to parse request: %v", err)
 				return
 			}
 			req.RemoteAddr = peerAddr.String()

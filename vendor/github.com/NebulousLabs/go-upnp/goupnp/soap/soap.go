@@ -54,7 +54,8 @@ func (client *SOAPClient) PerformAction(actionNamespace, actionName string, inAc
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
-		return fmt.Errorf("goupnp: SOAP request got HTTP %s", response.Status)
+		resp, _ := ioutil.ReadAll(response.Body)
+		return fmt.Errorf("goupnp: SOAP request got HTTP %s: %s", response.Status, resp)
 	}
 
 	responseEnv := newSOAPEnvelope()

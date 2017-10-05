@@ -2,7 +2,6 @@ package ssdp
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -18,7 +17,7 @@ const (
 )
 
 var (
-	maxAgeRx = regexp.MustCompile("max-age= *([0-9]+)")
+	maxAgeRx = regexp.MustCompile("max-age=([0-9]+)")
 )
 
 const (
@@ -235,19 +234,13 @@ func (reg *Registry) ServeMessage(r *http.Request) {
 
 	nts := r.Header.Get("nts")
 
-	var err error
 	switch nts {
 	case ntsAlive:
-		err = reg.handleNTSAlive(r)
+		reg.handleNTSAlive(r)
 	case ntsUpdate:
-		err = reg.handleNTSUpdate(r)
+		reg.handleNTSUpdate(r)
 	case ntsByebye:
-		err = reg.handleNTSByebye(r)
-	default:
-		err = fmt.Errorf("unknown NTS value: %q", nts)
-	}
-	if err != nil {
-		log.Printf("goupnp/ssdp: failed to handle %s message from %s: %v", nts, r.RemoteAddr, err)
+		reg.handleNTSByebye(r)
 	}
 }
 

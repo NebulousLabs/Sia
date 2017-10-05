@@ -15,6 +15,7 @@
 package goupnp
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -51,19 +52,24 @@ type MaybeRootDevice struct {
 	Err error
 }
 
-// DiscoverDevices attempts to find targets of the given type. This is
+// DiscoverDevices is deprecated. Use DiscoverDevicesCtx instead.
+func DiscoverDevices(searchTarget string) ([]MaybeRootDevice, error) {
+	return DiscoverDevicesCtx(context.Background(), searchTarget)
+}
+
+// DiscoverDevicesCtx attempts to find targets of the given type. This is
 // typically the entry-point for this package. searchTarget is typically a URN
 // in the form "urn:schemas-upnp-org:device:..." or
 // "urn:schemas-upnp-org:service:...". A single error is returned for errors
 // while attempting to send the query. An error or RootDevice is returned for
 // each discovered RootDevice.
-func DiscoverDevices(searchTarget string) ([]MaybeRootDevice, error) {
+func DiscoverDevicesCtx(ctx context.Context, searchTarget string) ([]MaybeRootDevice, error) {
 	httpu, err := httpu.NewHTTPUClient()
 	if err != nil {
 		return nil, err
 	}
 	defer httpu.Close()
-	responses, err := ssdp.SSDPRawSearch(httpu, string(searchTarget), 2, 3)
+	responses, err := ssdp.SSDPRawSearchCtx(ctx, httpu, string(searchTarget), 2, 3)
 	if err != nil {
 		return nil, err
 	}
