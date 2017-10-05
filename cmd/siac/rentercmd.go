@@ -117,7 +117,7 @@ blocks, and a week is 1008 blocks.
 Note that setting the allowance will cause siad to immediately begin forming
 contracts! You should only set the allowance once you are fully synced and you
 have a reasonable number (>30) of hosts in your hostdb.`,
-		Run: wrap(rentersetallowancecmd),
+		Run: rentersetallowancecmd,
 	}
 
 	renterUploadsCmd = &cobra.Command{
@@ -265,24 +265,45 @@ func renterallowancecancelcmd() {
 }
 
 // rentersetallowancecmd allows the user to set the allowance.
-func rentersetallowancecmd(amount, period, hosts, renewWindow string) {
-	hastings, err := parseCurrency(amount)
+// the first two parameters, amount and period, are required.
+// the second two parameters are optional:
+//    hosts                 integer number of hosts
+//    renewperiod           how many blocks between renewals
+func rentersetallowancecmd(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		die("Must supply amount (first) argument")
+	}
+	hastings, err := parseCurrency(args[0])
 	if err != nil {
 		die("Could not parse amount:", err)
 	}
-	blocks, err := parsePeriod(period)
+	if len(args) == 1 {
+		die("Must supply period (second) argument")
+	}
+	blocks, err := parsePeriod(args[1])
 	if err != nil {
 		die("Could not parse period")
 	}
-	_, err = strconv.Atoi(hosts)
-	if err != nil {
-		die("Count not parse host count")
+	queryString := fmt.Sprintf("funds=%s&period=%s", hastings, blocks)
+	if len(args) > 2 {
+		_, err = strconv.Atoi(args[2])
+		if err != nil {
+			die("Could not parse host count")
+		}
+		queryString += fmt.Sprintf("&hosts=%s", args[2])
 	}
-	_, err = parsePeriod(renewWindow)
-	if err != nil {
-		die("Could not parse renew window")
+	if len(args) > 3 {
+		renewWindow, err := parsePeriod(args[3])
+		if err != nil {
+			die("Could not parse renew window")
+		}
+		queryString += fmt.Sprintf("&renewwindow=%s", renewWindow)
 	}
-	err = post("/renter", fmt.Sprintf("funds=%s&period=%s&hosts=%s&renewwindow=%s", hastings, blocks, hosts, renewWindow))
+	if len(args) > 4 {
+		cmd.UsageFunc()(cmd)
+		os.Exit(exitCodeUsage)
+	}
+	err = post("/renter", queryString)
 	if err != nil {
 		die("Could not set allowance:", err)
 	}
