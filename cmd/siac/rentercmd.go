@@ -114,6 +114,14 @@ period is given in either blocks (b), hours (h), days (d), or weeks (w). A
 block is approximately 10 minutes, so one hour is six blocks, a day is 144
 blocks, and a week is 1008 blocks.
 
+The Sia renter module spreads data across more than one Sia server computer
+or "host". The "hosts" paramter for the setallowance command determines
+how many different hosts the renter will try to use to spread data out.
+
+Allowance can be automatically renewed periodically.  If the current
+blockheight + the renew window >= the end height the contract,
+then the contract is renewed automatically.
+
 Note that setting the allowance will cause siad to immediately begin forming
 contracts! You should only set the allowance once you are fully synced and you
 have a reasonable number (>30) of hosts in your hostdb.`,
