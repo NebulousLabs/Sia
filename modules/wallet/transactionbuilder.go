@@ -220,7 +220,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		parentTxn.SiacoinOutputs = append(parentTxn.SiacoinOutputs, refundOutput)
 	}
 
-	// Sign all of the inputs to the parent trancstion.
+	// Sign all of the inputs to the parent transaction.
 	for _, sci := range parentTxn.SiacoinInputs {
 		addSignatures(&parentTxn, types.FullCoveredFields, sci.UnlockConditions, crypto.Hash(sci.ParentID), tb.wallet.keys[sci.UnlockConditions.UnlockHash()])
 	}
@@ -352,7 +352,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 		parentTxn.SiafundOutputs = append(parentTxn.SiafundOutputs, refundOutput)
 	}
 
-	// Sign all of the inputs to the parent trancstion.
+	// Sign all of the inputs to the parent transaction.
 	for _, sfi := range parentTxn.SiafundInputs {
 		addSignatures(&parentTxn, types.FullCoveredFields, sfi.UnlockConditions, crypto.Hash(sfi.ParentID), tb.wallet.keys[sfi.UnlockConditions.UnlockHash()])
 	}
