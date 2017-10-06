@@ -166,7 +166,7 @@ func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLo
 	if location.count == 65535 {
 		return errMaxVirtualSectors
 	}
-	location.count += 1
+	location.count++
 
 	// Prepare the sector update.
 	su := sectorUpdate{
@@ -201,6 +201,7 @@ func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLo
 		// Revert the sector update in the WAL to reflect the fact that adding
 		// the sector has failed.
 		su.Count--
+		location.count--
 		wal.mu.Lock()
 		wal.appendChange(stateChange{
 			SectorUpdates: []sectorUpdate{su},
@@ -410,10 +411,16 @@ func (cm *ContractManager) AddSectorBatch(sectorRoots []crypto.Hash) error {
 
 	// Add each sector in a separate goroutine.
 	var wg sync.WaitGroup
+	// Ensure only 'maxSectorBatchThreads' goroutines are running at a time.
+	semaphore := make(chan struct{}, maxSectorBatchThreads)
 	for _, root := range sectorRoots {
 		wg.Add(1)
+		semaphore <- struct{}{}
 		go func(root crypto.Hash) {
 			defer wg.Done()
+			defer func() {
+				<-semaphore
+			}()
 
 			// Hold a sector lock throughout the duration of the function, but release
 			// before syncing.
@@ -476,13 +483,17 @@ func (cm *ContractManager) RemoveSectorBatch(sectorRoots []crypto.Hash) error {
 
 	// Add each sector in a separate goroutine.
 	var wg sync.WaitGroup
+	// Ensure only 'maxSectorBatchThreads' goroutines are running at a time.
+	semaphore := make(chan struct{}, maxSectorBatchThreads)
 	for _, root := range sectorRoots {
 		wg.Add(1)
+		semaphore <- struct{}{}
 		go func(root crypto.Hash) {
 			id := cm.managedSectorID(root)
 			cm.wal.managedLockSector(id)
 			cm.wal.managedRemoveSector(id) // Error is ignored.
 			cm.wal.managedUnlockSector(id)
+			<-semaphore
 			wg.Done()
 		}(root)
 	}

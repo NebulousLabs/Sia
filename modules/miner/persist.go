@@ -11,10 +11,9 @@ import (
 )
 
 const (
-	logFile      = modules.MinerDir + ".log"
-	settingsFile = modules.MinerDir + ".json"
-
+	logFile        = modules.MinerDir + ".log"
 	saveLoopPeriod = time.Minute * 2
+	settingsFile   = modules.MinerDir + ".json"
 )
 
 var (

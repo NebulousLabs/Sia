@@ -1,5 +1,20 @@
 package renter
 
+// CONCURRENCY PATTERNS: The renter has some complex concurrency patterns.
+// Preventing race conditions and deadlocks requires understanding the patterns.
+//
+// The renter itself has a lock that protects all internal state. The renter is
+// allowed to call out to the hostContractor while under lock, which means that
+// calls within the hostContractor should not ever leave the hostContractor -
+// external calls should be able to complete quickly, and without making any
+// external calls or calls that may acquire external locks.
+//
+// The renter has a bunch of worker objects. The worker objects have mutexes
+// which protect them, and the workers need to interact with the renter,
+// sometimes changing state which is prevented by locks. This means that the
+// renter itself can never interact with a worker while the renter is under
+// lock.
+
 // TODO: Change the upload loop to have an upload state, and make it so that
 // instead of occasionally rebuilding the whole file matrix it has just a
 // single matrix that it's constantly pulling chunks from. Have a separate loop
@@ -7,23 +22,28 @@ package renter
 // listen on the channel for new files, so that they can go directly into the
 // matrix.
 
+// TODO: Allow the 'baseMemory' to be set by the user.
+
 import (
 	"errors"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/sync"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/threadgroup"
 )
 
 var (
 	errNilContractor = errors.New("cannot create renter with nil contractor")
 	errNilCS         = errors.New("cannot create renter with nil consensus set")
-	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
 	errNilHdb        = errors.New("cannot create renter with nil hostdb")
+	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
 )
 
 var (
@@ -104,10 +124,6 @@ type hostContractor interface {
 	// insertion, deletion, and modification of sectors.
 	Editor(types.FileContractID, <-chan struct{}) (contractor.Editor, error)
 
-	// GoodForRenew indicates whether the contract line of the provided contract
-	// is actively being renewed.
-	GoodForRenew(types.FileContractID) bool
-
 	// IsOffline reports whether the specified host is considered offline.
 	IsOffline(types.FileContractID) bool
 
@@ -117,6 +133,11 @@ type hostContractor interface {
 
 	// ResolveID returns the most recent renewal of the specified ID.
 	ResolveID(types.FileContractID) types.FileContractID
+
+	// ResovleContract returns the current contract associated with the provided
+	// contract id. It is equivalent to calling 'ResolveID' and then using the
+	// result to call 'ContractByID'.
+	ResolveContract(types.FileContractID) (modules.RenterContract, bool)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
@@ -149,8 +170,17 @@ type Renter struct {
 	chunkQueue    []*chunkDownload // Accessed without locks.
 	downloadQueue []*download
 	newDownloads  chan *download
-	newRepairs    chan *file
+	newUploads    chan *file
 	workerPool    map[types.FileContractID]*worker
+
+	// Memory management - baseMemory tracks how much memory the renter is
+	// allowed to consume, memoryAvailable tracks how much more memory the
+	// renter can allocate before hitting the cap, and newMemory is a channel
+	// used to inform sleeping threads (the download loop and upload loop) that
+	// memory has become available.
+	baseMemory      uint64
+	memoryAvailable uint64
+	newMemory       chan struct{}
 
 	// Utilities.
 	cs             modules.ConsensusSet
@@ -158,8 +188,9 @@ type Renter struct {
 	hostDB         hostDB
 	log            *persist.Logger
 	persistDir     string
-	mu             *sync.RWMutex
-	tg             *sync.ThreadGroup
+	mu             *siasync.RWMutex
+	heapWG         sync.WaitGroup // in-progress chunks join this waitgroup
+	tg             threadgroup.ThreadGroup
 	tpool          modules.TransactionPool
 }
 
@@ -194,19 +225,22 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	}
 
 	r := &Renter{
-		newRepairs: make(chan *file),
-		files:      make(map[string]*file),
-		tracking:   make(map[string]trackedFile),
+		files:    make(map[string]*file),
+		tracking: make(map[string]trackedFile),
 
 		newDownloads: make(chan *download),
+		newUploads:   make(chan *file),
 		workerPool:   make(map[types.FileContractID]*worker),
+
+		baseMemory:      defaultMemory,
+		memoryAvailable: defaultMemory,
+		newMemory:       make(chan struct{}, 1),
 
 		cs:             cs,
 		hostDB:         hdb,
 		hostContractor: hc,
 		persistDir:     persistDir,
-		mu:             sync.New(modules.SafeMutexDelay, 1),
-		tg:             new(sync.ThreadGroup),
+		mu:             siasync.New(modules.SafeMutexDelay, 1),
 		tpool:          tpool,
 	}
 	if err := r.initPersist(); err != nil {
@@ -214,22 +248,62 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	}
 
 	// Spin up the workers for the work pool.
-	contracts := r.hostContractor.Contracts()
-	r.updateWorkerPool(contracts)
-	go r.threadedRepairLoop()
+	r.managedUpdateWorkerPool()
+	go r.threadedRepairScan()
 	go r.threadedDownloadLoop()
-	go r.threadedQueueRepairs()
 
 	// Kill workers on shutdown.
-	r.tg.OnStop(func() {
+	r.tg.OnStop(func() error {
 		id := r.mu.RLock()
 		for _, worker := range r.workerPool {
 			close(worker.killChan)
 		}
 		r.mu.RUnlock(id)
+		return nil
 	})
 
 	return r, nil
+}
+
+// managedMemoryAvailableAdd adds the amount provided to the renter's total
+// memory available.
+func (r *Renter) managedMemoryAvailableAdd(amt uint64) {
+	id := r.mu.Lock()
+	r.memoryAvailable += amt
+	if r.memoryAvailable > r.baseMemory {
+		r.mu.Unlock(id)
+		r.log.Critical("Memory available now exceeds base memory:", r.memoryAvailable, r.baseMemory)
+		return
+	}
+	r.mu.Unlock(id)
+
+	// Create a notification that more memory is available.
+	select {
+	case r.newMemory <- struct{}{}:
+	default:
+	}
+}
+
+// managedMemoryAvailableGet returns the current amount of memory available to
+// the renter.
+func (r *Renter) managedMemoryAvailableGet() uint64 {
+	id := r.mu.RLock()
+	memAvail := r.memoryAvailable
+	r.mu.RUnlock(id)
+	return memAvail
+}
+
+// managedMemoryAvailableSub subtracts the amount provided from the renter's
+// total memory available.
+func (r *Renter) managedMemoryAvailableSub(amt uint64) {
+	id := r.mu.Lock()
+	if r.memoryAvailable < amt {
+		r.mu.Unlock(id)
+		r.log.Critical("Memory available is underflowing", r.memoryAvailable, amt)
+		return
+	}
+	r.memoryAvailable -= amt
+	r.mu.Unlock(id)
 }
 
 // Close closes the Renter and its dependencies
@@ -303,10 +377,7 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		return err
 	}
 
-	contracts := r.hostContractor.Contracts()
-	id := r.mu.Lock()
-	r.updateWorkerPool(contracts)
-	r.mu.Unlock(id)
+	r.managedUpdateWorkerPool()
 	return nil
 }
 

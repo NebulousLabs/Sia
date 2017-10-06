@@ -15,25 +15,11 @@ import (
 )
 
 var (
-	renterCmd = &cobra.Command{
-		Use:   "renter",
-		Short: "Perform renter actions",
-		Long:  "Upload, download, rename, delete, load, or share files.",
-		Run:   wrap(rentercmd),
-	}
-
-	renterUploadsCmd = &cobra.Command{
-		Use:   "uploads",
-		Short: "View the upload queue",
-		Long:  "View the list of files currently uploading.",
-		Run:   wrap(renteruploadscmd),
-	}
-
-	renterDownloadsCmd = &cobra.Command{
-		Use:   "downloads",
-		Short: "View the download queue",
-		Long:  "View the list of files currently downloading.",
-		Run:   wrap(renterdownloadscmd),
+	renterAllowanceCancelCmd = &cobra.Command{
+		Use:   "cancel",
+		Short: "Cancel the current allowance",
+		Long:  "Cancel the current allowance, which controls how much money is spent on file contracts.",
+		Run:   wrap(renterallowancecancelcmd),
 	}
 
 	renterAllowanceCmd = &cobra.Command{
@@ -43,28 +29,11 @@ var (
 		Run:   wrap(renterallowancecmd),
 	}
 
-	renterAllowanceCancelCmd = &cobra.Command{
-		Use:   "cancel",
-		Short: "Cancel the current allowance",
-		Long:  "Cancel the current allowance, which controls how much money is spent on file contracts.",
-		Run:   wrap(renterallowancecancelcmd),
-	}
-
-	renterSetAllowanceCmd = &cobra.Command{
-		Use:   "setallowance [amount] [period]",
-		Short: "Set the allowance",
-		Long: `Set the amount of money that can be spent over a given period.
-
-amount is given in currency units (SC, KS, etc.)
-
-period is given in either blocks (b), hours (h), days (d), or weeks (w). A
-block is approximately 10 minutes, so one hour is six blocks, a day is 144
-blocks, and a week is 1008 blocks.
-
-Note that setting the allowance will cause siad to immediately begin forming
-contracts! You should only set the allowance once you are fully synced and you
-have a reasonable number (>30) of hosts in your hostdb.`,
-		Run: wrap(rentersetallowancecmd),
+	renterCmd = &cobra.Command{
+		Use:   "renter",
+		Short: "Perform renter actions",
+		Long:  "Upload, download, rename, delete, load, or share files.",
+		Run:   wrap(rentercmd),
 	}
 
 	renterContractsCmd = &cobra.Command{
@@ -79,6 +48,13 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Short: "View details of the specified contract",
 		Long:  "View all details available of the specified contract.",
 		Run:   wrap(rentercontractsviewcmd),
+	}
+
+	renterDownloadsCmd = &cobra.Command{
+		Use:   "downloads",
+		Short: "View the download queue",
+		Long:  "View the list of files currently downloading.",
+		Run:   wrap(renterdownloadscmd),
 	}
 
 	renterFilesDeleteCmd = &cobra.Command{
@@ -124,6 +100,30 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Short: "Display the price of storage and bandwidth",
 		Long:  "Display the estimated prices of storing files, retrieving files, and creating a set of contracts",
 		Run:   wrap(renterpricescmd),
+	}
+
+	renterSetAllowanceCmd = &cobra.Command{
+		Use:   "setallowance [amount] [period]",
+		Short: "Set the allowance",
+		Long: `Set the amount of money that can be spent over a given period.
+
+amount is given in currency units (SC, KS, etc.)
+
+period is given in either blocks (b), hours (h), days (d), or weeks (w). A
+block is approximately 10 minutes, so one hour is six blocks, a day is 144
+blocks, and a week is 1008 blocks.
+
+Note that setting the allowance will cause siad to immediately begin forming
+contracts! You should only set the allowance once you are fully synced and you
+have a reasonable number (>30) of hosts in your hostdb.`,
+		Run: wrap(rentersetallowancecmd),
+	}
+
+	renterUploadsCmd = &cobra.Command{
+		Use:   "uploads",
+		Short: "View the upload queue",
+		Long:  "View the list of files currently uploading.",
+		Run:   wrap(renteruploadscmd),
 	}
 )
 

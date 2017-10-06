@@ -11,6 +11,9 @@ import (
 // TestAcceptTransactionSet probes the AcceptTransactionSet method
 // of the transaction pool.
 func TestAcceptTransactionSet(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Create a transaction pool tester.
 	tpt, err := createTpoolTester(t.Name())
 	if err != nil {

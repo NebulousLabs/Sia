@@ -248,7 +248,7 @@ tests is a good way to get your feet wet.  See [doc/Running and Writing Tests fo
 
 ## Contact us
 
-Feel free to ask for help on the #dev channel on [Slack][slack].
+Feel free to ask for help on the #core-dev channel on [discord][discord].
 
 [cross]: http://dave.cheney.net/2015/08/22/cross-compilation-with-go-1-5
 [binary]: https://golang.org/dl/
@@ -266,7 +266,7 @@ Feel free to ask for help on the #dev channel on [Slack][slack].
 [developers.md]: https://github.com/NebulousLabs/Sia/blob/master/doc/Developers.md
 [gofmt]: https://golang.org/cmd/gofmt/
 [nutshell]: https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell
-[slack]: http://slackin.siacoin.com
+[discord]: https://discord.gg/sia
 [install-git]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
 [test-doc]: https://github.com/NebulousLabs/Sia/blob/master/doc/Testing.md
 [stashing]: https://git-scm.com/book/en/v2/Git-Tools-Stashing-and-Cleaning

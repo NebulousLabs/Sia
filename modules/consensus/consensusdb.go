@@ -18,7 +18,9 @@ import (
 var (
 	prefixDSCO = []byte("dsco_")
 	prefixFCEX = []byte("fcex_")
+)
 
+var (
 	// BlockHeight is a bucket that stores the current block height.
 	//
 	// Generally we would just look at BlockPath.Stats(), but there is an error
@@ -52,13 +54,13 @@ var (
 	// inconsistencies within the database have been detected.
 	Consistency = []byte("Consistency")
 
-	// SiacoinOutputs is a database bucket that contains all of the unspent
-	// siacoin outputs.
-	SiacoinOutputs = []byte("SiacoinOutputs")
-
 	// FileContracts is a database bucket that contains all of the open file
 	// contracts.
 	FileContracts = []byte("FileContracts")
+
+	// SiacoinOutputs is a database bucket that contains all of the unspent
+	// siacoin outputs.
+	SiacoinOutputs = []byte("SiacoinOutputs")
 
 	// SiafundOutputs is a database bucket that contains all of the unspent
 	// siafund outputs.

@@ -34,6 +34,30 @@ const (
 )
 
 var (
+	// connectablityCheckFirstWait defines how often the host's connectability
+	// check is run.
+	connectabilityCheckFirstWait = build.Select(build.Var{
+		Standard: time.Minute * 2,
+		Dev:      time.Minute * 1,
+		Testing:  time.Second * 3,
+	}).(time.Duration)
+
+	// connectablityCheckFrequency defines how often the host's connectability
+	// check is run.
+	connectabilityCheckFrequency = build.Select(build.Var{
+		Standard: time.Minute * 10,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 10,
+	}).(time.Duration)
+
+	// connectabilityCheckTimeout defines how long a connectability check's dial
+	// will be allowed to block before it times out.
+	connectabilityCheckTimeout = build.Select(build.Var{
+		Standard: time.Minute * 2,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 90,
+	}).(time.Duration)
+
 	// defaultCollateral defines the amount of money that the host puts up as
 	// collateral per-byte by default. The collateral should be considered as
 	// an absolute instead of as a percentage, because low prices result in
@@ -64,6 +88,14 @@ var (
 	// download bandwidth is expected to be plentiful but also in-demand.
 	defaultDownloadBandwidthPrice = types.SiacoinPrecision.Mul64(25).Div(modules.BytesPerTerabyte) // 25 SC / TB
 
+	// defaultMaxCollateral defines the maximum amount of collateral that the
+	// host is comfortable putting into a single file contract. 10e3 is a
+	// relatively small file contract, but millions of siacoins could be locked
+	// away by only a few hundred file contracts. As the ecosystem matures, it
+	// is expected that the safe default for this value will increase quite a
+	// bit.
+	defaultMaxCollateral = types.SiacoinPrecision.Mul64(5e3)
+
 	// defaultMaxDownloadBatchSize defines the maximum number of bytes that the
 	// host will allow to be requested by a single download request. 17 MiB has
 	// been chosen because it's 4 full sectors plus some wiggle room. 17 MiB is
@@ -83,14 +115,6 @@ var (
 	// with a number like 65 MiB.
 	defaultMaxReviseBatchSize = 17 * (1 << 20)
 
-	// defaultMaxCollateral defines the maximum amount of collateral that the
-	// host is comfortable putting into a single file contract. 10e3 is a
-	// relatively small file contract, but millions of siacoins could be locked
-	// away by only a few hundred file contracts. As the ecosystem matures, it
-	// is expected that the safe default for this value will increase quite a
-	// bit.
-	defaultMaxCollateral = types.SiacoinPrecision.Mul64(5e3)
-
 	// defaultStoragePrice defines the starting price for hosts selling
 	// storage. We try to match a number that is both reasonably profitable and
 	// reasonably competitive.
@@ -103,54 +127,6 @@ var (
 	// the data, meaning that the host serves to profit from accepting the
 	// data.
 	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(1).Div(modules.BytesPerTerabyte) // 1 SC / TB
-
-	// workingStatusFirstCheck defines how frequently the Host's working status
-	// check runs
-	workingStatusFirstCheck = build.Select(build.Var{
-		Standard: time.Minute * 3,
-		Dev:      time.Minute * 1,
-		Testing:  time.Second * 3,
-	}).(time.Duration)
-
-	// workingStatusFrequency defines how frequently the Host's working status
-	// check runs
-	workingStatusFrequency = build.Select(build.Var{
-		Standard: time.Minute * 10,
-		Dev:      time.Minute * 5,
-		Testing:  time.Second * 10,
-	}).(time.Duration)
-
-	// workingStatusThreshold defines how many settings calls must occur over the
-	// workingStatusFrequency for the host to be considered working.
-	workingStatusThreshold = build.Select(build.Var{
-		Standard: uint64(3),
-		Dev:      uint64(1),
-		Testing:  uint64(1),
-	}).(uint64)
-
-	// connectablityCheckFirstWait defines how often the host's connectability
-	// check is run.
-	connectabilityCheckFirstWait = build.Select(build.Var{
-		Standard: time.Minute * 2,
-		Dev:      time.Minute * 1,
-		Testing:  time.Second * 3,
-	}).(time.Duration)
-
-	// connectablityCheckFrequency defines how often the host's connectability
-	// check is run.
-	connectabilityCheckFrequency = build.Select(build.Var{
-		Standard: time.Minute * 10,
-		Dev:      time.Minute * 5,
-		Testing:  time.Second * 10,
-	}).(time.Duration)
-
-	// connectabilityCheckTimeout defines how long a connectability check's dial
-	// will be allowed to block before it times out.
-	connectabilityCheckTimeout = build.Select(build.Var{
-		Standard: time.Minute * 2,
-		Dev:      time.Minute * 5,
-		Testing:  time.Second * 90,
-	}).(time.Duration)
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window
@@ -220,6 +196,30 @@ var (
 		Standard: time.Millisecond * 50,
 		Testing:  time.Millisecond,
 	}).(time.Duration)
+
+	// workingStatusFirstCheck defines how frequently the Host's working status
+	// check runs
+	workingStatusFirstCheck = build.Select(build.Var{
+		Standard: time.Minute * 3,
+		Dev:      time.Minute * 1,
+		Testing:  time.Second * 3,
+	}).(time.Duration)
+
+	// workingStatusFrequency defines how frequently the Host's working status
+	// check runs
+	workingStatusFrequency = build.Select(build.Var{
+		Standard: time.Minute * 10,
+		Dev:      time.Minute * 5,
+		Testing:  time.Second * 10,
+	}).(time.Duration)
+
+	// workingStatusThreshold defines how many settings calls must occur over the
+	// workingStatusFrequency for the host to be considered working.
+	workingStatusThreshold = build.Select(build.Var{
+		Standard: uint64(3),
+		Dev:      uint64(1),
+		Testing:  uint64(1),
+	}).(uint64)
 )
 
 // All of the following variables define the names of buckets used by the host

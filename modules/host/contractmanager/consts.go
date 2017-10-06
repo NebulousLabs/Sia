@@ -16,6 +16,10 @@ const (
 	// metadata associated with a storage folder.
 	metadataFile = "siahostmetadata.dat"
 
+	// sectorFile is the file that is placed inside of a storage folder to
+	// house all of the sectors associated with a storage folder.
+	sectorFile = "siahostdata.dat"
+
 	// settingsFile is the name of the file that is used to save the contract
 	// manager's settings.
 	settingsFile = "contractmanager.json"
@@ -25,10 +29,6 @@ const (
 	// a copy-on-write operation is performed to make sure that the contract
 	// manager's persistent settings are updated atomically.
 	settingsFileTmp = "contractmanager.json_temp"
-
-	// sectorFile is the file that is placed inside of a storage folder to
-	// house all of the sectors associated with a storage folder.
-	sectorFile = "siahostdata.dat"
 
 	// walFile is the name of the file that is used to save the write ahead log
 	// for the contract manager.
@@ -45,6 +45,10 @@ const (
 	// time when writing out the sparse sector file during a storageFolderAdd or
 	// a storageFolderGrow.
 	folderAllocationStepSize = 1 << 35
+
+	// maxSectorBatchThreads is the maximum number of threads updating
+	// sector counters on disk in AddSectorBatch and RemoveSectorBatch.
+	maxSectorBatchThreads = 100
 
 	// sectorMetadataDiskSize defines the number of bytes it takes to store the
 	// metadata of a single sector on disk.
@@ -79,14 +83,6 @@ var (
 )
 
 var (
-	// maximumStorageFolders defines the maximum number of storage folders that
-	// the host can support.
-	maximumStorageFolders = build.Select(build.Var{
-		Dev:      uint64(1 << 5),
-		Standard: uint64(1 << 16),
-		Testing:  uint64(1 << 3),
-	}).(uint64)
-
 	// MaximumSectorsPerStorageFolder sets an upper bound on how large storage
 	// folders in the host are allowed to be. There is a hard limit at 4
 	// billion sectors because the sector location map only uses 4 bytes to
@@ -95,6 +91,14 @@ var (
 		Dev:      uint64(1 << 20), // 4 TiB
 		Standard: uint64(1 << 32), // 32 PiB
 		Testing:  uint64(1 << 12), // 16 MiB
+	}).(uint64)
+
+	// maximumStorageFolders defines the maximum number of storage folders that
+	// the host can support.
+	maximumStorageFolders = build.Select(build.Var{
+		Dev:      uint64(1 << 5),
+		Standard: uint64(1 << 16),
+		Testing:  uint64(1 << 3),
 	}).(uint64)
 
 	// MinimumSectorsPerStorageFolder defines the minimum number of sectors

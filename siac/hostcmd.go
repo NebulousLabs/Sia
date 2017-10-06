@@ -16,6 +16,19 @@ import (
 )
 
 var (
+	hostAnnounceCmd = &cobra.Command{
+		Use:   "announce",
+		Short: "Announce yourself as a host",
+		Long: `Announce yourself as a host on the network.
+Announcing will also configure the host to start accepting contracts.
+You can revert this by running:
+	siac host config acceptingcontracts false
+You may also supply a specific address to be announced, e.g.:
+	siac host announce my-host-domain.com:9001
+Doing so will override the standard connectivity checks.`,
+		Run: hostannouncecmd,
+	}
+
 	hostCmd = &cobra.Command{
 		Use:   "host",
 		Short: "Perform host actions",
@@ -59,30 +72,17 @@ To configure the host to accept new contracts, set acceptingcontracts to true:
 		Run: wrap(hostconfigcmd),
 	}
 
-	hostAnnounceCmd = &cobra.Command{
-		Use:   "announce",
-		Short: "Announce yourself as a host",
-		Long: `Announce yourself as a host on the network.
-Announcing will also configure the host to start accepting contracts.
-You can revert this by running:
-	siac host config acceptingcontracts false
-You may also supply a specific address to be announced, e.g.:
-	siac host announce my-host-domain.com:9001
-Doing so will override the standard connectivity checks.`,
-		Run: hostannouncecmd,
+	hostFolderAddCmd = &cobra.Command{
+		Use:   "add [path] [size]",
+		Short: "Add a storage folder to the host",
+		Long:  "Add a storage folder to the host, specifying how much data it should store",
+		Run:   wrap(hostfolderaddcmd),
 	}
 
 	hostFolderCmd = &cobra.Command{
 		Use:   "folder",
 		Short: "Add, remove, or resize a storage folder",
 		Long:  "Add, remove, or resize a storage folder.",
-	}
-
-	hostFolderAddCmd = &cobra.Command{
-		Use:   "add [path] [size]",
-		Short: "Add a storage folder to the host",
-		Long:  "Add a storage folder to the host, specifying how much data it should store",
-		Run:   wrap(hostfolderaddcmd),
 	}
 
 	hostFolderRemoveCmd = &cobra.Command{

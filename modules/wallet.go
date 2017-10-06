@@ -11,26 +11,22 @@ import (
 )
 
 const (
-	// WalletDir is the directory that contains the wallet persistence.
-	WalletDir = "wallet"
+	// PublicKeysPerSeed define the number of public keys that get pregenerated
+	// for a seed at startup when searching for balances in the blockchain.
+	PublicKeysPerSeed = 2500
 
 	// SeedChecksumSize is the number of bytes that are used to checksum
 	// addresses to prevent accidental spending.
 	SeedChecksumSize = 6
 
-	// PublicKeysPerSeed define the number of public keys that get pregenerated
-	// for a seed at startup when searching for balances in the blockchain.
-	PublicKeysPerSeed = 2500
+	// WalletDir is the directory that contains the wallet persistence.
+	WalletDir = "wallet"
 )
 
 var (
 	// ErrBadEncryptionKey is returned if the incorrect encryption key to a
 	// file is provided.
 	ErrBadEncryptionKey = errors.New("provided encryption key is incorrect")
-
-	// ErrLowBalance is returned if the wallet does not have enough funds to
-	// complete the desired action.
-	ErrLowBalance = errors.New("insufficient balance")
 
 	// ErrIncompleteTransactions is returned if the wallet has incomplete
 	// transactions being built that are using all of the current outputs, and
@@ -41,6 +37,10 @@ var (
 	// ErrLockedWallet is returned when an action cannot be performed due to
 	// the wallet being locked.
 	ErrLockedWallet = errors.New("wallet must be unlocked before it can be used")
+
+	// ErrLowBalance is returned if the wallet does not have enough funds to
+	// complete the desired action.
+	ErrLowBalance = errors.New("insufficient balance")
 )
 
 type (
@@ -391,6 +391,9 @@ type (
 		// transactions are automatically given to the transaction pool, and
 		// are also returned to the caller.
 		SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
+
+		// DustThreshold returns the quantity below which a Currency is considered to be Dust.
+		DustThreshold() types.Currency
 	}
 )
 

@@ -874,6 +874,22 @@ func TestRenterHandlerRename(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
+	}
+
 	// Create a file.
 	path1 := filepath.Join(st.dir, "test1.dat")
 	if err = createRandFile(path1, 512); err != nil {
@@ -1525,7 +1541,7 @@ func TestRenterPricesHandlerPricey(t *testing.T) {
 // from low quality hosts when there are higher quality hosts available.
 func TestContractorHostRemoval(t *testing.T) {
 	// Create a renter and 2 hosts. Connect to the hosts and start uploading.
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	st, err := createServerTester(t.Name() + "renter")
@@ -1579,7 +1595,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	allowanceValues := url.Values{}
 	allowanceValues.Set("funds", "500000000000000000000000000000") // 500k SC
 	allowanceValues.Set("hosts", "2")
-	allowanceValues.Set("period", "10")
+	allowanceValues.Set("period", "15")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -1686,7 +1702,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	}
 
 	// Block until the hostdb reaches five hosts.
-	err = build.Retry(50, time.Millisecond*250, func() error {
+	err = build.Retry(150, time.Millisecond*250, func() error {
 		var ah HostdbActiveGET
 		err = st.getAPI("/hostdb/active", &ah)
 		if err != nil {
@@ -1708,7 +1724,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	}
 
 	// Verify that st and stH1 are dropped in favor of the newer, better hosts.
-	err = build.Retry(50, time.Millisecond*250, func() error {
+	err = build.Retry(150, time.Millisecond*250, func() error {
 		var newContracts int
 		err = st.getAPI("/renter/contracts", &rc)
 		if err != nil {
@@ -1757,7 +1773,8 @@ func TestContractorHostRemoval(t *testing.T) {
 			t.Error("Each contrat should have 1 sector:", contract.Size, contract.ID)
 		}
 	}
-	for i := 0; i < 5; i++ {
+	// Mine blocks to force a contract renewal.
+	for i := 0; i < 11; i++ {
 		_, err := st.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -1766,6 +1783,8 @@ func TestContractorHostRemoval(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Sleep to give the contractor some time to perform the renew.
+		time.Sleep(time.Millisecond * 100)
 	}
 	// Give the renter time to renew. Two of the contracts should renew.
 	var rc2 RenterContracts
@@ -1827,7 +1846,7 @@ func TestContractorHostRemoval(t *testing.T) {
 	}
 
 	// Mine out another set of the blocks so that the bad contracts expire.
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 11; i++ {
 		_, err := st.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -1836,10 +1855,12 @@ func TestContractorHostRemoval(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		time.Sleep(time.Millisecond * 100)
 	}
 
-	// Should be back down to 2 contracts now, with the new hosts.
-	// Verify that st and stH1 are dropped in favor of the newer, better hosts.
+	// Should be back down to 2 contracts now, with the new hosts. Verify that
+	// st and stH1 are dropped in favor of the newer, better hosts. The
+	// contracts should also have data in them.
 	err = build.Retry(50, time.Millisecond*250, func() error {
 		err = st.getAPI("/renter/contracts", &rc)
 		if err != nil {
@@ -1859,7 +1880,13 @@ func TestContractorHostRemoval(t *testing.T) {
 	if rc.Contracts[1].HostPublicKey.String() == rc1Host || rc.Contracts[1].HostPublicKey.String() == rc2Host {
 		t.Error("renter is renewing the wrong contracts", rc.Contracts[1].HostPublicKey.String())
 	}
-
+	// The renewing process should not have resulted in additional data being
+	// uploaded - it should be the same data in the contracts.
+	for _, contract := range rc.Contracts {
+		if contract.Size != modules.SectorSize {
+			t.Error("Contract has the wrong size:", contract.Size)
+		}
+	}
 	// Redundancy should still be 2.
 	err = retry(120, 250*time.Millisecond, func() error {
 		st.getAPI("/renter/files", &rf)
@@ -1872,31 +1899,19 @@ func TestContractorHostRemoval(t *testing.T) {
 		t.Fatal(err, "::", rf.Files[0].Redundancy)
 	}
 
-	// Check that the amount of data in each contract has remained at the
-	// correct amount - just one sector each.
-	err = st.getAPI("/renter/contracts", &rc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, contract := range rc.Contracts {
-		if contract.Size != modules.SectorSize {
-			t.Error("Each contrat should have 1 sector:", contract.Size, contract.ID)
-		}
-	}
-
 	// Try again to download the file we uploaded. It should still be
 	// retrievable.
 	downloadPath3 := filepath.Join(st.dir, "test-downloaded-verify-3.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath3)
 	if err != nil {
-		t.Log("FINAL DOWNLOAD HAS FAILED:", err)
+		t.Error("Final download has failed:", err)
 	}
 	downloadBytes3, err := ioutil.ReadFile(downloadPath3)
 	if err != nil {
-		t.Log(err)
+		t.Error(err)
 	}
 	if !bytes.Equal(downloadBytes3, origBytes) {
-		t.Log("downloaded file and uploaded file do not match")
+		t.Error("downloaded file and uploaded file do not match")
 	}
 }
 
@@ -1940,7 +1955,7 @@ func TestExhaustedContracts(t *testing.T) {
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
 	testPeriod := "950000" // large period to cause an expensive test, exhausting the allowance faster
-	allowanceValues.Set("funds", types.SiacoinPrecision.Mul64(5).String())
+	allowanceValues.Set("funds", types.SiacoinPrecision.Mul64(10).String())
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
@@ -1999,17 +2014,18 @@ func TestExhaustedContracts(t *testing.T) {
 	newWindowStart := newContract.LastRevision.NewWindowStart
 	newWindowEnd := newContract.LastRevision.NewWindowEnd
 	endHeight := newContract.EndHeight()
+	if newContract.ID == initialContract.ID {
+		t.Error("renew did not occur")
+	}
+	t.Skip("skipping this portion of the test until contract renewing is budget-cycle aligned")
 	if endHeight != initialContract.EndHeight() {
-		t.Fatal("contract end height changed, wanted", initialContract.EndHeight(), "got", endHeight)
+		t.Error("contract end height changed, wanted", initialContract.EndHeight(), "got", endHeight)
 	}
 	if newWindowEnd != initialContract.LastRevision.NewWindowEnd {
-		t.Fatal("contract windowEnd changed, wanted", initialContract.LastRevision.NewWindowEnd, "got", newWindowEnd)
+		t.Error("contract windowEnd changed, wanted", initialContract.LastRevision.NewWindowEnd, "got", newWindowEnd)
 	}
 	if newWindowStart != initialContract.LastRevision.NewWindowStart {
-		t.Fatal("contract windowStart changed, wanted", initialContract.LastRevision.NewWindowStart, "got", newWindowStart)
-	}
-	if newContract.ID == initialContract.ID {
-		t.Fatal("renew did not occur")
+		t.Error("contract windowStart changed, wanted", initialContract.LastRevision.NewWindowStart, "got", newWindowStart)
 	}
 }
 

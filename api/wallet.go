@@ -28,6 +28,8 @@ type (
 
 		SiafundBalance      types.Currency `json:"siafundbalance"`
 		SiacoinClaimBalance types.Currency `json:"siacoinclaimbalance"`
+
+		DustThreshold types.Currency `json:"dustthreshold"`
 	}
 
 	// WalletAddressGET contains an address returned by a GET call to
@@ -121,6 +123,7 @@ func encryptionKeys(seedStr string) (validKeys []crypto.TwofishKey) {
 func (api *API) walletHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	siacoinBal, siafundBal, siaclaimBal := api.wallet.ConfirmedBalance()
 	siacoinsOut, siacoinsIn := api.wallet.UnconfirmedBalance()
+	dustThreshold := api.wallet.DustThreshold()
 	WriteJSON(w, WalletGET{
 		Encrypted:  api.wallet.Encrypted(),
 		Unlocked:   api.wallet.Unlocked(),
@@ -132,6 +135,8 @@ func (api *API) walletHandler(w http.ResponseWriter, req *http.Request, _ httpro
 
 		SiafundBalance:      siafundBal,
 		SiacoinClaimBalance: siaclaimBal,
+
+		DustThreshold: dustThreshold,
 	})
 }
 

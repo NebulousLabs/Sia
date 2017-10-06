@@ -1451,3 +1451,26 @@ func TestWalletSiacoins(t *testing.T) {
 		}
 	}
 }
+
+// TestWalletGETDust tests the consistency of dustthreshold field in /wallet
+func TestWalletGETDust(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg WalletGET
+	err = st.getAPI("/wallet", &wg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dt := st.wallet.DustThreshold()
+	if !dt.Equals(wg.DustThreshold) {
+		t.Fatal("dustThreshold mismatch")
+	}
+}
