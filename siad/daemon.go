@@ -111,14 +111,10 @@ func processConfig(config Config) (Config, error) {
 	return config, nil
 }
 
-// walletAutoUnlock is called on siad startup and attempts to automatically
-// unlock the wallet if the SIA_WALLET_PASSWORD env exists on the machine.
-func walletAutoUnlock(w modules.Wallet) {
+// unlockWallet is called on siad startup and attempts to automatically
+// unlock the wallet with the given password string.
+func unlockWallet(w modules.Wallet, password string) error {
 	var validKeys []crypto.TwofishKey
-	password := os.Getenv("SIA_WALLET_PASSWORD")
-	if password != "" {
-		fmt.Println("Sia Wallet Password found, attempting to auto-unlock wallet")
-	}
 	dicts := []mnemonics.DictionaryID{"english", "german", "japanese"}
 	for _, dict := range dicts {
 		seed, err := modules.StringToSeed(password, dict)
@@ -129,14 +125,11 @@ func walletAutoUnlock(w modules.Wallet) {
 	}
 	validKeys = append(validKeys, crypto.TwofishKey(crypto.HashObject(password)))
 	for _, key := range validKeys {
-		err := w.Unlock(key)
-		if err == nil {
-			fmt.Println("Wallet unlocked")
-		}
-		if err != nil && err != modules.ErrBadEncryptionKey {
-			fmt.Println("Automatic unlock failed!")
+		if err := w.Unlock(key); err == nil {
+			return nil
 		}
 	}
+	return modules.ErrBadEncryptionKey
 }
 
 // startDaemon uses the config parameters to initialize Sia modules and start
@@ -325,8 +318,15 @@ func startDaemon(config Config) (err error) {
 	// connect the API to the server
 	srv.mux.Handle("/", a)
 
-	// Attempt to auto-unlock the wallet
-	walletAutoUnlock(w)
+	// Attempt to auto-unlock the wallet using the SIA_WALLET_PASSWORD env variable
+	if password := os.Getenv("SIA_WALLET_PASSWORD"); password != "" {
+		fmt.Println("Sia Wallet Password found, attempting to auto-unlock wallet")
+		if err := unlockWallet(w, password); err != nil {
+			fmt.Println("Auto-unlock failed.")
+		} else {
+			fmt.Println("Auto-unlock successful.")
+		}
+	}
 
 	// stop the server if a kill signal is caught
 	sigChan := make(chan os.Signal, 1)
