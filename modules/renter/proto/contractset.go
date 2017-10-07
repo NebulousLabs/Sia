@@ -91,9 +91,10 @@ func (cs *ContractSet) Acquire(id types.FileContractID) (modules.RenterContract,
 	cs.mu.Lock()
 	sc, ok := cs.contracts[id]
 	cs.mu.Unlock()
-	if ok {
-		sc.mu.Lock()
+	if !ok {
+		return modules.RenterContract{}, false
 	}
+	sc.mu.Lock()
 	return sc.RenterContract, ok
 }
 
