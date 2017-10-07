@@ -668,9 +668,9 @@ func TestRenterHandlerContracts(t *testing.T) {
 	if err = st.getAPI("/renter", &get); err != nil {
 		t.Fatal(err)
 	}
-	expectedContractSpending := get.Settings.Allowance.Funds.Sub(get.FinancialMetrics.Unspent)
+	expectedContractSpending := types.ZeroCurrency
 	for _, contract := range contracts.Contracts {
-		expectedContractSpending = expectedContractSpending.Add(contract.RenterFunds)
+		expectedContractSpending = expectedContractSpending.Add(contract.TotalCost)
 	}
 	if got := get.FinancialMetrics.ContractSpending; got.Cmp(expectedContractSpending) != 0 {
 		t.Fatalf("expected contract spending to be %v; got %v", expectedContractSpending, got)
