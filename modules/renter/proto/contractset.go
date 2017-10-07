@@ -20,32 +20,6 @@ type safeContract struct {
 type ContractSet struct {
 	contracts map[types.FileContractID]*safeContract
 	mu        sync.Mutex
-
-	// caches (initialized by initCache)
-	flatIDs       []types.FileContractID
-	flatContracts []modules.RenterContract
-	once          sync.Once
-}
-
-// initCache populates the flatIDs and flatContracts fields so that repeated
-// work can be avoided when calling the IDs and Contracts methods. It must be
-// called under lock. initCache should be called by IDs and Contracts if a
-// call to Insert, Return, or Delete has invalidated the cache. This is
-// managed via a sync.Once.
-func (cs *ContractSet) initCache() {
-	cs.flatIDs = make([]types.FileContractID, 0, len(cs.contracts))
-	for id := range cs.contracts {
-		cs.flatIDs = append(cs.flatIDs, id)
-	}
-	cs.flatContracts = make([]modules.RenterContract, 0, len(cs.contracts))
-	for _, sc := range cs.contracts {
-		// construct deep copy, sans MerkleRoots
-		c := sc.RenterContract
-		c.MerkleRoots = nil
-		var contractCopy modules.RenterContract
-		encoding.Unmarshal(encoding.Marshal(c), &contractCopy)
-		cs.flatContracts = append(cs.flatContracts, contractCopy)
-	}
 }
 
 // Len returns the number of contracts in the set.
@@ -60,8 +34,11 @@ func (cs *ContractSet) Len() int {
 func (cs *ContractSet) IDs() []types.FileContractID {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	cs.once.Do(cs.initCache)
-	return cs.flatIDs
+	ids := make([]types.FileContractID, 0, len(cs.contracts))
+	for id := range cs.contracts {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 // Contracts returns a copy of each contract in the set. The contracts are not
@@ -71,8 +48,16 @@ func (cs *ContractSet) IDs() []types.FileContractID {
 func (cs *ContractSet) Contracts() []modules.RenterContract {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	cs.once.Do(cs.initCache)
-	return cs.flatContracts
+	contracts := make([]modules.RenterContract, 0, len(cs.contracts))
+	for _, sc := range cs.contracts {
+		// construct deep copy, sans MerkleRoots
+		c := sc.RenterContract
+		c.MerkleRoots = nil
+		var contractCopy modules.RenterContract
+		encoding.Unmarshal(encoding.Marshal(c), &contractCopy)
+		contracts = append(contracts, contractCopy)
+	}
+	return contracts
 }
 
 // Insert adds a new contract to the set. It panics if the contract is already
@@ -86,8 +71,6 @@ func (cs *ContractSet) Insert(contract modules.RenterContract) {
 		panic("contract already in set")
 	}
 	cs.contracts[contract.ID] = &safeContract{RenterContract: contract}
-	// reset sync.Once
-	cs.once = sync.Once{}
 }
 
 // Acquire looks up the contract with the specified FileContractID and locks
@@ -126,8 +109,6 @@ func (cs *ContractSet) Return(contract modules.RenterContract) {
 	sc.RenterContract = contract
 	cs.contracts[contract.ID] = sc
 	sc.mu.Unlock()
-	// reset sync.Once
-	cs.once = sync.Once{}
 }
 
 // Delete removes a contract from the set. The contract must have been
@@ -142,8 +123,6 @@ func (cs *ContractSet) Delete(contract modules.RenterContract) {
 	}
 	delete(cs.contracts, contract.ID)
 	sc.mu.Unlock()
-	// reset sync.Once
-	cs.once = sync.Once{}
 }
 
 // NewContractSet returns a ContractSet populated with the provided slice of
