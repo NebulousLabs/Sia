@@ -41,10 +41,10 @@ func (cs *ContractSet) IDs() []types.FileContractID {
 	return ids
 }
 
-// Contracts returns a copy of each contract in the set. The contracts are not
+// ViewAll returns a copy of each contract in the set. The contracts are not
 // locked. Certain fields, including the MerkleRoots, are set to nil for
 // safety reasons.
-func (cs *ContractSet) Contracts() []modules.RenterContract {
+func (cs *ContractSet) ViewAll() []modules.RenterContract {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 	contracts := make([]modules.RenterContract, 0, len(cs.contracts))
@@ -55,6 +55,22 @@ func (cs *ContractSet) Contracts() []modules.RenterContract {
 		contracts = append(contracts, c)
 	}
 	return contracts
+}
+
+// View returns a copy of the contract with the specified ID. The contracts is
+// not locked. Certain fields, including the MerkleRoots, are set to nil for
+// safety reasons. If the contract is not present in the set, View
+// returns false and a zero-valued RenterContract.
+func (cs *ContractSet) View(id types.FileContractID) (modules.RenterContract, bool) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	sc, ok := cs.contracts[id]
+	if !ok {
+		return modules.RenterContract{}, false
+	}
+	c := sc.RenterContract
+	c.MerkleRoots = nil
+	return c, true
 }
 
 // Insert adds a new contract to the set. It panics if the contract is already

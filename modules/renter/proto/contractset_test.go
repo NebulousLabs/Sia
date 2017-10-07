@@ -73,7 +73,8 @@ func TestContractSet(t *testing.T) {
 	funcs := []func(){
 		func() { cs.Len() },
 		func() { cs.IDs() },
-		func() { cs.Contracts() },
+		func() { cs.View(id1); cs.View(id2) },
+		func() { cs.ViewAll() },
 		func() { cs.Return(cs.mustAcquire(t, id1)) },
 		func() { cs.Return(cs.mustAcquire(t, id2)) },
 		func() {
