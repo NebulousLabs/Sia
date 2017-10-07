@@ -113,11 +113,11 @@ func (cs *ContractSet) Delete(contract modules.RenterContract) {
 // NewContractSet returns a ContractSet populated with the provided slice of
 // RenterContracts, which may be nil.
 func NewContractSet(contracts []modules.RenterContract) ContractSet {
-	cs := ContractSet{
-		contracts: make(map[types.FileContractID]*safeContract),
-	}
+	set := make(map[types.FileContractID]*safeContract)
 	for _, c := range contracts {
-		cs.contracts[c.ID] = &safeContract{RenterContract: c}
+		set[c.ID] = &safeContract{RenterContract: c}
 	}
-	return cs
+	return ContractSet{
+		contracts: set,
+	}
 }
