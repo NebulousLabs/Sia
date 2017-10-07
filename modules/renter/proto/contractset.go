@@ -58,8 +58,6 @@ func (cs *ContractSet) Contracts() []modules.RenterContract {
 
 // Insert adds a new contract to the set. It panics if the contract is already
 // in the set.
-//
-// TODO: this behavior might not be ideal.
 func (cs *ContractSet) Insert(contract modules.RenterContract) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
