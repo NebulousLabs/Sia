@@ -3,6 +3,7 @@ package proto
 import (
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -62,7 +63,7 @@ func (cs *ContractSet) Insert(contract modules.RenterContract) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 	if _, ok := cs.contracts[contract.ID]; ok {
-		panic("contract already in set")
+		build.Critical("contract already in set")
 	}
 	cs.contracts[contract.ID] = &safeContract{RenterContract: contract}
 }
@@ -98,7 +99,7 @@ func (cs *ContractSet) Return(contract modules.RenterContract) {
 	defer cs.mu.Unlock()
 	sc, ok := cs.contracts[contract.ID]
 	if !ok {
-		panic("no contract with that id")
+		build.Critical("no contract with that id")
 	}
 	sc.RenterContract = contract
 	cs.contracts[contract.ID] = sc
