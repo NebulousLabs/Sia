@@ -3,7 +3,6 @@ package proto
 import (
 	"sync"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -30,7 +29,7 @@ func (cs *ContractSet) Len() int {
 }
 
 // IDs returns the FileContractID of each contract in the set. The contracts
-// are not locked. The returned slice must not be modified.
+// are not locked.
 func (cs *ContractSet) IDs() []types.FileContractID {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -42,20 +41,17 @@ func (cs *ContractSet) IDs() []types.FileContractID {
 }
 
 // Contracts returns a copy of each contract in the set. The contracts are not
-// locked, because modifying the copy does not modify the original. Certain
-// fields, such as the MerkleRoots, may be set to nil to prevent excess
-// copying. The returned slice must not be modified.
+// locked. Certain fields, including the MerkleRoots, are set to nil for
+// safety reasons.
 func (cs *ContractSet) Contracts() []modules.RenterContract {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 	contracts := make([]modules.RenterContract, 0, len(cs.contracts))
 	for _, sc := range cs.contracts {
-		// construct deep copy, sans MerkleRoots
+		// construct shallow copy, sans MerkleRoots
 		c := sc.RenterContract
 		c.MerkleRoots = nil
-		var contractCopy modules.RenterContract
-		encoding.Unmarshal(encoding.Marshal(c), &contractCopy)
-		contracts = append(contracts, contractCopy)
+		contracts = append(contracts, c)
 	}
 	return contracts
 }
