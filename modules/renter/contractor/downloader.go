@@ -80,11 +80,14 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	}
 
 	hd.contractor.mu.Lock()
-	hd.contractor.contracts[contract.ID] = contract
 	hd.contractor.persist.update(updateDownloadRevision{
 		NewRevisionTxn:      contract.LastRevisionTxn,
 		NewDownloadSpending: contract.DownloadSpending,
 	})
+	// TODO: not sure how this should work. We probably want a way to update
+	// the contract without returning it.
+	hd.contractor.contracts.Return(contract)
+	hd.contractor.contracts.Acquire(contract.ID)
 	hd.contractor.mu.Unlock()
 
 	return sector, nil
@@ -116,15 +119,11 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	c.mu.RLock()
 	cachedDownloader, haveDownloader := c.downloaders[id]
 	height := c.blockHeight
-	contract, haveContract := c.contracts[id]
 	renewing := c.renewing[id]
 	c.mu.RUnlock()
-
 	if renewing {
 		return nil, errors.New("currently renewing that contract")
-	}
-
-	if haveDownloader {
+	} else if haveDownloader {
 		// increment number of clients and return
 		cachedDownloader.mu.Lock()
 		cachedDownloader.clients++
@@ -132,10 +131,20 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		return cachedDownloader, nil
 	}
 
-	host, haveHost := c.hdb.Host(contract.HostPublicKey)
+	// Attempt to acquire contract
+	contract, haveContract := c.contracts.Acquire(id)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
-	} else if height > contract.EndHeight() {
+	}
+	// return contract early if function returns error
+	defer func() {
+		if err != nil {
+			c.contracts.Return(contract)
+		}
+	}()
+
+	host, haveHost := c.hdb.Host(contract.HostPublicKey)
+	if height > contract.EndHeight() {
 		return nil, errors.New("contract has already ended")
 	} else if !haveHost {
 		return nil, errors.New("no record of that host")

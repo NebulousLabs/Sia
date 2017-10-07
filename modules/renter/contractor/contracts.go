@@ -78,7 +78,7 @@ func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, er
 // contracts.
 func (c *Contractor) contractEndHeight() types.BlockHeight {
 	var endHeight types.BlockHeight
-	for _, contract := range c.contracts {
+	for _, contract := range c.contracts.ViewAll() {
 		endHeight = contract.EndHeight()
 		break
 	}
@@ -115,86 +115,70 @@ func (c *Contractor) managedMarkContractsUtility() {
 	// Set the minimum acceptable score to a factor of the lowest score.
 	minScore := lowestScore.Div(scoreLeeway)
 
-	// Pull together the set of contracts.
-	c.mu.RLock()
-	contracts := make([]modules.RenterContract, 0, len(c.contracts))
-	for _, contract := range c.contracts {
-		contracts = append(contracts, contract)
+	// Update utility fields for each contract.
+	for _, id := range c.contracts.IDs() {
+		func() {
+			contract, ok := c.contracts.Acquire(id)
+			if !ok {
+				return
+			}
+			defer c.contracts.Return(contract)
+
+			// Start the contract in good standing.
+			contract.GoodForUpload = true
+			contract.GoodForRenew = true
+
+			host, exists := c.hdb.Host(contract.HostPublicKey)
+			// Contract has no utility if the host is not in the database.
+			if !exists {
+				contract.GoodForUpload = false
+				contract.GoodForRenew = false
+				return
+			}
+			// Contract has no utility if the score is poor.
+			if c.hdb.ScoreBreakdown(host).Score.Cmp(minScore) < 0 {
+				contract.GoodForUpload = false
+				contract.GoodForRenew = false
+				return
+			}
+			// Contract has no utility if the host is offline.
+			if isOffline(host) {
+				contract.GoodForUpload = false
+				contract.GoodForRenew = false
+				return
+			}
+			// Contract has no utility if renew has already completed. (grab some
+			// extra values while we have the mutex)
+			c.mu.RLock()
+			blockHeight := c.blockHeight
+			renewWindow := c.allowance.RenewWindow
+			_, renewedPreviously := c.renewedIDs[contract.ID]
+			c.mu.RUnlock()
+			if renewedPreviously {
+				contract.GoodForUpload = false
+				contract.GoodForRenew = false
+				return
+			}
+
+			// Contract should not be used for upload if the number of Merkle roots
+			// exceeds 25e3 - this is in place because the current hosts do not
+			// really perform well beyond this number of sectors in a single
+			// contract. Future updates will fix this, at which point this limit
+			// will change and also have to switch based on host version.
+			if len(contract.MerkleRoots) > 25e3 {
+				// Contract is still fine to be renewed, we just shouldn't keep
+				// adding data to this contract.
+				contract.GoodForUpload = false
+				return
+			}
+			// Contract should not be used for uploading if the time has come to
+			// renew the contract.
+			if blockHeight+renewWindow >= contract.EndHeight() {
+				contract.GoodForUpload = false
+				return
+			}
+		}()
 	}
-	c.mu.RUnlock()
-
-	// Go through and figure out if the utility fields need to be changed.
-	for i := 0; i < len(contracts); i++ {
-		// Start the contract in good standing.
-		contracts[i].GoodForUpload = true
-		contracts[i].GoodForRenew = true
-
-		host, exists := c.hdb.Host(contracts[i].HostPublicKey)
-		// Contract has no utility if the host is not in the database.
-		if !exists {
-			contracts[i].GoodForUpload = false
-			contracts[i].GoodForRenew = false
-			continue
-		}
-		// Contract has no utility if the score is poor.
-		if c.hdb.ScoreBreakdown(host).Score.Cmp(minScore) < 0 {
-			contracts[i].GoodForUpload = false
-			contracts[i].GoodForRenew = false
-			continue
-		}
-		// Contract has no utility if the host is offline.
-		c.mu.Lock()
-		offline := c.isOffline(contracts[i].ID)
-		c.mu.Unlock()
-		if offline {
-			contracts[i].GoodForUpload = false
-			contracts[i].GoodForRenew = false
-			continue
-		}
-		// Contract has no utility if renew has already completed. (grab some
-		// extra values while we have the mutex)
-		c.mu.RLock()
-		blockHeight := c.blockHeight
-		renewWindow := c.allowance.RenewWindow
-		_, renewedPreviously := c.renewedIDs[contracts[i].ID]
-		c.mu.RUnlock()
-		if renewedPreviously {
-			contracts[i].GoodForUpload = false
-			contracts[i].GoodForRenew = false
-			continue
-		}
-
-		// Contract should not be used for upload if the number of Merkle roots
-		// exceeds 25e3 - this is in place because the current hosts do not
-		// really perform well beyond this number of sectors in a single
-		// contract. Future updates will fix this, at which point this limit
-		// will change and also have to switch based on host version.
-		if len(contracts[i].MerkleRoots) > 25e3 {
-			// Contract is still fine to be renewed, we just shouldn't keep
-			// adding data to this contract.
-			contracts[i].GoodForUpload = false
-			continue
-		}
-		// Contract should not be used for uploading if the time has come to
-		// renew the contract.
-		if blockHeight+renewWindow >= contracts[i].EndHeight() {
-			contracts[i].GoodForUpload = false
-			continue
-		}
-	}
-
-	// Update the contractor to reflect the new state for each of the contracts.
-	c.mu.Lock()
-	for i := 0; i < len(contracts); i++ {
-		contract, exists := c.contracts[contracts[i].ID]
-		if !exists {
-			continue
-		}
-		contract.GoodForUpload = contracts[i].GoodForUpload
-		contract.GoodForRenew = contracts[i].GoodForRenew
-		c.contracts[contracts[i].ID] = contract
-	}
-	c.mu.Unlock()
 }
 
 // managedNewContract negotiates an initial file contract with the specified
@@ -380,7 +364,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		// numbers separately to avoid underflow, and then re-join them later to
 		// get the full picture for how many funds are available.
 		var fundsUsed types.Currency
-		for _, contract := range c.contracts {
+		for _, contract := range c.contracts.ViewAll() {
 			// Calculate the cost of the contract line.
 			contractLineCost := contract.TotalCost
 			for _, pre := range contract.PreviousContracts {
@@ -423,7 +407,7 @@ func (c *Contractor) threadedContractMaintenance() {
 
 		// Iterate through the contracts again, figuring out which contracts to
 		// renew and how much extra funds to renew them with.
-		for _, contract := range c.contracts {
+		for _, contract := range c.contracts.ViewAll() {
 			if !contract.GoodForRenew {
 				continue
 			}
@@ -540,11 +524,13 @@ func (c *Contractor) threadedContractMaintenance() {
 				d.invalidate()
 			}
 
-			c.mu.RLock()
-			oldContract, exists := c.contracts[id]
-			c.mu.RUnlock()
-			if !exists || !oldContract.GoodForRenew {
-				c.log.Println("Contract slated for renew has to be skipped:", exists, oldContract.GoodForRenew)
+			oldContract, exists := c.contracts.Acquire(id)
+			if !exists {
+				return
+			}
+			if !oldContract.GoodForRenew {
+				c.log.Printf("Contract %v with %v slated for renew is marked not good for renew", oldContract.ID, oldContract.NetAddress)
+				c.contracts.Return(oldContract) // TODO: delete instead?
 				return
 			}
 
@@ -577,15 +563,12 @@ func (c *Contractor) threadedContractMaintenance() {
 			defer c.mu.Unlock()
 
 			// Store the contract in the record of historic contracts.
-			_, exists = c.contracts[oldContract.ID]
-			if exists {
-				c.oldContracts[oldContract.ID] = oldContract
-				delete(c.contracts, oldContract.ID)
-			}
+			c.oldContracts[oldContract.ID] = oldContract
+			c.contracts.Delete(oldContract)
 
 			// Add the new contract, including a mapping from the old
 			// contract to the new contract.
-			c.contracts[newContract.ID] = newContract
+			c.contracts.Insert(newContract)
 			c.renewedIDs[oldContract.ID] = newContract.ID
 			c.cachedRevisions[newContract.ID] = c.cachedRevisions[oldContract.ID]
 			delete(c.cachedRevisions, oldContract.ID)
@@ -618,7 +601,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	// Renew any contracts that need to be renewed.
 	c.mu.RLock()
 	uploadContracts := 0
-	for _, contract := range c.contracts {
+	for _, contract := range c.contracts.ViewAll() {
 		if contract.GoodForUpload || (contract.GoodForRenew && c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight()) {
 			uploadContracts++
 		}
@@ -634,7 +617,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	// formation with.
 	c.mu.RLock()
 	var exclude []types.SiaPublicKey
-	for _, contract := range c.contracts {
+	for _, contract := range c.contracts.ViewAll() {
 		exclude = append(exclude, contract.HostPublicKey)
 	}
 	initialContractFunds := c.allowance.Funds.Div64(c.allowance.Hosts).Div64(3)
@@ -661,7 +644,7 @@ func (c *Contractor) threadedContractMaintenance() {
 
 		// Add this contract to the contractor and save.
 		c.mu.Lock()
-		c.contracts[newContract.ID] = newContract
+		c.contracts.Insert(newContract)
 		err = c.saveSync()
 		c.mu.Unlock()
 		if err != nil {

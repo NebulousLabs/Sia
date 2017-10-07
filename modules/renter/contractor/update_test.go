@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
@@ -23,11 +24,9 @@ func TestProcessConsensusUpdate(t *testing.T) {
 	rc.LastRevision.NewWindowStart = 20
 	rc.FileContract.ValidProofOutputs = []types.SiacoinOutput{{}}
 	c := &Contractor{
-		cs:  stub,
-		hdb: stub,
-		contracts: map[types.FileContractID]modules.RenterContract{
-			rc.ID: rc,
-		},
+		cs:           stub,
+		hdb:          stub,
+		contracts:    proto.NewContractSet([]modules.RenterContract{rc}),
 		oldContracts: make(map[types.FileContractID]modules.RenterContract),
 		persist:      new(memPersist),
 		log:          persist.NewLogger(ioutil.Discard),
@@ -41,14 +40,14 @@ func TestProcessConsensusUpdate(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		c.ProcessConsensusChange(cc)
 	}
-	if len(c.contracts) != 1 {
-		t.Error("expected 1 contract, got", len(c.contracts))
+	if c.contracts.Len() != 1 {
+		t.Error("expected 1 contract, got", c.contracts.Len())
 	}
 
 	// process one more block; contract should be removed
 	c.ProcessConsensusChange(cc)
-	if len(c.contracts) != 0 {
-		t.Error("expected 0 contracts, got", len(c.contracts))
+	if c.contracts.Len() != 0 {
+		t.Error("expected 0 contracts, got", c.contracts.Len())
 	}
 }
 

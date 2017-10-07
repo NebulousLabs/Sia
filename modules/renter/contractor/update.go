@@ -21,21 +21,20 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 
 	// archive expired contracts
-	var expired []types.FileContractID
-	for id, contract := range c.contracts {
+	for _, contract := range c.contracts.ViewAll() {
 		if c.blockHeight > contract.EndHeight() {
-			// No need to wait for extra confirmations - any processes which
-			// depend on this contract should have taken care of any issues
-			// already.
-			expired = append(expired, id)
-			// move to oldContracts
+			id := contract.ID
+			// Move the contract to oldContracts. No need to wait for extra
+			// confirmations - any processes which depend on this contract
+			// should have taken care of any issues already.
 			c.oldContracts[id] = contract
+			// TODO: this pattern may be tricky. We are potentially acquiring
+			// multiple contracts while holding the contractor lock.
+			if contract, ok := c.contracts.Acquire(id); ok {
+				c.contracts.Delete(contract)
+			}
+			c.log.Println("INFO: archived expired contract", id)
 		}
-	}
-	// delete expired contracts (can't delete while iterating)
-	for _, id := range expired {
-		delete(c.contracts, id)
-		c.log.Println("INFO: archived expired contract", id)
 	}
 
 	// If we have entered the next period, update currentPeriod
