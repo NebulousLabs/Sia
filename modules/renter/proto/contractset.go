@@ -81,16 +81,6 @@ func (cs *ContractSet) Acquire(id types.FileContractID) (modules.RenterContract,
 	return sc.RenterContract, ok
 }
 
-// MustAcquire is a convenience function for acquiring contracts that are
-// known to be in the set. It panics otherwise.
-func (cs *ContractSet) MustAcquire(id types.FileContractID) modules.RenterContract {
-	c, ok := cs.Acquire(id)
-	if !ok {
-		panic("no contract with that id")
-	}
-	return c
-}
-
 // Return returns a locked contract to the set and unlocks it. The contract
 // must have been previously acquired by Acquire. If the contract is not
 // present in the set, Return panics.
