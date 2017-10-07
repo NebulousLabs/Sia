@@ -115,7 +115,6 @@ func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
 		return crypto.Hash{}, err
 	}
 	he.contractor.mu.Lock()
-	he.contractor.contracts[contract.ID] = contract
 	he.contractor.persist.update(updateUploadRevision{
 		NewRevisionTxn:     contract.LastRevisionTxn,
 		NewSectorRoot:      sectorRoot,
@@ -123,6 +122,10 @@ func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
 		NewUploadSpending:  contract.UploadSpending,
 		NewStorageSpending: contract.StorageSpending,
 	})
+	// TODO: not sure how this should work. We probably want a way to update
+	// the contract without returning it.
+	he.contractor.contracts.Return(contract)
+	he.contractor.contracts.Acquire(contract.ID)
 	he.contractor.mu.Unlock()
 	he.contract = contract
 
@@ -142,7 +145,10 @@ func (he *hostEditor) Delete(root crypto.Hash) (err error) {
 	}
 
 	he.contractor.mu.Lock()
-	he.contractor.contracts[contract.ID] = contract
+	// TODO: not sure how this should work. We probably want a way to update
+	// the contract without returning it.
+	he.contractor.contracts.Return(contract)
+	he.contractor.contracts.Acquire(contract.ID)
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
 	he.contract = contract
@@ -162,7 +168,10 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 		return err
 	}
 	he.contractor.mu.Lock()
-	he.contractor.contracts[contract.ID] = contract
+	// TODO: not sure how this should work. We probably want a way to update
+	// the contract without returning it.
+	he.contractor.contracts.Return(contract)
+	he.contractor.contracts.Acquire(contract.ID)
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
 	he.contract = contract
@@ -177,15 +186,12 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	c.mu.RLock()
 	cachedEditor, haveEditor := c.editors[id]
 	height := c.blockHeight
-	contract, haveContract := c.contracts[id]
 	renewing := c.renewing[id]
 	c.mu.RUnlock()
 
 	if renewing {
 		return nil, errors.New("currently renewing that contract")
-	}
-
-	if haveEditor {
+	} else if haveEditor {
 		// increment number of clients and return
 		cachedEditor.mu.Lock()
 		cachedEditor.clients++
@@ -193,10 +199,20 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		return cachedEditor, nil
 	}
 
-	host, haveHost := c.hdb.Host(contract.HostPublicKey)
+	// Attempt to acquire contract
+	contract, haveContract := c.contracts.Acquire(id)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
-	} else if height > contract.EndHeight() {
+	}
+	// return contract early if function returns error
+	defer func() {
+		if err != nil {
+			c.contracts.Return(contract)
+		}
+	}()
+
+	host, haveHost := c.hdb.Host(contract.HostPublicKey)
+	if height > contract.EndHeight() {
 		return nil, errors.New("contract has already ended")
 	} else if !haveHost {
 		return nil, errors.New("no record of that host")

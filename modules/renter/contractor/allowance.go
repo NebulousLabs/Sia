@@ -5,7 +5,6 @@ import (
 	"reflect"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -95,10 +94,9 @@ func (c *Contractor) managedCancelAllowance(a modules.Allowance) error {
 	c.log.Println("INFO: canceling allowance")
 	// first need to invalidate any active editors/downloaders
 	// NOTE: this code is the same as in managedRenewContracts
-	var ids []types.FileContractID
 	c.mu.Lock()
-	for id := range c.contracts {
-		ids = append(ids, id)
+	ids := c.contracts.IDs()
+	for _, id := range ids {
 		// we aren't renewing, but we don't want new editors or downloaders to
 		// be created
 		c.renewing[id] = true
@@ -125,13 +123,23 @@ func (c *Contractor) managedCancelAllowance(a modules.Allowance) error {
 	}
 
 	// reset currentPeriod and archive all contracts
+	//
+	// TODO: this logic could be tricky. We're locking all the contracts while
+	// holding the contractor lock. Might cause deadlock if we aren't careful.
+	// Ideally we'd acquire the locks outside the contractor lock, but that
+	// means we need some way to prevent any new contracts from being formed
+	// in the interim.
 	c.mu.Lock()
 	c.allowance = a
 	c.currentPeriod = 0
-	for id, contract := range c.contracts {
+	for _, id := range c.contracts.IDs() {
+		contract, ok := c.contracts.Acquire(id)
+		if !ok {
+			continue
+		}
 		c.oldContracts[id] = contract
+		c.contracts.Delete(contract)
 	}
-	c.contracts = make(map[types.FileContractID]modules.RenterContract)
 	err := c.saveSync()
 	c.mu.Unlock()
 	return err

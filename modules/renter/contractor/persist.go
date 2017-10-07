@@ -35,7 +35,7 @@ func (c *Contractor) persistData() contractorPersist {
 	for _, rev := range c.cachedRevisions {
 		data.CachedRevisions[rev.Revision.ParentID.String()] = rev
 	}
-	for _, contract := range c.contracts {
+	for _, contract := range c.contracts.ViewAll() {
 		data.Contracts[contract.ID.String()] = contract
 	}
 	for _, contract := range c.oldContracts {
@@ -102,7 +102,7 @@ func (c *Contractor) load() error {
 			contract.TotalCost = contract.FileContract.ValidProofOutputs[0].Value.
 				Add(contract.TxnFee).Add(contract.SiafundFee).Add(contract.ContractFee)
 		}
-		c.contracts[contract.ID] = contract
+		c.contracts.Insert(contract)
 	}
 
 	c.lastChange = data.LastChange
