@@ -36,7 +36,7 @@ for os in darwin linux windows; do
 		if [ "$os" == "windows" ]; then
 			bin=${pkg}.exe
 		fi
-		GOOS=${os} go build -ldflags="-s -w" -o $folder/$bin ./$pkg
+		GOOS=${os} go build -tags 'netgo' -ldflags="-s -w" -o $folder/$bin ./$pkg
 		openssl dgst -sha256 -sign $keyfile -out $folder/${bin}.sig $folder/$bin
 		# verify signature
 		if [[ -n $pubkeyfile ]]; then
