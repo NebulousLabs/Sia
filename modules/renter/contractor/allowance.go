@@ -41,7 +41,7 @@ var (
 // This means the contractor may spend more than allowance.Funds.
 func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	if reflect.DeepEqual(a, modules.Allowance{}) {
-		return c.managedCancelAllowance(a)
+		return c.managedCancelAllowance()
 	}
 
 	// sanity checks
@@ -71,13 +71,16 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		c.log.Println("Unable to save contractor after setting allowance:", err)
 	}
 
-	// Initiate maintenance on the contracts, and then return.
+	// Initiate maintenance on the contracts, and then return. Interrupting the
+	// current contract maintenance will give us the maintenance lock, we need
+	// to unlock when we are done.
+	c.managedInterruptContractMaintenance()
 	go c.threadedContractMaintenance()
 	return nil
 }
 
 // managedCancelAllowance handles the special case where the allowance is empty.
-func (c *Contractor) managedCancelAllowance(a modules.Allowance) error {
+func (c *Contractor) managedCancelAllowance() error {
 	c.log.Println("INFO: canceling allowance")
 	// first need to invalidate any active editors/downloaders
 	// NOTE: this code is the same as in managedRenewContracts
@@ -109,25 +112,19 @@ func (c *Contractor) managedCancelAllowance(a modules.Allowance) error {
 		}
 	}
 
-	// reset currentPeriod and archive all contracts
-	//
-	// TODO: this logic could be tricky. We're locking all the contracts while
-	// holding the contractor lock. Might cause deadlock if we aren't careful.
-	// Ideally we'd acquire the locks outside the contractor lock, but that
-	// means we need some way to prevent any new contracts from being formed
-	// in the interim.
+	// Clear out the allowance and save.
 	c.mu.Lock()
-	c.allowance = a
+	c.allowance = modules.Allowance{}
 	c.currentPeriod = 0
-	for _, id := range c.contracts.IDs() {
-		contract, ok := c.contracts.Acquire(id)
-		if !ok {
-			continue
-		}
-		c.oldContracts[id] = contract
-		c.contracts.Delete(contract)
-	}
-	err := c.saveSync()
 	c.mu.Unlock()
-	return err
+	err := c.saveSync()
+	if err != nil {
+		return err
+	}
+
+	// Issue an interrupt to any in-progress contract maintenance thread. The
+	// interrupt will give us the maintenance lock, need to release it once the
+	// contracts have all been deleted.
+	c.managedInterruptContractMaintenance()
+	return nil
 }
