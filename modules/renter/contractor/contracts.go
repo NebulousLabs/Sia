@@ -306,10 +306,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		defer c.mu.RUnlock()
 
 		// Grab the end height that should be used for the contracts.
-		//
-		// TODO: End height should be calculated using the billing cycle, and
-		// not by just adding the period to the current height.
-		endHeight = c.blockHeight + c.allowance.Period
+		endHeight = c.currentPeriod + c.allowance.Period
 
 		// Determine how many funds have been used already in this billing
 		// cycle, and how many funds are remaining. We have to calculate these
