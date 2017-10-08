@@ -69,7 +69,7 @@ func TestSaveLoad(t *testing.T) {
 	_, ok1 := c.contracts.View(types.FileContractID{1})
 	_, ok2 := c.contracts.View(types.FileContractID{2})
 	if !ok0 || !ok1 || !ok2 {
-		t.Fatal("contracts were not restored properly:", c.contracts)
+		t.Fatal("contracts were not restored properly:", c.contracts.Len())
 	}
 	_, ok0 = c.renewedIDs[types.FileContractID{0}]
 	_, ok1 = c.renewedIDs[types.FileContractID{1}]
@@ -112,7 +112,7 @@ func TestSaveLoad(t *testing.T) {
 	_, ok1 = c.contracts.View(types.FileContractID{1})
 	_, ok2 = c.contracts.View(types.FileContractID{2})
 	if !ok0 || !ok1 || !ok2 {
-		t.Fatal("contracts were not restored properly:", c.contracts)
+		t.Fatal("contracts were not restored properly:", c.contracts.Len())
 	}
 	_, ok0 = c.renewedIDs[types.FileContractID{0}]
 	_, ok1 = c.renewedIDs[types.FileContractID{1}]
@@ -221,7 +221,7 @@ func TestPubKeyScanner(t *testing.T) {
 		id := types.FileContractID{byte(i)}
 		contract, ok := c.contracts.View(id)
 		if !ok {
-			t.Fatal("contracts were not restored properly:", c.contracts)
+			t.Fatal("contracts were not restored properly:", c.contracts.Len())
 		}
 		// check that pubkey was filled in
 		if !bytes.Equal(contract.HostPublicKey.Key, pk.Key) {
