@@ -33,8 +33,31 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 	for _, contract := range c.contracts.ViewAll() {
 		endHeight = contract.EndHeight()
 		break
+
+// managedInterruptContractMaintenance will issue an interrupt signal to any
+// running maintenance, stopping that maintenance. If there are multiple threads
+// running maintenance, they will all be stopped.
+func (c *Contractor) managedInterruptContractMaintenance() {
+	// Spin up a thread to grab the maintenance lock. Signal that the lock was
+	// acquired after the lock is acquired.
+	gotLock := make(chan struct{})
+	go func() {
+		c.maintenanceLock.Lock()
+		close(gotLock)
+		c.maintenanceLock.Unlock()
+	}()
+
+	// There may be multiple threads contending for the maintenance lock. Issue
+	// interrupts repeatedly until we get a signal that the maintenance lock has
+	// been acquired.
+	for {
+		select {
+		case <-gotLock:
+			return
+		case c.interruptMaintenance <- struct{}{}:
+			continue
+		}
 	}
-	return endHeight
 }
 
 // managedMarkContractsUtility checks every active contract in the contractor and
@@ -250,6 +273,10 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, contractFundi
 // has against the allownace, renewing any contracts that need to be renewed,
 // dropping contracts which are no longer worthwhile, and adding contracts if
 // there are not enough.
+//
+// Between each network call, the thread checks whether a maintenance iterrupt
+// signal is being sent. If so, maintannce returns, yielding to whatever thread
+// issued the interrupt.
 func (c *Contractor) threadedContractMaintenance() {
 	// Threading protection.
 	err := c.tg.Add()
@@ -257,7 +284,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		return
 	}
 	defer c.tg.Done()
-	// Nohting to do if there are no hosts.
+	// Nothing to do if there are no hosts.
 	c.mu.RLock()
 	wantedHosts := c.allowance.Hosts
 	c.mu.RUnlock()
@@ -271,10 +298,8 @@ func (c *Contractor) threadedContractMaintenance() {
 	// to run.
 	if build.Release == "testing" {
 		c.maintenanceLock.Lock()
-	} else {
-		if !c.maintenanceLock.TryLock() {
-			return
-		}
+	} else if !c.maintenanceLock.TryLock() {
+		return
 	}
 	defer c.maintenanceLock.Unlock()
 
@@ -401,7 +426,8 @@ func (c *Contractor) threadedContractMaintenance() {
 					amount: renewAmount,
 				})
 			} else {
-				// check if the contract has exhausted its funding and requires premature renewal.
+				// Check if the contract has exhausted its funding and requires
+				// premature renewal.
 				c.mu.RUnlock()
 				host, _ := c.hdb.Host(contract.HostPublicKey)
 				c.mu.RLock()
@@ -478,7 +504,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 			if !oldContract.GoodForRenew {
 				c.log.Printf("Contract %v with %v slated for renew is marked not good for renew", oldContract.ID, oldContract.NetAddress)
-				c.contracts.Return(oldContract) // TODO: delete instead?
+				c.contracts.Return(oldContract)
 				return
 			}
 
@@ -533,6 +559,8 @@ func (c *Contractor) threadedContractMaintenance() {
 		select {
 		case <-c.tg.StopChan():
 			return
+		case <-c.interruptMaintenance:
+			return
 		case <-time.After(contractFormationInterval):
 		}
 	}
@@ -540,6 +568,8 @@ func (c *Contractor) threadedContractMaintenance() {
 	// Quit in the event of shutdown.
 	select {
 	case <-c.tg.StopChan():
+		return
+	case <-c.interruptMaintenance:
 		return
 	default:
 	}
@@ -608,6 +638,8 @@ func (c *Contractor) threadedContractMaintenance() {
 		// Soft sleep before making the next contract.
 		select {
 		case <-c.tg.StopChan():
+			return
+		case <-c.interruptMaintenance:
 			return
 		case <-time.After(contractFormationInterval):
 		}

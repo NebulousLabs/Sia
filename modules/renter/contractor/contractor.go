@@ -55,6 +55,7 @@ type Contractor struct {
 	wallet  wallet
 
 	// Only one thread should be performing contract maintenance at a time.
+	interruptMaintenance chan struct{}
 	maintenanceLock siasync.TryMutex
 
 	allowance     modules.Allowance
@@ -230,6 +231,8 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		persist: p,
 		tpool:   tp,
 		wallet:  w,
+
+		interruptMaintenance: make(chan struct{}),
 
 		cachedRevisions: make(map[types.FileContractID]cachedRevision),
 		contracts:       proto.NewContractSet(nil),
