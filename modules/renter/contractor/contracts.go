@@ -6,7 +6,6 @@ package contractor
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -22,53 +21,6 @@ var (
 	ErrInsufficientAllowance = errors.New("allowance is not large enough to cover fees of contract creation")
 	errTooExpensive          = errors.New("host price was too high")
 )
-
-// maxSectors is the estimated maximum number of sectors that the allowance
-// can support.
-func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, error) {
-	if a.Hosts <= 0 || a.Period <= 0 {
-		return 0, errors.New("invalid allowance")
-	}
-
-	// Sample at least 10 hosts.
-	nRandomHosts := int(a.Hosts)
-	if nRandomHosts < minHostsForEstimations {
-		nRandomHosts = minHostsForEstimations
-	}
-	hosts := hdb.RandomHosts(nRandomHosts, nil)
-	if len(hosts) < int(a.Hosts) {
-		return 0, fmt.Errorf("not enough hosts in hostdb for sector calculation, got %v but needed %v", len(hosts), int(a.Hosts))
-	}
-
-	// Calculate cost of creating contracts with each host, and the cost of
-	// storing sectors on each host.
-	var sectorSum types.Currency
-	var contractCostSum types.Currency
-	for _, h := range hosts {
-		sectorSum = sectorSum.Add(h.StoragePrice)
-		contractCostSum = contractCostSum.Add(h.ContractPrice)
-	}
-	averageSectorPrice := sectorSum.Div64(uint64(len(hosts)))
-	averageContractPrice := contractCostSum.Div64(uint64(len(hosts)))
-	costPerSector := averageSectorPrice.Mul64(a.Hosts).Mul64(modules.SectorSize).Mul64(uint64(a.Period))
-	costForContracts := averageContractPrice.Mul64(a.Hosts)
-
-	// Subtract fees for creating the file contracts from the allowance.
-	_, feeEstimation := tp.FeeEstimation()
-	costForTxnFees := types.NewCurrency64(estimatedFileContractTransactionSize).Mul(feeEstimation).Mul64(a.Hosts)
-	// Check for potential divide by zero
-	if a.Funds.Cmp(costForTxnFees.Add(costForContracts)) <= 0 {
-		return 0, ErrInsufficientAllowance
-	}
-	sectorFunds := a.Funds.Sub(costForTxnFees).Sub(costForContracts)
-
-	// Divide total funds by cost per sector.
-	numSectors, err := sectorFunds.Div(costPerSector).Uint64()
-	if err != nil {
-		return 0, errors.New("error when totaling number of sectors that can be bought with an allowance: " + err.Error())
-	}
-	return numSectors, nil
-}
 
 // contractEndHeight returns the height at which the Contractor's contracts
 // end. If there are no contracts, it returns zero.
@@ -336,8 +288,8 @@ func (c *Contractor) threadedContractMaintenance() {
 	//
 	// refreshSet is used to mark contracts that need to be refreshed because
 	// they have run out of money. The refreshSet indicates how much currency
-	// was used in the previous contract which got exhausted, so that we know to
-	// put more money towards the refreshed contract.
+	// was used previously in the contract line, and is used to figure out how
+	// much additional money to add in the refreshed contract.
 	//
 	// The actions inside this RLock are complex enough to merit wrapping them
 	// in a function where we can defer the unlock.

@@ -57,19 +57,6 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return errAllowanceNotSynced
 	}
 
-	// calculate the maximum sectors this allowance can store
-	max, err := maxSectors(a, c.hdb, c.tpool)
-	if err != nil {
-		return err
-	}
-	// Only allocate half as many sectors as the max. This leaves some leeway
-	// for replacing contracts, transaction fees, etc.
-	numSectors := max / 2
-	// check that this is sufficient to store at least one sector
-	if numSectors == 0 {
-		return ErrInsufficientAllowance
-	}
-
 	c.log.Println("INFO: setting allowance to", a)
 	c.mu.Lock()
 	// set the current period to the blockheight if the existing allowance is
@@ -78,7 +65,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		c.currentPeriod = c.blockHeight
 	}
 	c.allowance = a
-	err = c.saveSync()
+	err := c.saveSync()
 	c.mu.Unlock()
 	if err != nil {
 		c.log.Println("Unable to save contractor after setting allowance:", err)
