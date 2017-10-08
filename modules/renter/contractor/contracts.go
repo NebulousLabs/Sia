@@ -492,23 +492,29 @@ func (c *Contractor) threadedContractMaintenance() {
 				d.invalidate()
 			}
 
+			// Fetch the contract that we are renewing.
 			oldContract, exists := c.contracts.Acquire(id)
 			if !exists {
 				return
 			}
+			// Return the contract if it's not useful for renewing.
 			if !oldContract.GoodForRenew {
 				c.log.Printf("Contract %v with %v slated for renew is marked not good for renew", oldContract.ID, oldContract.NetAddress)
 				c.contracts.Return(oldContract)
 				return
 			}
-
-			// Create the new contract.
+			// Perform the actual renew. If the renew fails, return the
+			// contract.
 			newContract, err := c.managedRenew(oldContract, amount, endHeight)
 			if err != nil {
 				c.log.Printf("WARN: failed to renew contract %v with %v: %v\n", id, oldContract.NetAddress, err)
+				c.contracts.Return(oldContract)
 				return
 			}
+			// Renew successful, defer deleting the contract.
+			defer c.contracts.Delete(oldContract)
 			c.log.Printf("Renewed contract %v with %v\n", id, oldContract.NetAddress)
+
 			// Update the utility values for the new contract, and for the old
 			// contract.
 			newContract.GoodForUpload = true
@@ -529,18 +535,14 @@ func (c *Contractor) threadedContractMaintenance() {
 			// instead of the old contract.
 			c.mu.Lock()
 			defer c.mu.Unlock()
-
 			// Store the contract in the record of historic contracts.
 			c.oldContracts[oldContract.ID] = oldContract
-			c.contracts.Delete(oldContract)
-
 			// Add the new contract, including a mapping from the old
 			// contract to the new contract.
 			c.contracts.Insert(newContract)
 			c.renewedIDs[oldContract.ID] = newContract.ID
 			c.cachedRevisions[newContract.ID] = c.cachedRevisions[oldContract.ID]
 			delete(c.cachedRevisions, oldContract.ID)
-
 			// Save the contractor.
 			err = c.saveSync()
 			if err != nil {
