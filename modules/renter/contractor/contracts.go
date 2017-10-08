@@ -379,10 +379,8 @@ func (c *Contractor) threadedContractMaintenance() {
 
 				// Get an estimate for how much the fees will cost.
 				//
-				// TODO: A better estimate would come from looking at the host
-				// and hostdb, and calculating the actual cost of renewing with
-				// the host. The current method doesn't even take into account
-				// potential discounts from not renewing as much money.
+				// TODO: Look up this host in the hostdb to figure out what the
+				// actual fees will be.
 				estimatedFees := contract.ContractFee.Add(contract.TxnFee).Add(contract.SiafundFee)
 				renewAmount = renewAmount.Add(estimatedFees)
 
@@ -408,8 +406,9 @@ func (c *Contractor) threadedContractMaintenance() {
 				host, _ := c.hdb.Host(contract.HostPublicKey)
 				c.mu.RLock()
 
-				// skip this host if its prices are too high. managedMarkContractsUtility
-				// should make this redundant, but this is here for extra safety.
+				// Skip this host if its prices are too high.
+				// managedMarkContractsUtility should make this redundant, but
+				// this is here for extra safety.
 				if host.StoragePrice.Cmp(maxStoragePrice) > 0 || host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
 					continue
 				}
