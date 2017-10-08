@@ -24,15 +24,9 @@ var (
 
 // contractEndHeight returns the height at which the Contractor's contracts
 // end. If there are no contracts, it returns zero.
-//
-// TODO: The contract end height should be picked based on the current period
-// start plus the period duration, not based on the end heights of the existing
-// contracts.
 func (c *Contractor) contractEndHeight() types.BlockHeight {
-	var endHeight types.BlockHeight
-	for _, contract := range c.contracts.ViewAll() {
-		endHeight = contract.EndHeight()
-		break
+	return c.currentPeriod + c.allowance.Period
+}
 
 // managedInterruptContractMaintenance will issue an interrupt signal to any
 // running maintenance, stopping that maintenance. If there are multiple threads
