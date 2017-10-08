@@ -56,7 +56,7 @@ type Contractor struct {
 
 	// Only one thread should be performing contract maintenance at a time.
 	interruptMaintenance chan struct{}
-	maintenanceLock siasync.TryMutex
+	maintenanceLock      siasync.TryMutex
 
 	allowance     modules.Allowance
 	blockHeight   types.BlockHeight
