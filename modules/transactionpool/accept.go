@@ -17,10 +17,10 @@ import (
 )
 
 var (
-	errObjectConflict      = errors.New("transaction set conflicts with an existing transaction set")
+	errEmptySet            = errors.New("transaction set is empty")
 	errFullTransactionPool = errors.New("transaction pool cannot accept more transactions")
 	errLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
-	errEmptySet            = errors.New("transaction set is empty")
+	errObjectConflict      = errors.New("transaction set conflicts with an existing transaction set")
 )
 
 // relatedObjectIDs determines all of the object ids related to a transaction.

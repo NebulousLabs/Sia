@@ -19,15 +19,19 @@ import (
 var (
 	// Flags.
 	addr              string // override default API address
-	initPassword      bool   // supply a custom password when creating a wallet
-	initForce         bool   // destroy and reencrypt the wallet on init if it already exists
 	hostVerbose       bool   // display additional host info
-	renterShowHistory bool   // Show download history in addition to download queue.
+	initForce         bool   // destroy and reencrypt the wallet on init if it already exists
+	initPassword      bool   // supply a custom password when creating a wallet
 	renterListVerbose bool   // Show additional info about uploaded files.
+	renterShowHistory bool   // Show download history in addition to download queue.
+)
 
+var (
 	// Globals.
 	rootCmd *cobra.Command // Root command cobra object, used by bash completion cmd.
+)
 
+var (
 	// User-supplied password, cached so that we don't need to prompt multiple
 	// times.
 	apiPassword string

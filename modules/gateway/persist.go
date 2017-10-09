@@ -9,11 +9,11 @@ import (
 )
 
 const (
-	// nodesFile is the name of the file that contains all seen nodes.
-	nodesFile = "nodes.json"
-
 	// logFile is the name of the log file.
 	logFile = modules.GatewayDir + ".log"
+
+	// nodesFile is the name of the file that contains all seen nodes.
+	nodesFile = "nodes.json"
 )
 
 // persistMetadata contains the header and version strings that identify the

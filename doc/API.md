@@ -1076,6 +1076,8 @@ locked or unlocked.
 
   "siafundbalance":      "1",    // siafunds, big int
   "siacoinclaimbalance": "9001", // hastings, big int
+
+  "dustthreshold": "1234", // hastings, big int
 }
 ```
 

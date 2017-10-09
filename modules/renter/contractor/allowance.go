@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"errors"
+	"reflect"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -9,9 +10,9 @@ import (
 
 var (
 	errAllowanceNoHosts    = errors.New("hosts must be non-zero")
-	errAllowanceZeroPeriod = errors.New("period must be non-zero")
-	errAllowanceWindowSize = errors.New("renew window must be less than period")
 	errAllowanceNotSynced  = errors.New("you must be synced to set an allowance")
+	errAllowanceWindowSize = errors.New("renew window must be less than period")
+	errAllowanceZeroPeriod = errors.New("period must be non-zero")
 
 	// ErrAllowanceZeroWindow is returned when the caller requests a
 	// zero-length renewal window. This will happen if the caller sets the
@@ -40,7 +41,7 @@ var (
 // NOTE: At this time, transaction fees are not counted towards the allowance.
 // This means the contractor may spend more than allowance.Funds.
 func (c *Contractor) SetAllowance(a modules.Allowance) error {
-	if a.Funds.IsZero() && a.Hosts == 0 && a.Period == 0 && a.RenewWindow == 0 {
+	if reflect.DeepEqual(a, modules.Allowance{}) {
 		return c.managedCancelAllowance(a)
 	}
 
@@ -72,6 +73,11 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 	c.log.Println("INFO: setting allowance to", a)
 	c.mu.Lock()
+	// set the current period to the blockheight if the existing allowance is
+	// empty
+	if reflect.DeepEqual(c.allowance, modules.Allowance{}) {
+		c.currentPeriod = c.blockHeight
+	}
 	c.allowance = a
 	err = c.saveSync()
 	c.mu.Unlock()

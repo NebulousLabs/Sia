@@ -27,9 +27,6 @@ type (
 )
 
 var (
-	// ZeroCurrency defines a currency of value zero.
-	ZeroCurrency = NewCurrency64(0)
-
 	// ErrNegativeCurrency is the error that is returned if performing an
 	// operation results in a negative currency.
 	ErrNegativeCurrency = errors.New("negative currency not allowed")
@@ -37,6 +34,9 @@ var (
 	// ErrUint64Overflow is the error that is returned if converting to a
 	// unit64 would cause an overflow.
 	ErrUint64Overflow = errors.New("cannot return the uint64 of this currency - result is an overflow")
+
+	// ZeroCurrency defines a currency of value zero.
+	ZeroCurrency = NewCurrency64(0)
 )
 
 // NewCurrency creates a Currency value from a big.Int. Undefined behavior

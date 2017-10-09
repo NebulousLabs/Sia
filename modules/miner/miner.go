@@ -15,6 +15,15 @@ import (
 )
 
 var (
+	// BlockMemory is the maximum number of blocks the miner will store
+	// Blocks take up to 2 megabytes of memory, which is why this number is
+	// limited.
+	BlockMemory = build.Select(build.Var{
+		Standard: 50,
+		Dev:      10,
+		Testing:  5,
+	}).(int)
+
 	errNilCS     = errors.New("miner cannot use a nil consensus set")
 	errNilTpool  = errors.New("miner cannot use a nil transaction pool")
 	errNilWallet = errors.New("miner cannot use a nil wallet")
@@ -28,15 +37,6 @@ var (
 		Standard: 10000,
 		Dev:      500,
 		Testing:  50,
-	}).(int)
-
-	// BlockMemory is the maximum number of blocks the miner will store
-	// Blocks take up to 2 megabytes of memory, which is why this number is
-	// limited.
-	BlockMemory = build.Select(build.Var{
-		Standard: 50,
-		Dev:      10,
-		Testing:  5,
 	}).(int)
 
 	// MaxSourceBlockAge is the maximum amount of time that is allowed to

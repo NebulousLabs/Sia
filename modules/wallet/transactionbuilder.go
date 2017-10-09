@@ -19,15 +19,15 @@ var (
 	// meaning that future calls to Sign will result in an invalid transaction.
 	errBuilderAlreadySigned = errors.New("sign has already been called on this transaction builder, multiple calls can cause issues")
 
-	// errSpendHeightTooHigh indicates an output's spend height is greater than
-	// the allowed height.
-	errSpendHeightTooHigh = errors.New("output spend height exceeds the allowed height")
+	// errDustOutput indicates an output is not spendable because it is dust.
+	errDustOutput = errors.New("output is too small")
 
 	// errOutputTimelock indicates an output's timelock is still active.
 	errOutputTimelock = errors.New("wallet consensus set height is lower than the output timelock")
 
-	// errDustOutput indicates an output is not spendable because it is dust.
-	errDustOutput = errors.New("output is too small")
+	// errSpendHeightTooHigh indicates an output's spend height is greater than
+	// the allowed height.
+	errSpendHeightTooHigh = errors.New("output spend height exceeds the allowed height")
 )
 
 // transactionBuilder allows transactions to be manually constructed, including
@@ -118,7 +118,7 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 // on the transaction builder.
 func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	// dustThreshold has to be obtained separate from the lock
-	dustThreshold := tb.wallet.managedDustThreshold()
+	dustThreshold := tb.wallet.DustThreshold()
 
 	tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock()
@@ -220,7 +220,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		parentTxn.SiacoinOutputs = append(parentTxn.SiacoinOutputs, refundOutput)
 	}
 
-	// Sign all of the inputs to the parent trancstion.
+	// Sign all of the inputs to the parent transaction.
 	for _, sci := range parentTxn.SiacoinInputs {
 		addSignatures(&parentTxn, types.FullCoveredFields, sci.UnlockConditions, crypto.Hash(sci.ParentID), tb.wallet.keys[sci.UnlockConditions.UnlockHash()])
 	}
@@ -352,7 +352,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 		parentTxn.SiafundOutputs = append(parentTxn.SiafundOutputs, refundOutput)
 	}
 
-	// Sign all of the inputs to the parent trancstion.
+	// Sign all of the inputs to the parent transaction.
 	for _, sfi := range parentTxn.SiafundInputs {
 		addSignatures(&parentTxn, types.FullCoveredFields, sfi.UnlockConditions, crypto.Hash(sfi.ParentID), tb.wallet.keys[sfi.UnlockConditions.UnlockHash()])
 	}

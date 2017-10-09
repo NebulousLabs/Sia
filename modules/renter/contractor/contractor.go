@@ -22,8 +22,8 @@ import (
 
 var (
 	errNilCS     = errors.New("cannot create contractor with nil consensus set")
-	errNilWallet = errors.New("cannot create contractor with nil wallet")
 	errNilTpool  = errors.New("cannot create contractor with nil transaction pool")
+	errNilWallet = errors.New("cannot create contractor with nil wallet")
 
 	// COMPATv1.0.4-lts
 	// metricsContractID identifies a special contract that contains aggregate
@@ -99,6 +99,30 @@ func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContra
 		}
 	}
 	return modules.RenterContract{}, false
+}
+
+// PeriodSpending returns the amount spent on contracts during the current
+// billing period.
+func (c *Contractor) PeriodSpending() modules.ContractorSpending {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	spending := modules.ContractorSpending{}
+	for _, contract := range c.contracts {
+		spending.ContractSpending = spending.ContractSpending.Add(contract.TotalCost)
+		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
+		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
+		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
+		for _, pre := range contract.PreviousContracts {
+			spending.ContractSpending = spending.ContractSpending.Add(pre.TotalCost)
+			spending.DownloadSpending = spending.DownloadSpending.Add(pre.DownloadSpending)
+			spending.UploadSpending = spending.UploadSpending.Add(pre.UploadSpending)
+			spending.StorageSpending = spending.StorageSpending.Add(pre.StorageSpending)
+		}
+	}
+	allSpending := spending.ContractSpending.Add(spending.DownloadSpending).Add(spending.UploadSpending).Add(spending.StorageSpending)
+	spending.Unspent = c.allowance.Funds.Sub(allSpending)
+	return spending
 }
 
 // ContractByID returns the contract with the id specified, if it exists.

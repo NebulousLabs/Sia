@@ -18,8 +18,8 @@ import (
 var (
 	errAlreadyUnlocked   = errors.New("wallet has already been unlocked")
 	errReencrypt         = errors.New("wallet is already encrypted, cannot encrypt again")
-	errUnencryptedWallet = errors.New("wallet has not been encrypted yet")
 	errScanInProgress    = errors.New("another wallet rescan is already underway")
+	errUnencryptedWallet = errors.New("wallet has not been encrypted yet")
 
 	// verificationPlaintext is the plaintext used to verify encryption keys.
 	// By storing the corresponding ciphertext for a given key, we can later

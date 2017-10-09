@@ -9,20 +9,26 @@ import (
 )
 
 const (
+	// TransactionSetSizeLimit defines the largest set of dependent unconfirmed
+	// transactions that will be accepted by the transaction pool.
+	TransactionSetSizeLimit = 250e3
+
 	// TransactionSizeLimit defines the size of the largest transaction that
 	// will be accepted by the transaction pool according to the IsStandard
 	// rules.
 	TransactionSizeLimit = 32e3
-
-	// TransactionSetSizeLimit defines the largest set of dependent unconfirmed
-	// transactions that will be accepted by the transaction pool.
-	TransactionSetSizeLimit = 250e3
 )
 
 var (
 	// ErrDuplicateTransactionSet is the error that gets returned if a
 	// duplicate transaction set is given to the transaction pool.
 	ErrDuplicateTransactionSet = errors.New("transaction set contains only duplicate transactions")
+
+	// ErrInvalidArbPrefix is the error that gets returned if a transaction is
+	// submitted to the transaction pool which contains a prefix that is not
+	// recognized. This helps prevent miners on old versions from mining
+	// potentially illegal transactions in the event of a soft-fork.
+	ErrInvalidArbPrefix = errors.New("transaction contains non-standard arbitrary data")
 
 	// ErrLargeTransaction is the error that gets returned if a transaction
 	// provided to the transaction pool is larger than what is allowed by the
@@ -33,12 +39,6 @@ var (
 	// set given to the transaction pool is larger than the limit placed by the
 	// IsStandard rules of the transaction pool.
 	ErrLargeTransactionSet = errors.New("transaction set is too large for this transaction pool")
-
-	// ErrInvalidArbPrefix is the error that gets returned if a transaction is
-	// submitted to the transaction pool which contains a prefix that is not
-	// recognized. This helps prevent miners on old versions from mining
-	// potentially illegal transactions in the event of a soft-fork.
-	ErrInvalidArbPrefix = errors.New("transaction contains non-standard arbitrary data")
 
 	// PrefixNonSia defines the prefix that should be appended to any
 	// transactions that use the arbitrary data for reasons outside of the

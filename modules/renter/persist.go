@@ -18,24 +18,24 @@ import (
 )
 
 const (
+	logFile         = modules.RenterDir + ".log"
 	PersistFilename = "renter.json"
 	ShareExtension  = ".sia"
-	logFile         = modules.RenterDir + ".log"
 )
 
 var (
-	ErrNoNicknames    = errors.New("at least one nickname must be supplied")
-	ErrNonShareSuffix = errors.New("suffix of file must be " + ShareExtension)
 	ErrBadFile        = errors.New("not a .sia file")
 	ErrIncompatible   = errors.New("file is not compatible with current version")
-
-	shareHeader  = [15]byte{'S', 'i', 'a', ' ', 'S', 'h', 'a', 'r', 'e', 'd', ' ', 'F', 'i', 'l', 'e'}
-	shareVersion = "0.4"
+	ErrNoNicknames    = errors.New("at least one nickname must be supplied")
+	ErrNonShareSuffix = errors.New("suffix of file must be " + ShareExtension)
 
 	saveMetadata = persist.Metadata{
 		Header:  "Renter Persistence",
 		Version: "0.4",
 	}
+
+	shareHeader  = [15]byte{'S', 'i', 'a', ' ', 'S', 'h', 'a', 'r', 'e', 'd', ' ', 'F', 'i', 'l', 'e'}
+	shareVersion = "0.4"
 )
 
 // MarshalSia implements the encoding.SiaMarshaller interface, writing the

@@ -89,10 +89,6 @@ var (
 	// inputs.
 	errInsaneStorageObligationRevisionData = errors.New("revision to storage obligation has insane data")
 
-	// errObligationUnlocked is returned when a storage obligation is being
-	// removed from lock, but is already unlocked.
-	errObligationUnlocked = errors.New("storage obligation is unlocked, and should not be getting unlocked")
-
 	// errNoBuffer is returned if there is an attempted storage obligation that
 	// needs to have the storage proof submitted in less than
 	// revisionSubmissionBuffer blocks.
@@ -101,6 +97,10 @@ var (
 	// errNoStorageObligation is returned if the requested storage obligation
 	// is not found in the database.
 	errNoStorageObligation = errors.New("storage obligation not found in database")
+
+	// errObligationUnlocked is returned when a storage obligation is being
+	// removed from lock, but is already unlocked.
+	errObligationUnlocked = errors.New("storage obligation is unlocked, and should not be getting unlocked")
 )
 
 type storageObligationStatus uint64

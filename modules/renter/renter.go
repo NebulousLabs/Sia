@@ -42,8 +42,8 @@ import (
 var (
 	errNilContractor = errors.New("cannot create renter with nil contractor")
 	errNilCS         = errors.New("cannot create renter with nil consensus set")
-	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
 	errNilHdb        = errors.New("cannot create renter with nil hostdb")
+	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
 )
 
 var (
@@ -119,6 +119,10 @@ type hostContractor interface {
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
 	CurrentPeriod() types.BlockHeight
+
+	// PeriodSpending returns the amount spent on contracts during the current
+	// billing period.
+	PeriodSpending() modules.ContractorSpending
 
 	// Editor creates an Editor from the specified contract ID, allowing the
 	// insertion, deletion, and modification of sectors.
@@ -393,8 +397,9 @@ func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreak
 }
 
 // contractor passthroughs
-func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
-func (r *Renter) CurrentPeriod() types.BlockHeight    { return r.hostContractor.CurrentPeriod() }
+func (r *Renter) Contracts() []modules.RenterContract        { return r.hostContractor.Contracts() }
+func (r *Renter) CurrentPeriod() types.BlockHeight           { return r.hostContractor.CurrentPeriod() }
+func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostContractor.PeriodSpending() }
 func (r *Renter) Settings() modules.RenterSettings {
 	return modules.RenterSettings{
 		Allowance: r.hostContractor.Allowance(),

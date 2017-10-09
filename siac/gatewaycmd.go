@@ -11,6 +11,13 @@ import (
 )
 
 var (
+	gatewayAddressCmd = &cobra.Command{
+		Use:   "address",
+		Short: "Print the gateway address",
+		Long:  "Print the network address of the gateway.",
+		Run:   wrap(gatewayaddresscmd),
+	}
+
 	gatewayCmd = &cobra.Command{
 		Use:   "gateway",
 		Short: "Perform gateway actions",
@@ -30,13 +37,6 @@ var (
 		Short: "Disconnect from a peer",
 		Long:  "Disconnect from a peer. Does not remove the peer from the node list.",
 		Run:   wrap(gatewaydisconnectcmd),
-	}
-
-	gatewayAddressCmd = &cobra.Command{
-		Use:   "address",
-		Short: "Print the gateway address",
-		Long:  "Print the network address of the gateway.",
-		Run:   wrap(gatewayaddresscmd),
 	}
 
 	gatewayListCmd = &cobra.Command{

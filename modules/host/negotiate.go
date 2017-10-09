@@ -104,10 +104,6 @@ var (
 	// settings.
 	errLongDuration = ErrorCommunication("renter proposed a file contract with a too-long duration")
 
-	// errLowTransactionFees is returned if the renter provides a transaction
-	// that the host does not feel is able to make it onto the blockchain.
-	errLowTransactionFees = ErrorCommunication("rejected for including too few transaction fees")
-
 	// errLowHostMissedOutput is returned if the renter incorrectly updates the
 	// host missed proof output during a file contract revision.
 	errLowHostMissedOutput = ErrorCommunication("rejected for low paying host missed output")
@@ -115,6 +111,10 @@ var (
 	// errLowHostValidOutput is returned if the renter incorrectly updates the
 	// host valid proof output during a file contract revision.
 	errLowHostValidOutput = ErrorCommunication("rejected for low paying host valid output")
+
+	// errLowTransactionFees is returned if the renter provides a transaction
+	// that the host does not feel is able to make it onto the blockchain.
+	errLowTransactionFees = ErrorCommunication("rejected for including too few transaction fees")
 
 	// errLowVoidOutput is returned if the renter has not allocated enough
 	// funds to the void output.

@@ -14,18 +14,9 @@ var (
 	// weight to be very large.
 	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(80), nil))
 
-	// tbMonth is the number of bytes in a terabyte times the number of blocks
-	// in a month.
-	tbMonth = uint64(4032) * uint64(1e12)
-
 	// collateralExponentiation is the number of times that the collateral is
 	// multiplied into the price.
 	collateralExponentiation = 1
-
-	// priceDiveNormalization reduces the raw value of the price so that not so
-	// many digits are needed when operating on the weight. This also allows the
-	// base weight to be a lot lower.
-	priceDivNormalization = types.SiacoinPrecision.Div64(10e3).Div64(tbMonth)
 
 	// minCollateral is the amount of collateral we weight all hosts as having,
 	// even if they do not have any collateral. This is to temporarily prop up
@@ -41,6 +32,11 @@ var (
 	// of storage changes, and as the price of the siacoin changes.
 	minTotalPrice = types.SiacoinPrecision.Mul64(25).Div64(tbMonth)
 
+	// priceDiveNormalization reduces the raw value of the price so that not so
+	// many digits are needed when operating on the weight. This also allows the
+	// base weight to be a lot lower.
+	priceDivNormalization = types.SiacoinPrecision.Div64(10e3).Div64(tbMonth)
+
 	// priceExponentiation is the number of times that the weight is divided by
 	// the price.
 	priceExponentiation = 5
@@ -52,6 +48,10 @@ var (
 		Dev:      uint64(1e6),
 		Testing:  uint64(1e3),
 	}).(uint64)
+
+	// tbMonth is the number of bytes in a terabyte times the number of blocks
+	// in a month.
+	tbMonth = uint64(4032) * uint64(1e12)
 )
 
 // collateralAdjustments improves the host's weight according to the amount of
