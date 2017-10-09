@@ -72,7 +72,7 @@ release:
 release-race:
 	go install -race -tags='debug profile netgo' $(pkgs)
 release-std:
-	go install -tags 'netgo' -ldflags='-s -w' $(pkgs)
+	go install -tags 'netgo' -a -ldflags='-s -w' $(pkgs)
 
 # clean removes all directories that get automatically created during
 # development.
