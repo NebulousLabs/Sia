@@ -71,9 +71,8 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		c.log.Println("Unable to save contractor after setting allowance:", err)
 	}
 
-	// Initiate maintenance on the contracts, and then return. Interrupting the
-	// current contract maintenance will give us the maintenance lock, we need
-	// to unlock when we are done.
+	// Interrupt any existing maintenance and launch a new round of
+	// maintenance.
 	c.managedInterruptContractMaintenance()
 	go c.threadedContractMaintenance()
 	return nil
@@ -116,8 +115,8 @@ func (c *Contractor) managedCancelAllowance() error {
 	c.mu.Lock()
 	c.allowance = modules.Allowance{}
 	c.currentPeriod = 0
-	c.mu.Unlock()
 	err := c.saveSync()
+	c.mu.Unlock()
 	if err != nil {
 		return err
 	}
