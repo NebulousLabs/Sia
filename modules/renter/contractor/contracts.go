@@ -49,7 +49,6 @@ func (c *Contractor) managedInterruptContractMaintenance() {
 		case <-gotLock:
 			return
 		case c.interruptMaintenance <- struct{}{}:
-			continue
 		}
 	}
 }
