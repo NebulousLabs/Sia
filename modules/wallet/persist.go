@@ -44,6 +44,9 @@ func (w *Wallet) openDB(filename string) (err error) {
 	}
 	// initialize the database
 	err = w.db.Update(func(tx *bolt.Tx) error {
+		// check whether we need to init bucketAddrTransactions
+		buildAddrTxns := tx.Bucket(bucketAddrTransactions) == nil
+		// ensure that all buckets exist
 		for _, b := range dbBuckets {
 			_, err := tx.CreateBucketIfNotExists(b)
 			if err != nil {
@@ -69,6 +72,17 @@ func (w *Wallet) openDB(filename string) (err error) {
 		}
 		if wb.Get(keySiafundPool) == nil {
 			wb.Put(keySiafundPool, encoding.Marshal(types.ZeroCurrency))
+		}
+
+		// build the bucketAddrTransactions bucket if necessary
+		if buildAddrTxns {
+			it := dbProcessedTransactionsIterator(tx)
+			for it.next() {
+				index, pt := it.key(), it.value()
+				if err := dbAddProcessedTransactionAddrs(tx, pt, index); err != nil {
+					return err
+				}
+			}
 		}
 
 		// check whether wallet is encrypted

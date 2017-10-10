@@ -60,7 +60,7 @@ func TestIntegrationTransactions(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(txns) != int(types.MaturityDelay+2+2) {
-		t.Error("unexpected transaction history length")
+		t.Errorf("unexpected transaction history length: expected %v, got %v", types.MaturityDelay+2+2, len(txns))
 	}
 
 	// Try getting a partial history for just the previous block.
@@ -71,7 +71,7 @@ func TestIntegrationTransactions(t *testing.T) {
 	// The partial should include one transaction for a block, and 2 for the
 	// send that occurred.
 	if len(txns) != 3 {
-		t.Error(len(txns))
+		t.Errorf("unexpected transaction history length: expected %v, got %v", 3, len(txns))
 	}
 }
 
