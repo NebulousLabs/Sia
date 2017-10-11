@@ -3,6 +3,7 @@ package wallet
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -254,4 +255,83 @@ func TestTransactionInputOutputIDs(t *testing.T) {
 			}
 		}
 	}
+}
+
+// BenchmarkAddressTransactions benchmarks the AddressTransactions method,
+// using the near-worst-case scenario of 10,000 transactions to search through
+// with only a single relevant transaction.
+func BenchmarkAddressTransactions(b *testing.B) {
+	wt, err := createWalletTester(b.Name())
+	if err != nil {
+		b.Fatal(err)
+	}
+	// add a bunch of fake transactions to the db
+	//
+	// NOTE: this is somewhat brittle, but the alternative (generating
+	// authentic transactions) is prohibitively slow.
+	wt.wallet.mu.Lock()
+	for i := 0; i < 10000; i++ {
+		err := dbAppendProcessedTransaction(wt.wallet.dbTx, modules.ProcessedTransaction{
+			TransactionID: types.TransactionID{1},
+		})
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	// add a single relevant transaction
+	searchAddr := types.UnlockHash{1}
+	err = dbAppendProcessedTransaction(wt.wallet.dbTx, modules.ProcessedTransaction{
+		TransactionID: types.TransactionID{1},
+		Inputs: []modules.ProcessedInput{{
+			RelatedAddress: searchAddr,
+		}},
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	wt.wallet.syncDB()
+	wt.wallet.mu.Unlock()
+
+	b.ResetTimer()
+	b.Run("indexed", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			txns := wt.wallet.AddressTransactions(searchAddr)
+			if len(txns) != 1 {
+				b.Fatal(len(txns))
+			}
+		}
+	})
+	b.Run("indexed-nosync", func(b *testing.B) {
+		wt.wallet.db.NoSync = true
+		for i := 0; i < b.N; i++ {
+			txns := wt.wallet.AddressTransactions(searchAddr)
+			if len(txns) != 1 {
+				b.Fatal(len(txns))
+			}
+		}
+		wt.wallet.db.NoSync = false
+	})
+	b.Run("unindexed", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			wt.wallet.mu.Lock()
+			wt.wallet.syncDB()
+			var pts []modules.ProcessedTransaction
+			it := dbProcessedTransactionsIterator(wt.wallet.dbTx)
+			for it.next() {
+				pt := it.value()
+				relevant := false
+				for _, input := range pt.Inputs {
+					relevant = relevant || input.RelatedAddress == searchAddr
+				}
+				for _, output := range pt.Outputs {
+					relevant = relevant || output.RelatedAddress == searchAddr
+				}
+				if relevant {
+					pts = append(pts, pt)
+				}
+			}
+			_ = pts
+			wt.wallet.mu.Unlock()
+		}
+	})
 }
