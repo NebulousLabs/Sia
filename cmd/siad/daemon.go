@@ -25,9 +25,17 @@ import (
 	"github.com/NebulousLabs/Sia/profile"
 	mnemonics "github.com/NebulousLabs/entropy-mnemonics"
 
-	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 )
+
+// passwordPrompt securely reads a password from stdin.
+func passwordPrompt(prompt string) (string, error) {
+	fmt.Print(prompt)
+	pw, err := terminal.ReadPassword(0)
+	fmt.Println()
+	return string(pw), err
+}
 
 // verifyAPISecurity checks that the security values are consistent with a
 // sane, secure system.
@@ -137,7 +145,7 @@ func unlockWallet(w modules.Wallet, password string) error {
 func startDaemon(config Config) (err error) {
 	// Prompt user for API password.
 	if config.Siad.AuthenticateAPI {
-		config.APIPassword, err = speakeasy.Ask("Enter API password: ")
+		config.APIPassword, err = passwordPrompt("Enter API password: ")
 		if err != nil {
 			return err
 		}
