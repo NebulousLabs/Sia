@@ -207,6 +207,18 @@ func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 // bucketProcessedTransactions works a little differently: the key is
 // meaningless, only used to order the transactions chronologically.
 
+// decodeProcessedTransaction decodes a marshalled processedTransaction
+func decodeProcessedTransaction(ptBytes []byte, pt *modules.ProcessedTransaction) error {
+	err := encoding.Unmarshal(ptBytes, pt)
+	if err != nil {
+		// COMPATv1.2.1: try decoding into old transaction type
+		var oldpt v121ProcessedTransaction
+		err = encoding.Unmarshal(ptBytes, &oldpt)
+		*pt = convertProcessedTransaction(oldpt)
+	}
+	return err
+}
+
 func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) error {
 	b := tx.Bucket(bucketProcessedTransactions)
 	key, err := b.NextSequence()
@@ -218,17 +230,13 @@ func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) 
 	binary.BigEndian.PutUint64(keyBytes, key)
 	return b.Put(keyBytes, encoding.Marshal(pt))
 }
+
 func dbGetLastProcessedTransaction(tx *bolt.Tx) (pt modules.ProcessedTransaction, err error) {
 	_, val := tx.Bucket(bucketProcessedTransactions).Cursor().Last()
-	err = encoding.Unmarshal(val, &pt)
-	if err != nil {
-		// COMPATv1.2.1: try decoding into old transaction type
-		var oldpt v121ProcessedTransaction
-		err = encoding.Unmarshal(val, &oldpt)
-		pt = convertProcessedTransaction(oldpt)
-	}
+	err = decodeProcessedTransaction(val, &pt)
 	return
 }
+
 func dbDeleteLastProcessedTransaction(tx *bolt.Tx) error {
 	// delete the last entry in the bucket. Note that we don't need to
 	// decrement the sequence integer; we only care that the next integer is
@@ -237,6 +245,7 @@ func dbDeleteLastProcessedTransaction(tx *bolt.Tx) error {
 	key, _ := b.Cursor().Last()
 	return b.Delete(key)
 }
+
 func dbForEachProcessedTransaction(tx *bolt.Tx, fn func(modules.ProcessedTransaction)) error {
 	return dbForEach(tx.Bucket(bucketProcessedTransactions), func(_ uint64, pt modules.ProcessedTransaction) {
 		fn(pt)
@@ -260,7 +269,7 @@ func (it *processedTransactionsIter) next() bool {
 	} else {
 		_, ptBytes = it.c.Next()
 	}
-	return decodeProcessedTransaction(ptBytes, &it.pt)
+	return decodeProcessedTransaction(ptBytes, &it.pt) == nil
 }
 
 // value returns the most recently decoded ProcessedTransaction.
