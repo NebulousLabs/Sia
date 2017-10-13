@@ -193,7 +193,7 @@ func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block, 
 		panic("incorrect request to buildExplorerBlock - block does not exist")
 	}
 
-	hexBlock := ""
+	var hexBlock string
 	if hexBlockEnable {
 		hexBlock = fmt.Sprintf("%x", encoding.Marshal(block)[:])
 	}
