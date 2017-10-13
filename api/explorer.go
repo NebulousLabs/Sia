@@ -174,10 +174,10 @@ func (api *API) buildExplorerTransaction(height types.BlockHeight, parent types.
 }
 
 // buildExplorerBlock takes a block and its height and uses it to construct an
-// explorer block. hex_block_enable is a required flag and indicates if the
-// hex_block field should be empty string (false) or
+// explorer block. hexBlockEnable is a required flag and indicates if the
+// hexBlock field should be empty string (false) or
 // should contain the hexadecimal binary encoded block (true).
-func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block, hex_block_enable bool) ExplorerBlock {
+func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block, hexBlockEnable bool) ExplorerBlock {
 	var mpoids []types.SiacoinOutputID
 	for i := range block.MinerPayouts {
 		mpoids = append(mpoids, block.MinerPayoutID(uint64(i)))
@@ -193,16 +193,16 @@ func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block, 
 		panic("incorrect request to buildExplorerBlock - block does not exist")
 	}
 
-	hex_block := ""
-	if hex_block_enable {
-		hex_block = fmt.Sprintf("%x", encoding.Marshal(block)[:])
+	hexBlock := ""
+	if hexBlockEnable {
+		hexBlock = fmt.Sprintf("%x", encoding.Marshal(block)[:])
 	}
 
 	return ExplorerBlock{
 		MinerPayoutIDs: mpoids,
 		Transactions:   etxns,
 		RawBlock:       block,
-		HexBlock:       hex_block,
+		HexBlock:       hexBlock,
 		BlockId:        fmt.Sprintf("%x", encoding.Marshal(block.ID())[:]),
 
 		BlockFacts: facts,
