@@ -1,8 +1,11 @@
 package wallet
 
 import (
+	"encoding/binary"
 	"errors"
+	"sort"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -86,6 +89,18 @@ func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTran
 	return modules.ProcessedTransaction{}, false
 }
 
+// decodeProcessedTransaction decodes a marshalled processedTransaction
+func decodeProcessedTransaction(ptBytes []byte, pt *modules.ProcessedTransaction) bool {
+	err := encoding.Unmarshal(ptBytes, pt)
+	if err != nil {
+		// COMPATv1.2.1: try decoding into old transaction type
+		var oldpt v121ProcessedTransaction
+		err = encoding.Unmarshal(ptBytes, &oldpt)
+		*pt = convertProcessedTransaction(oldpt)
+	}
+	return err == nil
+}
+
 // Transactions returns all transactions relevant to the wallet that were
 // confirmed in the range [startHeight, endHeight].
 func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []modules.ProcessedTransaction, err error) {
@@ -101,17 +116,55 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 		return nil, errOutOfBounds
 	}
 
-	it := dbProcessedTransactionsIterator(w.dbTx)
-	for it.next() {
-		pt := it.value()
-		if pt.ConfirmationHeight < startHeight {
-			continue
-		} else if pt.ConfirmationHeight > endHeight {
-			// transactions are stored in chronological order, so we can
-			// break as soon as we are above endHeight
-			break
-		} else {
+	// Conduct the binary search
+	var pt modules.ProcessedTransaction
+	cursor := w.dbTx.Bucket(bucketProcessedTransactions).Cursor()
+
+	// Get the largest key present in the processed transactions bucket
+	lastKeyBytes, _ := cursor.Last()
+	if lastKeyBytes == nil {
+		// bucket is empty
+		return
+	}
+
+	// Decode it to the the largest key
+	lastKey := binary.BigEndian.Uint64(lastKeyBytes)
+
+	// Conduct the binary search
+	sort.Search(int(lastKey), func(i int) bool {
+		// Create the key for the index
+		keyBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(keyBytes, uint64(i))
+
+		// Retrieve the processed transaction
+		key, ptBytes := cursor.Seek(keyBytes)
+		if key == nil {
+			panic("Failed to retrieve processed Transaction by key")
+		}
+
+		// Decode the transaction
+		if success := decodeProcessedTransaction(ptBytes, &pt); !success {
+			panic("Failed to decode the processed transaction")
+		}
+
+		return pt.ConfirmationHeight >= startHeight
+	})
+
+	// Gather all transactions until endHeight is reached
+	for pt.ConfirmationHeight <= endHeight {
+		if !(pt.ConfirmationHeight < startHeight) {
 			pts = append(pts, pt)
+		}
+
+		// Get next processed transaction
+		key, ptBytes := cursor.Next()
+		if key == nil {
+			break
+		}
+
+		// Decode the transaction
+		if success := decodeProcessedTransaction(ptBytes, &pt); !success {
+			panic("Failed to decode the processed transaction")
 		}
 	}
 	return
