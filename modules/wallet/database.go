@@ -260,14 +260,7 @@ func (it *processedTransactionsIter) next() bool {
 	} else {
 		_, ptBytes = it.c.Next()
 	}
-	err := encoding.Unmarshal(ptBytes, &it.pt)
-	if err != nil {
-		// COMPATv1.2.1: try decoding into old transaction type
-		var oldpt v121ProcessedTransaction
-		err = encoding.Unmarshal(ptBytes, &oldpt)
-		it.pt = convertProcessedTransaction(oldpt)
-	}
-	return err == nil
+	return decodeProcessedTransaction(ptBytes, &it.pt)
 }
 
 // value returns the most recently decoded ProcessedTransaction.
