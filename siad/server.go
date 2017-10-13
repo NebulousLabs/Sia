@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -64,6 +65,9 @@ type (
 	}
 	DaemonVersion struct {
 		Version string `json:"version"`
+	}
+	MemloggingInfo struct {
+		Active bool `json:"active"`
 	}
 	// UpdateInfo indicates whether an update is available, and to what
 	// version.
@@ -357,6 +361,9 @@ func (srv *Server) daemonStopHandler(w http.ResponseWriter, _ *http.Request, _ h
 func (srv *Server) daemonHandler(password string) http.Handler {
 	router := httprouter.New()
 
+	router.GET("/daemon/memlogging", srv.memloggingGET)
+	router.POST("/daemon/memlogging", srv.memloggingPOST)
+
 	router.GET("/daemon/constants", srv.daemonConstantsHandler)
 	router.GET("/daemon/version", srv.daemonVersionHandler)
 	router.GET("/daemon/update", srv.daemonUpdateHandlerGET)
@@ -364,6 +371,30 @@ func (srv *Server) daemonHandler(password string) http.Handler {
 	router.GET("/daemon/stop", api.RequirePassword(srv.daemonStopHandler, password))
 
 	return router
+}
+
+// memloggingGET returns a json response containing a bool that tells whether or
+// not memlogging is active or not.
+func (srv *Server) memloggingGET(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	active := atomic.LoadUint64(&build.AtomicMemLogging) != 0
+	api.WriteJSON(w, MemloggingInfo{Active: active})
+}
+
+// memloggingPOST makes a POST request with a boolean param `active` that sets
+// memlogging on if true, off if false.
+func (srv *Server) memloggingPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	val := strings.ToLower(req.FormValue("active")) // response is case-insensitive
+	if val == "true" {
+		atomic.StoreUint64(&build.AtomicMemLogging, 1)
+		api.WriteSuccess(w)
+		return
+	}
+	if val == "false" {
+		atomic.StoreUint64(&build.AtomicMemLogging, 0)
+		api.WriteSuccess(w)
+		return
+	}
+	api.WriteError(w, api.Error{Message: "error when calling /daemon/memlogging: expected param 'set' to be 'true' or 'false'"}, http.StatusBadRequest)
 }
 
 // NewServer creates a new net.http server listening on bindAddr.  Only the

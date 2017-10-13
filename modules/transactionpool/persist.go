@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -27,6 +28,21 @@ var (
 	errNilFeeMedian = errors.New("no fee median found")
 )
 
+// statsLogger logs the sizes of various data structures kept in the tpool's
+// state, in the tpool's log.
+func (tp *TransactionPool) statsLogger() {
+	// If MemLogging is not on, return.
+	if atomic.LoadUint64(&build.AtomicMemLogging) == 0 {
+		return
+	}
+	tp.log.Println("Logging memory usage:")
+	tp.log.Println("knownObjects size: ", len(tp.knownObjects))
+	tp.log.Println("subscriberSets size: ", len(tp.subscriberSets))
+	tp.log.Println("transactionHeights size: ", len(tp.transactionHeights))
+	tp.log.Println("transactionSets size: ", len(tp.transactionSets))
+	tp.log.Println("transactionSetDiffs size: ", len(tp.transactionSetDiffs))
+}
+
 // threadedRegularSync will make sure that sync gets called on the database
 // every once in a while.
 func (tp *TransactionPool) threadedRegularSync() {
@@ -42,6 +58,7 @@ func (tp *TransactionPool) threadedRegularSync() {
 		case <-time.After(tpoolSyncRate):
 			tp.mu.Lock()
 			tp.syncDB()
+			tp.statsLogger()
 			tp.mu.Unlock()
 		}
 	}
