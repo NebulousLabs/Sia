@@ -138,6 +138,7 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		return cachedDownloader, nil
 	}
 
+	// Fetch the contract and host.
 	contract, haveContract := c.contracts.View(id)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
@@ -153,7 +154,11 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	// Update the contract to the most recent net address for the host.
 	contract.NetAddress = host.NetAddress
 
-	// acquire revising lock
+	// Acquire the revising lock for the contract, which excludes other threads
+	// from interacting with the contract.
+	//
+	// TODO: Because we have another layer of contract safety via the
+	// contractset, do we need the revising lock anymore?
 	c.mu.Lock()
 	alreadyRevising := c.revising[contract.ID]
 	if alreadyRevising {
