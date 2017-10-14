@@ -22,11 +22,32 @@ type ContractSet struct {
 	mu        sync.Mutex
 }
 
-// Len returns the number of contracts in the set.
-func (cs *ContractSet) Len() int {
+// Acquire looks up the contract with the specified FileContractID and locks
+// it before returning it. If the contract is not present in the set, Acquire
+// returns false and a zero-valued RenterContract.
+func (cs *ContractSet) Acquire(id types.FileContractID) (modules.RenterContract, bool) {
+	cs.mu.Lock()
+	sc, ok := cs.contracts[id]
+	cs.mu.Unlock()
+	if !ok {
+		return modules.RenterContract{}, false
+	}
+	sc.mu.Lock()
+	return sc.RenterContract, ok
+}
+
+// Delete removes a contract from the set. The contract must have been
+// previously acquired by Acquire. If the contract is not present in the set,
+// Delete is a no-op.
+func (cs *ContractSet) Delete(contract modules.RenterContract) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	return len(cs.contracts)
+	sc, ok := cs.contracts[contract.ID]
+	if !ok {
+		return
+	}
+	delete(cs.contracts, contract.ID)
+	sc.mu.Unlock()
 }
 
 // IDs returns the FileContractID of each contract in the set. The contracts
@@ -41,20 +62,49 @@ func (cs *ContractSet) IDs() []types.FileContractID {
 	return ids
 }
 
-// ViewAll returns a copy of each contract in the set. The contracts are not
-// locked. Certain fields, including the MerkleRoots, are set to nil for
-// safety reasons.
-func (cs *ContractSet) ViewAll() []modules.RenterContract {
+// Insert adds a new contract to the set. It panics if the contract is already
+// in the set.
+func (cs *ContractSet) Insert(contract modules.RenterContract) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	contracts := make([]modules.RenterContract, 0, len(cs.contracts))
-	for _, sc := range cs.contracts {
-		// construct shallow copy, sans MerkleRoots
-		c := sc.RenterContract
-		c.MerkleRoots = nil
-		contracts = append(contracts, c)
+	if _, ok := cs.contracts[contract.ID]; ok {
+		build.Critical("contract already in set")
 	}
-	return contracts
+	cs.contracts[contract.ID] = &safeContract{RenterContract: contract}
+}
+
+// Len returns the number of contracts in the set.
+func (cs *ContractSet) Len() int {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	return len(cs.contracts)
+}
+
+// Modify will update a contract's contents without releasing the lock.
+func (cs *ContractSet) Modify(contract modules.RenterContract) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	sc, ok := cs.contracts[contract.ID]
+	if !ok {
+		build.Critical("no contract with that id")
+	}
+	sc.RenterContract = contract
+	cs.contracts[contract.ID] = sc
+}
+
+// Return returns a locked contract to the set and unlocks it. The contract
+// must have been previously acquired by Acquire. If the contract is not
+// present in the set, Return panics.
+func (cs *ContractSet) Return(contract modules.RenterContract) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	sc, ok := cs.contracts[contract.ID]
+	if !ok {
+		build.Critical("no contract with that id")
+	}
+	sc.RenterContract = contract
+	cs.contracts[contract.ID] = sc
+	sc.mu.Unlock()
 }
 
 // View returns a copy of the contract with the specified ID. The contracts is
@@ -73,58 +123,20 @@ func (cs *ContractSet) View(id types.FileContractID) (modules.RenterContract, bo
 	return c, true
 }
 
-// Insert adds a new contract to the set. It panics if the contract is already
-// in the set.
-func (cs *ContractSet) Insert(contract modules.RenterContract) {
+// ViewAll returns a copy of each contract in the set. The contracts are not
+// locked. Certain fields, including the MerkleRoots, are set to nil for
+// safety reasons.
+func (cs *ContractSet) ViewAll() []modules.RenterContract {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	if _, ok := cs.contracts[contract.ID]; ok {
-		build.Critical("contract already in set")
+	contracts := make([]modules.RenterContract, 0, len(cs.contracts))
+	for _, sc := range cs.contracts {
+		// construct shallow copy, sans MerkleRoots
+		c := sc.RenterContract
+		c.MerkleRoots = nil
+		contracts = append(contracts, c)
 	}
-	cs.contracts[contract.ID] = &safeContract{RenterContract: contract}
-}
-
-// Acquire looks up the contract with the specified FileContractID and locks
-// it before returning it. If the contract is not present in the set, Acquire
-// returns false and a zero-valued RenterContract.
-func (cs *ContractSet) Acquire(id types.FileContractID) (modules.RenterContract, bool) {
-	cs.mu.Lock()
-	sc, ok := cs.contracts[id]
-	cs.mu.Unlock()
-	if !ok {
-		return modules.RenterContract{}, false
-	}
-	sc.mu.Lock()
-	return sc.RenterContract, ok
-}
-
-// Return returns a locked contract to the set and unlocks it. The contract
-// must have been previously acquired by Acquire. If the contract is not
-// present in the set, Return panics.
-func (cs *ContractSet) Return(contract modules.RenterContract) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	sc, ok := cs.contracts[contract.ID]
-	if !ok {
-		build.Critical("no contract with that id")
-	}
-	sc.RenterContract = contract
-	cs.contracts[contract.ID] = sc
-	sc.mu.Unlock()
-}
-
-// Delete removes a contract from the set. The contract must have been
-// previously acquired by Acquire. If the contract is not present in the set,
-// Delete is a no-op.
-func (cs *ContractSet) Delete(contract modules.RenterContract) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	sc, ok := cs.contracts[contract.ID]
-	if !ok {
-		return
-	}
-	delete(cs.contracts, contract.ID)
-	sc.mu.Unlock()
+	return contracts
 }
 
 // NewContractSet returns a ContractSet populated with the provided slice of
