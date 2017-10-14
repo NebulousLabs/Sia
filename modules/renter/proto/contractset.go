@@ -27,13 +27,13 @@ type ContractSet struct {
 // returns false and a zero-valued RenterContract.
 func (cs *ContractSet) Acquire(id types.FileContractID) (modules.RenterContract, bool) {
 	cs.mu.Lock()
-	sc, ok := cs.contracts[id]
+	safeContract, ok := cs.contracts[id]
 	cs.mu.Unlock()
 	if !ok {
 		return modules.RenterContract{}, false
 	}
-	sc.mu.Lock()
-	return sc.RenterContract, ok
+	safeContract.mu.Lock()
+	return safeContract.RenterContract, true
 }
 
 // Delete removes a contract from the set. The contract must have been
@@ -41,13 +41,15 @@ func (cs *ContractSet) Acquire(id types.FileContractID) (modules.RenterContract,
 // Delete is a no-op.
 func (cs *ContractSet) Delete(contract modules.RenterContract) {
 	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	sc, ok := cs.contracts[contract.ID]
+	safeContract, ok := cs.contracts[contract.ID]
 	if !ok {
+		cs.mu.Unlock()
 		return
 	}
 	delete(cs.contracts, contract.ID)
-	sc.mu.Unlock()
+	cs.mu.Unlock()
+
+	safeContract.mu.Unlock()
 }
 
 // IDs returns the FileContractID of each contract in the set. The contracts
@@ -84,12 +86,12 @@ func (cs *ContractSet) Len() int {
 func (cs *ContractSet) Modify(contract modules.RenterContract) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	sc, ok := cs.contracts[contract.ID]
+	safeContract, ok := cs.contracts[contract.ID]
 	if !ok {
 		build.Critical("no contract with that id")
 	}
-	sc.RenterContract = contract
-	cs.contracts[contract.ID] = sc
+	safeContract.RenterContract = contract
+	cs.contracts[contract.ID] = safeContract
 }
 
 // Return returns a locked contract to the set and unlocks it. The contract
@@ -97,14 +99,16 @@ func (cs *ContractSet) Modify(contract modules.RenterContract) {
 // present in the set, Return panics.
 func (cs *ContractSet) Return(contract modules.RenterContract) {
 	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	sc, ok := cs.contracts[contract.ID]
+	safeContract, ok := cs.contracts[contract.ID]
 	if !ok {
+		cs.mu.Unlock()
 		build.Critical("no contract with that id")
 	}
-	sc.RenterContract = contract
-	cs.contracts[contract.ID] = sc
-	sc.mu.Unlock()
+	safeContract.RenterContract = contract
+	cs.contracts[contract.ID] = safeContract
+	cs.mu.Unlock()
+
+	safeContract.mu.Unlock()
 }
 
 // View returns a copy of the contract with the specified ID. The contracts is
@@ -114,11 +118,11 @@ func (cs *ContractSet) Return(contract modules.RenterContract) {
 func (cs *ContractSet) View(id types.FileContractID) (modules.RenterContract, bool) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	sc, ok := cs.contracts[id]
+	safeContract, ok := cs.contracts[id]
 	if !ok {
 		return modules.RenterContract{}, false
 	}
-	c := sc.RenterContract
+	c := safeContract.RenterContract
 	c.MerkleRoots = nil
 	return c, true
 }
@@ -130,9 +134,9 @@ func (cs *ContractSet) ViewAll() []modules.RenterContract {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 	contracts := make([]modules.RenterContract, 0, len(cs.contracts))
-	for _, sc := range cs.contracts {
+	for _, safeContract := range cs.contracts {
 		// construct shallow copy, sans MerkleRoots
-		c := sc.RenterContract
+		c := safeContract.RenterContract
 		c.MerkleRoots = nil
 		contracts = append(contracts, c)
 	}
