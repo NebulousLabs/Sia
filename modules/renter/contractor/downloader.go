@@ -57,6 +57,25 @@ func (hd *hostDownloader) invalidate() {
 	hd.contractor.mu.Unlock()
 }
 
+// Close cleanly terminates the download loop with the host and closes the
+// connection.
+func (hd *hostDownloader) Close() error {
+	hd.mu.Lock()
+	defer hd.mu.Unlock()
+	hd.clients--
+	// Close is a no-op if invalidate has been called, or if there are other
+	// clients still using the hostDownloader.
+	if hd.invalid || hd.clients > 0 {
+		return nil
+	}
+	hd.invalid = true
+	hd.contractor.mu.Lock()
+	delete(hd.contractor.downloaders, hd.contractID)
+	delete(hd.contractor.revising, hd.contractID)
+	hd.contractor.mu.Unlock()
+	return hd.downloader.Close()
+}
+
 // HostSettings returns the settings of the host that the downloader connects
 // to.
 func (hd *hostDownloader) HostSettings() modules.HostExternalSettings {
@@ -80,7 +99,7 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
 	}
-	updatedContract, sector, err := hd.downloader.Sector(root)
+	updatedContract, sector, err := hd.downloader.Sector(contract, root)
 	if err != nil {
 		hd.contractor.contracts.Return(contract)
 		return nil, err
@@ -98,25 +117,6 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	hd.contractor.mu.Unlock()
 
 	return sector, nil
-}
-
-// Close cleanly terminates the download loop with the host and closes the
-// connection.
-func (hd *hostDownloader) Close() error {
-	hd.mu.Lock()
-	defer hd.mu.Unlock()
-	hd.clients--
-	// Close is a no-op if invalidate has been called, or if there are other
-	// clients still using the hostDownloader.
-	if hd.invalid || hd.clients > 0 {
-		return nil
-	}
-	hd.invalid = true
-	hd.contractor.mu.Lock()
-	delete(hd.contractor.downloaders, hd.contractID)
-	delete(hd.contractor.revising, hd.contractID)
-	hd.contractor.mu.Unlock()
-	return hd.downloader.Close()
 }
 
 // Downloader returns a Downloader object that can be used to download sectors
@@ -167,7 +167,6 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	}
 	c.revising[contract.ID] = true
 	c.mu.Unlock()
-
 	// release lock early if function returns an error
 	defer func() {
 		if err != nil {
