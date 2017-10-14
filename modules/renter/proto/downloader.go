@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -16,7 +15,6 @@ import (
 // Downloaders are NOT thread- safe; calls to Sector must be serialized.
 type Downloader struct {
 	host      modules.HostDBEntry
-	contract  modules.RenterContract // updated after each revision
 	conn      net.Conn
 	closeChan chan struct{}
 	once      sync.Once
@@ -28,23 +26,21 @@ type Downloader struct {
 // Sector retrieves the sector with the specified Merkle root, and revises
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
-func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []byte, err error) {
-	defer extendDeadline(hd.conn, time.Hour) // reset deadline when finished
+func (hd *Downloader) Sector(contract modules.RenterContract, root crypto.Hash) (_ modules.RenterContract, _ []byte, err error) {
+	// Reset deadline when finished.
+	defer extendDeadline(hd.conn, time.Hour) // TODO: Constant.
 
 	// calculate price
 	sectorPrice := hd.host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
-	if hd.contract.RenterFunds().Cmp(sectorPrice) < 0 {
+	if contract.RenterFunds().Cmp(sectorPrice) < 0 {
 		return modules.RenterContract{}, nil, errors.New("contract has insufficient funds to support download")
 	}
-	// to mitigate small errors (e.g. differing block heights), fudge the
-	// price and collateral by 0.2%. This is only applied to hosts above
-	// v1.0.1; older hosts use stricter math.
-	if build.VersionCmp(hd.host.Version, "1.0.1") > 0 {
-		sectorPrice = sectorPrice.MulFloat(1 + hostPriceLeeway)
-	}
+	// To mitigate small errors (e.g. differing block heights), fudge the
+	// price and collateral by 0.2%.
+	sectorPrice = sectorPrice.MulFloat(1 + hostPriceLeeway)
 
 	// create the download revision
-	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
+	rev := newDownloadRevision(contract.LastRevision, sectorPrice)
 
 	// initiate download by confirming host settings
 	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
@@ -58,13 +54,13 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	// may report either revision as being the most recent. To mitigate this,
 	// we save the old revision as a fallback.
 	if hd.SaveFn != nil {
-		if err := hd.SaveFn(rev, hd.contract.MerkleRoots); err != nil {
+		if err := hd.SaveFn(rev, contract.MerkleRoots); err != nil {
 			return modules.RenterContract{}, nil, err
 		}
 	}
 
 	// send download action
-	extendDeadline(hd.conn, 2*time.Minute)
+	extendDeadline(hd.conn, 2*time.Minute) // TODO: Constant.
 	err = encoding.WriteObject(hd.conn, []modules.DownloadAction{{
 		MerkleRoot: root,
 		Offset:     0,
@@ -77,15 +73,15 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
 		if err != nil {
-			hd.hdb.IncrementFailedInteractions(hd.contract.HostPublicKey)
+			hd.hdb.IncrementFailedInteractions(contract.HostPublicKey)
 		} else if err == nil {
-			hd.hdb.IncrementSuccessfulInteractions(hd.contract.HostPublicKey)
+			hd.hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
 		}
 	}()
 
 	// send the revision to the host for approval
-	extendDeadline(hd.conn, 2*time.Minute)
-	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
+	extendDeadline(hd.conn, 2*time.Minute) // TODO: Constant.
+	signedTxn, err := negotiateRevision(hd.conn, rev, contract.SecretKey)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
 		// cause the next download to fail. However, we must delay closing
@@ -111,11 +107,11 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	}
 
 	// update contract and metrics
-	hd.contract.LastRevision = rev
-	hd.contract.LastRevisionTxn = signedTxn
-	hd.contract.DownloadSpending = hd.contract.DownloadSpending.Add(sectorPrice)
+	contract.LastRevision = rev
+	contract.LastRevisionTxn = signedTxn
+	contract.DownloadSpending = contract.DownloadSpending.Add(sectorPrice)
 
-	return hd.contract, sector, nil
+	return contract, sector, nil
 }
 
 // shutdown terminates the revision loop and signals the goroutine spawned in
@@ -138,6 +134,8 @@ func (hd *Downloader) Close() error {
 
 // NewDownloader initiates the download request loop with a host, and returns a
 // Downloader.
+//
+// TODO: NewDownloader should need to receieve nothing more than a host pubkey.
 func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, hdb hostDB, cancel <-chan struct{}) (_ *Downloader, err error) {
 	// check that contract has enough value to support a download
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
@@ -153,7 +151,7 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, hd
 		// A revision mismatch might not be the host's fault.
 		if err != nil && !IsRevisionMismatch(err) {
 			hdb.IncrementFailedInteractions(contract.HostPublicKey)
-		} else {
+		} else if err == nil {
 			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
 		}
 	}()
@@ -161,7 +159,7 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, hd
 	// initiate download loop
 	conn, err := (&net.Dialer{
 		Cancel:  cancel,
-		Timeout: 15 * time.Second,
+		Timeout: 45 * time.Second, // TODO: Constant
 	}).Dial("tcp", string(contract.NetAddress))
 	if err != nil {
 		return nil, err
@@ -192,7 +190,6 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, hd
 
 	// the host is now ready to accept revisions
 	return &Downloader{
-		contract:  contract,
 		host:      host,
 		conn:      conn,
 		closeChan: closeChan,
