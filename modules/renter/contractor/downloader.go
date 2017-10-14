@@ -74,20 +74,27 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	if hd.invalid {
 		return nil, errInvalidDownloader
 	}
-	contract, sector, err := hd.downloader.Sector(root)
+
+	// Fetch the contract, download the sector, return the contract.
+	contract, haveContract := hd.contractor.contracts.Acquire(hd.contractID)
+	if !haveContract {
+		return nil, errors.New("no record of that contract")
+	}
+	updatedContract, sector, err := hd.downloader.Sector(root)
 	if err != nil {
+		hd.contractor.contracts.Return(contract)
 		return nil, err
 	}
+	hd.contractor.contracts.Return(updatedContract)
 
+	// Submit an update documenting the new contract, instead of saving the
+	// whole journal state.
 	hd.contractor.mu.Lock()
 	hd.contractor.persist.update(updateDownloadRevision{
 		NewRevisionTxn:      contract.LastRevisionTxn,
 		NewDownloadSpending: contract.DownloadSpending,
 	})
-	// TODO: not sure how this should work. We probably want a way to update
-	// the contract without returning it.
-	hd.contractor.contracts.Return(contract)
-	hd.contractor.contracts.Acquire(contract.ID)
+	hd.contractor.contracts.Modify(contract)
 	hd.contractor.mu.Unlock()
 
 	return sector, nil
@@ -131,18 +138,10 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		return cachedDownloader, nil
 	}
 
-	// Attempt to acquire contract
-	contract, haveContract := c.contracts.Acquire(id)
+	contract, haveContract := c.contracts.View(id)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
 	}
-	// return contract early if function returns error
-	defer func() {
-		if err != nil {
-			c.contracts.Return(contract)
-		}
-	}()
-
 	host, haveHost := c.hdb.Host(contract.HostPublicKey)
 	if height > contract.EndHeight() {
 		return nil, errors.New("contract has already ended")
