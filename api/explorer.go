@@ -23,7 +23,7 @@ type (
 		Transactions   []ExplorerTransaction   `json:"transactions"`
 		RawBlock       types.Block             `json:"rawblock"`
 		HexBlock       string                  `json:"hexblock"`
-		BlockId        string                  `json:"blockid"`
+		BlockID        string                  `json:"blockid"`
 
 		modules.BlockFacts
 	}
@@ -194,20 +194,18 @@ func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block, 
 		panic("incorrect request to buildExplorerBlock - block does not exist")
 	}
 
-	var hexBlock string
-	if hexBlockEnable {
-		hexBlock = hex.EncodeToString(encoding.Marshal(block))
-	}
-
-	return ExplorerBlock{
+	b := ExplorerBlock{
 		MinerPayoutIDs: mpoids,
 		Transactions:   etxns,
 		RawBlock:       block,
-		HexBlock:       hexBlock,
-		BlockId:        hex.EncodeToString(encoding.Marshal(block.ID())),
+		BlockID:        hex.EncodeToString(encoding.Marshal(block.ID())),
 
 		BlockFacts: facts,
 	}
+	if hexBlockEnable {
+		b.HexBlock = hex.EncodeToString(encoding.Marshal(block))
+	}
+	return b
 }
 
 // explorerHandler handles API calls to /explorer/blocks/:height.
