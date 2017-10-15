@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/http"
 
@@ -195,7 +196,7 @@ func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block, 
 
 	var hexBlock string
 	if hexBlockEnable {
-		hexBlock = fmt.Sprintf("%x", encoding.Marshal(block)[:])
+		hexBlock = hex.EncodeToString(encoding.Marshal(block))
 	}
 
 	return ExplorerBlock{
@@ -203,7 +204,7 @@ func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block, 
 		Transactions:   etxns,
 		RawBlock:       block,
 		HexBlock:       hexBlock,
-		BlockId:        fmt.Sprintf("%x", encoding.Marshal(block.ID())[:]),
+		BlockId:        hex.EncodeToString(encoding.Marshal(block.ID())),
 
 		BlockFacts: facts,
 	}
