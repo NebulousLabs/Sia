@@ -235,15 +235,9 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		}
 	}()
 
-	// Create the perist directory if it does not yet exist.
-	err = dependencies.mkdirAll(h.persistDir, 0700)
-	if err != nil {
-		return nil, err
-	}
-
 	// Initialize the logger, and set up the stop call that will close the
 	// logger.
-	h.log, err = dependencies.newLogger(filepath.Join(h.persistDir, logFile))
+	h.log, err = dependencies.newLogger(logFile, h.persistDir)
 	if err != nil {
 		return nil, err
 	}

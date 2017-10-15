@@ -100,7 +100,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -188,12 +187,7 @@ func (g *Gateway) Close() error {
 
 // New returns an initialized Gateway.
 func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
-	// Create the directory if it doesn't exist.
-	err := os.MkdirAll(persistDir, 0700)
-	if err != nil {
-		return nil, err
-	}
-
+	var err error
 	g := &Gateway{
 		handlers: make(map[rpcID]modules.RPCFunc),
 		initRPCs: make(map[string]modules.RPCFunc),
@@ -208,7 +202,7 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 	fastrand.Read(g.id[:])
 
 	// Create the logger.
-	g.log, err = persist.NewFileLogger(filepath.Join(g.persistDir, logFile))
+	g.log, err = persist.NewFileLogger(logFile, g.persistDir)
 	if err != nil {
 		return nil, err
 	}

@@ -81,15 +81,10 @@ func (w *Wallet) openDB(filename string) (err error) {
 // initPersist loads all of the wallet's persistence files into memory,
 // creating them if they do not exist.
 func (w *Wallet) initPersist() error {
-	// Create a directory for the wallet without overwriting an existing
-	// directory.
-	err := os.MkdirAll(w.persistDir, 0700)
-	if err != nil {
-		return err
-	}
+	var err error
 
 	// Start logging.
-	w.log, err = persist.NewFileLogger(filepath.Join(w.persistDir, logFile))
+	w.log, err = persist.NewFileLogger(logFile, w.persistDir)
 	if err != nil {
 		return err
 	}

@@ -2,7 +2,6 @@ package persist
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,14 +14,10 @@ import (
 func TestLogger(t *testing.T) {
 	// Create a folder for the log file.
 	testdir := build.TempDir(persistDir, t.Name())
-	err := os.MkdirAll(testdir, 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// Create the logger.
-	logFilename := filepath.Join(testdir, "test.log")
-	fl, err := NewFileLogger(logFilename)
+	logFilename := "test.log"
+	fl, err := NewFileLogger(logFilename, testdir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +32,15 @@ func TestLogger(t *testing.T) {
 	// Check that data was written to the log file. There should be three
 	// lines, one for startup, the example line, and one to close the logger.
 	expectedSubstring := []string{"STARTUP", "TEST", "SHUTDOWN", ""} // file ends with a newline
-	fileData, err := ioutil.ReadFile(logFilename)
+
+	// We have to assemble the path the same way that NewFileLogger does
+	var logFilePath string
+	if LogDir != "" {
+		logFilePath = filepath.Join(LogDir, logFilename)
+	} else {
+		logFilePath = filepath.Join(testdir, logFilename)
+	}
+	fileData, err := ioutil.ReadFile(logFilePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,14 +59,10 @@ func TestLogger(t *testing.T) {
 func TestLoggerCritical(t *testing.T) {
 	// Create a folder for the log file.
 	testdir := build.TempDir(persistDir, t.Name())
-	err := os.MkdirAll(testdir, 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// Create the logger.
-	logFilename := filepath.Join(testdir, "test.log")
-	fl, err := NewFileLogger(logFilename)
+	logFilename := "test.log"
+	fl, err := NewFileLogger(logFilename, testdir)
 	if err != nil {
 		t.Fatal(err)
 	}

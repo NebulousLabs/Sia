@@ -2,7 +2,6 @@ package host
 
 import (
 	"net"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,53 +10,13 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 )
 
-// dependencyErrMkdirAll is a dependency set that returns an error when MkdirAll
-// is called.
-type dependencyErrMkdirAll struct {
-	productionDependencies
-}
-
-func (dependencyErrMkdirAll) mkdirAll(string, os.FileMode) error {
-	return mockErrMkdirAll
-}
-
-// TestHostFailedMkdirAll initializes the host using a call to MkdirAll that
-// will fail.
-func TestHostFailedMkdirAll(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-	ht, err := blankHostTester("TestHostFailedMkdirAll")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ht.Close()
-
-	err = ht.host.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ht.host, err = newHost(dependencyErrMkdirAll{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
-	if err != mockErrMkdirAll {
-		t.Fatal(err)
-	}
-	// Set ht.host to something non-nil - nil was returned because startup was
-	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
-	// operation will fail.
-	ht.host, err = newHost(productionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 // dependencyErrNewLogger is a dependency set that returns an error when
 // NewLogger is called.
 type dependencyErrNewLogger struct {
 	productionDependencies
 }
 
-func (dependencyErrNewLogger) newLogger(string) (*persist.Logger, error) {
+func (dependencyErrNewLogger) newLogger(string, string) (*persist.Logger, error) {
 	return nil, mockErrNewLogger
 }
 

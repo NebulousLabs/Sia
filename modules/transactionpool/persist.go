@@ -3,7 +3,6 @@ package transactionpool
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -88,14 +87,10 @@ func (tp *TransactionPool) resetDB(tx *bolt.Tx) error {
 
 // initPersist creates buckets in the database
 func (tp *TransactionPool) initPersist() error {
-	// Create the persist directory if it does not yet exist.
-	err := os.MkdirAll(tp.persistDir, 0700)
-	if err != nil {
-		return err
-	}
+	var err error
 
 	// Create the tpool logger.
-	tp.log, err = persist.NewFileLogger(filepath.Join(tp.persistDir, logFile))
+	tp.log, err = persist.NewFileLogger(logFile, tp.persistDir)
 	if err != nil {
 		return build.ExtendErr("unable to initialize the transaction pool logger", err)
 	}

@@ -3,7 +3,6 @@ package consensus
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -63,14 +62,10 @@ func (cs *ConsensusSet) loadDB() error {
 // initPersist initializes the persistence structures of the consensus set, in
 // particular loading the database and preparing to manage subscribers.
 func (cs *ConsensusSet) initPersist() error {
-	// Create the consensus directory.
-	err := os.MkdirAll(cs.persistDir, 0700)
-	if err != nil {
-		return err
-	}
+	var err error
 
 	// Initialize the logger.
-	cs.log, err = persist.NewFileLogger(filepath.Join(cs.persistDir, logFile))
+	cs.log, err = persist.NewFileLogger(logFile, cs.persistDir)
 	if err != nil {
 		return err
 	}

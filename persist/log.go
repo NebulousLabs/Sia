@@ -5,9 +5,15 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
+)
+
+var (
+	// LogDir is an optional cli flag which sets the directory for log files
+	LogDir string
 )
 
 // Logger is a wrapper for the standard library logger that enforces logging
@@ -117,8 +123,20 @@ func (cf *closeableFile) Write(b []byte) (int, error) {
 }
 
 // NewFileLogger returns a logger that logs to logFilename. The file is opened
-// in append mode, and created if it does not exist.
-func NewFileLogger(logFilename string) (*Logger, error) {
+// in append mode, and created if it does not exist. If global LogDir is set, the
+// defaultLogPath is overridden.
+func NewFileLogger(logFilename string, defaultLogPath string) (*Logger, error) {
+	if logFilename == "" || defaultLogPath == "" {
+		return nil, os.ErrNotExist
+	}
+	if LogDir != "" {
+		logFilename = filepath.Join(LogDir, logFilename)
+	} else {
+		logFilename = filepath.Join(defaultLogPath, logFilename)
+	}
+	if err := os.MkdirAll(filepath.Dir(logFilename), 0700); err != nil {
+		return nil, err
+	}
 	logFile, err := os.OpenFile(logFilename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
 	if err != nil {
 		return nil, err

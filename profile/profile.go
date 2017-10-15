@@ -119,16 +119,10 @@ func StopTrace() {
 // startContinuousLog creates dir and saves inexpensive logs periodically.
 // It also runs the restart function periodically.
 func startContinuousLog(dir string, sleepCap time.Duration, restart func()) {
-	// Create the folder for all of the profiling results.
-	err := os.MkdirAll(dir, 0700)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 	// Continuously log statistics about the running Sia application.
 	go func() {
 		// Create the logger.
-		log, err := persist.NewFileLogger(filepath.Join(dir, "continuousStats.log"))
+		log, err := persist.NewFileLogger("continuousStats.log", dir)
 		if err != nil {
 			fmt.Println("Stats logging failed:", err)
 			return

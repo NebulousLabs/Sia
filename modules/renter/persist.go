@@ -393,14 +393,10 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 // initPersist handles all of the persistence initialization, such as creating
 // the persistence directory and starting the logger.
 func (r *Renter) initPersist() error {
-	// Create the perist directory if it does not yet exist.
-	err := os.MkdirAll(r.persistDir, 0700)
-	if err != nil {
-		return err
-	}
+	var err error
 
 	// Initialize the logger.
-	r.log, err = persist.NewFileLogger(filepath.Join(r.persistDir, logFile))
+	r.log, err = persist.NewFileLogger(logFile, r.persistDir)
 	if err != nil {
 		return err
 	}

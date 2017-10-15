@@ -22,6 +22,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/profile"
 	mnemonics "github.com/NebulousLabs/entropy-mnemonics"
 
@@ -351,6 +352,14 @@ func startDaemon(config Config) (err error) {
 
 // startDaemonCmd is a passthrough function for startDaemon.
 func startDaemonCmd(cmd *cobra.Command, _ []string) {
+
+	// Set the global log directory, if provided. This must be
+	// done before profile.StartContinuousProfile is called, else
+	// there is a race on access.
+	if globalConfig.Siad.LogDir != "" {
+		persist.LogDir = globalConfig.Siad.LogDir
+	}
+
 	var profileCPU, profileMem, profileTrace bool
 
 	profileCPU = strings.Contains(globalConfig.Siad.Profile, "c")
