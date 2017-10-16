@@ -23,7 +23,7 @@ type (
 		Transactions   []ExplorerTransaction   `json:"transactions"`
 		RawBlock       types.Block             `json:"rawblock"`
 		HexBlock       string                  `json:"hexblock"`
-		BlockID        string                  `json:"blockid"`
+		HexBlockID     string                  `json:"blockid"`
 
 		modules.BlockFacts
 	}
@@ -198,7 +198,7 @@ func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block, 
 		MinerPayoutIDs: mpoids,
 		Transactions:   etxns,
 		RawBlock:       block,
-		BlockID:        hex.EncodeToString(encoding.Marshal(block.ID())),
+		HexBlockID:     hex.EncodeToString(encoding.Marshal(block.ID())),
 
 		BlockFacts: facts,
 	}
