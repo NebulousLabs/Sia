@@ -212,6 +212,34 @@ func TestFileExpiration(t *testing.T) {
 	}
 }
 
+// TestRenterFileListLocalPath verifies that FileList() returns the correct
+// local path information for an uploaded file.
+func TestRenterFileListLocalPath(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+	id := rt.renter.mu.Lock()
+	f := newTestingFile()
+	f.name = "testname"
+	rt.renter.files["test"] = f
+	rt.renter.tracking[f.name] = trackedFile{
+		RepairPath: "TestPath",
+	}
+	rt.renter.mu.Unlock(id)
+	files := rt.renter.FileList()
+	if len(files) != 1 {
+		t.Fatal("wrong number of files, got", len(files), "wanted one")
+	}
+	if files[0].LocalPath != "TestPath" {
+		t.Fatal("file had wrong LocalPath: got", files[0].LocalPath, "wanted TestPath")
+	}
+}
+
 // TestRenterDeleteFile probes the DeleteFile method of the renter type.
 func TestRenterDeleteFile(t *testing.T) {
 	if testing.Short() {
