@@ -50,11 +50,14 @@ type Editor interface {
 // multiple goroutines.
 type hostEditor struct {
 	clients    int // safe to Close when 0
-	contract   modules.RenterContract
 	contractor *Contractor
 	editor     *proto.Editor
+	endHeight  types.BlockHeight
+	id         types.FileContractID
 	invalid    bool // true if invalidate has been called
-	mu         sync.Mutex
+	netAddress modules.NetAddress
+
+	mu sync.Mutex
 }
 
 // invalidate sets the invalid flag and closes the underlying proto.Editor.
@@ -69,20 +72,20 @@ func (he *hostEditor) invalidate() {
 		he.invalid = true
 	}
 	he.contractor.mu.Lock()
-	delete(he.contractor.editors, he.contract.ID)
-	delete(he.contractor.revising, he.contract.ID)
+	delete(he.contractor.editors, he.id)
+	delete(he.contractor.revising, he.id)
 	he.contractor.mu.Unlock()
 }
 
 // Address returns the NetAddress of the host.
-func (he *hostEditor) Address() modules.NetAddress { return he.contract.NetAddress }
+func (he *hostEditor) Address() modules.NetAddress { return he.netAddress }
 
 // ContractID returns the ID of the contract being revised.
-func (he *hostEditor) ContractID() types.FileContractID { return he.contract.ID }
+func (he *hostEditor) ContractID() types.FileContractID { return he.id }
 
 // EndHeight returns the height at which the host is no longer obligated to
 // store the file.
-func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.EndHeight() }
+func (he *hostEditor) EndHeight() types.BlockHeight { return he.endHeight }
 
 // Close cleanly terminates the revision loop with the host and closes the
 // connection.
@@ -97,39 +100,10 @@ func (he *hostEditor) Close() error {
 	}
 	he.invalid = true
 	he.contractor.mu.Lock()
-	delete(he.contractor.editors, he.contract.ID)
-	delete(he.contractor.revising, he.contract.ID)
+	delete(he.contractor.editors, he.id)
+	delete(he.contractor.revising, he.id)
 	he.contractor.mu.Unlock()
 	return he.editor.Close()
-}
-
-// Upload negotiates a revision that adds a sector to a file contract.
-func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
-	he.mu.Lock()
-	defer he.mu.Unlock()
-	if he.invalid {
-		return crypto.Hash{}, errInvalidEditor
-	}
-	contract, sectorRoot, err := he.editor.Upload(data)
-	if err != nil {
-		return crypto.Hash{}, err
-	}
-	he.contractor.mu.Lock()
-	he.contractor.persist.update(updateUploadRevision{
-		NewRevisionTxn:     contract.LastRevisionTxn,
-		NewSectorRoot:      sectorRoot,
-		NewSectorIndex:     len(contract.MerkleRoots) - 1,
-		NewUploadSpending:  contract.UploadSpending,
-		NewStorageSpending: contract.StorageSpending,
-	})
-	// TODO: not sure how this should work. We probably want a way to update
-	// the contract without returning it.
-	he.contractor.contracts.Return(contract)
-	he.contractor.contracts.Acquire(contract.ID)
-	he.contractor.mu.Unlock()
-	he.contract = contract
-
-	return sectorRoot, nil
 }
 
 // Delete negotiates a revision that removes a sector from a file contract.
@@ -139,20 +113,23 @@ func (he *hostEditor) Delete(root crypto.Hash) (err error) {
 	if he.invalid {
 		return errInvalidEditor
 	}
-	contract, err := he.editor.Delete(root)
+
+	// Fetch the contract, perform the delete, and return the contract.
+	contract, exists := he.contractor.contracts.Acquire(he.id)
+	if !exists {
+		return errors.New("requested contract no longer exists")
+	}
+	newContract, err := he.editor.Delete(contract, root)
 	if err != nil {
+		he.contractor.contracts.Return(contract)
 		return err
 	}
+	he.contractor.contracts.Return(newContract)
 
+	// Save.
 	he.contractor.mu.Lock()
-	// TODO: not sure how this should work. We probably want a way to update
-	// the contract without returning it.
-	he.contractor.contracts.Return(contract)
-	he.contractor.contracts.Acquire(contract.ID)
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
-	he.contract = contract
-
 	return nil
 }
 
@@ -163,20 +140,57 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 	if he.invalid {
 		return errInvalidEditor
 	}
-	contract, err := he.editor.Modify(oldRoot, newRoot, offset, newData)
+
+	// Fetch the contract, perform the upload, and return the contract.
+	contract, exists := he.contractor.contracts.Acquire(he.id)
+	if !exists {
+		return errors.New("requested contract no longer exists")
+	}
+	newContract, err := he.editor.Modify(contract, oldRoot, newRoot, offset, newData)
 	if err != nil {
+		he.contractor.contracts.Return(contract)
 		return err
 	}
+	he.contractor.contracts.Return(newContract)
+
+	// Save.
 	he.contractor.mu.Lock()
-	// TODO: not sure how this should work. We probably want a way to update
-	// the contract without returning it.
-	he.contractor.contracts.Return(contract)
-	he.contractor.contracts.Acquire(contract.ID)
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
-	he.contract = contract
-
 	return nil
+}
+
+// Upload negotiates a revision that adds a sector to a file contract.
+func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
+	he.mu.Lock()
+	defer he.mu.Unlock()
+	if he.invalid {
+		return crypto.Hash{}, errInvalidEditor
+	}
+
+	// Fetch the contract, perform the upload, and return the contract.
+	contract, exists := he.contractor.contracts.Acquire(he.id)
+	if !exists {
+		return crypto.Hash{}, errors.New("requested contract no longer exists")
+	}
+	newContract, sectorRoot, err := he.editor.Upload(contract, data)
+	if err != nil {
+		he.contractor.contracts.Return(contract)
+		return crypto.Hash{}, err
+	}
+	he.contractor.contracts.Return(newContract)
+
+	// Save.
+	he.contractor.mu.Lock()
+	he.contractor.persist.update(updateUploadRevision{
+		NewRevisionTxn:     contract.LastRevisionTxn,
+		NewSectorRoot:      sectorRoot,
+		NewSectorIndex:     len(contract.MerkleRoots) - 1,
+		NewUploadSpending:  contract.UploadSpending,
+		NewStorageSpending: contract.StorageSpending,
+	})
+	he.contractor.mu.Unlock()
+	return sectorRoot, nil
 }
 
 // Editor returns a Editor object that can be used to upload, modify, and
@@ -199,18 +213,10 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		return cachedEditor, nil
 	}
 
-	// Attempt to acquire contract
-	contract, haveContract := c.contracts.Acquire(id)
+	contract, haveContract := c.contracts.View(id)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
 	}
-	// return contract early if function returns error
-	defer func() {
-		if err != nil {
-			c.contracts.Return(contract)
-		}
-	}()
-
 	host, haveHost := c.hdb.Host(contract.HostPublicKey)
 	if height > contract.EndHeight() {
 		return nil, errors.New("contract has already ended")
@@ -289,9 +295,11 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	// cache editor
 	he := &hostEditor{
 		clients:    1,
-		contract:   contract,
 		contractor: c,
 		editor:     e,
+		endHeight:  contract.EndHeight(),
+		id:         contract.ID,
+		netAddress: contract.NetAddress,
 	}
 	c.mu.Lock()
 	c.editors[contract.ID] = he
