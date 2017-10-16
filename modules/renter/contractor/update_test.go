@@ -18,6 +18,7 @@ import (
 // TestProcessConsensusUpdate tests that contracts are removed at the expected
 // block height.
 func TestProcessConsensusUpdate(t *testing.T) {
+	t.Skip("Test needs to be rewritten to use full-stack contractor")
 	// create contractor with a contract ending at height 20
 	var stub newStub
 	var rc modules.RenterContract

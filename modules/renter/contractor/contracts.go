@@ -90,7 +90,11 @@ func (c *Contractor) managedMarkContractsUtility() {
 			if !ok {
 				return
 			}
-			defer c.contracts.Return(contract)
+			// Wrap the contract in a closure so that changes we make to the
+			// contract get returned.
+			defer func() {
+				c.contracts.Return(contract)
+			}()
 
 			// Start the contract in good standing.
 			contract.GoodForUpload = true
@@ -571,11 +575,10 @@ func (c *Contractor) threadedContractMaintenance() {
 
 	// Count the number of contracts which are good for uploading, and then make
 	// more as needed to fill the gap.
-	// Renew any contracts that need to be renewed.
 	c.mu.RLock()
 	uploadContracts := 0
 	for _, contract := range c.contracts.ViewAll() {
-		if contract.GoodForUpload || (contract.GoodForRenew && c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight()) {
+		if contract.GoodForUpload {
 			uploadContracts++
 		}
 	}
