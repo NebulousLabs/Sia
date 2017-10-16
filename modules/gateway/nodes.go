@@ -173,15 +173,21 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	}
 
 	g.mu.Lock()
+	changed := false
 	for _, node := range nodes {
 		err := g.addNode(node)
 		if err != nil && err != errNodeExists && err != errOurAddress {
 			g.log.Printf("WARN: peer '%v' sent the invalid addr '%v'", conn.RPCAddr(), node)
 		}
+		if err == nil {
+			changed = true
+		}
 	}
-	err := g.saveSync()
-	if err != nil {
-		g.log.Println("ERROR: unable to save new nodes added to the gateway:", err)
+	if changed {
+		err := g.saveSync()
+		if err != nil {
+			g.log.Println("ERROR: unable to save new nodes added to the gateway:", err)
+		}
 	}
 	g.mu.Unlock()
 	return nil
