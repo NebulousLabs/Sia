@@ -281,7 +281,9 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 
 	// We may have upgraded persist or resubscribed. Save now so that we don't
 	// lose our work.
+	c.mu.Lock()
 	err = c.save()
+	c.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
