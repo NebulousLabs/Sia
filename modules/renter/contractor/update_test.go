@@ -176,7 +176,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// mine until we enter the renew window
+	// mine until we enter the renew window; the editor should be invalidated
 	renewHeight := contract.EndHeight() - c.allowance.RenewWindow
 	for c.blockHeight < renewHeight {
 		_, err := m.AddBlock()
@@ -191,6 +191,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 
 	// check renewed contract
 	contract = c.Contracts()[0]
+	c.mu.Lock()
 	if contract.FileContract.FileMerkleRoot != root {
 		t.Error("wrong merkle root:", contract.FileContract.FileMerkleRoot)
 	} else if contract.FileContract.FileSize != modules.SectorSize {
@@ -200,6 +201,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	} else if contract.FileContract.WindowStart != c.blockHeight+c.allowance.Period {
 		t.Error("wrong window start:", contract.FileContract.WindowStart)
 	}
+	c.mu.Unlock()
 
 	// editor should have been invalidated
 	err = editor.Delete(crypto.Hash{})
