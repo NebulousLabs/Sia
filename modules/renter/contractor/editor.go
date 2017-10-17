@@ -114,17 +114,11 @@ func (he *hostEditor) Delete(root crypto.Hash) (err error) {
 		return errInvalidEditor
 	}
 
-	// Fetch the contract, perform the delete, and return the contract.
-	contract, exists := he.contractor.contracts.Acquire(he.id)
-	if !exists {
-		return errors.New("requested contract no longer exists")
-	}
-	newContract, err := he.editor.Delete(contract, root)
+	// Perform the delete.
+	_, err = he.editor.Delete(root)
 	if err != nil {
-		he.contractor.contracts.Return(contract)
 		return err
 	}
-	he.contractor.contracts.Return(newContract)
 
 	// Save.
 	he.contractor.mu.Lock()
@@ -141,17 +135,11 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 		return errInvalidEditor
 	}
 
-	// Fetch the contract, perform the upload, and return the contract.
-	contract, exists := he.contractor.contracts.Acquire(he.id)
-	if !exists {
-		return errors.New("requested contract no longer exists")
-	}
-	newContract, err := he.editor.Modify(contract, oldRoot, newRoot, offset, newData)
+	// Perform the modification.
+	_, err = he.editor.Modify(oldRoot, newRoot, offset, newData)
 	if err != nil {
-		he.contractor.contracts.Return(contract)
 		return err
 	}
-	he.contractor.contracts.Return(newContract)
 
 	// Save.
 	he.contractor.mu.Lock()
@@ -168,26 +156,20 @@ func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
 		return crypto.Hash{}, errInvalidEditor
 	}
 
-	// Fetch the contract, perform the upload, and return the contract.
-	contract, exists := he.contractor.contracts.Acquire(he.id)
-	if !exists {
-		return crypto.Hash{}, errors.New("requested contract no longer exists")
-	}
-	newContract, sectorRoot, err := he.editor.Upload(contract, data)
+	// Perform the upload.
+	newContract, sectorRoot, err := he.editor.Upload(data)
 	if err != nil {
-		he.contractor.contracts.Return(contract)
 		return crypto.Hash{}, err
 	}
-	he.contractor.contracts.Return(newContract)
 
 	// Save.
 	he.contractor.mu.Lock()
 	he.contractor.persist.update(updateUploadRevision{
-		NewRevisionTxn:     contract.LastRevisionTxn,
+		NewRevisionTxn:     newContract.LastRevisionTxn,
 		NewSectorRoot:      sectorRoot,
-		NewSectorIndex:     len(contract.MerkleRoots) - 1,
-		NewUploadSpending:  contract.UploadSpending,
-		NewStorageSpending: contract.StorageSpending,
+		NewSectorIndex:     len(newContract.MerkleRoots) - 1,
+		NewUploadSpending:  newContract.UploadSpending,
+		NewStorageSpending: newContract.StorageSpending,
 	})
 	he.contractor.mu.Unlock()
 	return sectorRoot, nil
@@ -263,7 +245,7 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	}
 
 	// Create the editor.
-	e, err := proto.NewEditor(host, contract, height, c.hdb, cancel)
+	e, err := proto.NewEditor(host, contract.ID, c.contracts, height, c.hdb, cancel)
 	if proto.IsRevisionMismatch(err) {
 		// Our original revision does not match the host, try again using the
 		// cached revision.
@@ -277,7 +259,7 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		c.log.Printf("Host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
 		contract.LastRevision = cached.Revision
 		contract.MerkleRoots = cached.MerkleRoots
-		e, err = proto.NewEditor(host, contract, height, c.hdb, cancel)
+		e, err = proto.NewEditor(host, contract.ID, c.contracts, height, c.hdb, cancel)
 		// needs to be handled separately since a revision mismatch is not automatically a failed interaction
 		if proto.IsRevisionMismatch(err) {
 			c.hdb.IncrementFailedInteractions(host.PublicKey)

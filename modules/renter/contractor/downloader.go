@@ -94,17 +94,11 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 		return nil, errInvalidDownloader
 	}
 
-	// Fetch the contract, download the sector, return the contract.
-	contract, haveContract := hd.contractor.contracts.Acquire(hd.contractID)
-	if !haveContract {
-		return nil, errors.New("no record of that contract")
-	}
-	updatedContract, sector, err := hd.downloader.Sector(contract, root)
+	// Download the sector.
+	updatedContract, sector, err := hd.downloader.Sector(root)
 	if err != nil {
-		hd.contractor.contracts.Return(contract)
 		return nil, err
 	}
-	hd.contractor.contracts.Return(updatedContract)
 
 	// Submit an update documenting the new contract, instead of saving the
 	// whole journal state.
@@ -187,7 +181,7 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	}
 
 	// create downloader
-	d, err := proto.NewDownloader(host, contract, c.hdb, cancel)
+	d, err := proto.NewDownloader(host, contract.ID, c.contracts, c.hdb, cancel)
 	if proto.IsRevisionMismatch(err) {
 		// try again with the cached revision
 		c.mu.RLock()
@@ -200,7 +194,7 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
 		contract.LastRevision = cached.Revision
-		d, err = proto.NewDownloader(host, contract, c.hdb, cancel)
+		d, err = proto.NewDownloader(host, contract.ID, c.contracts, c.hdb, cancel)
 		// needs to be handled separately since a revision mismatch is not automatically a failed interaction
 		if proto.IsRevisionMismatch(err) {
 			c.hdb.IncrementFailedInteractions(host.PublicKey)

@@ -133,12 +133,12 @@ func (cs *ContractSet) ViewAll() []modules.RenterContract {
 
 // NewContractSet returns a ContractSet populated with the provided slice of
 // RenterContracts, which may be nil.
-func NewContractSet(contracts []modules.RenterContract) ContractSet {
+func NewContractSet(contracts []modules.RenterContract) *ContractSet {
 	set := make(map[types.FileContractID]*safeContract)
 	for _, c := range contracts {
 		set[c.ID] = &safeContract{RenterContract: c}
 	}
-	return ContractSet{
+	return &ContractSet{
 		contracts: set,
 	}
 }
