@@ -110,10 +110,9 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	// whole journal state.
 	hd.contractor.mu.Lock()
 	hd.contractor.persist.update(updateDownloadRevision{
-		NewRevisionTxn:      contract.LastRevisionTxn,
-		NewDownloadSpending: contract.DownloadSpending,
+		NewRevisionTxn:      updatedContract.LastRevisionTxn,
+		NewDownloadSpending: updatedContract.DownloadSpending,
 	})
-	hd.contractor.contracts.Modify(contract)
 	hd.contractor.mu.Unlock()
 
 	return sector, nil

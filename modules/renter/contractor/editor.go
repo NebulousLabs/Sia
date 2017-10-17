@@ -204,15 +204,19 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	c.mu.RUnlock()
 
 	if renewing {
+		// Cannot use the editor if the contract is being renewed.
 		return nil, errors.New("currently renewing that contract")
 	} else if haveEditor {
-		// increment number of clients and return
+		// This editor already exists. Mark that there are now two routines
+		// using the editor, and then return the editor that already exists.
 		cachedEditor.mu.Lock()
 		cachedEditor.clients++
 		cachedEditor.mu.Unlock()
 		return cachedEditor, nil
 	}
 
+	// Check that the contract and host are both available, and run some brief
+	// sanity checks to see that the host is not swindling us.
 	contract, haveContract := c.contracts.View(id)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
@@ -226,15 +230,10 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		return nil, errTooExpensive
 	} else if host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
 		return nil, errTooExpensive
-	} else if build.VersionCmp(host.Version, "0.6.0") > 0 {
-		// COMPATv0.6.0: don't cap host.Collateral on old hosts
-		if host.Collateral.Cmp(maxUploadCollateral) > 0 {
-			host.Collateral = maxUploadCollateral
-		}
 	}
 	contract.NetAddress = host.NetAddress
 
-	// acquire revising lock
+	// Acquire the revising lock.
 	c.mu.Lock()
 	alreadyRevising := c.revising[contract.ID]
 	if alreadyRevising {
@@ -243,8 +242,7 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	}
 	c.revising[contract.ID] = true
 	c.mu.Unlock()
-
-	// release lock early if function returns an error
+	// Release the revising lock early in the event of an error.
 	defer func() {
 		if err != nil {
 			c.mu.Lock()
@@ -264,19 +262,19 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		}
 	}
 
-	// create editor
+	// Create the editor.
 	e, err := proto.NewEditor(host, contract, height, c.hdb, cancel)
 	if proto.IsRevisionMismatch(err) {
-		// try again with the cached revision
+		// Our original revision does not match the host, try again using the
+		// cached revision.
 		c.mu.RLock()
 		cached, ok := c.cachedRevisions[contract.ID]
 		c.mu.RUnlock()
 		if !ok {
-			// nothing we can do; return original error
-			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
+			c.log.Printf("Wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
 			return nil, err
 		}
-		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
+		c.log.Printf("Host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
 		contract.LastRevision = cached.Revision
 		contract.MerkleRoots = cached.MerkleRoots
 		e, err = proto.NewEditor(host, contract, height, c.hdb, cancel)
@@ -284,6 +282,12 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		if proto.IsRevisionMismatch(err) {
 			c.hdb.IncrementFailedInteractions(host.PublicKey)
 		}
+
+		// TODO: Update the contract set to have the cached data. This is
+		// nontrivial, as we know the cached stuff was working on a previous set
+		// of the contract, which we no longer have :<
+		//
+		// TODO: Make sure these fixes get transplanted to the editor as well.
 	}
 	if err != nil {
 		return nil, err
