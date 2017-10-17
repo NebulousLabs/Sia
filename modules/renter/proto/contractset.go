@@ -82,18 +82,6 @@ func (cs *ContractSet) Len() int {
 	return len(cs.contracts)
 }
 
-// Modify will update a contract's contents without releasing the lock.
-func (cs *ContractSet) Modify(contract modules.RenterContract) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	safeContract, ok := cs.contracts[contract.ID]
-	if !ok {
-		build.Critical("no contract with that id")
-	}
-	safeContract.RenterContract = contract
-	cs.contracts[contract.ID] = safeContract
-}
-
 // Return returns a locked contract to the set and unlocks it. The contract
 // must have been previously acquired by Acquire. If the contract is not
 // present in the set, Return panics.
