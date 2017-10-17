@@ -257,8 +257,13 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 			return nil, err
 		}
 		c.log.Printf("Host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
+		contract, haveContract = c.contracts.Acquire(contract.ID)
+		if !haveContract {
+			c.log.Critical("contract set does not contain contract")
+		}
 		contract.LastRevision = cached.Revision
 		contract.MerkleRoots = cached.MerkleRoots
+		c.contracts.Return(contract)
 		e, err = proto.NewEditor(host, contract.ID, c.contracts, height, c.hdb, cancel)
 		// needs to be handled separately since a revision mismatch is not automatically a failed interaction
 		if proto.IsRevisionMismatch(err) {
