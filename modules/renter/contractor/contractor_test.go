@@ -241,14 +241,14 @@ func TestAllowancePeriodTracking(t *testing.T) {
 	}
 	// mine until one before the renew window, current period should stay
 	// constant
-	for i := types.BlockHeight(0); i < testAllowance.RenewWindow; i++ {
+	for i := types.BlockHeight(0); i < testAllowance.RenewWindow-1; i++ {
 		_, err = m.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	if c.CurrentPeriod() != initialHeight {
-		t.Fatal("current period should not have incremeented, wanted", initialHeight, "got", c.CurrentPeriod())
+		t.Fatal("current period should not have incremented, wanted", initialHeight, "got", c.CurrentPeriod())
 	}
 	// mine another another block. current period should increment.
 	_, err = m.AddBlock()
@@ -258,8 +258,8 @@ func TestAllowancePeriodTracking(t *testing.T) {
 	c.mu.Lock()
 	height := c.blockHeight
 	c.mu.Unlock()
-	if c.CurrentPeriod() != height-1 {
-		t.Fatal("unexpected period", c.CurrentPeriod(), "wanted", height-1)
+	if c.CurrentPeriod() != height {
+		t.Fatal("unexpected period", c.CurrentPeriod(), "wanted", height)
 	}
 }
 

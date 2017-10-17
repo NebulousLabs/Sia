@@ -65,7 +65,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// refers to how frequently the period metrics are reset.
 	// TODO: How to make this more explicit.
 	cycleLen := c.allowance.Period - c.allowance.RenewWindow
-	if c.blockHeight > c.currentPeriod+cycleLen {
+	if c.blockHeight >= c.currentPeriod+cycleLen {
 		c.currentPeriod += cycleLen
 		// COMPATv1.0.4-lts
 		// if we were storing a special metrics contract, it will be invalid

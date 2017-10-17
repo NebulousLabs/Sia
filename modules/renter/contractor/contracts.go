@@ -514,8 +514,6 @@ func (c *Contractor) threadedContractMaintenance() {
 				c.contracts.Return(oldContract)
 				return
 			}
-			// Renew successful, defer deleting the contract.
-			defer c.contracts.Delete(oldContract)
 			c.log.Printf("Renewed contract %v with %v\n", id, oldContract.NetAddress)
 
 			// Update the utility values for the new contract, and for the old
@@ -538,6 +536,8 @@ func (c *Contractor) threadedContractMaintenance() {
 			// instead of the old contract.
 			c.mu.Lock()
 			defer c.mu.Unlock()
+			// Delete the old contract.
+			c.contracts.Delete(oldContract)
 			// Store the contract in the record of historic contracts.
 			c.oldContracts[oldContract.ID] = oldContract
 			// Add the new contract, including a mapping from the old
