@@ -193,7 +193,12 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 			return nil, err
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
+		contract, haveContract = c.contracts.Acquire(contract.ID)
+		if !haveContract {
+			c.log.Critical("contract set does not contain contract")
+		}
 		contract.LastRevision = cached.Revision
+		c.contracts.Return(contract)
 		d, err = proto.NewDownloader(host, contract.ID, c.contracts, c.hdb, cancel)
 		// needs to be handled separately since a revision mismatch is not automatically a failed interaction
 		if proto.IsRevisionMismatch(err) {
