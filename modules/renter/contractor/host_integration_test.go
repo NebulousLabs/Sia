@@ -676,46 +676,49 @@ func TestIntegrationResync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	contract, _ = c.contracts.Acquire(contract.ID)
 
-	// Add some corruption to the set of cached revisions.
+	// Add some corruption to the contract.
+	contract, _ = c.contracts.Acquire(contract.ID)
 	badContract := contract
 	badContract.LastRevision.NewRevisionNumber--
 	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
+	c.contracts.Return(badContract)
 	c.mu.Lock()
+
+	// Add some corruption to the cached revision.
 	cr := c.cachedRevisions[contract.ID]
 	cr.Revision.NewRevisionNumber = 0
 	cr.Revision.NewRevisionNumber--
 	c.cachedRevisions[contract.ID] = cr
-	c.contracts.Return(badContract)
 	c.mu.Unlock()
 
 	// Editor should fail with the bad contract
-	_, err = c.Editor(badContract.ID, nil)
+	_, err = c.Editor(contract.ID, nil)
 	if !proto.IsRevisionMismatch(err) {
 		t.Fatal("expected revision mismatch, got", err)
 	}
 
-	// add cachedRevision
+	// Restore the cached revision so that it equals what the contract
+	// originally equalled, checking that the software correctly falls back to
+	// the cached revision.
 	cachedRev := cachedRevision{contract.LastRevision, contract.MerkleRoots}
 	c.mu.Lock()
 	c.cachedRevisions[contract.ID] = cachedRev
 	c.mu.Unlock()
 
 	// Editor and Downloader should now succeed after loading the cachedRevision
-	editor, err = c.Editor(badContract.ID, nil)
+	editor, err = c.Editor(contract.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	editor.Close()
-
-	downloader, err = c.Downloader(badContract.ID, nil)
+	downloader, err = c.Downloader(contract.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	downloader.Close()
 
-	// Add some corruption to the set of cached revisions.
+	// Add some corruption to the contract.
 	badContract = contract
 	badContract.LastRevision.NewRevisionNumber--
 	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
@@ -734,12 +737,13 @@ func TestIntegrationResync(t *testing.T) {
 		t.Fatal("expected revision mismatch, got", err)
 	}
 
-	// add cachedRevision
+	// Restore the cached revision to what it was when we were successfully able
+	// to create the editor and downloader.
 	c.mu.Lock()
 	c.cachedRevisions[contract.ID] = cachedRev
 	c.mu.Unlock()
 
-	// should be able to upload after loading the cachedRevision
+	// Uploading should be successful now.
 	editor, err = c.Editor(badContract.ID, nil)
 	if err != nil {
 		t.Fatal(err)
