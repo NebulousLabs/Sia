@@ -9,7 +9,6 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -80,7 +79,7 @@ func apiGet(call string) (*http.Response, error) {
 		if apiPassword == "" {
 			// prompt for password and store it in a global var for subsequent
 			// calls
-			apiPassword, err = speakeasy.Ask("API password: ")
+			apiPassword, err = passwordPrompt("API password: ")
 			if err != nil {
 				return nil, err
 			}
@@ -149,7 +148,7 @@ func apiPost(call, vals string) (*http.Response, error) {
 	if resp.StatusCode == http.StatusUnauthorized {
 		resp.Body.Close()
 		// Prompt for password and retry request with authentication.
-		password, err := speakeasy.Ask("API password: ")
+		password, err := passwordPrompt("API password: ")
 		if err != nil {
 			return nil, err
 		}
