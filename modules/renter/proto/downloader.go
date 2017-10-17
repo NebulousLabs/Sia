@@ -9,16 +9,19 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A Downloader retrieves sectors by calling the download RPC on a host.
 // Downloaders are NOT thread- safe; calls to Sector must be serialized.
 type Downloader struct {
-	host      modules.HostDBEntry
-	conn      net.Conn
-	closeChan chan struct{}
-	once      sync.Once
-	hdb       hostDB
+	contractID  types.FileContractID
+	contractSet *ContractSet
+	host        modules.HostDBEntry
+	conn        net.Conn
+	closeChan   chan struct{}
+	once        sync.Once
+	hdb         hostDB
 
 	SaveFn revisionSaver
 }
@@ -26,9 +29,16 @@ type Downloader struct {
 // Sector retrieves the sector with the specified Merkle root, and revises
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
-func (hd *Downloader) Sector(contract modules.RenterContract, root crypto.Hash) (_ modules.RenterContract, _ []byte, err error) {
+func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []byte, err error) {
 	// Reset deadline when finished.
 	defer extendDeadline(hd.conn, time.Hour) // TODO: Constant.
+
+	// Acquire the contract.
+	contract, haveContract := hd.contractSet.Acquire(hd.contractID)
+	if !haveContract {
+		return modules.RenterContract{}, nil, errors.New("contract not present in contract set")
+	}
+	defer func() { hd.contractSet.Return(contract) }()
 
 	// calculate price
 	sectorPrice := hd.host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
@@ -136,9 +146,10 @@ func (hd *Downloader) Close() error {
 // Downloader.
 //
 // TODO: NewDownloader should need to receieve nothing more than a host pubkey.
-func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, hdb hostDB, cancel <-chan struct{}) (_ *Downloader, err error) {
+func NewDownloader(host modules.HostDBEntry, id types.FileContractID, contractSet *ContractSet, hdb hostDB, cancel <-chan struct{}) (_ *Downloader, err error) {
+	contract, ok := contractSet.View(id)
 	// check that contract has enough value to support a download
-	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
+	if !ok || len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
 	}
 	sectorPrice := host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
@@ -190,9 +201,11 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract, hd
 
 	// the host is now ready to accept revisions
 	return &Downloader{
-		host:      host,
-		conn:      conn,
-		closeChan: closeChan,
-		hdb:       hdb,
+		contractID:  id,
+		contractSet: contractSet,
+		host:        host,
+		conn:        conn,
+		closeChan:   closeChan,
+		hdb:         hdb,
 	}, nil
 }

@@ -69,7 +69,7 @@ type Contractor struct {
 	revising    map[types.FileContractID]bool // prevent overlapping revisions
 
 	cachedRevisions map[types.FileContractID]cachedRevision
-	contracts       proto.ContractSet
+	contracts       *proto.ContractSet
 	oldContracts    map[types.FileContractID]modules.RenterContract
 	renewedIDs      map[types.FileContractID]types.FileContractID
 }
