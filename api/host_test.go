@@ -1071,6 +1071,9 @@ func TestDeleteSector(t *testing.T) {
 	if len(contracts) != 1 {
 		t.Fatalf("expected exactly 1 contract to have been formed; got %v instead", len(contracts))
 	}
+	if len(contracts[0].MerkleRoots) < 1 {
+		t.Fatal("expected at least one merkle root")
+	}
 	sectorRoot := contracts[0].MerkleRoots[0].String()
 
 	if err = st.stdPostAPI("/host/storage/sectors/delete/"+sectorRoot, url.Values{}); err != nil {
