@@ -208,22 +208,20 @@ func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
 }
 
-// bucketAddrTransactions is special: it's okay if the key doesn't exist, and
-// we need to avoid inserting duplicate slice elements.
-
 func dbPutAddrTransactions(tx *bolt.Tx, addr types.UnlockHash, txns []uint64) error {
 	return dbPut(tx.Bucket(bucketAddrTransactions), addr, txns)
 }
 func dbGetAddrTransactions(tx *bolt.Tx, addr types.UnlockHash) (txns []uint64, err error) {
 	err = dbGet(tx.Bucket(bucketAddrTransactions), addr, &txns)
-	if err == errNoKey {
-		err = nil // no key means no transactions associated yet
-	}
 	return
 }
+
+// dbAddAddrTransaction appends a single transaction index to the set of
+// transactions associated with addr. If the index is already in the set, it is
+// not added again.
 func dbAddAddrTransaction(tx *bolt.Tx, addr types.UnlockHash, txn uint64) error {
 	txns, err := dbGetAddrTransactions(tx, addr)
-	if err != nil {
+	if err != nil && err != errNoKey {
 		return err
 	}
 	for _, i := range txns {
@@ -233,6 +231,10 @@ func dbAddAddrTransaction(tx *bolt.Tx, addr types.UnlockHash, txn uint64) error 
 	}
 	return dbPutAddrTransactions(tx, addr, append(txns, txn))
 }
+
+// dbAddProcessedTransactionAddrs updates bucketAddrTransactions to associate
+// every address in pt with txn, which is assumed to be pt's index in
+// bucketProcessedTransactions.
 func dbAddProcessedTransactionAddrs(tx *bolt.Tx, pt modules.ProcessedTransaction, txn uint64) error {
 	addrs := make(map[types.UnlockHash]struct{})
 	for _, input := range pt.Inputs {
