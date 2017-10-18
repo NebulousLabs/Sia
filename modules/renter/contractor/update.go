@@ -12,6 +12,12 @@ import (
 // threadedContractMaintenance will currently quit if there are no hosts, but it
 // should at least run this code before quitting.
 func (c *Contractor) managedArchiveContracts() {
+	err := c.tg.Add()
+	if err != nil {
+		return
+	}
+	defer c.tg.Done()
+
 	// Determine the current block height.
 	c.mu.RLock()
 	currentHeight := c.blockHeight
