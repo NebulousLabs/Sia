@@ -88,14 +88,14 @@ files, and advertise yourself as a host.
 Building From Source
 --------------------
 
-To build from source, [Go 1.8 must be installed](https://golang.org/doc/install)
-on the system. Then simply use `go get`:
+To build from source, [Go 1.9 must be installed](https://golang.org/doc/install)
+on the system. Make sure your `$GOPATH` is set, and then simply use `go get`:
 
 ```
 go get -u github.com/NebulousLabs/Sia/...
 ```
 
-This will download the Sia repo to your `$GOPATH/src` folder, and install the
+This will download the Sia repo to your `$GOPATH/src` folder and install the
 `siad` and `siac` binaries in your `$GOPATH/bin` folder.
 
 To stay up-to-date, run the previous `go get` command again. Alternatively, you
