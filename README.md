@@ -88,8 +88,21 @@ files, and advertise yourself as a host.
 Building From Source
 --------------------
 
+### Prerequies
+
 To build from source, [Go 1.8 must be installed](https://golang.org/doc/install)
-on the system. Then simply use `go get`:
+on the system.
+
+Note: Don't forget to add `$GOPATH` in your path, ie add the line `export GOPATH=$HOME/.config/go`
+in your .bashrc (or .zshrc or equivalent).
+
+Then, run `go version` and check that it's **1.8** or highter.
+
+### Install
+
+#### Option A: with `go get`
+
+Then simply use `go get`:
 
 ```
 go get -u github.com/NebulousLabs/Sia/...
@@ -98,10 +111,27 @@ go get -u github.com/NebulousLabs/Sia/...
 This will download the Sia repo to your `$GOPATH/src` folder, and install the
 `siad` and `siac` binaries in your `$GOPATH/bin` folder.
 
-To stay up-to-date, run the previous `go get` command again. Alternatively, you
-can use the Makefile provided in this repo. Run `git pull origin master` to
-pull the latest changes, and `make release-std` to build the new binaries. You
-can also run `make test` and `make test-long` to run the short and full test
-suites, respectively. Finally, `make cover` will generate code coverage reports
-for each package; they are stored in the `cover` folder and can be viewed in
-your browser.
+To stay up-to-date, run the previous `go get` command again.
+
+Note: To be able to execute `siad` and `siac` commands, you can add `$GOPATH/bin` in your PATH,
+ie add the line `export PATH=$PATH:$GOPATH/bin` in your .bashrc (or .zshrc or equivalent).
+
+#### Option B: with Makefile
+
+Alternatively, you can use the Makefile provided in this repo. Run
+`git pull origin master` to pull the latest changes, and `make release-std` to
+build the new binaries. You can also run `make test` and `make test-long` to run
+the short and full test suites, respectively. Finally, `make cover` will generate
+code coverage reports for each package; they are stored in the `cover` folder and
+can be viewed in your browser.
+
+### Testing
+
+Run:
+
+```
+siad version
+siac version
+```
+
+This should display the siad and siac version. Otherwise a problem occured during the installation.
