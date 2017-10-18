@@ -858,6 +858,7 @@ lists the status of all files.
   "files": [
     {
       "siapath":        "foo/bar.txt",
+      "localpath":      "/home/foo/bar.txt",
       "filesize":       8192, // bytes
       "available":      true,
       "renewing":       true,

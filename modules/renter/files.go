@@ -229,8 +229,14 @@ func (r *Renter) FileList() []modules.FileInfo {
 	for _, f := range files {
 		f.mu.RLock()
 		renewing := true
+		var localPath string
+		tf, exists := r.tracking[f.name]
+		if exists {
+			localPath = tf.RepairPath
+		}
 		fileList = append(fileList, modules.FileInfo{
 			SiaPath:        f.name,
+			LocalPath:      localPath,
 			Filesize:       f.size,
 			Renewing:       renewing,
 			Available:      f.available(isOffline),
