@@ -2,6 +2,9 @@ package renter
 
 import (
 	"path/filepath"
+	"reflect"
+	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -165,6 +168,18 @@ func (stubHostDB) AllHosts() []modules.HostDBEntry      { return nil }
 func (stubHostDB) AverageContractPrice() types.Currency { return types.Currency{} }
 func (stubHostDB) Close() error                         { return nil }
 func (stubHostDB) IsOffline(modules.NetAddress) bool    { return true }
+func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry {
+	return []modules.HostDBEntry{}
+}
+func (stubHostDB) EstimateHostScore(modules.HostDBEntry) modules.HostScoreBreakdown {
+	return modules.HostScoreBreakdown{}
+}
+func (stubHostDB) Host(types.SiaPublicKey) (modules.HostDBEntry, bool) {
+	return modules.HostDBEntry{}, false
+}
+func (stubHostDB) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown {
+	return modules.HostScoreBreakdown{}
+}
 
 // stubContractor is the minimal implementation of the hostContractor
 // interface.
@@ -181,4 +196,54 @@ func (stubContractor) IsOffline(modules.NetAddress) bool                      { 
 func (stubContractor) Editor(types.FileContractID) (contractor.Editor, error) { return nil, nil }
 func (stubContractor) Downloader(types.FileContractID) (contractor.Downloader, error) {
 	return nil, nil
+}
+
+type pricesStub struct {
+	stubHostDB
+
+	dbEntries []modules.HostDBEntry
+}
+
+func (ps pricesStub) RandomHosts(n int, exclude []types.SiaPublicKey) []modules.HostDBEntry {
+	return ps.dbEntries
+}
+
+// TestRenterPricesVolatility verifies that the renter caches its price
+// estimation, and subsequent calls result in non-volatile results.
+func TestRenterPricesVolatility(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+
+	// create a stubbed hostdb, query it with one contract, add another, verify
+	// the price estimation remains constant until the timeout has passed.
+	hdb := &pricesStub{}
+	id := rt.renter.mu.Lock()
+	rt.renter.hostDB = hdb
+	rt.renter.mu.Unlock(id)
+	dbe := modules.HostDBEntry{}
+	dbe.ContractPrice = types.SiacoinPrecision
+	dbe.DownloadBandwidthPrice = types.SiacoinPrecision
+	dbe.StoragePrice = types.SiacoinPrecision
+	dbe.UploadBandwidthPrice = types.SiacoinPrecision
+	hdb.dbEntries = append(hdb.dbEntries, dbe)
+	initial := rt.renter.PriceEstimation()
+	dbe.ContractPrice = dbe.ContractPrice.Mul64(2)
+	hdb.dbEntries = append(hdb.dbEntries, dbe)
+	after := rt.renter.PriceEstimation()
+	if !reflect.DeepEqual(initial, after) {
+		t.Log(initial)
+		t.Log(after)
+		t.Fatal("expected renter price estimation to be constant")
+	}
+	time.Sleep(estimationTimeout)
+	after = rt.renter.PriceEstimation()
+	if reflect.DeepEqual(initial, after) {
+		t.Fatal("expected renter price estimation to change after waiting timeout")
+	}
 }
