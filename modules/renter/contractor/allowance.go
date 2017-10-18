@@ -121,9 +121,17 @@ func (c *Contractor) managedCancelAllowance() error {
 		return err
 	}
 
-	// Issue an interrupt to any in-progress contract maintenance thread. The
-	// interrupt will give us the maintenance lock, need to release it once the
-	// contracts have all been deleted.
+	// Issue an interrupt to any in-progress contract maintenance thread.
 	c.managedInterruptContractMaintenance()
+
+	// Cycle through all contracts and delete them.
+	ids = c.contracts.IDs()
+	for _, id := range ids {
+		contract, exists := c.contracts.Acquire(id)
+		if !exists {
+			continue
+		}
+		c.contracts.Delete(contract)
+	}
 	return nil
 }
