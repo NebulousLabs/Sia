@@ -171,7 +171,7 @@ func NewDownloader(host modules.HostDBEntry, id types.FileContractID, contractSe
 	conn, err := (&net.Dialer{
 		Cancel:  cancel,
 		Timeout: 45 * time.Second, // TODO: Constant
-	}).Dial("tcp", string(contract.NetAddress))
+	}).Dial("tcp", string(host.NetAddress))
 	if err != nil {
 		return nil, err
 	}

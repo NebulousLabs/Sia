@@ -303,7 +303,7 @@ func NewEditor(host modules.HostDBEntry, id types.FileContractID, contractSet *C
 	conn, err := (&net.Dialer{
 		Cancel:  cancel,
 		Timeout: 15 * time.Second,
-	}).Dial("tcp", string(contract.NetAddress))
+	}).Dial("tcp", string(host.NetAddress))
 	if err != nil {
 		return nil, err
 	}

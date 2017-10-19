@@ -144,8 +144,6 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	} else if host.DownloadBandwidthPrice.Cmp(maxDownloadPrice) > 0 {
 		return nil, errTooExpensive
 	}
-	// Update the contract to the most recent net address for the host.
-	contract.NetAddress = host.NetAddress
 
 	// Acquire the revising lock for the contract, which excludes other threads
 	// from interacting with the contract.
@@ -189,10 +187,10 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		c.mu.RUnlock()
 		if !ok {
 			// nothing we can do; return original error
-			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
+			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, host.NetAddress)
 			return nil, err
 		}
-		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
+		c.log.Printf("host %v has different revision for %v; retrying with cached revision", host.NetAddress, contract.ID)
 		contract, haveContract = c.contracts.Acquire(contract.ID)
 		if !haveContract {
 			c.log.Critical("contract set does not contain contract")
