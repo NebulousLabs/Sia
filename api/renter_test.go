@@ -746,14 +746,6 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	if err == nil || err.Error() != "unable to parse funds" {
 		t.Errorf("expected error to be 'unable to parse funds'; got %v", err)
 	}
-	// Try an invalid funds string. Can't test a negative value since
-	// ErrNegativeCurrency triggers a build.Critical, which calls a panic in
-	// debug mode.
-	allowanceValues.Set("funds", "0")
-	err = st.stdPostAPI("/renter", allowanceValues)
-	if err == nil || err.Error() != contractor.ErrInsufficientAllowance.Error() {
-		t.Errorf("expected error to be %v; got %v", contractor.ErrInsufficientAllowance, err)
-	}
 	// Try a empty period string.
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", "")
