@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -108,8 +109,14 @@ func (j *journal) checkpoint(data contractorPersist) error {
 	if err := j.f.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp.Name(), j.filename); err != nil {
-		return err
+
+	// Attempt rename up to 5 times to prevent issues with anti-virus software.
+	// If after 5 attempts file cannot be renamed, raise critical failure
+	err = build.Retry(5, 100*time.Millisecond, func() error {
+		return os.Rename(tmp.Name(), j.filename)
+	})
+	if err != nil {
+		build.Critical("Unable to rename contractor.journal:", err)
 	}
 
 	// Reopen the journal.
