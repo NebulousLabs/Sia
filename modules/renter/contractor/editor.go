@@ -213,7 +213,6 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	} else if host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
 		return nil, errTooExpensive
 	}
-	contract.NetAddress = host.NetAddress
 
 	// Acquire the revising lock.
 	c.mu.Lock()
@@ -253,10 +252,10 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		cached, ok := c.cachedRevisions[contract.ID]
 		c.mu.RUnlock()
 		if !ok {
-			c.log.Printf("Wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
+			c.log.Printf("Wanted to recover contract %v with host %v, but no revision was cached", contract.ID, host.NetAddress)
 			return nil, err
 		}
-		c.log.Printf("Host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
+		c.log.Printf("Host %v has different revision for %v; retrying with cached revision", host.NetAddress, contract.ID)
 		contract, haveContract = c.contracts.Acquire(contract.ID)
 		if !haveContract {
 			c.log.Critical("contract set does not contain contract")
@@ -290,7 +289,7 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		editor:     e,
 		endHeight:  contract.EndHeight(),
 		id:         contract.ID,
-		netAddress: contract.NetAddress,
+		netAddress: host.NetAddress,
 	}
 	c.mu.Lock()
 	c.editors[contract.ID] = he
