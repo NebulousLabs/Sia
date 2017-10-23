@@ -796,6 +796,112 @@ func TestHostAndRentMultiHost(t *testing.T) {
 	}
 }
 
+// TestHostAndRentMultiHost sets up an integration test where three hosts and a
+// renter do basic (parallel) uploads and downloads.
+func TestHostAndRentFileDetail(t *testing.T) {
+	if testing.Short() || !build.VLONG {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+	stH1, err := blankServerTester(t.Name() + " - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH1.server.panicClose()
+	stH2, err := blankServerTester(t.Name() + " - Host 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH2.server.panicClose()
+	testGroup := []*serverTester{st, stH1, stH2}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add storage to every host.
+	err = addStorageToAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Announce every host.
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance with three hosts.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
+	allowanceValues.Set("hosts", "3")
+	allowanceValues.Set("period", "10")
+	allowanceValues.Set("renewwindow", "2")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file to upload.
+	filesize := int(45678)
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, filesize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload a file with 2-of-6 redundancy.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("datapieces", "2")
+	uploadValues.Set("paritypieces", "4")
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Three pieces should get uploaded.
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 50); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 50 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+	}
+
+	err = st.stdPostAPI("/renter/upload/foo/bar/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// File should be listed by the renter.
+	var rfi modules.FileDetailInfo
+	err = st.getAPI("/renter/filedetail/test?pagingNum=20&current=1", &rfi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rfi.TotalPages != 1 || rfi.SiaPath != "test" {
+		t.Fatal("/renter/filedetail did not return correct file:", rfi)
+	}
+	if len(rfi.Details.Chunks) != 6 {
+		t.Fatal("/renter/filedetail did not return correct chunk count:", len(rfi.Details.Chunks), "\n", rfi)
+	}
+}
+
 // TestHostAndRentManyFiles sets up an integration test where a single renter
 // is uploading many files to the network.
 func TestHostAndRentManyFiles(t *testing.T) {

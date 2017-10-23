@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -11,6 +12,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/Unknwon/paginater"
 )
 
 var (
@@ -147,6 +150,55 @@ func (f *file) redundancy(isOffline func(types.FileContractID) bool) float64 {
 	return float64(minPieces) / float64(f.erasureCode.MinPieces())
 }
 
+// detail returns the detail of this file,
+// with info about each piece is storing by which host(IP)
+// offline or not. There are three level Chunks, Pieces, Hosts
+func (f *file) detail(isOffline func(types.FileContractID) bool) *modules.FileDetail {
+	if f.size == 0 {
+		return &modules.FileDetail{}
+	}
+
+	// If the file has non-0 size then the number of chunks should also be
+	// non-0. Therefore the f.size == 0 conditional block above must appear
+	// before this check.
+	if f.numChunks() == 0 {
+		build.Critical("cannot get detail of a file with 0 chunks")
+		return &modules.FileDetail{}
+	}
+
+	fd := &modules.FileDetail{
+		Hosts:  make([]*modules.HostDetail, 0),
+		Chunks: make([][][]int, f.numChunks()),
+	}
+	hostMap := make(map[string]int)
+
+	for i := 0; i < len(fd.Chunks); i++ {
+		p := make([][]int, f.erasureCode.NumPieces())
+		fd.Chunks[i] = p
+	}
+	for _, fc := range f.contracts {
+		isoffline := isOffline(fc.ID)
+		_, exists := hostMap[string(fc.IP)]
+		if !exists {
+			hd := &modules.HostDetail{
+				IP:        fc.IP,
+				IsOffline: isoffline,
+			}
+			hostMap[string(hd.IP)] = len(fd.Hosts)
+			fd.Hosts = append(fd.Hosts, hd)
+		}
+
+		for _, p := range fc.Pieces {
+			if fd.Chunks[p.Chunk][p.Piece] == nil {
+				fd.Chunks[p.Chunk][p.Piece] = make([]int, 0)
+			}
+			fd.Chunks[p.Chunk][p.Piece] = append(fd.Chunks[p.Chunk][p.Piece], hostMap[string(fc.IP)])
+		}
+	}
+
+	return fd
+}
+
 // expiration returns the lowest height at which any of the file's contracts
 // will expire.
 func (f *file) expiration() types.BlockHeight {
@@ -247,6 +299,72 @@ func (r *Renter) FileList() []modules.FileInfo {
 		f.mu.RUnlock()
 	}
 	return fileList
+}
+
+// ByHost sort hosts in pieces by ip or host name
+type ByHost struct {
+	PieceHosts []int
+	Hosts      []*modules.HostDetail
+}
+
+func (s ByHost) Len() int           { return len(s.PieceHosts) }
+func (s ByHost) Swap(i, j int)      { s.PieceHosts[i], s.PieceHosts[j] = s.PieceHosts[j], s.PieceHosts[i] }
+func (s ByHost) Less(i, j int) bool { return s.Hosts[s.PieceHosts[i]].IP < s.Hosts[s.PieceHosts[j]].IP }
+
+// FileDetail returns all of the files repairing detail
+func (r *Renter) FileDetail(siapath string, pagingNum int, current int) (modules.FileDetailInfo, error) {
+	lockID := r.mu.RLock()
+	r.mu.RUnlock(lockID)
+
+	file, exists := r.files[siapath]
+	if !exists {
+		return modules.FileDetailInfo{}, ErrUnknownPath
+	}
+
+	isOffline := func(id types.FileContractID) bool {
+		id = r.hostContractor.ResolveID(id)
+		offline := r.hostContractor.IsOffline(id)
+		contract, exists := r.hostContractor.ContractByID(id)
+		if !exists {
+			return true
+		}
+		return offline || !contract.GoodForRenew
+	}
+
+	fd := file.detail(isOffline)
+	p := paginater.New(len(fd.Chunks), pagingNum, current, 5)
+	startIndex := (p.Current() - 1) * pagingNum
+	endIndex := p.Current() * pagingNum
+	if endIndex > len(fd.Chunks) {
+		endIndex = len(fd.Chunks)
+	}
+
+	fd.Chunks = fd.Chunks[startIndex:endIndex]
+
+	for i := 0; i < len(fd.Chunks); i++ {
+		for j := 0; j < len(fd.Chunks[i]); j++ {
+			sort.Sort(ByHost{
+				PieceHosts: fd.Chunks[i][j],
+				Hosts:      fd.Hosts,
+			})
+		}
+	}
+
+	file.mu.RLock()
+	fileDetail := modules.FileDetailInfo{
+		SiaPath:        file.name,
+		Filesize:       file.size,
+		Renewing:       true,
+		Available:      file.available(isOffline),
+		Redundancy:     file.redundancy(isOffline),
+		UploadProgress: file.uploadProgress(),
+		Expiration:     file.expiration(),
+		Details:        fd,
+		TotalPages:     p.TotalPages(),
+	}
+	file.mu.RUnlock()
+
+	return fileDetail, nil
 }
 
 // RenameFile takes an existing file and changes the nickname. The original
