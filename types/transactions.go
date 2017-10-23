@@ -124,7 +124,7 @@ type (
 	// When the SiafundOutput is spent, a SiacoinOutput is created, where:
 	//
 	//     SiacoinOutput.Value := (SiafundPool - ClaimStart) / 10,000
-	//     SiacoinOutput.UnlockHash := SiafundOutput.ClaimUnlockHash
+	//     SiacoinOutput.UnlockHash := SiafundInput.ClaimUnlockHash
 	//
 	// When a SiafundOutput is put into a transaction, the ClaimStart must always
 	// equal zero. While the transaction is being processed, the ClaimStart is set
