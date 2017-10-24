@@ -9,7 +9,6 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -84,7 +83,7 @@ func apiGet(call string) (*http.Response, error) {
 			} else {
 				// prompt for password and store it in a global var for subsequent
 				// calls
-				apiPassword, err = speakeasy.Ask("API password: ")
+				apiPassword, err = passwordPrompt("API password: ")
 				if err != nil {
 					return nil, err
 				}
@@ -158,7 +157,7 @@ func apiPost(call, vals string) (*http.Response, error) {
 			fmt.Println("Using SIA_API_PASSWORD environment variable")
 		} else {
 			// Prompt for password and retry request with authentication.
-			apiPassword, err = speakeasy.Ask("API password: ")
+			apiPassword, err = passwordPrompt("API password: ")
 			if err != nil {
 				return nil, err
 			}

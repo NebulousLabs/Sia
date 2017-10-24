@@ -130,11 +130,11 @@ Block ID
 --------
 
 The ID of a block is derived using:
-	Hash(Parent Block ID + 64 bit Nonce + Block Merkle Root)
+	Hash(Parent Block ID + 64 bit Nonce + Timestamp + Block Merkle Root)
 
 The block Merkle root is obtained by creating a Merkle tree whose leaves are
-the hash of the timestamp, the hashes of the miner outputs (one leaf per miner
-output), and the hashes of the transactions (one leaf per transaction).
+the hashes of the miner outputs (one leaf per miner output), and the hashes of 
+the transactions (one leaf per transaction).
 
 Block Target
 ------------

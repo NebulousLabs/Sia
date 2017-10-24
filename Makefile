@@ -24,7 +24,7 @@ dependencies:
 	go get -u github.com/kardianos/osext
 	go get -u github.com/inconshreveable/mousetrap
 	# Frontend Dependencies
-	go get -u github.com/bgentry/speakeasy
+	go get -u golang.org/x/crypto/ssh/terminal
 	go get -u github.com/spf13/cobra/...
 	# Developer Dependencies
 	go install -race std
@@ -38,8 +38,8 @@ run = .
 pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus                                  \
        ./modules/explorer ./modules/gateway ./modules/host ./modules/host/contractmanager                               \
        ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb ./modules/renter/hostdb/hosttree            \
-       ./modules/renter/proto ./modules/miner ./modules/wallet ./modules/transactionpool ./persist ./siac               \
-       ./siad ./sync ./types
+       ./modules/renter/proto ./modules/miner ./modules/wallet ./modules/transactionpool ./persist                      \
+       ./cmd/siad ./cmd/siac ./sync ./types
 
 # fmt calls go fmt on all packages.
 fmt:

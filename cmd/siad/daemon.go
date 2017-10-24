@@ -12,6 +12,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/explorer"
@@ -22,10 +23,19 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/profile"
+	mnemonics "github.com/NebulousLabs/entropy-mnemonics"
 
-	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 )
+
+// passwordPrompt securely reads a password from stdin.
+func passwordPrompt(prompt string) (string, error) {
+	fmt.Print(prompt)
+	pw, err := terminal.ReadPassword(0)
+	fmt.Println()
+	return string(pw), err
+}
 
 // verifyAPISecurity checks that the security values are consistent with a
 // sane, secure system.
@@ -109,6 +119,27 @@ func processConfig(config Config) (Config, error) {
 	return config, nil
 }
 
+// unlockWallet is called on siad startup and attempts to automatically
+// unlock the wallet with the given password string.
+func unlockWallet(w modules.Wallet, password string) error {
+	var validKeys []crypto.TwofishKey
+	dicts := []mnemonics.DictionaryID{"english", "german", "japanese"}
+	for _, dict := range dicts {
+		seed, err := modules.StringToSeed(password, dict)
+		if err != nil {
+			continue
+		}
+		validKeys = append(validKeys, crypto.TwofishKey(crypto.HashObject(seed)))
+	}
+	validKeys = append(validKeys, crypto.TwofishKey(crypto.HashObject(password)))
+	for _, key := range validKeys {
+		if err := w.Unlock(key); err == nil {
+			return nil
+		}
+	}
+	return modules.ErrBadEncryptionKey
+}
+
 // startDaemon uses the config parameters to initialize Sia modules and start
 // siad.
 func startDaemon(config Config) (err error) {
@@ -119,7 +150,7 @@ func startDaemon(config Config) (err error) {
 			config.APIPassword = password
 		} else {
 			// Prompt user for API password.
-			config.APIPassword, err = speakeasy.Ask("Enter API password: ")
+			config.APIPassword, err = passwordPrompt("Enter API password: ")
 			if err != nil {
 				return err
 			}
@@ -300,6 +331,16 @@ func startDaemon(config Config) (err error) {
 
 	// connect the API to the server
 	srv.mux.Handle("/", a)
+
+	// Attempt to auto-unlock the wallet using the SIA_WALLET_PASSWORD env variable
+	if password := os.Getenv("SIA_WALLET_PASSWORD"); password != "" {
+		fmt.Println("Sia Wallet Password found, attempting to auto-unlock wallet")
+		if err := unlockWallet(w, password); err != nil {
+			fmt.Println("Auto-unlock failed.")
+		} else {
+			fmt.Println("Auto-unlock successful.")
+		}
+	}
 
 	// stop the server if a kill signal is caught
 	sigChan := make(chan os.Signal, 1)

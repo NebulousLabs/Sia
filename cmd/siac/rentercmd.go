@@ -147,7 +147,6 @@ func rentercmd() {
 		die("Could not get renter info:", err)
 	}
 	fm := rg.FinancialMetrics
-	unspent := fm.ContractSpending.Sub(fm.DownloadSpending).Sub(fm.StorageSpending).Sub(fm.UploadSpending)
 	fmt.Printf(`Renter info:
 	Storage Spending:  %v
 	Upload Spending:   %v
@@ -156,7 +155,7 @@ func rentercmd() {
 	Total Allocated:   %v
 
 `, currencyUnits(fm.StorageSpending), currencyUnits(fm.UploadSpending),
-		currencyUnits(fm.DownloadSpending), currencyUnits(unspent),
+		currencyUnits(fm.DownloadSpending), currencyUnits(fm.Unspent),
 		currencyUnits(fm.ContractSpending))
 
 	// also list files

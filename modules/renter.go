@@ -75,6 +75,7 @@ type FileUploadParams struct {
 // FileInfo provides information about a file.
 type FileInfo struct {
 	SiaPath        string            `json:"siapath"`
+	LocalPath      string            `json:"localpath"`
 	Filesize       uint64            `json:"filesize"`
 	Available      bool              `json:"available"`
 	Renewing       bool              `json:"renewing"`

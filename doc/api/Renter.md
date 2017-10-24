@@ -190,6 +190,9 @@ lists the status of all files.
       // Path to the file in the renter on the network.
       "siapath": "foo/bar.txt",
 
+      // Path to the local file on disk.
+      "localpath": "/home/foo/bar.txt",
+
       // Size of the file in bytes.
       "filesize": 8192, // bytes
 
