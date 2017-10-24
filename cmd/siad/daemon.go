@@ -324,7 +324,7 @@ func startDaemon(config Config) (err error) {
 	)
 
 	// connect the API to the server
-	srv.mux.Handle("/", a)
+	srv.AttachAPI(a)
 
 	// Attempt to auto-unlock the wallet using the SIA_WALLET_PASSWORD env variable
 	if password := os.Getenv("SIA_WALLET_PASSWORD"); password != "" {

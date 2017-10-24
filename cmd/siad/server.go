@@ -33,9 +33,11 @@ type (
 	// Server creates and serves a HTTP server that offers communication with a
 	// Sia API.
 	Server struct {
-		httpServer *http.Server
-		mux        *http.ServeMux
-		listener   net.Listener
+		httpServer        *http.Server
+		mux               *http.ServeMux
+		listener          net.Listener
+		requiredUserAgent string
+		requiredPassword  string
 	}
 
 	// SiaConstants is a struct listing all of the constants in use.
@@ -366,6 +368,21 @@ func (srv *Server) daemonHandler(password string) http.Handler {
 	return router
 }
 
+// uninitializedHandler handles calls to routes that have not yet been
+// initialized.
+func uninitializedHandler(w http.ResponseWriter, r *http.Request) {
+	api.WriteError(w, api.Error{"siad is not ready. please wait for siad to finish loading."}, http.StatusServiceUnavailable)
+}
+
+// AttachAPI attaches an initialized Sia API to the server.
+func (srv *Server) AttachAPI(a *api.API) {
+	mux := http.NewServeMux()
+	mux.Handle("/daemon/", api.RequireUserAgent(srv.daemonHandler(srv.requiredPassword), srv.requiredUserAgent))
+	mux.Handle("/", a)
+	srv.mux = mux
+	srv.httpServer.Handler = mux
+}
+
 // NewServer creates a new net.http server listening on bindAddr.  Only the
 // /daemon/ routes are registered by this func, additional routes can be
 // registered later by calling serv.mux.Handle.
@@ -401,10 +418,13 @@ func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, e
 			// the API is kept open with no activity before closing.
 			IdleTimeout: time.Minute * 5,
 		},
+		requiredUserAgent: requiredUserAgent,
+		requiredPassword:  requiredPassword,
 	}
 
 	// Register siad routes
 	srv.mux.Handle("/daemon/", api.RequireUserAgent(srv.daemonHandler(requiredPassword), requiredUserAgent))
+	srv.mux.HandleFunc("/", uninitializedHandler)
 
 	return srv, nil
 }
