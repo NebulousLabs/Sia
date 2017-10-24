@@ -143,14 +143,20 @@ func unlockWallet(w modules.Wallet, password string) error {
 // startDaemon uses the config parameters to initialize Sia modules and start
 // siad.
 func startDaemon(config Config) (err error) {
-	// Prompt user for API password.
 	if config.Siad.AuthenticateAPI {
-		config.APIPassword, err = passwordPrompt("Enter API password: ")
-		if err != nil {
-			return err
-		}
-		if config.APIPassword == "" {
-			return errors.New("password cannot be blank")
+		password := os.Getenv("SIA_API_PASSWORD")
+		if password != "" {
+			fmt.Println("Using SIA_API_PASSWORD environment variable")
+			config.APIPassword = password
+		} else {
+			// Prompt user for API password.
+			config.APIPassword, err = passwordPrompt("Enter API password: ")
+			if err != nil {
+				return err
+			}
+			if config.APIPassword == "" {
+				return errors.New("password cannot be blank")
+			}
 		}
 	}
 
