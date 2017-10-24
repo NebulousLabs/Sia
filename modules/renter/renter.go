@@ -27,7 +27,7 @@ package renter
 import (
 	"errors"
 	"sync"
-	"time"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -198,8 +198,8 @@ type Renter struct {
 	tg             threadgroup.ThreadGroup
 	tpool          modules.TransactionPool
 
-	lastEstimation          modules.RenterPriceEstimation // used to cache the last price estimation result
-	lastEstimationTimestamp time.Time                     // used to determine if we need to re-sample hosts for price estimation
+	lastEstimation modules.RenterPriceEstimation // used to cache the last price estimation result
+	reestimateFlag uint64                        // flag used to determine if we should calculate another price estimation
 }
 
 // New returns an initialized renter.
@@ -252,6 +252,12 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		tpool:          tpool,
 	}
 	if err := r.initPersist(); err != nil {
+		return nil, err
+	}
+
+	// Subscribe to the consensus set.
+	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
+	if err != nil {
 		return nil, err
 	}
 
@@ -327,12 +333,10 @@ func (r *Renter) Close() error {
 // TODO: Make this function line up with the actual settings in the renter.
 // Perhaps even make it so it uses the renter's actual contracts if it has any.
 func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
-	id := r.mu.RLock()
-	lastEstimationTimestamp := r.lastEstimationTimestamp
-	lastEstimation := r.lastEstimation
-	r.mu.RUnlock(id)
-
-	if time.Since(lastEstimationTimestamp) < estimationTimeout {
+	if atomic.LoadUint64(&r.reestimateFlag) == 0 {
+		id := r.mu.RLock()
+		lastEstimation := r.lastEstimation
+		r.mu.RUnlock(id)
 		return lastEstimation
 	}
 
@@ -385,8 +389,9 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 		StorageTerabyteMonth: totalStorageCost,
 		UploadTerabyte:       totalUploadCost,
 	}
-	id = r.mu.Lock()
-	r.lastEstimationTimestamp = time.Now()
+
+	atomic.StoreUint64(&r.reestimateFlag, 0)
+	id := r.mu.Lock()
 	r.lastEstimation = est
 	r.mu.Unlock(id)
 
@@ -428,6 +433,9 @@ func (r *Renter) AllContracts() []modules.RenterContract {
 	return r.hostContractor.(interface {
 		AllContracts() []modules.RenterContract
 	}).AllContracts()
+}
+func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
+	atomic.StoreUint64(&r.reestimateFlag, 1)
 }
 
 // Enforce that Renter satisfies the modules.Renter interface.

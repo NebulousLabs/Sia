@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -241,9 +240,12 @@ func TestRenterPricesVolatility(t *testing.T) {
 		t.Log(after)
 		t.Fatal("expected renter price estimation to be constant")
 	}
-	time.Sleep(estimationTimeout)
+	_, err = rt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 	after = rt.renter.PriceEstimation()
 	if reflect.DeepEqual(initial, after) {
-		t.Fatal("expected renter price estimation to change after waiting timeout")
+		t.Fatal("expected renter price estimation to change after mining a block")
 	}
 }

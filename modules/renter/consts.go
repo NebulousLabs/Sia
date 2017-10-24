@@ -56,11 +56,4 @@ var (
 		Standard: time.Second * 61,
 		Testing:  time.Second,
 	}).(time.Duration)
-
-	// estimationTimeout defines how long a renter price estimation is cached.
-	estimationTimeout = build.Select(build.Var{
-		Dev:      time.Minute,
-		Standard: time.Minute,
-		Testing:  time.Second * 5,
-	}).(time.Duration)
 )
