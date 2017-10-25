@@ -123,7 +123,7 @@ type (
 	//
 	// When the SiafundOutput is spent, a SiacoinOutput is created, where:
 	//
-	//     SiacoinOutput.Value := (SiafundPool - ClaimStart) / 10,000
+	//     SiacoinOutput.Value := (SiafundPool - ClaimStart) / 10,000 * Value
 	//     SiacoinOutput.UnlockHash := SiafundInput.ClaimUnlockHash
 	//
 	// When a SiafundOutput is put into a transaction, the ClaimStart must always
