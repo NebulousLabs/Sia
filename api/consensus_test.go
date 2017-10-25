@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -129,5 +130,48 @@ func TestConsensusValidateTransactionSet(t *testing.T) {
 	defer resp.Body.Close()
 	if !non2xx(resp.StatusCode) {
 		t.Fatal("expected validation error")
+	}
+}
+
+// TestConsensusChange probes the GET call to /consensus/change.
+func TestConsensusChange(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	// Request the consensus change beginning
+	requestedID := modules.ConsensusChangeBeginning
+	cc, nextID, err := st.cs.ConsensusChange(requestedID)
+
+	// Send the GET request
+	var ccg ConsensusChangeGet
+	err = st.getAPI("/consensus/change/"+cc.ID.String(), &ccg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check if values match
+	if ccg.ID != cc.ID {
+		t.Errorf("ID mismatch: expected %v but was %v", cc.ID, ccg.ID)
+	}
+	if ccg.NextID != nextID {
+		t.Errorf("NextID mismatch: expected %v but was %v", nextID, ccg.NextID)
+	}
+
+	// Request the next change
+	var ccg2 ConsensusChangeGet
+	err = st.getAPI("/consensus/change/"+ccg.NextID.String(), &ccg2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ccg2.ID != ccg.NextID {
+		t.Errorf("ID mismatch: expected %v but was %v", ccg.NextID, ccg2.ID)
 	}
 }

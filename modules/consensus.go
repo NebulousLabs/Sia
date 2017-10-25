@@ -3,6 +3,7 @@ package modules
 import (
 	"errors"
 
+	"encoding/json"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -244,6 +245,11 @@ type (
 		// allowing for garbage collection and rescanning. If the subscriber is
 		// not found in the subscriber database, no action is taken.
 		Unsubscribe(ConsensusSetSubscriber)
+
+		// ConsensusChange returns the ConsensusChange that corresponds to
+		// a given ConsensusChangeID. Primarily used for API calls as modules
+		// should Subscribe to the Consensus Set instead
+		ConsensusChange(id ConsensusChangeID) (ConsensusChange, ConsensusChangeID, error)
 	}
 )
 
@@ -260,4 +266,32 @@ func (cc ConsensusChange) Append(cc2 ConsensusChange) ConsensusChange {
 		SiafundOutputDiffs:        append(cc.SiafundOutputDiffs, cc2.SiafundOutputDiffs...),
 		DelayedSiacoinOutputDiffs: append(cc.DelayedSiacoinOutputDiffs, cc2.DelayedSiacoinOutputDiffs...),
 	}
+}
+
+// String prints the ConsensusChangeID in hex.
+func (ccid ConsensusChangeID) String() string {
+	return (*crypto.Hash)(&ccid).String()
+}
+
+// LoadString takes a string, parses the hash value of the string, and sets the
+// value of the ConsensusChangeID equal to the hash value of the string.
+func (ccid *ConsensusChangeID) LoadString(s string) error {
+	return (*crypto.Hash)(ccid).LoadString(s)
+}
+
+// MarshalJSON marshales a ConsensusChangeID as a hex string.
+func (ccid ConsensusChangeID) MarshalJSON() ([]byte, error) {
+	return (*crypto.Hash)(&ccid).MarshalJSON()
+}
+
+// UnmarshalJSON decodes the json hex string of the ConsensusChangeID.
+func (ccid *ConsensusChangeID) UnmarshalJSON(b []byte) error {
+	err := (*crypto.Hash)(ccid).UnmarshalJSON(b)
+	if err != nil {
+		// COMPATv1.0.0: try decoding into byte array
+		var id [crypto.HashSize]byte
+		err = json.Unmarshal(b, &id)
+		copy(ccid[:], id[:])
+	}
+	return err
 }
