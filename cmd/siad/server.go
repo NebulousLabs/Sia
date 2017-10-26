@@ -11,15 +11,27 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/modules/explorer"
+	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/host"
+	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/renter"
+	"github.com/NebulousLabs/Sia/modules/transactionpool"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/inconshreveable/go-update"
@@ -33,11 +45,12 @@ type (
 	// Server creates and serves a HTTP server that offers communication with a
 	// Sia API.
 	Server struct {
-		httpServer        *http.Server
-		mux               *http.ServeMux
-		listener          net.Listener
-		requiredUserAgent string
-		requiredPassword  string
+		httpServer    *http.Server
+		listener      net.Listener
+		config        Config
+		moduleClosers []io.Closer
+		api           http.Handler
+		mu            sync.Mutex
 	}
 
 	// SiaConstants is a struct listing all of the constants in use.
@@ -368,27 +381,30 @@ func (srv *Server) daemonHandler(password string) http.Handler {
 	return router
 }
 
-// uninitializedHandler handles calls to routes that have not yet been
-// initialized.
-func uninitializedHandler(w http.ResponseWriter, r *http.Request) {
-	api.WriteError(w, api.Error{"siad is not ready. please wait for siad to finish loading."}, http.StatusServiceUnavailable)
-}
-
-// AttachAPI attaches an initialized Sia API to the server.
-func (srv *Server) AttachAPI(a *api.API) {
-	mux := http.NewServeMux()
-	mux.Handle("/daemon/", api.RequireUserAgent(srv.daemonHandler(srv.requiredPassword), srv.requiredUserAgent))
-	mux.Handle("/", a)
-	srv.mux = mux
-	srv.httpServer.Handler = mux
+// apiHandler handles all calls to the API. If the ready flag is not set, this
+// will return an error. Otherwise it will serve the api.
+func (srv *Server) apiHandler(w http.ResponseWriter, r *http.Request) {
+	srv.mu.Lock()
+	isReady := srv.api != nil
+	srv.mu.Unlock()
+	if !isReady {
+		api.WriteError(w, api.Error{"siad is not ready. please wait for siad to finish loading."}, http.StatusServiceUnavailable)
+		return
+	}
+	srv.api.ServeHTTP(w, r)
 }
 
 // NewServer creates a new net.http server listening on bindAddr.  Only the
 // /daemon/ routes are registered by this func, additional routes can be
 // registered later by calling serv.mux.Handle.
-func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, error) {
+func NewServer(config Config) (*Server, error) {
+	// Process the config variables after they are parsed by cobra.
+	config, err := processConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	// Create the listener for the server
-	l, err := net.Listen("tcp", bindAddr)
+	l, err := net.Listen("tcp", config.Siad.APIaddr)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +412,6 @@ func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, e
 	// Create the Server
 	mux := http.NewServeMux()
 	srv := &Server{
-		mux:      mux,
 		listener: l,
 		httpServer: &http.Server{
 			Handler: mux,
@@ -418,15 +433,136 @@ func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, e
 			// the API is kept open with no activity before closing.
 			IdleTimeout: time.Minute * 5,
 		},
-		requiredUserAgent: requiredUserAgent,
-		requiredPassword:  requiredPassword,
+		config: config,
 	}
 
 	// Register siad routes
-	srv.mux.Handle("/daemon/", api.RequireUserAgent(srv.daemonHandler(requiredPassword), requiredUserAgent))
-	srv.mux.HandleFunc("/", uninitializedHandler)
+	mux.Handle("/daemon/", api.RequireUserAgent(srv.daemonHandler(config.APIPassword), config.Siad.RequiredUserAgent))
+	mux.HandleFunc("/", srv.apiHandler)
 
 	return srv, nil
+}
+
+// loadModules loads the modules defined by the server's config and makes their
+// API routes available.
+func (srv *Server) loadModules() error {
+	// Create the server and start serving daemon routes immediately.
+	fmt.Printf("(0/%d) Loading siad...\n", len(srv.config.Siad.Modules))
+
+	// Initialize the Sia modules
+	i := 0
+	var err error
+	var g modules.Gateway
+	if strings.Contains(srv.config.Siad.Modules, "g") {
+		i++
+		fmt.Printf("(%d/%d) Loading gateway...\n", i, len(srv.config.Siad.Modules))
+		g, err = gateway.New(srv.config.Siad.RPCaddr, !srv.config.Siad.NoBootstrap, filepath.Join(srv.config.Siad.SiaDir, modules.GatewayDir))
+		if err != nil {
+			return err
+		}
+		srv.moduleClosers = append(srv.moduleClosers, g)
+	}
+	var cs modules.ConsensusSet
+	if strings.Contains(srv.config.Siad.Modules, "c") {
+		i++
+		fmt.Printf("(%d/%d) Loading consensus...\n", i, len(srv.config.Siad.Modules))
+		cs, err = consensus.New(g, !srv.config.Siad.NoBootstrap, filepath.Join(srv.config.Siad.SiaDir, modules.ConsensusDir))
+		if err != nil {
+			return err
+		}
+		srv.moduleClosers = append(srv.moduleClosers, cs)
+	}
+	var e modules.Explorer
+	if strings.Contains(srv.config.Siad.Modules, "e") {
+		i++
+		fmt.Printf("(%d/%d) Loading explorer...\n", i, len(srv.config.Siad.Modules))
+		e, err = explorer.New(cs, filepath.Join(srv.config.Siad.SiaDir, modules.ExplorerDir))
+		if err != nil {
+			return err
+		}
+		srv.moduleClosers = append(srv.moduleClosers, e)
+	}
+	var tpool modules.TransactionPool
+	if strings.Contains(srv.config.Siad.Modules, "t") {
+		i++
+		fmt.Printf("(%d/%d) Loading transaction pool...\n", i, len(srv.config.Siad.Modules))
+		tpool, err = transactionpool.New(cs, g, filepath.Join(srv.config.Siad.SiaDir, modules.TransactionPoolDir))
+		if err != nil {
+			return err
+		}
+		srv.moduleClosers = append(srv.moduleClosers, tpool)
+	}
+	var w modules.Wallet
+	if strings.Contains(srv.config.Siad.Modules, "w") {
+		i++
+		fmt.Printf("(%d/%d) Loading wallet...\n", i, len(srv.config.Siad.Modules))
+		w, err = wallet.New(cs, tpool, filepath.Join(srv.config.Siad.SiaDir, modules.WalletDir))
+		if err != nil {
+			return err
+		}
+		srv.moduleClosers = append(srv.moduleClosers, w)
+	}
+	var m modules.Miner
+	if strings.Contains(srv.config.Siad.Modules, "m") {
+		i++
+		fmt.Printf("(%d/%d) Loading miner...\n", i, len(srv.config.Siad.Modules))
+		m, err = miner.New(cs, tpool, w, filepath.Join(srv.config.Siad.SiaDir, modules.MinerDir))
+		if err != nil {
+			return err
+		}
+		srv.moduleClosers = append(srv.moduleClosers, m)
+	}
+	var h modules.Host
+	if strings.Contains(srv.config.Siad.Modules, "h") {
+		i++
+		fmt.Printf("(%d/%d) Loading host...\n", i, len(srv.config.Siad.Modules))
+		h, err = host.New(cs, tpool, w, srv.config.Siad.HostAddr, filepath.Join(srv.config.Siad.SiaDir, modules.HostDir))
+		if err != nil {
+			return err
+		}
+		srv.moduleClosers = append(srv.moduleClosers, h)
+	}
+	var r modules.Renter
+	if strings.Contains(srv.config.Siad.Modules, "r") {
+		i++
+		fmt.Printf("(%d/%d) Loading renter...\n", i, len(srv.config.Siad.Modules))
+		r, err = renter.New(g, cs, w, tpool, filepath.Join(srv.config.Siad.SiaDir, modules.RenterDir))
+		if err != nil {
+			return err
+		}
+		srv.moduleClosers = append(srv.moduleClosers, r)
+	}
+
+	// Create the Sia API
+	a := api.New(
+		srv.config.Siad.RequiredUserAgent,
+		srv.config.APIPassword,
+		cs,
+		e,
+		g,
+		h,
+		m,
+		r,
+		tpool,
+		w,
+	)
+
+	// connect the API to the server
+	srv.mu.Lock()
+	srv.api = a
+	srv.mu.Unlock()
+
+	// Attempt to auto-unlock the wallet using the SIA_WALLET_PASSWORD env variable
+	if password := os.Getenv("SIA_WALLET_PASSWORD"); password != "" {
+		fmt.Println("Sia Wallet Password found, attempting to auto-unlock wallet")
+		if err := unlockWallet(w, password); err != nil {
+			fmt.Println("Auto-unlock failed.")
+		} else {
+			fmt.Println("Auto-unlock successful.")
+		}
+	}
+
+	return nil
 }
 
 func (srv *Server) Serve() error {
@@ -442,9 +578,19 @@ func (srv *Server) Serve() error {
 
 // Close closes the Server's listener, causing the HTTP server to shut down.
 func (srv *Server) Close() error {
+	var errs []error
 	// Close the listener, which will cause Server.Serve() to return.
 	if err := srv.listener.Close(); err != nil {
-		return err
+		errs = append(errs, err)
 	}
-	return nil
+	// Close all of the modules
+	for i := len(srv.moduleClosers) - 1; i >= 0; i-- {
+		m := srv.moduleClosers[i]
+		fmt.Printf("Closing %v...\n", reflect.TypeOf(m))
+		if err := m.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return build.JoinErrors(errs, "\n")
 }
