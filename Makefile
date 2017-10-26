@@ -17,13 +17,14 @@ dependencies:
 	go get -u github.com/NebulousLabs/errors
 	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/muxado
+	go get -u github.com/NebulousLabs/threadgroup
 	go get -u github.com/klauspost/reedsolomon
 	go get -u github.com/julienschmidt/httprouter
 	go get -u github.com/inconshreveable/go-update
 	go get -u github.com/kardianos/osext
 	go get -u github.com/inconshreveable/mousetrap
 	# Frontend Dependencies
-	go get -u github.com/bgentry/speakeasy
+	go get -u golang.org/x/crypto/ssh/terminal
 	go get -u github.com/spf13/cobra/...
 	# Developer Dependencies
 	go install -race std
@@ -37,8 +38,8 @@ run = .
 pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus                                  \
        ./modules/explorer ./modules/gateway ./modules/host ./modules/host/contractmanager                               \
        ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb ./modules/renter/hostdb/hosttree            \
-       ./modules/renter/proto ./modules/miner ./modules/wallet ./modules/transactionpool ./persist ./cmd/siac               \
-       ./cmd/siad ./sync ./types
+       ./modules/renter/proto ./modules/miner ./modules/wallet ./modules/transactionpool ./persist                      \
+       ./cmd/siad ./cmd/siac ./sync ./types
 
 # fmt calls go fmt on all packages.
 fmt:
@@ -63,15 +64,15 @@ spellcheck:
 
 # dev builds and installs developer binaries.
 dev:
-	go install -race -tags='dev debug profile' $(pkgs)
+	go install -race -tags='dev debug profile netgo' $(pkgs)
 
 # release builds and installs release binaries.
 release:
-	go install -tags='debug profile' $(pkgs)
+	go install -tags='debug profile netgo' $(pkgs)
 release-race:
-	go install -race -tags='debug profile' $(pkgs)
+	go install -race -tags='debug profile netgo' $(pkgs)
 release-std:
-	go install -tags '' -ldflags='-s -w' $(pkgs)
+	go install -tags 'netgo' -a -ldflags='-s -w' $(pkgs)
 
 # clean removes all directories that get automatically created during
 # development.
@@ -79,19 +80,19 @@ clean:
 	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
 
 test:
-	go test -short -tags='debug testing' -timeout=5s $(pkgs) -run=$(run)
+	go test -short -tags='debug testing netgo' -timeout=5s $(pkgs) -run=$(run)
 test-v:
-	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
+	go test -race -v -short -tags='debug testing netgo' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint
-	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
+	go test -v -race -tags='testing debug netgo' -timeout=500s $(pkgs) -run=$(run)
 test-vlong: clean fmt vet lint
-	go test -v -race -tags='testing debug vlong' -timeout=5000s $(pkgs) -run=$(run)
+	go test -v -race -tags='testing debug vlong netgo' -timeout=5000s $(pkgs) -run=$(run)
 test-cpu:
-	go test -v -tags='testing debug' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)
+	go test -v -tags='testing debug netgo' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)
 test-mem:
-	go test -v -tags='testing debug' -timeout=500s -memprofile mem.prof $(pkgs) -run=$(run)
+	go test -v -tags='testing debug netgo' -timeout=500s -memprofile mem.prof $(pkgs) -run=$(run)
 bench: clean fmt
-	go test -tags='debug testing' -timeout=500s -run=XXX -bench=$(run) $(pkgs)
+	go test -tags='debug testing netgo' -timeout=500s -run=XXX -bench=$(run) $(pkgs)
 cover: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter

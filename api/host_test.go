@@ -172,13 +172,9 @@ func TestHostSettingsHandlerParsing(t *testing.T) {
 	defer st.server.panicClose()
 
 	settings := st.host.InternalSettings()
-	t.Log(settings)
 	settingsValues := url.Values{}
 	settingsValues.Set("maxdownloadbatchsize", "foo")
-	err = st.stdPostAPI("/host", settingsValues)
-	if err != nil {
-		t.Fatal(err)
-	}
+	st.stdPostAPI("/host", settingsValues)
 	newSettings := st.host.InternalSettings()
 	if !reflect.DeepEqual(newSettings, settings) {
 		t.Fatal("invalid acceptingcontracts value changed host settings! got", newSettings, "wanted", settings)
