@@ -388,7 +388,7 @@ func (srv *Server) apiHandler(w http.ResponseWriter, r *http.Request) {
 	isReady := srv.api != nil
 	srv.mu.Unlock()
 	if !isReady {
-		api.WriteError(w, api.Error{"siad is not ready. please wait for siad to finish loading."}, http.StatusServiceUnavailable)
+		api.WriteError(w, api.Error{Message: "siad is not ready. please wait for siad to finish loading."}, http.StatusServiceUnavailable)
 		return
 	}
 	srv.api.ServeHTTP(w, r)
