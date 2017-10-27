@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -153,6 +154,30 @@ func TestEstimateWeight(t *testing.T) {
 		if eg.ConversionRate < test.minConversionRate {
 			t.Fatalf("test %v: incorrect conversion rate: got %v wanted %v\n", i, eg.ConversionRate, test.minConversionRate)
 		}
+	}
+}
+
+// TestHostSettingsHandlerParsing verifies that providing invalid host settings
+// doesn't reset the host's settings.
+func TestHostSettingsHandlerParsing(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	settings := st.host.InternalSettings()
+	settingsValues := url.Values{}
+	settingsValues.Set("maxdownloadbatchsize", "foo")
+	st.stdPostAPI("/host", settingsValues)
+	newSettings := st.host.InternalSettings()
+	if !reflect.DeepEqual(newSettings, settings) {
+		t.Fatal("invalid acceptingcontracts value changed host settings! got", newSettings, "wanted", settings)
 	}
 }
 
