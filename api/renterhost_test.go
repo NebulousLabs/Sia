@@ -22,6 +22,122 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestHostObligationAcceptingContracts verifies that the host will complete
+// storage proofs and the renter will successfully download even if the host
+// has set accepting contracts to false.
+func TestHostObligationAcceptingContracts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
+	allowanceValues.Set("hosts", "1")
+	allowanceValues.Set("period", "10")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
+	}
+
+	filesize := int(1024)
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, filesize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// upload the file
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// redundancy should reach 1
+	var rf RenterFiles
+	err = retry(60, time.Second, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Available {
+			return nil
+		}
+		return errors.New("file not uploaded")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// set acceptingcontracts = false, mine some blocks, verify we can download
+	settings := st.host.InternalSettings()
+	settings.AcceptingContracts = false
+	st.host.SetInternalSettings(settings)
+	for i := 0; i < 3; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Millisecond * 200)
+	}
+	downloadPath := filepath.Join(st.dir, "test-downloaded-verify.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mine blocks to cause the host to submit storage proofs to the blockchain.
+	for i := 0; i < 15; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Millisecond * 200)
+	}
+
+	// should have successful proofs
+	success := false
+	for _, so := range st.host.StorageObligations() {
+		if so.ProofConfirmed {
+			success = true
+			break
+		}
+	}
+	if !success {
+		t.Fatal("no successful storage proofs")
+	}
+}
+
 // TestRenterLocalRepair verifies that the renter will use the local file to
 // repair if the file exists locally
 func TestRenterLocalRepair(t *testing.T) {
