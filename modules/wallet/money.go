@@ -13,7 +13,8 @@ type sortedOutputs struct {
 	outputs []types.SiacoinOutput
 }
 
-// DustThreshold returns the quantity below which a Currency is considered to be Dust.
+// DustThreshold returns the quantity per byte below which a Currency is
+// considered to be Dust.
 func (w *Wallet) DustThreshold() types.Currency {
 	minFee, _ := w.tpool.FeeEstimation()
 	return minFee.Mul64(3)

@@ -392,7 +392,8 @@ type (
 		// are also returned to the caller.
 		SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
 
-		// DustThreshold returns the quantity below which a Currency is considered to be Dust.
+		// DustThreshold returns the quantity per byte below which a Currency is
+		// considered to be Dust.
 		DustThreshold() types.Currency
 	}
 )
