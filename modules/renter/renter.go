@@ -26,8 +26,8 @@ package renter
 
 import (
 	"errors"
+	"reflect"
 	"sync"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -199,7 +199,6 @@ type Renter struct {
 	tpool          modules.TransactionPool
 
 	lastEstimation modules.RenterPriceEstimation // used to cache the last price estimation result
-	reestimateFlag uint64                        // flag used to determine if we should calculate another price estimation
 }
 
 // New returns an initialized renter.
@@ -333,10 +332,10 @@ func (r *Renter) Close() error {
 // TODO: Make this function line up with the actual settings in the renter.
 // Perhaps even make it so it uses the renter's actual contracts if it has any.
 func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
-	if atomic.LoadUint64(&r.reestimateFlag) == 0 {
-		id := r.mu.RLock()
-		lastEstimation := r.lastEstimation
-		r.mu.RUnlock(id)
+	id := r.mu.RLock()
+	lastEstimation := r.lastEstimation
+	r.mu.RUnlock(id)
+	if !reflect.DeepEqual(lastEstimation, modules.RenterPriceEstimation{}) {
 		return lastEstimation
 	}
 
@@ -390,8 +389,7 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 		UploadTerabyte:       totalUploadCost,
 	}
 
-	atomic.StoreUint64(&r.reestimateFlag, 0)
-	id := r.mu.Lock()
+	id = r.mu.Lock()
 	r.lastEstimation = est
 	r.mu.Unlock(id)
 
@@ -435,7 +433,9 @@ func (r *Renter) AllContracts() []modules.RenterContract {
 	}).AllContracts()
 }
 func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
-	atomic.StoreUint64(&r.reestimateFlag, 1)
+	id := r.mu.Lock()
+	r.lastEstimation = modules.RenterPriceEstimation{}
+	r.mu.Unlock(id)
 }
 
 // Enforce that Renter satisfies the modules.Renter interface.
