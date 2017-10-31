@@ -14,7 +14,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"sort"
 	"strings"
@@ -48,9 +47,16 @@ type (
 		httpServer    *http.Server
 		listener      net.Listener
 		config        Config
-		moduleClosers []io.Closer
+		moduleClosers []moduleCloser
 		api           http.Handler
 		mu            sync.Mutex
+	}
+
+	// moduleCloser defines a struct that closes modules, defined by a name and
+	// an underlying io.Closer.
+	moduleCloser struct {
+		name   string
+		closer io.Closer
 	}
 
 	// SiaConstants is a struct listing all of the constants in use.
@@ -143,6 +149,12 @@ func (rs byVersion) Less(i, j int) bool {
 	// we want the higher version number to reported as "less" so that it is
 	// placed first in the slice
 	return build.VersionCmp(rs[i].version(), rs[j].version()) >= 0
+}
+
+// Close implements the Close method for moduleCloser.
+func (mc *moduleCloser) Close() error {
+	fmt.Printf("Closing %v...\n", mc.name)
+	return mc.closer.Close()
 }
 
 // latestRelease returns the latest non-LTS release, given a set of arbitrary
@@ -460,7 +472,7 @@ func (srv *Server) loadModules() error {
 		if err != nil {
 			return err
 		}
-		srv.moduleClosers = append(srv.moduleClosers, g)
+		srv.moduleClosers = append(srv.moduleClosers, moduleCloser{name: "gateway", closer: g})
 	}
 	var cs modules.ConsensusSet
 	if strings.Contains(srv.config.Siad.Modules, "c") {
@@ -470,7 +482,7 @@ func (srv *Server) loadModules() error {
 		if err != nil {
 			return err
 		}
-		srv.moduleClosers = append(srv.moduleClosers, cs)
+		srv.moduleClosers = append(srv.moduleClosers, moduleCloser{name: "consensus", closer: cs})
 	}
 	var e modules.Explorer
 	if strings.Contains(srv.config.Siad.Modules, "e") {
@@ -480,7 +492,7 @@ func (srv *Server) loadModules() error {
 		if err != nil {
 			return err
 		}
-		srv.moduleClosers = append(srv.moduleClosers, e)
+		srv.moduleClosers = append(srv.moduleClosers, moduleCloser{name: "explorer", closer: e})
 	}
 	var tpool modules.TransactionPool
 	if strings.Contains(srv.config.Siad.Modules, "t") {
@@ -490,7 +502,7 @@ func (srv *Server) loadModules() error {
 		if err != nil {
 			return err
 		}
-		srv.moduleClosers = append(srv.moduleClosers, tpool)
+		srv.moduleClosers = append(srv.moduleClosers, moduleCloser{name: "transaction pool", closer: tpool})
 	}
 	var w modules.Wallet
 	if strings.Contains(srv.config.Siad.Modules, "w") {
@@ -500,7 +512,7 @@ func (srv *Server) loadModules() error {
 		if err != nil {
 			return err
 		}
-		srv.moduleClosers = append(srv.moduleClosers, w)
+		srv.moduleClosers = append(srv.moduleClosers, moduleCloser{name: "wallet", closer: w})
 	}
 	var m modules.Miner
 	if strings.Contains(srv.config.Siad.Modules, "m") {
@@ -510,7 +522,7 @@ func (srv *Server) loadModules() error {
 		if err != nil {
 			return err
 		}
-		srv.moduleClosers = append(srv.moduleClosers, m)
+		srv.moduleClosers = append(srv.moduleClosers, moduleCloser{name: "miner", closer: m})
 	}
 	var h modules.Host
 	if strings.Contains(srv.config.Siad.Modules, "h") {
@@ -520,7 +532,7 @@ func (srv *Server) loadModules() error {
 		if err != nil {
 			return err
 		}
-		srv.moduleClosers = append(srv.moduleClosers, h)
+		srv.moduleClosers = append(srv.moduleClosers, moduleCloser{name: "host", closer: h})
 	}
 	var r modules.Renter
 	if strings.Contains(srv.config.Siad.Modules, "r") {
@@ -530,7 +542,7 @@ func (srv *Server) loadModules() error {
 		if err != nil {
 			return err
 		}
-		srv.moduleClosers = append(srv.moduleClosers, r)
+		srv.moduleClosers = append(srv.moduleClosers, moduleCloser{name: "renter", closer: r})
 	}
 
 	// Create the Sia API
@@ -583,10 +595,9 @@ func (srv *Server) Close() error {
 	if err := srv.listener.Close(); err != nil {
 		errs = append(errs, err)
 	}
-	// Close all of the modules
+	// Close all of the modules in reverse order
 	for i := len(srv.moduleClosers) - 1; i >= 0; i-- {
 		m := srv.moduleClosers[i]
-		fmt.Printf("Closing %v...\n", reflect.TypeOf(m))
 		if err := m.Close(); err != nil {
 			errs = append(errs, err)
 		}
