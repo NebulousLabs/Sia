@@ -26,6 +26,7 @@ package renter
 
 import (
 	"errors"
+	"reflect"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -196,6 +197,8 @@ type Renter struct {
 	heapWG         sync.WaitGroup // in-progress chunks join this waitgroup
 	tg             threadgroup.ThreadGroup
 	tpool          modules.TransactionPool
+
+	lastEstimation modules.RenterPriceEstimation // used to cache the last price estimation result
 }
 
 // New returns an initialized renter.
@@ -247,6 +250,12 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		tpool:          tpool,
 	}
 	if err := r.initPersist(); err != nil {
+		return nil, err
+	}
+
+	// Subscribe to the consensus set.
+	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
+	if err != nil {
 		return nil, err
 	}
 
@@ -322,6 +331,13 @@ func (r *Renter) Close() error {
 // TODO: Make this function line up with the actual settings in the renter.
 // Perhaps even make it so it uses the renter's actual contracts if it has any.
 func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
+	id := r.mu.RLock()
+	lastEstimation := r.lastEstimation
+	r.mu.RUnlock(id)
+	if !reflect.DeepEqual(lastEstimation, modules.RenterPriceEstimation{}) {
+		return lastEstimation
+	}
+
 	// Grab hosts to perform the estimation.
 	hosts := r.hostDB.RandomHosts(priceEstimationScope, nil)
 
@@ -365,12 +381,18 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 	_, feePerByte := r.tpool.FeeEstimation()
 	totalContractCost = totalContractCost.Add(feePerByte.Mul64(1000).Mul64(uint64(priceEstimationScope)))
 
-	return modules.RenterPriceEstimation{
+	est := modules.RenterPriceEstimation{
 		FormContracts:        totalContractCost,
 		DownloadTerabyte:     totalDownloadCost,
 		StorageTerabyteMonth: totalStorageCost,
 		UploadTerabyte:       totalUploadCost,
 	}
+
+	id = r.mu.Lock()
+	r.lastEstimation = est
+	r.mu.Unlock(id)
+
+	return est
 }
 
 // SetSettings will update the settings for the renter.
@@ -408,6 +430,11 @@ func (r *Renter) AllContracts() []modules.RenterContract {
 	return r.hostContractor.(interface {
 		AllContracts() []modules.RenterContract
 	}).AllContracts()
+}
+func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
+	id := r.mu.Lock()
+	r.lastEstimation = modules.RenterPriceEstimation{}
+	r.mu.Unlock(id)
 }
 
 // Enforce that Renter satisfies the modules.Renter interface.
