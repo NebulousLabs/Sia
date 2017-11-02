@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -66,6 +67,24 @@ func TestFileAvailable(t *testing.T) {
 	}
 	if f.available(specificOffline) {
 		t.Error("file should not be available")
+	}
+}
+
+// TestFileUploadProgressPinning verifies that uploadProgress() returns at most
+// 100%, even if more pieces have been uploaded,
+func TestFileUploadProgressPinning(t *testing.T) {
+	f := &file{}
+	f.pieceSize = 2
+	f.contracts = make(map[types.FileContractID]fileContract)
+	f.contracts[types.FileContractID{}] = fileContract{
+		ID:     types.FileContractID{},
+		IP:     modules.NetAddress(""),
+		Pieces: make([]pieceData, 4),
+	}
+	rsc, _ := NewRSCode(1, 1)
+	f.erasureCode = rsc
+	if f.uploadProgress() != 100 {
+		t.Fatal("expected uploadProgress to report 100%")
 	}
 }
 

@@ -2,6 +2,7 @@ package renter
 
 import (
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -110,7 +111,7 @@ func (f *file) uploadProgress() float64 {
 	}
 	desired := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
 
-	return 100 * (float64(uploaded) / float64(desired))
+	return math.Min(100*(float64(uploaded)/float64(desired)), 100)
 }
 
 // redundancy returns the redundancy of the least redundant chunk. A file
