@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"text/tabwriter"
 	"time"
 
@@ -103,7 +104,7 @@ var (
 	}
 
 	renterSetAllowanceCmd = &cobra.Command{
-		Use:   "setallowance [amount] [period]",
+		Use:   "setallowance [amount] [period] [hosts] [renew window]",
 		Short: "Set the allowance",
 		Long: `Set the amount of money that can be spent over a given period.
 
@@ -113,10 +114,18 @@ period is given in either blocks (b), hours (h), days (d), or weeks (w). A
 block is approximately 10 minutes, so one hour is six blocks, a day is 144
 blocks, and a week is 1008 blocks.
 
+The Sia renter module spreads data across more than one Sia server computer
+or "host". The "hosts" parameter for the setallowance command determines
+how many different hosts the renter will spread the data across.
+
+Allowance can be automatically renewed periodically. If the current
+blockheight + the renew window >= the end height the contract,
+then the contract is renewed automatically.
+
 Note that setting the allowance will cause siad to immediately begin forming
 contracts! You should only set the allowance once you are fully synced and you
 have a reasonable number (>30) of hosts in your hostdb.`,
-		Run: wrap(rentersetallowancecmd),
+		Run: rentersetallowancecmd,
 	}
 
 	renterUploadsCmd = &cobra.Command{
@@ -264,16 +273,39 @@ func renterallowancecancelcmd() {
 }
 
 // rentersetallowancecmd allows the user to set the allowance.
-func rentersetallowancecmd(amount, period string) {
-	hastings, err := parseCurrency(amount)
+// the first two parameters, amount and period, are required.
+// the second two parameters are optional:
+//    hosts                 integer number of hosts
+//    renewperiod           how many blocks between renewals
+func rentersetallowancecmd(cmd *cobra.Command, args []string) {
+	if len(args) < 2 || len(args) > 4 {
+		cmd.UsageFunc()(cmd)
+		os.Exit(exitCodeUsage)
+	}
+	hastings, err := parseCurrency(args[0])
 	if err != nil {
 		die("Could not parse amount:", err)
 	}
-	blocks, err := parsePeriod(period)
+	blocks, err := parsePeriod(args[1])
 	if err != nil {
 		die("Could not parse period")
 	}
-	err = post("/renter", fmt.Sprintf("funds=%s&period=%s", hastings, blocks))
+	queryString := fmt.Sprintf("funds=%s&period=%s", hastings, blocks)
+	if len(args) > 2 {
+		_, err = strconv.Atoi(args[2])
+		if err != nil {
+			die("Could not parse host count")
+		}
+		queryString += fmt.Sprintf("&hosts=%s", args[2])
+	}
+	if len(args) > 3 {
+		renewWindow, err := parsePeriod(args[3])
+		if err != nil {
+			die("Could not parse renew window")
+		}
+		queryString += fmt.Sprintf("&renewwindow=%s", renewWindow)
+	}
+	err = post("/renter", queryString)
 	if err != nil {
 		die("Could not set allowance:", err)
 	}
