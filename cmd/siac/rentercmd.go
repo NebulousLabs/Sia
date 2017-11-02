@@ -115,10 +115,10 @@ block is approximately 10 minutes, so one hour is six blocks, a day is 144
 blocks, and a week is 1008 blocks.
 
 The Sia renter module spreads data across more than one Sia server computer
-or "host". The "hosts" paramter for the setallowance command determines
-how many different hosts the renter will try to use to spread data out.
+or "host". The "hosts" parameter for the setallowance command determines
+how many different hosts the renter will spread the data across.
 
-Allowance can be automatically renewed periodically.  If the current
+Allowance can be automatically renewed periodically. If the current
 blockheight + the renew window >= the end height the contract,
 then the contract is renewed automatically.
 
@@ -278,15 +278,13 @@ func renterallowancecancelcmd() {
 //    hosts                 integer number of hosts
 //    renewperiod           how many blocks between renewals
 func rentersetallowancecmd(cmd *cobra.Command, args []string) {
-	if len(args) == 0 {
-		die("Must supply amount (first) argument")
+	if len(args) < 2 || len(args) > 4 {
+		cmd.UsageFunc()(cmd)
+		os.Exit(exitCodeUsage)
 	}
 	hastings, err := parseCurrency(args[0])
 	if err != nil {
 		die("Could not parse amount:", err)
-	}
-	if len(args) == 1 {
-		die("Must supply period (second) argument")
 	}
 	blocks, err := parsePeriod(args[1])
 	if err != nil {
@@ -306,10 +304,6 @@ func rentersetallowancecmd(cmd *cobra.Command, args []string) {
 			die("Could not parse renew window")
 		}
 		queryString += fmt.Sprintf("&renewwindow=%s", renewWindow)
-	}
-	if len(args) > 4 {
-		cmd.UsageFunc()(cmd)
-		os.Exit(exitCodeUsage)
 	}
 	err = post("/renter", queryString)
 	if err != nil {
