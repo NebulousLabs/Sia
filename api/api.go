@@ -2,14 +2,20 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/julienschmidt/httprouter"
+)
+
+var (
+	errCleanClosed = errors.New("Client closed connection")
 )
 
 // Error is a type that is encoded as JSON and returned in an API response in
@@ -119,35 +125,82 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 	}
 }
 
+type cleanResponseWriter struct {
+	impl   http.ResponseWriter
+	m      sync.Mutex
+	closed bool
+}
+
+func (c *cleanResponseWriter) Close() {
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.closed = true
+}
+
+func (c *cleanResponseWriter) Header() http.Header {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.closed {
+		return http.Header{}
+	}
+	return c.impl.Header()
+}
+
+func (c *cleanResponseWriter) Write(buffer []byte) (int, error) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.closed {
+		return 0, errCleanClosed
+	}
+	return c.impl.Write(buffer)
+}
+
+func (c *cleanResponseWriter) WriteHeader(code int) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.closed {
+		return
+	}
+	c.impl.WriteHeader(code)
+}
+
 // cleanCloseHandler wraps the entire API, ensuring that underlying conns are
-// not leaked if the rmeote end closes the connection before the underlying
+// not leaked if the remote end closes the connection before the underlying
 // handler finishes.
 func cleanCloseHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Close this file handle either when the function completes or when the
 		// connection is done.
 		done := make(chan struct{})
+		cw := &cleanResponseWriter{
+			impl: w,
+		}
+		// Stop all operations on the response writer after
+		// the connection is done.
+		// See https://github.com/NebulousLabs/Sia/issues/2385
+		defer cw.Close()
 		go func(w http.ResponseWriter, r *http.Request) {
 			defer close(done)
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(cw, r)
 		}(w, r)
-		select {
-		case <-done:
-		case <-r.Context().Done():
-		}
 
 		// Sanity check - thread should not take more than an hour to return. This
 		// must be done in a goroutine, otherwise the server will not close the
 		// underlying socket for this API call.
 		timer := time.NewTimer(time.Minute * 60)
 		go func() {
+			defer timer.Stop()
 			select {
 			case <-done:
-				timer.Stop()
 			case <-timer.C:
 				build.Severe("api call is taking more than 60 minutes to return:", r.URL.Path)
 			}
 		}()
+
+		select {
+		case <-done:
+		case <-r.Context().Done():
+		}
 	})
 }
 
