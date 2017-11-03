@@ -204,22 +204,6 @@ func startDaemon(config Config) (err error) {
 			}
 		}()
 	}
-	var e modules.Explorer
-	if strings.Contains(config.Siad.Modules, "e") {
-		i++
-		fmt.Printf("(%d/%d) Loading explorer...\n", i, len(config.Siad.Modules))
-		e, err = explorer.New(cs, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
-		if err != nil {
-			return err
-		}
-		defer func() {
-			fmt.Println("Closing explorer...")
-			err := e.Close()
-			if err != nil {
-				fmt.Println("Error during explorer shutdown:", err)
-			}
-		}()
-	}
 	var tpool modules.TransactionPool
 	if strings.Contains(config.Siad.Modules, "t") {
 		i++
@@ -233,6 +217,22 @@ func startDaemon(config Config) (err error) {
 			err := tpool.Close()
 			if err != nil {
 				fmt.Println("Error during transaction pool shutdown:", err)
+			}
+		}()
+	}
+	var e modules.Explorer
+	if strings.Contains(config.Siad.Modules, "e") {
+		i++
+		fmt.Printf("(%d/%d) Loading explorer...\n", i, len(config.Siad.Modules))
+		e, err = explorer.New(cs, tpool, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
+		if err != nil {
+			return err
+		}
+		defer func() {
+			fmt.Println("Closing explorer...")
+			err := e.Close()
+			if err != nil {
+				fmt.Println("Error during explorer shutdown:", err)
 			}
 		}()
 	}
@@ -302,7 +302,7 @@ func startDaemon(config Config) (err error) {
 	}
 
 	// Create the Sia API
-	a := api.New(
+	a, err := api.New(
 		config.Siad.RequiredUserAgent,
 		config.APIPassword,
 		cs,
@@ -314,6 +314,9 @@ func startDaemon(config Config) (err error) {
 		tpool,
 		w,
 	)
+	if err != nil {
+		return err
+	}
 
 	// connect the API to the server
 	srv.mux.Handle("/", a)

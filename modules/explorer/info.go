@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
@@ -53,6 +54,15 @@ func (e *Explorer) LatestBlockFacts() modules.BlockFacts {
 	return bf.BlockFacts
 }
 
+//PendingTransactions returns the current list of pending transactions in the mempool
+func (e *Explorer) PendingTransactions() []types.Transaction {
+	var txs []types.Transaction
+	for _, upt := range e.unconfirmedProcessedTransactions {
+		txs = append(txs, upt.Transaction)
+	}
+	return txs
+}
+
 // Transaction takes a transaction ID and finds the block containing the
 // transaction. Because of the miner payouts, the transaction ID might be a
 // block ID. To find the transaction, iterate through the block.
@@ -82,7 +92,18 @@ func (e *Explorer) UnlockHash(uh types.UnlockHash) []types.TransactionID {
 }
 
 // SiacoinOutput returns the siacoin output associated with the specified ID.
+// This first checks the memPool for the ID, then goes to the DB to see if it's already been stored
 func (e *Explorer) SiacoinOutput(id types.SiacoinOutputID) (types.SiacoinOutput, bool) {
+	for _, upt := range e.unconfirmedProcessedTransactions {
+		for _, uptSco := range upt.Outputs {
+			if uptSco.FundType == types.SpecifierSiacoinOutput && uptSco.ID == types.OutputID(id) {
+				return types.SiacoinOutput{
+					UnlockHash: uptSco.RelatedAddress,
+					Value:      uptSco.Value,
+				}, true
+			}
+		}
+	}
 	var sco types.SiacoinOutput
 	err := e.db.View(dbGetAndDecode(bucketSiacoinOutputs, id, &sco))
 	if err != nil {
@@ -164,13 +185,33 @@ func (e *Explorer) FileContractPayouts(id types.FileContractID) ([]types.Siacoin
 }
 
 // SiafundOutput returns the siafund output associated with the specified ID.
+// This first checks the memPool for the ID, then goes to the DB to see if it's already been stored
 func (e *Explorer) SiafundOutput(id types.SiafundOutputID) (types.SiafundOutput, bool) {
+	for _, upt := range e.unconfirmedProcessedTransactions {
+		for _, uptSco := range upt.Outputs {
+			if uptSco.FundType == types.SpecifierSiafundOutput && uptSco.ID == types.OutputID(id) {
+				return types.SiafundOutput{
+					UnlockHash: uptSco.RelatedAddress,
+					Value:      uptSco.Value,
+				}, true
+			}
+		}
+	}
 	var sco types.SiafundOutput
 	err := e.db.View(dbGetAndDecode(bucketSiafundOutputs, id, &sco))
 	if err != nil {
 		return types.SiafundOutput{}, false
 	}
 	return sco, true
+}
+
+//HashType returns the string representation of the hashtype.
+func (e *Explorer) HashType(hash crypto.Hash) (hashType string, err error) {
+	err = e.db.View(dbGetAndDecode(bucketHashType, hash, &hashType))
+	if err != nil {
+		return "", err
+	}
+	return hashType, nil
 }
 
 // SiafundOutputID returns all of the transactions that contain the specified

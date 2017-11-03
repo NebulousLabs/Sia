@@ -2,14 +2,15 @@ package api
 
 import (
 	"encoding/json"
-	"net/http"
-	"strings"
-	"time"
-
+	"errors"
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/julienschmidt/httprouter"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
 )
 
 // Error is a type that is encoded as JSON and returned in an API response in
@@ -154,16 +155,18 @@ func cleanCloseHandler(next http.Handler) http.Handler {
 // API encapsulates a collection of modules and implements a http.Handler
 // to access their methods.
 type API struct {
-	cs       modules.ConsensusSet
-	explorer modules.Explorer
-	gateway  modules.Gateway
-	host     modules.Host
-	miner    modules.Miner
-	renter   modules.Renter
-	tpool    modules.TransactionPool
-	wallet   modules.Wallet
-
-	router http.Handler
+	cs              modules.ConsensusSet
+	explorer        modules.Explorer
+	gateway         modules.Gateway
+	host            modules.Host
+	miner           modules.Miner
+	renter          modules.Renter
+	tpool           modules.TransactionPool
+	wallet          modules.Wallet
+	router          http.Handler
+	unconfirmedSets map[modules.TransactionSetID][]types.TransactionID
+	mu              sync.RWMutex
+	hub             *WebsocketHub
 }
 
 // api.ServeHTTP implements the http.Handler interface.
@@ -174,17 +177,38 @@ func (api *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // New creates a new Sia API from the provided modules.  The API will require
 // authentication using HTTP basic auth for certain endpoints of the supplied
 // password is not the empty string.  Usernames are ignored for authentication.
-func New(requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) *API {
+func New(requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*API, error) {
 	api := &API{
-		cs:       cs,
-		explorer: e,
-		gateway:  g,
-		host:     h,
-		miner:    m,
-		renter:   r,
-		tpool:    tp,
-		wallet:   w,
+		cs:              cs,
+		explorer:        e,
+		gateway:         g,
+		host:            h,
+		miner:           m,
+		renter:          r,
+		tpool:           tp,
+		wallet:          w,
+		unconfirmedSets: make(map[modules.TransactionSetID][]types.TransactionID),
+		hub: &WebsocketHub{
+			broadcastTx:      make(chan []byte),
+			broadcastBlock:   make(chan []byte),
+			registerBlock:    make(chan *Subscriber),
+			unregisterBlock:  make(chan *Subscriber),
+			registerTx:       make(chan *Subscriber),
+			unregisterTx:     make(chan *Subscriber),
+			blockSubscribers: make(map[*Subscriber]bool),
+			txSubscribers:    make(map[*Subscriber]bool),
+		},
 	}
+
+	//We start the hub in another thread because it sends responses outside the standard REST API lifecycle
+	go api.hub.StartWebsocketHub()
+
+	//Subscribing to both consensus updates and transaction updates to power the push notifications via websocket
+	err := cs.ConsensusSetSubscribe(api, modules.ConsensusChangeRecent, nil)
+	if err != nil {
+		return nil, errors.New("api consensus subscription failed: " + err.Error())
+	}
+	tp.TransactionPoolSubscribe(api)
 
 	// Register API handlers
 	router := httprouter.New()
@@ -200,8 +224,12 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	// Explorer API Calls
 	if api.explorer != nil {
 		router.GET("/explorer", api.explorerHandler)
+		router.GET("/explorer/pending", api.pendingBlockHandler)
 		router.GET("/explorer/blocks/:height", api.explorerBlocksHandler)
+		router.GET("/explorer/blocks", api.explorerBlocksHandler)
 		router.GET("/explorer/hashes/:hash", api.explorerHashHandler)
+		router.GET("/explorer/ws", api.explorerBlockSubscribe)
+		router.GET("/explorer/tx/ws", api.explorerTxSubscribe)
 	}
 
 	// Gateway API Calls
@@ -300,7 +328,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 
 	// Apply UserAgent middleware and return the API
 	api.router = cleanCloseHandler(RequireUserAgent(router, requiredUserAgent))
-	return api
+	return api, nil
 }
 
 // UnrecognizedCallHandler handles calls to unknown pages (404).

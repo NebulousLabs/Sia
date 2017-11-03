@@ -4,10 +4,11 @@ package explorer
 
 import (
 	"errors"
-
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"sync"
 )
 
 const (
@@ -17,7 +18,8 @@ const (
 )
 
 var (
-	errNilCS = errors.New("explorer cannot use a nil consensus set")
+	errNilCS    = errors.New("explorer cannot use a nil consensus set")
+	errNilTpool = errors.New("explorer cannot use a nil transaction pool")
 )
 
 type (
@@ -44,24 +46,34 @@ type (
 	// An Explorer contains a more comprehensive view of the blockchain,
 	// including various statistics and metrics.
 	Explorer struct {
-		cs         modules.ConsensusSet
-		db         *persist.BoltDatabase
-		persistDir string
+		cs                               modules.ConsensusSet
+		db                               *persist.BoltDatabase
+		tpool                            modules.TransactionPool
+		persistDir                       string
+		unconfirmedSets                  map[modules.TransactionSetID][]types.TransactionID
+		unconfirmedProcessedTransactions []modules.ProcessedTransaction
+		mu                               sync.RWMutex
+		tg                               siasync.ThreadGroup
 	}
 )
 
 // New creates the internal data structures, and subscribes to
 // consensus for changes to the blockchain
-func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string) (*Explorer, error) {
 	// Check that input modules are non-nil
 	if cs == nil {
 		return nil, errNilCS
 	}
+	if tpool == nil {
+		return nil, errNilTpool
+	}
 
 	// Initialize the explorer.
 	e := &Explorer{
-		cs:         cs,
-		persistDir: persistDir,
+		cs:              cs,
+		tpool:           tpool,
+		persistDir:      persistDir,
+		unconfirmedSets: make(map[modules.TransactionSetID][]types.TransactionID),
 	}
 
 	// Initialize the persistent structures, including the database.
@@ -79,9 +91,10 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 	err = cs.ConsensusSetSubscribe(e, recentChange, nil)
 	if err != nil {
-		// TODO: restart from 0
 		return nil, errors.New("explorer subscription failed: " + err.Error())
 	}
+
+	tpool.TransactionPoolSubscribe(e)
 
 	return e, nil
 }

@@ -48,6 +48,7 @@ func (e *Explorer) initPersist() error {
 			bucketSiafundOutputs,
 			bucketTransactionIDs,
 			bucketUnlockHashes,
+			bucketHashType,
 		}
 		for _, b := range buckets {
 			_, err := tx.CreateBucketIfNotExists(b)
