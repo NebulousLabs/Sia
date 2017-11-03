@@ -197,9 +197,9 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 	return nil
 }
 
-// getSiacoinSpentOutputs scans a slice of Siacoin output diffs for spent
+// computeSpentSiacoinOutputSet scans a slice of Siacoin output diffs for spent
 // outputs and collects them in a map of SiacoinOutputID -> SiacoinOutput.
-func getSiacoinSpentOutputs(diffs []modules.SiacoinOutputDiff) map[types.SiacoinOutputID]types.SiacoinOutput {
+func computeSpentSiacoinOutputSet(diffs []modules.SiacoinOutputDiff) map[types.SiacoinOutputID]types.SiacoinOutput {
 	outputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	for _, diff := range diffs {
 		if diff.Direction == modules.DiffRevert {
@@ -210,9 +210,9 @@ func getSiacoinSpentOutputs(diffs []modules.SiacoinOutputDiff) map[types.Siacoin
 	return outputs
 }
 
-// getSiafundSpentOutputs scans a slice of Siafund output diffs for spent
+// computeSpentSiafundOutputSet scans a slice of Siafund output diffs for spent
 // outputs and collects them in a map of SiafundOutputID -> SiafundOutput.
-func getSiafundSpentOutputs(diffs []modules.SiafundOutputDiff) map[types.SiafundOutputID]types.SiafundOutput {
+func computeSpentSiafundOutputSet(diffs []modules.SiafundOutputDiff) map[types.SiafundOutputID]types.SiafundOutput {
 	outputs := make(map[types.SiafundOutputID]types.SiafundOutput)
 	for _, diff := range diffs {
 		if diff.Direction == modules.DiffRevert {
@@ -226,8 +226,8 @@ func getSiafundSpentOutputs(diffs []modules.SiafundOutputDiff) map[types.Siafund
 // applyHistory applies any transaction history that was introduced by the
 // applied blocks.
 func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
-	spentSiacoinOutputs := getSiacoinSpentOutputs(cc.SiacoinOutputDiffs)
-	spentSiafundOutputs := getSiafundSpentOutputs(cc.SiafundOutputDiffs)
+	spentSiacoinOutputs := computeSpentSiacoinOutputSet(cc.SiacoinOutputDiffs)
+	spentSiafundOutputs := computeSpentSiafundOutputSet(cc.SiafundOutputDiffs)
 
 	for _, block := range cc.AppliedBlocks {
 		consensusHeight, err := dbGetConsensusHeight(tx)
