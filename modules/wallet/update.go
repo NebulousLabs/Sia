@@ -197,24 +197,37 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 	return nil
 }
 
+// computeSpentSiacoinOutputSet scans a slice of Siacoin output diffs for spent
+// outputs and collects them in a map of SiacoinOutputID -> SiacoinOutput.
+func computeSpentSiacoinOutputSet(diffs []modules.SiacoinOutputDiff) map[types.SiacoinOutputID]types.SiacoinOutput {
+	outputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	for _, diff := range diffs {
+		if diff.Direction == modules.DiffRevert {
+			// DiffRevert means spent.
+			outputs[diff.ID] = diff.SiacoinOutput
+		}
+	}
+	return outputs
+}
+
+// computeSpentSiafundOutputSet scans a slice of Siafund output diffs for spent
+// outputs and collects them in a map of SiafundOutputID -> SiafundOutput.
+func computeSpentSiafundOutputSet(diffs []modules.SiafundOutputDiff) map[types.SiafundOutputID]types.SiafundOutput {
+	outputs := make(map[types.SiafundOutputID]types.SiafundOutput)
+	for _, diff := range diffs {
+		if diff.Direction == modules.DiffRevert {
+			// DiffRevert means spent.
+			outputs[diff.ID] = diff.SiafundOutput
+		}
+	}
+	return outputs
+}
+
 // applyHistory applies any transaction history that was introduced by the
 // applied blocks.
 func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
-	// compute spent outputs
-	spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
-	spentSiafundOutputs := make(map[types.SiafundOutputID]types.SiafundOutput)
-	for _, diff := range cc.SiacoinOutputDiffs {
-		if diff.Direction == modules.DiffRevert {
-			// revert means spent
-			spentSiacoinOutputs[diff.ID] = diff.SiacoinOutput
-		}
-	}
-	for _, diff := range cc.SiafundOutputDiffs {
-		if diff.Direction == modules.DiffRevert {
-			// revert means spent
-			spentSiafundOutputs[diff.ID] = diff.SiafundOutput
-		}
-	}
+	spentSiacoinOutputs := computeSpentSiacoinOutputSet(cc.SiacoinOutputDiffs)
+	spentSiafundOutputs := computeSpentSiafundOutputSet(cc.SiafundOutputDiffs)
 
 	for _, block := range cc.AppliedBlocks {
 		consensusHeight, err := dbGetConsensusHeight(tx)
