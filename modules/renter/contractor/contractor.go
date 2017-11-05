@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -54,7 +55,8 @@ type Contractor struct {
 	wallet  wallet
 
 	// Only one thread should be performing contract maintenance at a time.
-	maintenanceLock siasync.TryMutex
+	interruptMaintenance chan struct{}
+	maintenanceLock      siasync.TryMutex
 
 	allowance     modules.Allowance
 	blockHeight   types.BlockHeight
@@ -67,7 +69,7 @@ type Contractor struct {
 	revising    map[types.FileContractID]bool // prevent overlapping revisions
 
 	cachedRevisions map[types.FileContractID]cachedRevision
-	contracts       map[types.FileContractID]modules.RenterContract
+	contracts       *proto.ContractSet
 	oldContracts    map[types.FileContractID]modules.RenterContract
 	renewedIDs      map[types.FileContractID]types.FileContractID
 }
@@ -93,7 +95,7 @@ func (c *Contractor) Allowance() modules.Allowance {
 func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContract, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	for _, c := range c.contracts {
+	for _, c := range c.contracts.ViewAll() {
 		if c.NetAddress == hostAddr {
 			return c, true
 		}
@@ -108,7 +110,7 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 	defer c.mu.RUnlock()
 
 	spending := modules.ContractorSpending{}
-	for _, contract := range c.contracts {
+	for _, contract := range c.contracts.ViewAll() {
 		spending.ContractSpending = spending.ContractSpending.Add(contract.TotalCost)
 		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
 		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
@@ -129,9 +131,7 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContract, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-
-	contract, exists := c.contracts[id]
-	return contract, exists
+	return c.contracts.View(id)
 }
 
 // Contracts returns the contracts formed by the contractor in the current
@@ -140,11 +140,7 @@ func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContra
 func (c *Contractor) Contracts() []modules.RenterContract {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	cs := make([]modules.RenterContract, 0, len(c.contracts))
-	for _, contract := range c.contracts {
-		cs = append(cs, contract)
-	}
-	return cs
+	return c.contracts.ViewAll()
 }
 
 // AllContracts returns the contracts formed by the contractor in the current
@@ -152,9 +148,7 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	for _, contract := range c.contracts {
-		cs = append(cs, contract)
-	}
+	cs = c.contracts.ViewAll()
 	// COMPATv1.0.4-lts
 	// also return the special metrics contract (see persist.go)
 	if contract, ok := c.oldContracts[metricsContractID]; ok {
@@ -191,8 +185,7 @@ func (c *Contractor) ResolveContract(id types.FileContractID) (contract modules.
 		id = newID
 		newID, exists = c.renewedIDs[id]
 	}
-	contract, exists = c.contracts[id]
-	return contract, exists
+	return c.contracts.View(id)
 }
 
 // Close closes the Contractor.
@@ -239,8 +232,10 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		tpool:   tp,
 		wallet:  w,
 
+		interruptMaintenance: make(chan struct{}),
+
 		cachedRevisions: make(map[types.FileContractID]cachedRevision),
-		contracts:       make(map[types.FileContractID]modules.RenterContract),
+		contracts:       proto.NewContractSet(nil),
 		downloaders:     make(map[types.FileContractID]*hostDownloader),
 		editors:         make(map[types.FileContractID]*hostEditor),
 		oldContracts:    make(map[types.FileContractID]modules.RenterContract),
@@ -286,7 +281,9 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 
 	// We may have upgraded persist or resubscribed. Save now so that we don't
 	// lose our work.
+	c.mu.Lock()
 	err = c.save()
+	c.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}

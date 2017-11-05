@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -31,7 +32,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	// Block until the contract is registered.
 	err = build.Retry(50, 100*time.Millisecond, func() error {
 		c.mu.Lock()
-		lenC := len(c.contracts)
+		lenC := c.contracts.Len()
 		c.mu.Unlock()
 		if lenC < 1 {
 			return errors.New("allowance forming seems to have failed")
@@ -164,9 +165,9 @@ func TestIsOffline(t *testing.T) {
 	for i, test := range tests {
 		// construct a contractor with a hostdb containing the scans
 		c := &Contractor{
-			contracts: map[types.FileContractID]modules.RenterContract{
-				{1}: {HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
-			},
+			contracts: proto.NewContractSet([]modules.RenterContract{
+				{ID: types.FileContractID{1}, HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
+			}),
 			hdb: mapHostDB{
 				hosts: map[string]modules.HostDBEntry{
 					"foo": {ScanHistory: test.scans},
@@ -178,9 +179,9 @@ func TestIsOffline(t *testing.T) {
 		}
 	}
 	c := &Contractor{
-		contracts: map[types.FileContractID]modules.RenterContract{
-			{1}: {HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
-		},
+		contracts: proto.NewContractSet([]modules.RenterContract{
+			{HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
+		}),
 	}
 	// should return true for an unknown contract id
 	if !c.IsOffline(types.FileContractID{4}) {

@@ -229,7 +229,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// revise the contract
@@ -275,7 +275,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// revise the contract
@@ -336,7 +336,7 @@ func TestIntegrationDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// revise the contract
@@ -354,7 +354,7 @@ func TestIntegrationDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	contract = c.contracts[contract.ID]
+	contract, _ = c.contracts.View(contract.ID)
 	c.mu.Unlock()
 
 	// delete the sector
@@ -397,7 +397,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// revise the contract
@@ -422,7 +422,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	}
 
 	// contract should have no sectors
-	contract = c.contracts[contract.ID]
+	contract, _ = c.contracts.View(contract.ID)
 	if len(contract.MerkleRoots) != 0 {
 		t.Fatal("contract should have no sectors:", contract.MerkleRoots)
 	}
@@ -453,7 +453,7 @@ func TestIntegrationModify(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// revise the contract
@@ -518,7 +518,7 @@ func TestIntegrationRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// revise the contract
@@ -538,14 +538,15 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// renew the contract
-	oldContract := c.contracts[contract.ID]
+	oldContract, _ := c.contracts.Acquire(contract.ID)
 	oldContract.GoodForRenew = true
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.contracts.Return(oldContract)
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// check renewed contract
@@ -581,12 +582,13 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// renew to a lower height
-	oldContract = c.contracts[contract.ID]
+	oldContract, _ = c.contracts.Acquire(contract.ID)
 	oldContract.GoodForRenew = true
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.contracts.Return(oldContract)
 	if contract.FileContract.WindowStart != c.blockHeight+100 {
 		t.Fatal(contract.FileContract.WindowStart)
 	}
@@ -595,7 +597,7 @@ func TestIntegrationRenew(t *testing.T) {
 		t.Fatal(len(contract.MerkleRoots), len(oldContract.MerkleRoots))
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// revise the contract
@@ -642,7 +644,7 @@ func TestIntegrationResync(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// revise the contract
@@ -676,46 +678,49 @@ func TestIntegrationResync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	contract = c.contracts[contract.ID]
 
-	// Add some corruption to the set of cached revisions.
+	// Add some corruption to the contract.
+	contract, _ = c.contracts.Acquire(contract.ID)
 	badContract := contract
 	badContract.LastRevision.NewRevisionNumber--
 	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
+	c.contracts.Return(badContract)
 	c.mu.Lock()
+
+	// Add some corruption to the cached revision.
 	cr := c.cachedRevisions[contract.ID]
 	cr.Revision.NewRevisionNumber = 0
 	cr.Revision.NewRevisionNumber--
 	c.cachedRevisions[contract.ID] = cr
-	c.contracts[badContract.ID] = badContract
 	c.mu.Unlock()
 
 	// Editor should fail with the bad contract
-	_, err = c.Editor(badContract.ID, nil)
+	_, err = c.Editor(contract.ID, nil)
 	if !proto.IsRevisionMismatch(err) {
 		t.Fatal("expected revision mismatch, got", err)
 	}
 
-	// add cachedRevision
+	// Restore the cached revision so that it equals what the contract
+	// originally equalled, checking that the software correctly falls back to
+	// the cached revision.
 	cachedRev := cachedRevision{contract.LastRevision, contract.MerkleRoots}
 	c.mu.Lock()
 	c.cachedRevisions[contract.ID] = cachedRev
 	c.mu.Unlock()
 
 	// Editor and Downloader should now succeed after loading the cachedRevision
-	editor, err = c.Editor(badContract.ID, nil)
+	editor, err = c.Editor(contract.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	editor.Close()
-
-	downloader, err = c.Downloader(badContract.ID, nil)
+	downloader, err = c.Downloader(contract.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	downloader.Close()
 
-	// Add some corruption to the set of cached revisions.
+	// Add some corruption to the contract.
 	badContract = contract
 	badContract.LastRevision.NewRevisionNumber--
 	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
@@ -724,7 +729,8 @@ func TestIntegrationResync(t *testing.T) {
 	cr.Revision.NewRevisionNumber = 0
 	cr.Revision.NewRevisionNumber--
 	c.cachedRevisions[contract.ID] = cr
-	c.contracts[badContract.ID] = badContract
+	c.contracts.Acquire(contract.ID)
+	c.contracts.Return(badContract)
 	c.mu.Unlock()
 
 	// Editor should fail with the bad contract
@@ -733,12 +739,13 @@ func TestIntegrationResync(t *testing.T) {
 		t.Fatal("expected revision mismatch, got", err)
 	}
 
-	// add cachedRevision
+	// Restore the cached revision to what it was when we were successfully able
+	// to create the editor and downloader.
 	c.mu.Lock()
 	c.cachedRevisions[contract.ID] = cachedRev
 	c.mu.Unlock()
 
-	// should be able to upload after loading the cachedRevision
+	// Uploading should be successful now.
 	editor, err = c.Editor(badContract.ID, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -778,7 +785,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// create a downloader
@@ -872,7 +879,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// create an editor
@@ -965,7 +972,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// revise the contract
@@ -999,7 +1006,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	contract = c.contracts[contract.ID]
+	contract, _ = c.contracts.Acquire(contract.ID)
 
 	// corrupt the contract and cachedRevision
 	badContract := contract
@@ -1011,7 +1018,7 @@ func TestIntegrationCachedRenew(t *testing.T) {
 	cr.Revision.NewRevisionNumber = 0
 	cr.Revision.NewRevisionNumber--
 	c.cachedRevisions[contract.ID] = cr
-	c.contracts[badContract.ID] = badContract
+	c.contracts.Return(badContract)
 	c.mu.Unlock()
 
 	// Renew should fail with the bad contract + cachedRevision
@@ -1061,7 +1068,7 @@ func TestContractPresenceLeak(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	c.mu.Unlock()
 
 	// Connect with bad challenge response. Try correct
