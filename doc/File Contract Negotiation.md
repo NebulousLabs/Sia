@@ -29,7 +29,7 @@ untrusted environment. Managing data on Sia happens through several protocols:
 + (planned for later) Storage Proof Request - the renter requests that the host
   perform an out-of-band storage proof.
 
-+ (planned for later) Metadata Request - the renter requests some metadata
++ Metadata Request - the renter requests some metadata
   about the file contract from the host, namely the list of hashes that compose
   the file. This list of hashes is provided along with a cryptographic proof
   that the hashes are valid. The proof is only needed if only a subset of

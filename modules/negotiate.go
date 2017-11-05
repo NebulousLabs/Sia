@@ -30,6 +30,13 @@ const (
 	// the negotiation.
 	NegotiateDownloadTime = 600 * time.Second
 
+	// NegotiateMetadataTime establishes the minimum amount of time that
+	// the connection deadline is expected to be set to when a metadata
+	// is being requested from the host. The deadline is long
+	// enough that the connection should be successful even if both parties are
+	// running Tor.
+	NegotiateMetadataTime = 120 * time.Second
+
 	// NegotiateFileContractRevisionTime defines the minimum amount of time
 	// that the renter and host have to negotiate a file contract revision. The
 	// time is set high enough that a full 4MB can be piped through a
@@ -147,6 +154,9 @@ var (
 
 	// RPCDownload is the specifier for downloading a file from a host.
 	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 2}
+
+	// RPCMetadata is the specifier for getting the list of sector roots.
+	RPCMetadata = types.Specifier{'M', 'e', 't', 'a', 'd', 'a', 't', 'a'}
 
 	// RPCFormContract is the specifier for forming a contract with a host.
 	RPCFormContract = types.Specifier{'F', 'o', 'r', 'm', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}

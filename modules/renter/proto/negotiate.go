@@ -66,17 +66,17 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry) (modules.HostDBEntr
 	return host, nil
 }
 
-// verifyRecentRevision confirms that the host and contractor agree upon the current
-// state of the contract being revised.
-func verifyRecentRevision(conn net.Conn, contract modules.RenterContract, hostVersion string) error {
+// getRecentRevision downloads the current revision from the host
+// and checks signatures.
+func getRecentRevision(conn net.Conn, contract modules.RenterContract, hostVersion string) (types.FileContractRevision, error) {
 	// send contract ID
 	if err := encoding.WriteObject(conn, contract.ID); err != nil {
-		return errors.New("couldn't send contract ID: " + err.Error())
+		return types.FileContractRevision{}, errors.New("couldn't send contract ID: " + err.Error())
 	}
 	// read challenge
 	var challenge crypto.Hash
 	if err := encoding.ReadObject(conn, &challenge, 32); err != nil {
-		return errors.New("couldn't read challenge: " + err.Error())
+		return types.FileContractRevision{}, errors.New("couldn't read challenge: " + err.Error())
 	}
 	if build.VersionCmp(hostVersion, "1.3.0") >= 0 {
 		crypto.SecureWipe(challenge[:16])
@@ -84,20 +84,36 @@ func verifyRecentRevision(conn net.Conn, contract modules.RenterContract, hostVe
 	// sign and return
 	sig := crypto.SignHash(challenge, contract.SecretKey)
 	if err := encoding.WriteObject(conn, sig); err != nil {
-		return errors.New("couldn't send challenge response: " + err.Error())
+		return types.FileContractRevision{}, errors.New("couldn't send challenge response: " + err.Error())
 	}
 	// read acceptance
 	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
-		return errors.New("host did not accept revision request: " + err.Error())
+		return types.FileContractRevision{}, errors.New("host did not accept revision request: " + err.Error())
 	}
 	// read last revision and signatures
 	var lastRevision types.FileContractRevision
 	var hostSignatures []types.TransactionSignature
 	if err := encoding.ReadObject(conn, &lastRevision, 2048); err != nil {
-		return errors.New("couldn't read last revision: " + err.Error())
+		return types.FileContractRevision{}, errors.New("couldn't read last revision: " + err.Error())
 	}
 	if err := encoding.ReadObject(conn, &hostSignatures, 2048); err != nil {
-		return errors.New("couldn't read host signatures: " + err.Error())
+		return types.FileContractRevision{}, errors.New("couldn't read host signatures: " + err.Error())
+	}
+	// NOTE: we can fake the blockheight here because it doesn't affect
+	// verification; it just needs to be above the fork height and below the
+	// contract expiration (which was checked earlier).
+	if err := modules.VerifyFileContractRevisionTransactionSignatures(lastRevision, hostSignatures, contract.FileContract.WindowStart-1); err != nil {
+		return types.FileContractRevision{}, err
+	}
+	return lastRevision, nil
+}
+
+// verifyRecentRevision confirms that the host and contractor agree upon the current
+// state of the contract being revised.
+func verifyRecentRevision(conn net.Conn, contract modules.RenterContract, hostVersion string) error {
+	lastRevision, err := getRecentRevision(conn, contract, hostVersion)
+	if err != nil {
+		return err
 	}
 	// Check that the unlock hashes match; if they do not, something is
 	// seriously wrong. Otherwise, check that the revision numbers match.
@@ -106,10 +122,7 @@ func verifyRecentRevision(conn net.Conn, contract modules.RenterContract, hostVe
 	} else if lastRevision.NewRevisionNumber != contract.LastRevision.NewRevisionNumber {
 		return &recentRevisionError{contract.LastRevision.NewRevisionNumber, lastRevision.NewRevisionNumber}
 	}
-	// NOTE: we can fake the blockheight here because it doesn't affect
-	// verification; it just needs to be above the fork height and below the
-	// contract expiration (which was checked earlier).
-	return modules.VerifyFileContractRevisionTransactionSignatures(lastRevision, hostSignatures, contract.FileContract.WindowStart-1)
+	return nil
 }
 
 // negotiateRevision sends a revision and actions to the host for approval,
