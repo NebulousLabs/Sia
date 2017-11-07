@@ -1,4 +1,4 @@
-Interested in contributing to SIA?
+Interested in contributing to Sia?
 ==================================
 
 Please review the contributing guidelines in the following pages:
