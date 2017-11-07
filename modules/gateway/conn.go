@@ -26,6 +26,9 @@ func (g *Gateway) dial(addr modules.NetAddress) (net.Conn, error) {
 	dialer := &net.Dialer{
 		Cancel:  g.threads.StopChan(),
 		Timeout: dialTimeout,
+		LocalAddr: &net.TCPAddr{
+			IP: g.listener.Addr().(*net.TCPAddr).IP,
+		},
 	}
 	conn, err := dialer.Dial("tcp", string(addr))
 	if err != nil {
