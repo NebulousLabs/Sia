@@ -1,3 +1,5 @@
+// Package renter is responsible for uploading and downloading files on the sia
+// network.
 package renter
 
 // TODO: Change the upload loop to have an upload state, and make it so that

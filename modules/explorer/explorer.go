@@ -1,5 +1,5 @@
-// The explorer module provides a glimpse into what the Sia network
-// currently looks like.
+// Package explorer provides a glimpse into what the Sia network currently
+// looks like.
 package explorer
 
 import (
