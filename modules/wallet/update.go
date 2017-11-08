@@ -202,7 +202,6 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 	return nil
 }
 
-// computeSpentSiacoinOutputSet scans a slice of Siacoin output diffs for spent
 // outputs and collects them in a map of SiacoinOutputID -> SiacoinOutput.
 func computeSpentSiacoinOutputSet(diffs []modules.SiacoinOutputDiff) spentSiacoinOutputSet {
 	outputs := make(spentSiacoinOutputSet)
@@ -228,22 +227,8 @@ func computeSpentSiafundOutputSet(diffs []modules.SiafundOutputDiff) spentSiafun
 	return outputs
 }
 
-// applyHistoryFromBlock applies any transaction history that the given block
-// introduced.
-func (w *Wallet) applyHistoryFromBlock(tx *bolt.Tx, block types.Block, spentSiacoinOutputs spentSiacoinOutputSet, spentSiafundOutputs spentSiafundOutputSet) error {
-	consensusHeight, err := dbGetConsensusHeight(tx)
-	if err != nil {
-		return err
-	}
-	// increment the consensus height
-	if block.ID() != types.GenesisID {
-		consensusHeight++
-		err = dbPutConsensusHeight(tx, consensusHeight)
-		if err != nil {
-			return err
-		}
-	}
-
+func (w *Wallet) computeProcessedTransactionsFromBlock(tx *bolt.Tx, block types.Block, spentSiacoinOutputs spentSiacoinOutputSet, spentSiafundOutputs spentSiafundOutputSet, consensusHeight types.BlockHeight) []modules.ProcessedTransaction {
+	pts := []modules.ProcessedTransaction{}
 	relevant := false
 	for _, mp := range block.MinerPayouts {
 		relevant = relevant || w.isWalletAddress(mp.UnlockHash)
@@ -268,10 +253,7 @@ func (w *Wallet) applyHistoryFromBlock(tx *bolt.Tx, block types.Block, spentSiac
 				Value:          mp.Value,
 			})
 		}
-		err := dbAppendProcessedTransaction(tx, minerPT)
-		if err != nil {
-			return fmt.Errorf("could not put processed miner transaction: %v", err)
-		}
+		pts = append(pts, minerPT)
 	}
 	for _, txn := range block.Transactions {
 		// determine if transaction is relevant
@@ -316,7 +298,6 @@ func (w *Wallet) applyHistoryFromBlock(tx *bolt.Tx, block types.Block, spentSiac
 			if pi.WalletAddress {
 				w.log.Println("\tSiacoin Input:", pi.ParentID, "::", pi.Value.HumanString())
 			}
-
 		}
 
 		for i, sco := range txn.SiacoinOutputs {
@@ -352,7 +333,8 @@ func (w *Wallet) applyHistoryFromBlock(tx *bolt.Tx, block types.Block, spentSiac
 
 			siafundPool, err := dbGetSiafundPool(w.dbTx)
 			if err != nil {
-				return fmt.Errorf("could not get siafund pool: %v", err)
+				w.log.Println("could not get siafund pool: %v", err)
+				continue
 			}
 
 			sfo := spentSiafundOutputs[sfi.ParentID]
@@ -393,13 +375,9 @@ func (w *Wallet) applyHistoryFromBlock(tx *bolt.Tx, block types.Block, spentSiac
 				Value:    fee,
 			})
 		}
-
-		err := dbAppendProcessedTransaction(tx, pt)
-		if err != nil {
-			return fmt.Errorf("could not put processed transaction: %v", err)
-		}
+		pts = append(pts, pt)
 	}
-	return nil
+	return pts
 }
 
 // applyHistory applies any transaction history that the applied blocks
@@ -409,8 +387,25 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 	spentSiafundOutputs := computeSpentSiafundOutputSet(cc.SiafundOutputDiffs)
 
 	for _, block := range cc.AppliedBlocks {
-		if err := w.applyHistoryFromBlock(tx, block, spentSiacoinOutputs, spentSiafundOutputs); err != nil {
+		consensusHeight, err := dbGetConsensusHeight(tx)
+		if err != nil {
 			return err
+		}
+		// Increment the consensus height.
+		if block.ID() != types.GenesisID {
+			consensusHeight++
+			err = dbPutConsensusHeight(tx, consensusHeight)
+			if err != nil {
+				return err
+			}
+		}
+
+		pts := w.computeProcessedTransactionsFromBlock(tx, block, spentSiacoinOutputs, spentSiafundOutputs, consensusHeight)
+		for _, pt := range pts {
+			err := dbAppendProcessedTransaction(tx, pt)
+			if err != nil {
+				return fmt.Errorf("could not put processed transaction: %v", err)
+			}
 		}
 	}
 
