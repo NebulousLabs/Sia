@@ -231,10 +231,10 @@ func computeSpentSiafundOutputSet(diffs []modules.SiafundOutputDiff) spentSiafun
 // transactions in a block and computes a ProcessedTransaction slice containing
 // all of the transactions processed for the given block.
 func (w *Wallet) computeProcessedTransactionsFromBlock(tx *bolt.Tx, block types.Block, spentSiacoinOutputs spentSiacoinOutputSet, spentSiafundOutputs spentSiafundOutputSet, consensusHeight types.BlockHeight) []modules.ProcessedTransaction {
-	pts := []modules.ProcessedTransaction{}
-	relevant := false
+	var pts []modules.ProcessedTransaction
 
-	// Find ProcessTransactions from miner payouts.
+	// Find ProcessedTransactions from miner payouts.
+	relevant := false
 	for _, mp := range block.MinerPayouts {
 		relevant = relevant || w.isWalletAddress(mp.UnlockHash)
 	}
