@@ -227,9 +227,14 @@ func computeSpentSiafundOutputSet(diffs []modules.SiafundOutputDiff) spentSiafun
 	return outputs
 }
 
+// computeProcessedTransactionsFromBlock searches all the miner payouts and
+// transactions in a block and computes a ProcessedTransaction slice containing
+// all of the transactions processed for the given block.
 func (w *Wallet) computeProcessedTransactionsFromBlock(tx *bolt.Tx, block types.Block, spentSiacoinOutputs spentSiacoinOutputSet, spentSiafundOutputs spentSiafundOutputSet, consensusHeight types.BlockHeight) []modules.ProcessedTransaction {
 	pts := []modules.ProcessedTransaction{}
 	relevant := false
+
+	// Find ProcessTransactions from miner payouts.
 	for _, mp := range block.MinerPayouts {
 		relevant = relevant || w.isWalletAddress(mp.UnlockHash)
 	}
@@ -255,8 +260,10 @@ func (w *Wallet) computeProcessedTransactionsFromBlock(tx *bolt.Tx, block types.
 		}
 		pts = append(pts, minerPT)
 	}
+
+	// Find ProcessedTransactions from transactions.
 	for _, txn := range block.Transactions {
-		// determine if transaction is relevant
+		// Determine if transaction is relevant.
 		relevant := false
 		for _, sci := range txn.SiacoinInputs {
 			relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
@@ -271,7 +278,7 @@ func (w *Wallet) computeProcessedTransactionsFromBlock(tx *bolt.Tx, block types.
 			relevant = relevant || w.isWalletAddress(sfo.UnlockHash)
 		}
 
-		// only create a ProcessedTransaction if txn is relevant
+		// Only create a ProcessedTransaction if transaction is relevant.
 		if !relevant {
 			continue
 		}
@@ -333,7 +340,7 @@ func (w *Wallet) computeProcessedTransactionsFromBlock(tx *bolt.Tx, block types.
 
 			siafundPool, err := dbGetSiafundPool(w.dbTx)
 			if err != nil {
-				w.log.Println("could not get siafund pool: %v", err)
+				w.log.Println("could not get siafund pool: ", err)
 				continue
 			}
 
