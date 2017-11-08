@@ -1,3 +1,5 @@
+// Package renter is responsible for uploading and downloading files on the sia
+// network.
 package renter
 
 // CONCURRENCY PATTERNS: The renter has some complex concurrency patterns.
