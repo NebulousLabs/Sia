@@ -192,92 +192,12 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 
 // Delete negotiates a revision that removes a sector from a file contract.
 func (he *Editor) Delete(root crypto.Hash) (modules.RenterContract, error) {
-	// Acquire the contract.
-	contract, haveContract := he.contractSet.Acquire(he.contractID)
-	if !haveContract {
-		return modules.RenterContract{}, errors.New("contract not present in contract set")
-	}
-	defer func() { he.contractSet.Return(contract) }()
-
-	// calculate the new Merkle root
-	newRoots := make([]crypto.Hash, 0, len(contract.MerkleRoots))
-	index := -1
-	for i, h := range contract.MerkleRoots {
-		if h == root {
-			index = i
-		} else {
-			newRoots = append(newRoots, h)
-		}
-	}
-	if index == -1 {
-		return modules.RenterContract{}, errors.New("no record of that sector root")
-	}
-	merkleRoot := cachedMerkleRoot(newRoots)
-
-	// create the action and accompanying revision
-	actions := []modules.RevisionAction{{
-		Type:        modules.ActionDelete,
-		SectorIndex: uint64(index),
-	}}
-	rev := newDeleteRevision(contract.LastRevision, merkleRoot)
-
-	// run the revision iteration
-	contract, err := he.runRevisionIteration(actions, contract, rev, newRoots)
-	if err != nil {
-		return modules.RenterContract{}, err
-	}
-	return contract, nil
+	return modules.RenterContract{}, errors.New("not supported")
 }
 
 // Modify negotiates a revision that edits a sector in a file contract.
 func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) (modules.RenterContract, error) {
-	// Acquire the contract.
-	contract, haveContract := he.contractSet.Acquire(he.contractID)
-	if !haveContract {
-		return modules.RenterContract{}, errors.New("contract not present in contract set")
-	}
-	defer func() { he.contractSet.Return(contract) }()
-
-	// calculate price
-	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(uint64(len(newData)))
-	if contract.RenterFunds().Cmp(sectorBandwidthPrice) < 0 {
-		return modules.RenterContract{}, errors.New("contract has insufficient funds to support modification")
-	}
-
-	// calculate the new Merkle root
-	newRoots := make([]crypto.Hash, len(contract.MerkleRoots))
-	index := -1
-	for i, h := range contract.MerkleRoots {
-		if h == oldRoot {
-			index = i
-			newRoots[i] = newRoot
-		} else {
-			newRoots[i] = h
-		}
-	}
-	if index == -1 {
-		return modules.RenterContract{}, errors.New("no record of that sector root")
-	}
-	merkleRoot := cachedMerkleRoot(newRoots)
-
-	// create the action and revision
-	actions := []modules.RevisionAction{{
-		Type:        modules.ActionModify,
-		SectorIndex: uint64(index),
-		Offset:      offset,
-		Data:        newData,
-	}}
-	rev := newModifyRevision(contract.LastRevision, merkleRoot, sectorBandwidthPrice)
-
-	// run the revision iteration
-	contract, err := he.runRevisionIteration(actions, contract, rev, newRoots)
-	if err != nil {
-		return modules.RenterContract{}, err
-	}
-
-	// update metrics
-	contract.UploadSpending = contract.UploadSpending.Add(sectorBandwidthPrice)
-	return contract, nil
+	return modules.RenterContract{}, errors.New("not supported")
 }
 
 // NewEditor initiates the contract revision process with a host, and returns
