@@ -22,52 +22,47 @@ type Downloader struct {
 	closeChan   chan struct{}
 	once        sync.Once
 	hdb         hostDB
-
-	SaveFn revisionSaver
 }
 
 // Sector retrieves the sector with the specified Merkle root, and revises
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
-func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []byte, err error) {
+func (hd *Downloader) Sector(root crypto.Hash) (_ ContractMetadata, _ []byte, err error) {
 	// Reset deadline when finished.
 	defer extendDeadline(hd.conn, time.Hour) // TODO: Constant.
 
 	// Acquire the contract.
-	contract, haveContract := hd.contractSet.Acquire(hd.contractID)
+	// TODO: why not just lock the SafeContract directly?
+	sc, haveContract := hd.contractSet.Acquire(hd.contractID)
 	if !haveContract {
-		return modules.RenterContract{}, nil, errors.New("contract not present in contract set")
+		return ContractMetadata{}, nil, errors.New("contract not present in contract set")
 	}
-	defer func() { hd.contractSet.Return(contract) }()
+	defer hd.contractSet.Return(hd.contractID)
+	contract := sc.header // for convenience
 
 	// calculate price
 	sectorPrice := hd.host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
 	if contract.RenterFunds().Cmp(sectorPrice) < 0 {
-		return modules.RenterContract{}, nil, errors.New("contract has insufficient funds to support download")
+		return ContractMetadata{}, nil, errors.New("contract has insufficient funds to support download")
 	}
 	// To mitigate small errors (e.g. differing block heights), fudge the
 	// price and collateral by 0.2%.
 	sectorPrice = sectorPrice.MulFloat(1 + hostPriceLeeway)
 
 	// create the download revision
-	rev := newDownloadRevision(contract.LastRevision, sectorPrice)
+	rev := newDownloadRevision(contract.LastRevision(), sectorPrice)
 
 	// initiate download by confirming host settings
 	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
 	if err := startDownload(hd.conn, hd.host); err != nil {
-		return modules.RenterContract{}, nil, err
+		return ContractMetadata{}, nil, err
 	}
 
-	// Before we continue, save the revision. Unexpected termination (e.g.
-	// power failure) during the signature transfer leaves in an ambiguous
-	// state: the host may or may not have received the signature, and thus
-	// may report either revision as being the most recent. To mitigate this,
-	// we save the old revision as a fallback.
-	if hd.SaveFn != nil {
-		if err := hd.SaveFn(rev, contract.MerkleRoots); err != nil {
-			return modules.RenterContract{}, nil, err
-		}
-	}
+	// TODO: record the change we are about to make to the contract. If we lose
+	// power mid-revision, this allows us to restore either the pre-revision
+	// or post-revision contract. This is necessary because the host may or
+	// may not have accepted the revision.
+	//sc.recordDownloadIntent(rev)
 
 	// send download action
 	extendDeadline(hd.conn, 2*time.Minute) // TODO: Constant.
@@ -77,15 +72,15 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 		Length:     modules.SectorSize,
 	}})
 	if err != nil {
-		return modules.RenterContract{}, nil, err
+		return ContractMetadata{}, nil, err
 	}
 
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
 		if err != nil {
-			hd.hdb.IncrementFailedInteractions(contract.HostPublicKey)
+			hd.hdb.IncrementFailedInteractions(contract.HostPublicKey())
 		} else if err == nil {
-			hd.hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+			hd.hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}
 	}()
 
@@ -98,30 +93,30 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 		// until we've finished downloading the sector.
 		defer hd.conn.Close()
 	} else if err != nil {
-		return modules.RenterContract{}, nil, err
+		return ContractMetadata{}, nil, err
 	}
 
 	// read sector data, completing one iteration of the download loop
 	extendDeadline(hd.conn, modules.NegotiateDownloadTime)
 	var sectors [][]byte
 	if err := encoding.ReadObject(hd.conn, &sectors, modules.SectorSize+16); err != nil {
-		return modules.RenterContract{}, nil, err
+		return ContractMetadata{}, nil, err
 	} else if len(sectors) != 1 {
-		return modules.RenterContract{}, nil, errors.New("host did not send enough sectors")
+		return ContractMetadata{}, nil, errors.New("host did not send enough sectors")
 	}
 	sector := sectors[0]
 	if uint64(len(sector)) != modules.SectorSize {
-		return modules.RenterContract{}, nil, errors.New("host did not send enough sector data")
+		return ContractMetadata{}, nil, errors.New("host did not send enough sector data")
 	} else if crypto.MerkleRoot(sector) != root {
-		return modules.RenterContract{}, nil, errors.New("host sent bad sector data")
+		return ContractMetadata{}, nil, errors.New("host sent bad sector data")
 	}
 
 	// update contract and metrics
-	contract.LastRevision = rev
-	contract.LastRevisionTxn = signedTxn
-	contract.DownloadSpending = contract.DownloadSpending.Add(sectorPrice)
+	if err := sc.recordDownload(signedTxn, sectorPrice); err != nil {
+		return ContractMetadata{}, nil, err
+	}
 
-	return contract, sector, nil
+	return sc.Metadata(), sector, nil
 }
 
 // shutdown terminates the revision loop and signals the goroutine spawned in
@@ -144,14 +139,15 @@ func (hd *Downloader) Close() error {
 
 // NewDownloader initiates the download request loop with a host, and returns a
 // Downloader.
-//
-// TODO: NewDownloader should need to receieve nothing more than a host pubkey.
-func NewDownloader(host modules.HostDBEntry, id types.FileContractID, contractSet *ContractSet, hdb hostDB, cancel <-chan struct{}) (_ *Downloader, err error) {
-	contract, ok := contractSet.View(id)
-	// check that contract has enough value to support a download
-	if !ok || len(contract.LastRevision.NewValidProofOutputs) != 2 {
+func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileContractID, hdb hostDB, cancel <-chan struct{}) (_ *Downloader, err error) {
+	sc, ok := cs.Acquire(id)
+	if !ok {
 		return nil, errors.New("invalid contract")
 	}
+	defer cs.Return(id)
+	contract := sc.header
+
+	// check that contract has enough value to support a download
 	sectorPrice := host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
 	if contract.RenterFunds().Cmp(sectorPrice) < 0 {
 		return nil, errors.New("contract has insufficient funds to support download")
@@ -161,9 +157,9 @@ func NewDownloader(host modules.HostDBEntry, id types.FileContractID, contractSe
 	defer func() {
 		// A revision mismatch might not be the host's fault.
 		if err != nil && !IsRevisionMismatch(err) {
-			hdb.IncrementFailedInteractions(contract.HostPublicKey)
+			hdb.IncrementFailedInteractions(contract.HostPublicKey())
 		} else if err == nil {
-			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}
 	}()
 
@@ -202,7 +198,7 @@ func NewDownloader(host modules.HostDBEntry, id types.FileContractID, contractSe
 	// the host is now ready to accept revisions
 	return &Downloader{
 		contractID:  id,
-		contractSet: contractSet,
+		contractSet: cs,
 		host:        host,
 		conn:        conn,
 		closeChan:   closeChan,

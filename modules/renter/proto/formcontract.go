@@ -17,8 +17,9 @@ const (
 )
 
 // FormContract forms a contract with a host and submits the contract
-// transaction to tpool.
-func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (modules.RenterContract, error) {
+// transaction to tpool. The contract is added to the ContractSet and its
+// metadata is returned.
+func (cs *ContractSet) FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (ContractMetadata, error) {
 	// Extract vars from params, for convenience.
 	host, funding, startHeight, endHeight, refundAddress := params.Host, params.Funding, params.StartHeight, params.EndHeight, params.RefundAddress
 
@@ -39,7 +40,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 
 	// Underflow check.
 	if funding.Cmp(host.ContractPrice.Add(txnFee)) <= 0 {
-		return modules.RenterContract{}, errors.New("insufficient funds to cover contract fee and transaction fee during contract formation")
+		return ContractMetadata{}, errors.New("insufficient funds to cover contract fee and transaction fee during contract formation")
 	}
 	// Divide by zero check.
 	if host.StoragePrice.IsZero() {
@@ -59,7 +60,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 
 	// Check for negative currency.
 	if types.PostTax(startHeight, totalPayout).Cmp(hostPayout) < 0 {
-		return modules.RenterContract{}, errors.New("not enough money to pay both siafund fee and also host payout")
+		return ContractMetadata{}, errors.New("not enough money to pay both siafund fee and also host payout")
 	}
 	// Create file contract.
 	fc := types.FileContract{
@@ -89,7 +90,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	// Build transaction containing fc, e.g. the File Contract.
 	err := txnBuilder.FundSiacoins(funding)
 	if err != nil {
-		return modules.RenterContract{}, err
+		return ContractMetadata{}, err
 	}
 	txnBuilder.AddFileContract(fc)
 	// Add miner fee.
@@ -115,23 +116,23 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	}
 	conn, err := dialer.Dial("tcp", string(host.NetAddress))
 	if err != nil {
-		return modules.RenterContract{}, err
+		return ContractMetadata{}, err
 	}
 	defer func() { _ = conn.Close() }()
 
 	// Allot time for sending RPC ID + verifySettings.
 	extendDeadline(conn, modules.NegotiateSettingsTime)
 	if err = encoding.WriteObject(conn, modules.RPCFormContract); err != nil {
-		return modules.RenterContract{}, err
+		return ContractMetadata{}, err
 	}
 
 	// Verify the host's settings and confirm its identity.
 	host, err = verifySettings(conn, host)
 	if err != nil {
-		return modules.RenterContract{}, err
+		return ContractMetadata{}, err
 	}
 	if !host.AcceptingContracts {
-		return modules.RenterContract{}, errors.New("host is not accepting contracts")
+		return ContractMetadata{}, errors.New("host is not accepting contracts")
 	}
 
 	// Allot time for negotiation.
@@ -139,18 +140,18 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 
 	// Send acceptance, txn signed by us, and pubkey.
 	if err = modules.WriteNegotiationAcceptance(conn); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send initial acceptance: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send initial acceptance: " + err.Error())
 	}
 	if err = encoding.WriteObject(conn, txnSet); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send the contract signed by us: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send the contract signed by us: " + err.Error())
 	}
 	if err = encoding.WriteObject(conn, ourSK.PublicKey()); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send our public key: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send our public key: " + err.Error())
 	}
 
 	// Read acceptance and txn signed by host.
 	if err = modules.ReadNegotiationAcceptance(conn); err != nil {
-		return modules.RenterContract{}, errors.New("host did not accept our proposed contract: " + err.Error())
+		return ContractMetadata{}, errors.New("host did not accept our proposed contract: " + err.Error())
 	}
 	// Host now sends any new parent transactions, inputs and outputs that
 	// were added to the transaction.
@@ -158,13 +159,13 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	var newInputs []types.SiacoinInput
 	var newOutputs []types.SiacoinOutput
 	if err = encoding.ReadObject(conn, &newParents, types.BlockSizeLimit); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't read the host's added parents: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't read the host's added parents: " + err.Error())
 	}
 	if err = encoding.ReadObject(conn, &newInputs, types.BlockSizeLimit); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't read the host's added inputs: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't read the host's added inputs: " + err.Error())
 	}
 	if err = encoding.ReadObject(conn, &newOutputs, types.BlockSizeLimit); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't read the host's added outputs: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't read the host's added outputs: " + err.Error())
 	}
 
 	// Merge txnAdditions with txnSet.
@@ -179,7 +180,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	// Sign the txn.
 	signedTxnSet, err := txnBuilder.Sign(true)
 	if err != nil {
-		return modules.RenterContract{}, modules.WriteNegotiationRejection(conn, errors.New("failed to sign transaction: "+err.Error()))
+		return ContractMetadata{}, modules.WriteNegotiationRejection(conn, errors.New("failed to sign transaction: "+err.Error()))
 	}
 
 	// Calculate signatures added by the transaction builder.
@@ -219,30 +220,30 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 
 	// Send acceptance and signatures.
 	if err = modules.WriteNegotiationAcceptance(conn); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send transaction acceptance: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send transaction acceptance: " + err.Error())
 	}
 	if err = encoding.WriteObject(conn, addedSignatures); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send added signatures: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send added signatures: " + err.Error())
 	}
 	if err = encoding.WriteObject(conn, revisionTxn.TransactionSignatures[0]); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send revision signature: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send revision signature: " + err.Error())
 	}
 
 	// Read the host acceptance and signatures.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
-		return modules.RenterContract{}, errors.New("host did not accept our signatures: " + err.Error())
+		return ContractMetadata{}, errors.New("host did not accept our signatures: " + err.Error())
 	}
 	var hostSigs []types.TransactionSignature
 	if err = encoding.ReadObject(conn, &hostSigs, 2e3); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't read the host's signatures: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't read the host's signatures: " + err.Error())
 	}
 	for _, sig := range hostSigs {
 		txnBuilder.AddTransactionSignature(sig)
 	}
 	var hostRevisionSig types.TransactionSignature
 	if err = encoding.ReadObject(conn, &hostRevisionSig, 2e3); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't read the host's revision signature: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't read the host's revision signature: " + err.Error())
 	}
 	revisionTxn.TransactionSignatures = append(revisionTxn.TransactionSignatures, hostRevisionSig)
 
@@ -257,25 +258,24 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		err = nil
 	}
 	if err != nil {
-		return modules.RenterContract{}, err
+		return ContractMetadata{}, err
 	}
 
-	// Calculate contract ID.
-	fcid := txn.FileContractID(0)
-
-	return modules.RenterContract{
-		FileContract:    fc,
-		HostPublicKey:   host.PublicKey,
-		ID:              fcid,
-		LastRevision:    initRevision,
-		LastRevisionTxn: revisionTxn,
-		NetAddress:      host.NetAddress,
-		SecretKey:       ourSK,
-		StartHeight:     startHeight,
-
+	// Construct contract header.
+	header := contractHeader{
+		Transaction: revisionTxn,
+		SecretKey:   ourSK,
+		StartHeight: startHeight,
 		TotalCost:   funding,
 		ContractFee: host.ContractPrice,
 		TxnFee:      txnFee,
 		SiafundFee:  types.Tax(startHeight, fc.Payout),
-	}, nil
+	}
+
+	// Add contract to set.
+	meta, err := cs.managedInsertContract(header, nil) // no Merkle roots yet
+	if err != nil {
+		return ContractMetadata{}, err
+	}
+	return meta, nil
 }

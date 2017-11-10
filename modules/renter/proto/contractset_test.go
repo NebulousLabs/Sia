@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/fastrand"
@@ -13,7 +12,7 @@ import (
 
 // mustAcquire is a convenience function for acquiring contracts that are
 // known to be in the set.
-func (cs *ContractSet) mustAcquire(t *testing.T, id types.FileContractID) modules.RenterContract {
+func (cs *ContractSet) mustAcquire(t *testing.T, id types.FileContractID) *SafeContract {
 	t.Helper()
 	c, ok := cs.Acquire(id)
 	if !ok {
@@ -25,16 +24,40 @@ func (cs *ContractSet) mustAcquire(t *testing.T, id types.FileContractID) module
 // TestContractSet tests that the ContractSet type is safe for concurrent use.
 func TestContractSet(t *testing.T) {
 	// create contract set
-	id1 := types.FileContractID{1}
-	id2 := types.FileContractID{2}
-	cs := NewContractSet([]modules.RenterContract{
-		{ID: id1},
-		{ID: id2},
-	})
+	h1 := contractHeader{
+		Transaction: types.Transaction{
+			FileContractRevisions: []types.FileContractRevision{{
+				ParentID:             types.FileContractID{1},
+				NewValidProofOutputs: []types.SiacoinOutput{{}, {}},
+				UnlockConditions: types.UnlockConditions{
+					PublicKeys: []types.SiaPublicKey{{}, {}},
+				},
+			}},
+		},
+	}
+	id1 := h1.ID()
+	h2 := contractHeader{
+		Transaction: types.Transaction{
+			FileContractRevisions: []types.FileContractRevision{{
+				ParentID:             types.FileContractID{2},
+				NewValidProofOutputs: []types.SiacoinOutput{{}, {}},
+				UnlockConditions: types.UnlockConditions{
+					PublicKeys: []types.SiaPublicKey{{}, {}},
+				},
+			}},
+		},
+	}
+	id2 := h2.ID()
+	cs := &ContractSet{
+		contracts: map[types.FileContractID]*SafeContract{
+			id1: {header: h1},
+			id2: {header: h2},
+		},
+	}
 
 	// uncontested acquire/release
 	c1 := cs.mustAcquire(t, id1)
-	cs.Return(c1)
+	cs.Return(id1)
 
 	// 100 concurrent serialized mutations
 	var wg sync.WaitGroup
@@ -43,31 +66,33 @@ func TestContractSet(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			c1 := cs.mustAcquire(t, id1)
-			c1.LastRevision.NewRevisionNumber++
+			c1.header.Transaction.FileContractRevisions[0].NewRevisionNumber++
 			time.Sleep(time.Duration(fastrand.Intn(100)))
-			cs.Return(c1)
+			cs.Return(id1)
 		}()
 	}
 	wg.Wait()
 	c1 = cs.mustAcquire(t, id1)
-	cs.Return(c1)
-	if c1.LastRevision.NewRevisionNumber != 100 {
-		t.Fatal("expected exactly 100 increments, got", c1.LastRevision.NewRevisionNumber)
+	cs.Return(id1)
+	if c1.header.LastRevision().NewRevisionNumber != 100 {
+		t.Fatal("expected exactly 100 increments, got", c1.header.LastRevision().NewRevisionNumber)
 	}
 
 	// a blocked acquire shouldn't prevent a return
 	c1 = cs.mustAcquire(t, id1)
 	go func() {
 		time.Sleep(time.Millisecond)
-		cs.Return(c1)
+		cs.Return(id1)
 	}()
 	c1 = cs.mustAcquire(t, id1)
-	cs.Return(c1)
+	cs.Return(id1)
 
 	// delete and reinsert id2
 	c2 := cs.mustAcquire(t, id2)
-	cs.Delete(c2)
-	cs.Insert(c2)
+	cs.Delete(id2)
+	cs.mu.Lock()
+	cs.contracts[id2] = c2
+	cs.mu.Unlock()
 
 	// call all the methods in parallel haphazardly
 	funcs := []func(){
@@ -75,12 +100,25 @@ func TestContractSet(t *testing.T) {
 		func() { cs.IDs() },
 		func() { cs.View(id1); cs.View(id2) },
 		func() { cs.ViewAll() },
-		func() { cs.Return(cs.mustAcquire(t, id1)) },
-		func() { cs.Return(cs.mustAcquire(t, id2)) },
+		func() { cs.mustAcquire(t, id1); cs.Return(id1) },
+		func() { cs.mustAcquire(t, id2); cs.Return(id2) },
 		func() {
-			id3 := types.FileContractID{3}
-			cs.Insert(modules.RenterContract{ID: id3})
-			cs.Delete(cs.mustAcquire(t, id3))
+			h3 := contractHeader{
+				Transaction: types.Transaction{
+					FileContractRevisions: []types.FileContractRevision{{
+						ParentID:             types.FileContractID{3},
+						NewValidProofOutputs: []types.SiacoinOutput{{}, {}},
+						UnlockConditions: types.UnlockConditions{
+							PublicKeys: []types.SiaPublicKey{{}, {}},
+						},
+					}},
+				},
+			}
+			cs.mu.Lock()
+			cs.contracts[h3.ID()] = &SafeContract{header: h3}
+			cs.mu.Unlock()
+			cs.mustAcquire(t, h3.ID())
+			cs.Delete(h3.ID())
 		},
 	}
 	wg = sync.WaitGroup{}

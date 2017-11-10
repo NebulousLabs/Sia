@@ -11,19 +11,29 @@ import (
 )
 
 // Renew negotiates a new contract for data already stored with a host, and
-// submits the new contract transaction to tpool.
-func Renew(contract modules.RenterContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (modules.RenterContract, error) {
-	// extract vars from params, for convenience
+// submits the new contract transaction to tpool. The new contract is added to
+// the ContractSet and its metadata is returned.
+func (cs *ContractSet) Renew(oldID types.FileContractID, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (ContractMetadata, error) {
+	// Acquire old contract.
+	sc, ok := cs.Acquire(oldID)
+	if !ok {
+		return ContractMetadata{}, errors.New("invalid contract")
+	}
+	defer cs.Return(oldID)
+	contract := sc.header
+
+	// Extract vars from params, for convenience.
 	host, funding, startHeight, endHeight, refundAddress := params.Host, params.Funding, params.StartHeight, params.EndHeight, params.RefundAddress
 	ourSK := contract.SecretKey
+	lastRev := contract.LastRevision()
 
 	// Calculate additional basePrice and baseCollateral. If the contract height
 	// did not increase, basePrice and baseCollateral are zero.
 	var basePrice, baseCollateral types.Currency
-	if endHeight+host.WindowSize > contract.LastRevision.NewWindowEnd {
-		timeExtension := uint64((endHeight + host.WindowSize) - contract.LastRevision.NewWindowEnd)
-		basePrice = host.StoragePrice.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension)    // cost of data already covered by contract, i.e. lastrevision.Filesize
-		baseCollateral = host.Collateral.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension) // same but collateral
+	if endHeight+host.WindowSize > lastRev.NewWindowEnd {
+		timeExtension := uint64((endHeight + host.WindowSize) - lastRev.NewWindowEnd)
+		basePrice = host.StoragePrice.Mul64(lastRev.NewFileSize).Mul64(timeExtension)    // cost of data already covered by contract, i.e. lastrevision.Filesize
+		baseCollateral = host.Collateral.Mul64(lastRev.NewFileSize).Mul64(timeExtension) // same but collateral
 	}
 
 	// Calculate the anticipated transaction fee.
@@ -32,7 +42,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 
 	// Underflow check.
 	if funding.Cmp(host.ContractPrice.Add(txnFee).Add(basePrice)) <= 0 {
-		return modules.RenterContract{}, errors.New("insufficient funds to cover contract fee and transaction fee during contract renewal")
+		return ContractMetadata{}, errors.New("insufficient funds to cover contract fee and transaction fee during contract renewal")
 	}
 	// Divide by zero check.
 	if host.StoragePrice.IsZero() {
@@ -53,19 +63,19 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 
 	// check for negative currency
 	if types.PostTax(startHeight, totalPayout).Cmp(hostPayout) < 0 {
-		return modules.RenterContract{}, errors.New("insufficient funds to pay both siafund fee and also host payout")
+		return ContractMetadata{}, errors.New("insufficient funds to pay both siafund fee and also host payout")
 	} else if hostCollateral.Cmp(baseCollateral) < 0 {
-		return modules.RenterContract{}, errors.New("new collateral smaller than base collateral")
+		return ContractMetadata{}, errors.New("new collateral smaller than base collateral")
 	}
 
 	// create file contract
 	fc := types.FileContract{
-		FileSize:       contract.LastRevision.NewFileSize,
-		FileMerkleRoot: contract.LastRevision.NewFileMerkleRoot,
+		FileSize:       lastRev.NewFileSize,
+		FileMerkleRoot: lastRev.NewFileMerkleRoot,
 		WindowStart:    endHeight,
 		WindowEnd:      endHeight + host.WindowSize,
 		Payout:         totalPayout,
-		UnlockHash:     contract.LastRevision.NewUnlockHash,
+		UnlockHash:     lastRev.NewUnlockHash,
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
 			// renter
@@ -86,7 +96,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	// build transaction containing fc
 	err := txnBuilder.FundSiacoins(funding)
 	if err != nil {
-		return modules.RenterContract{}, err
+		return ContractMetadata{}, err
 	}
 	txnBuilder.AddFileContract(fc)
 	// add miner fee
@@ -100,9 +110,9 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	defer func() {
 		// A revision mismatch might not be the host's fault.
 		if err != nil && !IsRevisionMismatch(err) {
-			hdb.IncrementFailedInteractions(contract.HostPublicKey)
+			hdb.IncrementFailedInteractions(contract.HostPublicKey())
 		} else if err == nil {
-			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}
 	}()
 
@@ -113,28 +123,28 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	}
 	conn, err := dialer.Dial("tcp", string(host.NetAddress))
 	if err != nil {
-		return modules.RenterContract{}, err
+		return ContractMetadata{}, err
 	}
 	defer func() { _ = conn.Close() }()
 
 	// allot time for sending RPC ID, verifyRecentRevision, and verifySettings
 	extendDeadline(conn, modules.NegotiateRecentRevisionTime+modules.NegotiateSettingsTime)
 	if err = encoding.WriteObject(conn, modules.RPCRenewContract); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't initiate RPC: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't initiate RPC: " + err.Error())
 	}
 	// verify that both parties are renewing the same contract
 	if err = verifyRecentRevision(conn, contract, host.Version); err != nil {
 		// don't add context; want to preserve the original error type so that
 		// callers can check using IsRevisionMismatch
-		return modules.RenterContract{}, err
+		return ContractMetadata{}, err
 	}
 	// verify the host's settings and confirm its identity
 	host, err = verifySettings(conn, host)
 	if err != nil {
-		return modules.RenterContract{}, errors.New("settings exchange failed: " + err.Error())
+		return ContractMetadata{}, errors.New("settings exchange failed: " + err.Error())
 	}
 	if !host.AcceptingContracts {
-		return modules.RenterContract{}, errors.New("host is not accepting contracts")
+		return ContractMetadata{}, errors.New("host is not accepting contracts")
 	}
 
 	// allot time for negotiation
@@ -142,18 +152,18 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 
 	// send acceptance, txn signed by us, and pubkey
 	if err = modules.WriteNegotiationAcceptance(conn); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send initial acceptance: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send initial acceptance: " + err.Error())
 	}
 	if err = encoding.WriteObject(conn, txnSet); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send the contract signed by us: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send the contract signed by us: " + err.Error())
 	}
 	if err = encoding.WriteObject(conn, ourSK.PublicKey()); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send our public key: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send our public key: " + err.Error())
 	}
 
 	// read acceptance and txn signed by host
 	if err = modules.ReadNegotiationAcceptance(conn); err != nil {
-		return modules.RenterContract{}, errors.New("host did not accept our proposed contract: " + err.Error())
+		return ContractMetadata{}, errors.New("host did not accept our proposed contract: " + err.Error())
 	}
 	// host now sends any new parent transactions, inputs and outputs that
 	// were added to the transaction
@@ -161,13 +171,13 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	var newInputs []types.SiacoinInput
 	var newOutputs []types.SiacoinOutput
 	if err = encoding.ReadObject(conn, &newParents, types.BlockSizeLimit); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't read the host's added parents: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't read the host's added parents: " + err.Error())
 	}
 	if err = encoding.ReadObject(conn, &newInputs, types.BlockSizeLimit); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't read the host's added inputs: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't read the host's added inputs: " + err.Error())
 	}
 	if err = encoding.ReadObject(conn, &newOutputs, types.BlockSizeLimit); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't read the host's added outputs: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't read the host's added outputs: " + err.Error())
 	}
 
 	// merge txnAdditions with txnSet
@@ -182,7 +192,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	// sign the txn
 	signedTxnSet, err := txnBuilder.Sign(true)
 	if err != nil {
-		return modules.RenterContract{}, modules.WriteNegotiationRejection(conn, errors.New("failed to sign transaction: "+err.Error()))
+		return ContractMetadata{}, modules.WriteNegotiationRejection(conn, errors.New("failed to sign transaction: "+err.Error()))
 	}
 
 	// calculate signatures added by the transaction builder
@@ -195,7 +205,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	// create initial (no-op) revision, transaction, and signature
 	initRevision := types.FileContractRevision{
 		ParentID:          signedTxnSet[len(signedTxnSet)-1].FileContractID(0),
-		UnlockConditions:  contract.LastRevision.UnlockConditions,
+		UnlockConditions:  lastRev.UnlockConditions,
 		NewRevisionNumber: 1,
 
 		NewFileSize:           fc.FileSize,
@@ -222,30 +232,30 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 
 	// Send acceptance and signatures
 	if err = modules.WriteNegotiationAcceptance(conn); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send transaction acceptance: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send transaction acceptance: " + err.Error())
 	}
 	if err = encoding.WriteObject(conn, addedSignatures); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send added signatures: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send added signatures: " + err.Error())
 	}
 	if err = encoding.WriteObject(conn, revisionTxn.TransactionSignatures[0]); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't send revision signature: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't send revision signature: " + err.Error())
 	}
 
 	// Read the host acceptance and signatures.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
-		return modules.RenterContract{}, errors.New("host did not accept our signatures: " + err.Error())
+		return ContractMetadata{}, errors.New("host did not accept our signatures: " + err.Error())
 	}
 	var hostSigs []types.TransactionSignature
 	if err = encoding.ReadObject(conn, &hostSigs, 2e3); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't read the host's signatures: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't read the host's signatures: " + err.Error())
 	}
 	for _, sig := range hostSigs {
 		txnBuilder.AddTransactionSignature(sig)
 	}
 	var hostRevisionSig types.TransactionSignature
 	if err = encoding.ReadObject(conn, &hostRevisionSig, 2e3); err != nil {
-		return modules.RenterContract{}, errors.New("couldn't read the host's revision signature: " + err.Error())
+		return ContractMetadata{}, errors.New("couldn't read the host's revision signature: " + err.Error())
 	}
 	revisionTxn.TransactionSignatures = append(revisionTxn.TransactionSignatures, hostRevisionSig)
 
@@ -260,26 +270,24 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 		err = nil
 	}
 	if err != nil {
-		return modules.RenterContract{}, err
+		return ContractMetadata{}, err
 	}
 
-	// calculate contract ID
-	fcid := txn.FileContractID(0)
-
-	return modules.RenterContract{
-		FileContract:    fc,
-		HostPublicKey:   host.PublicKey,
-		ID:              fcid,
-		LastRevision:    initRevision,
-		LastRevisionTxn: revisionTxn,
-		MerkleRoots:     contract.MerkleRoots,
-		NetAddress:      host.NetAddress,
-		SecretKey:       ourSK,
-		StartHeight:     startHeight,
-
+	// Construct contract header.
+	header := contractHeader{
+		Transaction: revisionTxn,
+		SecretKey:   ourSK,
+		StartHeight: startHeight,
 		TotalCost:   funding,
 		ContractFee: host.ContractPrice,
 		TxnFee:      txnFee,
 		SiafundFee:  types.Tax(startHeight, fc.Payout),
-	}, nil
+	}
+
+	// Add contract to set.
+	meta, err := cs.managedInsertContract(header, sc.merkleRoots)
+	if err != nil {
+		return ContractMetadata{}, err
+	}
+	return meta, nil
 }

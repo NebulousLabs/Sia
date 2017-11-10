@@ -52,8 +52,6 @@ type Editor struct {
 	hdb         hostDB
 
 	height types.BlockHeight
-
-	SaveFn revisionSaver
 }
 
 // shutdown terminates the revision loop and signals the goroutine spawned in
@@ -74,75 +72,19 @@ func (he *Editor) Close() error {
 	return he.conn.Close()
 }
 
-// runRevisionIteration submits actions and their accompanying revision to the
-// host for approval. If negotiation is successful, it updates the underlying
-// Contract.
-func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, contract modules.RenterContract, rev types.FileContractRevision, newRoots []crypto.Hash) (_ modules.RenterContract, err error) {
-	defer func() {
-		// Increase Successful/Failed interactions accordingly
-		if err != nil {
-			he.hdb.IncrementFailedInteractions(he.host.PublicKey)
-		} else {
-			he.hdb.IncrementSuccessfulInteractions(he.host.PublicKey)
-		}
-
-		// reset deadline
-		extendDeadline(he.conn, time.Hour)
-	}()
-
-	// initiate revision
-	extendDeadline(he.conn, modules.NegotiateSettingsTime)
-	if err := startRevision(he.conn, he.host); err != nil {
-		return modules.RenterContract{}, err
-	}
-
-	// Before we continue, save the revision. Unexpected termination (e.g.
-	// power failure) during the signature transfer leaves in an ambiguous
-	// state: the host may or may not have received the signature, and thus
-	// may report either revision as being the most recent. To mitigate this,
-	// we save the old revision as a fallback.
-	if he.SaveFn != nil {
-		if err := he.SaveFn(rev, newRoots); err != nil {
-			return modules.RenterContract{}, err
-		}
-	}
-
-	// send actions
-	extendDeadline(he.conn, modules.NegotiateFileContractRevisionTime)
-	if err := encoding.WriteObject(he.conn, actions); err != nil {
-		return modules.RenterContract{}, err
-	}
-
-	// send revision to host and exchange signatures
-	extendDeadline(he.conn, 2*time.Minute)
-	signedTxn, err := negotiateRevision(he.conn, rev, contract.SecretKey)
-	if err == modules.ErrStopResponse {
-		// if host gracefully closed, close our connection as well; this will
-		// cause the next operation to fail
-		he.conn.Close()
-	} else if err != nil {
-		return modules.RenterContract{}, err
-	}
-
-	// update host contract
-	contract.LastRevision = rev
-	contract.LastRevisionTxn = signedTxn
-	contract.MerkleRoots = newRoots
-	return contract, nil
-}
-
 // Upload negotiates a revision that adds a sector to a file contract.
-func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, error) {
+func (he *Editor) Upload(data []byte) (_ ContractMetadata, _ crypto.Hash, err error) {
 	// Acquire the contract.
-	contract, haveContract := he.contractSet.Acquire(he.contractID)
+	sc, haveContract := he.contractSet.Acquire(he.contractID)
 	if !haveContract {
-		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract not present in contract set")
+		return ContractMetadata{}, crypto.Hash{}, errors.New("contract not present in contract set")
 	}
-	defer func() { he.contractSet.Return(contract) }()
+	defer func() { he.contractSet.Return(he.contractID) }()
+	contract := sc.header // for convenience
 
 	// calculate price
 	// TODO: height is never updated, so we'll wind up overpaying on long-running uploads
-	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(contract.FileContract.WindowEnd-he.height))
+	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(contract.LastRevision().NewWindowEnd-he.height))
 	sectorStoragePrice := he.host.StoragePrice.Mul(blockBytes)
 	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(modules.SectorSize)
 	sectorCollateral := he.host.Collateral.Mul(blockBytes)
@@ -158,36 +100,73 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 
 	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
 	if contract.RenterFunds().Cmp(sectorPrice) < 0 {
-		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
+		return ContractMetadata{}, crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
 	}
-	if contract.LastRevision.NewMissedProofOutputs[1].Value.Cmp(sectorCollateral) < 0 {
-		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient collateral to support upload")
+	if contract.LastRevision().NewMissedProofOutputs[1].Value.Cmp(sectorCollateral) < 0 {
+		return ContractMetadata{}, crypto.Hash{}, errors.New("contract has insufficient collateral to support upload")
 	}
 
 	// calculate the new Merkle root
 	sectorRoot := crypto.MerkleRoot(data)
-	newRoots := append(contract.MerkleRoots, sectorRoot)
+	newRoots := append(sc.merkleRoots, sectorRoot)
 	merkleRoot := cachedMerkleRoot(newRoots)
 
 	// create the action and revision
 	actions := []modules.RevisionAction{{
 		Type:        modules.ActionInsert,
-		SectorIndex: uint64(len(contract.MerkleRoots)),
+		SectorIndex: uint64(len(sc.merkleRoots)),
 		Data:        data,
 	}}
-	rev := newUploadRevision(contract.LastRevision, merkleRoot, sectorPrice, sectorCollateral)
+	rev := newUploadRevision(contract.LastRevision(), merkleRoot, sectorPrice, sectorCollateral)
 
 	// run the revision iteration
-	newContract, err := he.runRevisionIteration(actions, contract, rev, newRoots)
-	if err != nil {
-		return modules.RenterContract{}, crypto.Hash{}, err
-	}
-	contract = newContract
+	defer func() {
+		// Increase Successful/Failed interactions accordingly
+		if err != nil {
+			he.hdb.IncrementFailedInteractions(he.host.PublicKey)
+		} else {
+			he.hdb.IncrementSuccessfulInteractions(he.host.PublicKey)
+		}
 
-	// update metrics
-	contract.StorageSpending = contract.StorageSpending.Add(sectorStoragePrice)
-	contract.UploadSpending = contract.UploadSpending.Add(sectorBandwidthPrice)
-	return contract, sectorRoot, nil
+		// reset deadline
+		extendDeadline(he.conn, time.Hour)
+	}()
+
+	// initiate revision
+	extendDeadline(he.conn, modules.NegotiateSettingsTime)
+	if err := startRevision(he.conn, he.host); err != nil {
+		return ContractMetadata{}, crypto.Hash{}, err
+	}
+
+	// TODO: record the change we are about to make to the contract. If we lose
+	// power mid-revision, this allows us to restore either the pre-revision
+	// or post-revision contract.
+	// sc.recordUploadIntent(rev, sectorRoot, len(newRoots))
+
+	// send actions
+	extendDeadline(he.conn, modules.NegotiateFileContractRevisionTime)
+	if err := encoding.WriteObject(he.conn, actions); err != nil {
+		return ContractMetadata{}, crypto.Hash{}, err
+	}
+
+	// send revision to host and exchange signatures
+	extendDeadline(he.conn, 2*time.Minute)
+	signedTxn, err := negotiateRevision(he.conn, rev, contract.SecretKey)
+	if err == modules.ErrStopResponse {
+		// if host gracefully closed, close our connection as well; this will
+		// cause the next operation to fail
+		he.conn.Close()
+	} else if err != nil {
+		return ContractMetadata{}, crypto.Hash{}, err
+	}
+
+	// update contract
+	err = sc.recordUpload(signedTxn, sectorRoot, sectorStoragePrice, sectorBandwidthPrice)
+	if err != nil {
+		return ContractMetadata{}, crypto.Hash{}, err
+	}
+
+	return sc.Metadata(), sectorRoot, nil
 }
 
 // Delete negotiates a revision that removes a sector from a file contract.
@@ -202,20 +181,21 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 
 // NewEditor initiates the contract revision process with a host, and returns
 // an Editor.
-func NewEditor(host modules.HostDBEntry, id types.FileContractID, contractSet *ContractSet, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}) (_ *Editor, err error) {
-	contract, ok := contractSet.View(id)
-	// check that contract has enough value to support an upload
-	if !ok || len(contract.LastRevision.NewValidProofOutputs) != 2 {
+func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContractID, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}) (_ *Editor, err error) {
+	sc, ok := cs.Acquire(id)
+	if !ok {
 		return nil, errors.New("invalid contract")
 	}
+	defer cs.Return(id)
+	contract := sc.header
 
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
 		// a revision mismatch is not necessarily the host's fault
 		if err != nil && !IsRevisionMismatch(err) {
-			hdb.IncrementFailedInteractions(contract.HostPublicKey)
+			hdb.IncrementFailedInteractions(contract.HostPublicKey())
 		} else if err == nil {
-			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}
 	}()
 
@@ -257,7 +237,7 @@ func NewEditor(host modules.HostDBEntry, id types.FileContractID, contractSet *C
 		hdb:         hdb,
 		height:      currentHeight,
 		contractID:  id,
-		contractSet: contractSet,
+		contractSet: cs,
 		conn:        conn,
 		closeChan:   closeChan,
 	}, nil
