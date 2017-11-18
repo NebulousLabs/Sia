@@ -14,7 +14,6 @@ import (
 // mustAcquire is a convenience function for acquiring contracts that are
 // known to be in the set.
 func (cs *ContractSet) mustAcquire(t *testing.T, id types.FileContractID) modules.RenterContract {
-	t.Helper()
 	c, ok := cs.Acquire(id)
 	if !ok {
 		t.Fatal("no contract with that id")
