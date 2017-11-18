@@ -207,8 +207,8 @@ func (r *Renter) DeleteFile(nickname string) error {
 	return nil
 }
 
-// getTrackedFile returns the metadata for a tracked file, if the file exists.
-func (r *Renter) getTrackedFile(nickname string) (tf trackedFile, exists bool) {
+// managedGetTrackedFile returns the metadata for a tracked file, if the file exists.
+func (r *Renter) managedGetTrackedFile(nickname string) (tf trackedFile, exists bool) {
 	lockId := r.mu.RLock()
 	defer r.mu.RUnlock(lockId)
 	tf, exists = r.tracking[nickname]
@@ -239,7 +239,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 		f.mu.RLock()
 		renewing := true
 		var localPath string
-		tf, exists := r.getTrackedFile(f.name)
+		tf, exists := r.managedGetTrackedFile(f.name)
 		if exists {
 			localPath = tf.RepairPath
 		}
