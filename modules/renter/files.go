@@ -101,14 +101,22 @@ func (f *file) available(isOffline func(types.FileContractID) bool) bool {
 	return true
 }
 
-// uploadProgress indicates what percentage of the file (plus redundancy) has
-// been uploaded. Note that a file may be Available long before UploadProgress
-// reaches 100%, and UploadProgress may report a value greater than 100%.
-func (f *file) uploadProgress() float64 {
+// uploadedBytes indicates how many bytes of the file have been uploaded via
+// current file contracts. Note that this includes padding and redundancy, so
+// uploadedBytes can return a value much larger than the file's original filesize.
+func (f *file) uploadedBytes() uint64 {
 	var uploaded uint64
 	for _, fc := range f.contracts {
 		uploaded += uint64(len(fc.Pieces)) * f.pieceSize
 	}
+	return uploaded
+}
+
+// uploadProgress indicates what percentage of the file (plus redundancy) has
+// been uploaded. Note that a file may be Available long before UploadProgress
+// reaches 100%, and UploadProgress may report a value greater than 100%.
+func (f *file) uploadProgress() float64 {
+	uploaded := f.uploadedBytes()
 	desired := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
 
 	return math.Min(100*(float64(uploaded)/float64(desired)), 100)
@@ -250,6 +258,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 			Renewing:       renewing,
 			Available:      f.available(isOffline),
 			Redundancy:     f.redundancy(isOffline),
+			UploadedBytes:  f.uploadedBytes(),
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
 		})
