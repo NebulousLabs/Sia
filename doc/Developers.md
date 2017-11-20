@@ -124,6 +124,22 @@ who are unfamiliar with the code. A reader should never have to ask 'What is
 `cs`?' on their first pass through the code, even though to experienced
 developers it is obvious that `cs` refers to a `consensus.ConsensusSet`.
 
+### Function Prefixes
+
+Sia uses special prefixes for certain functions to hint about their usage to the
+caller.
+
+#### `threaded`
+
+Prefix functions with `threaded` (e.g., `threadedMine`) to indicate that callers
+should only call these functions within their own goroutine (e.g.,
+`go threadedMine()`). These functions must manage their own thread-safety.
+
+#### `managed`
+
+Prefix functions with `managed` (e.g. `managedUpdateWorkerPool`) if the function
+acquires any locks in its body.
+
 Control Flow
 ------------
 
@@ -158,15 +174,11 @@ defer Unlock()`. Simple locking schemes should be preferred over performant
 locking schemes. As will everything else, anything unusual or convention
 breaking should have a comment.
 
-Non-exported functions should not do any locking, unless they have a special
-prefix to the name (explained below). The responsibility for thread-safety
-comes from the exported functions which call the non-exported functions.
-Maintaining this convention minimizes developer overhead when working with
-complex objects.
-
-Functions prefixed `threaded` (example `threadedMine`) are meant to be called
-in their own goroutine (`go threadedMine()`) and will manage their own
-thread-safety.
+Non-exported functions should not do any locking unless they are named with the
+proper prefix (see [Function Prefixes](#function-prefixes)). The responsibility
+for thread-safety comes from the exported functions which call the non-exported
+functions. Maintaining this convention minimizes developer overhead when working
+with complex objects.
 
 Error Handling
 --------------
