@@ -41,6 +41,10 @@ var (
 	// ErrLowBalance is returned if the wallet does not have enough funds to
 	// complete the desired action.
 	ErrLowBalance = errors.New("insufficient balance")
+
+	// DefaultWalletContext defines the default `context` to be used with the
+	// wallet.
+	DefaultWalletContext = ""
 )
 
 type (
@@ -95,9 +99,16 @@ type (
 		TransactionID         types.TransactionID `json:"transactionid"`
 		ConfirmationHeight    types.BlockHeight   `json:"confirmationheight"`
 		ConfirmationTimestamp types.Timestamp     `json:"confirmationtimestamp"`
+		Context               string              `json:"context"`
 
 		Inputs  []ProcessedInput  `json:"inputs"`
 		Outputs []ProcessedOutput `json:"outputs"`
+	}
+
+	// WalletContext defines a context inside the wallet.
+	WalletContext struct {
+		Name    string         `json:"name"`
+		Balance types.Currency `json:"balance"`
 	}
 
 	// TransactionBuilder is used to construct custom transactions. A transaction
@@ -130,6 +141,10 @@ type (
 		// double-spends, because the wallet will assume the transaction
 		// failed.
 		FundSiafunds(amount types.Currency) error
+
+		// SetContext configures the transaction builder to use the specified
+		// wallet context for the transaction.
+		SetContext(context string)
 
 		// AddParents adds a set of parents to the transaction.
 		AddParents([]types.Transaction)
@@ -334,7 +349,16 @@ type (
 		// ConfirmedBalance returns the confirmed balance of the wallet, minus
 		// any outgoing transactions. ConfirmedBalance will include unconfirmed
 		// refund transactions.
-		ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siacoinClaimBalance types.Currency)
+		ConfirmedBalance(context string) (siacoinBalance types.Currency, siafundBalance types.Currency, siacoinClaimBalance types.Currency)
+
+		// SetContextLimit sets the spending limit for a wallet context to the
+		// value specified by limit. Transactions which use the specified context
+		// will be limited to `limit` spending. Calling SetContextLimit again on
+		// the same context resets the spending limit to the value provided.
+		SetContextLimit(context string, limit types.Currency)
+
+		// Contexts returns every WalletContext currently in use by the wallet.
+		Contexts() []WalletContext
 
 		// UnconfirmedBalance returns the unconfirmed balance of the wallet.
 		// Outgoing funds and incoming funds are reported separately. Refund

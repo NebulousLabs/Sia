@@ -128,6 +128,52 @@ func TestViewAdded(t *testing.T) {
 	}
 }
 
+// TestTbuilderContext verifies that the transaction builder uses the wallet's
+// contextual balances correctly.
+func TestTbuilderContext(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// create a context with a low limit, try to use a tbuilder to create a
+	// transaction that exceeds this limit. tbuilder should fail.
+	wt.wallet.SetContextLimit(t.Name()+"-context", types.SiacoinPrecision.Mul64(100))
+	b := wt.wallet.StartTransaction()
+	b.SetContext(t.Name() + "-context")
+	err = b.FundSiacoins(types.SiacoinPrecision.Mul64(101))
+	if err == nil {
+		t.Fatal("expected fundsiacoins to fail when a context with too-low limit is used")
+	}
+	err = b.FundSiacoins(types.SiacoinPrecision.Mul64(50))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.AddSiacoinOutput(types.SiacoinOutput{
+		Value:      types.SiacoinPrecision.Mul64(50),
+		UnlockHash: types.UnlockHash{},
+	})
+	txnSet, err := b.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bal, err := dbGetContextBalance(wt.wallet.dbTx, t.Name()+"-context")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bal.Cmp(types.SiacoinPrecision.Mul64(50)) != 0 {
+		t.Fatal("expected contextual balance to be 50SC after using tbuilder to send money, got", bal.HumanString(), "instead.")
+	}
+}
+
 // TestDoubleSignError checks that an error is returned if there is a problem
 // when trying to call 'Sign' on a transaction twice.
 func TestDoubleSignError(t *testing.T) {
@@ -188,7 +234,7 @@ func TestConcurrentBuilders(t *testing.T) {
 	}
 
 	// Get a baseline balance for the wallet.
-	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
 	if !startingOutgoing.IsZero() {
 		t.Fatal(startingOutgoing)
@@ -213,7 +259,7 @@ func TestConcurrentBuilders(t *testing.T) {
 	}
 
 	// Get a second reading on the wallet's balance.
-	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	if !startingSCConfirmed.Equals(fundedSCConfirmed) {
 		t.Fatal("confirmed siacoin balance changed when no blocks have been mined", startingSCConfirmed, fundedSCConfirmed)
 	}
@@ -278,7 +324,7 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 
 	// Send all coins to a single confirmed output for the wallet.
 	unlockConditions, err := wt.wallet.NextAddress()
-	scBal, _, _ := wt.wallet.ConfirmedBalance()
+	scBal, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	// Use a custom builder so that there is no transaction fee.
 	builder := wt.wallet.StartTransaction()
 	err = builder.FundSiacoins(scBal)
@@ -306,7 +352,7 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	}
 
 	// Get a baseline balance for the wallet.
-	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
 	if !startingOutgoing.IsZero() {
 		t.Fatal(startingOutgoing)
@@ -331,7 +377,7 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	}
 
 	// Get a second reading on the wallet's balance.
-	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	if !startingSCConfirmed.Equals(fundedSCConfirmed) {
 		t.Fatal("confirmed siacoin balance changed when no blocks have been mined", startingSCConfirmed, fundedSCConfirmed)
 	}
@@ -391,7 +437,7 @@ func TestParallelBuilders(t *testing.T) {
 	}
 
 	// Get a baseline balance for the wallet.
-	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
 	if !startingOutgoing.IsZero() {
 		t.Fatal(startingOutgoing)
@@ -438,7 +484,7 @@ func TestParallelBuilders(t *testing.T) {
 	}
 
 	// Check the final balance.
-	endingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	endingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	expected := startingSCConfirmed.Sub(funding.Mul(types.NewCurrency64(uint64(outputsDesired))))
 	if !expected.Equals(endingSCConfirmed) {
 		t.Fatal("did not get the expected ending balance", expected, endingSCConfirmed, startingSCConfirmed)

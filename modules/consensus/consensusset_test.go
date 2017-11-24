@@ -69,7 +69,7 @@ func (cst *consensusSetTester) addSiafunds() {
 	}
 
 	// Check that the siafunds made it to the wallet.
-	_, siafundBalance, _ := cst.wallet.ConfirmedBalance()
+	_, siafundBalance, _ := cst.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	if !siafundBalance.Equals64(1e3) {
 		panic("wallet does not have the siafunds")
 	}

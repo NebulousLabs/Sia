@@ -102,6 +102,11 @@ type (
 	WalletVerifyAddressGET struct {
 		Valid bool `json:"valid"`
 	}
+
+	// WalletContextsGET contains the data returned from a /wallet/contexts call.
+	WalletContextsGET struct {
+		Contexts []modules.WalletContext `json:"contexts"`
+	}
 )
 
 // encryptionKeys enumerates the possible encryption keys that can be derived
@@ -121,7 +126,7 @@ func encryptionKeys(seedStr string) (validKeys []crypto.TwofishKey) {
 
 // walletHander handles API calls to /wallet.
 func (api *API) walletHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	siacoinBal, siafundBal, siaclaimBal := api.wallet.ConfirmedBalance()
+	siacoinBal, siafundBal, siaclaimBal := api.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	siacoinsOut, siacoinsIn := api.wallet.UnconfirmedBalance()
 	dustThreshold := api.wallet.DustThreshold()
 	WriteJSON(w, WalletGET{
@@ -404,13 +409,11 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 			WriteError(w, Error{"could not read address from POST call to /wallet/siacoins"}, http.StatusBadRequest)
 			return
 		}
-
 		txns, err = api.wallet.SendSiacoins(amount, dest)
 		if err != nil {
 			WriteError(w, Error{"error when calling /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 			return
 		}
-
 	}
 
 	var txids []types.TransactionID
@@ -519,9 +522,22 @@ func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Reque
 	}
 	unconfirmedTxns := api.wallet.UnconfirmedTransactions()
 
+	contextualConfirmedTransactions := confirmedTxns[:0]
+	contextualUnconfirmedTransactions := unconfirmedTxns[:0]
+	for _, txn := range confirmedTxns {
+		if txn.Context == req.FormValue("context") {
+			contextualConfirmedTransactions = append(contextualConfirmedTransactions, txn)
+		}
+	}
+	for _, txn := range unconfirmedTxns {
+		if txn.Context == req.FormValue("context") {
+			contextualUnconfirmedTransactions = append(contextualUnconfirmedTransactions, txn)
+		}
+	}
+
 	WriteJSON(w, WalletTransactionsGET{
-		ConfirmedTransactions:   confirmedTxns,
-		UnconfirmedTransactions: unconfirmedTxns,
+		ConfirmedTransactions:   contextualConfirmedTransactions,
+		UnconfirmedTransactions: contextualUnconfirmedTransactions,
 	})
 }
 
@@ -593,4 +609,26 @@ func (api *API) walletVerifyAddressHandler(w http.ResponseWriter, req *http.Requ
 
 	err := new(types.UnlockHash).LoadString(addrString)
 	WriteJSON(w, WalletVerifyAddressGET{Valid: err == nil})
+}
+
+// walletContextsHandler handles API calls to /wallet/contexts.
+func (api *API) walletContextsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	WriteJSON(w, WalletContextsGET{api.wallet.Contexts()})
+}
+
+// walletAddContextHandler handles API calls to POST /wallet/contexts and adds
+// a new context to the wallet using the given name and limit.
+func (api *API) walletAddContextHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	ctx := req.FormValue("context")
+	limit, ok := scanAmount(req.FormValue("limit"))
+	if !ok {
+		WriteError(w, Error{"error: could not decode currency amount from limit parameter"}, http.StatusBadRequest)
+		return
+	}
+	if ctx == "" {
+		WriteError(w, Error{"context parameter is required"}, http.StatusBadRequest)
+		return
+	}
+	api.wallet.SetContextLimit(ctx, limit)
+	WriteSuccess(w)
 }

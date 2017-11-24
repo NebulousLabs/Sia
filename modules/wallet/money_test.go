@@ -4,6 +4,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -20,7 +21,7 @@ func TestSendSiacoins(t *testing.T) {
 
 	// Get the initial balance - should be 1 block. The unconfirmed balances
 	// should be 0.
-	confirmedBal, _, _ := wt.wallet.ConfirmedBalance()
+	confirmedBal, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	unconfirmedOut, unconfirmedIn := wt.wallet.UnconfirmedBalance()
 	if !confirmedBal.Equals(types.CalculateCoinbase(1)) {
 		t.Error("unexpected confirmed balance")
@@ -42,7 +43,7 @@ func TestSendSiacoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	confirmedBal2, _, _ := wt.wallet.ConfirmedBalance()
+	confirmedBal2, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	unconfirmedOut2, unconfirmedIn2 := wt.wallet.UnconfirmedBalance()
 	if !confirmedBal2.Equals(confirmedBal) {
 		t.Error("confirmed balance changed without introduction of blocks")
@@ -57,7 +58,7 @@ func TestSendSiacoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	confirmedBal3, _, _ := wt.wallet.ConfirmedBalance()
+	confirmedBal3, _, _ := wt.wallet.ConfirmedBalance(modules.DefaultWalletContext)
 	unconfirmedOut3, unconfirmedIn3 := wt.wallet.UnconfirmedBalance()
 	if !confirmedBal3.Equals(confirmedBal2.Add(types.CalculateCoinbase(2)).Sub(sendValue).Sub(tpoolFee)) {
 		t.Error("confirmed balance did not adjust to the expected value")

@@ -38,6 +38,7 @@ type transactionBuilder struct {
 	parents     []types.Transaction
 	signed      bool
 	transaction types.Transaction
+	context     string
 
 	newParents            []int
 	siacoinInputs         []int
@@ -112,6 +113,12 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 	return nil
 }
 
+// SetContext configures the transaction builder to use the specified
+// wallet context for the transaction.
+func (tb *transactionBuilder) SetContext(context string) {
+	tb.context = context
+}
+
 // FundSiacoins will add a siacoin input of exactly 'amount' to the
 // transaction. A parent transaction may be needed to achieve an input with the
 // correct value. The siacoin input will not be signed until 'Sign' is called
@@ -126,6 +133,20 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	consensusHeight, err := dbGetConsensusHeight(tb.wallet.dbTx)
 	if err != nil {
 		return err
+	}
+
+	if tb.context != modules.DefaultWalletContext {
+		ctxBalance, err := dbGetContextBalance(tb.wallet.dbTx, tb.context)
+		if err != nil {
+			return err
+		}
+		if ctxBalance.Cmp(amount) < 0 {
+			return modules.ErrLowBalance
+		}
+		err = dbPutContextBalance(tb.wallet.dbTx, tb.context, ctxBalance.Sub(amount))
+		if err != nil {
+			return err
+		}
 	}
 
 	// Collect a value-sorted set of siacoin outputs.
@@ -547,28 +568,38 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 
 	// For each siacoin input in the transaction that we added, provide a
 	// signature.
-	tb.wallet.mu.RLock()
-	defer tb.wallet.mu.RUnlock()
-	for _, inputIndex := range tb.siacoinInputs {
-		input := tb.transaction.SiacoinInputs[inputIndex]
-		key, ok := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
-		if !ok {
-			return nil, errors.New("transaction builder added an input that it cannot sign")
+	err := func() error {
+		tb.wallet.mu.RLock()
+		defer tb.wallet.mu.RUnlock()
+		for _, inputIndex := range tb.siacoinInputs {
+			input := tb.transaction.SiacoinInputs[inputIndex]
+			key, ok := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+			if !ok {
+				return errors.New("transaction builder added an input that it cannot sign")
+			}
+			newSigIndices := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
+			tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
+			tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
 		}
-		newSigIndices := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
-		tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
-		tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
-	}
-	for _, inputIndex := range tb.siafundInputs {
-		input := tb.transaction.SiafundInputs[inputIndex]
-		key, ok := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
-		if !ok {
-			return nil, errors.New("transaction builder added an input that it cannot sign")
+		for _, inputIndex := range tb.siafundInputs {
+			input := tb.transaction.SiafundInputs[inputIndex]
+			key, ok := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+			if !ok {
+				return errors.New("transaction builder added an input that it cannot sign")
+			}
+			newSigIndices := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
+			tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
+			tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
 		}
-		newSigIndices := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
-		tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
-		tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
+		return nil
+	}()
+	if err != nil {
+		return nil, err
 	}
+
+	tb.wallet.mu.Lock()
+	dbPutTransactionContext(tb.wallet.dbTx, tb.transaction.ID(), tb.context)
+	tb.wallet.mu.Unlock()
 
 	// Get the transaction set and delete the transaction from the registry.
 	txnSet := append(tb.parents, tb.transaction)

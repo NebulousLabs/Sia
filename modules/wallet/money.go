@@ -20,9 +20,15 @@ func (w *Wallet) DustThreshold() types.Currency {
 	return minFee.Mul64(3)
 }
 
+func (w *Wallet) SetContextLimit(context string, limit types.Currency) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	dbPutContextBalance(w.dbTx, context, limit)
+}
+
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
-func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
+func (w *Wallet) ConfirmedBalance(context string) (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
 	// dustThreshold has to be obtained separate from the lock
 	dustThreshold := w.DustThreshold()
 
@@ -37,6 +43,15 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 			siacoinBalance = siacoinBalance.Add(sco.Value)
 		}
 	})
+
+	if context != modules.DefaultWalletContext {
+		contextBalance, err := dbGetContextBalance(w.dbTx, context)
+		if err != nil {
+			w.log.Debugf("couldnt get context balance: %v\n", err)
+		} else if contextBalance.Cmp(siacoinBalance) < 0 {
+			siacoinBalance = contextBalance
+		}
+	}
 
 	siafundPool, err := dbGetSiafundPool(w.dbTx)
 	if err != nil {

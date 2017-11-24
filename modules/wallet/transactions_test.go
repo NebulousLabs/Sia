@@ -3,6 +3,7 @@ package wallet
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -253,5 +254,66 @@ func TestTransactionInputOutputIDs(t *testing.T) {
 				t.Fatal("input has ParentID that points to a nonexistent output:", input.ParentID)
 			}
 		}
+	}
+}
+
+// TestWalletTransactionsContext verifies that transactions correctly set their
+// `context` field.
+func TestWalletTransactionsContext(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	wt.wallet.SetContextLimit("TestContext", types.SiacoinPrecision.Mul64(100))
+	output := types.SiacoinOutput{
+		Value:      types.SiacoinPrecision.Mul64(50),
+		UnlockHash: types.UnlockHash{},
+	}
+	txnBuilder := wt.wallet.StartTransaction()
+	txnBuilder.SetContext("TestContext")
+	err = txnBuilder.FundSiacoins(types.SiacoinPrecision.Mul64(50))
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnBuilder.AddSiacoinOutput(output)
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.wallet.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	txns, err := wt.wallet.Transactions(0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var contextTxns []modules.ProcessedTransaction
+	for _, txn := range txns {
+		if txn.Context == "TestContext" {
+			contextTxns = append(contextTxns, txn)
+		}
+	}
+	if len(contextTxns) != 1 {
+		t.Fatal("expected one matching contextual transactions")
+	}
+	val := types.NewCurrency64(0)
+	for _, output := range contextTxns[0].Outputs {
+		if output.FundType == types.SpecifierSiacoinOutput {
+			val = val.Add(output.Value)
+		}
+	}
+	if val.Cmp(types.SiacoinPrecision.Mul64(50)) != 0 {
+		t.Fatal("expected contextual transaction list to return our 50SC transaction")
 	}
 }
