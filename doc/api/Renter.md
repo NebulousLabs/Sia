@@ -215,7 +215,7 @@ lists the status of all files.
       // Total number of bytes successfully uploaded via current file contracts.
       // This number includes padding and rendundancy, so a file with a size of
       // 8192 bytes might be padded to 40 MiB and, with a redundancy of 5,
-      // striped to 200 MiB for upload.
+      // encoded to 200 MiB for upload.
       "uploadedbytes": 209715200, // bytes
 
       // Percentage of the file uploaded, including redundancy. Uploading has
