@@ -70,18 +70,19 @@ func TestFileAvailable(t *testing.T) {
 	}
 }
 
-// TestFileUploadedBytes tests that uploadedBytes() returns a value equal
-// to the number of pieces stored via contract times the size of each piece.
+// TestFileUploadedBytes tests that uploadedBytes() returns a value equal to
+// the number of sectors stored via contract times the size of each sector.
 func TestFileUploadedBytes(t *testing.T) {
 	f := &file{}
-	f.pieceSize = 2
+	// ensure that a piece fits within a sector
+	f.pieceSize = modules.SectorSize / 2
 	f.contracts = make(map[types.FileContractID]fileContract)
 	f.contracts[types.FileContractID{}] = fileContract{
 		ID:     types.FileContractID{},
 		IP:     modules.NetAddress(""),
 		Pieces: make([]pieceData, 4),
 	}
-	if f.uploadedBytes() != 8 {
+	if f.uploadedBytes() != 4*modules.SectorSize {
 		t.Errorf("expected uploadedBytes to be 8, got %v", f.uploadedBytes())
 	}
 }
