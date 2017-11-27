@@ -27,11 +27,11 @@ Index
 | [/renter/downloads](#renterdownloads-get)                               | GET       |
 | [/renter/files](#renterfiles-get)                                       | GET       |
 | [/renter/prices](#renter-prices-get)                                    | GET       |
-| [/renter/delete/___*siapath___](#renterdeletesiapath-post)              | POST      |
-| [/renter/download/___*siapath___](#renterdownloadsiapath-get)           | GET       |
-| [/renter/downloadasync/___*siapath___](#renterdownloadasyncsiapath-get) | GET       |
-| [/renter/rename/___*siapath___](#renterrenamesiapath-post)              | POST      |
-| [/renter/upload/___*siapath___](#renteruploadsiapath-post)              | POST      |
+| [/renter/delete/___*siapath___](#renterdelete___siapath___-post)              | POST      |
+| [/renter/download/___*siapath___](#renterdownload__siapath___-get)           | GET       |
+| [/renter/downloadasync/___*siapath___](#renterdownloadasync__siapath___-get) | GET       |
+| [/renter/rename/___*siapath___](#renterrename___siapath___-post)              | POST      |
+| [/renter/upload/___*siapath___](#renterupload___siapath___-post)              | POST      |
 
 #### /renter [GET]
 
@@ -328,11 +328,14 @@ standard success or error response. See
 
 #### /renter/upload/___*siapath___ [POST]
 
-uploads a file to the network from the local filesystem.
+starts a file upload to the Sia network from the local filesystem.
 
 ###### Path Parameters
+
 ```
-// Location where the file will reside in the renter on the network.
+// Location where the file will reside in the renter on the network. The path
+// must be non-empty, may not include any path traversal strings ("./", "../"),
+// and may not begin with a forward-slash character.
 *siapath
 ```
 
@@ -351,4 +354,8 @@ source // string - a filepath
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[API.md#standard-responses](/doc/API.md#standard-responses). A successful
+response indicates that the upload started successfully. To confirm the upload
+completed successfully, the caller must call [/renter/files](#renterfiles-get)
+until that API returns success with an `uploadprogress` >= 100.0 for the file
+at the given `siapath`.

@@ -19,6 +19,9 @@ var (
 	// chronological order. Only transactions relevant to the wallet are
 	// stored. The key of this bucket is an autoincrementing integer.
 	bucketProcessedTransactions = []byte("bucketProcessedTransactions")
+	// bucketAddrTransactions maps an UnlockHash to the
+	// ProcessedTransactions that it appears in.
+	bucketAddrTransactions = []byte("bucketAddrTransactions")
 	// bucketSiacoinOutputs maps a SiacoinOutputID to its SiacoinOutput. Only
 	// outputs that the wallet controls are stored. The wallet uses these
 	// outputs to fund transactions.
@@ -38,6 +41,7 @@ var (
 
 	dbBuckets = [][]byte{
 		bucketProcessedTransactions,
+		bucketAddrTransactions,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
 		bucketSpentOutputs,
@@ -204,6 +208,49 @@ func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
 }
 
+func dbPutAddrTransactions(tx *bolt.Tx, addr types.UnlockHash, txns []uint64) error {
+	return dbPut(tx.Bucket(bucketAddrTransactions), addr, txns)
+}
+func dbGetAddrTransactions(tx *bolt.Tx, addr types.UnlockHash) (txns []uint64, err error) {
+	err = dbGet(tx.Bucket(bucketAddrTransactions), addr, &txns)
+	return
+}
+
+// dbAddAddrTransaction appends a single transaction index to the set of
+// transactions associated with addr. If the index is already in the set, it is
+// not added again.
+func dbAddAddrTransaction(tx *bolt.Tx, addr types.UnlockHash, txn uint64) error {
+	txns, err := dbGetAddrTransactions(tx, addr)
+	if err != nil && err != errNoKey {
+		return err
+	}
+	for _, i := range txns {
+		if i == txn {
+			return nil
+		}
+	}
+	return dbPutAddrTransactions(tx, addr, append(txns, txn))
+}
+
+// dbAddProcessedTransactionAddrs updates bucketAddrTransactions to associate
+// every address in pt with txn, which is assumed to be pt's index in
+// bucketProcessedTransactions.
+func dbAddProcessedTransactionAddrs(tx *bolt.Tx, pt modules.ProcessedTransaction, txn uint64) error {
+	addrs := make(map[types.UnlockHash]struct{})
+	for _, input := range pt.Inputs {
+		addrs[input.RelatedAddress] = struct{}{}
+	}
+	for _, output := range pt.Outputs {
+		addrs[output.RelatedAddress] = struct{}{}
+	}
+	for addr := range addrs {
+		if err := dbAddAddrTransaction(tx, addr, txn); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // bucketProcessedTransactions works a little differently: the key is
 // meaningless, only used to order the transactions chronologically.
 
@@ -228,7 +275,11 @@ func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) 
 	// big-endian is used so that the keys are properly sorted
 	keyBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(keyBytes, key)
-	return b.Put(keyBytes, encoding.Marshal(pt))
+	if err = b.Put(keyBytes, encoding.Marshal(pt)); err != nil {
+		return err
+	}
+	// also add this txid to the bucketAddrTransactions
+	return dbAddProcessedTransactionAddrs(tx, pt, key)
 }
 
 func dbGetLastProcessedTransaction(tx *bolt.Tx) (pt modules.ProcessedTransaction, err error) {
@@ -246,30 +297,43 @@ func dbDeleteLastProcessedTransaction(tx *bolt.Tx) error {
 	return b.Delete(key)
 }
 
-func dbForEachProcessedTransaction(tx *bolt.Tx, fn func(modules.ProcessedTransaction)) error {
-	return dbForEach(tx.Bucket(bucketProcessedTransactions), func(_ uint64, pt modules.ProcessedTransaction) {
-		fn(pt)
-	})
+func dbGetProcessedTransaction(tx *bolt.Tx, index uint64) (pt modules.ProcessedTransaction, err error) {
+	// big-endian is used so that the keys are properly sorted
+	indexBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(indexBytes, index)
+	val := tx.Bucket(bucketProcessedTransactions).Get(indexBytes)
+	err = decodeProcessedTransaction(val, &pt)
+	return
 }
 
 // A processedTransactionsIter iterates through the ProcessedTransactions bucket.
 type processedTransactionsIter struct {
-	c  *bolt.Cursor
-	pt modules.ProcessedTransaction
+	c   *bolt.Cursor
+	seq uint64
+	pt  modules.ProcessedTransaction
 }
 
 // next decodes the next ProcessedTransaction, returning false if the end of
 // the bucket has been reached.
 func (it *processedTransactionsIter) next() bool {
-	var ptBytes []byte
+	var seqBytes, ptBytes []byte
 	if it.pt.TransactionID == (types.TransactionID{}) {
 		// this is the first time next has been called, so cursor is not
 		// initialized yet
-		_, ptBytes = it.c.First()
+		seqBytes, ptBytes = it.c.First()
 	} else {
-		_, ptBytes = it.c.Next()
+		seqBytes, ptBytes = it.c.Next()
 	}
+	if seqBytes == nil {
+		return false
+	}
+	it.seq = binary.BigEndian.Uint64(seqBytes)
 	return decodeProcessedTransaction(ptBytes, &it.pt) == nil
+}
+
+// key returns the key for the most recently decoded ProcessedTransaction.
+func (it *processedTransactionsIter) key() uint64 {
+	return it.seq
 }
 
 // value returns the most recently decoded ProcessedTransaction.
