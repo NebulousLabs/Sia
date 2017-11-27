@@ -152,7 +152,9 @@ func (w *worker) managedUpload(uc *unfinishedChunk, pieceIndex uint64) {
 	e, err := w.renter.hostContractor.Editor(w.contract.ID, w.renter.tg.StopChan())
 	if err != nil {
 		w.renter.log.Debugln("Worker failed to acquire an editor:", err)
+		w.mu.Lock()
 		w.uploadFailed(uc, pieceIndex)
+		w.mu.Unlock()
 		return
 	}
 	defer e.Close()
