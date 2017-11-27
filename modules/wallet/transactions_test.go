@@ -192,6 +192,59 @@ func TestIntegrationAddressTransactions(t *testing.T) {
 	}
 }
 
+// TestAddressTransactionRevertedBlock checks grabbing the history for a
+// address after its block was reverted
+func TestAddressTransactionRevertedBlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Grab an address and send it money.
+	uc, err := wt.wallet.NextAddress()
+	addr := uc.UnlockHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, _ := wt.miner.FindBlock()
+	err = wt.cs.AcceptBlock(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	addrHist := wt.wallet.AddressTransactions(addr)
+	if len(addrHist) == 0 {
+		t.Error("address history should have some transactions")
+	}
+	if len(wt.wallet.AddressUnconfirmedTransactions(addr)) != 0 {
+		t.Error("addresses unconfirmed transactions should be empty")
+	}
+
+	// Revert the block
+	wt.wallet.mu.Lock()
+	if err := wt.wallet.revertHistory(wt.wallet.dbTx, []types.Block{b}); err != nil {
+		t.Fatal(err)
+	}
+	wt.wallet.mu.Unlock()
+
+	addrHist = wt.wallet.AddressTransactions(addr)
+	if len(addrHist) > 0 {
+		t.Error("address history should should be empty")
+	}
+	if len(wt.wallet.AddressUnconfirmedTransactions(addr)) > 0 {
+		t.Error("addresses unconfirmed transactions should have some transactions")
+	}
+}
+
 // TestTransactionInputOutputIDs verifies that ProcessedTransaction's inputs
 // and outputs have a valid ID field.
 func TestTransactionInputOutputIDs(t *testing.T) {
