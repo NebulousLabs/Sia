@@ -2,21 +2,21 @@ Developer Environment
 =====================
 
 Sia is written in Go. To build and test Sia, you are going to need a working go
-environment, including having both $GOROOT/bin and $GOPATH/bin in your $PATH.
-For most Linux distributions, Go will be in the package manager, though it may
-be an old version that is incompatible with Sia. Once you have a working Go
-environment, you are set to build the project. If you plan on cross compiling
-Sia, you may need to install Go from source. You can find information on that
-[here](http://golang.org/doc/install/source).
+environment, including having both `$GOROOT/bin` and `$GOPATH/bin` in your
+`$PATH`. For most Linux distributions, Go will be in the package manager,
+though it may be an old version that is incompatible with Sia. Once you have a
+working Go environment, you are set to build the project. If you plan on cross
+compiling Sia, you may need to install Go from source. You can find information
+on that [here](http://golang.org/doc/install/source).
 
 Sia has a development build, an automated testing build, and a release
 build. The release build is the only one that can synchronize to the full
 network. To get the release build, it is usually sufficient to run `go get -u
 github.com/NebulousLabs/Sia/...`. This will download Sia and its dependencies
-and install binaries in $GOPATH/bin.
+and install binaries in `$GOPATH/bin`.
 
 After downloading, you can find the Sia source code in
-$GOPATH/src/github.com/NebulousLabs/Sia. To build the release binary, run
+`$GOPATH/src/github.com/NebulousLabs/Sia`. To build the release binary, run
 `make release-std` from this directory. To build the release binary with a
 (slow) race detector and an array of debugging asserts, run `make release`. To
 build the developer binary (which has a different genesis block, faster block
@@ -49,7 +49,7 @@ read and code review the Sia project.
 The primary purpose of the conventions within Sia is to keep the codebase
 simple. Simpler constructions means easier code reviews, greater accessibility
 to newcomers, and less potential for mistakes. It is also to keep things
-uniform, much in the spirit of 'go fmt'. When everything looks the same,
+uniform, much in the spirit of `go fmt`. When everything looks the same,
 everyone has an easier time reading and reviewing code they did not write
 themselves.
 
@@ -78,7 +78,7 @@ should have an explanation about what the concept it is and why it was picked
 over other potential choices.
 
 Code that exists purely to be compatible with previous versions of the
-software should be tagged with a 'COMPATvX.X.X' comment. Examples below.
+software should be tagged with a `COMPATvX.X.X` comment. Examples below.
 
 ```go
 // Find and sort the outputs.
@@ -101,28 +101,44 @@ Naming
 
 Names are used to give readers and reviewers a sense of what is happening in
 the code. When naming variables, you should assume that the person reading your
-code is unfamiliar with the codebase. Short names (like 'cs' instead of
-'consensusSet') should only be used when the context is immediately obvious.
-For example 'cs := new(ConsensusSet)' is immediately obvious context for 'cs',
-and so 'cs' is appropriate for the rest of the function.
+code is unfamiliar with the codebase. Short names (like `cs` instead of
+`consensusSet`) should only be used when the context is immediately obvious.
+For example `cs := new(ConsensusSet)` is immediately obvious context for `cs`,
+and so `cs` is appropriate for the rest of the function.
 
-Data structures should never have shortened names. 'FileContract.mr' is
+Data structures should never have shortened names. `FileContract.mr` is
 confusing to anyone who has not used the data structure extensively. The code
 should be accessible to people who are unfamiliar with the codebase. One
-exception is for the variable called 'mu', which is short for 'mutex'. This
-exception is made because 'mu' appears in many data structures.
+exception is for the variable called `mu`, which is short for 'mutex'. This
+exception is made because `mu` appears in many data structures.
 
 When calling functions with obscure parameters, named variables should be used
-to indicate what the parameters do. For example, 'm := NewMiner(1)' is
-confusing. Instead, use 'threads := 1; m := NewMiner(threads)'. The name gives
-readers a sense of what the parameter within 'NewMiner' does even when they are
-not familiar with the 'NewMiner' function. Where possible, functions with
+to indicate what the parameters do. For example, `m := NewMiner(1)` is
+confusing. Instead, use `threads := 1; m := NewMiner(threads)`. The name gives
+readers a sense of what the parameter within `NewMiner` does even when they are
+not familiar with the `NewMiner` function. Where possible, functions with
 obscure, untyped inputs should be avoided.
 
 The most important thing to remember when choosing names is to cater to people
 who are unfamiliar with the code. A reader should never have to ask 'What is
 `cs`?' on their first pass through the code, even though to experienced
-developers it is obvious that `cs` refers to a consensus.ConsensusSet.
+developers it is obvious that `cs` refers to a `consensus.ConsensusSet`.
+
+### Function Prefixes
+
+Sia uses special prefixes for certain functions to hint about their usage to the
+caller.
+
+#### `threaded`
+
+Prefix functions with `threaded` (e.g., `threadedMine`) to indicate that callers
+should only call these functions within their own goroutine (e.g.,
+`go threadedMine()`). These functions must manage their own thread-safety.
+
+#### `managed`
+
+Prefix functions with `managed` (e.g. `managedUpdateWorkerPool`) if the function
+acquires any locks in its body.
 
 Control Flow
 ------------
@@ -158,15 +174,11 @@ defer Unlock()`. Simple locking schemes should be preferred over performant
 locking schemes. As will everything else, anything unusual or convention
 breaking should have a comment.
 
-Non-exported functions should not do any locking, unless they have a special
-prefix to the name (explained below). The responsibility for thread-safety
-comes from the exported functions which call the non-exported functions.
-Maintaining this convention minimizes developer overhead when working with
-complex objects.
-
-Functions prefixed 'threaded' (example 'threadedMine') are meant to be called
-in their own goroutine (`go threadedMine()`) and will manage their own
-thread-safety.
+Non-exported functions should not do any locking unless they are named with the
+proper prefix (see [Function Prefixes](#function-prefixes)). The responsibility
+for thread-safety comes from the exported functions which call the non-exported
+functions. Maintaining this convention minimizes developer overhead when working
+with complex objects.
 
 Error Handling
 --------------
@@ -191,7 +203,7 @@ if err != nil {
 Sanity Checks
 -------------
 
-Some functions make assumptions. For example, the 'addTransaction' function
+Some functions make assumptions. For example, the `addTransaction` function
 assumes that the transaction being added is not in conflict with any other
 transactions. Where possible, these explicit assumptions should be validated.
 

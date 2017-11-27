@@ -91,7 +91,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x bool
 		_, err := fmt.Sscan(req.FormValue("acceptingcontracts"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.AcceptingContracts = x
 	}
@@ -99,7 +99,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x uint64
 		_, err := fmt.Sscan(req.FormValue("maxdownloadbatchsize"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.MaxDownloadBatchSize = x
 	}
@@ -107,7 +107,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x types.BlockHeight
 		_, err := fmt.Sscan(req.FormValue("maxduration"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.MaxDuration = x
 	}
@@ -115,7 +115,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x uint64
 		_, err := fmt.Sscan(req.FormValue("maxrevisebatchsize"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.MaxReviseBatchSize = x
 	}
@@ -123,7 +123,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x modules.NetAddress
 		_, err := fmt.Sscan(req.FormValue("netaddress"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.NetAddress = x
 	}
@@ -131,7 +131,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x types.BlockHeight
 		_, err := fmt.Sscan(req.FormValue("windowsize"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.WindowSize = x
 	}
@@ -140,7 +140,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("collateral"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.Collateral = x
 	}
@@ -148,7 +148,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("collateralbudget"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.CollateralBudget = x
 	}
@@ -156,7 +156,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("maxcollateral"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.MaxCollateral = x
 	}
@@ -165,7 +165,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("mincontractprice"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.MinContractPrice = x
 	}
@@ -173,7 +173,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("mindownloadbandwidthprice"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.MinDownloadBandwidthPrice = x
 	}
@@ -181,7 +181,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("minstorageprice"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.MinStoragePrice = x
 	}
@@ -189,7 +189,7 @@ func (api *API) parseHostSettings(req *http.Request) (modules.HostInternalSettin
 		var x types.Currency
 		_, err := fmt.Sscan(req.FormValue("minuploadbandwidthprice"), &x)
 		if err != nil {
-			return modules.HostInternalSettings{}, nil
+			return modules.HostInternalSettings{}, err
 		}
 		settings.MinUploadBandwidthPrice = x
 	}

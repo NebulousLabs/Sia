@@ -104,9 +104,9 @@ locked or unlocked.
   // increase before any claim transaction is confirmed.
   "siacoinclaimbalance": "9001", // hastings, big int
 
-  // Number of siacoins, in hastings, below which a transaction output cannot
-  // be used because the wallet considers it a dust output
-  "dustthreshold": "1234", // hastings, big int
+  // Number of siacoins, in hastings per byte, below which a transaction output
+  // cannot be used because the wallet considers it a dust output
+  "dustthreshold": "1234", // hastings / byte, big int
 }
 ```
 

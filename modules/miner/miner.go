@@ -1,3 +1,4 @@
+// Package miner is responsible for creating and submitting siacoin blocks
 package miner
 
 import (
