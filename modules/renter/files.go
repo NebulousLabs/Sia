@@ -107,7 +107,10 @@ func (f *file) available(isOffline func(types.FileContractID) bool) bool {
 func (f *file) uploadedBytes() uint64 {
 	var uploaded uint64
 	for _, fc := range f.contracts {
-		uploaded += uint64(len(fc.Pieces)) * f.pieceSize
+		// Note: we need to multiply by SectorSize here instead of
+		// f.pieceSize because the actual bytes uploaded include overhead
+		// from TwoFish encryption
+		uploaded += uint64(len(fc.Pieces)) * modules.SectorSize
 	}
 	return uploaded
 }
@@ -117,7 +120,7 @@ func (f *file) uploadedBytes() uint64 {
 // reaches 100%, and UploadProgress may report a value greater than 100%.
 func (f *file) uploadProgress() float64 {
 	uploaded := f.uploadedBytes()
-	desired := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
+	desired := modules.SectorSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
 
 	return math.Min(100*(float64(uploaded)/float64(desired)), 100)
 }
