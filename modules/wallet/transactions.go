@@ -19,21 +19,14 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 	defer w.mu.Unlock()
 	w.syncDB()
 
-	it := dbProcessedTransactionsIterator(w.dbTx)
-	for it.next() {
-		pt := it.value()
-		relevant := false
-		for _, input := range pt.Inputs {
-			relevant = relevant || input.RelatedAddress == uh
+	txnIndices, _ := dbGetAddrTransactions(w.dbTx, uh)
+	for _, i := range txnIndices {
+		pt, err := dbGetProcessedTransaction(w.dbTx, i)
+		if err != nil {
+			continue
 		}
-		for _, output := range pt.Outputs {
-			relevant = relevant || output.RelatedAddress == uh
-		}
-		if relevant {
-			pts = append(pts, pt)
-		}
+		pts = append(pts, pt)
 	}
-
 	return pts
 }
 

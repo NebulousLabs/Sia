@@ -3,6 +3,7 @@ package wallet
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -60,7 +61,7 @@ func TestIntegrationTransactions(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(txns) != int(types.MaturityDelay+2+2) {
-		t.Error("unexpected transaction history length")
+		t.Errorf("unexpected transaction history length: expected %v, got %v", types.MaturityDelay+2+2, len(txns))
 	}
 
 	// Try getting a partial history for just the previous block.
@@ -71,7 +72,7 @@ func TestIntegrationTransactions(t *testing.T) {
 	// The partial should include one transaction for a block, and 2 for the
 	// send that occurred.
 	if len(txns) != 3 {
-		t.Error(len(txns))
+		t.Errorf("unexpected transaction history length: expected %v, got %v", 3, len(txns))
 	}
 }
 
@@ -191,6 +192,59 @@ func TestIntegrationAddressTransactions(t *testing.T) {
 	}
 }
 
+// TestAddressTransactionRevertedBlock checks grabbing the history for a
+// address after its block was reverted
+func TestAddressTransactionRevertedBlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Grab an address and send it money.
+	uc, err := wt.wallet.NextAddress()
+	addr := uc.UnlockHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5005), addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, _ := wt.miner.FindBlock()
+	err = wt.cs.AcceptBlock(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	addrHist := wt.wallet.AddressTransactions(addr)
+	if len(addrHist) == 0 {
+		t.Error("address history should have some transactions")
+	}
+	if len(wt.wallet.AddressUnconfirmedTransactions(addr)) != 0 {
+		t.Error("addresses unconfirmed transactions should be empty")
+	}
+
+	// Revert the block
+	wt.wallet.mu.Lock()
+	if err := wt.wallet.revertHistory(wt.wallet.dbTx, []types.Block{b}); err != nil {
+		t.Fatal(err)
+	}
+	wt.wallet.mu.Unlock()
+
+	addrHist = wt.wallet.AddressTransactions(addr)
+	if len(addrHist) > 0 {
+		t.Error("address history should should be empty")
+	}
+	if len(wt.wallet.AddressUnconfirmedTransactions(addr)) > 0 {
+		t.Error("addresses unconfirmed transactions should have some transactions")
+	}
+}
+
 // TestTransactionInputOutputIDs verifies that ProcessedTransaction's inputs
 // and outputs have a valid ID field.
 func TestTransactionInputOutputIDs(t *testing.T) {
@@ -254,4 +308,83 @@ func TestTransactionInputOutputIDs(t *testing.T) {
 			}
 		}
 	}
+}
+
+// BenchmarkAddressTransactions benchmarks the AddressTransactions method,
+// using the near-worst-case scenario of 10,000 transactions to search through
+// with only a single relevant transaction.
+func BenchmarkAddressTransactions(b *testing.B) {
+	wt, err := createWalletTester(b.Name())
+	if err != nil {
+		b.Fatal(err)
+	}
+	// add a bunch of fake transactions to the db
+	//
+	// NOTE: this is somewhat brittle, but the alternative (generating
+	// authentic transactions) is prohibitively slow.
+	wt.wallet.mu.Lock()
+	for i := 0; i < 10000; i++ {
+		err := dbAppendProcessedTransaction(wt.wallet.dbTx, modules.ProcessedTransaction{
+			TransactionID: types.TransactionID{1},
+		})
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	// add a single relevant transaction
+	searchAddr := types.UnlockHash{1}
+	err = dbAppendProcessedTransaction(wt.wallet.dbTx, modules.ProcessedTransaction{
+		TransactionID: types.TransactionID{1},
+		Inputs: []modules.ProcessedInput{{
+			RelatedAddress: searchAddr,
+		}},
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	wt.wallet.syncDB()
+	wt.wallet.mu.Unlock()
+
+	b.ResetTimer()
+	b.Run("indexed", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			txns := wt.wallet.AddressTransactions(searchAddr)
+			if len(txns) != 1 {
+				b.Fatal(len(txns))
+			}
+		}
+	})
+	b.Run("indexed-nosync", func(b *testing.B) {
+		wt.wallet.db.NoSync = true
+		for i := 0; i < b.N; i++ {
+			txns := wt.wallet.AddressTransactions(searchAddr)
+			if len(txns) != 1 {
+				b.Fatal(len(txns))
+			}
+		}
+		wt.wallet.db.NoSync = false
+	})
+	b.Run("unindexed", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			wt.wallet.mu.Lock()
+			wt.wallet.syncDB()
+			var pts []modules.ProcessedTransaction
+			it := dbProcessedTransactionsIterator(wt.wallet.dbTx)
+			for it.next() {
+				pt := it.value()
+				relevant := false
+				for _, input := range pt.Inputs {
+					relevant = relevant || input.RelatedAddress == searchAddr
+				}
+				for _, output := range pt.Outputs {
+					relevant = relevant || output.RelatedAddress == searchAddr
+				}
+				if relevant {
+					pts = append(pts, pt)
+				}
+			}
+			_ = pts
+			wt.wallet.mu.Unlock()
+		}
+	})
 }
