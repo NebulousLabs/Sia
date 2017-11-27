@@ -136,3 +136,60 @@ func TestHostAnnounceAddress(t *testing.T) {
 		t.Error("announcement has wrong host key")
 	}
 }
+
+// TestHostAnnounceCheckUnlockHash verifies that the host's unlock hash is
+// checked when an announcement is performed.
+func TestHostAnnounceCheckUnlockHash(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	ht, err := newHostTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ht.Close()
+
+	ht.host.mu.RLock()
+	oldUnlockHash := ht.host.unlockHash
+	ht.host.mu.RUnlock()
+
+	err = ht.wallet.Reset()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.initWallet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		_, err = ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = ht.host.Announce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = ht.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ht.host.mu.RLock()
+	newUnlockHash := ht.host.unlockHash
+	ht.host.mu.RUnlock()
+	if newUnlockHash == oldUnlockHash {
+		t.Fatal("host did not set a new unlock hash after announce with reset wallet")
+	}
+	hasAddr := false
+	for _, addr := range ht.wallet.AllAddresses() {
+		if addr == newUnlockHash {
+			hasAddr = true
+			break
+		}
+	}
+	if !hasAddr {
+		t.Fatal("host unlock has did not exist in wallet")
+	}
+}
