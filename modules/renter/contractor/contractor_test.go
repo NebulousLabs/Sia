@@ -395,7 +395,7 @@ func TestAllowanceSpending(t *testing.T) {
 
 	// Retry to give the threadedMaintenenace some time to finish
 	var newReportedSpending modules.ContractorSpending
-	err = build.Retry(10, time.Second, func() error {
+	err = build.Retry(100, 100*time.Millisecond, func() error {
 		newReportedSpending = c.PeriodSpending()
 		if reflect.DeepEqual(newReportedSpending, reportedSpending) {
 			return errors.New("reported spending was identical after entering a renew period")
