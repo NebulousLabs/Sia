@@ -392,6 +392,10 @@ func TestAllowanceSpending(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
+	// Add timeout to allow for spending to be reset
+	time.Sleep(time.Second)
+
 	newReportedSpending := c.PeriodSpending()
 	if reflect.DeepEqual(newReportedSpending, reportedSpending) {
 		t.Fatal("reported spending was identical after entering a renew period")
