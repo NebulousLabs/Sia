@@ -2277,7 +2277,8 @@ func TestUploadedBytesReporting(t *testing.T) {
 			uploadProgressBytes := uint64(float64(fullyRedundantSize) * rf.Files[0].UploadProgress / 100.0)
 			// Note: in Go 1.10 we will be able to write Math.Round(uploadProgressBytes) != rf.Files[0].UploadedBytes
 			if uploadProgressBytes != rf.Files[0].UploadedBytes && (uploadProgressBytes+1) != rf.Files[0].UploadedBytes {
-				t.Fatal(fmt.Sprintf("api reports having uploaded %v bytes when upload progress is %v%%, but the actual uploaded bytes count should be %v", rf.Files[0].UploadedBytes, rf.Files[0].UploadProgress, uploadProgressBytes))
+				t.Fatalf("api reports having uploaded %v bytes when upload progress is %v%%, but the actual uploaded bytes count should be %v\n",
+					rf.Files[0].UploadedBytes, rf.Files[0].UploadProgress, uploadProgressBytes)
 			}
 		}
 		time.Sleep(time.Second)
@@ -2294,7 +2295,8 @@ func TestUploadedBytesReporting(t *testing.T) {
 	// When the file is fully redundantly uploaded, UploadedBytes should
 	// equal the file's fully redundant size
 	if rf.Files[0].UploadedBytes != fullyRedundantSize {
-		t.Fatal(fmt.Sprintf("api reports having uploaded %v bytes when upload progress is 100%%, but the actual fully redundant file size is %v", rf.Files[0].UploadedBytes, fullyRedundantSize))
+		t.Fatalf("api reports having uploaded %v bytes when upload progress is 100%%, but the actual fully redundant file size is %v\n",
+			rf.Files[0].UploadedBytes, fullyRedundantSize)
 	}
 
 }
