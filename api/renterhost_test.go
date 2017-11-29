@@ -295,6 +295,10 @@ func TestRenterLocalRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = stNewHost.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = waitForBlock(stNewHost.cs.CurrentBlock().ID(), st)
 	if err != nil {
 		t.Fatal(err)
@@ -310,10 +314,15 @@ func TestRenterLocalRepair(t *testing.T) {
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			t.Fatal(err)
 		}
-		if len(ah.Hosts) == 2 {
-			return nil
+		if len(ah.Hosts) != 2 {
+			return errors.New("not enough hosts in hostdb")
 		}
-		return errors.New("not enough hosts in hostdb")
+		for _, host := range ah.Hosts {
+			if len(host.ScanHistory) < 2 {
+				return errors.New("hosts are not scanned")
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err, ah)
@@ -336,7 +345,7 @@ func TestRenterLocalRepair(t *testing.T) {
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
-	err = retry(240, time.Second, func() error {
+	err = retry(1000, 250*time.Millisecond, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
@@ -514,7 +523,15 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = stNewHost.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = waitForBlock(stNewHost.cs.CurrentBlock().ID(), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -556,7 +573,7 @@ func TestRemoteFileRepair(t *testing.T) {
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
-	err = retry(300, time.Millisecond*250, func() error {
+	err = retry(1000, 250*time.Millisecond, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
@@ -2130,16 +2147,32 @@ func TestRedundancyReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = waitForBlock(st.cs.CurrentBlock().ID(), stH1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Wait until the host shows back up in the hostdb.
 	var ah HostdbActiveGET
-	err = retry(200, 100*time.Millisecond, func() error {
-		err := st.getAPI("/hostdb/active", &ah)
-		if err != nil {
-			return err
+	err = retry(250, time.Millisecond*250, func() error {
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			t.Fatal(err)
 		}
 		if len(ah.Hosts) != 2 {
-			return errors.New("not enough hosts")
+			return errors.New("not enough hosts in hostdb")
+		}
+		for _, host := range ah.Hosts {
+			if len(host.ScanHistory) < 2 {
+				return errors.New("hosts are not scanned")
+			}
 		}
 		return nil
 	})

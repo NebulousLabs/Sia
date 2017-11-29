@@ -96,6 +96,14 @@ func announceAllHosts(sts []*serverTester) error {
 	if err != nil {
 		return err
 	}
+	// Block until the block propagated to all nodes
+	for _, st := range sts[1:] {
+		err = waitForBlock(sts[0].cs.CurrentBlock().ID(), st)
+		if err != nil {
+			return (err)
+		}
+	}
+	// Check if all nodes are on the same block now
 	_, err = synchronizationCheck(sts)
 	if err != nil {
 		return err
