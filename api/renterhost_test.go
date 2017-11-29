@@ -2131,12 +2131,14 @@ func TestRedundancyReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = stH1.miner.AddBlock(); err != nil {
-		t.Fatal(err)
-	}
 	defer stH1.server.Close()
 
 	testGroup = []*serverTester{st, stH1}
+	// Make sure the leader of the group has the longest chain before
+	// connecting the nodes
+	if _, err := st.miner.AddBlock(); err != nil {
+		t.Fatal(err)
+	}
 	err = fullyConnectNodes(testGroup)
 	if err != nil {
 		t.Fatal(err)
