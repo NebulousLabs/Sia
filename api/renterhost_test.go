@@ -2126,12 +2126,16 @@ func TestRedundancyReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// bring back the host
+	// bring back the host and let it mine a block
 	stH1, err = assembleServerTester(stH1.walletKey, stH1.dir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err = stH1.miner.AddBlock(); err != nil {
+		t.Fatal(err)
+	}
 	defer stH1.server.Close()
+
 	testGroup = []*serverTester{st, stH1}
 	err = fullyConnectNodes(testGroup)
 	if err != nil {
