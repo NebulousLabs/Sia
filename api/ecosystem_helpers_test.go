@@ -258,6 +258,14 @@ func synchronizationCheck(sts []*serverTester) (types.BlockID, error) {
 		return types.BlockID{}, errors.New("no server testers provided")
 	}
 
+	// Wait until all nodes are on the same block
+	for _, st := range sts[1:] {
+		err := waitForBlock(sts[0].cs.CurrentBlock().ID(), st)
+		if err != nil {
+			return types.BlockID{}, err
+		}
+	}
+
 	var cg ConsensusGET
 	err := sts[0].getAPI("/consensus", &cg)
 	if err != nil {
