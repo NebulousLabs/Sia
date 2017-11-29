@@ -2109,6 +2109,11 @@ func TestRedundancyReporting(t *testing.T) {
 	// take down one of the hosts
 	stH1.server.Close()
 
+	// Mine a block to restart the scan process
+	if _, err := st.miner.AddBlock(); err != nil {
+		t.Fatal(err)
+	}
+
 	// wait for the redundancy to decrement
 	err = retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
