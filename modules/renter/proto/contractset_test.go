@@ -24,40 +24,36 @@ func (cs *ContractSet) mustAcquire(t *testing.T, id types.FileContractID) *SafeC
 // TestContractSet tests that the ContractSet type is safe for concurrent use.
 func TestContractSet(t *testing.T) {
 	// create contract set
-	h1 := contractHeader{
-		Transaction: types.Transaction{
-			FileContractRevisions: []types.FileContractRevision{{
-				ParentID:             types.FileContractID{1},
-				NewValidProofOutputs: []types.SiacoinOutput{{}, {}},
-				UnlockConditions: types.UnlockConditions{
-					PublicKeys: []types.SiaPublicKey{{}, {}},
-				},
-			}},
-		},
-	}
-	id1 := h1.ID()
-	h2 := contractHeader{
-		Transaction: types.Transaction{
-			FileContractRevisions: []types.FileContractRevision{{
-				ParentID:             types.FileContractID{2},
-				NewValidProofOutputs: []types.SiacoinOutput{{}, {}},
-				UnlockConditions: types.UnlockConditions{
-					PublicKeys: []types.SiaPublicKey{{}, {}},
-				},
-			}},
-		},
-	}
-	id2 := h2.ID()
+	c1 := &SafeContract{header: contractHeader{Transaction: types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{{
+			ParentID:             types.FileContractID{1},
+			NewValidProofOutputs: []types.SiacoinOutput{{}, {}},
+			UnlockConditions: types.UnlockConditions{
+				PublicKeys: []types.SiaPublicKey{{}, {}},
+			},
+		}},
+	}}}
+	id1 := c1.header.ID()
+	c2 := &SafeContract{header: contractHeader{Transaction: types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{{
+			ParentID:             types.FileContractID{2},
+			NewValidProofOutputs: []types.SiacoinOutput{{}, {}},
+			UnlockConditions: types.UnlockConditions{
+				PublicKeys: []types.SiaPublicKey{{}, {}},
+			},
+		}},
+	}}}
+	id2 := c2.header.ID()
 	cs := &ContractSet{
 		contracts: map[types.FileContractID]*SafeContract{
-			id1: {header: h1},
-			id2: {header: h2},
+			id1: c1,
+			id2: c2,
 		},
 	}
 
 	// uncontested acquire/release
-	c1 := cs.mustAcquire(t, id1)
-	cs.Return(id1)
+	c1 = cs.mustAcquire(t, id1)
+	cs.Return(c1)
 
 	// 100 concurrent serialized mutations
 	var wg sync.WaitGroup
@@ -68,12 +64,12 @@ func TestContractSet(t *testing.T) {
 			c1 := cs.mustAcquire(t, id1)
 			c1.header.Transaction.FileContractRevisions[0].NewRevisionNumber++
 			time.Sleep(time.Duration(fastrand.Intn(100)))
-			cs.Return(id1)
+			cs.Return(c1)
 		}()
 	}
 	wg.Wait()
 	c1 = cs.mustAcquire(t, id1)
-	cs.Return(id1)
+	cs.Return(c1)
 	if c1.header.LastRevision().NewRevisionNumber != 100 {
 		t.Fatal("expected exactly 100 increments, got", c1.header.LastRevision().NewRevisionNumber)
 	}
@@ -82,14 +78,14 @@ func TestContractSet(t *testing.T) {
 	c1 = cs.mustAcquire(t, id1)
 	go func() {
 		time.Sleep(time.Millisecond)
-		cs.Return(id1)
+		cs.Return(c1)
 	}()
 	c1 = cs.mustAcquire(t, id1)
-	cs.Return(id1)
+	cs.Return(c1)
 
 	// delete and reinsert id2
-	c2 := cs.mustAcquire(t, id2)
-	cs.Delete(id2)
+	c2 = cs.mustAcquire(t, id2)
+	cs.Delete(c2)
 	cs.mu.Lock()
 	cs.contracts[id2] = c2
 	cs.mu.Unlock()
@@ -100,10 +96,10 @@ func TestContractSet(t *testing.T) {
 		func() { cs.IDs() },
 		func() { cs.View(id1); cs.View(id2) },
 		func() { cs.ViewAll() },
-		func() { cs.mustAcquire(t, id1); cs.Return(id1) },
-		func() { cs.mustAcquire(t, id2); cs.Return(id2) },
+		func() { cs.Return(cs.mustAcquire(t, id1)) },
+		func() { cs.Return(cs.mustAcquire(t, id2)) },
 		func() {
-			h3 := contractHeader{
+			c3 := &SafeContract{header: contractHeader{
 				Transaction: types.Transaction{
 					FileContractRevisions: []types.FileContractRevision{{
 						ParentID:             types.FileContractID{3},
@@ -113,12 +109,13 @@ func TestContractSet(t *testing.T) {
 						},
 					}},
 				},
-			}
+			}}
+			id3 := c3.header.ID()
 			cs.mu.Lock()
-			cs.contracts[h3.ID()] = &SafeContract{header: h3}
+			cs.contracts[id3] = c3
 			cs.mu.Unlock()
-			cs.mustAcquire(t, h3.ID())
-			cs.Delete(h3.ID())
+			cs.mustAcquire(t, id3)
+			cs.Delete(c3)
 		},
 	}
 	wg = sync.WaitGroup{}

@@ -13,14 +13,9 @@ import (
 // Renew negotiates a new contract for data already stored with a host, and
 // submits the new contract transaction to tpool. The new contract is added to
 // the ContractSet and its metadata is returned.
-func (cs *ContractSet) Renew(oldID types.FileContractID, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (ContractMetadata, error) {
-	// Acquire old contract.
-	sc, ok := cs.Acquire(oldID)
-	if !ok {
-		return ContractMetadata{}, errors.New("invalid contract")
-	}
-	defer cs.Return(oldID)
-	contract := sc.header
+func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (ContractMetadata, error) {
+	// for convenience
+	contract := oldContract.header
 
 	// Extract vars from params, for convenience.
 	host, funding, startHeight, endHeight, refundAddress := params.Host, params.Funding, params.StartHeight, params.EndHeight, params.RefundAddress
@@ -285,7 +280,7 @@ func (cs *ContractSet) Renew(oldID types.FileContractID, params ContractParams, 
 	}
 
 	// Add contract to set.
-	meta, err := cs.managedInsertContract(header, sc.merkleRoots)
+	meta, err := cs.managedInsertContract(header, oldContract.merkleRoots)
 	if err != nil {
 		return ContractMetadata{}, err
 	}

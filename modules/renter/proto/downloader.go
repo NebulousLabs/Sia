@@ -37,7 +37,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ ContractMetadata, _ []byte, er
 	if !haveContract {
 		return ContractMetadata{}, nil, errors.New("contract not present in contract set")
 	}
-	defer hd.contractSet.Return(hd.contractID)
+	defer hd.contractSet.Return(sc)
 	contract := sc.header // for convenience
 
 	// calculate price
@@ -144,7 +144,7 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 	if !ok {
 		return nil, errors.New("invalid contract")
 	}
-	defer cs.Return(id)
+	defer cs.Return(sc)
 	contract := sc.header
 
 	// check that contract has enough value to support a download

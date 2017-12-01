@@ -40,14 +40,14 @@ func (cs *ContractSet) Acquire(id types.FileContractID) (*SafeContract, bool) {
 // Delete removes a contract from the set. The contract must have been
 // previously acquired by Acquire. If the contract is not present in the set,
 // Delete is a no-op.
-func (cs *ContractSet) Delete(id types.FileContractID) {
+func (cs *ContractSet) Delete(c *SafeContract) {
 	cs.mu.Lock()
-	safeContract, ok := cs.contracts[id]
+	safeContract, ok := cs.contracts[c.header.ID()]
 	if !ok {
 		cs.mu.Unlock()
 		return
 	}
-	delete(cs.contracts, id)
+	delete(cs.contracts, c.header.ID())
 	cs.mu.Unlock()
 	safeContract.mu.Unlock()
 	// TODO: delete contract file?
@@ -75,9 +75,9 @@ func (cs *ContractSet) Len() int {
 // Return returns a locked contract to the set and unlocks it. The contract
 // must have been previously acquired by Acquire. If the contract is not
 // present in the set, Return panics.
-func (cs *ContractSet) Return(id types.FileContractID) {
+func (cs *ContractSet) Return(c *SafeContract) {
 	cs.mu.Lock()
-	safeContract, ok := cs.contracts[id]
+	safeContract, ok := cs.contracts[c.header.ID()]
 	if !ok {
 		cs.mu.Unlock()
 		build.Critical("no contract with that id")

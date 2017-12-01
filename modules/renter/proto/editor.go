@@ -79,7 +79,7 @@ func (he *Editor) Upload(data []byte) (_ ContractMetadata, _ crypto.Hash, err er
 	if !haveContract {
 		return ContractMetadata{}, crypto.Hash{}, errors.New("contract not present in contract set")
 	}
-	defer func() { he.contractSet.Return(he.contractID) }()
+	defer he.contractSet.Return(sc)
 	contract := sc.header // for convenience
 
 	// calculate price
@@ -186,7 +186,7 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 	if !ok {
 		return nil, errors.New("invalid contract")
 	}
-	defer cs.Return(id)
+	defer cs.Return(sc)
 	contract := sc.header
 
 	// Increase Successful/Failed interactions accordingly
