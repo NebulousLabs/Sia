@@ -2003,21 +2003,12 @@ func TestExhaustedContracts(t *testing.T) {
 
 	// verify that the window did not change and the contract ID did change
 	newContract := st.renter.Contracts()[0]
-	newWindowStart := newContract.LastRevision.NewWindowStart
-	newWindowEnd := newContract.LastRevision.NewWindowEnd
-	endHeight := newContract.EndHeight()
+	endHeight := newContract.EndHeight
 	if newContract.ID == initialContract.ID {
 		t.Error("renew did not occur")
 	}
-	t.Skip("skipping this portion of the test until contract renewing is budget-cycle aligned")
-	if endHeight != initialContract.EndHeight() {
-		t.Error("contract end height changed, wanted", initialContract.EndHeight(), "got", endHeight)
-	}
-	if newWindowEnd != initialContract.LastRevision.NewWindowEnd {
-		t.Error("contract windowEnd changed, wanted", initialContract.LastRevision.NewWindowEnd, "got", newWindowEnd)
-	}
-	if newWindowStart != initialContract.LastRevision.NewWindowStart {
-		t.Error("contract windowStart changed, wanted", initialContract.LastRevision.NewWindowStart, "got", newWindowStart)
+	if endHeight != initialContract.EndHeight {
+		t.Error("contract end height changed, wanted", initialContract.EndHeight, "got", endHeight)
 	}
 }
 
@@ -2099,7 +2090,7 @@ func TestAdversarialPriceRenewal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	initialRevision := st.renter.Contracts()[0].LastRevision.NewRevisionNumber
+	initialID := st.renter.Contracts()[0].ID
 
 	// jack up the host's storage price to try to trigger a renew
 	settings := st.host.InternalSettings()
@@ -2118,7 +2109,7 @@ func TestAdversarialPriceRenewal(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if st.renter.Contracts()[0].LastRevision.NewRevisionNumber != initialRevision {
+		if st.renter.Contracts()[0].ID != initialID {
 			t.Fatal("changing host price caused renew")
 		}
 		time.Sleep(time.Millisecond * 100)

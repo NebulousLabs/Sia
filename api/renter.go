@@ -229,14 +229,14 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 	for _, c := range api.renter.Contracts() {
 		contracts = append(contracts, RenterContract{
 			DownloadSpending: c.DownloadSpending,
-			EndHeight:        c.EndHeight(),
+			EndHeight:        c.EndHeight,
 			Fees:             c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
 			HostPublicKey:    c.HostPublicKey,
 			ID:               c.ID,
-			LastTransaction:  c.LastRevisionTxn,
-			NetAddress:       c.NetAddress,
-			RenterFunds:      c.RenterFunds(),
-			Size:             c.LastRevision.NewFileSize,
+			LastTransaction:  types.Transaction{}, // TODO: add this field?
+			NetAddress:       "",                  // TODO: fetch this from hostdb?
+			RenterFunds:      c.RenterFunds,
+			Size:             0, // TODO: add this field?
 			StartHeight:      c.StartHeight,
 			StorageSpending:  c.StorageSpending,
 			TotalCost:        c.TotalCost,
