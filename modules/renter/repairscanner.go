@@ -137,7 +137,7 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	// map, also increment the 'piecesCompleted' value.
 	saveFile := false
 	for fcid, fileContract := range f.contracts {
-		recentContract, exists := r.hostContractor.ResolveContract(fcid)
+		recentContract, exists := r.hostContractor.ContractByID(fcid)
 		if !exists {
 			// File contract does not seem to be part of the host anymore.
 			// Delete this contract and mark the file to be saved.
@@ -145,11 +145,12 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			saveFile = true
 			continue
 		}
-		if !recentContract.GoodForUpload {
-			// We are no longer renewing with this contract, so it does not
-			// count for redundancy.
-			continue
-		}
+		// TODO: fix this
+		// if !recentContract.GoodForUpload {
+		// 	// We are no longer renewing with this contract, so it does not
+		// 	// count for redundancy.
+		// 	continue
+		// }
 		hpk := recentContract.HostPublicKey
 
 		// Mark the chunk set based on the pieces in this contract.

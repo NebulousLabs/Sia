@@ -67,6 +67,7 @@ func (w *worker) managedNextChunk() (nextChunk *unfinishedChunk, pieceIndex uint
 
 // processChunk will process a chunk from the worker chunk queue.
 func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, pieceIndex uint64) {
+	goodForUpload := w.renter.hostContractor.GoodForUpload(w.contract.ID)
 	// Determine what sort of help this chunk needs.
 	uc.mu.Lock()
 	_, candidateHost := uc.unusedHosts[w.hostPubKey.String()]
@@ -74,7 +75,7 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 	needsHelp := uc.piecesNeeded > uc.piecesCompleted+uc.piecesRegistered
 
 	// If the chunk does not need help from this worker, release the chunk.
-	if chunkComplete || !candidateHost || !w.contract.GoodForUpload {
+	if chunkComplete || !candidateHost || !goodForUpload {
 		// This worker no longer needs to track this chunk.
 		uc.mu.Unlock()
 		w.dropChunk(uc)
@@ -109,7 +110,7 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 // managedQueueChunkRepair will take a chunk and add it to the worker's repair stack.
 func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 	// Check that the worker is allowed to be uploading.
-	contract, exists := w.renter.hostContractor.ContractByID(w.contract.ID)
+	goodForUpload := w.renter.hostContractor.GoodForUpload(w.contract.ID)
 	w.mu.Lock()
 	// Figure out how long the worker would need to be on cooldown.
 	requiredCooldown := uploadFailureCooldown
@@ -117,7 +118,7 @@ func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 		requiredCooldown *= 2
 	}
 	onCooldown := time.Now().Before(w.uploadRecentFailure.Add(requiredCooldown))
-	if !exists || !contract.GoodForUpload || w.terminated || onCooldown {
+	if !goodForUpload || w.terminated || onCooldown {
 		// The worker should not be uploading, remove the chunk.
 		w.dropChunk(uc)
 		w.mu.Unlock()

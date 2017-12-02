@@ -147,6 +147,14 @@ func (c *Contractor) CurrentPeriod() types.BlockHeight {
 	return c.currentPeriod
 }
 
+// GoodForUpload returns whether the given contract should be uploaded to.
+func (c *Contractor) GoodForUpload(id types.FileContractID) bool {
+	c.mu.RLock()
+	good := c.contractUtilities[c.resolveID(id)].GoodForUpload
+	c.mu.RUnlock()
+	return good
+}
+
 // ResolveID returns the ID of the most recent renewal of id.
 func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	c.mu.RLock()
