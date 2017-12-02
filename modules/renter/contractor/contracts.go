@@ -140,10 +140,10 @@ func (c *Contractor) managedMarkContractsUtility() {
 
 // managedNewContract negotiates an initial file contract with the specified
 // host, saves it, and returns it.
-func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFunding types.Currency, endHeight types.BlockHeight) (proto.ContractMetadata, error) {
+func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFunding types.Currency, endHeight types.BlockHeight) (modules.RenterContract, error) {
 	// reject hosts that are too expensive
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
-		return proto.ContractMetadata{}, errTooExpensive
+		return modules.RenterContract{}, errTooExpensive
 	}
 	// cap host.MaxCollateral
 	if host.MaxCollateral.Cmp(maxCollateral) > 0 {
@@ -153,7 +153,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	// get an address to use for negotiation
 	uc, err := c.wallet.NextAddress()
 	if err != nil {
-		return proto.ContractMetadata{}, err
+		return modules.RenterContract{}, err
 	}
 
 	// create contract params
@@ -173,7 +173,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	contract, err := c.contracts.FormContract(params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if err != nil {
 		txnBuilder.Drop()
-		return proto.ContractMetadata{}, err
+		return modules.RenterContract{}, err
 	}
 
 	contractValue := contract.RenterFunds
@@ -184,7 +184,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 // managedRenew negotiates a new contract for data already stored with a host.
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
-func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.Currency, newEndHeight types.BlockHeight) (proto.ContractMetadata, error) {
+func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.Currency, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
 	// For convenience
 	contract := sc.Metadata()
 	// Sanity check - should not be renewing a bad contract.
@@ -198,9 +198,9 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 	// Fetch the host associated with this contract.
 	host, ok := c.hdb.Host(contract.HostPublicKey)
 	if !ok {
-		return proto.ContractMetadata{}, errors.New("no record of that host")
+		return modules.RenterContract{}, errors.New("no record of that host")
 	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
-		return proto.ContractMetadata{}, errTooExpensive
+		return modules.RenterContract{}, errTooExpensive
 	}
 	// cap host.MaxCollateral
 	if host.MaxCollateral.Cmp(maxCollateral) > 0 {
@@ -210,7 +210,7 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 	// get an address to use for negotiation
 	uc, err := c.wallet.NextAddress()
 	if err != nil {
-		return proto.ContractMetadata{}, err
+		return modules.RenterContract{}, err
 	}
 
 	// create contract params
@@ -229,7 +229,7 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 	newContract, err := c.contracts.Renew(sc, params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
-		return proto.ContractMetadata{}, err
+		return modules.RenterContract{}, err
 	}
 
 	return newContract, nil

@@ -8,6 +8,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/writeaheadlog"
@@ -91,22 +92,22 @@ func (cs *ContractSet) Return(c *SafeContract) {
 // not locked. Certain fields, including the MerkleRoots, are set to nil for
 // safety reasons. If the contract is not present in the set, View
 // returns false and a zero-valued RenterContract.
-func (cs *ContractSet) View(id types.FileContractID) (ContractMetadata, bool) {
+func (cs *ContractSet) View(id types.FileContractID) (modules.RenterContract, bool) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 	safeContract, ok := cs.contracts[id]
 	if !ok {
-		return ContractMetadata{}, false
+		return modules.RenterContract{}, false
 	}
 	return safeContract.Metadata(), true
 }
 
 // ViewAll returns the metadata of each contract in the set. The contracts are
 // not locked.
-func (cs *ContractSet) ViewAll() []ContractMetadata {
+func (cs *ContractSet) ViewAll() []modules.RenterContract {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	contracts := make([]ContractMetadata, 0, len(cs.contracts))
+	contracts := make([]modules.RenterContract, 0, len(cs.contracts))
 	for _, safeContract := range cs.contracts {
 		contracts = append(contracts, safeContract.Metadata())
 	}

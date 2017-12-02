@@ -77,7 +77,7 @@ type Contractor struct {
 
 	contracts         *proto.ContractSet
 	contractUtilities map[types.FileContractID]contractUtility
-	oldContracts      map[types.FileContractID]proto.ContractMetadata
+	oldContracts      map[types.FileContractID]modules.RenterContract
 	renewedIDs        map[types.FileContractID]types.FileContractID
 }
 
@@ -124,7 +124,7 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 }
 
 // ContractByID returns the contract with the id specified, if it exists.
-func (c *Contractor) ContractByID(id types.FileContractID) (proto.ContractMetadata, bool) {
+func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContract, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.contracts.View(id)
@@ -133,7 +133,7 @@ func (c *Contractor) ContractByID(id types.FileContractID) (proto.ContractMetada
 // Contracts returns the contracts formed by the contractor in the current
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
-func (c *Contractor) Contracts() []proto.ContractMetadata {
+func (c *Contractor) Contracts() []modules.RenterContract {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.contracts.ViewAll()
@@ -219,7 +219,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, co
 		downloaders:       make(map[types.FileContractID]*hostDownloader),
 		editors:           make(map[types.FileContractID]*hostEditor),
 		contractUtilities: make(map[types.FileContractID]contractUtility),
-		oldContracts:      make(map[types.FileContractID]proto.ContractMetadata),
+		oldContracts:      make(map[types.FileContractID]modules.RenterContract),
 		renewedIDs:        make(map[types.FileContractID]types.FileContractID),
 		renewing:          make(map[types.FileContractID]bool),
 		revising:          make(map[types.FileContractID]bool),

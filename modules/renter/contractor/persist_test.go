@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -27,7 +27,7 @@ func TestSaveLoad(t *testing.T) {
 		{1}: {2},
 		{2}: {3},
 	}
-	c.oldContracts = map[types.FileContractID]proto.ContractMetadata{
+	c.oldContracts = map[types.FileContractID]modules.RenterContract{
 		{0}: {ID: types.FileContractID{0}, HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
 		{1}: {ID: types.FileContractID{1}, HostPublicKey: types.SiaPublicKey{Key: []byte("bar")}},
 		{2}: {ID: types.FileContractID{2}, HostPublicKey: types.SiaPublicKey{Key: []byte("baz")}},
@@ -40,7 +40,7 @@ func TestSaveLoad(t *testing.T) {
 	}
 	c.hdb = stubHostDB{}
 	c.renewedIDs = make(map[types.FileContractID]types.FileContractID)
-	c.oldContracts = make(map[types.FileContractID]proto.ContractMetadata)
+	c.oldContracts = make(map[types.FileContractID]modules.RenterContract)
 	err = c.load()
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.renewedIDs = make(map[types.FileContractID]types.FileContractID)
-	c.oldContracts = make(map[types.FileContractID]proto.ContractMetadata)
+	c.oldContracts = make(map[types.FileContractID]modules.RenterContract)
 	err = c.load()
 	if err != nil {
 		t.Fatal(err)

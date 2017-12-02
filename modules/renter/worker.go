@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -18,7 +18,7 @@ import (
 // those ever exists at a time.
 type worker struct {
 	// The contract and host used by this worker.
-	contract   proto.ContractMetadata
+	contract   modules.RenterContract
 	hostPubKey types.SiaPublicKey
 	renter     *Renter
 
@@ -119,7 +119,7 @@ func (w *worker) threadedWorkLoop() {
 // update the worker pool to match.
 func (r *Renter) managedUpdateWorkerPool() {
 	contractSlice := r.hostContractor.Contracts()
-	contractMap := make(map[types.FileContractID]proto.ContractMetadata)
+	contractMap := make(map[types.FileContractID]modules.RenterContract)
 	for i := 0; i < len(contractSlice); i++ {
 		contractMap[contractSlice[i].ID] = contractSlice[i]
 	}

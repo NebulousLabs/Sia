@@ -35,7 +35,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -112,10 +111,10 @@ type hostContractor interface {
 	Close() error
 
 	// Contracts returns the contracts formed by the contractor.
-	Contracts() []proto.ContractMetadata
+	Contracts() []modules.RenterContract
 
 	// ContractByID returns the contract associated with the file contract id.
-	ContractByID(types.FileContractID) (proto.ContractMetadata, bool)
+	ContractByID(types.FileContractID) (modules.RenterContract, bool)
 
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
@@ -416,7 +415,7 @@ func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreak
 }
 
 // contractor passthroughs
-func (r *Renter) Contracts() []proto.ContractMetadata        { return r.hostContractor.Contracts() }
+func (r *Renter) Contracts() []modules.RenterContract        { return r.hostContractor.Contracts() }
 func (r *Renter) CurrentPeriod() types.BlockHeight           { return r.hostContractor.CurrentPeriod() }
 func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostContractor.PeriodSpending() }
 func (r *Renter) Settings() modules.RenterSettings {

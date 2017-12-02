@@ -27,7 +27,7 @@ type Downloader struct {
 // Sector retrieves the sector with the specified Merkle root, and revises
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
-func (hd *Downloader) Sector(root crypto.Hash) (_ ContractMetadata, _ []byte, err error) {
+func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []byte, err error) {
 	// Reset deadline when finished.
 	defer extendDeadline(hd.conn, time.Hour) // TODO: Constant.
 
@@ -35,7 +35,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ ContractMetadata, _ []byte, er
 	// TODO: why not just lock the SafeContract directly?
 	sc, haveContract := hd.contractSet.Acquire(hd.contractID)
 	if !haveContract {
-		return ContractMetadata{}, nil, errors.New("contract not present in contract set")
+		return modules.RenterContract{}, nil, errors.New("contract not present in contract set")
 	}
 	defer hd.contractSet.Return(sc)
 	contract := sc.header // for convenience
@@ -43,7 +43,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ ContractMetadata, _ []byte, er
 	// calculate price
 	sectorPrice := hd.host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
 	if contract.RenterFunds().Cmp(sectorPrice) < 0 {
-		return ContractMetadata{}, nil, errors.New("contract has insufficient funds to support download")
+		return modules.RenterContract{}, nil, errors.New("contract has insufficient funds to support download")
 	}
 	// To mitigate small errors (e.g. differing block heights), fudge the
 	// price and collateral by 0.2%.
@@ -55,7 +55,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ ContractMetadata, _ []byte, er
 	// initiate download by confirming host settings
 	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
 	if err := startDownload(hd.conn, hd.host); err != nil {
-		return ContractMetadata{}, nil, err
+		return modules.RenterContract{}, nil, err
 	}
 
 	// TODO: record the change we are about to make to the contract. If we lose
@@ -72,7 +72,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ ContractMetadata, _ []byte, er
 		Length:     modules.SectorSize,
 	}})
 	if err != nil {
-		return ContractMetadata{}, nil, err
+		return modules.RenterContract{}, nil, err
 	}
 
 	// Increase Successful/Failed interactions accordingly
@@ -93,27 +93,27 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ ContractMetadata, _ []byte, er
 		// until we've finished downloading the sector.
 		defer hd.conn.Close()
 	} else if err != nil {
-		return ContractMetadata{}, nil, err
+		return modules.RenterContract{}, nil, err
 	}
 
 	// read sector data, completing one iteration of the download loop
 	extendDeadline(hd.conn, modules.NegotiateDownloadTime)
 	var sectors [][]byte
 	if err := encoding.ReadObject(hd.conn, &sectors, modules.SectorSize+16); err != nil {
-		return ContractMetadata{}, nil, err
+		return modules.RenterContract{}, nil, err
 	} else if len(sectors) != 1 {
-		return ContractMetadata{}, nil, errors.New("host did not send enough sectors")
+		return modules.RenterContract{}, nil, errors.New("host did not send enough sectors")
 	}
 	sector := sectors[0]
 	if uint64(len(sector)) != modules.SectorSize {
-		return ContractMetadata{}, nil, errors.New("host did not send enough sector data")
+		return modules.RenterContract{}, nil, errors.New("host did not send enough sector data")
 	} else if crypto.MerkleRoot(sector) != root {
-		return ContractMetadata{}, nil, errors.New("host sent bad sector data")
+		return modules.RenterContract{}, nil, errors.New("host sent bad sector data")
 	}
 
 	// update contract and metrics
 	if err := sc.recordDownload(signedTxn, sectorPrice); err != nil {
-		return ContractMetadata{}, nil, err
+		return modules.RenterContract{}, nil, err
 	}
 
 	return sc.Metadata(), sector, nil

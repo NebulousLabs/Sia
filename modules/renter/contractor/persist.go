@@ -3,7 +3,6 @@ package contractor
 import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -14,7 +13,7 @@ type contractorPersist struct {
 	ContractUtilities map[string]contractUtility `json:"contractUtilities"`
 	CurrentPeriod     types.BlockHeight          `json:"currentperiod"`
 	LastChange        modules.ConsensusChangeID  `json:"lastchange"`
-	OldContracts      []proto.ContractMetadata   `json:"oldcontracts"`
+	OldContracts      []modules.RenterContract   `json:"oldcontracts"`
 	RenewedIDs        map[string]string          `json:"renewedids"`
 }
 

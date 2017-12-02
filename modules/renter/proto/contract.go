@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/writeaheadlog"
 )
@@ -33,47 +34,6 @@ type updateSetRoot struct {
 	Index int
 }
 
-// A ContractMetadata contains metadata about a contract. It is read-only;
-// modifying a ContractMetadata does not modify the underlying contract.
-type ContractMetadata struct {
-	ID            types.FileContractID
-	HostPublicKey types.SiaPublicKey
-
-	StartHeight types.BlockHeight
-	EndHeight   types.BlockHeight
-
-	// RenterFunds is the amount remaining in the contract that the renter can
-	// spend.
-	RenterFunds types.Currency
-
-	// The FileContract does not indicate what funds were spent on, so we have
-	// to track the various costs manually.
-	DownloadSpending types.Currency
-	StorageSpending  types.Currency
-	UploadSpending   types.Currency
-
-	// TotalCost indicates the amount of money that the renter spent and/or
-	// locked up while forming a contract. This includes fees, and includes
-	// funds which were allocated (but not necessarily committed) to spend on
-	// uploads/downloads/storage.
-	//
-	// ContractFee is the amount of money paid to the host to cover potential
-	// future transaction fees that the host may incur, and to cover any other
-	// overheads the host may have.
-	//
-	// TxnFee is the amount of money spent on the transaction fee when putting
-	// the renter contract on the blockchain.
-	//
-	// SiafundFee is the amount of money spent on siafund fees when creating the
-	// contract. The siafund fee that the renter pays covers both the renter and
-	// the host portions of the contract, and therefore can be unexpectedly high
-	// if the the host collateral is high.
-	TotalCost   types.Currency
-	ContractFee types.Currency
-	TxnFee      types.Currency
-	SiafundFee  types.Currency
-}
-
 type contractHeader struct {
 	// transaction is the signed transaction containing the most recent
 	// revision of the file contract.
@@ -83,7 +43,7 @@ type contractHeader struct {
 	// transaction.
 	SecretKey crypto.SecretKey
 
-	// Same as ContractMetadata.
+	// Same as modules.RenterContract.
 	StartHeight      types.BlockHeight
 	DownloadSpending types.Currency
 	StorageSpending  types.Currency
@@ -138,9 +98,9 @@ type SafeContract struct {
 	mu  sync.Mutex
 }
 
-func (c *SafeContract) Metadata() ContractMetadata {
+func (c *SafeContract) Metadata() modules.RenterContract {
 	h := c.header
-	return ContractMetadata{
+	return modules.RenterContract{
 		ID:               h.ID(),
 		HostPublicKey:    h.HostPublicKey(),
 		StartHeight:      h.StartHeight,
@@ -254,30 +214,30 @@ func (c *SafeContract) recordDownload(txn types.Transaction, bandwidthCost types
 	return t.SignalUpdatesApplied()
 }
 
-func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Hash) (ContractMetadata, error) {
+func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Hash) (modules.RenterContract, error) {
 	if err := h.validate(); err != nil {
-		return ContractMetadata{}, err
+		return modules.RenterContract{}, err
 	}
 	f, err := os.Create(filepath.Join(cs.dir, h.ID().String()+".contract"))
 	if err != nil {
-		return ContractMetadata{}, err
+		return modules.RenterContract{}, err
 	}
 	// preallocate space for header + roots
 	if err := f.Truncate(contractHeaderSize + crypto.HashSize*int64(len(roots))); err != nil {
-		return ContractMetadata{}, err
+		return modules.RenterContract{}, err
 	}
 	// write header
 	if _, err := f.WriteAt(encoding.Marshal(h), 0); err != nil {
-		return ContractMetadata{}, err
+		return modules.RenterContract{}, err
 	}
 	// write roots
 	for i, root := range roots {
 		if _, err := f.WriteAt(root[:], contractHeaderSize+crypto.HashSize*int64(i)); err != nil {
-			return ContractMetadata{}, err
+			return modules.RenterContract{}, err
 		}
 	}
 	if err := f.Sync(); err != nil {
-		return ContractMetadata{}, err
+		return modules.RenterContract{}, err
 	}
 	sc := &SafeContract{
 		header:      h,

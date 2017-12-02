@@ -73,11 +73,11 @@ func (he *Editor) Close() error {
 }
 
 // Upload negotiates a revision that adds a sector to a file contract.
-func (he *Editor) Upload(data []byte) (_ ContractMetadata, _ crypto.Hash, err error) {
+func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, err error) {
 	// Acquire the contract.
 	sc, haveContract := he.contractSet.Acquire(he.contractID)
 	if !haveContract {
-		return ContractMetadata{}, crypto.Hash{}, errors.New("contract not present in contract set")
+		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract not present in contract set")
 	}
 	defer he.contractSet.Return(sc)
 	contract := sc.header // for convenience
@@ -100,10 +100,10 @@ func (he *Editor) Upload(data []byte) (_ ContractMetadata, _ crypto.Hash, err er
 
 	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
 	if contract.RenterFunds().Cmp(sectorPrice) < 0 {
-		return ContractMetadata{}, crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
+		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
 	}
 	if contract.LastRevision().NewMissedProofOutputs[1].Value.Cmp(sectorCollateral) < 0 {
-		return ContractMetadata{}, crypto.Hash{}, errors.New("contract has insufficient collateral to support upload")
+		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient collateral to support upload")
 	}
 
 	// calculate the new Merkle root
@@ -135,7 +135,7 @@ func (he *Editor) Upload(data []byte) (_ ContractMetadata, _ crypto.Hash, err er
 	// initiate revision
 	extendDeadline(he.conn, modules.NegotiateSettingsTime)
 	if err := startRevision(he.conn, he.host); err != nil {
-		return ContractMetadata{}, crypto.Hash{}, err
+		return modules.RenterContract{}, crypto.Hash{}, err
 	}
 
 	// TODO: record the change we are about to make to the contract. If we lose
@@ -146,7 +146,7 @@ func (he *Editor) Upload(data []byte) (_ ContractMetadata, _ crypto.Hash, err er
 	// send actions
 	extendDeadline(he.conn, modules.NegotiateFileContractRevisionTime)
 	if err := encoding.WriteObject(he.conn, actions); err != nil {
-		return ContractMetadata{}, crypto.Hash{}, err
+		return modules.RenterContract{}, crypto.Hash{}, err
 	}
 
 	// send revision to host and exchange signatures
@@ -157,26 +157,16 @@ func (he *Editor) Upload(data []byte) (_ ContractMetadata, _ crypto.Hash, err er
 		// cause the next operation to fail
 		he.conn.Close()
 	} else if err != nil {
-		return ContractMetadata{}, crypto.Hash{}, err
+		return modules.RenterContract{}, crypto.Hash{}, err
 	}
 
 	// update contract
 	err = sc.recordUpload(signedTxn, sectorRoot, sectorStoragePrice, sectorBandwidthPrice)
 	if err != nil {
-		return ContractMetadata{}, crypto.Hash{}, err
+		return modules.RenterContract{}, crypto.Hash{}, err
 	}
 
 	return sc.Metadata(), sectorRoot, nil
-}
-
-// Delete negotiates a revision that removes a sector from a file contract.
-func (he *Editor) Delete(root crypto.Hash) (modules.RenterContract, error) {
-	return modules.RenterContract{}, errors.New("not supported")
-}
-
-// Modify negotiates a revision that edits a sector in a file contract.
-func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) (modules.RenterContract, error) {
-	return modules.RenterContract{}, errors.New("not supported")
 }
 
 // NewEditor initiates the contract revision process with a host, and returns
