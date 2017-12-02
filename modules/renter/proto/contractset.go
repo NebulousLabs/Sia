@@ -50,7 +50,8 @@ func (cs *ContractSet) Delete(c *SafeContract) {
 	delete(cs.contracts, c.header.ID())
 	cs.mu.Unlock()
 	safeContract.mu.Unlock()
-	// TODO: delete contract file?
+	// delete contract file
+	os.Remove(filepath.Join(cs.dir, c.header.ID().String()+".contract"))
 }
 
 // IDs returns the FileContractID of each contract in the set. The contracts

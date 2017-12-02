@@ -99,9 +99,9 @@ func (h *contractHeader) validate() error {
 	if len(h.Transaction.FileContractRevisions) > 0 &&
 		len(h.Transaction.FileContractRevisions[0].NewValidProofOutputs) > 0 &&
 		len(h.Transaction.FileContractRevisions[0].UnlockConditions.PublicKeys) == 2 {
-		return errors.New("invalid contract")
+		return nil
 	}
-	return nil
+	return errors.New("invalid contract")
 }
 
 func (h *contractHeader) LastRevision() types.FileContractRevision {
@@ -192,8 +192,8 @@ func (c *SafeContract) applySetRoot(root crypto.Hash, index int) error {
 	if _, err := c.f.WriteAt(root[:], rootOffset); err != nil {
 		return err
 	}
-	if len(c.merkleRoots) < index {
-		c.merkleRoots = append(c.merkleRoots, make([]crypto.Hash, index-len(c.merkleRoots))...)
+	if len(c.merkleRoots) <= index {
+		c.merkleRoots = append(c.merkleRoots, make([]crypto.Hash, 1+index-len(c.merkleRoots))...)
 	}
 	c.merkleRoots[index] = root
 	return nil
