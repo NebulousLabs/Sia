@@ -41,6 +41,13 @@ type cachedRevision struct {
 	MerkleRoots modules.MerkleRootSet      `json:"merkleroots"`
 }
 
+// contractUtility contains metrics internal to the contractor that reflect
+// the utility of a given contract.
+type contractUtility struct {
+	GoodForUpload bool
+	GoodForRenew  bool
+}
+
 // A Contractor negotiates, revises, renews, and provides access to file
 // contracts.
 type Contractor struct {
@@ -68,10 +75,10 @@ type Contractor struct {
 	renewing    map[types.FileContractID]bool // prevent revising during renewal
 	revising    map[types.FileContractID]bool // prevent overlapping revisions
 
-	cachedRevisions map[types.FileContractID]cachedRevision
-	contracts       *proto.ContractSet
-	oldContracts    map[types.FileContractID]modules.RenterContract
-	renewedIDs      map[types.FileContractID]types.FileContractID
+	contracts         *proto.ContractSet
+	contractUtilities map[types.FileContractID]contractUtility
+	oldContracts      map[types.FileContractID]proto.ContractMetadata
+	renewedIDs        map[types.FileContractID]types.FileContractID
 }
 
 // resolveID returns the ID of the most recent renewal of id.
@@ -91,36 +98,25 @@ func (c *Contractor) Allowance() modules.Allowance {
 	return c.allowance
 }
 
-// Contract returns the latest contract formed with the specified host.
-func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContract, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	for _, c := range c.contracts.ViewAll() {
-		if c.NetAddress == hostAddr {
-			return c, true
-		}
-	}
-	return modules.RenterContract{}, false
-}
-
 // PeriodSpending returns the amount spent on contracts during the current
 // billing period.
 func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	spending := modules.ContractorSpending{}
+	var spending modules.ContractorSpending
 	for _, contract := range c.contracts.ViewAll() {
 		spending.ContractSpending = spending.ContractSpending.Add(contract.TotalCost)
 		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
 		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
 		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
-		for _, pre := range contract.PreviousContracts {
-			spending.ContractSpending = spending.ContractSpending.Add(pre.TotalCost)
-			spending.DownloadSpending = spending.DownloadSpending.Add(pre.DownloadSpending)
-			spending.UploadSpending = spending.UploadSpending.Add(pre.UploadSpending)
-			spending.StorageSpending = spending.StorageSpending.Add(pre.StorageSpending)
-		}
+		// TODO: fix PreviousContracts
+		// for _, pre := range contract.PreviousContracts {
+		// 	spending.ContractSpending = spending.ContractSpending.Add(pre.TotalCost)
+		// 	spending.DownloadSpending = spending.DownloadSpending.Add(pre.DownloadSpending)
+		// 	spending.UploadSpending = spending.UploadSpending.Add(pre.UploadSpending)
+		// 	spending.StorageSpending = spending.StorageSpending.Add(pre.StorageSpending)
+		// }
 	}
 	allSpending := spending.ContractSpending.Add(spending.DownloadSpending).Add(spending.UploadSpending).Add(spending.StorageSpending)
 	spending.Unspent = c.allowance.Funds.Sub(allSpending)
@@ -128,7 +124,7 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 }
 
 // ContractByID returns the contract with the id specified, if it exists.
-func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContract, bool) {
+func (c *Contractor) ContractByID(id types.FileContractID) (proto.ContractMetadata, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.contracts.View(id)
@@ -137,24 +133,10 @@ func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContra
 // Contracts returns the contracts formed by the contractor in the current
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
-func (c *Contractor) Contracts() []modules.RenterContract {
+func (c *Contractor) Contracts() []proto.ContractMetadata {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.contracts.ViewAll()
-}
-
-// AllContracts returns the contracts formed by the contractor in the current
-// allowance period.
-func (c *Contractor) AllContracts() (cs []modules.RenterContract) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	cs = c.contracts.ViewAll()
-	// COMPATv1.0.4-lts
-	// also return the special metrics contract (see persist.go)
-	if contract, ok := c.oldContracts[metricsContractID]; ok {
-		cs = append(cs, contract)
-	}
-	return
 }
 
 // CurrentPeriod returns the height at which the current allowance period
@@ -171,21 +153,6 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	newID := c.resolveID(id)
 	c.mu.RUnlock()
 	return newID
-}
-
-// ResolveContract returns the current contract associated with the provided
-// contract id. It is equivalent to calling 'ResolveID' and then calling
-// 'ContractByID' with the result.
-func (c *Contractor) ResolveContract(id types.FileContractID) (contract modules.RenterContract, exists bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	newID, exists := c.renewedIDs[id]
-	for exists {
-		id = newID
-		newID, exists = c.renewedIDs[id]
-	}
-	return c.contracts.View(id)
 }
 
 // Close closes the Contractor.
@@ -211,6 +178,12 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	if err != nil {
 		return nil, err
 	}
+	// Create the contract set.
+	// TODO: put these in subdirectory?
+	contractSet, err := proto.NewContractSet(persistDir)
+	if err != nil {
+		return nil, err
+	}
 	// Create the logger.
 	logger, err := persist.NewFileLogger(filepath.Join(persistDir, "contractor.log"))
 	if err != nil {
@@ -218,11 +191,11 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	}
 
 	// Create Contractor using production dependencies.
-	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, newPersist(persistDir), logger)
+	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, contractSet, newPersist(persistDir), logger)
 }
 
 // newContractor creates a Contractor using the provided dependencies.
-func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p persister, l *persist.Logger) (*Contractor, error) {
+func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, contractSet *proto.ContractSet, p persister, l *persist.Logger) (*Contractor, error) {
 	// Create the Contractor object.
 	c := &Contractor{
 		cs:      cs,
@@ -234,14 +207,14 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 
 		interruptMaintenance: make(chan struct{}),
 
-		cachedRevisions: make(map[types.FileContractID]cachedRevision),
-		contracts:       proto.NewContractSet(nil),
-		downloaders:     make(map[types.FileContractID]*hostDownloader),
-		editors:         make(map[types.FileContractID]*hostEditor),
-		oldContracts:    make(map[types.FileContractID]modules.RenterContract),
-		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
-		renewing:        make(map[types.FileContractID]bool),
-		revising:        make(map[types.FileContractID]bool),
+		contracts:         contractSet,
+		downloaders:       make(map[types.FileContractID]*hostDownloader),
+		editors:           make(map[types.FileContractID]*hostEditor),
+		contractUtilities: make(map[types.FileContractID]contractUtility),
+		oldContracts:      make(map[types.FileContractID]proto.ContractMetadata),
+		renewedIDs:        make(map[types.FileContractID]types.FileContractID),
+		renewing:          make(map[types.FileContractID]bool),
+		revising:          make(map[types.FileContractID]bool),
 	}
 
 	// Close the logger (provided as a dependency) upon shutdown.
@@ -256,12 +229,6 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	// Close the persist (provided as a dependency) upon shutdown.
-	c.tg.AfterStop(func() {
-		if err := c.persist.Close(); err != nil {
-			c.log.Println("Failed to close contractor persist:", err)
-		}
-	})
 
 	// Subscribe to the consensus set.
 	err = cs.ConsensusSetSubscribe(c, c.lastChange, c.tg.StopChan())

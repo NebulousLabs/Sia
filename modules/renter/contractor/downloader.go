@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
@@ -95,20 +94,10 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	}
 
 	// Download the sector.
-	updatedContract, sector, err := hd.downloader.Sector(root)
+	_, sector, err := hd.downloader.Sector(root)
 	if err != nil {
 		return nil, err
 	}
-
-	// Submit an update documenting the new contract, instead of saving the
-	// whole journal state.
-	hd.contractor.mu.Lock()
-	hd.contractor.persist.update(updateDownloadRevision{
-		NewRevisionTxn:      updatedContract.LastRevisionTxn,
-		NewDownloadSpending: updatedContract.DownloadSpending,
-	})
-	hd.contractor.mu.Unlock()
-
 	return sector, nil
 }
 
@@ -137,7 +126,7 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		return nil, errors.New("no record of that contract")
 	}
 	host, haveHost := c.hdb.Host(contract.HostPublicKey)
-	if height > contract.EndHeight() {
+	if height > contract.EndHeight {
 		return nil, errors.New("contract has already ended")
 	} else if !haveHost {
 		return nil, errors.New("no record of that host")
@@ -167,49 +156,11 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		}
 	}()
 
-	// Sanity check, unless this is a brand new contract, a cached revision
-	// should exist.
-	if build.DEBUG && contract.LastRevision.NewRevisionNumber > 1 {
-		c.mu.RLock()
-		_, exists := c.cachedRevisions[contract.ID]
-		c.mu.RUnlock()
-		if !exists {
-			c.log.Critical("Cached revision does not exist for contract.")
-		}
-	}
-
 	// create downloader
-	d, err := proto.NewDownloader(host, contract.ID, c.contracts, c.hdb, cancel)
-	if proto.IsRevisionMismatch(err) {
-		// try again with the cached revision
-		c.mu.RLock()
-		cached, ok := c.cachedRevisions[contract.ID]
-		c.mu.RUnlock()
-		if !ok {
-			// nothing we can do; return original error
-			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, host.NetAddress)
-			return nil, err
-		}
-		c.log.Printf("host %v has different revision for %v; retrying with cached revision", host.NetAddress, contract.ID)
-		contract, haveContract = c.contracts.Acquire(contract.ID)
-		if !haveContract {
-			c.log.Critical("contract set does not contain contract")
-		}
-		contract.LastRevision = cached.Revision
-		contract.MerkleRoots = cached.MerkleRoots
-		c.contracts.Return(contract)
-		d, err = proto.NewDownloader(host, contract.ID, c.contracts, c.hdb, cancel)
-		// needs to be handled separately since a revision mismatch is not automatically a failed interaction
-		if proto.IsRevisionMismatch(err) {
-			c.hdb.IncrementFailedInteractions(host.PublicKey)
-		}
-	}
+	d, err := c.contracts.NewDownloader(host, contract.ID, c.hdb, cancel)
 	if err != nil {
 		return nil, err
 	}
-	// supply a SaveFn that saves the revision to the contractor's persist
-	// (the existing revision will be overwritten when SaveFn is called)
-	d.SaveFn = c.saveDownloadRevision(contract.ID)
 
 	// cache downloader
 	hd := &hostDownloader{

@@ -25,30 +25,29 @@ func (c *Contractor) managedArchiveContracts() {
 
 	// Loop through the current set of contracts and migrate any expired ones to
 	// the set of old contracts.
+	var expired []types.FileContractID
 	for _, contract := range c.contracts.ViewAll() {
-		if currentHeight > contract.EndHeight() {
+		if currentHeight > contract.EndHeight {
 			id := contract.ID
 			c.mu.Lock()
 			c.oldContracts[id] = contract
 			c.mu.Unlock()
-			if contract, ok := c.contracts.Acquire(id); ok {
-				c.contracts.Delete(contract)
-			}
+			expired = append(expired, id)
 			c.log.Println("INFO: archived expired contract", id)
 		}
 	}
 
 	// Save.
-	//
-	// TODO: There's potentially an issue here in the future where the
-	// contractSet and the set of oldContracts could desync if there's a power
-	// outage between calling Delete and adding the contract to oldContracts. To
-	// prevent that potential inconsistency, when the contract persistence gets
-	// migreated to the contractSet, we'll need some strategy for guaranteeing
-	// that the set of oldContracts stays consistent.
 	c.mu.Lock()
 	c.save()
 	c.mu.Unlock()
+
+	// Delete all the expired contracts from the contract set.
+	for _, id := range expired {
+		if sc, ok := c.contracts.Acquire(id); ok {
+			c.contracts.Delete(sc)
+		}
+	}
 }
 
 // ProcessConsensusChange will be called by the consensus set every time there

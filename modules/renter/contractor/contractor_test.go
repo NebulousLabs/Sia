@@ -9,7 +9,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -78,65 +77,6 @@ func TestNew(t *testing.T) {
 	_, err = New(stub, stub, stub, stub, "")
 	if !os.IsNotExist(err) {
 		t.Fatalf("expected invalid directory, got %v", err)
-	}
-}
-
-// TestContract tests the Contract method.
-func TestContract(t *testing.T) {
-	c := &Contractor{
-		contracts: proto.NewContractSet([]modules.RenterContract{
-			{ID: types.FileContractID{1}, NetAddress: "foo"},
-			{ID: types.FileContractID{2}, NetAddress: "bar"},
-			{ID: types.FileContractID{3}, NetAddress: "baz"},
-		}),
-	}
-	tests := []struct {
-		addr       modules.NetAddress
-		exists     bool
-		contractID types.FileContractID
-	}{
-		{"foo", true, types.FileContractID{1}},
-		{"bar", true, types.FileContractID{2}},
-		{"baz", true, types.FileContractID{3}},
-		{"quux", false, types.FileContractID{}},
-		{"nope", false, types.FileContractID{}},
-	}
-	for _, test := range tests {
-		contract, ok := c.Contract(test.addr)
-		if ok != test.exists {
-			t.Errorf("%v: expected %v, got %v", test.addr, test.exists, ok)
-		} else if contract.ID != test.contractID {
-			t.Errorf("%v: expected %v, got %v", test.addr, test.contractID, contract.ID)
-		}
-	}
-
-	// delete all contracts
-	c.contracts = proto.NewContractSet(nil)
-	for _, test := range tests {
-		_, ok := c.Contract(test.addr)
-		if ok {
-			t.Error("no contracts should remain")
-		}
-	}
-}
-
-// TestContracts tests the Contracts method.
-func TestContracts(t *testing.T) {
-	var stub newStub
-	dir := build.TempDir("contractor", t.Name())
-	c, err := New(stub, stub, stub, stub, dir)
-	if err != nil {
-		t.Fatalf("expected nil, got %v", err)
-	}
-	c.contracts = proto.NewContractSet([]modules.RenterContract{
-		{ID: types.FileContractID{1}, NetAddress: "foo"},
-		{ID: types.FileContractID{2}, NetAddress: "bar"},
-		{ID: types.FileContractID{3}, NetAddress: "baz"},
-	})
-	for _, contract := range c.Contracts() {
-		if exp, _ := c.contracts.View(contract.ID); exp.NetAddress != contract.NetAddress {
-			t.Errorf("contract does not match: expected %v, got %v", exp.NetAddress, contract.NetAddress)
-		}
 	}
 }
 
@@ -546,26 +486,6 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// make one of the contracts un-renewable and set allowance with Funds*2; should
-	// trigger 1 renewal failure and 2 new contracts
-	c.mu.Lock()
-	ids = c.contracts.IDs()
-	contract, _ = c.contracts.Acquire(ids[0])
-	contract.NetAddress = "foo"
-	c.contracts.Return(contract)
-	c.mu.Unlock()
-	a.Funds = a.Funds.Mul64(2)
-	err = c.SetAllowance(a)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.mu.Lock()
-	clen = c.contracts.Len()
-	c.mu.Unlock()
-	if clen != 2 {
-		t.Fatal("expected 2 contracts, got", clen)
 	}
 }
 

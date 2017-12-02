@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -117,74 +116,5 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err, numContracts)
-	}
-}
-
-// mapHostDB is a hostDB that implements the Host method via a simple map.
-type mapHostDB struct {
-	stubHostDB
-	hosts map[string]modules.HostDBEntry
-}
-
-func (m mapHostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
-	h, e := m.hosts[string(spk.Key)]
-	return h, e
-}
-
-// TestIsOffline tests the IsOffline method.
-func TestIsOffline(t *testing.T) {
-	now := time.Now()
-	oldBadScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow * 2), Success: false}
-	oldGoodScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow * 2), Success: true}
-	newBadScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow / 2), Success: false}
-	newGoodScan := modules.HostDBScan{Timestamp: now.Add(-uptimeWindow / 2), Success: true}
-	currentBadScan := modules.HostDBScan{Timestamp: now, Success: false}
-	currentGoodScan := modules.HostDBScan{Timestamp: now, Success: true}
-
-	tests := []struct {
-		scans   []modules.HostDBScan
-		offline bool
-	}{
-		// no data
-		{nil, true},
-		// not enough data
-		{[]modules.HostDBScan{oldBadScan, newGoodScan}, false},
-		// data covers small range
-		{[]modules.HostDBScan{oldBadScan, oldBadScan, oldBadScan}, true},
-		// data covers large range, but at least 1 scan succeeded
-		{[]modules.HostDBScan{oldBadScan, newGoodScan, currentBadScan}, true},
-		// data covers large range, no scans succeeded
-		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan}, true},
-		// old scan was good, recent scans are bad.
-		{[]modules.HostDBScan{oldGoodScan, newBadScan, newBadScan, currentBadScan}, true},
-		// recent scan was good, with many recent bad scans.
-		{[]modules.HostDBScan{oldBadScan, newGoodScan, newBadScan, currentBadScan, currentBadScan}, true},
-		// recent scan was good, old scans were bad.
-		{[]modules.HostDBScan{oldBadScan, newBadScan, currentBadScan, currentGoodScan}, false},
-	}
-	for i, test := range tests {
-		// construct a contractor with a hostdb containing the scans
-		c := &Contractor{
-			contracts: proto.NewContractSet([]modules.RenterContract{
-				{ID: types.FileContractID{1}, HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
-			}),
-			hdb: mapHostDB{
-				hosts: map[string]modules.HostDBEntry{
-					"foo": {ScanHistory: test.scans},
-				},
-			},
-		}
-		if offline := c.IsOffline(types.FileContractID{1}); offline != test.offline {
-			t.Errorf("IsOffline(%v) = %v, expected %v", i, offline, test.offline)
-		}
-	}
-	c := &Contractor{
-		contracts: proto.NewContractSet([]modules.RenterContract{
-			{HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
-		}),
-	}
-	// should return true for an unknown contract id
-	if !c.IsOffline(types.FileContractID{4}) {
-		t.Fatal("IsOffline returned false for a nonexistent contract id")
 	}
 }
