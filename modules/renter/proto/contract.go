@@ -87,7 +87,8 @@ func (h *contractHeader) EndHeight() types.BlockHeight {
 // A SafeContract contains the most recent revision transaction negotiated
 // with a host, and the secret key used to sign it.
 type SafeContract struct {
-	header contractHeader
+	headerMu sync.Mutex
+	header   contractHeader
 
 	// merkleRoots are the Merkle roots of each sector stored on the host that
 	// relate to this contract.
@@ -99,6 +100,8 @@ type SafeContract struct {
 }
 
 func (c *SafeContract) Metadata() modules.RenterContract {
+	c.headerMu.Lock()
+	defer c.headerMu.Unlock()
 	h := c.header
 	return modules.RenterContract{
 		ID:               h.ID(),
@@ -117,20 +120,26 @@ func (c *SafeContract) Metadata() modules.RenterContract {
 }
 
 func (c *SafeContract) makeUpdateSetHeader(h contractHeader) writeaheadlog.Update {
+	c.headerMu.Lock()
+	id := c.header.ID()
+	c.headerMu.Unlock()
 	return writeaheadlog.Update{
 		Name: updateNameSetHeader,
 		Instructions: encoding.Marshal(updateSetHeader{
-			ID:     c.header.ID(),
+			ID:     id,
 			Header: h,
 		}),
 	}
 }
 
 func (c *SafeContract) makeUpdateSetRoot(root crypto.Hash, index int) writeaheadlog.Update {
+	c.headerMu.Lock()
+	id := c.header.ID()
+	c.headerMu.Unlock()
 	return writeaheadlog.Update{
 		Name: updateNameSetRoot,
 		Instructions: encoding.Marshal(updateSetRoot{
-			ID:    c.header.ID(),
+			ID:    id,
 			Root:  root,
 			Index: index,
 		}),
@@ -143,7 +152,9 @@ func (c *SafeContract) applySetHeader(h contractHeader) error {
 	if _, err := c.f.WriteAt(headerBytes, 0); err != nil {
 		return err
 	}
+	c.headerMu.Lock()
 	c.header = h
+	c.headerMu.Unlock()
 	return nil
 }
 
@@ -161,7 +172,9 @@ func (c *SafeContract) applySetRoot(root crypto.Hash, index int) error {
 
 func (c *SafeContract) recordUpload(txn types.Transaction, root crypto.Hash, storageCost, bandwidthCost types.Currency) error {
 	// construct new header
+	c.headerMu.Lock()
 	newHeader := c.header
+	c.headerMu.Unlock()
 	newHeader.Transaction = txn
 	newHeader.StorageSpending = newHeader.StorageSpending.Add(storageCost)
 	newHeader.UploadSpending = newHeader.UploadSpending.Add(bandwidthCost)
@@ -192,7 +205,9 @@ func (c *SafeContract) recordUpload(txn types.Transaction, root crypto.Hash, sto
 
 func (c *SafeContract) recordDownload(txn types.Transaction, bandwidthCost types.Currency) error {
 	// construct new header
+	c.headerMu.Lock()
 	newHeader := c.header
+	c.headerMu.Unlock()
 	newHeader.Transaction = txn
 	newHeader.DownloadSpending = newHeader.DownloadSpending.Add(bandwidthCost)
 
