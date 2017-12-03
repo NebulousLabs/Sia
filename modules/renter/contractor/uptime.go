@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -27,18 +28,7 @@ var uptimeWindow = func() time.Duration {
 // IsOffline indicates whether a contract's host should be considered offline,
 // based on its scan metrics.
 func (c *Contractor) IsOffline(id types.FileContractID) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.isOffline(id)
-}
-
-// isOffline indicates whether a contract's host should be considered offline,
-// based on its scan metrics.
-func (c *Contractor) isOffline(id types.FileContractID) bool {
-	// See if there is a contract to match the id in the current set of
-	// contracts.
-	id = c.resolveID(id)
-	contract, ok := c.contracts[id]
+	contract, ok := c.contracts.View(id)
 	if !ok {
 		// No contract, assume offline.
 		return true
@@ -49,6 +39,12 @@ func (c *Contractor) isOffline(id types.FileContractID) bool {
 		// No host, assume offline.
 		return true
 	}
+	return isOffline(host)
+}
+
+// isOffline indicates whether a host should be considered offline, based on
+// its scan metrics.
+func isOffline(host modules.HostDBEntry) bool {
 	// See if the host has a scan history.
 	if len(host.ScanHistory) < 1 {
 		// No scan history, assume offline.

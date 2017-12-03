@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -83,11 +84,11 @@ func TestNew(t *testing.T) {
 // TestContract tests the Contract method.
 func TestContract(t *testing.T) {
 	c := &Contractor{
-		contracts: map[types.FileContractID]modules.RenterContract{
-			{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
-			{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
-			{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},
-		},
+		contracts: proto.NewContractSet([]modules.RenterContract{
+			{ID: types.FileContractID{1}, NetAddress: "foo"},
+			{ID: types.FileContractID{2}, NetAddress: "bar"},
+			{ID: types.FileContractID{3}, NetAddress: "baz"},
+		}),
 	}
 	tests := []struct {
 		addr       modules.NetAddress
@@ -110,7 +111,7 @@ func TestContract(t *testing.T) {
 	}
 
 	// delete all contracts
-	c.contracts = map[types.FileContractID]modules.RenterContract{}
+	c.contracts = proto.NewContractSet(nil)
 	for _, test := range tests {
 		_, ok := c.Contract(test.addr)
 		if ok {
@@ -127,13 +128,13 @@ func TestContracts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
-	c.contracts = map[types.FileContractID]modules.RenterContract{
-		{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
-		{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
-		{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},
-	}
+	c.contracts = proto.NewContractSet([]modules.RenterContract{
+		{ID: types.FileContractID{1}, NetAddress: "foo"},
+		{ID: types.FileContractID{2}, NetAddress: "bar"},
+		{ID: types.FileContractID{3}, NetAddress: "baz"},
+	})
 	for _, contract := range c.Contracts() {
-		if exp := c.contracts[contract.ID]; exp.NetAddress != contract.NetAddress {
+		if exp, _ := c.contracts.View(contract.ID); exp.NetAddress != contract.NetAddress {
 			t.Errorf("contract does not match: expected %v, got %v", exp.NetAddress, contract.NetAddress)
 		}
 	}
@@ -240,14 +241,14 @@ func TestAllowancePeriodTracking(t *testing.T) {
 	}
 	// mine until one before the renew window, current period should stay
 	// constant
-	for i := types.BlockHeight(0); i < testAllowance.RenewWindow; i++ {
+	for i := types.BlockHeight(0); i < testAllowance.RenewWindow-1; i++ {
 		_, err = m.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	if c.CurrentPeriod() != initialHeight {
-		t.Fatal("current period should not have incremeented, wanted", initialHeight, "got", c.CurrentPeriod())
+		t.Fatal("current period should not have incremented, wanted", initialHeight, "got", c.CurrentPeriod())
 	}
 	// mine another another block. current period should increment.
 	_, err = m.AddBlock()
@@ -257,8 +258,8 @@ func TestAllowancePeriodTracking(t *testing.T) {
 	c.mu.Lock()
 	height := c.blockHeight
 	c.mu.Unlock()
-	if c.CurrentPeriod() != height-1 {
-		t.Fatal("unexpected period", c.CurrentPeriod(), "wanted", height-1)
+	if c.CurrentPeriod() != height {
+		t.Fatal("unexpected period", c.CurrentPeriod(), "wanted", height)
 	}
 }
 
@@ -492,10 +493,10 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	clen := len(c.contracts)
+	clen := c.contracts.Len()
 	c.mu.Unlock()
 	if clen != 1 {
-		t.Fatal("expected 1 contract, got", len(c.contracts))
+		t.Fatal("expected 1 contract, got", clen)
 	}
 
 	_, err = m.AddBlock()
@@ -538,11 +539,9 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	// delete one of the contracts and set allowance with Funds*2; should
 	// trigger 1 renewal and 1 new contract
 	c.mu.Lock()
-	for id := range c.contracts {
-		delete(c.contracts, id)
-		break
-	}
-
+	ids := c.contracts.IDs()
+	contract, _ := c.contracts.Acquire(ids[0])
+	c.contracts.Delete(contract)
 	c.mu.Unlock()
 	a.Funds = a.Funds.Mul64(2)
 	err = c.SetAllowance(a)
@@ -562,11 +561,10 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	// make one of the contracts un-renewable and set allowance with Funds*2; should
 	// trigger 1 renewal failure and 2 new contracts
 	c.mu.Lock()
-	for id, contract := range c.contracts {
-		contract.NetAddress = "foo"
-		c.contracts[id] = contract
-		break
-	}
+	ids = c.contracts.IDs()
+	contract, _ = c.contracts.Acquire(ids[0])
+	contract.NetAddress = "foo"
+	c.contracts.Return(contract)
 	c.mu.Unlock()
 	a.Funds = a.Funds.Mul64(2)
 	err = c.SetAllowance(a)
@@ -574,10 +572,10 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	clen = len(c.contracts)
+	clen = c.contracts.Len()
 	c.mu.Unlock()
 	if clen != 2 {
-		t.Fatal("expected 2 contracts, got", len(c.contracts))
+		t.Fatal("expected 2 contracts, got", clen)
 	}
 }
 

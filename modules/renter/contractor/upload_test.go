@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -29,7 +30,7 @@ func TestEditor(t *testing.T) {
 	c := &Contractor{
 		hdb:       hdb,
 		revising:  make(map[types.FileContractID]bool),
-		contracts: make(map[types.FileContractID]modules.RenterContract),
+		contracts: proto.NewContractSet(nil),
 	}
 
 	// empty contract ID
@@ -58,7 +59,7 @@ func TestEditor(t *testing.T) {
 	dbe.StoragePrice = types.NewCurrency64(^uint64(0))
 	hdb.hosts["foo"] = dbe
 	contract := modules.RenterContract{NetAddress: "foo"}
-	c.contracts[contract.ID] = contract
+	c.contracts.Insert(contract)
 	_, err = c.Editor(contract.ID, nil)
 	if err == nil {
 		t.Error("expected error, got nil")
@@ -73,7 +74,8 @@ func TestEditor(t *testing.T) {
 	}
 
 	// spent contract
-	c.contracts[contract.ID] = modules.RenterContract{
+	c.contracts.Insert(modules.RenterContract{
+		ID:         types.FileContractID{1},
 		NetAddress: "bar",
 		LastRevision: types.FileContractRevision{
 			NewValidProofOutputs: []types.SiacoinOutput{
@@ -81,7 +83,7 @@ func TestEditor(t *testing.T) {
 				{Value: types.NewCurrency64(^uint64(0))},
 			},
 		},
-	}
+	})
 	_, err = c.Editor(contract.ID, nil)
 	if err == nil {
 		t.Error("expected error, got nil")

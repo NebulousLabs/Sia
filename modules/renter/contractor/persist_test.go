@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -28,11 +29,11 @@ func TestSaveLoad(t *testing.T) {
 	}
 
 	// add some fake contracts
-	c.contracts = map[types.FileContractID]modules.RenterContract{
-		{0}: {ID: types.FileContractID{0}, HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
-		{1}: {ID: types.FileContractID{1}, HostPublicKey: types.SiaPublicKey{Key: []byte("bar")}},
-		{2}: {ID: types.FileContractID{2}, HostPublicKey: types.SiaPublicKey{Key: []byte("baz")}},
-	}
+	c.contracts = proto.NewContractSet([]modules.RenterContract{
+		{ID: types.FileContractID{0}, HostPublicKey: types.SiaPublicKey{Key: []byte("foo")}},
+		{ID: types.FileContractID{1}, HostPublicKey: types.SiaPublicKey{Key: []byte("bar")}},
+		{ID: types.FileContractID{2}, HostPublicKey: types.SiaPublicKey{Key: []byte("baz")}},
+	})
 	c.renewedIDs = map[types.FileContractID]types.FileContractID{
 		{0}: {1},
 		{1}: {2},
@@ -55,7 +56,7 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.hdb = stubHostDB{}
-	c.contracts = make(map[types.FileContractID]modules.RenterContract)
+	c.contracts = proto.NewContractSet(nil)
 	c.renewedIDs = make(map[types.FileContractID]types.FileContractID)
 	c.cachedRevisions = make(map[types.FileContractID]cachedRevision)
 	c.oldContracts = make(map[types.FileContractID]modules.RenterContract)
@@ -64,11 +65,11 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	// check that all fields were restored
-	_, ok0 := c.contracts[types.FileContractID{0}]
-	_, ok1 := c.contracts[types.FileContractID{1}]
-	_, ok2 := c.contracts[types.FileContractID{2}]
+	_, ok0 := c.contracts.View(types.FileContractID{0})
+	_, ok1 := c.contracts.View(types.FileContractID{1})
+	_, ok2 := c.contracts.View(types.FileContractID{2})
 	if !ok0 || !ok1 || !ok2 {
-		t.Fatal("contracts were not restored properly:", c.contracts)
+		t.Fatal("contracts were not restored properly:", c.contracts.Len())
 	}
 	_, ok0 = c.renewedIDs[types.FileContractID{0}]
 	_, ok1 = c.renewedIDs[types.FileContractID{1}]
@@ -98,7 +99,7 @@ func TestSaveLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.contracts = make(map[types.FileContractID]modules.RenterContract)
+	c.contracts = proto.NewContractSet(nil)
 	c.renewedIDs = make(map[types.FileContractID]types.FileContractID)
 	c.cachedRevisions = make(map[types.FileContractID]cachedRevision)
 	c.oldContracts = make(map[types.FileContractID]modules.RenterContract)
@@ -107,11 +108,11 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	// check that all fields were restored
-	_, ok0 = c.contracts[types.FileContractID{0}]
-	_, ok1 = c.contracts[types.FileContractID{1}]
-	_, ok2 = c.contracts[types.FileContractID{2}]
+	_, ok0 = c.contracts.View(types.FileContractID{0})
+	_, ok1 = c.contracts.View(types.FileContractID{1})
+	_, ok2 = c.contracts.View(types.FileContractID{2})
 	if !ok0 || !ok1 || !ok2 {
-		t.Fatal("contracts were not restored properly:", c.contracts)
+		t.Fatal("contracts were not restored properly:", c.contracts.Len())
 	}
 	_, ok0 = c.renewedIDs[types.FileContractID{0}]
 	_, ok1 = c.renewedIDs[types.FileContractID{1}]
@@ -153,7 +154,7 @@ func (blockCS) Unsubscribe(modules.ConsensusSetSubscriber) { return }
 // public keys in the blockchain.
 func TestPubKeyScanner(t *testing.T) {
 	// create pubkeys, announcements, and contracts
-	contracts := make(map[types.FileContractID]modules.RenterContract)
+	var contracts []modules.RenterContract
 	var blocks []types.Block
 	var pubkeys []types.SiaPublicKey
 	for i := 0; i < 3; i++ {
@@ -178,7 +179,7 @@ func TestPubKeyScanner(t *testing.T) {
 		})
 
 		id := types.FileContractID{byte(i)}
-		contracts[id] = modules.RenterContract{ID: id, NetAddress: addr}
+		contracts = append(contracts, modules.RenterContract{ID: id, NetAddress: addr})
 	}
 	// overwrite the first pubkey with a new one, using the same netaddress.
 	// The contractor should use the newer pubkey.
@@ -202,7 +203,7 @@ func TestPubKeyScanner(t *testing.T) {
 	c := &Contractor{
 		persist:   new(memPersist),
 		cs:        blockCS{blocks},
-		contracts: contracts,
+		contracts: proto.NewContractSet(contracts),
 	}
 
 	// save, clear, and reload
@@ -210,7 +211,7 @@ func TestPubKeyScanner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.contracts = make(map[types.FileContractID]modules.RenterContract)
+	c.contracts = proto.NewContractSet(nil)
 	err = c.load()
 	if err != nil {
 		t.Fatal(err)
@@ -218,9 +219,9 @@ func TestPubKeyScanner(t *testing.T) {
 	// check that contracts were loaded and have their pubkeys filled in
 	for i, pk := range pubkeys {
 		id := types.FileContractID{byte(i)}
-		contract, ok := c.contracts[id]
+		contract, ok := c.contracts.View(id)
 		if !ok {
-			t.Fatal("contracts were not restored properly:", c.contracts)
+			t.Fatal("contracts were not restored properly:", c.contracts.Len())
 		}
 		// check that pubkey was filled in
 		if !bytes.Equal(contract.HostPublicKey.Key, pk.Key) {
