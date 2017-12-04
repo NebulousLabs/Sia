@@ -138,10 +138,13 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		return modules.RenterContract{}, crypto.Hash{}, err
 	}
 
-	// TODO: record the change we are about to make to the contract. If we lose
-	// power mid-revision, this allows us to restore either the pre-revision
-	// or post-revision contract.
-	// sc.recordUploadIntent(rev, sectorRoot, len(newRoots))
+	// record the change we are about to make to the contract. If we lose power
+	// mid-revision, this allows us to restore either the pre-revision or
+	// post-revision contract.
+	walTxn, err := sc.recordUploadIntent(rev, sectorRoot, sectorStoragePrice, sectorBandwidthPrice)
+	if err != nil {
+		return modules.RenterContract{}, crypto.Hash{}, err
+	}
 
 	// send actions
 	extendDeadline(he.conn, modules.NegotiateFileContractRevisionTime)
@@ -161,7 +164,7 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 	}
 
 	// update contract
-	err = sc.recordUpload(signedTxn, sectorRoot, sectorStoragePrice, sectorBandwidthPrice)
+	err = sc.commitUpload(walTxn, signedTxn, sectorRoot, sectorStoragePrice, sectorBandwidthPrice)
 	if err != nil {
 		return modules.RenterContract{}, crypto.Hash{}, err
 	}
@@ -189,12 +192,19 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		}
 	}()
 
-	// initiate revision loop
-	conn, err := (&net.Dialer{
-		Cancel:  cancel,
-		Timeout: 15 * time.Second,
-	}).Dial("tcp", string(host.NetAddress))
-	if err != nil {
+	conn, err := initiateRevisionLoop(host, contract, modules.RPCReviseContract, cancel)
+	if IsRevisionMismatch(err) && len(sc.unappliedTxns) > 0 {
+		// we have desynced from the host. If we have unapplied updates from the
+		// WAL, try applying them.
+		conn, err = initiateRevisionLoop(host, sc.unappliedHeader(), modules.RPCReviseContract, cancel)
+		if err != nil {
+			return nil, err
+		}
+		// applying the updates was successful; commit them to disk
+		if err := sc.commitTxns(); err != nil {
+			return nil, err
+		}
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -207,20 +217,6 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		}
 	}()
 
-	// allot 2 minutes for RPC request + revision exchange
-	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
-	defer extendDeadline(conn, time.Hour)
-	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
-		conn.Close()
-		close(closeChan)
-		return nil, errors.New("couldn't initiate RPC: " + err.Error())
-	}
-	if err := verifyRecentRevision(conn, contract, host.Version); err != nil {
-		conn.Close() // TODO: close gracefully if host has entered revision loop
-		close(closeChan)
-		return nil, err
-	}
-
 	// the host is now ready to accept revisions
 	return &Editor{
 		host:        host,
@@ -231,4 +227,41 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		conn:        conn,
 		closeChan:   closeChan,
 	}, nil
+}
+
+// initiateRevisionLoop initiates either the editor or downloader loop with
+// host, depending on which rpc was passed.
+func initiateRevisionLoop(host modules.HostDBEntry, contract contractHeader, rpc types.Specifier, cancel <-chan struct{}) (net.Conn, error) {
+	conn, err := (&net.Dialer{
+		Cancel:  cancel,
+		Timeout: 45 * time.Second, // TODO: Constant
+	}).Dial("tcp", string(host.NetAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	closeChan := make(chan struct{})
+	defer close(closeChan)
+	go func() {
+		select {
+		case <-cancel:
+			conn.Close()
+		case <-closeChan:
+		}
+	}()
+
+	// allot 2 minutes for RPC request + revision exchange
+	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
+	defer extendDeadline(conn, time.Hour)
+	if err := encoding.WriteObject(conn, rpc); err != nil {
+		conn.Close()
+		close(closeChan)
+		return nil, errors.New("couldn't initiate RPC: " + err.Error())
+	}
+	if err := verifyRecentRevision(conn, contract, host.Version); err != nil {
+		conn.Close() // TODO: close gracefully if host has entered revision loop
+		close(closeChan)
+		return nil, err
+	}
+	return conn, nil
 }

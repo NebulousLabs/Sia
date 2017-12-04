@@ -58,11 +58,13 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 		return modules.RenterContract{}, nil, err
 	}
 
-	// TODO: record the change we are about to make to the contract. If we lose
-	// power mid-revision, this allows us to restore either the pre-revision
-	// or post-revision contract. This is necessary because the host may or
-	// may not have accepted the revision.
-	//sc.recordDownloadIntent(rev)
+	// record the change we are about to make to the contract. If we lose power
+	// mid-revision, this allows us to restore either the pre-revision or
+	// post-revision contract.
+	walTxn, err := sc.recordDownloadIntent(rev, sectorPrice)
+	if err != nil {
+		return modules.RenterContract{}, nil, err
+	}
 
 	// send download action
 	extendDeadline(hd.conn, 2*time.Minute) // TODO: Constant.
@@ -112,7 +114,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	}
 
 	// update contract and metrics
-	if err := sc.recordDownload(signedTxn, sectorPrice); err != nil {
+	if err := sc.commitDownload(walTxn, signedTxn, sectorPrice); err != nil {
 		return modules.RenterContract{}, nil, err
 	}
 
@@ -163,12 +165,19 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 		}
 	}()
 
-	// initiate download loop
-	conn, err := (&net.Dialer{
-		Cancel:  cancel,
-		Timeout: 45 * time.Second, // TODO: Constant
-	}).Dial("tcp", string(host.NetAddress))
-	if err != nil {
+	conn, err := initiateRevisionLoop(host, contract, modules.RPCDownload, cancel)
+	if IsRevisionMismatch(err) && len(sc.unappliedTxns) > 0 {
+		// we have desynced from the host. If we have unapplied updates from the
+		// WAL, try applying them.
+		conn, err = initiateRevisionLoop(host, sc.unappliedHeader(), modules.RPCDownload, cancel)
+		if err != nil {
+			return nil, err
+		}
+		// applying the updates was successful; commit them to disk
+		if err := sc.commitTxns(); err != nil {
+			return nil, err
+		}
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -180,20 +189,6 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 		case <-closeChan:
 		}
 	}()
-
-	// allot 2 minutes for RPC request + revision exchange
-	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
-	defer extendDeadline(conn, time.Hour)
-	if err := encoding.WriteObject(conn, modules.RPCDownload); err != nil {
-		conn.Close()
-		close(closeChan)
-		return nil, errors.New("couldn't initiate RPC: " + err.Error())
-	}
-	if err := verifyRecentRevision(conn, contract, host.Version); err != nil {
-		conn.Close() // TODO: close gracefully if host has entered revision loop
-		close(closeChan)
-		return nil, err
-	}
 
 	// the host is now ready to accept revisions
 	return &Downloader{

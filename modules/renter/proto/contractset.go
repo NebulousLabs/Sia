@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -136,7 +135,7 @@ func NewContractSet(dir string) (*ContractSet, error) {
 
 	// Load the WAL. Any recovered updates will be applied after loading
 	// contracts.
-	updates, wal, err := writeaheadlog.New(filepath.Join(dir, "contractset.log"))
+	walTxns, wal, err := writeaheadlog.New(filepath.Join(dir, "contractset.log"))
 	if err != nil {
 		return nil, err
 	}
@@ -157,38 +156,8 @@ func NewContractSet(dir string) (*ContractSet, error) {
 		if filepath.Ext(filename) != "contract" {
 			continue
 		}
-		if err := cs.loadSafeContract(filename); err != nil {
+		if err := cs.loadSafeContract(filename, walTxns); err != nil {
 			return nil, err
-		}
-	}
-
-	// Apply any recovered updates.
-	for _, update := range updates {
-		switch update.Name {
-		case updateNameSetHeader:
-			var u updateSetHeader
-			if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
-				return nil, err
-			}
-			if c, ok := cs.contracts[u.ID]; !ok {
-				return nil, errors.New("no such contract")
-			} else if err := c.applySetHeader(u.Header); err != nil {
-				return nil, err
-			} else if err := c.f.Sync(); err != nil {
-				return nil, err
-			}
-		case updateNameSetRoot:
-			var u updateSetRoot
-			if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
-				return nil, err
-			}
-			if c, ok := cs.contracts[u.ID]; !ok {
-				return nil, errors.New("no such contract")
-			} else if err := c.applySetRoot(u.Root, u.Index); err != nil {
-				return nil, err
-			} else if err := c.f.Sync(); err != nil {
-				return nil, err
-			}
 		}
 	}
 

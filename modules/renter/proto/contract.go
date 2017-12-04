@@ -94,6 +94,10 @@ type SafeContract struct {
 	// relate to this contract.
 	merkleRoots []crypto.Hash
 
+	// unappliedTxns are the transactions that were written to the WAL but not
+	// applied to the contract file.
+	unappliedTxns []*writeaheadlog.Transaction
+
 	f   *os.File // TODO: use a dependency for this
 	wal *writeaheadlog.WAL
 	mu  sync.Mutex
@@ -170,12 +174,13 @@ func (c *SafeContract) applySetRoot(root crypto.Hash, index int) error {
 	return nil
 }
 
-func (c *SafeContract) recordUpload(txn types.Transaction, root crypto.Hash, storageCost, bandwidthCost types.Currency) error {
+func (c *SafeContract) recordUploadIntent(rev types.FileContractRevision, root crypto.Hash, storageCost, bandwidthCost types.Currency) (*writeaheadlog.Transaction, error) {
 	// construct new header
+	// NOTE: this header will not include the host signature
 	c.headerMu.Lock()
 	newHeader := c.header
 	c.headerMu.Unlock()
-	newHeader.Transaction = txn
+	newHeader.Transaction.FileContractRevisions[0] = rev
 	newHeader.StorageSpending = newHeader.StorageSpending.Add(storageCost)
 	newHeader.UploadSpending = newHeader.UploadSpending.Add(bandwidthCost)
 
@@ -185,12 +190,24 @@ func (c *SafeContract) recordUpload(txn types.Transaction, root crypto.Hash, sto
 		c.makeUpdateSetRoot(root, rootIndex),
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := <-t.SignalSetupComplete(); err != nil {
-		return err
+		return nil, err
 	}
+	return t, nil
+}
 
+func (c *SafeContract) commitUpload(t *writeaheadlog.Transaction, signedTxn types.Transaction, root crypto.Hash, storageCost, bandwidthCost types.Currency) error {
+	// construct new header
+	c.headerMu.Lock()
+	newHeader := c.header
+	c.headerMu.Unlock()
+	newHeader.Transaction = signedTxn
+	newHeader.StorageSpending = newHeader.StorageSpending.Add(storageCost)
+	newHeader.UploadSpending = newHeader.UploadSpending.Add(bandwidthCost)
+
+	rootIndex := len(c.merkleRoots)
 	if err := c.applySetHeader(newHeader); err != nil {
 		return err
 	}
@@ -203,23 +220,35 @@ func (c *SafeContract) recordUpload(txn types.Transaction, root crypto.Hash, sto
 	return t.SignalUpdatesApplied()
 }
 
-func (c *SafeContract) recordDownload(txn types.Transaction, bandwidthCost types.Currency) error {
+func (c *SafeContract) recordDownloadIntent(rev types.FileContractRevision, bandwidthCost types.Currency) (*writeaheadlog.Transaction, error) {
 	// construct new header
+	// NOTE: this header will not include the host signature
 	c.headerMu.Lock()
 	newHeader := c.header
 	c.headerMu.Unlock()
-	newHeader.Transaction = txn
+	newHeader.Transaction.FileContractRevisions[0] = rev
 	newHeader.DownloadSpending = newHeader.DownloadSpending.Add(bandwidthCost)
 
 	t, err := c.wal.NewTransaction([]writeaheadlog.Update{
 		c.makeUpdateSetHeader(newHeader),
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := <-t.SignalSetupComplete(); err != nil {
-		return err
+		return nil, err
 	}
+	return t, nil
+}
+
+func (c *SafeContract) commitDownload(t *writeaheadlog.Transaction, signedTxn types.Transaction, bandwidthCost types.Currency) error {
+	// construct new header
+	c.headerMu.Lock()
+	newHeader := c.header
+	c.headerMu.Unlock()
+	newHeader.Transaction = signedTxn
+	newHeader.DownloadSpending = newHeader.DownloadSpending.Add(bandwidthCost)
+
 	if err := c.applySetHeader(newHeader); err != nil {
 		return err
 	}
@@ -227,6 +256,58 @@ func (c *SafeContract) recordDownload(txn types.Transaction, bandwidthCost types
 		return err
 	}
 	return t.SignalUpdatesApplied()
+}
+
+// commitTxns commits the unapplied transactions to the contract file and marks
+// the transactions as applied.
+func (c *SafeContract) commitTxns() error {
+	for _, t := range c.unappliedTxns {
+		for _, update := range t.Updates {
+			switch update.Name {
+			case updateNameSetHeader:
+				var u updateSetHeader
+				if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+					return err
+				}
+				if err := c.applySetHeader(u.Header); err != nil {
+					return err
+				}
+			case updateNameSetRoot:
+				var u updateSetRoot
+				if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+					return err
+				}
+				if err := c.applySetRoot(u.Root, u.Index); err != nil {
+					return err
+				}
+			}
+		}
+		if err := c.f.Sync(); err != nil {
+			return err
+		}
+		if err := t.SignalUpdatesApplied(); err != nil {
+			return err
+		}
+	}
+	c.unappliedTxns = nil
+	return nil
+}
+
+// unappliedHeader returns the most recent header contained within the unapplied
+// transactions relevant to the contract.
+func (c *SafeContract) unappliedHeader() (h contractHeader) {
+	for _, t := range c.unappliedTxns {
+		for _, update := range t.Updates {
+			if update.Name == updateNameSetHeader {
+				var u updateSetHeader
+				if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+					continue
+				}
+				h = u.Header
+			}
+		}
+	}
+	return
 }
 
 func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Hash) (modules.RenterContract, error) {
@@ -266,7 +347,7 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 	return sc.Metadata(), nil
 }
 
-func (cs *ContractSet) loadSafeContract(filename string) error {
+func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlog.Transaction) error {
 	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
 		return err
@@ -292,12 +373,40 @@ func (cs *ContractSet) loadSafeContract(filename string) error {
 		}
 		merkleRoots = append(merkleRoots, root)
 	}
+	// add relevant unapplied transactions
+	var unappliedTxns []*writeaheadlog.Transaction
+	for _, t := range walTxns {
+		// NOTE: we assume here that if any of the updates apply to the
+		// contract, the whole transaction applies to the contract.
+		if len(t.Updates) == 0 {
+			continue
+		}
+		var id types.FileContractID
+		switch update := t.Updates[0]; update.Name {
+		case updateNameSetHeader:
+			var u updateSetHeader
+			if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+				return err
+			}
+			id = u.ID
+		case updateNameSetRoot:
+			var u updateSetRoot
+			if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+				return err
+			}
+			id = u.ID
+		}
+		if id == header.ID() {
+			unappliedTxns = append(unappliedTxns, t)
+		}
+	}
 	// add to set
 	cs.contracts[header.ID()] = &SafeContract{
-		header:      header,
-		merkleRoots: merkleRoots,
-		f:           f,
-		wal:         cs.wal,
+		header:        header,
+		merkleRoots:   merkleRoots,
+		unappliedTxns: unappliedTxns,
+		f:             f,
+		wal:           cs.wal,
 	}
 	return nil
 }
