@@ -1,8 +1,12 @@
 package wallet
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
+	"sort"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -94,17 +98,79 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 		return nil, errOutOfBounds
 	}
 
-	it := dbProcessedTransactionsIterator(w.dbTx)
-	for it.next() {
-		pt := it.value()
-		if pt.ConfirmationHeight < startHeight {
-			continue
-		} else if pt.ConfirmationHeight > endHeight {
-			// transactions are stored in chronological order, so we can
-			// break as soon as we are above endHeight
+	// Get the bucket, the largest key in it and the cursor
+	bucket := w.dbTx.Bucket(bucketProcessedTransactions)
+	cursor := bucket.Cursor()
+	lastKey := bucket.Sequence()
+
+	var pt modules.ProcessedTransaction
+	keyBytes := make([]byte, 8)
+	var result int
+	func() {
+		// Recover from possible panic during binary search
+		defer func() {
+			r := recover()
+			if r != nil {
+				err = fmt.Errorf("%v", r)
+			}
+		}()
+
+		// Start binary searching
+		result = sort.Search(int(lastKey), func(i int) bool {
+			// Create the key for the index
+			binary.BigEndian.PutUint64(keyBytes, uint64(i))
+
+			// Retrieve the processed transaction
+			key, ptBytes := cursor.Seek(keyBytes)
+			if build.DEBUG && key == nil {
+				panic("Failed to retrieve processed Transaction by key")
+			}
+
+			// Decode the transaction
+			if err = decodeProcessedTransaction(ptBytes, &pt); build.DEBUG && err != nil {
+				panic(err)
+			}
+
+			return pt.ConfirmationHeight >= startHeight
+		})
+	}()
+	if err != nil {
+		return
+	}
+
+	if uint64(result) == lastKey {
+		// No transaction was found
+		return
+	}
+
+	// Create the key that corresponds to the result of the search
+	binary.BigEndian.PutUint64(keyBytes, uint64(result))
+
+	// Get the processed transaction and decode it
+	key, ptBytes := cursor.Seek(keyBytes)
+	if build.DEBUG && key == nil {
+		build.Critical("Couldn't find the processed transaction from the search.")
+	}
+	if err = decodeProcessedTransaction(ptBytes, &pt); build.DEBUG && err != nil {
+		build.Critical(err)
+	}
+
+	// Gather all transactions until endHeight is reached
+	for pt.ConfirmationHeight <= endHeight {
+		if build.DEBUG && pt.ConfirmationHeight < startHeight {
+			build.Critical("wallet processed transactions are not sorted")
+		}
+		pts = append(pts, pt)
+
+		// Get next processed transaction
+		key, ptBytes := cursor.Next()
+		if key == nil {
 			break
-		} else {
-			pts = append(pts, pt)
+		}
+
+		// Decode the transaction
+		if err := decodeProcessedTransaction(ptBytes, &pt); build.DEBUG && err != nil {
+			panic("Failed to decode the processed transaction")
 		}
 	}
 	return
