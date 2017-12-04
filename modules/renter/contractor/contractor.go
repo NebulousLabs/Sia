@@ -225,8 +225,11 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, co
 		revising:          make(map[types.FileContractID]bool),
 	}
 
-	// Close the logger (provided as a dependency) upon shutdown.
+	// Close the contract set and logger upon shutdown.
 	c.tg.AfterStop(func() {
+		if err := c.contracts.Close(); err != nil {
+			c.log.Println("Failed to close contract set:", err)
+		}
 		if err := c.log.Close(); err != nil {
 			fmt.Println("Failed to close the contractor logger:", err)
 		}
