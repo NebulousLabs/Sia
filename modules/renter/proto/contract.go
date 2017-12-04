@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -408,5 +409,78 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 		f:             f,
 		wal:           cs.wal,
 	}
+	return nil
+}
+
+// ImportV130Contract creates a contract file for a v130 contract.
+func (cs *ContractSet) ImportV130Contract(c V130Contract) error {
+	_, err := cs.managedInsertContract(contractHeader{
+		Transaction:      c.LastRevisionTxn,
+		SecretKey:        c.SecretKey,
+		StartHeight:      c.StartHeight,
+		DownloadSpending: c.DownloadSpending,
+		StorageSpending:  c.StorageSpending,
+		UploadSpending:   c.UploadSpending,
+		TotalCost:        c.TotalCost,
+		ContractFee:      c.ContractFee,
+		TxnFee:           c.TxnFee,
+		SiafundFee:       c.SiafundFee,
+	}, c.MerkleRoots)
+	return err
+}
+
+// A V130Contract specifies the v130 contract format
+type V130Contract struct {
+	ID               types.FileContractID `json:"id"`
+	LastRevisionTxn  types.Transaction    `json:"lastrevisiontxn"`
+	MerkleRoots      MerkleRootSet        `json:"merkleroots"`
+	SecretKey        crypto.SecretKey     `json:"secretkey"`
+	StartHeight      types.BlockHeight    `json:"startheight"`
+	DownloadSpending types.Currency       `json:"downloadspending"`
+	StorageSpending  types.Currency       `json:"storagespending"`
+	UploadSpending   types.Currency       `json:"uploadspending"`
+	TotalCost        types.Currency       `json:"totalcost"`
+	ContractFee      types.Currency       `json:"contractfee"`
+	TxnFee           types.Currency       `json:"txnfee"`
+	SiafundFee       types.Currency       `json:"siafundfee"`
+	GoodForRenew     bool
+	GoodForUpload    bool
+}
+
+// MerkleRootSet is a set of Merkle roots, and gets encoded more efficiently.
+type MerkleRootSet []crypto.Hash
+
+// MarshalJSON defines a JSON encoding for a MerkleRootSet.
+func (mrs MerkleRootSet) MarshalJSON() ([]byte, error) {
+	// Copy the whole array into a giant byte slice and then encode that.
+	fullBytes := make([]byte, crypto.HashSize*len(mrs))
+	for i := range mrs {
+		copy(fullBytes[i*crypto.HashSize:(i+1)*crypto.HashSize], mrs[i][:])
+	}
+	return json.Marshal(fullBytes)
+}
+
+// UnmarshalJSON attempts to decode a MerkleRootSet, falling back on the legacy
+// decoding of a []crypto.Hash if that fails.
+func (mrs *MerkleRootSet) UnmarshalJSON(b []byte) error {
+	// Decode the giant byte slice, and then split it into separate arrays.
+	var fullBytes []byte
+	err := json.Unmarshal(b, &fullBytes)
+	if err != nil {
+		// Encoding the byte slice has failed, try decoding it as a []crypto.Hash.
+		var hashes []crypto.Hash
+		err := json.Unmarshal(b, &hashes)
+		if err != nil {
+			return err
+		}
+		*mrs = MerkleRootSet(hashes)
+		return nil
+	}
+
+	umrs := make(MerkleRootSet, len(fullBytes)/32)
+	for i := range umrs {
+		copy(umrs[i][:], fullBytes[i*crypto.HashSize:(i+1)*crypto.HashSize])
+	}
+	*mrs = umrs
 	return nil
 }
