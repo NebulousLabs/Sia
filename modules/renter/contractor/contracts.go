@@ -68,20 +68,21 @@ func (c *Contractor) managedMarkContractsUtility() {
 		return
 	}
 	hosts := c.hdb.RandomHosts(hostCount+minScoreHostBuffer, nil)
-	if len(hosts) <= 0 {
-		return
-	}
 
-	// Find the lowest score of this batch of hosts.
-	lowestScore := c.hdb.ScoreBreakdown(hosts[0]).Score
-	for i := 1; i < len(hosts); i++ {
-		score := c.hdb.ScoreBreakdown(hosts[i]).Score
-		if score.Cmp(lowestScore) < 0 {
-			lowestScore = score
+	// Find the minimum score that a host is allowed to have to be considered
+	// good for upload.
+	var minScore types.Currency
+	if len(hosts) > 0 {
+		lowestScore := c.hdb.ScoreBreakdown(hosts[0]).Score
+		for i := 1; i < len(hosts); i++ {
+			score := c.hdb.ScoreBreakdown(hosts[i]).Score
+			if score.Cmp(lowestScore) < 0 {
+				lowestScore = score
+			}
 		}
+		// Set the minimum acceptable score to a factor of the lowest score.
+		minScore = lowestScore.Div(scoreLeeway)
 	}
-	// Set the minimum acceptable score to a factor of the lowest score.
-	minScore := lowestScore.Div(scoreLeeway)
 
 	// Update utility fields for each contract.
 	for _, contract := range c.contracts.ViewAll() {
@@ -98,7 +99,7 @@ func (c *Contractor) managedMarkContractsUtility() {
 				return
 			}
 			// Contract has no utility if the score is poor.
-			if c.hdb.ScoreBreakdown(host).Score.Cmp(minScore) < 0 {
+			if !minScore.IsZero() && c.hdb.ScoreBreakdown(host).Score.Cmp(minScore) < 0 {
 				u.GoodForUpload = false
 				u.GoodForRenew = false
 				return
