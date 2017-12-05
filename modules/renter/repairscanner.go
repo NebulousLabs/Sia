@@ -259,11 +259,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 		if !workDistributed {
 			// Release any data that did not get distributed to workers.
 			r.managedMemoryAvailableAdd(nextChunk.memoryNeeded - nextChunk.memoryReleased)
-		} else {
-			nextChunk.mu.Lock()
-			nextChunk.mu.Unlock()
 		}
-
 		// Sanity check, make sure memory was returned properly.
 		if nextChunk.logicalChunkData != nil {
 			nextChunk.logicalChunkData = nil
