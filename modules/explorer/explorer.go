@@ -54,6 +54,8 @@ type (
 		unconfirmedProcessedTransactions []modules.ProcessedTransaction
 		mu                               sync.RWMutex
 		tg                               siasync.ThreadGroup
+		persist                          peristence
+		persistMu                        sync.RWMutex
 	}
 )
 
@@ -82,21 +84,47 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		return nil, err
 	}
 
-	// retrieve the current ConsensusChangeID
-	var recentChange modules.ConsensusChangeID
-	err = e.db.View(dbGetInternal(internalRecentChange, &recentChange))
-	if err != nil {
-		return nil, err
-	}
-
-	err = cs.ConsensusSetSubscribe(e, recentChange, nil)
-	if err != nil {
+	err = cs.ConsensusSetSubscribe(e, e.persist.RecentChange, nil)
+	if err == modules.ErrInvalidConsensusChangeID {
+		// Perform a rescan of the consensus set if the change id is not found.
+		// The id will only be not found if there has been desynchronization
+		// between the explorer and the consensus package.
+		err = e.startupRescan()
+		if err != nil {
+			return nil, errors.New("explorer startup failed - rescanning failed: " + err.Error())
+		}
+	} else if err != nil {
 		return nil, errors.New("explorer subscription failed: " + err.Error())
 	}
-
 	tpool.TransactionPoolSubscribe(e)
 
 	return e, nil
+}
+
+func (e *Explorer) startupRescan() error {
+	err := func() error {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+
+		e.persist.RecentChange = modules.ConsensusChangeBeginning
+		e.persist.Height = 0
+		e.persist.Target = types.Target{}
+		return e.saveSync()
+	}()
+	if err != nil {
+		return err
+	}
+
+	// Subscribe to the consensus set. This is a blocking call that will not
+	// return until the explorer has fully caught up to the current block.
+	err = e.cs.ConsensusSetSubscribe(e, modules.ConsensusChangeBeginning, e.tg.StopChan())
+	if err != nil {
+		return err
+	}
+	e.tg.OnStop(func() {
+		e.cs.Unsubscribe(e)
+	})
+	return nil
 }
 
 // Close closes the explorer.

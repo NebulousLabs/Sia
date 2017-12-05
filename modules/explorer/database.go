@@ -29,10 +29,6 @@ var (
 	bucketHashType         = []byte("HashType")
 
 	errNotExist = errors.New("entry does not exist")
-
-	// keys for bucketInternal
-	internalBlockHeight  = []byte("BlockHeight")
-	internalRecentChange = []byte("RecentChange")
 )
 
 // These functions all return a 'func(*bolt.Tx) error', which, allows them to

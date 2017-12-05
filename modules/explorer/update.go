@@ -106,14 +106,8 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}()
 
 		// get starting block height
-		var blockheight types.BlockHeight
-		err = dbGetInternal(internalBlockHeight, &blockheight)(tx)
-		if err != nil && build.DEBUG {
-			panic(err)
-		} else if err != nil {
-			log.Printf("Error getting block facts in ProcessConsensusChange: %s", err)
-			return
-		}
+
+		blockheight := e.persist.Height
 
 		// Update cumulative stats for reverted blocks.
 		for _, block := range cc.RevertedBlocks {
@@ -347,27 +341,17 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			if err != nil {
 				return err
 			}
+		} else {
+			log.Printf("Error getting block facts for %s", currentBlock.ID())
 		}
 
-		// set final blockheight
-		err = dbSetInternal(internalBlockHeight, blockheight)(tx)
-		if err != nil && build.DEBUG {
-			panic(err)
-		} else if err != nil {
-			log.Printf("Error setting internal blockheight: %s", err)
-			return err
-		}
+		e.persistMu.Lock()
+		e.persist.Height = blockheight
+		e.persist.RecentChange = cc.ID
+		e.persist.Target = cc.ChildTarget
+		e.persistMu.Unlock()
 
-		// set change ID
-		err = dbSetInternal(internalRecentChange, cc.ID)(tx)
-		if err != nil && build.DEBUG {
-			panic(err)
-		} else if err != nil {
-			log.Printf("Error setting recent change: %s", err)
-			return err
-		}
-
-		return nil
+		return e.saveSync()
 	})
 
 	if err != nil && build.DEBUG {

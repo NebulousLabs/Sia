@@ -6,6 +6,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
+	"log"
 )
 
 // Block takes a block ID and finds the corresponding block, provided that the
@@ -14,10 +15,12 @@ func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool
 	var height types.BlockHeight
 	err := e.db.View(dbGetAndDecode(bucketBlockIDs, id, &height))
 	if err != nil {
+		log.Printf("Error: %s", err)
 		return types.Block{}, 0, false
 	}
 	block, exists := e.cs.BlockAtHeight(height)
 	if !exists {
+		log.Printf("did not find height: %s", height)
 		return types.Block{}, 0, false
 	}
 	return block, height, true
@@ -30,6 +33,7 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 	var bf blockFacts
 	err := e.db.View(e.dbGetBlockFacts(height, &bf))
 	if err != nil {
+		log.Printf("Did not find block facts %s", err)
 		return modules.BlockFacts{}, false
 	}
 
@@ -41,12 +45,9 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 func (e *Explorer) LatestBlockFacts() modules.BlockFacts {
 	var bf blockFacts
 	err := e.db.View(func(tx *bolt.Tx) error {
-		var height types.BlockHeight
-		err := dbGetInternal(internalBlockHeight, &height)(tx)
-		if err != nil {
-			return err
-		}
-		return e.dbGetBlockFacts(height, &bf)(tx)
+		e.persistMu.Lock()
+		defer e.persistMu.Unlock()
+		return e.dbGetBlockFacts(e.persist.Height, &bf)(tx)
 	})
 	if err != nil {
 		build.Critical(err)
@@ -64,7 +65,7 @@ func (e *Explorer) PendingTransactions() []types.Transaction {
 }
 
 // Transaction takes a transaction ID and finds the block containing the
-// transaction. Because of the miner payouts, the transaction ID might be a
+// transaction. Because of the miner payouts, the transacti on ID might be a
 // block ID. To find the transaction, iterate through the block.
 func (e *Explorer) Transaction(id types.TransactionID) (types.Block, types.BlockHeight, bool) {
 	var height types.BlockHeight
