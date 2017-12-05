@@ -301,6 +301,12 @@ RPC Stats:
 		fmt.Fprintf(w, "\t%s\t%s\t%.2f\t%s\n", filesizeUnits(curSize), filesizeUnits(int64(folder.Capacity)), pctUsed, folder.Path)
 	}
 	w.Flush()
+
+	// if wallet is locked print warning
+	status := new(api.WalletGET)
+	if !status.Unlocked {
+		fmt.Println("\nWARNING: In order to operate your host you need to unlock your wallet using the command \"siac wallet unlock\"")
+	}
 }
 
 // hostconfigcmd is the handler for the command `siac host config [setting] [value]`.
