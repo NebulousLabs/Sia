@@ -460,7 +460,6 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// wait for the redundancy to decrement
 	err = retry(120, time.Millisecond*250, func() error {
 		st.getAPI("/renter/files", &rf)
@@ -472,7 +471,6 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// verify we still can download
 	downloadPath = filepath.Join(st.dir, "test-downloaded-verify2.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
@@ -487,7 +485,6 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 	defer stNewHost.server.Close()
 	testGroup = []*serverTester{st, stNewHost}
-
 	// Connect the testers to eachother so that they are all on the same
 	// blockchain.
 	err = fullyConnectNodes(testGroup)
@@ -499,12 +496,12 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Make sure that every wallet has money in it.
+	// Make sure that every wallet has money in it, then set the storage and
+	// perform annoucnements.
 	err = fundAllNodes(testGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	err = stNewHost.setHostStorage()
 	if err != nil {
 		t.Fatal(err)

@@ -14,22 +14,22 @@ import (
 
 // contractorPersist defines what Contractor data persists across sessions.
 type contractorPersist struct {
-	Allowance         modules.Allowance          `json:"allowance"`
-	BlockHeight       types.BlockHeight          `json:"blockheight"`
-	CurrentPeriod     types.BlockHeight          `json:"currentperiod"`
-	LastChange        modules.ConsensusChangeID  `json:"lastchange"`
-	OldContracts      []modules.RenterContract   `json:"oldcontracts"`
-	RenewedIDs        map[string]string          `json:"renewedids"`
+	Allowance     modules.Allowance         `json:"allowance"`
+	BlockHeight   types.BlockHeight         `json:"blockheight"`
+	CurrentPeriod types.BlockHeight         `json:"currentperiod"`
+	LastChange    modules.ConsensusChangeID `json:"lastchange"`
+	OldContracts  []modules.RenterContract  `json:"oldcontracts"`
+	RenewedIDs    map[string]string         `json:"renewedids"`
 }
 
 // persistData returns the data in the Contractor that will be saved to disk.
 func (c *Contractor) persistData() contractorPersist {
 	data := contractorPersist{
-		Allowance:         c.allowance,
-		BlockHeight:       c.blockHeight,
-		CurrentPeriod:     c.currentPeriod,
-		LastChange:        c.lastChange,
-		RenewedIDs:        make(map[string]string),
+		Allowance:     c.allowance,
+		BlockHeight:   c.blockHeight,
+		CurrentPeriod: c.currentPeriod,
+		LastChange:    c.lastChange,
+		RenewedIDs:    make(map[string]string),
 	}
 	for _, contract := range c.oldContracts {
 		data.OldContracts = append(data.OldContracts, contract)

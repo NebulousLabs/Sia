@@ -120,11 +120,12 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 	return spending
 }
 
-// ContractByID returns the contract with the id specified, if it exists.
+// ContractByID returns the contract with the id specified, if it exists. The
+// contract will be resolved if possible to the most recent child contract.
 func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContract, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.contracts.View(id)
+	return c.contracts.View(c.resolveID(id))
 }
 
 // Contracts returns the contracts formed by the contractor in the current
