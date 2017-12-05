@@ -153,7 +153,7 @@ func NewContractSet(dir string) (*ContractSet, error) {
 	}
 
 	for _, filename := range dirNames {
-		if filepath.Ext(filename) != "contract" {
+		if filepath.Ext(filename) != ".contract" {
 			continue
 		}
 		if err := cs.loadSafeContract(filename, walTxns); err != nil {
