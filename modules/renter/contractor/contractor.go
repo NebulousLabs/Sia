@@ -180,10 +180,16 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	}
 
 	// Create the persist directory if it does not yet exist.
-	err := os.MkdirAll(persistDir, 0700)
-	if err != nil {
+	if err := os.MkdirAll(persistDir, 0700); err != nil {
 		return nil, err
 	}
+
+	// Convert the old persist file(s), if necessary. This must occur before
+	// loading the contract set.
+	if err := convertPersist(persistDir); err != nil {
+		return nil, err
+	}
+
 	// Create the contract set.
 	contractSet, err := proto.NewContractSet(filepath.Join(persistDir, "contracts"))
 	if err != nil {

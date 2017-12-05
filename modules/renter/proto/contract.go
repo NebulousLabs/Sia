@@ -412,9 +412,13 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 	return nil
 }
 
-// ImportV130Contract creates a contract file for a v130 contract.
-func (cs *ContractSet) ImportV130Contract(c V130Contract) error {
-	_, err := cs.managedInsertContract(contractHeader{
+// ConvertV130Contract creates a contract file for a v130 contract.
+func ConvertV130Contract(c V130Contract, dir string) error {
+	cs := &ContractSet{
+		contracts: make(map[types.FileContractID]*SafeContract),
+		dir:       dir,
+	}
+	m, err := cs.managedInsertContract(contractHeader{
 		Transaction:      c.LastRevisionTxn,
 		SecretKey:        c.SecretKey,
 		StartHeight:      c.StartHeight,
@@ -426,25 +430,44 @@ func (cs *ContractSet) ImportV130Contract(c V130Contract) error {
 		TxnFee:           c.TxnFee,
 		SiafundFee:       c.SiafundFee,
 	}, c.MerkleRoots)
-	return err
+	if err != nil {
+		return err
+	}
+	cs.contracts[m.ID].f.Close()
+	return nil
 }
 
-// A V130Contract specifies the v130 contract format
+// A V130Contract specifies the v130 contract format.
 type V130Contract struct {
-	ID               types.FileContractID `json:"id"`
-	LastRevisionTxn  types.Transaction    `json:"lastrevisiontxn"`
-	MerkleRoots      MerkleRootSet        `json:"merkleroots"`
-	SecretKey        crypto.SecretKey     `json:"secretkey"`
-	StartHeight      types.BlockHeight    `json:"startheight"`
-	DownloadSpending types.Currency       `json:"downloadspending"`
-	StorageSpending  types.Currency       `json:"storagespending"`
-	UploadSpending   types.Currency       `json:"uploadspending"`
-	TotalCost        types.Currency       `json:"totalcost"`
-	ContractFee      types.Currency       `json:"contractfee"`
-	TxnFee           types.Currency       `json:"txnfee"`
-	SiafundFee       types.Currency       `json:"siafundfee"`
-	GoodForRenew     bool
-	GoodForUpload    bool
+	HostPublicKey    types.SiaPublicKey         `json:"hostpublickey"`
+	ID               types.FileContractID       `json:"id"`
+	LastRevision     types.FileContractRevision `json:"lastrevision"`
+	LastRevisionTxn  types.Transaction          `json:"lastrevisiontxn"`
+	MerkleRoots      MerkleRootSet              `json:"merkleroots"`
+	SecretKey        crypto.SecretKey           `json:"secretkey"`
+	StartHeight      types.BlockHeight          `json:"startheight"`
+	DownloadSpending types.Currency             `json:"downloadspending"`
+	StorageSpending  types.Currency             `json:"storagespending"`
+	UploadSpending   types.Currency             `json:"uploadspending"`
+	TotalCost        types.Currency             `json:"totalcost"`
+	ContractFee      types.Currency             `json:"contractfee"`
+	TxnFee           types.Currency             `json:"txnfee"`
+	SiafundFee       types.Currency             `json:"siafundfee"`
+}
+
+// EndHeight returns the height at which the host is no longer obligated to
+// store contract data.
+func (c *V130Contract) EndHeight() types.BlockHeight {
+	return c.LastRevision.NewWindowStart
+}
+
+// RenterFunds returns the funds remaining in the contract's Renter payout as
+// of the most recent revision.
+func (c *V130Contract) RenterFunds() types.Currency {
+	if len(c.LastRevision.NewValidProofOutputs) < 2 {
+		return types.ZeroCurrency
+	}
+	return c.LastRevision.NewValidProofOutputs[0].Value
 }
 
 // MerkleRootSet is a set of Merkle roots, and gets encoded more efficiently.

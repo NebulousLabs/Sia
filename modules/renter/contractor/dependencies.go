@@ -79,7 +79,7 @@ type stdPersist struct {
 
 var persistMeta = persist.Metadata{
 	Header:  "Contractor Persistence",
-	Version: "1.3.2",
+	Version: "1.3.1",
 }
 
 func (p *stdPersist) save(data contractorPersist) error {

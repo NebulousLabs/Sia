@@ -1,9 +1,8 @@
 package contractor
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -45,10 +44,6 @@ func (c *Contractor) load() error {
 	var data contractorPersist
 	err := c.persist.load(&data)
 	if err != nil {
-		if p, ok := c.persist.(*stdPersist); ok {
-			// try loading old persist
-			err = c.loadv130Contracts(p.filename)
-		}
 		return err
 	}
 	c.allowance = data.Allowance
@@ -78,37 +73,66 @@ func (c *Contractor) saveSync() error {
 	return c.persist.save(c.persistData())
 }
 
-// loadv130Contracts converts the old contract journal format to the new
-// per-contract file format.
-func (c *Contractor) loadv130Contracts(filename string) error {
-	f, err := os.Open(filename)
+// convertPersist converts the pre-v1.3.1 contractor persist formats to the new
+// formats.
+func convertPersist(dir string) error {
+	// Try loading v1.3.1 persist. If it has the correct version number, no
+	// further action is necessary.
+	persistPath := filepath.Join(dir, "contractor.json")
+	err := persist.LoadJSON(persistMeta, nil, persistPath)
+	if err == nil {
+		return nil
+	}
+
+	// Try loading v1.3.0 persist (journal).
+	journalPath := filepath.Join(dir, "contractor.journal")
+	if _, err := os.Stat(journalPath); os.IsNotExist(err) {
+		// no journal file found; assume this is a fresh install
+		return nil
+	}
+	var p journalPersist
+	j, err := openJournal(journalPath, &p)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-
-	// decode the journal metadata
-	dec := json.NewDecoder(f)
-	var meta persist.Metadata
-	if err = dec.Decode(&meta); err != nil {
+	j.Close()
+	// convert to v1.3.1 format and save
+	data := contractorPersist{
+		Allowance:     p.Allowance,
+		BlockHeight:   p.BlockHeight,
+		CurrentPeriod: p.CurrentPeriod,
+		LastChange:    p.LastChange,
+		RenewedIDs:    p.RenewedIDs,
+	}
+	for _, c := range p.OldContracts {
+		data.OldContracts = append(data.OldContracts, modules.RenterContract{
+			ID:               c.ID,
+			HostPublicKey:    c.HostPublicKey,
+			StartHeight:      c.StartHeight,
+			EndHeight:        c.EndHeight(),
+			RenterFunds:      c.RenterFunds(),
+			DownloadSpending: c.DownloadSpending,
+			StorageSpending:  c.StorageSpending,
+			UploadSpending:   c.UploadSpending,
+			TotalCost:        c.TotalCost,
+			ContractFee:      c.ContractFee,
+			TxnFee:           c.TxnFee,
+			SiafundFee:       c.SiafundFee,
+		})
+	}
+	err = persist.SaveJSON(persistMeta, data, persistPath)
+	if err != nil {
 		return err
-	} else if meta.Header != "Contractor Journal" {
-		return fmt.Errorf("expected header %q, got %q", "Contractor Journal", meta.Header)
-	} else if meta.Version != "1.1.1" {
-		return fmt.Errorf("journal version (%s) is incompatible with the current version (%s)", meta.Version, "1.1.1")
 	}
 
-	// decode the old journal checkpoint
-	var checkpoint struct {
-		Contracts map[string]proto.V130Contract `json:"contracts"`
-	}
-	if err = dec.Decode(&checkpoint); err != nil {
-		return err
-	}
-	for _, contract := range checkpoint.Contracts {
-		if err := c.contracts.ImportV130Contract(contract); err != nil {
+	// convert contracts to contract files
+	for _, c := range p.Contracts {
+		if err := proto.ConvertV130Contract(c, dir); err != nil {
 			return err
 		}
 	}
+
+	// delete the journal file
+	os.RemoveAll(journalPath)
 	return nil
 }
