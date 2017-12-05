@@ -16,7 +16,6 @@ import (
 type contractorPersist struct {
 	Allowance         modules.Allowance          `json:"allowance"`
 	BlockHeight       types.BlockHeight          `json:"blockheight"`
-	ContractUtilities map[string]contractUtility `json:"contractUtilities"`
 	CurrentPeriod     types.BlockHeight          `json:"currentperiod"`
 	LastChange        modules.ConsensusChangeID  `json:"lastchange"`
 	OldContracts      []modules.RenterContract   `json:"oldcontracts"`
@@ -28,13 +27,9 @@ func (c *Contractor) persistData() contractorPersist {
 	data := contractorPersist{
 		Allowance:         c.allowance,
 		BlockHeight:       c.blockHeight,
-		ContractUtilities: make(map[string]contractUtility),
 		CurrentPeriod:     c.currentPeriod,
 		LastChange:        c.lastChange,
 		RenewedIDs:        make(map[string]string),
-	}
-	for id, u := range c.contractUtilities {
-		data.ContractUtilities[id.String()] = u
 	}
 	for _, contract := range c.oldContracts {
 		data.OldContracts = append(data.OldContracts, contract)
@@ -113,11 +108,6 @@ func (c *Contractor) loadv130Contracts(filename string) error {
 	for _, contract := range checkpoint.Contracts {
 		if err := c.contracts.ImportV130Contract(contract); err != nil {
 			return err
-		}
-		// add utility entry
-		c.contractUtilities[contract.ID] = contractUtility{
-			GoodForUpload: contract.GoodForUpload,
-			GoodForRenew:  contract.GoodForRenew,
 		}
 	}
 	return nil

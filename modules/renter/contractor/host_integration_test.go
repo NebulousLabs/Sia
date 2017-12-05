@@ -350,7 +350,7 @@ func TestIntegrationRenew(t *testing.T) {
 	// renew the contract
 	oldContract, _ := c.contracts.Acquire(contract.ID)
 	c.mu.Lock()
-	c.contractUtilities[contract.ID] = contractUtility{GoodForRenew: true}
+	c.contractUtilities[contract.ID] = modules.ContractUtility{GoodForRenew: true}
 	c.mu.Unlock()
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if err != nil {
@@ -383,7 +383,7 @@ func TestIntegrationRenew(t *testing.T) {
 	// renew to a lower height
 	oldContract, _ = c.contracts.Acquire(contract.ID)
 	c.mu.Lock()
-	c.contractUtilities[contract.ID] = contractUtility{GoodForRenew: true}
+	c.contractUtilities[contract.ID] = modules.ContractUtility{GoodForRenew: true}
 	c.mu.Unlock()
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {

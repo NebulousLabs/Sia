@@ -41,13 +41,6 @@ type cachedRevision struct {
 	MerkleRoots modules.MerkleRootSet      `json:"merkleroots"`
 }
 
-// contractUtility contains metrics internal to the contractor that reflect
-// the utility of a given contract.
-type contractUtility struct {
-	GoodForUpload bool
-	GoodForRenew  bool
-}
-
 // A Contractor negotiates, revises, renews, and provides access to file
 // contracts.
 type Contractor struct {
@@ -75,8 +68,12 @@ type Contractor struct {
 	renewing    map[types.FileContractID]bool // prevent revising during renewal
 	revising    map[types.FileContractID]bool // prevent overlapping revisions
 
+	// The contract utility values are not persisted in any way, instead get
+	// set based on the values in the hostdb at startup. During startup, the
+	// 'managedMarkContractsUtility' needs to be called so that the utility is
+	// set correctly.
 	contracts         *proto.ContractSet
-	contractUtilities map[types.FileContractID]contractUtility
+	contractUtilities map[types.FileContractID]modules.ContractUtility
 	oldContracts      map[types.FileContractID]modules.RenterContract
 	renewedIDs        map[types.FileContractID]types.FileContractID
 }
@@ -139,20 +136,20 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 	return c.contracts.ViewAll()
 }
 
+// ContractUtility returns the utility fields for the given contract.
+func (c *Contractor) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
+	c.mu.RLock()
+	utility, exists := c.contractUtilities[c.resolveID(id)]
+	c.mu.RUnlock()
+	return utility, exists
+}
+
 // CurrentPeriod returns the height at which the current allowance period
 // began.
 func (c *Contractor) CurrentPeriod() types.BlockHeight {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.currentPeriod
-}
-
-// GoodForUpload returns whether the given contract should be uploaded to.
-func (c *Contractor) GoodForUpload(id types.FileContractID) bool {
-	c.mu.RLock()
-	good := c.contractUtilities[c.resolveID(id)].GoodForUpload
-	c.mu.RUnlock()
-	return good
 }
 
 // ResolveID returns the ID of the most recent renewal of id.
@@ -218,13 +215,12 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, co
 		contracts:         contractSet,
 		downloaders:       make(map[types.FileContractID]*hostDownloader),
 		editors:           make(map[types.FileContractID]*hostEditor),
-		contractUtilities: make(map[types.FileContractID]contractUtility),
+		contractUtilities: make(map[types.FileContractID]modules.ContractUtility),
 		oldContracts:      make(map[types.FileContractID]modules.RenterContract),
 		renewedIDs:        make(map[types.FileContractID]types.FileContractID),
 		renewing:          make(map[types.FileContractID]bool),
 		revising:          make(map[types.FileContractID]bool),
 	}
-
 	// Close the contract set and logger upon shutdown.
 	c.tg.AfterStop(func() {
 		if err := c.contracts.Close(); err != nil {
@@ -240,6 +236,9 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, co
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
+
+	// Mark contract utility.
+	c.managedMarkContractsUtility()
 
 	// Subscribe to the consensus set.
 	err = cs.ConsensusSetSubscribe(c, c.lastChange, c.tg.StopChan())

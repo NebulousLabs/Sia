@@ -67,7 +67,13 @@ func (w *worker) managedNextChunk() (nextChunk *unfinishedChunk, pieceIndex uint
 
 // processChunk will process a chunk from the worker chunk queue.
 func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, pieceIndex uint64) {
-	goodForUpload := w.renter.hostContractor.GoodForUpload(w.contract.ID)
+	// Determine the usability value of this worker.
+	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
+	if !exists {
+		return nil, 0
+	}
+	goodForUpload := utility.GoodForUpload
+
 	// Determine what sort of help this chunk needs.
 	uc.mu.Lock()
 	_, candidateHost := uc.unusedHosts[w.hostPubKey.String()]
@@ -110,7 +116,12 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 // managedQueueChunkRepair will take a chunk and add it to the worker's repair stack.
 func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 	// Check that the worker is allowed to be uploading.
-	goodForUpload := w.renter.hostContractor.GoodForUpload(w.contract.ID)
+	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
+	if !exists {
+		return
+	}
+	goodForUpload := utility.GoodForUpload
+
 	w.mu.Lock()
 	// Figure out how long the worker would need to be on cooldown.
 	requiredCooldown := uploadFailureCooldown

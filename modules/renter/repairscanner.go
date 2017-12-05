@@ -138,19 +138,19 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	saveFile := false
 	for fcid, fileContract := range f.contracts {
 		recentContract, exists := r.hostContractor.ContractByID(fcid)
-		if !exists {
+		contractUtility, exists2 := r.hostContractor.ContractUtility(fcid)
+		if !exists || !exists2 {
 			// File contract does not seem to be part of the host anymore.
 			// Delete this contract and mark the file to be saved.
 			delete(f.contracts, fcid)
 			saveFile = true
 			continue
 		}
-		// TODO: fix this
-		// if !recentContract.GoodForUpload {
-		// 	// We are no longer renewing with this contract, so it does not
-		// 	// count for redundancy.
-		// 	continue
-		// }
+		if !contractUtility.GoodForUpload {
+			// We are no longer renewing with this contract, so it does not
+			// count for redundancy.
+			continue
+		}
 		hpk := recentContract.HostPublicKey
 
 		// Mark the chunk set based on the pieces in this contract.

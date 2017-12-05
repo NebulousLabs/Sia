@@ -45,6 +45,13 @@ type Allowance struct {
 	RenewWindow types.BlockHeight `json:"renewwindow"`
 }
 
+// ContractUtility contains metrics internal to the contractor that reflect the
+// utility of a given contract.
+type ContractUtility struct {
+	GoodForUpload bool
+	GoodForRenew  bool
+}
+
 // DownloadInfo provides information about a file that has been requested for
 // download.
 type DownloadInfo struct {

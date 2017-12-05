@@ -85,7 +85,7 @@ func (c *Contractor) managedMarkContractsUtility() {
 
 	// Update utility fields for each contract.
 	for _, contract := range c.contracts.ViewAll() {
-		utility := func() (u contractUtility) {
+		utility := func() (u modules.ContractUtility) {
 			// Start the contract in good standing.
 			u.GoodForUpload = true
 			u.GoodForRenew = true
@@ -487,7 +487,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			// Update the utility values for the new contract, and for the old
 			// contract.
 			c.mu.Lock()
-			newUtility := contractUtility{
+			newUtility := modules.ContractUtility{
 				GoodForUpload: true,
 				GoodForRenew:  true,
 			}
@@ -585,7 +585,7 @@ func (c *Contractor) threadedContractMaintenance() {
 
 		// Add this contract to the contractor and save.
 		c.mu.Lock()
-		c.contractUtilities[newContract.ID] = contractUtility{
+		c.contractUtilities[newContract.ID] = modules.ContractUtility{
 			GoodForUpload: true,
 			GoodForRenew:  true,
 		}

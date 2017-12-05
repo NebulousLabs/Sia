@@ -116,12 +116,13 @@ type hostContractor interface {
 	// ContractByID returns the contract associated with the file contract id.
 	ContractByID(types.FileContractID) (modules.RenterContract, bool)
 
+	// ContractUtility returns the utility field for a given contract, along
+	// with a bool indicating if it exists.
+	ContractUtility(types.FileContractID) (modules.ContractUtility, bool)
+
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
 	CurrentPeriod() types.BlockHeight
-
-	// GoodForUpload returns whether the given contract should be uploaded to.
-	GoodForUpload(types.FileContractID) bool
 
 	// PeriodSpending returns the amount spent on contracts during the current
 	// billing period.

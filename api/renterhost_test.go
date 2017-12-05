@@ -486,7 +486,6 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer stNewHost.server.Close()
-
 	testGroup = []*serverTester{st, stNewHost}
 
 	// Connect the testers to eachother so that they are all on the same
@@ -539,19 +538,17 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// add a few new blocks in order to cause the renter to form contracts with the new host
-	for i := 0; i < 10; i++ {
-		b, err := testGroup[0].miner.AddBlock()
-		if err != nil {
-			t.Fatal(err)
-		}
-		tipID, err := synchronizationCheck(testGroup)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if b.ID() != tipID {
-			t.Fatal("test group does not have the tip block")
-		}
+	// Add a block to get the renter to run contract maintenance.
+	b, err := testGroup[0].miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tipID, err := synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.ID() != tipID {
+		t.Fatal("test group does not have the tip block")
 	}
 
 	// redundancy should increment back to 2 as the renter uploads to the new
@@ -564,9 +561,7 @@ func TestRemoteFileRepair(t *testing.T) {
 		return errors.New("file redundancy not incremented")
 	})
 	if err != nil {
-		t.Log(len(rf.Files))
-		t.Log(rf.Files[0].Redundancy)
-		t.Log(rf.Files[0].Available)
+		t.Log(len(rf.Files), rf.Files[0].Redundancy, rf.Files[0].Available)
 		t.Fatal(err)
 	}
 
