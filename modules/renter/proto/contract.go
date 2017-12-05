@@ -349,7 +349,7 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 }
 
 func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlog.Transaction) error {
-	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0600)
+	f, err := os.OpenFile(filename, os.O_RDWR, 0600)
 	if err != nil {
 		return err
 	}

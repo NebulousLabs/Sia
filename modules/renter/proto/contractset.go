@@ -156,7 +156,8 @@ func NewContractSet(dir string) (*ContractSet, error) {
 		if filepath.Ext(filename) != ".contract" {
 			continue
 		}
-		if err := cs.loadSafeContract(filename, walTxns); err != nil {
+		path := filepath.Join(dir, filename)
+		if err := cs.loadSafeContract(path, walTxns); err != nil {
 			return nil, err
 		}
 	}
