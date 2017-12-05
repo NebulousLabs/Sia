@@ -165,11 +165,11 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 		}
 	}()
 
-	conn, err := initiateRevisionLoop(host, contract, modules.RPCDownload, cancel)
+	conn, closeChan, err := initiateRevisionLoop(host, contract, modules.RPCDownload, cancel)
 	if IsRevisionMismatch(err) && len(sc.unappliedTxns) > 0 {
 		// we have desynced from the host. If we have unapplied updates from the
 		// WAL, try applying them.
-		conn, err = initiateRevisionLoop(host, sc.unappliedHeader(), modules.RPCDownload, cancel)
+		conn, closeChan, err = initiateRevisionLoop(host, sc.unappliedHeader(), modules.RPCDownload, cancel)
 		if err != nil {
 			return nil, err
 		}
@@ -180,15 +180,6 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 	} else if err != nil {
 		return nil, err
 	}
-
-	closeChan := make(chan struct{})
-	go func() {
-		select {
-		case <-cancel:
-			conn.Close()
-		case <-closeChan:
-		}
-	}()
 
 	// the host is now ready to accept revisions
 	return &Downloader{
