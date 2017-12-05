@@ -185,8 +185,7 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 		return nil, err
 	}
 	// Create the contract set.
-	// TODO: put these in subdirectory?
-	contractSet, err := proto.NewContractSet(persistDir)
+	contractSet, err := proto.NewContractSet(filepath.Join(persistDir, "contracts"))
 	if err != nil {
 		return nil, err
 	}

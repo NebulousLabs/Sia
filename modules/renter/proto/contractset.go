@@ -123,6 +123,9 @@ func (cs *ContractSet) Close() error {
 // NewContractSet returns a ContractSet storing its contracts in the specified
 // dir.
 func NewContractSet(dir string) (*ContractSet, error) {
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, err
+	}
 	d, err := os.Open(dir)
 	if err != nil {
 		return nil, err
