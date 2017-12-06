@@ -247,6 +247,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 		case <-r.newMemory:
 			memoryAvailable = r.managedMemoryAvailableGet()
 		case <-r.tg.StopChan():
+			return
 		}
 	}
 	r.managedMemoryAvailableSub(nextChunk.memoryNeeded)
