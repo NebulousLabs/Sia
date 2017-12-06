@@ -80,6 +80,7 @@ type FileInfo struct {
 	Available      bool              `json:"available"`
 	Renewing       bool              `json:"renewing"`
 	Redundancy     float64           `json:"redundancy"`
+	UploadedBytes  uint64            `json:"uploadedbytes"`
 	UploadProgress float64           `json:"uploadprogress"`
 	Expiration     types.BlockHeight `json:"expiration"`
 }
