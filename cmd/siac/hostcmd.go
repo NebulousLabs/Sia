@@ -283,6 +283,17 @@ RPC Stats:
 			currencyUnits(totalRevenue))
 	}
 
+	// if wallet is locked print warning
+	walletstatus := new(api.WalletGET)
+	walleterr := getAPI("/wallet", walletstatus)
+	if err != nil {
+		die("Could not get wallet status. A working wallet is needed in order to operate your host. Error:", walleterr)
+	} else {
+		if !walletstatus.Unlocked {
+			fmt.Println("\nWARNING:\n	In order to operate your host you need to unlock your wallet using the command \"siac wallet unlock\"")
+		}
+	}
+
 	fmt.Println("\nStorage Folders:")
 
 	// display storage folder info
@@ -301,12 +312,6 @@ RPC Stats:
 		fmt.Fprintf(w, "\t%s\t%s\t%.2f\t%s\n", filesizeUnits(curSize), filesizeUnits(int64(folder.Capacity)), pctUsed, folder.Path)
 	}
 	w.Flush()
-
-	// if wallet is locked print warning
-	status := new(api.WalletGET)
-	if !status.Unlocked {
-		fmt.Println("\nWARNING: In order to operate your host you need to unlock your wallet using the command \"siac wallet unlock\"")
-	}
 }
 
 // hostconfigcmd is the handler for the command `siac host config [setting] [value]`.
