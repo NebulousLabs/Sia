@@ -88,8 +88,6 @@ func (e *Explorer) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transacti
 func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.persistMu.Lock()
-	defer e.persistMu.Unlock()
 
 	if len(cc.AppliedBlocks) == 0 && build.DEBUG {
 		build.Critical("Explorer.ProcessConsensusChange called with a ConsensusChange that has no AppliedBlocks")
@@ -107,7 +105,9 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}()
 
 		// get starting block height
+		e.persistMu.Lock()
 		blockheight := e.persist.Height
+		e.persistMu.Unlock()
 
 		// Update cumulative stats for reverted blocks.
 		for _, block := range cc.RevertedBlocks {
@@ -353,7 +353,10 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		e.persist.Target = cc.ChildTarget
 		e.persistMu.Unlock()
 
-		return e.saveSync()
+		if cc.Synced {
+			err = e.saveSync()
+		}
+		return err
 	})
 
 	if err != nil && build.DEBUG {

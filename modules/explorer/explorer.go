@@ -108,7 +108,15 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 	}
 	tpool.TransactionPoolSubscribe(e)
 
-	return e, nil
+	// make sure we commit on shutdown
+	e.tg.OnStop(func() {
+		e.cs.Unsubscribe(e)
+		e.tpool.Unsubscribe(e)
+		e.saveSync()
+	})
+
+	err = e.saveSync()
+	return e, err
 }
 
 func (e *Explorer) startupRescan() error {
