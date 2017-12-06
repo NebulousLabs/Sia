@@ -9,7 +9,25 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/errors"
 )
+
+// NewTestNodeParams contains a bunch of parameters for creating a new test
+// node.
+//
+// Each module is instantiated separately. There are several ways to
+// instantiate a module, not all available for each module:
+//		+ Pass the module in directly (everything else should be nil)
+//		+ Pass the newFunc (everything else should be nil)
+//		+ Pass the newFuncDeps and deps in (everything else shoudl be nil)
+//		+ Pass 'nil' in for everything (module will not be instantiated)
+type NewTestNodeParams struct {
+	Dir string
+
+	// Gateway.
+	Gateway        modules.Gateway
+	NewGatewayFunc func(string, bool, string) (modules.Gateway, error)
+}
 
 // serverTester contains a server and a set of channels for keeping all of the
 // modules synchronized during testing.
@@ -34,11 +52,25 @@ type TestNode struct {
 // of initialization because the siatest package cannot import any of the
 // modules directly (so that the modules may use the siatest package to test
 // themselves).
-func NewTestNode(dir string, newGateway func(string, bool, string) (modules.Gateway, error)) { // , newConsensusSet func(), newTransactionPool func(), newExplorer func(), newWallet func(), newRenter func(), newHost func()) (*TestNode, error) {
-	_, err := newGateway("localhost:0", false, filepath.Join(dir, "gateway"))
+func NewTestNode(params NewTestNodeParams) (*TestNode, error) {
+	dir := params.Dir
+	g, err := func() (modules.Gateway, error) {
+		if params.Gateway != nil && params.NewGatewayFunc != nil {
+			return nil, errors.New("cannot instantiate gateway - cannot pass both non-nil Gateway and non-nil NewGatewayFunc")
+		}
+		if params.Gateway != nil {
+			return params.Gateway, nil
+		}
+		if params.NewGatewayFunc != nil {
+			return params.NewGatewayFunc("localhost:0", false, filepath.Join(dir, "gateway"))
+		}
+		return nil, nil
+	}()
 	if err != nil {
-		println("error!")
-		return
+		return nil, err
 	}
-	println("it worked")
+
+	return &TestNode{
+		Gateway: g,
+	}, nil
 }
