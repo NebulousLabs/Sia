@@ -319,19 +319,20 @@ func TestRenterLocalRepair(t *testing.T) {
 		t.Fatal(err, ah)
 	}
 
-	// add a few new blocks in order to cause the renter to form contracts with the new host
-	for i := 0; i < 10; i++ {
-		b, err := testGroup[0].miner.AddBlock()
+	// Block until we formed a contract with the new host.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
 		if err != nil {
-			t.Fatal(err)
+			return errors.New("couldn't get renter stats")
 		}
-		tipID, err := synchronizationCheck(testGroup)
-		if err != nil {
-			t.Fatal(err)
+		if len(rc.Contracts) != 3 {
+			return errors.New("no contracts")
 		}
-		if b.ID() != tipID {
-			t.Fatal("test group does not have the tip block")
-		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
 	}
 
 	// redundancy should increment back to 2 as the renter uploads to the new
@@ -535,17 +536,20 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add a block to get the renter to run contract maintenance.
-	b, err := testGroup[0].miner.AddBlock()
+	// Block until we formed a contract with the new host.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 3 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
 	if err != nil {
-		t.Fatal(err)
-	}
-	tipID, err := synchronizationCheck(testGroup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if b.ID() != tipID {
-		t.Fatal("test group does not have the tip block")
+		t.Fatal("allowance setting failed")
 	}
 
 	// redundancy should increment back to 2 as the renter uploads to the new
