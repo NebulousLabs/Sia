@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules/gateway"
 )
 
 // TestNewTestNode checks that the NewTestNode method is properly build and can
@@ -14,7 +13,7 @@ func TestNewTestNode(t *testing.T) {
 	tn, err := NewTestNode(NewTestNodeParams{
 		Dir: testDir,
 
-		NewGatewayFunc: gateway.New,
+		CreateGateway: true,
 	})
 	if err != nil {
 		t.Fatal(err)

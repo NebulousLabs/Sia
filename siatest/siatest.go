@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/errors"
 )
 
@@ -25,8 +26,8 @@ type NewTestNodeParams struct {
 	Dir string
 
 	// Gateway.
-	Gateway        modules.Gateway
-	NewGatewayFunc func(string, bool, string) (modules.Gateway, error)
+	CreateGateway bool
+	Gateway       modules.Gateway
 }
 
 // serverTester contains a server and a set of channels for keeping all of the
@@ -54,15 +55,16 @@ type TestNode struct {
 // themselves).
 func NewTestNode(params NewTestNodeParams) (*TestNode, error) {
 	dir := params.Dir
+
 	g, err := func() (modules.Gateway, error) {
-		if params.Gateway != nil && params.NewGatewayFunc != nil {
-			return nil, errors.New("cannot instantiate gateway - cannot pass both non-nil Gateway and non-nil NewGatewayFunc")
+		if params.CreateGateway && params.Gateway != nil {
+			return nil, errors.New("cannot both create a gateway and use a passed in gateway")
 		}
 		if params.Gateway != nil {
 			return params.Gateway, nil
 		}
-		if params.NewGatewayFunc != nil {
-			return params.NewGatewayFunc("localhost:0", false, filepath.Join(dir, "gateway"))
+		if params.CreateGateway {
+			return gateway.New("localhost:0", false, filepath.Join(dir, "gateway"))
 		}
 		return nil, nil
 	}()
