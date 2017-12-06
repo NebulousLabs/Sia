@@ -6,7 +6,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
-	"log"
 )
 
 // Block takes a block ID and finds the corresponding block, provided that the
@@ -15,12 +14,12 @@ func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool
 	var height types.BlockHeight
 	err := e.db.View(dbGetAndDecode(bucketBlockIDs, id, &height))
 	if err != nil {
-		log.Printf("Error: %s", err)
+		e.log.Printf("Error decoding blockfacts: %s", err)
 		return types.Block{}, 0, false
 	}
 	block, exists := e.cs.BlockAtHeight(height)
 	if !exists {
-		log.Printf("did not find height: %s", height)
+		e.log.Printf("did not find block at height: %s", height)
 		return types.Block{}, 0, false
 	}
 	return block, height, true
@@ -33,7 +32,7 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 	var bf blockFacts
 	err := e.db.View(e.dbGetBlockFacts(height, &bf))
 	if err != nil {
-		log.Printf("Did not find block facts %s", err)
+		e.log.Printf("Did not find block facts %s", err)
 		return modules.BlockFacts{}, false
 	}
 
@@ -57,6 +56,8 @@ func (e *Explorer) LatestBlockFacts() modules.BlockFacts {
 
 //PendingTransactions returns the current list of pending transactions in the mempool
 func (e *Explorer) PendingTransactions() []types.Transaction {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	var txs []types.Transaction
 	for _, upt := range e.unconfirmedProcessedTransactions {
 		txs = append(txs, upt.Transaction)

@@ -1,14 +1,12 @@
 package explorer
 
 import (
-	"os"
-	"path/filepath"
-
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
-
 	"github.com/NebulousLabs/bolt"
+	"os"
+	"path/filepath"
 )
 
 const (
@@ -67,6 +65,7 @@ func (e *Explorer) initPersist() error {
 		}
 		return nil
 	})
+
 	if err != nil {
 		return err
 	}

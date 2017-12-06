@@ -152,6 +152,7 @@ func dbAddBlockFacts(tx *bolt.Tx, facts blockFacts) {
 	mustPut(tx.Bucket(bucketBlockFacts), facts.BlockID, facts)
 }
 func dbRemoveBlockFacts(tx *bolt.Tx, id types.BlockID) {
+	log.Printf("Deleting block facts for BlockId: %s", id)
 	mustDelete(tx.Bucket(bucketBlockFacts), id)
 }
 

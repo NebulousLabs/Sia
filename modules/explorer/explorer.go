@@ -8,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"path/filepath"
 	"sync"
 )
 
@@ -15,6 +16,8 @@ const (
 	// hashrateEstimationBlocks is the number of blocks that are used to
 	// estimate the current hashrate.
 	hashrateEstimationBlocks = 200 // 33 hours
+	// logFile is the name of the log file.
+	logFile = modules.ExplorerDir + ".log"
 )
 
 var (
@@ -56,6 +59,7 @@ type (
 		tg                               siasync.ThreadGroup
 		persist                          peristence
 		persistMu                        sync.RWMutex
+		log                              *persist.Logger
 	}
 )
 
@@ -80,6 +84,12 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 
 	// Initialize the persistent structures, including the database.
 	err := e.initPersist()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the logger.
+	e.log, err = persist.NewFileLogger(filepath.Join(e.persistDir, logFile))
 	if err != nil {
 		return nil, err
 	}

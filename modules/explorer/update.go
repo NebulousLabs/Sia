@@ -3,11 +3,9 @@ package explorer
 import (
 	"fmt"
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
-	"log"
 	"math"
 )
 
@@ -90,10 +88,13 @@ func (e *Explorer) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transacti
 func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	e.persistMu.Lock()
+	defer e.persistMu.Unlock()
+
 	if len(cc.AppliedBlocks) == 0 && build.DEBUG {
 		build.Critical("Explorer.ProcessConsensusChange called with a ConsensusChange that has no AppliedBlocks")
 	} else if len(cc.AppliedBlocks) == 0 {
-		log.Printf("Explorer.ProcessConsensusChange called with a ConsensusChange that has no AppliedBlocks")
+		e.log.Printf("Explorer.ProcessConsensusChange called with a ConsensusChange that has no AppliedBlocks")
 		return
 	}
 
@@ -106,7 +107,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}()
 
 		// get starting block height
-
 		blockheight := e.persist.Height
 
 		// Update cumulative stats for reverted blocks.
@@ -290,9 +290,11 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 
 			// calculate and add new block facts, if possible
-			if tx.Bucket(bucketBlockFacts).Get(encoding.Marshal(block.ParentID)) != nil {
-				facts := dbCalculateBlockFacts(tx, e.cs, block)
+			facts, err := e.dbCalculateBlockFacts(tx, e.cs, block)
+			if err != nil {
 				dbAddBlockFacts(tx, facts)
+			} else {
+				return err
 			}
 		}
 
@@ -319,11 +321,12 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		if !exists && build.DEBUG {
 			build.Critical("consensus is missing block", blockheight)
 		} else if !exists {
-			log.Printf("consensus is missing block: %s", blockheight)
+			e.log.Printf("consensus is missing block: %s", blockheight)
 			return
 		}
 		currentID := currentBlock.ID()
 		var facts blockFacts
+
 		err = dbGetAndDecode(bucketBlockFacts, currentID, &facts)(tx)
 		if err == nil {
 			for _, diff := range cc.FileContractDiffs {
@@ -337,12 +340,10 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					facts.ActiveContractSize = facts.ActiveContractSize.Sub(types.NewCurrency64(diff.FileContract.FileSize))
 				}
 			}
-			err = tx.Bucket(bucketBlockFacts).Put(encoding.Marshal(currentID), encoding.Marshal(facts))
-			if err != nil {
-				return err
-			}
+			dbAddBlockFacts(tx, facts)
 		} else {
-			log.Printf("Error getting block facts for %s", currentBlock.ID())
+			e.log.Printf("Error getting block facts for %s", currentBlock.ID())
+			return err
 		}
 
 		e.persistMu.Lock()
@@ -357,22 +358,24 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if err != nil && build.DEBUG {
 		build.Critical("explorer update failed:", err)
 	} else if err != nil {
-		log.Printf("explorer update failed: %s", err)
+		e.log.Printf("explorer update failed: %s", err)
 	}
 }
 
-func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Block) blockFacts {
+func (e *Explorer) dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Block) (blockFacts, error) {
 	// get the parent block facts
 	var bf blockFacts
 	err := dbGetAndDecode(bucketBlockFacts, block.ParentID, &bf)(tx)
-	assertNil(err)
+	if err != nil {
+		return bf, err
+	}
 
 	// get target
 	target, exists := cs.ChildTarget(block.ParentID)
 	if !exists && build.DEBUG {
 		panic(fmt.Sprintf("ConsensusSet is missing target of known block: %s", block.ParentID))
 	} else if !exists {
-		log.Printf("ConsensusSet is missing target of known block: %s", block.ParentID)
+		e.log.Printf("ConsensusSet is missing target of known block: %s", block.ParentID)
 	}
 
 	// update fields
@@ -390,7 +393,7 @@ func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Blo
 		if !exists && build.DEBUG {
 			panic(fmt.Sprint("ConsensusSet is missing block at height", bf.Height-types.MaturityDelay))
 		} else if !exists {
-			log.Printf("ConsensusSet is missing block at height: %s", bf.Height-types.MaturityDelay)
+			e.log.Printf("ConsensusSet is missing block at height: %s", bf.Height-types.MaturityDelay)
 		}
 		maturityTimestamp = oldBlock.Timestamp
 	}
@@ -406,13 +409,13 @@ func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Blo
 			if !exists && build.DEBUG {
 				panic(fmt.Sprintf("ConsensusSet is missing block at height: %s", bf.Height-hashrateEstimationBlocks))
 			} else if !exists {
-				log.Printf("ConsensusSet is missing block at height: %s", bf.Height-hashrateEstimationBlocks)
+				e.log.Printf("ConsensusSet is missing block at height: %s", bf.Height-hashrateEstimationBlocks)
 			}
 			target, exists := cs.ChildTarget(b.ParentID)
 			if !exists && build.DEBUG {
 				panic(fmt.Sprintf("ConsensusSet is missing target of known block: %s", b.ParentID))
 			} else if !exists {
-				log.Printf("ConsensusSet is missing target of known block: %s", b.ParentID)
+				e.log.Printf("ConsensusSet is missing target of known block: %s", b.ParentID)
 			}
 			totalDifficulty = totalDifficulty.AddDifficulties(target)
 			oldestTimestamp = b.Timestamp
@@ -446,7 +449,7 @@ func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Blo
 		}
 	}
 
-	return bf
+	return bf, nil
 }
 
 // Special handling for the genesis block. No other functions are called on it.
