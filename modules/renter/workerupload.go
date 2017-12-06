@@ -117,10 +117,7 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 	// Check that the worker is allowed to be uploading.
 	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
-	if !exists {
-		return
-	}
-	goodForUpload := utility.GoodForUpload
+	goodForUpload := exists && utility.GoodForUpload
 
 	w.mu.Lock()
 	// Figure out how long the worker would need to be on cooldown.
