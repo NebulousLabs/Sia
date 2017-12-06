@@ -286,12 +286,11 @@ RPC Stats:
 	// if wallet is locked print warning
 	walletstatus := new(api.WalletGET)
 	walleterr := getAPI("/wallet", walletstatus)
-	if err != nil {
-		die("Could not get wallet status. A working wallet is needed in order to operate your host. Error:", walleterr)
-	} else {
-		if !walletstatus.Unlocked {
-			fmt.Println("\nWARNING:\n	In order to operate your host you need to unlock your wallet using the command \"siac wallet unlock\"")
-		}
+	if walleterr != nil {
+		fmt.Print("\nWarning:\n	Could not get wallet status. A working wallet is needed in order to operate your host. Error: ")
+		fmt.Println(walleterr)
+	} else if !walletstatus.Unlocked {
+		fmt.Println("\nWarning:\n	Your wallet is locked. You must unlock your wallet for the host to function properly.")
 	}
 
 	fmt.Println("\nStorage Folders:")
