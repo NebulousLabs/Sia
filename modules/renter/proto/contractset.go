@@ -51,7 +51,7 @@ func (cs *ContractSet) Delete(c *SafeContract) {
 	cs.mu.Unlock()
 	safeContract.mu.Unlock()
 	// delete contract file
-	os.Remove(filepath.Join(cs.dir, c.header.ID().String()+".contract"))
+	os.Remove(filepath.Join(cs.dir, c.header.ID().String()+contractExtension))
 }
 
 // IDs returns the FileContractID of each contract in the set. The contracts
@@ -156,7 +156,7 @@ func NewContractSet(dir string) (*ContractSet, error) {
 	}
 
 	for _, filename := range dirNames {
-		if filepath.Ext(filename) != ".contract" {
+		if filepath.Ext(filename) != contractExtension {
 			continue
 		}
 		path := filepath.Join(dir, filename)

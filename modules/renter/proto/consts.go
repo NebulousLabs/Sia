@@ -6,6 +6,10 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
+const (
+	contractExtension = ".contract"
+)
+
 var (
 	// connTimeout determines the number of seconds the dialer will wait
 	// for a connect to complete

@@ -315,7 +315,7 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 	if err := h.validate(); err != nil {
 		return modules.RenterContract{}, err
 	}
-	f, err := os.Create(filepath.Join(cs.dir, h.ID().String()+".contract"))
+	f, err := os.Create(filepath.Join(cs.dir, h.ID().String()+contractExtension))
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
