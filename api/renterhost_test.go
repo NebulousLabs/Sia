@@ -337,7 +337,7 @@ func TestRenterLocalRepair(t *testing.T) {
 			return errors.New("couldn't get renter stats")
 		}
 		if len(rc.Contracts) != 3 {
-			return errors.New("no contracts")
+			return fmt.Errorf("Insufficient contracts: expected %v was %v", 3, len(rc.Contracts))
 		}
 		return nil
 	})
@@ -562,7 +562,7 @@ func TestRemoteFileRepair(t *testing.T) {
 			return errors.New("couldn't get renter stats")
 		}
 		if len(rc.Contracts) != 3 {
-			return errors.New("no contracts")
+			return fmt.Errorf("Insufficient contracts: expected %v was %v", 3, len(rc.Contracts))
 		}
 		return nil
 	})
