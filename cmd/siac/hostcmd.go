@@ -283,6 +283,16 @@ RPC Stats:
 			currencyUnits(totalRevenue))
 	}
 
+	// if wallet is locked print warning
+	walletstatus := new(api.WalletGET)
+	walleterr := getAPI("/wallet", walletstatus)
+	if walleterr != nil {
+		fmt.Print("\nWarning:\n	Could not get wallet status. A working wallet is needed in order to operate your host. Error: ")
+		fmt.Println(walleterr)
+	} else if !walletstatus.Unlocked {
+		fmt.Println("\nWarning:\n	Your wallet is locked. You must unlock your wallet for the host to function properly.")
+	}
+
 	fmt.Println("\nStorage Folders:")
 
 	// display storage folder info
