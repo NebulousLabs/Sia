@@ -333,10 +333,20 @@ func TestAllowanceSpending(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	newReportedSpending := c.PeriodSpending()
-	if reflect.DeepEqual(newReportedSpending, reportedSpending) {
-		t.Fatal("reported spending was identical after entering a renew period")
+
+	// Retry to give the threadedMaintenenace some time to finish
+	var newReportedSpending modules.ContractorSpending
+	err = build.Retry(100, 100*time.Millisecond, func() error {
+		newReportedSpending = c.PeriodSpending()
+		if reflect.DeepEqual(newReportedSpending, reportedSpending) {
+			return errors.New("reported spending was identical after entering a renew period")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
+
 	if newReportedSpending.Unspent.Cmp(reportedSpending.Unspent) <= 0 {
 		t.Fatal("expected newReportedSpending to have more unspent")
 	}

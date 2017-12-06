@@ -863,6 +863,7 @@ lists the status of all files.
       "available":      true,
       "renewing":       true,
       "redundancy":     5,
+      "bytesuploaded":  209715200, // total bytes uploaded
       "uploadprogress": 100, // percent
       "expiration":     60000
     }

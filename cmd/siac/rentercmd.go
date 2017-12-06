@@ -485,7 +485,7 @@ func renterfileslistcmd() {
 	fmt.Println("Tracking", len(rf.Files), "files:")
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	if renterListVerbose {
-		fmt.Fprintln(w, "File size\tAvailable\tProgress\tRedundancy\tRenewing\tSia path")
+		fmt.Fprintln(w, "File size\tAvailable\tUploaded\tProgress\tRedundancy\tRenewing\tSia path")
 	}
 	sort.Sort(bySiaPath(rf.Files))
 	for _, file := range rf.Files {
@@ -501,7 +501,7 @@ func renterfileslistcmd() {
 			if file.UploadProgress == -1 {
 				uploadProgressStr = "-"
 			}
-			fmt.Fprintf(w, "\t%s\t%8s\t%10s\t%s", availableStr, uploadProgressStr, redundancyStr, renewingStr)
+			fmt.Fprintf(w, "\t%s\t%9s\t%8s\t%10s\t%s", availableStr, filesizeUnits(int64(file.UploadedBytes)), uploadProgressStr, redundancyStr, renewingStr)
 		}
 		fmt.Fprintf(w, "\t%s", file.SiaPath)
 		if !renterListVerbose && !file.Available {
