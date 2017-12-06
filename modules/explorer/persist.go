@@ -44,11 +44,9 @@ func (e *Explorer) initPersist() error {
 		buckets := [][]byte{
 			bucketBlockFacts,
 			bucketBlockIDs,
-			bucketBlocksDifficulty,
 			bucketBlockTargets,
 			bucketFileContractHistories,
 			bucketFileContractIDs,
-			bucketInternal,
 			bucketSiacoinOutputIDs,
 			bucketSiacoinOutputs,
 			bucketSiafundOutputIDs,

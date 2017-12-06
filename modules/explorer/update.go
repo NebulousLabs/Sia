@@ -291,9 +291,10 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 			// calculate and add new block facts, if possible
 			facts, err := e.dbCalculateBlockFacts(tx, e.cs, block)
-			if err != nil {
+			if err == nil {
 				dbAddBlockFacts(tx, facts)
 			} else {
+				e.log.Printf("Error calculating block facts: %s", err)
 				return err
 			}
 		}

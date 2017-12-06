@@ -14,12 +14,10 @@ var (
 	// database buckets
 	bucketBlockFacts            = []byte("BlockFacts")
 	bucketBlockIDs              = []byte("BlockIDs")
-	bucketBlocksDifficulty      = []byte("BlocksDifficulty")
 	bucketBlockTargets          = []byte("BlockTargets")
 	bucketFileContractHistories = []byte("FileContractHistories")
 	bucketFileContractIDs       = []byte("FileContractIDs")
 	// bucketInternal is used to store values internal to the explorer
-	bucketInternal         = []byte("Internal")
 	bucketSiacoinOutputIDs = []byte("SiacoinOutputIDs")
 	bucketSiacoinOutputs   = []byte("SiacoinOutputs")
 	bucketSiafundOutputIDs = []byte("SiafundOutputIDs")
@@ -96,20 +94,6 @@ func (e *Explorer) dbGetBlockFacts(height types.BlockHeight, bf *blockFacts) fun
 			return errors.New("requested block facts for a block that does not exist")
 		}
 		return dbGetAndDecode(bucketBlockFacts, block.ID(), bf)(tx)
-	}
-}
-
-// dbSetInternal sets the specified key of bucketInternal to the encoded value.
-func dbSetInternal(key []byte, val interface{}) func(*bolt.Tx) error {
-	return func(tx *bolt.Tx) error {
-		return tx.Bucket(bucketInternal).Put(key, encoding.Marshal(val))
-	}
-}
-
-// dbGetInternal decodes the specified key of bucketInternal into the supplied pointer.
-func dbGetInternal(key []byte, val interface{}) func(*bolt.Tx) error {
-	return func(tx *bolt.Tx) error {
-		return encoding.Unmarshal(tx.Bucket(bucketInternal).Get(key), val)
 	}
 }
 
