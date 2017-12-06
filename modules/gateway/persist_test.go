@@ -22,10 +22,11 @@ func TestLoad(t *testing.T) {
 	g.mu.Unlock()
 	g.Close()
 
-	g2, err := New("localhost:0", false, g.persistDir)
+	newGateway, err := New("localhost:0", false, g.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	g2 := newGateway.(*Gateway)
 	if _, ok := g2.nodes[dummyNode]; !ok {
 		t.Fatal("gateway did not load old peer list:", g2.nodes)
 	}

@@ -1055,10 +1055,11 @@ func TestPeerManagerPriority(t *testing.T) {
 
 	// Restart g1. It should immediately reconnect to g2, and then g3 after a
 	// delay.
-	g1, err = New(string(g1.myAddr), false, g1.persistDir)
+	newGateway, err := New(string(g1.myAddr), false, g1.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	g1 = newGateway.(*Gateway)
 	defer g1.Close()
 
 	// Wait until g1 connects to g2.

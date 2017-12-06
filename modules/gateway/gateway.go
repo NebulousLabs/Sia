@@ -187,7 +187,7 @@ func (g *Gateway) Close() error {
 }
 
 // New returns an initialized Gateway.
-func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
+func New(addr string, bootstrap bool, persistDir string) (modules.Gateway, error) {
 	// Create the directory if it doesn't exist.
 	err := os.MkdirAll(persistDir, 0700)
 	if err != nil {
