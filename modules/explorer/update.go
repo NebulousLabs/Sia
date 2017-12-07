@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -296,7 +297,11 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				dbAddBlockFacts(tx, facts)
 			} else {
 				e.log.Printf("Error calculating block facts: %s", err)
-				return err
+				err = e.goBackInTime(tx, e.cs, blockheight)
+				if err != nil {
+					e.log.Printf("Error going back in time: %s", err)
+					return err
+				}
 			}
 		}
 
@@ -323,7 +328,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		if !exists && build.DEBUG {
 			build.Critical("consensus is missing block", blockheight)
 		} else if !exists {
-			e.log.Printf("consensus is missing block: %s", blockheight)
+			e.log.Printf("consensus is missing block: %d", blockheight)
 			return
 		}
 		currentID := currentBlock.ID()
@@ -366,6 +371,39 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 }
 
+func (e *Explorer) goBackInTime(tx *bolt.Tx, cs modules.ConsensusSet, height types.BlockHeight) error {
+	var missingBlocks []types.Block
+	for {
+		currentBlock, exists := e.cs.BlockAtHeight(height)
+		if !exists {
+			return errors.New(fmt.Sprintf("Block missing at height: %d", height))
+		}
+		var bf blockFacts
+		err := dbGetAndDecode(bucketBlockFacts, currentBlock.ID(), &bf)(tx)
+		missingBlocks = append([]types.Block{currentBlock}, missingBlocks...)
+		if err == nil {
+			break
+		} else {
+			if len(missingBlocks) > 5000 {
+				return errors.New(fmt.Sprintf("Block missing at height: %d", height))
+			}
+		}
+		height--
+	}
+
+	//The first block in this list should be in the block facts bucket
+	for _, block := range missingBlocks {
+		facts, err := e.dbCalculateBlockFacts(tx, cs, block)
+		if err == nil {
+			dbAddBlockFacts(tx, facts)
+		} else {
+			return errors.New(fmt.Sprintf("Still missing blockfacts: %s", err))
+		}
+	}
+
+	return nil
+}
+
 func (e *Explorer) dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Block) (blockFacts, error) {
 	// get the parent block facts
 	var bf blockFacts
@@ -397,7 +435,7 @@ func (e *Explorer) dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, b
 		if !exists && build.DEBUG {
 			panic(fmt.Sprint("ConsensusSet is missing block at height", bf.Height-types.MaturityDelay))
 		} else if !exists {
-			e.log.Printf("ConsensusSet is missing block at height: %s", bf.Height-types.MaturityDelay)
+			e.log.Printf("ConsensusSet is missing block at height: %d", bf.Height-types.MaturityDelay)
 		}
 		maturityTimestamp = oldBlock.Timestamp
 	}
