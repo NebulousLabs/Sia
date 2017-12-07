@@ -117,7 +117,8 @@ func (cs *ContractSet) Close() error {
 	for _, c := range cs.contracts {
 		c.f.Close()
 	}
-	return cs.wal.Close()
+	_, err := cs.wal.CloseIncomplete()
+	return err
 }
 
 // NewContractSet returns a ContractSet storing its contracts in the specified
