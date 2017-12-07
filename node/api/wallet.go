@@ -45,6 +45,11 @@ type (
 		Addresses []types.UnlockHash `json:"addresses"`
 	}
 
+	WalletAddressesPaginatedGET struct {
+		Addresses 	[]types.UnlockHash `json:"addresses"`
+		TotalPages 	int `json:"total_pages"`
+	}
+
 	// WalletInitPOST contains the primary seed that gets generated during a
 	// POST call to /wallet/init.
 	WalletInitPOST struct {
@@ -88,6 +93,13 @@ type (
 	WalletTransactionsGET struct {
 		ConfirmedTransactions   []modules.ProcessedTransaction `json:"confirmedtransactions"`
 		UnconfirmedTransactions []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
+	}
+
+	WalletTransactionsPaginatedGET struct {
+		ConfirmedTransactions   []modules.ProcessedTransaction `json:"confirmedtransactions"`
+		UnconfirmedTransactions []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
+		TotalConfirmedPages 	int `json:"total_confirmed_pages"`
+		TotalUnConfirmedPages 	int `json:"total_unconfirmed_pages"`
 	}
 
 	// WalletTransactionsGETaddr contains the set of wallet transactions
@@ -179,9 +191,25 @@ func (api *API) walletAddressHandler(w http.ResponseWriter, req *http.Request, _
 
 // walletAddressHandler handles API calls to /wallet/addresses.
 func (api *API) walletAddressesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	WriteJSON(w, WalletAddressesGET{
-		Addresses: api.wallet.AllAddresses(),
-	})
+	pageString := req.FormValue("page")
+	allAddresses := api.wallet.AllAddresses()
+	if pageString == "" || allAddresses == nil {
+		WriteJSON(w, WalletAddressesGET{
+			Addresses: allAddresses,
+		})
+	} else {
+		page, err := strconv.Atoi(pageString)
+		if err != nil || page < 0 {
+			WriteError(w, Error{"page query must be a nonnegative integer"}, http.StatusBadRequest)
+			return
+		}
+		startPageIdx, endPageIndex, totalPages := GetPaginatedSliceIndicesAndTotalPages(allAddresses, page)
+		addresses := allAddresses[startPageIdx:endPageIndex]
+		WriteJSON(w, WalletAddressesPaginatedGET{
+			Addresses: addresses,
+			TotalPages: totalPages,
+		})
+	}
 }
 
 // walletBackupHandler handles API calls to /wallet/backup.
@@ -520,11 +548,28 @@ func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 	unconfirmedTxns := api.wallet.UnconfirmedTransactions()
-
-	WriteJSON(w, WalletTransactionsGET{
-		ConfirmedTransactions:   confirmedTxns,
-		UnconfirmedTransactions: unconfirmedTxns,
-	})
+	confirmedPageString, unconfirmedPageString := req.FormValue("confirmPage"), req.FormValue("unconfirmedPage")
+	if confirmedPageString == "" || unconfirmedPageString == "" || confirmedTxns == nil || unconfirmedTxns == nil {
+		WriteJSON(w, WalletTransactionsGET{
+			ConfirmedTransactions:   confirmedTxns,
+			UnconfirmedTransactions: unconfirmedTxns,
+		})
+	} else {
+		confirmedPage, confirmedErr := strconv.Atoi(confirmedPageString)
+		uncnfrmedPage, uncnfrmedErr := strconv.Atoi(unconfirmedPageString)
+		if confirmedErr != nil || uncnfrmedErr != nil || confirmedPage < 0 || uncnfrmedPage < 0 {
+			WriteError(w, Error{"page query must be an nonnegative integer"}, http.StatusBadRequest)
+			return
+		}
+		startConfirmPageIdx, endConfirmPageIdx, totalConfirmPages := GetPaginatedSliceIndicesAndTotalPages(confirmedTxns, confirmedPage)
+		startUncnfrmPageIdx, endUncnfrmPageIdx, totalUncnfrmPages := GetPaginatedSliceIndicesAndTotalPages(unconfirmedTxns, uncnfrmedPage)
+		WriteJSON(w, WalletTransactionsPaginatedGET{
+			ConfirmedTransactions: confirmedTxns[startConfirmPageIdx:endConfirmPageIdx],
+			UnconfirmedTransactions: unconfirmedTxns[startUncnfrmPageIdx:endUncnfrmPageIdx],
+			TotalConfirmedPages: totalConfirmPages,
+			TotalUnConfirmedPages: totalUncnfrmPages,
+		})
+	}
 }
 
 // walletTransactionsAddrHandler handles API calls to

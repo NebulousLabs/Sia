@@ -4,9 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"reflect"
+	"math"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+)
+
+const (
+	// size of each page for paginated API responses
+	PAGINATION_SIZE = 25
 )
 
 // Error is a type that is encoded as JSON and returned in an API response in
@@ -161,4 +168,19 @@ func WriteJSON(w http.ResponseWriter, obj interface{}) {
 // requested action succeeded AND there is no data to return.
 func WriteSuccess(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// returns the starting index, end index, and total pages of a given slice for the page
+func GetPaginatedSliceIndicesAndTotalPages(sliceInterface interface{}, page int) (int, int, int) {
+	slice := reflect.ValueOf(sliceInterface)
+	if slice.Kind() != reflect.Slice {
+		build.Critical("attempting to paginate on non-slice object type: ", slice.Kind())
+	}
+	startingPageIndex := int(math.Min(float64(page * PAGINATION_SIZE), float64(slice.Len())))
+	endingPageIndex := int(math.Min(float64(startingPageIndex + PAGINATION_SIZE), float64(slice.Len())));
+	totalPages := slice.Len() / PAGINATION_SIZE
+	if math.Mod(float64(slice.Len()), float64(PAGINATION_SIZE)) != 0 {
+		totalPages += 1
+	}
+	return startingPageIndex, endingPageIndex, totalPages
 }
