@@ -350,7 +350,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			dbAddBlockFacts(tx, facts)
 		} else {
 			e.log.Printf("Error getting block facts for %s.  Height: %d", currentBlock.ID(), blockheight)
-			err = goBackInTime(tx, cs, blockheight)
+			err = e.goBackInTime(tx, e.cs, blockheight)
 			if err != nil {
 				return err
 			}
@@ -375,6 +375,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 }
 
 func (e *Explorer) goBackInTime(tx *bolt.Tx, cs modules.ConsensusSet, height types.BlockHeight) error {
+	e.log.Printf("Going back in time from blockheight: %d", height)
 	var missingBlocks []types.Block
 	for {
 		currentBlock, exists := e.cs.BlockAtHeight(height)
@@ -385,12 +386,14 @@ func (e *Explorer) goBackInTime(tx *bolt.Tx, cs modules.ConsensusSet, height typ
 		err := dbGetAndDecode(bucketBlockFacts, currentBlock.ID(), &bf)(tx)
 		missingBlocks = append([]types.Block{currentBlock}, missingBlocks...)
 		if err == nil {
+			e.log.Printf("Found blockfacts at blockheight: %d", height)
 			break
 		} else {
 			if len(missingBlocks) > 5000 {
 				return errors.New(fmt.Sprintf("Block missing at height: %d", height))
 			}
 		}
+		e.log.Printf("Searching backward for blockfacts at height: %d", height)
 		height--
 	}
 
