@@ -217,6 +217,7 @@ func (mrs *MerkleRootSet) UnmarshalJSON(b []byte) error {
 type RenterContract struct {
 	ID            types.FileContractID
 	HostPublicKey types.SiaPublicKey
+	Transaction   types.Transaction
 
 	StartHeight types.BlockHeight
 	EndHeight   types.BlockHeight

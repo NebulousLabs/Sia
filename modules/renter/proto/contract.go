@@ -65,6 +65,11 @@ func (h *contractHeader) validate() error {
 	return errors.New("invalid contract")
 }
 
+func (h *contractHeader) copyTransaction() (txn types.Transaction) {
+	encoding.Unmarshal(encoding.Marshal(h.Transaction), &txn)
+	return
+}
+
 func (h *contractHeader) LastRevision() types.FileContractRevision {
 	return h.Transaction.FileContractRevisions[0]
 }
@@ -110,6 +115,7 @@ func (c *SafeContract) Metadata() modules.RenterContract {
 	h := c.header
 	return modules.RenterContract{
 		ID:               h.ID(),
+		Transaction:      h.copyTransaction(),
 		HostPublicKey:    h.HostPublicKey(),
 		StartHeight:      h.StartHeight,
 		EndHeight:        h.EndHeight(),
