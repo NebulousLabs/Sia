@@ -116,7 +116,11 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 		// }
 	}
 	allSpending := spending.ContractSpending.Add(spending.DownloadSpending).Add(spending.UploadSpending).Add(spending.StorageSpending)
-	spending.Unspent = c.allowance.Funds.Sub(allSpending)
+
+	// If there is no allowance, the unspent funds are 0
+	if !c.allowance.Funds.IsZero() {
+		spending.Unspent = c.allowance.Funds.Sub(allSpending)
+	}
 	return spending
 }
 
