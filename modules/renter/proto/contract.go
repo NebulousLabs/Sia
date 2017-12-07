@@ -187,7 +187,7 @@ func (c *SafeContract) recordUploadIntent(rev types.FileContractRevision, root c
 	c.headerMu.Lock()
 	newHeader := c.header
 	c.headerMu.Unlock()
-	newHeader.Transaction.FileContractRevisions[0] = rev
+	newHeader.Transaction.FileContractRevisions = []types.FileContractRevision{rev}
 	newHeader.StorageSpending = newHeader.StorageSpending.Add(storageCost)
 	newHeader.UploadSpending = newHeader.UploadSpending.Add(bandwidthCost)
 
@@ -233,7 +233,7 @@ func (c *SafeContract) recordDownloadIntent(rev types.FileContractRevision, band
 	c.headerMu.Lock()
 	newHeader := c.header
 	c.headerMu.Unlock()
-	newHeader.Transaction.FileContractRevisions[0] = rev
+	newHeader.Transaction.FileContractRevisions = []types.FileContractRevision{rev}
 	newHeader.DownloadSpending = newHeader.DownloadSpending.Add(bandwidthCost)
 
 	t, err := c.wal.NewTransaction([]writeaheadlog.Update{
