@@ -2,11 +2,12 @@ package explorer
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
-	"math"
 )
 
 func (e *Explorer) ReceiveUpdatedUnconfirmedTransactions(diff *modules.TransactionPoolDiff) {
@@ -347,15 +348,14 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			return err
 		}
 
+		e.log.Printf("Explorer update for block: %d", blockheight)
 		e.persistMu.Lock()
 		e.persist.Height = blockheight
 		e.persist.RecentChange = cc.ID
 		e.persist.Target = cc.ChildTarget
 		e.persistMu.Unlock()
 
-		if cc.Synced {
-			err = e.saveSync()
-		}
+		err = e.saveSync()
 		return err
 	})
 
