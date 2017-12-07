@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-
+"log"
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 )
@@ -19,7 +19,7 @@ func readJSON(meta Metadata, object interface{}, filename string) error {
 		return err
 	}
 	if err != nil {
-		return build.ExtendErr("unable to open persisted json object file", err)
+		return build.ExtendErr("unable to open persisted1 json object file", err)
 	}
 	defer file.Close()
 
@@ -27,13 +27,13 @@ func readJSON(meta Metadata, object interface{}, filename string) error {
 	var header, version string
 	dec := json.NewDecoder(file)
 	if err := dec.Decode(&header); err != nil {
-		return build.ExtendErr("unable to read header from persisted json object file", err)
+		return build.ExtendErr("unable to read header from persisted2 json object file", err)
 	}
 	if header != meta.Header {
 		return ErrBadHeader
 	}
 	if err := dec.Decode(&version); err != nil {
-		return build.ExtendErr("unable to read version from persisted json object file", err)
+		return build.ExtendErr("unable to read version from persisted3 json object file", err)
 	}
 	if version != meta.Version {
 		return ErrBadVersion
@@ -42,13 +42,13 @@ func readJSON(meta Metadata, object interface{}, filename string) error {
 	// Read everything else.
 	remainingBytes, err := ioutil.ReadAll(dec.Buffered())
 	if err != nil {
-		return build.ExtendErr("unable to read persisted json object data", err)
+		return build.ExtendErr("unable to read persisted1 json object data", err)
 	}
 	// The buffer may or may not have read the rest of the file, read the rest
 	// of the file to be certain.
 	remainingBytesExtra, err := ioutil.ReadAll(file)
 	if err != nil {
-		return build.ExtendErr("unable to read persisted json object data", err)
+		return build.ExtendErr("unable to read persisted2 json object data", err)
 	}
 	remainingBytes = append(remainingBytes, remainingBytesExtra...)
 
@@ -64,12 +64,22 @@ func readJSON(meta Metadata, object interface{}, filename string) error {
 		remainingBytes = remainingBytes[68:]
 	} else {
 		// Cryptographic checksum failed, try interpreting a manual checksum.
+		log.Println(string(remainingBytes[:11]))
 		var manualChecksum string
-		err := json.Unmarshal(remainingBytes[:8], &manualChecksum)
+		err := json.Unmarshal(remainingBytes[:11], &manualChecksum)
+		log.Println(string(remainingBytes))
+		log.Println(manualChecksum)
+		if err != nil {
+			log.Println(err)
+		}
 		if err == nil && manualChecksum == "manual" {
 			// Manual checksum is proper. Update the remaining data to exclude
 			// the manual checksum.
-			remainingBytes = remainingBytes[9:]
+			remainingBytes = remainingBytes[11:]
+			log.Println("er2")
+		} else {
+			log.Println("er1")
+			remainingBytes = remainingBytes[11:]
 		}
 	}
 
@@ -120,7 +130,7 @@ func LoadJSON(meta Metadata, object interface{}, filename string) error {
 		// Try opening the temp file.
 		err := readJSON(meta, object, filename+tempSuffix)
 		if err != nil {
-			return build.ExtendErr("unable to read persisted json object from disk", err)
+			return build.ExtendErr("unable to read persisted4 json object from disk", err)
 		}
 	}
 
