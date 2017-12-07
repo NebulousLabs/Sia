@@ -306,7 +306,26 @@ func (r *Renter) threadedRepairScan() {
 	}
 	defer r.tg.Done()
 
+	// Helper function that closes a channel when we are online
+	closeWhenOnline := func(channel chan struct{}) {
+		for !r.g.Online() {
+			select {
+			case <-r.tg.StopChan():
+				break
+			case <-time.After(time.Second):
+			}
+		}
+		close(channel)
+	}
+
 	for {
+		// Check if we are online. If not, wait until we are
+		if !r.g.Online() {
+			wait := make(chan struct{})
+			go closeWhenOnline(wait)
+			<-wait
+		}
+
 		// Return if the renter has shut down.
 		select {
 		case <-r.tg.StopChan():
@@ -337,7 +356,9 @@ func (r *Renter) threadedRepairScan() {
 			default:
 			}
 
-			if chunkHeap.Len() > 0 {
+			if !r.g.Online() {
+				break LOOP
+			} else if chunkHeap.Len() > 0 {
 				r.managedPrepareNextChunk(chunkHeap, hosts)
 			} else {
 				// Block until the rebuild signal is received.

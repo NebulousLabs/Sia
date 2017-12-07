@@ -137,7 +137,10 @@ func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 // chunk.
 func (w *worker) uploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
 	w.uploadRecentFailure = time.Now()
-	w.uploadConsecutiveFailures++
+	if w.renter.g.Online() {
+		// It's not the worker's fault if we are offline
+		w.uploadConsecutiveFailures++
+	}
 	uc.mu.Lock()
 	uc.piecesRegistered--
 	uc.pieceUsage[pieceIndex] = false
