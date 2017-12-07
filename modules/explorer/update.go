@@ -349,8 +349,11 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			dbAddBlockFacts(tx, facts)
 		} else {
-			e.log.Printf("Error getting block facts for %s", currentBlock.ID())
-			return err
+			e.log.Printf("Error getting block facts for %s.  Height: %d", currentBlock.ID(), blockheight)
+			err = goBackInTime(tx, cs, blockheight)
+			if err != nil {
+				return err
+			}
 		}
 
 		e.log.Printf("Explorer update for block: %d", blockheight)
