@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/errors"
 )
@@ -25,9 +26,17 @@ import (
 type NewTestNodeParams struct {
 	Dir string
 
-	// Gateway.
-	CreateGateway bool
-	Gateway       modules.Gateway
+	// Omissions - if the omit flag is set for a module, that module will not
+	// be included in the test node.
+	OmitConsensusSet bool
+	OmitGateway      bool
+
+	// Custom modules - if the modules is provided directly, the provided
+	// module will be used instead of creating a new one. If a custom module is
+	// provided, the 'omit' flag for that module must be set to false (which is
+	// the default setting).
+	ConsensusSet modules.ConsensusSet
+	Gateway      modules.Gateway
 }
 
 // serverTester contains a server and a set of channels for keeping all of the
@@ -56,15 +65,33 @@ type TestNode struct {
 func NewTestNode(params NewTestNodeParams) (*TestNode, error) {
 	dir := params.Dir
 
+	// Gateway.
 	g, err := func() (modules.Gateway, error) {
-		if params.CreateGateway && params.Gateway != nil {
+		if !params.OmitGateway && params.Gateway != nil {
 			return nil, errors.New("cannot both create a gateway and use a passed in gateway")
 		}
 		if params.Gateway != nil {
 			return params.Gateway, nil
 		}
-		if params.CreateGateway {
-			return gateway.New("localhost:0", false, filepath.Join(dir, "gateway"))
+		if !params.OmitGateway {
+			return gateway.New("localhost:0", false, filepath.Join(dir, modules.GatewayDir))
+		}
+		return nil, nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	// Consensus.
+	cs, err := func() (modules.ConsensusSet, error) {
+		if !params.OmitConsensusSet && params.ConsensusSet != nil {
+			return nil, errors.New("cannot both create consensus and use passed in consensus")
+		}
+		if params.ConsensusSet != nil {
+			return params.ConsensusSet, nil
+		}
+		if !params.OmitConsensusSet {
+			return consensus.New(g, false, filepath.Join(dir, modules.ConsensusDir))
 		}
 		return nil, nil
 	}()
@@ -73,6 +100,7 @@ func NewTestNode(params NewTestNodeParams) (*TestNode, error) {
 	}
 
 	return &TestNode{
-		Gateway: g,
+		Gateway:      g,
+		ConsensusSet: cs,
 	}, nil
 }
