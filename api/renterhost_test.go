@@ -342,7 +342,7 @@ func TestRenterLocalRepair(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal("allowance setting failed")
+		t.Fatal("Failed to form new contract: %v", err)
 	}
 
 	// redundancy should increment back to 2 as the renter uploads to the new
@@ -567,7 +567,7 @@ func TestRemoteFileRepair(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal("allowance setting failed")
+		t.Fatalf("Failed to form new contract: %v", err)
 	}
 
 	// redundancy should increment back to 2 as the renter uploads to the new
