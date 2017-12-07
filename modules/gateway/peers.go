@@ -77,11 +77,8 @@ func (g *Gateway) addPeer(p *peer) {
 // deletePeer deletes a peer from the Gateway's peer list and decrements the
 // amount of remotePeers accodingly
 func (g *Gateway) deletePeer(p *peer) {
-	if !p.Local {
+	if _, exists := g.peers[p.NetAddress]; exists && !p.Local {
 		g.remotePeers--
-		if build.DEBUG && g.remotePeers < 0 {
-			panic("remotePeers shouldn't have a negative value")
-		}
 	}
 	delete(g.peers, p.NetAddress)
 }
