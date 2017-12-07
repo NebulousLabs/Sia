@@ -6,8 +6,11 @@ package host
 // correctly.
 
 import (
+	"errors"
 	"testing"
+	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -683,24 +686,30 @@ func TestAutoRevisionSubmission(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = ht.host.db.View(func(tx *bolt.Tx) error {
-		so, err = getStorageObligation(tx, so.id())
+	err = build.Retry(50, 250*time.Millisecond, func() error {
+		err = ht.host.db.View(func(tx *bolt.Tx) error {
+			so, err = getStorageObligation(tx, so.id())
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 		if err != nil {
-			return err
+			return (err)
+		}
+		if !so.OriginConfirmed {
+			return errors.New("origin transaction for storage obligation was not confirmed after blocks were mined")
+		}
+		if !so.RevisionConfirmed {
+			return errors.New("revision transaction for storage obligation was not confirmed after blocks were mined")
+		}
+		if !so.ProofConfirmed {
+			return errors.New("storage obligation is not saying that the storage proof was confirmed on the blockchain")
 		}
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if !so.OriginConfirmed {
-		t.Fatal("origin transaction for storage obligation was not confirmed after blocks were mined")
-	}
-	if !so.RevisionConfirmed {
-		t.Fatal("revision transaction for storage obligation was not confirmed after blocks were mined")
-	}
-	if !so.ProofConfirmed {
-		t.Fatal("storage obligation is not saying that the storage proof was confirmed on the blockchain")
 	}
 
 	// Mine blocks until the storage proof has enough confirmations that the
