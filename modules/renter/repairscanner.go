@@ -306,27 +306,17 @@ func (r *Renter) threadedRepairScan() {
 	}
 	defer r.tg.Done()
 
-	// Helper function that closes a channel when we are online
-	closeWhenOnline := func(channel chan struct{}) {
+	for {
+		// Wait until we are online
 		for !r.g.Online() {
 			select {
 			case <-r.tg.StopChan():
-				break
+				return
 			case <-time.After(time.Second):
 			}
 		}
-		close(channel)
-	}
 
-	for {
-		// Check if we are online. If not, wait until we are
-		if !r.g.Online() {
-			wait := make(chan struct{})
-			go closeWhenOnline(wait)
-			<-wait
-		}
-
-		// Return if the renter has shut down.
+		// Return if the renter has shut d wn.
 		select {
 		case <-r.tg.StopChan():
 			return
