@@ -134,6 +134,9 @@ type (
 		// given peers in parallel.
 		Broadcast(name string, obj interface{}, peers []Peer)
 
+		// Online returns true if the gateway is connected to remote hosts
+		Online() bool
+
 		// Close safely stops the Gateway's listener process.
 		Close() error
 	}

@@ -50,7 +50,7 @@ func (g *Gateway) managedRPC(addr modules.NetAddress, name string, fn modules.RP
 		g.log.Debugf("Could not initiate RPC with %v; disconnecting", addr)
 		peer.sess.Close()
 		g.mu.Lock()
-		delete(g.peers, addr)
+		g.deletePeer(peer)
 		g.mu.Unlock()
 		return err
 	}
@@ -158,7 +158,7 @@ func (g *Gateway) threadedListenPeer(p *peer) {
 		// Close the session and remove p from the peer list.
 		p.sess.Close()
 		g.mu.Lock()
-		delete(g.peers, p.NetAddress)
+		g.deletePeer(p)
 		g.mu.Unlock()
 	}()
 

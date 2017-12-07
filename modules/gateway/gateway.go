@@ -146,10 +146,11 @@ type Gateway struct {
 	peerTG siasync.ThreadGroup
 
 	// Utilities.
-	log        *persist.Logger
-	mu         sync.RWMutex
-	persistDir string
-	threads    siasync.ThreadGroup
+	log         *persist.Logger
+	mu          sync.RWMutex
+	persistDir  string
+	threads     siasync.ThreadGroup
+	remotePeers int64
 
 	// Unique ID
 	id gatewayID
