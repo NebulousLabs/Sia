@@ -252,7 +252,9 @@ func TestRenterLocalRepair(t *testing.T) {
 
 	// wait for the redundancy to decrement
 	err = retry(60, time.Second, func() error {
-		st.getAPI("/renter/files", &rf)
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
 			return nil
 		}
@@ -342,13 +344,15 @@ func TestRenterLocalRepair(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal("Failed to form new contract: %v", err)
+		t.Fatalf("Failed to form new contract: %v", err)
 	}
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
 	err = retry(1000, 250*time.Millisecond, func() error {
-		st.getAPI("/renter/files", &rf)
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
 		}
@@ -435,7 +439,9 @@ func TestRemoteFileRepair(t *testing.T) {
 	// redundancy should reach 2
 	var rf RenterFiles
 	err = retry(60, time.Second, func() error {
-		st.getAPI("/renter/files", &rf)
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
 			return nil
 		}
@@ -573,7 +579,10 @@ func TestRemoteFileRepair(t *testing.T) {
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
 	err = retry(1000, 250*time.Millisecond, func() error {
-		st.getAPI("/renter/files", &rf)
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
+
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
 		}
