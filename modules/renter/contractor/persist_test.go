@@ -1,11 +1,14 @@
 package contractor
 
 import (
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -86,5 +89,50 @@ func TestSaveLoad(t *testing.T) {
 	_, ok2 = c.oldContracts[types.FileContractID{2}]
 	if !ok0 || !ok1 || !ok2 {
 		t.Fatal("oldContracts were not restored properly:", c.oldContracts)
+	}
+}
+
+// TestConvertPersist tests that contracts previously stored in the
+// .journal format can be converted to the .contract format.
+func TestConvertPersist(t *testing.T) {
+	dir := build.TempDir(filepath.Join("contractor", t.Name()))
+	os.MkdirAll(dir, 0700)
+	// copy the test data into the temp folder
+	testdata, err := ioutil.ReadFile(filepath.Join("testdata", "TestConvertPersist.journal"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ioutil.WriteFile(filepath.Join(dir, "contractor.journal"), testdata, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// convert the journal
+	err = convertPersist(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// load the persist
+	var p contractorPersist
+	err = newPersist(dir).load(&p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Allowance.Funds.Equals64(10) || p.Allowance.Hosts != 7 || p.Allowance.Period != 3 || p.Allowance.RenewWindow != 20 {
+		t.Fatal("recovered allowance was wrong:", p.Allowance)
+	}
+
+	// load the contracts
+	cs, err := proto.NewContractSet(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cs.Len() != 1 {
+		t.Fatal("expected 1 contract, got", cs.Len())
+	}
+	m := cs.ViewAll()[0]
+	if m.ID.String() != "792b5eec683819d78416a9e80cba454ebcb5a52eeac4f17b443d177bd425fc5c" {
+		t.Fatal("recovered contract has wrong ID", m.ID)
 	}
 }
