@@ -44,6 +44,10 @@ type NewTestNodeParams struct {
 	OmitTransactionPool bool
 	OmitWallet          bool
 
+	// NOTE: if the explorer is ever implemented, it should be omitted by
+	// default, since it is not needed for the vast majority of integration
+	// tests, and is also very expensive and slow.
+
 	// Custom modules - if the modules is provided directly, the provided
 	// module will be used instead of creating a new one. If a custom module is
 	// provided, the 'omit' flag for that module must be set to false (which is
