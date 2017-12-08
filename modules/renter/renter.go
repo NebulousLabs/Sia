@@ -45,6 +45,7 @@ import (
 var (
 	errNilContractor = errors.New("cannot create renter with nil contractor")
 	errNilCS         = errors.New("cannot create renter with nil consensus set")
+	errNilGateway    = errors.New("cannot create hostdb with nil gateway")
 	errNilHdb        = errors.New("cannot create renter with nil hostdb")
 	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
 )
@@ -191,6 +192,7 @@ type Renter struct {
 
 	// Utilities.
 	cs             modules.ConsensusSet
+	g              modules.Gateway
 	hostContractor hostContractor
 	hostDB         hostDB
 	log            *persist.Logger
@@ -214,11 +216,14 @@ func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpoo
 		return nil, err
 	}
 
-	return newRenter(cs, tpool, hdb, hc, persistDir)
+	return newRenter(g, cs, tpool, hdb, hc, persistDir)
 }
 
 // newRenter initializes a renter and returns it.
-func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
+func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
+	if g == nil {
+		return nil, errNilGateway
+	}
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -245,6 +250,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		newMemory:       make(chan struct{}, 1),
 
 		cs:             cs,
+		g:              g,
 		hostDB:         hdb,
 		hostContractor: hc,
 		persistDir:     persistDir,

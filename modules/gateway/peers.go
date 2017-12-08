@@ -64,8 +64,8 @@ func (p *peer) accept() (modules.PeerConn, error) {
 	return &peerConn{conn, p.NetAddress}, nil
 }
 
-// addPeer adds a peer to the Gateway's peer list and spawns a listener thread
-// to handle its requests.
+// addPeer adds a peer to the Gateway's peer list, spawns a listener thread to
+// handle its requests and increments the remotePeers accordingly
 func (g *Gateway) addPeer(p *peer) {
 	g.peers[p.NetAddress] = p
 	go g.threadedListenPeer(p)
@@ -603,4 +603,21 @@ func (g *Gateway) Peers() []modules.Peer {
 		peers = append(peers, p.Peer)
 	}
 	return peers
+}
+
+// Online returns true if the node is connected to the internet. During testing
+// we always assume that the node is online
+func (g *Gateway) Online() bool {
+	if build.Release == "dev" || build.Release == "testing" {
+		return true
+	}
+
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	for _, p := range g.peers {
+		if !p.Local {
+			return true
+		}
+	}
+	return false
 }

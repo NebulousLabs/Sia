@@ -307,7 +307,16 @@ func (r *Renter) threadedRepairScan() {
 	defer r.tg.Done()
 
 	for {
-		// Return if the renter has shut down.
+		// Wait until we are online
+		for !r.g.Online() {
+			select {
+			case <-r.tg.StopChan():
+				return
+			case <-time.After(20 * time.Second):
+			}
+		}
+
+		// Return if the renter has shut d wn.
 		select {
 		case <-r.tg.StopChan():
 			return
@@ -337,7 +346,9 @@ func (r *Renter) threadedRepairScan() {
 			default:
 			}
 
-			if chunkHeap.Len() > 0 {
+			if !r.g.Online() {
+				break LOOP
+			} else if chunkHeap.Len() > 0 {
 				r.managedPrepareNextChunk(chunkHeap, hosts)
 			} else {
 				// Block until the rebuild signal is received.

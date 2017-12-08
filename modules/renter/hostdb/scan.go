@@ -107,7 +107,7 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 // to keep this function in mind, and vice-versa.
 func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 	// If the scan failed because we don't have Internet access, toss out this update.
-	if netErr != nil && !hdb.online {
+	if netErr != nil && !hdb.gateway.Online() {
 		return
 	}
 
@@ -281,7 +281,7 @@ func (hdb *HostDB) threadedProbeHosts(scanPool <-chan modules.HostDBEntry) {
 		// Block until hostdb has internet connectivity.
 		for {
 			hdb.mu.RLock()
-			online := hdb.online
+			online := hdb.gateway.Online()
 			hdb.mu.RUnlock()
 			if online {
 				break

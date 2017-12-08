@@ -100,7 +100,7 @@ func (hdb *HostDB) IncrementFailedInteractions(key types.SiaPublicKey) {
 
 	// Fetch the host.
 	host, haveHost := hdb.hostTree.Select(key)
-	if !haveHost || !hdb.online {
+	if !haveHost || !hdb.gateway.Online() {
 		// If we are offline it probably wasn't the host's fault
 		return
 	}

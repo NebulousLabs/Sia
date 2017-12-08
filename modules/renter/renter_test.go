@@ -127,7 +127,7 @@ func newContractorTester(name string, hdb hostDB, hc hostContractor) (*renterTes
 	if err != nil {
 		return nil, err
 	}
-	r, err := newRenter(cs, tp, hdb, hc, filepath.Join(testdir, modules.RenterDir))
+	r, err := newRenter(g, cs, tp, hdb, hc, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
