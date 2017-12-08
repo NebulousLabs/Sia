@@ -586,7 +586,7 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 	g.mu.Lock()
 	// Peer is removed from the peer list as well as the node list, to prevent
 	// the node from being re-connected while looking for a replacement peer.
-	delete(g.peers, p.NetAddress)
+	delete(g.peers, addr)
 	delete(g.nodes, addr)
 	g.mu.Unlock()
 

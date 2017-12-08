@@ -50,7 +50,7 @@ func (g *Gateway) managedRPC(addr modules.NetAddress, name string, fn modules.RP
 		g.log.Debugf("Could not initiate RPC with %v; disconnecting", addr)
 		peer.sess.Close()
 		g.mu.Lock()
-		delete(g.peers, peer.NetAddress)
+		delete(g.peers, addr)
 		g.mu.Unlock()
 		return err
 	}
