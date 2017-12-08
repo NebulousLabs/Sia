@@ -24,7 +24,7 @@ func newTestingGateway(t *testing.T) *Gateway {
 	if err != nil {
 		panic(err)
 	}
-	return g.(*Gateway)
+	return g
 }
 
 // newNamedTestingGateway returns a gateway ready to use in a testing
@@ -38,7 +38,7 @@ func newNamedTestingGateway(t *testing.T, suffix string) *Gateway {
 	if err != nil {
 		panic(err)
 	}
-	return g.(*Gateway)
+	return g
 }
 
 // TestExportedMethodsErrAfterClose tests that exported methods like Close and
@@ -133,8 +133,8 @@ func TestNew(t *testing.T) {
 	if _, err := New("localhost:0", false, ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
 	}
-	if _, err := New("foo", false, build.TempDir("gateway", t.Name()+"1")); err == nil {
-		t.Fatal("expecting listener error, got nil")
+	if g, err := New("foo", false, build.TempDir("gateway", t.Name()+"1")); err == nil {
+		t.Fatal("expecting listener error, got nil", g.myAddr)
 	}
 	// create corrupted nodes.json
 	dir := build.TempDir("gateway", t.Name()+"2")
