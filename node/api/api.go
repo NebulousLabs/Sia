@@ -6,6 +6,7 @@ import (
 	"strings"
 	"reflect"
 	"math"
+	"strconv"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -13,7 +14,7 @@ import (
 
 const (
 	// size of each page for paginated API responses
-	PAGINATION_SIZE = 25
+	DEFAULT_PAGINATION_SIZE = 25
 )
 
 // Error is a type that is encoded as JSON and returned in an API response in
@@ -34,6 +35,25 @@ type Error struct {
 	// connection error or an invalid netaddress parameter. Validating
 	// parameters in the API is not sufficient, as a parameter's value may
 	// be valid or invalid depending on the current state of a module.
+}
+
+type PaginationRequest struct {
+	HasPaginationQuery 			bool
+	PaginationQueryIsValid 		bool
+	Start 						int
+	Limit 						int
+}
+
+type PaginationResponse struct {
+	Start 		int `json:"start"`
+	Limit 		int `json:"limit"`
+	TotalPages 	int `json:"total_pages"`
+}
+
+type PaginationWrapper struct {
+	Start 		int
+	End 		int
+	TotalPages 	int
 }
 
 // Error implements the error interface for the Error type. It returns only the
@@ -170,17 +190,76 @@ func WriteSuccess(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func GetPaginationDefaultRequest(req *http.Request) PaginationRequest {
+	return GetPaginationRequest(req, "start", "limit")
+}
+
+func GetPaginationRequest(req *http.Request, startQueryParam string, limitQueryParam string) PaginationRequest {
+	startString := req.FormValue(startQueryParam)
+	if startString == "" {
+		return PaginationRequest {
+			HasPaginationQuery: false,
+			PaginationQueryIsValid: false,
+			Start: 0,
+			Limit: 0,
+		}
+	}
+	startIndex, err := strconv.Atoi(startString)
+	if err != nil || startIndex < 0 {
+		return PaginationRequest {
+			HasPaginationQuery: true,
+			PaginationQueryIsValid: false,
+			Start: 0,
+			Limit: 0,
+		}
+	}
+	limit:= DEFAULT_PAGINATION_SIZE
+	limitString := req.FormValue(limitQueryParam)
+	if limitString != "" {
+		limit, err = strconv.Atoi(limitString)
+		if err != nil || limit <= 0 {
+			return PaginationRequest {
+				HasPaginationQuery: true,
+				PaginationQueryIsValid: false,
+				Start: 0,
+				Limit: 0,
+			}
+		}
+	}
+	return PaginationRequest {
+		HasPaginationQuery: true,
+		PaginationQueryIsValid: true,
+		Start: startIndex,
+		Limit: limit,
+	}
+}
+
 // returns the starting index, end index, and total pages of a given slice for the page
-func GetPaginatedSliceIndicesAndTotalPages(sliceInterface interface{}, page int) (int, int, int) {
+func GetPaginationIndicesAndResponse(sliceInterface interface{}, paginationRequest PaginationRequest) (PaginationWrapper, PaginationResponse) {
+	if paginationRequest.Limit <= 0 {
+		build.Critical("pagination request limit must be greater than 0")
+	}
 	slice := reflect.ValueOf(sliceInterface)
 	if slice.Kind() != reflect.Slice {
 		build.Critical("attempting to paginate on non-slice object type: ", slice.Kind())
 	}
-	startingPageIndex := int(math.Min(float64(page * PAGINATION_SIZE), float64(slice.Len())))
-	endingPageIndex := int(math.Min(float64(startingPageIndex + PAGINATION_SIZE), float64(slice.Len())));
-	totalPages := slice.Len() / PAGINATION_SIZE
-	if math.Mod(float64(slice.Len()), float64(PAGINATION_SIZE)) != 0 {
+	startingPageIndex := int(math.Min(float64(paginationRequest.Start), float64(slice.Len())))
+	endingPageIndex := int(math.Min(float64(paginationRequest.Start + paginationRequest.Limit), float64(slice.Len())));
+	totalPages := slice.Len() / paginationRequest.Limit
+	if math.Mod(float64(slice.Len()), float64(paginationRequest.Limit)) != 0 {
 		totalPages += 1
 	}
-	return startingPageIndex, endingPageIndex, totalPages
+
+	pagination := PaginationWrapper {
+		Start: startingPageIndex,
+		End: endingPageIndex,
+		TotalPages: totalPages,
+	}
+
+	paginationResponse := PaginationResponse {
+		Start: startingPageIndex,
+		Limit: paginationRequest.Limit,
+		TotalPages: totalPages,
+	}
+	return pagination, paginationResponse
 }

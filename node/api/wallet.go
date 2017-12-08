@@ -47,7 +47,7 @@ type (
 
 	WalletAddressesPaginatedGET struct {
 		Addresses 	[]types.UnlockHash `json:"addresses"`
-		TotalPages 	int `json:"total_pages"`
+		Pagination 	PaginationResponse `json:"pagination"`
 	}
 
 	// WalletInitPOST contains the primary seed that gets generated during a
@@ -98,8 +98,8 @@ type (
 	WalletTransactionsPaginatedGET struct {
 		ConfirmedTransactions   []modules.ProcessedTransaction `json:"confirmedtransactions"`
 		UnconfirmedTransactions []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
-		TotalConfirmedPages 	int `json:"total_confirmed_pages"`
-		TotalUnConfirmedPages 	int `json:"total_unconfirmed_pages"`
+		ConfirmedTransactionsPagination 	PaginationResponse `json:"confirmed_transactions_pagination"`
+		UnconfirmedTransactionsPagination 	PaginationResponse `json:"unconfirmed_transactions_pagination"`
 	}
 
 	// WalletTransactionsGETaddr contains the set of wallet transactions
@@ -191,23 +191,22 @@ func (api *API) walletAddressHandler(w http.ResponseWriter, req *http.Request, _
 
 // walletAddressHandler handles API calls to /wallet/addresses.
 func (api *API) walletAddressesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	pageString := req.FormValue("page")
+	paginationRequest := GetPaginationDefaultRequest(req)
 	allAddresses := api.wallet.AllAddresses()
-	if pageString == "" || allAddresses == nil {
+	if !paginationRequest.HasPaginationQuery || allAddresses == nil {
 		WriteJSON(w, WalletAddressesGET{
 			Addresses: allAddresses,
 		})
 	} else {
-		page, err := strconv.Atoi(pageString)
-		if err != nil || page < 0 {
-			WriteError(w, Error{"page query must be a nonnegative integer"}, http.StatusBadRequest)
+		if !paginationRequest.PaginationQueryIsValid {
+			WriteError(w, Error{"start and limit queries must be nonnegative integers"}, http.StatusBadRequest)
 			return
 		}
-		startPageIdx, endPageIndex, totalPages := GetPaginatedSliceIndicesAndTotalPages(allAddresses, page)
-		addresses := allAddresses[startPageIdx:endPageIndex]
+		pagination, paginationResponse := GetPaginationIndicesAndResponse(allAddresses, paginationRequest)
+		addresses := allAddresses[pagination.Start:pagination.End]
 		WriteJSON(w, WalletAddressesPaginatedGET{
 			Addresses: addresses,
-			TotalPages: totalPages,
+			Pagination: paginationResponse,
 		})
 	}
 }
@@ -548,26 +547,27 @@ func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 	unconfirmedTxns := api.wallet.UnconfirmedTransactions()
-	confirmedPageString, unconfirmedPageString := req.FormValue("confirmPage"), req.FormValue("unconfirmedPage")
-	if confirmedPageString == "" || unconfirmedPageString == "" || confirmedTxns == nil || unconfirmedTxns == nil {
+
+	confirmedPaginationRequest := GetPaginationRequest(req, "confirmedTransactionsStart", "confirmedTransactionsLimit")
+	unconfirmedPaginationRequest := GetPaginationRequest(req, "unconfirmedTransactionsStart", "unconfirmedTransactionsLimit")
+
+	if !confirmedPaginationRequest.HasPaginationQuery || !unconfirmedPaginationRequest.HasPaginationQuery || confirmedTxns == nil || unconfirmedTxns == nil {
 		WriteJSON(w, WalletTransactionsGET{
 			ConfirmedTransactions:   confirmedTxns,
 			UnconfirmedTransactions: unconfirmedTxns,
 		})
 	} else {
-		confirmedPage, confirmedErr := strconv.Atoi(confirmedPageString)
-		uncnfrmedPage, uncnfrmedErr := strconv.Atoi(unconfirmedPageString)
-		if confirmedErr != nil || uncnfrmedErr != nil || confirmedPage < 0 || uncnfrmedPage < 0 {
-			WriteError(w, Error{"page query must be an nonnegative integer"}, http.StatusBadRequest)
+		if !confirmedPaginationRequest.PaginationQueryIsValid || !unconfirmedPaginationRequest.PaginationQueryIsValid {
+			WriteError(w, Error{"start and limit queries must be nonnegative integers"}, http.StatusBadRequest)
 			return
 		}
-		startConfirmPageIdx, endConfirmPageIdx, totalConfirmPages := GetPaginatedSliceIndicesAndTotalPages(confirmedTxns, confirmedPage)
-		startUncnfrmPageIdx, endUncnfrmPageIdx, totalUncnfrmPages := GetPaginatedSliceIndicesAndTotalPages(unconfirmedTxns, uncnfrmedPage)
+		confirmedPagination, confirmedPaginationResponse := GetPaginationIndicesAndResponse(confirmedTxns, confirmedPaginationRequest)
+		unconfirmedPagination, unconfirmedPaginationResponse := GetPaginationIndicesAndResponse(unconfirmedTxns, unconfirmedPaginationRequest)
 		WriteJSON(w, WalletTransactionsPaginatedGET{
-			ConfirmedTransactions: confirmedTxns[startConfirmPageIdx:endConfirmPageIdx],
-			UnconfirmedTransactions: unconfirmedTxns[startUncnfrmPageIdx:endUncnfrmPageIdx],
-			TotalConfirmedPages: totalConfirmPages,
-			TotalUnConfirmedPages: totalUncnfrmPages,
+			ConfirmedTransactions: confirmedTxns[confirmedPagination.Start:confirmedPagination.End],
+			UnconfirmedTransactions: unconfirmedTxns[unconfirmedPagination.Start:unconfirmedPagination.End],
+			ConfirmedTransactionsPagination: confirmedPaginationResponse,
+			UnconfirmedTransactionsPagination: unconfirmedPaginationResponse,
 		})
 	}
 }
