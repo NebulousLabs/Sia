@@ -20,4 +20,19 @@ func TestNewTestNode(t *testing.T) {
 	if tn.ConsensusSet == nil {
 		t.Error("consensus set not set correctly")
 	}
+	if tn.TransactionPool == nil {
+		t.Error("transaction pool not set correctly")
+	}
+	if tn.Wallet == nil {
+		t.Error("wallet not set correctly")
+	}
+	if tn.Host == nil {
+		t.Error("host not set correctly")
+	}
+	if tn.Renter == nil {
+		t.Error("renter not set correctly")
+	}
+	if tn.Miner == nil {
+		t.Error("miner not set correctly")
+	}
 }

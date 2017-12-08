@@ -11,6 +11,11 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/host"
+	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/renter"
+	"github.com/NebulousLabs/Sia/modules/transactionpool"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/errors"
 )
 
@@ -24,19 +29,32 @@ import (
 //		+ Pass the newFuncDeps and deps in (everything else shoudl be nil)
 //		+ Pass 'nil' in for everything (module will not be instantiated)
 type NewTestNodeParams struct {
+	// The directory to use when creating or opening modules.
 	Dir string
 
 	// Omissions - if the omit flag is set for a module, that module will not
 	// be included in the test node.
-	OmitConsensusSet bool
-	OmitGateway      bool
+	//
+	// If you omit a module, you will implicitly omit all dependencies as well.
+	OmitConsensusSet    bool
+	OmitGateway         bool
+	OmitHost            bool
+	OmitMiner           bool
+	OmitRenter          bool
+	OmitTransactionPool bool
+	OmitWallet          bool
 
 	// Custom modules - if the modules is provided directly, the provided
 	// module will be used instead of creating a new one. If a custom module is
 	// provided, the 'omit' flag for that module must be set to false (which is
 	// the default setting).
-	ConsensusSet modules.ConsensusSet
-	Gateway      modules.Gateway
+	ConsensusSet    modules.ConsensusSet
+	Gateway         modules.Gateway
+	Host            modules.Host
+	Miner           modules.TestMiner
+	Renter          modules.Renter
+	TransactionPool modules.TransactionPool
+	Wallet          modules.Wallet
 }
 
 // serverTester contains a server and a set of channels for keeping all of the
@@ -55,6 +73,9 @@ type TestNode struct {
 	// The key of the wallet, which is used to re-unlock the wallet when the
 	// node resets.
 	WalletKey crypto.TwofishKey
+
+	// Folder on disk that stores all of the module persistence.
+	PersistDir string
 }
 
 // NewTestNode will create a new test node. The inputs to the function are the
@@ -73,13 +94,13 @@ func NewTestNode(params NewTestNodeParams) (*TestNode, error) {
 		if params.Gateway != nil {
 			return params.Gateway, nil
 		}
-		if !params.OmitGateway {
-			return gateway.New("localhost:0", false, filepath.Join(dir, modules.GatewayDir))
+		if params.OmitGateway {
+			return nil, nil
 		}
-		return nil, nil
+		return gateway.New("localhost:0", false, filepath.Join(dir, modules.GatewayDir))
 	}()
 	if err != nil {
-		return nil, err
+		return nil, errors.Extend(err, errors.New("unable to create gateway"))
 	}
 
 	// Consensus.
@@ -90,17 +111,109 @@ func NewTestNode(params NewTestNodeParams) (*TestNode, error) {
 		if params.ConsensusSet != nil {
 			return params.ConsensusSet, nil
 		}
-		if !params.OmitConsensusSet {
-			return consensus.New(g, false, filepath.Join(dir, modules.ConsensusDir))
+		if params.OmitGateway || params.OmitConsensusSet {
+			return nil, nil
 		}
-		return nil, nil
+		return consensus.New(g, false, filepath.Join(dir, modules.ConsensusDir))
 	}()
 	if err != nil {
-		return nil, err
+		return nil, errors.Extend(err, errors.New("unable to create consensus set"))
+	}
+
+	// Transaction Pool.
+	tp, err := func() (modules.TransactionPool, error) {
+		if !params.OmitTransactionPool && params.TransactionPool != nil {
+			return nil, errors.New("cannot create transaction pool and also use custom transaction pool")
+		}
+		if params.TransactionPool != nil {
+			return params.TransactionPool, nil
+		}
+		if params.OmitGateway || params.OmitConsensusSet || params.OmitTransactionPool {
+			return nil, nil
+		}
+		return transactionpool.New(cs, g, filepath.Join(dir, modules.TransactionPoolDir))
+	}()
+	if err != nil {
+		return nil, errors.Extend(err, errors.New("unable to create transaction pool"))
+	}
+
+	// Wallet.
+	w, err := func() (modules.Wallet, error) {
+		if !params.OmitWallet && params.Wallet != nil {
+			return nil, errors.New("cannot create wallet and use custom wallet")
+		}
+		if params.Wallet != nil {
+			return params.Wallet, nil
+		}
+		if params.OmitGateway || params.OmitConsensusSet || params.OmitTransactionPool || params.OmitWallet {
+			return nil, nil
+		}
+		return wallet.New(cs, tp, filepath.Join(dir, modules.WalletDir))
+	}()
+	if err != nil {
+		return nil, errors.Extend(err, errors.New("unable to create wallet"))
+	}
+
+	// Host.
+	h, err := func() (modules.Host, error) {
+		if !params.OmitHost && params.Host != nil {
+			return nil, errors.New("cannot create host and use custom host")
+		}
+		if params.Host != nil {
+			return params.Host, nil
+		}
+		if params.OmitGateway || params.OmitConsensusSet || params.OmitTransactionPool || params.OmitWallet || params.OmitHost {
+			return nil, nil
+		}
+		return host.New(cs, tp, w, "localhost:0", filepath.Join(dir, modules.HostDir))
+	}()
+	if err != nil {
+		return nil, errors.Extend(err, errors.New("unable to create host"))
+	}
+
+	// Renter.
+	r, err := func() (modules.Renter, error) {
+		if !params.OmitRenter && params.Renter != nil {
+			return nil, errors.New("cannot create renter and also use custom renter")
+		}
+		if params.Renter != nil {
+			return params.Renter, nil
+		}
+		if params.OmitGateway || params.OmitConsensusSet || params.OmitTransactionPool || params.OmitWallet || params.OmitRenter {
+			return nil, nil
+		}
+		return renter.New(g, cs, w, tp, filepath.Join(dir, modules.RenterDir))
+	}()
+	if err != nil {
+		return nil, errors.Extend(err, errors.New("unable to create renter"))
+	}
+
+	// Miner.
+	m, err := func() (modules.TestMiner, error) {
+		if !params.OmitMiner && params.Miner != nil {
+			return nil, errors.New("cannot create miner and also use custom miner")
+		}
+		if params.Miner != nil {
+			return params.Miner, nil
+		}
+		if params.OmitGateway || params.OmitConsensusSet || params.OmitTransactionPool || params.OmitWallet || params.OmitMiner {
+			return nil, nil
+		}
+		return miner.New(cs, tp, w, filepath.Join(dir, modules.MinerDir))
+	}()
+	if err != nil {
+		return nil, errors.Extend(err, errors.New("unable to create miner"))
 	}
 
 	return &TestNode{
-		Gateway:      g,
-		ConsensusSet: cs,
+		ConsensusSet:    cs,
+		Gateway:         g,
+		Host:            h,
+		Miner:           m,
+		Renter:          r,
+		TransactionPool: tp,
+		Wallet:          w,
+
+		PersistDir: dir,
 	}, nil
 }
