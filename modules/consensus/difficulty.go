@@ -26,9 +26,9 @@ var (
 // A running tally is maintained which keeps the total difficulty and total time
 // passed across all blocks. The total difficulty can be divided by the total
 // time to get a hashrate. The total is multiplied by 0.995 each block, to keep
-// exponential preference on recent blocks with a half life of about 24 hours.
-// This estimated hashrate is assumed to closely match the actual hashrate on
-// the network.
+// exponential preference on recent blocks with a half life of 144 data points.
+// This is about 24 hours. This estimated hashrate is assumed to closely match
+// the actual hashrate on the network.
 //
 // There is a target block time. If the difficulty increases or decreases, the
 // total amount of time that has passed will be more or less than the target
