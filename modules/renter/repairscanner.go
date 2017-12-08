@@ -312,7 +312,7 @@ func (r *Renter) threadedRepairScan() {
 			select {
 			case <-r.tg.StopChan():
 				return
-			case <-time.After(time.Second):
+			case <-time.After(20 * time.Second):
 			}
 		}
 

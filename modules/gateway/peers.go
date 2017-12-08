@@ -608,7 +608,7 @@ func (g *Gateway) Peers() []modules.Peer {
 // Online returns true if the node is connected to the internet. During testing
 // we always assume that the node is online
 func (g *Gateway) Online() bool {
-	if build.Release != "standard" {
+	if build.Release == "dev" || build.Release == "testing" {
 		return true
 	}
 
