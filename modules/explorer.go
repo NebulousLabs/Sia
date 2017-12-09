@@ -8,13 +8,13 @@ import (
 const (
 	// ExplorerDir is the name of the directory that is typically used for the
 	// explorer.
-	ExplorerDir     = "explorer"
-	BlockHash       = "Blk"
-	Transaction     = "Tx"
-	SiacoinOutputId = "Scoid"
-	FileContractId  = "Fcid"
-	SiafundOutputId = "Sfoid"
-	UnlockHash      = "Uh"
+	ExplorerDir             = "explorer"
+	BlockHashType           = "Blk"
+	TransactionHashType     = "Tx"
+	SiacoinOutputIdHashType = "Scoid"
+	FileContractIdHashType  = "Fcid"
+	SiafundOutputIdHashType = "Sfoid"
+	UnlockHashType          = "Uh"
 )
 
 type (
