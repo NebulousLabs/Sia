@@ -61,8 +61,9 @@ type NewTestNodeParams struct {
 	Wallet          modules.Wallet
 }
 
-// serverTester contains a server and a set of channels for keeping all of the
-// modules synchronized during testing.
+// TestNode contains all modules, and can be used as a testing node. Modules
+// can individually be enabled or disabled, and there are lots of helper
+// functions associated with the test node to assist with testing.
 type TestNode struct {
 	// The modules of the node. Modules that are not initialized will be nil.
 	ConsensusSet    modules.ConsensusSet
