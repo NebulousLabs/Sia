@@ -135,6 +135,13 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 		return
 	}
 
+	if g.myAddr.IsAllZeros() {
+		g.mu.Lock()
+		host, _, _ := net.SplitHostPort(conn.LocalAddr().String())
+		g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
+		g.mu.Unlock()
+	}
+
 	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
 		err = g.managedAcceptConnv130Peer(conn, remoteVersion)
 	} else if build.VersionCmp(remoteVersion, handshakeUpgradeVersion) >= 0 {
@@ -499,6 +506,13 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	if err != nil {
 		conn.Close()
 		return err
+	}
+
+	if g.myAddr.IsAllZeros() {
+		g.mu.Lock()
+		host, _, _ := net.SplitHostPort(conn.LocalAddr().String())
+		g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
+		g.mu.Unlock()
 	}
 
 	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
