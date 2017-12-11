@@ -125,9 +125,15 @@ func convertPersist(dir string) error {
 		return err
 	}
 
+	// create the contracts directory if it does not yet exist
+	contractsDir := filepath.Join(dir, "contracts")
+	if err := os.MkdirAll(contractsDir, 0700); err != nil {
+		return err
+	}
+
 	// convert contracts to contract files
 	for _, c := range p.Contracts {
-		if err := proto.ConvertV130Contract(c, filepath.Join(dir, "contracts")); err != nil {
+		if err := proto.ConvertV130Contract(c, contractsDir); err != nil {
 			return err
 		}
 	}
