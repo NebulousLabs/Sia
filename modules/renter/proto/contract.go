@@ -441,6 +441,7 @@ func (cs *ContractSet) ConvertV130Contract(c V130Contract, cr V130CachedRevision
 		if !ok {
 			return errors.New("contract set is missing contract that was just added")
 		}
+		defer cs.Return(sc)
 		if len(cr.MerkleRoots) == len(sc.merkleRoots)+1 {
 			root := cr.MerkleRoots[len(cr.MerkleRoots)-1]
 			_, err = sc.recordUploadIntent(cr.Revision, root, types.ZeroCurrency, types.ZeroCurrency)
