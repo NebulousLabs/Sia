@@ -195,7 +195,9 @@ func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string)
 			// NOTE: local may be true even if the supplied NetAddress is not
 			// actually reachable.
 			Local:      remoteAddr.IsLocal(),
-			NetAddress: remoteAddr,
+			// Ignoring claimed IP address (which should be == to the socket address)
+			// by the host but keeping note of the port number so we can call back
+			NetAddress: modules.NetAddress(net.JoinHostPort(remoteAddr.Host(), remoteHeader.NetAddress.Port())),
 			Version:    remoteVersion,
 		},
 		sess: newServerStream(conn, remoteVersion),
