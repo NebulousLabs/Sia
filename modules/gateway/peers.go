@@ -185,14 +185,17 @@ func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string)
 		return err
 	}
 
+	// Get the remote address from opened socket
+	remoteAddr := modules.NetAddress(conn.RemoteAddr().String())
+
 	// Accept the peer.
 	peer := &peer{
 		Peer: modules.Peer{
 			Inbound: true,
 			// NOTE: local may be true even if the supplied NetAddress is not
 			// actually reachable.
-			Local:      remoteHeader.NetAddress.IsLocal(),
-			NetAddress: remoteHeader.NetAddress,
+			Local:      remoteAddr.IsLocal(),
+			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
 		sess: newServerStream(conn, remoteVersion),
