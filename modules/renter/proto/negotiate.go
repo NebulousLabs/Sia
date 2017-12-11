@@ -68,9 +68,9 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry) (modules.HostDBEntr
 
 // verifyRecentRevision confirms that the host and contractor agree upon the current
 // state of the contract being revised.
-func verifyRecentRevision(conn net.Conn, contract modules.RenterContract, hostVersion string) error {
+func verifyRecentRevision(conn net.Conn, contract contractHeader, hostVersion string) error {
 	// send contract ID
-	if err := encoding.WriteObject(conn, contract.ID); err != nil {
+	if err := encoding.WriteObject(conn, contract.ID()); err != nil {
 		return errors.New("couldn't send contract ID: " + err.Error())
 	}
 	// read challenge
@@ -101,15 +101,16 @@ func verifyRecentRevision(conn net.Conn, contract modules.RenterContract, hostVe
 	}
 	// Check that the unlock hashes match; if they do not, something is
 	// seriously wrong. Otherwise, check that the revision numbers match.
-	if lastRevision.UnlockConditions.UnlockHash() != contract.LastRevision.UnlockConditions.UnlockHash() {
+	ourRev := contract.LastRevision()
+	if lastRevision.UnlockConditions.UnlockHash() != ourRev.UnlockConditions.UnlockHash() {
 		return errors.New("unlock conditions do not match")
-	} else if lastRevision.NewRevisionNumber != contract.LastRevision.NewRevisionNumber {
-		return &recentRevisionError{contract.LastRevision.NewRevisionNumber, lastRevision.NewRevisionNumber}
+	} else if lastRevision.NewRevisionNumber != ourRev.NewRevisionNumber {
+		return &recentRevisionError{ourRev.NewRevisionNumber, lastRevision.NewRevisionNumber}
 	}
 	// NOTE: we can fake the blockheight here because it doesn't affect
 	// verification; it just needs to be above the fork height and below the
 	// contract expiration (which was checked earlier).
-	return modules.VerifyFileContractRevisionTransactionSignatures(lastRevision, hostSignatures, contract.FileContract.WindowStart-1)
+	return modules.VerifyFileContractRevisionTransactionSignatures(lastRevision, hostSignatures, contract.EndHeight()-1)
 }
 
 // negotiateRevision sends a revision and actions to the host for approval,

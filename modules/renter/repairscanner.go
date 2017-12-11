@@ -137,15 +137,16 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	// map, also increment the 'piecesCompleted' value.
 	saveFile := false
 	for fcid, fileContract := range f.contracts {
-		recentContract, exists := r.hostContractor.ResolveContract(fcid)
-		if !exists {
+		recentContract, exists := r.hostContractor.ContractByID(fcid)
+		contractUtility, exists2 := r.hostContractor.ContractUtility(fcid)
+		if !exists || !exists2 {
 			// File contract does not seem to be part of the host anymore.
 			// Delete this contract and mark the file to be saved.
 			delete(f.contracts, fcid)
 			saveFile = true
 			continue
 		}
-		if !recentContract.GoodForUpload {
+		if !contractUtility.GoodForUpload {
 			// We are no longer renewing with this contract, so it does not
 			// count for redundancy.
 			continue
@@ -246,6 +247,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 		case <-r.newMemory:
 			memoryAvailable = r.managedMemoryAvailableGet()
 		case <-r.tg.StopChan():
+			return
 		}
 	}
 	r.managedMemoryAvailableSub(nextChunk.memoryNeeded)
@@ -258,11 +260,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 		if !workDistributed {
 			// Release any data that did not get distributed to workers.
 			r.managedMemoryAvailableAdd(nextChunk.memoryNeeded - nextChunk.memoryReleased)
-		} else {
-			nextChunk.mu.Lock()
-			nextChunk.mu.Unlock()
 		}
-
 		// Sanity check, make sure memory was returned properly.
 		if nextChunk.logicalChunkData != nil {
 			nextChunk.logicalChunkData = nil

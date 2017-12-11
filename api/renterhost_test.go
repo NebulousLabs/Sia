@@ -252,14 +252,16 @@ func TestRenterLocalRepair(t *testing.T) {
 
 	// wait for the redundancy to decrement
 	err = retry(60, time.Second, func() error {
-		st.getAPI("/renter/files", &rf)
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
 			return nil
 		}
 		return errors.New("file redundancy not decremented")
 	})
 	if err != nil {
-		t.Fatal(err, len(rf.Files), rf.Files[9].Redundancy)
+		t.Fatal(err, len(rf.Files), rf.Files[0].Redundancy)
 	}
 
 	// bring up a new host
@@ -329,25 +331,28 @@ func TestRenterLocalRepair(t *testing.T) {
 		t.Fatal(err, ah)
 	}
 
-	// add a few new blocks in order to cause the renter to form contracts with the new host
-	for i := 0; i < 10; i++ {
-		b, err := testGroup[0].miner.AddBlock()
+	// Block until we formed a contract with the new host.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
 		if err != nil {
-			t.Fatal(err)
+			return errors.New("couldn't get renter stats")
 		}
-		tipID, err := synchronizationCheck(testGroup)
-		if err != nil {
-			t.Fatal(err)
+		if len(rc.Contracts) != 3 {
+			return fmt.Errorf("Insufficient contracts: expected %v was %v", 3, len(rc.Contracts))
 		}
-		if b.ID() != tipID {
-			t.Fatal("test group does not have the tip block")
-		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to form new contract: %v", err)
 	}
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
 	err = retry(1000, 250*time.Millisecond, func() error {
-		st.getAPI("/renter/files", &rf)
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
 		}
@@ -434,7 +439,9 @@ func TestRemoteFileRepair(t *testing.T) {
 	// redundancy should reach 2
 	var rf RenterFiles
 	err = retry(60, time.Second, func() error {
-		st.getAPI("/renter/files", &rf)
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
 			return nil
 		}
@@ -470,7 +477,6 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// wait for the redundancy to decrement
 	err = retry(120, time.Millisecond*250, func() error {
 		st.getAPI("/renter/files", &rf)
@@ -482,7 +488,6 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// verify we still can download
 	downloadPath = filepath.Join(st.dir, "test-downloaded-verify2.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
@@ -496,9 +501,7 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer stNewHost.server.Close()
-
 	testGroup = []*serverTester{st, stNewHost}
-
 	// Connect the testers to eachother so that they are all on the same
 	// blockchain.
 	err = fullyConnectNodes(testGroup)
@@ -510,12 +513,12 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Make sure that every wallet has money in it.
+	// Make sure that every wallet has money in it, then set the storage and
+	// perform annoucnements.
 	err = fundAllNodes(testGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	err = stNewHost.setHostStorage()
 	if err != nil {
 		t.Fatal(err)
@@ -557,34 +560,36 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// add a few new blocks in order to cause the renter to form contracts with the new host
-	for i := 0; i < 10; i++ {
-		b, err := testGroup[0].miner.AddBlock()
+	// Block until we formed a contract with the new host.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
 		if err != nil {
-			t.Fatal(err)
+			return errors.New("couldn't get renter stats")
 		}
-		tipID, err := synchronizationCheck(testGroup)
-		if err != nil {
-			t.Fatal(err)
+		if len(rc.Contracts) != 3 {
+			return fmt.Errorf("Insufficient contracts: expected %v was %v", 3, len(rc.Contracts))
 		}
-		if b.ID() != tipID {
-			t.Fatal("test group does not have the tip block")
-		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to form new contract: %v", err)
 	}
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
 	err = retry(1000, 250*time.Millisecond, func() error {
-		st.getAPI("/renter/files", &rf)
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
+
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
 		}
 		return errors.New("file redundancy not incremented")
 	})
 	if err != nil {
-		t.Log(len(rf.Files))
-		t.Log(rf.Files[0].Redundancy)
-		t.Log(rf.Files[0].Available)
+		t.Log(len(rf.Files), rf.Files[0].Redundancy, rf.Files[0].Available)
 		t.Fatal(err)
 	}
 

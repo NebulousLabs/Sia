@@ -111,14 +111,15 @@ type hostContractor interface {
 	// Close closes the hostContractor.
 	Close() error
 
-	// Contract returns the latest contract formed with the specified host.
-	Contract(modules.NetAddress) (modules.RenterContract, bool)
-
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
 	// ContractByID returns the contract associated with the file contract id.
 	ContractByID(types.FileContractID) (modules.RenterContract, bool)
+
+	// ContractUtility returns the utility field for a given contract, along
+	// with a bool indicating if it exists.
+	ContractUtility(types.FileContractID) (modules.ContractUtility, bool)
 
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
@@ -141,11 +142,6 @@ type hostContractor interface {
 
 	// ResolveID returns the most recent renewal of the specified ID.
 	ResolveID(types.FileContractID) types.FileContractID
-
-	// ResovleContract returns the current contract associated with the provided
-	// contract id. It is equivalent to calling 'ResolveID' and then using the
-	// result to call 'ContractByID'.
-	ResolveContract(types.FileContractID) (modules.RenterContract, bool)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
@@ -433,11 +429,6 @@ func (r *Renter) Settings() modules.RenterSettings {
 	return modules.RenterSettings{
 		Allowance: r.hostContractor.Allowance(),
 	}
-}
-func (r *Renter) AllContracts() []modules.RenterContract {
-	return r.hostContractor.(interface {
-		AllContracts() []modules.RenterContract
-	}).AllContracts()
 }
 func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
 	id := r.mu.Lock()

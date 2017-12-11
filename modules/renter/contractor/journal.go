@@ -24,12 +24,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -37,6 +36,17 @@ import (
 var journalMeta = persist.Metadata{
 	Header:  "Contractor Journal",
 	Version: "1.1.1",
+}
+
+type journalPersist struct {
+	Allowance       modules.Allowance                   `json:"allowance"`
+	BlockHeight     types.BlockHeight                   `json:"blockheight"`
+	CachedRevisions map[string]proto.V130CachedRevision `json:"cachedrevisions"`
+	Contracts       map[string]proto.V130Contract       `json:"contracts"`
+	CurrentPeriod   types.BlockHeight                   `json:"currentperiod"`
+	LastChange      modules.ConsensusChangeID           `json:"lastchange"`
+	OldContracts    []proto.V130Contract                `json:"oldcontracts"`
+	RenewedIDs      map[string]string                   `json:"renewedids"`
 }
 
 // A journal is a log of updates to a JSON object.
@@ -54,105 +64,14 @@ func (j *journal) update(us updateSet) error {
 	return j.f.Sync()
 }
 
-// Checkpoint refreshes the journal with a new initial object. It syncs the
-// underlying file before returning.
-func (j *journal) checkpoint(data contractorPersist) error {
-	if build.DEBUG {
-		// Sanity check - applying the updates to the initial object should
-		// result in a contractorPersist that matches data.
-		var data2 contractorPersist
-		j2, err := openJournal(j.filename, &data2)
-		if err != nil {
-			panic("could not open journal for sanity check: " + err.Error())
-		}
-		for id, c := range data.CachedRevisions {
-			if c2, ok := data2.CachedRevisions[id]; !ok {
-				continue
-			} else if !reflect.DeepEqual(c.Revision, c2.Revision) {
-				panic("CachedRevision Revisions mismatch: " + fmt.Sprint(c.Revision, c2.Revision))
-			} else if !reflect.DeepEqual(c.MerkleRoots, c2.MerkleRoots) && (c.MerkleRoots == nil) == (c2.MerkleRoots == nil) {
-				panic("CachedRevision Merkle roots mismatch: " + fmt.Sprint(len(c.MerkleRoots), len(c2.MerkleRoots)))
-			}
-		}
-		for id, c := range data.Contracts {
-			if c2, ok := data2.Contracts[id]; !ok {
-				continue
-			} else if !reflect.DeepEqual(c.LastRevisionTxn, c2.LastRevisionTxn) {
-				panic("Contract Txns mismatch: " + fmt.Sprint(c.LastRevisionTxn, c2.LastRevisionTxn))
-			} else if !reflect.DeepEqual(c.MerkleRoots, c2.MerkleRoots) && (c.MerkleRoots == nil) == (c2.MerkleRoots == nil) {
-				panic("Contract Merkle roots mismatch: " + fmt.Sprint(len(c.MerkleRoots), len(c2.MerkleRoots)))
-			}
-		}
-		j2.Close()
-	}
-
-	// Write to a new temp file.
-	tmp, err := os.Create(j.filename + "_tmp")
-	if err != nil {
-		return err
-	}
-	enc := json.NewEncoder(tmp)
-	if err := enc.Encode(journalMeta); err != nil {
-		return err
-	}
-	if err := enc.Encode(data); err != nil {
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		return err
-	}
-
-	// Atomically replace the old file with the new one.
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := j.f.Close(); err != nil {
-		return err
-	}
-
-	// Attempt rename up to 5 times to prevent issues with anti-virus software.
-	// If after 5 attempts file cannot be renamed, raise critical failure
-	err = build.Retry(5, 100*time.Millisecond, func() error {
-		return os.Rename(tmp.Name(), j.filename)
-	})
-	if err != nil {
-		build.Critical("Unable to rename contractor.journal:", err)
-	}
-
-	// Reopen the journal.
-	j.f, err = os.OpenFile(j.filename, os.O_RDWR|os.O_APPEND, 0)
-	return err
-}
-
 // Close closes the underlying file.
 func (j *journal) Close() error {
 	return j.f.Close()
 }
 
-// newJournal creates a new journal, using data as the initial object.
-func newJournal(filename string, data contractorPersist) (*journal, error) {
-	// safely create the journal
-	f, err := os.Create(filename)
-	if err != nil {
-		return nil, err
-	}
-	enc := json.NewEncoder(f)
-	if err := enc.Encode(journalMeta); err != nil {
-		return nil, err
-	}
-	if err := enc.Encode(data); err != nil {
-		return nil, err
-	}
-	if err := f.Sync(); err != nil {
-		return nil, err
-	}
-
-	return &journal{f: f, filename: filename}, nil
-}
-
 // openJournal opens the supplied journal and decodes the reconstructed
-// contractorPersist into data.
-func openJournal(filename string, data *contractorPersist) (*journal, error) {
+// journalPersist into data.
+func openJournal(filename string, data *journalPersist) (*journal, error) {
 	// Open file handle for reading and writing.
 	f, err := os.OpenFile(filename, os.O_RDWR, 0)
 	if err != nil {
@@ -177,10 +96,10 @@ func openJournal(filename string, data *contractorPersist) (*journal, error) {
 
 	// Make sure all maps are properly initialized.
 	if data.CachedRevisions == nil {
-		data.CachedRevisions = map[string]cachedRevision{}
+		data.CachedRevisions = map[string]proto.V130CachedRevision{}
 	}
 	if data.Contracts == nil {
-		data.Contracts = map[string]modules.RenterContract{}
+		data.Contracts = map[string]proto.V130Contract{}
 	}
 	if data.RenewedIDs == nil {
 		data.RenewedIDs = map[string]string{}
@@ -208,7 +127,7 @@ func openJournal(filename string, data *contractorPersist) (*journal, error) {
 }
 
 type journalUpdate interface {
-	apply(*contractorPersist)
+	apply(*journalPersist)
 }
 
 type marshaledUpdate struct {
@@ -218,31 +137,6 @@ type marshaledUpdate struct {
 }
 
 type updateSet []journalUpdate
-
-// MarshalJSON marshals a set of journalUpdates as an array of
-// marshaledUpdates.
-func (set updateSet) MarshalJSON() ([]byte, error) {
-	marshaledSet := make([]marshaledUpdate, len(set))
-	for i, u := range set {
-		data, err := json.Marshal(u)
-		if err != nil {
-			build.Critical("failed to marshal known type:", err)
-		}
-		marshaledSet[i].Data = data
-		marshaledSet[i].Checksum = crypto.HashBytes(data)
-		switch u.(type) {
-		case updateUploadRevision:
-			marshaledSet[i].Type = "uploadRevision"
-		case updateDownloadRevision:
-			marshaledSet[i].Type = "downloadRevision"
-		case updateCachedUploadRevision:
-			marshaledSet[i].Type = "cachedUploadRevision"
-		case updateCachedDownloadRevision:
-			marshaledSet[i].Type = "cachedDownloadRevision"
-		}
-	}
-	return json.Marshal(marshaledSet)
-}
 
 // UnmarshalJSON unmarshals an array of marshaledUpdates as a set of
 // journalUpdates.
@@ -294,7 +188,7 @@ type updateUploadRevision struct {
 // apply sets the LastRevision, LastRevisionTxn, UploadSpending, and
 // DownloadSpending fields of the contract being revised. It also adds the new
 // Merkle root to the contract's Merkle root set.
-func (u updateUploadRevision) apply(data *contractorPersist) {
+func (u updateUploadRevision) apply(data *journalPersist) {
 	if len(u.NewRevisionTxn.FileContractRevisions) == 0 {
 		build.Critical("updateUploadRevision is missing its FileContractRevision")
 		return
@@ -303,7 +197,6 @@ func (u updateUploadRevision) apply(data *contractorPersist) {
 	rev := u.NewRevisionTxn.FileContractRevisions[0]
 	c := data.Contracts[rev.ParentID.String()]
 	c.LastRevisionTxn = u.NewRevisionTxn
-	c.LastRevision = rev
 
 	if u.NewSectorIndex == len(c.MerkleRoots) {
 		c.MerkleRoots = append(c.MerkleRoots, u.NewSectorRoot)
@@ -327,7 +220,7 @@ type updateDownloadRevision struct {
 
 // apply sets the LastRevision, LastRevisionTxn, and DownloadSpending fields
 // of the contract being revised.
-func (u updateDownloadRevision) apply(data *contractorPersist) {
+func (u updateDownloadRevision) apply(data *journalPersist) {
 	if len(u.NewRevisionTxn.FileContractRevisions) == 0 {
 		build.Critical("updateDownloadRevision is missing its FileContractRevision")
 		return
@@ -335,7 +228,6 @@ func (u updateDownloadRevision) apply(data *contractorPersist) {
 	rev := u.NewRevisionTxn.FileContractRevisions[0]
 	c := data.Contracts[rev.ParentID.String()]
 	c.LastRevisionTxn = u.NewRevisionTxn
-	c.LastRevision = rev
 	c.DownloadSpending = u.NewDownloadSpending
 	data.Contracts[rev.ParentID.String()] = c
 }
@@ -351,7 +243,7 @@ type updateCachedUploadRevision struct {
 
 // apply sets the Revision field of the cachedRevision associated with the
 // contract being revised, as well as the Merkle root of the new sector.
-func (u updateCachedUploadRevision) apply(data *contractorPersist) {
+func (u updateCachedUploadRevision) apply(data *journalPersist) {
 	c := data.CachedRevisions[u.Revision.ParentID.String()]
 	c.Revision = u.Revision
 	if u.SectorIndex == len(c.MerkleRoots) {
@@ -372,7 +264,7 @@ type updateCachedDownloadRevision struct {
 
 // apply sets the Revision field of the cachedRevision associated with the
 // contract being revised.
-func (u updateCachedDownloadRevision) apply(data *contractorPersist) {
+func (u updateCachedDownloadRevision) apply(data *journalPersist) {
 	c := data.CachedRevisions[u.Revision.ParentID.String()]
 	c.Revision = u.Revision
 	data.CachedRevisions[u.Revision.ParentID.String()] = c

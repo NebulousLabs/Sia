@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -57,9 +58,7 @@ type (
 
 	persister interface {
 		save(contractorPersist) error
-		update(...journalUpdate) error
 		load(*contractorPersist) error
-		Close() error
 	}
 )
 
@@ -72,46 +71,27 @@ type walletBridge struct {
 func (ws *walletBridge) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
 func (ws *walletBridge) StartTransaction() transactionBuilder         { return ws.w.StartTransaction() }
 
-// stdPersist implements the persister interface via the journal type. The
-// filename required by these functions is internal to stdPersist.
+// stdPersist implements the persister interface. The filename required by
+// these functions is internal to stdPersist.
 type stdPersist struct {
-	journal  *journal
 	filename string
 }
 
-func (p *stdPersist) save(data contractorPersist) error {
-	if p.journal == nil {
-		var err error
-		p.journal, err = newJournal(p.filename, data)
-		return err
-	}
-	return p.journal.checkpoint(data)
+var persistMeta = persist.Metadata{
+	Header:  "Contractor Persistence",
+	Version: "1.3.1",
 }
 
-func (p *stdPersist) update(us ...journalUpdate) error {
-	return p.journal.update(us)
+func (p *stdPersist) save(data contractorPersist) error {
+	return persist.SaveJSON(persistMeta, data, p.filename)
 }
 
 func (p *stdPersist) load(data *contractorPersist) error {
-	var err error
-	p.journal, err = openJournal(p.filename, data)
-	if err != nil {
-		// Try loading old persist.
-		err = loadv110persist(filepath.Dir(p.filename), data)
-		if err != nil {
-			return err
-		}
-		p.journal, err = newJournal(p.filename, *data)
-	}
-	return err
-}
-
-func (p stdPersist) Close() error {
-	return p.journal.Close()
+	return persist.LoadJSON(persistMeta, &data, p.filename)
 }
 
 func newPersist(dir string) *stdPersist {
 	return &stdPersist{
-		filename: filepath.Join(dir, "contractor.journal"),
+		filename: filepath.Join(dir, "contractor.json"),
 	}
 }
