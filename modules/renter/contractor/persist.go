@@ -127,7 +127,7 @@ func convertPersist(dir string) error {
 
 	// convert contracts to contract files
 	for _, c := range p.Contracts {
-		if err := proto.ConvertV130Contract(c, dir); err != nil {
+		if err := proto.ConvertV130Contract(c, filepath.Join(dir, "contracts")); err != nil {
 			return err
 		}
 	}
