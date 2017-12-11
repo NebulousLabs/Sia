@@ -44,12 +44,17 @@ func TestChildTargetOak(t *testing.T) {
 
 	// Start with some values that are normal, resulting in no change in target.
 	parentHeight := types.BlockHeight(100)
+	// The total time and total target will be set to 100 uncompressed blocks.
+	// Though the actual algorithm is compressing the times to achieve an
+	// exponential weighting, this test only requires that the visible hashrate
+	// be measured as equal to the root target per block.
 	parentTotalTime := int64(types.BlockFrequency * parentHeight)
 	parentTotalTarget := types.RootTarget.MulDifficulty(big.NewRat(int64(parentHeight), 1))
+	parentTimestamp := types.GenesisTimestamp + types.Timestamp((types.BlockFrequency * parentHeight))
 	parentTarget := types.RootTarget
 	// newTarget should match the root target, as the hashrate and blocktime all
 	// match the existing target - there should be no reason for adjustment.
-	newTarget := cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight)
+	newTarget := cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight, parentTimestamp)
 	// New target should be barely moving. Some imprecision may cause slight
 	// adjustments, but the total difference should be less than 0.01%.
 	maxNewTarget := parentTarget.MulDifficulty(big.NewRat(10e3, 10001))
@@ -61,94 +66,178 @@ func TestChildTargetOak(t *testing.T) {
 		t.Error("The target shifted too much for a constant hashrate")
 	}
 
-	// Probe the target clamps and the block deltas by providing a correct
-	// hashrate, but a parent total time that is very far in the future, which
-	// means that blocks have been taking too long - this means that the target
-	// block time should be decreased, the difficulty should go down (and target
-	// up).
+	// Set the total time such that the difficulty needs to be adjusted down.
+	// Shifter clamps and adjustment clamps will both be in effect.
 	parentHeight = types.BlockHeight(100)
-	parentTotalTime = int64(types.BlockFrequency*parentHeight) + 500e6 // very large delta used to probe extremes
+	// Set the visible hashrate to types.RootTarget per block.
+	parentTotalTime = int64(types.BlockFrequency * parentHeight)
 	parentTotalTarget = types.RootTarget.MulDifficulty(big.NewRat(int64(parentHeight), 1))
+	// Set the timestamp far in the future, triggering the shifter to increase
+	// the block time to the point that the shifter clamps activate.
+	parentTimestamp = types.GenesisTimestamp + types.Timestamp((types.BlockFrequency * parentHeight)) + 500e6
+	// Set the target to types.RootTarget, causing the max difficulty adjustment
+	// clamp to be in effect.
 	parentTarget = types.RootTarget
-	// newTarget should be higher, representing reduced difficulty. It should be
-	// as high as the adjustment clamp allows it to move.
-	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight)
-	expectedTarget := parentTarget.MulDifficulty(types.OakMaxDrop)
-	if newTarget.Cmp(expectedTarget) != 0 {
-		t.Log(parentTarget)
-		t.Log(expectedTarget)
-		t.Log(newTarget)
-		t.Error("target was not adjusted correctly when the block delta was put to an extreme")
+	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight, parentTimestamp)
+	if parentTarget.Difficulty().Cmp(newTarget.Difficulty()) <= 0 {
+		t.Error("Difficulty did not decrease in response to increased total time")
 	}
-	// Check that the difficulty decreased from the parent.
-	if newTarget.Difficulty().Cmp(parentTarget.Difficulty()) >= 0 {
-		t.Log(newTarget.Difficulty())
-		t.Log(expectedTarget.Difficulty())
-		t.Error("difficulty has risen when we need the block time to be shorter")
+	// Check that the difficulty decreased by the maximum amount.
+	minNewTarget = parentTarget.MulDifficulty(types.OakMaxDrop)
+	if minNewTarget.Difficulty().Cmp(newTarget.Difficulty()) != 0 {
+		t.Error("Difficulty did not decrease by the maximum amount")
 	}
 
-	// Use the same values as the previous check, but set the parent target so
-	// it's within range (but above) the adjustment, so the clamp is not
-	// triggered.
+	// Set the total time such that the difficulty needs to be adjusted up.
+	// Shifter clamps and adjustment clamps will both be in effect.
 	parentHeight = types.BlockHeight(100)
-	parentTotalTime = int64(types.BlockFrequency*parentHeight) + 500e6
+	// Set the visible hashrate to types.RootTarget per block.
+	parentTotalTime = int64(types.BlockFrequency * parentHeight)
 	parentTotalTarget = types.RootTarget.MulDifficulty(big.NewRat(int64(parentHeight), 1))
-	parentTarget = types.Target{0, 0, 97, 120}
-	// New target should be higher, but the adjustment clamp should not have
-	// kicked in.
-	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight)
+	// Set the timestamp far in the past, triggering the shifter to decrease the
+	// block time to the point that the shifter clamps activate.
+	parentTimestamp = types.GenesisTimestamp + types.Timestamp((types.BlockFrequency * parentHeight)) - 500e6
+	// Set the target to types.RootTarget, causing the max difficulty adjustment
+	// clamp to be in effect.
+	parentTarget = types.RootTarget
+	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight, parentTimestamp)
+	if parentTarget.Difficulty().Cmp(newTarget.Difficulty()) >= 0 {
+		t.Error("Difficulty did not increase in response to decreased total time")
+	}
+	// Check that the difficulty decreased by the maximum amount.
+	minNewTarget = parentTarget.MulDifficulty(types.OakMaxRise)
+	if minNewTarget.Difficulty().Cmp(newTarget.Difficulty()) != 0 {
+		t.Error("Difficulty did not increase by the maximum amount")
+	}
+
+	// Set the total time such that the difficulty needs to be adjusted down.
+	// Neither the shiftor clamps nor the adjustor clamps will be in effect.
+	parentHeight = types.BlockHeight(100)
+	// Set the visible hashrate to types.RootTarget per block.
+	parentTotalTime = int64(types.BlockFrequency * parentHeight)
+	parentTotalTarget = types.RootTarget.MulDifficulty(big.NewRat(int64(parentHeight), 1))
+	// Set the timestamp in the future, but little enough in the future that
+	// neither the shifter clamp nor the adjustment clamp will trigger.
+	parentTimestamp = types.GenesisTimestamp + types.Timestamp((types.BlockFrequency * parentHeight)) + 5e3
+	// Set the target to types.RootTarget.
+	parentTarget = types.RootTarget
+	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight, parentTimestamp)
+	// Check that the difficulty decreased, but not by the max amount.
 	minNewTarget = parentTarget.MulDifficulty(types.OakMaxDrop)
-	// Check that the difficulty of the new target decreased.
 	if parentTarget.Difficulty().Cmp(newTarget.Difficulty()) <= 0 {
 		t.Error("Difficulty did not decrease")
 	}
-	// Check that the difficulty decreased by less than the clamped amount.
 	if minNewTarget.Difficulty().Cmp(newTarget.Difficulty()) >= 0 {
-		t.Error("Difficulty decreased by too much - clamp should not be in effect for these values")
+		t.Error("Difficulty decreased by the clamped amount")
 	}
 
-	// A repeat of the second test, except that blocks are coming out too fast
-	// instead of too slow, meaning we should see an increased difficulty and a
-	// slower block time.
-	parentHeight = types.BlockHeight(10e3)
-	parentTotalTime = int64(100)
+	// Set the total time such that the difficulty needs to be adjusted up.
+	// Neither the shiftor clamps nor the adjustor clamps will be in effect.
+	parentHeight = types.BlockHeight(100)
+	// Set the visible hashrate to types.RootTarget per block.
+	parentTotalTime = int64(types.BlockFrequency * parentHeight)
 	parentTotalTarget = types.RootTarget.MulDifficulty(big.NewRat(int64(parentHeight), 1))
+	// Set the timestamp in the past, but little enough in the future that
+	// neither the shifter clamp nor the adjustment clamp will trigger.
+	parentTimestamp = types.GenesisTimestamp + types.Timestamp((types.BlockFrequency * parentHeight)) - 5e3
+	// Set the target to types.RootTarget.
 	parentTarget = types.RootTarget
-	// newTarget should be lower, representing increased difficulty. It should
-	// be as high as the adjustment clamp allows it to move.
-	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight)
-	expectedTarget = parentTarget.MulDifficulty(types.OakMaxRise)
-	if newTarget.Cmp(expectedTarget) != 0 {
-		t.Log(parentTarget)
-		t.Log(expectedTarget)
-		t.Log(newTarget)
-		t.Error("target was not adjusted correctly when the block delta was put to an extreme")
+	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight, parentTimestamp)
+	// Check that the difficulty increased, but not by the max amount.
+	maxNewTarget = parentTarget.MulDifficulty(types.OakMaxRise)
+	if parentTarget.Difficulty().Cmp(newTarget.Difficulty()) >= 0 {
+		t.Error("Difficulty did not decrease")
 	}
-	// Check that the difficulty increased from the parent.
-	if newTarget.Difficulty().Cmp(parentTarget.Difficulty()) <= 0 {
-		t.Log(newTarget.Difficulty())
-		t.Log(expectedTarget.Difficulty())
-		t.Error("difficulty has dropped when we need the block time to be longer")
+	if maxNewTarget.Difficulty().Cmp(newTarget.Difficulty()) <= 0 {
+		t.Error("Difficulty decreased by the clamped amount")
 	}
 
-	// Use the same values as the previous check, but set the parent target so
-	// it's within range (but below) the adjustment, so the clamp is not
-	// triggered.
-	parentHeight = types.BlockHeight(10e3)
-	parentTotalTime = int64(100)
+	// Set the total time such that the difficulty needs to be adjusted down.
+	// Adjustor clamps will be in effect, shifter clamps will not be in effect.
+	parentHeight = types.BlockHeight(100)
+	// Set the visible hashrate to types.RootTarget per block.
+	parentTotalTime = int64(types.BlockFrequency * parentHeight)
 	parentTotalTarget = types.RootTarget.MulDifficulty(big.NewRat(int64(parentHeight), 1))
-	parentTarget = types.Target{0, 0, 0, 0, 0, 0, 93, 70}
-	// New target should be higher, but the adjustment clamp should not have
-	// kicked in.
-	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight)
-	minNewTarget = parentTarget.MulDifficulty(types.OakMaxRise)
-	// Check that the difficulty of the new target decreased.
-	if parentTarget.Difficulty().Cmp(newTarget.Difficulty()) >= 0 {
-		t.Error("Difficulty did not increase")
+	// Set the timestamp in the future, but little enough in the future that
+	// neither the shifter clamp nor the adjustment clamp will trigger.
+	parentTimestamp = types.GenesisTimestamp + types.Timestamp((types.BlockFrequency * parentHeight)) + 10e3
+	// Set the target to types.RootTarget.
+	parentTarget = types.RootTarget
+	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight, parentTimestamp)
+	// Check that the difficulty decreased, but not by the max amount.
+	minNewTarget = parentTarget.MulDifficulty(types.OakMaxDrop)
+	if parentTarget.Difficulty().Cmp(newTarget.Difficulty()) <= 0 {
+		t.Error("Difficulty did not decrease")
 	}
-	// Check that the difficulty decreased by less than the clamped amount.
-	if minNewTarget.Difficulty().Cmp(newTarget.Difficulty()) <= 0 {
-		t.Error("Difficulty increased by too much - clamp should not be in effect for these values")
+	if minNewTarget.Difficulty().Cmp(newTarget.Difficulty()) != 0 {
+		t.Error("Difficulty decreased by the clamped amount")
+	}
+
+	// Set the total time such that the difficulty needs to be adjusted up.
+	// Adjustor clamps will be in effect, shifter clamps will not be in effect.
+	parentHeight = types.BlockHeight(100)
+	// Set the visible hashrate to types.RootTarget per block.
+	parentTotalTime = int64(types.BlockFrequency * parentHeight)
+	parentTotalTarget = types.RootTarget.MulDifficulty(big.NewRat(int64(parentHeight), 1))
+	// Set the timestamp in the past, but little enough in the future that
+	// neither the shifter clamp nor the adjustment clamp will trigger.
+	parentTimestamp = types.GenesisTimestamp + types.Timestamp((types.BlockFrequency * parentHeight)) - 10e3
+	// Set the target to types.RootTarget.
+	parentTarget = types.RootTarget
+	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight, parentTimestamp)
+	// Check that the difficulty increased, but not by the max amount.
+	maxNewTarget = parentTarget.MulDifficulty(types.OakMaxRise)
+	if parentTarget.Difficulty().Cmp(newTarget.Difficulty()) >= 0 {
+		t.Error("Difficulty did not decrease")
+	}
+	if maxNewTarget.Difficulty().Cmp(newTarget.Difficulty()) != 0 {
+		t.Error("Difficulty decreased by the clamped amount")
+	}
+
+	// Set the total time such that the difficulty needs to be adjusted down.
+	// Shifter clamps will be in effect, adjustor clamps will not be in effect.
+	parentHeight = types.BlockHeight(100)
+	// Set the visible hashrate to types.RootTarget per block.
+	parentTotalTime = int64(types.BlockFrequency * parentHeight)
+	parentTotalTarget = types.RootTarget.MulDifficulty(big.NewRat(int64(parentHeight), 1))
+	// Set the timestamp in the future, but little enough in the future that
+	// neither the shifter clamp nor the adjustment clamp will trigger.
+	parentTimestamp = types.GenesisTimestamp + types.Timestamp((types.BlockFrequency * parentHeight)) + 500e6
+	// Set the target to types.RootTarget.
+	parentTarget = types.RootTarget.MulDifficulty(big.NewRat(1, types.OakMaxBlockShift))
+	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight, parentTimestamp)
+	// New target should be barely moving. Some imprecision may cause slight
+	// adjustments, but the total difference should be less than 0.01%.
+	maxNewTarget = parentTarget.MulDifficulty(big.NewRat(10e3, 10001))
+	minNewTarget = parentTarget.MulDifficulty(big.NewRat(10001, 10e3))
+	if newTarget.Cmp(maxNewTarget) > 0 {
+		t.Error("The target shifted too much for a constant hashrate")
+	}
+	if newTarget.Cmp(minNewTarget) < 0 {
+		t.Error("The target shifted too much for a constant hashrate")
+	}
+
+	// Set the total time such that the difficulty needs to be adjusted up.
+	// Shifter clamps will be in effect, adjustor clamps will not be in effect.
+	parentHeight = types.BlockHeight(100)
+	// Set the visible hashrate to types.RootTarget per block.
+	parentTotalTime = int64(types.BlockFrequency * parentHeight)
+	parentTotalTarget = types.RootTarget.MulDifficulty(big.NewRat(int64(parentHeight), 1))
+	// Set the timestamp in the past, but little enough in the future that
+	// neither the shifter clamp nor the adjustment clamp will trigger.
+	parentTimestamp = types.GenesisTimestamp + types.Timestamp((types.BlockFrequency * parentHeight)) - 500e6
+	// Set the target to types.RootTarget.
+	parentTarget = types.RootTarget.MulDifficulty(big.NewRat(types.OakMaxBlockShift, 1))
+	newTarget = cs.childTargetOak(parentTotalTime, parentTotalTarget, parentTarget, parentHeight, parentTimestamp)
+	// New target should be barely moving. Some imprecision may cause slight
+	// adjustments, but the total difference should be less than 0.01%.
+	maxNewTarget = parentTarget.MulDifficulty(big.NewRat(10e3, 10001))
+	minNewTarget = parentTarget.MulDifficulty(big.NewRat(10001, 10e3))
+	if newTarget.Cmp(maxNewTarget) > 0 {
+		t.Error("The target shifted too much for a constant hashrate")
+	}
+	if newTarget.Cmp(minNewTarget) < 0 {
+		t.Error("The target shifted too much for a constant hashrate")
 	}
 }
 
