@@ -419,11 +419,7 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 }
 
 // ConvertV130Contract creates a contract file for a v130 contract.
-func ConvertV130Contract(c V130Contract, dir string) error {
-	cs := &ContractSet{
-		contracts: make(map[types.FileContractID]*SafeContract),
-		dir:       dir,
-	}
+func (cs *ContractSet) ConvertV130Contract(c V130Contract, cr V130CachedRevision) error {
 	m, err := cs.managedInsertContract(contractHeader{
 		Transaction:      c.LastRevisionTxn,
 		SecretKey:        c.SecretKey,
@@ -439,7 +435,22 @@ func ConvertV130Contract(c V130Contract, dir string) error {
 	if err != nil {
 		return err
 	}
-	cs.contracts[m.ID].f.Close()
+	// if there is a cached revision, store it as an unapplied WAL transaction
+	if cr.Revision.NewRevisionNumber != 0 {
+		sc, ok := cs.Acquire(m.ID)
+		if !ok {
+			return errors.New("contract set is missing contract that was just added")
+		}
+		if len(cr.MerkleRoots) == len(sc.merkleRoots)+1 {
+			root := cr.MerkleRoots[len(cr.MerkleRoots)-1]
+			_, err = sc.recordUploadIntent(cr.Revision, root, types.ZeroCurrency, types.ZeroCurrency)
+		} else {
+			_, err = sc.recordDownloadIntent(cr.Revision, types.ZeroCurrency)
+		}
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -474,6 +485,13 @@ func (c *V130Contract) RenterFunds() types.Currency {
 		return types.ZeroCurrency
 	}
 	return c.LastRevision.NewValidProofOutputs[0].Value
+}
+
+// A V130CachedRevision contains changes that would be applied to a
+// RenterContract if a contract revision succeeded.
+type V130CachedRevision struct {
+	Revision    types.FileContractRevision `json:"revision"`
+	MerkleRoots modules.MerkleRootSet      `json:"merkleroots"`
 }
 
 // MerkleRootSet is a set of Merkle roots, and gets encoded more efficiently.

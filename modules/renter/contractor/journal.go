@@ -39,14 +39,14 @@ var journalMeta = persist.Metadata{
 }
 
 type journalPersist struct {
-	Allowance       modules.Allowance             `json:"allowance"`
-	BlockHeight     types.BlockHeight             `json:"blockheight"`
-	CachedRevisions map[string]cachedRevision     `json:"cachedrevisions"`
-	Contracts       map[string]proto.V130Contract `json:"contracts"`
-	CurrentPeriod   types.BlockHeight             `json:"currentperiod"`
-	LastChange      modules.ConsensusChangeID     `json:"lastchange"`
-	OldContracts    []proto.V130Contract          `json:"oldcontracts"`
-	RenewedIDs      map[string]string             `json:"renewedids"`
+	Allowance       modules.Allowance                   `json:"allowance"`
+	BlockHeight     types.BlockHeight                   `json:"blockheight"`
+	CachedRevisions map[string]proto.V130CachedRevision `json:"cachedrevisions"`
+	Contracts       map[string]proto.V130Contract       `json:"contracts"`
+	CurrentPeriod   types.BlockHeight                   `json:"currentperiod"`
+	LastChange      modules.ConsensusChangeID           `json:"lastchange"`
+	OldContracts    []proto.V130Contract                `json:"oldcontracts"`
+	RenewedIDs      map[string]string                   `json:"renewedids"`
 }
 
 // A journal is a log of updates to a JSON object.
@@ -96,7 +96,7 @@ func openJournal(filename string, data *journalPersist) (*journal, error) {
 
 	// Make sure all maps are properly initialized.
 	if data.CachedRevisions == nil {
-		data.CachedRevisions = map[string]cachedRevision{}
+		data.CachedRevisions = map[string]proto.V130CachedRevision{}
 	}
 	if data.Contracts == nil {
 		data.Contracts = map[string]proto.V130Contract{}
