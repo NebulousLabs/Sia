@@ -213,7 +213,7 @@ func init() {
 		// followed up with another fix. The height of that fix is the
 		// OakHardforkFixBlock.
 		OakHardforkBlock = 135e3
-		OakHardforkFixBlock = 138e3
+		OakHardforkFixBlock = 139e3
 
 		// The decay is kept at 995/1000, or a decay of about 0.5% each block.
 		// This puts the halflife of a block's relevance at about 1 day. This
