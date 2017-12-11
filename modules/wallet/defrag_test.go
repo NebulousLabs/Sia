@@ -155,7 +155,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 			case <-closechan:
 				return
 			case <-time.After(time.Millisecond * 100):
-				_, err = wt.miner.AddBlock()
+				_, err := wt.miner.AddBlock()
 				if err != nil {
 					t.Fatal(err)
 				}

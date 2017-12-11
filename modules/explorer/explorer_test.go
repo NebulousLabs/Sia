@@ -157,6 +157,9 @@ func TestNilExplorerDependencies(t *testing.T) {
 // TestExplorerGenesisHeight checks that when the explorer is initialized and given the
 // genesis block, the result has the correct height.
 func TestExplorerGenesisHeight(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Create the dependencies.
 	testdir := build.TempDir(modules.HostDir, t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
