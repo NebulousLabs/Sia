@@ -135,13 +135,6 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 		return
 	}
 
-	if g.myAddr.IsAllZeros() {
-		g.mu.Lock()
-		host, _, _ := net.SplitHostPort(conn.LocalAddr().String())
-		g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
-		g.mu.Unlock()
-	}
-
 	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
 		err = g.managedAcceptConnv130Peer(conn, remoteVersion)
 	} else if build.VersionCmp(remoteVersion, handshakeUpgradeVersion) >= 0 {
@@ -179,11 +172,14 @@ func acceptableSessionHeader(ourHeader, remoteHeader sessionHeader, remoteAddr s
 func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string) error {
 	g.log.Debugln("Sending sessionHeader with address", g.myAddr, g.myAddr.IsLocal())
 	// Perform header handshake.
+	g.mu.RLock()
 	ourHeader := sessionHeader{
 		GenesisID:  types.GenesisID,
 		UniqueID:   g.id,
 		NetAddress: g.myAddr,
 	}
+	g.mu.RUnlock()
+
 	remoteHeader, err := exchangeRemoteHeader(conn, ourHeader)
 	if err != nil {
 		return err
@@ -445,11 +441,14 @@ func exchangeRemoteHeader(conn net.Conn, ourHeader sessionHeader) (sessionHeader
 func (g *Gateway) managedConnectv130Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
 	g.log.Debugln("Sending sessionHeader with address", g.myAddr, g.myAddr.IsLocal())
 	// Perform header handshake.
+	g.mu.RLock()
 	ourHeader := sessionHeader{
 		GenesisID:  types.GenesisID,
 		UniqueID:   g.id,
 		NetAddress: g.myAddr,
 	}
+	g.mu.RUnlock()
+
 	if err := exchangeOurHeader(conn, ourHeader); err != nil {
 		return err
 	} else if _, err := exchangeRemoteHeader(conn, ourHeader); err != nil {
@@ -506,13 +505,6 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	if err != nil {
 		conn.Close()
 		return err
-	}
-
-	if g.myAddr.IsAllZeros() {
-		g.mu.Lock()
-		host, _, _ := net.SplitHostPort(conn.LocalAddr().String())
-		g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
-		g.mu.Unlock()
 	}
 
 	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {

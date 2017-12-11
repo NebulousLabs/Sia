@@ -60,13 +60,6 @@ func (na NetAddress) IsLoopback() bool {
 	return false
 }
 
-// IsAllZeros return true if the address is an invalid/any interface address
-// which can happen if siad is not bound to a specific interface
-func (na NetAddress) IsAllZeros() bool {
-	return na.Host() == "0.0.0.0" || na.Host() == "::"
-}
-
-
 // IsLocal returns true if the input IP address belongs to a local address
 // range such as 192.168.x.x or 127.x.x.x
 func (na NetAddress) IsLocal() bool {

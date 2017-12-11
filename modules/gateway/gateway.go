@@ -282,13 +282,20 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 		<-permanentListenClosedChan
 	})
 	// Set the address and port of the gateway.
-	_, g.port, err = net.SplitHostPort(g.listener.Addr().String())
+	host, port, err := net.SplitHostPort(g.listener.Addr().String())
+	g.port = port
 	if err != nil {
 		return nil, err
 	}
+
+	if ip := net.ParseIP(host); ip.IsUnspecified() && ip != nil {
+		// if host is unspecified, set a dummy one for now.
+		host = "localhost"
+	}
+
 	// Set myAddr equal to the address returned by the listener. It will be
 	// overwritten by threadedLearnHostname later on.
-	g.myAddr = modules.NetAddress(g.listener.Addr().String())
+	g.myAddr = modules.NetAddress(net.JoinHostPort(host, port))
 
 	// Spawn the peer connection listener.
 	go g.permanentListen(permanentListenClosedChan)
