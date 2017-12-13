@@ -74,5 +74,5 @@ var (
 	// queried from the hostdb and the lowest scoring among them is selected.
 	// That score is then divided by scoreLeeway to get the minimum score that a
 	// host is allowed to have before being marked as !GoodForUpload.
-	scoreLeeway = types.NewCurrency64(25)
+	scoreLeeway = types.NewCurrency64(100)
 )
