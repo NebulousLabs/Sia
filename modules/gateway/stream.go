@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/muxado"
 	"github.com/xtaci/smux"
 )
 
@@ -16,44 +15,18 @@ type streamSession interface {
 	Close() error
 }
 
-// returns a new client stream, with a protocol that works on top of the TCP connection.
-// using smux for version >= 1.3.0, and using muxado otherwise.
+// newClientStream returns a new smux client.
 func newClientStream(conn net.Conn, version string) streamSession {
-	if build.VersionCmp(version, sessionUpgradeVersion) >= 0 {
-		return newSmuxClient(conn)
-	}
-	return newMuxadoClient(conn)
+	return newSmuxClient(conn)
 }
 
-// returns a new server stream, with a protocol that works on top of the TCP connection.
-// using smux for version >= 1.3.0, and using muxado otherwise.
+// newServerStream returns a new smux server.
 func newServerStream(conn net.Conn, version string) streamSession {
-	if build.VersionCmp(version, sessionUpgradeVersion) >= 0 {
-		return newSmuxServer(conn)
-	}
-	return newMuxadoServer(conn)
+	return newSmuxServer(conn)
 }
 
-// muxado's Session methods do not return a net.Conn, but rather a
-// muxado.Stream, necessitating an adaptor.
-type muxadoSession struct {
-	sess muxado.Session
-}
-
-func (m muxadoSession) Accept() (net.Conn, error) { return m.sess.Accept() }
-func (m muxadoSession) Open() (net.Conn, error)   { return m.sess.Open() }
-func (m muxadoSession) Close() error              { return m.sess.Close() }
-
-func newMuxadoServer(conn net.Conn) streamSession {
-	return muxadoSession{muxado.Server(conn)}
-}
-
-func newMuxadoClient(conn net.Conn) streamSession {
-	return muxadoSession{muxado.Client(conn)}
-}
-
-// smux's Session methods do not return a net.Conn, but rather a
-// smux.Stream, necessitating an adaptor.
+// smuxSession adapts the methods of smux.Session to conform to the
+// streamSession interface.
 type smuxSession struct {
 	sess *smux.Session
 }
