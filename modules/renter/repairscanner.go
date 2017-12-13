@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -248,7 +249,9 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 	}
 	// If there are not enough good hosts for this chunk we ignore it for now
 	nextChunk := heap.Pop(ch).(*unfinishedChunk)
-	if numGoodHosts < nextChunk.piecesNeeded {
+	if !build.DEBUG && numGoodHosts < nextChunk.piecesNeeded {
+		// Only abort in Release builds. Tests often don't have enough hosts to
+		// restore full redundancy
 		return
 	}
 
