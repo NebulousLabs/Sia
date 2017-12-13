@@ -28,9 +28,8 @@ const (
 	// minAcceptableVersion is the version below which the gateway will refuse to
 	// connect to peers and reject connection attempts.
 	//
-	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
-	// pre-hardfork.
-	minAcceptableVersion = "0.4.0"
+	// Reject peers < v1.3.0 due to hardfork.
+	minAcceptableVersion = "1.3.0"
 
 	// saveFrequency defines how often the gateway saves its persistence.
 	saveFrequency = time.Minute * 2

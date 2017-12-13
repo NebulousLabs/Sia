@@ -137,10 +137,6 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 
 	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
 		err = g.managedAcceptConnv130Peer(conn, remoteVersion)
-	} else if build.VersionCmp(remoteVersion, handshakeUpgradeVersion) >= 0 {
-		err = g.managedAcceptConnv100Peer(conn, remoteVersion)
-	} else {
-		err = g.managedAcceptConnOldPeer(conn, remoteVersion)
 	}
 	if err != nil {
 		g.log.Debugf("INFO: %v wanted to connect, but failed: %v", addr, err)
@@ -217,88 +213,6 @@ func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string)
 		}
 	}()
 
-	return nil
-}
-
-// managedAcceptConnv100Peer accepts connection requests from peers >= v1.0.0.
-// The requesting peer is added as a node and a peer. The peer is only added if
-// a nil error is returned.
-func (g *Gateway) managedAcceptConnv100Peer(conn net.Conn, remoteVersion string) error {
-	// Learn the peer's dialback address.
-	var dialbackPort string
-	err := encoding.ReadObject(conn, &dialbackPort, 13) // Max port # is 65535 (5 digits long) + 8 byte string length prefix
-	if err != nil {
-		return fmt.Errorf("could not read remote peer's port: %v", err)
-	}
-	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	remoteAddr := modules.NetAddress(net.JoinHostPort(host, dialbackPort))
-	if err := remoteAddr.IsStdValid(); err != nil {
-		return fmt.Errorf("peer's address (%v) is invalid: %v", remoteAddr, err)
-	}
-	// Sanity check to ensure that appending the port string to the host didn't
-	// change the host. Only necessary because the peer sends the port as a string
-	// instead of an integer.
-	if remoteAddr.Host() != host {
-		return fmt.Errorf("peer sent a port which modified the host")
-	}
-
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	// Don't accept a connection from a peer we're already connected to.
-	if _, exists := g.peers[remoteAddr]; exists {
-		return fmt.Errorf("already connected to a peer on that address: %v", remoteAddr)
-	}
-	// Accept the peer.
-	g.acceptPeer(&peer{
-		Peer: modules.Peer{
-			Inbound: true,
-			// NOTE: local may be true even if the supplied remoteAddr is not
-			// actually reachable.
-			Local:      remoteAddr.IsLocal(),
-			NetAddress: remoteAddr,
-			Version:    remoteVersion,
-		},
-		sess: newServerStream(conn, remoteVersion),
-	})
-
-	// Attempt to ping the supplied address. If successful, and a connection is wanted,
-	// we will add remoteAddr to our node list after accepting the peer. We do this in a
-	// goroutine so that we can start communicating with the peer immediately.
-	go func() {
-		err := g.pingNode(remoteAddr)
-		if err == nil {
-			g.mu.Lock()
-			g.addNode(remoteAddr)
-			g.mu.Unlock()
-		}
-	}()
-
-	return nil
-}
-
-// managedAcceptConnOldPeer accepts a connection request from peers < v1.0.0.
-// The requesting peer is added as a peer, but is not added to the node list
-// (older peers do not share their dialback address). The peer is only added if
-// a nil error is returned.
-func (g *Gateway) managedAcceptConnOldPeer(conn net.Conn, remoteVersion string) error {
-	addr := modules.NetAddress(conn.RemoteAddr().String())
-
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	// Old peers are unable to give us a dialback port, so we can't verify
-	// whether or not they are local peers.
-	g.acceptPeer(&peer{
-		Peer: modules.Peer{
-			Inbound:    true,
-			Local:      false,
-			NetAddress: addr,
-			Version:    remoteVersion,
-		},
-		sess: newServerStream(conn, remoteVersion),
-	})
-	g.addNode(addr)
 	return nil
 }
 
@@ -457,20 +371,6 @@ func (g *Gateway) managedConnectv130Peer(conn net.Conn, remoteVersion string, re
 	return nil
 }
 
-// managedConnectv100Peer connects to peers >= v1.0.0 and < v1.3.0. The peer is added as a
-// node and a peer. The peer is only added if a nil error is returned.
-func (g *Gateway) managedConnectv100Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
-	g.mu.RLock()
-	port := g.port
-	g.mu.RUnlock()
-	// Send our port to the peer so they can dial us back.
-	err := encoding.WriteObject(conn, port)
-	if err != nil {
-		return errors.New("could not write port #: " + err.Error())
-	}
-	return nil
-}
-
 // managedConnect establishes a persistent connection to a peer, and adds it to
 // the Gateway's peer list.
 func (g *Gateway) managedConnect(addr modules.NetAddress) error {
@@ -509,10 +409,6 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 
 	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
 		err = g.managedConnectv130Peer(conn, remoteVersion, addr)
-	} else if build.VersionCmp(remoteVersion, handshakeUpgradeVersion) >= 0 {
-		err = g.managedConnectv100Peer(conn, remoteVersion, addr)
-	} else {
-		// for older nodes, protocol stops here
 	}
 	if err != nil {
 		conn.Close()
