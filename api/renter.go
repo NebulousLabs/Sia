@@ -231,6 +231,14 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 		if len(c.Transaction.FileContractRevisions) != 0 {
 			size = c.Transaction.FileContractRevisions[0].NewFileSize
 		}
+
+		// Fetch host address
+		var netAddress modules.NetAddress
+		hdbe, exists := api.renter.Host(c.HostPublicKey)
+		if exists {
+			netAddress = hdbe.NetAddress
+		}
+
 		contracts = append(contracts, RenterContract{
 			DownloadSpending: c.DownloadSpending,
 			EndHeight:        c.EndHeight,
@@ -238,7 +246,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			HostPublicKey:    c.HostPublicKey,
 			ID:               c.ID,
 			LastTransaction:  c.Transaction,
-			NetAddress:       "", // TODO: fetch this from hostdb?
+			NetAddress:       netAddress,
 			RenterFunds:      c.RenterFunds,
 			Size:             size,
 			StartHeight:      c.StartHeight,
