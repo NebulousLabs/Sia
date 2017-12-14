@@ -4,13 +4,14 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 const (
 	// contractExtension is the extention given to contract files.
 	contractExtension = ".contract"
 )
-
 
 var (
 	// connTimeout determines the number of seconds the dialer will wait
@@ -31,7 +32,7 @@ var (
 	// properly connected to the peer network, and so could fall behind on
 	// blocks. Once enough of the network has upgraded, we can move the number
 	// to '0.003' for 'Standard'.
-	var hostPriceLeeway = build.Select(build.Var{
+	hostPriceLeeway = build.Select(build.Var{
 		Dev:      0.05,
 		Standard: 0.01,
 		Testing:  0.002,
