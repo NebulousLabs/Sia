@@ -202,6 +202,7 @@ func (c *SafeContract) recordUploadIntent(rev types.FileContractRevision, root c
 	if err := <-t.SignalSetupComplete(); err != nil {
 		return nil, err
 	}
+	c.unappliedTxns = append(c.unappliedTxns, t)
 	return t, nil
 }
 
@@ -224,7 +225,11 @@ func (c *SafeContract) commitUpload(t *writeaheadlog.Transaction, signedTxn type
 	if err := c.f.Sync(); err != nil {
 		return err
 	}
-	return t.SignalUpdatesApplied()
+	if err := t.SignalUpdatesApplied(); err != nil {
+		return err
+	}
+	c.unappliedTxns = nil
+	return nil
 }
 
 func (c *SafeContract) recordDownloadIntent(rev types.FileContractRevision, bandwidthCost types.Currency) (*writeaheadlog.Transaction, error) {
@@ -245,6 +250,7 @@ func (c *SafeContract) recordDownloadIntent(rev types.FileContractRevision, band
 	if err := <-t.SignalSetupComplete(); err != nil {
 		return nil, err
 	}
+	c.unappliedTxns = append(c.unappliedTxns, t)
 	return t, nil
 }
 
@@ -262,7 +268,11 @@ func (c *SafeContract) commitDownload(t *writeaheadlog.Transaction, signedTxn ty
 	if err := c.f.Sync(); err != nil {
 		return err
 	}
-	return t.SignalUpdatesApplied()
+	if err := t.SignalUpdatesApplied(); err != nil {
+		return err
+	}
+	c.unappliedTxns = nil
+	return nil
 }
 
 // commitTxns commits the unapplied transactions to the contract file and marks
