@@ -139,7 +139,12 @@ func NewContractSet(dir string) (*ContractSet, error) {
 
 	// Load the WAL. Any recovered updates will be applied after loading
 	// contracts.
-	walTxns, wal, err := writeaheadlog.New(filepath.Join(dir, "contractset.log"))
+	// COMPATv1.3.1RC2 Rename old wals to have the 'wal' extension.
+	err = os.Rename(filepath.Join(dir, "contractset.log"), filepath.Join(dir, "contractset.wal"))
+	if !os.IsNotExist(err) {
+		return nil, err
+	}
+	walTxns, wal, err := writeaheadlog.New(filepath.Join(dir, "contractset.wal"))
 	if err != nil {
 		return nil, err
 	}
