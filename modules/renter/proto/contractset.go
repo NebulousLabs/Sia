@@ -139,9 +139,9 @@ func NewContractSet(dir string) (*ContractSet, error) {
 
 	// Load the WAL. Any recovered updates will be applied after loading
 	// contracts.
-	// COMPATv1.3.1RC2 Rename old wals to have the 'wal' extension.
-	err = os.Rename(filepath.Join(dir, "contractset.log"), filepath.Join(dir, "contractset.wal"))
-	if !os.IsNotExist(err) {
+	// COMPATv1.3.1RC2 Rename old wals to have the 'wal' extension if new file
+	// doesn't exist.
+	if err := v131RC2RenameWAL(dir); err != nil {
 		return nil, err
 	}
 	walTxns, wal, err := writeaheadlog.New(filepath.Join(dir, "contractset.wal"))
@@ -172,4 +172,18 @@ func NewContractSet(dir string) (*ContractSet, error) {
 	}
 
 	return cs, nil
+}
+
+// v131RC2RenameWAL renames an existing old wal file from contractset.log to
+// contractset.wal
+func v131RC2RenameWAL(dir string) error {
+	oldPath := filepath.Join(dir, "contractset.log")
+	newPath := filepath.Join(dir, "contractset.wal")
+	_, errOld := os.Stat(oldPath)
+	_, errNew := os.Stat(newPath)
+	if !os.IsNotExist(errOld) && os.IsNotExist(errNew) {
+		return build.ExtendErr("failed to rename contractset.log to contractset.wal",
+			os.Rename(oldPath, newPath))
+	}
+	return nil
 }
