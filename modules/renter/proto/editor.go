@@ -13,24 +13,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-var hostPriceLeeway = build.Select(build.Var{
-	Dev:      0.05,
-	Standard: 0.002,
-	Testing:  0.002,
-}).(float64)
-
-var (
-	// sectorHeight is the height of a Merkle tree that covers a single
-	// sector. It is log2(modules.SectorSize / crypto.SegmentSize)
-	sectorHeight = func() uint64 {
-		height := uint64(0)
-		for 1<<height < (modules.SectorSize / crypto.SegmentSize) {
-			height++
-		}
-		return height
-	}()
-)
-
 // cachedMerkleRoot calculates the root of a set of existing Merkle roots.
 func cachedMerkleRoot(roots []crypto.Hash) crypto.Hash {
 	tree := crypto.NewCachedTree(sectorHeight) // NOTE: height is not strictly necessary here
