@@ -240,28 +240,7 @@ func versionAdjustments(entry modules.HostDBEntry) float64 {
 		base = base * 0.7
 	}
 	if build.VersionCmp(entry.Version, "1.3.0") < 0 {
-		base = base * 0.9
-	}
-	if build.VersionCmp(entry.Version, "1.2.2") < 0 {
-		base = base * 0.9
-	}
-	if build.VersionCmp(entry.Version, "1.2.1") < 0 {
-		base = base / 2 // 2x total penalty.
-	}
-	if build.VersionCmp(entry.Version, "1.2.0") < 0 {
-		base = base / 2 // 4x total penalty.
-	}
-	if build.VersionCmp(entry.Version, "1.1.2") < 0 {
-		base = base / 2 // 8x total penalty.
-	}
-	if build.VersionCmp(entry.Version, "1.1.1") < 0 {
-		base = base / 2 // 16x total penalty.
-	}
-	if build.VersionCmp(entry.Version, "1.0.3") < 0 {
-		base = base / 2 // 32x total penalty.
-	}
-	if build.VersionCmp(entry.Version, "1.0.0") < 0 {
-		base = base / 1000 // 32,000x total penalty.
+		base = base / 1000
 	}
 	return base
 }
