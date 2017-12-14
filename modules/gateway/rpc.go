@@ -141,12 +141,12 @@ func (g *Gateway) threadedListenPeer(p *peer) {
 	defer g.peerTG.Done()
 
 	// Spin up a goroutine to listen for a shutdown signal from both the peer
-	// and from the gateway. In the event of either, close the muxado session.
+	// and from the gateway. In the event of either, close the session.
 	connClosedChan := make(chan struct{})
 	peerCloseChan := make(chan struct{})
 	go func() {
-		// Signal that the muxado session has been successfully closed, and
-		// that this goroutine has terminated.
+		// Signal that the session has been successfully closed, and that this
+		// goroutine has terminated.
 		defer close(connClosedChan)
 
 		// Listen for a stop signal.
