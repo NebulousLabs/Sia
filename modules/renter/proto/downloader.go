@@ -180,6 +180,11 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 	} else if err != nil {
 		return nil, err
 	}
+	// if we succeeded, we can safely discard the unappliedTxns
+	for _, txn := range sc.unappliedTxns {
+		txn.SignalUpdatesApplied()
+	}
+	sc.unappliedTxns = nil
 
 	// the host is now ready to accept revisions
 	return &Downloader{
