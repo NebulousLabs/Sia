@@ -123,7 +123,7 @@ func bucketIsEmpty(bucket *bolt.Bucket) bool {
 
 // Add/Remove block ID
 func dbAddBlockID(tx *bolt.Tx, id types.BlockID, height types.BlockHeight) {
-	mustPut(tx.Bucket(bucketHashType), id, modules.BlockHash)
+	mustPut(tx.Bucket(bucketHashType), id, modules.BlockHashType)
 	mustPut(tx.Bucket(bucketBlockIDs), id, height)
 }
 func dbRemoveBlockID(tx *bolt.Tx, id types.BlockID) {
@@ -150,7 +150,7 @@ func dbRemoveBlockTarget(tx *bolt.Tx, id types.BlockID, target types.Target) {
 
 // Add/Remove file contract
 func dbAddFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract) {
-	mustPut(tx.Bucket(bucketHashType), id, modules.FileContractId)
+	mustPut(tx.Bucket(bucketHashType), id, modules.FileContractIdHashType)
 	history := fileContractHistory{Contract: fc}
 	mustPut(tx.Bucket(bucketFileContractHistories), id, history)
 }
@@ -163,12 +163,14 @@ func dbRemoveFileContract(tx *bolt.Tx, id types.FileContractID) {
 func dbAddFileContractID(tx *bolt.Tx, id types.FileContractID, txid types.TransactionID) {
 	b, err := tx.Bucket(bucketFileContractIDs).CreateBucketIfNotExists(encoding.Marshal(id))
 	assertNil(err)
+	mustPut(tx.Bucket(bucketHashType), id, modules.FileContractIdHashType)
 	mustPutSet(b, txid)
 }
 
 func dbRemoveFileContractID(tx *bolt.Tx, id types.FileContractID, txid types.TransactionID) {
 	bucket := tx.Bucket(bucketFileContractIDs).Bucket(encoding.Marshal(id))
 	mustDelete(bucket, txid)
+	mustDelete(tx.Bucket(bucketHashType), id)
 	if bucketIsEmpty(bucket) {
 		tx.Bucket(bucketFileContractIDs).DeleteBucket(encoding.Marshal(id))
 	}
@@ -179,6 +181,7 @@ func dbAddFileContractRevision(tx *bolt.Tx, fcid types.FileContractID, fcr types
 	assertNil(dbGetAndDecode(bucketFileContractHistories, fcid, &history)(tx))
 	history.Revisions = append(history.Revisions, fcr)
 	mustPut(tx.Bucket(bucketFileContractHistories), fcid, history)
+	mustPut(tx.Bucket(bucketHashType), fcid, modules.FileContractIdHashType)
 }
 func dbRemoveFileContractRevision(tx *bolt.Tx, fcid types.FileContractID) {
 	var history fileContractHistory
@@ -186,11 +189,12 @@ func dbRemoveFileContractRevision(tx *bolt.Tx, fcid types.FileContractID) {
 	// TODO: could be more rigorous
 	history.Revisions = history.Revisions[:len(history.Revisions)-1]
 	mustPut(tx.Bucket(bucketFileContractHistories), fcid, history)
+	mustPut(tx.Bucket(bucketHashType), fcid, modules.FileContractIdHashType)
 }
 
 // Add/Remove siacoin output
 func dbAddSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, output types.SiacoinOutput) {
-	mustPut(tx.Bucket(bucketHashType), id, modules.SiacoinOutputId)
+	mustPut(tx.Bucket(bucketHashType), id, modules.SiacoinOutputIdHashType)
 	mustPut(tx.Bucket(bucketSiacoinOutputs), id, output)
 }
 func dbRemoveSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) {
@@ -203,10 +207,12 @@ func dbAddSiacoinOutputID(tx *bolt.Tx, id types.SiacoinOutputID, txid types.Tran
 	b, err := tx.Bucket(bucketSiacoinOutputIDs).CreateBucketIfNotExists(encoding.Marshal(id))
 	assertNil(err)
 	mustPutSet(b, txid)
+	mustPut(tx.Bucket(bucketHashType), id, modules.SiacoinOutputIdHashType)
 }
 func dbRemoveSiacoinOutputID(tx *bolt.Tx, id types.SiacoinOutputID, txid types.TransactionID) {
 	bucket := tx.Bucket(bucketSiacoinOutputIDs).Bucket(encoding.Marshal(id))
 	mustDelete(bucket, txid)
+	mustDelete(tx.Bucket(bucketHashType), id)
 	if bucketIsEmpty(bucket) {
 		tx.Bucket(bucketSiacoinOutputIDs).DeleteBucket(encoding.Marshal(id))
 	}
@@ -214,7 +220,7 @@ func dbRemoveSiacoinOutputID(tx *bolt.Tx, id types.SiacoinOutputID, txid types.T
 
 // Add/Remove siafund output
 func dbAddSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, output types.SiafundOutput) {
-	mustPut(tx.Bucket(bucketHashType), id, modules.SiafundOutputId)
+	mustPut(tx.Bucket(bucketHashType), id, modules.SiafundOutputIdHashType)
 	mustPut(tx.Bucket(bucketSiafundOutputs), id, output)
 }
 func dbRemoveSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) {
@@ -227,10 +233,12 @@ func dbAddSiafundOutputID(tx *bolt.Tx, id types.SiafundOutputID, txid types.Tran
 	b, err := tx.Bucket(bucketSiafundOutputIDs).CreateBucketIfNotExists(encoding.Marshal(id))
 	assertNil(err)
 	mustPutSet(b, txid)
+	mustPut(tx.Bucket(bucketHashType), id, modules.SiafundOutputIdHashType)
 }
 func dbRemoveSiafundOutputID(tx *bolt.Tx, id types.SiafundOutputID, txid types.TransactionID) {
 	bucket := tx.Bucket(bucketSiafundOutputIDs).Bucket(encoding.Marshal(id))
 	mustDelete(bucket, txid)
+	mustDelete(tx.Bucket(bucketHashType), id)
 	if bucketIsEmpty(bucket) {
 		tx.Bucket(bucketSiafundOutputIDs).DeleteBucket(encoding.Marshal(id))
 	}
@@ -242,28 +250,34 @@ func dbAddStorageProof(tx *bolt.Tx, fcid types.FileContractID, sp types.StorageP
 	assertNil(dbGetAndDecode(bucketFileContractHistories, fcid, &history)(tx))
 	history.StorageProof = sp
 	mustPut(tx.Bucket(bucketFileContractHistories), fcid, history)
+	mustPut(tx.Bucket(bucketHashType), fcid, modules.FileContractIdHashType)
 }
 func dbRemoveStorageProof(tx *bolt.Tx, fcid types.FileContractID) {
 	dbAddStorageProof(tx, fcid, types.StorageProof{})
+	mustDelete(tx.Bucket(bucketHashType), fcid)
 }
 
 // Add/Remove transaction ID
 func dbAddTransactionID(tx *bolt.Tx, id types.TransactionID, height types.BlockHeight) {
 	mustPut(tx.Bucket(bucketTransactionIDs), id, height)
+	mustPut(tx.Bucket(bucketHashType), id, modules.TransactionHashType)
 }
 func dbRemoveTransactionID(tx *bolt.Tx, id types.TransactionID) {
 	mustDelete(tx.Bucket(bucketTransactionIDs), id)
+	mustDelete(tx.Bucket(bucketHashType), id)
 }
 
 // Add/Remove txid from unlock hash bucket
 func dbAddUnlockHash(tx *bolt.Tx, uh types.UnlockHash, txid types.TransactionID) {
 	b, err := tx.Bucket(bucketUnlockHashes).CreateBucketIfNotExists(encoding.Marshal(uh))
 	assertNil(err)
+	mustPut(tx.Bucket(bucketHashType), uh, modules.UnlockHashType)
 	mustPutSet(b, txid)
 }
 func dbRemoveUnlockHash(tx *bolt.Tx, uh types.UnlockHash, txid types.TransactionID) {
 	bucket := tx.Bucket(bucketUnlockHashes).Bucket(encoding.Marshal(uh))
 	mustDelete(bucket, txid)
+	mustDelete(tx.Bucket(bucketHashType), uh)
 	if bucketIsEmpty(bucket) {
 		tx.Bucket(bucketUnlockHashes).DeleteBucket(encoding.Marshal(uh))
 	}
