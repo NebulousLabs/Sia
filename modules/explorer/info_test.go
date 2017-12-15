@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 )
@@ -40,6 +41,15 @@ func TestBlock(t *testing.T) {
 
 	gb := types.GenesisBlock
 	gbFetch, height, exists := et.explorer.Block(gb.ID())
+
+	for i := 0; i < int(types.MaturityDelay); i++ {
+		b, _ := et.cs.BlockAtHeight(types.BlockHeight(i))
+		hashType, err := et.explorer.HashType(crypto.Hash(b.ID()))
+		if hashType != modules.BlockHashType || err != nil {
+			t.Errorf("Did not get the correct hashtype for block: %d.  Got: %s.  Expected: %s", i, hashType, modules.BlockHashType)
+		}
+	}
+
 	if !exists || height != 0 || gbFetch.ID() != gb.ID() {
 		t.Error("call to 'Block' inside explorer failed")
 	}

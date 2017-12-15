@@ -119,7 +119,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			tbid := types.TransactionID(bid)
 			blockheight--
 			dbRemoveBlockID(tx, bid)
-			dbRemoveTransactionID(tx, tbid) // Miner payouts are a transaction
 			target, exists := e.cs.ChildTarget(block.ParentID)
 			if !exists {
 				target = types.RootTarget
@@ -214,7 +213,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 			blockheight++
 			dbAddBlockID(tx, bid, blockheight)
-			dbAddTransactionID(tx, tbid, blockheight) // Miner payouts are a transaction
 
 			target, exists := e.cs.ChildTarget(block.ParentID)
 			if !exists {

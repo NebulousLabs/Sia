@@ -263,6 +263,7 @@ func dbAddTransactionID(tx *bolt.Tx, id types.TransactionID, height types.BlockH
 	mustPut(tx.Bucket(bucketTransactionIDs), id, height)
 	mustPut(tx.Bucket(bucketHashType), id, modules.TransactionHashType)
 }
+
 func dbRemoveTransactionID(tx *bolt.Tx, id types.TransactionID) {
 	mustDelete(tx.Bucket(bucketTransactionIDs), id)
 	mustDelete(tx.Bucket(bucketHashType), id)
