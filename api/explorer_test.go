@@ -8,7 +8,6 @@ import (
 
 // TestIntegrationExplorerGET probes the GET call to /explorer.
 func TestIntegrationExplorerGET(t *testing.T) {
-	t.Skip("Explorer has deadlock issues")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -18,11 +17,16 @@ func TestIntegrationExplorerGET(t *testing.T) {
 	}
 	defer st.server.panicClose()
 
-	var eg ExplorerGET
-	err = st.getAPI("/explorer", &eg)
+	var egBlocks ExplorerBlockGET
+	err = st.getAPI("/explorer", &egBlocks)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	if len(egBlocks.Blocks) != 1 {
+		t.Errorf("wrong block len for ExplorerBlockGET: %d", len(egBlocks.Blocks))
+	}
+	eg := egBlocks.Blocks[0]
 	if eg.Height != st.server.api.cs.Height() {
 		t.Error("height not accurately reported by explorer")
 	}
@@ -33,7 +37,6 @@ func TestIntegrationExplorerGET(t *testing.T) {
 
 // TestIntegrationExplorerBlockGET probes the GET call to /explorer/block.
 func TestIntegrationExplorerBlockGET(t *testing.T) {
-	t.Skip("Explorer has deadlock issues")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -43,22 +46,26 @@ func TestIntegrationExplorerBlockGET(t *testing.T) {
 	}
 	defer st.server.panicClose()
 
-	var ebg ExplorerBlockGET
-	err = st.getAPI("/explorer/blocks/0", &ebg)
+	var egBlocks ExplorerBlockGET
+	err = st.getAPI("/explorer/blocks/0", &egBlocks)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ebg.Block.BlockID != ebg.Block.RawBlock.ID() {
+
+	if len(egBlocks.Blocks) != 1 {
+		t.Errorf("wrong block len for ExplorerBlockGET: %d", len(egBlocks.Blocks))
+	}
+	ebg := egBlocks.Blocks[0]
+	if ebg.BlockID != ebg.RawBlock.ID() {
 		t.Error("block id and block do not match up from api call")
 	}
-	if ebg.Block.BlockID != types.GenesisBlock.ID() {
-		t.Error("wrong block returned by /explorer/block?height=0")
+	if ebg.BlockID != types.GenesisBlock.ID() {
+		t.Errorf("wrong block returned by /explorer/block?height=0.  Got: %s.  Expected: %s", ebg.BlockID, types.GenesisBlock.ID())
 	}
 }
 
 // TestIntegrationExplorerHashGet probes the GET call to /explorer/hash/:hash.
 func TestIntegrationExplorerHashGet(t *testing.T) {
-	t.Skip("Explorer has deadlock issues")
 	if testing.Short() {
 		t.SkipNow()
 	}

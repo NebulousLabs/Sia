@@ -121,7 +121,7 @@ func NewServer(APIaddr string, requiredUserAgent string, requiredPassword string
 		return nil, err
 	}
 
-	a := New(requiredUserAgent, requiredPassword, cs, e, g, h, m, r, tp, w)
+	a, _ := New(requiredUserAgent, requiredPassword, cs, e, g, h, m, r, tp, w)
 	srv := &Server{
 		api: a,
 
@@ -201,7 +201,11 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer("localhost:0", "Sia-Agent", "", cs, nil, g, h, m, r, tp, w)
+	explorer, err := explorer.New(cs, tp, filepath.Join(testdir, modules.ExplorerDir))
+	if err != nil {
+		return nil, err
+	}
+	srv, err := NewServer("localhost:0", "Sia-Agent", "", cs, explorer, g, h, m, r, tp, w)
 	if err != nil {
 		return nil, err
 	}
@@ -216,10 +220,9 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 		tpool:     tp,
 		wallet:    w,
 		walletKey: key,
-
-		server: srv,
-
-		dir: testdir,
+		explorer:  explorer,
+		server:    srv,
+		dir:       testdir,
 	}
 
 	// TODO: A more reasonable way of listening for server errors.
@@ -331,7 +334,13 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	e, err := explorer.New(cs, filepath.Join(testdir, modules.ExplorerDir))
+
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
+	if err != nil {
+		return nil, err
+	}
+
+	e, err := explorer.New(cs, tp, filepath.Join(testdir, modules.ExplorerDir))
 	if err != nil {
 		return nil, err
 	}
