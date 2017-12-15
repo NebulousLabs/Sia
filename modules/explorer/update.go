@@ -3,6 +3,7 @@ package explorer
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -110,12 +111,12 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		e.persistMu.Lock()
 		blockheight := e.persist.Height
 		e.persistMu.Unlock()
-
+		log.Printf(" block: %d", blockheight)
 		// Update cumulative stats for reverted blocks.
 		for _, block := range cc.RevertedBlocks {
 			bid := block.ID()
 			tbid := types.TransactionID(bid)
-
+			log.Printf("reverting block: %d", blockheight)
 			blockheight--
 			dbRemoveBlockID(tx, bid)
 			dbRemoveTransactionID(tx, tbid) // Miner payouts are a transaction
@@ -455,9 +456,9 @@ func (e *Explorer) dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, b
 		for i := types.BlockHeight(1); i < hashrateEstimationBlocks; i++ {
 			b, exists := cs.BlockAtHeight(bf.Height - i)
 			if !exists && build.DEBUG {
-				panic(fmt.Sprintf("ConsensusSet is missing block at height: %s", bf.Height-hashrateEstimationBlocks))
+				panic(fmt.Sprintf("ConsensusSet is missing block at height: %d", bf.Height-hashrateEstimationBlocks))
 			} else if !exists {
-				e.log.Printf("ConsensusSet is missing block at height: %s", bf.Height-hashrateEstimationBlocks)
+				e.log.Printf("ConsensusSet is missing block at height: %d", bf.Height-hashrateEstimationBlocks)
 			}
 			target, exists := cs.ChildTarget(b.ParentID)
 			if !exists && build.DEBUG {

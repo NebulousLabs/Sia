@@ -19,7 +19,7 @@ func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool
 	}
 	block, exists := e.cs.BlockAtHeight(height)
 	if !exists {
-		e.log.Printf("did not find block at height: %s", height)
+		e.log.Printf("did not find block at height: %d", height)
 		return types.Block{}, 0, false
 	}
 	return block, height, true

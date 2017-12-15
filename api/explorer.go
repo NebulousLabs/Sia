@@ -2,14 +2,15 @@ package api
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/julienschmidt/httprouter"
-	"log"
-	"net/http"
-	"strconv"
 )
 
 const (
@@ -292,12 +293,12 @@ func (api *API) explorerBlocksHandler(w http.ResponseWriter, req *http.Request, 
 
 		//if "to" is greater than the current consensus Height, that's an impossible query condition
 		if to > api.cs.Height() {
-			WriteError(w, Error{fmt.Sprintf("to paramater must be less than the current block height of: %s", api.cs.Height())}, http.StatusBadRequest)
+			WriteError(w, Error{fmt.Sprintf("to paramater must be less than the current block height of: %d", api.cs.Height())}, http.StatusBadRequest)
 			return
 		}
 
 		if to-from > MaxBlocksRequest {
-			WriteError(w, Error{fmt.Sprintf("to paramater must be less than the current block height of: %s", api.cs.Height())}, http.StatusBadRequest)
+			WriteError(w, Error{fmt.Sprintf("to paramater must be less than the current block height of: %d", api.cs.Height())}, http.StatusBadRequest)
 			return
 		}
 
@@ -305,7 +306,7 @@ func (api *API) explorerBlocksHandler(w http.ResponseWriter, req *http.Request, 
 		for blockHeight := from; blockHeight <= to; blockHeight++ {
 			block, exists := api.cs.BlockAtHeight(blockHeight)
 			if !exists {
-				WriteError(w, Error{fmt.Sprintf("no block found at height %s in call to /explorer/block.  This is a server error, please contact the operator of this explorer", blockHeight)}, http.StatusInternalServerError)
+				WriteError(w, Error{fmt.Sprintf("no block found at height %d in call to /explorer/block.  This is a server error, please contact the operator of this explorer", blockHeight)}, http.StatusInternalServerError)
 				return
 			}
 			blockGet.Blocks = append(blockGet.Blocks, api.buildExplorerBlock(blockHeight, block))
@@ -514,7 +515,7 @@ func (api *API) pendingBlockHandler(w http.ResponseWriter, req *http.Request, _ 
 
 	facts := api.explorer.LatestBlockFacts()
 	WriteJSON(w, ExplorerBlockGET{
-		Blocks: []ExplorerBlock{ExplorerBlock{
+		Blocks: []ExplorerBlock{{
 			BlockFacts:   facts,
 			Transactions: explorerReps,
 		}},

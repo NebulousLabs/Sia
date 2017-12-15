@@ -20,12 +20,7 @@ func TestImmediateBlockFacts(t *testing.T) {
 	}
 
 	facts := et.explorer.LatestBlockFacts()
-	var explorerHeight types.BlockHeight
-	err = et.explorer.db.View(dbGetInternal(internalBlockHeight, &explorerHeight))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if facts.Height != explorerHeight || explorerHeight == 0 {
+	if facts.Height != et.explorer.persist.Height || et.explorer.persist.Height == 0 {
 		t.Error("wrong height reported in facts object")
 	}
 	if !facts.TotalCoins.Equals(types.CalculateNumSiacoins(et.cs.Height())) {

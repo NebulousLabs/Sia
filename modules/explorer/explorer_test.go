@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"log"
 	"path/filepath"
 	"testing"
 
@@ -40,18 +41,22 @@ func createExplorerTester(name string) (*explorerTester, error) {
 	testdir := build.TempDir(modules.ExplorerDir, name)
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
+		log.Printf("Failed to open gateway: %s", err)
 		return nil, err
 	}
 	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
+		log.Printf("Failed to open consensus: %s", err)
 		return nil, err
 	}
 	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
 	if err != nil {
+		log.Printf("Failed to open tpool: %s", err)
 		return nil, err
 	}
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
+		log.Printf("Failed to open wallet: %s", err)
 		return nil, err
 	}
 	key := crypto.GenerateTwofishKey()
@@ -65,10 +70,12 @@ func createExplorerTester(name string) (*explorerTester, error) {
 	}
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
+		log.Printf("Failed to open miner: %s", err)
 		return nil, err
 	}
-	e, err := New(cs, filepath.Join(testdir, modules.ExplorerDir))
+	e, err := New(cs, tp, filepath.Join(testdir, modules.ExplorerDir))
 	if err != nil {
+		log.Printf("Failed to open explorer: %s", err)
 		return nil, err
 	}
 	et := &explorerTester{
@@ -85,9 +92,15 @@ func createExplorerTester(name string) (*explorerTester, error) {
 
 	// Mine until the wallet has money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		b, _ := et.miner.FindBlock()
+		b, err := et.miner.FindBlock()
+		for err != nil {
+			b, err = et.miner.FindBlock()
+			log.Printf("Did not find: %s", err)
+		}
+
 		err = et.cs.AcceptBlock(b)
 		if err != nil {
+			log.Printf("Failed to accept block: %s", err)
 			return nil, err
 		}
 	}
@@ -134,21 +147,29 @@ func (et *explorerTester) reorgToBlank() error {
 
 	// Mine blocks until the height is higher than the existing consensus,
 	// submitting each block to the explorerTester.
-	currentHeight := cs.Height()
+	currentHeight := et.cs.Height()
+	mined := []types.Block{}
 	for i := types.BlockHeight(0); i <= currentHeight+1; i++ {
 		block, err := m.AddBlock()
 		if err != nil {
 			return err
 		}
-		et.cs.AcceptBlock(block) // error is not checked, will not always be nil
+		mined = append(mined, block)
 	}
+	for _, block := range mined {
+		err = et.cs.AcceptBlock(block) // error is not checked, will not always be nil
+		if err != nil && err != modules.ErrNonExtendingBlock {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // TestNilExplorerDependencies tries to initialize an explorer with nil
 // dependencies, checks that the correct error is returned.
 func TestNilExplorerDependencies(t *testing.T) {
-	_, err := New(nil, "expdir")
+	_, err := New(nil, nil, "expdir")
 	if err != errNilCS {
 		t.Fatal("Expecting errNilCS")
 	}
@@ -167,10 +188,14 @@ func TestExplorerGenesisHeight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	tpool, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create the explorer - from the subscription only the genesis block will
 	// be received.
-	e, err := New(cs, testdir)
+	e, err := New(cs, tpool, testdir)
 	if err != nil {
 		t.Fatal(err)
 	}
