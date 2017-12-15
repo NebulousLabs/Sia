@@ -2,12 +2,13 @@ package explorer
 
 import (
 	"errors"
+	"log"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
-	"log"
 )
 
 var (
@@ -136,7 +137,7 @@ func dbAddBlockFacts(tx *bolt.Tx, facts blockFacts) {
 	mustPut(tx.Bucket(bucketBlockFacts), facts.BlockID, facts)
 }
 func dbRemoveBlockFacts(tx *bolt.Tx, id types.BlockID) {
-	log.Printf("Deleting block facts for BlockId: %s", id)
+	//log.Printf("Deleting block facts for BlockId: %s", id)
 	mustDelete(tx.Bucket(bucketBlockFacts), id)
 }
 
@@ -278,7 +279,4 @@ func dbRemoveUnlockHash(tx *bolt.Tx, uh types.UnlockHash, txid types.Transaction
 	bucket := tx.Bucket(bucketUnlockHashes).Bucket(encoding.Marshal(uh))
 	mustDelete(bucket, txid)
 	mustDelete(tx.Bucket(bucketHashType), uh)
-	if bucketIsEmpty(bucket) {
-		tx.Bucket(bucketUnlockHashes).DeleteBucket(encoding.Marshal(uh))
-	}
 }

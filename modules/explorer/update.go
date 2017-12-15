@@ -1,9 +1,7 @@
 package explorer
 
 import (
-	"errors"
 	"fmt"
-	"log"
 	"math"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -111,16 +109,17 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		e.persistMu.Lock()
 		blockheight := e.persist.Height
 		e.persistMu.Unlock()
-		log.Printf(" block: %d", blockheight)
 		// Update cumulative stats for reverted blocks.
+		e.log.Printf(" block: %d", blockheight)
 		for _, block := range cc.RevertedBlocks {
 			bid := block.ID()
+			if bid == types.GenesisID {
+				continue
+			}
 			tbid := types.TransactionID(bid)
-			log.Printf("reverting block: %d", blockheight)
 			blockheight--
 			dbRemoveBlockID(tx, bid)
 			dbRemoveTransactionID(tx, tbid) // Miner payouts are a transaction
-
 			target, exists := e.cs.ChildTarget(block.ParentID)
 			if !exists {
 				target = types.RootTarget
@@ -208,6 +207,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 			// special handling for genesis block
 			if bid == types.GenesisID {
+				blockheight = 0
 				dbAddGenesisBlock(tx)
 				continue
 			}
@@ -296,13 +296,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			facts, err := e.dbCalculateBlockFacts(tx, e.cs, block)
 			if err == nil {
 				dbAddBlockFacts(tx, facts)
-			} else {
-				e.log.Printf("Error calculating block facts: %s", err)
-				err = e.goBackInTime(tx, e.cs, blockheight)
-				if err != nil {
-					e.log.Printf("Error going back in time: %s", err)
-					return err
-				}
 			}
 		}
 
@@ -334,7 +327,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 		currentID := currentBlock.ID()
 		var facts blockFacts
-
 		err = dbGetAndDecode(bucketBlockFacts, currentID, &facts)(tx)
 		if err == nil {
 			for _, diff := range cc.FileContractDiffs {
@@ -342,22 +334,23 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					facts.ActiveContractCount++
 					facts.ActiveContractCost = facts.ActiveContractCost.Add(diff.FileContract.Payout)
 					facts.ActiveContractSize = facts.ActiveContractSize.Add(types.NewCurrency64(diff.FileContract.FileSize))
-				} else {
+				}
+			}
+			for _, diff := range cc.FileContractDiffs {
+				if diff.Direction == modules.DiffRevert {
 					facts.ActiveContractCount--
-					facts.ActiveContractCost = facts.ActiveContractCost.Sub(diff.FileContract.Payout)
-					facts.ActiveContractSize = facts.ActiveContractSize.Sub(types.NewCurrency64(diff.FileContract.FileSize))
+					if diff.FileContract.Payout.Cmp(facts.ActiveContractCost) < 1 {
+						facts.ActiveContractCost = facts.ActiveContractCost.Sub(diff.FileContract.Payout)
+					}
+					c := types.NewCurrency64(diff.FileContract.FileSize)
+					if facts.ActiveContractSize.Cmp(c) >= 0 {
+						facts.ActiveContractSize = facts.ActiveContractSize.Sub(c)
+					}
 				}
 			}
 			dbAddBlockFacts(tx, facts)
-		} else {
-			e.log.Printf("Error getting block facts for %s.  Height: %d", currentBlock.ID(), blockheight)
-			err = e.goBackInTime(tx, e.cs, blockheight)
-			if err != nil {
-				return err
-			}
 		}
 
-		e.log.Printf("Explorer update for block: %d", blockheight)
 		e.persistMu.Lock()
 		e.persist.Height = blockheight
 		e.persist.RecentChange = cc.ID
@@ -373,42 +366,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	} else if err != nil {
 		e.log.Printf("explorer update failed: %s", err)
 	}
-}
-
-func (e *Explorer) goBackInTime(tx *bolt.Tx, cs modules.ConsensusSet, height types.BlockHeight) error {
-	e.log.Printf("Going back in time from blockheight: %d", height)
-	var missingBlocks []types.Block
-	for {
-		currentBlock, exists := e.cs.BlockAtHeight(height)
-		if !exists {
-			return errors.New(fmt.Sprintf("Block missing at height: %d", height))
-		}
-		var bf blockFacts
-		err := dbGetAndDecode(bucketBlockFacts, currentBlock.ID(), &bf)(tx)
-		missingBlocks = append([]types.Block{currentBlock}, missingBlocks...)
-		if err == nil {
-			e.log.Printf("Found blockfacts at blockheight: %d", height)
-			break
-		} else {
-			if len(missingBlocks) > 5000 {
-				return errors.New(fmt.Sprintf("Block missing at height: %d", height))
-			}
-		}
-		e.log.Printf("Searching backward for blockfacts at height: %d", height)
-		height--
-	}
-
-	//The first block in this list should be in the block facts bucket
-	for _, block := range missingBlocks {
-		facts, err := e.dbCalculateBlockFacts(tx, cs, block)
-		if err == nil {
-			dbAddBlockFacts(tx, facts)
-		} else {
-			return errors.New(fmt.Sprintf("Still missing blockfacts: %s", err))
-		}
-	}
-
-	return nil
 }
 
 func (e *Explorer) dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Block) (blockFacts, error) {
