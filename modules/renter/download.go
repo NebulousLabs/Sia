@@ -371,7 +371,8 @@ func (r *Renter) managedDownloadIteration(ds *downloadState) {
 		// If the above conditions are true, it should also be the case that
 		// the number of active pieces is zero.
 		if ds.activePieces != 0 {
-			r.log.Critical("ERROR: the renter is idle, but tracking", ds.activePieces, "active pieces; resetting to zero")
+			// TODO: renter is idle but tracking pieces. Resetting it is a
+			// workaround and needs to be fixed
 			ds.activePieces = 0
 		}
 
