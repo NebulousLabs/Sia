@@ -19,6 +19,7 @@ var (
 	bucketFileContractHistories = []byte("FileContractHistories")
 	bucketFileContractIDs       = []byte("FileContractIDs")
 	// bucketInternal is used to store values internal to the explorer
+	bucketInternal         = []byte("Internal")
 	bucketSiacoinOutputIDs = []byte("SiacoinOutputIDs")
 	bucketSiacoinOutputs   = []byte("SiacoinOutputs")
 	bucketSiafundOutputIDs = []byte("SiafundOutputIDs")
@@ -26,6 +27,10 @@ var (
 	bucketTransactionIDs   = []byte("TransactionIDs")
 	bucketUnlockHashes     = []byte("UnlockHashes")
 	bucketHashType         = []byte("HashType")
+
+	// keys for bucketInternal
+	internalBlockHeight  = []byte("BlockHeight")
+	internalRecentChange = []byte("RecentChange")
 
 	errNotExist = errors.New("entry does not exist")
 )
@@ -279,4 +284,18 @@ func dbRemoveUnlockHash(tx *bolt.Tx, uh types.UnlockHash, txid types.Transaction
 	bucket := tx.Bucket(bucketUnlockHashes).Bucket(encoding.Marshal(uh))
 	mustDelete(bucket, txid)
 	mustDelete(tx.Bucket(bucketHashType), uh)
+}
+
+// dbSetInternal sets the specified key of bucketInternal to the encoded value.
+func dbSetInternal(key []byte, val interface{}) func(*bolt.Tx) error {
+	return func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketInternal).Put(key, encoding.Marshal(val))
+	}
+}
+
+// dbGetInternal decodes the specified key of bucketInternal into the supplied pointer.
+func dbGetInternal(key []byte, val interface{}) func(*bolt.Tx) error {
+	return func(tx *bolt.Tx) error {
+		return encoding.Unmarshal(tx.Bucket(bucketInternal).Get(key), val)
+	}
 }

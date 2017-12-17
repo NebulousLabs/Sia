@@ -44,9 +44,12 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 func (e *Explorer) LatestBlockFacts() modules.BlockFacts {
 	var bf blockFacts
 	err := e.db.View(func(tx *bolt.Tx) error {
-		e.persistMu.Lock()
-		defer e.persistMu.Unlock()
-		return e.dbGetBlockFacts(e.persist.Height, &bf)(tx)
+		var height types.BlockHeight
+		err := dbGetInternal(internalBlockHeight, &height)(tx)
+		if err != nil {
+			return err
+		}
+		return e.dbGetBlockFacts(height, &bf)(tx)
 	})
 	if err != nil {
 		build.Critical(err)
@@ -141,7 +144,7 @@ func (e *Explorer) FileContractHistory(id types.FileContractID) (fc types.FileCo
 	return
 }
 
-// FileContractIDs returns all of the transactions that contain the specified
+// FileContractID returns all of the transactions that contain the specified
 // file contract ID. An empty set indicates that the file contract ID does not
 // appear in the blockchain.
 func (e *Explorer) FileContractID(id types.FileContractID) []types.TransactionID {

@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
@@ -16,12 +17,6 @@ const (
 var explorerMetadata = persist.Metadata{
 	Header:  "Sia Explorer",
 	Version: "0.5.2",
-}
-
-type peristence struct {
-	RecentChange modules.ConsensusChangeID
-	Height       types.BlockHeight
-	Target       types.Target
 }
 
 // initPersist initializes the persistent structures of the explorer module.
@@ -54,9 +49,28 @@ func (e *Explorer) initPersist() error {
 			bucketTransactionIDs,
 			bucketUnlockHashes,
 			bucketHashType,
+			bucketInternal,
 		}
 		for _, b := range buckets {
 			_, err := tx.CreateBucketIfNotExists(b)
+			if err != nil {
+				return err
+			}
+		}
+
+		// set default values for the bucketInternal
+		internalDefaults := []struct {
+			key, val []byte
+		}{
+			{internalBlockHeight, encoding.Marshal(types.BlockHeight(0))},
+			{internalRecentChange, encoding.Marshal(modules.ConsensusChangeID{})},
+		}
+		b := tx.Bucket(bucketInternal)
+		for _, d := range internalDefaults {
+			if b.Get(d.key) != nil {
+				continue
+			}
+			err := b.Put(d.key, d.val)
 			if err != nil {
 				return err
 			}
@@ -67,24 +81,5 @@ func (e *Explorer) initPersist() error {
 	if err != nil {
 		return err
 	}
-
-	filename := filepath.Join(e.persistDir, explorerPersist)
-	_, err = os.Stat(filename)
-	if os.IsNotExist(err) {
-		return e.saveSync()
-	} else if err != nil {
-		return err
-	}
-
-	return e.load()
-}
-
-// load loads the explorer persistence from disk.
-func (e *Explorer) load() error {
-	return persist.LoadJSON(explorerMetadata, &e.persist, filepath.Join(e.persistDir, explorerPersist))
-}
-
-// saveSync saves the explorer persistence to disk, and then syncs to disk.
-func (e *Explorer) saveSync() error {
-	return persist.SaveJSON(explorerMetadata, e.persist, filepath.Join(e.persistDir, explorerPersist))
+	return nil
 }

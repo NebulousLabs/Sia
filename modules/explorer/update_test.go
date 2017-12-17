@@ -8,7 +8,13 @@ import (
 )
 
 func (et *explorerTester) currentFacts() (facts modules.BlockFacts, exists bool) {
-	return et.explorer.BlockFacts(et.explorer.persist.Height)
+	var height types.BlockHeight
+	err := et.explorer.db.View(dbGetInternal(internalBlockHeight, &height))
+	if err != nil {
+		exists = false
+		return
+	}
+	return et.explorer.BlockFacts(height)
 }
 
 // TestIntegrationExplorerFileContractMetrics checks that the siacoin

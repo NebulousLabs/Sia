@@ -106,9 +106,12 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}()
 
 		// get starting block height
-		e.persistMu.Lock()
-		blockheight := e.persist.Height
-		e.persistMu.Unlock()
+		var blockheight types.BlockHeight
+		err = dbGetInternal(internalBlockHeight, &blockheight)(tx)
+		if err != nil {
+			return err
+		}
+
 		// Update cumulative stats for reverted blocks.
 		e.log.Printf(" block: %d", blockheight)
 		for _, block := range cc.RevertedBlocks {
@@ -351,13 +354,18 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			dbAddBlockFacts(tx, facts)
 		}
 
-		e.persistMu.Lock()
-		e.persist.Height = blockheight
-		e.persist.RecentChange = cc.ID
-		e.persist.Target = cc.ChildTarget
-		e.persistMu.Unlock()
+		// set final blockheight
+		err = dbSetInternal(internalBlockHeight, blockheight)(tx)
+		if err != nil {
+			return err
+		}
 
-		err = e.saveSync()
+		// set change ID
+		err = dbSetInternal(internalRecentChange, cc.ID)(tx)
+		if err != nil {
+			return err
+		}
+
 		return err
 	})
 

@@ -1,15 +1,16 @@
-// The explorer module provides a glimpse into what the Sia network
+// Package explorer module provides a glimpse into what the Sia network
 // currently looks like.
 package explorer
 
 import (
 	"errors"
+	"path/filepath"
+	"sync"
+
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
-	"path/filepath"
-	"sync"
 )
 
 const (
@@ -57,7 +58,6 @@ type (
 		unconfirmedProcessedTransactions []modules.ProcessedTransaction
 		mu                               sync.RWMutex
 		tg                               siasync.ThreadGroup
-		persist                          peristence
 		persistMu                        sync.RWMutex
 		log                              *persist.Logger
 	}
@@ -94,12 +94,18 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		return nil, err
 	}
 
-	err = cs.ConsensusSetSubscribe(e, e.persist.RecentChange, nil)
+	// retrieve the current ConsensusChangeID
+	var recentChange modules.ConsensusChangeID
+	err = e.db.View(dbGetInternal(internalRecentChange, &recentChange))
+	if err != nil {
+		return nil, err
+	}
+
+	err = cs.ConsensusSetSubscribe(e, recentChange, nil)
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Perform a rescan of the consensus set if the change id is not found.
 		// The id will only be not found if there has been desynchronization
 		// between the explorer and the consensus package.
-		err = e.startupRescan()
 		if err != nil {
 			return nil, errors.New("explorer startup failed - rescanning failed: " + err.Error())
 		}
@@ -112,37 +118,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 	e.tg.OnStop(func() {
 		e.cs.Unsubscribe(e)
 		e.tpool.Unsubscribe(e)
-		e.saveSync()
 	})
 
-	err = e.saveSync()
 	return e, err
-}
-
-func (e *Explorer) startupRescan() error {
-	err := func() error {
-		e.mu.Lock()
-		defer e.mu.Unlock()
-
-		e.persist.RecentChange = modules.ConsensusChangeBeginning
-		e.persist.Height = 0
-		e.persist.Target = types.Target{}
-		return e.saveSync()
-	}()
-	if err != nil {
-		return err
-	}
-
-	// Subscribe to the consensus set. This is a blocking call that will not
-	// return until the explorer has fully caught up to the current block.
-	err = e.cs.ConsensusSetSubscribe(e, modules.ConsensusChangeBeginning, e.tg.StopChan())
-	if err != nil {
-		return err
-	}
-	e.tg.OnStop(func() {
-		e.cs.Unsubscribe(e)
-	})
-	return nil
 }
 
 // Close closes the explorer.
