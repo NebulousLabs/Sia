@@ -12,7 +12,7 @@ func TestSendSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), productionDependencies{})
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestIntegrationSendOverUnder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), productionDependencies{})
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestIntegrationSpendHalfHalf(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), productionDependencies{})
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestIntegrationSpendUnconfirmed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), productionDependencies{})
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestSendSiacoinsAcceptTxnSetFailed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	deps := dependencySendSiacoinsInterrupted{}
+	deps := &dependencySendSiacoinsInterrupted{}
 	wt, err := createWalletTester(t.Name(), deps)
 	if err != nil {
 		t.Fatal(err)
@@ -216,6 +216,7 @@ func TestSendSiacoinsAcceptTxnSetFailed(t *testing.T) {
 		sco.Value = types.SiacoinPrecision
 		sco.UnlockHash = uc.UnlockHash()
 	}
+	deps.fail()
 	_, err = wt.wallet.SendSiacoinsMulti(scos)
 	if err == nil {
 		t.Fatal("SendSiacoinsMulti should have failed but didn't")
@@ -226,6 +227,7 @@ func TestSendSiacoinsAcceptTxnSetFailed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	deps.fail()
 	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash())
 	if err == nil {
 		t.Fatal("SendSiacoins should have failed but didn't")

@@ -107,10 +107,10 @@ type Wallet struct {
 // not loaded into the wallet during the call to 'new', but rather during the
 // call to 'Unlock'.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string) (*Wallet, error) {
-	return newWallet(cs, tpool, persistDir, productionDependencies{})
+	return newWallet(cs, tpool, persistDir, &ProductionDependencies{})
 }
 
-func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string, deps dependencies) (*Wallet, error) {
+func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string, deps Dependencies) (*Wallet, error) {
 	// Check for nil dependencies.
 	if cs == nil {
 		return nil, errNilConsensusSet
