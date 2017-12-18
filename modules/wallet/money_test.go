@@ -12,7 +12,7 @@ func TestSendSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestIntegrationSendOverUnder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestIntegrationSpendHalfHalf(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestIntegrationSpendUnconfirmed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,5 +181,78 @@ func TestIntegrationSortedOutputsSorting(t *testing.T) {
 		if !so.outputs[i].Value.Equals64(i) {
 			t.Error("a value is out of place: ", i)
 		}
+	}
+}
+
+// TestSendSiacoinsFailed checks if SendSiacoins and SendSiacoinsMulti behave
+// correctly when funcing the Transaction succeeded but accepting it didn't.
+func TestSendSiacoinsAcceptTxnSetFailed(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	deps := &dependencySendSiacoinsInterrupted{}
+	wt, err := createWalletTester(t.Name(), deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// There should be no spent transactions in the database at this point
+	wt.wallet.mu.Lock()
+	wt.wallet.syncDB()
+	if wt.wallet.dbTx.Bucket(bucketSpentOutputs).Stats().KeyN != 0 {
+		wt.wallet.mu.Unlock()
+		t.Fatal("bucketSpentOutputs isn't empty")
+	}
+	wt.wallet.mu.Unlock()
+
+	// Try to send coins using SendSiacoinsMulti
+	numOutputs := 10
+	scos := make([]types.SiacoinOutput, numOutputs)
+	for i := 0; i < numOutputs; i++ {
+		uc, err := wt.wallet.NextAddress()
+		if err != nil {
+			t.Fatal(err)
+		}
+		scos[i].Value = types.SiacoinPrecision
+		scos[i].UnlockHash = uc.UnlockHash()
+	}
+	deps.fail()
+	_, err = wt.wallet.SendSiacoinsMulti(scos)
+	if err == nil {
+		t.Fatal("SendSiacoinsMulti should have failed but didn't")
+	}
+
+	// Send some coins using SendSiacoins
+	uc, err := wt.wallet.NextAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps.fail()
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash())
+	if err == nil {
+		t.Fatal("SendSiacoins should have failed but didn't")
+	}
+
+	// There should still be no spent transactions in the database
+	wt.wallet.mu.Lock()
+	wt.wallet.syncDB()
+	bucket := wt.wallet.dbTx.Bucket(bucketSpentOutputs)
+	if bucket.Stats().KeyN != 0 {
+		wt.wallet.mu.Unlock()
+		t.Fatal("bucketSpentOutputs isn't empty")
+	}
+	wt.wallet.mu.Unlock()
+
+	// Send the money again without the failing dependency
+	_, err = wt.wallet.SendSiacoinsMulti(scos)
+	if err != nil {
+		t.Fatalf("SendSiacoinsMulti failed: %v", err)
+	}
+
+	// Send some coins using SendSiacoins
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash())
+	if err != nil {
+		t.Fatalf("SendSiacoins failed: %v", err)
 	}
 }

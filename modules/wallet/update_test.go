@@ -12,7 +12,7 @@ func TestUpdate(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestUpdate")
+	wt, err := createWalletTester("TestUpdate", &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
