@@ -145,6 +145,15 @@ func (w *Wallet) threadedDefragWallet() {
 
 	// Create the defrag transaction.
 	txnSet, err := w.managedCreateDefragTransaction()
+	defer func() {
+		if err != nil {
+			for _, txn := range txnSet {
+				for i := range txn.SiacoinOutputs {
+					dbDeleteSpentOutput(w.dbTx, types.OutputID(txn.SiacoinOutputID(uint64(i))))
+				}
+			}
+		}
+	}()
 	if err == errDefragNotNeeded {
 		// benign
 		return
