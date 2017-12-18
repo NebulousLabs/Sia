@@ -5,7 +5,7 @@ package wallet
 // possible subset of the real dependency.
 type (
 	// dependencies defines all of the dependencies of the Host.
-	dependencies interface {
+	Dependencies interface {
 		// disrupt can be inserted in the code as a way to inject problems,
 		disrupt(string) bool
 	}
@@ -13,11 +13,11 @@ type (
 
 type (
 	// productionDependencies is an empty struct
-	productionDependencies struct{}
+	ProductionDependencies struct{}
 )
 
 // disrupt will always return false, but can be over-written during testing to
 // trigger disruptions.
-func (productionDependencies) disrupt(string) bool {
+func (ProductionDependencies) disrupt(string) bool {
 	return false
 }

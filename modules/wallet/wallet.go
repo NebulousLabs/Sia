@@ -61,7 +61,7 @@ type Wallet struct {
 	// The wallet's dependencies.
 	cs    modules.ConsensusSet
 	tpool modules.TransactionPool
-	deps  dependencies
+	deps  Dependencies
 
 	// The following set of fields are responsible for tracking the confirmed
 	// outputs, and for being able to spend them. The seeds are used to derive
