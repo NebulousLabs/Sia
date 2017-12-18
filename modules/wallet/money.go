@@ -183,7 +183,7 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.
 		return nil, build.ExtendErr("unable to sign transaction", err)
 	}
 	if w.deps.disrupt("SendSiacoinsInterrupted") {
-		return nil, errors.New("Failed to accept transaction set. (SendSiacoinsInterrupted)")
+		return nil, errors.New("failed to accept transaction set (SendSiacoinsInterrupted)")
 	}
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {

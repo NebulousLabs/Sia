@@ -207,14 +207,15 @@ func TestSendSiacoinsAcceptTxnSetFailed(t *testing.T) {
 	wt.wallet.mu.Unlock()
 
 	// Try to send coins using SendSiacoinsMulti
-	scos := make([]types.SiacoinOutput, 10)
-	for _, sco := range scos {
+	numOutputs := 10
+	scos := make([]types.SiacoinOutput, numOutputs)
+	for i := 0; i < numOutputs; i++ {
 		uc, err := wt.wallet.NextAddress()
 		if err != nil {
 			t.Fatal(err)
 		}
-		sco.Value = types.SiacoinPrecision
-		sco.UnlockHash = uc.UnlockHash()
+		scos[i].Value = types.SiacoinPrecision
+		scos[i].UnlockHash = uc.UnlockHash()
 	}
 	deps.fail()
 	_, err = wt.wallet.SendSiacoinsMulti(scos)
@@ -242,4 +243,16 @@ func TestSendSiacoinsAcceptTxnSetFailed(t *testing.T) {
 		t.Fatal("bucketSpentOutputs isn't empty")
 	}
 	wt.wallet.mu.Unlock()
+
+	// Send the money again without the failing dependency
+	_, err = wt.wallet.SendSiacoinsMulti(scos)
+	if err != nil {
+		t.Fatalf("SendSiacoinsMulti failed: %v", err)
+	}
+
+	// Send some coins using SendSiacoins
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash())
+	if err != nil {
+		t.Fatalf("SendSiacoins failed: %v", err)
+	}
 }
