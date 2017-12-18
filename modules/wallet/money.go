@@ -84,7 +84,7 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 
 // SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
-func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
+func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txns []types.Transaction, err error) {
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
@@ -102,7 +102,12 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 	}
 
 	txnBuilder := w.StartTransaction()
-	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
+	defer func() {
+		if err != nil {
+			txnBuilder.Drop()
+		}
+	}()
+	err = txnBuilder.FundSiacoins(amount.Add(tpoolFee))
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
 		return nil, build.ExtendErr("unable to fund transaction", err)
@@ -132,7 +137,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 // SendSiacoinsMulti creates a transaction that includes the specified
 // outputs. The transaction is submitted to the transaction pool and is also
 // returned.
-func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) ([]types.Transaction, error) {
+func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.Transaction, err error) {
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
@@ -143,6 +148,11 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) ([]types.Trans
 	}
 
 	txnBuilder := w.StartTransaction()
+	defer func() {
+		if err != nil {
+			txnBuilder.Drop()
+		}
+	}()
 
 	// Add estimated transaction fee.
 	_, tpoolFee := w.tpool.FeeEstimation()
@@ -158,7 +168,7 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) ([]types.Trans
 	for _, sco := range outputs {
 		totalCost = totalCost.Add(sco.Value)
 	}
-	err := txnBuilder.FundSiacoins(totalCost)
+	err = txnBuilder.FundSiacoins(totalCost)
 	if err != nil {
 		return nil, build.ExtendErr("unable to fund transaction", err)
 	}
