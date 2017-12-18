@@ -15,7 +15,7 @@ func TestDefragWallet(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), productionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestDefragWalletDust(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), productionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), productionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}

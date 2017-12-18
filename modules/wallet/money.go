@@ -1,6 +1,8 @@
 package wallet
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -112,6 +114,9 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
 		return nil, build.ExtendErr("unable to sign transaction", err)
 	}
+	if w.deps.disrupt("SendSiacoinsInterrupted") {
+		return nil, errors.New("Failed to accept transaction set. (SendSiacoinsInterrupted)")
+	}
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
@@ -166,6 +171,9 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) ([]types.Trans
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
 		return nil, build.ExtendErr("unable to sign transaction", err)
+	}
+	if w.deps.disrupt("SendSiacoinsInterrupted") {
+		return nil, errors.New("Failed to accept transaction set. (SendSiacoinsInterrupted)")
 	}
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
