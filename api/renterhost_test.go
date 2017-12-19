@@ -332,6 +332,11 @@ func TestRenterLocalRepair(t *testing.T) {
 		t.Fatal(err, ah)
 	}
 
+	// Mine a block to force contract maintenance
+	if _, err := st.miner.AddBlock(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Block until we formed a contract with the new host.
 	err = build.Retry(50, time.Millisecond*250, func() error {
 		var rc RenterContracts
@@ -558,6 +563,11 @@ func TestRemoteFileRepair(t *testing.T) {
 		return nil
 	})
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine a block to force contract maintenance
+	if _, err := st.miner.AddBlock(); err != nil {
 		t.Fatal(err)
 	}
 
