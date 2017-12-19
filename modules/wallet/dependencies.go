@@ -7,7 +7,7 @@ type (
 	// Dependencies defines all of the dependencies of the Host.
 	Dependencies interface {
 		// disrupt can be inserted in the code as a way to inject problems,
-		disrupt(string) bool
+		Disrupt(string) bool
 	}
 )
 
@@ -16,8 +16,8 @@ type (
 	ProductionDependencies struct{}
 )
 
-// disrupt will always return false, but can be over-written during testing to
+// Disrupt will always return false, but can be over-written during testing to
 // trigger disruptions.
-func (*ProductionDependencies) disrupt(string) bool {
+func (*ProductionDependencies) Disrupt(string) bool {
 	return false
 }

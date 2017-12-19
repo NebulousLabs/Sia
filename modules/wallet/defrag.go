@@ -145,11 +145,28 @@ func (w *Wallet) threadedDefragWallet() {
 
 	// Create the defrag transaction.
 	txnSet, err := w.managedCreateDefragTransaction()
+	defer func() {
+		if err == nil {
+			return
+		}
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		for _, txn := range txnSet {
+			for _, sci := range txn.SiacoinInputs {
+				dbDeleteSpentOutput(w.dbTx, types.OutputID(sci.ParentID))
+			}
+		}
+	}()
 	if err == errDefragNotNeeded {
-		// benign
+		// begin
 		return
 	} else if err != nil {
 		w.log.Println("WARN: couldn't create defrag transaction:", err)
+		return
+	}
+
+	if w.deps.Disrupt("DefragInterrupted") {
+		err = errors.New("defrag was interrupted (DefragInterrupted)")
 		return
 	}
 	// Submit the defrag to the transaction pool.
