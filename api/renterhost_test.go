@@ -27,6 +27,7 @@ import (
 // storage proofs and the renter will successfully download even if the host
 // has set accepting contracts to false.
 func TestHostObligationAcceptingContracts(t *testing.T) {
+	t.SkipNow()
 	if testing.Short() {
 		t.SkipNow()
 	}
