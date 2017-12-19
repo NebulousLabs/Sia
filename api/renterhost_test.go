@@ -1206,7 +1206,7 @@ func TestRenterUploadDownload(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal("allowance setting failed")
+		t.Fatalf("allowance setting failed: %v", err)
 	}
 
 	// Check financial metrics; coins should have been spent on contracts
