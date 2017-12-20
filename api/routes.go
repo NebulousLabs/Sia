@@ -131,7 +131,7 @@ func (api *API) buildHttpRoutes(requiredUserAgent string, requiredPassword strin
 }
 
 // cleanCloseHandler wraps the entire API, ensuring that underlying conns are
-// not leaked if the rmeote end closes the connection before the underlying
+// not leaked if the remote end closes the connection before the underlying
 // handler finishes.
 func cleanCloseHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
