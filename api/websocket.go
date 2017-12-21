@@ -29,7 +29,7 @@ type WebsocketHub struct {
 	unregisterBlock chan *Subscriber
 }
 
-//Subscriber is a
+//Subscriber is an encapsulation of a single connection to the websocket hub
 type Subscriber struct {
 	hub  *WebsocketHub
 	conn *websocket.Conn
@@ -45,7 +45,9 @@ var Upgrader = websocket.Upgrader{
 //SocketWriter should be called in a goroutine.  SocketWriter manages writing to the subscriber connection via channel buffers
 func (s *Subscriber) SocketWriter() {
 	defer func() {
-		s.conn.Close()
+		if s.conn != nil {
+			s.conn.Close()
+		}
 	}()
 	for {
 		select {
@@ -60,6 +62,7 @@ func (s *Subscriber) SocketWriter() {
 				w, err := s.conn.NextWriter(websocket.TextMessage)
 				if err != nil {
 					//Closed in the defer
+					log.Printf("Error reading from connection: %s", err)
 					return
 				}
 				w.Write(message)
@@ -69,6 +72,7 @@ func (s *Subscriber) SocketWriter() {
 				}
 				if err := w.Close(); err != nil {
 					//Closed in the defer
+					log.Printf("Error writing connection: %s", err)
 					return
 				}
 			}
