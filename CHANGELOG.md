@@ -1,6 +1,15 @@
 Version History
 ---------------
 
+December 2017:
+
+v1.3.1 (minor release)
+- Integrate new writeaheadlog and pages packages
+- Contract creation and file upload overhaul
+- Faster and smoother file repairs
+- Various bug fixes and logging tweaks
+- Introduce hardfork to fix DAA bug
+
 July 2017:
 
 v1.3.0 (minor release)
