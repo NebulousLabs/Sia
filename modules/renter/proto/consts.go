@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	// contractExtension is the extention given to contract files.
+	// contractExtension is the extension given to contract files.
 	contractExtension = ".contract"
 )
 

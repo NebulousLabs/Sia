@@ -514,7 +514,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// Make sure that every wallet has money in it, then set the storage and
-	// perform annoucnements.
+	// perform announcements.
 	err = fundAllNodes(testGroup)
 	if err != nil {
 		t.Fatal(err)
