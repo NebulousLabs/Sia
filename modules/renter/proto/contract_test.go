@@ -98,7 +98,7 @@ func TestContractUncommittedTxn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// the uncomitted transaction should be gone now
+	// the uncommitted transaction should be gone now
 	if len(sc.unappliedTxns) != 0 {
 		t.Fatal("expected 0 unappliedTxns, got", len(sc.unappliedTxns))
 	}
