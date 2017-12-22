@@ -101,8 +101,12 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 }
 
 // handleConflicts detects whether the conflicts in the transaction pool are
-// legal children of the new transaction pool set or not.
+// legal children of the new transaction pool set or not. If the conflict can be
+// handled itt also creates a TransactionPoolDiff by adding the given
+// transaction set to the transaction pool, and removing any transaction sets
+// that conflict with it. It then updates all subscribers with that diff.
 func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []TransactionSetID, txnFn func([]types.Transaction) (modules.ConsensusChange, error)) error {
+	diff := new(modules.TransactionPoolDiff)
 	// Create a list of all the transaction ids that compose the set of
 	// conflicts.
 	conflictMap := make(map[types.TransactionID]TransactionSetID)
@@ -198,23 +202,44 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 		tp.transactionListSize -= len(encoding.Marshal(conflictSet))
 		delete(tp.transactionSets, conflict)
 		delete(tp.transactionSetDiffs, conflict)
+		diff.RevertedTransactions = append(diff.RevertedTransactions, modules.TransactionSetID(conflict))
+		delete(tp.subscriberSets, conflict)
 	}
 
 	// Add the transaction set to the pool.
 	setID := TransactionSetID(crypto.HashObject(superset))
 	tp.transactionSets[setID] = superset
-	for _, diff := range cc.SiacoinOutputDiffs {
-		tp.knownObjects[ObjectID(diff.ID)] = setID
+	for _, txDiff := range cc.SiacoinOutputDiffs {
+		tp.knownObjects[ObjectID(txDiff.ID)] = setID
 	}
-	for _, diff := range cc.FileContractDiffs {
-		tp.knownObjects[ObjectID(diff.ID)] = setID
+	for _, txDiff := range cc.FileContractDiffs {
+		tp.knownObjects[ObjectID(txDiff.ID)] = setID
 	}
-	for _, diff := range cc.SiafundOutputDiffs {
-		tp.knownObjects[ObjectID(diff.ID)] = setID
+	for _, txDiff := range cc.SiafundOutputDiffs {
+		tp.knownObjects[ObjectID(txDiff.ID)] = setID
 	}
 	tp.transactionSetDiffs[setID] = &cc
 	tsetSize := len(encoding.Marshal(superset))
 	tp.transactionListSize += tsetSize
+
+	// Create the UnconfirmedTransactionSet object for this transaction set, and
+	// then add it to the diff.
+	ids := make([]types.TransactionID, 0, len(superset))
+	sizes := make([]uint64, 0, len(superset))
+	for i := range superset {
+		sizes = append(sizes, uint64(superset[i].MarshalSiaSize()))
+		ids = append(ids, superset[i].ID())
+	}
+	ut := &modules.UnconfirmedTransactionSet{
+		Change: &cc,
+		ID:     modules.TransactionSetID(setID),
+
+		IDs:          ids,
+		Sizes:        sizes,
+		Transactions: superset,
+	}
+	tp.subscriberSets[setID] = ut
+	diff.AppliedTransactions = append(diff.AppliedTransactions, ut)
 
 	// debug logging
 	if build.DEBUG {
@@ -225,11 +250,16 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 		tp.log.Debugf("accepted transaction superset %v, size: %vB\ntpool size is %vB after accpeting transaction superset\ntransactions: \n%v\n", setID, tsetSize, tp.transactionListSize, txLogs)
 	}
 
+	for _, subscriber := range tp.subscribers {
+		subscriber.ReceiveUpdatedUnconfirmedTransactions(diff)
+	}
+
 	return nil
 }
 
 // acceptTransactionSet verifies that a transaction set is allowed to be in the
-// transaction pool, and then adds it to the transaction pool.
+// transaction pool, then adds it to the transaction pool, and updates its
+// subscribers.
 func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn func([]types.Transaction) (modules.ConsensusChange, error)) error {
 	if len(ts) == 0 {
 		return errEmptySet
@@ -284,7 +314,8 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 		}
 	}
 	if len(conflicts) > 0 {
-		return tp.handleConflicts(ts, conflicts, txnFn)
+		err := tp.handleConflicts(ts, conflicts, txnFn)
+		return err
 	}
 	cc, err := txnFn(ts)
 	if err != nil {
@@ -304,6 +335,30 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 		if _, exists := tp.transactionHeights[txn.ID()]; !exists {
 			tp.transactionHeights[txn.ID()] = tp.blockHeight
 		}
+	}
+
+	// Create the UnconfirmedTransactionSet object for this transaction set, and
+	// then add it to a diff for the subscribers.
+	ids := make([]types.TransactionID, 0, len(ts))
+	sizes := make([]uint64, 0, len(ts))
+	for i := range ts {
+		sizes = append(sizes, uint64(ts[i].MarshalSiaSize()))
+		ids = append(ids, ts[i].ID())
+	}
+	ut := &modules.UnconfirmedTransactionSet{
+		Change: &cc,
+		ID:     modules.TransactionSetID(setID),
+
+		IDs:          ids,
+		Sizes:        sizes,
+		Transactions: ts,
+	}
+	// Add this diff to our set of subscriber diffs.
+	tp.subscriberSets[setID] = ut
+	diff := new(modules.TransactionPoolDiff)
+	diff.AppliedTransactions = append(diff.AppliedTransactions, ut)
+	for _, subscriber := range tp.subscribers {
+		subscriber.ReceiveUpdatedUnconfirmedTransactions(diff)
 	}
 
 	// debug logging
@@ -339,8 +394,6 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 			return err
 		}
 		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
-		// Notify subscribers of an accepted transaction set
-		tp.updateSubscribersTransactions()
 		return nil
 	})
 }
