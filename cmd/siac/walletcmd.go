@@ -195,8 +195,11 @@ func passConfirm(prompt string) string {
 	pass := passPrompt(prompt)
 	pass2 := passPrompt(prompt + " (again)")
 
-	if len(pass) < 8 || pass != pass2 {
-		die(prompt, "mismatch or too short")
+	if len(pass) < 8 {
+		die(prompt, "too short")
+	}
+	if pass != pass2 {
+		die(prompt, "mismatch")
 	}
 	// any other password quality checks here
 	return pass
