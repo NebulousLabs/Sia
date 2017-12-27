@@ -193,11 +193,11 @@ func passPrompt(prompt string) string {
 // ask & confirm a new password with min length
 func passConfirm(prompt string) string {
 	pass := passPrompt(prompt)
-	pass2 := passPrompt(prompt + " (again)")
-
 	if len(pass) < 8 {
 		die(prompt, "too short")
 	}
+
+	pass2 := passPrompt(prompt + " (again)")
 	if pass != pass2 {
 		die(prompt, "mismatch")
 	}
