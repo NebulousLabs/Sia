@@ -25,13 +25,10 @@ type Server struct {
 
 // Close closes the Server's listener, causing the HTTP server to shut down.
 func (srv *Server) Close() error {
-	err := srv.tg.Stop()
-	if err != nil {
-		return errors.AddContext(err, "unable to close server")
-	}
+	err := srv.listener.Close()
+	err = errors.Extend(err, srv.tg.Stop())
 
 	// Safely close each module.
-	var errs []error
 	mods := []struct {
 		name string
 		c    io.Closer
@@ -47,12 +44,12 @@ func (srv *Server) Close() error {
 	}
 	for _, mod := range mods {
 		if mod.c != nil {
-			if err := mod.c.Close(); err != nil {
-				errs = append(errs, fmt.Errorf("%v.Close failed: %v", mod.name, err))
+			if closeErr := mod.c.Close(); closeErr != nil {
+				err = errors.Extend(err, fmt.Errorf("%v.Close failed: %v", mod.name, err))
 			}
 		}
 	}
-	return errors.Compose(errs...)
+	return errors.AddContext(err, "error while closing server")
 }
 
 // Serve listens for and handles API calls. It is a blocking function.
@@ -79,24 +76,19 @@ func (srv *Server) Serve() error {
 // authentication sends passwords in plaintext and should therefore only be
 // used if the APIaddr is localhost.
 func NewServer(APIaddr string, requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*Server, error) {
-	var tg threadgroup.ThreadGroup
 	listener, err := net.Listen("tcp", APIaddr)
 	if err != nil {
 		return nil, err
 	}
-	tg.OnStop(func() error {
-		return errors.AddContext(listener.Close(), "unable to close server listener")
-	})
 
 	api := New(requiredUserAgent, requiredPassword, cs, e, g, h, m, r, tp, w)
 	srv := &Server{
 		api: api,
-
-		listener:          listener,
-		requiredUserAgent: requiredUserAgent,
 		apiServer: &http.Server{
 			Handler: api,
 		},
+		listener:          listener,
+		requiredUserAgent: requiredUserAgent,
 	}
 	return srv, nil
 }
