@@ -89,7 +89,7 @@ func TestHostObligationAcceptingContracts(t *testing.T) {
 
 	// redundancy should reach 1
 	var rf RenterFiles
-	err = retry(60, time.Second, func() error {
+	err = retry(120, time.Millisecond*250, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Available {
 			return nil
@@ -109,7 +109,7 @@ func TestHostObligationAcceptingContracts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(time.Millisecond * 200)
+		time.Sleep(time.Millisecond * 100)
 	}
 	downloadPath := filepath.Join(st.dir, "test-downloaded-verify.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
@@ -123,7 +123,7 @@ func TestHostObligationAcceptingContracts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(time.Millisecond * 200)
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	// should have successful proofs
@@ -249,6 +249,15 @@ func TestRenterLocalRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Mine a block so the renter realizes the host is offline.
+	b, err := st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = waitForBlock(b.ID(), st)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// wait for the redundancy to decrement
 	err = retry(60, time.Second, func() error {
@@ -270,7 +279,6 @@ func TestRenterLocalRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer stNewHost.server.Close()
-
 	testGroup = []*serverTester{st, stNewHost}
 
 	// Connect the testers to eachother so that they are all on the same
@@ -290,6 +298,7 @@ func TestRenterLocalRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set up storage on the new host.
 	err = stNewHost.setHostStorage()
 	if err != nil {
 		t.Fatal(err)
@@ -298,11 +307,14 @@ func TestRenterLocalRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = stNewHost.miner.AddBlock()
+	// Mine a block so the renter sees the host in its hostdb. Need to mine two
+	// blocks because after the announcement, the renter node's blockchain is
+	// actually behind.
+	b, err = stNewHost.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = waitForBlock(stNewHost.cs.CurrentBlock().ID(), st)
+	err = waitForBlock(b.ID(), testGroup[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,6 +341,20 @@ func TestRenterLocalRepair(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err, ah)
+	}
+
+	// Mine a block so the contractor sees that it can form a new contract.
+	b, err = testGroup[0].miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = waitForBlock(b.ID(), testGroup[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Block until we formed a contract with the new host.
@@ -556,6 +582,16 @@ func TestRemoteFileRepair(t *testing.T) {
 		}
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine a block so the contractor sees that it can form a new contract.
+	_, err = testGroup[0].miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
