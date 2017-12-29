@@ -7,6 +7,7 @@ package siatest
 import (
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -29,9 +30,6 @@ import (
 //		+ Pass the newFuncDeps and deps in (everything else shoudl be nil)
 //		+ Pass 'nil' in for everything (module will not be instantiated)
 type NewTestNodeParams struct {
-	// The directory to use when creating or opening modules.
-	Dir string
-
 	// Omissions - if the omit flag is set for a module, that module will not
 	// be included in the test node.
 	//
@@ -59,6 +57,9 @@ type NewTestNodeParams struct {
 	Renter          modules.Renter
 	TransactionPool modules.TransactionPool
 	Wallet          modules.Wallet
+
+	// Utilities.
+	Dir string // The directory to use when creating or opening modules.
 }
 
 // TestNode contains all modules, and can be used as a testing node. Modules
@@ -80,7 +81,9 @@ type TestNode struct {
 	WalletKey crypto.TwofishKey
 
 	// Folder on disk that stores all of the module persistence.
-	PersistDir string
+	Client     *api.Client // A client that can be used to talk to this node's API.
+	PersistDir string      // The folder used for this node's persist files.
+	Server     *api.Server // The server that listens and handles api requests.
 }
 
 // NewTestNode will create a new test node. The inputs to the function are the
@@ -210,6 +213,12 @@ func NewTestNode(params NewTestNodeParams) (*TestNode, error) {
 		return nil, errors.Extend(err, errors.New("unable to create miner"))
 	}
 
+	// Create the server.
+	server, err := api.NewServer("", "", cs, e, g, h, m, r, tp, w)
+	if err != nil {
+		return nil, errors.AddContext(err, "unable to create server")
+	}
+
 	return &TestNode{
 		ConsensusSet:    cs,
 		Gateway:         g,
@@ -220,5 +229,6 @@ func NewTestNode(params NewTestNodeParams) (*TestNode, error) {
 		Wallet:          w,
 
 		PersistDir: dir,
+		Server:     server,
 	}, nil
 }
