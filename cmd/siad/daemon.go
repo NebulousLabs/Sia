@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -22,7 +23,7 @@ import (
 // passwordPrompt securely reads a password from stdin.
 func passwordPrompt(prompt string) (string, error) {
 	fmt.Print(prompt)
-	pw, err := terminal.ReadPassword(0)
+	pw, err := terminal.ReadPassword(syscall.Stdin)
 	fmt.Println()
 	return string(pw), err
 }
