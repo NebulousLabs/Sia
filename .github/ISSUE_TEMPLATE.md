@@ -1,21 +1,18 @@
-Bug Report
-==========
-Check to see if a bug report already exists.  If you still want to create a new issue please include the information below.
+<!-- This form is for bug reports and feature requests only.
+
+If you're looking for help check [Discord](https://discord.gg/sia) and the Sia [website](sia.tech).
+
+Please make sure the bug report doesn't already exist in the GitHub issues.
+-->
+
+# Is this a BUG REPORT or FEATURE REQUEST?
 
 **Stack Trace or error message**
 
 **Expected Behavior**
 
+**How to reproduce it (as minimally and precisely as possible)**
+
 **Environment**
 * Sia version:
 * OS:
-
-**Any useful logs**
-
-
-
-Feature Request
-===============
-Check to see if the feature is on the roadmap.  If it is not on the roadmap then clearly describe your feature request and why it would benefit Sia.
-
-[Sia roadmap](https://trello.com/b/Io1dDyuI/sia-public-roadmap)
