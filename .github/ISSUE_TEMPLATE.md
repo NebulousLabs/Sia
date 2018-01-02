@@ -1,11 +1,6 @@
-<!-- This form is for bug reports and feature requests only.
+<!-- If this is a feature request, please put 'Feature Request:' in the issue title. -->
 
-If you're looking for help check [Discord](https://discord.gg/sia) and the Sia [website](sia.tech).
-
-Please make sure the bug report doesn't already exist in the GitHub issues.
--->
-
-# Is this a BUG REPORT or FEATURE REQUEST?
+# BUG REPORT
 
 **Stack Trace or error message**
 
