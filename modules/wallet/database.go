@@ -19,6 +19,9 @@ var (
 	// chronological order. Only transactions relevant to the wallet are
 	// stored. The key of this bucket is an autoincrementing integer.
 	bucketProcessedTransactions = []byte("bucketProcessedTransactions")
+	// bucketProcessedTxnKey maps a ProcessedTransactions ID to it's
+	// autoincremented key in bucketProcessedTransactions
+	bucketProcessedTxnKey = []byte("bucketProcessedTxnKey")
 	// bucketAddrTransactions maps an UnlockHash to the
 	// ProcessedTransactions that it appears in.
 	bucketAddrTransactions = []byte("bucketAddrTransactions")
@@ -41,6 +44,7 @@ var (
 
 	dbBuckets = [][]byte{
 		bucketProcessedTransactions,
+		bucketProcessedTxnKey,
 		bucketAddrTransactions,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
@@ -266,6 +270,16 @@ func decodeProcessedTransaction(ptBytes []byte, pt *modules.ProcessedTransaction
 	return err
 }
 
+func dbPutTransactionKey(tx *bolt.Tx, txid types.TransactionID, key []byte) error {
+	return dbPut(tx.Bucket(bucketProcessedTxnKey), txid, key)
+}
+
+func dbGetTransactionKey(tx *bolt.Tx, txid types.TransactionID) (key []byte, err error) {
+	key = make([]byte, 8)
+	err = dbGet(tx.Bucket(bucketProcessedTxnKey), txid, &key)
+	return
+}
+
 func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) error {
 	b := tx.Bucket(bucketProcessedTransactions)
 	key, err := b.NextSequence()
@@ -278,6 +292,12 @@ func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) 
 	if err = b.Put(keyBytes, encoding.Marshal(pt)); err != nil {
 		return err
 	}
+
+	// add used key to bucketProcessedTxnKey
+	if err = dbPutTransactionKey(tx, pt.TransactionID, keyBytes); err != nil {
+		return err
+	}
+
 	// also add this txid to the bucketAddrTransactions
 	return dbAddProcessedTransactionAddrs(tx, pt, key)
 }
