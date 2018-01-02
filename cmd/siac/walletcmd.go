@@ -172,17 +172,38 @@ use it instead of displaying the typical interactive prompt.`,
 	}
 )
 
-const askPasswordText = "We need to encrypt the new data using the current wallet password, please provide: "
-
-const currentPasswordText = "Current Password: "
-const newPasswordText = "New Password: "
+const askPasswordText = "Need to encrypt new data with wallet password"
 
 // passwordPrompt securely reads a password from stdin.
 func passwordPrompt(prompt string) (string, error) {
-	fmt.Print(prompt)
+	fmt.Print(prompt, ": ")
 	pw, err := terminal.ReadPassword(syscall.Stdin)
 	fmt.Println()
 	return string(pw), err
+}
+
+// same except handle error here
+func passPrompt(prompt string) string {
+	pass, err := passwordPrompt(prompt)
+	if err != nil {
+		die("Reading", prompt, "failed:", err)
+	}
+	return pass
+}
+
+// ask & confirm a new password with min length
+func passConfirm(prompt string) string {
+	pass := passPrompt(prompt)
+	if len(pass) < 8 {
+		die(prompt, "too short")
+	}
+	// any other password quality checks here
+
+	pass2 := passPrompt(prompt + " (again)")
+	if pass != pass2 {
+		die(prompt, "mismatch")
+	}
+	return pass
 }
 
 // walletaddresscmd fetches a new address from the wallet that will be able to
@@ -210,16 +231,14 @@ func walletaddressescmd() {
 
 // walletchangepasswordcmd changes the password of the wallet.
 func walletchangepasswordcmd() {
-	currentPassword, err := passwordPrompt(currentPasswordText)
-	if err != nil {
-		die("Reading password failed:", err)
+	curPass := passPrompt("Current Password")
+	newPass := passConfirm("New Password")
+	if newPass == curPass {
+		die("Must be a different password")
 	}
-	newPassword, err := passwordPrompt(newPasswordText)
-	if err != nil {
-		die("Reading password failed:", err)
-	}
-	qs := fmt.Sprintf("newpassword=%s&encryptionpassword=%s", newPassword, currentPassword)
-	err = post("/wallet/changepassword", qs)
+	qs := fmt.Sprintf("newpassword=%s&encryptionpassword=%s", newPass, curPass)
+
+	err := post("/wallet/changepassword", qs)
 	if err != nil {
 		die("Changing the password failed:", err)
 	}
@@ -228,66 +247,63 @@ func walletchangepasswordcmd() {
 
 // walletinitcmd encrypts the wallet with the given password
 func walletinitcmd() {
-	var er api.WalletInitPOST
-	qs := fmt.Sprintf("dictionary=%s", "english")
+	var wi api.WalletInitPOST
+	qs := "dictionary=english"
+
 	if initPassword {
-		password, err := passwordPrompt("Wallet password: ")
-		if err != nil {
-			die("Reading password failed:", err)
-		}
-		qs += fmt.Sprintf("&encryptionpassword=%s", password)
+		password := passConfirm("Wallet password")
+		qs += "&encryptionpassword=" + password
 	}
 	if initForce {
 		qs += "&force=true"
 	}
-	err := postResp("/wallet/init", qs, &er)
+
+	err := postResp("/wallet/init", qs, &wi)
 	if err != nil {
 		die("Error when encrypting wallet:", err)
 	}
-	fmt.Printf("Recovery seed:\n%s\n\n", er.PrimarySeed)
+
+	fmt.Printf("Recovery seed:\n%s\n\n", wi.PrimarySeed)
 	if initPassword {
 		fmt.Printf("Wallet encrypted with given password\n")
 	} else {
-		fmt.Printf("Wallet encrypted with password:\n%s\n", er.PrimarySeed)
+		fmt.Printf("Wallet encrypted with password:\n%s\n", wi.PrimarySeed)
 	}
 }
 
 // walletinitseedcmd initializes the wallet from a preexisting seed.
 func walletinitseedcmd() {
-	seed, err := passwordPrompt("Seed: ")
-	if err != nil {
-		die("Reading seed failed:", err)
-	}
-	qs := fmt.Sprintf("&seed=%s&dictionary=%s", seed, "english")
+	seed := passPrompt("Seed") // needs confirm?
+	qs := "&dictionary=english&seed=" + seed
+
 	if initPassword {
-		password, err := passwordPrompt("Wallet password: ")
-		if err != nil {
-			die("Reading password failed:", err)
-		}
-		qs += fmt.Sprintf("&encryptionpassword=%s", password)
+		password := passConfirm("Wallet password")
+		qs += "&encryptionpassword=" + password
 	}
 	if initForce {
 		qs += "&force=true"
 	}
-	err = post("/wallet/init/seed", qs)
+
+	err := post("/wallet/init/seed", qs)
 	if err != nil {
 		die("Could not initialize wallet from seed:", err)
 	}
+
+	fmt.Print("Wallet initialized and encrypted with ")
 	if initPassword {
-		fmt.Println("Wallet initialized and encrypted with given password.")
+		fmt.Println("given password.")
 	} else {
-		fmt.Println("Wallet initialized and encrypted with seed.")
+		fmt.Println("seed.")
 	}
 }
 
 // walletload033xcmd loads a v0.3.3.x wallet into the current wallet.
 func walletload033xcmd(source string) {
-	password, err := passwordPrompt(askPasswordText)
-	if err != nil {
-		die("Reading password failed:", err)
-	}
+	fmt.Println(askPasswordText)
+	password := passPrompt("Password")
 	qs := fmt.Sprintf("source=%s&encryptionpassword=%s", abs(source), password)
-	err = post("/wallet/033x", qs)
+
+	err := post("/wallet/033x", qs)
 	if err != nil {
 		die("Loading wallet failed:", err)
 	}
@@ -296,16 +312,12 @@ func walletload033xcmd(source string) {
 
 // walletloadseedcmd adds a seed to the wallet's list of seeds
 func walletloadseedcmd() {
-	seed, err := passwordPrompt("New seed: ")
-	if err != nil {
-		die("Reading seed failed:", err)
-	}
-	password, err := passwordPrompt(askPasswordText)
-	if err != nil {
-		die("Reading password failed:", err)
-	}
-	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
-	err = post("/wallet/seed", qs)
+	seed := passPrompt("New seed") // needs confirm?
+	fmt.Println(askPasswordText)
+	password := passPrompt("Password")
+	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=english", password, seed)
+
+	err := post("/wallet/seed", qs)
 	if err != nil {
 		die("Could not add seed:", err)
 	}
@@ -314,12 +326,11 @@ func walletloadseedcmd() {
 
 // walletloadsiagcmd loads a siag key set into the wallet.
 func walletloadsiagcmd(keyfiles string) {
-	password, err := passwordPrompt(askPasswordText)
-	if err != nil {
-		die("Reading password failed:", err)
-	}
+	fmt.Println(askPasswordText)
+	password := passPrompt("Password")
 	qs := fmt.Sprintf("keyfiles=%s&encryptionpassword=%s", keyfiles, password)
-	err = post("/wallet/siagkey", qs)
+
+	err := post("/wallet/siagkey", qs)
 	if err != nil {
 		die("Loading siag key failed:", err)
 	}
@@ -341,14 +352,14 @@ func walletseedscmd() {
 	if err != nil {
 		die("Error retrieving the current seed:", err)
 	}
-	fmt.Println("Primary Seed:")
-	fmt.Println(seedInfo.PrimarySeed)
+
+	fmt.Println("Primary Seed:", seedInfo.PrimarySeed)
 	if len(seedInfo.AllSeeds) == 1 {
 		// AllSeeds includes the primary seed
 		return
 	}
-	fmt.Println()
-	fmt.Println("Auxiliary Seeds:")
+
+	fmt.Println("\nAuxiliary Seeds:")
 	for _, seed := range seedInfo.AllSeeds {
 		if seed == seedInfo.PrimarySeed {
 			continue
@@ -428,13 +439,10 @@ Estimated Fee:       %v / KB
 
 // walletsweepcmd sweeps coins and funds from a seed.
 func walletsweepcmd() {
-	seed, err := passwordPrompt("Seed: ")
-	if err != nil {
-		die("Reading seed failed:", err)
-	}
-
+	seed := passPrompt("Seed")
 	var swept api.WalletSweepPOST
-	err = postResp("/wallet/sweep/seed", fmt.Sprintf("seed=%s&dictionary=%s", seed, "english"), &swept)
+
+	err := postResp("/wallet/sweep/seed", "dictionary=english&seed="+seed, &swept)
 	if err != nil {
 		die("Could not sweep seed:", err)
 	}
@@ -505,9 +513,10 @@ func walletunlockcmd() {
 	// try reading from environment variable first, then fallback to
 	// interactive method. Also allow overriding auto-unlock via -p
 	password := os.Getenv("SIA_WALLET_PASSWORD")
-	if password != "" && !initPassword {
+	if len(password) > 0 && !initPassword {
 		fmt.Println("Using SIA_WALLET_PASSWORD environment variable")
-		qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
+		qs := "dictonary=english&encryptionpassword=" + password
+
 		err := post("/wallet/unlock", qs)
 		if err != nil {
 			fmt.Println("Automatic unlock failed!")
@@ -516,12 +525,11 @@ func walletunlockcmd() {
 			return
 		}
 	}
-	password, err := passwordPrompt("Wallet password: ")
-	if err != nil {
-		die("Reading password failed:", err)
-	}
-	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
-	err = post("/wallet/unlock", qs)
+
+	password = passPrompt("Wallet password")
+	qs := "dictonary=english&encryptionpassword=" + password
+
+	err := post("/wallet/unlock", qs)
 	if err != nil {
 		die("Could not unlock wallet:", err)
 	}
