@@ -76,6 +76,62 @@ func TestIntegrationTransactions(t *testing.T) {
 	}
 }
 
+// TestTransactionsSingleTxn checks if it is possible to find a txn that was
+// appended to the processed transactions and is also the only txn for a
+// certain block height.
+func TestTransactionsSingleTxn(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Creating the wallet tester results in blocks being mined until the miner
+	// has money, which means types.MaturityDelay+1 blocks are created, and
+	// each block is going to have a transaction (the miner payout) going to
+	// the wallet.
+	txns, err := wt.wallet.Transactions(0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(txns) != int(types.MaturityDelay+1) {
+		t.Error("unexpected transaction history length")
+	}
+
+	// Create a processed txn for a future block height. It whould be the last
+	// txn in the database and the only txn with that height.
+	height := wt.cs.Height() + 1
+	pt := modules.ProcessedTransaction{
+		ConfirmationHeight: height,
+	}
+	wt.wallet.mu.Lock()
+	if err := dbAppendProcessedTransaction(wt.wallet.dbTx, pt); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set the consensus height to height. Otherwise Transactions will return
+	// an error. We can't just mine a block since that would create new
+	// transactions.
+	if err := dbPutConsensusHeight(wt.wallet.dbTx, height); err != nil {
+		t.Fatal(err)
+	}
+	wt.wallet.mu.Unlock()
+
+	// Search for the previously appended txn
+	txns, err = wt.wallet.Transactions(height, height)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We should find exactly 1 txn
+	if len(txns) != 1 {
+		t.Errorf("Found %v txns but should be 1", len(txns))
+	}
+}
+
 // TestIntegrationTransaction checks that individually queried transactions
 // contain the correct values.
 func TestIntegrationTransaction(t *testing.T) {
