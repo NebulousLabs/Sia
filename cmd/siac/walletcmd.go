@@ -177,7 +177,7 @@ const askPasswordText = "Need to encrypt new data with wallet password"
 // passwordPrompt securely reads a password from stdin.
 func passwordPrompt(prompt string) (string, error) {
 	fmt.Print(prompt, ": ")
-	pw, err := terminal.ReadPassword(syscall.Stdin) 
+	pw, err := terminal.ReadPassword(syscall.Stdin)
 	fmt.Println()
 	return string(pw), err
 }
@@ -197,7 +197,7 @@ func passConfirm(prompt string) string {
 	if len(pass) < 8 {
 		die(prompt, "too short")
 	}
-  // any other password quality checks here
+	// any other password quality checks here
 
 	pass2 := passPrompt(prompt + " (again)")
 	if pass != pass2 {
