@@ -75,7 +75,7 @@ func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTran
 	w.syncDB()
 
 	// Get the keyBytes for the given txid
-	keyBytes, err := dbGetTransactionKey(w.dbTx, txid)
+	keyBytes, err := dbGetTransactionIndex(w.dbTx, txid)
 	if err != nil {
 		return modules.ProcessedTransaction{}, false
 	}
