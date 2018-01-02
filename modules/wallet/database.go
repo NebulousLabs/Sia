@@ -280,6 +280,26 @@ func dbGetTransactionIndex(tx *bolt.Tx, txid types.TransactionID) (key []byte, e
 	return
 }
 
+// initProcessedTxnIndex initializes the bucketProcessedTxnIndex with the
+// elements from bucketProcessedTransactions
+func initProcessedTxnIndex(tx *bolt.Tx) error {
+	_, err := tx.CreateBucket(bucketProcessedTxnIndex)
+	if err != nil {
+		return err
+	}
+
+	it := dbProcessedTransactionsIterator(tx)
+	indexBytes := make([]byte, 8)
+	for it.next() {
+		index, pt := it.key(), it.value()
+		binary.BigEndian.PutUint64(indexBytes, index)
+		if err := dbPutTransactionIndex(tx, pt.TransactionID, indexBytes); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) error {
 	b := tx.Bucket(bucketProcessedTransactions)
 	key, err := b.NextSequence()

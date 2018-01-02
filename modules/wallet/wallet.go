@@ -144,6 +144,16 @@ func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDi
 		w.log.Critical("ERROR: failed to start database update:", err)
 	}
 
+	// COMPATv131 we need to create the bucketProcessedTxnIndex if it doesn't exist
+	if w.dbTx.Bucket(bucketProcessedTxnIndex) == nil {
+		err = initProcessedTxnIndex(w.dbTx)
+		if err != nil {
+			return nil, err
+		}
+		// Save changes to disk
+		w.syncDB()
+	}
+
 	// make sure we commit on shutdown
 	w.tg.AfterStop(func() {
 		err := w.dbTx.Commit()

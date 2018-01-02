@@ -147,6 +147,53 @@ func TestIntegrationTransaction(t *testing.T) {
 	}
 }
 
+// TestProcessedTxnIndexCompatCode checks if the compatibility code for the
+// bucketProcessedTxnIndex works as expected
+func TestProcessedTxnIndexCompatCode(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// The wallet tester mined a few blocks. Therefore the bucket shouldn't be
+	// empty.
+	wt.wallet.mu.Lock()
+	defer wt.wallet.mu.Unlock()
+	wt.wallet.syncDB()
+	expectedTxns := wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex).Stats().KeyN
+	if expectedTxns == 0 {
+		t.Fatal("bucketProcessedTxnIndex shouldn't be empty")
+	}
+
+	// Delete the bucket
+	if err := wt.wallet.dbTx.DeleteBucket(bucketProcessedTxnIndex); err != nil {
+		t.Fatalf("Failed to empty bucket: %v", err)
+	}
+
+	// Bucket shouldn't exist
+	if wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex) != nil {
+		t.Fatal("bucketProcessedTxnIndex should be empty")
+	}
+
+	// Initialize the bucket
+	if err := initProcessedTxnIndex(wt.wallet.dbTx); err != nil {
+		t.Fatalf("initProcessedTxnIndex failed: %v", err)
+	}
+
+	// Sync changes to disk
+	wt.wallet.syncDB()
+
+	// Check if bucket has expected size
+	numTxns := wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex).Stats().KeyN
+	if expectedTxns != numTxns {
+		t.Errorf("Bucket should have %v entries but had %v", expectedTxns, numTxns)
+	}
+}
+
 // TestIntegrationAddressTransactions checks grabbing the history for a single
 // address.
 func TestIntegrationAddressTransactions(t *testing.T) {
