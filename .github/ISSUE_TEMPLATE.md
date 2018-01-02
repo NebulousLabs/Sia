@@ -4,11 +4,11 @@ Check to see if a bug report already exists.  If you still want to create a new 
 
 **Stack Trace or error message**
 
+**Expected Behavior**
 
 **Environment**
 * Sia version:
 * OS:
-
 
 **Any useful logs**
 
