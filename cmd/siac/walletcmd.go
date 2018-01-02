@@ -180,7 +180,7 @@ const newPasswordText = "New Password: "
 // passwordPrompt securely reads a password from stdin.
 func passwordPrompt(prompt string) (string, error) {
 	fmt.Print(prompt)
-	pw, err := terminal.ReadPassword(syscall.Stdin)
+	pw, err := terminal.ReadPassword(int(syscall.Stdin))
 	fmt.Println()
 	return string(pw), err
 }
