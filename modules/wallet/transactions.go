@@ -101,7 +101,12 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 	// Get the bucket, the largest key in it and the cursor
 	bucket := w.dbTx.Bucket(bucketProcessedTransactions)
 	cursor := bucket.Cursor()
-	lastKey := bucket.Sequence()
+	nextKey := bucket.Sequence() + 1
+
+	// Database is empty
+	if nextKey == 1 {
+		return
+	}
 
 	var pt modules.ProcessedTransaction
 	keyBytes := make([]byte, 8)
@@ -116,7 +121,7 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 		}()
 
 		// Start binary searching
-		result = sort.Search(int(lastKey), func(i int) bool {
+		result = sort.Search(int(nextKey), func(i int) bool {
 			// Create the key for the index
 			binary.BigEndian.PutUint64(keyBytes, uint64(i))
 
@@ -138,7 +143,7 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 		return
 	}
 
-	if uint64(result) == lastKey {
+	if uint64(result) == nextKey {
 		// No transaction was found
 		return
 	}
