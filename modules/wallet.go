@@ -308,6 +308,10 @@ type (
 		// primary seed.
 		NextAddress() (types.UnlockConditions, error)
 
+		// NextAddresses returns n new coin addresses generated from the primary
+		// seed.
+		NextAddresses(uint64) ([]types.UnlockConditions, error)
+
 		// PrimarySeed returns the unencrypted primary seed of the wallet,
 		// along with a uint64 indicating how many addresses may be safely
 		// generated from the seed.
