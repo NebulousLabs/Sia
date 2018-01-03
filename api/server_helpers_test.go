@@ -438,10 +438,18 @@ func (st *serverTester) setHostStorage() error {
 // announceHost announces the host, mines a block, and waits for the
 // announcement to register.
 func (st *serverTester) announceHost() error {
+	// Check how many hosts there are to begin with.
+	var hosts HostdbActiveGET
+	err := st.getAPI("/hostdb/active", &hosts)
+	if err != nil {
+		return err
+	}
+	initialHosts := len(hosts.Hosts)
+
 	// Set the host to be accepting contracts.
 	acceptingContractsValues := url.Values{}
 	acceptingContractsValues.Set("acceptingcontracts", "true")
-	err := st.stdPostAPI("/host", acceptingContractsValues)
+	err = st.stdPostAPI("/host", acceptingContractsValues)
 	if err != nil {
 		return build.ExtendErr("couldn't make an api call to the host:", err)
 	}
@@ -458,19 +466,18 @@ func (st *serverTester) announceHost() error {
 		return err
 	}
 	// wait for announcement
-	var hosts HostdbActiveGET
 	err = st.getAPI("/hostdb/active", &hosts)
 	if err != nil {
 		return err
 	}
-	for i := 0; i < 50 && len(hosts.Hosts) == 0; i++ {
+	for i := 0; i < 50 && len(hosts.Hosts) <= initialHosts; i++ {
 		time.Sleep(100 * time.Millisecond)
 		err = st.getAPI("/hostdb/active", &hosts)
 		if err != nil {
 			return err
 		}
 	}
-	if len(hosts.Hosts) == 0 {
+	if len(hosts.Hosts) <= initialHosts {
 		return errors.New("host announcement not seen")
 	}
 	return nil
