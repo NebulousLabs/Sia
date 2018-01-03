@@ -57,9 +57,6 @@ type TestMiner interface {
 	// each can safely start from nonce 0.
 	BlockForWork() (types.Block, types.Target, error)
 
-	// Close is necessary for clean shutdown during testing.
-	Close() error
-
 	// FindBlock will have the miner make 1 attempt to find a solved block that
 	// builds on the current consensus set. It will give up after a few
 	// seconds, returning the block and a bool indicating whether the block is
@@ -70,6 +67,10 @@ type TestMiner interface {
 	// which amounts to trying a few thousand different nonces. SolveBlock is
 	// primarily used for testing.
 	SolveBlock(types.Block, types.Target) (types.Block, bool)
+
+	// Needs to have all other miner functions in addition to shortcuts for
+	// mining blocks.
+	Miner
 }
 
 // The Miner interface provides access to mining features.
