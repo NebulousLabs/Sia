@@ -1,11 +1,13 @@
 package api
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -20,6 +22,8 @@ type (
 		MinerPayoutIDs []types.SiacoinOutputID `json:"minerpayoutids"`
 		Transactions   []ExplorerTransaction   `json:"transactions"`
 		RawBlock       types.Block             `json:"rawblock"`
+		HexBlock       string                  `json:"hexblock"`
+		HexBlockID     string                  `json:"blockid"`
 
 		modules.BlockFacts
 	}
@@ -171,8 +175,10 @@ func (api *API) buildExplorerTransaction(height types.BlockHeight, parent types.
 }
 
 // buildExplorerBlock takes a block and its height and uses it to construct an
-// explorer block.
-func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlock {
+// explorer block. hexBlockEnable is a required flag and indicates if the
+// hexBlock field should be empty string (false) or
+// should contain the hexadecimal binary encoded block (true).
+func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block, hexBlockEnable bool) ExplorerBlock {
 	var mpoids []types.SiacoinOutputID
 	for i := range block.MinerPayouts {
 		mpoids = append(mpoids, block.MinerPayoutID(uint64(i)))
@@ -188,13 +194,18 @@ func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block) 
 		panic("incorrect request to buildExplorerBlock - block does not exist")
 	}
 
-	return ExplorerBlock{
+	b := ExplorerBlock{
 		MinerPayoutIDs: mpoids,
 		Transactions:   etxns,
 		RawBlock:       block,
+		HexBlockID:     hex.EncodeToString(encoding.Marshal(block.ID())),
 
 		BlockFacts: facts,
 	}
+	if hexBlockEnable {
+		b.HexBlock = hex.EncodeToString(encoding.Marshal(block))
+	}
+	return b
 }
 
 // explorerHandler handles API calls to /explorer/blocks/:height.
@@ -214,7 +225,8 @@ func (api *API) explorerBlocksHandler(w http.ResponseWriter, req *http.Request, 
 		return
 	}
 	WriteJSON(w, ExplorerBlockGET{
-		Block: api.buildExplorerBlock(height, block),
+		Block: api.buildExplorerBlock(height, block,
+			req.FormValue("hexblock") == "true"),
 	})
 }
 
@@ -231,7 +243,7 @@ func (api *API) buildTransactionSet(txids []types.TransactionID) (txns []Explore
 
 		// Check if the block is the transaction.
 		if types.TransactionID(block.ID()) == txid {
-			blocks = append(blocks, api.buildExplorerBlock(height, block))
+			blocks = append(blocks, api.buildExplorerBlock(height, block, false))
 		} else {
 			// Find the transaction within the block with the correct id.
 			for _, t := range block.Transactions {
@@ -271,7 +283,8 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 	if exists {
 		WriteJSON(w, ExplorerHashGET{
 			HashType: "blockid",
-			Block:    api.buildExplorerBlock(height, block),
+			Block: api.buildExplorerBlock(height, block,
+				req.FormValue("hexblock") == "true"),
 		})
 		return
 	}
