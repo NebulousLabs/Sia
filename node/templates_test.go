@@ -6,9 +6,9 @@ import (
 	"github.com/NebulousLabs/Sia/siatest"
 )
 
-// TestNewNode is a basic smoke test for NewNode that uses all of the templates
-// to verify a working NewNode function.
-func TestNewNode(t *testing.T) {
+// TestNew is a basic smoke test for New that uses all of the templates to
+// verify a working New function.
+func TestNew(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -18,7 +18,7 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n, err := NewNode(AllModules(dir))
+	n, err := New(AllModules(dir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n, err = NewNode(Wallet(dir))
+	n, err = New(Wallet(dir))
 	if err != nil {
 		t.Fatal(err)
 	}

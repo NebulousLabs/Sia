@@ -117,12 +117,12 @@ func (n *Node) Close() (err error) {
 	return err
 }
 
-// NewNode will create a new test node. The inputs to the function are the
-// respective 'New' calls for each module. We need to use this awkward method
-// of initialization because the siatest package cannot import any of the
-// modules directly (so that the modules may use the siatest package to test
+// New will create a new test node. The inputs to the function are the
+// respective 'New' calls for each module. We need to use this awkward method of
+// initialization because the siatest package cannot import any of the modules
+// directly (so that the modules may use the siatest package to test
 // themselves).
-func NewNode(params NodeParams) (*Node, error) {
+func New(params NodeParams) (*Node, error) {
 	dir := params.Dir
 
 	// Gateway.
