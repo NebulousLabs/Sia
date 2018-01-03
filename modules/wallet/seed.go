@@ -186,6 +186,9 @@ func (w *Wallet) PrimarySeed() (modules.Seed, uint64, error) {
 
 // NextAddresses returns n unlock hashes that are ready to receive siacoins or
 // siafunds. The addresses are generated using the primary address seed.
+// Warning: If this function is used to generate large numbers of addresses,
+// those addresses should be used. Otherwise the lookahead might not be able to
+// keep up and multiple wallets with the same seed might desync.
 func (w *Wallet) NextAddresses(n uint64) ([]types.UnlockConditions, error) {
 	if err := w.tg.Add(); err != nil {
 		return []types.UnlockConditions{}, err
