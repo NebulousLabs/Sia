@@ -112,7 +112,7 @@ func (w *Wallet) integrateSeed(seed modules.Seed, n uint64) {
 	}
 }
 
-// nextPrimarySeedAddresss fetches the next n addresses from the primary seed.
+// nextPrimarySeedAddress fetches the next n addresses from the primary seed.
 func (w *Wallet) nextPrimarySeedAddresses(tx *bolt.Tx, n uint64) ([]types.UnlockConditions, error) {
 	// Check that the wallet has been unlocked.
 	if !w.unlocked {
@@ -186,6 +186,7 @@ func (w *Wallet) PrimarySeed() (modules.Seed, uint64, error) {
 
 // NextAddresses returns n unlock hashes that are ready to receive siacoins or
 // siafunds. The addresses are generated using the primary address seed.
+//
 // Warning: If this function is used to generate large numbers of addresses,
 // those addresses should be used. Otherwise the lookahead might not be able to
 // keep up and multiple wallets with the same seed might desync.
