@@ -273,7 +273,7 @@ func walletinitcmd() {
 
 // walletinitseedcmd initializes the wallet from a preexisting seed.
 func walletinitseedcmd() {
-	seed := passPrompt("Seed") // needs confirm?
+	seed := passPrompt("Seed")
 	qs := "&dictionary=english&seed=" + seed
 
 	if initPassword {
@@ -312,7 +312,7 @@ func walletload033xcmd(source string) {
 
 // walletloadseedcmd adds a seed to the wallet's list of seeds
 func walletloadseedcmd() {
-	seed := passPrompt("New seed") // needs confirm?
+	seed := passPrompt("New seed")
 	fmt.Println(askPasswordText)
 	password := passPrompt("Password")
 	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=english", password, seed)
