@@ -113,7 +113,7 @@ func announceAllHosts(sts []*serverTester) error {
 	// that each node has a full hostdb.
 	for _, st := range sts {
 		var ah HostdbActiveGET
-		for i := 0; i < 50; i++ {
+		for i := 0; i < 100; i++ {
 			err = st.getAPI("/hostdb/active", &ah)
 			if err != nil {
 				return err
