@@ -1505,9 +1505,6 @@ func TestRenterPricesHandlerPricey(t *testing.T) {
 	// Grab the price estimates for when there are a bunch of hosts with the
 	// same stats.
 	var rpeMulti modules.RenterPriceEstimation
-	if err = st.announceHost(); err != nil {
-		t.Fatal(err)
-	}
 	if err = st.getAPI("/renter/prices", &rpeMulti); err != nil {
 		t.Fatal(err)
 	}

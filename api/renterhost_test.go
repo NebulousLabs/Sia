@@ -1895,7 +1895,31 @@ func TestHostAndRentReload(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.server.panicClose()
-	err = st.announceHost()
+
+	// Announce the host again and wait until the host is re-scanned and put
+	// back into the hostdb as an active host.
+	announceValues := url.Values{}
+	announceValues.Set("address", string(st.host.ExternalSettings().NetAddress))
+	err = st.stdPostAPI("/host/announce", announceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Mine a block.
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = retry(100, time.Millisecond*100, func() error {
+		var hosts HostdbActiveGET
+		err := st.getAPI("/hostdb/active", &hosts)
+		if err != nil {
+			return err
+		}
+		if len(hosts.Hosts) != 1 {
+			return errors.New("host is not in the set of active hosts")
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
