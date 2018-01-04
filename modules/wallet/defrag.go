@@ -128,6 +128,11 @@ func (w *Wallet) managedCreateDefragTransaction() ([]types.Transaction, error) {
 // operation is only performed if the wallet has greater than defragThreshold
 // outputs.
 func (w *Wallet) threadedDefragWallet() {
+	// Don't defrag if it was disabled
+	if w.defragDisabled {
+		return
+	}
+
 	err := w.tg.Add()
 	if err != nil {
 		return
