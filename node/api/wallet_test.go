@@ -1082,7 +1082,7 @@ func TestWalletSiafunds(t *testing.T) {
 	numTxns := len(wtg.ConfirmedTransactions)
 
 	// load siafunds into the wallet
-	siagPath, _ := filepath.Abs("../types/siag0of1of1.siakey")
+	siagPath, _ := filepath.Abs("../../types/siag0of1of1.siakey")
 	loadSiagValues := url.Values{}
 	loadSiagValues.Set("keyfiles", siagPath)
 	loadSiagValues.Set("encryptionpassword", walletPassword)
