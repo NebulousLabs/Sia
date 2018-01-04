@@ -44,6 +44,32 @@ type spendableKey struct {
 	SecretKeys       []crypto.SecretKey
 }
 
+// broadcastedTSet is a helper struct to keep track of transaction sets and to
+// help rebroadcast them.
+type broadcastedTSet struct {
+	height       types.BlockHeight
+	tries        int
+	confirmedTxn map[types.TransactionID]bool
+	transactions []types.Transaction
+}
+
+// newBroadcastedTSet
+func (w *Wallet) newBroadcastedTSet(tSet []types.Transaction) (bts *broadcastedTSet, err error) {
+	bts = &broadcastedTSet{}
+	// Set the height
+	bts.height, err = dbGetConsensusHeight(w.dbTx)
+	if err != nil {
+		return
+	}
+	// Initialize confirmedTxn and transactions
+	bts.confirmedTxn = make(map[types.TransactionID]bool)
+	for _, txn := range tSet {
+		bts.confirmedTxn[txn.ID()] = false
+		bts.transactions = append(bts.transactions, txn)
+	}
+	return
+}
+
 // Wallet is an object that tracks balances, creates keys and addresses,
 // manages building and sending transactions.
 type Wallet struct {
@@ -82,6 +108,11 @@ type Wallet struct {
 	// array can have tens of thousands of elements, it's a performance issue.
 	unconfirmedSets                  map[modules.TransactionSetID][]types.TransactionID
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
+
+	// broadcastedTSets tracks transactions that have been sent to the
+	// transaction pool for broadcasting. This allows the wallet to rebroadcast
+	// them if necessary
+	broadcastedTSets map[modules.TransactionSetID]*broadcastedTSet
 
 	// The wallet's database tracks its seeds, keys, outputs, and
 	// transactions. A global db transaction is maintained in memory to avoid
@@ -147,7 +178,8 @@ func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDi
 		keys:      make(map[types.UnlockHash]spendableKey),
 		lookahead: make(map[types.UnlockHash]uint64),
 
-		unconfirmedSets: make(map[modules.TransactionSetID][]types.TransactionID),
+		unconfirmedSets:  make(map[modules.TransactionSetID][]types.TransactionID),
+		broadcastedTSets: make(map[modules.TransactionSetID]*broadcastedTSet),
 
 		persistDir: persistDir,
 

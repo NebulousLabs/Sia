@@ -15,6 +15,15 @@ const (
 	// defragThreshold is the number of outputs a wallet is allowed before it is
 	// defragmented.
 	defragThreshold = 50
+
+	// rebroadcastInterval is the number of blocks the wallet will wait until
+	// it rebroadcasts an unconfirmed transaction by adding it to the
+	// transaction pool again.
+	rebroadcastInterval = 10
+
+	// rebroadcastMaxTries is the maximum number of times a transaction set
+	// will be rebroadcasted before the wallet stops tracking it
+	rebroadcastMaxTries = 10
 )
 
 var (
