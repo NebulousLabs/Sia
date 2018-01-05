@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -159,10 +160,16 @@ func TestProcessedTxnIndexCompatCode(t *testing.T) {
 	}
 	defer wt.closeWt()
 
-	// The wallet tester mined a few blocks. Therefore the bucket shouldn't be
+	// Mine blocks to get lots of processed transactions
+	for i := 0; i < 1000; i++ {
+		if _, err := wt.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The wallet tester mined blocks. Therefore the bucket shouldn't be
 	// empty.
 	wt.wallet.mu.Lock()
-	defer wt.wallet.mu.Unlock()
 	wt.wallet.syncDB()
 	expectedTxns := wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex).Stats().KeyN
 	if expectedTxns == 0 {
@@ -178,16 +185,29 @@ func TestProcessedTxnIndexCompatCode(t *testing.T) {
 	if wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex) != nil {
 		t.Fatal("bucketProcessedTxnIndex should be empty")
 	}
+	wt.wallet.mu.Unlock()
 
-	// Initialize the bucket
-	if err := initProcessedTxnIndex(wt.wallet.dbTx); err != nil {
-		t.Fatalf("initProcessedTxnIndex failed: %v", err)
+	// Close the wallet
+	if err := wt.wallet.Close(); err != nil {
+		t.Fatalf("Failed to close wallet: %v", err)
 	}
 
-	// Sync changes to disk
-	wt.wallet.syncDB()
+	// Restart wallet
+	wallet, err := New(wt.cs, wt.tpool, filepath.Join(wt.persistDir, modules.WalletDir))
+	if err != nil {
+		t.Fatalf("Failed to restart wallet: %v", err)
+	}
+	wt.wallet = wallet
+
+	// Bucket should exist
+	wt.wallet.mu.Lock()
+	defer wt.wallet.mu.Unlock()
+	if wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex) == nil {
+		t.Fatal("bucketProcessedTxnIndex should exist")
+	}
 
 	// Check if bucket has expected size
+	wt.wallet.syncDB()
 	numTxns := wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex).Stats().KeyN
 	if expectedTxns != numTxns {
 		t.Errorf("Bucket should have %v entries but had %v", expectedTxns, numTxns)

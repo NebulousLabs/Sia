@@ -145,7 +145,8 @@ func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDi
 	}
 
 	// COMPATv131 we need to create the bucketProcessedTxnIndex if it doesn't exist
-	if w.dbTx.Bucket(bucketProcessedTxnIndex) == nil {
+	if w.dbTx.Bucket(bucketProcessedTransactions).Stats().KeyN > 0 &&
+		w.dbTx.Bucket(bucketProcessedTxnIndex).Stats().KeyN == 0 {
 		err = initProcessedTxnIndex(w.dbTx)
 		if err != nil {
 			return nil, err
