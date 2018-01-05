@@ -21,14 +21,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	// RespendTimeout records the number of blocks that the wallet will wait
-	// before spending an output that has been spent in the past. If the
-	// transaction spending the output has not made it to the transaction pool
-	// after the limit, the assumption is that it never will.
-	RespendTimeout = 40
-)
-
 var (
 	errNilConsensusSet = errors.New("wallet cannot initialize with a nil consensus set")
 	errNilTpool        = errors.New("wallet cannot initialize with a nil transaction pool")
@@ -42,32 +34,6 @@ var (
 type spendableKey struct {
 	UnlockConditions types.UnlockConditions
 	SecretKeys       []crypto.SecretKey
-}
-
-// broadcastedTSet is a helper struct to keep track of transaction sets and to
-// help rebroadcast them.
-type broadcastedTSet struct {
-	height       types.BlockHeight
-	tries        int
-	confirmedTxn map[types.TransactionID]bool
-	transactions []types.Transaction
-}
-
-// newBroadcastedTSet
-func (w *Wallet) newBroadcastedTSet(tSet []types.Transaction) (bts *broadcastedTSet, err error) {
-	bts = &broadcastedTSet{}
-	// Set the height
-	bts.height, err = dbGetConsensusHeight(w.dbTx)
-	if err != nil {
-		return
-	}
-	// Initialize confirmedTxn and transactions
-	bts.confirmedTxn = make(map[types.TransactionID]bool)
-	for _, txn := range tSet {
-		bts.confirmedTxn[txn.ID()] = false
-		bts.transactions = append(bts.transactions, txn)
-	}
-	return
 }
 
 // Wallet is an object that tracks balances, creates keys and addresses,

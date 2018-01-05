@@ -2,6 +2,8 @@ package wallet
 
 import (
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -19,14 +21,24 @@ const (
 	// rebroadcastInterval is the number of blocks the wallet will wait until
 	// it rebroadcasts an unconfirmed transaction by adding it to the
 	// transaction pool again.
-	rebroadcastInterval = 10
+	rebroadcastInterval = 6
 
-	// rebroadcastMaxTries is the maximum number of times a transaction set
-	// will be rebroadcasted before the wallet stops tracking it
-	rebroadcastMaxTries = 10
+	// RespendTimeout records the number of blocks that the wallet will wait
+	// before spending an output that has been spent in the past. If the
+	// transaction spending the output has not made it to the transaction pool
+	// after the limit, the assumption is that it never will.
+	respendTimeout = 72
 )
 
 var (
+	// rebroadcastTimeout is the amount of blocks after which we stop trying to
+	// rebroadcast transactions. The reason why we can't just use
+	// respendTimeout as the rebroadcastTimeout is, that the transaction pool
+	// will boot transactions after MaxTxnAge. We need to make sure that we
+	// leave at least MaxTxnAge blocks after the last broadcast to allow for
+	// the transasction to be pruned before the wallet tries to respend it.
+	rebroadcastTimeout = types.BlockHeight(respendTimeout - modules.MaxTxnAge)
+
 	// lookaheadBuffer together with lookaheadRescanThreshold defines the constant part
 	// of the maxLookahead
 	lookaheadBuffer = build.Select(build.Var{

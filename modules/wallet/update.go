@@ -510,7 +510,7 @@ func (w *Wallet) rebroadcastOldTransactions(tx *bolt.Tx, cc modules.ConsensusCha
 		}
 		// If the transaction set has been confirmed for one broadcast cycle it
 		// should be safe to remove it
-		if confirmed && consensusHeight > bts.height+rebroadcastInterval {
+		if confirmed && consensusHeight > bts.lastTry+rebroadcastInterval {
 			delete(w.broadcastedTSets, tSetID)
 			continue
 		}
@@ -521,17 +521,16 @@ func (w *Wallet) rebroadcastOldTransactions(tx *bolt.Tx, cc modules.ConsensusCha
 		}
 		// If the transaction set is not confirmed and hasn't been broadcasted
 		// for rebroadcastInterval blocks we try to broadcast it again
-		if consensusHeight > bts.height+rebroadcastInterval {
-			bts.height = consensusHeight
-			bts.tries++
+		if consensusHeight > bts.lastTry+rebroadcastInterval {
+			bts.lastTry = consensusHeight
 			go func() {
-				w.mu.Lock()
-				defer w.mu.Unlock()
 				if err := w.tpool.AcceptTransactionSet(bts.transactions); err != nil {
 					w.log.Println("WARNING: Rebroadcast failed: ", err)
 				}
 			}()
-			if bts.tries >= rebroadcastMaxTries {
+			// Delete the transaction set once we have tried for RespendTimeout
+			// blocks
+			if consensusHeight >= bts.firstTry+rebroadcastTimeout {
 				delete(w.broadcastedTSets, tSetID)
 			}
 		}
