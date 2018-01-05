@@ -2,11 +2,14 @@ package api
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,7 +26,20 @@ import (
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
+	"github.com/NebulousLabs/threadgroup"
 )
+
+// A Server is a collection of siad modules that can be communicated with over
+// an http api.
+type Server struct {
+	api               *API
+	apiServer         *http.Server
+	listener          net.Listener
+	requiredUserAgent string
+	tg                threadgroup.ThreadGroup
+}
 
 // panicClose will close a Server, panicking if there is an error upon close.
 func (srv *Server) panicClose() {
@@ -33,6 +49,76 @@ func (srv *Server) panicClose() {
 		debug.PrintStack()
 		panic(err)
 	}
+}
+
+// Close closes the Server's listener, causing the HTTP server to shut down.
+func (srv *Server) Close() error {
+	err := srv.listener.Close()
+	err = errors.Extend(err, srv.tg.Stop())
+
+	// Safely close each module.
+	mods := []struct {
+		name string
+		c    io.Closer
+	}{
+		{"explorer", srv.api.explorer},
+		{"host", srv.api.host},
+		{"renter", srv.api.renter},
+		{"miner", srv.api.miner},
+		{"wallet", srv.api.wallet},
+		{"tpool", srv.api.tpool},
+		{"consensus", srv.api.cs},
+		{"gateway", srv.api.gateway},
+	}
+	for _, mod := range mods {
+		if mod.c != nil {
+			if closeErr := mod.c.Close(); closeErr != nil {
+				err = errors.Extend(err, fmt.Errorf("%v.Close failed: %v", mod.name, err))
+			}
+		}
+	}
+	return errors.AddContext(err, "error while closing server")
+}
+
+// Serve listens for and handles API calls. It is a blocking function.
+func (srv *Server) Serve() error {
+	err := srv.tg.Add()
+	if err != nil {
+		return errors.AddContext(err, "unable to initialize server")
+	}
+	defer srv.tg.Done()
+
+	// The server will run until an error is encountered or the listener is
+	// closed, via either the Close method or by signal handling.  Closing the
+	// listener will result in the benign error handled below.
+	err = srv.apiServer.Serve(srv.listener)
+	if err != nil && !strings.HasSuffix(err.Error(), "use of closed network connection") {
+		return err
+	}
+	return nil
+}
+
+// NewServer creates a new API server from the provided modules. The API will
+// require authentication using HTTP basic auth if the supplied password is not
+// the empty string. Usernames are ignored for authentication. This type of
+// authentication sends passwords in plaintext and should therefore only be
+// used if the APIaddr is localhost.
+func NewServer(APIaddr string, requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*Server, error) {
+	listener, err := net.Listen("tcp", APIaddr)
+	if err != nil {
+		return nil, err
+	}
+
+	api := New(requiredUserAgent, requiredPassword, cs, e, g, h, m, r, tp, w)
+	srv := &Server{
+		api: api,
+		apiServer: &http.Server{
+			Handler: api,
+		},
+		listener:          listener,
+		requiredUserAgent: requiredUserAgent,
+	}
+	return srv, nil
 }
 
 // serverTester contains a server and a set of channels for keeping all of the
