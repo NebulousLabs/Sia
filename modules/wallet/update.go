@@ -523,11 +523,11 @@ func (w *Wallet) rebroadcastOldTransactions(tx *bolt.Tx, cc modules.ConsensusCha
 		// for rebroadcastInterval blocks we try to broadcast it again
 		if consensusHeight > bts.lastTry+rebroadcastInterval {
 			bts.lastTry = consensusHeight
-			go func() {
-				if err := w.tpool.AcceptTransactionSet(bts.transactions); err != nil {
+			go func(tSet []types.Transaction) {
+				if err := w.tpool.AcceptTransactionSet(tSet); err != nil {
 					w.log.Println("WARNING: Rebroadcast failed: ", err)
 				}
-			}()
+			}(bts.transactions)
 			// Delete the transaction set once we have tried for RespendTimeout
 			// blocks
 			if consensusHeight >= bts.firstTry+rebroadcastTimeout {
