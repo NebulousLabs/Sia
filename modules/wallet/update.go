@@ -601,7 +601,7 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 			if _, exists := w.broadcastedTSets[unconfirmedTxnSet.ID]; !exists {
 				bts, err = w.newBroadcastedTSet(unconfirmedTxnSet.Transactions)
 			}
-			if err == nil {
+			if bts != nil && err == nil {
 				w.broadcastedTSets[unconfirmedTxnSet.ID] = bts
 			}
 		}
