@@ -216,11 +216,11 @@ func (w *Wallet) Rescanning() bool {
 // Returns the wallet's current settings
 func (w *Wallet) Settings() modules.WalletSettings {
 	return modules.WalletSettings{
-		Defrag: !w.defragDisabled,
+		NoDefrag: w.defragDisabled,
 	}
 }
 
 // SetSettings will update the settings for the wallet.
 func (w *Wallet) SetSettings(s modules.WalletSettings) {
-	w.defragDisabled = !s.Defrag
+	w.defragDisabled = s.NoDefrag
 }

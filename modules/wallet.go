@@ -409,7 +409,7 @@ type (
 
 	// WalletSettings control the behavior of the Wallet.
 	WalletSettings struct {
-		Defrag bool `json:"defrag"`
+		NoDefrag bool `json:"noDefrag"`
 	}
 )
 

@@ -1476,13 +1476,16 @@ func TestWalletGETDust(t *testing.T) {
 }
 
 // testWalletTransactionEndpoint is a subtest that queries the transaction endpoint of a node.
-func testWalletTransactionEndpoint(t *testing.T, st *serverTester) {
+func testWalletTransactionEndpoint(t *testing.T, st *serverTester, expectedConfirmedTxns int) {
 	// Mining blocks should have created transactions for the wallet containing
 	// miner payouts. Get the list of transactions.
 	var wtg WalletTransactionsGET
 	err := st.getAPI("/wallet/transactions?startheight=0&endheight=-1", &wtg)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(wtg.ConfirmedTransactions) != expectedConfirmedTxns {
+		t.Fatalf("expected %v txns but was %v", expectedConfirmedTxns, len(wtg.ConfirmedTransactions))
 	}
 
 	// Query the details of all transactions using
@@ -1501,11 +1504,14 @@ func testWalletTransactionEndpoint(t *testing.T, st *serverTester) {
 }
 
 // testWalletTransactionEndpoint is a subtest that queries the transactions endpoint of a node.
-func testWalletTransactionsEndpoint(t *testing.T, st *serverTester) {
+func testWalletTransactionsEndpoint(t *testing.T, st *serverTester, expectedConfirmedTxns int) {
 	var wtg WalletTransactionsGET
 	err := st.getAPI("/wallet/transactions?startheight=0&endheight=-1", &wtg)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(wtg.ConfirmedTransactions) != expectedConfirmedTxns {
+		t.Fatalf("expected %v txns but was %v", expectedConfirmedTxns, len(wtg.ConfirmedTransactions))
 	}
 	totalTxns := len(wtg.ConfirmedTransactions)
 
@@ -1548,7 +1554,7 @@ func TestWalletManyTransactions(t *testing.T) {
 	// Declare tests that should be executed
 	subtests := []struct {
 		name string
-		f    func(*testing.T, *serverTester)
+		f    func(*testing.T, *serverTester, int)
 	}{
 		{"TestWalletTransactionEndpoint", testWalletTransactionEndpoint},
 		{"TestWalletTransactionsEndpoint", testWalletTransactionsEndpoint},
@@ -1563,7 +1569,7 @@ func TestWalletManyTransactions(t *testing.T) {
 
 	// Disable defrag for the wallet
 	st.wallet.SetSettings(modules.WalletSettings{
-		Defrag: false,
+		NoDefrag: true,
 	})
 
 	// Mining blocks should have created transactions for the wallet containing
@@ -1625,7 +1631,7 @@ func TestWalletManyTransactions(t *testing.T) {
 	// Execute tests
 	for _, subtest := range subtests {
 		t.Run(subtest.name, func(t *testing.T) {
-			subtest.f(t, st)
+			subtest.f(t, st, expectedConfirmedTxns)
 		})
 	}
 }
