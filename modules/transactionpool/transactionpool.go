@@ -6,6 +6,7 @@ import (
 	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/demotemutex"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -61,7 +62,8 @@ type (
 		// been sent to the transaction pool. When a new subscriber joins the
 		// transaction pool, all prior consensus changes are sent to the new
 		// subscriber.
-		subscribers []modules.TransactionPoolSubscriber
+		subscribers               []modules.TransactionPoolSubscriber
+		diffConsistencySubscriber *diffConsistencySubscriber
 
 		// Utilities.
 		db         *persist.BoltDatabase
@@ -95,6 +97,10 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 		transactionSetDiffs: make(map[TransactionSetID]*modules.ConsensusChange),
 
 		persistDir: persistDir,
+	}
+
+	if build.DEBUG {
+		tp.newDiffConsistencySubscriber()
 	}
 
 	// Open the tpool database.
