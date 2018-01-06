@@ -377,6 +377,12 @@ type (
 		// blockchain.
 		Rescanning() bool
 
+		// Settings returns the Wallet's current settings.
+		Settings() WalletSettings
+
+		// SetSettings sets the Wallet's settings.
+		SetSettings(WalletSettings)
+
 		// StartTransaction is a convenience method that calls
 		// RegisterTransaction(types.Transaction{}, nil)
 		StartTransaction() TransactionBuilder
@@ -399,6 +405,11 @@ type (
 		// DustThreshold returns the quantity per byte below which a Currency is
 		// considered to be Dust.
 		DustThreshold() types.Currency
+	}
+
+	// WalletSettings control the behavior of the Wallet.
+	WalletSettings struct {
+		NoDefrag bool `json:"noDefrag"`
 	}
 )
 

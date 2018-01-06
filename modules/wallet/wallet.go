@@ -100,6 +100,10 @@ type Wallet struct {
 	// The wallet's ThreadGroup tells tracked functions to shut down and
 	// blocks until they have all exited before returning from Close.
 	tg siasync.ThreadGroup
+
+	// defragDisabled determines if the wallet is set to defrag outputs once it
+	// reaches a certain threshold
+	defragDisabled bool
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -207,4 +211,16 @@ func (w *Wallet) Rescanning() bool {
 		w.scanLock.Unlock()
 	}
 	return rescanning
+}
+
+// Returns the wallet's current settings
+func (w *Wallet) Settings() modules.WalletSettings {
+	return modules.WalletSettings{
+		NoDefrag: w.defragDisabled,
+	}
+}
+
+// SetSettings will update the settings for the wallet.
+func (w *Wallet) SetSettings(s modules.WalletSettings) {
+	w.defragDisabled = s.NoDefrag
 }
