@@ -396,6 +396,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 				return
 			} else {
 				WriteError(w, Error{"hash found to be a Block HashType, but not found in database"}, http.StatusInternalServerError)
+				return
 			}
 		}
 	case modules.TransactionHashType:
@@ -416,6 +417,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 				return
 			} else {
 				WriteError(w, Error{"hash found to be a Transaction HashType, but not found in database"}, http.StatusInternalServerError)
+				return
 			}
 		}
 	case modules.SiacoinOutputIdHashType:
@@ -432,6 +434,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 				return
 			} else {
 				WriteError(w, Error{"hash found to be a SiacoinOutputId HashType, but not found in database"}, http.StatusInternalServerError)
+				return
 			}
 		}
 	case modules.FileContractIdHashType:
@@ -447,7 +450,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 				return
 			} else {
 				WriteError(w, Error{"hash found to be a FileContractId HashType, but not found in database"}, http.StatusInternalServerError)
-
+				return
 			}
 		}
 	case modules.SiafundOutputIdHashType:

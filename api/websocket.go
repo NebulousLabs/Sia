@@ -1,8 +1,10 @@
 package api
 
 import (
-	"github.com/gorilla/websocket"
+	"log"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 const (
