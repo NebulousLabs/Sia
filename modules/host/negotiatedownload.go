@@ -89,11 +89,11 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 
 		// Load the sectors and build the data payload.
 		for _, request := range requests {
-			sectorData, err := h.ReadSector(request.MerkleRoot)
+			sectorData, err := h.ReadSectorPart(request.MerkleRoot, uint32(request.Offset), uint32(request.Length))
 			if err != nil {
 				return extendErr("failed to load sector: ", ErrorInternal(err.Error()))
 			}
-			payload = append(payload, sectorData[request.Offset:request.Offset+request.Length])
+			payload = append(payload, sectorData)
 		}
 		return nil
 	}()
