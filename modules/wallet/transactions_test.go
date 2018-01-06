@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -200,6 +201,72 @@ func TestIntegrationTransaction(t *testing.T) {
 		t.Errorf("expected first output to equal %v, got %v", sentValue, txn.Outputs[1].Value)
 	} else if exp := txn.Inputs[0].Value.Sub(sentValue); !txn.Outputs[2].Value.Equals(exp) {
 		t.Errorf("expected first output to equal %v, got %v", exp, txn.Outputs[2].Value)
+	}
+}
+
+// TestProcessedTxnIndexCompatCode checks if the compatibility code for the
+// bucketProcessedTxnIndex works as expected
+func TestProcessedTxnIndexCompatCode(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Mine blocks to get lots of processed transactions
+	for i := 0; i < 1000; i++ {
+		if _, err := wt.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The wallet tester mined blocks. Therefore the bucket shouldn't be
+	// empty.
+	wt.wallet.mu.Lock()
+	wt.wallet.syncDB()
+	expectedTxns := wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex).Stats().KeyN
+	if expectedTxns == 0 {
+		t.Fatal("bucketProcessedTxnIndex shouldn't be empty")
+	}
+
+	// Delete the bucket
+	if err := wt.wallet.dbTx.DeleteBucket(bucketProcessedTxnIndex); err != nil {
+		t.Fatalf("Failed to empty bucket: %v", err)
+	}
+
+	// Bucket shouldn't exist
+	if wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex) != nil {
+		t.Fatal("bucketProcessedTxnIndex should be empty")
+	}
+	wt.wallet.mu.Unlock()
+
+	// Close the wallet
+	if err := wt.wallet.Close(); err != nil {
+		t.Fatalf("Failed to close wallet: %v", err)
+	}
+
+	// Restart wallet
+	wallet, err := New(wt.cs, wt.tpool, filepath.Join(wt.persistDir, modules.WalletDir))
+	if err != nil {
+		t.Fatalf("Failed to restart wallet: %v", err)
+	}
+	wt.wallet = wallet
+
+	// Bucket should exist
+	wt.wallet.mu.Lock()
+	defer wt.wallet.mu.Unlock()
+	if wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex) == nil {
+		t.Fatal("bucketProcessedTxnIndex should exist")
+	}
+
+	// Check if bucket has expected size
+	wt.wallet.syncDB()
+	numTxns := wt.wallet.dbTx.Bucket(bucketProcessedTxnIndex).Stats().KeyN
+	if expectedTxns != numTxns {
+		t.Errorf("Bucket should have %v entries but had %v", expectedTxns, numTxns)
 	}
 }
 

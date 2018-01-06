@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -73,14 +74,15 @@ func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTran
 	defer w.mu.Unlock()
 	w.syncDB()
 
-	it := dbProcessedTransactionsIterator(w.dbTx)
-	for it.next() {
-		pt := it.value()
-		if pt.TransactionID == txid {
-			return pt, true
-		}
+	// Get the keyBytes for the given txid
+	keyBytes, err := dbGetTransactionIndex(w.dbTx, txid)
+	if err != nil {
+		return modules.ProcessedTransaction{}, false
 	}
-	return modules.ProcessedTransaction{}, false
+
+	// Retrieve the transaction
+	found = encoding.Unmarshal(w.dbTx.Bucket(bucketProcessedTransactions).Get(keyBytes), &pt) == nil
+	return
 }
 
 // Transactions returns all transactions relevant to the wallet that were

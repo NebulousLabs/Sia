@@ -19,6 +19,9 @@ var (
 	// chronological order. Only transactions relevant to the wallet are
 	// stored. The key of this bucket is an autoincrementing integer.
 	bucketProcessedTransactions = []byte("bucketProcessedTransactions")
+	// bucketProcessedTxnIndex maps a ProcessedTransactions ID to it's
+	// autoincremented index in bucketProcessedTransactions
+	bucketProcessedTxnIndex = []byte("bucketProcessedTxnKey")
 	// bucketAddrTransactions maps an UnlockHash to the
 	// ProcessedTransactions that it appears in.
 	bucketAddrTransactions = []byte("bucketAddrTransactions")
@@ -41,6 +44,7 @@ var (
 
 	dbBuckets = [][]byte{
 		bucketProcessedTransactions,
+		bucketProcessedTxnIndex,
 		bucketAddrTransactions,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
@@ -266,6 +270,31 @@ func decodeProcessedTransaction(ptBytes []byte, pt *modules.ProcessedTransaction
 	return err
 }
 
+func dbPutTransactionIndex(tx *bolt.Tx, txid types.TransactionID, key []byte) error {
+	return dbPut(tx.Bucket(bucketProcessedTxnIndex), txid, key)
+}
+
+func dbGetTransactionIndex(tx *bolt.Tx, txid types.TransactionID) (key []byte, err error) {
+	key = make([]byte, 8)
+	err = dbGet(tx.Bucket(bucketProcessedTxnIndex), txid, &key)
+	return
+}
+
+// initProcessedTxnIndex initializes the bucketProcessedTxnIndex with the
+// elements from bucketProcessedTransactions
+func initProcessedTxnIndex(tx *bolt.Tx) error {
+	it := dbProcessedTransactionsIterator(tx)
+	indexBytes := make([]byte, 8)
+	for it.next() {
+		index, pt := it.key(), it.value()
+		binary.BigEndian.PutUint64(indexBytes, index)
+		if err := dbPutTransactionIndex(tx, pt.TransactionID, indexBytes); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) error {
 	b := tx.Bucket(bucketProcessedTransactions)
 	key, err := b.NextSequence()
@@ -278,6 +307,12 @@ func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) 
 	if err = b.Put(keyBytes, encoding.Marshal(pt)); err != nil {
 		return err
 	}
+
+	// add used index to bucketProcessedTxnIndex
+	if err = dbPutTransactionIndex(tx, pt.TransactionID, keyBytes); err != nil {
+		return err
+	}
+
 	// also add this txid to the bucketAddrTransactions
 	return dbAddProcessedTransactionAddrs(tx, pt, key)
 }
