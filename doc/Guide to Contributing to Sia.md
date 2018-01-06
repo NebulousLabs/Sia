@@ -131,7 +131,7 @@ repository's master branch.
 To create and checkout a new branch:
 ```bash
 # If you're not already in the right directory:
-$ cd $GOPATH/src/NebulousLabs/Sia
+$ cd $GOPATH/src/github.com/NebulousLabs/Sia
 # Make sure you're on branch master
 $ git checkout master
 # Create and checkout a new branch
