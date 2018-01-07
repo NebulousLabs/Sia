@@ -171,8 +171,29 @@ func (tp *TransactionPool) purge() {
 func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	tp.mu.Lock()
 
+	// Get the recent block ID for a sanity check that the consensus change is
+	// being provided to us correctly.
+	reset := false
+	recentID, err := tp.getRecentBlockID(tp.dbTx)
+	if err == errNilRecentBlock {
+		// This almost certainly means that the database hasn't been initalized
+		// yet with a recent block, meaning the user was previously running
+		// v1.3.1 or earlier.
+		tp.log.Println("NOTE: Upgrading tpool database to support consensus change verification.")
+		reset = true
+	} else if err != nil {
+		tp.log.Println("ERROR: Could not access recentID from tpool.")
+	}
+
 	// Update the database of confirmed transactions.
 	for _, block := range cc.RevertedBlocks {
+		// Sanity check - the id of each reverted block should match the recent
+		// parent id.
+		if block.ID() != recentID && !reset {
+			tp.log.Critical("Consensus change series appears to be inconsistent - we are reverting the wrong block.")
+		}
+		recentID = block.ParentID
+
 		if tp.blockHeight > 0 || block.ID() != types.GenesisID {
 			tp.blockHeight--
 		}
@@ -193,6 +214,13 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 	for _, block := range cc.AppliedBlocks {
+		// Sanity check - the parent id of each block should match the current
+		// block id.
+		if block.ParentID != recentID && !reset {
+			tp.log.Critical("Consensus change series appears to be inconsistent - we are applying the wrong block.")
+		}
+		recentID = block.ID()
+
 		if tp.blockHeight > 0 || block.ID() != types.GenesisID {
 			tp.blockHeight++
 		}
@@ -269,9 +297,13 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	tp.recentMedianFee = safeMedians[len(safeMedians)/2]
 
 	// Update all the on-disk structures.
-	err := tp.putRecentConsensusChange(tp.dbTx, cc.ID)
+	err = tp.putRecentConsensusChange(tp.dbTx, cc.ID)
 	if err != nil {
 		tp.log.Println("ERROR: could not update the recent consensus change:", err)
+	}
+	err = tp.putRecentBlockID(tp.dbTx, recentID)
+	if err != nil {
+		tp.log.Println("ERROR: could not store recent block id:", err)
 	}
 	err = tp.putBlockHeight(tp.dbTx, tp.blockHeight)
 	if err != nil {

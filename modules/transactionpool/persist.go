@@ -1,7 +1,6 @@
 package transactionpool
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,16 +15,6 @@ import (
 )
 
 const tpoolSyncRate = time.Minute * 2
-
-var (
-	// errNilConsensusChange is returned if there is no consensus change in the
-	// database.
-	errNilConsensusChange = errors.New("no consensus change found")
-
-	// errNilFeeMedian is the message returned if a database does not find fee
-	// median persistence.
-	errNilFeeMedian = errors.New("no fee median found")
-)
 
 // threadedRegularSync will make sure that sync gets called on the database
 // every once in a while.
@@ -71,6 +60,10 @@ func (tp *TransactionPool) syncDB() {
 // resetDB deletes all consensus related persistence from the transaction pool.
 func (tp *TransactionPool) resetDB(tx *bolt.Tx) error {
 	err := tx.DeleteBucket(bucketConfirmedTransactions)
+	if err != nil {
+		return err
+	}
+	err = tp.putRecentBlockID(tx, types.BlockID{})
 	if err != nil {
 		return err
 	}
