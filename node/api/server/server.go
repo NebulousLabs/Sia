@@ -1,6 +1,6 @@
 // package server provides a server that can wrap a node and serve an http api
 // for interacting with the node.
-package api
+package server
 
 import (
 	"net"
@@ -47,12 +47,12 @@ func (srv *Server) Close() error {
 	return errors.AddContext(err, "error while closing server")
 }
 
-// NewServer creates a new API server from the provided modules. The API will
+// New creates a new API server from the provided modules. The API will
 // require authentication using HTTP basic auth if the supplied password is not
 // the empty string. Usernames are ignored for authentication. This type of
 // authentication sends passwords in plaintext and should therefore only be
 // used if the APIaddr is localhost.
-func NewServer(APIaddr string, requiredUserAgent string, requiredPassword string, nodeParams node.NodeParams) (*Server, error) {
+func New(APIaddr string, requiredUserAgent string, requiredPassword string, nodeParams node.NodeParams) (*Server, error) {
 	// Create the server listener.
 	listener, err := net.Listen("tcp", APIaddr)
 	if err != nil {
