@@ -466,6 +466,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 				return
 			} else {
 				WriteError(w, Error{"hash found to be a SiafundOutputId HashType, but not found in database"}, http.StatusInternalServerError)
+				return
 			}
 		}
 	}

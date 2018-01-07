@@ -47,7 +47,7 @@ func verifyAPISecurity(config Config) error {
 
 	// If the --disable-api-security flag is used, enforce that
 	// --authenticate-api must also be used.
-	if config.Siad.AllowAPIBind && !config.Siad.AuthenticateAPI {
+	if config.Siad.AllowAPIBind && !config.Siad.AuthenticateAPI && config.Siad.APIPassword == "" {
 		return errors.New("cannot use --disable-api-security without setting an api password")
 	}
 	return nil
@@ -136,7 +136,7 @@ func unlockWallet(w modules.Wallet, password string) error {
 // siad.
 func startDaemon(config Config) (err error) {
 	// Prompt user for API password.
-	if config.Siad.AuthenticateAPI {
+	if config.Siad.AuthenticateAPI && config.Siad.APIPassword == "" {
 		config.APIPassword, err = speakeasy.Ask("Enter API password: ")
 		if err != nil {
 			return err
@@ -144,6 +144,8 @@ func startDaemon(config Config) (err error) {
 		if config.APIPassword == "" {
 			return errors.New("password cannot be blank")
 		}
+	} else if config.Siad.AuthenticateAPI && config.Siad.APIPassword != "" {
+		config.APIPassword = config.Siad.APIPassword
 	}
 
 	// Process the config variables after they are parsed by cobra.

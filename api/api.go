@@ -3,14 +3,15 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
-	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
+	"github.com/julienschmidt/httprouter"
 )
 
 // Error is a type that is encoded as JSON and returned in an API response in
@@ -179,36 +180,15 @@ func (api *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // password is not the empty string.  Usernames are ignored for authentication.
 func New(requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*API, error) {
 	api := &API{
-		cs:              cs,
-		explorer:        e,
-		gateway:         g,
-		host:            h,
-		miner:           m,
-		renter:          r,
-		tpool:           tp,
-		wallet:          w,
-		unconfirmedSets: make(map[modules.TransactionSetID][]types.TransactionID),
-		hub: &WebsocketHub{
-			broadcastTx:      make(chan []byte),
-			broadcastBlock:   make(chan []byte),
-			registerBlock:    make(chan *Subscriber),
-			unregisterBlock:  make(chan *Subscriber),
-			registerTx:       make(chan *Subscriber),
-			unregisterTx:     make(chan *Subscriber),
-			blockSubscribers: make(map[*Subscriber]bool),
-			txSubscribers:    make(map[*Subscriber]bool),
-		},
+		cs:       cs,
+		explorer: e,
+		gateway:  g,
+		host:     h,
+		miner:    m,
+		renter:   r,
+		tpool:    tp,
+		wallet:   w,
 	}
-
-	//We start the hub in another thread because it sends responses outside the standard REST API lifecycle
-	go api.hub.StartWebsocketHub()
-
-	//Subscribing to both consensus updates and transaction updates to power the push notifications via websocket
-	err := cs.ConsensusSetSubscribe(api, modules.ConsensusChangeRecent, nil)
-	if err != nil {
-		return nil, errors.New("api consensus subscription failed: " + err.Error())
-	}
-	tp.TransactionPoolSubscribe(api)
 
 	// Register API handlers
 	router := httprouter.New()
@@ -223,6 +203,28 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 
 	// Explorer API Calls
 	if api.explorer != nil {
+		//Subscribing to both consensus updates and transaction updates to power the push notifications via websocket
+		err := cs.ConsensusSetSubscribe(api, modules.ConsensusChangeRecent, nil)
+		api.unconfirmedSets = make(map[modules.TransactionSetID][]types.TransactionID)
+		api.hub = &WebsocketHub{
+			broadcastTx:      make(chan []byte),
+			broadcastBlock:   make(chan []byte),
+			registerBlock:    make(chan *Subscriber),
+			unregisterBlock:  make(chan *Subscriber),
+			registerTx:       make(chan *Subscriber),
+			unregisterTx:     make(chan *Subscriber),
+			blockSubscribers: make(map[*Subscriber]bool),
+			txSubscribers:    make(map[*Subscriber]bool),
+		}
+
+		if err != nil {
+			return nil, errors.New("api consensus subscription failed: " + err.Error())
+		}
+
+		//We start the hub in another thread because it sends responses outside the standard REST API lifecycle
+		go api.hub.StartWebsocketHub()
+
+		tp.TransactionPoolSubscribe(api)
 		router.GET("/explorer", api.explorerHandler)
 		router.GET("/explorer/pending", api.pendingBlockHandler)
 		router.GET("/explorer/blocks/:height", api.explorerBlocksHandler)
@@ -339,12 +341,14 @@ func UnrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
 // WriteError an error to the API caller.
 func WriteError(w http.ResponseWriter, err Error, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(code)
-	encodingErr := json.NewEncoder(w).Encode(err)
-	if _, isJsonErr := encodingErr.(*json.SyntaxError); isJsonErr {
-		// Marshalling should only fail in the event of a developer error.
-		// Specifically, only non-marshallable types should cause an error here.
-		build.Critical("failed to encode API error response:", encodingErr)
+	if w != nil {
+		w.WriteHeader(code)
+		encodingErr := json.NewEncoder(w).Encode(err)
+		if _, isJsonErr := encodingErr.(*json.SyntaxError); isJsonErr {
+			// Marshalling should only fail in the event of a developer error.
+			// Specifically, only non-marshallable types should cause an error here.
+			build.Critical("failed to encode API error response:", encodingErr)
+		}
 	}
 }
 
@@ -353,11 +357,13 @@ func WriteError(w http.ResponseWriter, err Error, code int) {
 // accordingly.
 func WriteJSON(w http.ResponseWriter, obj interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	err := json.NewEncoder(w).Encode(obj)
-	if _, isJsonErr := err.(*json.SyntaxError); isJsonErr {
-		// Marshalling should only fail in the event of a developer error.
-		// Specifically, only non-marshallable types should cause an error here.
-		build.Critical("failed to encode API response:", err)
+	if w != nil {
+		err := json.NewEncoder(w).Encode(obj)
+		if _, isJsonErr := err.(*json.SyntaxError); isJsonErr {
+			// Marshalling should only fail in the event of a developer error.
+			// Specifically, only non-marshallable types should cause an error here.
+			build.Critical("failed to encode API response:", err)
+		}
 	}
 }
 
