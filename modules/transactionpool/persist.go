@@ -206,13 +206,15 @@ func (tp *TransactionPool) initPersist() error {
 	return nil
 }
 
-// transactionConfirmed returns true if the transaction has been confirmed on
-// the blockchain and false if the transaction has not been confirmed on the
-// blockchain.
+// TransactionConfirmed returns true if the transaction has been seen on the
+// blockchain. Note, however, that the block containing the transaction may
+// later be invalidated by a reorg.
+func (tp *TransactionPool) TransactionConfirmed(id types.TransactionID) bool {
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+	return tp.transactionConfirmed(tp.dbTx, id)
+}
+
 func (tp *TransactionPool) transactionConfirmed(tx *bolt.Tx, id types.TransactionID) bool {
-	confirmedBytes := tx.Bucket(bucketConfirmedTransactions).Get(id[:])
-	if confirmedBytes == nil {
-		return false
-	}
-	return true
+	return tx.Bucket(bucketConfirmedTransactions).Get(id[:]) != nil
 }
