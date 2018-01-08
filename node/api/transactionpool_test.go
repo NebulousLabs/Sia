@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -197,5 +198,57 @@ func TestTransactionPoolFee(t *testing.T) {
 	min, max := st.tpool.FeeEstimation()
 	if !min.Equals(fees.Minimum) || !max.Equals(fees.Maximum) {
 		t.Fatal("fee mismatch")
+	}
+}
+
+// TestTransactionPoolConfirmed tests the /tpool/confirmed endpoint.
+func TestTransactionPoolConfirmed(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a transaction.
+	sentValue := types.SiacoinPrecision.Mul64(1000)
+	txns, err := st.wallet.SendSiacoins(sentValue, types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnID := txns[len(txns)-1].ID().String()
+
+	// Transaction should not be confirmed yet.
+	var tcg TpoolConfirmedGET
+	err = st.getAPI("/tpool/confirmed/"+txnID, &tcg)
+	if err != nil {
+		t.Fatal(err)
+	} else if tcg.Confirmed {
+		t.Fatal("transaction should not be confirmed")
+	}
+
+	// Mine the block containing the transaction
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Transaction should now be confirmed.
+	err = st.getAPI("/tpool/confirmed/"+txnID, &tcg)
+	if err != nil {
+		t.Fatal(err)
+	} else if !tcg.Confirmed {
+		t.Fatal("transaction should be confirmed")
+	}
+
+	// Check for a nonexistent transaction.
+	badID := strings.Repeat("0", len(txnID))
+	err = st.getAPI("/tpool/confirmed/"+badID, &tcg)
+	if err != nil {
+		t.Fatal(err)
+	} else if tcg.Confirmed {
+		t.Fatal("transaction should not be confirmed")
 	}
 }
