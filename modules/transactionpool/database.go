@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/errors"
 )
 
 // database.go contains objects related to the layout of the transaction pool's
@@ -44,9 +45,29 @@ var (
 	// field.
 	fieldFeeMedian = []byte("FeeMedian")
 
+	// fieldRecentBlockID is a place where we store the id of the most recent
+	// block seen by the transaction pool, and also the parent id of the most
+	// recent block seen by the transaction pool.
+	fieldRecentBlockID = []byte("RecentBlockID")
+
 	// fieldRecentConsensusChange is the field in bucketRecentConsensusChange
 	// that holds the value of the most recent consensus change.
 	fieldRecentConsensusChange = []byte("RecentConsensusChange")
+)
+
+// Errors relating to the database.
+var (
+	// errNilConsensusChange is returned if there is no consensus change in the
+	// database.
+	errNilConsensusChange = errors.New("no consensus change found")
+
+	// errNilFeeMedian is the message returned if a database does not find fee
+	// median persistence.
+	errNilFeeMedian = errors.New("no fee median found")
+
+	// errNilRecentBlock is returned if there is no data stored in
+	// fieldRecentBlockID.
+	errNilRecentBlock = errors.New("no recent block found in the database")
 )
 
 // Complex objects that get stored in database fields.
@@ -86,6 +107,20 @@ func (tp *TransactionPool) getFeeMedian(tx *bolt.Tx) (medianPersist, error) {
 	return mp, nil
 }
 
+// getRecentBlockID will fetch the most recent block id and most recent parent
+// id from the database.
+func (tp *TransactionPool) getRecentBlockID(tx *bolt.Tx) (recentID types.BlockID, err error) {
+	idBytes := tx.Bucket(bucketRecentConsensusChange).Get(fieldRecentBlockID)
+	if idBytes == nil {
+		return types.BlockID{}, errNilRecentBlock
+	}
+	copy(recentID[:], idBytes[:])
+	if recentID == (types.BlockID{}) {
+		return types.BlockID{}, errNilRecentBlock
+	}
+	return recentID, nil
+}
+
 // getRecentConsensusChange returns the most recent consensus change from the
 // database.
 func (tp *TransactionPool) getRecentConsensusChange(tx *bolt.Tx) (cc modules.ConsensusChangeID, err error) {
@@ -110,6 +145,12 @@ func (tp *TransactionPool) putFeeMedian(tx *bolt.Tx, mp medianPersist) error {
 		return err
 	}
 	return tx.Bucket(bucketFeeMedian).Put(fieldFeeMedian, objBytes)
+}
+
+// putRecentBlockID will store the most recent block id and the parent id of
+// that block in the database.
+func (tp *TransactionPool) putRecentBlockID(tx *bolt.Tx, recentID types.BlockID) error {
+	return tx.Bucket(bucketRecentConsensusChange).Put(fieldRecentBlockID, recentID[:])
 }
 
 // putRecentConsensusChange updates the most recent consensus change seen by
