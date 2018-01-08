@@ -241,9 +241,9 @@ func dbDeleteBroadcastedTSet(tx *bolt.Tx, tSetID modules.TransactionSetID) error
 }
 
 // dbLoadBroadcastedTSets returns all the broadcasted tSets from the database
-func dbLoadBroadcastedTSets(tx *bolt.Tx) (tSets map[modules.TransactionSetID]*broadcastedTSet, err error) {
+func dbLoadBroadcastedTSets(w *Wallet) (tSets map[modules.TransactionSetID]*broadcastedTSet, err error) {
 	tSets = make(map[modules.TransactionSetID]*broadcastedTSet)
-	err = tx.Bucket(bucketBroadcastedTSets).ForEach(func(k []byte, v []byte) error {
+	err = w.dbTx.Bucket(bucketBroadcastedTSets).ForEach(func(k []byte, v []byte) error {
 		// Load the persisted structure from disk
 		var pbts persistBTS
 		if err := encoding.Unmarshal(v, &pbts); err != nil {
@@ -261,6 +261,7 @@ func dbLoadBroadcastedTSets(tx *bolt.Tx) (tSets map[modules.TransactionSetID]*br
 		}
 
 		bts.id = modules.TransactionSetID(crypto.HashAll(bts.transactions))
+		bts.w = w
 		tSets[bts.id] = &bts
 		return nil
 	})

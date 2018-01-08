@@ -174,7 +174,7 @@ func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDi
 	}
 
 	// retrieve the previously tracked broadcasted tSets from the database
-	w.broadcastedTSets, err = dbLoadBroadcastedTSets(w.dbTx)
+	w.broadcastedTSets, err = dbLoadBroadcastedTSets(w)
 	if err != nil {
 		return nil, err
 	}
