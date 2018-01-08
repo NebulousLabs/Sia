@@ -38,7 +38,7 @@ func TestRebroadcastTransactions(t *testing.T) {
 			1, len(wt.wallet.broadcastedTSets))
 	}
 	// Mine enough blocks for the wallet to stop tracking the tSet
-	for i := 0; i < rebroadcastInterval+1; i++ {
+	for i := 0; i < RebroadcastInterval+1; i++ {
 		if _, err := wt.miner.AddBlock(); err != nil {
 			t.Fatal(err)
 		}
@@ -70,7 +70,7 @@ func TestRebroadcastTransactions(t *testing.T) {
 	}
 	// Mine the same number of blocks. This time the wallet should still track
 	// the tSet afterwards.
-	for i := 0; i < rebroadcastInterval+1; i++ {
+	for i := 0; i < RebroadcastInterval+1; i++ {
 		if _, err := wt.miner.AddBlock(); err != nil {
 			t.Fatal(err)
 		}
@@ -162,7 +162,7 @@ func TestRebroadcastTransactionsPersist(t *testing.T) {
 	}
 	// Mine rebroadcastInterval blocks. The wallet should keep tracking the
 	// tSet afterwards
-	for i := 0; i < rebroadcastInterval+1; i++ {
+	for i := 0; i < RebroadcastInterval+1; i++ {
 		if _, err := wt.miner.AddBlock(); err != nil {
 			t.Fatal(err)
 		}

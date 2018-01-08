@@ -18,10 +18,10 @@ const (
 	// defragmented.
 	defragThreshold = 50
 
-	// rebroadcastInterval is the number of blocks the wallet will wait until
+	// RebroadcastInterval is the number of blocks the wallet will wait until
 	// it rebroadcasts an unconfirmed transaction by adding it to the
 	// transaction pool again.
-	rebroadcastInterval = 6
+	RebroadcastInterval = 6
 
 	// RespendTimeout records the number of blocks that the wallet will wait
 	// before spending an output that has been spent in the past. If the

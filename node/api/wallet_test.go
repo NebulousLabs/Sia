@@ -1702,3 +1702,87 @@ func TestWalletTransactionsGetAddr(t *testing.T) {
 		t.Errorf("There should be exactly 0 unconfirmed and 1 confirmed related txns")
 	}
 }
+
+// TestWalletRebroadcast checks if the wallet rebroadcasts transactions after
+// some time
+func TestWalletRebroadcast(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create tester
+	st1, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st1.server.panicClose()
+
+	// The first node shouldn't have unconfirmed txns
+	if len(st1.wallet.UnconfirmedTransactions()) != 0 {
+		t.Fatal("Node shouldn't have any unconfirmed txns")
+	}
+
+	// Send coins to the own wallet
+	uc, err := st1.wallet.NextAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+	txns, err := st1.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(1000), uc.UnlockHash())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Spin up a second node and connect it to the first one
+	st2, err := blankServerTester(t.Name() + " - Node 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testGroup := []*serverTester{st1, st2}
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The first node's txn should be unconfirmed
+	if len(st1.wallet.UnconfirmedTransactions()) != 2 {
+		t.Error("Node should have exactly 2 unconfirmed transactions")
+	}
+
+	// The second node shouldn't know about the transaction
+	if _, _, exists := st2.tpool.Transaction(txns[1].ID()); exists {
+		t.Fatal("Node 2 shouldn't know about the transaction")
+	}
+
+	// Let the second node mine rebroadcastInterval blocks. That triggers the
+	// rebroadcast in the first node
+	for i := 0; i < wallet.RebroadcastInterval+1; i++ {
+		if _, err := st2.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Wait until the second nodes transaction pool knows about the transaction
+	err = build.Retry(100, 100*time.Millisecond, func() error {
+		if _, _, exists := st2.tpool.Transaction(txns[1].ID()); !exists {
+			return errors.New("Txn not found")
+		}
+		return nil
+	})
+
+	// Mine 1 more block to confirm the transaction
+	if _, err := st2.miner.AddBlock(); err != nil {
+		t.Fatal(err)
+	}
+
+	// The sent transactions should be confirmed now
+	err = build.Retry(100, 100*time.Millisecond, func() error {
+		if len(st1.wallet.UnconfirmedTransactions()) != 0 {
+			return errors.New(fmt.Sprintf("expecting 0 unconfirmed transactions but was %v",
+				len(st1.wallet.UnconfirmedTransactions())))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
+	}
+}
