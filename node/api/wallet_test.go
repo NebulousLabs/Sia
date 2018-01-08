@@ -1755,7 +1755,7 @@ func TestWalletRebroadcast(t *testing.T) {
 
 	// Let the second node mine rebroadcastInterval blocks. That triggers the
 	// rebroadcast in the first node
-	for i := 0; i < wallet.RebroadcastInterval+1; i++ {
+	for i := 0; i < wallet.RebroadcastInterval; i++ {
 		if _, err := st2.miner.AddBlock(); err != nil {
 			t.Fatal(err)
 		}

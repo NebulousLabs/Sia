@@ -31,13 +31,13 @@ const (
 )
 
 var (
-	// rebroadcastTimeout is the amount of blocks after which we stop trying to
+	// RebroadcastTimeout is the amount of blocks after which we stop trying to
 	// rebroadcast transactions. The reason why we can't just use
-	// respendTimeout as the rebroadcastTimeout is, that the transaction pool
+	// respendTimeout as the RebroadcastTimeout is, that the transaction pool
 	// will boot transactions after MaxTxnAge. We need to make sure that we
 	// leave at least MaxTxnAge blocks after the last broadcast to allow for
 	// the transasction to be pruned before the wallet tries to respend it.
-	rebroadcastTimeout = types.BlockHeight(respendTimeout - modules.MaxTxnAge)
+	RebroadcastTimeout = types.BlockHeight(respendTimeout - modules.MaxTxnAge)
 
 	// lookaheadBuffer together with lookaheadRescanThreshold defines the constant part
 	// of the maxLookahead

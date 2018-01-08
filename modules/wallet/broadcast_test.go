@@ -70,7 +70,7 @@ func TestRebroadcastTransactions(t *testing.T) {
 	}
 	// Mine the same number of blocks. This time the wallet should still track
 	// the tSet afterwards.
-	for i := 0; i < RebroadcastInterval+1; i++ {
+	for i := 0; i < RebroadcastInterval; i++ {
 		if _, err := wt.miner.AddBlock(); err != nil {
 			t.Fatal(err)
 		}
@@ -80,13 +80,13 @@ func TestRebroadcastTransactions(t *testing.T) {
 	}
 	// Continue mining to make sure that the wallet stops tracking the tSet
 	// once the max number of retries is reached
-	for i := types.BlockHeight(0); i < rebroadcastTimeout; i++ {
+	for i := types.BlockHeight(0); i < RebroadcastTimeout; i++ {
 		if _, err := wt.miner.AddBlock(); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if _, exists := wt.wallet.broadcastedTSets[tSetID]; exists {
-		t.Fatalf("Wallet should drop txnSet after %v blocks", rebroadcastTimeout)
+		t.Fatalf("Wallet should drop txnSet after %v blocks", RebroadcastTimeout)
 	}
 }
 
@@ -162,7 +162,7 @@ func TestRebroadcastTransactionsPersist(t *testing.T) {
 	}
 	// Mine rebroadcastInterval blocks. The wallet should keep tracking the
 	// tSet afterwards
-	for i := 0; i < RebroadcastInterval+1; i++ {
+	for i := 0; i < RebroadcastInterval; i++ {
 		if _, err := wt.miner.AddBlock(); err != nil {
 			t.Fatal(err)
 		}
@@ -172,12 +172,12 @@ func TestRebroadcastTransactionsPersist(t *testing.T) {
 	}
 	// Continue mining to make sure that the wallet stops tracking the tSet
 	// once the max number of retries is reached
-	for i := types.BlockHeight(0); i < rebroadcastTimeout; i++ {
+	for i := types.BlockHeight(0); i < RebroadcastTimeout; i++ {
 		if _, err := wt.miner.AddBlock(); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if _, exists := wt.wallet.broadcastedTSets[tSetID]; exists {
-		t.Fatalf("Wallet should drop txnSet after %v blocks", rebroadcastTimeout)
+		t.Fatalf("Wallet should drop txnSet after %v blocks", RebroadcastTimeout)
 	}
 }
