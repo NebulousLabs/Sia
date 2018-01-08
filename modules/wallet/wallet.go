@@ -173,6 +173,12 @@ func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDi
 		w.syncDB()
 	}
 
+	// retrieve the previously tracked broadcasted tSets from the database
+	w.broadcastedTSets, err = dbLoadBroadcastedTSets(w.dbTx)
+	if err != nil {
+		return nil, err
+	}
+
 	// make sure we commit on shutdown
 	w.tg.AfterStop(func() {
 		err := w.dbTx.Commit()
