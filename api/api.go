@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/gorilla/handlers"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -329,7 +330,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	}
 
 	// Apply UserAgent middleware and return the API
-	api.router = cleanCloseHandler(RequireUserAgent(router, requiredUserAgent))
+	api.router = handlers.CompressHandler(cleanCloseHandler(RequireUserAgent(router, requiredUserAgent)))
 	return api, nil
 }
 
