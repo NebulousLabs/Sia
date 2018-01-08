@@ -45,9 +45,8 @@ var (
 	// field.
 	fieldFeeMedian = []byte("FeeMedian")
 
-	// fieldRecentBlockID is a place where we store the id of the most recent
-	// block seen by the transaction pool, and also the parent id of the most
-	// recent block seen by the transaction pool.
+	// fieldRecentBlockID is used to store the id of the most recent block seen
+	// by the transaction pool.
 	fieldRecentBlockID = []byte("RecentBlockID")
 
 	// fieldRecentConsensusChange is the field in bucketRecentConsensusChange
