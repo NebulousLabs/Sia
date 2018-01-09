@@ -45,6 +45,11 @@
 * aryzle
 * starius
 * roipoussiere
+* pedrorivera
+* mikkeljuhl
+* idanakav
+* dNetGuru
+* huetsch
 * Google Inc.
 
 
