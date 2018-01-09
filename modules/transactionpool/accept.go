@@ -339,6 +339,16 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 		// In case of certain errors we still want to broadcast the set
 		broadcast := err == nil || err == modules.ErrDuplicateTransactionSet
 		if broadcast {
+			// This set was broadcasted before if err != nil. We need to update
+			// it's seen txn height when we rebroadcast it. If we don't do
+			// that, the transaction will be pruned from the tpool and they
+			// might no longer show up in the wallet while still beingt
+			// tracked.
+			if err != nil {
+				for _, txn := range ts {
+					tp.transactionHeights[txn.ID()] = tp.blockHeight
+				}
+			}
 			go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 		}
 		if err != nil {
