@@ -176,7 +176,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	resetSanityCheck := false
 	recentID, err := tp.getRecentBlockID(tp.dbTx)
 	if err == errNilRecentBlock {
-		// This almost certainly means that the database hasn't been initalized
+		// This almost certainly means that the database hasn't been initialized
 		// yet with a recent block, meaning the user was previously running
 		// v1.3.1 or earlier.
 		tp.log.Println("NOTE: Upgrading tpool database to support consensus change verification.")
