@@ -380,7 +380,7 @@ func TestUpdateBlockHeight(t *testing.T) {
 
 // TestDatabaseUpgrade verifies that the database will upgrade correctly from
 // v1.3.1 or earlier to the new sanity check persistence, by clearing out the
-// persistence at various points in the proccess of a reorg.
+// persistence at various points in the process of a reorg.
 func TestDatabaseUpgrade(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -428,7 +428,7 @@ func TestDatabaseUpgrade(t *testing.T) {
 		}
 		txnSets = append(txnSets, txns)
 	}
-	// mine some blocks to cause a re-org, first clearing the persistance to
+	// mine some blocks to cause a re-org, first clearing the persistence to
 	// simulate an un-upgraded database.
 	err = tpt.tpool.dbTx.Bucket(bucketRecentConsensusChange).Delete(fieldRecentBlockID)
 	if err != nil {
@@ -449,7 +449,7 @@ func TestDatabaseUpgrade(t *testing.T) {
 	}
 
 	// connect the testers and wait for them to have the same current block,
-	// first clearing the persistance to simulate an un-upgraded database.
+	// first clearing the persistence to simulate an un-upgraded database.
 	err = tpt.tpool.dbTx.Bucket(bucketRecentConsensusChange).Delete(fieldRecentBlockID)
 	if err != nil {
 		t.Fatal(err)
