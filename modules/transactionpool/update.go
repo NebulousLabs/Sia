@@ -190,7 +190,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Sanity check - the id of each reverted block should match the recent
 		// parent id.
 		if block.ID() != recentID && !resetSanityCheck {
-			tp.log.Critical("Consensus change series appears to be inconsistent - we are reverting the wrong block.")
+			panic("Consensus change series appears to be inconsistent - we are reverting the wrong block.")
 		}
 		recentID = block.ParentID
 
@@ -217,7 +217,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Sanity check - the parent id of each block should match the current
 		// block id.
 		if block.ParentID != recentID && !resetSanityCheck {
-			tp.log.Critical("Consensus change series appears to be inconsistent - we are applying the wrong block.")
+			panic("Consensus change series appears to be inconsistent - we are applying the wrong block.")
 		}
 		recentID = block.ID()
 
