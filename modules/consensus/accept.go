@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
@@ -284,67 +285,26 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 	})
 	if _, ok := setErr.(bolt.MmapError); ok {
 		cs.log.Println("ERROR: Bolt mmap failed:", setErr)
-		println("Blockchain database has run out of disk space!")
+		fmt.Println("Blockchain database has run out of disk space!")
 		os.Exit(1)
 	}
 	if setErr != nil {
-		// Check if any blocks were valid.
-		if len(validBlocks) < 1 {
-			// Nothing more to do, the first block was invalid.
-			return false, setErr
+		if len(changes) < 1 {
+			fmt.Println("Received an invalid block set.")
+			cs.log.Println("Consensus received an invalid block:", setErr)
+		} else {
+			fmt.Println("Received a partially valid block set.")
+			cs.log.Println("Consensus received a chain of blocks, where one was valid, but others were not:", setErr)
 		}
-
-		// At least some of the blocks were valid. Add the valid blocks before
-		// returning, since we've already done the downloading and header
-		// validation.
-		verifyExtended := false
-		err := cs.db.Update(func(tx *bolt.Tx) error {
-			for i := 0; i < len(validBlocks); i++ {
-				_, err := cs.addBlockToTree(tx, validBlocks[i], parents[i])
-				if err == nil {
-					verifyExtended = true
-				}
-				if err != modules.ErrNonExtendingBlock && err != nil {
-					return err
-				}
-			}
-			// Flush DB pages
-			return tx.FlushDBPages()
-		})
-		// Sanity check - verifyExtended should match chainExtended.
-		if build.DEBUG && verifyExtended != chainExtended {
-			panic("chain extension logic does not match up between first and last attempt")
-		}
-		// Something has gone wrong. Maybe the filesystem is having errors for
-		// example. But under normal conditions, this code should not be
-		// reached. If it is, return early because both attempts to add blocks
-		// have failed.
-		if err != nil {
-			return false, err
-		}
+		return false, setErr
 	}
-
 	// Stop here if the blocks did not extend the longest blockchain.
 	if !chainExtended {
 		return false, modules.ErrNonExtendingBlock
 	}
-
-	// Sanity check - if we get here, len(changes) should be non-zero.
-	if build.DEBUG && len(changes) == 0 {
-		panic("changes is empty, but this code should not be reached if no blocks got added")
-	}
-
-	// Update the subscribers with all of the consensus changes. First combine
-	// the changes into a single set.
+	// Send any changes to subscribers.
 	for _, change := range changes {
 		cs.updateSubscribers(change)
-	}
-
-	// If there were valid blocks and invalid blocks in the set that was
-	// provided, then the setErr is not going to be nil. Return the set error to
-	// the caller.
-	if setErr != nil {
-		return chainExtended, setErr
 	}
 	return chainExtended, nil
 }
