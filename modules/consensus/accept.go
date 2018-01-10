@@ -241,8 +241,6 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 	// invalid blocks (which includes the children of invalid blocks).
 	chainExtended := false
 	changes := make([]changeEntry, 0, len(blocks))
-	validBlocks := make([]types.Block, 0, len(blocks))
-	parents := make([]*processedBlock, 0, len(blocks))
 	setErr := cs.db.Update(func(tx *bolt.Tx) error {
 		for i := 0; i < len(blocks); i++ {
 			// Start by checking the header of the block.
@@ -276,9 +274,6 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			if build.DEBUG && len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
 				panic("after adding a change entry, there are no applied blocks but there are reverted blocks")
 			}
-			// Append to the set of changes, and append the valid block.
-			validBlocks = append(validBlocks, blocks[i])
-			parents = append(parents, parent)
 		}
 		// Flush DB pages
 		return tx.FlushDBPages()
