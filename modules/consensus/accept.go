@@ -303,8 +303,8 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 		return false, modules.ErrNonExtendingBlock
 	}
 	// Send any changes to subscribers.
-	for _, change := range changes {
-		cs.updateSubscribers(change)
+	for i := 0; i < len(changes); i++ {
+		cs.updateSubscribers(changes[i])
 	}
 	return chainExtended, nil
 }
