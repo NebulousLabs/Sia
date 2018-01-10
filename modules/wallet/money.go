@@ -126,7 +126,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 	if w.deps.Disrupt("SendSiacoinsInterrupted") {
 		return nil, errors.New("failed to accept transaction set (SendSiacoinsInterrupted)")
 	}
-	err = w.tpool.AcceptTransactionSet(txnSet)
+	err = w.managedCommitTransactionSet(txnSet)
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
 		return nil, build.ExtendErr("unable to get transaction accepted", err)
@@ -195,7 +195,7 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.
 		return nil, errors.New("failed to accept transaction set (SendSiacoinsInterrupted)")
 	}
 	w.log.Println("Attempting to broadcast a multi-send over the network")
-	err = w.tpool.AcceptTransactionSet(txnSet)
+	err = w.managedCommitTransactionSet(txnSet)
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
 		return nil, build.ExtendErr("unable to get transaction accepted", err)
@@ -247,7 +247,7 @@ func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]t
 	if err != nil {
 		return nil, err
 	}
-	err = w.tpool.AcceptTransactionSet(txnSet)
+	err = w.managedCommitTransactionSet(txnSet)
 	if err != nil {
 		return nil, err
 	}

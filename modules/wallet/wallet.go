@@ -123,6 +123,23 @@ func (w *Wallet) Height() types.BlockHeight {
 	return types.BlockHeight(height)
 }
 
+// acceptTransactionSet is a convenience wrapper for the transaction pools
+// commitTransactionSet method. It only returns an error if the transaction was
+// rejected and won't be rebroadcasted over time
+func (w *Wallet) commitTransactionSet(txns []types.Transaction) error {
+	w.mu.Unlock()
+	err := w.tpool.AcceptTransactionSet(txns)
+	w.mu.Lock()
+	return err
+}
+
+// managedCommitTransactionSet is a thread-safe version of acceptTransactionSet
+func (w *Wallet) managedCommitTransactionSet(txns []types.Transaction) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.commitTransactionSet(txns)
+}
+
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future. Keys and addresses are
 // not loaded into the wallet during the call to 'new', but rather during the

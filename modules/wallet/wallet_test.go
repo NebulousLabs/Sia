@@ -373,7 +373,7 @@ func TestAdvanceLookaheadNoRescan(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wt.tpool.AcceptTransactionSet(tSet)
+	err = wt.wallet.managedCommitTransactionSet(tSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -447,7 +447,7 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wt.tpool.AcceptTransactionSet(txnSet)
+	err = wt.wallet.managedCommitTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,7 +490,7 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wt.tpool.AcceptTransactionSet(txnSet)
+	err = wt.wallet.managedCommitTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,7 +581,7 @@ func TestDistantWallets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = wt.tpool.AcceptTransactionSet(txnSet)
+	err = wt.wallet.managedCommitTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal(err)
 	}

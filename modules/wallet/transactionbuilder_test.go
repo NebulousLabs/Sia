@@ -93,7 +93,7 @@ func TestViewAdded(t *testing.T) {
 		t.Error("seems like there's memory sharing happening between txn calls")
 	}
 	// Set1 should be missing some signatures.
-	err = wt.tpool.AcceptTransactionSet(set1)
+	err = wt.wallet.managedCommitTransactionSet(set1)
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestViewAdded(t *testing.T) {
 		b2.AddTransactionSignature(unfinishedTxn3.TransactionSignatures[sigIndex])
 	}
 	set2, err := b2.Sign(true)
-	err = wt.tpool.AcceptTransactionSet(set2)
+	err = wt.wallet.managedCommitTransactionSet(set2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestViewAdded(t *testing.T) {
 		b.AddTransactionSignature(finishedTxn.TransactionSignatures[sigIndex])
 	}
 	set3Txn, set3Parents := b.View()
-	err = wt.tpool.AcceptTransactionSet(append(set3Parents, set3Txn))
+	err = wt.wallet.managedCommitTransactionSet(append(set3Parents, set3Txn))
 	if err != modules.ErrDuplicateTransactionSet {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestDoubleSignError(t *testing.T) {
 	if err != nil && txnSet2 != nil {
 		t.Error("errored call to sign did not return a nil txn set")
 	}
-	err = wt.tpool.AcceptTransactionSet(txnSet)
+	err = wt.wallet.managedCommitTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,11 +235,11 @@ func TestConcurrentBuilders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = wt.tpool.AcceptTransactionSet(tset1)
+	err = wt.wallet.managedCommitTransactionSet(tset1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = wt.tpool.AcceptTransactionSet(tset2)
+	err = wt.wallet.managedCommitTransactionSet(tset2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +294,7 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = wt.tpool.AcceptTransactionSet(tSet)
+	err = wt.wallet.managedCommitTransactionSet(tSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +347,7 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = wt.tpool.AcceptTransactionSet(tset1)
+	err = wt.wallet.managedCommitTransactionSet(tset1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +422,7 @@ func TestParallelBuilders(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = wt.tpool.AcceptTransactionSet(tset)
+			err = wt.wallet.managedCommitTransactionSet(tset)
 			if err != nil {
 				t.Fatal(err)
 			}

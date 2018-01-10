@@ -510,7 +510,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		txnSet := append(parents, txn)
 
 		// submit the transactions
-		err = w.tpool.AcceptTransactionSet(txnSet)
+		err = w.managedCommitTransactionSet(txnSet)
 		if err != nil {
 			return
 		}
