@@ -414,6 +414,7 @@ Unlock the wallet to view balance
 
 	fmt.Printf(`Wallet status:
 %s, Unlocked
+Height:              %v
 Confirmed Balance:   %v
 Unconfirmed Delta:  %v
 Exact:               %v H
@@ -421,7 +422,7 @@ Siafunds:            %v SF
 Siafund Claims:      %v H
 
 Estimated Fee:       %v / KB
-`, encStatus, currencyUnits(status.ConfirmedSiacoinBalance), delta,
+`, encStatus, status.Height, currencyUnits(status.ConfirmedSiacoinBalance), delta,
 		status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance,
 		fees.Maximum.Mul64(1e3).HumanString())
 }

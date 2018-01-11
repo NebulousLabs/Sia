@@ -347,6 +347,8 @@ type (
 		// not considered in the unconfirmed balance.
 		UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency)
 
+		Height() types.BlockHeight
+
 		// AddressTransactions returns all of the transactions that are related
 		// to a given address.
 		AddressTransactions(types.UnlockHash) []ProcessedTransaction

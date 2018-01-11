@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"sync"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
@@ -104,6 +106,21 @@ type Wallet struct {
 	// defragDisabled determines if the wallet is set to defrag outputs once it
 	// reaches a certain threshold
 	defragDisabled bool
+}
+
+func (w *Wallet) Height() types.BlockHeight {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	var height uint64
+	err := w.db.View(func(tx *bolt.Tx) error {
+		return encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyConsensusHeight), &height)
+	})
+	if err != nil {
+		log.Println(err)
+		return types.BlockHeight(0)
+	}
+	return types.BlockHeight(height)
 }
 
 // New creates a new wallet, loading any known addresses from the input file
