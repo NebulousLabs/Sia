@@ -242,6 +242,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 	chainExtended := false
 	changes := make([]changeEntry, 0, len(blocks))
 	setErr := cs.db.Update(func(tx *bolt.Tx) error {
+		cs.log.Printf("accept: starting block processing loop (%v blocks, height %v)", len(blocks), blockHeight(tx))
 		for i := 0; i < len(blocks); i++ {
 			// Start by checking the header of the block.
 			parent, err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, blocks[i], blockIDs[i])
@@ -262,6 +263,8 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			if err == nil {
 				changes = append(changes, changeEntry)
 				chainExtended = true
+				id := blocks[i].ID().String()
+				cs.log.Printf("accept: added block %v (height now %v)", id[:6], blockHeight(tx))
 			}
 			if err == modules.ErrNonExtendingBlock {
 				err = nil
@@ -278,6 +281,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 		// Flush DB pages
 		return tx.FlushDBPages()
 	})
+	cs.log.Printf("accept: finished block processing loop")
 	if _, ok := setErr.(bolt.MmapError); ok {
 		cs.log.Println("ERROR: Bolt mmap failed:", setErr)
 		fmt.Println("Blockchain database has run out of disk space!")
