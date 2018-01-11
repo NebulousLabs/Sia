@@ -263,8 +263,14 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			if err == nil {
 				changes = append(changes, changeEntry)
 				chainExtended = true
-				id := blocks[i].ID().String()
-				cs.log.Printf("accept: added block %v (height now %v)", id[:6], blockHeight(tx))
+				var applied, reverted []string
+				for _, b := range changeEntry.AppliedBlocks {
+					applied = append(applied, b.String()[:6])
+				}
+				for _, b := range changeEntry.RevertedBlocks {
+					reverted = append(reverted, b.String()[:6])
+				}
+				cs.log.Printf("accept: added change %v, applying blocks %v, reverting blocks %v (height now %v)", changeEntry.ID(), applied, reverted, blockHeight(tx))
 			}
 			if err == modules.ErrNonExtendingBlock {
 				err = nil
