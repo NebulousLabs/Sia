@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"sort"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -171,6 +172,8 @@ func (tp *TransactionPool) purge() {
 func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	tp.mu.Lock()
 
+	tp.log.Printf("CCID %v (height %v): %v applied blocks, %v reverted blocks", crypto.Hash(cc.ID).String()[:8], tp.blockHeight, len(cc.AppliedBlocks), len(cc.RevertedBlocks))
+
 	// Get the recent block ID for a sanity check that the consensus change is
 	// being provided to us correctly.
 	resetSanityCheck := false
@@ -190,7 +193,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Sanity check - the id of each reverted block should match the recent
 		// parent id.
 		if block.ID() != recentID && !resetSanityCheck {
-			tp.log.Critical("Consensus change series appears to be inconsistent - we are reverting the wrong block.")
+			panic("Consensus change series appears to be inconsistent - we are reverting the wrong block.")
 		}
 		recentID = block.ParentID
 
@@ -217,7 +220,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Sanity check - the parent id of each block should match the current
 		// block id.
 		if block.ParentID != recentID && !resetSanityCheck {
-			tp.log.Critical("Consensus change series appears to be inconsistent - we are applying the wrong block.")
+			panic("Consensus change series appears to be inconsistent - we are applying the wrong block.")
 		}
 		recentID = block.ID()
 
