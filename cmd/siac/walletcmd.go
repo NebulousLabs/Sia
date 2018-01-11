@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -176,6 +177,7 @@ const askPasswordText = "We need to encrypt the new data using the current walle
 
 const currentPasswordText = "Current Password: "
 const newPasswordText = "New Password: "
+const confirmPasswordText = "Confirm: "
 
 // passwordPrompt securely reads a password from stdin.
 func passwordPrompt(prompt string) (string, error) {
@@ -183,6 +185,17 @@ func passwordPrompt(prompt string) (string, error) {
 	pw, err := terminal.ReadPassword(int(syscall.Stdin))
 	fmt.Println()
 	return string(pw), err
+}
+
+// confirmPassword requests confirmation of a previously-entered password.
+func confirmPassword(prev string) error {
+	pw, err := passwordPrompt(confirmPasswordText)
+	if err != nil {
+		return err
+	} else if pw != prev {
+		return errors.New("passwords do not match")
+	}
+	return nil
 }
 
 // walletaddresscmd fetches a new address from the wallet that will be able to
@@ -217,6 +230,8 @@ func walletchangepasswordcmd() {
 	newPassword, err := passwordPrompt(newPasswordText)
 	if err != nil {
 		die("Reading password failed:", err)
+	} else if err = confirmPassword(newPassword); err != nil {
+		die(err)
 	}
 	qs := fmt.Sprintf("newpassword=%s&encryptionpassword=%s", newPassword, currentPassword)
 	err = post("/wallet/changepassword", qs)
@@ -234,6 +249,8 @@ func walletinitcmd() {
 		password, err := passwordPrompt("Wallet password: ")
 		if err != nil {
 			die("Reading password failed:", err)
+		} else if err = confirmPassword(password); err != nil {
+			die(err)
 		}
 		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
@@ -263,6 +280,8 @@ func walletinitseedcmd() {
 		password, err := passwordPrompt("Wallet password: ")
 		if err != nil {
 			die("Reading password failed:", err)
+		} else if err = confirmPassword(password); err != nil {
+			die(err)
 		}
 		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
