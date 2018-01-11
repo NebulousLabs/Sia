@@ -24,6 +24,16 @@ func ComposeErrors(errs ...error) error {
 		return nil
 	}
 
+	// If there is only a single error return it directly. This still allows
+	// callers of functions to check for specific errors
+	if len(errStrings) == 1 {
+		for _, err := range errs {
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// Combine all of the non-nil errors into one larger return value.
 	return errors.New(strings.Join(errStrings, "; "))
 }

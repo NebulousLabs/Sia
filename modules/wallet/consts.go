@@ -15,6 +15,12 @@ const (
 	// defragThreshold is the number of outputs a wallet is allowed before it is
 	// defragmented.
 	defragThreshold = 50
+
+	// respendTimeout records the number of blocks that the wallet will wait
+	// before spending an output that has been spent in the past. If the
+	// transaction spending the output has not made it to the transaction pool
+	// after the limit, the assumption is that it never will.
+	respendTimeout = 40
 )
 
 var (

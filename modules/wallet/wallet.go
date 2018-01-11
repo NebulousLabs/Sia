@@ -22,14 +22,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	// RespendTimeout records the number of blocks that the wallet will wait
-	// before spending an output that has been spent in the past. If the
-	// transaction spending the output has not made it to the transaction pool
-	// after the limit, the assumption is that it never will.
-	RespendTimeout = 40
-)
-
 var (
 	errNilConsensusSet = errors.New("wallet cannot initialize with a nil consensus set")
 	errNilTpool        = errors.New("wallet cannot initialize with a nil transaction pool")
@@ -123,17 +115,35 @@ func (w *Wallet) Height() types.BlockHeight {
 	return types.BlockHeight(height)
 }
 
-// acceptTransactionSet is a convenience wrapper for the transaction pools
-// commitTransactionSet method. It only returns an error if the transaction was
+// commitTransactionSet is a convenience wrapper for the transaction pools
+// AcceptTransactionSet method. It only returns an error if the transaction was
 // rejected and won't be rebroadcasted over time
 func (w *Wallet) commitTransactionSet(txns []types.Transaction) error {
+	// Get the transaction ids and add them to the unconfirmedSets
+	tSetID := modules.TransactionSetID(crypto.HashObject(txns))
+	ids := make([]types.TransactionID, 0, len(txns))
+	for _, txn := range txns {
+		ids = append(ids, txn.ID())
+	}
+	w.unconfirmedSets[tSetID] = ids
+	if err := dbPutUnconfirmedSet(w.dbTx, tSetID, ids); err != nil {
+		return err
+	}
+
+	// Accept the set. If the error returned prevents the set from ever being
+	// accepted we should remove it from the wallet again.
 	w.mu.Unlock()
 	err := w.tpool.AcceptTransactionSet(txns)
 	w.mu.Lock()
-	return err
+	if err != nil { // TODO: There are exceptions to this
+		delete(w.unconfirmedSets, tSetID)
+		err2 := dbDeleteUnconfirmedSet(w.dbTx, tSetID)
+		return build.ComposeErrors(err, err2)
+	}
+	return nil
 }
 
-// managedCommitTransactionSet is a thread-safe version of acceptTransactionSet
+// managedCommitTransactionSet is a thread-safe version of commitTransactionSet
 func (w *Wallet) managedCommitTransactionSet(txns []types.Transaction) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -191,6 +201,12 @@ func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDi
 		}
 		// Save changes to disk
 		w.syncDB()
+	}
+
+	// Load possible unconfirmed sets from disk
+	w.unconfirmedSets, err = dbLoadUnconfirmedSets(w.dbTx)
+	if err != nil {
+		return nil, err
 	}
 
 	// make sure we commit on shutdown

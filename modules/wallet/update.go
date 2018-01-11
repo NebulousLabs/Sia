@@ -2,8 +2,10 @@ package wallet
 
 import (
 	"fmt"
+	"log"
 	"math"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -453,6 +455,26 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 }
 
+// isSuperset is a helper function that checks if super is a superset of sub
+func isSuperset(super []types.TransactionID, sub []types.TransactionID) bool {
+	if len(super) < len(sub) {
+		log.Println(false)
+		return false
+	}
+	// Create maps from the slices for faster verification
+	superset := make(map[types.TransactionID]struct{})
+	for _, id := range super {
+		superset[id] = struct{}{}
+	}
+	// Check if all ids of sub are in the superset
+	for _, id := range sub {
+		if _, exists := superset[id]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
 // transaction set.
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.TransactionPoolDiff) {
@@ -473,6 +495,9 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 			droppedTransactions[txids[i]] = struct{}{}
 		}
 		delete(w.unconfirmedSets, diff.RevertedTransactions[i])
+		if err := dbDeleteUnconfirmedSet(w.dbTx, diff.RevertedTransactions[i]); err != nil {
+			build.Critical(err)
+		}
 	}
 
 	// Skip the reallocation if we can, otherwise reallocate the
@@ -503,7 +528,39 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 		//
 		// TODO: Technically only necessary to mark the ones that are relevant
 		// to the wallet, but overhead should be low.
-		w.unconfirmedSets[unconfirmedTxnSet.ID] = unconfirmedTxnSet.IDs
+		//
+		// Check if commitTransactionSet already added the transaction
+		if _, exists := w.unconfirmedSets[unconfirmedTxnSet.ID]; !exists {
+			// Maybe acceptTransactionSet added a subset with a different
+			// id. If that's the case, replace it with the one from the
+			// tpool.
+			isSubset := false
+			for tSetID, ids := range w.unconfirmedSets {
+				if isSuperset(unconfirmedTxnSet.IDs, ids) {
+					// Add the new id
+					w.unconfirmedSets[unconfirmedTxnSet.ID] = w.unconfirmedSets[tSetID]
+					if err := dbPutUnconfirmedSet(w.dbTx, unconfirmedTxnSet.ID, unconfirmedTxnSet.IDs); err != nil {
+						build.Critical(err)
+					}
+					// Remove the old id
+					delete(w.unconfirmedSets, tSetID)
+					if err := dbDeleteUnconfirmedSet(w.dbTx, tSetID); err != nil {
+						build.Critical(err)
+					}
+					isSubset = true
+					break
+				}
+			}
+			// If we couldn't find a matching superset, the transaction
+			// probably wasn't created by this wallet. In that case we can add
+			// the transaction.
+			if !isSubset {
+				w.unconfirmedSets[unconfirmedTxnSet.ID] = unconfirmedTxnSet.IDs
+				if err := dbPutUnconfirmedSet(w.dbTx, unconfirmedTxnSet.ID, unconfirmedTxnSet.IDs); err != nil {
+					build.Critical(err)
+				}
+			}
+		}
 
 		// Get the values for the spent outputs.
 		spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
