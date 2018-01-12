@@ -153,10 +153,25 @@ func startDaemon(config Config) (err error) {
 
 	// Print the Siad Version
 	fmt.Println("Sia Daemon v" + build.Version)
+
+	// Install a signal handler that will catch exceptions thrown by mmap'd
+	// files.
+	// NOTE: ideally we would catch SIGSEGV here too, since that signal can
+	// also be thrown by an mmap I/O error. However, SIGSEGV can occur under
+	// other circumstances as well, and in those cases, we will want a full
+	// stack trace.
+	mmapChan := make(chan os.Signal, 1)
+	signal.Notify(mmapChan, syscall.SIGBUS)
+	go func() {
+		<-mmapChan
+		fmt.Println("A fatal I/O exception (SIGBUS) has occurred.")
+		fmt.Println("Please check your disk for errors.")
+		os.Exit(1)
+	}()
+
 	// Print a startup message.
 	fmt.Println("Loading...")
 	loadStart := time.Now()
-
 	srv, err := NewServer(config)
 	if err != nil {
 		return err
