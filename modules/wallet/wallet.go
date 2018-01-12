@@ -130,9 +130,15 @@ func (w *Wallet) commitTransactionSet(txns []types.Transaction) error {
 		// ReceiveUpdatedUnconfirmedTransactions
 		return nil
 	}
-	if err != nil {
-		// TODO: There might be some errors that make us abort here
+	// If there was a consensus conflict we shouldn't add the set
+	if cconflict, ok := err.(modules.ConsensusConflict); ok {
+		return cconflict
 	}
+	// If the set was already added we don't need to add it again
+	if err == modules.ErrDuplicateTransactionSet {
+		return err
+	}
+	// TODO: There might be more errors that make us abort here
 
 	// If we couldn't add the transaction but still want the wallet to track it
 	// we need to add it manually to the unconfirmedSets and
