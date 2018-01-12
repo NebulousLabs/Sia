@@ -554,40 +554,26 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 			continue
 		}
 
-		// Mark all of the transactions that appeared in this set.
-		//
-		// Check if commitTransactionSet already added the transaction to the
-		// unconfirmedSets
-		if _, exists := w.unconfirmedSets[unconfirmedTxnSet.ID]; !exists {
-			// Maybe acceptTransactionSet added a subset with a different
-			// id. If that's the case, replace it with the one from the
-			// tpool.
-			isSubset := false
-			for tSetID, ids := range w.unconfirmedSets {
-				if isSuperset(unconfirmedTxnSet.IDs, ids) {
-					// Add the new id
-					w.unconfirmedSets[unconfirmedTxnSet.ID] = w.unconfirmedSets[tSetID]
-					if err := dbPutUnconfirmedSet(w.dbTx, unconfirmedTxnSet.ID, unconfirmedTxnSet.IDs); err != nil {
-						build.Critical(err)
-					}
-					// Remove the old id
-					delete(w.unconfirmedSets, tSetID)
-					if err := dbDeleteUnconfirmedSet(w.dbTx, tSetID); err != nil {
-						build.Critical(err)
-					}
-					isSubset = true
-					break
-				}
-			}
-			// If we couldn't find a matching superset, the transaction
-			// probably wasn't created by this wallet. In that case we can add
-			// the transaction.
-			if !isSubset {
-				w.unconfirmedSets[unconfirmedTxnSet.ID] = unconfirmedTxnSet.IDs
-				if err := dbPutUnconfirmedSet(w.dbTx, unconfirmedTxnSet.ID, unconfirmedTxnSet.IDs); err != nil {
+		// Check if unconfirmedSets already contains a subset of the
+		// unconfirmedTxnSet's ids. This might happen if the wallet manually
+		// added the set to unconfirmedSets after AcceptTransactionSet failed
+		// in commitTransactionSet.  If it contains a subset it should be
+		// deleted and be replaced by the superset.
+		for tSetID, ids := range w.unconfirmedSets {
+			if isSuperset(unconfirmedTxnSet.IDs, ids) {
+				// Remove the old id
+				delete(w.unconfirmedSets, tSetID)
+				if err := dbDeleteUnconfirmedSet(w.dbTx, tSetID); err != nil {
 					build.Critical(err)
 				}
+				break
 			}
+		}
+		// Add the set to the unconfirmedSets
+		w.unconfirmedSets[unconfirmedTxnSet.ID] = unconfirmedTxnSet.IDs
+		err := dbPutUnconfirmedSet(w.dbTx, unconfirmedTxnSet.ID, unconfirmedTxnSet.IDs)
+		if err != nil {
+			build.Critical(err)
 		}
 
 		// Get the values for the spent outputs.
@@ -598,6 +584,17 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 			if scod.Direction == modules.DiffRevert {
 				spentSiacoinOutputs[scod.ID] = scod.SiacoinOutput
 			}
+		}
+
+		// Build an index that maps a transaction id to it's index in
+		// unconfirmedProcessedTransactions. This allows us to find duplicates
+		// in unconfirmedProcessedTransactions. There is a chance that after a
+		// failed AcceptTransactionSet in commitTransactionSet the wallet
+		// already added a particular transaction. In that case we want to
+		// replace it instead of appending.
+		ptIndices := make(map[types.TransactionID]int)
+		for i, pt := range w.unconfirmedProcessedTransactions {
+			ptIndices[pt.TransactionID] = i
 		}
 
 		// Add each transaction to our set of unconfirmed transactions.
@@ -638,7 +635,13 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 					Value:    fee,
 				})
 			}
-			w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
+			// Check if a transaction with that id already consists. If it does
+			// we replace it. Otherwise we append
+			if _, exists := ptIndices[pt.TransactionID]; exists {
+				w.unconfirmedProcessedTransactions[i] = pt
+			} else {
+				w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
+			}
 		}
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"sync"
 
@@ -119,27 +120,44 @@ func (w *Wallet) Height() types.BlockHeight {
 // AcceptTransactionSet method. It only returns an error if the transaction was
 // rejected and won't be rebroadcasted over time
 func (w *Wallet) commitTransactionSet(txns []types.Transaction) error {
-	// Get the transaction ids and add them to the unconfirmedSets
+	w.mu.Unlock()
+	err := w.tpool.AcceptTransactionSet(txns)
+	w.mu.Lock()
+	if err == nil {
+		// If we were able to add the transactions to the pool we are done. The
+		// wallet already updated the unconfirmedSets and
+		// unconfirmedProcessedTransactions fields in
+		// ReceiveUpdatedUnconfirmedTransactions
+		return nil
+	}
+	if err != nil {
+		// TODO: There might be some errors that make us abort here
+	}
+
+	// If we couldn't add the transaction but still want the wallet to track it
+	// we need to add it manually to the unconfirmedSets and
+	// unconfirmedProcessedTransactions
 	tSetID := modules.TransactionSetID(crypto.HashObject(txns))
 	ids := make([]types.TransactionID, 0, len(txns))
+	pts := make([]modules.ProcessedTransaction, 0, len(txns))
 	for _, txn := range txns {
 		ids = append(ids, txn.ID())
+		pt := modules.ProcessedTransaction{
+			Transaction:           txn,
+			TransactionID:         txn.ID(),
+			ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
+			ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
+		}
+		// TODO Also add processed inputs and outputs
+		pts = append(pts, pt)
 	}
+	// Add the unconfirmed set
 	w.unconfirmedSets[tSetID] = ids
 	if err := dbPutUnconfirmedSet(w.dbTx, tSetID, ids); err != nil {
 		return err
 	}
-
-	// Accept the set. If the error returned prevents the set from ever being
-	// accepted we should remove it from the wallet again.
-	w.mu.Unlock()
-	err := w.tpool.AcceptTransactionSet(txns)
-	w.mu.Lock()
-	if err != nil { // TODO: There are exceptions to this
-		delete(w.unconfirmedSets, tSetID)
-		err2 := dbDeleteUnconfirmedSet(w.dbTx, tSetID)
-		return build.ComposeErrors(err, err2)
-	}
+	// Add the unconfirmed processed transactions
+	w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pts...)
 	return nil
 }
 
