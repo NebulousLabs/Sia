@@ -284,9 +284,9 @@ func (s *Session) keepAliveSend() {
 		case <-s.die:
 			return
 		case <-keepAliveTimeout:
+			keepAliveTimeout = time.After(s.config.KeepAliveInterval) // set before writing so we start sending the next one in time
 			s.writeFrame(newFrame(cmdNOP, 0), time.Now().Add(s.config.WriteTimeout))
 			s.notifyBucket() // force a signal to the recvLoop
-			keepAliveTimeout = time.After(s.config.KeepAliveInterval)
 		}
 	}
 }
@@ -312,6 +312,13 @@ func (s *Session) keepAliveTimeout() {
 // writeFrame writes the frame to the underlying connection
 // and returns the number of bytes written if successful
 func (s *Session) writeFrame(frame Frame, timeout time.Time) (int, error) {
+	// Ensure that the configured WriteTimeout is the maximum amount of time
+	// that we can wait to send a single frame.
+	latestTimeout := time.Now().Add(s.config.WriteTimeout)
+	if timeout.IsZero() || timeout.After(latestTimeout) {
+		timeout = latestTimeout
+	}
+
 	// Determine how much time remains in the timeout, wait for up to that long
 	// to grab the sendMu.
 	currentTime := time.Now()
