@@ -3,36 +3,31 @@ package smux
 import (
 	"encoding/binary"
 	"io"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
+	siasync "github.com/NebulousLabs/Sia/sync" // TODO: Replace with github.com/NebulousLabs/trymutex
 )
 
 const (
 	defaultAcceptBacklog = 1024
 )
 
-const (
-	errBrokenPipe      = "broken pipe"
-	errInvalidProtocol = "invalid protocol version"
-	errGoAway          = "stream id overflows, should start a new connection"
+var (
+	errBrokenPipe      = errors.New("broken pipe")
+	errGoAway          = errors.New("stream id overflows, should start a new connection")
+	errInvalidProtocol = errors.New("invalid protocol version")
+	errWriteTimeout    = errors.New("unable to write to conn within the write timeout")
 )
-
-type writeRequest struct {
-	frame  Frame
-	result chan writeResult
-}
-
-type writeResult struct {
-	n   int
-	err error
-}
 
 // Session defines a multiplexed connection for streams
 type Session struct {
-	conn io.ReadWriteCloser
+	conn net.Conn
+	dataWasRead int32 // used to determine if KeepAlive has failed
+	sendMu siasync.TryMutex // ensures only one thread sends at a time
 
 	config           *Config
 	nextStreamID     uint32 // next stream identifier
@@ -48,16 +43,12 @@ type Session struct {
 	dieLock   sync.Mutex
 	chAccepts chan *Stream
 
-	dataReady int32 // flag data has arrived
-
 	goAway int32 // flag id exhausted
 
 	deadline atomic.Value
-
-	writes chan writeRequest
 }
 
-func newSession(config *Config, conn io.ReadWriteCloser, client bool) *Session {
+func newSession(config *Config, conn net.Conn, client bool) *Session {
 	s := new(Session)
 	s.die = make(chan struct{})
 	s.conn = conn
@@ -66,30 +57,34 @@ func newSession(config *Config, conn io.ReadWriteCloser, client bool) *Session {
 	s.chAccepts = make(chan *Stream, defaultAcceptBacklog)
 	s.bucket = int32(config.MaxReceiveBuffer)
 	s.bucketNotify = make(chan struct{}, 1)
-	s.writes = make(chan writeRequest)
 
 	if client {
 		s.nextStreamID = 1
 	} else {
 		s.nextStreamID = 0
 	}
+
 	go s.recvLoop()
-	go s.sendLoop()
-	go s.keepalive()
+	// keepaliveSend and keepaliveTimeout need to be separate threads, because
+	// the keepaliveSend can block, and especially if the underlying conn has no
+	// deadline or a very long deadline, we may not check the keepaliveTimeout
+	// for an extended period of time and potentially even end in a deadlock.
+	go s.keepAliveSend()
+	go s.keepAliveTimeout()
 	return s
 }
 
 // OpenStream is used to create a new stream
 func (s *Session) OpenStream() (*Stream, error) {
 	if s.IsClosed() {
-		return nil, errors.New(errBrokenPipe)
+		return nil, errBrokenPipe
 	}
 
 	// generate stream id
 	s.nextStreamIDLock.Lock()
 	if s.goAway > 0 {
 		s.nextStreamIDLock.Unlock()
-		return nil, errors.New(errGoAway)
+		return nil, errGoAway
 	}
 
 	s.nextStreamID += 2
@@ -97,13 +92,13 @@ func (s *Session) OpenStream() (*Stream, error) {
 	if sid == sid%2 { // stream-id overflows
 		s.goAway = 1
 		s.nextStreamIDLock.Unlock()
-		return nil, errors.New(errGoAway)
+		return nil, errGoAway
 	}
 	s.nextStreamIDLock.Unlock()
 
 	stream := newStream(sid, s.config.MaxFrameSize, s)
 
-	if _, err := s.writeFrame(newFrame(cmdSYN, sid)); err != nil {
+	if _, err := s.writeFrame(newFrame(cmdSYN, sid), time.Now().Add(s.config.WriteTimeout)); err != nil {
 		return nil, errors.Wrap(err, "writeFrame")
 	}
 
@@ -128,7 +123,7 @@ func (s *Session) AcceptStream() (*Stream, error) {
 	case <-deadline:
 		return nil, errTimeout
 	case <-s.die:
-		return nil, errors.New(errBrokenPipe)
+		return nil, errBrokenPipe
 	}
 }
 
@@ -139,7 +134,7 @@ func (s *Session) Close() (err error) {
 	select {
 	case <-s.die:
 		s.dieLock.Unlock()
-		return errors.New(errBrokenPipe)
+		return errBrokenPipe
 	default:
 		close(s.die)
 		s.dieLock.Unlock()
@@ -216,7 +211,7 @@ func (s *Session) readFrame(buffer []byte) (f Frame, err error) {
 
 	dec := rawHeader(buffer)
 	if dec.Version() != version {
-		return f, errors.New(errInvalidProtocol)
+		return f, errInvalidProtocol
 	}
 
 	f.ver = dec.Version()
@@ -240,7 +235,7 @@ func (s *Session) recvLoop() {
 		}
 
 		if f, err := s.readFrame(buffer); err == nil {
-			atomic.StoreInt32(&s.dataReady, 1)
+			atomic.StoreInt32(&s.dataWasRead, 1)
 
 			switch f.cmd {
 			case cmdNOP:
@@ -281,73 +276,76 @@ func (s *Session) recvLoop() {
 	}
 }
 
-func (s *Session) keepalive() {
-	tickerPing := time.NewTicker(s.config.KeepAliveInterval)
-	tickerTimeout := time.NewTicker(s.config.KeepAliveTimeout)
-	defer tickerPing.Stop()
-	defer tickerTimeout.Stop()
+// keepAliveSend will periodically send a keepalive meesage to the remote peer.
+func (s *Session) keepAliveSend() {
+	keepAliveTimeout := time.After(s.config.KeepAliveInterval)
 	for {
 		select {
-		case <-tickerPing.C:
-			s.writeFrame(newFrame(cmdNOP, 0))
-			s.notifyBucket() // force a signal to the recvLoop
-		case <-tickerTimeout.C:
-			if !atomic.CompareAndSwapInt32(&s.dataReady, 1, 0) {
-				s.Close()
-				return
-			}
 		case <-s.die:
 			return
+		case <-keepAliveTimeout:
+			s.writeFrame(newFrame(cmdNOP, 0), time.Now().Add(s.config.WriteTimeout))
+			s.notifyBucket() // force a signal to the recvLoop
+			keepAliveTimeout = time.After(s.config.KeepAliveInterval)
 		}
 	}
 }
 
-func (s *Session) sendLoop() {
-	buf := make([]byte, (1<<16)+headerSize)
+// keepAliveTimeout will periodically check that some sort of message has been
+// sent by the remote peer, closing the session if not.
+func (s *Session) keepAliveTimeout() {
+	timeoutChan := time.After(s.config.KeepAliveTimeout)
 	for {
 		select {
 		case <-s.die:
 			return
-		case request, ok := <-s.writes:
-			if !ok {
-				continue
+		case <-timeoutChan:
+			if !atomic.CompareAndSwapInt32(&s.dataWasRead, 1, 0) {
+				s.Close()
+				return
 			}
-			buf[0] = request.frame.ver
-			buf[1] = request.frame.cmd
-			binary.LittleEndian.PutUint16(buf[2:], uint16(len(request.frame.data)))
-			binary.LittleEndian.PutUint32(buf[4:], request.frame.sid)
-			copy(buf[headerSize:], request.frame.data)
-			n, err := s.conn.Write(buf[:headerSize+len(request.frame.data)])
-
-			n -= headerSize
-			if n < 0 {
-				n = 0
-			}
-
-			result := writeResult{
-				n:   n,
-				err: err,
-			}
-
-			request.result <- result
-			close(request.result)
+			timeoutChan = time.After(s.config.KeepAliveTimeout)
 		}
 	}
 }
 
 // writeFrame writes the frame to the underlying connection
 // and returns the number of bytes written if successful
-func (s *Session) writeFrame(f Frame) (n int, err error) {
-	req := writeRequest{
-		frame:  f,
-		result: make(chan writeResult, 1),
+func (s *Session) writeFrame(frame Frame, timeout time.Time) (int, error) {
+	// Determine how much time remains in the timeout, wait for up to that long
+	// to grab the sendMu.
+	currentTime := time.Now()
+	if !timeout.After(currentTime) {
+		return 0, errWriteTimeout
 	}
+	remaining := currentTime.Sub(timeout)
+	if !s.sendMu.TryLockTimed(remaining) {
+		return 0, errWriteTimeout
+	}
+	defer s.sendMu.Unlock()
+
+	// Check again that the stream has not been killed.
 	select {
 	case <-s.die:
-		return 0, errors.New(errBrokenPipe)
-	case s.writes <- req:
+		return 0, errBrokenPipe
+	default:
 	}
 
-	result := <-req.result
-	return result.n, result.err
+	// Prepare the write data.
+	buf := make([]byte, headerSize+len(frame.data))
+	buf[0] = frame.ver
+	buf[1] = frame.cmd
+	binary.LittleEndian.PutUint16(buf[2:], uint16(len(frame.data)))
+	binary.LittleEndian.PutUint32(buf[4:], frame.sid)
+	copy(buf[headerSize:], frame.data)
+
+	// Write the data using the provided writeTimeout.
+	s.conn.SetWriteDeadline(timeout)
+	n, err := s.conn.Write(buf[:headerSize+len(frame.data)])
+	s.conn.SetWriteDeadline(time.Time{})
+	n -= headerSize
+	if n < 0 {
+		n = 0
+	}
+	return n, err
 }
