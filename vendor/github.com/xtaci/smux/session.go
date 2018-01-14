@@ -20,6 +20,7 @@ var (
 	errBrokenPipe      = errors.New("broken pipe")
 	errGoAway          = errors.New("stream id overflows, should start a new connection")
 	errInvalidProtocol = errors.New("invalid protocol version")
+	errLargeFrame      = errors.New("frame is too large to send")
 	errWriteTimeout    = errors.New("unable to write to conn within the write timeout")
 )
 
@@ -312,6 +313,11 @@ func (s *Session) keepAliveTimeout() {
 // writeFrame writes the frame to the underlying connection
 // and returns the number of bytes written if successful
 func (s *Session) writeFrame(frame Frame, timeout time.Time) (int, error) {
+	// Verify the frame data size.
+	if len(frame.data) > 1<<16 {
+		return 0, errLargeFrame
+	}
+
 	// Ensure that the configured WriteTimeout is the maximum amount of time
 	// that we can wait to send a single frame.
 	latestTimeout := time.Now().Add(s.config.WriteTimeout)
