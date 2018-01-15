@@ -331,7 +331,7 @@ func (s *Session) writeFrame(frame Frame, timeout time.Time) (int, error) {
 	if !timeout.After(currentTime) {
 		return 0, errWriteTimeout
 	}
-	remaining := currentTime.Sub(timeout)
+	remaining := timeout.Sub(currentTime)
 	if !s.sendMu.TryLockTimed(remaining) {
 		return 0, errWriteTimeout
 	}
