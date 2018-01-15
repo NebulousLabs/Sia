@@ -28,12 +28,6 @@ const (
 	// default size during times of congestion.
 	TransactionPoolExponentiation = 3
 
-	// TransactionPoolSizeForFee defines how large the transaction pool needs to
-	// be before it starts expecting fees to be on the transaction. This initial
-	// limit is to help the network grow and provide some wiggle room for
-	// wallets that are not yet able to operate via a fee market.
-	TransactionPoolSizeForFee = 500e3
-
 	// TransactionPoolSizeTarget defines the target size of the pool when the
 	// transactions are paying 1 SC / kb in fees.
 	TransactionPoolSizeTarget = 3e6
@@ -69,6 +63,18 @@ var (
 	// minEstimation defines a sane minimum fee per byte for transactions.  This
 	// will typically be only suggested as a fee in the absence of congestion.
 	minEstimation = types.SiacoinPrecision.Div64(100).Div64(1e3)
+)
+
+var (
+	// TransactionPoolSizeForFee defines how large the transaction pool needs to
+	// be before it starts expecting fees to be on the transaction. This initial
+	// limit is to help the network grow and provide some wiggle room for
+	// wallets that are not yet able to operate via a fee market.
+	TransactionPoolSizeForFee = build.Select(build.Var{
+		Standard: int(500e3),
+		Dev:      int(500e3),
+		Testing:  int(30e3),
+	}).(int)
 )
 
 // Variables related to propagating transactions through the network.

@@ -175,7 +175,7 @@ func (w *Wallet) threadedDefragWallet() {
 		return
 	}
 	// Submit the defrag to the transaction pool.
-	err = w.tpool.AcceptTransactionSet(txnSet)
+	err = w.managedCommitTransactionSet(txnSet)
 	if err != nil {
 		w.log.Println("WARN: defrag transaction was rejected:", err)
 		return

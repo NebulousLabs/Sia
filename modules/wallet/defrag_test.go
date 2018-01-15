@@ -96,7 +96,7 @@ func TestDefragWalletDust(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wt.tpool.AcceptTransactionSet(txns)
+	err = wt.wallet.managedCommitTransactionSet(txns)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 				if err != nil {
 					t.Error("Error signing fragmenting transaction:", err)
 				}
-				err = wt.tpool.AcceptTransactionSet(txns)
+				err = wt.wallet.managedCommitTransactionSet(txns)
 				if err != nil {
 					t.Error("Error accepting fragmenting transaction:", err)
 				}

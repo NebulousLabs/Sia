@@ -3,9 +3,11 @@ package wallet
 import (
 	"encoding/binary"
 	"errors"
+	"log"
 	"reflect"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -41,6 +43,8 @@ var (
 	// bucketWallet contains various fields needed by the wallet, such as its
 	// UID, EncryptionVerification, and PrimarySeedFile.
 	bucketWallet = []byte("bucketWallet")
+	// bucketUnconfirmedSets contains the unconfirmedSets field of the wallet
+	bucketUnconfirmedSets = []byte("bucketUnconfirmedSets")
 
 	dbBuckets = [][]byte{
 		bucketProcessedTransactions,
@@ -49,6 +53,7 @@ var (
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
 		bucketSpentOutputs,
+		bucketUnconfirmedSets,
 		bucketWallet,
 	}
 
@@ -211,13 +216,33 @@ func dbGetSpentOutput(tx *bolt.Tx, id types.OutputID) (height types.BlockHeight,
 func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
 }
-
 func dbPutAddrTransactions(tx *bolt.Tx, addr types.UnlockHash, txns []uint64) error {
 	return dbPut(tx.Bucket(bucketAddrTransactions), addr, txns)
 }
 func dbGetAddrTransactions(tx *bolt.Tx, addr types.UnlockHash) (txns []uint64, err error) {
 	err = dbGet(tx.Bucket(bucketAddrTransactions), addr, &txns)
 	return
+}
+func dbPutUnconfirmedSet(tx *bolt.Tx, tSetID modules.TransactionSetID, ids []types.TransactionID) error {
+	return dbPut(tx.Bucket(bucketUnconfirmedSets), tSetID, ids)
+}
+func dbDeleteUnconfirmedSet(tx *bolt.Tx, tSetID modules.TransactionSetID) error {
+	return dbDelete(tx.Bucket(bucketUnconfirmedSets), tSetID)
+}
+func dbLoadUnconfirmedSets(tx *bolt.Tx) (map[modules.TransactionSetID][]types.TransactionID, error) {
+	sets := make(map[modules.TransactionSetID][]types.TransactionID)
+	err := tx.Bucket(bucketUnconfirmedSets).ForEach(func(k []byte, v []byte) error {
+		var tSetID modules.TransactionSetID
+		var ids []types.TransactionID
+		err := build.ComposeErrors(encoding.Unmarshal(k, &tSetID), encoding.Unmarshal(v, &ids))
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		sets[tSetID] = ids
+		return nil
+	})
+	return sets, err
 }
 
 // dbAddAddrTransaction appends a single transaction index to the set of

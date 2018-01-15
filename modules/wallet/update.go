@@ -2,8 +2,10 @@ package wallet
 
 import (
 	"fmt"
+	"log"
 	"math"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -453,6 +455,49 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 }
 
+// isRelevantTxn checks if a tranaction is relevant to the wallet
+func (w *Wallet) isRelevantTxn(txn types.Transaction) (relevant bool) {
+	// determine whether transaction is relevant to the wallet
+	for _, sci := range txn.SiacoinInputs {
+		relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
+	}
+	for _, sco := range txn.SiacoinOutputs {
+		relevant = relevant || w.isWalletAddress(sco.UnlockHash)
+	}
+	return
+}
+
+// isRelevantTSet checks if a set of transactions is relevant to the wallet. It
+// is relevant if at least one transaction is relevant.
+func (w *Wallet) isRelevantTSet(txns []types.Transaction) bool {
+	for _, txn := range txns {
+		if w.isRelevantTxn(txn) {
+			return true
+		}
+	}
+	return false
+}
+
+// isSuperset is a helper function that checks if super is a superset of sub
+func isSuperset(super []types.TransactionID, sub []types.TransactionID) bool {
+	if len(super) < len(sub) {
+		log.Println(false)
+		return false
+	}
+	// Create maps from the slices for faster verification
+	superset := make(map[types.TransactionID]struct{})
+	for _, id := range super {
+		superset[id] = struct{}{}
+	}
+	// Check if all ids of sub are in the superset
+	for _, id := range sub {
+		if _, exists := superset[id]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
 // transaction set.
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.TransactionPoolDiff) {
@@ -473,17 +518,22 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 			droppedTransactions[txids[i]] = struct{}{}
 		}
 		delete(w.unconfirmedSets, diff.RevertedTransactions[i])
+		if err := dbDeleteUnconfirmedSet(w.dbTx, diff.RevertedTransactions[i]); err != nil {
+			build.Critical(err)
+		}
 	}
 
 	// Skip the reallocation if we can, otherwise reallocate the
 	// unconfirmedProcessedTransactions to no longer have the dropped
 	// transactions.
 	if len(droppedTransactions) != 0 {
-		// Capacity can't be reduced, because we have no way of knowing if the
-		// dropped transactions are relevant to the wallet or not, and some will
-		// not be relevant to the wallet, meaning they don't have a counterpart
-		// in w.unconfirmedProcessedTransactions.
-		newUPT := make([]modules.ProcessedTransaction, 0, len(w.unconfirmedProcessedTransactions))
+		// droppedTransactions should only contain transactions relevant to the
+		// wallet. Therefore we can safely reduce the allocated memory.
+		newLen := len(w.unconfirmedProcessedTransactions) - len(droppedTransactions)
+		if newLen < 0 {
+			newLen = 0
+		}
+		newUPT := make([]modules.ProcessedTransaction, 0, newLen)
 		for _, txn := range w.unconfirmedProcessedTransactions {
 			_, exists := droppedTransactions[txn.TransactionID]
 			if !exists {
@@ -499,11 +549,32 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 
 	// Scroll through all of the diffs and add any new transactions.
 	for _, unconfirmedTxnSet := range diff.AppliedTransactions {
-		// Mark all of the transactions that appeared in this set.
-		//
-		// TODO: Technically only necessary to mark the ones that are relevant
-		// to the wallet, but overhead should be low.
+		// We only need to do that for transactions relevant to the wallet
+		if !w.isRelevantTSet(unconfirmedTxnSet.Transactions) {
+			continue
+		}
+
+		// Check if unconfirmedSets already contains a subset of the
+		// unconfirmedTxnSet's ids. This might happen if the wallet manually
+		// added the set to unconfirmedSets after AcceptTransactionSet failed
+		// in commitTransactionSet.  If it contains a subset it should be
+		// deleted and be replaced by the superset.
+		for tSetID, ids := range w.unconfirmedSets {
+			if isSuperset(unconfirmedTxnSet.IDs, ids) && len(unconfirmedTxnSet.IDs) != len(ids) {
+				// Remove the old id
+				delete(w.unconfirmedSets, tSetID)
+				if err := dbDeleteUnconfirmedSet(w.dbTx, tSetID); err != nil {
+					build.Critical(err)
+				}
+				break
+			}
+		}
+		// Add the set to the unconfirmedSets
 		w.unconfirmedSets[unconfirmedTxnSet.ID] = unconfirmedTxnSet.IDs
+		err := dbPutUnconfirmedSet(w.dbTx, unconfirmedTxnSet.ID, unconfirmedTxnSet.IDs)
+		if err != nil {
+			build.Critical(err)
+		}
 
 		// Get the values for the spent outputs.
 		spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
@@ -515,19 +586,21 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 			}
 		}
 
+		// Build an index that maps a transaction id to it's index in
+		// unconfirmedProcessedTransactions. This allows us to find duplicates
+		// in unconfirmedProcessedTransactions. There is a chance that after a
+		// failed AcceptTransactionSet in commitTransactionSet the wallet
+		// already added a particular transaction. In that case we want to
+		// replace it instead of appending.
+		ptIndices := make(map[types.TransactionID]int)
+		for i, pt := range w.unconfirmedProcessedTransactions {
+			ptIndices[pt.TransactionID] = i
+		}
+
 		// Add each transaction to our set of unconfirmed transactions.
 		for i, txn := range unconfirmedTxnSet.Transactions {
-			// determine whether transaction is relevant to the wallet
-			relevant := false
-			for _, sci := range txn.SiacoinInputs {
-				relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
-			}
-			for _, sco := range txn.SiacoinOutputs {
-				relevant = relevant || w.isWalletAddress(sco.UnlockHash)
-			}
-
 			// only create a ProcessedTransaction if txn is relevant
-			if !relevant {
+			if !w.isRelevantTxn(txn) {
 				continue
 			}
 
@@ -562,7 +635,13 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 					Value:    fee,
 				})
 			}
-			w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
+			// Check if a transaction with that id already consists. If it does
+			// we replace it. Otherwise we append
+			if _, exists := ptIndices[pt.TransactionID]; exists {
+				w.unconfirmedProcessedTransactions[i] = pt
+			} else {
+				w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
+			}
 		}
 	}
 }

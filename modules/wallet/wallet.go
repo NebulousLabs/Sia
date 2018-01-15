@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"sync"
 
@@ -20,14 +21,6 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-const (
-	// RespendTimeout records the number of blocks that the wallet will wait
-	// before spending an output that has been spent in the past. If the
-	// transaction spending the output has not made it to the transaction pool
-	// after the limit, the assumption is that it never will.
-	RespendTimeout = 40
 )
 
 var (
@@ -123,6 +116,64 @@ func (w *Wallet) Height() types.BlockHeight {
 	return types.BlockHeight(height)
 }
 
+// commitTransactionSet is a convenience wrapper for the transaction pools
+// AcceptTransactionSet method. It only returns an error if the transaction was
+// rejected and won't be rebroadcasted over time
+func (w *Wallet) commitTransactionSet(txns []types.Transaction) error {
+	w.mu.Unlock()
+	err := w.tpool.AcceptTransactionSet(txns)
+	w.mu.Lock()
+	if err == nil {
+		// If we were able to add the transactions to the pool we are done. The
+		// wallet already updated the unconfirmedSets and
+		// unconfirmedProcessedTransactions fields in
+		// ReceiveUpdatedUnconfirmedTransactions
+		return nil
+	}
+	// If there was a consensus conflict we shouldn't add the set
+	if cconflict, ok := err.(modules.ConsensusConflict); ok {
+		return cconflict
+	}
+	// If the set was already added we don't need to add it again
+	if err == modules.ErrDuplicateTransactionSet {
+		return err
+	}
+	// TODO: There might be more errors that make us abort here
+
+	// If we couldn't add the transaction but still want the wallet to track it
+	// we need to add it manually to the unconfirmedSets and
+	// unconfirmedProcessedTransactions
+	tSetID := modules.TransactionSetID(crypto.HashObject(txns))
+	ids := make([]types.TransactionID, 0, len(txns))
+	pts := make([]modules.ProcessedTransaction, 0, len(txns))
+	for _, txn := range txns {
+		ids = append(ids, txn.ID())
+		pt := modules.ProcessedTransaction{
+			Transaction:           txn,
+			TransactionID:         txn.ID(),
+			ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
+			ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
+		}
+		// TODO Also add processed inputs and outputs
+		pts = append(pts, pt)
+	}
+	// Add the unconfirmed set
+	w.unconfirmedSets[tSetID] = ids
+	if err := dbPutUnconfirmedSet(w.dbTx, tSetID, ids); err != nil {
+		return err
+	}
+	// Add the unconfirmed processed transactions
+	w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pts...)
+	return nil
+}
+
+// managedCommitTransactionSet is a thread-safe version of commitTransactionSet
+func (w *Wallet) managedCommitTransactionSet(txns []types.Transaction) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.commitTransactionSet(txns)
+}
+
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future. Keys and addresses are
 // not loaded into the wallet during the call to 'new', but rather during the
@@ -174,6 +225,12 @@ func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDi
 		}
 		// Save changes to disk
 		w.syncDB()
+	}
+
+	// Load possible unconfirmed sets from disk
+	w.unconfirmedSets, err = dbLoadUnconfirmedSets(w.dbTx)
+	if err != nil {
+		return nil, err
 	}
 
 	// make sure we commit on shutdown

@@ -100,7 +100,7 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 	// Check that this output has not recently been spent by the wallet.
 	spendHeight, err := dbGetSpentOutput(tx, types.OutputID(id))
 	if err == nil {
-		if spendHeight+RespendTimeout > currentHeight {
+		if spendHeight+respendTimeout > currentHeight {
 			return errSpendHeightTooHigh
 		}
 	}
@@ -287,8 +287,8 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 			spendHeight = 0
 		}
 		// Prevent an underflow error.
-		allowedHeight := consensusHeight - RespendTimeout
-		if consensusHeight < RespendTimeout {
+		allowedHeight := consensusHeight - respendTimeout
+		if consensusHeight < respendTimeout {
 			allowedHeight = 0
 		}
 		if spendHeight > allowedHeight {
