@@ -560,7 +560,7 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 		// in commitTransactionSet.  If it contains a subset it should be
 		// deleted and be replaced by the superset.
 		for tSetID, ids := range w.unconfirmedSets {
-			if isSuperset(unconfirmedTxnSet.IDs, ids) {
+			if isSuperset(unconfirmedTxnSet.IDs, ids) && len(unconfirmedTxnSet.IDs) != len(ids) {
 				// Remove the old id
 				delete(w.unconfirmedSets, tSetID)
 				if err := dbDeleteUnconfirmedSet(w.dbTx, tSetID); err != nil {

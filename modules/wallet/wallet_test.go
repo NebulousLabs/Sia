@@ -591,3 +591,73 @@ func TestDistantWallets(t *testing.T) {
 		t.Fatal("wallet should not recognize coins sent to very high seed index")
 	}
 }
+
+// TestCommitTransactionSetInsufficientFees checks if a transaction still makes
+// it into unconfirmedSets and unconfirmedProcessedTransactions even though the
+// fees are not sufficient.
+func TestCommitTransactionSetInsufficientFees(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Get an address from the wallet
+	uc, err := wt.wallet.NextAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Send a bunch of transactions without fees. The transaction pool should
+	// expect an increasing number of fees once we hit the
+	// TransactionPoolSizeForFee limit but we will not add any to the
+	// transactions.
+	amount := types.SiacoinPrecision.Mul64(100)
+	poolSize := 0
+	numTxnsSent := 0
+	for poolSize < 2*transactionpool.TransactionPoolSizeForFee {
+		builder := wt.wallet.StartTransaction()
+		builder.AddSiacoinOutput(types.SiacoinOutput{
+			UnlockHash: uc.UnlockHash(),
+			Value:      amount,
+		})
+		// Don't add any fees
+		err = builder.FundSiacoins(amount)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txnSet, err := builder.Sign(true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Committing the transaction should work
+		err = wt.wallet.managedCommitTransactionSet(txnSet)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Increase poolSize
+		for _, txn := range txnSet {
+			poolSize += txn.MarshalSiaSize()
+		}
+		numTxnsSent++
+	}
+	// Each sent transaction creates a set of 2 transactions. There hsould be
+	// the same number of unconfirmedProcessedTransactions
+	if len(wt.wallet.unconfirmedProcessedTransactions) != 2*numTxnsSent {
+		t.Errorf("There should be 2 txns for each sent set.")
+	}
+	// For each unfirmed processed transaction there should be a transaction id
+	// in the unconfirmedSets
+	unconfirmedSetsTxns := 0
+	for _, set := range wt.wallet.unconfirmedSets {
+		unconfirmedSetsTxns += len(set)
+	}
+	if len(wt.wallet.unconfirmedProcessedTransactions) != unconfirmedSetsTxns {
+		t.Errorf("There should be as many unconfirmed processed transactions as there are txns in the unconfirmed sets")
+	}
+}
