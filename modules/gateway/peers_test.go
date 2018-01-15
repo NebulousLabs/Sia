@@ -25,6 +25,7 @@ type dummyConn struct {
 func (dc *dummyConn) Read(p []byte) (int, error)       { return len(p), nil }
 func (dc *dummyConn) Write(p []byte) (int, error)      { return len(p), nil }
 func (dc *dummyConn) Close() error                     { return nil }
+func (dc *dummyConn) SetReadDeadline(time.Time) error  { return nil }
 func (dc *dummyConn) SetWriteDeadline(time.Time) error { return nil }
 
 // TestAddPeer tries adding a peer to the gateway.

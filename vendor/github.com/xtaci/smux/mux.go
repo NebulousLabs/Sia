@@ -25,8 +25,13 @@ type Config struct {
 	// number of data in the buffer pool
 	MaxReceiveBuffer int
 
+	// ReadTimeout defines the global timeout for writing a single frame to a
+	// conn.
+	ReadTimeout time.Duration
+
 	// WriteTimeout defines the default amount of time to wait before giving up
-	// on a write.
+	// on a write. This same value is used as a global timeout for writing a
+	// single frame to the connection.
 	WriteTimeout time.Duration
 }
 
@@ -37,6 +42,7 @@ func DefaultConfig() *Config {
 		KeepAliveTimeout:  120 * time.Second,
 		MaxFrameSize:      4096,
 		MaxReceiveBuffer:  4194304,
+		ReadTimeout:       120 * time.Second,
 		WriteTimeout:      120 * time.Second,
 	}
 }

@@ -206,6 +206,10 @@ func (s *Session) returnTokens(n int) {
 // session read a frame from underlying connection
 // it's data is pointed to the input buffer
 func (s *Session) readFrame(buffer []byte) (f Frame, err error) {
+	// Ensure that reading a frame follows the global timeout.
+	s.conn.SetReadDeadline(time.Now().Add(s.config.ReadTimeout))
+	defer s.conn.SetReadDeadline(time.Time{})
+
 	if _, err := io.ReadFull(s.conn, buffer[:headerSize]); err != nil {
 		return f, errors.Wrap(err, "readFrame")
 	}
@@ -279,13 +283,14 @@ func (s *Session) recvLoop() {
 
 // keepAliveSend will periodically send a keepalive meesage to the remote peer.
 func (s *Session) keepAliveSend() {
-	keepAliveTimeout := time.After(s.config.KeepAliveInterval)
+	// Use 'time.Ticker' to ensure that if the keepalive sending falls behind
+	// schedule, unnecessary sleeping does not occur.
+	ticker := time.NewTicker(s.config.KeepAliveTimeout)
 	for {
 		select {
 		case <-s.die:
 			return
-		case <-keepAliveTimeout:
-			keepAliveTimeout = time.After(s.config.KeepAliveInterval) // set before writing so we start sending the next one in time
+		case <-ticker.C:
 			s.writeFrame(newFrame(cmdNOP, 0), time.Now().Add(s.config.WriteTimeout))
 			s.notifyBucket() // force a signal to the recvLoop
 		}
@@ -295,6 +300,8 @@ func (s *Session) keepAliveSend() {
 // keepAliveTimeout will periodically check that some sort of message has been
 // sent by the remote peer, closing the session if not.
 func (s *Session) keepAliveTimeout() {
+	// Use 'time.After' to ensure that at least 'n' amount of time passes
+	// between each check that a keepalive has been sent.
 	timeoutChan := time.After(s.config.KeepAliveTimeout)
 	for {
 		select {
