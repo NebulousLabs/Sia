@@ -89,7 +89,11 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 		return nil, err
 	}
 	defer w.tg.Done()
-	if !w.unlocked {
+
+	w.mu.RLock()
+	unlocked := w.unlocked
+	w.mu.RUnlock()
+	if !unlocked {
 		w.log.Println("Attempt to send coins has failed - wallet is locked")
 		return nil, modules.ErrLockedWallet
 	}
@@ -138,11 +142,15 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 // outputs. The transaction is submitted to the transaction pool and is also
 // returned.
 func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.Transaction, err error) {
+	w.log.Println("Beginning call to SendSiacoinsMulti")
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
 	defer w.tg.Done()
-	if !w.unlocked {
+	w.mu.RLock()
+	unlocked := w.unlocked
+	w.mu.RUnlock()
+	if !unlocked {
 		w.log.Println("Attempt to send coins has failed - wallet is locked")
 		return nil, modules.ErrLockedWallet
 	}
@@ -161,6 +169,7 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.
 	txnBuilder.AddMinerFee(tpoolFee)
 
 	// Calculate total cost to wallet.
+	//
 	// NOTE: we only want to call FundSiacoins once; that way, it will
 	// (ideally) fund the entire transaction with a single input, instead of
 	// many smaller ones.
@@ -185,11 +194,19 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.
 	if w.deps.Disrupt("SendSiacoinsInterrupted") {
 		return nil, errors.New("failed to accept transaction set (SendSiacoinsInterrupted)")
 	}
+	w.log.Println("Attempting to broadcast a multi-send over the network")
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
 		return nil, build.ExtendErr("unable to get transaction accepted", err)
 	}
+
+	// Log the success.
+	var outputList string
+	for _, output := range outputs {
+		outputList = outputList + "\n\tAddress: " + output.UnlockHash.String() + "\n\tValue: " + output.Value.HumanString() + "\n"
+	}
+	w.log.Printf("Successfully broadcast transaction with id %v, fee %v, and the following outputs: %v", txnSet[len(txnSet)-1].ID(), tpoolFee.HumanString(), outputList)
 	return txnSet, nil
 }
 
@@ -200,7 +217,10 @@ func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]t
 		return nil, err
 	}
 	defer w.tg.Done()
-	if !w.unlocked {
+	w.mu.RLock()
+	unlocked := w.unlocked
+	w.mu.RUnlock()
+	if !unlocked {
 		return nil, modules.ErrLockedWallet
 	}
 

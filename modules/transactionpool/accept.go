@@ -332,15 +332,18 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	}
 
 	return cs.LockedTryTransactionSet(func(txnFn func(txns []types.Transaction) (modules.ConsensusChange, error)) error {
+		tp.log.Println("Beginning broadcast of transaction set")
 		tp.mu.Lock()
 		defer tp.mu.Unlock()
 		err := tp.acceptTransactionSet(ts, txnFn)
 		if err != nil {
+			tp.log.Println("Transaction set broadcast has failed")
 			return err
 		}
 		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 		// Notify subscribers of an accepted transaction set
 		tp.updateSubscribersTransactions()
+		tp.log.Println("Transaction set broadcast appears to have succeeded")
 		return nil
 	})
 }
