@@ -432,7 +432,7 @@ func TestRandomFrame(t *testing.T) {
 	session, _ = Client(cli, nil)
 	for i := 0; i < 100; i++ {
 		f := newFrame(cmdSYN, 1000)
-		session.writeFrame(f)
+		session.writeFrame(f, time.Time{})
 	}
 	cli.Close()
 
@@ -445,7 +445,7 @@ func TestRandomFrame(t *testing.T) {
 	session, _ = Client(cli, nil)
 	for i := 0; i < 100; i++ {
 		f := newFrame(allcmds[rand.Int()%len(allcmds)], rand.Uint32())
-		session.writeFrame(f)
+		session.writeFrame(f, time.Time{})
 	}
 	cli.Close()
 
@@ -457,7 +457,7 @@ func TestRandomFrame(t *testing.T) {
 	session, _ = Client(cli, nil)
 	for i := 0; i < 100; i++ {
 		f := newFrame(byte(rand.Uint32()), rand.Uint32())
-		session.writeFrame(f)
+		session.writeFrame(f, time.Time{})
 	}
 	cli.Close()
 
@@ -470,7 +470,7 @@ func TestRandomFrame(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		f := newFrame(byte(rand.Uint32()), rand.Uint32())
 		f.ver = byte(rand.Uint32())
-		session.writeFrame(f)
+		session.writeFrame(f, time.Time{})
 	}
 	cli.Close()
 

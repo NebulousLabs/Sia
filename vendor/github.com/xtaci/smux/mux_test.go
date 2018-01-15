@@ -2,7 +2,9 @@ package smux
 
 import (
 	"bytes"
+	"net"
 	"testing"
+	"time"
 )
 
 type buffer struct {
@@ -13,6 +15,12 @@ func (b *buffer) Close() error {
 	b.Buffer.Reset()
 	return nil
 }
+
+func (b *buffer) LocalAddr() net.Addr                { return nil }
+func (b *buffer) RemoteAddr() net.Addr               { return nil }
+func (b *buffer) SetDeadline(t time.Time) error      { return nil }
+func (b *buffer) SetReadDeadline(t time.Time) error  { return nil }
+func (b *buffer) SetWriteDeadline(t time.Time) error { return nil }
 
 func TestConfig(t *testing.T) {
 	VerifyConfig(DefaultConfig())

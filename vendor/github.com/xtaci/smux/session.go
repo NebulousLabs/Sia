@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
 	siasync "github.com/NebulousLabs/Sia/sync" // TODO: Replace with github.com/NebulousLabs/trymutex
+	"github.com/pkg/errors"
 )
 
 const (
@@ -21,14 +21,13 @@ var (
 	errGoAway          = errors.New("stream id overflows, should start a new connection")
 	errInvalidProtocol = errors.New("invalid protocol version")
 	errLargeFrame      = errors.New("frame is too large to send")
-	errWriteTimeout    = errors.New("unable to write to conn within the write timeout")
 )
 
 // Session defines a multiplexed connection for streams
 type Session struct {
-	conn net.Conn
-	dataWasRead int32 // used to determine if KeepAlive has failed
-	sendMu siasync.TryMutex // ensures only one thread sends at a time
+	conn        net.Conn
+	dataWasRead int32            // used to determine if KeepAlive has failed
+	sendMu      siasync.TryMutex // ensures only one thread sends at a time
 
 	config           *Config
 	nextStreamID     uint32 // next stream identifier
@@ -336,11 +335,11 @@ func (s *Session) writeFrame(frame Frame, timeout time.Time) (int, error) {
 	// to grab the sendMu.
 	currentTime := time.Now()
 	if !timeout.After(currentTime) {
-		return 0, errWriteTimeout
+		return 0, errTimeout
 	}
 	remaining := timeout.Sub(currentTime)
 	if !s.sendMu.TryLockTimed(remaining) {
-		return 0, errWriteTimeout
+		return 0, errTimeout
 	}
 	defer s.sendMu.Unlock()
 
