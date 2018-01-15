@@ -81,6 +81,12 @@ func (s *Stream) Write(b []byte) (int, error) {
 		deadline = d
 	}
 
+	select {
+	case <-s.die:
+		return 0, errBrokenPipe
+	default:
+	}
+
 	// Send the data as a series of frames.
 	frames := s.split(b, cmdPSH, s.id)
 	sent := 0 // total bytes sent
