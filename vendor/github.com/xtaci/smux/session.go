@@ -280,10 +280,8 @@ func (s *Session) recvLoop() {
 	}
 }
 
-// keepAliveSend will periodically send a keepalive meesage to the remote peer.
+// keepAliveSend will periodically send a keepalive message to the remote peer.
 func (s *Session) keepAliveSend() {
-	// Use 'time.Ticker' to ensure that if the keepalive sending falls behind
-	// schedule, unnecessary sleeping does not occur.
 	ticker := time.NewTicker(s.config.KeepAliveInterval)
 	defer ticker.Stop()
 	for {
