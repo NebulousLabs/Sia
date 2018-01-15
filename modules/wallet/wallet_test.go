@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -659,5 +660,20 @@ func TestCommitTransactionSetInsufficientFees(t *testing.T) {
 	}
 	if len(wt.wallet.unconfirmedProcessedTransactions) != unconfirmedSetsTxns {
 		t.Errorf("There should be as many unconfirmed processed transactions as there are txns in the unconfirmed sets")
+	}
+	err = build.Retry(10, time.Millisecond*250, func() error {
+		if _, err := wt.miner.AddBlock(); err != nil {
+			return err
+		}
+		// TODO This won't work for now since it needs the Rebroadcast PR. Once
+		// we have that, calling AcceptTransactionSet again will cause the
+		// number of unconfirmed transactions to go down to 0.
+		if len(wt.wallet.unconfirmedSets) > 0 || len(wt.wallet.unconfirmedProcessedTransactions) > 0 {
+			return errors.New("there is still unconfirmed transactions and sets remaining after mining a couple of new blocks")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
 	}
 }
