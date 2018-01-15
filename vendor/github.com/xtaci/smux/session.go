@@ -284,7 +284,8 @@ func (s *Session) recvLoop() {
 func (s *Session) keepAliveSend() {
 	// Use 'time.Ticker' to ensure that if the keepalive sending falls behind
 	// schedule, unnecessary sleeping does not occur.
-	ticker := time.NewTicker(s.config.KeepAliveTimeout)
+	ticker := time.NewTicker(s.config.KeepAliveInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-s.die:
@@ -299,19 +300,17 @@ func (s *Session) keepAliveSend() {
 // keepAliveTimeout will periodically check that some sort of message has been
 // sent by the remote peer, closing the session if not.
 func (s *Session) keepAliveTimeout() {
-	// Use 'time.After' to ensure that at least 'n' amount of time passes
-	// between each check that a keepalive has been sent.
-	timeoutChan := time.After(s.config.KeepAliveTimeout)
+	ticker := time.NewTicker(s.config.KeepAliveTimeout)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-s.die:
 			return
-		case <-timeoutChan:
+		case <-ticker.C:
 			if !atomic.CompareAndSwapInt32(&s.dataWasRead, 1, 0) {
 				s.Close()
 				return
 			}
-			timeoutChan = time.After(s.config.KeepAliveTimeout)
 		}
 	}
 }
