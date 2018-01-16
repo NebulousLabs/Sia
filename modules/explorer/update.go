@@ -98,13 +98,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 
 	err := e.db.Update(func(tx *bolt.Tx) (err error) {
-		// use exception-style error handling to enable more concise update code
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("%v", r)
-			}
-		}()
-
 		// get starting block height
 		var blockheight types.BlockHeight
 		err = dbGetInternal(internalBlockHeight, &blockheight)(tx)
