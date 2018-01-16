@@ -347,6 +347,7 @@ type (
 		// not considered in the unconfirmed balance.
 		UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency)
 
+		// Height returns the wallet's internal processed consensus height
 		Height() types.BlockHeight
 
 		// AddressTransactions returns all of the transactions that are related

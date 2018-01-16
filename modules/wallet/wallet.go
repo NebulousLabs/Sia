@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"sort"
 	"sync"
 
@@ -108,6 +107,7 @@ type Wallet struct {
 	defragDisabled bool
 }
 
+// Height return the internal processed consensus height of the wallet
 func (w *Wallet) Height() types.BlockHeight {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -117,7 +117,6 @@ func (w *Wallet) Height() types.BlockHeight {
 		return encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyConsensusHeight), &height)
 	})
 	if err != nil {
-		log.Println(err)
 		return types.BlockHeight(0)
 	}
 	return types.BlockHeight(height)
