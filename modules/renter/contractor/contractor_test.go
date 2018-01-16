@@ -80,65 +80,6 @@ func TestNew(t *testing.T) {
 	}
 }
 
-// TestContract tests the Contract method.
-func TestContract(t *testing.T) {
-	c := &Contractor{
-		contracts: map[types.FileContractID]modules.RenterContract{
-			{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
-			{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
-			{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},
-		},
-	}
-	tests := []struct {
-		addr       modules.NetAddress
-		exists     bool
-		contractID types.FileContractID
-	}{
-		{"foo", true, types.FileContractID{1}},
-		{"bar", true, types.FileContractID{2}},
-		{"baz", true, types.FileContractID{3}},
-		{"quux", false, types.FileContractID{}},
-		{"nope", false, types.FileContractID{}},
-	}
-	for _, test := range tests {
-		contract, ok := c.Contract(test.addr)
-		if ok != test.exists {
-			t.Errorf("%v: expected %v, got %v", test.addr, test.exists, ok)
-		} else if contract.ID != test.contractID {
-			t.Errorf("%v: expected %v, got %v", test.addr, test.contractID, contract.ID)
-		}
-	}
-
-	// delete all contracts
-	c.contracts = map[types.FileContractID]modules.RenterContract{}
-	for _, test := range tests {
-		_, ok := c.Contract(test.addr)
-		if ok {
-			t.Error("no contracts should remain")
-		}
-	}
-}
-
-// TestContracts tests the Contracts method.
-func TestContracts(t *testing.T) {
-	var stub newStub
-	dir := build.TempDir("contractor", t.Name())
-	c, err := New(stub, stub, stub, stub, dir)
-	if err != nil {
-		t.Fatalf("expected nil, got %v", err)
-	}
-	c.contracts = map[types.FileContractID]modules.RenterContract{
-		{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
-		{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
-		{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},
-	}
-	for _, contract := range c.Contracts() {
-		if exp := c.contracts[contract.ID]; exp.NetAddress != contract.NetAddress {
-			t.Errorf("contract does not match: expected %v, got %v", exp.NetAddress, contract.NetAddress)
-		}
-	}
-}
-
 // TestResolveID tests the ResolveID method.
 func TestResolveID(t *testing.T) {
 	c := &Contractor{
@@ -240,14 +181,14 @@ func TestAllowancePeriodTracking(t *testing.T) {
 	}
 	// mine until one before the renew window, current period should stay
 	// constant
-	for i := types.BlockHeight(0); i < testAllowance.RenewWindow; i++ {
+	for i := types.BlockHeight(0); i < testAllowance.RenewWindow-1; i++ {
 		_, err = m.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	if c.CurrentPeriod() != initialHeight {
-		t.Fatal("current period should not have incremeented, wanted", initialHeight, "got", c.CurrentPeriod())
+		t.Fatal("current period should not have incremented, wanted", initialHeight, "got", c.CurrentPeriod())
 	}
 	// mine another another block. current period should increment.
 	_, err = m.AddBlock()
@@ -257,8 +198,8 @@ func TestAllowancePeriodTracking(t *testing.T) {
 	c.mu.Lock()
 	height := c.blockHeight
 	c.mu.Unlock()
-	if c.CurrentPeriod() != height-1 {
-		t.Fatal("unexpected period", c.CurrentPeriod(), "wanted", height-1)
+	if c.CurrentPeriod() != height {
+		t.Fatal("unexpected period", c.CurrentPeriod(), "wanted", height)
 	}
 }
 
@@ -392,10 +333,20 @@ func TestAllowanceSpending(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	newReportedSpending := c.PeriodSpending()
-	if reflect.DeepEqual(newReportedSpending, reportedSpending) {
-		t.Fatal("reported spending was identical after entering a renew period")
+
+	// Retry to give the threadedMaintenenace some time to finish
+	var newReportedSpending modules.ContractorSpending
+	err = build.Retry(100, 100*time.Millisecond, func() error {
+		newReportedSpending = c.PeriodSpending()
+		if reflect.DeepEqual(newReportedSpending, reportedSpending) {
+			return errors.New("reported spending was identical after entering a renew period")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
+
 	if newReportedSpending.Unspent.Cmp(reportedSpending.Unspent) <= 0 {
 		t.Fatal("expected newReportedSpending to have more unspent")
 	}
@@ -482,10 +433,10 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	clen := len(c.contracts)
+	clen := c.contracts.Len()
 	c.mu.Unlock()
 	if clen != 1 {
-		t.Fatal("expected 1 contract, got", len(c.contracts))
+		t.Fatal("expected 1 contract, got", clen)
 	}
 
 	_, err = m.AddBlock()
@@ -528,11 +479,9 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	// delete one of the contracts and set allowance with Funds*2; should
 	// trigger 1 renewal and 1 new contract
 	c.mu.Lock()
-	for id := range c.contracts {
-		delete(c.contracts, id)
-		break
-	}
-
+	ids := c.contracts.IDs()
+	contract, _ := c.contracts.Acquire(ids[0])
+	c.contracts.Delete(contract)
 	c.mu.Unlock()
 	a.Funds = a.Funds.Mul64(2)
 	err = c.SetAllowance(a)
@@ -547,27 +496,6 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// make one of the contracts un-renewable and set allowance with Funds*2; should
-	// trigger 1 renewal failure and 2 new contracts
-	c.mu.Lock()
-	for id, contract := range c.contracts {
-		contract.NetAddress = "foo"
-		c.contracts[id] = contract
-		break
-	}
-	c.mu.Unlock()
-	a.Funds = a.Funds.Mul64(2)
-	err = c.SetAllowance(a)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.mu.Lock()
-	clen = len(c.contracts)
-	c.mu.Unlock()
-	if clen != 2 {
-		t.Fatal("expected 2 contracts, got", len(c.contracts))
 	}
 }
 

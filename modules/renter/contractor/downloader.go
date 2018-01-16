@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
@@ -57,39 +56,6 @@ func (hd *hostDownloader) invalidate() {
 	hd.contractor.mu.Unlock()
 }
 
-// HostSettings returns the settings of the host that the downloader connects
-// to.
-func (hd *hostDownloader) HostSettings() modules.HostExternalSettings {
-	hd.mu.Lock()
-	defer hd.mu.Unlock()
-	return hd.hostSettings
-}
-
-// Sector retrieves the sector with the specified Merkle root, and revises
-// the underlying contract to pay the host proportionally to the data
-// retrieve.
-func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
-	hd.mu.Lock()
-	defer hd.mu.Unlock()
-	if hd.invalid {
-		return nil, errInvalidDownloader
-	}
-	contract, sector, err := hd.downloader.Sector(root)
-	if err != nil {
-		return nil, err
-	}
-
-	hd.contractor.mu.Lock()
-	hd.contractor.contracts[contract.ID] = contract
-	hd.contractor.persist.update(updateDownloadRevision{
-		NewRevisionTxn:      contract.LastRevisionTxn,
-		NewDownloadSpending: contract.DownloadSpending,
-	})
-	hd.contractor.mu.Unlock()
-
-	return sector, nil
-}
-
 // Close cleanly terminates the download loop with the host and closes the
 // connection.
 func (hd *hostDownloader) Close() error {
@@ -109,6 +75,32 @@ func (hd *hostDownloader) Close() error {
 	return hd.downloader.Close()
 }
 
+// HostSettings returns the settings of the host that the downloader connects
+// to.
+func (hd *hostDownloader) HostSettings() modules.HostExternalSettings {
+	hd.mu.Lock()
+	defer hd.mu.Unlock()
+	return hd.hostSettings
+}
+
+// Sector retrieves the sector with the specified Merkle root, and revises
+// the underlying contract to pay the host proportionally to the data
+// retrieve.
+func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
+	hd.mu.Lock()
+	defer hd.mu.Unlock()
+	if hd.invalid {
+		return nil, errInvalidDownloader
+	}
+
+	// Download the sector.
+	_, sector, err := hd.downloader.Sector(root)
+	if err != nil {
+		return nil, err
+	}
+	return sector, nil
+}
+
 // Downloader returns a Downloader object that can be used to download sectors
 // from a host.
 func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{}) (_ Downloader, err error) {
@@ -116,15 +108,11 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	c.mu.RLock()
 	cachedDownloader, haveDownloader := c.downloaders[id]
 	height := c.blockHeight
-	contract, haveContract := c.contracts[id]
 	renewing := c.renewing[id]
 	c.mu.RUnlock()
-
 	if renewing {
 		return nil, errors.New("currently renewing that contract")
-	}
-
-	if haveDownloader {
+	} else if haveDownloader {
 		// increment number of clients and return
 		cachedDownloader.mu.Lock()
 		cachedDownloader.clients++
@@ -132,20 +120,25 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		return cachedDownloader, nil
 	}
 
-	host, haveHost := c.hdb.Host(contract.HostPublicKey)
+	// Fetch the contract and host.
+	contract, haveContract := c.contracts.View(id)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
-	} else if height > contract.EndHeight() {
+	}
+	host, haveHost := c.hdb.Host(contract.HostPublicKey)
+	if height > contract.EndHeight {
 		return nil, errors.New("contract has already ended")
 	} else if !haveHost {
 		return nil, errors.New("no record of that host")
 	} else if host.DownloadBandwidthPrice.Cmp(maxDownloadPrice) > 0 {
 		return nil, errTooExpensive
 	}
-	// Update the contract to the most recent net address for the host.
-	contract.NetAddress = host.NetAddress
 
-	// acquire revising lock
+	// Acquire the revising lock for the contract, which excludes other threads
+	// from interacting with the contract.
+	//
+	// TODO: Because we have another layer of contract safety via the
+	// contractset, do we need the revising lock anymore?
 	c.mu.Lock()
 	alreadyRevising := c.revising[contract.ID]
 	if alreadyRevising {
@@ -154,7 +147,6 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	}
 	c.revising[contract.ID] = true
 	c.mu.Unlock()
-
 	// release lock early if function returns an error
 	defer func() {
 		if err != nil {
@@ -164,43 +156,11 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 		}
 	}()
 
-	// Sanity check, unless this is a brand new contract, a cached revision
-	// should exist.
-	if build.DEBUG && contract.LastRevision.NewRevisionNumber > 1 {
-		c.mu.RLock()
-		_, exists := c.cachedRevisions[contract.ID]
-		c.mu.RUnlock()
-		if !exists {
-			c.log.Critical("Cached revision does not exist for contract.")
-		}
-	}
-
 	// create downloader
-	d, err := proto.NewDownloader(host, contract, c.hdb, cancel)
-	if proto.IsRevisionMismatch(err) {
-		// try again with the cached revision
-		c.mu.RLock()
-		cached, ok := c.cachedRevisions[contract.ID]
-		c.mu.RUnlock()
-		if !ok {
-			// nothing we can do; return original error
-			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
-			return nil, err
-		}
-		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
-		contract.LastRevision = cached.Revision
-		d, err = proto.NewDownloader(host, contract, c.hdb, cancel)
-		// needs to be handled separately since a revision mismatch is not automatically a failed interaction
-		if proto.IsRevisionMismatch(err) {
-			c.hdb.IncrementFailedInteractions(host.PublicKey)
-		}
-	}
+	d, err := c.contracts.NewDownloader(host, contract.ID, c.hdb, cancel)
 	if err != nil {
 		return nil, err
 	}
-	// supply a SaveFn that saves the revision to the contractor's persist
-	// (the existing revision will be overwritten when SaveFn is called)
-	d.SaveFn = c.saveDownloadRevision(contract.ID)
 
 	// cache downloader
 	hd := &hostDownloader{

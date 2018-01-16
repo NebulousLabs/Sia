@@ -31,7 +31,7 @@ type walletTester struct {
 }
 
 // createWalletTester takes a testing.T and creates a WalletTester.
-func createWalletTester(name string) (*walletTester, error) {
+func createWalletTester(name string, deps Dependencies) (*walletTester, error) {
 	// Create the modules
 	testdir := build.TempDir(modules.WalletDir, name)
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
@@ -46,7 +46,7 @@ func createWalletTester(name string) (*walletTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	w, err := New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	w, err := newWallet(cs, tp, filepath.Join(testdir, modules.WalletDir), deps)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func TestRescanning(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestLookaheadGeneration(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +333,7 @@ func TestAdvanceLookaheadNoRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,7 +527,7 @@ func TestDistantWallets(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -858,10 +858,12 @@ lists the status of all files.
   "files": [
     {
       "siapath":        "foo/bar.txt",
+      "localpath":      "/home/foo/bar.txt",
       "filesize":       8192, // bytes
       "available":      true,
       "renewing":       true,
       "redundancy":     5,
+      "bytesuploaded":  209715200, // total bytes uploaded
       "uploadprogress": 100, // percent
       "expiration":     60000
     }
@@ -979,11 +981,25 @@ standard success or error response. See
 Transaction Pool
 ------
 
-| Route                           | HTTP verb |
-| ------------------------------- | --------- |
-| [/tpool/fee](#tpoolfee-get)     | GET       |
-| [/tpool/raw/:id](#tpoolraw-get) | GET       |
-| [/tpool/raw](#tpoolraw-post)    | POST      |
+| Route                                       | HTTP verb |
+| ------------------------------------------- | --------- |
+| [/tpool/confirmed/:id](#tpoolconfirmed-get) | GET       |
+| [/tpool/fee](#tpoolfee-get)                 | GET       |
+| [/tpool/raw/:id](#tpoolraw-get)             | GET       |
+| [/tpool/raw](#tpoolraw-post)                | POST      |
+
+#### /tpool/confirmed/:id [GET]
+
+returns whether the requested transaction has been seen on the blockchain.
+Note, however, that the block containing the transaction may later be
+invalidated by a reorg.
+
+###### JSON Response
+```javascript
+{
+  "confirmed": true
+}
+```
 
 #### /tpool/fee [GET]
 
@@ -1077,7 +1093,7 @@ locked or unlocked.
   "siafundbalance":      "1",    // siafunds, big int
   "siacoinclaimbalance": "9001", // hastings, big int
 
-  "dustthreshold": "1234", // hastings, big int
+  "dustthreshold": "1234", // hastings / byte, big int
 }
 ```
 

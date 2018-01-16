@@ -144,7 +144,7 @@ func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block)
 	if pb.Height < types.OakHardforkBlock {
 		cs.setChildTarget(blockMap, child)
 	} else {
-		child.ChildTarget = cs.childTargetOak(prevTotalTime, prevTotalTarget, pb.ChildTarget, pb.Height)
+		child.ChildTarget = cs.childTargetOak(prevTotalTime, prevTotalTarget, pb.ChildTarget, pb.Height, pb.Block.Timestamp)
 	}
 	err = blockMap.Put(childID[:], encoding.Marshal(*child))
 	if build.DEBUG && err != nil {

@@ -19,11 +19,25 @@ the transaction pool and submitting transactions to the transaction pool.
 Index
 -----
 
-| Route                           | HTTP verb |
-| ------------------------------- | --------- |
-| [/tpool/fee](#tpoolfee-get)     | GET       |
-| [/tpool/raw/:id](#tpoolraw-get) | GET       |
-| [/tpool/raw](#tpoolraw-post)    | POST      |
+| Route                                       | HTTP verb |
+| ------------------------------------------- | --------- |
+| [/tpool/confirmed/:id](#tpoolconfirmed-get) | GET       |
+| [/tpool/fee](#tpoolfee-get)                 | GET       |
+| [/tpool/raw/:id](#tpoolraw-get)             | GET       |
+| [/tpool/raw](#tpoolraw-post)                | POST      |
+
+#### /tpool/confirmed/:id [GET]
+
+returns whether the requested transaction has been seen on the blockchain.
+Note, however, that the block containing the transaction may later be
+invalidated by a reorg.
+
+###### JSON Response
+```javascript
+{
+  "confirmed": true
+}
+```
 
 #### /tpool/fee [GET]
 

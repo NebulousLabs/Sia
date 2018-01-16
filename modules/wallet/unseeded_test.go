@@ -13,7 +13,7 @@ func TestIntegrationLoad1of1Siag(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestIntegrationLoad2of3Siag(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -18,16 +18,17 @@ import (
 type (
 	// WalletGET contains general information about the wallet.
 	WalletGET struct {
-		Encrypted  bool `json:"encrypted"`
-		Unlocked   bool `json:"unlocked"`
-		Rescanning bool `json:"rescanning"`
+		Encrypted  bool              `json:"encrypted"`
+		Height     types.BlockHeight `json:"height"`
+		Rescanning bool              `json:"rescanning"`
+		Unlocked   bool              `json:"unlocked"`
 
 		ConfirmedSiacoinBalance     types.Currency `json:"confirmedsiacoinbalance"`
 		UnconfirmedOutgoingSiacoins types.Currency `json:"unconfirmedoutgoingsiacoins"`
 		UnconfirmedIncomingSiacoins types.Currency `json:"unconfirmedincomingsiacoins"`
 
-		SiafundBalance      types.Currency `json:"siafundbalance"`
 		SiacoinClaimBalance types.Currency `json:"siacoinclaimbalance"`
+		SiafundBalance      types.Currency `json:"siafundbalance"`
 
 		DustThreshold types.Currency `json:"dustthreshold"`
 	}
@@ -128,6 +129,7 @@ func (api *API) walletHandler(w http.ResponseWriter, req *http.Request, _ httpro
 		Encrypted:  api.wallet.Encrypted(),
 		Unlocked:   api.wallet.Unlocked(),
 		Rescanning: api.wallet.Rescanning(),
+		Height:     api.wallet.Height(),
 
 		ConfirmedSiacoinBalance:     siacoinBal,
 		UnconfirmedOutgoingSiacoins: siacoinsOut,

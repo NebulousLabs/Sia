@@ -1,6 +1,6 @@
 package renter
 
-// TODO: Add failure cooldowns to the workers, particulary for uploading tasks.
+// TODO: Add failure cooldowns to the workers, particularly for uploading tasks.
 
 import (
 	"sync"

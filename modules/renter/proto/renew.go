@@ -11,19 +11,24 @@ import (
 )
 
 // Renew negotiates a new contract for data already stored with a host, and
-// submits the new contract transaction to tpool.
-func Renew(contract modules.RenterContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (modules.RenterContract, error) {
-	// extract vars from params, for convenience
+// submits the new contract transaction to tpool. The new contract is added to
+// the ContractSet and its metadata is returned.
+func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (modules.RenterContract, error) {
+	// for convenience
+	contract := oldContract.header
+
+	// Extract vars from params, for convenience.
 	host, funding, startHeight, endHeight, refundAddress := params.Host, params.Funding, params.StartHeight, params.EndHeight, params.RefundAddress
 	ourSK := contract.SecretKey
+	lastRev := contract.LastRevision()
 
 	// Calculate additional basePrice and baseCollateral. If the contract height
 	// did not increase, basePrice and baseCollateral are zero.
 	var basePrice, baseCollateral types.Currency
-	if endHeight+host.WindowSize > contract.LastRevision.NewWindowEnd {
-		timeExtension := uint64((endHeight + host.WindowSize) - contract.LastRevision.NewWindowEnd)
-		basePrice = host.StoragePrice.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension)    // cost of data already covered by contract, i.e. lastrevision.Filesize
-		baseCollateral = host.Collateral.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension) // same but collateral
+	if endHeight+host.WindowSize > lastRev.NewWindowEnd {
+		timeExtension := uint64((endHeight + host.WindowSize) - lastRev.NewWindowEnd)
+		basePrice = host.StoragePrice.Mul64(lastRev.NewFileSize).Mul64(timeExtension)    // cost of data already covered by contract, i.e. lastrevision.Filesize
+		baseCollateral = host.Collateral.Mul64(lastRev.NewFileSize).Mul64(timeExtension) // same but collateral
 	}
 
 	// Calculate the anticipated transaction fee.
@@ -60,12 +65,12 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 
 	// create file contract
 	fc := types.FileContract{
-		FileSize:       contract.LastRevision.NewFileSize,
-		FileMerkleRoot: contract.LastRevision.NewFileMerkleRoot,
+		FileSize:       lastRev.NewFileSize,
+		FileMerkleRoot: lastRev.NewFileMerkleRoot,
 		WindowStart:    endHeight,
 		WindowEnd:      endHeight + host.WindowSize,
 		Payout:         totalPayout,
-		UnlockHash:     contract.LastRevision.NewUnlockHash,
+		UnlockHash:     lastRev.NewUnlockHash,
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
 			// renter
@@ -100,9 +105,9 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	defer func() {
 		// A revision mismatch might not be the host's fault.
 		if err != nil && !IsRevisionMismatch(err) {
-			hdb.IncrementFailedInteractions(contract.HostPublicKey)
+			hdb.IncrementFailedInteractions(contract.HostPublicKey())
 		} else if err == nil {
-			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey)
+			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}
 	}()
 
@@ -195,7 +200,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	// create initial (no-op) revision, transaction, and signature
 	initRevision := types.FileContractRevision{
 		ParentID:          signedTxnSet[len(signedTxnSet)-1].FileContractID(0),
-		UnlockConditions:  contract.LastRevision.UnlockConditions,
+		UnlockConditions:  lastRev.UnlockConditions,
 		NewRevisionNumber: 1,
 
 		NewFileSize:           fc.FileSize,
@@ -263,23 +268,21 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 		return modules.RenterContract{}, err
 	}
 
-	// calculate contract ID
-	fcid := txn.FileContractID(0)
-
-	return modules.RenterContract{
-		FileContract:    fc,
-		HostPublicKey:   host.PublicKey,
-		ID:              fcid,
-		LastRevision:    initRevision,
-		LastRevisionTxn: revisionTxn,
-		MerkleRoots:     contract.MerkleRoots,
-		NetAddress:      host.NetAddress,
-		SecretKey:       ourSK,
-		StartHeight:     startHeight,
-
+	// Construct contract header.
+	header := contractHeader{
+		Transaction: revisionTxn,
+		SecretKey:   ourSK,
+		StartHeight: startHeight,
 		TotalCost:   funding,
 		ContractFee: host.ContractPrice,
 		TxnFee:      txnFee,
 		SiafundFee:  types.Tax(startHeight, fc.Payout),
-	}, nil
+	}
+
+	// Add contract to set.
+	meta, err := cs.managedInsertContract(header, oldContract.merkleRoots)
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
+	return meta, nil
 }

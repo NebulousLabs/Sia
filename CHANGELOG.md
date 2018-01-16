@@ -1,6 +1,13 @@
 Version History
 ---------------
 
+December 2017:
+
+v1.3.1 (minor release)
+- Add new efficient, reliable contract format
+- Faster and smoother file repairs
+- Fix difficulty adjustment hardfork
+
 July 2017:
 
 v1.3.0 (minor release)

@@ -25,6 +25,10 @@ type (
 		Parents     []byte              `json:"parents"`
 		Transaction []byte              `json:"transaction"`
 	}
+
+	TpoolConfirmedGET struct {
+		Confirmed bool `json:"confirmed"`
+	}
 )
 
 // decodeTransactionID will decode a transaction id from a string.
@@ -107,4 +111,17 @@ func (api *API) tpoolRawHandlerPOST(w http.ResponseWriter, req *http.Request, _ 
 		return
 	}
 	WriteSuccess(w)
+}
+
+// tpoolConfirmedGET returns whether the specified transaction has
+// been seen on the blockchain.
+func (api *API) tpoolConfirmedGET(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	txid, err := decodeTransactionID(ps.ByName("id"))
+	if err != nil {
+		WriteError(w, Error{"error decoding transaction id:" + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteJSON(w, TpoolConfirmedGET{
+		Confirmed: api.tpool.TransactionConfirmed(txid),
+	})
 }

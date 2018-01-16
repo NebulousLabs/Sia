@@ -14,6 +14,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
@@ -61,6 +62,7 @@ type Wallet struct {
 	// The wallet's dependencies.
 	cs    modules.ConsensusSet
 	tpool modules.TransactionPool
+	deps  Dependencies
 
 	// The following set of fields are responsible for tracking the confirmed
 	// outputs, and for being able to spend them. The seeds are used to derive
@@ -99,6 +101,25 @@ type Wallet struct {
 	// The wallet's ThreadGroup tells tracked functions to shut down and
 	// blocks until they have all exited before returning from Close.
 	tg siasync.ThreadGroup
+
+	// defragDisabled determines if the wallet is set to defrag outputs once it
+	// reaches a certain threshold
+	defragDisabled bool
+}
+
+// Height return the internal processed consensus height of the wallet
+func (w *Wallet) Height() types.BlockHeight {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	var height uint64
+	err := w.db.View(func(tx *bolt.Tx) error {
+		return encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyConsensusHeight), &height)
+	})
+	if err != nil {
+		return types.BlockHeight(0)
+	}
+	return types.BlockHeight(height)
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -106,6 +127,10 @@ type Wallet struct {
 // not loaded into the wallet during the call to 'new', but rather during the
 // call to 'Unlock'.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string) (*Wallet, error) {
+	return newWallet(cs, tpool, persistDir, &ProductionDependencies{})
+}
+
+func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string, deps Dependencies) (*Wallet, error) {
 	// Check for nil dependencies.
 	if cs == nil {
 		return nil, errNilConsensusSet
@@ -125,6 +150,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		unconfirmedSets: make(map[modules.TransactionSetID][]types.TransactionID),
 
 		persistDir: persistDir,
+
+		deps: deps,
 	}
 	err := w.initPersist()
 	if err != nil {
@@ -135,6 +162,17 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 	w.dbTx, err = w.db.Begin(true)
 	if err != nil {
 		w.log.Critical("ERROR: failed to start database update:", err)
+	}
+
+	// COMPATv131 we need to create the bucketProcessedTxnIndex if it doesn't exist
+	if w.dbTx.Bucket(bucketProcessedTransactions).Stats().KeyN > 0 &&
+		w.dbTx.Bucket(bucketProcessedTxnIndex).Stats().KeyN == 0 {
+		err = initProcessedTxnIndex(w.dbTx)
+		if err != nil {
+			return nil, err
+		}
+		// Save changes to disk
+		w.syncDB()
 	}
 
 	// make sure we commit on shutdown
@@ -200,4 +238,16 @@ func (w *Wallet) Rescanning() bool {
 		w.scanLock.Unlock()
 	}
 	return rescanning
+}
+
+// Returns the wallet's current settings
+func (w *Wallet) Settings() modules.WalletSettings {
+	return modules.WalletSettings{
+		NoDefrag: w.defragDisabled,
+	}
+}
+
+// SetSettings will update the settings for the wallet.
+func (w *Wallet) SetSettings(s modules.WalletSettings) {
+	w.defragDisabled = s.NoDefrag
 }

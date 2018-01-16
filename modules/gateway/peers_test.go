@@ -25,6 +25,7 @@ type dummyConn struct {
 func (dc *dummyConn) Read(p []byte) (int, error)       { return len(p), nil }
 func (dc *dummyConn) Write(p []byte) (int, error)      { return len(p), nil }
 func (dc *dummyConn) Close() error                     { return nil }
+func (dc *dummyConn) SetReadDeadline(time.Time) error  { return nil }
 func (dc *dummyConn) SetWriteDeadline(time.Time) error { return nil }
 
 // TestAddPeer tries adding a peer to the gateway.
@@ -422,15 +423,15 @@ func TestUnitAcceptableVersion(t *testing.T) {
 	}
 	validVersions := []string{
 		minAcceptableVersion,
-		"0.4.0",
-		"0.6.0",
-		"0.6.1",
-		"0.9",
-		"0.999",
-		"0.9999999999",
-		"1",
-		"1.0",
-		"1.0.0",
+		"1.4.0",
+		"1.6.0",
+		"1.6.1",
+		"1.9",
+		"1.999",
+		"1.9999999999",
+		"2",
+		"2.0",
+		"2.0.0",
 		"9",
 		"9.0",
 		"9.0.0",
@@ -742,13 +743,15 @@ func TestAcceptConnRejectsVersions(t *testing.T) {
 			errWant:             errPeerRejectedConn,
 			msg:                 "acceptConn shouldn't accept a remote peer whose version is 0.3.9.9.9",
 		},
-		// Test that acceptConn succeeds when the remote peer's version is 0.4.0.
+		// Test that acceptConn succeeds when the remote peer's version is
+		// minAcceptableVersion
 		{
-			remoteVersion:       "0.4.0",
+			remoteVersion:       minAcceptableVersion,
 			versionResponseWant: build.Version,
 			msg:                 "acceptConn should accept a remote peer whose version is 0.4.0",
 		},
-		// Test that acceptConn succeeds when the remote peer's version is > 0.4.0.
+		// Test that acceptConn succeeds when the remote peer's version is
+		// above minAcceptableVersion
 		{
 			remoteVersion:       "9",
 			versionResponseWant: build.Version,

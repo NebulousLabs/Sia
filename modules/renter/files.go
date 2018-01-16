@@ -2,6 +2,7 @@ package renter
 
 import (
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -100,17 +101,28 @@ func (f *file) available(isOffline func(types.FileContractID) bool) bool {
 	return true
 }
 
+// uploadedBytes indicates how many bytes of the file have been uploaded via
+// current file contracts. Note that this includes padding and redundancy, so
+// uploadedBytes can return a value much larger than the file's original filesize.
+func (f *file) uploadedBytes() uint64 {
+	var uploaded uint64
+	for _, fc := range f.contracts {
+		// Note: we need to multiply by SectorSize here instead of
+		// f.pieceSize because the actual bytes uploaded include overhead
+		// from TwoFish encryption
+		uploaded += uint64(len(fc.Pieces)) * modules.SectorSize
+	}
+	return uploaded
+}
+
 // uploadProgress indicates what percentage of the file (plus redundancy) has
 // been uploaded. Note that a file may be Available long before UploadProgress
 // reaches 100%, and UploadProgress may report a value greater than 100%.
 func (f *file) uploadProgress() float64 {
-	var uploaded uint64
-	for _, fc := range f.contracts {
-		uploaded += uint64(len(fc.Pieces)) * f.pieceSize
-	}
-	desired := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
+	uploaded := f.uploadedBytes()
+	desired := modules.SectorSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
 
-	return 100 * (float64(uploaded) / float64(desired))
+	return math.Min(100*(float64(uploaded)/float64(desired)), 100)
 }
 
 // redundancy returns the redundancy of the least redundant chunk. A file
@@ -218,27 +230,32 @@ func (r *Renter) FileList() []modules.FileInfo {
 	isOffline := func(id types.FileContractID) bool {
 		id = r.hostContractor.ResolveID(id)
 		offline := r.hostContractor.IsOffline(id)
-		contract, exists := r.hostContractor.ContractByID(id)
-		if !exists {
-			return true
-		}
-		return offline || !contract.GoodForRenew
+		return offline
 	}
 
 	var fileList []modules.FileInfo
 	for _, f := range files {
+		lockId := r.mu.RLock()
 		f.mu.RLock()
 		renewing := true
+		var localPath string
+		tf, exists := r.tracking[f.name]
+		if exists {
+			localPath = tf.RepairPath
+		}
 		fileList = append(fileList, modules.FileInfo{
 			SiaPath:        f.name,
+			LocalPath:      localPath,
 			Filesize:       f.size,
 			Renewing:       renewing,
 			Available:      f.available(isOffline),
 			Redundancy:     f.redundancy(isOffline),
+			UploadedBytes:  f.uploadedBytes(),
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
 		})
 		f.mu.RUnlock()
+		r.mu.RUnlock(lockId)
 	}
 	return fileList
 }

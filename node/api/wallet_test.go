@@ -1082,7 +1082,7 @@ func TestWalletSiafunds(t *testing.T) {
 	numTxns := len(wtg.ConfirmedTransactions)
 
 	// load siafunds into the wallet
-	siagPath, _ := filepath.Abs("../types/siag0of1of1.siakey")
+	siagPath, _ := filepath.Abs("../../types/siag0of1of1.siakey")
 	loadSiagValues := url.Values{}
 	loadSiagValues.Set("keyfiles", siagPath)
 	loadSiagValues.Set("encryptionpassword", walletPassword)
@@ -1472,5 +1472,166 @@ func TestWalletGETDust(t *testing.T) {
 	dt := st.wallet.DustThreshold()
 	if !dt.Equals(wg.DustThreshold) {
 		t.Fatal("dustThreshold mismatch")
+	}
+}
+
+// testWalletTransactionEndpoint is a subtest that queries the transaction endpoint of a node.
+func testWalletTransactionEndpoint(t *testing.T, st *serverTester, expectedConfirmedTxns int) {
+	// Mining blocks should have created transactions for the wallet containing
+	// miner payouts. Get the list of transactions.
+	var wtg WalletTransactionsGET
+	err := st.getAPI("/wallet/transactions?startheight=0&endheight=-1", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtg.ConfirmedTransactions) != expectedConfirmedTxns {
+		t.Fatalf("expected %v txns but was %v", expectedConfirmedTxns, len(wtg.ConfirmedTransactions))
+	}
+
+	// Query the details of all transactions using
+	// /wallet/transaction/:id
+	for _, txn := range wtg.ConfirmedTransactions {
+		var wtgid WalletTransactionGETid
+		wtgidQuery := fmt.Sprintf("/wallet/transaction/%s", txn.TransactionID)
+		err = st.getAPI(wtgidQuery, &wtgid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if wtgid.Transaction.TransactionID != txn.TransactionID {
+			t.Fatalf("Expected txn with id %v but was %v", txn.TransactionID, wtgid.Transaction.TransactionID)
+		}
+	}
+}
+
+// testWalletTransactionEndpoint is a subtest that queries the transactions endpoint of a node.
+func testWalletTransactionsEndpoint(t *testing.T, st *serverTester, expectedConfirmedTxns int) {
+	var wtg WalletTransactionsGET
+	err := st.getAPI("/wallet/transactions?startheight=0&endheight=-1", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtg.ConfirmedTransactions) != expectedConfirmedTxns {
+		t.Fatalf("expected %v txns but was %v", expectedConfirmedTxns, len(wtg.ConfirmedTransactions))
+	}
+	totalTxns := len(wtg.ConfirmedTransactions)
+
+	// Query the details of all transactions one block at a time using
+	// /wallet/transactions
+	queriedTxns := 0
+	for i := types.BlockHeight(0); i <= st.cs.Height(); i++ {
+		err := st.getAPI(fmt.Sprintf("/wallet/transactions?startheight=%v&endheight=%v", i, i), &wtg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		queriedTxns += len(wtg.ConfirmedTransactions)
+	}
+	if queriedTxns != totalTxns {
+		t.Errorf("Expected %v txns but was %v", totalTxns, queriedTxns)
+	}
+
+	queriedTxns = 0
+	batchSize := types.BlockHeight(5)
+	for i := types.BlockHeight(0); i <= st.cs.Height(); i += (batchSize + 1) {
+		err := st.getAPI(fmt.Sprintf("/wallet/transactions?startheight=%v&endheight=%v", i, i+batchSize), &wtg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		queriedTxns += len(wtg.ConfirmedTransactions)
+	}
+	if queriedTxns != totalTxns {
+		t.Errorf("Expected %v txns but was %v", totalTxns, queriedTxns)
+	}
+}
+
+// TestWalletManyTransactions creates a wallet and sends a large number of
+// coins to itself. Afterwards it will execute subtests to test the wallet's
+// scalability.
+func TestWalletManyTransactions(t *testing.T) {
+	if testing.Short() || !build.VLONG {
+		t.SkipNow()
+	}
+
+	// Declare tests that should be executed
+	subtests := []struct {
+		name string
+		f    func(*testing.T, *serverTester, int)
+	}{
+		{"TestWalletTransactionEndpoint", testWalletTransactionEndpoint},
+		{"TestWalletTransactionsEndpoint", testWalletTransactionsEndpoint},
+	}
+
+	// Create tester
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	// Disable defrag for the wallet
+	st.wallet.SetSettings(modules.WalletSettings{
+		NoDefrag: true,
+	})
+
+	// Mining blocks should have created transactions for the wallet containing
+	// miner payouts. Get the list of transactions.
+	var wtg WalletTransactionsGET
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=-1", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtg.ConfirmedTransactions) == 0 {
+		t.Fatal("expecting a few wallet transactions, corresponding to miner payouts.")
+	}
+	if len(wtg.UnconfirmedTransactions) != 0 {
+		t.Fatal("expecting 0 unconfirmed transactions")
+	}
+
+	// Remember the number of confirmed transactions
+	numConfirmedTxns := len(wtg.ConfirmedTransactions)
+
+	// Get lots of addresses from the wallet
+	numTxns := uint64(10000)
+	ucs, err := st.wallet.NextAddresses(numTxns)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Send SC to each address.
+	minedBlocks := 0
+	for i, uc := range ucs {
+		st.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash())
+		if i%100 == 0 {
+			if _, err := st.miner.AddBlock(); err != nil {
+				t.Fatal(err)
+			}
+			minedBlocks++
+		}
+	}
+	if _, err := st.miner.AddBlock(); err != nil {
+		t.Fatal(err)
+	}
+	minedBlocks++
+
+	// After sending numTxns times there should be 2*numTxns confirmed
+	// transactions plus one for each mined block. Every send creates a setup
+	// transaction and the actual transaction.
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=-1", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedConfirmedTxns := numConfirmedTxns + int(2*numTxns) + minedBlocks
+	if len(wtg.ConfirmedTransactions) != expectedConfirmedTxns {
+		t.Fatalf("expecting %v confirmed transactions but was %v", expectedConfirmedTxns,
+			len(wtg.ConfirmedTransactions))
+	}
+	if len(wtg.UnconfirmedTransactions) != 0 {
+		t.Fatal("expecting 0 unconfirmed transactions")
+	}
+
+	// Execute tests
+	for _, subtest := range subtests {
+		t.Run(subtest.name, func(t *testing.T) {
+			subtest.f(t, st, expectedConfirmedTxns)
+		})
 	}
 }

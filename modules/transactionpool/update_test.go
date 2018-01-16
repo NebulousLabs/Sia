@@ -377,3 +377,95 @@ func TestUpdateBlockHeight(t *testing.T) {
 		t.Fatalf("transaction pool had the wrong block height, got %v wanted %v\n", tpt.tpool.blockHeight, targetHeight)
 	}
 }
+
+// TestDatabaseUpgrade verifies that the database will upgrade correctly from
+// v1.3.1 or earlier to the new sanity check persistence, by clearing out the
+// persistence at various points in the process of a reorg.
+func TestDatabaseUpgrade(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	tpt, err := createTpoolTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpt.Close()
+	tpt2, err := blankTpoolTester(t.Name() + "-tpt2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpt2.Close()
+
+	// connect the testers and wait for them to have the same current block
+	err = tpt2.gateway.Connect(tpt.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	success := false
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(time.Millisecond * 100) {
+		if tpt.cs.CurrentBlock().ID() == tpt2.cs.CurrentBlock().ID() {
+			success = true
+			break
+		}
+	}
+	if !success {
+		t.Fatal("testers did not have the same block height after one minute")
+	}
+
+	// disconnect the testers
+	err = tpt2.gateway.Disconnect(tpt.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpt.gateway.Disconnect(tpt2.gateway.Address())
+
+	// make some transactions on tpt
+	var txnSets [][]types.Transaction
+	for i := 0; i < 5; i++ {
+		txns, err := tpt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(1000), types.UnlockHash{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		txnSets = append(txnSets, txns)
+	}
+	// mine some blocks to cause a re-org, first clearing the persistence to
+	// simulate an un-upgraded database.
+	err = tpt.tpool.dbTx.Bucket(bucketRecentConsensusChange).Delete(fieldRecentBlockID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		_, err = tpt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// put tpt2 at a higher height
+	for i := 0; i < 10; i++ {
+		_, err = tpt2.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// connect the testers and wait for them to have the same current block,
+	// first clearing the persistence to simulate an un-upgraded database.
+	err = tpt.tpool.dbTx.Bucket(bucketRecentConsensusChange).Delete(fieldRecentBlockID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tpt.gateway.Connect(tpt2.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	success = false
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(time.Millisecond * 100) {
+		if tpt.cs.CurrentBlock().ID() == tpt2.cs.CurrentBlock().ID() {
+			success = true
+			break
+		}
+	}
+	if !success {
+		t.Fatal("testers did not have the same block height after one minute")
+	}
+}

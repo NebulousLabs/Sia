@@ -18,9 +18,126 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// TestHostObligationAcceptingContracts verifies that the host will complete
+// storage proofs and the renter will successfully download even if the host
+// has set accepting contracts to false.
+func TestHostObligationAcceptingContracts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
+	allowanceValues.Set("hosts", "1")
+	allowanceValues.Set("period", "10")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 1 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
+	}
+
+	filesize := int(1024)
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, filesize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// upload the file
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// redundancy should reach 1
+	var rf RenterFiles
+	err = retry(120, time.Millisecond*250, func() error {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 && rf.Files[0].Available {
+			return nil
+		}
+		return errors.New("file not uploaded")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// set acceptingcontracts = false, mine some blocks, verify we can download
+	settings := st.host.InternalSettings()
+	settings.AcceptingContracts = false
+	st.host.SetInternalSettings(settings)
+	for i := 0; i < 3; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	downloadPath := filepath.Join(st.dir, "test-downloaded-verify.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mine blocks to cause the host to submit storage proofs to the blockchain.
+	for i := 0; i < 15; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+
+	// should have successful proofs
+	success := false
+	for _, so := range st.host.StorageObligations() {
+		if so.ProofConfirmed {
+			success = true
+			break
+		}
+	}
+	if !success {
+		t.Fatal("no successful storage proofs")
+	}
+}
 
 // TestRenterLocalRepair verifies that the renter will use the local file to
 // repair if the file exists locally
@@ -132,17 +249,28 @@ func TestRenterLocalRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Mine a block so the renter realizes the host is offline.
+	b, err := st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = waitForBlock(b.ID(), st)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// wait for the redundancy to decrement
 	err = retry(60, time.Second, func() error {
-		st.getAPI("/renter/files", &rf)
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
 			return nil
 		}
 		return errors.New("file redundancy not decremented")
 	})
 	if err != nil {
-		t.Fatal(err, len(rf.Files), rf.Files[9].Redundancy)
+		t.Fatal(err, len(rf.Files), rf.Files[0].Redundancy)
 	}
 
 	// bring up a new host
@@ -151,7 +279,6 @@ func TestRenterLocalRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer stNewHost.server.Close()
-
 	testGroup = []*serverTester{st, stNewHost}
 
 	// Connect the testers to eachother so that they are all on the same
@@ -171,6 +298,7 @@ func TestRenterLocalRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set up storage on the new host.
 	err = stNewHost.setHostStorage()
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +307,14 @@ func TestRenterLocalRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = waitForBlock(stNewHost.cs.CurrentBlock().ID(), st)
+	// Mine a block so the renter sees the host in its hostdb. Need to mine two
+	// blocks because after the announcement, the renter node's blockchain is
+	// actually behind.
+	b, err = stNewHost.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = waitForBlock(b.ID(), testGroup[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,34 +329,56 @@ func TestRenterLocalRepair(t *testing.T) {
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			t.Fatal(err)
 		}
-		if len(ah.Hosts) == 2 {
-			return nil
+		if len(ah.Hosts) != 2 {
+			return errors.New("not enough hosts in hostdb")
 		}
-		return errors.New("not enough hosts in hostdb")
+		for _, host := range ah.Hosts {
+			if len(host.ScanHistory) < 2 {
+				return errors.New("hosts are not scanned")
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err, ah)
 	}
 
-	// add a few new blocks in order to cause the renter to form contracts with the new host
-	for i := 0; i < 10; i++ {
-		b, err := testGroup[0].miner.AddBlock()
+	// Mine a block so the contractor sees that it can form a new contract.
+	b, err = testGroup[0].miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = waitForBlock(b.ID(), testGroup[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Block until we formed a contract with the new host.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
 		if err != nil {
-			t.Fatal(err)
+			return errors.New("couldn't get renter stats")
 		}
-		tipID, err := synchronizationCheck(testGroup)
-		if err != nil {
-			t.Fatal(err)
+		if len(rc.Contracts) != 3 {
+			return fmt.Errorf("Insufficient contracts: expected %v was %v", 3, len(rc.Contracts))
 		}
-		if b.ID() != tipID {
-			t.Fatal("test group does not have the tip block")
-		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to form new contract: %v", err)
 	}
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
-	err = retry(240, time.Second, func() error {
-		st.getAPI("/renter/files", &rf)
+	err = retry(1000, 250*time.Millisecond, func() error {
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
 		}
@@ -308,7 +465,9 @@ func TestRemoteFileRepair(t *testing.T) {
 	// redundancy should reach 2
 	var rf RenterFiles
 	err = retry(60, time.Second, func() error {
-		st.getAPI("/renter/files", &rf)
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
 			return nil
 		}
@@ -344,7 +503,6 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// wait for the redundancy to decrement
 	err = retry(120, time.Millisecond*250, func() error {
 		st.getAPI("/renter/files", &rf)
@@ -356,7 +514,6 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// verify we still can download
 	downloadPath = filepath.Join(st.dir, "test-downloaded-verify2.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
@@ -370,9 +527,7 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer stNewHost.server.Close()
-
 	testGroup = []*serverTester{st, stNewHost}
-
 	// Connect the testers to eachother so that they are all on the same
 	// blockchain.
 	err = fullyConnectNodes(testGroup)
@@ -384,12 +539,12 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Make sure that every wallet has money in it.
+	// Make sure that every wallet has money in it, then set the storage and
+	// perform announcements.
 	err = fundAllNodes(testGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	err = stNewHost.setHostStorage()
 	if err != nil {
 		t.Fatal(err)
@@ -398,7 +553,15 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = stNewHost.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = waitForBlock(stNewHost.cs.CurrentBlock().ID(), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -423,34 +586,46 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// add a few new blocks in order to cause the renter to form contracts with the new host
-	for i := 0; i < 10; i++ {
-		b, err := testGroup[0].miner.AddBlock()
+	// Mine a block so the contractor sees that it can form a new contract.
+	_, err = testGroup[0].miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Block until we formed a contract with the new host.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
 		if err != nil {
-			t.Fatal(err)
+			return errors.New("couldn't get renter stats")
 		}
-		tipID, err := synchronizationCheck(testGroup)
-		if err != nil {
-			t.Fatal(err)
+		if len(rc.Contracts) != 3 {
+			return fmt.Errorf("Insufficient contracts: expected %v was %v", 3, len(rc.Contracts))
 		}
-		if b.ID() != tipID {
-			t.Fatal("test group does not have the tip block")
-		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to form new contract: %v", err)
 	}
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
-	err = retry(300, time.Millisecond*250, func() error {
-		st.getAPI("/renter/files", &rf)
+	err = retry(1000, 250*time.Millisecond, func() error {
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
+
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
 		}
 		return errors.New("file redundancy not incremented")
 	})
 	if err != nil {
-		t.Log(len(rf.Files))
-		t.Log(rf.Files[0].Redundancy)
-		t.Log(rf.Files[0].Available)
+		t.Log(len(rf.Files), rf.Files[0].Redundancy, rf.Files[0].Available)
 		t.Fatal(err)
 	}
 
@@ -1720,7 +1895,31 @@ func TestHostAndRentReload(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.server.panicClose()
-	err = st.announceHost()
+
+	// Announce the host again and wait until the host is re-scanned and put
+	// back into the hostdb as an active host.
+	announceValues := url.Values{}
+	announceValues.Set("address", string(st.host.ExternalSettings().NetAddress))
+	err = st.stdPostAPI("/host/announce", announceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Mine a block.
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = retry(100, time.Millisecond*100, func() error {
+		var hosts HostdbActiveGET
+		err := st.getAPI("/hostdb/active", &hosts)
+		if err != nil {
+			return err
+		}
+		if len(hosts.Hosts) != 1 {
+			return errors.New("host is not in the set of active hosts")
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1988,13 +2187,19 @@ func TestRedundancyReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// bring back the host
+	// bring back the host and let it mine a block
 	stH1, err = assembleServerTester(stH1.walletKey, stH1.dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stH1.server.Close()
+
 	testGroup = []*serverTester{st, stH1}
+	// Make sure the leader of the group has the longest chain before
+	// connecting the nodes
+	if _, err := st.miner.AddBlock(); err != nil {
+		t.Fatal(err)
+	}
 	err = fullyConnectNodes(testGroup)
 	if err != nil {
 		t.Fatal(err)
@@ -2014,16 +2219,32 @@ func TestRedundancyReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = waitForBlock(st.cs.CurrentBlock().ID(), stH1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = synchronizationCheck(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Wait until the host shows back up in the hostdb.
 	var ah HostdbActiveGET
-	err = retry(200, 100*time.Millisecond, func() error {
-		err := st.getAPI("/hostdb/active", &ah)
-		if err != nil {
-			return err
+	err = retry(250, time.Millisecond*250, func() error {
+		if err = st.getAPI("/hostdb/active", &ah); err != nil {
+			t.Fatal(err)
 		}
 		if len(ah.Hosts) != 2 {
-			return errors.New("not enough hosts")
+			return errors.New("not enough hosts in hostdb")
+		}
+		for _, host := range ah.Hosts {
+			if len(host.ScanHistory) < 2 {
+				return errors.New("hosts are not scanned")
+			}
 		}
 		return nil
 	})
@@ -2053,6 +2274,135 @@ func TestRedundancyReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// TestUploadedBytesReporting verifies that reporting of how many bytes have
+// been uploaded via active contracts is accurate
+func TestUploadedBytesReporting(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+	stH1, err := blankServerTester(t.Name() + " - Host 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH1.server.Close()
+	testGroup := []*serverTester{st, stH1}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Add storage to every host.
+	err = addStorageToAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Announce every host.
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance with two hosts.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
+	allowanceValues.Set("hosts", "2")
+	allowanceValues.Set("period", "10")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Block until the allowance has finished forming contracts.
+	err = build.Retry(50, time.Millisecond*250, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		if len(rc.Contracts) != 2 {
+			return errors.New("no contracts")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("allowance setting failed")
+	}
+
+	// Create a file to upload.
+	filesize := int(modules.SectorSize * 2)
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, filesize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload the file
+	dataPieces := 1
+	parityPieces := 1
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("datapieces", fmt.Sprint(dataPieces))
+	uploadValues.Set("paritypieces", fmt.Sprint(parityPieces))
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Calculate the encrypted size of our fully redundant encoded file
+	pieceSize := modules.SectorSize - crypto.TwofishOverhead
+	chunkSize := pieceSize * uint64(dataPieces)
+	numChunks := uint64(filesize) / chunkSize
+	if uint64(filesize)%chunkSize != 0 {
+		numChunks++
+	}
+	fullyRedundantSize := modules.SectorSize * uint64(dataPieces+parityPieces) * uint64(numChunks)
+
+	// Monitor the file as it uploads. Ensure that the UploadProgress times
+	// the fully redundant file size always equals UploadedBytes reported
+	var rf RenterFiles
+	for i := 0; i < 60 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 100); i++ {
+		st.getAPI("/renter/files", &rf)
+		if len(rf.Files) >= 1 {
+			uploadProgressBytes := uint64(float64(fullyRedundantSize) * rf.Files[0].UploadProgress / 100.0)
+			// Note: in Go 1.10 we will be able to write Math.Round(uploadProgressBytes) != rf.Files[0].UploadedBytes
+			if uploadProgressBytes != rf.Files[0].UploadedBytes && (uploadProgressBytes+1) != rf.Files[0].UploadedBytes {
+				t.Fatalf("api reports having uploaded %v bytes when upload progress is %v%%, but the actual uploaded bytes count should be %v\n",
+					rf.Files[0].UploadedBytes, rf.Files[0].UploadProgress, uploadProgressBytes)
+			}
+		}
+		time.Sleep(time.Second)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload progress should be 100% and redundancy should reach 2
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 100 || rf.Files[0].Redundancy != 2 {
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+	}
+
+	// When the file is fully redundantly uploaded, UploadedBytes should
+	// equal the file's fully redundant size
+	if rf.Files[0].UploadedBytes != fullyRedundantSize {
+		t.Fatalf("api reports having uploaded %v bytes when upload progress is 100%%, but the actual fully redundant file size is %v\n",
+			rf.Files[0].UploadedBytes, fullyRedundantSize)
+	}
+
 }
 
 // TestRenterMissingHosts verifies that if hosts are taken offline, downloads

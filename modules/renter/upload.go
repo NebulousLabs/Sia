@@ -47,11 +47,11 @@ var (
 )
 
 // validateSiapath checks that a Siapath is a legal filename.
-// ../ is disallowed to prevent directory traversal,
-// and paths must not begin with / or be empty.
+// ../ is disallowed to prevent directory traversal, and paths must not begin
+// with / or be empty.
 func validateSiapath(siapath string) error {
-	if strings.HasPrefix(siapath, "/") || strings.HasPrefix(siapath, "./") {
-		return errors.New("nicknames cannot begin with /")
+	if strings.HasPrefix(siapath, "/") {
+		return errors.New("siapath cannot begin with /")
 	}
 
 	if siapath == "" {

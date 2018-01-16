@@ -9,11 +9,10 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/node/api"
 )
 
 var (
@@ -78,11 +77,16 @@ func apiGet(call string) (*http.Response, error) {
 		// retry request with authentication.
 		resp.Body.Close()
 		if apiPassword == "" {
-			// prompt for password and store it in a global var for subsequent
-			// calls
-			apiPassword, err = speakeasy.Ask("API password: ")
-			if err != nil {
-				return nil, err
+			apiPassword = os.Getenv("SIA_API_PASSWORD")
+			if apiPassword != "" {
+				fmt.Println("Using SIA_API_PASSWORD environment variable")
+			} else {
+				// prompt for password and store it in a global var for subsequent
+				// calls
+				apiPassword, err = passwordPrompt("API password: ")
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 		resp, err = api.HttpGETAuthenticated("http://"+addr+call, apiPassword)
@@ -148,12 +152,17 @@ func apiPost(call, vals string) (*http.Response, error) {
 	// check error code
 	if resp.StatusCode == http.StatusUnauthorized {
 		resp.Body.Close()
-		// Prompt for password and retry request with authentication.
-		password, err := speakeasy.Ask("API password: ")
-		if err != nil {
-			return nil, err
+		apiPassword = os.Getenv("SIA_API_PASSWORD")
+		if apiPassword != "" {
+			fmt.Println("Using SIA_API_PASSWORD environment variable")
+		} else {
+			// Prompt for password and retry request with authentication.
+			apiPassword, err = passwordPrompt("API password: ")
+			if err != nil {
+				return nil, err
+			}
 		}
-		resp, err = api.HttpPOSTAuthenticated("http://"+addr+call, vals, password)
+		resp, err = api.HttpPOSTAuthenticated("http://"+addr+call, vals, apiPassword)
 		if err != nil {
 			return nil, errors.New("no response from daemon - authentication failed")
 		}

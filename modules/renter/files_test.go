@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -66,6 +67,41 @@ func TestFileAvailable(t *testing.T) {
 	}
 	if f.available(specificOffline) {
 		t.Error("file should not be available")
+	}
+}
+
+// TestFileUploadedBytes tests that uploadedBytes() returns a value equal to
+// the number of sectors stored via contract times the size of each sector.
+func TestFileUploadedBytes(t *testing.T) {
+	f := &file{}
+	// ensure that a piece fits within a sector
+	f.pieceSize = modules.SectorSize / 2
+	f.contracts = make(map[types.FileContractID]fileContract)
+	f.contracts[types.FileContractID{}] = fileContract{
+		ID:     types.FileContractID{},
+		IP:     modules.NetAddress(""),
+		Pieces: make([]pieceData, 4),
+	}
+	if f.uploadedBytes() != 4*modules.SectorSize {
+		t.Errorf("expected uploadedBytes to be 8, got %v", f.uploadedBytes())
+	}
+}
+
+// TestFileUploadProgressPinning verifies that uploadProgress() returns at most
+// 100%, even if more pieces have been uploaded,
+func TestFileUploadProgressPinning(t *testing.T) {
+	f := &file{}
+	f.pieceSize = 2
+	f.contracts = make(map[types.FileContractID]fileContract)
+	f.contracts[types.FileContractID{}] = fileContract{
+		ID:     types.FileContractID{},
+		IP:     modules.NetAddress(""),
+		Pieces: make([]pieceData, 4),
+	}
+	rsc, _ := NewRSCode(1, 1)
+	f.erasureCode = rsc
+	if f.uploadProgress() != 100 {
+		t.Fatal("expected uploadProgress to report 100%")
 	}
 }
 
@@ -209,6 +245,34 @@ func TestFileExpiration(t *testing.T) {
 	f.contracts[types.FileContractID{2}] = fc
 	if f.expiration() != 50 {
 		t.Error("file did not report lowest WindowStart")
+	}
+}
+
+// TestRenterFileListLocalPath verifies that FileList() returns the correct
+// local path information for an uploaded file.
+func TestRenterFileListLocalPath(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+	id := rt.renter.mu.Lock()
+	f := newTestingFile()
+	f.name = "testname"
+	rt.renter.files["test"] = f
+	rt.renter.tracking[f.name] = trackedFile{
+		RepairPath: "TestPath",
+	}
+	rt.renter.mu.Unlock(id)
+	files := rt.renter.FileList()
+	if len(files) != 1 {
+		t.Fatal("wrong number of files, got", len(files), "wanted one")
+	}
+	if files[0].LocalPath != "TestPath" {
+		t.Fatal("file had wrong LocalPath: got", files[0].LocalPath, "wanted TestPath")
 	}
 }
 

@@ -90,7 +90,7 @@ func TestScanLoop(t *testing.T) {
 	}
 
 	// create a wallet
-	wt, err := createWalletTester("TestScanLoop")
+	wt, err := createWalletTester("TestScanLoop", &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}

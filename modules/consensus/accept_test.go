@@ -1129,25 +1129,23 @@ func TestChainedAcceptBlock(t *testing.T) {
 		}},
 	})
 	// Append the invalid transaction to the block.
-	blocks = append(blocks, badBlock)
-	// Submit the whole invalid set. Result should be that the valid ones get
-	// added, and the invalid ones get dropped.
-	_, err = cst2.cs.managedAcceptBlocks(blocks)
+	badBlocks := append(blocks, badBlock)
+	// Submit the whole invalid set. Result should be that nothing is added.
+	_, err = cst2.cs.managedAcceptBlocks(badBlocks)
 	if err == nil {
 		t.Fatal(err)
 	}
-	if cst2.cs.Height() != cst.cs.Height()-1 {
+	if cst2.cs.Height() != 0 {
 		t.Log(cst2.cs.Height())
 		t.Log(cst.cs.Height())
-		t.Fatal("height is not correct, does not seem that the blocks were added")
+		t.Fatal("height is not correct, seems that blocks were added")
 	}
-	if bcs.appliedBlocks != int(cst2.cs.Height()+1) || bcs.revertedBlocks != 0 {
+	if bcs.appliedBlocks != 1 || bcs.revertedBlocks != 0 {
 		t.Error("consensus changes do not seem to be getting passed to subscribers correctly")
 	}
 
-	// Try submitting the good block. It should succeed because the other good
-	// blocks should have been added.
-	err = cst2.cs.AcceptBlock(block)
+	// Try submitting the good blocks.
+	_, err = cst2.cs.managedAcceptBlocks(blocks)
 	if err != nil {
 		t.Fatal(err)
 	}

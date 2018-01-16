@@ -227,16 +227,28 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	contracts := []RenterContract{}
 	for _, c := range api.renter.Contracts() {
+		var size uint64
+		if len(c.Transaction.FileContractRevisions) != 0 {
+			size = c.Transaction.FileContractRevisions[0].NewFileSize
+		}
+
+		// Fetch host address
+		var netAddress modules.NetAddress
+		hdbe, exists := api.renter.Host(c.HostPublicKey)
+		if exists {
+			netAddress = hdbe.NetAddress
+		}
+
 		contracts = append(contracts, RenterContract{
 			DownloadSpending: c.DownloadSpending,
-			EndHeight:        c.EndHeight(),
+			EndHeight:        c.EndHeight,
 			Fees:             c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
 			HostPublicKey:    c.HostPublicKey,
 			ID:               c.ID,
-			LastTransaction:  c.LastRevisionTxn,
-			NetAddress:       c.NetAddress,
-			RenterFunds:      c.RenterFunds(),
-			Size:             c.LastRevision.NewFileSize,
+			LastTransaction:  c.Transaction,
+			NetAddress:       netAddress,
+			RenterFunds:      c.RenterFunds,
+			Size:             size,
 			StartHeight:      c.StartHeight,
 			StorageSpending:  c.StorageSpending,
 			TotalCost:        c.TotalCost,

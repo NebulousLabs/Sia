@@ -16,15 +16,15 @@ dependencies:
 	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/NebulousLabs/errors
 	go get -u github.com/NebulousLabs/go-upnp
-	go get -u github.com/NebulousLabs/muxado
 	go get -u github.com/NebulousLabs/threadgroup
+	go get -u github.com/NebulousLabs/writeaheadlog
 	go get -u github.com/klauspost/reedsolomon
 	go get -u github.com/julienschmidt/httprouter
 	go get -u github.com/inconshreveable/go-update
 	go get -u github.com/kardianos/osext
 	go get -u github.com/inconshreveable/mousetrap
 	# Frontend Dependencies
-	go get -u github.com/bgentry/speakeasy
+	go get -u golang.org/x/crypto/ssh/terminal
 	go get -u github.com/spf13/cobra/...
 	# Developer Dependencies
 	go install -race std
@@ -35,11 +35,10 @@ dependencies:
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
 run = .
-pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus                                  \
-       ./modules/explorer ./modules/gateway ./modules/host ./modules/host/contractmanager                               \
-       ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb ./modules/renter/hostdb/hosttree            \
-       ./modules/renter/proto ./modules/miner ./modules/wallet ./modules/transactionpool ./persist                      \
-       ./cmd/siad ./cmd/siac ./sync ./types
+pkgs = ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer ./modules/gateway   \
+       ./modules/host ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor                       \
+       ./modules/renter/hostdb ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/miner ./modules/wallet \
+       ./modules/transactionpool ./node ./node/api ./persist ./siatest ./cmd/siad ./cmd/siac ./sync ./types
 
 # fmt calls go fmt on all packages.
 fmt:
@@ -51,7 +50,8 @@ vet: release-std
 	go vet $(pkgs)
 
 # will always run on some packages for a while.
-lintpkgs = ./modules ./modules/gateway ./modules/host ./modules/renter/hostdb ./modules/renter/contractor ./persist
+lintpkgs = ./modules ./modules/gateway ./modules/host ./modules/renter/hostdb ./modules/renter/contractor ./node        \
+           ./persist ./siatest
 lint:
 	@for package in $(lintpkgs); do                           \
 		golint -min_confidence=1.0 $$package                  \

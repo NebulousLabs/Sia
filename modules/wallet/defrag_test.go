@@ -15,7 +15,7 @@ func TestDefragWallet(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestDefragWalletDust(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	wt, err := createWalletTester(t.Name())
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 			case <-closechan:
 				return
 			case <-time.After(time.Millisecond * 100):
-				_, err = wt.miner.AddBlock()
+				_, err := wt.miner.AddBlock()
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -206,4 +206,74 @@ func TestDefragOutputExhaustion(t *testing.T) {
 
 	close(closechan)
 	<-donechan
+}
+
+// TestDefragInterrupted checks that a failing defrag unmarks spent outputs correctly
+func TestDefragInterrupted(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	deps := dependencyDefragInterrupted{}
+	deps.fail()
+	wt, err := createWalletTester(t.Name(), &deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// mine defragThreshold blocks, resulting in defragThreshold outputs
+	for i := 0; i < defragThreshold; i++ {
+		_, err := wt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// allow some time for the defrag transaction to occur, then mine another block
+	time.Sleep(time.Second * 5)
+
+	wt.wallet.mu.Lock()
+	// force a sync because bucket stats may not be reliable until commit
+	wt.wallet.syncDB()
+	spentOutputs := wt.wallet.dbTx.Bucket(bucketSpentOutputs).Stats().KeyN
+	siacoinOutputs := wt.wallet.dbTx.Bucket(bucketSiacoinOutputs).Stats().KeyN
+	wt.wallet.mu.Unlock()
+	if siacoinOutputs <= defragThreshold {
+		t.Fatal("not enough outputs created - defrag wasn't triggered")
+	}
+	if spentOutputs > 0 {
+		t.Fatalf("There should be 0 outputs in the database since defrag failed but there were %v",
+			spentOutputs)
+	}
+
+	// Trigger defrag again
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// allow some time for the defrag
+	time.Sleep(time.Second * 5)
+
+	// Mine another block to update the wallet
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Defrag should have worked this time
+	wt.wallet.mu.Lock()
+	// force a sync because bucket stats may not be reliable until commit
+	wt.wallet.syncDB()
+	spentOutputs = wt.wallet.dbTx.Bucket(bucketSpentOutputs).Stats().KeyN
+	siacoinOutputs = wt.wallet.dbTx.Bucket(bucketSiacoinOutputs).Stats().KeyN
+	wt.wallet.mu.Unlock()
+	if siacoinOutputs > defragThreshold {
+		t.Fatalf("defrag should result in fewer than defragThreshold outputs, got %v wanted %v\n", siacoinOutputs, defragThreshold)
+	}
+	if spentOutputs == 0 {
+		t.Fatalf("There should be > 0 spentOutputs")
+	}
+
 }

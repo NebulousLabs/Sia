@@ -2,10 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"log"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-	"log"
 )
 
 //ProcessConsensusChange subscription allows the API to react in real time to consensus change events

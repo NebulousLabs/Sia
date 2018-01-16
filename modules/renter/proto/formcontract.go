@@ -17,8 +17,9 @@ const (
 )
 
 // FormContract forms a contract with a host and submits the contract
-// transaction to tpool.
-func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (modules.RenterContract, error) {
+// transaction to tpool. The contract is added to the ContractSet and its
+// metadata is returned.
+func (cs *ContractSet) FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (modules.RenterContract, error) {
 	// Extract vars from params, for convenience.
 	host, funding, startHeight, endHeight, refundAddress := params.Host, params.Funding, params.StartHeight, params.EndHeight, params.RefundAddress
 
@@ -260,22 +261,21 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		return modules.RenterContract{}, err
 	}
 
-	// Calculate contract ID.
-	fcid := txn.FileContractID(0)
-
-	return modules.RenterContract{
-		FileContract:    fc,
-		HostPublicKey:   host.PublicKey,
-		ID:              fcid,
-		LastRevision:    initRevision,
-		LastRevisionTxn: revisionTxn,
-		NetAddress:      host.NetAddress,
-		SecretKey:       ourSK,
-		StartHeight:     startHeight,
-
+	// Construct contract header.
+	header := contractHeader{
+		Transaction: revisionTxn,
+		SecretKey:   ourSK,
+		StartHeight: startHeight,
 		TotalCost:   funding,
 		ContractFee: host.ContractPrice,
 		TxnFee:      txnFee,
 		SiafundFee:  types.Tax(startHeight, fc.Payout),
-	}, nil
+	}
+
+	// Add contract to set.
+	meta, err := cs.managedInsertContract(header, nil) // no Merkle roots yet
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
+	return meta, nil
 }

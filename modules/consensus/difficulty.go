@@ -26,9 +26,9 @@ var (
 // A running tally is maintained which keeps the total difficulty and total time
 // passed across all blocks. The total difficulty can be divided by the total
 // time to get a hashrate. The total is multiplied by 0.995 each block, to keep
-// exponential preference on recent blocks with a half life of about 24 hours.
-// This estimated hashrate is assumed to closely match the actual hashrate on
-// the network.
+// exponential preference on recent blocks with a half life of 144 data points.
+// This is about 24 hours. This estimated hashrate is assumed to closely match
+// the actual hashrate on the network.
 //
 // There is a target block time. If the difficulty increases or decreases, the
 // total amount of time that has passed will be more or less than the target
@@ -68,10 +68,31 @@ var (
 // however we do not use the child block deltas because that would allow the
 // child block to influence the target of the following block, which makes abuse
 // easier in selfish mining scenarios.
-func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget, currentTarget types.Target, parentHeight types.BlockHeight) types.Target {
-	// Determine the detla of the current total time vs. the desired total time.
-	expectedTime := types.BlockFrequency * parentHeight
-	delta := int64(expectedTime) - parentTotalTime
+func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget, currentTarget types.Target, parentHeight types.BlockHeight, parentTimestamp types.Timestamp) types.Target {
+	// Determine the delta of the current total time vs. the desired total time.
+	// The desired total time is the difference between the genesis block
+	// timestamp and the current block timestamp.
+	var delta int64
+	if parentHeight < types.OakHardforkFixBlock {
+		// This is the original code. It is incorrect, because it is comparing
+		// 'expectedTime', an absolute value, to 'parentTotalTime', a value
+		// which gets compressed every block. The result is that 'expectedTime'
+		// is substantially larger than 'parentTotalTime' always, and that the
+		// shifter is always reading that blocks have been coming out far too
+		// quickly.
+		expectedTime := int64(types.BlockFrequency * parentHeight)
+		delta = expectedTime - parentTotalTime
+	} else {
+		// This is the correct code. The expected time is an absolute time based
+		// on the genesis block, and the delta is an absolute time based on the
+		// timestamp of the parent block.
+		//
+		// Rules elsewhere in consensus ensure that the timestamp of the parent
+		// block has not been manipulated by more than a few hours, which is
+		// accurate enough for this logic to be safe.
+		expectedTime := int64(types.BlockFrequency*parentHeight) + int64(types.GenesisTimestamp)
+		delta = expectedTime - int64(parentTimestamp)
+	}
 	// Convert the delta in to a target block time.
 	square := delta * delta
 	if delta < 0 {
@@ -82,11 +103,11 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 	targetBlockTime := int64(types.BlockFrequency) + shift
 
 	// Clamp the block time to 1/3 and 3x the target block time.
-	if targetBlockTime < int64(types.BlockFrequency)/3 {
-		targetBlockTime = int64(types.BlockFrequency) / 3
+	if targetBlockTime < int64(types.BlockFrequency)/types.OakMaxBlockShift {
+		targetBlockTime = int64(types.BlockFrequency) / types.OakMaxBlockShift
 	}
-	if targetBlockTime > int64(types.BlockFrequency)*3 {
-		targetBlockTime = int64(types.BlockFrequency) * 3
+	if targetBlockTime > int64(types.BlockFrequency)*types.OakMaxBlockShift {
+		targetBlockTime = int64(types.BlockFrequency) * types.OakMaxBlockShift
 	}
 
 	// Determine the hashrate using the total time and total target. Set a
@@ -95,19 +116,27 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 		parentTotalTime = 1
 	}
 	visibleHashrate := parentTotalTarget.Difficulty().Div64(uint64(parentTotalTime)) // Hashes per second.
+	// Handle divide by zero risks.
 	if visibleHashrate.IsZero() {
 		visibleHashrate = visibleHashrate.Add(types.NewCurrency64(1))
+	}
+	if targetBlockTime == 0 {
+		// This code can only possibly be triggered if the block frequency is
+		// less than 3, but during testing the block frequency is 1.
+		targetBlockTime = 1
 	}
 
 	// Determine the new target by multiplying the visible hashrate by the
 	// target block time. Clamp it to a 0.4% difficulty adjustment.
-	maxNewTarget := currentTarget.MulDifficulty(types.OakMaxRise)
-	minNewTarget := currentTarget.MulDifficulty(types.OakMaxDrop)
+	maxNewTarget := currentTarget.MulDifficulty(types.OakMaxRise) // Max = difficulty increase (target decrease)
+	minNewTarget := currentTarget.MulDifficulty(types.OakMaxDrop) // Min = difficulty decrease (target increase)
 	newTarget := types.RatToTarget(new(big.Rat).SetFrac(types.RootDepth.Int(), visibleHashrate.Mul64(uint64(targetBlockTime)).Big()))
 	if newTarget.Cmp(maxNewTarget) < 0 {
 		newTarget = maxNewTarget
 	}
 	if newTarget.Cmp(minNewTarget) > 0 {
+		// This can only possibly trigger if the BlockFrequency is less than 3
+		// seconds, but during testing it is 1 second.
 		newTarget = minNewTarget
 	}
 	return newTarget
@@ -127,6 +156,21 @@ func (cs *ConsensusSet) getBlockTotals(tx *bolt.Tx, id types.BlockID) (totalTime
 // totals.
 func (cs *ConsensusSet) storeBlockTotals(tx *bolt.Tx, currentHeight types.BlockHeight, currentBlockID types.BlockID, prevTotalTime int64, parentTimestamp, currentTimestamp types.Timestamp, prevTotalTarget, targetOfCurrentBlock types.Target) (newTotalTime int64, newTotalTarget types.Target, err error) {
 	// Reset the prevTotalTime to a delta of zero just before the hardfork.
+	//
+	// NOTICE: This code is broken, an incorrectly executed hardfork. The
+	// correct thing to do was to not put in these 3 lines of code. It is
+	// correct to not have them.
+	//
+	// This code is incorrect, and introduces an unfortunate drop in difficulty,
+	// because this is an uncompreesed prevTotalTime, but really it should be
+	// getting set to a compressed prevTotalTime. And, actually, a compressed
+	// prevTotalTime doesn't have much meaning, so this code block shouldn't be
+	// here at all. But... this is the code that was running for the block
+	// 135,000 hardfork, so this code needs to stay. With the standard
+	// constants, it should cause a disruptive bump that lasts only a few days.
+	//
+	// The disruption will be complete well before we can deploy a fix, so
+	// there's no point in fixing it.
 	if currentHeight == types.OakHardforkBlock-1 {
 		prevTotalTime = int64(types.BlockFrequency * currentHeight)
 	}

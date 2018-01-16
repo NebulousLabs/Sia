@@ -1,3 +1,5 @@
+// Package renter is responsible for uploading and downloading files on the sia
+// network.
 package renter
 
 // CONCURRENCY PATTERNS: The renter has some complex concurrency patterns.
@@ -26,6 +28,7 @@ package renter
 
 import (
 	"errors"
+	"reflect"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -42,6 +45,7 @@ import (
 var (
 	errNilContractor = errors.New("cannot create renter with nil contractor")
 	errNilCS         = errors.New("cannot create renter with nil consensus set")
+	errNilGateway    = errors.New("cannot create hostdb with nil gateway")
 	errNilHdb        = errors.New("cannot create renter with nil hostdb")
 	errNilTpool      = errors.New("cannot create renter with nil transaction pool")
 )
@@ -107,14 +111,15 @@ type hostContractor interface {
 	// Close closes the hostContractor.
 	Close() error
 
-	// Contract returns the latest contract formed with the specified host.
-	Contract(modules.NetAddress) (modules.RenterContract, bool)
-
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
 	// ContractByID returns the contract associated with the file contract id.
 	ContractByID(types.FileContractID) (modules.RenterContract, bool)
+
+	// ContractUtility returns the utility field for a given contract, along
+	// with a bool indicating if it exists.
+	ContractUtility(types.FileContractID) (modules.ContractUtility, bool)
 
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
@@ -137,11 +142,6 @@ type hostContractor interface {
 
 	// ResolveID returns the most recent renewal of the specified ID.
 	ResolveID(types.FileContractID) types.FileContractID
-
-	// ResovleContract returns the current contract associated with the provided
-	// contract id. It is equivalent to calling 'ResolveID' and then using the
-	// result to call 'ContractByID'.
-	ResolveContract(types.FileContractID) (modules.RenterContract, bool)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
@@ -188,6 +188,7 @@ type Renter struct {
 
 	// Utilities.
 	cs             modules.ConsensusSet
+	g              modules.Gateway
 	hostContractor hostContractor
 	hostDB         hostDB
 	log            *persist.Logger
@@ -196,6 +197,8 @@ type Renter struct {
 	heapWG         sync.WaitGroup // in-progress chunks join this waitgroup
 	tg             threadgroup.ThreadGroup
 	tpool          modules.TransactionPool
+
+	lastEstimation modules.RenterPriceEstimation // used to cache the last price estimation result
 }
 
 // New returns an initialized renter.
@@ -209,11 +212,14 @@ func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpoo
 		return nil, err
 	}
 
-	return newRenter(cs, tpool, hdb, hc, persistDir)
+	return newRenter(g, cs, tpool, hdb, hc, persistDir)
 }
 
 // newRenter initializes a renter and returns it.
-func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
+func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
+	if g == nil {
+		return nil, errNilGateway
+	}
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -223,9 +229,8 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 	if hc == nil {
 		return nil, errNilContractor
 	}
-	if hdb == nil {
-		// Nil hdb currently allowed for testing purposes. :(
-		// return nil, errNilHdb
+	if hdb == nil && build.Release != "testing" {
+		return nil, errNilHdb
 	}
 
 	r := &Renter{
@@ -241,6 +246,7 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		newMemory:       make(chan struct{}, 1),
 
 		cs:             cs,
+		g:              g,
 		hostDB:         hdb,
 		hostContractor: hc,
 		persistDir:     persistDir,
@@ -248,6 +254,12 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		tpool:          tpool,
 	}
 	if err := r.initPersist(); err != nil {
+		return nil, err
+	}
+
+	// Subscribe to the consensus set.
+	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
+	if err != nil {
 		return nil, err
 	}
 
@@ -323,6 +335,13 @@ func (r *Renter) Close() error {
 // TODO: Make this function line up with the actual settings in the renter.
 // Perhaps even make it so it uses the renter's actual contracts if it has any.
 func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
+	id := r.mu.RLock()
+	lastEstimation := r.lastEstimation
+	r.mu.RUnlock(id)
+	if !reflect.DeepEqual(lastEstimation, modules.RenterPriceEstimation{}) {
+		return lastEstimation
+	}
+
 	// Grab hosts to perform the estimation.
 	hosts := r.hostDB.RandomHosts(priceEstimationScope, nil)
 
@@ -366,12 +385,18 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 	_, feePerByte := r.tpool.FeeEstimation()
 	totalContractCost = totalContractCost.Add(feePerByte.Mul64(1000).Mul64(uint64(priceEstimationScope)))
 
-	return modules.RenterPriceEstimation{
+	est := modules.RenterPriceEstimation{
 		FormContracts:        totalContractCost,
 		DownloadTerabyte:     totalDownloadCost,
 		StorageTerabyteMonth: totalStorageCost,
 		UploadTerabyte:       totalUploadCost,
 	}
+
+	id = r.mu.Lock()
+	r.lastEstimation = est
+	r.mu.Unlock(id)
+
+	return est
 }
 
 // SetSettings will update the settings for the renter.
@@ -405,10 +430,10 @@ func (r *Renter) Settings() modules.RenterSettings {
 		Allowance: r.hostContractor.Allowance(),
 	}
 }
-func (r *Renter) AllContracts() []modules.RenterContract {
-	return r.hostContractor.(interface {
-		AllContracts() []modules.RenterContract
-	}).AllContracts()
+func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
+	id := r.mu.Lock()
+	r.lastEstimation = modules.RenterPriceEstimation{}
+	r.mu.Unlock(id)
 }
 
 // Enforce that Renter satisfies the modules.Renter interface.

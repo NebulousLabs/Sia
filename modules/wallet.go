@@ -308,6 +308,10 @@ type (
 		// primary seed.
 		NextAddress() (types.UnlockConditions, error)
 
+		// NextAddresses returns n new coin addresses generated from the primary
+		// seed.
+		NextAddresses(uint64) ([]types.UnlockConditions, error)
+
 		// PrimarySeed returns the unencrypted primary seed of the wallet,
 		// along with a uint64 indicating how many addresses may be safely
 		// generated from the seed.
@@ -343,6 +347,9 @@ type (
 		// not considered in the unconfirmed balance.
 		UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency)
 
+		// Height returns the wallet's internal processed consensus height
+		Height() types.BlockHeight
+
 		// AddressTransactions returns all of the transactions that are related
 		// to a given address.
 		AddressTransactions(types.UnlockHash) []ProcessedTransaction
@@ -373,6 +380,12 @@ type (
 		// blockchain.
 		Rescanning() bool
 
+		// Settings returns the Wallet's current settings.
+		Settings() WalletSettings
+
+		// SetSettings sets the Wallet's settings.
+		SetSettings(WalletSettings)
+
 		// StartTransaction is a convenience method that calls
 		// RegisterTransaction(types.Transaction{}, nil)
 		StartTransaction() TransactionBuilder
@@ -392,8 +405,14 @@ type (
 		// are also returned to the caller.
 		SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
 
-		// DustThreshold returns the quantity below which a Currency is considered to be Dust.
+		// DustThreshold returns the quantity per byte below which a Currency is
+		// considered to be Dust.
 		DustThreshold() types.Currency
+	}
+
+	// WalletSettings control the behavior of the Wallet.
+	WalletSettings struct {
+		NoDefrag bool `json:"noDefrag"`
 	}
 )
 

@@ -13,6 +13,10 @@ import (
 
 // TestDBOpen tests the wallet.openDB method.
 func TestDBOpen(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	w := new(Wallet)
 	err := w.openDB("")
 	if err == nil {

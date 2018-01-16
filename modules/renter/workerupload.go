@@ -67,6 +67,13 @@ func (w *worker) managedNextChunk() (nextChunk *unfinishedChunk, pieceIndex uint
 
 // processChunk will process a chunk from the worker chunk queue.
 func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, pieceIndex uint64) {
+	// Determine the usability value of this worker.
+	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
+	if !exists {
+		return nil, 0
+	}
+	goodForUpload := utility.GoodForUpload
+
 	// Determine what sort of help this chunk needs.
 	uc.mu.Lock()
 	_, candidateHost := uc.unusedHosts[w.hostPubKey.String()]
@@ -74,7 +81,7 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 	needsHelp := uc.piecesNeeded > uc.piecesCompleted+uc.piecesRegistered
 
 	// If the chunk does not need help from this worker, release the chunk.
-	if chunkComplete || !candidateHost || !w.contract.GoodForUpload {
+	if chunkComplete || !candidateHost || !goodForUpload {
 		// This worker no longer needs to track this chunk.
 		uc.mu.Unlock()
 		w.dropChunk(uc)
@@ -109,7 +116,9 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 // managedQueueChunkRepair will take a chunk and add it to the worker's repair stack.
 func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 	// Check that the worker is allowed to be uploading.
-	contract, exists := w.renter.hostContractor.ContractByID(w.contract.ID)
+	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
+	goodForUpload := exists && utility.GoodForUpload
+
 	w.mu.Lock()
 	// Figure out how long the worker would need to be on cooldown.
 	requiredCooldown := uploadFailureCooldown
@@ -117,7 +126,7 @@ func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 		requiredCooldown *= 2
 	}
 	onCooldown := time.Now().Before(w.uploadRecentFailure.Add(requiredCooldown))
-	if !exists || !contract.GoodForUpload || w.terminated || onCooldown {
+	if !goodForUpload || w.terminated || onCooldown {
 		// The worker should not be uploading, remove the chunk.
 		w.dropChunk(uc)
 		w.mu.Unlock()
@@ -137,7 +146,10 @@ func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 // chunk.
 func (w *worker) uploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
 	w.uploadRecentFailure = time.Now()
-	w.uploadConsecutiveFailures++
+	if w.renter.g.Online() {
+		// It's not the worker's fault if we are offline
+		w.uploadConsecutiveFailures++
+	}
 	uc.mu.Lock()
 	uc.piecesRegistered--
 	uc.pieceUsage[pieceIndex] = false
@@ -152,7 +164,9 @@ func (w *worker) managedUpload(uc *unfinishedChunk, pieceIndex uint64) {
 	e, err := w.renter.hostContractor.Editor(w.contract.ID, w.renter.tg.StopChan())
 	if err != nil {
 		w.renter.log.Debugln("Worker failed to acquire an editor:", err)
+		w.mu.Lock()
 		w.uploadFailed(uc, pieceIndex)
+		w.mu.Unlock()
 		return
 	}
 	defer e.Close()

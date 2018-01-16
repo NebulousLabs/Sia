@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb/hosttree"
 	"github.com/NebulousLabs/Sia/persist"
@@ -49,7 +48,6 @@ type HostDB struct {
 	scanList        []modules.HostDBEntry
 	scanMap         map[string]struct{}
 	scanWait        bool
-	online          bool
 	scanningThreads int
 
 	blockHeight types.BlockHeight
@@ -157,17 +155,6 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	hdb.tg.OnStop(func() {
 		cs.Unsubscribe(hdb)
 	})
-
-	// Spin up the host scanning processes.
-	if build.Release == "standard" {
-		go hdb.threadedOnlineCheck()
-	} else {
-		// During testing, the hostdb is just always assumed to be online, since
-		// the online check of having nonlocal peers will always fail.
-		hdb.mu.Lock()
-		hdb.online = true
-		hdb.mu.Unlock()
-	}
 
 	// Spawn the scan loop during production, but allow it to be disrupted
 	// during testing. Primary reason is so that we can fill the hostdb with

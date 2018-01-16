@@ -37,7 +37,9 @@ var (
 	OakDecayDenom           int64
 	OakDecayNum             int64
 	OakHardforkBlock        BlockHeight
+	OakHardforkFixBlock     BlockHeight
 	OakHardforkTxnSizeLimit = uint64(64e3) // 64 KB
+	OakMaxBlockShift        int64
 	OakMaxDrop              *big.Rat
 	OakMaxRise              *big.Rat
 
@@ -72,8 +74,10 @@ func init() {
 		MinimumCoinbase = 30e3
 
 		OakHardforkBlock = 100
+		OakHardforkFixBlock = 105
 		OakDecayNum = 985
 		OakDecayDenom = 1000
+		OakMaxBlockShift = 3
 		OakMaxRise = big.NewRat(102, 100)
 		OakMaxDrop = big.NewRat(100, 102)
 
@@ -114,8 +118,10 @@ func init() {
 		// Do not let the difficulty change rapidly - blocks will be getting
 		// mined far faster than the difficulty can adjust to.
 		OakHardforkBlock = 20
+		OakHardforkFixBlock = 23
 		OakDecayNum = 9999
 		OakDecayDenom = 10e3
+		OakMaxBlockShift = 3
 		OakMaxRise = big.NewRat(10001, 10e3)
 		OakMaxDrop = big.NewRat(10e3, 10001)
 
@@ -202,7 +208,12 @@ func init() {
 		// everyone plenty of time to upgrade and adopt the hardfork, while also
 		// being earlier than the most optimistic shipping dates for the miners
 		// that would otherwise be very disruptive to the network.
+		//
+		// There was a bug in the original Oak hardfork that had to be quickly
+		// followed up with another fix. The height of that fix is the
+		// OakHardforkFixBlock.
 		OakHardforkBlock = 135e3
+		OakHardforkFixBlock = 139e3
 
 		// The decay is kept at 995/1000, or a decay of about 0.5% each block.
 		// This puts the halflife of a block's relevance at about 1 day. This
@@ -211,6 +222,12 @@ func init() {
 		// random variance.
 		OakDecayNum = 995
 		OakDecayDenom = 1e3
+
+		// The block shift determines the most that the difficulty adjustment
+		// algorithm is allowed to shift the target block time. With a block
+		// frequency of 600 seconds, the min target block time is 200 seconds,
+		// and the max target block time is 1800 seconds.
+		OakMaxBlockShift = 3
 
 		// The max rise and max drop for the difficulty is kept at 0.4% per
 		// block, which means that in 1008 blocks the difficulty can move a

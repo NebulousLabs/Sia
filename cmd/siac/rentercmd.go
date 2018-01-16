@@ -5,13 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/node/api"
 )
 
 var (
@@ -103,7 +104,7 @@ var (
 	}
 
 	renterSetAllowanceCmd = &cobra.Command{
-		Use:   "setallowance [amount] [period]",
+		Use:   "setallowance [amount] [period] [hosts] [renew window]",
 		Short: "Set the allowance",
 		Long: `Set the amount of money that can be spent over a given period.
 
@@ -113,10 +114,18 @@ period is given in either blocks (b), hours (h), days (d), or weeks (w). A
 block is approximately 10 minutes, so one hour is six blocks, a day is 144
 blocks, and a week is 1008 blocks.
 
+The Sia renter module spreads data across more than one Sia server computer
+or "host". The "hosts" parameter for the setallowance command determines
+how many different hosts the renter will spread the data across.
+
+Allowance can be automatically renewed periodically. If the current
+blockheight + the renew window >= the end height the contract,
+then the contract is renewed automatically.
+
 Note that setting the allowance will cause siad to immediately begin forming
 contracts! You should only set the allowance once you are fully synced and you
 have a reasonable number (>30) of hosts in your hostdb.`,
-		Run: wrap(rentersetallowancecmd),
+		Run: rentersetallowancecmd,
 	}
 
 	renterUploadsCmd = &cobra.Command{
@@ -147,7 +156,6 @@ func rentercmd() {
 		die("Could not get renter info:", err)
 	}
 	fm := rg.FinancialMetrics
-	unspent := fm.ContractSpending.Sub(fm.DownloadSpending).Sub(fm.StorageSpending).Sub(fm.UploadSpending)
 	fmt.Printf(`Renter info:
 	Storage Spending:  %v
 	Upload Spending:   %v
@@ -156,7 +164,7 @@ func rentercmd() {
 	Total Allocated:   %v
 
 `, currencyUnits(fm.StorageSpending), currencyUnits(fm.UploadSpending),
-		currencyUnits(fm.DownloadSpending), currencyUnits(unspent),
+		currencyUnits(fm.DownloadSpending), currencyUnits(fm.Unspent),
 		currencyUnits(fm.ContractSpending))
 
 	// also list files
@@ -265,16 +273,39 @@ func renterallowancecancelcmd() {
 }
 
 // rentersetallowancecmd allows the user to set the allowance.
-func rentersetallowancecmd(amount, period string) {
-	hastings, err := parseCurrency(amount)
+// the first two parameters, amount and period, are required.
+// the second two parameters are optional:
+//    hosts                 integer number of hosts
+//    renewperiod           how many blocks between renewals
+func rentersetallowancecmd(cmd *cobra.Command, args []string) {
+	if len(args) < 2 || len(args) > 4 {
+		cmd.UsageFunc()(cmd)
+		os.Exit(exitCodeUsage)
+	}
+	hastings, err := parseCurrency(args[0])
 	if err != nil {
 		die("Could not parse amount:", err)
 	}
-	blocks, err := parsePeriod(period)
+	blocks, err := parsePeriod(args[1])
 	if err != nil {
 		die("Could not parse period")
 	}
-	err = post("/renter", fmt.Sprintf("funds=%s&period=%s", hastings, blocks))
+	queryString := fmt.Sprintf("funds=%s&period=%s", hastings, blocks)
+	if len(args) > 2 {
+		_, err = strconv.Atoi(args[2])
+		if err != nil {
+			die("Could not parse host count")
+		}
+		queryString += fmt.Sprintf("&hosts=%s", args[2])
+	}
+	if len(args) > 3 {
+		renewWindow, err := parsePeriod(args[3])
+		if err != nil {
+			die("Could not parse renew window")
+		}
+		queryString += fmt.Sprintf("&renewwindow=%s", renewWindow)
+	}
+	err = post("/renter", queryString)
 	if err != nil {
 		die("Could not set allowance:", err)
 	}
@@ -454,7 +485,7 @@ func renterfileslistcmd() {
 	fmt.Println("Tracking", len(rf.Files), "files:")
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	if renterListVerbose {
-		fmt.Fprintln(w, "File size\tAvailable\tProgress\tRedundancy\tRenewing\tSia path")
+		fmt.Fprintln(w, "File size\tAvailable\tUploaded\tProgress\tRedundancy\tRenewing\tSia path")
 	}
 	sort.Sort(bySiaPath(rf.Files))
 	for _, file := range rf.Files {
@@ -470,7 +501,7 @@ func renterfileslistcmd() {
 			if file.UploadProgress == -1 {
 				uploadProgressStr = "-"
 			}
-			fmt.Fprintf(w, "\t%s\t%8s\t%10s\t%s", availableStr, uploadProgressStr, redundancyStr, renewingStr)
+			fmt.Fprintf(w, "\t%s\t%9s\t%8s\t%10s\t%s", availableStr, filesizeUnits(int64(file.UploadedBytes)), uploadProgressStr, redundancyStr, renewingStr)
 		}
 		fmt.Fprintf(w, "\t%s", file.SiaPath)
 		if !renterListVerbose && !file.Available {

@@ -5,29 +5,28 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
-	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
-	"github.com/NebulousLabs/Sia/modules/explorer"
-	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/modules/host"
-	"github.com/NebulousLabs/Sia/modules/miner"
-	"github.com/NebulousLabs/Sia/modules/renter"
-	"github.com/NebulousLabs/Sia/modules/transactionpool"
-	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/profile"
 	mnemonics "github.com/NebulousLabs/entropy-mnemonics"
 
-	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 )
+
+// passwordPrompt securely reads a password from stdin.
+func passwordPrompt(prompt string) (string, error) {
+	fmt.Print(prompt)
+	pw, err := terminal.ReadPassword(int(syscall.Stdin))
+	fmt.Println()
+	return string(pw), err
+}
 
 // verifyAPISecurity checks that the security values are consistent with a
 // sane, secure system.
@@ -135,218 +134,71 @@ func unlockWallet(w modules.Wallet, password string) error {
 // startDaemon uses the config parameters to initialize Sia modules and start
 // siad.
 func startDaemon(config Config) (err error) {
-	// Prompt user for API password.
-	if config.Siad.AuthenticateAPI && config.Siad.APIPassword == "" {
-		config.APIPassword, err = speakeasy.Ask("Enter API password: ")
-		if err != nil {
-			return err
-		}
-		if config.APIPassword == "" {
-			return errors.New("password cannot be blank")
+	if config.Siad.AuthenticateAPI {
+		password := os.Getenv("SIA_API_PASSWORD")
+		if password != "" {
+			fmt.Println("Using SIA_API_PASSWORD environment variable")
+			config.APIPassword = password
+		} else {
+			// Prompt user for API password.
+			config.APIPassword, err = passwordPrompt("Enter API password: ")
+			if err != nil {
+				return err
+			}
+			if config.APIPassword == "" {
+				return errors.New("password cannot be blank")
+			}
 		}
 	} else if config.Siad.AuthenticateAPI && config.Siad.APIPassword != "" {
 		config.APIPassword = config.Siad.APIPassword
 	}
 
-	// Process the config variables after they are parsed by cobra.
-	config, err = processConfig(config)
-	if err != nil {
-		return err
-	}
-
 	// Print the Siad Version
 	fmt.Println("Sia Daemon v" + build.Version)
+
+	// Install a signal handler that will catch exceptions thrown by mmap'd
+	// files.
+	// NOTE: ideally we would catch SIGSEGV here too, since that signal can
+	// also be thrown by an mmap I/O error. However, SIGSEGV can occur under
+	// other circumstances as well, and in those cases, we will want a full
+	// stack trace.
+	mmapChan := make(chan os.Signal, 1)
+	signal.Notify(mmapChan, syscall.SIGBUS)
+	go func() {
+		<-mmapChan
+		fmt.Println("A fatal I/O exception (SIGBUS) has occurred.")
+		fmt.Println("Please check your disk for errors.")
+		os.Exit(1)
+	}()
+
 	// Print a startup message.
 	fmt.Println("Loading...")
 	loadStart := time.Now()
-
-	// Create the server and start serving daemon routes immediately.
-	fmt.Printf("(0/%d) Loading siad...\n", len(config.Siad.Modules))
-	srv, err := NewServer(config.Siad.APIaddr, config.Siad.RequiredUserAgent, config.APIPassword)
+	srv, err := NewServer(config)
 	if err != nil {
 		return err
 	}
-
-	servErrs := make(chan error)
-	go func() {
-		servErrs <- srv.Serve()
-	}()
-
-	// Initialize the Sia modules
-	i := 0
-	var g modules.Gateway
-	if strings.Contains(config.Siad.Modules, "g") {
-		i++
-		fmt.Printf("(%d/%d) Loading gateway...\n", i, len(config.Siad.Modules))
-		g, err = gateway.New(config.Siad.RPCaddr, !config.Siad.NoBootstrap, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
-		if err != nil {
-			return err
-		}
-		defer func() {
-			fmt.Println("Closing gateway...")
-			err := g.Close()
-			if err != nil {
-				fmt.Println("Error during gateway shutdown:", err)
-			}
-		}()
-	}
-	var cs modules.ConsensusSet
-	if strings.Contains(config.Siad.Modules, "c") {
-		i++
-		fmt.Printf("(%d/%d) Loading consensus...\n", i, len(config.Siad.Modules))
-		cs, err = consensus.New(g, !config.Siad.NoBootstrap, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
-		if err != nil {
-			return err
-		}
-		defer func() {
-			fmt.Println("Closing consensus...")
-			err := cs.Close()
-			if err != nil {
-				fmt.Println("Error during consensus set shutdown:", err)
-			}
-		}()
-	}
-	var tpool modules.TransactionPool
-	if strings.Contains(config.Siad.Modules, "t") {
-		i++
-		fmt.Printf("(%d/%d) Loading transaction pool...\n", i, len(config.Siad.Modules))
-		tpool, err = transactionpool.New(cs, g, filepath.Join(config.Siad.SiaDir, modules.TransactionPoolDir))
-		if err != nil {
-			return err
-		}
-		defer func() {
-			fmt.Println("Closing transaction pool...")
-			err := tpool.Close()
-			if err != nil {
-				fmt.Println("Error during transaction pool shutdown:", err)
-			}
-		}()
-	}
-	var e modules.Explorer
-	if strings.Contains(config.Siad.Modules, "e") {
-		i++
-		fmt.Printf("(%d/%d) Loading explorer...\n", i, len(config.Siad.Modules))
-		e, err = explorer.New(cs, tpool, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
-		if err != nil {
-			return err
-		}
-		defer func() {
-			fmt.Println("Closing explorer...")
-			err := e.Close()
-			if err != nil {
-				fmt.Println("Error during explorer shutdown:", err)
-			}
-		}()
-	}
-	var w modules.Wallet
-	if strings.Contains(config.Siad.Modules, "w") {
-		i++
-		fmt.Printf("(%d/%d) Loading wallet...\n", i, len(config.Siad.Modules))
-		w, err = wallet.New(cs, tpool, filepath.Join(config.Siad.SiaDir, modules.WalletDir))
-		if err != nil {
-			return err
-		}
-		defer func() {
-			fmt.Println("Closing wallet...")
-			err := w.Close()
-			if err != nil {
-				fmt.Println("Error during wallet shutdown:", err)
-			}
-		}()
-	}
-	var m modules.Miner
-	if strings.Contains(config.Siad.Modules, "m") {
-		i++
-		fmt.Printf("(%d/%d) Loading miner...\n", i, len(config.Siad.Modules))
-		m, err = miner.New(cs, tpool, w, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
-		if err != nil {
-			return err
-		}
-		defer func() {
-			fmt.Println("Closing miner...")
-			err := m.Close()
-			if err != nil {
-				fmt.Println("Error during miner shutdown:", err)
-			}
-		}()
-	}
-	var h modules.Host
-	if strings.Contains(config.Siad.Modules, "h") {
-		i++
-		fmt.Printf("(%d/%d) Loading host...\n", i, len(config.Siad.Modules))
-		h, err = host.New(cs, tpool, w, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
-		if err != nil {
-			return err
-		}
-		defer func() {
-			fmt.Println("Closing host...")
-			err := h.Close()
-			if err != nil {
-				fmt.Println("Error during host shutdown:", err)
-			}
-		}()
-	}
-	var r modules.Renter
-	if strings.Contains(config.Siad.Modules, "r") {
-		i++
-		fmt.Printf("(%d/%d) Loading renter...\n", i, len(config.Siad.Modules))
-		r, err = renter.New(g, cs, w, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
-		if err != nil {
-			return err
-		}
-		defer func() {
-			fmt.Println("Closing renter...")
-			err := r.Close()
-			if err != nil {
-				fmt.Println("Error during renter shutdown:", err)
-			}
-		}()
-	}
-
-	// Create the Sia API
-	a, err := api.New(
-		config.Siad.RequiredUserAgent,
-		config.APIPassword,
-		cs,
-		e,
-		g,
-		h,
-		m,
-		r,
-		tpool,
-		w,
-	)
+	go srv.Serve()
+	err = srv.loadModules()
 	if err != nil {
 		return err
-	}
-
-	// connect the API to the server
-	srv.mux.Handle("/", a)
-
-	// Attempt to auto-unlock the wallet using the SIA_WALLET_PASSWORD env variable
-	if password := os.Getenv("SIA_WALLET_PASSWORD"); password != "" {
-		fmt.Println("Sia Wallet Password found, attempting to auto-unlock wallet")
-		if err := unlockWallet(w, password); err != nil {
-			fmt.Println("Auto-unlock failed.")
-		} else {
-			fmt.Println("Auto-unlock successful.")
-		}
 	}
 
 	// stop the server if a kill signal is caught
+	errChan := make(chan error)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill)
 	go func() {
 		<-sigChan
 		fmt.Println("\rCaught stop signal, quitting...")
-		srv.Close()
+		errChan <- srv.Close()
 	}()
 
 	// Print a 'startup complete' message.
 	startupTime := time.Since(loadStart)
 	fmt.Println("Finished loading in", startupTime.Seconds(), "seconds")
 
-	err = <-servErrs
+	err = <-errChan
 	if err != nil {
 		build.Critical(err)
 	}

@@ -432,7 +432,7 @@ func TestRandomFrame(t *testing.T) {
 	session, _ = Client(cli, nil)
 	for i := 0; i < 100; i++ {
 		f := newFrame(cmdSYN, 1000)
-		session.writeFrame(f)
+		session.writeFrame(f, time.Time{})
 	}
 	cli.Close()
 
@@ -445,7 +445,7 @@ func TestRandomFrame(t *testing.T) {
 	session, _ = Client(cli, nil)
 	for i := 0; i < 100; i++ {
 		f := newFrame(allcmds[rand.Int()%len(allcmds)], rand.Uint32())
-		session.writeFrame(f)
+		session.writeFrame(f, time.Time{})
 	}
 	cli.Close()
 
@@ -457,7 +457,7 @@ func TestRandomFrame(t *testing.T) {
 	session, _ = Client(cli, nil)
 	for i := 0; i < 100; i++ {
 		f := newFrame(byte(rand.Uint32()), rand.Uint32())
-		session.writeFrame(f)
+		session.writeFrame(f, time.Time{})
 	}
 	cli.Close()
 
@@ -470,7 +470,7 @@ func TestRandomFrame(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		f := newFrame(byte(rand.Uint32()), rand.Uint32())
 		f.ver = byte(rand.Uint32())
-		session.writeFrame(f)
+		session.writeFrame(f, time.Time{})
 	}
 	cli.Close()
 
@@ -545,6 +545,254 @@ func TestWriteDeadline(t *testing.T) {
 		}
 	}
 	session.Close()
+}
+
+func TestKeepAlive(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	config := DefaultConfig()
+	config.KeepAliveInterval = 1 * time.Second
+	config.KeepAliveTimeout = 3 * time.Second
+
+	srvListener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srvListener.Close()
+	go func() {
+		conn, err := srvListener.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		srv, err := Server(conn, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer srv.Close()
+		for i := 0; i < 2; i++ {
+			stream, err := srv.AcceptStream()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stream.Close()
+			// echo until Read fails
+			for {
+				buf := make([]byte, 65536)
+				n, err := stream.Read(buf)
+				if err != nil {
+					break
+				}
+				stream.Write(buf[:n])
+			}
+		}
+	}()
+
+	cliConn, err := net.Dial("tcp", srvListener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cli, err := Client(cliConn, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cli.Close()
+
+	time.Sleep(10 * time.Second)
+
+	cliStream, err := cli.OpenStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cliStream.Close()
+
+	// perform an echo exchange
+	const echoString = "hello world"
+	_, err = cliStream.Write([]byte(echoString))
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, len(echoString))
+	_, err = io.ReadFull(cliStream, buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(buf) != echoString {
+		t.Fatal("bad echo:", string(buf))
+	}
+
+	// wait for a few keepalive pings
+	time.Sleep(10 * time.Second)
+
+	// perform another echo exchange. The stream should still be open.
+	_, err = cliStream.Write([]byte(echoString))
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf = make([]byte, len(echoString))
+	_, err = io.ReadFull(cliStream, buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(buf) != echoString {
+		t.Fatal("bad echo:", string(buf))
+	}
+
+	// close the stream, wait for a few keepalive pings, then open a new
+	// stream
+	err = cliStream.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(10 * time.Second)
+
+	cliStream, err = cli.OpenStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cliStream.Close()
+
+	// perform an echo exchange
+	_, err = cliStream.Write([]byte(echoString))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = io.ReadFull(cliStream, buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(buf) != echoString {
+		t.Fatal("bad echo:", string(buf))
+	}
+	cliStream.Close()
+}
+
+type slowWriterConn struct {
+	net.Conn
+	writeTime time.Duration
+}
+
+func (c slowWriterConn) Write(p []byte) (int, error) {
+	time.Sleep(c.writeTime)
+	return c.Conn.Write(p)
+}
+
+func TestKeepAliveSlowServer(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	config := DefaultConfig()
+	config.KeepAliveInterval = 1 * time.Second
+	config.KeepAliveTimeout = 3 * time.Second
+
+	srvListener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srvListener.Close()
+	go func() {
+		conn, err := srvListener.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		slowConn := slowWriterConn{
+			Conn:      conn,
+			writeTime: 5 * time.Second,
+		}
+		srv, err := Server(slowConn, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer srv.Close()
+		for {
+			_, err := srv.AcceptStream()
+			if err != nil {
+				break
+			}
+		}
+	}()
+
+	cliConn, err := net.Dial("tcp", srvListener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cli, err := Client(cliConn, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cli.Close()
+
+	// open a stream
+	_, err = cli.OpenStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for keepalive to fail
+	time.Sleep(5 * time.Second)
+
+	// try to open a stream
+	_, err = cli.OpenStream()
+	if err != errBrokenPipe {
+		t.Fatal("OpenStream should have failed with errBrokenPipe; got", err)
+	}
+}
+
+func TestStreamDeadlineSlowServer(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	config := DefaultConfig()
+	config.KeepAliveInterval = 1 * time.Second
+	config.KeepAliveTimeout = 3 * time.Second
+
+	srvListener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srvListener.Close()
+	go func() {
+		conn, err := srvListener.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		srv, err := Server(conn, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer srv.Close()
+		for {
+			// accept stream, but perform no further I/O
+			_, err := srv.AcceptStream()
+			if err != nil {
+				break
+			}
+		}
+	}()
+
+	cliConn, err := net.Dial("tcp", srvListener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cli, err := Client(cliConn, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cli.Close()
+
+	// open a stream
+	stream, err := cli.OpenStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+
+	// set deadline and attempt a read
+	stream.SetReadDeadline(time.Now().Add(time.Second))
+	_, err = stream.Read(make([]byte, 10))
+	if err != errTimeout {
+		t.Fatal("excepted errTimeout, got", err)
+	}
 }
 
 func BenchmarkAcceptClose(b *testing.B) {
