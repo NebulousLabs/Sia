@@ -4,6 +4,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/bolt"
 )
 
 // broadcastedTSet is a helper struct to keep track of transaction sets and to
@@ -27,9 +28,9 @@ type persistBTS struct {
 	Transactions []types.Transaction // the tSet
 }
 
-// confirmed is a helper function that sets a certain transactions to confirmed
+// markConfirmation is a helper function that sets a certain transactions to markConfirmation
 // or unconfirmed. It also updates the state on disk.
-func (bts *broadcastedTSet) confirmed(txid types.TransactionID, confirmed bool) error {
+func (bts *broadcastedTSet) markConfirmation(txid types.TransactionID, confirmed bool) error {
 	bts.confirmedTxn[txid] = confirmed
 	return dbPutBroadcastedTSet(bts.w.dbTx, *bts)
 }
@@ -71,4 +72,88 @@ func (w *Wallet) newBroadcastedTSet(tSet []types.Transaction) (bts *broadcastedT
 		return nil, err
 	}
 	return
+}
+
+// rebroadcastOldTransaction rebroadcasts transactions that haven't been
+// confirmed within rebroadcastInterval blocks
+func (w *Wallet) rebroadcastOldTransactions(tx *bolt.Tx, cc modules.ConsensusChange) error {
+	// Get the current consensus height
+	consensusHeight, err := dbGetConsensusHeight(tx)
+	if err != nil {
+		return err
+	}
+
+	// Build an index to quickly map a transaction to a set in broadcastedTSets
+	broadcastedTxns := make(map[types.TransactionID]modules.TransactionSetID)
+	for tSetID, bts := range w.broadcastedTSets {
+		for _, txn := range bts.transactions {
+			broadcastedTxns[txn.ID()] = tSetID
+		}
+	}
+
+	// Mark reverted transactions as not confirmed
+	for _, block := range cc.RevertedBlocks {
+		for _, txn := range block.Transactions {
+			if tSetID, exists := broadcastedTxns[txn.ID()]; exists {
+				bts := w.broadcastedTSets[tSetID]
+				if err := bts.markConfirmation(txn.ID(), false); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Mark applied transactions as confirmed
+	for _, block := range cc.AppliedBlocks {
+		for _, txn := range block.Transactions {
+			if tSetID, exists := broadcastedTxns[txn.ID()]; exists {
+				bts := w.broadcastedTSets[tSetID]
+				if err := bts.markConfirmation(txn.ID(), true); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Check if all transactions of the set are confirmed
+	for tSetID, bts := range w.broadcastedTSets {
+		confirmed := true
+		for _, c := range bts.confirmedTxn {
+			if !c {
+				confirmed = false
+				break
+			}
+		}
+		// If the transaction set has been confirmed for one broadcast cycle it
+		// should be safe to remove it
+		if confirmed && consensusHeight >= bts.lastTry+RebroadcastInterval {
+			if err := w.deleteBroadcastedTSet(tSetID); err != nil {
+				return err
+			}
+			continue
+		}
+		// If the transaction set has been confirmed recently we wait a little
+		// bit longer before we remove it
+		if confirmed {
+			continue
+		}
+		// If the transaction set is not confirmed and hasn't been broadcasted
+		// for rebroadcastInterval blocks we try to broadcast it again
+		if consensusHeight >= bts.lastTry+RebroadcastInterval {
+			bts.lastTry = consensusHeight
+			go func(tSet []types.Transaction) {
+				if err := w.tpool.AcceptTransactionSet(tSet); err != nil {
+					w.log.Println("WARNING: Rebroadcast failed: ", err)
+				}
+			}(bts.transactions)
+			// Delete the transaction set once we have tried for RespendTimeout
+			// blocks
+			if consensusHeight >= bts.firstTry+RebroadcastTimeout {
+				if err := w.deleteBroadcastedTSet(tSetID); err != nil {
+					w.log.Println("ERROR: Failed to delete broadcasted TSet from db: ", err)
+				}
+			}
+		}
+	}
+	return nil
 }

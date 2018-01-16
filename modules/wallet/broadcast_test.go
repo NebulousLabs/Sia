@@ -125,7 +125,7 @@ func TestRebroadcastTransactionsPersist(t *testing.T) {
 	tSetID := modules.TransactionSetID(crypto.HashAll(tSet))
 	bts := wt.wallet.broadcastedTSets[tSetID]
 	bts.confirmedTxn[tSet[0].ID()] = false
-	if err := bts.confirmed(tSet[0].ID(), false); err != nil {
+	if err := bts.markConfirmation(tSet[0].ID(), false); err != nil {
 		t.Fatal(err)
 	}
 
