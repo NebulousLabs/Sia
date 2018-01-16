@@ -448,7 +448,9 @@ func TestRecentContractPricesLength(t *testing.T) {
 
 	// add 150 more blocks
 	for i := 0; i < 150; i++ {
-		ht.miner.AddBlock()
+		if _, err := ht.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// recentContractPrices should have length 144

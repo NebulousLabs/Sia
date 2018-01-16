@@ -77,6 +77,7 @@ var (
 	// furious for losing access to it for a few weeks.
 	defaultCollateralBudget = types.SiacoinPrecision.Mul64(100e3)
 
+	// defaultContractPrice defines the default price of creating a contract
 	// with the host. The default is set to 0 siacoins and will be adjusted
 	// automatically if it needs to be higher
 	defaultContractPrice = types.ZeroCurrency
