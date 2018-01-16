@@ -166,15 +166,28 @@ func acceptableSessionHeader(ourHeader, remoteHeader sessionHeader, remoteAddr s
 // The requesting peer is added as a node and a peer. The peer is only added if
 // a nil error is returned.
 func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string) error {
-	g.log.Debugln("Sending sessionHeader with address", g.myAddr, g.myAddr.IsLocal())
+	// Get the remote address from opened socket
+	remoteAddr := modules.NetAddress(conn.RemoteAddr().String())
+
+	var ourAddr modules.NetAddress
+	// Send the local IP if we are connecting to a local node
+	// the interface address suffices in case we are using IPv6 as well
+	if ip := net.ParseIP(remoteAddr.Host()); ip.To4() == nil || remoteAddr.IsLocal() {
+		host, _, _ := net.SplitHostPort(conn.LocalAddr().String())
+		ourAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
+	} else {
+		// Send the detected external IP otherwise
+		g.mu.RLock()
+		ourAddr = g.myAddr
+		g.mu.RUnlock()
+	}
+
 	// Perform header handshake.
-	g.mu.RLock()
 	ourHeader := sessionHeader{
 		GenesisID:  types.GenesisID,
 		UniqueID:   g.id,
-		NetAddress: g.myAddr,
+		NetAddress: ourAddr,
 	}
-	g.mu.RUnlock()
 
 	remoteHeader, err := exchangeRemoteHeader(conn, ourHeader)
 	if err != nil {
@@ -183,9 +196,6 @@ func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string)
 	if err := exchangeOurHeader(conn, ourHeader); err != nil {
 		return err
 	}
-
-	// Get the remote address from opened socket
-	remoteAddr := modules.NetAddress(conn.RemoteAddr().String())
 
 	// Accept the peer.
 	peer := &peer{
@@ -358,13 +368,25 @@ func exchangeRemoteHeader(conn net.Conn, ourHeader sessionHeader) (sessionHeader
 // managedConnectv130Peer connects to peers >= v1.3.0. The peer is added as a
 // node and a peer. The peer is only added if a nil error is returned.
 func (g *Gateway) managedConnectv130Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
-	g.log.Debugln("Sending sessionHeader with address", g.myAddr, g.myAddr.IsLocal())
+	var ourAddr modules.NetAddress
+	// Send the local IP if we are connecting to a local node
+	// the interface address suffices in case we are using IPv6 as well
+	if ip := net.ParseIP(remoteAddr.Host()); ip.To4() == nil || remoteAddr.IsLocal() {
+		host, _, _ := net.SplitHostPort(conn.LocalAddr().String())
+		ourAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
+	} else {
+		// Send the detected external IP otherwise
+		g.mu.RLock()
+		ourAddr = g.myAddr
+		g.mu.RUnlock()
+	}
+
 	// Perform header handshake.
 	g.mu.RLock()
 	ourHeader := sessionHeader{
 		GenesisID:  types.GenesisID,
-		UniqueID:   g.id,
-		NetAddress: g.myAddr,
+		UniqueID:  	g.id,
+		NetAddress: ourAddr,
 	}
 	g.mu.RUnlock()
 
