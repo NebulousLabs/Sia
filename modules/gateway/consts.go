@@ -34,11 +34,11 @@ const (
 	// saveFrequency defines how often the gateway saves its persistence.
 	saveFrequency = time.Minute * 2
 
-	// sessionUpgradeVersion is the version where the gateway handshake RPC
-	// was altered to include the ID of the genesis block, the gateway's
-	// unique ID, and whether a connection is desired. This version also uses
-	// smux instead of muxado for stream multiplexing.
-	sessionUpgradeVersion = "1.3.0"
+	// minimumAcceptablePeerVersion is the oldest version for which we accept
+	// incoming connections. This version is usually raised if changes to the
+	// codebase were made that weren't backwards compatible. This might include
+	// changes to the protocol or hardforks.
+	minimumAcceptablePeerVersion = "1.3.1"
 )
 
 var (

@@ -591,20 +591,20 @@ func TestConnectRejectsVersions(t *testing.T) {
 		},
 		// Test that Connect /could/ succeed when the remote peer's version is >= 1.3.0.
 		{
-			version:         sessionUpgradeVersion,
+			version:         minimumAcceptablePeerVersion,
 			msg:             "Connect should succeed when the remote peer's version is 1.3.0 and sessionHeader checks out",
 			uniqueID:        func() (id gatewayID) { fastrand.Read(id[:]); return }(),
 			genesisID:       types.GenesisID,
-			versionRequired: sessionUpgradeVersion,
+			versionRequired: minimumAcceptablePeerVersion,
 		},
 		{
-			version:         sessionUpgradeVersion,
+			version:         minimumAcceptablePeerVersion,
 			msg:             "Connect should not succeed when peer is connecting to itself",
 			uniqueID:        g.id,
 			genesisID:       types.GenesisID,
 			errWant:         errOurAddress.Error(),
 			localErrWant:    errOurAddress.Error(),
-			versionRequired: sessionUpgradeVersion,
+			versionRequired: minimumAcceptablePeerVersion,
 		},
 	}
 	for testIndex, tt := range tests {
@@ -628,7 +628,7 @@ func TestConnectRejectsVersions(t *testing.T) {
 				panic(fmt.Sprintf("test #%d failed: remoteVersion != build.Version", testIndex))
 			}
 
-			if build.VersionCmp(tt.version, sessionUpgradeVersion) >= 0 {
+			if build.VersionCmp(tt.version, minimumAcceptablePeerVersion) >= 0 {
 				ourHeader := sessionHeader{
 					GenesisID:  tt.genesisID,
 					UniqueID:   tt.uniqueID,

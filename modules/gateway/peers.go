@@ -135,8 +135,10 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 		return
 	}
 
-	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
+	if build.VersionCmp(remoteVersion, minimumAcceptablePeerVersion) >= 0 {
 		err = g.managedAcceptConnv130Peer(conn, remoteVersion)
+	} else {
+		err = errors.New("version number is below threshold")
 	}
 	if err != nil {
 		g.log.Debugf("INFO: %v wanted to connect, but failed: %v", addr, err)
@@ -355,9 +357,9 @@ func exchangeRemoteHeader(conn net.Conn, ourHeader sessionHeader) (sessionHeader
 	return remoteHeader, nil
 }
 
-// managedConnectv130Peer connects to peers >= v1.3.0. The peer is added as a
+// managedConnectPeer connects to peers >= v1.3.1. The peer is added as a
 // node and a peer. The peer is only added if a nil error is returned.
-func (g *Gateway) managedConnectv130Peer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
+func (g *Gateway) managedConnectPeer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
 	g.log.Debugln("Sending sessionHeader with address", g.myAddr, g.myAddr.IsLocal())
 	// Perform header handshake.
 	g.mu.RLock()
@@ -412,8 +414,10 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 		return err
 	}
 
-	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) >= 0 {
-		err = g.managedConnectv130Peer(conn, remoteVersion, addr)
+	if build.VersionCmp(remoteVersion, minimumAcceptablePeerVersion) >= 0 {
+		err = g.managedConnectPeer(conn, remoteVersion, addr)
+	} else {
+		err = errors.New("version number is below threshold")
 	}
 	if err != nil {
 		conn.Close()

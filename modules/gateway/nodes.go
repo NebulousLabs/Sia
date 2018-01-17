@@ -61,7 +61,7 @@ func (g *Gateway) pingNode(addr modules.NetAddress) error {
 		return err
 	}
 
-	if build.VersionCmp(remoteVersion, sessionUpgradeVersion) < 0 {
+	if build.VersionCmp(remoteVersion, minimumAcceptablePeerVersion) < 0 {
 		return nil // for older versions, this is where pinging ends
 	}
 
