@@ -1635,3 +1635,70 @@ func TestWalletManyTransactions(t *testing.T) {
 		})
 	}
 }
+
+// TestWalletTransactionsGETAddr queries the /wallet/transactions/:addr api
+// call.
+func TestWalletTransactionsGetAddr(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.panicClose()
+
+	// Create a second wallet.
+	st2, err := blankServerTester(t.Name() + "w2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.server.panicClose()
+
+	err = fullyConnectNodes([]*serverTester{st, st2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get address of recipient
+	uc, err := st2.wallet.NextAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := uc.UnlockHash()
+
+	// Sent some money to the address
+	sentValue := types.SiacoinPrecision.Mul64(3)
+	_, err = st.wallet.SendSiacoins(sentValue, addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Query the details of the first transaction using
+	// /wallet/transactions/:addr
+	var wtga WalletTransactionsGETaddr
+	wtgaQuery := fmt.Sprintf("/wallet/transactions/%s", addr)
+	err = st.getAPI(wtgaQuery, &wtga)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtga.UnconfirmedTransactions) != 1 || len(wtga.ConfirmedTransactions) != 0 {
+		t.Errorf("There should be exactly 1 unconfirmed and 0 confirmed related txns")
+	}
+
+	// Mine a block to get the transaction confirmed
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// See if they moved to the confirmed transactions after mining a block
+	err = st.getAPI(wtgaQuery, &wtga)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtga.UnconfirmedTransactions) != 0 || len(wtga.ConfirmedTransactions) != 1 {
+		t.Errorf("There should be exactly 0 unconfirmed and 1 confirmed related txns")
+	}
+}
