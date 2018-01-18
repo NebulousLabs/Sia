@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -234,12 +236,17 @@ func TestManualConnectDisconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal("failed to disconnect:", err)
 	}
-	time.Sleep(time.Second)
-
-	// Neither g1 nor g2 can connect after g1 being blacklisted
-	err = g1.Connect(g2.Address())
-	if err == nil {
-		t.Fatal("shouldn't be able to connect")
+	// Retry to give the peers map enough time to update after the disconnect
+	err = build.Retry(100, time.Millisecond*100, func() error {
+		// Neither g1 nor g2 can connect after g1 being blacklisted
+		err := g1.Connect(g2.Address())
+		if err == nil {
+			return errors.New("shouldn't be able to connect")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 	err = g1.ConnectManual(g2.Address())
 	if err == nil {
@@ -261,10 +268,15 @@ func TestManualConnectDisconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal("failed to disconnect:", err)
 	}
-	time.Sleep(time.Second)
-	err = g1.Connect(g2.Address())
+	err = build.Retry(100, time.Millisecond*100, func() error {
+		err = g1.Connect(g2.Address())
+		if err != nil {
+			return fmt.Errorf("failed to connect: %v", err)
+		}
+		return nil
+	})
 	if err != nil {
-		t.Fatal("failed to connect:", err)
+		t.Fatal(err)
 	}
 
 	// same thing again but the other way round
@@ -272,10 +284,15 @@ func TestManualConnectDisconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal("failed to disconnect:", err)
 	}
-	time.Sleep(time.Second)
-	err = g2.Connect(g1.Address())
+	err = build.Retry(100, time.Millisecond*100, func() error {
+		err := g2.Connect(g1.Address())
+		if err != nil {
+			t.Fatal("failed to connect:", err)
+		}
+		return nil
+	})
 	if err != nil {
-		t.Fatal("failed to connect:", err)
+		t.Fatal(err)
 	}
 }
 
