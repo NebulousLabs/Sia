@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -208,4 +209,133 @@ func TestParallelClose(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+// TestManualConnectDisconnect checks if a user initiated connect and
+// disconnect works as expected.
+func TestManualConnectDisconnect(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	g1 := newNamedTestingGateway(t, "1")
+	defer g1.Close()
+	g2 := newNamedTestingGateway(t, "2")
+	defer g2.Close()
+
+	// g1 should be able to connect to g2
+	err := g1.Connect(g2.Address())
+	if err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+
+	// g2 manually disconnects from g1 and therefore blacklists it
+	err = g2.DisconnectManual(g1.Address())
+	if err != nil {
+		t.Fatal("failed to disconnect:", err)
+	}
+	time.Sleep(time.Second)
+
+	// Neither g1 nor g2 can connect after g1 being blacklisted
+	err = g1.Connect(g2.Address())
+	if err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	err = g1.ConnectManual(g2.Address())
+	if err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	err = g2.Connect(g1.Address())
+	if err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+
+	// g2 manually connects and therefore removes g1 from the blacklist again
+	err = g2.ConnectManual(g1.Address())
+	if err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+
+	// g2 disconnects and lets g1 connect which should also be possible now
+	err = g2.Disconnect(g1.Address())
+	if err != nil {
+		t.Fatal("failed to disconnect:", err)
+	}
+	time.Sleep(time.Second)
+	err = g1.Connect(g2.Address())
+	if err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+
+	// same thing again but the other way round
+	err = g2.Disconnect(g1.Address())
+	if err != nil {
+		t.Fatal("failed to disconnect:", err)
+	}
+	time.Sleep(time.Second)
+	err = g2.Connect(g1.Address())
+	if err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+}
+
+// TestManualConnectDisconnectPersist checks if the blacklist is persistet on
+// disk
+func TestManualConnectDisconnectPersist(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	g1 := newNamedTestingGateway(t, "1")
+	defer g1.Close()
+	g2 := newNamedTestingGateway(t, "2")
+
+	// g1 should be able to connect to g2
+	err := g1.Connect(g2.Address())
+	if err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+
+	// g2 manually disconnects from g1 and therefore blacklists it
+	err = g2.DisconnectManual(g1.Address())
+	if err != nil {
+		t.Fatal("failed to disconnect:", err)
+	}
+	time.Sleep(time.Second)
+
+	// Neither g1 nor g2 can connect after g1 being blacklisted
+	err = g1.Connect(g2.Address())
+	if err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	err = g1.ConnectManual(g2.Address())
+	if err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	err = g2.Connect(g1.Address())
+	if err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+
+	// Restart g2 without deleting the tmp dir
+	g2.Close()
+	g2, err = New("localhost:0", false, g2.persistDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g2.Close()
+
+	// Neither g1 nor g2 can connect. Since g1 is still blacklisted
+	err = g1.Connect(g2.Address())
+	if err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	err = g1.ConnectManual(g2.Address())
+	if err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	err = g2.Connect(g1.Address())
+	if err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
 }
