@@ -14,6 +14,9 @@ const (
 
 	// nodesFile is the name of the file that contains all seen nodes.
 	nodesFile = "nodes.json"
+
+	// blacklistFile is the name of the file that contains all blacklisted nodes.
+	blacklistFile = "blacklist.json"
 )
 
 // persistMetadata contains the header and version strings that identify the
@@ -23,10 +26,26 @@ var persistMetadata = persist.Metadata{
 	Version: "1.3.0",
 }
 
+// persistMetadataBlacklist contains the header and version strings that
+// identify the gateway persist file.
+var persistMetadataBlacklist = persist.Metadata{
+	Header:  "Sia Node Blacklist",
+	Version: "1.3.2",
+}
+
 // persistData returns the data in the Gateway that will be saved to disk.
 func (g *Gateway) persistData() (nodes []*node) {
 	for _, node := range g.nodes {
 		nodes = append(nodes, node)
+	}
+	return
+}
+
+// persistDataBlacklist returns the data of the blacklist that will be saved to
+// disk.
+func (g *Gateway) persistDataBlacklist() (ips []string) {
+	for ip := range g.blacklist {
+		ips = append(ips, ip)
 	}
 	return
 }
@@ -43,6 +62,25 @@ func (g *Gateway) load() error {
 		g.nodes[nodes[i].NetAddress] = nodes[i]
 	}
 	return nil
+}
+
+// load loads the Gateway's blacklisted ips from disk.
+func (g *Gateway) loadBlacklist() error {
+	var ips []string
+	err := persist.LoadJSON(persistMetadataBlacklist, &ips, filepath.Join(g.persistDir, blacklistFile))
+	if err != nil {
+		return err
+	}
+	for _, ip := range ips {
+		g.blacklist[ip] = struct{}{}
+	}
+	return nil
+}
+
+// saveBlacklist stores the Gateway's blacklisted ips on disk and then syncs to
+// disk to minimize the possibility of data loss.
+func (g *Gateway) saveBlacklist() error {
+	return persist.SaveJSON(persistMetadataBlacklist, g.persistDataBlacklist(), filepath.Join(g.persistDir, blacklistFile))
 }
 
 // saveSync stores the Gateway's persistent data on disk, and then syncs to
