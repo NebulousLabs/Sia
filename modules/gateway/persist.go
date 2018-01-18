@@ -52,22 +52,23 @@ func (g *Gateway) persistDataBlacklist() (ips []string) {
 
 // load loads the Gateway's persistent data from disk.
 func (g *Gateway) load() error {
+	// load nodes
 	var nodes []*node
 	err := persist.LoadJSON(persistMetadata, &nodes, filepath.Join(g.persistDir, nodesFile))
 	if err != nil {
 		// COMPATv1.3.0
-		return g.loadv033persist()
+		err = g.loadv033persist()
+		if err != nil {
+			return err
+		}
 	}
 	for i := range nodes {
 		g.nodes[nodes[i].NetAddress] = nodes[i]
 	}
-	return nil
-}
 
-// load loads the Gateway's blacklisted ips from disk.
-func (g *Gateway) loadBlacklist() error {
+	// load blacklist
 	var ips []string
-	err := persist.LoadJSON(persistMetadataBlacklist, &ips, filepath.Join(g.persistDir, blacklistFile))
+	err = persist.LoadJSON(persistMetadataBlacklist, &ips, filepath.Join(g.persistDir, blacklistFile))
 	if err != nil {
 		return err
 	}

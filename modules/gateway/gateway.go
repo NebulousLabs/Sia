@@ -249,10 +249,6 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
 	}
-	// Do the same for the blacklist.
-	if loadErr := g.loadBlacklist(); loadErr != nil && !os.IsNotExist(loadErr) {
-		return nil, loadErr
-	}
 	// Spawn the thread to periodically save the gateway.
 	go g.threadedSaveLoop()
 	// Make sure that the gateway saves after shutdown.
