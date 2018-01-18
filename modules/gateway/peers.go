@@ -128,6 +128,11 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 	addr := modules.NetAddress(conn.RemoteAddr().String())
 	g.log.Debugf("INFO: %v wants to connect", addr)
 
+	if _, exists := g.blacklist[addr.Host()]; exists {
+		g.log.Debugf("INFO: %v was rejected. (blacklisted)")
+		conn.Close()
+		return
+	}
 	remoteVersion, err := acceptVersionHandshake(conn, build.Version)
 	if err != nil {
 		g.log.Debugf("INFO: %v wanted to connect but version handshake failed: %v", addr, err)
@@ -394,6 +399,9 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	if net.ParseIP(addr.Host()) == nil {
 		return errors.New("address must be an IP address")
 	}
+	if _, exists := g.blacklist[addr.Host()]; exists {
+		return errors.New("can't connect to blacklisted address")
+	}
 	g.mu.RLock()
 	_, exists := g.peers[addr]
 	g.mu.RUnlock()
@@ -505,15 +513,27 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 	return nil
 }
 
-// Peers returns the addresses currently connected to the Gateway.
-func (g *Gateway) Peers() []modules.Peer {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	var peers []modules.Peer
-	for _, p := range g.peers {
-		peers = append(peers, p.Peer)
+// ConnectManual is a wrapper for the Connect function. It is specifically used
+// if a user wants to connect to a node manually. This also removes the node
+// from the blacklist.
+func (g *Gateway) ConnectManual(addr modules.NetAddress) error {
+	g.mu.Lock()
+	delete(g.blacklist, addr.Host())
+	g.mu.Unlock()
+	return g.Connect(addr)
+}
+
+// DisconnectManual is a wrapper for the Disconnect function. It is
+// specifically used if a user wants to connect to a node manually. This also
+// adds the node to the blacklist.
+func (g *Gateway) DisconnectManual(addr modules.NetAddress) error {
+	err := g.Disconnect(addr)
+	if err == nil {
+		g.mu.Lock()
+		g.blacklist[addr.Host()] = struct{}{}
+		g.mu.Unlock()
 	}
-	return peers
+	return err
 }
 
 // Online returns true if the node is connected to the internet. During testing
@@ -531,4 +551,15 @@ func (g *Gateway) Online() bool {
 		}
 	}
 	return false
+}
+
+// Peers returns the addresses currently connected to the Gateway.
+func (g *Gateway) Peers() []modules.Peer {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	var peers []modules.Peer
+	for _, p := range g.peers {
+		peers = append(peers, p.Peer)
+	}
+	return peers
 }
