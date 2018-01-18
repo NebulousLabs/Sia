@@ -1,8 +1,6 @@
 package gateway
 
 import (
-	"errors"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -42,6 +40,24 @@ func newNamedTestingGateway(t *testing.T, suffix string) *Gateway {
 		panic(err)
 	}
 	return g
+}
+
+// NDF safe connection helpers
+func connectToNode(g1 *Gateway, g2 *Gateway, manual bool) error {
+	return build.Retry(100, 10*time.Millisecond, func() error {
+		if manual {
+			return g1.ConnectManual(g2.Address())
+		}
+		return g1.Connect(g2.Address())
+	})
+}
+func disconnectFromNode(g1 *Gateway, g2 *Gateway, manual bool) error {
+	return build.Retry(100, 10*time.Millisecond, func() error {
+		if manual {
+			return g1.DisconnectManual(g2.Address())
+		}
+		return g1.Disconnect(g2.Address())
+	})
 }
 
 // TestExportedMethodsErrAfterClose tests that exported methods like Close and
@@ -226,73 +242,43 @@ func TestManualConnectDisconnect(t *testing.T) {
 	defer g2.Close()
 
 	// g1 should be able to connect to g2
-	err := g1.Connect(g2.Address())
-	if err != nil {
+	if err := connectToNode(g1, g2, false); err != nil {
 		t.Fatal("failed to connect:", err)
 	}
-
 	// g2 manually disconnects from g1 and therefore blacklists it
-	err = g2.DisconnectManual(g1.Address())
-	if err != nil {
+	if err := disconnectFromNode(g2, g1, true); err != nil {
 		t.Fatal("failed to disconnect:", err)
 	}
-	// Retry to give the peers map enough time to update after the disconnect
-	err = build.Retry(100, time.Millisecond*100, func() error {
-		// Neither g1 nor g2 can connect after g1 being blacklisted
-		err := g1.Connect(g2.Address())
-		if err == nil {
-			return errors.New("shouldn't be able to connect")
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = g1.ConnectManual(g2.Address())
-	if err == nil {
+	// Neither g1 nor g2 can connect after g1 being blacklisted
+	if err := connectToNode(g1, g2, false); err == nil {
 		t.Fatal("shouldn't be able to connect")
 	}
-	err = g2.Connect(g1.Address())
-	if err == nil {
+	if err := connectToNode(g1, g2, true); err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	if err := connectToNode(g2, g1, false); err == nil {
 		t.Fatal("shouldn't be able to connect")
 	}
 
 	// g2 manually connects and therefore removes g1 from the blacklist again
-	err = g2.ConnectManual(g1.Address())
-	if err != nil {
+	if err := connectToNode(g2, g1, true); err != nil {
 		t.Fatal("failed to connect:", err)
 	}
 
 	// g2 disconnects and lets g1 connect which should also be possible now
-	err = g2.Disconnect(g1.Address())
-	if err != nil {
+	if err := disconnectFromNode(g2, g1, false); err != nil {
 		t.Fatal("failed to disconnect:", err)
 	}
-	err = build.Retry(100, time.Millisecond*100, func() error {
-		err = g1.Connect(g2.Address())
-		if err != nil {
-			return fmt.Errorf("failed to connect: %v", err)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	if err := connectToNode(g1, g2, false); err != nil {
+		t.Fatal("failed to connect:", err)
 	}
 
 	// same thing again but the other way round
-	err = g2.Disconnect(g1.Address())
-	if err != nil {
+	if err := disconnectFromNode(g2, g1, false); err != nil {
 		t.Fatal("failed to disconnect:", err)
 	}
-	err = build.Retry(100, time.Millisecond*100, func() error {
-		err := g2.Connect(g1.Address())
-		if err != nil {
-			t.Fatal("failed to connect:", err)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	if err := connectToNode(g2, g1, false); err != nil {
+		t.Fatal("failed to connect:", err)
 	}
 }
 
@@ -308,51 +294,42 @@ func TestManualConnectDisconnectPersist(t *testing.T) {
 	g2 := newNamedTestingGateway(t, "2")
 
 	// g1 should be able to connect to g2
-	err := g1.Connect(g2.Address())
-	if err != nil {
+	if err := connectToNode(g1, g2, false); err != nil {
 		t.Fatal("failed to connect:", err)
 	}
 
 	// g2 manually disconnects from g1 and therefore blacklists it
-	err = g2.DisconnectManual(g1.Address())
-	if err != nil {
+	if err := disconnectFromNode(g2, g1, true); err != nil {
 		t.Fatal("failed to disconnect:", err)
 	}
-	time.Sleep(time.Second)
 
 	// Neither g1 nor g2 can connect after g1 being blacklisted
-	err = g1.Connect(g2.Address())
-	if err == nil {
+	if err := connectToNode(g1, g2, false); err == nil {
 		t.Fatal("shouldn't be able to connect")
 	}
-	err = g1.ConnectManual(g2.Address())
-	if err == nil {
+	if err := connectToNode(g1, g2, true); err == nil {
 		t.Fatal("shouldn't be able to connect")
 	}
-	err = g2.Connect(g1.Address())
-	if err == nil {
+	if err := connectToNode(g2, g1, false); err == nil {
 		t.Fatal("shouldn't be able to connect")
 	}
 
 	// Restart g2 without deleting the tmp dir
 	g2.Close()
-	g2, err = New("localhost:0", false, g2.persistDir)
+	g2, err := New("localhost:0", false, g2.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer g2.Close()
 
-	// Neither g1 nor g2 can connect. Since g1 is still blacklisted
-	err = g1.Connect(g2.Address())
-	if err == nil {
+	// Neither g1 nor g2 can connect after g1 being blacklisted
+	if err := connectToNode(g1, g2, false); err == nil {
 		t.Fatal("shouldn't be able to connect")
 	}
-	err = g1.ConnectManual(g2.Address())
-	if err == nil {
+	if err := connectToNode(g1, g2, true); err == nil {
 		t.Fatal("shouldn't be able to connect")
 	}
-	err = g2.Connect(g1.Address())
-	if err == nil {
+	if err := connectToNode(g2, g1, false); err == nil {
 		t.Fatal("shouldn't be able to connect")
 	}
 }
