@@ -145,13 +145,8 @@ func TestNewContractManagerErroredStartup(t *testing.T) {
 	// Verify that shutdown was triggered correctly - tmp files should be gone,
 	// WAL file should also be gone.
 	walFileName := filepath.Join(cmd, walFile)
-	walFileTmpName := filepath.Join(cmd, walFileTmp)
 	settingsFileTmpName := filepath.Join(cmd, settingsFileTmp)
 	_, err = os.Stat(walFileName)
-	if !os.IsNotExist(err) {
-		t.Error("file should have been removed:", err)
-	}
-	_, err = os.Stat(walFileTmpName)
 	if !os.IsNotExist(err) {
 		t.Error("file should have been removed:", err)
 	}

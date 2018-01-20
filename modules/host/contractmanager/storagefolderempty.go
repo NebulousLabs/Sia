@@ -18,6 +18,10 @@ var (
 // managedMoveSector will move a sector from its current storage folder to
 // another.
 func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
+	// Wait if WAL reset is in progress
+	wal.rmu.RLock()
+	defer wal.rmu.RUnlock()
+
 	wal.managedLockSector(id)
 	defer wal.managedUnlockSector(id)
 

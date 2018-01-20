@@ -1,18 +1,33 @@
 package contractmanager
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/fastrand"
 )
 
 type (
+	// walHeader is the header of the wal file
+	//
+	// LengthMD defines the changeLength (in bytes) of the metadata section right after
+	// the walHeader
+	//
+	// Revision defines the current revision of the WAL. If an older revision than the one
+	// in the header is encountered during a recovery it stops reading the WAL
+	walHeader struct {
+		LengthMD int64
+		Revision uint64
+	}
+
 	// sectorUpdate is an idempotent update to the sector metadata.
 	sectorUpdate struct {
 		Count  uint16
@@ -60,12 +75,25 @@ type (
 		// that a sector update will not make it into the synced WAL unless the
 		// sector data is already on-disk and synced.
 		SectorUpdates []sectorUpdate
+
+		// Revision describes the revision the stateChange belongs to. After the WAL is full
+		// it will process the changes, restart from the beginning and increase the revision
+		// to invalidate old stateChanges should they still be readable.
+		Revision uint64
+	}
+
+	// stateChangePrefix defines a short prefix of constant size that is written to the WAL before each
+	// stateChange. I contains a checksum and changeLength of the encoded stateChange
+	stateChangePrefix struct {
+		ChangeLength int64
+		Checksum     crypto.Hash
 	}
 
 	// writeAheadLog coordinates ACID transactions which update the state of
 	// the contract manager. Consistency on a field is only guaranteed by
 	// looking it up through the WAL, and is not guaranteed by direct access.
 	writeAheadLog struct {
+		// TODO change this before merging
 		// The primary feature of the WAL is a file on disk that records all of
 		// the changes which have been proposed. The data is written to a temp
 		// file and then renamed atomically to a non-corrupt commitment of
@@ -89,27 +117,49 @@ type (
 		// uncommittedChanges details a list of operations which have been
 		// suggested or queued to be made to the state, but are not yet
 		// guaranteed to have completed.
-		fileSettingsTmp    file
-		fileWALTmp         file
-		syncChan           chan struct{}
-		uncommittedChanges []stateChange
+		fileSettingsTmp file
+		fileWal         file
+		header          walHeader
+		changeOffset    int64
+		syncChan        chan struct{}
 
 		// Utilities. The WAL needs access to the ContractManager because all
 		// mutations to ACID fields of the contract manager happen through the
 		// WAL.
 		cm *ContractManager
 		mu sync.Mutex
+
+		// Utilities needed for a reset.
+		resetInProgress bool
+		rmu             sync.RWMutex
 	}
 )
 
 // readWALMetadata reads WAL metadata from the input file, returning an error
 // if the result is unexpected.
-func readWALMetadata(decoder *json.Decoder) error {
-	var md persist.Metadata
-	err := decoder.Decode(&md)
+func readWALMetadata(f file, header walHeader) error {
+	// Check if the metadata of the file has the same length as the current version
+	if ml, err := metadataLength(); (err != nil) || (header.LengthMD != ml) {
+		return errors.New("WAL metadata header does not have the same length as the one in the WAL." +
+			"The file might use an older version or the header was corrupted")
+	}
+
+	// Read the bytes of the metadata
+	byteMD := make([]byte, header.LengthMD)
+	_, err := f.ReadAt(byteMD, headerLength())
 	if err != nil {
 		return build.ExtendErr("error reading WAL metadata", err)
 	}
+
+	// Decode the metadata
+	decoder := json.NewDecoder(bytes.NewBuffer(byteMD))
+	var md persist.Metadata
+	err = decoder.Decode(&md)
+	if err != nil {
+		return build.ExtendErr("error decoding WAL metadata", err)
+	}
+
+	// Check if correct header was found
 	if md.Header != walMetadata.Header {
 		return errors.New("WAL metadata header does not match header found in WAL file")
 	}
@@ -120,16 +170,124 @@ func readWALMetadata(decoder *json.Decoder) error {
 }
 
 // writeWALMetadata writes WAL metadata to the input file.
-func writeWALMetadata(f file) error {
-	changeBytes, err := json.MarshalIndent(walMetadata, "", "\t")
+func writeWALMetadata(f file) (int64, error) {
+	mdBytes, err := json.MarshalIndent(walMetadata, "", "\t")
 	if err != nil {
-		return build.ExtendErr("could not marshal WAL metadata", err)
+		return 0, build.ExtendErr("could not marshal WAL metadata", err)
 	}
-	_, err = f.Write(changeBytes)
+
+	_, err = f.WriteAt(mdBytes, headerLength())
 	if err != nil {
-		return build.ExtendErr("unable to write WAL metadata", err)
+		return 0, build.ExtendErr("unable to write WAL metadata", err)
+	}
+	return int64(len(mdBytes)), nil
+}
+
+// headerLength is a helper function that returns the changeLength of the binary encoded wal header
+func headerLength() int64 {
+	return int64(binary.Size(walHeader{}))
+}
+
+// metadataLength is a helper function that returns the length of the binary encoded metadata
+func metadataLength() (int64, error) {
+	mdBytes, err := json.MarshalIndent(walMetadata, "", "\t")
+	if err != nil {
+		return 0, build.ExtendErr("could not marshal WAL metadata", err)
+	}
+	return int64(len(mdBytes)), nil
+}
+
+// prefixLength is a helper function that returns the length of a binary encoded stateChange prefix
+func prefixLength() int64 {
+	return int64(binary.Size(stateChangePrefix{}))
+}
+
+// readWALHeader reads the WAL header from the input file
+func readWALHeader(f file, header *walHeader) error {
+	bytesHeader := make([]byte, headerLength())
+
+	_, err := f.ReadAt(bytesHeader, 0)
+	if err != nil {
+		return build.ExtendErr("could not read WAL header", err)
+	}
+	buffer := bytes.NewBuffer(bytesHeader)
+
+	err = binary.Read(buffer, binary.LittleEndian, header)
+	if err != nil {
+		return build.ExtendErr("could not decode WAL header", err)
 	}
 	return nil
+}
+
+// writeWALHeader writes the WAL header to the input file
+func writeWALHeader(f file, header walHeader) error {
+	buffer := new(bytes.Buffer)
+
+	err := binary.Write(buffer, binary.LittleEndian, &header)
+	if err != nil {
+		return build.ExtendErr("could not marshal WAL header", err)
+	}
+	_, err = f.WriteAt(buffer.Bytes(), 0)
+	if err != nil {
+		return build.ExtendErr("could not write WAL header", err)
+	}
+	return nil
+}
+
+// readStateChange reads a stateChange at a specific offset in the file and
+// returns the changeLength of the stateChange read
+func (wal *writeAheadLog) readStateChange(offset int64, sc *stateChange) (int64, error) {
+	// Read the prefix
+	bytesPrefix := make([]byte, prefixLength())
+
+	_, err := wal.fileWal.ReadAt(bytesPrefix, offset)
+	if err != nil {
+		return 0, build.ExtendErr("could not read stateChange prefix", err)
+	}
+
+	// Decode the prefix
+	buffer := bytes.NewBuffer(bytesPrefix)
+	var prefix stateChangePrefix
+
+	err = binary.Read(buffer, binary.LittleEndian, &prefix)
+	if err != nil {
+		return 0, build.ExtendErr("could not decode stateChange prefix", err)
+	}
+
+	// Don't trust changeLength. It might be corrupted
+	if prefix.ChangeLength < 0 || prefix.ChangeLength > maxWalSize-offset {
+		return 0, build.ExtendErr("changeLength was too large. Probably due to corruption", err)
+	}
+
+	// Read the state change
+	bytesChange := make([]byte, prefix.ChangeLength)
+
+	_, err = wal.fileWal.ReadAt(bytesChange, offset+prefixLength())
+	if err != nil {
+		return 0, build.ExtendErr("could not read stateChange", err)
+	}
+
+	// Check the stateChange for corruption before decoding it
+	checksum := crypto.HashBytes(bytesChange)
+	if bytes.Compare(prefix.Checksum[:], checksum[:]) != 0 {
+		return 0, errors.New("stateChange is corrupted")
+	}
+
+	// Decode the state change
+	buffer = bytes.NewBuffer(bytesChange)
+	decoder := json.NewDecoder(buffer)
+
+	err = decoder.Decode(sc)
+	if err != nil {
+		return 0, build.ExtendErr("could not decode stateChange", err)
+	}
+
+	// Check if the revision of the stateChange matches the header
+	if sc.Revision != wal.header.Revision {
+		return 0, errors.New("stateChange doesn't match the current header's revision")
+	}
+
+	return prefix.ChangeLength, nil
 }
 
 // appendChange will add a change to the WAL, writing the details of the change
@@ -139,22 +297,68 @@ func writeWALMetadata(f file) error {
 // appending an error. This is common for long running operations like adding a
 // storage folder.
 func (wal *writeAheadLog) appendChange(sc stateChange) {
+	// set the revision to which the stateChange is added
+	sc.Revision = wal.header.Revision
+
+	// Simulate a wrong revision when the StorageFolderAddition is appended.
+	if wal.cm.dependencies.disrupt("walWrongRevision") && len(sc.StorageFolderAdditions) > 0 {
+		sc.Revision = wal.header.Revision + 1
+	}
+
 	// Marshal the change and then write the change to the WAL file. Syncing
 	// happens in the sync loop.
 	changeBytes, err := json.MarshalIndent(sc, "", "\t")
+	changeLength := int64(len(changeBytes))
 	if err != nil {
 		wal.cm.log.Severe("Unable to marshal state change:", err)
 		panic("unable to append a change to the WAL, crashing to prevent corruption")
 	}
-	_, err = wal.fileWALTmp.Write(changeBytes)
+
+	// Create and encode a new prefix
+	prefix := stateChangePrefix{
+		ChangeLength: changeLength,
+		Checksum:     crypto.HashBytes(changeBytes),
+	}
+	var buffer bytes.Buffer
+	err = binary.Write(&buffer, binary.LittleEndian, prefix)
+	if err != nil {
+		wal.cm.log.Severe("Unable to encode state change prefix:", err)
+		panic("unable to append a change to the WAL, crashing to prevent corruption")
+	}
+
+	// Write the prefix to the file followed by the state change
+	_, err = wal.fileWal.WriteAt(buffer.Bytes(), wal.changeOffset)
+	if err != nil {
+		wal.cm.log.Severe("Unable to write state change prefix to WAL:", err)
+		panic("unable to append a change to the WAL, crashing to prevent corruption")
+	}
+
+	_, err = wal.fileWal.WriteAt(changeBytes, wal.changeOffset+prefixLength())
 	if err != nil {
 		wal.cm.log.Severe("Unable to write state change to WAL:", err)
 		panic("unable to append a change to the WAL, crashing to prevent corruption")
 	}
 
-	// Update the WAL to include the new storage folder in the uncommitted
-	// changes.
-	wal.uncommittedChanges = append(wal.uncommittedChanges, sc)
+	// Simulate a corruption of the stateChange when the StorageFolderAddition is appended.
+	if wal.cm.dependencies.disrupt("walCorruptedChange") && len(sc.StorageFolderAdditions) > 0 {
+		wal.fileWal.WriteAt(fastrand.Bytes(len(changeBytes)), wal.changeOffset+prefixLength())
+	}
+
+	// Update the offset
+	wal.changeOffset += prefixLength() + changeLength
+
+	// Perform any cleanup actions on the updates.
+	for _, sfe := range sc.StorageFolderExtensions {
+		wal.commitStorageFolderExtension(sfe)
+	}
+	for _, sfr := range sc.StorageFolderReductions {
+		wal.commitStorageFolderReduction(sfr)
+	}
+	for _, sfr := range sc.StorageFolderRemovals {
+		wal.commitStorageFolderRemoval(sfr)
+	}
+
+	// TODO: Virtual sector handling here.
 }
 
 // commitChange will commit the provided change to the contract manager,
@@ -192,29 +396,50 @@ func (wal *writeAheadLog) commitChange(sc stateChange) {
 	}
 }
 
-// createWALTmp will open up the temporary WAL file.
-func (wal *writeAheadLog) createWALTmp() {
+// createWAL will open up the WAL file.
+func (wal *writeAheadLog) createWAL() {
 	var err error
-	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
-	wal.fileWALTmp, err = wal.cm.dependencies.createFile(walTmpName)
+	walName := filepath.Join(wal.cm.persistDir, walFile)
+	wal.fileWal, err = wal.cm.dependencies.createFile(walName)
 	if err != nil {
-		wal.cm.log.Severe("Unable to create WAL temporary file:", err)
-		panic("unable to create WAL temporary file, crashing to avoid corruption")
+		wal.cm.log.Severe("Unable to create WAL file:", err)
+		panic("unable to create WAL file, crashing to avoid corruption")
 	}
-	err = writeWALMetadata(wal.fileWALTmp)
+
+	lengthMD, err := writeWALMetadata(wal.fileWal)
 	if err != nil {
 		wal.cm.log.Severe("Unable to write WAL metadata:", err)
-		panic("unable to create WAL temporary file, crashing to prevent corruption")
+		panic("unable to create WAL file, crashing to prevent corruption")
 	}
+
+	header := walHeader{
+		LengthMD: lengthMD,
+	}
+
+	err = writeWALHeader(wal.fileWal, header)
+	if err != nil {
+		wal.cm.log.Severe("Unable to write WAL header:", err)
+		panic("unable to write WAL header, crashing to avoid corruption")
+	}
+	wal.header = header
+	wal.changeOffset = headerLength() + lengthMD
 }
 
 // recoverWAL will read a previous WAL and re-commit all of the changes inside,
 // restoring the program to consistency after an unclean shutdown. The tmp WAL
 // file needs to be open before this function is called.
-func (wal *writeAheadLog) recoverWAL(walFile file) error {
+func (wal *writeAheadLog) recoverWAL() error {
+	// Read the WAL header and save it
+	var header walHeader
+	err := readWALHeader(wal.fileWal, &header)
+	if err != nil {
+		wal.cm.log.Println("ERROR: error while reading WAL header:", err)
+		return err
+	}
+	wal.header = header
+
 	// Read the WAL metadata to make sure that the version is correct.
-	decoder := json.NewDecoder(walFile)
-	err := readWALMetadata(decoder)
+	err = readWALMetadata(wal.fileWal, wal.header)
 	if err != nil {
 		wal.cm.log.Println("ERROR: error while reading WAL metadata:", err)
 		return build.ExtendErr("walFile metadata mismatch", err)
@@ -225,22 +450,24 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 	// changes can be parsed properly.
 	var sc stateChange
 	var scs []stateChange
-	for err == nil {
-		err = decoder.Decode(&sc)
-		if err == nil {
-			// The uncommitted changes are loaded into memory using a simple
-			// append, because the tmp WAL file has not been created yet, and
-			// will not be created until the sync loop is spawned. The sync
-			// loop spawner will make sure that the uncommitted changes are
-			// written to the tmp WAL file.
-			wal.commitChange(sc)
-			scs = append(scs, sc)
+	offset := headerLength() + header.LengthMD
+	for offset < maxWalSize {
+		changeLength, err := wal.readStateChange(offset, &sc)
+		if err != nil {
+			break
 		}
+		// The uncommitted changes are loaded into memory using a simple
+		// append, because the WAL file is still being read. The sync
+		// loop spawner will make sure that the uncommitted changes are
+		// written to the new WAL file.
+		wal.commitChange(sc)
+		scs = append(scs, sc)
+		offset += prefixLength() + changeLength
 	}
-	if err != io.EOF {
-		wal.cm.log.Println("ERROR: could not load WAL json:", err)
-		return build.ExtendErr("error loading WAL json", err)
-	}
+	//if err != nil {
+	//	wal.cm.log.Println("ERROR: could not load WAL json:", err)
+	//	return build.ExtendErr("error loading WAL json", err)
+	//}
 
 	// Do any cleanup regarding long-running unfinished tasks. Long running
 	// task cleanup cannot be handled in the 'commitChange' loop because future
@@ -255,46 +482,32 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 // them and doing any necessary preprocessing. In the most common case (any
 // time the previous shutdown was clean), there will not be a WAL file.
 func (wal *writeAheadLog) load() error {
-	// Create the walTmpFile, which needs to be open before recovery can start.
-	wal.createWALTmp()
-
-	// Close the WAL tmp file upon shutdown.
-	wal.cm.tg.AfterStop(func() {
-		wal.mu.Lock()
-		defer wal.mu.Unlock()
-
-		err := wal.fileWALTmp.Close()
-		if err != nil {
-			wal.cm.log.Println("ERROR: error closing wal file during contract manager shutdown:", err)
-			return
-		}
-		err = wal.cm.dependencies.removeFile(filepath.Join(wal.cm.persistDir, walFileTmp))
-		if err != nil {
-			wal.cm.log.Println("ERROR: error removing temporary WAL during contract manager shutdown:", err)
-			return
-		}
-	})
-
 	// Try opening the WAL file.
 	walFileName := filepath.Join(wal.cm.persistDir, walFile)
-	walFile, err := wal.cm.dependencies.openFile(walFileName, os.O_RDONLY, 0600)
+	var err error
+	wal.fileWal, err = wal.cm.dependencies.openFile(walFileName, os.O_RDWR, 0600)
 	if err == nil {
 		// err == nil indicates that there is a WAL file, which means that the
 		// previous shutdown was not clean. Re-commit the changes in the WAL to
 		// bring the program back to consistency.
 		wal.cm.log.Println("WARN: WAL file detected, performing recovery after unclean shutdown.")
-		err = wal.recoverWAL(walFile)
+		err = wal.recoverWAL()
 		if err != nil {
+			wal.fileWal.Close()
 			return build.ExtendErr("failed to recover WAL", err)
 		}
-		err = walFile.Close()
+		err = wal.fileWal.Close()
 		if err != nil {
 			return build.ExtendErr("error closing WAL after performing a recovery", err)
 		}
+
 	} else if !os.IsNotExist(err) {
 		return build.ExtendErr("walFile was not opened successfully", err)
 	}
-	// err == os.IsNotExist, suggesting a successful, clean shutdown. No action
+	// Create/Reset the WAL
+	wal.createWAL()
+
+	// err == os.IsNotExist, suggesting a successful, clean shutdown. A new WAL is created but no additional action
 	// is taken.
 
 	// Create the tmp settings file and initialize the first write to it. This
