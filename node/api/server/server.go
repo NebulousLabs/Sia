@@ -18,10 +18,11 @@ import (
 type Server struct {
 	api               *api.API
 	apiServer         *http.Server
-	errChan           chan error
+	done              chan struct{}
 	listener          net.Listener
 	node              *node.Node
 	requiredUserAgent string
+	serveErr          error
 }
 
 // serve listens for and handles API calls. It is a blocking function.
@@ -38,11 +39,12 @@ func (srv *Server) serve() error {
 
 // Close closes the Server's listener, causing the HTTP server to shut down.
 func (srv *Server) Close() error {
-	// Ordering is important. Listener must be closed before the threadgroup is
-	// stopped. Then the threadgroup should be stopped before grabbing the error
-	// from the errChan.
+	// Stop accepting API requests.
 	err := srv.listener.Close()
-	err = errors.Compose(err, <-srv.errChan)
+	// Wait for serve() to return and capture its error.
+	<-srv.done
+	err = errors.Compose(err, srv.serveErr)
+	// Shutdown modules.
 	err = errors.Compose(err, srv.node.Close())
 	return errors.AddContext(err, "error while closing server")
 }
@@ -72,16 +74,16 @@ func New(APIaddr string, requiredUserAgent string, requiredPassword string, node
 		apiServer: &http.Server{
 			Handler: api,
 		},
+		done:              make(chan struct{}),
 		listener:          listener,
 		requiredUserAgent: requiredUserAgent,
 	}
 
-	// Spin up a channel that will block until the server has closed, and then
-	// send any error down the channel.
+	// Spin up a goroutine that serves the API and closes srv.done when
+	// finished.
 	go func() {
-		err := srv.serve()
-		srv.errChan <- err
-		close(srv.errChan)
+		srv.serveErr = srv.serve()
+		close(srv.done)
 	}()
 
 	return srv, nil
