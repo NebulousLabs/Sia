@@ -35,10 +35,10 @@ dependencies:
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
 run = .
-pkgs = ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer ./modules/gateway   \
-       ./modules/host ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor                       \
-       ./modules/renter/hostdb ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/miner ./modules/wallet \
-       ./modules/transactionpool ./node ./node/api ./persist ./siatest ./cmd/siad ./cmd/siac ./sync ./types
+pkgs = ./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer \
+       ./modules/gateway ./modules/host ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor       \
+       ./modules/renter/hostdb ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/miner ./modules/wallet   \
+       ./modules/transactionpool ./node ./node/api ./persist ./siatest ./node/api/server ./sync ./types
 
 # fmt calls go fmt on all packages.
 fmt:
@@ -50,8 +50,8 @@ vet: release-std
 	go vet $(pkgs)
 
 # will always run on some packages for a while.
-lintpkgs = ./modules ./modules/gateway ./modules/host ./modules/renter/hostdb ./modules/renter/contractor ./node        \
-           ./persist ./siatest
+lintpkgs = ./modules ./modules/gateway ./modules/host ./modules/renter/hostdb ./modules/renter/contractor ./node \
+           ./node/api/server ./persist ./siatest
 lint:
 	@for package in $(lintpkgs); do                           \
 		golint -min_confidence=1.0 $$package                  \

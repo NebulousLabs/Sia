@@ -6,7 +6,8 @@ package node
 
 // TODO: Add support for the explorer.
 
-// TODO: Add support for custom dependencies for all of the modules.
+// TODO: Add support for custom dependencies and parameters for all of the
+// modules.
 
 import (
 	"path/filepath"
@@ -39,10 +40,15 @@ import (
 //		  This will result in a 'nil' module, meaning the node will not have
 //		  that module.
 type NodeParams struct {
-	// Omissions - if the omit flag is set for a module, that module will not
-	// be included in the test node.
+	// Flags to indicate which modules should be created automatically by the
+	// server. If you are providing a pre-existing module, do not set the flag
+	// for that module.
 	//
-	// If you omit a module, you will implicitly omit all dependencies as well.
+	// NOTE / TODO: The code does not currently enforce this, but you should not
+	// provide a custom module unless all of its dependencies are also custom.
+	// Example: if the ConsensusSet is custom, the Gateway should also be
+	// custom. The TransactionPool however does not need to be custom in this
+	// example.
 	CreateConsensusSet    bool
 	CreateExplorer        bool
 	CreateGateway         bool
