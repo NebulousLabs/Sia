@@ -36,6 +36,8 @@ func (r *Renter) managedDistributeChunkToWorkers(uc *unfinishedChunk) {
 // download to the renter's downloader, and then using the data that gets
 // returned.
 func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
+	println("----------download chunk data ", chunk.index)
+	defer println("----------finished downloading chunk data ", chunk.index)
 	// Create the download, queue the download, and then wait for the download
 	// to finish.
 	//
@@ -48,7 +50,7 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 	buf := NewDownloadBufferWriter(chunk.length, chunk.offset)
 	// TODO: Should convert the inputs of newSectionDownload to use an int64 for
 	// the offset.
-	d := r.newSectionDownload(chunk.renterFile, buf, uint64(chunk.offset), chunk.length)
+	d := r.newSectionDownload(chunk.renterFile, buf, uint64(chunk.offset), chunk.length, false)
 	select {
 	case r.newDownloads <- d:
 	case <-r.tg.StopChan():

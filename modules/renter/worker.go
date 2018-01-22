@@ -23,10 +23,9 @@ type worker struct {
 	renter     *Renter
 
 	// Channels that inform the worker of kill signals and of new work.
-	downloadChan         chan downloadWork // higher priority than all uploads
-	killChan             chan struct{}     // highest priority
-	priorityDownloadChan chan downloadWork // higher priority than downloads (used for user-initiated downloads)
-	uploadChan           chan struct{}     // lowest priority
+	downloadChan chan struct{} // higher priority than uploads
+	killChan     chan struct{} // highest priority
+	uploadChan   chan struct{} // lowest priority
 
 	// Operation failure statistics for the worker.
 	downloadRecentFailure     time.Time // Only modified by the primary download loop.
@@ -39,10 +38,14 @@ type worker struct {
 	// because other workers had taken on all of the work already. This list is
 	// maintained in case any of the other workers fail - this worker will be
 	// able to pick up the slack.
-	mu                sync.Mutex
-	standbyChunks     []*unfinishedChunk
-	terminated        bool
-	unprocessedChunks []*unfinishedChunk
+	mu                      sync.Mutex
+	standbyChunks           []*unfinishedChunk
+	terminated              bool
+	unprocessedChunks       []*unfinishedChunk
+	standbyDownload         []*downloadWork
+	unprocessedDownload     []*downloadWork
+	standbyPrioDownload     []*downloadWork
+	unprocessedPrioDownload []*downloadWork
 }
 
 // threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
@@ -55,26 +58,45 @@ func (w *worker) threadedWorkLoop() {
 	defer w.renter.tg.Done()
 	// The worker may have upload chunks and it needs to drop them before
 	// terminating.
-	defer w.managedKillUploading()
+	// TODO enable this again
+	//defer w.managedKillUploading()
 
+	// The amount of time we wait before trying to do a standby work again. Is
+	// 3 seconds if there are standby jobs and 1 hour if there are none.
+	var sleepDuration = 2 * time.Second
 	for {
-		// Check for priority downloads.
+		// Block until new work is received via the upload or download channels,
+		// or until the standby chunks are ready to be revisited, or until a
+		// kill signal is received.
 		select {
-		case d := <-w.priorityDownloadChan:
-			w.download(d)
-			continue
-		default:
+		case <-w.killChan:
+			return
+		case <-w.renter.tg.StopChan():
+			return
+		case <-w.downloadChan:
+		case <-w.uploadChan:
+		case <-time.After(sleepDuration):
 		}
 
-		// Check for standard downloads.
-		select {
-		case d := <-w.downloadChan:
-			w.download(d)
+		// check if there is priority download work
+		w.mu.Lock()
+		if len(w.unprocessedPrioDownload) > 0 {
+			w.download(*w.unprocessedPrioDownload[0])
+			w.unprocessedPrioDownload = w.unprocessedPrioDownload[1:]
+			w.mu.Unlock()
 			continue
-		default:
 		}
-
-		// Perform one step of processing upload work.
+		// check if there is regular download work
+		if len(w.unprocessedDownload) > 0 {
+			println("start download ", w.unprocessedDownload[0].chunkDownload.index)
+			w.download(*w.unprocessedDownload[0])
+			println("done download", w.unprocessedDownload[0].chunkDownload.index)
+			w.unprocessedDownload = w.unprocessedDownload[1:]
+			w.mu.Unlock()
+			continue
+		}
+		w.mu.Unlock()
+		// check if there is upload work
 		chunk, pieceIndex := w.managedNextChunk()
 		if chunk != nil {
 			w.managedUpload(chunk, pieceIndex)
@@ -82,35 +104,14 @@ func (w *worker) threadedWorkLoop() {
 		}
 
 		// Determine the maximum amount of time to wait for any standby chunks.
-		var sleepDuration time.Duration
 		w.mu.Lock()
-		numStandby := len(w.standbyChunks)
+		numStandby := len(w.standbyChunks) + len(w.standbyDownload) + len(w.standbyPrioDownload)
 		w.mu.Unlock()
 		if numStandby > 0 {
 			// TODO: Pick a random time instead of just a constant time.
 			sleepDuration = time.Second * 3 // TODO: Constant
 		} else {
 			sleepDuration = time.Hour // TODO: Constant
-		}
-
-		// Block until new work is received via the upload or download channels,
-		// or until the standby chunks are ready to be revisited, or until a
-		// kill signal is received.
-		select {
-		case d := <-w.priorityDownloadChan:
-			w.download(d)
-			continue
-		case d := <-w.downloadChan:
-			w.download(d)
-			continue
-		case <-w.uploadChan:
-			continue
-		case <-time.After(sleepDuration):
-			continue
-		case <-w.killChan:
-			return
-		case <-w.renter.tg.StopChan():
-			return
 		}
 	}
 }
@@ -133,10 +134,9 @@ func (r *Renter) managedUpdateWorkerPool() {
 				contract:   contract,
 				hostPubKey: contract.HostPublicKey,
 
-				downloadChan:         make(chan downloadWork, 1),
-				killChan:             make(chan struct{}),
-				priorityDownloadChan: make(chan downloadWork, 1),
-				uploadChan:           make(chan struct{}, 1),
+				downloadChan: make(chan struct{}, 1),
+				killChan:     make(chan struct{}),
+				uploadChan:   make(chan struct{}, 1),
 
 				renter: r,
 			}

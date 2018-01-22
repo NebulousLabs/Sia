@@ -58,9 +58,8 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 		}
 		dw = dfw
 	}
-
 	// Create the download object and add it to the queue.
-	d := r.newSectionDownload(file, dw, p.Offset, p.Length)
+	d := r.newSectionDownload(file, dw, p.Offset, p.Length, true)
 
 	lockID = r.mu.Lock()
 	r.downloadQueue = append(r.downloadQueue, d)

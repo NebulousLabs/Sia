@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -30,6 +31,39 @@ type (
 		workerID      types.FileContractID
 	}
 )
+
+// managedQueueChunkDownload will take a chunk and add it to the worker's download stack.
+func (w *worker) managedQueueChunkDownload(ds *downloadState, cd *chunkDownload) {
+	w.mu.Lock()
+	// TODO check worker cooldown
+	// Get the piece of the chunk that the worker's host holds
+	var dw *downloadWork
+	piece, exists := cd.download.pieceSet[cd.index][w.contract.ID]
+	if exists {
+		dw = &downloadWork{
+			dataRoot:      piece.MerkleRoot,
+			pieceIndex:    piece.Piece,
+			chunkDownload: cd,
+			resultChan:    ds.resultChan,
+		}
+	} else {
+		build.Critical("worker doesn't hold piece of chunk but should")
+	}
+
+	// Check whether the download is a priority download or not
+	if cd.download.priority {
+		w.unprocessedPrioDownload = append(w.unprocessedPrioDownload, dw)
+	} else {
+		w.unprocessedDownload = append(w.unprocessedDownload, dw)
+	}
+	w.mu.Unlock()
+
+	// Send a signal informing the work thread that there is work.
+	select {
+	case w.downloadChan <- struct{}{}:
+	default:
+	}
+}
 
 // download will perform some download work.
 func (w *worker) download(dw downloadWork) {
