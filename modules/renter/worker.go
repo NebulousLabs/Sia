@@ -58,44 +58,45 @@ func (w *worker) threadedWorkLoop() {
 	defer w.renter.tg.Done()
 	// The worker may have upload chunks and it needs to drop them before
 	// terminating.
-	// TODO enable this again
-	//defer w.managedKillUploading()
+	defer w.managedKillUploading()
 
 	// The amount of time we wait before trying to do a standby work again. Is
 	// 3 seconds if there are standby jobs and 1 hour if there are none.
-	var sleepDuration = 2 * time.Second
+	var sleepDuration = 3 * time.Second
 	for {
-		// Block until new work is received via the upload or download channels,
-		// or until the standby chunks are ready to be revisited, or until a
-		// kill signal is received.
+		w.mu.Lock()
+		unfinishedJobs := len(w.unprocessedDownload) + len(w.unprocessedPrioDownload) + len(w.unprocessedChunks)
+		w.mu.Unlock()
+		if unfinishedJobs == 0 {
+			// Block until new work is received via the upload or download channels,
+			// or until the standby chunks are ready to be revisited, or until a
+			// kill signal is received.
+			select {
+			case <-w.killChan:
+				return
+			case <-w.renter.tg.StopChan():
+				return
+			case <-w.downloadChan:
+			case <-w.uploadChan:
+			case <-time.After(sleepDuration):
+			}
+		}
+		// Check if worker is supposed to shut down
 		select {
 		case <-w.killChan:
 			return
 		case <-w.renter.tg.StopChan():
 			return
-		case <-w.downloadChan:
-		case <-w.uploadChan:
-		case <-time.After(sleepDuration):
+		default:
 		}
 
-		// check if there is priority download work
-		w.mu.Lock()
-		if len(w.unprocessedPrioDownload) > 0 {
-			w.download(*w.unprocessedPrioDownload[0])
-			w.unprocessedPrioDownload = w.unprocessedPrioDownload[1:]
-			w.mu.Unlock()
+		// check if there is download work
+		downloadChunk := w.managedNextDownloadChunk()
+		if downloadChunk != nil {
+			w.managedDownload(downloadChunk)
 			continue
 		}
-		// check if there is regular download work
-		if len(w.unprocessedDownload) > 0 {
-			println("start download ", w.unprocessedDownload[0].chunkDownload.index)
-			w.download(*w.unprocessedDownload[0])
-			println("done download", w.unprocessedDownload[0].chunkDownload.index)
-			w.unprocessedDownload = w.unprocessedDownload[1:]
-			w.mu.Unlock()
-			continue
-		}
-		w.mu.Unlock()
+
 		// check if there is upload work
 		chunk, pieceIndex := w.managedNextChunk()
 		if chunk != nil {

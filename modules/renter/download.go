@@ -38,14 +38,13 @@ type (
 		index        uint64 // index of the chunk within the download
 		memoryNeeded uint64 // memory required to restore chunk in bytes
 
-		// completedPieces contains information about which pieces have been
-		// successfully downloaded.
-		//
-		// workerAttempts contains a list of workers that are able to fetch a
-		// piece of the chunk, mapped to an indication of whether or not they
-		// have tried to fetch a piece of the chunk.
-		completedPieces map[uint64][]byte
-		workerAttempts  map[types.FileContractID]bool
+		// Worker synchronization fields. The mutex only protects these fields.
+		mu               sync.Mutex
+		completedPieces  map[uint64][]byte             // pieces that were already downloaded
+		workerAttempts   map[types.FileContractID]bool // workers that tried to download a piece
+		piecesRegistered int                           // number of pieces that are being uploaded, but aren't finished yet.
+		workersRemaining int                           // number of workers who have received the chunk, but haven't finished processing it.
+
 	}
 
 	// A download is a file download that has been queued by the renter.
@@ -289,8 +288,7 @@ func (cd *chunkDownload) recoverChunk() error {
 	// Update the download to signal that this chunk has completed. Only update
 	// after the sync, so that durability is maintained.
 	if cd.download.finishedChunks[cd.index] {
-		// TODO reenable again
-		//build.Critical("recovering chunk when the chunk has already finished downloading")
+		build.Critical("recovering chunk when the chunk has already finished downloading")
 	}
 	cd.download.finishedChunks[cd.index] = true
 
@@ -367,11 +365,7 @@ func (r *Renter) managedDistributeDownloadsToWorkers(ds *downloadState) {
 		}
 		r.mu.RUnlock(id)
 		for _, worker := range workers {
-			// Only give it to workers that haven't tried before
-			if attempted, _ := cd.workerAttempts[worker.contract.ID]; !attempted {
 				worker.managedQueueChunkDownload(ds, cd)
-				cd.workerAttempts[worker.contract.ID] = true
-			}
 		}
 	}
 }
@@ -487,6 +481,8 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 		ds.incompleteChunks = append(ds.incompleteChunks, cd)
 		return
 	}
+	cd.mu.Lock()
+	defer cd.mu.Unlock()
 	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data
 	atomic.AddUint64(&cd.download.atomicDataReceived, cd.download.reportedPieceSize)
 
