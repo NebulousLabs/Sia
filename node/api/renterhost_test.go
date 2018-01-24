@@ -494,15 +494,6 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(orig, downloaded) {
-		t.Log("orig len: ", len(orig))
-		t.Log("down len: ", len(downloaded))
-		diff := 0
-		for i := 0; i < len(orig); i++ {
-			if orig[i] != downloaded[i] {
-				diff++
-			}
-		}
-		t.Log("wrong bytes: ", diff)
 		t.Fatal("data mismatch when downloading a file")
 	}
 

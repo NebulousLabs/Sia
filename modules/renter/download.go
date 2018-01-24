@@ -356,16 +356,13 @@ func (r *Renter) managedDistributeDownloadsToWorkers(ds *downloadState) {
 		ds.incompleteChunks = ds.incompleteChunks[1:]
 
 		id := r.mu.RLock()
-		workers := make([]*worker, 0, len(cd.workerAttempts))
+		workers := make([]*worker, 0, len(r.workerPool))
 		for _, worker := range r.workerPool {
-			// Make sure the worker contains a relevant piece
-			if _, exists := cd.workerAttempts[worker.contract.ID]; exists {
-				workers = append(workers, worker)
-			}
+			workers = append(workers, worker)
 		}
 		r.mu.RUnlock(id)
 		for _, worker := range workers {
-				worker.managedQueueChunkDownload(ds, cd)
+			worker.managedQueueChunkDownload(ds, cd)
 		}
 	}
 }
@@ -474,13 +471,6 @@ func (r *Renter) managedWaitOnDownloadWork(ds *downloadState) {
 		return
 	}
 
-	// Add this returned piece to the appropriate chunk.
-	if _, ok := cd.completedPieces[finishedDownload.pieceIndex]; ok {
-		r.log.Debugln("Piece", finishedDownload.pieceIndex, "already added")
-		// TODO Is this necessary?
-		ds.incompleteChunks = append(ds.incompleteChunks, cd)
-		return
-	}
 	cd.mu.Lock()
 	defer cd.mu.Unlock()
 	cd.completedPieces[finishedDownload.pieceIndex] = finishedDownload.data

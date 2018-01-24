@@ -1,7 +1,6 @@
 package renter
 
 import (
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -47,7 +46,9 @@ func (w *worker) managedQueueChunkDownload(ds *downloadState, cd *chunkDownload)
 			resultChan:    ds.resultChan,
 		}
 	} else {
-		build.Critical("worker doesn't hold piece of chunk but should")
+		// Worker doesn't hold a piece of the chunk. Nothing to do.
+		w.mu.Unlock()
+		return
 	}
 
 	// Check whether the download is a priority download or not
@@ -69,11 +70,12 @@ func (w *worker) managedQueueChunkDownload(ds *downloadState, cd *chunkDownload)
 func (w *worker) managedDownload(dw *downloadWork) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	cd := dw.chunkDownload
+	cd.mu.Lock()
+	defer cd.mu.Unlock()
 	defer func() {
 		// Unregister worker after download finished
-		dw.chunkDownload.mu.Lock()
 		dw.chunkDownload.piecesRegistered--
-		dw.chunkDownload.mu.Unlock()
 	}()
 	d, err := w.renter.hostContractor.Downloader(w.contract.ID, w.renter.tg.StopChan())
 	if err != nil {
@@ -88,6 +90,15 @@ func (w *worker) managedDownload(dw *downloadWork) {
 	defer d.Close()
 
 	data, err := d.Sector(dw.dataRoot)
+	if err == nil {
+		// Add data to the comletedPieces
+		if _, ok := dw.chunkDownload.completedPieces[dw.pieceIndex]; ok {
+			println("already added")
+		} else {
+			cd.completedPieces[dw.pieceIndex] = data
+		}
+	}
+
 	go func() {
 		select {
 		case dw.resultChan <- finishedDownload{dw.chunkDownload, data, err, dw.pieceIndex, w.contract.ID}:
@@ -135,6 +146,17 @@ func (w *worker) processDownloadChunk(dw *downloadWork) (nextChunk *downloadWork
 	attempted, _ := cd.workerAttempts[w.contract.ID]
 	chunkComplete := minPieces <= len(cd.completedPieces)
 	needsHelp := minPieces > len(cd.completedPieces)+cd.piecesRegistered
+
+	//	println("******************************************")
+	//	println("workerid:      ", w.contract.ID.String())
+	//	println("chunkid:       ", dw.chunkDownload.index)
+	//	println("minPieces:     ", minPieces)
+	//	println("attempted:     ", attempted)
+	//	println("chunkComplete: ", chunkComplete)
+	//	println("completedpiec: ", len(cd.completedPieces))
+	//	println("registeredpie: ", cd.piecesRegistered)
+	//	println("needsHelp:     ", needsHelp)
+	//	println("******************************************")
 
 	// If the chunk does not need help from this worker, release the chunk.
 	if chunkComplete || attempted {
