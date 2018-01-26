@@ -15,6 +15,12 @@ const (
 	// defragThreshold is the number of outputs a wallet is allowed before it is
 	// defragmented.
 	defragThreshold = 50
+
+	// naturalDefragThreshold is the number of outputs a wallet is allowed
+	// before it starts defragging using its normal spending behavior. This
+	// threshold is a bit lower than the defragThreshold to avoid starting the
+	// thread.
+	naturalDefragThreshold = defragThreshold - 10
 )
 
 var (

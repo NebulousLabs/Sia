@@ -149,7 +149,16 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 			so.outputs = append(so.outputs, sco)
 		}
 	}
-	sort.Sort(sort.Reverse(so))
+
+	// If we have too man unspent transactions we might as well do some
+	// defragging since we create a setup transaction anyway
+	defrag := tb.wallet.defragDisabled && len(so.ids) >= naturalDefragThreshold
+	if defrag {
+		// If we defrag we start with the smallest output
+		sort.Sort(so)
+	} else {
+		sort.Sort(sort.Reverse(so))
+	}
 
 	// Create and fund a parent transaction that will add the correct amount of
 	// siacoins to the transaction.
@@ -183,7 +192,12 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		// Add the output to the total fund
 		fund = fund.Add(sco.Value)
 		potentialFund = potentialFund.Add(sco.Value)
-		if fund.Cmp(amount) >= 0 {
+		if defrag && len(spentScoids) >= defragBatchSize {
+			// If we defrag we don't stop once we have gathered enough money
+			// but if we reach the batch size.
+			break
+		} else if !defrag && fund.Cmp(amount) >= 0 {
+			// If we don't defrag we stop once we have gathered enough money.
 			break
 		}
 	}
