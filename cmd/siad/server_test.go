@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/node/api"
+	"github.com/NebulousLabs/Sia/node/api/client"
 )
 
 // TestLatestRelease tests that the latestRelease function properly processes a
@@ -97,7 +98,7 @@ func TestNewServer(t *testing.T) {
 		}
 	}()
 	// verify that startup routes can be called correctly
-	c := api.NewClient(srv.listener.Addr().String(), "")
+	c := client.NewClient(srv.listener.Addr().String(), "")
 	var daemonVersion DaemonVersion
 	err = c.Get("/daemon/version", &daemonVersion)
 	if err != nil {
