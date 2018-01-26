@@ -271,7 +271,6 @@ func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(diff *modules.TransactionP
 
 	m.deleteReverts(diff)
 	m.addNewTxns(diff)
-	m.persist.UnsolvedBlock.Transactions = m.blockTxns.transactions()
 }
 
 // removeSplitSetFromUnsolvedBlock removes a split set from the miner's unsolved
