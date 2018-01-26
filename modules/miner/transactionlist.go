@@ -1,6 +1,11 @@
 package miner
 
-import "github.com/NebulousLabs/Sia/types"
+import (
+	"sync"
+
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/types"
+)
 
 type (
 	// txnListElemenet is a single element in a txnList
@@ -19,6 +24,14 @@ type (
 	}
 )
 
+// A pool to reduce the amount of memory allocations when elements are removed
+// and inserted rapidly.
+var listElementPool = sync.Pool{
+	New: func() interface{} {
+		return &txnListElement{}
+	},
+}
+
 // newTxnList creates a new instance of the txnList
 func newTxnList() *txnList {
 	return &txnList{
@@ -26,12 +39,20 @@ func newTxnList() *txnList {
 	}
 }
 
+// newListElement returns a list element with all fields initialized to their
+// default values
+func newListElement() *txnListElement {
+	listElement := listElementPool.Get().(*txnListElement)
+	listElement.prev = nil
+	listElement.next = nil
+	return listElement
+}
+
 // appendTxn appends a transaction to the list
 func (tl *txnList) appendTxn(txn *types.Transaction) {
 	// Create the element and store it in idToTxn for easier lookup by id
-	listElement := &txnListElement{
-		txn: txn,
-	}
+	listElement := newListElement()
+	listElement.txn = txn
 	tl.idToTxn[txn.ID()] = listElement
 
 	// check if it is the first element
@@ -65,8 +86,11 @@ func (tl *txnList) removeTxn(id types.TransactionID) {
 	// Get the corresponding list element and remove it from the map
 	listElement, exists := tl.idToTxn[id]
 	if !exists {
-		panic("transaction is not in the list")
+		build.Critical("transaction is not in the list")
+		return
 	}
+	delete(tl.idToTxn, id)
+	defer listElementPool.Put(listElement)
 
 	pe := listElement.prev
 	ne := listElement.next
