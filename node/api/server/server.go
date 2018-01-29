@@ -1,4 +1,4 @@
-// package server provides a server that can wrap a node and serve an http api
+// Package server provides a server that can wrap a node and serve an http api
 // for interacting with the node.
 package server
 

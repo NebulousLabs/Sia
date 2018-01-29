@@ -53,10 +53,7 @@ vet: release-std
 lintpkgs = ./modules ./modules/gateway ./modules/host ./modules/renter/hostdb ./modules/renter/contractor ./node \
            ./node/api/server ./persist ./siatest
 lint:
-	@for package in $(lintpkgs); do                           \
-		golint -min_confidence=1.0 $$package                  \
-		&& test -z $$(golint -min_confidence=1.0 $$package) ; \
-	done
+	golint -min_confidence=1.0 -set_exit_status $(lintpkgs)
 
 # spellcheck checks for misspelled words in comments or strings.
 spellcheck:
