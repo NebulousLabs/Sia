@@ -13,31 +13,39 @@ import (
 
 // A Client makes requests to the siad HTTP API.
 type Client struct {
-	address  string
-	password string
+	// Address is the API address of the siad server.
+	Address string
+
+	// Password must match the password of the siad server.
+	Password string
+
+	// UserAgent must match the User-Agent required by the siad server. If not
+	// set, it defaults to "Sia-Agent".
+	UserAgent string
 }
 
-// New creates a new Client using the provided address and password. If
-// password is not the empty string, HTTP basic authentication will be used to
-// communicate with the API.
-func New(address string, password string) *Client {
+// New creates a new Client using the provided address.
+func New(address string) *Client {
 	return &Client{
-		address:  address,
-		password: password,
+		Address: address,
 	}
 }
 
 // NewRequest constructs a request to the siad HTTP API, setting the correct
 // User-Agent and Basic Auth. The resource path must begin with /.
 func (c *Client) NewRequest(method, resource string, body io.Reader) (*http.Request, error) {
-	url := "http://" + c.address + resource
+	url := "http://" + c.Address + resource
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "Sia-Agent")
-	if c.password != "" {
-		req.SetBasicAuth("", c.password)
+	agent := c.UserAgent
+	if agent == "" {
+		agent = "Sia-Agent"
+	}
+	req.Header.Set("User-Agent", agent)
+	if c.Password != "" {
+		req.SetBasicAuth("", c.Password)
 	}
 	return req, nil
 }
