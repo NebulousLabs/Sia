@@ -98,7 +98,7 @@ func TestNewServer(t *testing.T) {
 		}
 	}()
 	// verify that startup routes can be called correctly
-	c := client.NewClient(srv.listener.Addr().String(), "")
+	c := client.New(srv.listener.Addr().String(), "")
 	var daemonVersion DaemonVersion
 	err = c.Get("/daemon/version", &daemonVersion)
 	if err != nil {

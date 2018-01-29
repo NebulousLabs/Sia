@@ -17,10 +17,10 @@ type Client struct {
 	password string
 }
 
-// NewClient creates a new Client using the provided address and password. If
+// New creates a new Client using the provided address and password. If
 // password is not the empty string, HTTP basic authentication will be used to
 // communicate with the API.
-func NewClient(address string, password string) *Client {
+func New(address string, password string) *Client {
 	return &Client{
 		address:  address,
 		password: password,
