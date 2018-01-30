@@ -323,9 +323,9 @@ dictionary
 
 Function: Send siacoins to an address or set of addresses. The outputs are
 arbitrarily selected from addresses in the wallet. If 'outputs' is supplied,
-'amount' and 'destination' must be empty. The number of outputs should not
-exceed 400; this may result in a transaction too large to fit in the
-transaction pool.
+'amount', 'destination' and 'data' must be empty. The number of outputs 
+should not exceed 400; this may result in a transaction too large to fit in 
+the transaction pool.
 
 ###### Query String Parameters
 ```
@@ -335,6 +335,9 @@ amount      // hastings
 
 // Address that is receiving the coins.
 destination // address
+
+// Optional arbitrary string data to include.
+data // string
 
 // JSON array of outputs. The structure of each output is:
 // {"unlockhash": "<destination>", "value": "<amount>"}
@@ -360,9 +363,9 @@ outputs
 #### Send to single address
 
 ###### Example POST Request
-Use _amount_ and _destination_ parameters.
+Use _amount_, _destination_ and _data_ parameters.
 ```
-/wallet/siacoins?amount=1000000000000000000000000&destination=1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
+/wallet/siacoins?amount=1000000000000000000000000&destination=1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab&data=arbitrary+string
 ```
 
 ###### Expected Response Code
@@ -382,7 +385,7 @@ Use _amount_ and _destination_ parameters.
 
 
 #### Send to set of addresses
-Use _outputs_ parameter in the form of a JSON array. _amount_ and _destination_ parameters must be empty.
+Use _outputs_ parameter in the form of a JSON array. _amount_, _destination_ and _data_ parameters must be empty.
 
 
 ###### Example POST Request

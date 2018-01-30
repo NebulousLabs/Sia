@@ -377,8 +377,8 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var txns []types.Transaction
 	if req.FormValue("outputs") != "" {
-		// multiple amounts + destinations
-		if req.FormValue("amount") != "" || req.FormValue("destination") != "" {
+		// multiple amounts + destinations + data
+		if req.FormValue("amount") != "" || req.FormValue("destination") != "" || req.FormValue("data") != "" {
 			WriteError(w, Error{"cannot supply both 'outputs' and single amount+destination pair"}, http.StatusInternalServerError)
 			return
 		}
@@ -407,7 +407,12 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 			return
 		}
 
-		txns, err = api.wallet.SendSiacoins(amount, dest)
+		if req.FormValue("data") != "" {
+			arbData := append(modules.PrefixNonSia[:], []byte(req.FormValue("data"))...)
+			txns, err = api.wallet.SendSiacoinsWithAribitraryData(amount, dest, arbData)
+		} else {
+			txns, err = api.wallet.SendSiacoins(amount, dest)
+		}
 		if err != nil {
 			WriteError(w, Error{"error when calling /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 			return
