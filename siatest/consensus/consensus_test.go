@@ -18,13 +18,13 @@ func TestApiHeight(t *testing.T) {
 	}
 
 	// Create a new server
-	c, s, err := siatest.NewClientServerPair(node.AllModules(testdir))
+	testNode, err := siatest.NewNode(node.AllModules(testdir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Send GET request
-	cg, err := c.GetConsensus()
+	cg, err := testNode.GetConsensus()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,12 +33,12 @@ func TestApiHeight(t *testing.T) {
 	height := cg.Height
 
 	// Mine a block
-	if err := s.MineBlock(); err != nil {
+	if err := testNode.MineBlock(); err != nil {
 		t.Fatal(err)
 	}
 
 	// Request height again
-	cg, err = c.GetConsensus()
+	cg, err = testNode.GetConsensus()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestApiHeight(t *testing.T) {
 
 	// Close the server and check error
 	defer func() {
-		if err := s.Close(); err != nil {
+		if err := testNode.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}()

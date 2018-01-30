@@ -12,7 +12,6 @@ package node
 import (
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -206,16 +205,7 @@ func New(params NodeParams) (*Node, error) {
 		if !params.CreateWallet {
 			return nil, nil
 		}
-		w, err := wallet.New(cs, tp, filepath.Join(dir, modules.WalletDir))
-		if err != nil {
-			return nil, err
-		}
-		key := crypto.GenerateTwofishKey()
-		_, err = w.Encrypt(key)
-		if err != nil {
-			return nil, err
-		}
-		return w, w.Unlock(key)
+		return wallet.New(cs, tp, filepath.Join(dir, modules.WalletDir))
 	}()
 	if err != nil {
 		return nil, errors.Extend(err, errors.New("unable to create wallet"))
