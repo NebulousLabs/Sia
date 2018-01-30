@@ -12,7 +12,7 @@ func TestApiHeight(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testdir, err := siatest.TestDir(siatest.SiaTestingDir, t.Name())
+	testdir, err := siatest.TestDir(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestApiHeight(t *testing.T) {
 	}
 
 	// Send GET request
-	cg, err := testNode.GetConsensus()
+	cg, err := testNode.ConsensusGet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestApiHeight(t *testing.T) {
 	}
 
 	// Request height again
-	cg, err = testNode.GetConsensus()
+	cg, err = testNode.ConsensusGet()
 	if err != nil {
 		t.Fatal(err)
 	}

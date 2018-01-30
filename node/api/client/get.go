@@ -6,14 +6,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// GetConsensus requests the /consensus api resource
-func (c *Client) GetConsensus() (cg api.ConsensusGET, err error) {
+// ConsensusGet requests the /consensus api resource
+func (c *Client) ConsensusGet() (cg api.ConsensusGET, err error) {
 	err = c.Get("/consensus", &cg)
 	return
 }
 
-// GetMinerHeader uses the /miner/header endpoint to get a header for work.
-func (c *Client) GetMinerHeader() (target types.Target, bh types.BlockHeader, err error) {
+// MinerHeaderGet uses the /miner/header endpoint to get a header for work.
+func (c *Client) MinerHeaderGet() (target types.Target, bh types.BlockHeader, err error) {
 	targetAndHeader, err := c.GetRawResponse("/miner/header")
 	if err != nil {
 		return types.Target{}, types.BlockHeader{}, err

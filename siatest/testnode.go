@@ -48,14 +48,14 @@ func NewNode(nodeParams node.NodeParams) (*TestNode, error) {
 	tn := &TestNode{*s, *c, ""}
 
 	// Init wallet
-	wip, err := tn.PostWalletInit("", false)
+	wip, err := tn.WalletInitPost("", false)
 	if err != nil {
 		return nil, err
 	}
 	tn.primarySeed = wip.PrimarySeed
 
 	// Unlock wallet
-	if err := tn.PostWalletUnlock(tn.primarySeed); err != nil {
+	if err := tn.WalletUnlockPost(tn.primarySeed); err != nil {
 		return nil, err
 	}
 
@@ -73,7 +73,7 @@ func NewNode(nodeParams node.NodeParams) (*TestNode, error) {
 // MineBlock makes the underlying node mine a single block and broadcast it.
 func (tn *TestNode) MineBlock() error {
 	// Get the header
-	target, header, err := tn.GetMinerHeader()
+	target, header, err := tn.MinerHeaderGet()
 	if err != nil {
 		return build.ExtendErr("failed to get header for work", err)
 	}
@@ -84,7 +84,7 @@ func (tn *TestNode) MineBlock() error {
 	}
 
 	// Submit the header
-	if err := tn.PostMinerHeader(header); err != nil {
+	if err := tn.MinerHeaderPost(header); err != nil {
 		return build.ExtendErr("failed to submit header", err)
 	}
 	return nil
