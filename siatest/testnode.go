@@ -1,10 +1,13 @@
 package siatest
 
 import (
+	"bytes"
 	"errors"
+	"unsafe"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api/client"
 	"github.com/NebulousLabs/Sia/node/api/server"
@@ -16,6 +19,7 @@ import (
 type TestNode struct {
 	server.Server
 	client.Client
+	primarySeed string
 }
 
 // NewNode creates a new funded TestNode
@@ -40,35 +44,63 @@ func NewNode(nodeParams node.NodeParams) (*TestNode, error) {
 		return nil, err
 	}
 
-	// Encrypt and unlock wallet
-	key := crypto.GenerateTwofishKey()
-	_, err = s.Node.Wallet.Encrypt(key)
+	// Create TestNode
+	tn := &TestNode{*s, *c, ""}
+
+	// Init wallet
+	wip, err := tn.PostWalletInit("", false)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.Node.Wallet.Unlock(key); err != nil {
+	tn.primarySeed = wip.PrimarySeed
+
+	// Unlock wallet
+	if err := tn.PostWalletUnlock(tn.primarySeed); err != nil {
 		return nil, err
 	}
 
 	// fund the node
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, err := s.Node.Miner.AddBlock()
-		if err != nil {
+		if err := tn.MineBlock(); err != nil {
 			return nil, err
 		}
 	}
 
 	// Return TestNode
-	return &TestNode{*s, *c}, nil
+	return tn, nil
 }
 
 // MineBlock makes the underlying node mine a single block and broadcast it.
 func (tn *TestNode) MineBlock() error {
-	if tn.Node.Miner == nil {
-		return errors.New("server doesn't have the miner modules enabled")
+	// Get the header
+	target, header, err := tn.GetMinerHeader()
+	if err != nil {
+		return build.ExtendErr("failed to get header for work", err)
 	}
-	if _, err := tn.Node.Miner.AddBlock(); err != nil {
-		return build.ExtendErr("server failed to mine block:", err)
+	// Solve the header
+	solveHeader(target, header)
+
+	// Submit the header
+	if err := tn.PostMinerHeader(header); err != nil {
+		return build.ExtendErr("failed to submit header", err)
 	}
 	return nil
+}
+
+// solveHeader solves the header by finding a nonce for the target
+func solveHeader(target types.Target, bh types.BlockHeader) error {
+	header := encoding.Marshal(bh)
+
+	// try 16e3 times to solve block
+	var nonce uint64
+	for i := 0; i < 16e3; i++ {
+		id := crypto.HashBytes(header)
+		if bytes.Compare(target[:], id[:]) >= 0 {
+			copy(bh.Nonce[:], header[32:40])
+			return nil
+		}
+		*(*uint64)(unsafe.Pointer(&header[32])) = nonce
+		nonce++
+	}
+	return errors.New("couldn't solve block")
 }

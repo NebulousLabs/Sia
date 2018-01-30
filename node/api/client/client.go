@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -67,70 +68,116 @@ func readAPIError(r io.Reader) error {
 	return apiErr
 }
 
-// Get requests the specified resource. The response, if provided, will be
-// decoded into obj. The resource path must begin with /.
-func (c *Client) Get(resource string, obj interface{}) error {
+// GetRawResponse requests the specified resource. The response, if provided,
+// will be returned in a byte slice
+func (c *Client) GetRawResponse(resource string) ([]byte, error) {
 	req, err := c.NewRequest("GET", resource, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return errors.AddContext(err, "request failed")
+		return nil, errors.AddContext(err, "request failed")
 	}
 	defer drainAndClose(res.Body)
 
 	if res.StatusCode == http.StatusNotFound {
-		return errors.New("API call not recognized: " + resource)
+		return nil, errors.New("API call not recognized: " + resource)
 	}
 
 	// If the status code is not 2xx, decode and return the accompanying
 	// api.Error.
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return readAPIError(res.Body)
+		return nil, readAPIError(res.Body)
 	}
-	if res.StatusCode == http.StatusNoContent || obj == nil {
+
+	if res.StatusCode == http.StatusNoContent {
 		// no reason to read the response
+		return []byte{}, nil
+	}
+
+	// Return the body
+	body := make([]byte, res.ContentLength)
+	_, err = io.ReadFull(res.Body, body)
+
+	return body, err
+}
+
+// GetAndParse requests the specified resource. The response, if provided, will be
+// decoded into obj. The resource path must begin with /.
+func (c *Client) Get(resource string, obj interface{}) error {
+	// Request resource
+	data, err := c.GetRawResponse(resource)
+	if err != nil {
+		return err
+	}
+	if obj == nil {
+		// No need to decode response
 		return nil
 	}
-	err = json.NewDecoder(res.Body).Decode(obj)
+
+	// Decode response
+	buf := bytes.NewBuffer(data)
+	err = json.NewDecoder(buf).Decode(obj)
 	if err != nil {
 		return errors.AddContext(err, "could not read response")
 	}
 	return nil
 }
 
-// Post makes a POST request to the resource at `resource`, using `data` as the
-// request body.  The response, if provided, will be decoded into `obj`.
-func (c *Client) Post(resource string, data string, obj interface{}) error {
+// PostRawResponse requests the specified resource. The response, if provided,
+// will be returned in a byte slice
+func (c *Client) PostRawResponse(resource string, data string) ([]byte, error) {
 	req, err := c.NewRequest("POST", resource, strings.NewReader(data))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// TODO: is this necessary?
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return errors.AddContext(err, "request failed")
+		return nil, errors.AddContext(err, "request failed")
 	}
 	defer drainAndClose(res.Body)
 
 	if res.StatusCode == http.StatusNotFound {
-		return errors.New("API call not recognized: " + resource)
+		return nil, errors.New("API call not recognized: " + resource)
 	}
 
 	// If the status code is not 2xx, decode and return the accompanying
 	// api.Error.
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return readAPIError(res.Body)
+		return nil, readAPIError(res.Body)
 	}
 
-	if res.StatusCode == http.StatusNoContent || obj == nil {
+	if res.StatusCode == http.StatusNoContent {
 		// no reason to read the response
+		return []byte{}, nil
+	}
+
+	// Return the body
+	body := make([]byte, res.ContentLength)
+	_, err = io.ReadFull(res.Body, body)
+
+	return body, err
+}
+
+// Post makes a POST request to the resource at `resource`, using `data` as the
+// request body. The response, if provided, will be decoded into `obj`.
+func (c *Client) Post(resource string, data string, obj interface{}) error {
+	// Request resource
+	body, err := c.PostRawResponse(resource, data)
+	if err != nil {
+		return err
+	}
+	if obj == nil {
+		// No need to decode response
 		return nil
 	}
 
-	err = json.NewDecoder(res.Body).Decode(obj)
+	// Decode response
+	buf := bytes.NewBuffer(body)
+	err = json.NewDecoder(buf).Decode(obj)
 	if err != nil {
 		return errors.AddContext(err, "could not read response")
 	}

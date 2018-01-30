@@ -20,7 +20,7 @@ type Server struct {
 	apiServer         *http.Server
 	done              chan struct{}
 	listener          net.Listener
-	Node              *node.Node
+	node              *node.Node
 	requiredUserAgent string
 	serveErr          error
 }
@@ -45,7 +45,7 @@ func (srv *Server) Close() error {
 	<-srv.done
 	err = errors.Compose(err, srv.serveErr)
 	// Shutdown modules.
-	err = errors.Compose(err, srv.Node.Close())
+	err = errors.Compose(err, srv.node.Close())
 	return errors.AddContext(err, "error while closing server")
 }
 
@@ -76,7 +76,7 @@ func New(APIaddr string, requiredUserAgent string, requiredPassword string, node
 		},
 		done:              make(chan struct{}),
 		listener:          listener,
-		Node:              node,
+		node:              node,
 		requiredUserAgent: requiredUserAgent,
 	}
 
