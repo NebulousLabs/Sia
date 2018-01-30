@@ -78,7 +78,10 @@ func (tn *TestNode) MineBlock() error {
 		return build.ExtendErr("failed to get header for work", err)
 	}
 	// Solve the header
-	solveHeader(target, header)
+	header, err = solveHeader(target, header)
+	if err != nil {
+		return build.ExtendErr("failed to solve header", err)
+	}
 
 	// Submit the header
 	if err := tn.PostMinerHeader(header); err != nil {
@@ -88,19 +91,17 @@ func (tn *TestNode) MineBlock() error {
 }
 
 // solveHeader solves the header by finding a nonce for the target
-func solveHeader(target types.Target, bh types.BlockHeader) error {
+func solveHeader(target types.Target, bh types.BlockHeader) (types.BlockHeader, error) {
 	header := encoding.Marshal(bh)
-
-	// try 16e3 times to solve block
 	var nonce uint64
-	for i := 0; i < 16e3; i++ {
+	for i := 0; i < 256; i++ {
 		id := crypto.HashBytes(header)
 		if bytes.Compare(target[:], id[:]) >= 0 {
 			copy(bh.Nonce[:], header[32:40])
-			return nil
+			return bh, nil
 		}
 		*(*uint64)(unsafe.Pointer(&header[32])) = nonce
 		nonce++
 	}
-	return errors.New("couldn't solve block")
+	return bh, errors.New("couldn't solve block")
 }
