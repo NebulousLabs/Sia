@@ -37,7 +37,13 @@ func TestApiHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Check height again
+	// Request height again
+	cg, err = c.GetConsensus()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check if height increased
 	if cg.Height != height+1 {
 		t.Fatal("Height should have increased by 1 block")
 	}

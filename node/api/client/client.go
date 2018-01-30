@@ -89,12 +89,10 @@ func (c *Client) Get(resource string, obj interface{}) error {
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return readAPIError(res.Body)
 	}
-
-	if res.StatusCode == http.StatusNoContent || obj != nil {
+	if res.StatusCode == http.StatusNoContent {
 		// no reason to read the response
 		return nil
 	}
-
 	err = json.NewDecoder(res.Body).Decode(&obj)
 	if err != nil {
 		return errors.AddContext(err, "could not read response")

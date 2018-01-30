@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/errors"
 )
@@ -56,6 +57,11 @@ func (srv *Server) Close() error {
 // authentication sends passwords in plaintext and should therefore only be
 // used if the APIaddr is localhost.
 func New(APIaddr string, requiredUserAgent string, requiredPassword string, nodeParams node.NodeParams) (*Server, error) {
+	// We can't create a funded node without a miner
+	if !nodeParams.CreateMiner && nodeParams.Miner == nil {
+		return nil, errors.New("Can't create funded node without miner")
+	}
+
 	// Create the server listener.
 	listener, err := net.Listen("tcp", APIaddr)
 	if err != nil {
@@ -79,6 +85,14 @@ func New(APIaddr string, requiredUserAgent string, requiredPassword string, node
 		listener:          listener,
 		node:              node,
 		requiredUserAgent: requiredUserAgent,
+	}
+
+	// fund the node
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		_, err := node.Miner.AddBlock()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Spin up a goroutine that serves the API and closes srv.done when
