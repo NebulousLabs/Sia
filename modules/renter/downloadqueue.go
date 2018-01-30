@@ -16,19 +16,19 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	file, exists := r.files[p.Siapath]
 	r.mu.RUnlock(lockID)
 	if !exists {
-		return errors.New(fmt.Sprintf("no file with that path: %s", p.Siapath))
+		return fmt.Errorf("no file with that path: %s", p.Siapath)
 	}
 
-	isHttpResp := p.Httpwriter != nil
+	isHTTPResp := p.Httpwriter != nil
 
 	// validate download parameters
-	if p.Async && isHttpResp {
+	if p.Async && isHTTPResp {
 		return errors.New("cannot async download to http response")
 	}
-	if isHttpResp && p.Destination != "" {
+	if isHTTPResp && p.Destination != "" {
 		return errors.New("destination cannot be specified when downloading to http response")
 	}
-	if !isHttpResp && p.Destination == "" {
+	if !isHTTPResp && p.Destination == "" {
 		return errors.New("destination not supplied")
 	}
 	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
@@ -49,8 +49,8 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	// Instantiate the correct DownloadWriter implementation
 	// (e.g. content written to file or response body).
 	var dw modules.DownloadWriter
-	if isHttpResp {
-		dw = NewDownloadHttpWriter(p.Httpwriter, p.Offset, p.Length)
+	if isHTTPResp {
+		dw = NewDownloadHTTPWriter(p.Httpwriter, p.Offset, p.Length)
 	} else {
 		dfw, err := NewDownloadFileWriter(p.Destination, p.Offset, p.Length)
 		if err != nil {

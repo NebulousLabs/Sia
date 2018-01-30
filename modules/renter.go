@@ -308,9 +308,9 @@ type Renter interface {
 	// contain multiple files. The paths of the added files are returned.
 	LoadSharedFiles(source string) ([]string, error)
 
-	// LoadSharedFilesAscii loads an ASCII-encoded '.sia' file into the
+	// LoadSharedFilesASCII loads an ASCII-encoded '.sia' file into the
 	// renter.
-	LoadSharedFilesAscii(asciiSia string) ([]string, error)
+	LoadSharedFilesASCII(asciiSia string) ([]string, error)
 
 	// PriceEstimation estimates the cost in siacoins of performing various
 	// storage and data operations.
@@ -337,7 +337,7 @@ type Renter interface {
 	ShareFiles(paths []string, shareDest string) error
 
 	// ShareFilesAscii creates an ASCII-encoded '.sia' file.
-	ShareFilesAscii(paths []string) (asciiSia string, err error)
+	ShareFilesASCII(paths []string) (asciiSia string, err error)
 
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error

@@ -62,10 +62,11 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 	if d.Err() != nil {
 		buf.data = nil
 		return d.Err()
-	} else {
-		chunk.logicalChunkData = buf.Bytes()
-		return nil
 	}
+
+	chunk.logicalChunkData = buf.Bytes()
+	return nil
+
 }
 
 // managedFetchAndRepairChunk will fetch the logical data for a chunk, create
