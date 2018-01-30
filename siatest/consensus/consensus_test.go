@@ -22,14 +22,17 @@ func TestApiHeight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		if err := testNode.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Send GET request
 	cg, err := testNode.ConsensusGet()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Check height
 	height := cg.Height
 
 	// Mine a block
@@ -37,21 +40,12 @@ func TestApiHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Request height again
+	// Request height again and check if it increased
 	cg, err = testNode.ConsensusGet()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Check if height increased
 	if cg.Height != height+1 {
 		t.Fatal("Height should have increased by 1 block")
 	}
-
-	// Close the server and check error
-	defer func() {
-		if err := testNode.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}()
 }
