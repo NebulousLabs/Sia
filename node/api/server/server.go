@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api"
 
@@ -76,6 +77,7 @@ func New(APIaddr string, requiredUserAgent string, requiredPassword string, node
 		},
 		done:              make(chan struct{}),
 		listener:          listener,
+		node:              node,
 		requiredUserAgent: requiredUserAgent,
 	}
 
@@ -87,4 +89,15 @@ func New(APIaddr string, requiredUserAgent string, requiredPassword string, node
 	}()
 
 	return srv, nil
+}
+
+// MineBlock makes the underlying node mine a single block and broadcast it.
+func (srv *Server) MineBlock() error {
+	if srv.node.Miner == nil {
+		return errors.New("server doesn't have the miner modules enabled")
+	}
+	if _, err := srv.node.Miner.AddBlock(); err != nil {
+		return build.ExtendErr("server failed to mine block:", err)
+	}
+	return nil
 }

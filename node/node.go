@@ -12,6 +12,7 @@ package node
 import (
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -20,6 +21,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/errors"
 )
@@ -123,12 +125,33 @@ func (n *Node) Close() (err error) {
 	return err
 }
 
-// New will create a new test node. The inputs to the function are the
-// respective 'New' calls for each module. We need to use this awkward method of
-// initialization because the siatest package cannot import any of the modules
-// directly (so that the modules may use the siatest package to test
-// themselves).
+// New creates a node that has some money in its wallet
 func New(params NodeParams) (*Node, error) {
+	// We can't create a funded node without a miner
+	if !params.CreateMiner && params.Miner == nil {
+		return nil, errors.New("Can't create funded node without miner")
+	}
+	// Create the node
+	node, err := NewClean(params)
+	if err != nil {
+		return nil, err
+	}
+	// fund the node
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		_, err := node.Miner.AddBlock()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return node, nil
+}
+
+// NewClean will create a new test node. The inputs to the function are the
+// respective 'New' calls for each module. We need to use this awkward method
+// of initialization because the siatest package cannot import any of the
+// modules directly (so that the modules may use the siatest package to test
+// themselves).
+func NewClean(params NodeParams) (*Node, error) {
 	dir := params.Dir
 
 	// Gateway.
@@ -205,7 +228,16 @@ func New(params NodeParams) (*Node, error) {
 		if !params.CreateWallet {
 			return nil, nil
 		}
-		return wallet.New(cs, tp, filepath.Join(dir, modules.WalletDir))
+		w, err := wallet.New(cs, tp, filepath.Join(dir, modules.WalletDir))
+		if err != nil {
+			return nil, err
+		}
+		key := crypto.GenerateTwofishKey()
+		_, err = w.Encrypt(key)
+		if err != nil {
+			return nil, err
+		}
+		return w, w.Unlock(key)
 	}()
 	if err != nil {
 		return nil, errors.Extend(err, errors.New("unable to create wallet"))
@@ -256,7 +288,11 @@ func New(params NodeParams) (*Node, error) {
 		if !params.CreateMiner {
 			return nil, nil
 		}
-		return miner.New(cs, tp, w, filepath.Join(dir, modules.MinerDir))
+		m, err := miner.New(cs, tp, w, filepath.Join(dir, modules.MinerDir))
+		if err != nil {
+			return nil, err
+		}
+		return m, nil
 	}()
 	if err != nil {
 		return nil, errors.Extend(err, errors.New("unable to create miner"))
