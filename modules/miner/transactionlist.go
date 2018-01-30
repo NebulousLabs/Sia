@@ -8,19 +8,35 @@ import (
 )
 
 type (
+	// txnList is a helper structure to allow for quicker lookups, inserts and
+	// removals of transactions that should go into a block.
+	// In addition to the unsolved block's transaction field, the miner also
+	// keeps a txnList in memory. The txnList contains the transactions that
+	// will be in the unsolved block the next time blockForWork is called.
+	// Whenever we move a transaction from the overflow heap into the block
+	// heap, we also append it to the txnList. If we remove a transaction from
+	// the block heap we also remove it from the txnList. By using a map to map
+	// a transaction id to its element in the list, we can search, insert and
+	// remove in constant time. Removing an element from the txnList doesn't
+	// change the order of the remaining elements in the list. This is
+	// important since we don't want to mess up the relative order of
+	// transactions in their transaction sets.
+	// Every time blockForWork is called, we copy the transactions from the
+	// txnList into a slice that is then assigned to be the unsolved block's
+	// updated transaction field. To avoid allocating new memory every time
+	// this happens, a preallocated slice is kept in memory. Memory allocation
+	// for txnListElements is also optimized by using a memory pool that
+	// recycles txnListElements during rapid deletion and insertion.
+	txnList struct {
+		first   *txnListElement
+		last    *txnListElement
+		idToTxn map[types.TransactionID]*txnListElement
+	}
 	// txnListElemenet is a single element in a txnList
 	txnListElement struct {
 		txn  *types.Transaction
 		prev *txnListElement
 		next *txnListElement
-	}
-
-	// txnList is a helper structure to allow for quicker lookups, inserts and
-	// removals of transactions that should go into a block
-	txnList struct {
-		first   *txnListElement
-		last    *txnListElement
-		idToTxn map[types.TransactionID]*txnListElement
 	}
 )
 
