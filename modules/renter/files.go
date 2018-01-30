@@ -15,9 +15,12 @@ import (
 )
 
 var (
+	// ErrEmptyFilename is an error when filename is empty
 	ErrEmptyFilename = errors.New("filename must be a nonempty string")
-	ErrPathOverload  = errors.New("a file already exists at that location")
-	ErrUnknownPath   = errors.New("no file known with that path")
+	// ErrPathOverload is an error when a file already exists at that location
+	ErrPathOverload = errors.New("a file already exists at that location")
+	// ErrUnknownPath is an error when a file cannot be found with the given path
+	ErrUnknownPath = errors.New("no file known with that path")
 )
 
 // A file is a single file that has been uploaded to the network. Files are
@@ -235,7 +238,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 
 	var fileList []modules.FileInfo
 	for _, f := range files {
-		lockId := r.mu.RLock()
+		lockID := r.mu.RLock()
 		f.mu.RLock()
 		renewing := true
 		var localPath string
@@ -255,7 +258,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 			Expiration:     f.expiration(),
 		})
 		f.mu.RUnlock()
-		r.mu.RUnlock(lockId)
+		r.mu.RUnlock(lockID)
 	}
 	return fileList
 }

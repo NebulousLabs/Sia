@@ -410,26 +410,42 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	return nil
 }
 
-// hostdb passthroughs
-func (r *Renter) ActiveHosts() []modules.HostDBEntry                      { return r.hostDB.ActiveHosts() }
-func (r *Renter) AllHosts() []modules.HostDBEntry                         { return r.hostDB.AllHosts() }
+// ActiveHosts returns an array of hostDB's active hosts
+func (r *Renter) ActiveHosts() []modules.HostDBEntry { return r.hostDB.ActiveHosts() }
+
+// AllHosts returns an array of all hosts
+func (r *Renter) AllHosts() []modules.HostDBEntry { return r.hostDB.AllHosts() }
+
+// Host returns the host associated with the given public key
 func (r *Renter) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) { return r.hostDB.Host(spk) }
+
+// ScoreBreakdown returns the score breakdown
 func (r *Renter) ScoreBreakdown(e modules.HostDBEntry) modules.HostScoreBreakdown {
 	return r.hostDB.ScoreBreakdown(e)
 }
+
+// EstimateHostScore returns the estimated host score
 func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreakdown {
 	return r.hostDB.EstimateHostScore(e)
 }
 
-// contractor passthroughs
-func (r *Renter) Contracts() []modules.RenterContract        { return r.hostContractor.Contracts() }
-func (r *Renter) CurrentPeriod() types.BlockHeight           { return r.hostContractor.CurrentPeriod() }
+// Contracts returns an array of host contractor's contracts
+func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
+
+// CurrentPeriod returns the host contractor's current period
+func (r *Renter) CurrentPeriod() types.BlockHeight { return r.hostContractor.CurrentPeriod() }
+
+// PeriodSpending returns the host contractor's period spending
 func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostContractor.PeriodSpending() }
+
+// Settings returns the host contractor's allowance
 func (r *Renter) Settings() modules.RenterSettings {
 	return modules.RenterSettings{
 		Allowance: r.hostContractor.Allowance(),
 	}
 }
+
+// ProcessConsensusChange returns the process consensus change
 func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
 	id := r.mu.Lock()
 	r.lastEstimation = modules.RenterPriceEstimation{}

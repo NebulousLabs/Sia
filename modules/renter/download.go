@@ -684,7 +684,7 @@ func (dw *DownloadBufferWriter) Bytes() []byte {
 	return dw.data
 }
 
-// Close() implements DownloadWriter's Close method.
+// Close implements DownloadWriter's Close method.
 func (dw *DownloadBufferWriter) Close() error {
 	return nil
 }
@@ -738,13 +738,13 @@ func (dw *DownloadFileWriter) Close() error {
 	return dw.f.Close()
 }
 
-// DownloadHttpWriter is a http response writer-backed implementation of
+// DownloadHTTPWriter is a http response writer-backed implementation of
 // DownloadWriter.  The writer writes all content that is written to the
 // current `offset` directly to the ResponseWriter, and buffers all content
 // that is written at other offsets.  After every write to the ResponseWriter
 // the `offset` and `length` fields are updated, and buffer content written
 // until
-type DownloadHttpWriter struct {
+type DownloadHTTPWriter struct {
 	w              io.Writer
 	offset         int            // The index in the original file of the last byte written to the response writer.
 	firstByteIndex int            // The index of the first byte in the original file.
@@ -752,9 +752,9 @@ type DownloadHttpWriter struct {
 	buffer         map[int][]byte // Buffer used for storing the chunks until download finished.
 }
 
-// NewDownloadHttpWriter creates a new instance of http.ResponseWriter backed DownloadWriter.
-func NewDownloadHttpWriter(w io.Writer, offset, length uint64) *DownloadHttpWriter {
-	return &DownloadHttpWriter{
+// NewDownloadHTTPWriter creates a new instance of http.ResponseWriter backed DownloadWriter.
+func NewDownloadHTTPWriter(w io.Writer, offset, length uint64) *DownloadHTTPWriter {
+	return &DownloadHTTPWriter{
 		w:              w,
 		offset:         0,           // Current offset in the output file.
 		firstByteIndex: int(offset), // Index of first byte in original file.
@@ -766,18 +766,18 @@ func NewDownloadHttpWriter(w io.Writer, offset, length uint64) *DownloadHttpWrit
 // Destination implements the Destination method of the DownloadWriter
 // interface and informs callers where this download writer is
 // being written to.
-func (dw *DownloadHttpWriter) Destination() string {
+func (dw *DownloadHTTPWriter) Destination() string {
 	return "httpresp"
 }
 
-// Cloes implements DownloadWriter's Close method.
-func (dw *DownloadHttpWriter) Close() error {
+// Close implements DownloadWriter's Close method.
+func (dw *DownloadHTTPWriter) Close() error {
 	return nil
 }
 
 // WriteAt buffers parts of the file until the entire file can be
 // flushed to the client. Returns the number of bytes written or an error.
-func (dw *DownloadHttpWriter) WriteAt(b []byte, off int64) (int, error) {
+func (dw *DownloadHTTPWriter) WriteAt(b []byte, off int64) (int, error) {
 	// Write bytes to buffer.
 	offsetInBuffer := int(off) - dw.firstByteIndex
 	dw.buffer[offsetInBuffer] = b

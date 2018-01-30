@@ -18,15 +18,21 @@ import (
 )
 
 const (
-	logFile         = modules.RenterDir + ".log"
+	logFile = modules.RenterDir + ".log"
+	// PersistFilename is the filename to be used when persisting renter information to a JSON file
 	PersistFilename = "renter.json"
-	ShareExtension  = ".sia"
+	// ShareExtension is the extension to be used
+	ShareExtension = ".sia"
 )
 
 var (
-	ErrBadFile        = errors.New("not a .sia file")
-	ErrIncompatible   = errors.New("file is not compatible with current version")
-	ErrNoNicknames    = errors.New("at least one nickname must be supplied")
+	//ErrBadFile is an error when a file does not qualify as .sia file
+	ErrBadFile = errors.New("not a .sia file")
+	// ErrIncompatible is an error when file is not compatible with current version
+	ErrIncompatible = errors.New("file is not compatible with current version")
+	// ErrNoNicknames is an error when no nickname is given
+	ErrNoNicknames = errors.New("at least one nickname must be supplied")
+	// ErrNonShareSuffix is an error when the suffix of a file does not match the defined share extension
 	ErrNonShareSuffix = errors.New("suffix of file must be " + ShareExtension)
 
 	saveMetadata = persist.Metadata{
@@ -268,7 +274,7 @@ func shareFiles(files []*file, w io.Writer) error {
 	return zip.Close()
 }
 
-// ShareFile saves the specified files to shareDest.
+// ShareFiles saves the specified files to shareDest.
 func (r *Renter) ShareFiles(nicknames []string, shareDest string) error {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
@@ -303,8 +309,8 @@ func (r *Renter) ShareFiles(nicknames []string, shareDest string) error {
 	return nil
 }
 
-// ShareFilesAscii returns the specified files in ASCII format.
-func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
+// ShareFilesASCII returns the specified files in ASCII format.
+func (r *Renter) ShareFilesASCII(nicknames []string) (string, error) {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
@@ -427,9 +433,9 @@ func (r *Renter) LoadSharedFiles(filename string) ([]string, error) {
 	return r.loadSharedFiles(file)
 }
 
-// LoadSharedFilesAscii loads an ASCII-encoded .sia file into the renter. It
+// LoadSharedFilesASCII loads an ASCII-encoded .sia file into the renter. It
 // returns the nicknames of the loaded files.
-func (r *Renter) LoadSharedFilesAscii(asciiSia string) ([]string, error) {
+func (r *Renter) LoadSharedFilesASCII(asciiSia string) ([]string, error) {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 

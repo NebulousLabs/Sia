@@ -300,7 +300,7 @@ func (api *API) renterLoadHandler(w http.ResponseWriter, req *http.Request, _ ht
 // renterLoadAsciiHandler handles the API call to load a '.sia' file
 // in ASCII form.
 func (api *API) renterLoadAsciiHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	files, err := api.renter.LoadSharedFilesAscii(req.FormValue("asciisia"))
+	files, err := api.renter.LoadSharedFilesASCII(req.FormValue("asciisia"))
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -477,7 +477,7 @@ func (api *API) renterShareHandler(w http.ResponseWriter, req *http.Request, ps 
 // renterShareAsciiHandler handles the API call to return a '.sia' file
 // in ascii form.
 func (api *API) renterShareAsciiHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	ascii, err := api.renter.ShareFilesAscii(strings.Split(req.FormValue("siapaths"), ","))
+	ascii, err := api.renter.ShareFilesASCII(strings.Split(req.FormValue("siapaths"), ","))
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
