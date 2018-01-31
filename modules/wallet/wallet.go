@@ -240,7 +240,7 @@ func (w *Wallet) Rescanning() bool {
 	return rescanning
 }
 
-// Returns the wallet's current settings
+// Settings returns the wallet's current settings
 func (w *Wallet) Settings() modules.WalletSettings {
 	return modules.WalletSettings{
 		NoDefrag: w.defragDisabled,

@@ -35,7 +35,7 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 	return pts
 }
 
-// AddressUnconfirmedHistory returns all of the unconfirmed wallet transactions
+// AddressUnconfirmedTransactions returns all of the unconfirmed wallet transactions
 // related to a specific address.
 func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction) {
 	// ensure durability of reported transactions
