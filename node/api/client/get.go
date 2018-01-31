@@ -12,6 +12,12 @@ func (c *Client) ConsensusGet() (cg api.ConsensusGET, err error) {
 	return
 }
 
+// Gateway requests the /gateway api resource
+func (c *Client) GatewayGet() (gwg api.GatewayGET, err error) {
+	err = c.Get("/gateway", &gwg)
+	return
+}
+
 // MinerHeaderGet uses the /miner/header endpoint to get a header for work.
 func (c *Client) MinerHeaderGet() (target types.Target, bh types.BlockHeader, err error) {
 	targetAndHeader, err := c.GetRawResponse("/miner/header")

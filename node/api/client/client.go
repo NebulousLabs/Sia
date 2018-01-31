@@ -103,7 +103,7 @@ func (c *Client) GetRawResponse(resource string) ([]byte, error) {
 	return body, err
 }
 
-// GetAndParse requests the specified resource. The response, if provided, will be
+// Get requests the specified resource. The response, if provided, will be
 // decoded into obj. The resource path must begin with /.
 func (c *Client) Get(resource string, obj interface{}) error {
 	// Request resource
