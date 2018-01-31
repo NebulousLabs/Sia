@@ -124,9 +124,9 @@ func (n *Node) Close() (err error) {
 }
 
 // New will create a new test node. The inputs to the function are the
-// respective 'New' calls for each module. We need to use this awkward method of
-// initialization because the siatest package cannot import any of the modules
-// directly (so that the modules may use the siatest package to test
+// respective 'New' calls for each module. We need to use this awkward method
+// of initialization because the siatest package cannot import any of the
+// modules directly (so that the modules may use the siatest package to test
 // themselves).
 func New(params NodeParams) (*Node, error) {
 	dir := params.Dir
@@ -256,7 +256,11 @@ func New(params NodeParams) (*Node, error) {
 		if !params.CreateMiner {
 			return nil, nil
 		}
-		return miner.New(cs, tp, w, filepath.Join(dir, modules.MinerDir))
+		m, err := miner.New(cs, tp, w, filepath.Join(dir, modules.MinerDir))
+		if err != nil {
+			return nil, err
+		}
+		return m, nil
 	}()
 	if err != nil {
 		return nil, errors.Extend(err, errors.New("unable to create miner"))

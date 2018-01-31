@@ -76,6 +76,7 @@ func New(APIaddr string, requiredUserAgent string, requiredPassword string, node
 		},
 		done:              make(chan struct{}),
 		listener:          listener,
+		node:              node,
 		requiredUserAgent: requiredUserAgent,
 	}
 

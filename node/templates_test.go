@@ -3,7 +3,7 @@ package node
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/siatest"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // TestNew is a basic smoke test for New that uses all of the templates to
@@ -14,10 +14,7 @@ func TestNew(t *testing.T) {
 	}
 
 	// Test AllModulesTemplate.
-	dir, err := siatest.TestDir("node", t.Name()+"-AllModulesTemplate")
-	if err != nil {
-		t.Fatal(err)
-	}
+	dir := build.TempDir("node", t.Name()+"-AllModulesTemplate")
 	n, err := New(AllModules(dir))
 	if err != nil {
 		t.Fatal(err)
@@ -53,10 +50,7 @@ func TestNew(t *testing.T) {
 	}
 
 	// Test WalletTemplate.
-	dir, err = siatest.TestDir("node", t.Name()+"-WalletTemplate")
-	if err != nil {
-		t.Fatal(err)
-	}
+	dir = build.TempDir("node", t.Name()+"-WalletTemplate")
 	n, err = New(Wallet(dir))
 	if err != nil {
 		t.Fatal(err)
