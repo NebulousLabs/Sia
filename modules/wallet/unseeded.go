@@ -11,13 +11,15 @@ import (
 )
 
 const (
+	// SiagFileExtension is the file extension to be used for siag files
 	SiagFileExtension = ".siakey"
 
-	// The header for all siag files. Do not change. Because siag was created
+	// SiagFileHeader is the header for all siag files. Do not change. Because siag was created
 	// early in development, compatibility with siag requires manually handling
 	// the headers and version instead of using the persist package.
 	SiagFileHeader = "siag"
 
+	// SiagFileVersion is the version number to be used for siag files
 	SiagFileVersion = "1.0"
 )
 
@@ -25,11 +27,16 @@ var (
 	errAllDuplicates         = errors.New("old wallet has no new seeds")
 	errDuplicateSpendableKey = errors.New("key has already been loaded into the wallet")
 
+	// ErrInconsistentKeys is the error when keyfiles provided are for different addresses
 	ErrInconsistentKeys = errors.New("keyfiles provided that are for different addresses")
+	// ErrInsufficientKeys is the error when there's not enough keys provided to spend the siafunds
 	ErrInsufficientKeys = errors.New("not enough keys provided to spend the siafunds")
-	ErrNoKeyfile        = errors.New("no keyfile has been presented")
-	ErrUnknownHeader    = errors.New("file contains the wrong header")
-	ErrUnknownVersion   = errors.New("file has an unknown version number")
+	// ErrNoKeyfile is the error when no keyfile has been presented
+	ErrNoKeyfile = errors.New("no keyfile has been presented")
+	// ErrUnknownHeader is the error when file contains wrong header
+	ErrUnknownHeader = errors.New("file contains the wrong header")
+	// ErrUnknownVersion is the error when the file has an unknown version number
+	ErrUnknownVersion = errors.New("file has an unknown version number")
 )
 
 // A siagKeyPair is the struct representation of the bytes that get saved to
