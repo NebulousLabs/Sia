@@ -95,12 +95,7 @@ func (c *Client) GetRawResponse(resource string) ([]byte, error) {
 		// no reason to read the response
 		return []byte{}, nil
 	}
-
-	// Return the body
-	body := make([]byte, res.ContentLength)
-	_, err = io.ReadFull(res.Body, body)
-
-	return body, err
+	return ioutil.ReadAll(res.Body)
 }
 
 // Get requests the specified resource. The response, if provided, will be
@@ -154,12 +149,7 @@ func (c *Client) PostRawResponse(resource string, data string) ([]byte, error) {
 		// no reason to read the response
 		return []byte{}, nil
 	}
-
-	// Return the body
-	body := make([]byte, res.ContentLength)
-	_, err = io.ReadFull(res.Body, body)
-
-	return body, err
+	return ioutil.ReadAll(res.Body)
 }
 
 // Post makes a POST request to the resource at `resource`, using `data` as the

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"net/url"
 	"strconv"
 
@@ -31,6 +32,29 @@ func (c *Client) WalletInitPost(password string, force bool) (wip api.WalletInit
 	values.Set("encryptionpassword", password)
 	values.Set("force", strconv.FormatBool(force))
 	err = c.Post("/wallet/init", values.Encode(), &wip)
+	return
+}
+
+// WalletSiacoinsPost uses the /wallet/siacoins api endpoint to send money to a
+// single address
+func (c *Client) WalletSiacoinsPost(amount types.Currency, destination types.UnlockHash) (wsp api.WalletSiacoinsPOST, err error) {
+	values := url.Values{}
+	values.Set("amount", amount.String())
+	values.Set("destination", destination.String())
+	err = c.Post("wallet/siacoins", values.Encode(), &wsp)
+	return
+}
+
+// WalletSiacoinsMultiPost uses the /wallet/siacoin api endpoint to send money
+// to multiple addresses at once
+func (c *Client) WalletSiacoinsMultiPost(outputs []types.SiacoinOutput) (wsp api.WalletSiacoinsPOST, err error) {
+	values := url.Values{}
+	marshaledOutputs, err := json.Marshal(outputs)
+	if err != nil {
+		return api.WalletSiacoinsPOST{}, err
+	}
+	values.Set("outputs", string(marshaledOutputs))
+	err = c.Post("/wallet/siacoins", values.Encode(), &wsp)
 	return
 }
 

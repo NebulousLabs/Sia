@@ -40,11 +40,19 @@ func TestNewGroup(t *testing.T) {
 		t.Error("Wrong number of nodes")
 	}
 
-	// TODO check if nodes are fully connected
+	// Check if nodes are funded
+	cg, err := tg.Nodes()[0].ConsensusGet()
+	for _, node := range tg.Nodes() {
+		wtg, err := node.WalletTransactionsGet(0, cg.Height)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(wtg.ConfirmedTransactions) == 0 {
+			t.Errorf("Node has 0 confirmed funds")
+		}
+	}
 
 	// TODO check if hosts are announced and in each other's database
-
-	// TODO check if nodes are funded
 }
 
 // TestCreateTestGroup tests NewGroup without a miner

@@ -123,7 +123,35 @@ func NewGroup(nodeParams []node.NodeParams) (*TestGroup, error) {
 		}
 	}
 
-	// TODO Fund all the other nodes
+	// Fund all the nodes equally
+	wg, err := miner.WalletGet()
+	if err != nil {
+		return nil, err
+	}
+	// Calculate the funding for each node.
+	// Add +1 to avoid rounding errors that might lead to insufficient funds.
+	funding := wg.ConfirmedSiacoinBalance.Div64(uint64(len(tg.nodes)) + 1)
+	// Prepare the transaction outputs
+	scos := make([]types.SiacoinOutput, 0, len(tg.nodes))
+	for node := range tg.nodes {
+		wag, err := node.WalletAddressGet()
+		if err != nil {
+			return nil, err
+		}
+		scos = append(scos, types.SiacoinOutput{
+			Value:      funding,
+			UnlockHash: wag.Address,
+		})
+	}
+	// Send the coins to the outputs
+	_, err = miner.WalletSiacoinsMultiPost(scos)
+	if err != nil {
+		return nil, err
+	}
+	// Mine the transaction
+	if err := miner.MineBlock(); err != nil {
+		return nil, err
+	}
 
 	// TODO announce hosts and wait for them to show up in each other's hostdb
 
