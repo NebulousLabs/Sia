@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"strconv"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/node"
@@ -126,6 +127,26 @@ func NewGroup(nodeParams []node.NodeParams) (*TestGroup, error) {
 
 	// TODO announce hosts and wait for them to show up in each other's hostdb
 
+	// All nodes should be at the same block as the miner
+	mcg, err := miner.ConsensusGet()
+	if err != nil {
+		return nil, err
+	}
+	for node := range tg.nodes {
+		err := Retry(100, 100*time.Millisecond, func() error {
+			ncg, err := node.ConsensusGet()
+			if err != nil {
+				return err
+			}
+			if mcg.CurrentBlock != ncg.CurrentBlock {
+				return errors.New("the node's current block doesn't equal the miner's")
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
 	return tg, nil
 }
 
