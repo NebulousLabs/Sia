@@ -116,7 +116,9 @@ func (tp *TransactionPool) initPersist() error {
 		return build.ExtendErr("unable to begin tpool dbTx", err)
 	}
 	tp.tg.AfterStop(func() {
+		tp.mu.Lock()
 		err := tp.dbTx.Commit()
+		tp.mu.Unlock()
 		if err != nil {
 			tp.log.Println("Unable to close transaction properly during shutdown:", err)
 		}
