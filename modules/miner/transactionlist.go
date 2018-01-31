@@ -28,9 +28,10 @@ type (
 	// for txnListElements is also optimized by using a memory pool that
 	// recycles txnListElements during rapid deletion and insertion.
 	txnList struct {
-		first   *txnListElement
-		last    *txnListElement
-		idToTxn map[types.TransactionID]*txnListElement
+		first            *txnListElement                         // pointer to first element in list
+		last             *txnListElement                         // pointer to last element in list
+		idToTxn          map[types.TransactionID]*txnListElement // maps transaction ids to list element
+		preallocatedTxns []types.Transaction                     // used to return the list's contents without having to reallocate
 	}
 	// txnListElemenet is a single element in a txnList
 	txnListElement struct {
@@ -89,12 +90,12 @@ func (tl *txnList) transactions() []types.Transaction {
 		return []types.Transaction{}
 	}
 	element := tl.first
-	txns := []types.Transaction{}
+	tl.preallocatedTxns = tl.preallocatedTxns[:0]
 	for element != nil {
-		txns = append(txns, *element.txn)
+		tl.preallocatedTxns = append(tl.preallocatedTxns, *element.txn)
 		element = element.next
 	}
-	return txns
+	return tl.preallocatedTxns
 }
 
 // removeTxn removes a transaction by id
