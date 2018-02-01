@@ -33,6 +33,16 @@ type (
 	}
 )
 
+var (
+	// defaultAllowance is the allowance used for the group's renters
+	defaultAllowance = modules.Allowance{
+		Funds:       types.SiacoinPrecision.Mul64(100000),
+		Hosts:       10,
+		Period:      20,
+		RenewWindow: 5,
+	}
+)
+
 // announceHosts adds storage to each host and announces them to the group
 func announceHosts(hosts map[*TestNode]struct{}) error {
 	for host := range hosts {
@@ -199,8 +209,10 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	if err := hostsInRenterDBCheck(miner, tg.renters, len(tg.hosts)); err != nil {
 		return nil, err
 	}
-	// TODO Make sure all renters formed contracts with the hosts
-
+	// Wait for all the renters to form contracts
+	if err := waitForContracts(miner, tg.renters, tg.hosts); err != nil {
+		return nil, err
+	}
 	// Make sure all nodes are synced
 	if err := synchronizationCheck(miner, tg.nodes); err != nil {
 		return nil, err
@@ -210,15 +222,10 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 
 // setRentersAllowance sets the allowance of each renter
 func setRentersAllowance(renters map[*TestNode]struct{}) error {
-	// Create a sane default allowance for all renters
-	allowance := modules.Allowance{
-		Funds:       types.SiacoinPrecision.Mul64(100000),
-		Hosts:       50,
-		Period:      10,
-		RenewWindow: 5,
-	}
 	for renter := range renters {
-		renter.RenterPost(allowance)
+		if err := renter.RenterPost(defaultAllowance); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -283,6 +290,34 @@ func mapToSlice(m map[*TestNode]struct{}) []*TestNode {
 		tns = append(tns, tn)
 	}
 	return tns
+}
+
+// waitForContracts waits until the renters have formed contracts with the
+// hosts in the group.
+func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map[*TestNode]struct{}) error {
+	expectedContracts := defaultAllowance.Hosts
+	if uint64(len(hosts)) < expectedContracts {
+		expectedContracts = uint64(len(hosts))
+	}
+	for renter := range renters {
+		err := build.Retry(100, time.Second, func() error {
+			rc, err := renter.RenterContractsGet()
+			if err != nil {
+				return err
+			}
+			if uint64(len(rc.Contracts)) < expectedContracts {
+				if err := miner.MineBlock(); err != nil {
+					return err
+				}
+				return errors.New("Renter hasn't formed enough contracts")
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Nodes returns all the nodes of the group
