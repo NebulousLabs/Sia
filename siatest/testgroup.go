@@ -40,32 +40,51 @@ func (tg *TestGroup) Close() (err error) {
 	return
 }
 
-// randomDir is a helper functions that returns a random directory path
-func randomDir() string {
-	dir, err := TestDir(strconv.Itoa(fastrand.Intn(math.MaxInt32)))
-	if err != nil {
-		panic(build.ExtendErr("failed to create testing directory", err))
+// fullyConnectNodes takes a list of nodes and connects all their gateways
+func fullyConnectNodes(nodes []*TestNode) error {
+	// Fully connect the nodes
+	for i, nodeA := range nodes {
+		for _, nodeB := range nodes[i+1:] {
+			if err := nodeA.GatewayConnectPost(nodeB.GatewayAddress()); err != nil {
+				return build.ExtendErr("failed to connect to peer", err)
+			}
+		}
 	}
-	return dir
+	return nil
 }
 
-// NewGroupFromTemplate will create hosts, renters and miners according to the
-// settings in groupParams.
-func NewGroupFromTemplate(groupParams GroupParams) (*TestGroup, error) {
-	var params []node.NodeParams
-	// Create host params
-	for i := 0; i < groupParams.hosts; i++ {
-		params = append(params, node.Host(randomDir()))
+// fundNodes uses the funds of a miner node to fund all the nodes of the group
+func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
+	// Fund all the nodes equally
+	wg, err := miner.WalletGet()
+	if err != nil {
+		return err
 	}
-	// Create renter params
-	for i := 0; i < groupParams.renters; i++ {
-		params = append(params, node.Renter(randomDir()))
+	// Calculate the funding for each node.
+	// Add +1 to avoid rounding errors that might lead to insufficient funds.
+	funding := wg.ConfirmedSiacoinBalance.Div64(uint64(len(nodes)) + 1)
+	// Prepare the transaction outputs
+	scos := make([]types.SiacoinOutput, 0, len(nodes))
+	for node := range nodes {
+		wag, err := node.WalletAddressGet()
+		if err != nil {
+			return err
+		}
+		scos = append(scos, types.SiacoinOutput{
+			Value:      funding,
+			UnlockHash: wag.Address,
+		})
 	}
-	// Create miner params
-	for i := 0; i < groupParams.miners; i++ {
-		params = append(params, node.Miner(randomDir()))
+	// Send the coins to the outputs
+	_, err = miner.WalletSiacoinsMultiPost(scos)
+	if err != nil {
+		return err
 	}
-	return NewGroup(params)
+	// Mine the transaction
+	if err := miner.MineBlock(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // NewGroup creates a group of TestNodes from node params. All the nodes will
@@ -103,13 +122,9 @@ func NewGroup(nodeParams []node.NodeParams) (*TestGroup, error) {
 		}
 	}
 
-	// Fully connect the nodes
-	for i, nodeA := range nodes {
-		for _, nodeB := range nodes[i+1:] {
-			if err := nodeA.GatewayConnectPost(nodeB.GatewayAddress()); err != nil {
-				return nil, build.ExtendErr("failed to connect to peer", err)
-			}
-		}
+	// Fully connect nodes
+	if err := fullyConnectNodes(nodes); err != nil {
+		return nil, err
 	}
 
 	// Get a miner and mine some blocks to generate coins
@@ -123,44 +138,64 @@ func NewGroup(nodeParams []node.NodeParams) (*TestGroup, error) {
 		}
 	}
 
-	// Fund all the nodes equally
-	wg, err := miner.WalletGet()
-	if err != nil {
-		return nil, err
-	}
-	// Calculate the funding for each node.
-	// Add +1 to avoid rounding errors that might lead to insufficient funds.
-	funding := wg.ConfirmedSiacoinBalance.Div64(uint64(len(tg.nodes)) + 1)
-	// Prepare the transaction outputs
-	scos := make([]types.SiacoinOutput, 0, len(tg.nodes))
-	for node := range tg.nodes {
-		wag, err := node.WalletAddressGet()
-		if err != nil {
-			return nil, err
-		}
-		scos = append(scos, types.SiacoinOutput{
-			Value:      funding,
-			UnlockHash: wag.Address,
-		})
-	}
-	// Send the coins to the outputs
-	_, err = miner.WalletSiacoinsMultiPost(scos)
-	if err != nil {
-		return nil, err
-	}
-	// Mine the transaction
-	if err := miner.MineBlock(); err != nil {
+	// Fund nodes
+	if err := fundNodes(miner, tg.nodes); err != nil {
 		return nil, err
 	}
 
+	// TODO set the renters allowance
 	// TODO announce hosts and wait for them to show up in each other's hostdb
 
-	// All nodes should be at the same block as the miner
-	mcg, err := miner.ConsensusGet()
-	if err != nil {
+	// TODO add host storage folder
+	// TODO set hosts to accepting contracts
+	// TODO announce host
+
+	// TODO Mine blocks until all the hosts show up in the hostdbs of the renters.
+	// TODO Make sure all renters formed contracts with the hosts
+
+	// Make sure all nodes are synced
+	if err := synchronizationCheck(miner, tg.nodes); err != nil {
 		return nil, err
 	}
-	for node := range tg.nodes {
+	return tg, nil
+}
+
+// NewGroupFromTemplate will create hosts, renters and miners according to the
+// settings in groupParams.
+func NewGroupFromTemplate(groupParams GroupParams) (*TestGroup, error) {
+	var params []node.NodeParams
+	// Create host params
+	for i := 0; i < groupParams.hosts; i++ {
+		params = append(params, node.Host(randomDir()))
+	}
+	// Create renter params
+	for i := 0; i < groupParams.renters; i++ {
+		params = append(params, node.Renter(randomDir()))
+	}
+	// Create miner params
+	for i := 0; i < groupParams.miners; i++ {
+		params = append(params, node.Miner(randomDir()))
+	}
+	return NewGroup(params)
+}
+
+// randomDir is a helper functions that returns a random directory path
+func randomDir() string {
+	dir, err := TestDir(strconv.Itoa(fastrand.Intn(math.MaxInt32)))
+	if err != nil {
+		panic(build.ExtendErr("failed to create testing directory", err))
+	}
+	return dir
+}
+
+// synchronizationCheck makes sure that all the nodes are synced and follow the
+// same chain.
+func synchronizationCheck(miner *TestNode, nodes map[*TestNode]struct{}) error {
+	mcg, err := miner.ConsensusGet()
+	if err != nil {
+		return err
+	}
+	for node := range nodes {
 		err := Retry(100, 100*time.Millisecond, func() error {
 			ncg, err := node.ConsensusGet()
 			if err != nil {
@@ -172,10 +207,10 @@ func NewGroup(nodeParams []node.NodeParams) (*TestGroup, error) {
 			return nil
 		})
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return tg, nil
+	return nil
 }
 
 // mapToSlice converts a map of TestNodes into a slice
