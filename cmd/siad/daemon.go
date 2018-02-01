@@ -176,27 +176,33 @@ func startDaemon(config Config) (err error) {
 	if err != nil {
 		return err
 	}
-	go srv.Serve()
+	errChan := make(chan error)
+	go func() {
+		errChan <- srv.Serve()
+	}()
 	err = srv.loadModules()
 	if err != nil {
 		return err
 	}
 
-	// stop the server if a kill signal is caught
-	errChan := make(chan error)
+	// listen for kill signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill)
-	go func() {
-		<-sigChan
-		fmt.Println("\rCaught stop signal, quitting...")
-		errChan <- srv.Close()
-	}()
 
 	// Print a 'startup complete' message.
 	startupTime := time.Since(loadStart)
 	fmt.Println("Finished loading in", startupTime.Seconds(), "seconds")
 
-	err = <-errChan
+	// wait for Serve to return or for kill signal to be caught
+	err = func() error {
+		select {
+		case err := <-errChan:
+			return err
+		case <-sigChan:
+			fmt.Println("\rCaught stop signal, quitting...")
+			return srv.Close()
+		}
+	}()
 	if err != nil {
 		build.Critical(err)
 	}
