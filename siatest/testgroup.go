@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
@@ -143,8 +144,10 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		return nil, err
 	}
 
-	// TODO set the renters allowance
-	// TODO announce hosts and wait for them to show up in each other's hostdb
+	// Set renter allowances
+	if err := setRentersAllowance(tg.renters); err != nil {
+		return nil, err
+	}
 
 	// TODO add host storage folder
 	// TODO set hosts to accepting contracts
@@ -158,6 +161,21 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		return nil, err
 	}
 	return tg, nil
+}
+
+// setRentersAllowance sets the allowance of each renter
+func setRentersAllowance(renters map[*TestNode]struct{}) error {
+	// Create a sane default allowance for all renters
+	allowance := modules.Allowance{
+		Funds:       types.SiacoinPrecision.Mul64(100000),
+		Hosts:       50,
+		Period:      10,
+		RenewWindow: 5,
+	}
+	for renter := range renters {
+		renter.RenterPost(allowance)
+	}
+	return nil
 }
 
 // NewGroupFromTemplate will create hosts, renters and miners according to the

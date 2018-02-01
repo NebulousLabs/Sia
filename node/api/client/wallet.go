@@ -2,26 +2,17 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strconv"
 
-	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// GatewayConnectPost uses the /gateway/connect/:address endpoint to connect to
-// the gateway at address
-func (c *Client) GatewayConnectPost(address modules.NetAddress) (err error) {
-	err = c.Post("/gateway/connect/"+string(address), "", nil)
-	return
-}
-
-// MinerHeaderPost uses the /miner/header endpoint to submit a solved block
-// header that was previously received from the same endpoint
-func (c *Client) MinerHeaderPost(bh types.BlockHeader) (err error) {
-	err = c.Post("/miner/header", string(encoding.Marshal(bh)), nil)
+// WalletAddressGet requests a new address from the /wallet/address endpoint
+func (c *Client) WalletAddressGet() (wag api.WalletAddressGET, err error) {
+	err = c.Get("/wallet/address", &wag)
 	return
 }
 
@@ -35,13 +26,9 @@ func (c *Client) WalletInitPost(password string, force bool) (wip api.WalletInit
 	return
 }
 
-// WalletSiacoinsPost uses the /wallet/siacoins api endpoint to send money to a
-// single address
-func (c *Client) WalletSiacoinsPost(amount types.Currency, destination types.UnlockHash) (wsp api.WalletSiacoinsPOST, err error) {
-	values := url.Values{}
-	values.Set("amount", amount.String())
-	values.Set("destination", destination.String())
-	err = c.Post("wallet/siacoins", values.Encode(), &wsp)
+// WalletGet requests the /wallet api resource
+func (c *Client) WalletGet() (wg api.WalletGET, err error) {
+	err = c.Get("/wallet", &wg)
 	return
 }
 
@@ -55,6 +42,24 @@ func (c *Client) WalletSiacoinsMultiPost(outputs []types.SiacoinOutput) (wsp api
 	}
 	values.Set("outputs", string(marshaledOutputs))
 	err = c.Post("/wallet/siacoins", values.Encode(), &wsp)
+	return
+}
+
+// WalletSiacoinsPost uses the /wallet/siacoins api endpoint to send money to a
+// single address
+func (c *Client) WalletSiacoinsPost(amount types.Currency, destination types.UnlockHash) (wsp api.WalletSiacoinsPOST, err error) {
+	values := url.Values{}
+	values.Set("amount", amount.String())
+	values.Set("destination", destination.String())
+	err = c.Post("wallet/siacoins", values.Encode(), &wsp)
+	return
+}
+
+// WalletTransactionsGet requests the/wallet/transactions api resource for a
+// certain startheight and endheight
+func (c *Client) WalletTransactionsGet(startHeight types.BlockHeight, endHeight types.BlockHeight) (wtg api.WalletTransactionsGET, err error) {
+	err = c.Get(fmt.Sprintf("/wallet/transactions?startheight=%v&endheight=%v",
+		startHeight, endHeight), &wtg)
 	return
 }
 
