@@ -84,7 +84,7 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 
 // SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
-func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txns []types.Transaction, err error) {
+func (w *Wallet) SendSiacoinsWithAribitraryData(amount types.Currency, dest types.UnlockHash, arbData []byte) (txns []types.Transaction, err error) {
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
@@ -116,6 +116,9 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 		w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
 		return nil, build.ExtendErr("unable to fund transaction", err)
 	}
+	if len(arbData) > 0 {
+		txnBuilder.AddArbitraryData(arbData)
+	}
 	txnBuilder.AddMinerFee(tpoolFee)
 	txnBuilder.AddSiacoinOutput(output)
 	txnSet, err := txnBuilder.Sign(true)
@@ -136,6 +139,10 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 		w.log.Println("\t", txn.ID())
 	}
 	return txnSet, nil
+}
+
+func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txns []types.Transaction, err error) {
+	return w.SendSiacoinsWithAribitraryData(amount, dest, make([]byte, 0))
 }
 
 // SendSiacoinsMulti creates a transaction that includes the specified
