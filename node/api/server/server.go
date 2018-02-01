@@ -24,6 +24,7 @@ type Server struct {
 	node              *node.Node
 	requiredUserAgent string
 	serveErr          error
+	Dir               string
 }
 
 // serve listens for and handles API calls. It is a blocking function.
@@ -89,6 +90,7 @@ func New(APIaddr string, requiredUserAgent string, requiredPassword string, node
 		listener:          listener,
 		node:              node,
 		requiredUserAgent: requiredUserAgent,
+		Dir:               nodeParams.Dir,
 	}
 
 	// Spin up a goroutine that serves the API and closes srv.done when

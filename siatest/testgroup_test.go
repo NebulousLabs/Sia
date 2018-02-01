@@ -51,7 +51,6 @@ func TestNewGroup(t *testing.T) {
 			t.Errorf("Node has 0 confirmed funds")
 		}
 	}
-
 	// TODO check if hosts are announced and in each other's database
 }
 

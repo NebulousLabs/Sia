@@ -5,7 +5,14 @@ import (
 	"strconv"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/node/api"
 )
+
+// RenterContractsGet requests the /renter/contracts resource
+func (c *Client) RenterContractsGet() (rc api.RenterContracts, err error) {
+	err = c.Get("/renter/contracts", &rc)
+	return
+}
 
 // RenterPost uses the /renter endpoint to change the renter's allowance
 func (c *Client) RenterPost(allowance modules.Allowance) (err error) {

@@ -33,6 +33,22 @@ type (
 	}
 )
 
+// announceHosts adds storage to each host and announces them to the group
+func announceHosts(hosts map[*TestNode]struct{}) error {
+	for host := range hosts {
+		if err := host.HostStorageFoldersAddPost(host.Dir, 1048576); err != nil {
+			return err
+		}
+		if err := host.HostAcceptingContractsPost(true); err != nil {
+			return err
+		}
+		if err := host.HostAnnouncePost(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Close closes the group and all its nodes
 func (tg *TestGroup) Close() (err error) {
 	for n := range tg.nodes {
@@ -84,6 +100,30 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	// Mine the transaction
 	if err := miner.MineBlock(); err != nil {
 		return err
+	}
+	return nil
+}
+
+// hostsInRenterDBCheck makes sure that all the renters see numHosts hosts in
+// their database.
+func hostsInRenterDBCheck(miner *TestNode, renters map[*TestNode]struct{}, numHosts int) error {
+	for renter := range renters {
+		err := Retry(100, 100*time.Millisecond, func() error {
+			hdag, err := renter.HostDbActiveGet()
+			if err != nil {
+				return err
+			}
+			if len(hdag.Hosts) != numHosts {
+				if err := miner.MineBlock(); err != nil {
+					return err
+				}
+				return errors.New("renter doesn't have enough active hosts in hostdb")
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -143,17 +183,22 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	if err := fundNodes(miner, tg.nodes); err != nil {
 		return nil, err
 	}
-
 	// Set renter allowances
 	if err := setRentersAllowance(tg.renters); err != nil {
 		return nil, err
 	}
-
-	// TODO add host storage folder
-	// TODO set hosts to accepting contracts
-	// TODO announce host
-
-	// TODO Mine blocks until all the hosts show up in the hostdbs of the renters.
+	// Add storage to the hosts and announce them
+	if err := announceHosts(tg.hosts); err != nil {
+		return nil, err
+	}
+	// Mine a block to get the announcements confirmed
+	if err := miner.MineBlock(); err != nil {
+		return nil, err
+	}
+	// Block until all hosts show up as active in the renters' hostdbs
+	if err := hostsInRenterDBCheck(miner, tg.renters, len(tg.hosts)); err != nil {
+		return nil, err
+	}
 	// TODO Make sure all renters formed contracts with the hosts
 
 	// Make sure all nodes are synced
