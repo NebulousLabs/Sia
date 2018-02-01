@@ -89,7 +89,7 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 
 // NewGroup creates a group of TestNodes from node params. All the nodes will
 // be connected, synced and funded. Hosts nodes are also announced.
-func NewGroup(nodeParams []node.NodeParams) (*TestGroup, error) {
+func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	// Create and init group
 	tg := &TestGroup{
 		nodes:   make(map[*TestNode]struct{}),
@@ -174,9 +174,9 @@ func NewGroupFromTemplate(groupParams GroupParams) (*TestGroup, error) {
 	}
 	// Create miner params
 	for i := 0; i < groupParams.miners; i++ {
-		params = append(params, node.Miner(randomDir()))
+		params = append(params, Miner(randomDir()))
 	}
-	return NewGroup(params)
+	return NewGroup(params...)
 }
 
 // randomDir is a helper functions that returns a random directory path
