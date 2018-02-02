@@ -215,11 +215,6 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	if err := fundNodes(miner, tg.nodes); err != nil {
 		return nil, err
 	}
-	log.Println("set allowances")
-	// Set renter allowances
-	if err := setRenterAllowances(tg.renters); err != nil {
-		return nil, err
-	}
 	log.Println("add storage")
 	// Add storage to hosts
 	if err := addStorageFolderToHosts(tg.hosts); err != nil {
@@ -237,6 +232,11 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	log.Println("renterdb check")
 	// Block until all hosts show up as active in the renters' hostdbs
 	if err := hostsInRenterDBCheck(miner, tg.renters, len(tg.hosts)); err != nil {
+		return nil, err
+	}
+	log.Println("set allowances")
+	// Set renter allowances
+	if err := setRenterAllowances(tg.renters); err != nil {
 		return nil, err
 	}
 	log.Println("wait contracts")
