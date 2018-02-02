@@ -2,5 +2,5 @@
 
 package build
 
-// VLONG set to false will make the build time short
+// VLONG enables a set of test cases that take a very long time to run
 const VLONG = false
