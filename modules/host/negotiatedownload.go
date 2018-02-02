@@ -1,6 +1,7 @@
 package host
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -160,6 +161,18 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 	// has not already passed.
 	if existingRevision.NewWindowStart-revisionSubmissionBuffer <= blockHeight {
 		return errLateRevision
+	}
+
+	// Host payout addresses shouldn't change
+	if paymentRevision.NewValidProofOutputs[1].UnlockHash != existingRevision.NewValidProofOutputs[1].UnlockHash {
+		return errors.New("host payout address changed")
+	}
+	if paymentRevision.NewMissedProofOutputs[1].UnlockHash != existingRevision.NewMissedProofOutputs[1].UnlockHash {
+		return errors.New("host payout address changed")
+	}
+	// Make sure the lost collateral still goes to the void
+	if paymentRevision.NewMissedProofOutputs[2].UnlockHash != existingRevision.NewMissedProofOutputs[2].UnlockHash {
+		return errors.New("lost collateral address was changed")
 	}
 
 	// Determine the amount that was transferred from the renter.
