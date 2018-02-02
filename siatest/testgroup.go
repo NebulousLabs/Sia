@@ -2,8 +2,10 @@ package siatest
 
 import (
 	"errors"
+	"log"
 	"math"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -44,14 +46,23 @@ var (
 	}
 )
 
-// addStorageFolderToHosts adds a single storage folder to each host
+// addStorageFolderToHosts adds a single storage folder to each host.
 func addStorageFolderToHosts(hosts map[*TestNode]struct{}) error {
+	errors := make([]error, len(hosts))
+	wg := new(sync.WaitGroup)
+	i := 0
+	// The following api call is very slow. Using multiple threads speeds that
+	// process up a lot.
 	for host := range hosts {
-		if err := host.HostStorageFoldersAddPost(host.Dir, 1048576); err != nil {
-			return err
-		}
+		wg.Add(1)
+		go func(i int, host *TestNode) {
+			errors[i] = host.HostStorageFoldersAddPost(host.Dir, 1048576)
+			wg.Done()
+		}(i, host)
+		i++
 	}
-	return nil
+	wg.Wait()
+	return build.ComposeErrors(errors...)
 }
 
 // announceHosts adds storage to each host and announces them to the group
@@ -157,6 +168,7 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		miners:  make(map[*TestNode]struct{}),
 	}
 
+	log.Println("creating")
 	// Create node and add it to the correct groups
 	nodes := make([]*TestNode, 0, len(nodeParams))
 	for _, np := range nodeParams {
@@ -181,11 +193,13 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		}
 	}
 
+	log.Println("fully connect")
 	// Fully connect nodes
 	if err := fullyConnectNodes(nodes); err != nil {
 		return nil, err
 	}
 
+	log.Println("mine blocks")
 	// Get a miner and mine some blocks to generate coins
 	if len(tg.miners) == 0 {
 		return nil, errors.New("cannot fund group without miners")
@@ -196,19 +210,22 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 			return nil, err
 		}
 	}
-
+	log.Println("fund nodes")
 	// Fund nodes
 	if err := fundNodes(miner, tg.nodes); err != nil {
 		return nil, err
 	}
+	log.Println("set allowances")
 	// Set renter allowances
 	if err := setRenterAllowances(tg.renters); err != nil {
 		return nil, err
 	}
+	log.Println("add storage")
 	// Add storage to hosts
 	if err := addStorageFolderToHosts(tg.hosts); err != nil {
 		return nil, err
 	}
+	log.Println("announce")
 	// Announce hosts
 	if err := announceHosts(tg.hosts); err != nil {
 		return nil, err
@@ -217,18 +234,22 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	if err := miner.MineBlock(); err != nil {
 		return nil, err
 	}
+	log.Println("renterdb check")
 	// Block until all hosts show up as active in the renters' hostdbs
 	if err := hostsInRenterDBCheck(miner, tg.renters, len(tg.hosts)); err != nil {
 		return nil, err
 	}
+	log.Println("wait contracts")
 	// Wait for all the renters to form contracts
 	if err := waitForContracts(miner, tg.renters, tg.hosts); err != nil {
 		return nil, err
 	}
+	log.Println("wait sync")
 	// Make sure all nodes are synced
 	if err := synchronizationCheck(miner, tg.nodes); err != nil {
 		return nil, err
 	}
+	log.Println("done")
 	return tg, nil
 }
 
