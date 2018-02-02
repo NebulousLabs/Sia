@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node"
+	"github.com/NebulousLabs/Sia/node/api/client"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 )
@@ -36,19 +37,26 @@ type (
 var (
 	// defaultAllowance is the allowance used for the group's renters
 	defaultAllowance = modules.Allowance{
-		Funds:       types.SiacoinPrecision.Mul64(100000),
-		Hosts:       10,
-		Period:      20,
-		RenewWindow: 5,
+		Funds:       types.SiacoinPrecision.Mul64(1e3),
+		Hosts:       5,
+		Period:      50,
+		RenewWindow: 10,
 	}
 )
 
-// announceHosts adds storage to each host and announces them to the group
-func announceHosts(hosts map[*TestNode]struct{}) error {
+// addStorageFolderToHosts adds a single storage folder to each host
+func addStorageFolderToHosts(hosts map[*TestNode]struct{}) error {
 	for host := range hosts {
 		if err := host.HostStorageFoldersAddPost(host.Dir, 1048576); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// announceHosts adds storage to each host and announces them to the group
+func announceHosts(hosts map[*TestNode]struct{}) error {
+	for host := range hosts {
 		if err := host.HostAcceptingContractsPost(true); err != nil {
 			return err
 		}
@@ -72,7 +80,7 @@ func fullyConnectNodes(nodes []*TestNode) error {
 	// Fully connect the nodes
 	for i, nodeA := range nodes {
 		for _, nodeB := range nodes[i+1:] {
-			if err := nodeA.GatewayConnectPost(nodeB.GatewayAddress()); err != nil {
+			if err := nodeA.GatewayConnectPost(nodeB.GatewayAddress()); err != nil && err != client.ErrPeerExists {
 				return build.ExtendErr("failed to connect to peer", err)
 			}
 		}
@@ -194,10 +202,14 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		return nil, err
 	}
 	// Set renter allowances
-	if err := setRentersAllowance(tg.renters); err != nil {
+	if err := setRenterAllowances(tg.renters); err != nil {
 		return nil, err
 	}
-	// Add storage to the hosts and announce them
+	// Add storage to hosts
+	if err := addStorageFolderToHosts(tg.hosts); err != nil {
+		return nil, err
+	}
+	// Announce hosts
 	if err := announceHosts(tg.hosts); err != nil {
 		return nil, err
 	}
@@ -220,8 +232,8 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	return tg, nil
 }
 
-// setRentersAllowance sets the allowance of each renter
-func setRentersAllowance(renters map[*TestNode]struct{}) error {
+// setRenterAllowances sets the allowance of each renter
+func setRenterAllowances(renters map[*TestNode]struct{}) error {
 	for renter := range renters {
 		if err := renter.RenterPost(defaultAllowance); err != nil {
 			return err
@@ -259,7 +271,6 @@ func randomDir() string {
 }
 
 // synchronizationCheck makes sure that all the nodes are synced and follow the
-// same chain.
 func synchronizationCheck(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	mcg, err := miner.ConsensusGet()
 	if err != nil {
@@ -300,15 +311,18 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 		expectedContracts = uint64(len(hosts))
 	}
 	for renter := range renters {
-		err := build.Retry(100, time.Second, func() error {
+		numRetries := 0
+		err := build.Retry(1000, 100*time.Millisecond, func() error {
+			if numRetries%10 == 0 {
+				if err := miner.MineBlock(); err != nil {
+					return err
+				}
+			}
 			rc, err := renter.RenterContractsGet()
 			if err != nil {
 				return err
 			}
 			if uint64(len(rc.Contracts)) < expectedContracts {
-				if err := miner.MineBlock(); err != nil {
-					return err
-				}
 				return errors.New("Renter hasn't formed enough contracts")
 			}
 			return nil

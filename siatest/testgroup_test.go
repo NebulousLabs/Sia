@@ -51,7 +51,6 @@ func TestNewGroup(t *testing.T) {
 			t.Errorf("Node has 0 confirmed funds")
 		}
 	}
-	// TODO check if hosts are announced and in each other's database
 }
 
 // TestCreateTestGroup tests NewGroup without a miner
@@ -77,7 +76,7 @@ func TestNewGroupNoRenterHost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// Create a group with nothing but a single miner
+	// Create a group with nothing but miners
 	groupParams := GroupParams{
 		hosts:   0,
 		renters: 0,
