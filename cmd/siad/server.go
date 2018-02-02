@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -412,6 +413,10 @@ func NewServer(config Config) (*Server, error) {
 	// Create the listener for the server
 	l, err := net.Listen("tcp", config.Siad.APIaddr)
 	if err != nil {
+		if isAddrInUseErr(err) {
+			return nil, fmt.Errorf("%v; are you running another instance of siad?", err.Error())
+		}
+
 		return nil, err
 	}
 
@@ -447,6 +452,16 @@ func NewServer(config Config) (*Server, error) {
 	mux.HandleFunc("/", srv.apiHandler)
 
 	return srv, nil
+}
+
+// isAddrInUseErr checks if the error corresponds to syscall.EADDRINUSE
+func isAddrInUseErr(err error) bool {
+	if opErr, ok := err.(*net.OpError); ok {
+		if syscallErr, ok := opErr.Err.(*os.SyscallError); ok {
+			return syscallErr.Err == syscall.EADDRINUSE
+		}
+	}
+	return false
 }
 
 // loadModules loads the modules defined by the server's config and makes their
