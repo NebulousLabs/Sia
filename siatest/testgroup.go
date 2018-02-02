@@ -2,7 +2,6 @@ package siatest
 
 import (
 	"errors"
-	"log"
 	"math"
 	"strconv"
 	"sync"
@@ -101,32 +100,33 @@ func fullyConnectNodes(nodes []*TestNode) error {
 
 // fundNodes uses the funds of a miner node to fund all the nodes of the group
 func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
-	// Fund all the nodes equally
+	// Get the miner's balance
 	wg, err := miner.WalletGet()
 	if err != nil {
 		return err
 	}
-	// Calculate the funding for each node.
-	// Add +1 to avoid rounding errors that might lead to insufficient funds.
-	funding := wg.ConfirmedSiacoinBalance.Div64(uint64(len(nodes)) + 1)
-	// Prepare the transaction outputs
-	scos := make([]types.SiacoinOutput, 0, len(nodes))
+	// Send txnsPerNode outputs to each node
+	txnsPerNode := uint64(25)
+	scos := make([]types.SiacoinOutput, 0, uint64(len(nodes))*txnsPerNode)
+	funding := wg.ConfirmedSiacoinBalance.Div64(uint64(len(nodes))).Div64(txnsPerNode + 1)
 	for node := range nodes {
 		wag, err := node.WalletAddressGet()
 		if err != nil {
 			return err
 		}
-		scos = append(scos, types.SiacoinOutput{
-			Value:      funding,
-			UnlockHash: wag.Address,
-		})
+		for i := uint64(0); i < txnsPerNode; i++ {
+			scos = append(scos, types.SiacoinOutput{
+				Value:      funding,
+				UnlockHash: wag.Address,
+			})
+		}
 	}
-	// Send the coins to the outputs
+	// Send the transaction
 	_, err = miner.WalletSiacoinsMultiPost(scos)
 	if err != nil {
 		return err
 	}
-	// Mine the transaction
+	// Mine the transactions
 	if err := miner.MineBlock(); err != nil {
 		return err
 	}
@@ -168,7 +168,6 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		miners:  make(map[*TestNode]struct{}),
 	}
 
-	log.Println("creating")
 	// Create node and add it to the correct groups
 	nodes := make([]*TestNode, 0, len(nodeParams))
 	for _, np := range nodeParams {
@@ -193,13 +192,11 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		}
 	}
 
-	log.Println("fully connect")
 	// Fully connect nodes
 	if err := fullyConnectNodes(nodes); err != nil {
 		return nil, err
 	}
 
-	log.Println("mine blocks")
 	// Get a miner and mine some blocks to generate coins
 	if len(tg.miners) == 0 {
 		return nil, errors.New("cannot fund group without miners")
@@ -210,17 +207,14 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 			return nil, err
 		}
 	}
-	log.Println("fund nodes")
 	// Fund nodes
 	if err := fundNodes(miner, tg.nodes); err != nil {
 		return nil, err
 	}
-	log.Println("add storage")
 	// Add storage to hosts
 	if err := addStorageFolderToHosts(tg.hosts); err != nil {
 		return nil, err
 	}
-	log.Println("announce")
 	// Announce hosts
 	if err := announceHosts(tg.hosts); err != nil {
 		return nil, err
@@ -229,27 +223,22 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	if err := miner.MineBlock(); err != nil {
 		return nil, err
 	}
-	log.Println("renterdb check")
 	// Block until all hosts show up as active in the renters' hostdbs
 	if err := hostsInRenterDBCheck(miner, tg.renters, len(tg.hosts)); err != nil {
 		return nil, err
 	}
-	log.Println("set allowances")
 	// Set renter allowances
 	if err := setRenterAllowances(tg.renters); err != nil {
 		return nil, err
 	}
-	log.Println("wait contracts")
 	// Wait for all the renters to form contracts
 	if err := waitForContracts(miner, tg.renters, tg.hosts); err != nil {
 		return nil, err
 	}
-	log.Println("wait sync")
 	// Make sure all nodes are synced
 	if err := synchronizationCheck(miner, tg.nodes); err != nil {
 		return nil, err
 	}
-	log.Println("done")
 	return tg, nil
 }
 
