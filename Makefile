@@ -50,8 +50,8 @@ vet: release-std
 	go vet $(pkgs)
 
 # will always run on some packages for a while.
-lintpkgs = ./modules ./modules/gateway ./modules/host ./modules/renter ./modules/renter/hostdb ./modules/renter/contractor \
-           ./node ./node/api/server ./persist ./siatest
+lintpkgs = ./modules ./modules/gateway ./modules/host ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb \
+           ./modules/wallet ./node ./node/api/server ./persist ./siatest
 lint:
 	golint -min_confidence=1.0 -set_exit_status $(lintpkgs)
 
@@ -107,3 +107,4 @@ whitepaper:
 	pdflatex -output-directory=doc whitepaper.tex
 
 .PHONY: all dependencies fmt install release release-std xc clean test test-v test-long cover cover-integration cover-unit whitepaper
+
