@@ -50,8 +50,8 @@ vet: release-std
 	go vet $(pkgs)
 
 # will always run on some packages for a while.
-lintpkgs = ./modules ./modules/gateway ./modules/host ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb \
-           ./modules/wallet ./node ./node/api/server ./persist ./siatest
+lintpkgs = ./build ./modules ./modules/gateway ./modules/host ./modules/renter ./modules/renter/contractor \
+           ./modules/renter/hostdb ./modules/wallet ./node ./node/api/server ./persist ./siatest
 lint:
 	golint -min_confidence=1.0 -set_exit_status $(lintpkgs)
 
