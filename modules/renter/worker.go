@@ -22,27 +22,21 @@ type worker struct {
 	hostPubKey types.SiaPublicKey
 	renter     *Renter
 
-	// Channels that inform the worker of kill signals and of new work.
-	downloadChan         chan downloadWork // higher priority than all uploads
-	killChan             chan struct{}     // highest priority
-	priorityDownloadChan chan downloadWork // higher priority than downloads (used for user-initiated downloads)
-	uploadChan           chan struct{}     // lowest priority
+	// Download variables.
+	downloadChan          chan downloadWork // higher priority than all uploads
+	downloadRecentFailure time.Time
+	priorityDownloadChan  chan downloadWork // higher priority than downloads (used for user-initiated downloads)
 
-	// Operation failure statistics for the worker.
-	downloadRecentFailure     time.Time // Only modified by the primary download loop.
-	uploadRecentFailure       time.Time // Only modified by primary repair loop.
-	uploadConsecutiveFailures int
+	// Uploading variables.
+	unprocessedChunks         []*unfinishedChunk // Yet unprocessed work items.
+	uploadChan                chan struct{}      // Notifications of new work.
+	uploadConsecutiveFailures int                // How many times in a row uploading has failed.
+	uploadRecentFailure       time.Time          // How recent was the last failure?
+	uploadTerminated          bool               // Have we stopped uploading?
 
-	// Two lists of chunks that relate to worker upload tasks. The first list is
-	// the set of chunks that the worker hasn't examined yet. The second list is
-	// the list of chunks that the worker examined, but was unable to process
-	// because other workers had taken on all of the work already. This list is
-	// maintained in case any of the other workers fail - this worker will be
-	// able to pick up the slack.
-	mu                sync.Mutex
-	standbyChunks     []*unfinishedChunk
-	terminated        bool
-	unprocessedChunks []*unfinishedChunk
+	// Utilities.
+	killChan chan struct{} // Worker will shut down if a signal is sent down this channel.
+	mu       sync.Mutex
 }
 
 // threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
@@ -81,18 +75,6 @@ func (w *worker) threadedWorkLoop() {
 			continue
 		}
 
-		// Determine the maximum amount of time to wait for any standby chunks.
-		var sleepDuration time.Duration
-		w.mu.Lock()
-		numStandby := len(w.standbyChunks)
-		w.mu.Unlock()
-		if numStandby > 0 {
-			// TODO: Pick a random time instead of just a constant time.
-			sleepDuration = time.Second * 3 // TODO: Constant
-		} else {
-			sleepDuration = time.Hour // TODO: Constant
-		}
-
 		// Block until new work is received via the upload or download channels,
 		// or until the standby chunks are ready to be revisited, or until a
 		// kill signal is received.
@@ -104,8 +86,6 @@ func (w *worker) threadedWorkLoop() {
 			w.download(d)
 			continue
 		case <-w.uploadChan:
-			continue
-		case <-time.After(sleepDuration):
 			continue
 		case <-w.killChan:
 			return
