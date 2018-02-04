@@ -90,7 +90,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) bool {
 	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.Encode(chunk.logicalChunkData)
 	memoryFreed := uint64(len(chunk.logicalChunkData))
 	chunk.logicalChunkData = nil
-	r.managedMemoryAvailableAdd(memoryFreed)
+	r.managedMemoryReturn(memoryFreed)
 	chunk.memoryReleased += memoryFreed
 	memoryFreed = 0
 	if err != nil {
@@ -118,7 +118,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) bool {
 		}
 	}
 	// Return the released memory.
-	r.managedMemoryAvailableAdd(memoryFreed)
+	r.managedMemoryReturn(memoryFreed)
 	chunk.memoryReleased += memoryFreed
 
 	// Distribute the chunk to the workers.
@@ -203,6 +203,6 @@ func (r *Renter) managedReleaseIdleChunkPieces(uc *unfinishedChunk) {
 	}
 	uc.mu.Unlock()
 	if memoryReleased > 0 {
-		r.managedMemoryAvailableAdd(uint64(memoryReleased))
+		r.managedMemoryReturn(uint64(memoryReleased))
 	}
 }

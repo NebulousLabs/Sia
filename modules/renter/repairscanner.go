@@ -228,29 +228,22 @@ func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts ma
 // available, fetching the logical data for the chunk (either from the disk or
 // from the network), erasure coding the logical data into the physical data,
 // and then finally passing the work onto the workers.
-//
-// TODO: Need to turn this into a smarter memory pool construction - this
-// construction as it stands has a race condition. Instead of blocking until a
-// memory refresh signal is received, it should just call 'AcquireMemory' on a
-// pool object or something, and then that object can worry about breaking and
-// stuff, and can also make sure that the memory goes to only one place.
 func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{}) {
 	// Grab the next chunk, loop until we have enough memory, update the amount
 	// of memory available, and then spin up a thread to asynchronously handle
 	// the rest of the chunk tasks.
-	memoryAvailable := r.managedMemoryAvailableGet()
 	nextChunk := heap.Pop(ch).(*unfinishedChunk)
-	for nextChunk.memoryNeeded > memoryAvailable {
+	memChan, memoryAcquired := r.managedMemoryGet(nextChunk.memoryNeeded)
+	for !memoryAcquired {
 		select {
 		case newFile := <-r.newUploads:
 			r.managedInsertFileIntoChunkHeap(newFile, ch, hosts)
-		case <-r.newMemory:
-			memoryAvailable = r.managedMemoryAvailableGet()
+		case <-memChan:
+			memChan, memoryAcquired = r.managedMemoryGet(nextChunk.memoryNeeded)
 		case <-r.tg.StopChan():
 			return
 		}
 	}
-	r.managedMemoryAvailableSub(nextChunk.memoryNeeded)
 	// Add this thread to the waitgroup. This Add will be released once the
 	// worker threads have been added to the wg.
 	r.heapWG.Add(1)
@@ -259,7 +252,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 		r.heapWG.Done()
 		if !workDistributed {
 			// Release any data that did not get distributed to workers.
-			r.managedMemoryAvailableAdd(nextChunk.memoryNeeded - nextChunk.memoryReleased)
+			r.managedMemoryReturn(nextChunk.memoryNeeded - nextChunk.memoryReleased)
 		}
 		// Sanity check, make sure memory was returned properly.
 		if nextChunk.logicalChunkData != nil {
