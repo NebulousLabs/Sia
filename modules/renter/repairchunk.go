@@ -73,12 +73,8 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 // the physical pieces for the chunk, and then distribute them. The returned
 // bool indicates whether the chunk was successfully distributed to workers.
 func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) bool {
-	// Only download this file if more than 25% of the redundancy is missing.
-	minMissingPiecesToDownload := (chunk.piecesNeeded - chunk.minimumPieces) / 4
-	download := chunk.piecesCompleted+minMissingPiecesToDownload < chunk.piecesNeeded
-
 	// Fetch the logical data for the chunk.
-	err := r.managedFetchLogicalChunkData(chunk, download)
+	err := r.managedFetchLogicalChunkData(chunk)
 	if err != nil {
 		// Logical data is not available, nothing to do.
 		r.log.Debugln("Fetching logical data of a chunk failed:", err)
@@ -131,7 +127,11 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) bool {
 //
 // chunk.data should be passed as 'nil' to the download, to keep memory usage as
 // light as possible.
-func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk, download bool) error {
+func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedChunk) error {
+	// Only download this file if more than 25% of the redundancy is missing.
+	minMissingPiecesToDownload := (chunk.piecesNeeded - chunk.minimumPieces) / 4
+	download := chunk.piecesCompleted+minMissingPiecesToDownload < chunk.piecesNeeded
+
 	// Download the chunk if it's not on disk.
 	if chunk.localPath == "" && download {
 		return r.managedDownloadLogicalChunkData(chunk)
