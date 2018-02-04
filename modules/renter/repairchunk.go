@@ -101,7 +101,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) bool {
 		r.log.Critical("not enough physical pieces to match the upload settings of the file")
 		return false
 	}
-	// Loop through the pieces and encrypt any that our needed, while dropping
+	// Loop through the pieces and encrypt any that are needed, while dropping
 	// any pieces that are not needed.
 	for i := 0; i < len(chunk.pieceUsage); i++ {
 		if chunk.pieceUsage[i] {
