@@ -18,9 +18,9 @@ import (
 type (
 	// GroupParams is a helper struct to make creating TestGroups easier.
 	GroupParams struct {
-		hosts   int // number of hosts to create
-		renters int // number of renters to create
-		miners  int // number of miners to create
+		Hosts   int // number of hosts to create
+		Renters int // number of renters to create
+		Miners  int // number of miners to create
 	}
 
 	// TestGroup is a group of of TestNodes that are funded, synced and ready
@@ -135,15 +135,15 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 func NewGroupFromTemplate(groupParams GroupParams) (*TestGroup, error) {
 	var params []node.NodeParams
 	// Create host params
-	for i := 0; i < groupParams.hosts; i++ {
+	for i := 0; i < groupParams.Hosts; i++ {
 		params = append(params, node.Host(randomDir()))
 	}
 	// Create renter params
-	for i := 0; i < groupParams.renters; i++ {
+	for i := 0; i < groupParams.Renters; i++ {
 		params = append(params, node.Renter(randomDir()))
 	}
 	// Create miner params
-	for i := 0; i < groupParams.miners; i++ {
+	for i := 0; i < groupParams.Miners; i++ {
 		params = append(params, Miner(randomDir()))
 	}
 	return NewGroup(params...)
