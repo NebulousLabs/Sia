@@ -2,6 +2,8 @@ package siatest
 
 import (
 	"testing"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // TestCreateTestGroup tests the behavior of NewGroup.
@@ -55,7 +57,7 @@ func TestNewGroup(t *testing.T) {
 
 // TestCreateTestGroup tests NewGroup without a miner
 func TestNewGroupNoMiner(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	// Try to create a group without miners
@@ -73,7 +75,7 @@ func TestNewGroupNoMiner(t *testing.T) {
 
 // TestCreateTestGroup tests NewGroup with no renter or host
 func TestNewGroupNoRenterHost(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	// Create a group with nothing but miners
@@ -87,7 +89,7 @@ func TestNewGroupNoRenterHost(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
-	defer func() {
+	func() {
 		if err := tg.Close(); err != nil {
 			t.Fatal(err)
 		}
