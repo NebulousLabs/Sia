@@ -150,12 +150,16 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		}
 	}
 
-	// If we have too man unspent transactions we might as well do some
+	// If we have too many unspent transactions we might as well do some
 	// defragging since we create a setup transaction anyway
 	defrag := tb.wallet.defragDisabled && len(so.ids) >= naturalDefragThreshold
 	if defrag {
-		// If we defrag we start with the smallest output
+		// If we defrag we start with the smallest output and skip the
+		// defragStartIndex last ones to make sure the wallet still has a
+		// minimum amount of large outputs to spend.
 		sort.Sort(so)
+		so.ids = so.ids[:len(so.ids)-defragStartIndex]
+		so.outputs = so.outputs[:len(so.outputs)-defragStartIndex]
 	} else {
 		sort.Sort(sort.Reverse(so))
 	}
