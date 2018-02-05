@@ -84,6 +84,8 @@ type (
 
 		SiacoinPrecision types.Currency `json:"siacoinprecision"`
 	}
+
+	// DaemonVersion holds the version information for siad
 	DaemonVersion struct {
 		Version string `json:"version"`
 	}
@@ -586,6 +588,7 @@ func (srv *Server) loadModules() error {
 	return nil
 }
 
+// Serve starts the HTTP server
 func (srv *Server) Serve() error {
 	// The server will run until an error is encountered or the listener is
 	// closed, via either the Close method or the signal handling above.
