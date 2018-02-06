@@ -30,25 +30,6 @@ func (w *worker) managedKillUploading() {
 	w.mu.Unlock()
 }
 
-// managedNextChunk will pull the next potential chunk out of the worker's work queue
-// for uploading.
-func (w *worker) managedNextChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	// Loop through the unprocessed chunks and find some work to do.
-	for range w.unprocessedChunks {
-		// Pull a chunk off of the unprocessed chunks stack.
-		chunk := w.unprocessedChunks[0]
-		w.unprocessedChunks = w.unprocessedChunks[1:]
-		nextChunk, pieceIndex := w.processChunk(chunk)
-		if nextChunk != nil {
-			return nextChunk, pieceIndex
-		}
-	}
-	return nil, 0 // no work found
-}
-
 // processChunk will process a chunk from the worker chunk queue.
 func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, pieceIndex uint64) {
 	// Determine the usability value of this worker.

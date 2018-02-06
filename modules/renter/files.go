@@ -67,6 +67,8 @@ func deriveKey(masterKey crypto.TwofishKey, chunkIndex, pieceIndex uint64) crypt
 }
 
 // chunkSize returns the size of one chunk.
+//
+// NOTE: no lock is necessary to call this function.
 func (f *file) chunkSize() uint64 {
 	return f.pieceSize * uint64(f.erasureCode.MinPieces())
 }

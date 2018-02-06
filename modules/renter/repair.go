@@ -33,6 +33,8 @@ type chunkHeap []*unfinishedChunk
 
 // unfinishedChunk contains a chunk from the filesystem that has not finished
 // uploading, including knowledge of the progress.
+//
+// TODO: rename to unfinishedUploadChunk
 type unfinishedChunk struct {
 	// Information about the file. localPath may be the empty string if the file
 	// is known not to exist locally.
@@ -65,7 +67,7 @@ type unfinishedChunk struct {
 	piecesCompleted  int                 // number of pieces that have been fully uploaded.
 	piecesRegistered int                 // number of pieces that are being uploaded, but aren't finished yet.
 	unusedHosts      map[string]struct{} // hosts that aren't yet storing any pieces
-	workersRemaining int                 // number of workers who have received the chunk, but haven't finished processing it.
+	workersRemaining int                 // number of workers still able to upload a piece.
 	workersStandby   []*worker           // workers that can be used if other workers fail
 }
 
@@ -309,16 +311,16 @@ func (r *Renter) threadedRepairScan() {
 	defer r.tg.Done()
 
 	for {
-		// Wait until we are online
+		// Wait until we are online.
 		for !r.g.Online() {
 			select {
 			case <-r.tg.StopChan():
 				return
-			case <-time.After(20 * time.Second):
+			case <-time.After(offlineCheckFrequency):
 			}
 		}
 
-		// Return if the renter has shut d wn.
+		// Return if the renter has shut down.
 		select {
 		case <-r.tg.StopChan():
 			return

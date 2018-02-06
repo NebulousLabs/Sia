@@ -26,6 +26,14 @@ package renter
 
 // TODO: Allow the 'baseMemory' to be set by the user.
 
+// TODO: Need some extra handling in the memory management scheme for the
+// situation where more memory is requested than 'baseMemory'. The memory should
+// be allocated, but only if no other memory has been allocated at all. Also
+// need the memory manager thing to have some way to prevent thread starvation,
+// currently if a series of concurrent threads requesting small amounts of
+// memory have continuous presence, threads needed a larger amount of memory
+// will be blocked permanenty.
+
 import (
 	"errors"
 	"reflect"
@@ -164,16 +172,9 @@ type Renter struct {
 	tracking map[string]trackedFile // map from nickname to metadata
 
 	// Work management.
-	//
-	// chunkQueue contains a list of incomplete work that the download loop acts
-	// upon. The chunkQueue is only ever modified by the main download loop
-	// thread, which means it can be accessed and updated without locks.
-	//
-	// downloadQueue contains a complete history of work that has been
-	// submitted to the download loop.
 	chunkQueue    []*chunkDownload // Accessed without locks.
 	downloadQueue []*download
-	newDownloads  chan *download
+	newDownloads  chan []*unfinishedDownloadChunk
 	newUploads    chan *file
 	workerPool    map[types.FileContractID]*worker
 
@@ -242,7 +243,7 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 		files:    make(map[string]*file),
 		tracking: make(map[string]trackedFile),
 
-		newDownloads: make(chan *download),
+		newDownloads: make(chan *[]unfinishedDownloadChunk),
 		newUploads:   make(chan *file),
 		workerPool:   make(map[types.FileContractID]*worker),
 
@@ -321,6 +322,8 @@ func (r *Renter) managedMemoryGet(amt uint64) (chan struct{}, bool) {
 	id := r.mu.Lock()
 	defer r.mu.Unlock(id)
 
+	// If there is enough memory available, return true to indicate that the
+	// memory was successfully acquired.
 	if r.memoryAvailable >= amt {
 		r.memoryAvailable -= amt
 		return nil, true

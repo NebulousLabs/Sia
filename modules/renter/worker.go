@@ -1,7 +1,5 @@
 package renter
 
-// TODO: Add failure cooldowns to the workers, particularly for uploading tasks.
-
 import (
 	"sync"
 	"time"
@@ -23,11 +21,13 @@ type worker struct {
 	renter     *Renter
 
 	// Download variables.
-	downloadChan          chan downloadWork // higher priority than all uploads
-	downloadRecentFailure time.Time
-	priorityDownloadChan  chan downloadWork // higher priority than downloads (used for user-initiated downloads)
+	downloadChan                chan struct{} // Notifications of new work. Takes priority over uploads.
+	downloadChunks              []*unfinishedDownloadChunk // Yet unprocessed work items.
+	downloadConsecutiveFailures time.Time         // How many failures in a row?
+	downloadRecentFailure       time.Time         // How recent was the last failure?
+	downloadTerminated          bool              // Has downloading been terminated for this worker?
 
-	// Uploading variables.
+	// Upload variables.
 	unprocessedChunks         []*unfinishedChunk // Yet unprocessed work items.
 	uploadChan                chan struct{}      // Notifications of new work.
 	uploadConsecutiveFailures int                // How many times in a row uploading has failed.
@@ -37,6 +37,61 @@ type worker struct {
 	// Utilities.
 	killChan chan struct{} // Worker will shut down if a signal is sent down this channel.
 	mu       sync.Mutex
+}
+
+// managedQueueDownloadChunk adds a chunk to the worker's queue.
+func (w *worker) managedQueueDownloadChunk(udc *unfinishedDownloadChunk) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Don't add the chunk to a terminated worker.
+	//
+	// TODO: Don't add chunk to a worker on timeout either.
+	if w.downloadTerminated {
+		udc.mu.Lock()
+		w.dropDownloadChunk(udc)
+		udc.mu.Unlock()
+		return
+	}
+
+	w.downloadChunks = append(w.downloadChunks, udc)
+}
+
+// managedNextDownloadChunk will pull the next potential chunk out of the work
+// queue for downloading.
+func (w *worker) managedNextDownloadChunk() (nextChunk *unfinishedDownloadChunk) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Loop through the download chunks to find something to do.
+	for range w.downloadChunks {
+		chunk := w.downloadChunks[0]
+		w.downloadChunks = w.downloadChunks[1:]
+		nextDownloadChunk = w.processDownloadChunk(chunk)
+		if nextDownloadChunk != nil {
+			return nextDownloadChunk
+		}
+	}
+	return nil
+}
+
+// managedNextUploadChunk will pull the next potential chunk out of the worker's
+// work queue for uploading.
+func (w *worker) managedNextUploadChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Loop through the unprocessed chunks and find some work to do.
+	for range w.unprocessedChunks {
+		// Pull a chunk off of the unprocessed chunks stack.
+		chunk := w.unprocessedChunks[0]
+		w.unprocessedChunks = w.unprocessedChunks[1:]
+		nextChunk, pieceIndex := w.processChunk(chunk)
+		if nextChunk != nil {
+			return nextChunk, pieceIndex
+		}
+	}
+	return nil, 0 // no work found
 }
 
 // threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
@@ -50,22 +105,14 @@ func (w *worker) threadedWorkLoop() {
 	// The worker may have upload chunks and it needs to drop them before
 	// terminating.
 	defer w.managedKillUploading()
+	defer w.managedKillDownloading()
 
 	for {
-		// Check for priority downloads.
-		select {
-		case d := <-w.priorityDownloadChan:
-			w.download(d)
+		// Perform one stpe of processing download work.
+		downloadChunk := w.managedNextDownloadChunk()
+		if downloadChunk != nil {
+			w.managedDownload(chunk)
 			continue
-		default:
-		}
-
-		// Check for standard downloads.
-		select {
-		case d := <-w.downloadChan:
-			w.download(d)
-			continue
-		default:
 		}
 
 		// Perform one step of processing upload work.
@@ -76,14 +123,9 @@ func (w *worker) threadedWorkLoop() {
 		}
 
 		// Block until new work is received via the upload or download channels,
-		// or until the standby chunks are ready to be revisited, or until a
-		// kill signal is received.
+		// or until a kill or stop signal is received.
 		select {
-		case d := <-w.priorityDownloadChan:
-			w.download(d)
-			continue
 		case d := <-w.downloadChan:
-			w.download(d)
 			continue
 		case <-w.uploadChan:
 			continue
@@ -113,9 +155,8 @@ func (r *Renter) managedUpdateWorkerPool() {
 				contract:   contract,
 				hostPubKey: contract.HostPublicKey,
 
-				downloadChan:         make(chan downloadWork, 1),
+				downloadChan:         make(chan struct{}, 1),
 				killChan:             make(chan struct{}),
-				priorityDownloadChan: make(chan downloadWork, 1),
 				uploadChan:           make(chan struct{}, 1),
 
 				renter: r,
