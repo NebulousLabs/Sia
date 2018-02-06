@@ -15,19 +15,23 @@ import (
 )
 
 const (
-	TwofishOverhead = 28 // number of bytes added by EncryptBytes
+	// TwofishOverhead is the number of bytes added by EncryptBytes
+	TwofishOverhead = 28
 )
 
 var (
+	// ErrInsufficientLen is an error when supplied ciphertext is not long enough to contain a nonce
 	ErrInsufficientLen = errors.New("supplied ciphertext is not long enough to contain a nonce")
 )
 
 type (
+	// Ciphertext {insert comment here}
 	Ciphertext []byte
+	// TwofishKey {insert comment here}
 	TwofishKey [EntropySize]byte
 )
 
-// GenerateEncryptionKey produces a key that can be used for encrypting and
+// GenerateTwofishKey produces a key that can be used for encrypting and
 // decrypting files.
 func GenerateTwofishKey() (key TwofishKey) {
 	fastrand.Read(key[:])
@@ -90,10 +94,12 @@ func (key TwofishKey) NewReader(r io.Reader) io.Reader {
 	return &cipher.StreamReader{S: stream, R: r}
 }
 
+// MarshalJSON returns the JSON encoding of a CipherText
 func (c Ciphertext) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]byte(c))
 }
 
+// UnmarshalJSON parses the JSON-encoded b and returns an instance of CipherText
 func (c *Ciphertext) UnmarshalJSON(b []byte) error {
 	var umarB []byte
 	err := json.Unmarshal(b, &umarB)

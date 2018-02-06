@@ -19,10 +19,12 @@ import (
 )
 
 const (
+	// HashSize {insert comment here}
 	HashSize = 32
 )
 
 type (
+	// Hash {insert comment here}
 	Hash [HashSize]byte
 
 	// HashSlice is used for sorting
@@ -30,6 +32,7 @@ type (
 )
 
 var (
+	// ErrHashWrongLen is the error when encoded value has the wrong length to be a hash
 	ErrHashWrongLen = errors.New("encoded value has the wrong length to be a hash")
 )
 
