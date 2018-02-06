@@ -22,16 +22,8 @@ func (w *worker) dropUploadChunks() {
 	w.unprocessedChunks = w.unprocessedChunks[:0]
 }
 
-// managedKillUploading will disable all uploading for the worker.
-func (w *worker) managedKillUploading() {
-	w.mu.Lock()
-	w.dropUploadChunks()
-	w.uploadTerminated = true
-	w.mu.Unlock()
-}
-
-// processChunk will process a chunk from the worker chunk queue.
-func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, pieceIndex uint64) {
+// processUploadChunk will process a chunk from the worker chunk queue.
+func (w *worker) processUploadChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, pieceIndex uint64) {
 	// Determine the usability value of this worker.
 	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
 	if !exists {
@@ -41,12 +33,13 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 
 	// Determine what sort of help this chunk needs.
 	uc.mu.Lock()
+	// Determine that this worker is not on cooldonw.
 	_, candidateHost := uc.unusedHosts[w.hostPubKey.String()]
 	chunkComplete := uc.piecesNeeded <= uc.piecesCompleted
 	needsHelp := uc.piecesNeeded > uc.piecesCompleted+uc.piecesRegistered
 
 	// If the chunk does not need help from this worker, release the chunk.
-	if chunkComplete || !candidateHost || !goodForUpload {
+	if chunkComplete || !candidateHost || !goodForUpload || w.onUploadCooldown() {
 		// This worker no longer needs to track this chunk.
 		uc.mu.Unlock()
 		w.dropChunk(uc)
@@ -77,35 +70,6 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 	// The chunk could need help from this worker, but only if other workers who
 	// are performing uploads experience failures. Put this chunk on standby.
 	return nil, 0
-}
-
-// managedQueueChunkRepair will take a chunk and add it to the worker's repair stack.
-func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
-	// Check that the worker is allowed to be uploading.
-	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
-	goodForUpload := exists && utility.GoodForUpload
-
-	w.mu.Lock()
-	// Figure out how long the worker would need to be on cooldown.
-	requiredCooldown := uploadFailureCooldown
-	for i := 0; i < w.uploadConsecutiveFailures && i < maxConsecutivePenalty; i++ {
-		requiredCooldown *= 2
-	}
-	onCooldown := time.Now().Before(w.uploadRecentFailure.Add(requiredCooldown))
-	if !goodForUpload || w.uploadTerminated || onCooldown {
-		// The worker should not be uploading, remove the chunk.
-		w.dropChunk(uc)
-		w.mu.Unlock()
-		return
-	}
-	w.unprocessedChunks = append(w.unprocessedChunks, uc)
-	w.mu.Unlock()
-
-	// Send a signal informing the work thread that there is work.
-	select {
-	case w.uploadChan <- struct{}{}:
-	default:
-	}
 }
 
 // uploadFailed is called if a worker failed to upload part of an unfinished

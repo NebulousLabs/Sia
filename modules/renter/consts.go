@@ -64,4 +64,12 @@ var (
 		Standard: time.Second * 61,
 		Testing:  time.Second,
 	}).(time.Duration)
+
+	// workerPoolUpdateTimeout is the amount of time that can pass before the
+	// worker pool should be updated.
+	workerPoolUpdateTimeout = build.Select(build.Var{
+		Dev:      30 * time.Second,
+		Standard: 5 * time.Minute,
+		Testing:  3 * time.Second,
+	}).(time.Duration)
 )

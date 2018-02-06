@@ -169,14 +169,16 @@ type Renter struct {
 	// tracking contains a list of files that the user intends to maintain. By
 	// default, files loaded through sharing are not maintained by the user.
 	files    map[string]*file
-	tracking map[string]trackedFile // map from nickname to metadata
+	tracking map[string]trackedFile // Map from nickname to metadata.
 
-	// Work management.
-	chunkQueue    []*chunkDownload // Accessed without locks.
-	downloadQueue []*download
-	newDownloads  chan []*unfinishedDownloadChunk
-	newUploads    chan *file
-	workerPool    map[types.FileContractID]*worker
+	// Download management.
+	downloadHeapMu sync.Mutex // Used to protect the downloadHeap.
+	downloadHeap  *downloadChunkHeap // A heap of priority-sorted chunks to download.
+	downloadQueue []*download // List of user-initiated downloads.
+	newDownloads  chan struct{} // Used to notify download heap thread that new downlaods are available.
+
+	// Upload management.
+	newUploads    chan *file // Used to send new uploads to the upload heap.
 
 	// Memory management - baseMemory tracks how much memory the renter is
 	// allowed to consume, memoryAvailable tracks how much more memory the
@@ -191,6 +193,7 @@ type Renter struct {
 	baseMemory      uint64
 	memoryAvailable uint64
 	newMemory       *chan struct{}
+	workerPool    map[types.FileContractID]*worker
 
 	// Utilities.
 	cs             modules.ConsensusSet
@@ -244,11 +247,13 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 		tracking: make(map[string]trackedFile),
 
 		newDownloads: make(chan *[]unfinishedDownloadChunk),
+		downloadHeap: new(downloadChunkHeap),
+
 		newUploads:   make(chan *file),
-		workerPool:   make(map[types.FileContractID]*worker),
 
 		baseMemory:      defaultMemory,
 		memoryAvailable: defaultMemory,
+		workerPool:   make(map[types.FileContractID]*worker),
 
 		cs:             cs,
 		g:              g,

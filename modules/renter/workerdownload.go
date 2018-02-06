@@ -1,15 +1,18 @@
 package renter
 
-// TODO: In the actual download function, no attention is paid to the worker
-// timeout stuff.
-
 import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TODO: Clean up the concurrency patterns / assumptions with regards to the
+// drop function.
+
 // dropDownloadChunk will release a download chunk that the worker had queued
 // up.
+//
+// NOTE: This function expects that the udc lock is held in addition to the
+// worker lock.
 func (w *worker) dropDownloadChunk(udc *unfinishedDownloadChunk) {
 	udc.workersRemaining--
 
@@ -33,14 +36,6 @@ func (w *worker) dropDownloadChunks() {
 	w.downloadChunks = w.downloadChunks[:0]
 }
 
-// managedKillDownloading will drop all of the pieces given to the worker.
-func (w *worker) managedKillDownloading(udc *unfinishedDownloadChunk) {
-	w.mu.Lock()
-	w.dropDownloadChunks()
-	w.downloadTerminated = true
-	w.mu.Unlock()
-}
-
 // processDownloadChunk will take a potential download chunk, figure out if
 // there is work to do, and then perform any registration or processing with the
 // chunk before returning the chunk to the caller.
@@ -53,6 +48,23 @@ func (w *worker) managedKillDownloading(udc *unfinishedDownloadChunk) {
 // worker if the latency for this worker is higher than the target latency for
 // this chunk.
 func (w *worker) processDownloadChunk(udc *unfinishedDownloadChunk) *unfinishedDownloadChunk {
+	udc.mu.Lock()
+	defer udc.mu.Unlock()
+
+	// TODO: Clean up the concurrency patterns and stuff with regards to the
+	// dopr function.
+
+	// Determine whether the worker needs to drop the chunk.
+	chunkComplete := udc.piecesCompleted >= udc.erasureCode.MinPieces()
+	pieceIndex, workerHasPiece := udc.chunkMap[w.contract.ID]
+	if chunkComplete || chunkFailed || w.onDownloadCooldown() || !workerHasPiece {
+		w.dropDownloadChunk(udc)
+		return nil
+	}
+
+	// TODO TODO TODO: pick up here.
+
+
 	// TODO: Compare worker latency here to see if it is below the latencyTarget
 	// for the chunk.
 	meetsLatencyTarget := true
@@ -64,27 +76,17 @@ func (w *worker) processDownloadChunk(udc *unfinishedDownloadChunk) *unfinishedD
 	// bunch, track that.
 
 	// If this chunk has not had enough pieces regiseterd yet, register this
-	// worker. If this worker is not able to help out, subtract the worker from
-	// 'workersRemaining'. Otherwise, just put the worker on standby.
-	pieceIndex, exists := udc.chunkMap[w.contract.ID]
-	udc.mu.Lock()
-	useful := exists && !udc.failed
-	if udc.piecesRegistered < udc.erasureCode.MinPieces()+overdrive && !udc.pieceUsage[pieceIndex] && meetsLatencyTarget && useful {
+	// worker. Otherwies put the worker on standby.
+	if udc.piecesRegistered < udc.erasureCode.MinPieces()+overdrive && !udc.pieceUsage[pieceIndex] && meetsLatencyTarget {
 		// Worker can be useful. Register the worker and return the chunk for
 		// downloading.
 		udc.piecesRegistered++
 		udc.pieceUsage[pieceIndex] = true
-		udc.mu.Unlock()
 		return udc
-	} else if !udc.piecesCompleted[pieceIndex] && useful {
-		// Worker is not needed, but the worker's piece is also not completed,
-		// so put the worker on standby.
-		udc.workersStandby = append(udc.workersStandby, w)
-	} else {
-		// This worker is unable to work on the chunk.
-		w.dropDownloadChunk(udc)
 	}
-	udc.mu.Unlock()
+	// Worker is not needed unless another worker fails, so put this worker on
+	// standby for this chunk.
+	udc.workersStandby = append(udc.workersStandby, w)
 	return nil
 }
 
@@ -97,16 +99,17 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 		udc.mu.Unlock()
 	}()
 
+	// Fetch the sector.
 	d, err := w.renter.hostContractor.Downloader(w.contract.ID, w.renter.tg.StopChan())
 	if err != nil {
 		return
 	}
 	defer d.Close()
-
 	data, err := d.Sector(dw.dataRoot)
 	if err != nil {
 		return
 	}
+
 	udc.mu.Lock()
 	piecesCompleted++
 	totalCompleted := udc.piecesCompleted

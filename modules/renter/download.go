@@ -1,42 +1,15 @@
 package renter
 
-// TODO: Need to structure the download + heap priority such that the earlier
-// chunks in a file will always be selected before later chunks in a file. That
-// is to ensure memory availability - some download formats (namely ones that
-// require the download to be serialized) require that earlier chunks be written
-// first, which means you can have a deadlock if it is possible for later chunks
-// to begin requesting memory before earlier chunks have had a chance to request
-// memory.
-
 import (
-	"bytes"
 	"errors"
-	"io"
-	"os"
-	"sync"
+	"fmt"
+	"path/filepath"
 	"sync/atomic"
-	"time"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
-)
-
-const (
-	defaultFilePerm         = 0666
-	downloadFailureCooldown = time.Minute * 30
-)
-
-var (
-	errDownloadRenterClosed = errors.New("download could not be scheduled because renter is shutting down")
-	errInsufficientHosts    = errors.New("insufficient hosts to recover file")
-	errInsufficientPieces   = errors.New("couldn't fetch enough pieces to recover data")
-	errPrevErr              = errors.New("download could not be completed due to a previous error")
 )
 
 type (
-
 	// A download is a file download that has been queued by the renter.
 	download struct {
 		// atomicDataReceived is updated as data is downloaded from the wire.
@@ -63,13 +36,6 @@ type (
 		// Utilities.
 		mu sync.Mutex
 	}
-
-	// downloadChunkHeap is a heap that is sorted first by file priority, then
-	// by the start time of the download, and finally by the index of the chunk.
-	// As downloads are queued, they are added to the downloadChunkHeap. As
-	// resources become available to execute downloads, chunks are pulled off of
-	// the heap and distributed to workers.
-	downloadChunkHeap []*unfinishedDownloadChunk
 
 	// downloadParams is the set of parameters to use when downloading a file.
 	downloadParams struct {
@@ -132,36 +98,6 @@ type (
 		download *download
 	}
 )
-
-// Implementation of heap.Interface for downloadChunkHeap.
-func (dch downloadChunkHeap) Len() int { return len(dch) }
-func (dch downloadChunkHeap) Less(i, j int) bool {
-	// First sort by priority.
-	if dch[i].priority != dch[j].priority {
-		return dch[i].priority > dch[j].priority
-	}
-	// For equal priority, sort by start time.
-	if dch[i].download.startTime != dch[j].download.startTime {
-		return dch[i].download.startTime.Before(dch[j].download.startTime)
-	}
-	// For equal start time (typically meaning it's the same file), sort by
-	// chunkIndex.
-	//
-	// NOTE: To prevent deadlocks when acquiring memory and using writers that
-	// will streamline / order different chunks, we must make sure that we sort
-	// by chunkIndex such that the earlier chunks are selected first from the
-	// heap.
-	return dch[i].chunkIndex < dch[j].chunkIndex
-}
-func (dch downloadChunkHeap) Swap(i, j int)       { dch[i], dch[j] = dch[j], dch[i] }
-func (dch *downloadChunkHeap) Push(x interface{}) { *dch = append(*dch, x.(*unfinishedDownloadChunk)) }
-func (dch *downloadChunkHeap) Pop() interface{} {
-	old := *dch
-	n := len(old)
-	x := old[n-1]
-	*dch = old[0 : n-1]
-	return x
-}
 
 // fail will
 func (udc *unfinishedDownloadChunk) fail() {
@@ -430,118 +366,97 @@ func (cd *chunkDownload) recoverChunk() error {
 }
 */
 
-// managedBlockUntilOnline will block until the renter is online. The renter
-// will appropriately handle incoming download requests and stop signals while
-// waiting.
-func (r *Renter) managedBlockUntillOnline() {
-	for !r.g.Online() {
-		select {
-		case <-r.tg.StopChan():
-			return
-		case newDownload := <-r.newDownloads:
-			for i := 0; i < len(newDownload); i++ {
-				heap.Push(downloadHeap, newDownload[i])
-			}
-		case <-time.After(offlineCheckFrequency):
+// Download performs a file download using the passed parameters.
+func (r *Renter) Download(p modules.RenterDownloadParameters) error {
+	// lookup the file associated with the nickname.
+	lockID := r.mu.RLock()
+	file, exists := r.files[p.Siapath]
+	r.mu.RUnlock(lockID)
+	if !exists {
+		return fmt.Errorf("no file with that path: %s", p.Siapath)
+	}
+
+	isHTTPResp := p.Httpwriter != nil
+
+	// validate download parameters
+	if p.Async && isHTTPResp {
+		return errors.New("cannot async download to http response")
+	}
+	if isHTTPResp && p.Destination != "" {
+		return errors.New("destination cannot be specified when downloading to http response")
+	}
+	if !isHTTPResp && p.Destination == "" {
+		return errors.New("destination not supplied")
+	}
+	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
+		return errors.New("destination must be an absolute path")
+	}
+	if p.Offset == file.size {
+		return errors.New("offset equals filesize")
+	}
+	// sentinel: if length == 0, download the entire file
+	if p.Length == 0 {
+		p.Length = file.size - p.Offset
+	}
+	// Check whether offset and length is valid.
+	if p.Offset < 0 || p.Offset+p.Length > file.size {
+		return fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
+	}
+
+	// Instantiate the correct DownloadWriter implementation
+	// (e.g. content written to file or response body).
+	var dw modules.DownloadWriter
+	if isHTTPResp {
+		dw = NewDownloadHTTPWriter(p.Httpwriter, p.Offset, p.Length)
+	} else {
+		dfw, err := NewDownloadFileWriter(p.Destination, p.Offset, p.Length)
+		if err != nil {
+			return err
 		}
+		dw = dfw
+	}
+
+	// Create the download object and add it to the queue.
+	d := r.newSectionDownload(file, dw, p.Offset, p.Length)
+
+	lockID = r.mu.Lock()
+	r.downloadQueue = append(r.downloadQueue, d)
+	r.mu.Unlock(lockID)
+	r.newDownloads <- d
+
+	// Block until the download has completed.
+	//
+	// TODO: Eventually just return the channel to the error instead of the
+	// error itself.
+	select {
+	case <-d.downloadFinished:
+		return d.Err()
+	case <-r.tg.StopChan():
+		return errors.New("download interrupted by shutdown")
 	}
 }
 
-// managedFetchDownloadMemory will block until the requested memory has been
-// obtained.. The renter will appropriately handle incoming download requests
-// and stop signals while waiting.
-func (r *Renter) managedFetchDownloadMemory(memoryNeeded uint64) bool {
-	memChan, memoryAcquired := r.managedMemoryGet(memoryNeeded)
-	for !memoryAcquired {
-		select {
-		case <-memChan:
-			memChan, memoryAcquired = r.managedMemoryGet(memoryNeeded)
-		case newDownload := <-r.newDownloads:
-			for i := 0; i < len(newDownload); i++ {
-				heap.Push(downloadHeap, newDownload[i])
-			}
-		case <-r.tg.StopChan():
-			// Shutdown occurred before memory was acquired.
-			return false
+// DownloadQueue returns the list of downloads in the queue.
+func (r *Renter) DownloadQueue() []modules.DownloadInfo {
+	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
+
+	// Order from most recent to least recent.
+	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
+	for i := range r.downloadQueue {
+		d := r.downloadQueue[len(r.downloadQueue)-i-1]
+
+		downloads[i] = modules.DownloadInfo{
+			SiaPath:     d.siapath,
+			Destination: d.destination,
+			Filesize:    d.length,
+			StartTime:   d.startTime,
+		}
+		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)
+
+		if err := d.Err(); err != nil {
+			downloads[i].Error = err.Error()
 		}
 	}
-	// Memory acquired successfully.
-	return true
-}
-
-// threadedDownloadLoop utilizes the worker pool to make progress on any queued
-// downloads.
-func (r *Renter) threadedDownloadLoop() {
-	err := r.tg.Add()
-	if err != nil {
-		return
-	}
-	defer r.tg.Done()
-
-	downloadHeap := new(downloadChunkHeap)
-	for {
-		// Wait until we are online.
-		r.managedBlockUntilOnline()
-
-		// Return if the renter has shut down.
-		select {
-		case <-r.tg.StopChan():
-			return
-		default:
-		}
-
-		// Update the worker pool.
-		r.managedUpdateWorkerPool()
-
-		// Pull downloads out of the heap
-		for downloadHeap.Len() > 0 {
-			// Get the chunk.
-			nextChunk := heap.Pop(downloadHeap).(*unfinishedDownloadChunk)
-
-			// Acquire memory if required.
-			if nextChunk.needsMemory {
-				// The amount of memory needed is maximally 2x the number of min
-				// pieces - if you do not get any data pieces, you will need to
-				// recover the parity pieces that you do get into the data
-				// pieces. In addition to that, you need room for any overdrive
-				// pieces that you end up downloading.
-				memoryNeeded := nextChunk.pieceSize*nextChunk.erasureCode.MinPieces()*2 + nextChunk.overdrivePieces*nextChunk.pieceSize
-				if memoryNeeded > nextChunk.erasureCode.NumPieces()*nextChunk.pieceSize {
-					// You will never need more memory than one slot for each
-					// piece in the chunk.
-					memoryNeeded = nextChunk.erasureCode.NumPieces() * nextChunk.pieceSize
-				}
-				if !r.managedFetchDownloadMemory(memoryNeeded) {
-					// Indicates that the renter is shutting down.
-					return
-				}
-
-				nextChunk.mu.Lock()
-				udc.memoryAllocated = memoryNeeded
-				nextChunk.mu.Unlock()
-			}
-
-			// TODO: Distribute the chunk to workers.
-			//
-			// Remember to set the 'workers remaining' flag.
-			r.mu.Lock()
-			nextChunk.mu.Lock()
-			nextChunk.workersRemaining = len(r.workerPool)
-			nextChunk.mu.Unlock()
-			for _, worker := range r.workerPool {
-				worker.managedQueueDownloadChunk(nextChunk)
-			}
-			r.mu.Unlock()
-		}
-
-		// Wait for more work.
-		select {
-		case <-r.tg.StopChan():
-			return
-		case newDownload := <-r.newDownloads:
-			for i := 0; i < len(newDownload); i++ {
-				heap.Push(downloadHeap, newDownload[i])
-			}
-		}
-	}
+	return downloads
 }
