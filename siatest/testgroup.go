@@ -351,12 +351,23 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 	return nil
 }
 
-// Close closes the group and all its nodes
-func (tg *TestGroup) Close() (err error) {
+// Close closes the group and all its nodes. Closing a node is usually a slow
+// process, but we can speed it up a lot by closing each node in a separate
+// goroutine.
+func (tg *TestGroup) Close() error {
+	wg := new(sync.WaitGroup)
+	errors := make([]error, len(tg.nodes))
+	i := 0
 	for n := range tg.nodes {
-		err = build.ComposeErrors(err, n.Close())
+		wg.Add(1)
+		go func(i int, n *TestNode) {
+			errors[i] = n.Close()
+			wg.Done()
+		}(i, n)
+		i++
 	}
-	return
+	wg.Wait()
+	return build.ComposeErrors(errors...)
 }
 
 // Nodes returns all the nodes of the group
