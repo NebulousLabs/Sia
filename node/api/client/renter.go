@@ -24,6 +24,12 @@ func (c *Client) RenterDownloadGet(siaPath, destination string, offset, length u
 	return
 }
 
+// RenterDownloadsGet requests the /renter/downloads resource
+func (c *Client) RenterDownloadsGet() (rdq api.RenterDownloadQueue, err error) {
+	err = c.Get("/renter/downloads", &rdq)
+	return
+}
+
 // RenterDownloadHTTPResponseGet uses the /renter/download endpoint to download
 // a file and return its data.
 func (c *Client) RenterDownloadHTTPResponseGet(siaPath string, offset, length uint64) (resp []byte, err error) {

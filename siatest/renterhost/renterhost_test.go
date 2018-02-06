@@ -74,7 +74,7 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 	if bytes.Compare(downloadedData, file.Bytes()) != 0 {
-		t.Errorf("Downloaded data doesn't match original file's contents")
+		t.Error("Downloaded data doesn't match original file's contents")
 	}
 	// Download the file synchronously to a file on disk and compare it to the
 	// original
@@ -83,7 +83,18 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 	if file.Compare(downloadedFile) != 0 {
-		t.Errorf("Downloaded file's contents do not equal the uploaded file's contents")
+		t.Error("Downloaded file's contents do not equal the uploaded file's contents")
 	}
-	// TODO download file asynchronously
+	// Download the file  asynchronously, wait for the download to finish and
+	// compare it to the original
+	downloadedFile, err = renter.DownloadToDisk(file, true)
+	if err != nil {
+		t.Error(err)
+	}
+	if err := renter.WaitForDownload(file); err != nil {
+		t.Error(err)
+	}
+	if file.Compare(downloadedFile) != 0 {
+		t.Error("Downloaded file's contents do not equal the uploaded file's contents")
+	}
 }

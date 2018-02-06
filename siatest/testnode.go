@@ -15,6 +15,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node"
+	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/NebulousLabs/Sia/node/api/client"
 	"github.com/NebulousLabs/Sia/node/api/server"
 	"github.com/NebulousLabs/Sia/types"
@@ -57,6 +58,21 @@ func (tn *TestNode) Download(tf *TestFile) (data []byte, err error) {
 	}
 	data, err = tn.RenterDownloadHTTPResponseGet(tf.siaPath, 0, fi.Filesize)
 	return
+}
+
+// DownloadInfo returns the DownloadInfo struct of a file. If it returns nil,
+// the download has either finished, or was never started in the first place.
+func (tn *TestNode) DownloadInfo(tf *TestFile) (*api.DownloadInfo, error) {
+	rdq, err := tn.RenterDownloadsGet()
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range rdq.Downloads {
+		if tf.siaPath == d.SiaPath && tf.path == d.Destination {
+			return &d, nil
+		}
+	}
+	return nil, nil
 }
 
 // Files lists the files tracked by the renter
@@ -114,6 +130,21 @@ func (tn *TestNode) Upload(tf *TestFile, dataPieces, parityPieces uint64) (err e
 		return build.ExtendErr("uploaded file is not tracked by the renter", err)
 	}
 	return nil
+}
+
+// WaitForDownload waits for the download of a file to finish. If a file wasn't
+// scheduled for download it will return instantly without an error.
+func (tn *TestNode) WaitForDownload(tf *TestFile) error {
+	return Retry(1000, 100*time.Millisecond, func() error {
+		file, err := tn.DownloadInfo(tf)
+		if err != nil {
+			return build.ExtendErr("couldn't retrieve DownloadInfo", err)
+		}
+		if file != nil {
+			return errors.New("file hasn't finished downloading yet")
+		}
+		return nil
+	})
 }
 
 // WaitForUploadProgress waits for a file to reach a certain upload progress.
