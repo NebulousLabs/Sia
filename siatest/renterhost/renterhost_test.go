@@ -28,7 +28,6 @@ func TestRenterHost(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-
 	// Specifiy subtests to run
 	subTests := []struct {
 		name string
@@ -47,4 +46,25 @@ func TestRenterHost(t *testing.T) {
 // testUploadDownload is a subtest that uses an existing TestGroup to test if
 // uploading and downloading a file works
 func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	renter := tg.Renters()[0]
+	// Create file for upload
+	file, err := siatest.NewFile(100)
+	if err != nil {
+		t.Fatal("Failed to create file for testing: ", err)
+	}
+	// Upload file, creating a parity piece for each host in the group
+	err = renter.Upload(file, 1, uint64(len(tg.Hosts())))
+	if err != nil {
+		t.Fatal("Failed to start upload: ", err)
+	}
+	// Wait until upload reached 100% progress
+	if err := renter.WaitForUploadProgress(file, 1); err != nil {
+		t.Error(err)
+	}
+	// Wait until upload reaches len(tg.Hosts()) redundancy
+	if err := renter.WaitForUploadRedundancy(file, float64(len(tg.Hosts()))); err != nil {
+		t.Error(err)
+	}
+	// TODO download the file
 }

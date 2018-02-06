@@ -61,7 +61,7 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	for _, np := range nodeParams {
 		node, err := NewCleanNode(np)
 		if err != nil {
-			return nil, err
+			return nil, build.ExtendErr("failed to create clean node", err)
 		}
 		// Add node to nodes
 		tg.nodes[node] = struct{}{}
@@ -82,9 +82,8 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 
 	// Fully connect nodes
 	if err := fullyConnectNodes(nodes); err != nil {
-		return nil, err
+		return nil, build.ExtendErr("failed to fully connect nodes", err)
 	}
-
 	// Get a miner and mine some blocks to generate coins
 	if len(tg.miners) == 0 {
 		return nil, errors.New("cannot fund group without miners")
@@ -92,40 +91,40 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	miner := tg.Miners()[0]
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
 		if err := miner.MineBlock(); err != nil {
-			return nil, err
+			return nil, build.ExtendErr("failed to mine block for funding", err)
 		}
 	}
 	// Fund nodes
 	if err := fundNodes(miner, tg.nodes); err != nil {
-		return nil, err
+		return nil, build.ExtendErr("failed to fund nodes", err)
 	}
 	// Add storage to hosts
 	if err := addStorageFolderToHosts(tg.hosts); err != nil {
-		return nil, err
+		return nil, build.ExtendErr("failed to add storage to nodes", err)
 	}
 	// Announce hosts
 	if err := announceHosts(tg.hosts); err != nil {
-		return nil, err
+		return nil, build.ExtendErr("failed to announce hosts", err)
 	}
 	// Mine a block to get the announcements confirmed
 	if err := miner.MineBlock(); err != nil {
-		return nil, err
+		return nil, build.ExtendErr("failed to mine host announcements", err)
 	}
 	// Block until all hosts show up as active in the renters' hostdbs
 	if err := hostsInRenterDBCheck(miner, tg.renters, len(tg.hosts)); err != nil {
-		return nil, err
+		return nil, build.ExtendErr("renter database check failed", err)
 	}
 	// Set renter allowances
 	if err := setRenterAllowances(tg.renters); err != nil {
-		return nil, err
+		return nil, build.ExtendErr("failed to set renter allowance", err)
 	}
 	// Wait for all the renters to form contracts
 	if err := waitForContracts(miner, tg.renters, tg.hosts); err != nil {
-		return nil, err
+		return nil, build.ExtendErr("renters failed to form contracts", err)
 	}
 	// Make sure all nodes are synced
 	if err := synchronizationCheck(miner, tg.nodes); err != nil {
-		return nil, err
+		return nil, build.ExtendErr("synchronization check failed", err)
 	}
 	return tg, nil
 }
@@ -172,10 +171,10 @@ func addStorageFolderToHosts(hosts map[*TestNode]struct{}) error {
 func announceHosts(hosts map[*TestNode]struct{}) error {
 	for host := range hosts {
 		if err := host.HostAcceptingContractsPost(true); err != nil {
-			return err
+			return build.ExtendErr("failed to set host to accepting contracts", err)
 		}
 		if err := host.HostAnnouncePost(); err != nil {
-			return err
+			return build.ExtendErr("failed to announce host", err)
 		}
 	}
 	return nil
@@ -199,7 +198,7 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	// Get the miner's balance
 	wg, err := miner.WalletGet()
 	if err != nil {
-		return err
+		return build.ExtendErr("failed to get miner's balance", err)
 	}
 	// Send txnsPerNode outputs to each node
 	txnsPerNode := uint64(25)
@@ -208,7 +207,7 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	for node := range nodes {
 		wag, err := node.WalletAddressGet()
 		if err != nil {
-			return err
+			return build.ExtendErr("failed to get wallet address", err)
 		}
 		for i := uint64(0); i < txnsPerNode; i++ {
 			scos = append(scos, types.SiacoinOutput{
@@ -220,11 +219,27 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	// Send the transaction
 	_, err = miner.WalletSiacoinsMultiPost(scos)
 	if err != nil {
-		return err
+		return build.ExtendErr("failed to send funding txn", err)
 	}
 	// Mine the transactions
 	if err := miner.MineBlock(); err != nil {
-		return err
+		return build.ExtendErr("failed to mine funding txn", err)
+	}
+	// Make sure every node has at least one confirmed transaction
+	for node := range nodes {
+		err := Retry(100, 100*time.Millisecond, func() error {
+			wtg, err := node.WalletTransactionsGet(0, math.MaxInt32)
+			if err != nil {
+				return err
+			}
+			if len(wtg.ConfirmedTransactions) == 0 {
+				return errors.New("confirmed transactions should be greater than 0")
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
