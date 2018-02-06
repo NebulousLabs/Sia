@@ -1,6 +1,7 @@
 package renterhost
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/siatest"
@@ -66,5 +67,23 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	if err := renter.WaitForUploadRedundancy(file, float64(len(tg.Hosts()))); err != nil {
 		t.Error(err)
 	}
-	// TODO download the file
+	// Download the file synchronously directly into memory and compare the
+	// data to the original
+	downloadedData, err := renter.Download(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(downloadedData, file.Bytes()) != 0 {
+		t.Errorf("Downloaded data doesn't match original file's contents")
+	}
+	// Download the file synchronously to a file on disk and compare it to the
+	// original
+	downloadedFile, err := renter.DownloadToDisk(file, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.Compare(downloadedFile) != 0 {
+		t.Errorf("Downloaded file's contents do not equal the uploaded file's contents")
+	}
+	// TODO download file asynchronously
 }

@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
+	"path/filepath"
+	"strconv"
 	"time"
 	"unsafe"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/NebulousLabs/Sia/node/api/client"
 	"github.com/NebulousLabs/Sia/node/api/server"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestNode is a helper struct for testing that contains a server and a client
@@ -23,6 +27,36 @@ type TestNode struct {
 	server.Server
 	client.Client
 	primarySeed string
+}
+
+// DownloadToDisk downloads a previously uploaded file. The file will be downloaded
+// to a random location and returned as a TestFile object.
+func (tn *TestNode) DownloadToDisk(tf *TestFile, async bool) (*TestFile, error) {
+	fi, err := tn.FileInfo(tf)
+	if err != nil {
+		return nil, build.ExtendErr("failed to retrieve FileInfo", err)
+	}
+	// Create a random destination for the download
+	fileName := strconv.Itoa(fastrand.Intn(math.MaxInt32))
+	dest := filepath.Join(SiaTestingDir, fileName)
+	if err := tn.RenterDownloadGet(tf.siaPath, dest, 0, fi.Filesize, async); err != nil {
+		return nil, build.ExtendErr("failed to download file", err)
+	}
+	return &TestFile{
+		path:     dest,
+		fileName: fileName,
+		siaPath:  tf.siaPath,
+	}, nil
+}
+
+// Download downloads a file and returns its contents as a slice of bytes.
+func (tn *TestNode) Download(tf *TestFile) (data []byte, err error) {
+	fi, err := tn.FileInfo(tf)
+	if err != nil {
+		return nil, build.ExtendErr("failed to retrieve FileInfo", err)
+	}
+	data, err = tn.RenterDownloadHTTPResponseGet(tf.siaPath, 0, fi.Filesize)
+	return
 }
 
 // Files lists the files tracked by the renter
