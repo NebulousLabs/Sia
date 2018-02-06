@@ -87,14 +87,14 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	}
 	// Download the file  asynchronously, wait for the download to finish and
 	// compare it to the original
-	downloadedFile, err = renter.DownloadToDisk(file, true)
+	downloadingFile, err := renter.DownloadToDisk(file, true)
 	if err != nil {
 		t.Error(err)
 	}
-	if err := renter.WaitForDownload(file); err != nil {
+	if err := renter.WaitForDownload(downloadingFile); err != nil {
 		t.Error(err)
 	}
-	if file.Compare(downloadedFile) != 0 {
+	if file.Compare(downloadingFile) != 0 {
 		t.Error("Downloaded file's contents do not equal the uploaded file's contents")
 	}
 }

@@ -140,7 +140,10 @@ func (tn *TestNode) WaitForDownload(tf *TestFile) error {
 		if err != nil {
 			return build.ExtendErr("couldn't retrieve DownloadInfo", err)
 		}
-		if file != nil {
+		if file == nil {
+			return nil
+		}
+		if file.Filesize != file.Received {
 			return errors.New("file hasn't finished downloading yet")
 		}
 		return nil
