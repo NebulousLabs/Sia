@@ -13,14 +13,21 @@ import (
 )
 
 const (
-	MaxObjectSize = 12e6 // 12 MB
-	MaxSliceSize  = 5e6  // 5 MB
+	// MaxObjectSize refers to the maximum size an object could have.
+	// Limited to 12 MB.
+	MaxObjectSize = 12e6
+
+	// MaxSliceSize refers to the maximum size slice could have. Limited
+	// to 5 MB.
+	MaxSliceSize = 5e6 // 5 MB
 )
 
 var (
-	errBadPointer     = errors.New("cannot decode into invalid pointer")
+	errBadPointer = errors.New("cannot decode into invalid pointer")
+	// ErrObjectTooLarge is an error when encoded object exceeds size limit.
 	ErrObjectTooLarge = errors.New("encoded object exceeds size limit")
-	ErrSliceTooLarge  = errors.New("encoded slice is too large")
+	// ErrSliceTooLarge is an error when encoded slice is too large.
+	ErrSliceTooLarge = errors.New("encoded slice is too large")
 )
 
 type (
@@ -87,9 +94,9 @@ func (e *Encoder) encode(val reflect.Value) error {
 	case reflect.Bool:
 		if val.Bool() {
 			return e.write([]byte{1})
-		} else {
-			return e.write([]byte{0})
 		}
+
+		return e.write([]byte{0})
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return e.write(EncInt64(val.Int()))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
