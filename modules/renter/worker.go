@@ -42,16 +42,18 @@ type worker struct {
 	uploadTerminated          bool               // Have we stopped uploading?
 
 	// Utilities.
+	//
+	// The mutex is only needed when interacting with 'downloadChunks' and
+	// 'unprocessedChunks', as everything else is only accessed from the single
+	// master thread.
 	killChan chan struct{} // Worker will shut down if a signal is sent down this channel.
 	mu       sync.Mutex
 }
 
 // managedKillDownloading will drop all of the pieces given to the worker.
 func (w *worker) managedKillDownloading(udc *unfinishedDownloadChunk) {
-	w.mu.Lock()
-	w.dropDownloadChunks()
+	w.managedDropDownloadChunks()
 	w.downloadTerminated = true
-	w.mu.Unlock()
 }
 
 // managedKillUploading will disable all uploading for the worker.
@@ -84,19 +86,18 @@ func (w *worker) onUploadCooldown() bool {
 
 // managedQueueDownloadChunk adds a chunk to the worker's queue.
 func (w *worker) managedQueueDownloadChunk(udc *unfinishedDownloadChunk) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	// Drop the chunk if the worker is terminated or on cooldown.
 	if w.downloadTerminated || w.onDownloadCooldown() {
 		udc.mu.Lock()
-		w.dropDownloadChunk(udc)
+		udc.removeWorker(w)
 		udc.mu.Unlock()
 		return
 	}
 
 	// Append the chunk and send a signal that download chunks are available.
+	w.mu.Lock()
 	w.downloadChunks = append(w.downloadChunks, udc)
+	w.mu.Unlock()
 	select {
 	case w.downloadChan <- struct{}{}:
 	default:
@@ -129,19 +130,22 @@ func (w *worker) managedQueueUploadChunk(uc *unfinishedChunk) {
 
 // managedNextDownloadChunk will pull the next potential chunk out of the work
 // queue for downloading.
+//
+// Concurrency in this function is a little funky because we do not want to be
+// holding the lock when we call 'processDownloadChunk'.
 func (w *worker) managedNextDownloadChunk() (nextChunk *unfinishedDownloadChunk) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	// Loop through the download chunks to find something to do.
-	for range w.downloadChunks {
+	for len(w.downloadChunks) > 0 {
 		chunk := w.downloadChunks[0]
 		w.downloadChunks = w.downloadChunks[1:]
+		w.mu.Unlock()
 		nextDownloadChunk = w.processDownloadChunk(chunk)
 		if nextDownloadChunk != nil {
 			return nextDownloadChunk
 		}
+		w.mu.Lock()
 	}
+	w.mu.Unlock()
 	return nil
 }
 
