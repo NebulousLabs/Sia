@@ -118,7 +118,7 @@ func (e *Explorer) FileContractHistory(id types.FileContractID) (fc types.FileCo
 	return
 }
 
-// FileContractIDs returns all of the transactions that contain the specified
+// FileContractID returns all transactions that contain the specified
 // file contract ID. An empty set indicates that the file contract ID does not
 // appear in the blockchain.
 func (e *Explorer) FileContractID(id types.FileContractID) []types.TransactionID {
