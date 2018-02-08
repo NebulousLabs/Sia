@@ -20,17 +20,13 @@ func (w *worker) dropUploadChunks() {
 		w.dropChunk(w.unprocessedChunks[i])
 	}
 	w.unprocessedChunks = w.unprocessedChunks[:0]
-	for i := 0; i < len(w.standbyChunks); i++ {
-		w.dropChunk(w.standbyChunks[i])
-	}
-	w.standbyChunks = w.standbyChunks[:0]
 }
 
 // managedKillUploading will disable all uploading for the worker.
 func (w *worker) managedKillUploading() {
 	w.mu.Lock()
 	w.dropUploadChunks()
-	w.terminated = true
+	w.uploadTerminated = true
 	w.mu.Unlock()
 }
 
@@ -50,19 +46,7 @@ func (w *worker) managedNextChunk() (nextChunk *unfinishedChunk, pieceIndex uint
 			return nextChunk, pieceIndex
 		}
 	}
-
-	// Loop through the standby chunks to see if there is work to do.
-	for range w.standbyChunks {
-		chunk := w.standbyChunks[0]
-		w.standbyChunks = w.standbyChunks[1:]
-		nextChunk, pieceIndex := w.processChunk(chunk)
-		if nextChunk != nil {
-			return nextChunk, pieceIndex
-		}
-	}
-
-	// No work found, try again later.
-	return nil, 0
+	return nil, 0 // no work found
 }
 
 // processChunk will process a chunk from the worker chunk queue.
@@ -105,11 +89,12 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 		uc.mu.Unlock()
 		return uc, uint64(index)
 	}
+	// Add this worker to the set of standby workers for this chunk.
+	uc.workersStandby = append(uc.workersStandby, w)
 	uc.mu.Unlock()
 
 	// The chunk could need help from this worker, but only if other workers who
 	// are performing uploads experience failures. Put this chunk on standby.
-	w.standbyChunks = append(w.standbyChunks, uc)
 	return nil, 0
 }
 
@@ -126,7 +111,7 @@ func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 		requiredCooldown *= 2
 	}
 	onCooldown := time.Now().Before(w.uploadRecentFailure.Add(requiredCooldown))
-	if !goodForUpload || w.terminated || onCooldown {
+	if !goodForUpload || w.uploadTerminated || onCooldown {
 		// The worker should not be uploading, remove the chunk.
 		w.dropChunk(uc)
 		w.mu.Unlock()
@@ -153,6 +138,7 @@ func (w *worker) uploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.mu.Lock()
 	uc.piecesRegistered--
 	uc.pieceUsage[pieceIndex] = false
+	uc.notifyStandbyWorkers()
 	uc.mu.Unlock()
 	w.dropChunk(uc)
 	w.dropUploadChunks()

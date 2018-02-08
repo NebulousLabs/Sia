@@ -66,6 +66,7 @@ type unfinishedChunk struct {
 	piecesRegistered int                 // number of pieces that are being uploaded, but aren't finished yet.
 	unusedHosts      map[string]struct{} // hosts that aren't yet storing any pieces
 	workersRemaining int                 // number of workers who have received the chunk, but haven't finished processing it.
+	workersStandby   []*worker           // workers that can be used if other workers fail
 }
 
 // Implementation of heap.Interface for chunkHeap.
@@ -81,6 +82,16 @@ func (ch *chunkHeap) Pop() interface{} {
 	x := old[n-1]
 	*ch = old[0 : n-1]
 	return x
+}
+
+// notifyStandbyWorkers is called when a worker fails to upload a piece, meaning
+// that the standby workers may now be needed to help the piece finish
+// uploading.
+func (uc *unfinishedChunk) notifyStandbyWorkers() {
+	for i := 0; i < len(uc.workersStandby); i++ {
+		uc.workersStandby[i].managedQueueChunkRepair(uc)
+	}
+	uc.workersStandby = uc.workersStandby[:0]
 }
 
 // buildUnfinishedChunks will pull all of the unfinished chunks out of a file.
