@@ -13,33 +13,47 @@ package renter
 // so there's not really any code to write, need to get latency and pricing
 // situation figured out.
 
+// returnMemory will check on the status of all the workers and pieces, and
+// determine how much memory is safe to return to the renter. This should be
+// called each time a worker returns, and also after the chunk is recovered.
+func(udc *unfinishedDownloadChunk) returnMemory() {
+	// The maximum amount of memory is the pieces completed plus the number of
+	// workers remaining.
+	initialMemory := (udc.staticOverdrive+udc.erasureCode.MinPieces())*udc.staticPieceSize
+	maxMemory := (udc.workersRemaining + udc.piecesCompleted) * udc.pieceSize
+	// If the maxMemory exceeds the inital memory, set the max memory equal to
+	// the initial memory.
+	if maxMemory > initialMemory {
+		maxMemory = initialMemory
+	}
+	// If enough pieces have completed, max memory is the number of registered
+	// pieces plus the number of completed pieces.
+	if udc.piecesCompleted >= udc.erasureCode.MinPieces() {
+		// udc.piecesRegistered is guaranteed to be at most equal to the number
+		// of overdrive pieces, meaning it will be equal to or less than
+		// initalMemory.
+		maxMemory = (udc.piecesCompleted+udc.piecesRegistered) * udc.pieceSize
+	}
+	// If the chunk recovery has completed, the maximum number of pieces is the
+	// number of registered.
+	if udc.recoveryComplete {
+		maxMemory = udc.piecesRegistered * udc.pieceSize
+	}
+	// Return any memory we don't need.
+	if udc.memoryAllocated > maxMemory {
+		udc.download.memoryManager.Return(udc.memoryAllocated - maxMemory)
+		udc.memoryAllocated = maxMemory
+	}
+}
+
 // removeWorker will release a download chunk that the worker had queued up.
 // This function should be called any time that a worker completes work.
 //
 // NOTE: The udc is expected to be locked, the worker is expected to be
 // unlocked.
-func (udc *unfinishedDownloadChunk) removeWorker(w *worker) {
+func (udc *unfinishedDownloadChunk) removeWorker() {
 	udc.workersRemaining--
-
-	// The maximum amount of memory is the pieces completed plus the number of
-	// workers remaining.
-	maxMemory := (udc.workersRemaining + udc.piecesCompleted) * udc.pieceSize
-	// If enough pieces have completed, max memory is the number of registered
-	// pieces plus the number of completed pieces.
-	if udc.piecesCompleted >= udc.erasureCode.MinPieces() {
-		maxMemory = udc.piecesRegistered * udc.pieceSize
-	}
-	// If the chunk recovery has completed, the maximum number of pieces is the
-	// number of registered pieces minus the number of completed pieces (the
-	// completed pieces have been recovered and the memory is no longer needed).
-	if udc.recoveryComplete {
-		maxMemory = (udc.piecesRegistered - udc.piecesCompleted) * udc.pieceSize
-	}
-	// Return any memory we don't need.
-	if udc.memoryAllocated > maxMemory {
-		w.renter.managedMemoryReturn(udc.memoryAllocated - maxMemory)
-		udc.memoryAllocated = maxMemory
-	}
+	udc.returnMemory()
 
 	// Check if the chunk has failed. If so, fail the download and return any
 	// remaining memory.
@@ -133,12 +147,13 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 
 	udc.mu.Lock()
 	udc.piecesCompleted++
-	udc.removeWorker(w)
+	udc.piecesRegistered--
 	if udc.piecesCompleted <= udc.erasureCode.MinPieces() {
 		udc.physicalChunkData[udc.chunkMap[w.contract.ID]] = data
-		if udc.piecesCompleted == udc.erasureCode.MinPieces() {
-			udc.recoverAndWrite()
-		}
 	}
+	if udc.piecesCompleted == udc.erasureCode.MinPieces() {
+		go udc.threadedRecoverLogicalData()
+	}
+	udc.removeWorker()
 	udc.mu.Unlock()
 }

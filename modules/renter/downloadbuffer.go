@@ -31,12 +31,12 @@ type downloadDestination interface {
 type downloadDestinationBuffer []byte
 
 // Close implements Close for the downloadDestination interface.
-func (dw *downloadDestinationBuffer) Close() error {
+func (dw downloadDestinationBuffer) Close() error {
 	return nil
 }
 
 // WriteAt writes the provided data to the downloadDestinationBuffer.
-func (dw *downloadDestinationBuffer) WriteAt(data []byte, offset int64) (int, error) {
+func (dw downloadDestinationBuffer) WriteAt(data []byte, offset int64) (int, error) {
 	if len(data)+int(offset) > len(dw) || offset < 0 {
 		return 0, errors.New("write at specified offset exceeds buffer size")
 	}
@@ -79,13 +79,13 @@ func newDownloadDestinationWriter(w io.WriteCloser) downloadDestination {
 // one that is next in line, if the next-in-line call is available.
 func (ddw *downloadDestinationWriter) nextWrite() {
 	for i, offset := range ddw.blockingWriteCalls {
-		if offset == progress {
+		if offset == ddw.progress {
 			ddw.blockingWriteSignals[i].Unlock()
 			ddw.blockingWriteCalls = append(ddw.blockingWriteCalls[0:i], ddw.blockingWriteCalls[i+1:]...)
 			ddw.blockingWriteSignals = append(ddw.blockingWriteSignals[0:i], ddw.blockingWriteSignals[i+1:]...)
 			return
 		}
-		if offset < progress {
+		if offset < ddw.progress {
 			// Sanity check - there should not be a call to WriteAt that occurs
 			// earlier than the current progress. If there is, the
 			// downloadDestinationWriter is being used incorrectly in an
@@ -118,7 +118,7 @@ func (ddw *downloadDestinationWriter) WriteAt(data []byte, offset int64) (int, e
 		}
 
 		// Update the progress and unblock the next write.
-		ddw.progress += n
+		ddw.progress += int64(n)
 		ddw.nextWrite()
 		return n, nil
 	}
@@ -133,7 +133,7 @@ func (ddw *downloadDestinationWriter) WriteAt(data []byte, offset int64) (int, e
 
 	// Check if we are writing to the correct offset for the stream. If so, call
 	// write() and return.
-	if offset == progress {
+	if offset == ddw.progress {
 		// This write is the next write in line.
 		n, err := write()
 		ddw.mu.Unlock()
@@ -163,10 +163,10 @@ type httpWriteCloser struct {
 
 // Close is a blank function that allows an httpWriter to become an
 // io.WriteCloser.
-func (*httpWriteCloser) Close() error { return nil }
+func (httpWriteCloser) Close() error { return nil }
 
 func newDownloadDestinationHTTPWriter(w io.Writer) downloadDestination {
 	var hwc httpWriteCloser
-	hwc = w
+	hwc.Writer = w
 	return newDownloadDestinationWriter(hwc)
 }

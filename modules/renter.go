@@ -55,12 +55,12 @@ type ContractUtility struct {
 // DownloadInfo provides information about a file that has been requested for
 // download.
 type DownloadInfo struct {
-	SiaPath     string         `json:"siapath"`
-	Destination DownloadWriter `json:"destination"`
-	Filesize    uint64         `json:"filesize"`
-	Received    uint64         `json:"received"`
-	StartTime   time.Time      `json:"starttime"`
-	Error       string         `json:"error"`
+	SiaPath     string    `json:"siapath"`
+	Destination string    `json:"destination"`
+	Filesize    uint64    `json:"filesize"`
+	Received    uint64    `json:"received"`
+	StartTime   time.Time `json:"starttime"`
+	Error       string    `json:"error"`
 }
 
 // DownloadWriter provides an interface which all output writers have to implement.

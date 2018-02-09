@@ -180,19 +180,8 @@ type Renter struct {
 	// Upload management.
 	newUploads chan *file // Used to send new uploads to the upload heap.
 
-	// Memory management - baseMemory tracks how much memory the renter is
-	// allowed to consume, memoryAvailable tracks how much more memory the
-	// renter can allocate before hitting the cap, and newMemory is a channel
-	// used to inform sleeping threads (the download loop and upload loop) that
-	// memory has become available.
-	//
-	// The newMemory channel is closed and replaced each time new memory becomes
-	// available, that way all threads can be notified together. The functions
-	// for working with the memory (managedMemoryGet, managedMemoryReturn)
-	// handle the creation and closing of the channels automatically.
-	baseMemory      uint64
-	memoryAvailable uint64
-	newMemory       *chan struct{}
+	// List of workers that can be used for uploading and/or downloading.
+	memoryManager   *memoryManager
 	workerPool      map[types.FileContractID]*worker
 
 	// Utilities.
@@ -208,137 +197,6 @@ type Renter struct {
 	tpool          modules.TransactionPool
 
 	lastEstimation modules.RenterPriceEstimation // used to cache the last price estimation result
-}
-
-// New returns an initialized renter.
-func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
-	hdb, err := hostdb.New(g, cs, persistDir)
-	if err != nil {
-		return nil, err
-	}
-	hc, err := contractor.New(cs, wallet, tpool, hdb, persistDir)
-	if err != nil {
-		return nil, err
-	}
-
-	return newRenter(g, cs, tpool, hdb, hc, persistDir)
-}
-
-// newRenter initializes a renter and returns it.
-func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
-	if g == nil {
-		return nil, errNilGateway
-	}
-	if cs == nil {
-		return nil, errNilCS
-	}
-	if tpool == nil {
-		return nil, errNilTpool
-	}
-	if hc == nil {
-		return nil, errNilContractor
-	}
-	if hdb == nil && build.Release != "testing" {
-		return nil, errNilHdb
-	}
-
-	r := &Renter{
-		files:    make(map[string]*file),
-		tracking: make(map[string]trackedFile),
-
-		// Making newDownloads a buffered channel means that most of the time, a
-		// new download will trigger an unnecessary extra iteration of the
-		// download heap loop, popping a download chunk that's not there. But
-		// this is preferable to the alternative, where in rare cases the
-		// download heap will miss work altogether.
-		newDownloads: make(chan *[]unfinishedDownloadChunk, 1),
-		downloadHeap: new(downloadChunkHeap),
-
-		newUploads: make(chan *file),
-
-		baseMemory:      defaultMemory,
-		memoryAvailable: defaultMemory,
-		workerPool:      make(map[types.FileContractID]*worker),
-
-		cs:             cs,
-		g:              g,
-		hostDB:         hdb,
-		hostContractor: hc,
-		persistDir:     persistDir,
-		mu:             siasync.New(modules.SafeMutexDelay, 1),
-		tpool:          tpool,
-	}
-	memChan := make(chan struct{})
-	r.newMemory = &memChan
-
-	// Load all saved data.
-	if err := r.initPersist(); err != nil {
-		return nil, err
-	}
-
-	// Subscribe to the consensus set.
-	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
-	if err != nil {
-		return nil, err
-	}
-
-	// Spin up the workers for the work pool.
-	r.managedUpdateWorkerPool()
-	go r.threadedRepairScan()
-	go r.threadedDownloadLoop()
-
-	// Kill workers on shutdown.
-	r.tg.OnStop(func() error {
-		id := r.mu.RLock()
-		for _, worker := range r.workerPool {
-			close(worker.killChan)
-		}
-		r.mu.RUnlock(id)
-		return nil
-	})
-
-	return r, nil
-}
-
-// managedMemoryReturn will return memory to the renter's memory pool, notifying
-// anyone waiting for memory that memory has become available.
-func (r *Renter) managedMemoryReturn(amt uint64) {
-	id := r.mu.Lock()
-	defer r.mu.Unlock(id)
-
-	// Return the memory with a santiy check.
-	r.memoryAvailable += amt
-	if r.memoryAvailable > r.baseMemory {
-		r.log.Critical("Memory available now exceeds base memory:", r.memoryAvailable, r.baseMemory)
-		return
-	}
-
-	// Notify waiting threads that more memory is available.
-	close(*r.newMemory)
-	newMemChan := make(chan struct{})
-	r.newMemory = &newMemChan
-}
-
-// managedMemoryGet is a nonblocking function to request memory from the renter,
-// typically used for uploading and downloading. The return values are a
-// channel, and a bool.
-//
-// If the memory is available, the channel will be 'nil', and the bool will be
-// 'true'. If the memory is not available, the bool will be 'false', and a
-// channel will be provided which will be closed the next time that memory is
-// added to the pool. After the channel is closed, the caller must call
-// 'managedMemoryGet' again.
-func (r *Renter) managedMemoryGet(amt uint64) (chan struct{}, bool) {
-	id := r.mu.Lock()
-	defer r.mu.Unlock(id)
-
-	// If there is enough memory available, return true to indicate that the
-	// memory was successfully acquired.
-	if r.memoryAvailable >= amt {
-		r.memoryAvailable -= amt
-		return nil, true
-	}
-	return *r.newMemory, false
 }
 
 // Close closes the Renter and its dependencies
@@ -473,3 +331,90 @@ func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 // Enforce that Renter satisfies the modules.Renter interface.
 var _ modules.Renter = (*Renter)(nil)
+
+// New returns an initialized renter.
+func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
+	hdb, err := hostdb.New(g, cs, persistDir)
+	if err != nil {
+		return nil, err
+	}
+	hc, err := contractor.New(cs, wallet, tpool, hdb, persistDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return newRenter(g, cs, tpool, hdb, hc, persistDir)
+}
+
+// newRenter initializes a renter and returns it.
+func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
+	if g == nil {
+		return nil, errNilGateway
+	}
+	if cs == nil {
+		return nil, errNilCS
+	}
+	if tpool == nil {
+		return nil, errNilTpool
+	}
+	if hc == nil {
+		return nil, errNilContractor
+	}
+	if hdb == nil && build.Release != "testing" {
+		return nil, errNilHdb
+	}
+
+	r := &Renter{
+		files:    make(map[string]*file),
+		tracking: make(map[string]trackedFile),
+
+		// Making newDownloads a buffered channel means that most of the time, a
+		// new download will trigger an unnecessary extra iteration of the
+		// download heap loop, popping a download chunk that's not there. But
+		// this is preferable to the alternative, where in rare cases the
+		// download heap will miss work altogether.
+		newDownloads: make(chan *[]unfinishedDownloadChunk, 1),
+		downloadHeap: new(downloadChunkHeap),
+
+		newUploads: make(chan *file),
+
+		workerPool:      make(map[types.FileContractID]*worker),
+
+		cs:             cs,
+		g:              g,
+		hostDB:         hdb,
+		hostContractor: hc,
+		persistDir:     persistDir,
+		mu:             siasync.New(modules.SafeMutexDelay, 1),
+		tpool:          tpool,
+	}
+	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
+
+	// Load all saved data.
+	if err := r.initPersist(); err != nil {
+		return nil, err
+	}
+
+	// Subscribe to the consensus set.
+	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
+	if err != nil {
+		return nil, err
+	}
+
+	// Spin up the workers for the work pool.
+	r.managedUpdateWorkerPool()
+	go r.threadedRepairScan()
+	go r.threadedDownloadLoop()
+
+	// Kill workers on shutdown.
+	r.tg.OnStop(func() error {
+		id := r.mu.RLock()
+		for _, worker := range r.workerPool {
+			close(worker.killChan)
+		}
+		r.mu.RUnlock(id)
+		return nil
+	})
+
+	return r, nil
+}

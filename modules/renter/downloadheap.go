@@ -35,12 +35,12 @@ type downloadChunkHeap []*unfinishedDownloadChunk
 func (dch downloadChunkHeap) Len() int { return len(dch) }
 func (dch downloadChunkHeap) Less(i, j int) bool {
 	// First sort by priority.
-	if dch[i].priority != dch[j].priority {
-		return dch[i].priority > dch[j].priority
+	if dch[i].staticPriority != dch[j].staticPriority {
+		return dch[i].staticPriority > dch[j].staticPriority
 	}
 	// For equal priority, sort by start time.
-	if dch[i].download.startTime != dch[j].download.startTime {
-		return dch[i].download.startTime.Before(dch[j].download.startTime)
+	if dch[i].download.staticStartTime != dch[j].download.staticStartTime {
+		return dch[i].download.staticStartTime.Before(dch[j].download.staticStartTime)
 	}
 	// For equal start time (typically meaning it's the same file), sort by
 	// chunkIndex.
@@ -49,7 +49,7 @@ func (dch downloadChunkHeap) Less(i, j int) bool {
 	// will streamline / order different chunks, we must make sure that we sort
 	// by chunkIndex such that the earlier chunks are selected first from the
 	// heap.
-	return dch[i].chunkIndex < dch[j].chunkIndex
+	return dch[i].staticChunkIndex < dch[j].staticChunkIndex
 }
 func (dch downloadChunkHeap) Swap(i, j int)       { dch[i], dch[j] = dch[j], dch[i] }
 func (dch *downloadChunkHeap) Push(x interface{}) { *dch = append(*dch, x.(*unfinishedDownloadChunk)) }
@@ -67,12 +67,14 @@ func (dch *downloadChunkHeap) Pop() interface{} {
 func (r *Renter) managedAcquireMemoryForDownloadChunk(udc *unfinishedDownloadChunk) bool {
 	// If the chunk does not need memory, can return immediately with a success
 	// condition - all requried memory has been acquired.
-	if nextChunk.memoryRequired == 0 {
+	if !udc.staticNeedsMemory {
 		return true
 	}
-	// Wait to acquire the memory. 'false' will be returned if the renter shuts
-	// down before memory can be acquired.
-	return r.managedMemoryGet(memoryNeeded)
+
+	// The amount of memory required is equal minimum number of pieces plus the
+	// overdrive amount.
+	memoryRequired := (udc.staticOverdrive + udc.erasureCode.MinPieces())*udc.staticPieceSize
+	return r.memoryManager.Request(memoryRequired)
 }
 
 // managedAddChunkToHeap will add a chunk to the download heap in a thread-safe

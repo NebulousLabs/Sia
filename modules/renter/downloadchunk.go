@@ -1,12 +1,16 @@
 package renter
 
 import (
-	"errors"
+	"bytes"
+	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
 
 // downloadPieceInfo contains all the information required to download and
@@ -18,15 +22,6 @@ type downloadPieceInfo struct {
 }
 
 // unfinishedDownloadChunk contains a chunk for a download that is in progress.
-//
-// TODO: The memory management is not perfect here. As we collect data pieces
-// (instead of parity pieces), we don't need as much memory to recover the
-// original data. But we do already allocate only as much as we potentially
-// need, meaning that you can't naively release some memory to the renter each
-// time a data piece completes, you have to check that the data piece was not
-// already expected to be required for the download.
-//
-// TODO: Combine chunkMap and rootMap into single structure.
 type unfinishedDownloadChunk struct {
 	// Fetch + Write instructions - read only or otherwise thread safe.
 	destination downloadDestination // Where to write the recovered logical chunk.
@@ -53,6 +48,7 @@ type unfinishedDownloadChunk struct {
 	pieceUsage        []bool    // Which pieces are being actively fetched.
 	piecesCompleted   int       // Number of pieces that have successfully completed.
 	piecesRegistered  int       // Number of pieces that workers are actively fetching.
+	recoveryComplete  bool      // Whether or not the recovery has completed and the chunk memory released.
 	workersRemaining  int       // Number of workers still able to fetch the chunk.
 	workersStandby    []*worker // Set of workers that are able to work on this download, but are not needed unless other workers fail.
 
@@ -64,128 +60,68 @@ type unfinishedDownloadChunk struct {
 	mu       sync.Mutex
 }
 
-// fail will mark the chunk as failed, and then fail the whole download as well.
-//
-// TODO: Error message can at least declare which chunk failed within the
-// download.
-//
-// TODO: Should we have the ability to log this failure? Might that need to be
-// done by the worker?
-func (udc *unfinishedDownloadChunk) fail() {
-	if udc.failed {
-		// Failure code has already run, no need to run again.
-		return
-	}
-	udc.failed = true
-	// TODO: managed fail? Fail in a goroutine? Need to be careful with
-	// concurrency here.
-	udc.download.managedFail(errors.New("not enough working hosts to recover file"))
+// fail will pass the error to the download and fail the download.
+func (udc *unfinishedDownloadChunk) fail(err error) {
+	udc.download.managedFail(fmt.Errorf("chunk %v failed", udc.staticChunkIndex))
 }
 
-// recoverLogicalData
-func (udc *unfinishedDownloadChunk) recoverLogicalData() error {
-	// Assemble the chunk from the download.
-	cd.download.mu.Lock()
-	chunk := make([][]byte, cd.download.erasureCode.NumPieces())
-	for pieceIndex, pieceData := range cd.completedPieces {
-		chunk[pieceIndex] = pieceData
-	}
-	complete := cd.download.downloadComplete
-	prevErr := cd.download.downloadErr
-	cd.download.mu.Unlock()
-
-	// Return early if the download has previously suffered an error.
-	if complete {
-		return build.ComposeErrors(errPrevErr, prevErr)
-	}
-
+// threadedRecoverLogicalData will take all of the pieces that have been
+// downloaded and encode them into the logical data which is then written to the
+// underlying writer for the download.
+func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	// Decrypt the chunk pieces.
-	for i := range chunk {
-		// Skip pieces that were not downloaded.
-		if chunk[i] == nil {
+	udc.mu.Lock()
+	for i := range udc.physicalChunkData {
+		// Skip empty pieces.
+		if udc.physicalChunkData[i] == nil {
 			continue
 		}
 
-		// Decrypt the piece.
-		key := deriveKey(cd.download.masterKey, cd.index, uint64(i))
-		decryptedPiece, err := key.DecryptBytes(chunk[i])
+		key := deriveKey(udc.masterKey, udc.staticChunkIndex, uint64(i))
+		decryptedPiece, err := key.DecryptBytes(udc.physicalChunkData[i])
 		if err != nil {
-			return build.ExtendErr("unable to decrypt piece", err)
-		}
-		chunk[i] = decryptedPiece
-	}
-
-	// Recover the chunk into a byte slice.
-	recoverWriter := new(bytes.Buffer)
-	recoverSize := cd.download.chunkSize
-	if cd.index == cd.download.numChunks-1 && cd.download.fileSize%cd.download.chunkSize != 0 {
-		recoverSize = cd.download.fileSize % cd.download.chunkSize
-	}
-	err := cd.download.erasureCode.Recover(chunk, recoverSize, recoverWriter)
-	if err != nil {
-		return build.ExtendErr("unable to recover chunk", err)
-	}
-
-	result := recoverWriter.Bytes()
-
-	// Calculate the offset. If the offset is within the chunk, the
-	// requested offset is passed, otherwise the offset of the chunk
-	// within the overall file is passed.
-	chunkBaseAddress := cd.index * cd.download.chunkSize
-	chunkTopAddress := chunkBaseAddress + cd.download.chunkSize - 1
-	off := chunkBaseAddress
-	lowerBound := 0
-	if cd.download.offset >= chunkBaseAddress && cd.download.offset <= chunkTopAddress {
-		off = cd.download.offset
-		offsetInBlock := off - chunkBaseAddress
-		lowerBound = int(offsetInBlock) // If the offset is within the block, part of the block will be ignored
-	}
-
-	// Truncate b if writing the whole buffer at the specified offset would
-	// exceed the maximum file size.
-	upperBound := cd.download.chunkSize
-	if chunkTopAddress > cd.download.length+cd.download.offset {
-		diff := chunkTopAddress - (cd.download.length + cd.download.offset)
-		upperBound -= diff + 1
-	}
-	if upperBound > uint64(len(result)) {
-		upperBound = uint64(len(result))
-	}
-
-	result = result[lowerBound:upperBound]
-
-	// Write the bytes to the requested output.
-	_, err = cd.download.destination.WriteAt(result, int64(off))
-	if err != nil {
-		return build.ExtendErr("unable to write to download destination", err)
-	}
-
-	cd.download.mu.Lock()
-	defer cd.download.mu.Unlock()
-
-	// Update the download to signal that this chunk has completed. Only update
-	// after the sync, so that durability is maintained.
-	if cd.download.finishedChunks[cd.index] {
-		build.Critical("recovering chunk when the chunk has already finished downloading")
-	}
-	cd.download.finishedChunks[cd.index] = true
-
-	// Determine whether the download is complete.
-	nowComplete := true
-	for _, chunkComplete := range cd.download.finishedChunks {
-		if !chunkComplete {
-			nowComplete = false
-			break
-		}
-	}
-	if nowComplete {
-		// Signal that the download is complete.
-		cd.download.downloadComplete = true
-		close(cd.download.downloadFinished)
-		err = cd.download.destination.Close()
-		if err != nil {
+			udc.mu.Unlock()
 			return err
 		}
+		udc.physicalChunkData[i] = decryptedPiece
 	}
-	return nil
+
+	// Recover the pieces into the logical chunk data.
+	recoverWriter := new(bytes.Buffer)
+	err := udc.erasureCode.Recover(udc.physicalChunkData, udc.staticFetchLength, recoverWriter)
+	if err != nil {
+		udc.mu.Unlock()
+		return errors.AddContext(err, "unable to recover chunk")
+	}
+	// Clear out the physical chunk pieces, we do not need them anymore.
+	for i := range udc.physicalChunkData {
+		udc.physicalChunkData[i] = nil
+	}
+	udc.mu.Unlock()
+
+	// Write the bytes to the requested output.
+	_, err = udc.destination.WriteAt(recoverWriter.Bytes(), udc.staticWriteOffset)
+	if err != nil {
+		return errors.AddContext(err, "unable to write to download destination")
+	}
+	recoveryWriter = nil
+	udc.mu.Lock()
+	udc.recoveryComplete = true
+	udc.returnMemory()
+	udc.mu.Unlock()
+
+	// Update the download and signal completion of this chunk.
+	udc.download.mu.Lock()
+	udc.download.chunksRemaining--
+	remaining := udc.download.chunksRemaining
+	udc.download.mu.Unlock()
+	atomic.AddUint64(&udc.download.atomicDataCompleted, udc.staticFetchLength)
+
+	// Check if the download as a whole has completed.
+	if remaining != 0 {
+		// Download not yet complete.
+		return nil
+	}
+	close(udc.download.completeChan)
+	return udc.download.destination.Close()
 }

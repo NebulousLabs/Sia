@@ -32,6 +32,7 @@ type (
 
 		// Static information about the file - can be read without a lock.
 		destination         downloadDestination
+		destinationString   string // The string reported to the user to indicate the download's destination.
 		staticLatencyTarget uint64 // In milliseconds. Lower latency results in lower total system throughput.
 		staticLength        uint64 // Length to download starting from the offset.
 		staticOffset        uint64 // Offset within the file to start the download.
@@ -41,12 +42,14 @@ type (
 
 		// Utilities.
 		log *persist.Logger // Same log as the renter.
+		memoryManager  *memoryManager
 		mu  sync.Mutex
 	}
 
 	// downloadParams is the set of parameters to use when downloading a file.
 	downloadParams struct {
 		destination downloadDestination // The place to write the downloaded data.
+		destinationString string        // The string to report to the user for the destination.
 		file        *file               // The file to download.
 
 		latencyTarget uint64 // Workers above this latency will be automatically put on standby initially.
@@ -126,6 +129,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		staticStartTime: time.Now(),
 
 		destination:         params.destination,
+		destinationString:   params.destinationString,
 		staticLatencyTarget: params.latencyTarget,
 		staticLength:        params.length,
 		staticOffset:        params.offset,
@@ -134,11 +138,12 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		staticPriority:      params.priority,
 
 		log: r.log,
+		memoryManager: r.memoryManager,
 	}
 
 	// Determine which chunks to download.
-	minChunk := params.offset / params.file.chunkSize()
-	maxChunk := (params.offset + params.length - 1) / params.file.chunkSize()
+	minChunk := params.offset / params.file.staticChunkSize()
+	maxChunk := (params.offset + params.length - 1) / params.file.staticChunkSize()
 
 	// For each chunk, assemble a mapping from the contract id to the index of
 	// the piece within the chunk that the contract is responsible for.
@@ -172,7 +177,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 
 			staticChunkIndex: i,
 			staticChunkMap:   chunkMaps[i-minChunk],
-			staticChunkSize:  params.file.chunkSize(),
+			staticChunkSize:  params.file.staticChunkSize(),
 			staticPieceSize:  params.file.pieceSize,
 
 			// TODO: 25ms is just a guess for a good default. Really, we want to
@@ -197,16 +202,16 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		// Set the fetchOffset - the offset within the chunk that we start
 		// downloading from.
 		if i == minChunk {
-			udc.staticFetchOffset = params.offset % params.file.chunkSize()
+			udc.staticFetchOffset = params.offset % params.file.staticChunkSize()
 		} else {
 			udc.staticFetchOffset = 0
 		}
 		// Set the fetchLength - the number of bytes to fetch within the chunk
 		// that we start downloading from.
 		if i == maxChunk {
-			udc.staticFetchLength = ((params.length + params.offset) % params.file.chunkSize()) - udc.staticFetchOffset
+			udc.staticFetchLength = ((params.length + params.offset) % params.file.staticChunkSize()) - udc.staticFetchOffset
 		} else {
-			udc.staticFetchLength = params.file.chunkSize() - udc.staticFetchOffset
+			udc.staticFetchLength = params.file.staticChunkSize() - udc.staticFetchOffset
 		}
 		// Set the writeOffset within the destination for where the data should
 		// be written.
@@ -267,11 +272,23 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 		return fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
 	}
 
+	// TODO: Eventually this won't be a requirement (pending updates to both the
+	// encryption scheme, the download scheme, and potentially even the erasure
+	// coding scheme), but currently we need to make sure that we are
+	// downloading full chunks.
+	if p.Offset%file.staticChunkSize() != 0 {
+		return errors.New("download request needs to be chunk-aligned, offset is not chunk-aligned")
+	}
+	if p.Offset + p.Length != file.size && p.Offset+p.Length % file.staticChunkSize() != 0 {
+		return errors.New("download request needs to be chunk-aligned, length is not chunk-aligned")
+	}
+
 	// Instantiate the correct DownloadWriter implementation
 	// (e.g. content written to file or response body).
 	var dw downloadDestination
 	if isHTTPResp {
 		dw = newDownloadDestinationHTTPWriter(p.Httpwriter)
+		p.Destination = "http stream"
 	} else {
 		osFile, err := os.Open(p.Destination)
 		if err != nil {
@@ -283,6 +300,7 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	// Create the download object.
 	d, err := r.newDownload(downloadParams{
 		destination: dw,
+		destinationString: p.Destination,
 		file:        file,
 
 		latencyTarget: 25e3, // TODO: high default until full latency support is added.
@@ -322,11 +340,11 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 
 		downloads[i] = modules.DownloadInfo{
 			// TODO: Add completed value to modules.DownloadInfo Completed:   d.downloadComplete,
-			Destination: d.destination,
-			Error:       d.Err(),
-			Filesize:    d.length,
-			SiaPath:     d.siapath,
-			StartTime:   d.startTime,
+			Destination: d.destinationString,
+			Error:       d.Err().Error(),
+			Filesize:    d.staticLength,
+			SiaPath:     d.staticSiapath,
+			StartTime:   d.staticStartTime,
 		}
 		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)
 	}
