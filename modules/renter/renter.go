@@ -182,9 +182,14 @@ type Renter struct {
 	// renter can allocate before hitting the cap, and newMemory is a channel
 	// used to inform sleeping threads (the download loop and upload loop) that
 	// memory has become available.
+	//
+	// The newMemory channel is closed and replaced each time new memory becomes
+	// available, that way all threads can be notified together. The functions
+	// for working with the memory (managedMemoryGet, managedMemoryReturn)
+	// handle the creation and closing of the channels automatically.
 	baseMemory      uint64
 	memoryAvailable uint64
-	newMemory       chan struct{}
+	newMemory       *chan struct{}
 
 	// Utilities.
 	cs             modules.ConsensusSet
@@ -243,7 +248,6 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 
 		baseMemory:      defaultMemory,
 		memoryAvailable: defaultMemory,
-		newMemory:       make(chan struct{}, 1),
 
 		cs:             cs,
 		g:              g,
@@ -253,6 +257,10 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 		mu:             siasync.New(modules.SafeMutexDelay, 1),
 		tpool:          tpool,
 	}
+	memChan := make(chan struct{})
+	r.newMemory = &memChan
+
+	// Load all saved data.
 	if err := r.initPersist(); err != nil {
 		return nil, err
 	}
@@ -281,45 +289,43 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 	return r, nil
 }
 
-// managedMemoryAvailableAdd adds the amount provided to the renter's total
-// memory available.
-func (r *Renter) managedMemoryAvailableAdd(amt uint64) {
+// managedMemoryReturn will return memory to the renter's memory pool, notifying
+// anyone waiting for memory that memory has become available.
+func (r *Renter) managedMemoryReturn(amt uint64) {
 	id := r.mu.Lock()
+	defer r.mu.Unlock(id)
+
+	// Return the memory with a santiy check.
 	r.memoryAvailable += amt
 	if r.memoryAvailable > r.baseMemory {
-		r.mu.Unlock(id)
 		r.log.Critical("Memory available now exceeds base memory:", r.memoryAvailable, r.baseMemory)
 		return
 	}
-	r.mu.Unlock(id)
 
-	// Create a notification that more memory is available.
-	select {
-	case r.newMemory <- struct{}{}:
-	default:
-	}
+	// Notify waiting threads that more memory is available.
+	close(*r.newMemory)
+	newMemChan := make(chan struct{})
+	r.newMemory = &newMemChan
 }
 
-// managedMemoryAvailableGet returns the current amount of memory available to
-// the renter.
-func (r *Renter) managedMemoryAvailableGet() uint64 {
-	id := r.mu.RLock()
-	memAvail := r.memoryAvailable
-	r.mu.RUnlock(id)
-	return memAvail
-}
-
-// managedMemoryAvailableSub subtracts the amount provided from the renter's
-// total memory available.
-func (r *Renter) managedMemoryAvailableSub(amt uint64) {
+// managedMemoryGet is a nonblocking function to request memory from the renter,
+// typically used for uploading and downloading. The return values are a
+// channel, and a bool.
+//
+// If the memory is available, the channel will be 'nil', and the bool will be
+// 'true'. If the memory is not available, the bool will be 'false', and a
+// channel will be provided which will be closed the next time that memory is
+// added to the pool. After the channel is closed, the caller must call
+// 'managedMemoryGet' again.
+func (r *Renter) managedMemoryGet(amt uint64) (chan struct{}, bool) {
 	id := r.mu.Lock()
-	if r.memoryAvailable < amt {
-		r.mu.Unlock(id)
-		r.log.Critical("Memory available is underflowing", r.memoryAvailable, amt)
-		return
+	defer r.mu.Unlock(id)
+
+	if r.memoryAvailable >= amt {
+		r.memoryAvailable -= amt
+		return nil, true
 	}
-	r.memoryAvailable -= amt
-	r.mu.Unlock(id)
+	return *r.newMemory, false
 }
 
 // Close closes the Renter and its dependencies
