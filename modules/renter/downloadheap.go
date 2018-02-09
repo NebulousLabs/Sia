@@ -8,18 +8,8 @@ package renter
 // Download jobs are added to the heap via a function call.
 
 import (
-	"bytes"
 	"errors"
-	"io"
-	"os"
-	"sync"
-	"sync/atomic"
 	"time"
-
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (

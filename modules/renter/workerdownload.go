@@ -1,10 +1,5 @@
 package renter
 
-import (
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/types"
-)
-
 // workerdownload.go is responsible for coordinating the actual fetching of
 // pieces, determining when to add standby workers, when to perform repairs, and
 // coordinating resource management between the workers operating on a chunk.
@@ -38,23 +33,23 @@ func (udc *unfinishedDownloadChunk) removeWorker(w *worker) {
 	// number of registered pieces minus the number of completed pieces (the
 	// completed pieces have been recovered and the memory is no longer needed).
 	if udc.recoveryComplete {
-		maxMemory = (udc.piecesRegistered-udc.piecesCompleted)*udc.pieceSize
+		maxMemory = (udc.piecesRegistered - udc.piecesCompleted) * udc.pieceSize
 	}
 	// Return any memory we don't need.
 	if udc.memoryAllocated > maxMemory {
-		w.renter.managedMemoryReturn(udc.memoryAllocated-maxMemory)
+		w.renter.managedMemoryReturn(udc.memoryAllocated - maxMemory)
 		udc.memoryAllocated = maxMemory
 	}
 
 	// Check if the chunk has failed. If so, fail the download and return any
 	// remaining memory.
-	if udc.workersRemaining + udc.piecesCompleted < udc.erasureCode.MinPieces() - 1 && !udc.failed {
+	if udc.workersRemaining+udc.piecesCompleted < udc.erasureCode.MinPieces()-1 && !udc.failed {
 		udc.fail()
 		return
 	}
 
 	// Add the chunk as work to any standby workers.
-	if udc.workersRemaining + udc.piecesCompleted - len(udc.workersStandby) < udc.erasureCode.MinPieces()+udc.overdrive {
+	if udc.workersRemaining+udc.piecesCompleted-len(udc.workersStandby) < udc.erasureCode.MinPieces()+udc.overdrive {
 		for i := 0; i < len(udc.workersStandby); i++ {
 			udc.workersStandby[i].managedQueueDownloadChunk(udc)
 		}
@@ -130,7 +125,7 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 		return
 	}
 	defer d.Close()
-	data, err := d.Sector(dw.dataRoot)
+	data, err := d.Sector(udc.rootMap[w.contract.ID])
 	if err != nil {
 		udc.managedUnregisterWorker(w)
 		return

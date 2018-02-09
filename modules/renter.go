@@ -64,6 +64,9 @@ type DownloadInfo struct {
 }
 
 // DownloadWriter provides an interface which all output writers have to implement.
+//
+// TODO: Looks like this, as passed to the api, allows the API to call the Close
+// and WriteAt methods, which we don't want.
 type DownloadWriter interface {
 	WriteAt(b []byte, off int64) (int, error)
 	Destination() string

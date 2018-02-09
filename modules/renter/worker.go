@@ -28,11 +28,11 @@ type worker struct {
 	renter     *Renter
 
 	// Download variables.
-	downloadChan                chan struct{} // Notifications of new work. Takes priority over uploads.
+	downloadChan                chan struct{}              // Notifications of new work. Takes priority over uploads.
 	downloadChunks              []*unfinishedDownloadChunk // Yet unprocessed work items.
-	downloadConsecutiveFailures time.Time         // How many failures in a row?
-	downloadRecentFailure       time.Time         // How recent was the last failure?
-	downloadTerminated          bool              // Has downloading been terminated for this worker?
+	downloadConsecutiveFailures time.Time                  // How many failures in a row?
+	downloadRecentFailure       time.Time                  // How recent was the last failure?
+	downloadTerminated          bool                       // Has downloading been terminated for this worker?
 
 	// Upload variables.
 	unprocessedChunks         []*unfinishedChunk // Yet unprocessed work items.
@@ -186,9 +186,9 @@ func (r *Renter) managedUpdateWorkerPool() {
 				contract:   contract,
 				hostPubKey: contract.HostPublicKey,
 
-				downloadChan:         make(chan struct{}, 1),
-				killChan:             make(chan struct{}),
-				uploadChan:           make(chan struct{}, 1),
+				downloadChan: make(chan struct{}, 1),
+				killChan:     make(chan struct{}),
+				uploadChan:   make(chan struct{}, 1),
 
 				renter: r,
 			}

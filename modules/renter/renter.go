@@ -172,13 +172,13 @@ type Renter struct {
 	tracking map[string]trackedFile // Map from nickname to metadata.
 
 	// Download management.
-	downloadHeapMu sync.Mutex // Used to protect the downloadHeap.
-	downloadHeap  *downloadChunkHeap // A heap of priority-sorted chunks to download.
-	downloadQueue []*download // List of user-initiated downloads.
-	newDownloads  chan struct{} // Used to notify download heap thread that new downlaods are available.
+	downloadHeapMu sync.Mutex         // Used to protect the downloadHeap.
+	downloadHeap   *downloadChunkHeap // A heap of priority-sorted chunks to download.
+	downloadQueue  []*download        // List of user-initiated downloads.
+	newDownloads   chan struct{}      // Used to notify download heap thread that new downlaods are available.
 
 	// Upload management.
-	newUploads    chan *file // Used to send new uploads to the upload heap.
+	newUploads chan *file // Used to send new uploads to the upload heap.
 
 	// Memory management - baseMemory tracks how much memory the renter is
 	// allowed to consume, memoryAvailable tracks how much more memory the
@@ -193,7 +193,7 @@ type Renter struct {
 	baseMemory      uint64
 	memoryAvailable uint64
 	newMemory       *chan struct{}
-	workerPool    map[types.FileContractID]*worker
+	workerPool      map[types.FileContractID]*worker
 
 	// Utilities.
 	cs             modules.ConsensusSet
@@ -246,14 +246,19 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 		files:    make(map[string]*file),
 		tracking: make(map[string]trackedFile),
 
-		newDownloads: make(chan *[]unfinishedDownloadChunk),
+		// Making newDownloads a buffered channel means that most of the time, a
+		// new download will trigger an unnecessary extra iteration of the
+		// download heap loop, popping a download chunk that's not there. But
+		// this is preferable to the alternative, where in rare cases the
+		// download heap will miss work altogether.
+		newDownloads: make(chan *[]unfinishedDownloadChunk, 1),
 		downloadHeap: new(downloadChunkHeap),
 
-		newUploads:   make(chan *file),
+		newUploads: make(chan *file),
 
 		baseMemory:      defaultMemory,
 		memoryAvailable: defaultMemory,
-		workerPool:   make(map[types.FileContractID]*worker),
+		workerPool:      make(map[types.FileContractID]*worker),
 
 		cs:             cs,
 		g:              g,
