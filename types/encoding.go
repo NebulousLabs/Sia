@@ -280,6 +280,11 @@ func (bid BlockID) String() string {
 	return fmt.Sprintf("%x", bid[:])
 }
 
+// LoadString loads a BlockID from a string
+func (bid *BlockID) LoadString(str string) error {
+	return (*crypto.Hash)(bid).LoadString(str)
+}
+
 // UnmarshalJSON decodes the json hex string of the block id.
 func (bid *BlockID) UnmarshalJSON(b []byte) error {
 	return (*crypto.Hash)(bid).UnmarshalJSON(b)

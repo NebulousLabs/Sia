@@ -23,6 +23,8 @@ Index
 | Route                                                                       | HTTP verb |
 | --------------------------------------------------------------------------- | --------- |
 | [/consensus](#consensus-get)                                                | GET       |
+| [/consensus/blocks/:id](#consensus-blocks-id-get)                           | GET       |
+| [/consensus/headers/:height](#consensus-headers-height-get)                 | GET       |
 | [/consensus/validate/transactionset](#consensusvalidatetransactionset-post) | POST      |
 
 #### /consensus [GET]
@@ -49,6 +51,15 @@ returns information about the consensus set, such as the current block height.
   "difficulty": "1234" // arbitrary-precision integer
 }
 ```
+
+#### /consensus/blocks/:id [GET]
+
+Returns the block for a given id.
+
+#### /consensus/headers/:height [GET]
+
+Returns header information of a block at a given height. At the moment only the
+BlockID is included, but this can be extended as needed.
 
 #### /consensus/validate/transactionset [POST]
 

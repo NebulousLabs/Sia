@@ -202,6 +202,20 @@ func (cs *ConsensusSet) BlockAtHeight(height types.BlockHeight) (block types.Blo
 	return block, exists
 }
 
+// BlockByID returns the block for a given BlockID.
+func (cs *ConsensusSet) BlockByID(id types.BlockID) (block types.Block, exists bool) {
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		pb, err := getBlockMap(tx, id)
+		if err != nil {
+			return err
+		}
+		block = pb.Block
+		exists = true
+		return nil
+	})
+	return block, exists
+}
+
 // ChildTarget returns the target for the child of a block.
 func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exists bool) {
 	// A call to a closed database can cause undefined behavior.
