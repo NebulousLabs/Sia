@@ -48,7 +48,7 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 	buf := NewDownloadBufferWriter(chunk.length, chunk.offset)
 	// TODO: Should convert the inputs of newSectionDownload to use an int64 for
 	// the offset.
-	d := r.newSectionDownload(chunk.renterFile, buf, uint64(chunk.offset), chunk.length)
+	d := r.newSectionDownload(chunk.renterFile, buf, uint64(chunk.offset), chunk.length, false)
 	select {
 	case r.newDownloads <- d:
 	case <-r.tg.StopChan():

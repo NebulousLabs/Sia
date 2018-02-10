@@ -477,17 +477,24 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// save a copy of the file contents in memory for verification later
+	orig, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// verify we can download
 	downloadPath := filepath.Join(st.dir, "test-downloaded-verify.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// save a copy of the file contents in memory for verification later
-	orig, err := ioutil.ReadFile(path)
+	downloaded, err := ioutil.ReadFile(downloadPath)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !bytes.Equal(orig, downloaded) {
+		t.Fatal("data mismatch when downloading a file")
 	}
 
 	// remove the local copy of the file
@@ -520,7 +527,6 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// bring up a new host
 	stNewHost, err := blankServerTester(t.Name() + "-newhost")
 	if err != nil {
@@ -618,7 +624,6 @@ func TestRemoteFileRepair(t *testing.T) {
 		if err := st.getAPI("/renter/files", &rf); err != nil {
 			return err
 		}
-
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 && rf.Files[0].Available {
 			return nil
 		}
@@ -640,7 +645,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// Check that the download has the right contents.
-	downloaded, err := ioutil.ReadFile(downloadPath)
+	downloaded, err = ioutil.ReadFile(downloadPath)
 	if err != nil {
 		t.Fatal(err)
 	}

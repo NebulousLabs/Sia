@@ -314,7 +314,7 @@ func (r *Renter) threadedRepairScan() {
 			}
 		}
 
-		// Return if the renter has shut d wn.
+		// Return if the renter has shut down.
 		select {
 		case <-r.tg.StopChan():
 			return
