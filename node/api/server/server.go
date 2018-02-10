@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api"
 
@@ -23,6 +24,7 @@ type Server struct {
 	node              *node.Node
 	requiredUserAgent string
 	serveErr          error
+	Dir               string
 }
 
 // serve listens for and handles API calls. It is a blocking function.
@@ -47,6 +49,16 @@ func (srv *Server) Close() error {
 	// Shutdown modules.
 	err = errors.Compose(err, srv.node.Close())
 	return errors.AddContext(err, "error while closing server")
+}
+
+// APIAddress returns the underlying node's api address
+func (srv *Server) APIAddress() string {
+	return srv.listener.Addr().String()
+}
+
+// GatewayAddress returns the underlying node's gateway address
+func (srv *Server) GatewayAddress() modules.NetAddress {
+	return srv.node.Gateway.Address()
 }
 
 // New creates a new API server from the provided modules. The API will
@@ -78,6 +90,7 @@ func New(APIaddr string, requiredUserAgent string, requiredPassword string, node
 		listener:          listener,
 		node:              node,
 		requiredUserAgent: requiredUserAgent,
+		Dir:               nodeParams.Dir,
 	}
 
 	// Spin up a goroutine that serves the API and closes srv.done when

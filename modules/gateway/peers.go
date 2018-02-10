@@ -136,7 +136,7 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 	}
 
 	if build.VersionCmp(remoteVersion, minimumAcceptablePeerVersion) >= 0 {
-		err = g.managedAcceptConnv130Peer(conn, remoteVersion)
+		err = g.managedAcceptConnPeer(conn, remoteVersion)
 	} else {
 		err = errors.New("version number is below threshold")
 	}
@@ -145,6 +145,7 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 		conn.Close()
 		return
 	}
+
 	// Handshake successful, remove the deadline.
 	conn.SetDeadline(time.Time{})
 
@@ -164,10 +165,10 @@ func acceptableSessionHeader(ourHeader, remoteHeader sessionHeader, remoteAddr s
 	return nil
 }
 
-// managedAcceptConnv130Peer accepts connection requests from peers >= v1.3.0.
+// managedAcceptConnPeer accepts connection requests from peers >= v1.3.1.
 // The requesting peer is added as a node and a peer. The peer is only added if
 // a nil error is returned.
-func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string) error {
+func (g *Gateway) managedAcceptConnPeer(conn net.Conn, remoteVersion string) error {
 	g.log.Debugln("Sending sessionHeader with address", g.myAddr, g.myAddr.IsLocal())
 	// Perform header handshake.
 	g.mu.RLock()
@@ -186,8 +187,12 @@ func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string)
 		return err
 	}
 
-	// Get the remote address from opened socket
-	remoteAddr := modules.NetAddress(conn.RemoteAddr().String())
+	// Get the remote address on which the connecting peer is listening on.
+	// This means we need to combine the incoming connections ip address with
+	// the announced open port of the peer.
+	remoteIP := modules.NetAddress(conn.RemoteAddr().String()).Host()
+	remotePort := remoteHeader.NetAddress.Port()
+	remoteAddr := modules.NetAddress(net.JoinHostPort(remoteIP, remotePort))
 
 	// Accept the peer.
 	peer := &peer{
@@ -198,7 +203,7 @@ func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string)
 			Local: remoteAddr.IsLocal(),
 			// Ignoring claimed IP address (which should be == to the socket address)
 			// by the host but keeping note of the port number so we can call back
-			NetAddress: modules.NetAddress(net.JoinHostPort(remoteAddr.Host(), remoteHeader.NetAddress.Port())),
+			NetAddress: remoteAddr,
 			Version:    remoteVersion,
 		},
 		sess: newServerStream(conn, remoteVersion),
@@ -212,10 +217,10 @@ func (g *Gateway) managedAcceptConnv130Peer(conn net.Conn, remoteVersion string)
 	// do this in a goroutine so that we can begin communicating with the peer
 	// immediately.
 	go func() {
-		err := g.pingNode(remoteHeader.NetAddress)
+		err := g.pingNode(remoteAddr)
 		if err == nil {
 			g.mu.Lock()
-			g.addNode(remoteHeader.NetAddress)
+			g.addNode(remoteAddr)
 			g.mu.Unlock()
 		}
 	}()
