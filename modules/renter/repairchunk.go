@@ -40,14 +40,14 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 	buf := downloadDestinationBuffer(make([]byte, chunk.length))
 	d, err := r.newDownload(downloadParams{
 		destination: buf,
-		file: chunk.renterFile,
+		file:        chunk.renterFile,
 
 		latencyTarget: 200e3, // No need to rush latency on repair downloads.
-		length: chunk.length,
-		needsMemory: false, // We already requested memory, the download memory fits inside of that.
-		offset: uint64(chunk.offset),
-		overdrive: 0, // No need to rush the latency on repair downloads.
-		priority: 0, // Repair downloads are completely de-prioritized.
+		length:        chunk.length,
+		needsMemory:   false, // We already requested memory, the download memory fits inside of that.
+		offset:        uint64(chunk.offset),
+		overdrive:     0, // No need to rush the latency on repair downloads.
+		priority:      0, // Repair downloads are completely de-prioritized.
 	})
 	if err != nil {
 		return err

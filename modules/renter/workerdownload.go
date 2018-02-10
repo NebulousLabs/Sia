@@ -18,8 +18,8 @@ import (
 func (udc *unfinishedDownloadChunk) returnMemory() {
 	// The maximum amount of memory is the pieces completed plus the number of
 	// workers remaining.
-	initialMemory := uint64(udc.staticOverdrive + udc.erasureCode.MinPieces()) * udc.staticPieceSize
-	maxMemory := uint64(udc.workersRemaining + udc.piecesCompleted) * udc.staticPieceSize
+	initialMemory := uint64(udc.staticOverdrive+udc.erasureCode.MinPieces()) * udc.staticPieceSize
+	maxMemory := uint64(udc.workersRemaining+udc.piecesCompleted) * udc.staticPieceSize
 	// If the maxMemory exceeds the inital memory, set the max memory equal to
 	// the initial memory.
 	if maxMemory > initialMemory {
@@ -31,7 +31,7 @@ func (udc *unfinishedDownloadChunk) returnMemory() {
 		// udc.piecesRegistered is guaranteed to be at most equal to the number
 		// of overdrive pieces, meaning it will be equal to or less than
 		// initalMemory.
-		maxMemory = uint64(udc.piecesCompleted + udc.piecesRegistered) * udc.staticPieceSize
+		maxMemory = uint64(udc.piecesCompleted+udc.piecesRegistered) * udc.staticPieceSize
 	}
 	// If the chunk recovery has completed, the maximum number of pieces is the
 	// number of registered.
@@ -98,7 +98,7 @@ func (w *worker) managedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfi
 
 	// Determine whether the worker needs to drop the chunk.
 	chunkComplete := udc.piecesCompleted >= udc.erasureCode.MinPieces()
-	chunkFailed := udc.piecesCompleted + udc.workersRemaining < udc.erasureCode.MinPieces()
+	chunkFailed := udc.piecesCompleted+udc.workersRemaining < udc.erasureCode.MinPieces()
 	chunkData, workerHasPiece := udc.staticChunkMap[w.contract.ID]
 	if chunkComplete || chunkFailed || w.onDownloadCooldown() || !workerHasPiece {
 		udc.removeWorker()

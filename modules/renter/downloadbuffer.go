@@ -63,7 +63,7 @@ type downloadDestinationWriter struct {
 	// The next write call can be unblocked by unlocking the corresponding mutex
 	// in the next array.
 	blockingWriteCalls   []int64 // A list of write calls that are waiting for their turn
-	blockingWriteSignals []sync.Mutex
+	blockingWriteSignals []*sync.Mutex
 }
 
 // errFailedStreamWrite gets returned if a prior error occurred when writing to
@@ -111,8 +111,8 @@ func (ddw *downloadDestinationWriter) WriteAt(data []byte, offset int64) (int, e
 			// unlock/unblock all of the waiting WriteAt calls.
 			ddw.failed = true
 			ddw.Close()
-			for _, mu := range ddw.blockingWriteSignals {
-				mu.Unlock()
+			for i := range ddw.blockingWriteSignals {
+				ddw.blockingWriteSignals[i].Unlock()
 			}
 			return n, err
 		}
@@ -143,7 +143,7 @@ func (ddw *downloadDestinationWriter) WriteAt(data []byte, offset int64) (int, e
 	// Block until we are the correct offset for the stream. The blocking is
 	// coordinated by a new mutex which gets added to an array. When the earlier
 	// data is written, the mutex will be unlocked, allowing us to write.
-	var myMu sync.Mutex
+	myMu := new(sync.Mutex)
 	myMu.Lock()
 	ddw.blockingWriteCalls = append(ddw.blockingWriteCalls, offset)
 	ddw.blockingWriteSignals = append(ddw.blockingWriteSignals, myMu)
