@@ -25,7 +25,7 @@ func (r *Renter) managedDistributeChunkToWorkers(uc *unfinishedChunk) {
 	}
 	r.mu.RUnlock(id)
 	for _, worker := range workers {
-		worker.managedQueueChunkRepair(uc)
+		worker.managedQueueUploadChunk(uc)
 	}
 
 	// Perform cleanup for any pieces that will never be used by a worker.
@@ -36,37 +36,35 @@ func (r *Renter) managedDistributeChunkToWorkers(uc *unfinishedChunk) {
 // download to the renter's downloader, and then using the data that gets
 // returned.
 func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
-	// Create the download, queue the download, and then wait for the download
-	// to finish.
-	//
-	// TODO / NOTE: Once we migrate to the uploader and downloader having a
-	// shared memory pool, this part will need to signal to the download group
-	// that the memory has already been allocated - upload memory always takes
-	// more than download memory, and if we need to allocate two times in a row
-	// from the same memory pool while other processes are asynchronously doing
-	// the same, we risk deadlock.
-	buf := NewDownloadBufferWriter(chunk.length, chunk.offset)
-	// TODO: Should convert the inputs of newSectionDownload to use an int64 for
-	// the offset.
-	d := r.newSectionDownload(chunk.renterFile, buf, uint64(chunk.offset), chunk.length)
-	select {
-	case r.newDownloads <- d:
-	case <-r.tg.StopChan():
-		return errors.New("repair download queing interrupted by stop call")
+	// Create the download.
+	buf := downloadDestinationBuffer(make([]byte, chunk.length))
+	d, err := r.newDownload(downloadParams{
+		destination: buf,
+		file: chunk.renterFile,
+
+		latencyTarget: 200e3, // No need to rush latency on repair downloads.
+		length: chunk.length,
+		needsMemory: false, // We already requested memory, the download memory fits inside of that.
+		offset: uint64(chunk.offset),
+		overdrive: 0, // No need to rush the latency on repair downloads.
+		priority: 0, // Repair downloads are completely de-prioritized.
+	})
+	if err != nil {
+		return err
 	}
+
+	// Wait for the download to complete.
 	select {
-	case <-d.downloadFinished:
+	case <-d.completeChan:
 	case <-r.tg.StopChan():
 		return errors.New("repair download interrupted by stop call")
 	}
 	if d.Err() != nil {
-		buf.data = nil
+		buf = nil
 		return d.Err()
 	}
-
-	chunk.logicalChunkData = buf.Bytes()
+	chunk.logicalChunkData = []byte(buf)
 	return nil
-
 }
 
 // managedFetchAndRepairChunk will fetch the logical data for a chunk, create
@@ -86,7 +84,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) bool {
 	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.Encode(chunk.logicalChunkData)
 	memoryFreed := uint64(len(chunk.logicalChunkData))
 	chunk.logicalChunkData = nil
-	r.managedMemoryReturn(memoryFreed)
+	r.memoryManager.Return(memoryFreed)
 	chunk.memoryReleased += memoryFreed
 	memoryFreed = 0
 	if err != nil {
@@ -114,7 +112,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) bool {
 		}
 	}
 	// Return the released memory.
-	r.managedMemoryReturn(memoryFreed)
+	r.memoryManager.Return(memoryFreed)
 	chunk.memoryReleased += memoryFreed
 
 	// Distribute the chunk to the workers.
@@ -203,6 +201,6 @@ func (r *Renter) managedReleaseIdleChunkPieces(uc *unfinishedChunk) {
 	}
 	uc.mu.Unlock()
 	if memoryReleased > 0 {
-		r.managedMemoryReturn(uint64(memoryReleased))
+		r.memoryManager.Return(uint64(memoryReleased))
 	}
 }

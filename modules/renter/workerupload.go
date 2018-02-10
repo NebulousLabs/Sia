@@ -148,6 +148,6 @@ func (w *worker) managedUpload(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.physicalChunkData[pieceIndex] = nil
 	uc.memoryReleased += uint64(releaseSize)
 	uc.mu.Unlock()
-	w.renter.managedMemoryReturn(uint64(releaseSize))
+	w.renter.memoryManager.Return(uint64(releaseSize))
 	w.dropChunk(uc)
 }

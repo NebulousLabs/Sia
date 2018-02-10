@@ -41,16 +41,16 @@ type (
 		staticPriority      uint64 // Downloads with higher priority will complete first.
 
 		// Utilities.
-		log *persist.Logger // Same log as the renter.
-		memoryManager  *memoryManager
-		mu  sync.Mutex
+		log           *persist.Logger // Same log as the renter.
+		memoryManager *memoryManager
+		mu            sync.Mutex
 	}
 
 	// downloadParams is the set of parameters to use when downloading a file.
 	downloadParams struct {
-		destination downloadDestination // The place to write the downloaded data.
-		destinationString string        // The string to report to the user for the destination.
-		file        *file               // The file to download.
+		destination       downloadDestination // The place to write the downloaded data.
+		destinationString string              // The string to report to the user for the destination.
+		file              *file               // The file to download.
 
 		latencyTarget uint64 // Workers above this latency will be automatically put on standby initially.
 		length        uint64 // Length of download. Cannot be 0.
@@ -137,7 +137,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		staticSiapath:       params.file.name,
 		staticPriority:      params.priority,
 
-		log: r.log,
+		log:           r.log,
 		memoryManager: r.memoryManager,
 	}
 
@@ -279,7 +279,7 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	if p.Offset%file.staticChunkSize() != 0 {
 		return errors.New("download request needs to be chunk-aligned, offset is not chunk-aligned")
 	}
-	if p.Offset + p.Length != file.size && p.Offset+p.Length % file.staticChunkSize() != 0 {
+	if p.Offset+p.Length != file.size && p.Offset+p.Length%file.staticChunkSize() != 0 {
 		return errors.New("download request needs to be chunk-aligned, length is not chunk-aligned")
 	}
 
@@ -299,9 +299,9 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 
 	// Create the download object.
 	d, err := r.newDownload(downloadParams{
-		destination: dw,
+		destination:       dw,
 		destinationString: p.Destination,
-		file:        file,
+		file:              file,
 
 		latencyTarget: 25e3, // TODO: high default until full latency support is added.
 		length:        p.Length,

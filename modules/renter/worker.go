@@ -30,7 +30,7 @@ type worker struct {
 	// Download variables.
 	downloadChan                chan struct{}              // Notifications of new work. Takes priority over uploads.
 	downloadChunks              []*unfinishedDownloadChunk // Yet unprocessed work items.
-	downloadConsecutiveFailures time.Time                  // How many failures in a row?
+	downloadConsecutiveFailures int                        // How many failures in a row?
 	downloadRecentFailure       time.Time                  // How recent was the last failure?
 	downloadTerminated          bool                       // Has downloading been terminated for this worker?
 
@@ -51,9 +51,11 @@ type worker struct {
 }
 
 // managedKillDownloading will drop all of the pieces given to the worker.
-func (w *worker) managedKillDownloading(udc *unfinishedDownloadChunk) {
-	w.managedDropDownloadChunks()
+func (w *worker) managedKillDownloading() {
+	w.mu.Lock()
+	w.dropDownloadChunks()
 	w.downloadTerminated = true
+	w.mu.Unlock()
 }
 
 // managedKillUploading will disable all uploading for the worker.
@@ -89,7 +91,7 @@ func (w *worker) managedQueueDownloadChunk(udc *unfinishedDownloadChunk) {
 	// Drop the chunk if the worker is terminated or on cooldown.
 	if w.downloadTerminated || w.onDownloadCooldown() {
 		udc.mu.Lock()
-		udc.removeWorker(w)
+		udc.removeWorker()
 		udc.mu.Unlock()
 		return
 	}
@@ -136,13 +138,15 @@ func (w *worker) managedQueueUploadChunk(uc *unfinishedChunk) {
 func (w *worker) managedNextDownloadChunk() (nextChunk *unfinishedDownloadChunk) {
 	w.mu.Lock()
 	for len(w.downloadChunks) > 0 {
-		chunk := w.downloadChunks[0]
+		nextDownloadChunk := w.downloadChunks[0]
 		w.downloadChunks = w.downloadChunks[1:]
 		w.mu.Unlock()
-		nextDownloadChunk = w.processDownloadChunk(chunk)
+		nextDownloadChunk = w.managedProcessDownloadChunk(nextDownloadChunk)
 		if nextDownloadChunk != nil {
 			return nextDownloadChunk
 		}
+		// TODO: The structure of this loop means that in the final iteration,
+		// we grab one more lock than we need to.
 		w.mu.Lock()
 	}
 	w.mu.Unlock()
@@ -227,12 +231,12 @@ func (w *worker) threadedWorkLoop() {
 		// Perform one stpe of processing download work.
 		downloadChunk := w.managedNextDownloadChunk()
 		if downloadChunk != nil {
-			w.managedDownload(chunk)
+			w.managedDownload(downloadChunk)
 			continue
 		}
 
 		// Perform one step of processing upload work.
-		chunk, pieceIndex := w.managedNextChunk()
+		chunk, pieceIndex := w.managedNextUploadChunk()
 		if chunk != nil {
 			w.managedUpload(chunk, pieceIndex)
 			continue

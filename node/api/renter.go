@@ -266,7 +266,7 @@ func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _
 	for _, d := range api.renter.DownloadQueue() {
 		downloads = append(downloads, DownloadInfo{
 			SiaPath:     d.SiaPath,
-			Destination: d.Destination.Destination(),
+			Destination: d.Destination,
 			Filesize:    d.Filesize,
 			StartTime:   d.StartTime,
 			Received:    d.Received,

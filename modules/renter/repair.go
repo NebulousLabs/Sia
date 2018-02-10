@@ -91,7 +91,7 @@ func (ch *chunkHeap) Pop() interface{} {
 // uploading.
 func (uc *unfinishedChunk) notifyStandbyWorkers() {
 	for i := 0; i < len(uc.workersStandby); i++ {
-		uc.workersStandby[i].managedQueueChunkRepair(uc)
+		uc.workersStandby[i].managedQueueUploadChunk(uc)
 	}
 	uc.workersStandby = uc.workersStandby[:0]
 }
@@ -125,8 +125,8 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			localPath:  trackedFile.RepairPath,
 
 			index:  i,
-			length: f.chunkSize(),
-			offset: int64(i * f.chunkSize()),
+			length: f.staticChunkSize(),
+			offset: int64(i * f.staticChunkSize()),
 
 			// memoryNeeded has to also include the logical data, and also
 			// include the overhead for encryption.
@@ -246,16 +246,8 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 	// of memory available, and then spin up a thread to asynchronously handle
 	// the rest of the chunk tasks.
 	nextChunk := heap.Pop(ch).(*unfinishedChunk)
-	memChan, memoryAcquired := r.managedMemoryGet(nextChunk.memoryNeeded)
-	for !memoryAcquired {
-		select {
-		case newFile := <-r.newUploads:
-			r.managedInsertFileIntoChunkHeap(newFile, ch, hosts)
-		case <-memChan:
-			memChan, memoryAcquired = r.managedMemoryGet(nextChunk.memoryNeeded)
-		case <-r.tg.StopChan():
-			return
-		}
+	if !r.memoryManager.Request(nextChunk.memoryNeeded) {
+		return
 	}
 	// Add this thread to the waitgroup. This Add will be released once the
 	// worker threads have been added to the wg.
@@ -265,7 +257,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 		r.heapWG.Done()
 		if !workDistributed {
 			// Release any data that did not get distributed to workers.
-			r.managedMemoryReturn(nextChunk.memoryNeeded - nextChunk.memoryReleased)
+			r.memoryManager.Return(nextChunk.memoryNeeded - nextChunk.memoryReleased)
 		}
 		// Sanity check, make sure memory was returned properly.
 		if nextChunk.logicalChunkData != nil {

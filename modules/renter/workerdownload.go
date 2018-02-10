@@ -7,20 +7,19 @@ package renter
 // NOTE: the 'piecesRegistered' field of the unfinishedDownloadChunk will only
 // be decremented if a piece download fails or is un-needed to perform recovery.
 // Otherwise it just keeps incrementing.
-//
-// TODO: all remaining TODOs in this file relate to relaxing standby
-// requirements for workers. Currently, we don't have any standby requirements,
-// so there's not really any code to write, need to get latency and pricing
-// situation figured out.
+
+import (
+	"errors"
+)
 
 // returnMemory will check on the status of all the workers and pieces, and
 // determine how much memory is safe to return to the renter. This should be
 // called each time a worker returns, and also after the chunk is recovered.
-func(udc *unfinishedDownloadChunk) returnMemory() {
+func (udc *unfinishedDownloadChunk) returnMemory() {
 	// The maximum amount of memory is the pieces completed plus the number of
 	// workers remaining.
-	initialMemory := (udc.staticOverdrive+udc.erasureCode.MinPieces())*udc.staticPieceSize
-	maxMemory := (udc.workersRemaining + udc.piecesCompleted) * udc.pieceSize
+	initialMemory := uint64(udc.staticOverdrive + udc.erasureCode.MinPieces()) * udc.staticPieceSize
+	maxMemory := uint64(udc.workersRemaining + udc.piecesCompleted) * udc.staticPieceSize
 	// If the maxMemory exceeds the inital memory, set the max memory equal to
 	// the initial memory.
 	if maxMemory > initialMemory {
@@ -32,15 +31,15 @@ func(udc *unfinishedDownloadChunk) returnMemory() {
 		// udc.piecesRegistered is guaranteed to be at most equal to the number
 		// of overdrive pieces, meaning it will be equal to or less than
 		// initalMemory.
-		maxMemory = (udc.piecesCompleted+udc.piecesRegistered) * udc.pieceSize
+		maxMemory = uint64(udc.piecesCompleted + udc.piecesRegistered) * udc.staticPieceSize
 	}
 	// If the chunk recovery has completed, the maximum number of pieces is the
 	// number of registered.
 	if udc.recoveryComplete {
-		maxMemory = udc.piecesRegistered * udc.pieceSize
+		maxMemory = uint64(udc.piecesRegistered) * udc.staticPieceSize
 	}
 	// Return any memory we don't need.
-	if udc.memoryAllocated > maxMemory {
+	if uint64(udc.memoryAllocated) > maxMemory {
 		udc.download.memoryManager.Return(udc.memoryAllocated - maxMemory)
 		udc.memoryAllocated = maxMemory
 	}
@@ -48,9 +47,6 @@ func(udc *unfinishedDownloadChunk) returnMemory() {
 
 // removeWorker will release a download chunk that the worker had queued up.
 // This function should be called any time that a worker completes work.
-//
-// NOTE: The udc is expected to be locked, the worker is expected to be
-// unlocked.
 func (udc *unfinishedDownloadChunk) removeWorker() {
 	udc.workersRemaining--
 	udc.returnMemory()
@@ -58,12 +54,12 @@ func (udc *unfinishedDownloadChunk) removeWorker() {
 	// Check if the chunk has failed. If so, fail the download and return any
 	// remaining memory.
 	if udc.workersRemaining+udc.piecesCompleted < udc.erasureCode.MinPieces()-1 && !udc.failed {
-		udc.fail()
+		udc.fail(errors.New("not enough workers to continue download"))
 		return
 	}
 
 	// Add the chunk as work to any standby workers.
-	if udc.workersRemaining+udc.piecesCompleted-len(udc.workersStandby) < udc.erasureCode.MinPieces()+udc.overdrive {
+	if udc.workersRemaining+udc.piecesCompleted-len(udc.workersStandby) < udc.erasureCode.MinPieces()+udc.staticOverdrive {
 		for i := 0; i < len(udc.workersStandby); i++ {
 			udc.workersStandby[i].managedQueueDownloadChunk(udc)
 		}
@@ -76,9 +72,9 @@ func (udc *unfinishedDownloadChunk) removeWorker() {
 // only be called when a worker download fails.
 func (udc *unfinishedDownloadChunk) managedUnregisterWorker(w *worker) {
 	udc.mu.Lock()
-	udc.piecesRegisterd--
-	udc.pieceUsage[udc.chunkMap[w.contract.ID]] = false
-	udc.removeWorker(w)
+	udc.piecesRegistered--
+	udc.pieceUsage[udc.staticChunkMap[w.contract.ID].index] = false
+	udc.removeWorker()
 	udc.mu.Unlock()
 }
 
@@ -86,25 +82,26 @@ func (udc *unfinishedDownloadChunk) managedUnregisterWorker(w *worker) {
 // currently working on.
 func (w *worker) dropDownloadChunks() {
 	for i := 0; i < len(w.downloadChunks); i++ {
-		w.downloadChunks[i].removeWorker(w)
+		w.downloadChunks[i].removeWorker()
 	}
 	w.downloadChunks = w.downloadChunks[:0]
 }
 
-// processDownloadChunk will take a potential download chunk, figure out if
-// there is work to do, and then perform any registration or processing with the
-// chunk before returning the chunk to the caller.
+// managedProcessDownloadChunk will take a potential download chunk, figure out
+// if there is work to do, and then perform any registration or processing with
+// the chunk before returning the chunk to the caller.
 //
 // If no immediate action is required, 'nil' will be returned.
-func (w *worker) processDownloadChunk(udc *unfinishedDownloadChunk) *unfinishedDownloadChunk {
+func (w *worker) managedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfinishedDownloadChunk {
 	udc.mu.Lock()
 	defer udc.mu.Unlock()
 
 	// Determine whether the worker needs to drop the chunk.
 	chunkComplete := udc.piecesCompleted >= udc.erasureCode.MinPieces()
-	pieceIndex, workerHasPiece := udc.chunkMap[w.contract.ID]
+	chunkFailed := udc.piecesCompleted + udc.workersRemaining < udc.erasureCode.MinPieces()
+	chunkData, workerHasPiece := udc.staticChunkMap[w.contract.ID]
 	if chunkComplete || chunkFailed || w.onDownloadCooldown() || !workerHasPiece {
-		udc.removeWorker(w)
+		udc.removeWorker()
 		return nil
 	}
 
@@ -115,13 +112,13 @@ func (w *worker) processDownloadChunk(udc *unfinishedDownloadChunk) *unfinishedD
 	// set to standby (such as price) should be handled here as well.
 	meetsLatencyTarget := true
 
-	// If this chunk has not had enough pieces regiseterd yet, register this
+	// If this chunk has not had enough pieces regisetered yet, register this
 	// worker. Otherwies put the worker on standby.
-	if udc.piecesRegistered < udc.erasureCode.MinPieces()+udc.overdrive && !udc.pieceUsage[pieceIndex] && meetsLatencyTarget {
+	if udc.piecesRegistered-udc.piecesCompleted < udc.erasureCode.MinPieces()+udc.staticOverdrive && !udc.pieceUsage[chunkData.index] && meetsLatencyTarget {
 		// Worker can be useful. Register the worker and return the chunk for
 		// downloading.
 		udc.piecesRegistered++
-		udc.pieceUsage[pieceIndex] = true
+		udc.pieceUsage[chunkData.index] = true
 		return udc
 	}
 	// Worker is not needed unless another worker fails, so put this worker on
@@ -139,7 +136,7 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 		return
 	}
 	defer d.Close()
-	data, err := d.Sector(udc.rootMap[w.contract.ID])
+	data, err := d.Sector(udc.staticChunkMap[w.contract.ID].root)
 	if err != nil {
 		udc.managedUnregisterWorker(w)
 		return
@@ -149,7 +146,7 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 	udc.piecesCompleted++
 	udc.piecesRegistered--
 	if udc.piecesCompleted <= udc.erasureCode.MinPieces() {
-		udc.physicalChunkData[udc.chunkMap[w.contract.ID]] = data
+		udc.physicalChunkData[udc.staticChunkMap[w.contract.ID].index] = data
 	}
 	if udc.piecesCompleted == udc.erasureCode.MinPieces() {
 		go udc.threadedRecoverLogicalData()

@@ -8,6 +8,7 @@ package renter
 // Download jobs are added to the heap via a function call.
 
 import (
+	"container/heap"
 	"errors"
 	"time"
 )
@@ -73,7 +74,13 @@ func (r *Renter) managedAcquireMemoryForDownloadChunk(udc *unfinishedDownloadChu
 
 	// The amount of memory required is equal minimum number of pieces plus the
 	// overdrive amount.
-	memoryRequired := (udc.staticOverdrive + udc.erasureCode.MinPieces())*udc.staticPieceSize
+	//
+	// TODO: This allocation assumes that the erasure coding does not need extra
+	// memory to decode a bunch of pieces. Optimized erasure coding will not
+	// need extra memory to decode a bunch of pieces, though I do not believe
+	// our erasure coding has been optimized around this yet, so we may actually
+	// go over the memory limits when we decode pieces.
+	memoryRequired := uint64(udc.staticOverdrive+udc.erasureCode.MinPieces()) * udc.staticPieceSize
 	return r.memoryManager.Request(memoryRequired)
 }
 
@@ -88,7 +95,7 @@ func (r *Renter) managedAddChunkToHeap(udc *unfinishedDownloadChunk) {
 // managedBlockUntilOnline will block until the renter is online. The renter
 // will appropriately handle incoming download requests and stop signals while
 // waiting.
-func (r *Renter) managedBlockUntillOnline() bool {
+func (r *Renter) managedBlockUntilOnline() bool {
 	for !r.g.Online() {
 		select {
 		case <-r.tg.StopChan():
@@ -159,14 +166,14 @@ LOOP:
 
 			// Distribute the chunk to workers, marking the number of workers
 			// that have received the work.
-			r.mu.Lock()
+			id := r.mu.Lock()
 			nextChunk.mu.Lock()
 			nextChunk.workersRemaining = len(r.workerPool)
 			nextChunk.mu.Unlock()
 			for _, worker := range r.workerPool {
 				worker.managedQueueDownloadChunk(nextChunk)
 			}
-			r.mu.Unlock()
+			r.mu.Unlock(id)
 		}
 
 		// Wait for more work.

@@ -2,37 +2,18 @@
 // network.
 package renter
 
-// CONCURRENCY PATTERNS: The renter has some complex concurrency patterns.
-// Preventing race conditions and deadlocks requires understanding the patterns.
-//
-// The renter itself has a lock that protects all internal state. The renter is
-// allowed to call out to the hostContractor while under lock, which means that
-// calls within the hostContractor should not ever leave the hostContractor -
-// external calls should be able to complete quickly, and without making any
-// external calls or calls that may acquire external locks.
-//
-// The renter has a bunch of worker objects. The worker objects have mutexes
-// which protect them, and the workers need to interact with the renter,
-// sometimes changing state which is prevented by locks. This means that the
-// renter itself can never interact with a worker while the renter is under
-// lock.
-
-// TODO: Change the upload loop to have an upload state, and make it so that
-// instead of occasionally rebuilding the whole file matrix it has just a
-// single matrix that it's constantly pulling chunks from. Have a separate loop
-// which goes through the files and adds them to the matrix. Have the loop
-// listen on the channel for new files, so that they can go directly into the
-// matrix.
+// NOTE: Some of the concurrency patterns in the renter are fairly complex. A
+// lot of this has been cleaned up, though some shadows of previous demons still
+// remain. Be careful when working with anything that involves concurrency.
 
 // TODO: Allow the 'baseMemory' to be set by the user.
 
-// TODO: Need some extra handling in the memory management scheme for the
-// situation where more memory is requested than 'baseMemory'. The memory should
-// be allocated, but only if no other memory has been allocated at all. Also
-// need the memory manager thing to have some way to prevent thread starvation,
-// currently if a series of concurrent threads requesting small amounts of
-// memory have continuous presence, threads needed a larger amount of memory
-// will be blocked permanenty.
+// TODO: The repair loop currently receives new upload jobs through a channel.
+// The download loop has a better model, a heap that can be pushed to and popped
+// from concurrently without needing complex channel communication. Migrating
+// the renter to this model should clean up some of the places where uploading
+// bottlenecks, and reduce the amount of channel-ninjitsu required to make the
+// uploading function.
 
 import (
 	"errors"
@@ -163,6 +144,13 @@ type trackedFile struct {
 
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
+//
+// TODO: Separate the workerPool to have its own mutex. The workerPool doesn't
+// interfere with any of the other fields in the renter, should be fine for it
+// to have a separate mutex, that way operations on the worker pool don't block
+// operations on other parts of the struct. If we're going to do it that way,
+// might make sense to split the worker pool off into it's own struct entirely
+// the same way that we split of the memoryManager entirely.
 type Renter struct {
 	// File management.
 	//
@@ -181,8 +169,8 @@ type Renter struct {
 	newUploads chan *file // Used to send new uploads to the upload heap.
 
 	// List of workers that can be used for uploading and/or downloading.
-	memoryManager   *memoryManager
-	workerPool      map[types.FileContractID]*worker
+	memoryManager *memoryManager
+	workerPool    map[types.FileContractID]*worker
 
 	// Utilities.
 	cs             modules.ConsensusSet
@@ -370,15 +358,15 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 
 		// Making newDownloads a buffered channel means that most of the time, a
 		// new download will trigger an unnecessary extra iteration of the
-		// download heap loop, popping a download chunk that's not there. But
-		// this is preferable to the alternative, where in rare cases the
-		// download heap will miss work altogether.
-		newDownloads: make(chan *[]unfinishedDownloadChunk, 1),
+		// download heap loop, searching for a chunk that's not there. This is
+		// preferable to the alternative, where in rare cases the download heap
+		// will miss work altogether.
+		newDownloads: make(chan struct{}, 1),
 		downloadHeap: new(downloadChunkHeap),
 
 		newUploads: make(chan *file),
 
-		workerPool:      make(map[types.FileContractID]*worker),
+		workerPool: make(map[types.FileContractID]*worker),
 
 		cs:             cs,
 		g:              g,

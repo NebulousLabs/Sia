@@ -22,6 +22,10 @@ type downloadPieceInfo struct {
 }
 
 // unfinishedDownloadChunk contains a chunk for a download that is in progress.
+//
+// TODO: Explore making workersStandby a heap sorted by latency or whatever
+// other metric the download is prioritizing (price, total system throughput,
+// etc.)
 type unfinishedDownloadChunk struct {
 	// Fetch + Write instructions - read only or otherwise thread safe.
 	destination downloadDestination // Where to write the recovered logical chunk.
@@ -44,6 +48,7 @@ type unfinishedDownloadChunk struct {
 	staticPriority      uint64
 
 	// Download chunk state - need mutex to access.
+	failed            bool      // Indicates if the chunk has been marked as failed.
 	physicalChunkData [][]byte  // Used to recover the logical data.
 	pieceUsage        []bool    // Which pieces are being actively fetched.
 	piecesCompleted   int       // Number of pieces that have successfully completed.
@@ -53,7 +58,7 @@ type unfinishedDownloadChunk struct {
 	workersStandby    []*worker // Set of workers that are able to work on this download, but are not needed unless other workers fail.
 
 	// Memory management variables.
-	memoryAllocated int
+	memoryAllocated uint64
 
 	// The download object, mostly to update download progress.
 	download *download
@@ -62,6 +67,7 @@ type unfinishedDownloadChunk struct {
 
 // fail will pass the error to the download and fail the download.
 func (udc *unfinishedDownloadChunk) fail(err error) {
+	udc.failed = true
 	udc.download.managedFail(fmt.Errorf("chunk %v failed", udc.staticChunkIndex))
 }
 
@@ -104,7 +110,7 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	if err != nil {
 		return errors.AddContext(err, "unable to write to download destination")
 	}
-	recoveryWriter = nil
+	recoverWriter = nil
 	udc.mu.Lock()
 	udc.recoveryComplete = true
 	udc.returnMemory()

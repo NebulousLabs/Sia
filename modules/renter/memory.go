@@ -23,17 +23,17 @@ import (
 // requests to go through even if there is not enough base memory.
 type memoryManager struct {
 	available uint64
-	base uint64
-	fifo []*memoryRequest
-	mu sync.Mutex
-	stop chan struct{}
+	base      uint64
+	fifo      []*memoryRequest
+	mu        sync.Mutex
+	stop      <-chan struct{}
 	underflow uint64
 }
 
 // memoryRequest is a single thread that is blocked while waiting for memory.
 type memoryRequest struct {
 	amount uint64
-	done chan struct{}
+	done   chan struct{}
 }
 
 // try will try to get the amount of memory requested from the manger, returning
@@ -54,7 +54,7 @@ func (mm *memoryManager) try(amount uint64) bool {
 		// request, allowing the request to succeed even though there is
 		// technically not enough total memory available for the request.
 		mm.available = 0
-		mm.underflow = amount-mm.base
+		mm.underflow = amount - mm.base
 		return true
 	}
 	return false
@@ -74,7 +74,7 @@ func (mm *memoryManager) Request(amount uint64) bool {
 	// There is not enough memory available for this request, join the fifo.
 	myRequest := &memoryRequest{
 		amount: amount,
-		done: make(chan struct{}),
+		done:   make(chan struct{}),
 	}
 	mm.fifo = append(mm.fifo, myRequest)
 	mm.mu.Unlock()
@@ -130,10 +130,10 @@ func (mm *memoryManager) Return(amount uint64) {
 }
 
 // newMemoryManager will create a memoryManager and return it.
-func newMemoryManager(baseMemory uint64, stopChan chan struct{}) *memoryManager {
+func newMemoryManager(baseMemory uint64, stopChan <-chan struct{}) *memoryManager {
 	return &memoryManager{
 		available: baseMemory,
-		base: baseMemory,
-		stop: stopChan,
+		base:      baseMemory,
+		stop:      stopChan,
 	}
 }

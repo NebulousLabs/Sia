@@ -77,9 +77,9 @@ func (f *file) numChunks() uint64 {
 	if f.size == 0 {
 		return 1
 	}
-	n := f.size / f.chunkSize()
+	n := f.size / f.staticChunkSize()
 	// last chunk will be padded, unless chunkSize divides file evenly.
-	if f.size%f.chunkSize() != 0 {
+	if f.size%f.staticChunkSize() != 0 {
 		n++
 	}
 	return n
