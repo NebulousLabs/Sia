@@ -41,11 +41,11 @@ type memoryRequest struct {
 // event that the attempt is successful, the internal state of the memory
 // manager will be updated to reflect the granted request.
 func (mm *memoryManager) try(amount uint64) bool {
-	if mm.available >= amount && len(mm.fifo) == 0 {
+	if mm.available >= amount {
 		// There is enough memory, decrement the memory and return.
 		mm.available -= amount
 		return true
-	} else if mm.available == mm.base && len(mm.fifo) == 0 {
+	} else if mm.available == mm.base {
 		// The amount of memory being requested is greater than the amount of
 		// memory available, but no memory is currently in use. Set the amount
 		// of memory available to zero and return.
@@ -66,7 +66,7 @@ func (mm *memoryManager) try(amount uint64) bool {
 func (mm *memoryManager) Request(amount uint64) bool {
 	// Try to request the memory.
 	mm.mu.Lock()
-	if mm.try(amount) {
+	if len(mm.fifo) == 0 && mm.try(amount) {
 		mm.mu.Unlock()
 		return true
 	}
@@ -94,13 +94,14 @@ func (mm *memoryManager) Request(amount uint64) bool {
 // now have enough memory to proceed.
 func (mm *memoryManager) Return(amount uint64) {
 	mm.mu.Lock()
+	defer mm.mu.Unlock()
+
 	// Add the remaining memory to the pool of available memory, clearing out
 	// the underflow if needed.
 	if mm.underflow > 0 && amount <= mm.underflow {
 		// Not even enough memory has been returned to clear the underflow.
 		// Reduce the underflow amount and return.
 		mm.underflow -= amount
-		mm.mu.Unlock()
 		return
 	} else if mm.underflow > 0 && amount > mm.underflow {
 		amount -= mm.underflow

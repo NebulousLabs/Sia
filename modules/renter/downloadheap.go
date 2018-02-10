@@ -84,9 +84,9 @@ func (r *Renter) managedAcquireMemoryForDownloadChunk(udc *unfinishedDownloadChu
 	return r.memoryManager.Request(memoryRequired)
 }
 
-// managedAddChunkToHeap will add a chunk to the download heap in a thread-safe
-// way.
-func (r *Renter) managedAddChunkToHeap(udc *unfinishedDownloadChunk) {
+// managedAddChunkToDownloadHeap will add a chunk to the download heap in a
+// thread-safe way.
+func (r *Renter) managedAddChunkToDownloadHeap(udc *unfinishedDownloadChunk) {
 	r.downloadHeapMu.Lock()
 	r.downloadHeap.Push(udc)
 	r.downloadHeapMu.Unlock()

@@ -112,8 +112,10 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedChunk) bool {
 		}
 	}
 	// Return the released memory.
-	r.memoryManager.Return(memoryFreed)
-	chunk.memoryReleased += memoryFreed
+	if memoryFreed > 0 {
+		r.memoryManager.Return(memoryFreed)
+		chunk.memoryReleased += memoryFreed
+	}
 
 	// Distribute the chunk to the workers.
 	r.managedDistributeChunkToWorkers(chunk)

@@ -148,6 +148,9 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 	// For each chunk, assemble a mapping from the contract id to the index of
 	// the piece within the chunk that the contract is responsible for.
 	chunkMaps := make([]map[types.FileContractID]downloadPieceInfo, maxChunk-minChunk+1)
+	for i := range chunkMaps {
+		chunkMaps[i] = make(map[types.FileContractID]downloadPieceInfo)
+	}
 	for id, contract := range params.file.contracts {
 		resolvedID := r.hostContractor.ResolveID(id)
 		for _, piece := range contract.Pieces {
@@ -227,9 +230,9 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 
 		// Add this chunk to the chunk heap, and notify the download loop that
 		// there is work to do.
-		r.managedAddChunkToHeap(udc)
+		r.managedAddChunkToDownloadHeap(udc)
 		select {
-		case <-r.newDownloads:
+		case r.newDownloads <-struct{}{}:
 		default:
 		}
 	}
@@ -290,7 +293,7 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 		dw = newDownloadDestinationHTTPWriter(p.Httpwriter)
 		p.Destination = "http stream"
 	} else {
-		osFile, err := os.Open(p.Destination)
+		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
 		if err != nil {
 			return err
 		}
@@ -341,10 +344,12 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 		downloads[i] = modules.DownloadInfo{
 			// TODO: Add completed value to modules.DownloadInfo Completed:   d.downloadComplete,
 			Destination: d.destinationString,
-			Error:       d.Err().Error(),
 			Filesize:    d.staticLength,
 			SiaPath:     d.staticSiapath,
 			StartTime:   d.staticStartTime,
+		}
+		if d.Err() != nil {
+			downloads[i].Error = d.Err().Error()
 		}
 		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)
 	}
