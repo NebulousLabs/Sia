@@ -55,8 +55,8 @@ type unfinishedChunk struct {
 	memoryNeeded   uint64 // memory needed in bytes
 	memoryReleased uint64 // memory that has been returned of memoryNeeded
 	minimumPieces  int    // number of pieces required to recover the file.
-	offset         int64 // Offset of the chunk within the file.
-	piecesNeeded   int // number of pieces to achieve a 100% complete upload
+	offset         int64  // Offset of the chunk within the file.
+	piecesNeeded   int    // number of pieces to achieve a 100% complete upload
 
 	// The logical data is the data that is presented to the user when the user
 	// requests the chunk. The physical data is all of the pieces that get

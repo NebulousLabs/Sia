@@ -18,26 +18,30 @@ import (
 type (
 	// A download is a file download that has been queued by the renter.
 	download struct {
-		atomicDataReceived  uint64 // incremented as data comes in, even if that data is redundant, may go over 100% file progress
-		atomicDataCompleted uint64 // incremented as data completes, will stop at 100% file progress
+		// Data progress variables.
+		atomicDataReceived        uint64 // incremented as data completes, will stop at 100% file progress
+		atomicTotalDataTransfered uint64 // incremented as data arrives, includes overdrive, contract negotitiaon, etc.
 
-		// Progress variables.
+		// Other progress variables.
 		chunksRemaining uint64        // Number of chunks whose downloads are incomplete.
 		completeChan    chan struct{} // Closed once the download is complete.
 		err             error         // Only set if there was an error which prevented the download from completing.
 
 		// Timestamp information.
-		completeTime    time.Time
+		endTime         time.Time
 		staticStartTime time.Time
 
-		// Static information about the file - can be read without a lock.
-		destination         downloadDestination
-		destinationString   string // The string reported to the user to indicate the download's destination.
+		// Basic information about the file.
+		destination       downloadDestination
+		destinationString string // The string reported to the user to indicate the download's destination.
+		destinationType   string // "memory buffer", "http stream", "file", etc.
+		staticLength      uint64 // Length to download starting from the offset.
+		staticOffset      uint64 // Offset within the file to start the download.
+		staticSiaPath     string
+
+		// Retrieval settings for the file.
 		staticLatencyTarget uint64 // In milliseconds. Lower latency results in lower total system throughput.
-		staticLength        uint64 // Length to download starting from the offset.
-		staticOffset        uint64 // Offset within the file to start the download.
 		staticOverdrive     int    // How many extra hosts to download from. Reduces latency at the cost of lower total system throughput.
-		staticSiapath       string
 		staticPriority      uint64 // Downloads with higher priority will complete first.
 
 		// Utilities.
@@ -134,7 +138,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		staticLength:        params.length,
 		staticOffset:        params.offset,
 		staticOverdrive:     params.overdrive,
-		staticSiapath:       params.file.name,
+		staticSiaPath:       params.file.name,
 		staticPriority:      params.priority,
 
 		log:           r.log,
@@ -211,7 +215,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		}
 		// Set the fetchLength - the number of bytes to fetch within the chunk
 		// that we start downloading from.
-		if i == maxChunk && (params.length+params.offset) % params.file.staticChunkSize() != 0 {
+		if i == maxChunk && (params.length+params.offset)%params.file.staticChunkSize() != 0 {
 			udc.staticFetchLength = ((params.length + params.offset) % params.file.staticChunkSize()) - udc.staticFetchOffset
 		} else {
 			udc.staticFetchLength = params.file.staticChunkSize() - udc.staticFetchOffset
@@ -232,7 +236,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		// there is work to do.
 		r.managedAddChunkToDownloadHeap(udc)
 		select {
-		case r.newDownloads <-struct{}{}:
+		case r.newDownloads <- struct{}{}:
 		default:
 		}
 	}
@@ -243,10 +247,10 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
-	file, exists := r.files[p.Siapath]
+	file, exists := r.files[p.SiaPath]
 	r.mu.RUnlock(lockID)
 	if !exists {
-		return fmt.Errorf("no file with that path: %s", p.Siapath)
+		return fmt.Errorf("no file with that path: %s", p.SiaPath)
 	}
 
 	// Validate download parameters.
@@ -340,18 +344,34 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	for i := range r.downloadQueue {
 		// Order from most recent to least recent.
 		d := r.downloadQueue[len(r.downloadQueue)-i-1]
-
+		d.mu.Lock()
 		downloads[i] = modules.DownloadInfo{
-			// TODO: Add completed value to modules.DownloadInfo Completed:   d.downloadComplete,
-			Destination: d.destinationString,
-			Filesize:    d.staticLength,
-			SiaPath:     d.staticSiapath,
-			StartTime:   d.staticStartTime,
+			Destination:     d.destinationString,
+			DestinationType: d.destinationType,
+			Length:          d.staticLength,
+			Offset:          d.staticOffset,
+			SiaPath:         d.staticSiaPath,
+
+			EndTime:             d.endTime,
+			Received:            atomic.LoadUint64(&d.atomicDataReceived),
+			StartTime:           d.staticStartTime,
+			TotalDataTransfered: atomic.LoadUint64(&d.atomicTotalDataTransfered),
 		}
+		// Need to listen on the completed channel to know if the download has
+		// completed.
+		select {
+		case <-d.completeChan:
+			downloads[i].Completed = true
+		default:
+			downloads[i].Completed = false
+		}
+		// Need to check if the error is nil before setting the error string.
 		if d.Err() != nil {
 			downloads[i].Error = d.Err().Error()
+		} else {
+			downloads[i].Error = ""
 		}
-		downloads[i].Received = atomic.LoadUint64(&d.atomicDataReceived)
+		d.mu.Unlock()
 	}
 	return downloads
 }

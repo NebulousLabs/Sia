@@ -6,6 +6,7 @@ package renter
 
 import (
 	"errors"
+	"sync/atomic"
 )
 
 // cleanUp will check if the download has failed, and if not it will add any
@@ -27,7 +28,7 @@ func (udc *unfinishedDownloadChunk) cleanUp() {
 
 	// Check if standby workers are required, and add them if so.
 	chunkComplete := udc.piecesCompleted >= udc.erasureCode.MinPieces()
-	desiredPiecesRegistered := udc.erasureCode.MinPieces()+udc.staticOverdrive-udc.piecesCompleted
+	desiredPiecesRegistered := udc.erasureCode.MinPieces() + udc.staticOverdrive - udc.piecesCompleted
 	if !chunkComplete && udc.piecesRegistered < desiredPiecesRegistered {
 		for i := 0; i < len(udc.workersStandby); i++ {
 			udc.workersStandby[i].managedQueueDownloadChunk(udc)
@@ -157,6 +158,12 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 		udc.managedUnregisterWorker(w)
 		return
 	}
+	// TODO: Instead of adding the whole sector after the download completes,
+	// have the 'd.Sector' call add to this value ongoing as the sector comes
+	// in. Perhaps even include the data from creating the downloader and other
+	// data sent to and received from the host (like signatures) that aren't
+	// actually payload data.
+	atomic.AddUint64(&udc.download.atomicTotalDataTransfered, udc.staticPieceSize)
 
 	// Mark the piece as completed. Perform chunk recovery if we have enough
 	// pieces to do so. Chunk recovery is an expensive operation that should be

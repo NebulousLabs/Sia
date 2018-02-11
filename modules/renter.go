@@ -55,12 +55,18 @@ type ContractUtility struct {
 // DownloadInfo provides information about a file that has been requested for
 // download.
 type DownloadInfo struct {
-	SiaPath     string    `json:"siapath"`
-	Destination string    `json:"destination"`
-	Filesize    uint64    `json:"filesize"`
-	Received    uint64    `json:"received"`
-	StartTime   time.Time `json:"starttime"`
-	Error       string    `json:"error"`
+	Destination     string `json:"destination"`     // The destination of the download.
+	DestinationType string `json:"destinationtype"` // Can be "file", "memory buffer", or "http stream".
+	Length          uint64 `json:"length"`          // The length requested for the download.
+	Offset          uint64 `json:"offset"`          // The offset within the siafile requested for the download.
+	SiaPath         string `json:"siapath"`         // The siapath of the file used for the download.
+
+	Completed           bool      `json:"completed"`           // Whether or not the download has completed.
+	EndTime             time.Time `json:"endtime"`             // The time when the download fully completed.
+	Error               string    `json:"error"`               // Will be the empty string unless there was an error.
+	Received            uint64    `json:"received"`            // Amount of data confirmed and decoded.
+	StartTime           time.Time `json:"starttime"`           // The time when the download was started.
+	TotalDataTransfered uint64    `json:"totaldatatransfered"` // The total amount of data transfered, including negotiation, overdrive, etc.
 }
 
 // DownloadWriter provides an interface which all output writers have to implement.
@@ -353,6 +359,6 @@ type RenterDownloadParameters struct {
 	Httpwriter  io.Writer
 	Length      uint64
 	Offset      uint64
-	Siapath     string
+	SiaPath     string
 	Destination string
 }
