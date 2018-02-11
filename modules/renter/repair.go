@@ -18,6 +18,9 @@ package renter
 // complete in some way before we send off the next round of upload jobs.
 // Otherwise we might end up with simultenously overlapping repair jobs.
 
+// TODO: Renter will try to download to repair a piece even if there are not
+// enough workers to make any progress on the repair.  This should be fixed.
+
 import (
 	"container/heap"
 	"sync"
@@ -52,7 +55,7 @@ type unfinishedChunk struct {
 	memoryNeeded   uint64 // memory needed in bytes
 	memoryReleased uint64 // memory that has been returned of memoryNeeded
 	minimumPieces  int    // number of pieces required to recover the file.
-	offset         int64
+	offset         int64 // Offset of the chunk within the file.
 	piecesNeeded   int // number of pieces to achieve a 100% complete upload
 
 	// The logical data is the data that is presented to the user when the user

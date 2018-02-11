@@ -81,12 +81,28 @@ func (r *Renter) managedAcquireMemoryForDownloadChunk(udc *unfinishedDownloadChu
 	// our erasure coding has been optimized around this yet, so we may actually
 	// go over the memory limits when we decode pieces.
 	memoryRequired := uint64(udc.staticOverdrive+udc.erasureCode.MinPieces()) * udc.staticPieceSize
+	udc.memoryAllocated = memoryRequired
 	return r.memoryManager.Request(memoryRequired)
 }
 
 // managedAddChunkToDownloadHeap will add a chunk to the download heap in a
 // thread-safe way.
 func (r *Renter) managedAddChunkToDownloadHeap(udc *unfinishedDownloadChunk) {
+	// The purpose of the chunk heap is to block work from happening until there
+	// is enough memory available to send off the work. If the chunk does not
+	// need any memory to be allocated, it should be given to the workers
+	// directly and immediately. This is actually a requirement in our memory
+	// model. If a download chunk does not need memory, that means that the
+	// memory has already been allocated and will actually be blocking new
+	// memory from being allocated until the download is complete. If the job is
+	// put in the heap and ends up behind a job which get stuck allocating
+	// memory, you get a deadlock.
+	if !udc.staticNeedsMemory {
+		r.managedDistributeDownloadChunkToWorkers(udc)
+		return
+	}
+
+	// Put the chunk into the chunk heap.
 	r.downloadHeapMu.Lock()
 	r.downloadHeap.Push(udc)
 	r.downloadHeapMu.Unlock()
@@ -104,6 +120,28 @@ func (r *Renter) managedBlockUntilOnline() bool {
 		}
 	}
 	return true
+}
+
+// managedDistributeDownloadChunkToWorkers will take a chunk and pass it out to
+// all of the workers.
+func (r *Renter) managedDistributeDownloadChunkToWorkers(udc *unfinishedDownloadChunk) {
+	// Distribute the chunk to workers, marking the number of workers
+	// that have received the work.
+	id := r.mu.Lock()
+	udc.mu.Lock()
+	udc.workersRemaining = len(r.workerPool)
+	udc.mu.Unlock()
+	for _, worker := range r.workerPool {
+		worker.managedQueueDownloadChunk(udc)
+	}
+	r.mu.Unlock(id)
+	// Return any memory that was not used up by workers in the
+	// workerPool. Typically this call will do nothing, but if for
+	// example the worker pool is empty, this call is required to clean
+	// up the memory.
+	udc.mu.Lock()
+	udc.returnMemory()
+	udc.mu.Unlock()
 }
 
 // managedNextDownloadChunk will fetch the next chunk from the download heap. If
@@ -163,17 +201,8 @@ LOOP:
 				// The renter shut down before memory could be acquired.
 				return
 			}
-
-			// Distribute the chunk to workers, marking the number of workers
-			// that have received the work.
-			id := r.mu.Lock()
-			nextChunk.mu.Lock()
-			nextChunk.workersRemaining = len(r.workerPool)
-			nextChunk.mu.Unlock()
-			for _, worker := range r.workerPool {
-				worker.managedQueueDownloadChunk(nextChunk)
-			}
-			r.mu.Unlock(id)
+			// Distribute the chunk to workers.
+			r.managedDistributeDownloadChunkToWorkers(nextChunk)
 		}
 
 		// Wait for more work.

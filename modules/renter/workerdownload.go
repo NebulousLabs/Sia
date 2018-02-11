@@ -53,7 +53,7 @@ func (udc *unfinishedDownloadChunk) removeWorker() {
 
 	// Check if the chunk has failed. If so, fail the download and return any
 	// remaining memory.
-	if udc.workersRemaining+udc.piecesCompleted < udc.erasureCode.MinPieces()-1 && !udc.failed {
+	if udc.workersRemaining+udc.piecesCompleted < udc.erasureCode.MinPieces() && !udc.failed {
 		udc.fail(errors.New("not enough workers to continue download"))
 		return
 	}

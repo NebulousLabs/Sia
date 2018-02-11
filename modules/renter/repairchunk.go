@@ -36,6 +36,17 @@ func (r *Renter) managedDistributeChunkToWorkers(uc *unfinishedChunk) {
 // download to the renter's downloader, and then using the data that gets
 // returned.
 func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
+	//  Determine what the download length should be. Normally it is just the
+	//  chunk size, but if this is the last chunk we need to download less
+	//  because the file is not that large.
+	//
+	// TODO: There is a disparity in the way that the upload and download code
+	// handle the last chunk, which may not be full sized.
+	downloadLength := chunk.length
+	if chunk.index == chunk.renterFile.numChunks()-1 && chunk.renterFile.size%chunk.length != 0 {
+		downloadLength = chunk.renterFile.size % chunk.length
+	}
+
 	// Create the download.
 	buf := downloadDestinationBuffer(make([]byte, chunk.length))
 	d, err := r.newDownload(downloadParams{
@@ -43,7 +54,7 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 		file:        chunk.renterFile,
 
 		latencyTarget: 200e3, // No need to rush latency on repair downloads.
-		length:        chunk.length,
+		length:        downloadLength,
 		needsMemory:   false, // We already requested memory, the download memory fits inside of that.
 		offset:        uint64(chunk.offset),
 		overdrive:     0, // No need to rush the latency on repair downloads.

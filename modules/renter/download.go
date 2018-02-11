@@ -211,7 +211,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		}
 		// Set the fetchLength - the number of bytes to fetch within the chunk
 		// that we start downloading from.
-		if i == maxChunk {
+		if i == maxChunk && (params.length+params.offset) % params.file.staticChunkSize() != 0 {
 			udc.staticFetchLength = ((params.length + params.offset) % params.file.staticChunkSize()) - udc.staticFetchOffset
 		} else {
 			udc.staticFetchLength = params.file.staticChunkSize() - udc.staticFetchOffset

@@ -65,9 +65,16 @@ type unfinishedDownloadChunk struct {
 	mu       sync.Mutex
 }
 
-// fail will pass the error to the download and fail the download.
+// fail will set the chunk status to failed. The physical chunk memory will be
+// wiped and any allocation will be returned to the renter. The download as a
+// whole will be failed as well.
 func (udc *unfinishedDownloadChunk) fail(err error) {
 	udc.failed = true
+	udc.recoveryComplete = true
+	for i := range udc.physicalChunkData {
+		udc.physicalChunkData[i] = nil
+	}
+	udc.returnMemory()
 	udc.download.managedFail(fmt.Errorf("chunk %v failed", udc.staticChunkIndex))
 }
 
@@ -86,6 +93,7 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 		key := deriveKey(udc.masterKey, udc.staticChunkIndex, uint64(i))
 		decryptedPiece, err := key.DecryptBytes(udc.physicalChunkData[i])
 		if err != nil {
+			udc.fail(err)
 			udc.mu.Unlock()
 			return err
 		}
@@ -93,9 +101,13 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	}
 
 	// Recover the pieces into the logical chunk data.
+	//
+	// TODO: Instead of using the recoverWriter, just write directly to the
+	// WriteAt interface we have.
 	recoverWriter := new(bytes.Buffer)
 	err := udc.erasureCode.Recover(udc.physicalChunkData, udc.staticFetchLength, recoverWriter)
 	if err != nil {
+		udc.fail(err)
 		udc.mu.Unlock()
 		return errors.AddContext(err, "unable to recover chunk")
 	}
@@ -108,6 +120,7 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	// Write the bytes to the requested output.
 	_, err = udc.destination.WriteAt(recoverWriter.Bytes(), udc.staticWriteOffset)
 	if err != nil {
+		udc.fail(err)
 		return errors.AddContext(err, "unable to write to download destination")
 	}
 	recoverWriter = nil
