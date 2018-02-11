@@ -130,18 +130,12 @@ func (r *Renter) managedDistributeDownloadChunkToWorkers(udc *unfinishedDownload
 	id := r.mu.Lock()
 	udc.mu.Lock()
 	udc.workersRemaining = len(r.workerPool)
+	udc.cleanUp() // Return any memory that we don't need if e.g. not enough workers for overdrive.
 	udc.mu.Unlock()
 	for _, worker := range r.workerPool {
 		worker.managedQueueDownloadChunk(udc)
 	}
 	r.mu.Unlock(id)
-	// Return any memory that was not used up by workers in the
-	// workerPool. Typically this call will do nothing, but if for
-	// example the worker pool is empty, this call is required to clean
-	// up the memory.
-	udc.mu.Lock()
-	udc.returnMemory()
-	udc.mu.Unlock()
 }
 
 // managedNextDownloadChunk will fetch the next chunk from the download heap. If

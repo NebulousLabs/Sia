@@ -74,7 +74,6 @@ func (udc *unfinishedDownloadChunk) fail(err error) {
 	for i := range udc.physicalChunkData {
 		udc.physicalChunkData[i] = nil
 	}
-	udc.returnMemory()
 	udc.download.managedFail(fmt.Errorf("chunk %v failed", udc.staticChunkIndex))
 }
 
@@ -124,23 +123,26 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 		return errors.AddContext(err, "unable to write to download destination")
 	}
 	recoverWriter = nil
+
+	// Now that the download has completed and been flushed from memory, we can
+	// release the memory that was used to store the data. Call 'cleanUp' to
+	// trigger the memory cleanup along with some extra checks that everything
+	// is consistent.
 	udc.mu.Lock()
 	udc.recoveryComplete = true
-	udc.returnMemory()
+	udc.cleanUp()
 	udc.mu.Unlock()
 
 	// Update the download and signal completion of this chunk.
 	udc.download.mu.Lock()
+	defer udc.download.mu.Unlock()
 	udc.download.chunksRemaining--
-	remaining := udc.download.chunksRemaining
-	udc.download.mu.Unlock()
 	atomic.AddUint64(&udc.download.atomicDataCompleted, udc.staticFetchLength)
-
-	// Check if the download as a whole has completed.
-	if remaining != 0 {
-		// Download not yet complete.
-		return nil
+	if udc.download.chunksRemaining == 0 {
+		// Download is complete, send out a notification and close the
+		// destination writer.
+		close(udc.download.completeChan)
+		return udc.download.destination.Close()
 	}
-	close(udc.download.completeChan)
-	return udc.download.destination.Close()
+	return nil
 }

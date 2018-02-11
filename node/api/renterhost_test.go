@@ -1426,7 +1426,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 	// Try downloading the file; should fail
 	downpath := filepath.Join(st.dir, "testdown.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
-	if err == nil || !strings.Contains(err.Error(), "insufficient hosts") {
+	if err == nil || !strings.Contains(err.Error(), "download failed") {
 		t.Fatal("expected insufficient hosts error, got", err)
 	}
 }

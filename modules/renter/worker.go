@@ -89,7 +89,11 @@ func (w *worker) onUploadCooldown() bool {
 // managedQueueDownloadChunk adds a chunk to the worker's queue.
 func (w *worker) managedQueueDownloadChunk(udc *unfinishedDownloadChunk) {
 	// Drop the chunk if the worker is terminated or on cooldown.
-	if w.downloadTerminated || w.onDownloadCooldown() {
+	w.mu.Lock()
+	terminated := w.downloadTerminated
+	onCooldown := w.onDownloadCooldown()
+	w.mu.Unlock()
+	if terminated || onCooldown {
 		udc.mu.Lock()
 		udc.removeWorker()
 		udc.mu.Unlock()
@@ -135,22 +139,16 @@ func (w *worker) managedQueueUploadChunk(uc *unfinishedChunk) {
 //
 // Concurrency in this function is a little funky because we do not want to be
 // holding the lock when we call 'processDownloadChunk'.
-func (w *worker) managedNextDownloadChunk() (nextChunk *unfinishedDownloadChunk) {
+func (w *worker) managedNextDownloadChunk() *unfinishedDownloadChunk {
 	w.mu.Lock()
-	for len(w.downloadChunks) > 0 {
-		nextDownloadChunk := w.downloadChunks[0]
-		w.downloadChunks = w.downloadChunks[1:]
+	if len(w.downloadChunks) == 0 {
 		w.mu.Unlock()
-		nextDownloadChunk = w.managedProcessDownloadChunk(nextDownloadChunk)
-		if nextDownloadChunk != nil {
-			return nextDownloadChunk
-		}
-		// TODO: The structure of this loop means that in the final iteration,
-		// we grab one more lock than we need to.
-		w.mu.Lock()
+		return nil
 	}
+	nextChunk := w.downloadChunks[0]
+	w.downloadChunks = w.downloadChunks[1:]
 	w.mu.Unlock()
-	return nil
+	return nextChunk
 }
 
 // managedNextUploadChunk will pull the next potential chunk out of the worker's

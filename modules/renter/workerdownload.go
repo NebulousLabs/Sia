@@ -3,14 +3,38 @@ package renter
 // workerdownload.go is responsible for coordinating the actual fetching of
 // pieces, determining when to add standby workers, when to perform repairs, and
 // coordinating resource management between the workers operating on a chunk.
-//
-// NOTE: the 'piecesRegistered' field of the unfinishedDownloadChunk will only
-// be decremented if a piece download fails or is un-needed to perform recovery.
-// Otherwise it just keeps incrementing.
 
 import (
 	"errors"
 )
+
+// cleanUp will check if the download has failed, and if not it will add any
+// standby workers which need to be added. Calling cleanUp too many times is not
+// harmful, however missing a call to cleanUp can lead to dealocks.
+//
+// NOTE: The fact that calls to cleanUp must be actively managed is probably the
+// weakest part of the design of the download code.
+func (udc *unfinishedDownloadChunk) cleanUp() {
+	// Return any unused memory.
+	udc.returnMemory()
+
+	// Check if the chunk has failed. If so, fail the download and return any
+	// remaining memory.
+	if udc.workersRemaining+udc.piecesCompleted < udc.erasureCode.MinPieces() && !udc.failed {
+		udc.fail(errors.New("not enough workers to continue download"))
+		return
+	}
+
+	// Check if standby workers are required, and add them if so.
+	chunkComplete := udc.piecesCompleted >= udc.erasureCode.MinPieces()
+	desiredPiecesRegistered := udc.erasureCode.MinPieces()+udc.staticOverdrive-udc.piecesCompleted
+	if !chunkComplete && udc.piecesRegistered < desiredPiecesRegistered {
+		for i := 0; i < len(udc.workersStandby); i++ {
+			udc.workersStandby[i].managedQueueDownloadChunk(udc)
+		}
+		udc.workersStandby = udc.workersStandby[:0]
+	}
+}
 
 // returnMemory will check on the status of all the workers and pieces, and
 // determine how much memory is safe to return to the renter. This should be
@@ -49,22 +73,7 @@ func (udc *unfinishedDownloadChunk) returnMemory() {
 // This function should be called any time that a worker completes work.
 func (udc *unfinishedDownloadChunk) removeWorker() {
 	udc.workersRemaining--
-	udc.returnMemory()
-
-	// Check if the chunk has failed. If so, fail the download and return any
-	// remaining memory.
-	if udc.workersRemaining+udc.piecesCompleted < udc.erasureCode.MinPieces() && !udc.failed {
-		udc.fail(errors.New("not enough workers to continue download"))
-		return
-	}
-
-	// Add the chunk as work to any standby workers.
-	if udc.workersRemaining+udc.piecesCompleted-len(udc.workersStandby) < udc.erasureCode.MinPieces()+udc.staticOverdrive {
-		for i := 0; i < len(udc.workersStandby); i++ {
-			udc.workersStandby[i].managedQueueDownloadChunk(udc)
-		}
-		udc.workersStandby = udc.workersStandby[:0]
-	}
+	udc.cleanUp()
 }
 
 // managedUnregisterWorker will remove the worker from an unfinished download
@@ -129,6 +138,13 @@ func (w *worker) managedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfi
 
 // managedDownload will perform some download work.
 func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
+	// Process this chunk. If the worker is not fit to do the download, or is
+	// put on standby, 'nil' will be returned.
+	udc = w.managedProcessDownloadChunk(udc)
+	if udc == nil {
+		return
+	}
+
 	// Fetch the sector.
 	d, err := w.renter.hostContractor.Downloader(w.contract.ID, w.renter.tg.StopChan())
 	if err != nil {
@@ -142,6 +158,9 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 		return
 	}
 
+	// Mark the piece as completed. Perform chunk recovery if we have enough
+	// pieces to do so. Chunk recovery is an expensive operation that should be
+	// performed in a separate thread as to not block the worker.
 	udc.mu.Lock()
 	udc.piecesCompleted++
 	udc.piecesRegistered--
