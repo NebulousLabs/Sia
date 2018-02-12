@@ -97,6 +97,24 @@ package renter
 // of downloading that gets set by the user through the API on a per-file basis
 // instead of set by default.
 
+// TODO: I tried to write the code such that the transition to true partial
+// downloads would be as seamless as possible, but there's a lot of work that
+// still needs to be done to make that fully possible. The most disruptive thing
+// probably is the place where we call 'Sector' in worker.managedDownload.
+// That's going to need to be changed to a partial sector. This is probably
+// going to result in downloading that's 64-byte aligned instead of perfectly
+// byte-aligned. Further, the encryption and erasure coding may also have
+// alignment requirements which interefere with how the call to Sector can work.
+// So you need to make sure that in 'managedDownload' you download at least
+// enough data to fit the alignment requirements of all 3 steps (download from
+// host, encryption, erasure coding). After the logical data has been recovered,
+// we slice it to whatever is meant to be written to the underlying
+// downloadWriter, that code is going to need to be adjusted as well to slice
+// things in the right way.
+//
+// Overall I don't think it's going to be all that difficult, but it's not
+// nearly as clean-cut as some of the other potential extensions that we can do.
+
 import (
 	"fmt"
 	"os"
