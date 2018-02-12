@@ -22,7 +22,7 @@ type (
 	// ObjectID is the ID of an object such as siacoin output and file
 	// contracts, and is used to see if there is are conflicts or overlaps within
 	// the transaction pool.
-	ObjectID         crypto.Hash
+	ObjectID crypto.Hash
 	// TransactionSetID is the hash of a transaction set.
 	TransactionSetID crypto.Hash
 

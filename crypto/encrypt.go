@@ -20,8 +20,8 @@ const (
 )
 
 var (
-	// ErrInsufficientLen is an error when supplied ciphertext is not 
-        // long enough to contain a nonce.
+	// ErrInsufficientLen is an error when supplied ciphertext is not
+	// long enough to contain a nonce.
 	ErrInsufficientLen = errors.New("supplied ciphertext is not long enough to contain a nonce")
 )
 
@@ -100,7 +100,7 @@ func (c Ciphertext) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]byte(c))
 }
 
-// UnmarshalJSON parses the JSON-encoded b and returns an instance of 
+// UnmarshalJSON parses the JSON-encoded b and returns an instance of
 // CipherText.
 func (c *Ciphertext) UnmarshalJSON(b []byte) error {
 	var umarB []byte
