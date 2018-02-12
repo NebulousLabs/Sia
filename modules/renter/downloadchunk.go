@@ -116,7 +116,7 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 
 	// Write the bytes to the requested output.
 	start := udc.staticFetchOffset
-	end := udc.staticFetchOffset+udc.staticFetchLength
+	end := udc.staticFetchOffset + udc.staticFetchLength
 	_, err = udc.destination.WriteAt(recoverWriter.Bytes()[start:end], udc.staticWriteOffset)
 	if err != nil {
 		udc.fail(err)

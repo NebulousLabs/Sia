@@ -50,9 +50,9 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedChunk) error {
 	// Create the download.
 	buf := downloadDestinationBuffer(make([]byte, chunk.length))
 	d, err := r.newDownload(downloadParams{
-		destination: buf,
+		destination:     buf,
 		destinationType: "buffer",
-		file:        chunk.renterFile,
+		file:            chunk.renterFile,
 
 		latencyTarget: 200e3, // No need to rush latency on repair downloads.
 		length:        downloadLength,
