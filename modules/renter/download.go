@@ -1,7 +1,39 @@
 package renter
 
-// TODO: There are some magic numbers in this file, particularly with regards to
-// latency and overdrive. They are all marked with respective TODOs.
+// By default, the download code organizes itself around having maximum possible
+// throughput. That is, it is highly parallel, and exploits that parallelism as
+// efficiently and effectively as possible. The hostdb does a good of selecting
+// for hosts that have good traits, so we can generally assume that every host
+// or worker at our disposable is reasonably effective in all dimensions, and
+// that the overall selection is generally geared towards the user's
+// preferences.
+//
+// We can leverage the standby workers in each unfinishedDownloadChunk to
+// emphasize various traits. For example, if we want to prioritize latency,
+// we'll put a filter in the 'managedProcessDownloadChunk' function that has a
+// worker go standby instead of accept a chunk if the latency is higher than the
+// targeted latency. These filters can target other traits as well, such as
+// price and total throughput.
+
+// TODO: One of the biggest requested features for users is to improve the
+// latency of the system. The biggest fruit actually doesn't happen here, right
+// now the hostdb doesn't discriminate based on latency at all, and simply
+// adding some sort of latency scoring will probably be the biggest thing that
+// we can do to improve overall file latency.
+//
+// After we do that, the second most important thing that we can do is enable
+// partial downloads. It's hard to have a low latency when to get any data back
+// at all you need to download a full 40 MiB. If we can leverage partial
+// downloads to drop that to something like 256kb, we'll get much better overall
+// latency for small files and for starting video streams.
+//
+// After both of those, we can leverage worker latency discrimination. We can
+// add code to 'managedProcessDownloadChunk' to put a worker on standby
+// initially instead of have it grab a piece if the latency of the worker is
+// higher than the faster workers. This will prevent the slow workers from
+// bottlenecking a chunk that we are trying to download quickly, though it will
+// harm overall system throughput because it means that the slower workers will
+// idle some of the time.
 
 import (
 	"fmt"
@@ -22,8 +54,8 @@ type (
 	// A download is a file download that has been queued by the renter.
 	download struct {
 		// Data progress variables.
-		atomicDataReceived        uint64 // incremented as data completes, will stop at 100% file progress
-		atomicTotalDataTransfered uint64 // incremented as data arrives, includes overdrive, contract negotitiaon, etc.
+		atomicDataReceived        uint64 // Incremented as data completes, will stop at 100% file progress.
+		atomicTotalDataTransfered uint64 // Incremented as data arrives, includes overdrive, contract negotitiaon, etc.
 
 		// Other progress variables.
 		chunksRemaining uint64        // Number of chunks whose downloads are incomplete.
@@ -31,8 +63,8 @@ type (
 		err             error         // Only set if there was an error which prevented the download from completing.
 
 		// Timestamp information.
-		endTime         time.Time
-		staticStartTime time.Time
+		endTime         time.Time // Set immediately before closing 'completeChan'.
+		staticStartTime time.Time // Set immediately when the download object is created.
 
 		// Basic information about the file.
 		destination       downloadDestination
@@ -40,17 +72,17 @@ type (
 		destinationType   string // "memory buffer", "http stream", "file", etc.
 		staticLength      uint64 // Length to download starting from the offset.
 		staticOffset      uint64 // Offset within the file to start the download.
-		staticSiaPath     string
+		staticSiaPath     string // The path of the siafile at the time the download started.
 
 		// Retrieval settings for the file.
 		staticLatencyTarget uint64 // In milliseconds. Lower latency results in lower total system throughput.
-		staticOverdrive     int    // How many extra hosts to download from. Reduces latency at the cost of lower total system throughput.
+		staticOverdrive     int    // How many extra pieces to download to prevent slow hosts from being a bottleneck.
 		staticPriority      uint64 // Downloads with higher priority will complete first.
 
 		// Utilities.
 		log           *persist.Logger // Same log as the renter.
-		memoryManager *memoryManager
-		mu            sync.Mutex
+		memoryManager *memoryManager // Same memoryManager used across the renter.
+		mu            sync.Mutex // Unique to the download object.
 	}
 
 	// downloadParams is the set of parameters to use when downloading a file.
@@ -64,14 +96,14 @@ type (
 		length        uint64 // Length of download. Cannot be 0.
 		needsMemory   bool   // Whether new memory needs to be allocated to perform the download.
 		offset        uint64 // Offset within the file to start the download. Must be less than the total filesize.
-		overdrive     int    // Number of extra pieces to download as a race to improve latency at the cost of bandwidth efficiency.
+		overdrive     int    // How many extra pieces to download to prevent slow hosts from being a bottleneck.
 		priority      uint64 // Files with a higher priority will be downloaded first.
 	}
 )
 
-// complete is a helper function to indicate whether or not the download has
-// completed.
-func (d *download) complete() bool {
+// staticComplete is a helper function to indicate whether or not the download
+// has completed.
+func (d *download) staticComplete() bool {
 	select {
 	case <-d.completeChan:
 		return true
@@ -88,10 +120,11 @@ func (d *download) managedFail(err error) {
 	defer d.mu.Unlock()
 
 	// If the download is already complete, extend the error.
-	if d.complete() && d.err != nil {
+	complete := d.staticComplete()
+	if complete && d.err != nil {
 		d.err = errors.Compose(d.err, err)
 		return
-	} else if d.complete() && d.err == nil {
+	} else if complete && d.err == nil {
 		d.log.Critical("download is marked as completed without error, but then managedFail was called with err:", err)
 		return
 	}
@@ -317,9 +350,9 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	}
 
 	// Add the download object to the download queue.
-	lockID = r.mu.Lock()
-	r.downloadQueue = append(r.downloadQueue, d)
-	r.mu.Unlock(lockID)
+	r.downloadHistoryMu.Lock()
+	r.downloadHistory = append(r.downloadHistory, d)
+	r.downloadHistoryMu.Unlock()
 
 	// Block until the download has completed.
 	select {
@@ -330,15 +363,19 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	}
 }
 
-// DownloadQueue returns the list of downloads in the queue.
-func (r *Renter) DownloadQueue() []modules.DownloadInfo {
-	lockID := r.mu.RLock()
-	defer r.mu.RUnlock(lockID)
+// DownloadHistory returns the list of downloads that have been performed. Will
+// include downloads that have not yet completed. Downloads will be roughly, but
+// not precisely, sorted according to start time.
+//
+// TODO: Currently only remembers downloads from the current session.
+func (r *Renter) DownloadHistory() []modules.DownloadInfo {
+	r.downloadHistoryMu.Lock()
+	defer r.downloadHistoryMu.Unlock()
 
-	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
-	for i := range r.downloadQueue {
+	downloads := make([]modules.DownloadInfo, len(r.downloadHistory))
+	for i := range r.downloadHistory {
 		// Order from most recent to least recent.
-		d := r.downloadQueue[len(r.downloadQueue)-i-1]
+		d := r.downloadHistory[len(r.downloadHistory)-i-1]
 		d.mu.Lock() // Lock required for d.endTime only.
 		downloads[i] = modules.DownloadInfo{
 			Destination:     d.destinationString,
@@ -347,21 +384,16 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 			Offset:          d.staticOffset,
 			SiaPath:         d.staticSiaPath,
 
+			Completed:           d.staticComplete(),
 			EndTime:             d.endTime,
 			Received:            atomic.LoadUint64(&d.atomicDataReceived),
 			StartTime:           d.staticStartTime,
 			TotalDataTransfered: atomic.LoadUint64(&d.atomicTotalDataTransfered),
 		}
-		d.mu.Unlock() // Release lock before calling d.Err().
-		// Need to listen on the completed channel to know if the download has
-		// completed.
-		select {
-		case <-d.completeChan:
-			downloads[i].Completed = true
-		default:
-			downloads[i].Completed = false
-		}
-		// Need to check if the error is nil before setting the error string.
+		// Release download lock before calling d.Err(), which will acquire the
+		// lock. The error needs to be checked separately because we need to
+		// know if it's 'nil' before grabbing the error string.
+		d.mu.Unlock()
 		if d.Err() != nil {
 			downloads[i].Error = d.Err().Error()
 		} else {

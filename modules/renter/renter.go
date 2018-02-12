@@ -159,11 +159,19 @@ type Renter struct {
 	files    map[string]*file
 	tracking map[string]trackedFile // Map from nickname to metadata.
 
-	// Download management.
+	// Download management. The heap has a separate mutex because it is always
+	// accessed in isolation.
 	downloadHeapMu sync.Mutex         // Used to protect the downloadHeap.
 	downloadHeap   *downloadChunkHeap // A heap of priority-sorted chunks to download.
-	downloadQueue  []*download        // List of user-initiated downloads.
 	newDownloads   chan struct{}      // Used to notify download heap thread that new downlaods are available.
+
+	// Download history. The history list has its own mutex because it is always
+	// accessed in isolation.
+	//
+	// TODO: Currently the download history doesn't include repair-initiated
+	// downloads, and instead only contains user-initiated downlods.
+	downloadHistory []*download
+	downloadHistoryMu sync.Mutex
 
 	// Upload management.
 	newUploads chan *file // Used to send new uploads to the upload heap.

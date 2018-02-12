@@ -294,8 +294,8 @@ type Renter interface {
 	// downloads of `offset` and `length` type.
 	Download(params RenterDownloadParameters) error
 
-	// DownloadQueue lists all the files that have been scheduled for download.
-	DownloadQueue() []DownloadInfo
+	// DownloadHistory lists all the files that have been scheduled for download.
+	DownloadHistory() []DownloadInfo
 
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo

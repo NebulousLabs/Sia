@@ -270,7 +270,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 // renterDownloadsHandler handles the API call to request the download queue.
 func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	var downloads []DownloadInfo
-	for _, di := range api.renter.DownloadQueue() {
+	for _, di := range api.renter.DownloadHistory() {
 		downloads = append(downloads, DownloadInfo{
 			Destination:     di.Destination,
 			DestinationType: di.DestinationType,

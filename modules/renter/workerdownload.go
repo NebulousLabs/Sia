@@ -115,16 +115,34 @@ func (w *worker) managedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfi
 		return nil
 	}
 
-	// TODO: Compare worker latency here to see if it is below the latencyTarget
-	// for the chunk.
+	// TODO: This is where we would put filters based on worker latency, worker
+	// price, worker throughput, etc. There's a lot of fancy stuff we can do
+	// with filtering to make sure that for any given chunk we always use the
+	// optimal set of workers, and this is the spot where most of the filtering
+	// will happen.
 	//
-	// TODO: Any other things that may result in the worker being automatically
-	// set to standby (such as price) should be handled here as well.
-	meetsLatencyTarget := true
+	// Workers that do not meet the extra criteria are not discarded but rather
+	// put on standby, so that they can step in if the workers that do meet the
+	// extra criteria fail or otherwise prove insufficient.
+	meetsExtraCriteria := true
 
-	// If this chunk has not had enough pieces regisetered yet, register this
-	// worker. Otherwies put the worker on standby.
-	if udc.piecesRegistered-udc.piecesCompleted < udc.erasureCode.MinPieces()+udc.staticOverdrive && !udc.pieceUsage[chunkData.index] && meetsLatencyTarget {
+	// TODO: There's going to need to be some method for relaxing criteria after
+	// the first wave of workers are sent off. If the first waves of workers
+	// fail, the next wave need to realize that they shouldn't immediately go on
+	// standby because for some reason there were failures in the first wave and
+	// now the second/etc. wave of workers is needed.
+
+	// Figure out if this chunk needs another worker actively downloading
+	// pieces. The number of workers that should be active simultaneously on
+	// this chunk is the minimum number of pieces required for recovery plus the
+	// number of overdrive workers (typically zero). For our purposes, completed
+	// pieces count as active workers, though the workers have actually
+	// finished.
+	piecesInProgress := udc.piecesRegistered + udc.piecesCompleted
+	desiredPiecesInProgress := udc.erasureCode.MinPieces()+udc.staticOverdrive
+	workersDesired := piecesInProgress < desiredPiecesInProgress
+
+	if workersDesired && meetsExtraCriteria {
 		// Worker can be useful. Register the worker and return the chunk for
 		// downloading.
 		udc.piecesRegistered++
