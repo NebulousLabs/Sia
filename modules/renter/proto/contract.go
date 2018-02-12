@@ -109,6 +109,7 @@ type SafeContract struct {
 	mu  sync.Mutex
 }
 
+// Metadata returns the metadata of a renter contract
 func (c *SafeContract) Metadata() modules.RenterContract {
 	c.headerMu.Lock()
 	defer c.headerMu.Unlock()

@@ -113,6 +113,7 @@ func (cs *ContractSet) ViewAll() []modules.RenterContract {
 	return contracts
 }
 
+// Close closes all contracts in a contract set, this means rendering it unusable for I/O
 func (cs *ContractSet) Close() error {
 	for _, c := range cs.contracts {
 		c.f.Close()
