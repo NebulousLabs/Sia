@@ -145,7 +145,6 @@ func cleanCloseHandler(next http.Handler) http.Handler {
 		}(w, r)
 		select {
 		case <-done:
-		case <-r.Context().Done():
 		}
 
 		// Sanity check - thread should not take more than an hour to return. This
