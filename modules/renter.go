@@ -69,16 +69,6 @@ type DownloadInfo struct {
 	TotalDataTransfered uint64    `json:"totaldatatransfered"` // The total amount of data transfered, including negotiation, overdrive, etc.
 }
 
-// DownloadWriter provides an interface which all output writers have to implement.
-//
-// TODO: Looks like this, as passed to the api, allows the API to call the Close
-// and WriteAt methods, which we don't want.
-type DownloadWriter interface {
-	WriteAt(b []byte, off int64) (int, error)
-	Destination() string
-	Close() error
-}
-
 // FileUploadParams contains the information used by the Renter to upload a
 // file.
 type FileUploadParams struct {

@@ -101,11 +101,8 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	}
 
 	// Recover the pieces into the logical chunk data.
-	//
-	// TODO: Instead of using the recoverWriter, just write directly to the
-	// WriteAt interface we have.
 	recoverWriter := new(bytes.Buffer)
-	err := udc.erasureCode.Recover(udc.physicalChunkData, udc.staticFetchLength, recoverWriter)
+	err := udc.erasureCode.Recover(udc.physicalChunkData, udc.staticChunkSize, recoverWriter)
 	if err != nil {
 		udc.fail(err)
 		udc.mu.Unlock()
@@ -118,7 +115,9 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	udc.mu.Unlock()
 
 	// Write the bytes to the requested output.
-	_, err = udc.destination.WriteAt(recoverWriter.Bytes(), udc.staticWriteOffset)
+	start := udc.staticFetchOffset
+	end := udc.staticFetchOffset+udc.staticFetchLength
+	_, err = udc.destination.WriteAt(recoverWriter.Bytes()[start:end], udc.staticWriteOffset)
 	if err != nil {
 		udc.fail(err)
 		return errors.AddContext(err, "unable to write to download destination")

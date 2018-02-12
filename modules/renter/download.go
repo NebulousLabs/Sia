@@ -1,5 +1,8 @@
 package renter
 
+// TODO: There are some magic numbers in this file, particularly with regards to
+// latency and overdrive. They are all marked with respective TODOs.
+
 import (
 	"fmt"
 	"os"
@@ -53,6 +56,7 @@ type (
 	// downloadParams is the set of parameters to use when downloading a file.
 	downloadParams struct {
 		destination       downloadDestination // The place to write the downloaded data.
+		destinationType   string              // "file", "buffer", "http stream", etc.
 		destinationString string              // The string to report to the user for the destination.
 		file              *file               // The file to download.
 
@@ -155,6 +159,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 	for i := range chunkMaps {
 		chunkMaps[i] = make(map[types.FileContractID]downloadPieceInfo)
 	}
+	params.file.mu.Lock()
 	for id, contract := range params.file.contracts {
 		resolvedID := r.hostContractor.ResolveID(id)
 		for _, piece := range contract.Pieces {
@@ -172,6 +177,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 			}
 		}
 	}
+	params.file.mu.Unlock()
 
 	// Queue the downloads for each chunk.
 	writeOffset := int64(0) // where to write a chunk within the download destination.
@@ -196,7 +202,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 			// TODO: There is some sane minimum latency that should actually be
 			// set based on the number of pieces 'n', and the 'n' fastest
 			// workers that we have.
-			staticLatencyTarget: params.latencyTarget + (25 * (i - minChunk)), // Latency target is dropped by 25ms for each following chunk.
+			staticLatencyTarget: params.latencyTarget + (25 * (i - minChunk)), // TODO: Latency target is dropped by 25ms for each following chunk.
 			staticNeedsMemory:   params.needsMemory,
 			staticPriority:      params.priority,
 
@@ -225,9 +231,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		udc.staticWriteOffset = writeOffset
 		writeOffset += int64(udc.staticFetchLength)
 
-		// Set the latency and overdrive for the chunk. These are parameters
-		// which prioritize latency over throughput and efficiency, and are only
-		// necessary for the first few chunks in a download.
+		// TODO: Pick a smarter value for the overdrive setting.
 		if i < 2 {
 			udc.staticOverdrive = params.overdrive
 		}
@@ -279,34 +283,25 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 		return fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
 	}
 
-	// TODO: Eventually this won't be a requirement (pending updates to both the
-	// encryption scheme, the download scheme, and potentially even the erasure
-	// coding scheme), but currently we need to make sure that we are
-	// downloading full chunks.
-	if p.Offset%file.staticChunkSize() != 0 {
-		return errors.New("download request needs to be chunk-aligned, offset is not chunk-aligned")
-	}
-	if p.Offset+p.Length != file.size && p.Offset+p.Length%file.staticChunkSize() != 0 {
-		return errors.New("download request needs to be chunk-aligned, length is not chunk-aligned")
-	}
-
-	// Instantiate the correct DownloadWriter implementation
-	// (e.g. content written to file or response body).
+	// Instantiate the correct downloadWriter implementation.
 	var dw downloadDestination
+	var destinationType string
 	if isHTTPResp {
 		dw = newDownloadDestinationHTTPWriter(p.Httpwriter)
-		p.Destination = "http stream"
+		destinationType = "http stream"
 	} else {
 		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
 		if err != nil {
 			return err
 		}
 		dw = osFile
+		destinationType = "file"
 	}
 
 	// Create the download object.
 	d, err := r.newDownload(downloadParams{
 		destination:       dw,
+		destinationType:   destinationType,
 		destinationString: p.Destination,
 		file:              file,
 
@@ -344,7 +339,7 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	for i := range r.downloadQueue {
 		// Order from most recent to least recent.
 		d := r.downloadQueue[len(r.downloadQueue)-i-1]
-		d.mu.Lock()
+		d.mu.Lock() // Lock required for d.endTime only.
 		downloads[i] = modules.DownloadInfo{
 			Destination:     d.destinationString,
 			DestinationType: d.destinationType,
@@ -357,6 +352,7 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 			StartTime:           d.staticStartTime,
 			TotalDataTransfered: atomic.LoadUint64(&d.atomicTotalDataTransfered),
 		}
+		d.mu.Unlock() // Release lock before calling d.Err().
 		// Need to listen on the completed channel to know if the download has
 		// completed.
 		select {
@@ -371,7 +367,6 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 		} else {
 			downloads[i].Error = ""
 		}
-		d.mu.Unlock()
 	}
 	return downloads
 }
