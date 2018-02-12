@@ -139,7 +139,7 @@ func (w *worker) managedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfi
 	// pieces count as active workers, though the workers have actually
 	// finished.
 	piecesInProgress := udc.piecesRegistered + udc.piecesCompleted
-	desiredPiecesInProgress := udc.erasureCode.MinPieces()+udc.staticOverdrive
+	desiredPiecesInProgress := udc.erasureCode.MinPieces() + udc.staticOverdrive
 	workersDesired := piecesInProgress < desiredPiecesInProgress
 
 	if workersDesired && meetsExtraCriteria {
