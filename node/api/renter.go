@@ -98,7 +98,7 @@ type (
 		// Block height that the file contract began on.
 		StartHeight types.BlockHeight `json:"startheight"`
 		// Amount of contract funds that have been spent on storage.
-		StorageSpending types.Currency `json:"StorageSpending"`
+		StorageSpending types.Currency `json:"storagespending"`
 		// Total cost to the wallet of forming the file contract.
 		TotalCost types.Currency `json:"totalcost"`
 		// Amount of contract funds that have been spent on uploads.
