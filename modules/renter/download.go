@@ -400,7 +400,7 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 	var dw downloadDestination
 	var destinationType string
 	if isHTTPResp {
-		dw = newDownloadDestinationHTTPWriter(p.Httpwriter)
+		dw = newDownloadDestinationWriteCloserFromWriter(p.Httpwriter)
 		destinationType = "http stream"
 	} else {
 		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, defaultFilePerm)

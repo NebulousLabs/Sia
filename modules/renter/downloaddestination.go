@@ -2,10 +2,19 @@ package renter
 
 // Downloads can be written directly to a file, can be written to an http
 // stream, or can be written to an in-memory buffer. The core download loop only
-// has the concept of writing using WriteAt, so to support writing to a stream
-// or to an in-memory buffer, we need to wrap the function with something that
-// will transform the WriteAt call into an in-order stream or otherwise write it
-// to the right place.
+// has the concept of writing using WriteAt, and then calling Close when the
+// download is complete.
+//
+// To support streaming and writing to memory buffers, the downloadDestination
+// interface exists. It is used to map things like a []byte or an io.WriteCloser
+// to a downloadDestination. This interface is implemented by:
+//		+ os.File
+//		+ downloadDestinationBuffer (an alias of a []byte)
+//		+ downloadDestinationWriteCloser (created using an io.WriteCloser)
+//
+// There is also a helper function to convert an io.Writer to an io.WriteCloser,
+// so that an io.Writer can be used to create a downloadDestinationWriteCloser
+// as well.
 
 import (
 	"errors"
@@ -44,7 +53,7 @@ func (dw downloadDestinationBuffer) WriteAt(data []byte, offset int64) (int, err
 	return i, nil
 }
 
-// downloadDestinationWriter is a downloadDestination that writes to an
+// downloadDestinationWriteCloser is a downloadDestination that writes to an
 // underlying data stream. The data stream is expecting sequential data while
 // the download chunks will be written in an aribtrary order using calls to
 // WriteAt. We need to block the calls to WriteAt until all prior data has been
@@ -52,12 +61,12 @@ func (dw downloadDestinationBuffer) WriteAt(data []byte, offset int64) (int, err
 //
 // NOTE: If the caller accedentally leaves a gap between calls to WriteAt, for
 // example writes bytes 0-100 and then writes bytes 110-200, and accidentally
-// never writes bytes 100-110, the downloadDestinationWriter will block forever
-// waiting for those gap bytes to be written.
+// never writes bytes 100-110, the downloadDestinationWriteCloser will block
+// forever waiting for those gap bytes to be written.
 //
 // NOTE: Calling WriteAt has linear time performance in the number of concurrent
 // calls to WriteAt.
-type downloadDestinationWriter struct {
+type downloadDestinationWriteCloser struct {
 	closed         bool
 	mu             sync.Mutex // Protects the underlying data structures.
 	progress       int64      // How much data has been written yet.
@@ -81,9 +90,10 @@ var (
 	errOffsetAlreadyWritten = errors.New("cannot write to that offset in stream, data already written")
 )
 
-// newDownloadDestinationWriter takes a writer and converts it into a
-func newDownloadDestinationWriter(w io.WriteCloser) downloadDestination {
-	return &downloadDestinationWriter{WriteCloser: w}
+// newDownloadDestinationWriteCloser takes an io.WriteCloser and converts it
+// into a downloadDestination.
+func newDownloadDestinationWriteCloser(w io.WriteCloser) downloadDestination {
+	return &downloadDestinationWriteCloser{WriteCloser: w}
 }
 
 // unblockNextWrites will iterate over all of the blocking write calls and
@@ -92,7 +102,7 @@ func newDownloadDestinationWriter(w io.WriteCloser) downloadDestination {
 //
 // NOTE: unblockNextWrites has linear time performance in the number of currently
 // blocking calls.
-func (ddw *downloadDestinationWriter) unblockNextWrites() {
+func (ddw *downloadDestinationWriteCloser) unblockNextWrites() {
 	for i, offset := range ddw.blockingWriteCalls {
 		if offset <= ddw.progress {
 			ddw.blockingWriteSignals[i].Unlock()
@@ -104,7 +114,7 @@ func (ddw *downloadDestinationWriter) unblockNextWrites() {
 
 // Close will unblock any hanging calls to WriteAt, and then call Close on the
 // underlying WriteCloser.
-func (ddw *downloadDestinationWriter) Close() error {
+func (ddw *downloadDestinationWriteCloser) Close() error {
 	ddw.mu.Lock()
 	if ddw.closed {
 		ddw.mu.Unlock()
@@ -121,7 +131,7 @@ func (ddw *downloadDestinationWriter) Close() error {
 // WriteAt will block until the stream has progressed to 'offset', and then it
 // will write its own data. An error will be returned if the stream has already
 // progressed beyond 'offset'.
-func (ddw *downloadDestinationWriter) WriteAt(data []byte, offset int64) (int, error) {
+func (ddw *downloadDestinationWriteCloser) WriteAt(data []byte, offset int64) (int, error) {
 	write := func() (int, error) {
 		// Error if the stream has been closed.
 		if ddw.closed {
@@ -172,23 +182,26 @@ func (ddw *downloadDestinationWriter) WriteAt(data []byte, offset int64) (int, e
 	return n, err
 }
 
-// httpWriteCloser wraps an hhtpWriter with a closer function so that it can be
-// passed to the newDownloadDestinationWriter function.
-type httpWriteCloser struct {
+
+// writerToWriteCloser will convert an io.Writer to an io.WriteCloser by adding
+// a Close function which always returns nil.
+type writerToWriteCloser struct {
 	io.Writer
 }
 
-// Close is a blank function that allows an httpWriter to become an
-// io.WriteCloser.
-func (httpWriteCloser) Close() error { return nil }
+// Close will always return nil.
+func (writerToWriteCloser) Close() error { return nil }
 
-// newDownloadDestinationHTTPWriter wraps an io.Writer (typically an HTTPWriter)
-// with a do-nothing Close function so that it satisfies the WriteCloser
-// interface.
+// newDownloadDestinationWriteCloserFromWriter will return a
+// downloadDestinationWriteCloser taking an io.Writer as input. The io.Writer
+// will be wrapped with a Close function which always returns nil. If the
+// underlying object is an io.WriteCloser, newDownloadDestinationWriteCloser
+// should be called instead.
 //
-// TODO: Reconsider the name of this funciton.
-func newDownloadDestinationHTTPWriter(w io.Writer) downloadDestination {
-	var hwc httpWriteCloser
-	hwc.Writer = w
-	return newDownloadDestinationWriter(hwc)
+// This function is primarily used with http streams, which do not implement a
+// Close function.
+func newDownloadDestinationWriteCloserFromWriter(w io.Writer) downloadDestination {
+	var wtwc writerToWriteCloser
+	wtwc.Writer = w
+	return newDownloadDestinationWriteCloser(wtwc)
 }
