@@ -77,21 +77,21 @@ func TestUnitSigning(t *testing.T) {
 		}
 
 		// Attempt to verify after the data has been altered.
-		randData[0] += 1
+		randData[0]++
 		err = VerifyHash(randData, pk, sig)
 		if err != ErrInvalidSignature {
 			t.Fatal(err)
 		}
 
 		// Restore the data and make sure the signature is valid again.
-		randData[0] -= 1
+		randData[0]--
 		err = VerifyHash(randData, pk, sig)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Attempt to verify after the signature has been altered.
-		sig[0] += 1
+		sig[0]++
 		err = VerifyHash(randData, pk, sig)
 		if err != ErrInvalidSignature {
 			t.Fatal(err)
