@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/writeaheadlog"
 )
@@ -106,7 +108,7 @@ type SafeContract struct {
 
 	f   *os.File // TODO: use a dependency for this
 	wal *writeaheadlog.WAL
-	mu  sync.Mutex
+	mu  *siasync.RWMutex
 }
 
 // Metadata returns the metadata of a renter contract
@@ -358,6 +360,7 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 		merkleRoots: roots,
 		f:           f,
 		wal:         cs.wal,
+		mu:          siasync.New(time.Minute, 100),
 	}
 	cs.mu.Lock()
 	cs.contracts[h.ID()] = sc
@@ -425,6 +428,7 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 		unappliedTxns: unappliedTxns,
 		f:             f,
 		wal:           cs.wal,
+		mu:            siasync.New(time.Minute, 100),
 	}
 	return nil
 }
@@ -448,11 +452,11 @@ func (cs *ContractSet) ConvertV130Contract(c V130Contract, cr V130CachedRevision
 	}
 	// if there is a cached revision, store it as an unapplied WAL transaction
 	if cr.Revision.NewRevisionNumber != 0 {
-		sc, ok := cs.Acquire(m.ID)
+		sc, ok, lockid := cs.Acquire(m.ID)
 		if !ok {
 			return errors.New("contract set is missing contract that was just added")
 		}
-		defer cs.Return(sc)
+		defer cs.Return(sc, lockid)
 		if len(cr.MerkleRoots) == len(sc.merkleRoots)+1 {
 			root := cr.MerkleRoots[len(cr.MerkleRoots)-1]
 			_, err = sc.recordUploadIntent(cr.Revision, root, types.ZeroCurrency, types.ZeroCurrency)

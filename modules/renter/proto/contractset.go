@@ -26,21 +26,21 @@ type ContractSet struct {
 // Acquire looks up the contract with the specified FileContractID and locks
 // it before returning it. If the contract is not present in the set, Acquire
 // returns false and a zero-valued RenterContract.
-func (cs *ContractSet) Acquire(id types.FileContractID) (*SafeContract, bool) {
+func (cs *ContractSet) Acquire(id types.FileContractID) (*SafeContract, bool, int) {
 	cs.mu.Lock()
 	safeContract, ok := cs.contracts[id]
 	cs.mu.Unlock()
 	if !ok {
-		return nil, false
+		return nil, false, 0
 	}
-	safeContract.mu.Lock()
-	return safeContract, true
+	lockid := safeContract.mu.Lock()
+	return safeContract, true, lockid
 }
 
 // Delete removes a contract from the set. The contract must have been
 // previously acquired by Acquire. If the contract is not present in the set,
 // Delete is a no-op.
-func (cs *ContractSet) Delete(c *SafeContract) {
+func (cs *ContractSet) Delete(c *SafeContract, lockid int) {
 	cs.mu.Lock()
 	safeContract, ok := cs.contracts[c.header.ID()]
 	if !ok {
@@ -49,7 +49,7 @@ func (cs *ContractSet) Delete(c *SafeContract) {
 	}
 	delete(cs.contracts, c.header.ID())
 	cs.mu.Unlock()
-	safeContract.mu.Unlock()
+	safeContract.mu.Unlock(lockid)
 	// delete contract file
 	os.Remove(filepath.Join(cs.dir, c.header.ID().String()+contractExtension))
 }
@@ -76,7 +76,7 @@ func (cs *ContractSet) Len() int {
 // Return returns a locked contract to the set and unlocks it. The contract
 // must have been previously acquired by Acquire. If the contract is not
 // present in the set, Return panics.
-func (cs *ContractSet) Return(c *SafeContract) {
+func (cs *ContractSet) Return(c *SafeContract, lockid int) {
 	cs.mu.Lock()
 	safeContract, ok := cs.contracts[c.header.ID()]
 	if !ok {
@@ -84,7 +84,7 @@ func (cs *ContractSet) Return(c *SafeContract) {
 		build.Critical("no contract with that id")
 	}
 	cs.mu.Unlock()
-	safeContract.mu.Unlock()
+	safeContract.mu.Unlock(lockid)
 }
 
 // View returns a copy of the contract with the specified ID. The contracts is

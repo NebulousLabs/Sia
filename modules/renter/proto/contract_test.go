@@ -40,7 +40,7 @@ func TestContractUncommittedTxn(t *testing.T) {
 	}
 
 	// apply an update to the contract, but don't commit it
-	sc := cs.mustAcquire(t, id)
+	sc, lockid := cs.mustAcquire(t, id)
 	revisedHeader := contractHeader{
 		Transaction: types.Transaction{
 			FileContractRevisions: []types.FileContractRevision{{
@@ -73,6 +73,7 @@ func TestContractUncommittedTxn(t *testing.T) {
 		t.Fatal("Merkle roots should match initial Merkle roots")
 	}
 
+	cs.Return(sc, lockid)
 	// close and reopen the contract set
 	cs.Close()
 	cs, err = NewContractSet(dir)
@@ -80,7 +81,7 @@ func TestContractUncommittedTxn(t *testing.T) {
 		t.Fatal(err)
 	}
 	// the uncommitted transaction should be stored in the contract
-	sc = cs.mustAcquire(t, id)
+	sc, lockid = cs.mustAcquire(t, id)
 	if len(sc.unappliedTxns) != 1 {
 		t.Fatal("expected 1 unappliedTxn, got", len(sc.unappliedTxns))
 	} else if !bytes.Equal(sc.unappliedTxns[0].Updates[0].Instructions, walTxn.Updates[0].Instructions) {
@@ -108,4 +109,5 @@ func TestContractUncommittedTxn(t *testing.T) {
 	} else if !reflect.DeepEqual(sc.merkleRoots, revisedRoots) {
 		t.Fatal("Merkle roots should match revised Merkle roots")
 	}
+	cs.Return(sc, lockid)
 }

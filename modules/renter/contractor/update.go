@@ -44,8 +44,8 @@ func (c *Contractor) managedArchiveContracts() {
 
 	// Delete all the expired contracts from the contract set.
 	for _, id := range expired {
-		if sc, ok := c.contracts.Acquire(id); ok {
-			c.contracts.Delete(sc)
+		if sc, ok, lockid := c.contracts.Acquire(id); ok {
+			c.contracts.Delete(sc, lockid)
 		}
 	}
 }
