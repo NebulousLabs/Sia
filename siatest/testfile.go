@@ -22,28 +22,28 @@ type (
 )
 
 // Bytes returns the contents of the TestFile
-func (tf *TestFile) Bytes() []byte {
-	data, err := ioutil.ReadFile(tf.path)
-	if err != nil {
-		println(err)
-		return []byte{}
-	}
-	return data
+func (tf *TestFile) Bytes() ([]byte, error) {
+	return ioutil.ReadFile(tf.path)
 }
 
 // Compare is a convenience function that compares the contents of two
 // TestFiles on disk. Its behavior is similar to bytes.Compare.
-func (tf *TestFile) Compare(tf2 *TestFile) int {
-	tfData, err := ioutil.ReadFile(tf.path)
-	tf2Data, err2 := ioutil.ReadFile(tf2.path)
+func (tf *TestFile) Compare(tf2 *TestFile) (int, error) {
+	tfData, err := tf.Bytes()
+	tf2Data, err2 := tf2.Bytes()
 	if err != nil || err2 != nil {
-		// Print error and return a mismatch instead of returning the error.
-		// This should be sufficient for a testing environment and makes for
-		// cleaner tests.
-		println(build.ComposeErrors(err, err2))
-		return math.MaxInt32
+		return 0, build.ComposeErrors(err, err2)
 	}
-	return bytes.Compare(tfData, tf2Data)
+	return bytes.Compare(tfData, tf2Data), nil
+}
+
+// CompareBytes compares the contents of a TestFile to a byte slice.
+func (tf *TestFile) CompareBytes(data []byte) (int, error) {
+	tfData, err := tf.Bytes()
+	if err != nil {
+		return 0, err
+	}
+	return bytes.Compare(tfData, data), nil
 }
 
 // NewFile creates and returns a new TestFile. It will write size random bytes

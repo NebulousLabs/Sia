@@ -1,15 +1,14 @@
-package renterhost
+package renter
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/siatest"
 )
 
-// TestRenterHost executes a number of subtests using the same TestGroup to
+// TestRenter executes a number of subtests using the same TestGroup to
 // save time on initialization
-func TestRenterHost(t *testing.T) {
+func TestRenter(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -29,6 +28,7 @@ func TestRenterHost(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+
 	// Specifiy subtests to run
 	subTests := []struct {
 		name string
@@ -49,23 +49,12 @@ func TestRenterHost(t *testing.T) {
 func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	// Grab the first of the group's renters
 	renter := tg.Renters()[0]
-	// Create file for upload
-	file, err := siatest.NewFile(100)
+	// Upload file, creating a piece for each host in the group
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+	file, err := renter.UploadNewFileBlocking(100, dataPieces, parityPieces)
 	if err != nil {
 		t.Fatal("Failed to create file for testing: ", err)
-	}
-	// Upload file, creating a parity piece for each host in the group
-	err = renter.Upload(file, 1, uint64(len(tg.Hosts())))
-	if err != nil {
-		t.Fatal("Failed to start upload: ", err)
-	}
-	// Wait until upload reached 100% progress
-	if err := renter.WaitForUploadProgress(file, 1); err != nil {
-		t.Error(err)
-	}
-	// Wait until upload reaches len(tg.Hosts()) redundancy
-	if err := renter.WaitForUploadRedundancy(file, float64(len(tg.Hosts()))); err != nil {
-		t.Error(err)
 	}
 	// Download the file synchronously directly into memory and compare the
 	// data to the original
@@ -73,8 +62,8 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(downloadedData, file.Bytes()) != 0 {
-		t.Error("Downloaded data doesn't match original file's contents")
+	if i, err := file.CompareBytes(downloadedData); err != nil || i != 0 {
+		t.Error("Downloaded data doesn't match original file's contents", err)
 	}
 	// Download the file synchronously to a file on disk and compare it to the
 	// original
@@ -82,8 +71,8 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if file.Compare(downloadedFile) != 0 {
-		t.Error("Downloaded file's contents do not equal the uploaded file's contents")
+	if i, err := file.Compare(downloadedFile); err != nil || i != 0 {
+		t.Error("Downloaded file's contents do not equal the uploaded file's contents", err)
 	}
 	// Download the file  asynchronously, wait for the download to finish and
 	// compare it to the original
@@ -94,7 +83,7 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	if err := renter.WaitForDownload(downloadingFile); err != nil {
 		t.Error(err)
 	}
-	if file.Compare(downloadingFile) != 0 {
+	if i, err := file.Compare(downloadingFile); err != nil || i != 0 {
 		t.Error("Downloaded file's contents do not equal the uploaded file's contents")
 	}
 }

@@ -1,18 +1,14 @@
 package siatest
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
 	"strconv"
 	"time"
-	"unsafe"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api"
@@ -98,25 +94,6 @@ func (tn *TestNode) FileInfo(tf *TestFile) (modules.FileInfo, error) {
 	return modules.FileInfo{}, errors.New("file is not tracked by the renter")
 }
 
-// MineBlock makes the underlying node mine a single block and broadcast it.
-func (tn *TestNode) MineBlock() error {
-	// Get the header
-	target, header, err := tn.MinerHeaderGet()
-	if err != nil {
-		return build.ExtendErr("failed to get header for work", err)
-	}
-	// Solve the header
-	header, err = solveHeader(target, header)
-	if err != nil {
-		return build.ExtendErr("failed to solve header", err)
-	}
-	// Submit the header
-	if err := tn.MinerHeaderPost(header); err != nil {
-		return build.ExtendErr("failed to submit header", err)
-	}
-	return nil
-}
-
 // Upload uses the node to upload the file.
 func (tn *TestNode) Upload(tf *TestFile, dataPieces, parityPieces uint64) (err error) {
 	// Upload file
@@ -130,6 +107,39 @@ func (tn *TestNode) Upload(tf *TestFile, dataPieces, parityPieces uint64) (err e
 		return build.ExtendErr("uploaded file is not tracked by the renter", err)
 	}
 	return nil
+}
+
+// UploadNewFile initiates the upload of a filesize bytes large file.
+func (tn *TestNode) UploadNewFile(filesize int, dataPieces uint64, parityPieces uint64) (file *TestFile, err error) {
+	// Create file for upload
+	file, err = NewFile(filesize)
+	if err != nil {
+		err = build.ExtendErr("failed to create file", err)
+		return
+	}
+	// Upload file, creating a parity piece for each host in the group
+	err = tn.Upload(file, dataPieces, parityPieces)
+	if err != nil {
+		err = build.ExtendErr("failed to start upload", err)
+		return
+	}
+	return
+}
+
+// UploadNewFileBlocking uploads a filesize bytes large file and waits for the
+// upload to reach 100% progress and redundancy.
+func (tn *TestNode) UploadNewFileBlocking(filesize int, dataPieces uint64, parityPieces uint64) (file *TestFile, err error) {
+	file, err = tn.UploadNewFile(filesize, dataPieces, parityPieces)
+	if err != nil {
+		return
+	}
+	// Wait until upload reached the specified progress
+	if err = tn.WaitForUploadProgress(file, 1); err != nil {
+		return
+	}
+	// Wait until upload reaches a certain redundancy
+	err = tn.WaitForUploadRedundancy(file, float64((dataPieces+parityPieces))/float64(dataPieces))
+	return
 }
 
 // WaitForDownload waits for the download of a file to finish. If a file wasn't
@@ -243,20 +253,4 @@ func NewCleanNode(nodeParams node.NodeParams) (*TestNode, error) {
 
 	// Return TestNode
 	return tn, nil
-}
-
-// solveHeader solves the header by finding a nonce for the target
-func solveHeader(target types.Target, bh types.BlockHeader) (types.BlockHeader, error) {
-	header := encoding.Marshal(bh)
-	var nonce uint64
-	for i := 0; i < 256; i++ {
-		id := crypto.HashBytes(header)
-		if bytes.Compare(target[:], id[:]) >= 0 {
-			copy(bh.Nonce[:], header[32:40])
-			return bh, nil
-		}
-		*(*uint64)(unsafe.Pointer(&header[32])) = nonce
-		nonce++
-	}
-	return bh, errors.New("couldn't solve block")
 }
