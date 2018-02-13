@@ -50,10 +50,15 @@ func (dw downloadDestinationBuffer) WriteAt(data []byte, offset int64) (int, err
 // WriteAt. We need to block the calls to WriteAt until all prior data has been
 // written.
 //
-// TODO: There is no timeout protection here. If there's some misalignment of
-// data, we'll never know it'll just hang forever.
+// NOTE: If the caller accedentally leaves a gap between calls to WriteAt, for
+// example writes bytes 0-100 and then writes bytes 110-200, and accidentally
+// never writes bytes 100-110, the downloadDestinationWriter will block forever
+// waiting for those gap bytes to be written.
+//
+// NOTE: Calling WriteAt has linear time performance in the number of concurrent
+// calls to WriteAt.
 type downloadDestinationWriter struct {
-	failed         bool
+	closed         bool
 	mu             sync.Mutex // Protects the underlying data structures.
 	progress       int64      // How much data has been written yet.
 	io.WriteCloser            // The underlying writer.
@@ -66,83 +71,95 @@ type downloadDestinationWriter struct {
 	blockingWriteSignals []*sync.Mutex
 }
 
-// errFailedStreamWrite gets returned if a prior error occurred when writing to
-// the stream.
-var errFailedStreamWrite = errors.New("downloadDestinationWriter has a broken stream due to a prior failed write")
+var (
+	// errClosedStream gets returned if the stream was closed but we are trying
+	// to write.
+	errClosedStream = errors.New("unable to write because stream has been closed")
+
+	// errOffsetAlreadyWritten gets returned if a call to WriteAt tries to write
+	// to a place in the stream which has already had data written to it.
+	errOffsetAlreadyWritten = errors.New("cannot write to that offset in stream, data already written")
+)
 
 // newDownloadDestinationWriter takes a writer and converts it into a
 func newDownloadDestinationWriter(w io.WriteCloser) downloadDestination {
 	return &downloadDestinationWriter{WriteCloser: w}
 }
 
-// nextWrite will iterate over all of the blocking write calls and unblock the
-// one that is next in line, if the next-in-line call is available.
-func (ddw *downloadDestinationWriter) nextWrite() {
+// unblockNextWrites will iterate over all of the blocking write calls and
+// unblock any whose offsets have been reached by the current progress of the
+// stream.
+//
+// NOTE: unblockNextWrites has linear time performance in the number of currently
+// blocking calls.
+func (ddw *downloadDestinationWriter) unblockNextWrites() {
 	for i, offset := range ddw.blockingWriteCalls {
-		if offset == ddw.progress {
+		if offset <= ddw.progress {
 			ddw.blockingWriteSignals[i].Unlock()
 			ddw.blockingWriteCalls = append(ddw.blockingWriteCalls[0:i], ddw.blockingWriteCalls[i+1:]...)
 			ddw.blockingWriteSignals = append(ddw.blockingWriteSignals[0:i], ddw.blockingWriteSignals[i+1:]...)
-			return
-		}
-		if offset < ddw.progress {
-			// Sanity check - there should not be a call to WriteAt that occurs
-			// earlier than the current progress. If there is, the
-			// downloadDestinationWriter is being used incorrectly in an
-			// unrecoverable way.
-			panic("incorrect write order for downloadDestinationWriter")
 		}
 	}
 }
 
-// WriteAt will block until the stream has progressed to or past 'offset', and
-// then it will write its own data.
+// Close will unblock any hanging calls to WriteAt, and then call Close on the
+// underlying WriteCloser.
+func (ddw *downloadDestinationWriter) Close() error {
+	ddw.mu.Lock()
+	if ddw.closed {
+		ddw.mu.Unlock()
+		return errClosedStream
+	}
+	ddw.closed = true
+	for i := range ddw.blockingWriteSignals {
+		ddw.blockingWriteSignals[i].Unlock()
+	}
+	ddw.mu.Unlock()
+	return ddw.WriteCloser.Close()
+}
+
+// WriteAt will block until the stream has progressed to 'offset', and then it
+// will write its own data. An error will be returned if the stream has already
+// progressed beyond 'offset'.
 func (ddw *downloadDestinationWriter) WriteAt(data []byte, offset int64) (int, error) {
 	write := func() (int, error) {
-		// If the stream writer has already failed, return an error.
-		if ddw.failed {
-			return 0, errFailedStreamWrite
+		// Error if the stream has been closed.
+		if ddw.closed {
+			return 0, errClosedStream
+		}
+		// Error if the stream has progressed beyond 'offset'.
+		if offset < ddw.progress {
+			ddw.mu.Unlock()
+			return 0, errOffsetAlreadyWritten
 		}
 
-		// Write the data to the stream.
+		// Write the data to the stream, and the update the progress and unblock
+		// the next write.
 		n, err := ddw.Write(data)
-		if err != nil {
-			// If there is an error, marked the stream write as failed and then
-			// unlock/unblock all of the waiting WriteAt calls.
-			ddw.failed = true
-			ddw.Close()
-			for i := range ddw.blockingWriteSignals {
-				ddw.blockingWriteSignals[i].Unlock()
-			}
-			return n, err
-		}
-
-		// Update the progress and unblock the next write.
 		ddw.progress += int64(n)
-		ddw.nextWrite()
-		return n, nil
+		ddw.unblockNextWrites()
+		return n, err
 	}
 
 	ddw.mu.Lock()
-	// Check if the stream has already failed. If so, return immediately with
-	// the failed stream error.
-	if ddw.failed {
-		ddw.mu.Unlock()
-		return 0, errFailedStreamWrite
-	}
-
-	// Check if we are writing to the correct offset for the stream. If so, call
-	// write() and return.
-	if offset == ddw.progress {
-		// This write is the next write in line.
+	// Attempt to write if the stream progress is at or beyond the offset. The
+	// write call will perform error handling.
+	if offset <= ddw.progress {
 		n, err := write()
 		ddw.mu.Unlock()
 		return n, err
 	}
 
-	// Block until we are the correct offset for the stream. The blocking is
-	// coordinated by a new mutex which gets added to an array. When the earlier
-	// data is written, the mutex will be unlocked, allowing us to write.
+	// The stream has not yet progressed to 'offset'. We will block until the
+	// stream has made progress. We perform the block by creating a
+	// thread-specific mutex 'myMu' and adding it to the object's list of
+	// blocking threads. When other threads successfully call WriteAt, they will
+	// reference this list and unblock any which have enough progress. The
+	// result is a somewhat strange construction where we lock myMu twice in a
+	// row, but between those two calls to lock, we put myMu in a place where
+	// another thread can unlock myMu.
+	//
+	// myMu will be unblocked when another thread calls 'unblockNextWrites'.
 	myMu := new(sync.Mutex)
 	myMu.Lock()
 	ddw.blockingWriteCalls = append(ddw.blockingWriteCalls, offset)
@@ -165,6 +182,11 @@ type httpWriteCloser struct {
 // io.WriteCloser.
 func (httpWriteCloser) Close() error { return nil }
 
+// newDownloadDestinationHTTPWriter wraps an io.Writer (typically an HTTPWriter)
+// with a do-nothing Close function so that it satisfies the WriteCloser
+// interface.
+//
+// TODO: Reconsider the name of this funciton.
 func newDownloadDestinationHTTPWriter(w io.Writer) downloadDestination {
 	var hwc httpWriteCloser
 	hwc.Writer = w
