@@ -58,21 +58,15 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	}
 	// Download the file synchronously directly into memory and compare the
 	// data to the original
-	downloadedData, err := renter.Download(file)
+	_, err = renter.DownloadByStream(file)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if i, err := file.CompareBytes(downloadedData); err != nil || i != 0 {
-		t.Error("Downloaded data doesn't match original file's contents", err)
 	}
 	// Download the file synchronously to a file on disk and compare it to the
 	// original
-	downloadedFile, err := renter.DownloadToDisk(file, false)
+	_, err = renter.DownloadToDisk(file, false)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if i, err := file.Compare(downloadedFile); err != nil || i != 0 {
-		t.Error("Downloaded file's contents do not equal the uploaded file's contents", err)
 	}
 	// Download the file  asynchronously, wait for the download to finish and
 	// compare it to the original
@@ -80,10 +74,7 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	if err != nil {
 		t.Error(err)
 	}
-	if err := renter.WaitForDownload(downloadingFile); err != nil {
+	if err := renter.WaitForDownload(downloadingFile, file); err != nil {
 		t.Error(err)
-	}
-	if i, err := file.Compare(downloadingFile); err != nil || i != 0 {
-		t.Error("Downloaded file's contents do not equal the uploaded file's contents")
 	}
 }

@@ -39,20 +39,37 @@ func (tn *TestNode) DownloadToDisk(tf *TestFile, async bool) (*TestFile, error) 
 	if err := tn.RenterDownloadGet(tf.siaPath, dest, 0, fi.Filesize, async); err != nil {
 		return nil, build.ExtendErr("failed to download file", err)
 	}
-	return &TestFile{
+	// Create the TestFile
+	downloadedFile := &TestFile{
 		path:     dest,
 		fileName: fileName,
 		siaPath:  tf.siaPath,
-	}, nil
+	}
+	// If we download the file asynchronously we are done
+	if async {
+		return downloadedFile, nil
+	}
+	// If we downloaded the file, we need to update its checksum and compare it
+	// to the requested file's checksum.
+	if err := downloadedFile.updateChecksum(); err != nil {
+		return nil, err
+	}
+	if downloadedFile.Compare(tf) != 0 {
+		return nil, errors.New("checksums don't match")
+	}
+	return tf, nil
 }
 
-// Download downloads a file and returns its contents as a slice of bytes.
-func (tn *TestNode) Download(tf *TestFile) (data []byte, err error) {
+// DownloadByStream downloads a file and returns its contents as a slice of bytes.
+func (tn *TestNode) DownloadByStream(tf *TestFile) (data []byte, err error) {
 	fi, err := tn.FileInfo(tf)
 	if err != nil {
 		return nil, build.ExtendErr("failed to retrieve FileInfo", err)
 	}
 	data, err = tn.RenterDownloadHTTPResponseGet(tf.siaPath, 0, fi.Filesize)
+	if err == nil && tf.CompareBytes(data) != 0 {
+		err = errors.New("downloaded bytes don't match requested data")
+	}
 	return
 }
 
@@ -143,9 +160,11 @@ func (tn *TestNode) UploadNewFileBlocking(filesize int, dataPieces uint64, parit
 }
 
 // WaitForDownload waits for the download of a file to finish. If a file wasn't
-// scheduled for download it will return instantly without an error.
-func (tn *TestNode) WaitForDownload(tf *TestFile) error {
-	return Retry(1000, 100*time.Millisecond, func() error {
+// scheduled for download it will return instantly without an error. If parent
+// is provided, it will compare the contents of the downloaded file to the
+// contents of tf2 after the download is finished.
+func (tn *TestNode) WaitForDownload(tf *TestFile, parent *TestFile) error {
+	err := Retry(1000, 100*time.Millisecond, func() error {
 		file, err := tn.DownloadInfo(tf)
 		if err != nil {
 			return build.ExtendErr("couldn't retrieve DownloadInfo", err)
@@ -158,6 +177,21 @@ func (tn *TestNode) WaitForDownload(tf *TestFile) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	// Update the downloaded file's checksum
+	if err := tf.updateChecksum(); err != nil {
+		return err
+	}
+	// If a parent was provided, compare checksums
+	if parent == nil {
+		return nil
+	}
+	if tf.Compare(parent) != 0 {
+		return errors.New("downloaded file's data doesn't match parent")
+	}
+	return nil
 }
 
 // WaitForUploadProgress waits for a file to reach a certain upload progress.

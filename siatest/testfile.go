@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -18,32 +19,30 @@ type (
 		path     string
 		fileName string
 		siaPath  string
+		checksum crypto.Hash
 	}
 )
 
-// Bytes returns the contents of the TestFile
-func (tf *TestFile) Bytes() ([]byte, error) {
-	return ioutil.ReadFile(tf.path)
+// Compare compares the contents of two files by comparing
+func (tf *TestFile) Compare(tf2 *TestFile) int {
+	return bytes.Compare(tf.checksum[:], tf2.checksum[:])
 }
 
-// Compare is a convenience function that compares the contents of two
-// TestFiles on disk. Its behavior is similar to bytes.Compare.
-func (tf *TestFile) Compare(tf2 *TestFile) (int, error) {
-	tfData, err := tf.Bytes()
-	tf2Data, err2 := tf2.Bytes()
-	if err != nil || err2 != nil {
-		return 0, build.ComposeErrors(err, err2)
-	}
-	return bytes.Compare(tfData, tf2Data), nil
+// CompareBytes compares the contents of a TestFile to a byte slice by
+// comparing its checksum to the checksum of the slice.
+func (tf *TestFile) CompareBytes(data []byte) int {
+	dataHash := crypto.HashObject(data)
+	return bytes.Compare(tf.checksum[:], dataHash[:])
 }
 
-// CompareBytes compares the contents of a TestFile to a byte slice.
-func (tf *TestFile) CompareBytes(data []byte) (int, error) {
-	tfData, err := tf.Bytes()
+// updateChecksum updates the file's underlying checksum from disk.
+func (tf *TestFile) updateChecksum() error {
+	data, err := ioutil.ReadFile(tf.path)
 	if err != nil {
-		return 0, err
+		return build.ExtendErr("failed to read file", err)
 	}
-	return bytes.Compare(tfData, data), nil
+	tf.checksum = crypto.HashObject(data)
+	return nil
 }
 
 // NewFile creates and returns a new TestFile. It will write size random bytes
@@ -51,10 +50,12 @@ func (tf *TestFile) CompareBytes(data []byte) (int, error) {
 func NewFile(size int) (*TestFile, error) {
 	fileName := strconv.Itoa(fastrand.Intn(math.MaxInt32))
 	path := filepath.Join(SiaTestingDir, fileName)
-	err := ioutil.WriteFile(path, fastrand.Bytes(size), 0600)
+	bytes := fastrand.Bytes(size)
+	err := ioutil.WriteFile(path, bytes, 0600)
 	return &TestFile{
 		path:     path,
 		fileName: fileName,
 		siaPath:  fileName,
+		checksum: crypto.HashObject(bytes),
 	}, err
 }
