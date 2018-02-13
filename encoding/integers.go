@@ -41,7 +41,7 @@ func WriteUint64(w io.Writer, u uint64) error {
 	return err
 }
 
-// WriteInt64 writes i to w.
+// WriteInt writes i to w.
 func WriteInt(w io.Writer, i int) error {
 	return WriteUint64(w, uint64(i))
 }
