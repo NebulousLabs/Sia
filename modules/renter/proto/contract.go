@@ -108,7 +108,7 @@ type SafeContract struct {
 
 	f   *os.File // TODO: use a dependency for this
 	wal *writeaheadlog.WAL
-	mu  *siasync.RWMutex
+	mu  *siasync.RWMutex // safelock to find deadlocks more easily
 }
 
 // Metadata returns the metadata of a renter contract
