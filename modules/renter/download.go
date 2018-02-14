@@ -115,6 +115,14 @@ package renter
 // Overall I don't think it's going to be all that difficult, but it's not
 // nearly as clean-cut as some of the other potential extensions that we can do.
 
+// TODO: Right now the whole download will build and send off chunks even if
+// there are not enough hosts to download the file, and even if there are not
+// enough hosts to download a particular chunk. For the downloads and chunks
+// which are doomed from the outset, we can skip some computation by checking
+// and failing earlier. Another optimization we can make is to not count a
+// worker for a chunk if the worker's contract does not appear in the chunk
+// heap.
+
 import (
 	"fmt"
 	"os"
@@ -277,7 +285,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		resolvedID := r.hostContractor.ResolveID(id)
 		for _, piece := range contract.Pieces {
 			if piece.Chunk >= minChunk && piece.Chunk <= maxChunk {
-				// Sanity check - the same worker should not have to pieces for
+				// Sanity check - the same worker should not have two pieces for
 				// the same chunk.
 				_, exists := chunkMaps[piece.Chunk-minChunk][resolvedID]
 				if exists {
