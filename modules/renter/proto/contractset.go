@@ -2,9 +2,13 @@ package proto
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+
+	"github.com/lukechampine/caller"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -31,9 +35,11 @@ func (cs *ContractSet) Acquire(id types.FileContractID) (*SafeContract, bool) {
 	safeContract, ok := cs.contracts[id]
 	cs.mu.Unlock()
 	if !ok {
+		fmt.Printf("Acquire (noop) %v:\n\t%v\n", id, strings.Join(caller.Trace(3), "\n\t"))
 		return nil, false
 	}
 	safeContract.mu.Lock()
+	fmt.Printf("Acquire %v:\n\t%v\n", id, strings.Join(caller.Trace(3), "\n\t"))
 	return safeContract, true
 }
 
@@ -45,10 +51,13 @@ func (cs *ContractSet) Delete(c *SafeContract) {
 	safeContract, ok := cs.contracts[c.header.ID()]
 	if !ok {
 		cs.mu.Unlock()
+		c.mu.Unlock()
+		fmt.Printf("Delete (noop) %v:\n\t%v\n", c.header.ID(), strings.Join(caller.Trace(3), "\n\t"))
 		return
 	}
 	delete(cs.contracts, c.header.ID())
 	cs.mu.Unlock()
+	fmt.Printf("Delete %v:\n\t%v\n", c.header.ID(), strings.Join(caller.Trace(3), "\n\t"))
 	safeContract.mu.Unlock()
 	// delete contract file
 	os.Remove(filepath.Join(cs.dir, c.header.ID().String()+contractExtension))
@@ -81,9 +90,11 @@ func (cs *ContractSet) Return(c *SafeContract) {
 	safeContract, ok := cs.contracts[c.header.ID()]
 	if !ok {
 		cs.mu.Unlock()
+		c.mu.Unlock()
 		build.Critical("no contract with that id")
 	}
 	cs.mu.Unlock()
+	fmt.Printf("Return %v:\n\t%v\n", c.header.ID(), strings.Join(caller.Trace(3), "\n\t"))
 	safeContract.mu.Unlock()
 }
 
