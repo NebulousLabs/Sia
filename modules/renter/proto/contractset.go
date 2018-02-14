@@ -54,6 +54,7 @@ func (cs *ContractSet) Delete(c *SafeContract) {
 	safeContract, ok := cs.contracts[c.header.ID()]
 	if !ok {
 		cs.mu.Unlock()
+		build.Critical("Delete called on already deleted contract")
 		return
 	}
 	delete(cs.contracts, c.header.ID())
