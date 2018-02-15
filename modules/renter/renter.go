@@ -328,20 +328,6 @@ func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
 // Enforce that Renter satisfies the modules.Renter interface.
 var _ modules.Renter = (*Renter)(nil)
 
-// New returns an initialized renter.
-func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
-	hdb, err := hostdb.New(g, cs, persistDir)
-	if err != nil {
-		return nil, err
-	}
-	hc, err := contractor.New(cs, wallet, tpool, hdb, persistDir)
-	if err != nil {
-		return nil, err
-	}
-
-	return newRenter(g, cs, tpool, hdb, hc, persistDir)
-}
-
 // newRenter initializes a renter and returns it.
 func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
 	if g == nil {
@@ -413,4 +399,18 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 	})
 
 	return r, nil
+}
+
+// New returns an initialized renter.
+func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
+	hdb, err := hostdb.New(g, cs, persistDir)
+	if err != nil {
+		return nil, err
+	}
+	hc, err := contractor.New(cs, wallet, tpool, hdb, persistDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return newRenter(g, cs, tpool, hdb, hc, persistDir)
 }

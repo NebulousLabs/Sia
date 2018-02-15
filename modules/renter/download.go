@@ -308,6 +308,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 			destination: params.destination,
 			erasureCode: params.file.erasureCode,
 			masterKey:   params.file.masterKey,
+			id: persist.RandomSuffix(),
 
 			staticChunkIndex: i,
 			staticChunkMap:   chunkMaps[i-minChunk],

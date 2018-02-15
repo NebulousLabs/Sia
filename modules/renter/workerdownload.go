@@ -5,74 +5,118 @@ package renter
 // coordinating resource management between the workers operating on a chunk.
 
 import (
-	"errors"
 	"sync/atomic"
+	"time"
 )
 
-// cleanUp will check if the download has failed, and if not it will add any
-// standby workers which need to be added. Calling cleanUp too many times is not
-// harmful, however missing a call to cleanUp can lead to dealocks.
-//
-// NOTE: The fact that calls to cleanUp must be actively managed is probably the
-// weakest part of the design of the download code.
-func (udc *unfinishedDownloadChunk) cleanUp() {
-	// Return any unused memory.
-	udc.returnMemory()
-
-	// Check if the chunk has failed. If so, fail the download and return any
-	// remaining memory.
-	if udc.workersRemaining+udc.piecesCompleted < udc.erasureCode.MinPieces() && !udc.failed {
-		udc.fail(errors.New("not enough workers to continue download"))
+// managedDownload will perform some download work.
+func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
+	// Process this chunk. If the worker is not fit to do the download, or is
+	// put on standby, 'nil' will be returned. After the chunk has been
+	// processed, the worker will be registered with the chunk.
+	//
+	// If 'nil' is returned, it is either because the worker has been removed
+	// from the chunk entirely, or because the worker has been put on standby.
+	udc = w.ownedProcessDownloadChunk(udc)
+	if udc == nil {
 		return
 	}
+	// Worker is being given a chance to work. After the work is complete,
+	// whether successful or failed, the worker needs to be removed.
+	defer udc.managedRemoveWorker()
 
-	// Check if standby workers are required, and add them if so.
-	chunkComplete := udc.piecesCompleted >= udc.erasureCode.MinPieces()
-	desiredPiecesRegistered := udc.erasureCode.MinPieces() + udc.staticOverdrive - udc.piecesCompleted
-	if !chunkComplete && udc.piecesRegistered < desiredPiecesRegistered {
-		for i := 0; i < len(udc.workersStandby); i++ {
-			// Convention mandates that the udc be unlocked when passed in as an
-			// argument (and in this case, failing to do so causes a deadlock).
-			// Since we can't unlock the udc here, we'll have to use a goroutine
-			// to make the call to prevent a deadlock.
-			go udc.workersStandby[i].managedQueueDownloadChunk(udc)
+	// Fetch the sector. If fetching the sector fails, the worker needs to be
+	// unregistered with the chunk.
+	d, err := w.renter.hostContractor.Downloader(w.contract.ID, w.renter.tg.StopChan())
+	if err != nil {
+		udc.managedUnregisterWorker(w)
+		return
+	}
+	defer d.Close()
+	data, err := d.Sector(udc.staticChunkMap[w.contract.ID].root)
+	if err != nil {
+		udc.managedUnregisterWorker(w)
+		return
+	}
+	// TODO: Instead of adding the whole sector after the download completes,
+	// have the 'd.Sector' call add to this value ongoing as the sector comes
+	// in. Perhaps even include the data from creating the downloader and other
+	// data sent to and received from the host (like signatures) that aren't
+	// actually payload data.
+	atomic.AddUint64(&udc.download.atomicTotalDataTransfered, udc.staticPieceSize)
+
+	// Mark the piece as completed. Perform chunk recovery if we newly have
+	// enough pieces to do so. Chunk recovery is an expensive operation that
+	// should be performed in a separate thread as to not block the worker.
+	udc.mu.Lock()
+	udc.piecesCompleted++
+	udc.piecesRegistered--
+	if udc.piecesCompleted <= udc.erasureCode.MinPieces() {
+		udc.physicalChunkData[udc.staticChunkMap[w.contract.ID].index] = data
+	}
+	if udc.piecesCompleted == udc.erasureCode.MinPieces() {
+		go udc.threadedRecoverLogicalData()
+	}
+	udc.mu.Unlock()
+}
+
+// managedKillDownloading will drop all of the download work given to the
+// worker, and set a signal to prevent the worker from accepting more download
+// work.
+//
+// The chunk cleanup needs to occur after the worker mutex is released so that
+// the worker is not locked while chunk cleanup is happening.
+func (w *worker) managedKillDownloading() {
+	w.downloadMu.Lock()
+	var removedChunks []*unfinishedDownloadChunk
+	for i := 0; i < len(w.downloadChunks); i++ {
+		removedChunks = append(removedChunks, w.downloadChunks[i])
+	}
+	w.downloadChunks = w.downloadChunks[:0]
+	w.downloadTerminated = true
+	w.downloadMu.Unlock()
+	for i := 0; i < len(removedChunks); i++ {
+		removedChunks[i].managedRemoveWorker()
+	}
+}
+
+// managedNextDownloadChunk will pull the next potential chunk out of the work
+// queue for downloading.
+func (w *worker) managedNextDownloadChunk() *unfinishedDownloadChunk {
+	w.downloadMu.Lock()
+	defer w.downloadMu.Unlock()
+
+	if len(w.downloadChunks) == 0 {
+		return nil
+	}
+	nextChunk := w.downloadChunks[0]
+	w.downloadChunks = w.downloadChunks[1:]
+	return nextChunk
+}
+
+// managedQueueDownloadChunk adds a chunk to the worker's queue.
+func (w *worker) managedQueueDownloadChunk(udc *unfinishedDownloadChunk) {
+	// Accept the chunk unless the worker has been terminated. Accepting the
+	// chunk needs to happen under the same lock as fetching the termination
+	// status.
+	w.downloadMu.Lock()
+	terminated := w.downloadTerminated
+	if !terminated {
+		// Accept the chunk and issue a notification to the master thread that
+		// there is a new download.
+		w.downloadChunks = append(w.downloadChunks, udc)
+		select {
+		case w.downloadChan <- struct{}{}:
+		default:
 		}
-		udc.workersStandby = udc.workersStandby[:0]
 	}
-}
+	w.downloadMu.Unlock()
 
-// returnMemory will check on the status of all the workers and pieces, and
-// determine how much memory is safe to return to the renter. This should be
-// called each time a worker returns, and also after the chunk is recovered.
-func (udc *unfinishedDownloadChunk) returnMemory() {
-	// The maximum amount of memory is the pieces completed plus the number of
-	// workers remaining.
-	maxMemory := uint64(udc.workersRemaining+udc.piecesCompleted) * udc.staticPieceSize
-	// If enough pieces have completed, max memory is the number of registered
-	// pieces plus the number of completed pieces.
-	if udc.piecesCompleted >= udc.erasureCode.MinPieces() {
-		// udc.piecesRegistered is guaranteed to be at most equal to the number
-		// of overdrive pieces, meaning it will be equal to or less than
-		// initalMemory.
-		maxMemory = uint64(udc.piecesCompleted+udc.piecesRegistered) * udc.staticPieceSize
+	// If the worker has terminated, remove it from the udc. This call needs to
+	// happen without holding the worker lock.
+	if terminated {
+		udc.managedRemoveWorker()
 	}
-	// If the chunk recovery has completed, the maximum number of pieces is the
-	// number of registered.
-	if udc.recoveryComplete {
-		maxMemory = uint64(udc.piecesRegistered) * udc.staticPieceSize
-	}
-	// Return any memory we don't need.
-	if uint64(udc.memoryAllocated) > maxMemory {
-		udc.download.memoryManager.Return(udc.memoryAllocated - maxMemory)
-		udc.memoryAllocated = maxMemory
-	}
-}
-
-// removeWorker will release a download chunk that the worker had queued up.
-// This function should be called any time that a worker completes work.
-func (udc *unfinishedDownloadChunk) removeWorker() {
-	udc.workersRemaining--
-	udc.cleanUp()
 }
 
 // managedUnregisterWorker will remove the worker from an unfinished download
@@ -82,36 +126,39 @@ func (udc *unfinishedDownloadChunk) managedUnregisterWorker(w *worker) {
 	udc.mu.Lock()
 	udc.piecesRegistered--
 	udc.pieceUsage[udc.staticChunkMap[w.contract.ID].index] = false
-	udc.removeWorker()
 	udc.mu.Unlock()
 }
 
-// dropDownloadChunks will release all of the chunks that the worker is
-// currently working on.
-func (w *worker) dropDownloadChunks() {
-	for i := 0; i < len(w.downloadChunks); i++ {
-		w.downloadChunks[i].removeWorker()
+// ownedOnDownloadCooldown returns true if the worker is on cooldown from failed
+// downloads. This function should only be called by the master worker thread,
+// and does not require any mutexes.
+func (w *worker) ownedOnDownloadCooldown() bool {
+	requiredCooldown := downloadFailureCooldown
+	for i := 0; i < w.ownedDownloadConsecutiveFailures && i < maxConsecutivePenalty; i++ {
+		requiredCooldown *= 2
 	}
-	w.downloadChunks = w.downloadChunks[:0]
+	return time.Now().Before(w.ownedDownloadRecentFailure.Add(requiredCooldown))
 }
 
-// managedProcessDownloadChunk will take a potential download chunk, figure out
-// if there is work to do, and then perform any registration or processing with
-// the chunk before returning the chunk to the caller.
+// ownedProcessDownloadChunk will take a potential download chunk, figure out if
+// there is work to do, and then perform any registration or processing with the
+// chunk before returning the chunk to the caller.
 //
 // If no immediate action is required, 'nil' will be returned.
-func (w *worker) managedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfinishedDownloadChunk {
+func (w *worker) ownedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfinishedDownloadChunk {
+	// Determine whether the worker needs to drop the chunk. If so, remove the
+	// worker and return nil. Worker only needs to be removed if worker is being
+	// dropped.
 	udc.mu.Lock()
-	defer udc.mu.Unlock()
-
-	// Determine whether the worker needs to drop the chunk.
 	chunkComplete := udc.piecesCompleted >= udc.erasureCode.MinPieces()
 	chunkFailed := udc.piecesCompleted+udc.workersRemaining < udc.erasureCode.MinPieces()
 	chunkData, workerHasPiece := udc.staticChunkMap[w.contract.ID]
-	if chunkComplete || chunkFailed || w.onDownloadCooldown() || !workerHasPiece {
-		udc.removeWorker()
+	if chunkComplete || chunkFailed || w.ownedOnDownloadCooldown() || !workerHasPiece {
+		udc.mu.Unlock()
+		udc.managedRemoveWorker()
 		return nil
 	}
+	defer udc.mu.Unlock()
 
 	// TODO: This is where we would put filters based on worker latency, worker
 	// price, worker throughput, etc. There's a lot of fancy stuff we can do
@@ -122,6 +169,11 @@ func (w *worker) managedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfi
 	// Workers that do not meet the extra criteria are not discarded but rather
 	// put on standby, so that they can step in if the workers that do meet the
 	// extra criteria fail or otherwise prove insufficient.
+	//
+	// NOTE: Any metrics that we pull from the worker here need to be 'owned'
+	// metrics, so that we can avoid holding the worker lock and the udc lock
+	// simultaneously (deadlock risk). The 'owned' variables of the worker are
+	// variables that are only accessed by the master worker thread.
 	meetsExtraCriteria := true
 
 	// TODO: There's going to need to be some method for relaxing criteria after
@@ -148,51 +200,8 @@ func (w *worker) managedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfi
 		return udc
 	}
 	// Worker is not needed unless another worker fails, so put this worker on
-	// standby for this chunk.
+	// standby for this chunk. The worker is still available to help with the
+	// download, so the worker is not removed from the chunk in this codepath.
 	udc.workersStandby = append(udc.workersStandby, w)
 	return nil
-}
-
-// managedDownload will perform some download work.
-func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
-	// Process this chunk. If the worker is not fit to do the download, or is
-	// put on standby, 'nil' will be returned.
-	udc = w.managedProcessDownloadChunk(udc)
-	if udc == nil {
-		return
-	}
-
-	// Fetch the sector.
-	d, err := w.renter.hostContractor.Downloader(w.contract.ID, w.renter.tg.StopChan())
-	if err != nil {
-		udc.managedUnregisterWorker(w)
-		return
-	}
-	defer d.Close()
-	data, err := d.Sector(udc.staticChunkMap[w.contract.ID].root)
-	if err != nil {
-		udc.managedUnregisterWorker(w)
-		return
-	}
-	// TODO: Instead of adding the whole sector after the download completes,
-	// have the 'd.Sector' call add to this value ongoing as the sector comes
-	// in. Perhaps even include the data from creating the downloader and other
-	// data sent to and received from the host (like signatures) that aren't
-	// actually payload data.
-	atomic.AddUint64(&udc.download.atomicTotalDataTransfered, udc.staticPieceSize)
-
-	// Mark the piece as completed. Perform chunk recovery if we have enough
-	// pieces to do so. Chunk recovery is an expensive operation that should be
-	// performed in a separate thread as to not block the worker.
-	udc.mu.Lock()
-	udc.piecesCompleted++
-	udc.piecesRegistered--
-	if udc.piecesCompleted <= udc.erasureCode.MinPieces() {
-		udc.physicalChunkData[udc.staticChunkMap[w.contract.ID].index] = data
-	}
-	if udc.piecesCompleted == udc.erasureCode.MinPieces() {
-		go udc.threadedRecoverLogicalData()
-	}
-	udc.removeWorker()
-	udc.mu.Unlock()
 }

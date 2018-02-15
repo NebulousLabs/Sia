@@ -27,12 +27,18 @@ type worker struct {
 	hostPubKey types.SiaPublicKey
 	renter     *Renter
 
-	// Download variables.
-	downloadChan                chan struct{}              // Notifications of new work. Takes priority over uploads.
-	downloadChunks              []*unfinishedDownloadChunk // Yet unprocessed work items.
-	downloadConsecutiveFailures int                        // How many failures in a row?
-	downloadRecentFailure       time.Time                  // How recent was the last failure?
-	downloadTerminated          bool                       // Has downloading been terminated for this worker?
+	// Download variables that are not protected by a mutex, but also do not
+	// need to be protected by a mutex, as they are only accessed by the master
+	// thread for the worker.
+	ownedDownloadConsecutiveFailures int       // How many failures in a row?
+	ownedDownloadRecentFailure       time.Time // How recent was the last failure?
+
+	// Download variables related to queuing work. They have a separate mutex to
+	// minimize lock contention.
+	downloadChan       chan struct{}              // Notifications of new work. Takes priority over uploads.
+	downloadChunks     []*unfinishedDownloadChunk // Yet unprocessed work items.
+	downloadMu         sync.Mutex
+	downloadTerminated bool // Has downloading been terminated for this worker?
 
 	// Upload variables.
 	unprocessedChunks         []*unfinishedChunk // Yet unprocessed work items.
@@ -50,14 +56,6 @@ type worker struct {
 	mu       sync.Mutex
 }
 
-// managedKillDownloading will drop all of the pieces given to the worker.
-func (w *worker) managedKillDownloading() {
-	w.mu.Lock()
-	w.dropDownloadChunks()
-	w.downloadTerminated = true
-	w.mu.Unlock()
-}
-
 // managedKillUploading will disable all uploading for the worker.
 func (w *worker) managedKillUploading() {
 	w.mu.Lock()
@@ -66,48 +64,23 @@ func (w *worker) managedKillUploading() {
 	w.mu.Unlock()
 }
 
-// onDownloadCooldown returns true if the worker is on cooldown from failed
-// downloads.
-func (w *worker) onDownloadCooldown() bool {
-	requiredCooldown := downloadFailureCooldown
-	for i := 0; i < w.downloadConsecutiveFailures && i < maxConsecutivePenalty; i++ {
-		requiredCooldown *= 2
-	}
-	return time.Now().Before(w.downloadRecentFailure.Add(requiredCooldown))
-}
-
-// onUploadCooldown returns true if the worker is on cooldown from failed
-// uploads.
-func (w *worker) onUploadCooldown() bool {
-	requiredCooldown := uploadFailureCooldown
-	for i := 0; i < w.uploadConsecutiveFailures && i < maxConsecutivePenalty; i++ {
-		requiredCooldown *= 2
-	}
-	return time.Now().Before(w.uploadRecentFailure.Add(requiredCooldown))
-}
-
-// managedQueueDownloadChunk adds a chunk to the worker's queue.
-func (w *worker) managedQueueDownloadChunk(udc *unfinishedDownloadChunk) {
-	// Drop the chunk if the worker is terminated or on cooldown.
+// managedNextUploadChunk will pull the next potential chunk out of the worker's
+// work queue for uploading.
+func (w *worker) managedNextUploadChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
 	w.mu.Lock()
-	terminated := w.downloadTerminated
-	onCooldown := w.onDownloadCooldown()
-	w.mu.Unlock()
-	if terminated || onCooldown {
-		udc.mu.Lock()
-		udc.removeWorker()
-		udc.mu.Unlock()
-		return
-	}
+	defer w.mu.Unlock()
 
-	// Append the chunk and send a signal that download chunks are available.
-	w.mu.Lock()
-	w.downloadChunks = append(w.downloadChunks, udc)
-	w.mu.Unlock()
-	select {
-	case w.downloadChan <- struct{}{}:
-	default:
+	// Loop through the unprocessed chunks and find some work to do.
+	for range w.unprocessedChunks {
+		// Pull a chunk off of the unprocessed chunks stack.
+		chunk := w.unprocessedChunks[0]
+		w.unprocessedChunks = w.unprocessedChunks[1:]
+		nextChunk, pieceIndex := w.processUploadChunk(chunk)
+		if nextChunk != nil {
+			return nextChunk, pieceIndex
+		}
 	}
+	return nil, 0 // no work found
 }
 
 // managedQueueUploadChunk will take a chunk and add it to the worker's repair
@@ -134,40 +107,60 @@ func (w *worker) managedQueueUploadChunk(uc *unfinishedChunk) {
 	}
 }
 
-// managedNextDownloadChunk will pull the next potential chunk out of the work
-// queue for downloading.
-//
-// Concurrency in this function is a little funky because we do not want to be
-// holding the lock when we call 'processDownloadChunk'.
-func (w *worker) managedNextDownloadChunk() *unfinishedDownloadChunk {
-	w.mu.Lock()
-	if len(w.downloadChunks) == 0 {
-		w.mu.Unlock()
-		return nil
+// onUploadCooldown returns true if the worker is on cooldown from failed
+// uploads.
+func (w *worker) onUploadCooldown() bool {
+	requiredCooldown := uploadFailureCooldown
+	for i := 0; i < w.uploadConsecutiveFailures && i < maxConsecutivePenalty; i++ {
+		requiredCooldown *= 2
 	}
-	nextChunk := w.downloadChunks[0]
-	w.downloadChunks = w.downloadChunks[1:]
-	w.mu.Unlock()
-	return nextChunk
+	return time.Now().Before(w.uploadRecentFailure.Add(requiredCooldown))
 }
 
-// managedNextUploadChunk will pull the next potential chunk out of the worker's
-// work queue for uploading.
-func (w *worker) managedNextUploadChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+// threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
+// is killed or when the thread group is closed.
+func (w *worker) threadedWorkLoop() {
+	err := w.renter.tg.Add()
+	if err != nil {
+		return
+	}
+	defer w.renter.tg.Done()
+	defer w.managedKillUploading()
+	defer w.managedKillDownloading()
 
-	// Loop through the unprocessed chunks and find some work to do.
-	for range w.unprocessedChunks {
-		// Pull a chunk off of the unprocessed chunks stack.
-		chunk := w.unprocessedChunks[0]
-		w.unprocessedChunks = w.unprocessedChunks[1:]
-		nextChunk, pieceIndex := w.processUploadChunk(chunk)
-		if nextChunk != nil {
-			return nextChunk, pieceIndex
+	for {
+		// Perform one stpe of processing download work.
+		downloadChunk := w.managedNextDownloadChunk()
+		if downloadChunk != nil {
+			// managedDownload will handle removing the worker internally. If
+			// the chunk is dropped from the worker, the worker will be removed
+			// from the chunk. If the worker executes a download (success or
+			// failure), the worker will be removed from the chunk. If the
+			// worker is put on standby, it will not be removed from the chunk.
+			w.managedDownload(downloadChunk)
+			continue
+		}
+
+		// Perform one step of processing upload work.
+		chunk, pieceIndex := w.managedNextUploadChunk()
+		if chunk != nil {
+			w.managedUpload(chunk, pieceIndex)
+			continue
+		}
+
+		// Block until new work is received via the upload or download channels,
+		// or until a kill or stop signal is received.
+		select {
+		case <-w.downloadChan:
+			continue
+		case <-w.uploadChan:
+			continue
+		case <-w.killChan:
+			return
+		case <-w.renter.tg.StopChan():
+			return
 		}
 	}
-	return nil, 0 // no work found
 }
 
 // updateWorkerPool will grab the set of contracts from the contractor and
@@ -210,47 +203,4 @@ func (r *Renter) managedUpdateWorkerPool() {
 		}
 	}
 	r.mu.Unlock(lockID)
-}
-
-// threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
-// is killed or when the thread group is closed.
-func (w *worker) threadedWorkLoop() {
-	err := w.renter.tg.Add()
-	if err != nil {
-		return
-	}
-	defer w.renter.tg.Done()
-	// The worker may have upload chunks and it needs to drop them before
-	// terminating.
-	defer w.managedKillUploading()
-	defer w.managedKillDownloading()
-
-	for {
-		// Perform one stpe of processing download work.
-		downloadChunk := w.managedNextDownloadChunk()
-		if downloadChunk != nil {
-			w.managedDownload(downloadChunk)
-			continue
-		}
-
-		// Perform one step of processing upload work.
-		chunk, pieceIndex := w.managedNextUploadChunk()
-		if chunk != nil {
-			w.managedUpload(chunk, pieceIndex)
-			continue
-		}
-
-		// Block until new work is received via the upload or download channels,
-		// or until a kill or stop signal is received.
-		select {
-		case <-w.downloadChan:
-			continue
-		case <-w.uploadChan:
-			continue
-		case <-w.killChan:
-			return
-		case <-w.renter.tg.StopChan():
-			return
-		}
-	}
 }

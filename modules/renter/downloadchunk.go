@@ -32,6 +32,7 @@ type unfinishedDownloadChunk struct {
 	destination downloadDestination // Where to write the recovered logical chunk.
 	erasureCode modules.ErasureCoder
 	masterKey   crypto.TwofishKey
+	id string
 
 	// Fetch + Write instructions - read only or otherwise thread safe.
 	staticChunkIndex  uint64                                     // Required for deriving the encryption keys for each piece.
@@ -67,23 +68,108 @@ type unfinishedDownloadChunk struct {
 }
 
 // fail will set the chunk status to failed. The physical chunk memory will be
-// wiped and any allocation will be returned to the renter. The download as a
-// whole will be failed as well.
+// wiped and any memory allocation will be returned to the renter. The download
+// as a whole will be failed as well.
 func (udc *unfinishedDownloadChunk) fail(err error) {
 	udc.failed = true
 	udc.recoveryComplete = true
 	for i := range udc.physicalChunkData {
 		udc.physicalChunkData[i] = nil
 	}
-	udc.download.managedFail(fmt.Errorf("chunk %v failed", udc.staticChunkIndex))
+	udc.download.managedFail(fmt.Errorf("chunk %v failed: %v", udc.staticChunkIndex, err))
+}
+
+// managedCleanUp will check if the download has failed, and if not it will add
+// any standby workers which need to be added. Calling managedCleanUp too many
+// times is not harmful, however missing a call to managedCleanUp can lead to
+// dealocks.
+func (udc *unfinishedDownloadChunk) managedCleanUp() {
+	// Check if the chunk is newly failed.
+	udc.mu.Lock()
+	if udc.workersRemaining+udc.piecesCompleted < udc.erasureCode.MinPieces() && !udc.failed {
+		udc.fail(errors.New("not enough workers to continue download"))
+	}
+
+	// Return any excess memory.
+	udc.returnMemory()
+
+	// Nothing to do if the chunk has failed.
+	if udc.failed {
+		udc.mu.Unlock()
+		return
+	}
+
+	// Check whether standby workers are required.
+	chunkComplete := udc.piecesCompleted >= udc.erasureCode.MinPieces()
+	desiredPiecesRegistered := udc.erasureCode.MinPieces() + udc.staticOverdrive - udc.piecesCompleted
+	standbyWorkersRequired := !chunkComplete && udc.piecesRegistered < desiredPiecesRegistered
+	if !standbyWorkersRequired {
+		udc.mu.Unlock()
+		return
+	}
+
+	// Assemble a list of standby workers, release the udc lock, and then queue
+	// the chunk into the workers. The lock needs to be released early because
+	// holding the udc lock and the worker lock at the same time is a deadlock
+	// risk (they interact with eachother, call functions on eachother).
+	var standbyWorkers []*worker
+	for i := 0; i < len(udc.workersStandby); i++ {
+		standbyWorkers = append(standbyWorkers, udc.workersStandby[i])
+	}
+	udc.workersStandby = udc.workersStandby[:0] // Workers have been taken off of standby.
+	udc.mu.Unlock()
+	for i := 0; i < len(standbyWorkers); i++ {
+		standbyWorkers[i].managedQueueDownloadChunk(udc)
+	}
+}
+
+// managedRemoveWorker will decrement a worker from the set of remaining workers
+// in the udc. After a worker has been removed, the udc needs to be cleaned up.
+func (udc *unfinishedDownloadChunk) managedRemoveWorker() {
+	udc.mu.Lock()
+	udc.workersRemaining--
+	udc.mu.Unlock()
+	udc.managedCleanUp()
+}
+
+// returnMemory will check on the status of all the workers and pieces, and
+// determine how much memory is safe to return to the renter. This should be
+// called each time a worker returns, and also after the chunk is recovered.
+func (udc *unfinishedDownloadChunk) returnMemory() {
+	// The maximum amount of memory is the pieces completed plus the number of
+	// workers remaining.
+	maxMemory := uint64(udc.workersRemaining+udc.piecesCompleted) * udc.staticPieceSize
+	// If enough pieces have completed, max memory is the number of registered
+	// pieces plus the number of completed pieces.
+	if udc.piecesCompleted >= udc.erasureCode.MinPieces() {
+		// udc.piecesRegistered is guaranteed to be at most equal to the number
+		// of overdrive pieces, meaning it will be equal to or less than
+		// initalMemory.
+		maxMemory = uint64(udc.piecesCompleted+udc.piecesRegistered) * udc.staticPieceSize
+	}
+	// If the chunk recovery has completed, the maximum number of pieces is the
+	// number of registered.
+	if udc.recoveryComplete {
+		maxMemory = uint64(udc.piecesRegistered) * udc.staticPieceSize
+	}
+	// Return any memory we don't need.
+	if uint64(udc.memoryAllocated) > maxMemory {
+		udc.download.memoryManager.Return(udc.memoryAllocated - maxMemory)
+		udc.memoryAllocated = maxMemory
+	}
 }
 
 // threadedRecoverLogicalData will take all of the pieces that have been
 // downloaded and encode them into the logical data which is then written to the
 // underlying writer for the download.
 func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
-	// Decrypt the chunk pieces.
-	udc.mu.Lock()
+	// Ensure cleanup occurs after the data is recovered, whether recovery
+	// succeeds or fails.
+	defer udc.managedCleanUp()
+
+	// Decrypt the chunk pieces. This doesn't need to happen under a lock,
+	// because any thread potentially writing to the physicalChunkData array is
+	// going to be stopped by the fact that the chunk is complete.
 	for i := range udc.physicalChunkData {
 		// Skip empty pieces.
 		if udc.physicalChunkData[i] == nil {
@@ -93,17 +179,22 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 		key := deriveKey(udc.masterKey, udc.staticChunkIndex, uint64(i))
 		decryptedPiece, err := key.DecryptBytes(udc.physicalChunkData[i])
 		if err != nil {
+			udc.mu.Lock()
 			udc.fail(err)
 			udc.mu.Unlock()
-			return err
+			return errors.AddContext(err, "unable to decrypt chunk")
 		}
 		udc.physicalChunkData[i] = decryptedPiece
 	}
 
 	// Recover the pieces into the logical chunk data.
+	//
+	// TODO: Might be some way to recover into the downloadDestination instead
+	// of creating a buffer and then writing that.
 	recoverWriter := new(bytes.Buffer)
 	err := udc.erasureCode.Recover(udc.physicalChunkData, udc.staticChunkSize, recoverWriter)
 	if err != nil {
+		udc.mu.Lock()
 		udc.fail(err)
 		udc.mu.Unlock()
 		return errors.AddContext(err, "unable to recover chunk")
@@ -112,14 +203,15 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	for i := range udc.physicalChunkData {
 		udc.physicalChunkData[i] = nil
 	}
-	udc.mu.Unlock()
 
 	// Write the bytes to the requested output.
 	start := udc.staticFetchOffset
 	end := udc.staticFetchOffset + udc.staticFetchLength
 	_, err = udc.destination.WriteAt(recoverWriter.Bytes()[start:end], udc.staticWriteOffset)
 	if err != nil {
+		udc.mu.Lock()
 		udc.fail(err)
+		udc.mu.Unlock()
 		return errors.AddContext(err, "unable to write to download destination")
 	}
 	recoverWriter = nil
@@ -130,7 +222,6 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	// is consistent.
 	udc.mu.Lock()
 	udc.recoveryComplete = true
-	udc.cleanUp()
 	udc.mu.Unlock()
 
 	// Update the download and signal completion of this chunk.

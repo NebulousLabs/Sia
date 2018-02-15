@@ -66,12 +66,6 @@ func (dch *downloadChunkHeap) Pop() interface{} {
 // chunk to be downloaded. 'false' will be returned if the renter shuts down
 // before memory can be acquired.
 func (r *Renter) managedAcquireMemoryForDownloadChunk(udc *unfinishedDownloadChunk) bool {
-	// If the chunk does not need memory, can return immediately with a success
-	// condition - all requried memory has been acquired.
-	if !udc.staticNeedsMemory {
-		return true
-	}
-
 	// The amount of memory required is equal minimum number of pieces plus the
 	// overdrive amount.
 	//
@@ -130,25 +124,33 @@ func (r *Renter) managedDistributeDownloadChunkToWorkers(udc *unfinishedDownload
 	id := r.mu.Lock()
 	udc.mu.Lock()
 	udc.workersRemaining = len(r.workerPool)
-	udc.cleanUp() // Return any memory that we don't need if e.g. not enough workers for overdrive.
 	udc.mu.Unlock()
 	for _, worker := range r.workerPool {
 		worker.managedQueueDownloadChunk(udc)
 	}
 	r.mu.Unlock(id)
+
+	// If there are no workers, there will be no workers to attempt to clean up
+	// the chunk, so we must make sure that managedCleanUp is called at least
+	// once on the chunk.
+	udc.managedCleanUp()
 }
 
 // managedNextDownloadChunk will fetch the next chunk from the download heap. If
 // the download heap is empty, 'nil' will be returned.
 func (r *Renter) managedNextDownloadChunk() *unfinishedDownloadChunk {
 	r.downloadHeapMu.Lock()
-	if r.downloadHeap.Len() <= 0 {
-		r.downloadHeapMu.Unlock()
-		return nil
+	defer r.downloadHeapMu.Unlock()
+
+	for {
+		if r.downloadHeap.Len() <= 0 {
+			return nil
+		}
+		nextChunk := heap.Pop(r.downloadHeap).(*unfinishedDownloadChunk)
+		if !nextChunk.download.staticComplete() {
+			return nextChunk
+		}
 	}
-	nextChunk := heap.Pop(r.downloadHeap).(*unfinishedDownloadChunk)
-	r.downloadHeapMu.Unlock()
-	return nextChunk
 }
 
 // threadedDownloadLoop utilizes the worker pool to make progress on any queued
@@ -180,7 +182,9 @@ LOOP:
 			// Check that we still have an internet connection, and also that we
 			// do not need to update the worker pool yet.
 			if !r.g.Online() || time.Now().After(workerUpdateTime.Add(workerPoolUpdateTimeout)) {
-				// Reset to the top of the outer loop.
+				// Reset to the top of the outer loop. Either we need to wait
+				// until we are online, or we need to refresh the worker pool.
+				// The outer loop will handle both situations.
 				continue LOOP
 			}
 
