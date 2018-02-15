@@ -31,7 +31,11 @@ func (udc *unfinishedDownloadChunk) cleanUp() {
 	desiredPiecesRegistered := udc.erasureCode.MinPieces() + udc.staticOverdrive - udc.piecesCompleted
 	if !chunkComplete && udc.piecesRegistered < desiredPiecesRegistered {
 		for i := 0; i < len(udc.workersStandby); i++ {
-			udc.workersStandby[i].managedQueueDownloadChunk(udc)
+			// Convention mandates that the udc be unlocked when passed in as an
+			// argument (and in this case, failing to do so causes a deadlock).
+			// Since we can't unlock the udc here, we'll have to use a goroutine
+			// to make the call to prevent a deadlock.
+			go udc.workersStandby[i].managedQueueDownloadChunk(udc)
 		}
 		udc.workersStandby = udc.workersStandby[:0]
 	}
