@@ -143,7 +143,7 @@ type (
 	download struct {
 		// Data progress variables.
 		atomicDataReceived        uint64 // Incremented as data completes, will stop at 100% file progress.
-		atomicTotalDataTransfered uint64 // Incremented as data arrives, includes overdrive, contract negotitiaon, etc.
+		atomicTotalDataTransfered uint64 // Incremented as data arrives, includes overdrive, contract negotiation, etc.
 
 		// Other progress variables.
 		chunksRemaining uint64        // Number of chunks whose downloads are incomplete.

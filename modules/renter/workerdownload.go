@@ -43,13 +43,7 @@ func (udc *unfinishedDownloadChunk) cleanUp() {
 func (udc *unfinishedDownloadChunk) returnMemory() {
 	// The maximum amount of memory is the pieces completed plus the number of
 	// workers remaining.
-	initialMemory := uint64(udc.staticOverdrive+udc.erasureCode.MinPieces()) * udc.staticPieceSize
 	maxMemory := uint64(udc.workersRemaining+udc.piecesCompleted) * udc.staticPieceSize
-	// If the maxMemory exceeds the inital memory, set the max memory equal to
-	// the initial memory.
-	if maxMemory > initialMemory {
-		maxMemory = initialMemory
-	}
 	// If enough pieces have completed, max memory is the number of registered
 	// pieces plus the number of completed pieces.
 	if udc.piecesCompleted >= udc.erasureCode.MinPieces() {

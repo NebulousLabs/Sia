@@ -182,7 +182,6 @@ func (ddw *downloadDestinationWriteCloser) WriteAt(data []byte, offset int64) (i
 	return n, err
 }
 
-
 // writerToWriteCloser will convert an io.Writer to an io.WriteCloser by adding
 // a Close function which always returns nil.
 type writerToWriteCloser struct {
