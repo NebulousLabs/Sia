@@ -480,8 +480,8 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	// trigger 1 renewal and 1 new contract
 	c.mu.Lock()
 	ids := c.contracts.IDs()
-	contract, _ := c.contracts.Acquire(ids[0])
-	c.contracts.Delete(contract)
+	contract, _, lockid := c.contracts.Acquire(ids[0])
+	c.contracts.Delete(contract, lockid)
 	c.mu.Unlock()
 	a.Funds = a.Funds.Mul64(2)
 	err = c.SetAllowance(a)

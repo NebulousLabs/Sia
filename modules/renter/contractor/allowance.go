@@ -127,11 +127,11 @@ func (c *Contractor) managedCancelAllowance() error {
 	// Cycle through all contracts and delete them.
 	ids = c.contracts.IDs()
 	for _, id := range ids {
-		contract, exists := c.contracts.Acquire(id)
+		contract, exists, lockid := c.contracts.Acquire(id)
 		if !exists {
 			continue
 		}
-		c.contracts.Delete(contract)
+		c.contracts.Delete(contract, lockid)
 	}
 	return nil
 }

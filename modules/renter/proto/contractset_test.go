@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/fastrand"
@@ -12,13 +13,13 @@ import (
 
 // mustAcquire is a convenience function for acquiring contracts that are
 // known to be in the set.
-func (cs *ContractSet) mustAcquire(t *testing.T, id types.FileContractID) *SafeContract {
+func (cs *ContractSet) mustAcquire(t *testing.T, id types.FileContractID) (*SafeContract, int) {
 	t.Helper()
-	c, ok := cs.Acquire(id)
+	c, ok, lockid := cs.Acquire(id)
 	if !ok {
 		t.Fatal("no contract with that id")
 	}
-	return c
+	return c, lockid
 }
 
 // TestContractSet tests that the ContractSet type is safe for concurrent use.
@@ -32,7 +33,7 @@ func TestContractSet(t *testing.T) {
 				PublicKeys: []types.SiaPublicKey{{}, {}},
 			},
 		}},
-	}}}
+	}}, mu: siasync.New(time.Minute, 100)}
 	id1 := c1.header.ID()
 	c2 := &SafeContract{header: contractHeader{Transaction: types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{{
@@ -42,7 +43,7 @@ func TestContractSet(t *testing.T) {
 				PublicKeys: []types.SiaPublicKey{{}, {}},
 			},
 		}},
-	}}}
+	}}, mu: siasync.New(time.Minute, 100)}
 	id2 := c2.header.ID()
 	cs := &ContractSet{
 		contracts: map[types.FileContractID]*SafeContract{
@@ -52,8 +53,8 @@ func TestContractSet(t *testing.T) {
 	}
 
 	// uncontested acquire/release
-	c1 = cs.mustAcquire(t, id1)
-	cs.Return(c1)
+	c1, lockid := cs.mustAcquire(t, id1)
+	cs.Return(c1, lockid)
 
 	// 100 concurrent serialized mutations
 	var wg sync.WaitGroup
@@ -61,31 +62,31 @@ func TestContractSet(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			c1 := cs.mustAcquire(t, id1)
+			c1, lockid := cs.mustAcquire(t, id1)
 			c1.header.Transaction.FileContractRevisions[0].NewRevisionNumber++
 			time.Sleep(time.Duration(fastrand.Intn(100)))
-			cs.Return(c1)
+			cs.Return(c1, lockid)
 		}()
 	}
 	wg.Wait()
-	c1 = cs.mustAcquire(t, id1)
-	cs.Return(c1)
+	c1, lockid = cs.mustAcquire(t, id1)
+	cs.Return(c1, lockid)
 	if c1.header.LastRevision().NewRevisionNumber != 100 {
 		t.Fatal("expected exactly 100 increments, got", c1.header.LastRevision().NewRevisionNumber)
 	}
 
 	// a blocked acquire shouldn't prevent a return
-	c1 = cs.mustAcquire(t, id1)
+	c1, lockid = cs.mustAcquire(t, id1)
 	go func() {
 		time.Sleep(time.Millisecond)
-		cs.Return(c1)
+		cs.Return(c1, lockid)
 	}()
-	c1 = cs.mustAcquire(t, id1)
-	cs.Return(c1)
+	c1, lockid = cs.mustAcquire(t, id1)
+	cs.Return(c1, lockid)
 
 	// delete and reinsert id2
-	c2 = cs.mustAcquire(t, id2)
-	cs.Delete(c2)
+	c2, lockid = cs.mustAcquire(t, id2)
+	cs.Delete(c2, lockid)
 	cs.mu.Lock()
 	cs.contracts[id2] = c2
 	cs.mu.Unlock()
@@ -109,13 +110,15 @@ func TestContractSet(t *testing.T) {
 						},
 					}},
 				},
-			}}
+			},
+				mu: siasync.New(time.Minute, 100),
+			}
 			id3 := c3.header.ID()
 			cs.mu.Lock()
 			cs.contracts[id3] = c3
 			cs.mu.Unlock()
-			cs.mustAcquire(t, id3)
-			cs.Delete(c3)
+			_, lockid := cs.mustAcquire(t, id3)
+			cs.Delete(c3, lockid)
 		},
 	}
 	wg = sync.WaitGroup{}

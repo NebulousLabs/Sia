@@ -57,11 +57,11 @@ func (he *Editor) Close() error {
 // Upload negotiates a revision that adds a sector to a file contract.
 func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, err error) {
 	// Acquire the contract.
-	sc, haveContract := he.contractSet.Acquire(he.contractID)
+	sc, haveContract, lockid := he.contractSet.Acquire(he.contractID)
 	if !haveContract {
 		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract not present in contract set")
 	}
-	defer he.contractSet.Return(sc)
+	defer he.contractSet.Return(sc, lockid)
 	contract := sc.header // for convenience
 
 	// calculate price
@@ -157,11 +157,11 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 // NewEditor initiates the contract revision process with a host, and returns
 // an Editor.
 func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContractID, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}) (_ *Editor, err error) {
-	sc, ok := cs.Acquire(id)
+	sc, ok, lockid := cs.Acquire(id)
 	if !ok {
 		return nil, errors.New("invalid contract")
 	}
-	defer cs.Return(sc)
+	defer cs.Return(sc, lockid)
 	contract := sc.header
 
 	// Increase Successful/Failed interactions accordingly

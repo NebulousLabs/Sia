@@ -33,11 +33,11 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 
 	// Acquire the contract.
 	// TODO: why not just lock the SafeContract directly?
-	sc, haveContract := hd.contractSet.Acquire(hd.contractID)
+	sc, haveContract, lockid := hd.contractSet.Acquire(hd.contractID)
 	if !haveContract {
 		return modules.RenterContract{}, nil, errors.New("contract not present in contract set")
 	}
-	defer hd.contractSet.Return(sc)
+	defer hd.contractSet.Return(sc, lockid)
 	contract := sc.header // for convenience
 
 	// calculate price
@@ -142,11 +142,11 @@ func (hd *Downloader) Close() error {
 // NewDownloader initiates the download request loop with a host, and returns a
 // Downloader.
 func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileContractID, hdb hostDB, cancel <-chan struct{}) (_ *Downloader, err error) {
-	sc, ok := cs.Acquire(id)
+	sc, ok, lockid := cs.Acquire(id)
 	if !ok {
 		return nil, errors.New("invalid contract")
 	}
-	defer cs.Return(sc)
+	defer cs.Return(sc, lockid)
 	contract := sc.header
 
 	// check that contract has enough value to support a download

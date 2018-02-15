@@ -348,7 +348,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// renew the contract
-	oldContract, _ := c.contracts.Acquire(contract.ID)
+	oldContract, _, lockid := c.contracts.Acquire(contract.ID)
 	c.mu.Lock()
 	c.contractUtilities[contract.ID] = modules.ContractUtility{GoodForRenew: true}
 	c.mu.Unlock()
@@ -356,7 +356,7 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.contracts.Return(oldContract)
+	c.contracts.Return(oldContract, lockid)
 
 	// check renewed contract
 	if contract.EndHeight != c.blockHeight+200 {
@@ -381,7 +381,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// renew to a lower height
-	oldContract, _ = c.contracts.Acquire(contract.ID)
+	oldContract, _, lockid = c.contracts.Acquire(contract.ID)
 	c.mu.Lock()
 	c.contractUtilities[contract.ID] = modules.ContractUtility{GoodForRenew: true}
 	c.mu.Unlock()
@@ -389,7 +389,7 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.contracts.Return(oldContract)
+	c.contracts.Return(oldContract, lockid)
 	if contract.EndHeight != c.blockHeight+100 {
 		t.Fatal(contract.EndHeight)
 	}

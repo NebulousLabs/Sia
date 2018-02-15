@@ -459,7 +459,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 
 			// Fetch the contract that we are renewing.
-			oldContract, exists := c.contracts.Acquire(id)
+			oldContract, exists, lockid := c.contracts.Acquire(id)
 			if !exists {
 				return
 			}
@@ -469,7 +469,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			c.mu.RUnlock()
 			if !oldUtility.GoodForRenew {
 				c.log.Printf("Contract %v slated for renew is marked not good for renew", id)
-				c.contracts.Return(oldContract)
+				c.contracts.Return(oldContract, lockid)
 				return
 			}
 			// Perform the actual renew. If the renew fails, return the
@@ -477,7 +477,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			newContract, err := c.managedRenew(oldContract, amount, endHeight)
 			if err != nil {
 				c.log.Printf("WARN: failed to renew contract %v: %v\n", id, err)
-				c.contracts.Return(oldContract)
+				c.contracts.Return(oldContract, lockid)
 				return
 			}
 			c.log.Printf("Renewed contract %v\n", id)
@@ -506,7 +506,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			c.mu.Lock()
 			defer c.mu.Unlock()
 			// Delete the old contract.
-			c.contracts.Delete(oldContract)
+			c.contracts.Delete(oldContract, lockid)
 			// Store the contract in the record of historic contracts.
 			c.oldContracts[id] = oldContract.Metadata()
 			// Add a mapping from the old contract to the new contract.
