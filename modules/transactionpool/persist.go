@@ -11,7 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 )
 
 const tpoolSyncRate = time.Minute * 2
@@ -49,11 +49,6 @@ func (tp *TransactionPool) syncDB() {
 	tp.dbTx, err = tp.db.Begin(true)
 	if err != nil {
 		tp.log.Severe("ERROR: failed to initialize a db transaction:", err)
-	}
-	// Flush the cached DB pages from memory
-	err = tp.dbTx.FlushDBPages()
-	if err != nil {
-		tp.log.Severe("ERROR: failed to flush db pages:", err)
 	}
 }
 

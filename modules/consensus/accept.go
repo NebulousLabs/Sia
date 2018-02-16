@@ -11,7 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 )
 
 var (
@@ -284,8 +284,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 				panic("after adding a change entry, there are no applied blocks but there are reverted blocks")
 			}
 		}
-		// Flush DB pages
-		return tx.FlushDBPages()
+		return nil
 	})
 	cs.log.Printf("accept: finished block processing loop")
 	if _, ok := setErr.(bolt.MmapError); ok {

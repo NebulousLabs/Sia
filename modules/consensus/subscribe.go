@@ -5,7 +5,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 
 	siasync "github.com/NebulousLabs/Sia/sync"
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 )
 
 // computeConsensusChange computes the consensus change from the change entry
@@ -187,16 +187,6 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 			return nil
 		})
 		cs.mu.RUnlock()
-		if err != nil {
-			return err
-		}
-		// Flush DB pages from memory. Caching the pages doesn't improve
-		// performance much anyway, since they are only read once.
-		cs.mu.Lock()
-		err = cs.db.Update(func(tx *bolt.Tx) error {
-			return tx.FlushDBPages()
-		})
-		cs.mu.Unlock()
 		if err != nil {
 			return err
 		}

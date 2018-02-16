@@ -7,7 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/types"
 
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 )
 
 // TestChildTargetOak checks the childTargetOak function, especially for edge
