@@ -360,7 +360,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		// the slow hosts could end up hogging all of the memory and slowing the
 		// whole system down. Ideally the fix for that type of scenario would
 		// happen within the worker standby selection though.
-		if i < 2 {
+		if i < minChunk+1 || i+3 > maxChunk {
 			udc.staticOverdrive = params.overdrive
 		}
 
@@ -437,7 +437,7 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 		length:        p.Length,
 		needsMemory:   true,
 		offset:        p.Offset,
-		overdrive:     2, // TODO: moderate default until full overdrive support is added.
+		overdrive:     3, // TODO: moderate default until full overdrive support is added.
 		priority:      5, // TODO: moderate default until full priority support is added.
 	})
 	if err != nil {

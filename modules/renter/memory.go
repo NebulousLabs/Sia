@@ -22,12 +22,13 @@ import (
 // future requests for memory until the memory is returned. This allows large
 // requests to go through even if there is not enough base memory.
 type memoryManager struct {
-	available uint64
-	base      uint64
-	fifo      []*memoryRequest
-	mu        sync.Mutex
-	stop      <-chan struct{}
-	underflow uint64
+	available    uint64
+	base         uint64
+	fifo         []*memoryRequest
+	priorityFifo []*memoryRequest
+	mu           sync.Mutex
+	stop         <-chan struct{}
+	underflow    uint64
 }
 
 // memoryRequest is a single thread that is blocked while waiting for memory.
@@ -63,7 +64,7 @@ func (mm *memoryManager) try(amount uint64) bool {
 // Request is a blocking request for memory. The request will return when the
 // memory has been acquired. If 'false' is returned, it means that the renter
 // shut down before the memory could be allocated.
-func (mm *memoryManager) Request(amount uint64) bool {
+func (mm *memoryManager) Request(amount uint64, priority bool) bool {
 	// Try to request the memory.
 	mm.mu.Lock()
 	if len(mm.fifo) == 0 && mm.try(amount) {
@@ -76,7 +77,11 @@ func (mm *memoryManager) Request(amount uint64) bool {
 		amount: amount,
 		done:   make(chan struct{}),
 	}
-	mm.fifo = append(mm.fifo, myRequest)
+	if priority {
+		mm.priorityFifo = append(mm.priorityFifo, myRequest)
+	} else {
+		mm.fifo = append(mm.fifo, myRequest)
+	}
 	mm.mu.Unlock()
 
 	// Block until memory is available or until shutdown. The thread that closes
@@ -116,12 +121,25 @@ func (mm *memoryManager) Return(amount uint64) {
 		mm.available = mm.base
 	}
 
+	// Release as many of the priority threads blocking in the fifo as possible.
+	for len(mm.priorityFifo) > 0 {
+		if !mm.try(mm.priorityFifo[0].amount) {
+			// There is not enough memory to grant the next request, meaning no
+			// future requests should be checked either.
+			return
+		}
+		// There is enough memory to grant the next request. Unblock that
+		// request and continue checking the next requests.
+		close(mm.priorityFifo[0].done)
+		mm.priorityFifo = mm.priorityFifo[1:]
+	}
+
 	// Release as many of the threads blocking in the fifo as possible.
 	for len(mm.fifo) > 0 {
 		if !mm.try(mm.fifo[0].amount) {
 			// There is not enough memory to grant the next request, meaning no
 			// future requests should be checked either.
-			break
+			return
 		}
 		// There is enough memory to grant the next request. Unblock that
 		// request and continue checking the next requests.

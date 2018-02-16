@@ -14,6 +14,12 @@ const (
 	// downloadFailureCooldown defines how long to wait for a worker after a
 	// worker has experienced a download failure.
 	downloadFailureCooldown = time.Second * 3
+
+	// memoryPriorityLow is used to request low priority memory
+	memoryPriorityLow = false
+
+	// memoryPriorityHigh is used to request high priority memory
+	memoryPriorityHigh = true
 )
 
 var (

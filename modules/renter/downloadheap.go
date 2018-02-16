@@ -71,7 +71,7 @@ func (r *Renter) managedAcquireMemoryForDownloadChunk(udc *unfinishedDownloadChu
 	// go over the memory limits when we decode pieces.
 	memoryRequired := uint64(udc.staticOverdrive+udc.erasureCode.MinPieces()) * udc.staticPieceSize
 	udc.memoryAllocated = memoryRequired
-	return r.memoryManager.Request(memoryRequired)
+	return r.memoryManager.Request(memoryRequired, memoryPriorityHigh)
 }
 
 // managedAddChunkToDownloadHeap will add a chunk to the download heap in a

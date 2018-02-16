@@ -249,7 +249,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 	// of memory available, and then spin up a thread to asynchronously handle
 	// the rest of the chunk tasks.
 	nextChunk := heap.Pop(ch).(*unfinishedChunk)
-	if !r.memoryManager.Request(nextChunk.memoryNeeded) {
+	if !r.memoryManager.Request(nextChunk.memoryNeeded, memoryPriorityLow) {
 		return
 	}
 	// Add this thread to the waitgroup. This Add will be released once the
