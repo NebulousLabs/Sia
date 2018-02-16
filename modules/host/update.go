@@ -7,12 +7,61 @@ import (
 	"encoding/binary"
 	"encoding/json"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/errors"
 )
+
+// adjustContractPrice updates the recentContractPrices and sets the adjustedContractPrices to the new maximum value
+// in recentContractPrices
+func (h *Host) adjustContractPrice() {
+	// Check if adjustContractPrice was disabled for testing
+	if h.dependencies.disrupt("disablePriceAdjustment") {
+		h.adjustedContractPrice = h.settings.MinContractPrice
+		return
+	}
+
+	// Update the contract price estimates by adding a new estimate
+	_, max := h.tpool.FeeEstimation()
+	newEstimate := max.Mul64(10e3) // 10 kb
+	h.recentContractPrices = append(h.recentContractPrices, newEstimate)
+
+	// If the new estimate is greater than the last max it becomes the new max
+	if newEstimate.Cmp(h.adjustedContractPrice) > 0 {
+		h.adjustedContractPrice = newEstimate
+	}
+
+	// Remove elements if there are more than 144 estimates in the slice
+	for len(h.recentContractPrices) > 144 {
+		removedPrice := h.recentContractPrices[0]
+		h.recentContractPrices = h.recentContractPrices[1:]
+
+		if removedPrice.Cmp(h.adjustedContractPrice) < 0 {
+			// adjustedContractPrice is still the maximum. Nothing to do
+		} else if build.DEBUG && removedPrice.Cmp(h.adjustedContractPrice) > 0 {
+			// sanity check. If the removed price was greater than the current one
+			// it should have been the current one.
+			panic(errors.New("Sanity check failed. removedPrice.Cmp(h.adjustedContractPrice) > 0"))
+		} else {
+			// the removed element equals the maximum. We need to find the new maximum.
+			h.adjustedContractPrice = types.ZeroCurrency
+			for _, estimate := range h.recentContractPrices {
+				if estimate.Cmp(h.adjustedContractPrice) > 0 {
+					h.adjustedContractPrice = estimate
+				}
+			}
+		}
+	}
+
+	// Never go below the user set value
+	if h.adjustedContractPrice.Cmp(h.settings.MinContractPrice) < 0 {
+		h.adjustedContractPrice = h.settings.MinContractPrice
+	}
+}
 
 // initRescan is a helper function of initConsensusSubscribe, and is called when
 // the host and the consensus set have become desynchronized. Desynchronization
@@ -299,6 +348,9 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for i := range actionItems {
 		go h.threadedHandleActionItem(actionItems[i])
 	}
+
+	// Adjust contract pricing
+	h.adjustContractPrice()
 
 	// Update the host's recent change pointer to point to the most recent
 	// change.

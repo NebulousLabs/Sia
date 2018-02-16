@@ -422,6 +422,78 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 	ht.host = rebootHost
 }
 
+// TestRecentContractPricesLength checks that the length of recentContractPrices never
+// exceeds 144, that it is persisted correctly and that changing the minContractPrice is
+// handled correctly
+func TestRecentContractPricesLength(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	ht, err := newHostTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get initial length of recentContractPrices
+	initialLength := len(ht.host.recentContractPrices)
+
+	// Add a block
+	ht.miner.AddBlock()
+
+	// check if recentContractPrices grew by 1 entry
+	if len(ht.host.recentContractPrices) != initialLength+1 {
+		t.Error("recentContractPrices doesn't contain additional entry after new block")
+	}
+
+	// add 150 more blocks
+	for i := 0; i < 150; i++ {
+		if _, err := ht.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// recentContractPrices should have length 144
+	if len(ht.host.recentContractPrices) != 144 {
+		t.Errorf("len(recentContractPrices): expected %v but was %v",
+			144, len(ht.host.recentContractPrices))
+	}
+
+	// set the MinContractPrice to a value above the current adjustedContractPrice
+	// and check if it is adjusted immediately
+	ht.host.settings.MinContractPrice = ht.host.adjustedContractPrice.Mul64(2)
+	ht.host.SetInternalSettings(ht.host.settings)
+	if ht.host.adjustedContractPrice.Cmp(ht.host.settings.MinContractPrice) != 0 {
+		t.Errorf("failed to update contract price after setting new MinContractPrice. expected %v but was %v",
+			ht.host.settings.MinContractPrice, ht.host.adjustedContractPrice)
+	}
+
+	// get adjusted contract price to see if it is the same after the reboot
+	contractPrice := ht.host.adjustedContractPrice
+
+	// Reboot host
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// recentContractPrices should have length 144 right away
+	if len(rebootHost.recentContractPrices) != 144 {
+		t.Errorf("len(recentContractPrices) after reboot: expected %d but was %d",
+			144, len(rebootHost.recentContractPrices))
+	}
+
+	// adjustedContractPrice should be the same as before
+	if contractPrice.Cmp(ht.host.adjustedContractPrice) != 0 {
+		t.Errorf("adjustedContractPrice after reboot: expected %v but was %v",
+			contractPrice, ht.host.adjustedContractPrice)
+	}
+}
+
 /*
 // TestSetAndGetSettings checks that the functions for interacting with the
 // hosts settings object are working as expected.

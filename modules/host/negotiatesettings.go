@@ -32,6 +32,7 @@ func (h *Host) externalSettings() modules.HostExternalSettings {
 	} else {
 		netAddr = h.autoAddress
 	}
+
 	return modules.HostExternalSettings{
 		AcceptingContracts:   h.settings.AcceptingContracts,
 		MaxDownloadBatchSize: h.settings.MaxDownloadBatchSize,
@@ -47,7 +48,7 @@ func (h *Host) externalSettings() modules.HostExternalSettings {
 		Collateral:    h.settings.Collateral,
 		MaxCollateral: h.settings.MaxCollateral,
 
-		ContractPrice:          h.settings.MinContractPrice,
+		ContractPrice:          h.adjustedContractPrice,
 		DownloadBandwidthPrice: h.settings.MinDownloadBandwidthPrice,
 		StoragePrice:           h.settings.MinStoragePrice,
 		UploadBandwidthPrice:   h.settings.MinUploadBandwidthPrice,

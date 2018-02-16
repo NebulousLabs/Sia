@@ -38,7 +38,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 
 	// Read some variables from the host for use later in the function.
 	h.mu.RLock()
-	settings := h.settings
+	settings := h.externalSettings()
 	secretKey := h.secretKey
 	blockHeight := h.blockHeight
 	h.mu.RUnlock()
@@ -96,8 +96,8 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 				// Update finances.
 				blocksRemaining := so.proofDeadline() - blockHeight
 				blockBytesCurrency := types.NewCurrency64(uint64(blocksRemaining)).Mul64(modules.SectorSize)
-				bandwidthRevenue = bandwidthRevenue.Add(settings.MinUploadBandwidthPrice.Mul64(modules.SectorSize))
-				storageRevenue = storageRevenue.Add(settings.MinStoragePrice.Mul(blockBytesCurrency))
+				bandwidthRevenue = bandwidthRevenue.Add(settings.UploadBandwidthPrice.Mul64(modules.SectorSize))
+				storageRevenue = storageRevenue.Add(settings.StoragePrice.Mul(blockBytesCurrency))
 				newCollateral = newCollateral.Add(settings.Collateral.Mul(blockBytesCurrency))
 
 				// Insert the sector into the root list.
@@ -122,7 +122,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 				copy(sector[modification.Offset:], modification.Data)
 
 				// Update finances.
-				bandwidthRevenue = bandwidthRevenue.Add(settings.MinUploadBandwidthPrice.Mul64(uint64(len(modification.Data))))
+				bandwidthRevenue = bandwidthRevenue.Add(settings.UploadBandwidthPrice.Mul64(uint64(len(modification.Data))))
 
 				// Update the sectors removed and gained to indicate that the old
 				// sector has been replaced with a new sector.

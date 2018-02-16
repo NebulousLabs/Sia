@@ -45,7 +45,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	h.mu.RLock()
 	blockHeight := h.blockHeight
 	secretKey := h.secretKey
-	settings := h.settings
+	settings := h.externalSettings()
 	h.mu.RUnlock()
 
 	// Read the download requests, followed by the file contract revision that
@@ -81,7 +81,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 
 		// Verify that the correct amount of money has been moved from the
 		// renter's contract funds to the host's contract funds.
-		expectedTransfer := settings.MinDownloadBandwidthPrice.Mul64(totalSize)
+		expectedTransfer := settings.DownloadBandwidthPrice.Mul64(totalSize)
 		err = verifyPaymentRevision(existingRevision, paymentRevision, blockHeight, expectedTransfer)
 		if err != nil {
 			return extendErr("payment verification failed: ", err)
