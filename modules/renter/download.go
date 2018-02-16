@@ -189,17 +189,6 @@ type (
 	}
 )
 
-// staticComplete is a helper function to indicate whether or not the download
-// has completed.
-func (d *download) staticComplete() bool {
-	select {
-	case <-d.completeChan:
-		return true
-	default:
-		return false
-	}
-}
-
 // managedFail will mark the download as complete, but with the provided error.
 // If the download has already failed, the error will be updated to be a
 // concatenation of the previous error and the new error.
@@ -223,6 +212,17 @@ func (d *download) managedFail(err error) {
 	err = d.destination.Close()
 	if err != nil {
 		d.log.Println("unable to close download destination:", err)
+	}
+}
+
+// staticComplete is a helper function to indicate whether or not the download
+// has completed.
+func (d *download) staticComplete() bool {
+	select {
+	case <-d.completeChan:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -308,7 +308,6 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 			destination: params.destination,
 			erasureCode: params.file.erasureCode,
 			masterKey:   params.file.masterKey,
-			id: persist.RandomSuffix(),
 
 			staticChunkIndex: i,
 			staticChunkMap:   chunkMaps[i-minChunk],
@@ -353,7 +352,15 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		udc.staticWriteOffset = writeOffset
 		writeOffset += int64(udc.staticFetchLength)
 
-		// TODO: Pick a smarter value for the overdrive setting.
+		// TODO: Currently only the first two chunks are given overdrive, on the
+		// assumption that even the slow hosts will be able to finish the third
+		// chunk before the fast hosts complete the first chunks. This does
+		// assume however (incorrectly) that the workers internally are already
+		// able to tell when a worker is going to be a big bottleneck when
+		// downloading. On later chunks, if the system is memory-bottlenecked,
+		// the slow hosts could end up hogging all of the memory and slowing the
+		// whole system down. Ideally the fix for that type of scenario would
+		// happen within the worker standby selection though.
 		if i < 2 {
 			udc.staticOverdrive = params.overdrive
 		}
@@ -456,7 +463,12 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 // include downloads that have not yet completed. Downloads will be roughly, but
 // not precisely, sorted according to start time.
 //
-// TODO: Currently only remembers downloads from the current session.
+// TODO: Currently the DownloadHistory only contains downloads from this
+// session, does not contain downloads that were executed for the purposes of
+// repairing, and has no way to clear the download history if it gets long or
+// unweildly. It's not entirely certain which of the missing features are
+// actually desirable, please consult core team + app dev community before
+// deciding what to implement.
 func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()

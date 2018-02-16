@@ -24,15 +24,22 @@ type downloadPieceInfo struct {
 
 // unfinishedDownloadChunk contains a chunk for a download that is in progress.
 //
-// TODO: Explore making workersStandby a heap sorted by latency or whatever
-// other metric the download is prioritizing (price, total system throughput,
-// etc.)
+// TODO: Currently, if a standby worker is needed, all of the standby workers
+// are added and the first one that is available will pick up the slack. But,
+// depending on the situation, we may only want to add a handful of workers to
+// make sure that a fast / optimal worker is initially able to pick up the
+// slack. This could potentially be streamlined by turning the standby array
+// into a standby heap, and then having some general scoring system for figuring
+// out how useful a worker is, and then having some threshold that a worker
+// needs to be pulled from standby to work on the download. That threshold
+// should go up every time that a worker fails, to make sure that if you have
+// repeated failures, you keep pulling in the fresh workers instead of getting
+// stuck and always rejecting all the standby workers.
 type unfinishedDownloadChunk struct {
 	// Fetch + Write instructions - read only or otherwise thread safe.
 	destination downloadDestination // Where to write the recovered logical chunk.
 	erasureCode modules.ErasureCoder
 	masterKey   crypto.TwofishKey
-	id string
 
 	// Fetch + Write instructions - read only or otherwise thread safe.
 	staticChunkIndex  uint64                                     // Required for deriving the encryption keys for each piece.

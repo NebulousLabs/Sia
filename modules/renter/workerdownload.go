@@ -166,6 +166,17 @@ func (w *worker) ownedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfini
 	// optimal set of workers, and this is the spot where most of the filtering
 	// will happen.
 	//
+	// One major thing that we will want to be careful about when we improve
+	// this section is total memory vs. worker bandwidth. If the renter is
+	// consistently memory bottlenecked such that the slow hosts are hogging all
+	// of the memory and choking out the fasts hosts, leading to underutilized
+	// network connections where we actually have enough fast hosts to be fully
+	// utilizing the network. Part of this will be solved by adding bandwidth
+	// stats to the hostdb, but part of it will need to be solved by making sure
+	// that we automatically put low-bandwidth or high-latency workers on
+	// standby if we know that memory is the bottleneck as opposed to download
+	// bandwidth.
+	//
 	// Workers that do not meet the extra criteria are not discarded but rather
 	// put on standby, so that they can step in if the workers that do meet the
 	// extra criteria fail or otherwise prove insufficient.
