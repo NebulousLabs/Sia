@@ -9,7 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 )
 
 // TestRescan triggers a rescan in the transaction pool, verifying that the

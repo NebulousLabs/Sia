@@ -11,7 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 )
 
 const tpoolSyncRate = time.Minute * 2

@@ -5,7 +5,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 
 	siasync "github.com/NebulousLabs/Sia/sync"
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 )
 
 // computeConsensusChange computes the consensus change from the change entry

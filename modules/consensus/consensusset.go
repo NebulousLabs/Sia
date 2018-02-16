@@ -15,8 +15,8 @@ import (
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 
-	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/demotemutex"
+	"github.com/coreos/bbolt"
 )
 
 var (

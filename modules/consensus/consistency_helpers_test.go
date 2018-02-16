@@ -3,7 +3,7 @@ package consensus
 import (
 	"github.com/NebulousLabs/Sia/crypto"
 
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 )
 
 // dbConsensusChecksum is a convenience function to call consensusChecksum

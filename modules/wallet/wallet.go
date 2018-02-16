@@ -10,7 +10,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
