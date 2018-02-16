@@ -50,11 +50,6 @@ func (tp *TransactionPool) syncDB() {
 	if err != nil {
 		tp.log.Severe("ERROR: failed to initialize a db transaction:", err)
 	}
-	// Flush the cached DB pages from memory
-	err = tp.dbTx.FlushDBPages()
-	if err != nil {
-		tp.log.Severe("ERROR: failed to flush db pages:", err)
-	}
 }
 
 // resetDB deletes all consensus related persistence from the transaction pool.
