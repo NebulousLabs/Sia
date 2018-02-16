@@ -24,25 +24,40 @@ type TestNode struct {
 
 // NewNode creates a new funded TestNode
 func NewNode(nodeParams node.NodeParams) (*TestNode, error) {
-	address := ":9980"
-	userAgent := "Sia-Agent"
-	password := "password"
-
 	// We can't create a funded node without a miner
 	if !nodeParams.CreateMiner && nodeParams.Miner == nil {
 		return nil, errors.New("Can't create funded node without miner")
 	}
-
-	// Create client
-	c := client.New(address)
-	c.UserAgent = userAgent
-	c.Password = password
-
-	// Create server
-	s, err := server.New(address, userAgent, password, nodeParams)
+	// Create clean node
+	tn, err := NewCleanNode(nodeParams)
 	if err != nil {
 		return nil, err
 	}
+	// Fund the node
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		if err := tn.MineBlock(); err != nil {
+			return nil, err
+		}
+	}
+	// Return TestNode
+	return tn, nil
+}
+
+// NewCleanNode creates a new TestNode that's not yet funded
+func NewCleanNode(nodeParams node.NodeParams) (*TestNode, error) {
+	userAgent := "Sia-Agent"
+	password := "password"
+
+	// Create server
+	s, err := server.New(":0", userAgent, password, nodeParams)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create client
+	c := client.New(s.APIAddress())
+	c.UserAgent = userAgent
+	c.Password = password
 
 	// Create TestNode
 	tn := &TestNode{*s, *c, ""}
@@ -57,13 +72,6 @@ func NewNode(nodeParams node.NodeParams) (*TestNode, error) {
 	// Unlock wallet
 	if err := tn.WalletUnlockPost(tn.primarySeed); err != nil {
 		return nil, err
-	}
-
-	// fund the node
-	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		if err := tn.MineBlock(); err != nil {
-			return nil, err
-		}
 	}
 
 	// Return TestNode

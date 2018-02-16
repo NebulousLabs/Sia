@@ -317,7 +317,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 	return nil
 }
 
-// AcceptTransaction adds a transaction to the unconfirmed set of
+// AcceptTransactionSet adds a transaction to the unconfirmed set of
 // transactions. If the transaction is accepted, it will be relayed to
 // connected peers.
 //

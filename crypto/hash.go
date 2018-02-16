@@ -19,10 +19,12 @@ import (
 )
 
 const (
+	// HashSize is the length of a Hash in bytes.
 	HashSize = 32
 )
 
 type (
+	// Hash is a BLAKE2b 256-bit digest.
 	Hash [HashSize]byte
 
 	// HashSlice is used for sorting
@@ -30,6 +32,8 @@ type (
 )
 
 var (
+	// ErrHashWrongLen is the error when encoded value has the wrong
+	// length to be a hash.
 	ErrHashWrongLen = errors.New("encoded value has the wrong length to be a hash")
 )
 
