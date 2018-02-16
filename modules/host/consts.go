@@ -81,7 +81,7 @@ var (
 	// with the host. The default is set to 30 siacoins, which the file
 	// contract revision can have 15 siacoins put towards it, and the storage
 	// proof can have 15 siacoins put towards it.
-	defaultContractPrice = types.SiacoinPrecision.Mul64(3) // 3 siacoins
+	defaultContractPrice = types.ZeroCurrency // 0 siacoins
 
 	// defaultDownloadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 10 siacoins per gigabyte, because
