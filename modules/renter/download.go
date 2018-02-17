@@ -199,7 +199,6 @@ func (d *download) managedFail(err error) {
 	// If the download is already complete, extend the error.
 	complete := d.staticComplete()
 	if complete && d.err != nil {
-		d.err = errors.Compose(d.err, err)
 		return
 	} else if complete && d.err == nil {
 		d.log.Critical("download is marked as completed without error, but then managedFail was called with err:", err)
