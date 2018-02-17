@@ -78,10 +78,10 @@ var (
 	defaultCollateralBudget = types.SiacoinPrecision.Mul64(100e3)
 
 	// defaultContractPrice defines the default price of creating a contract
-	// with the host. The default is set to 0 siacoins. This should be fine
-	// since we use the FeeEstimation function for an estimation which already
-	// has a sane minimum > 0.
-	defaultContractPrice = types.ZeroCurrency // 0 siacoins
+	// with the host. The current default is 0.05. This was chosen since it is
+	// 1/2e6 times 10,000 bytes. 1/2e6 is the current transaction pool's fee
+	// estimation minimum.
+	defaultContractPrice = types.SiacoinPrecision.Div64(200) // 0.05 siacoins
 
 	// defaultDownloadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 10 siacoins per gigabyte, because
