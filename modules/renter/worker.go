@@ -56,6 +56,48 @@ type worker struct {
 	mu       sync.Mutex
 }
 
+// updateWorkerPool will grab the set of contracts from the contractor and
+// update the worker pool to match.
+func (r *Renter) managedUpdateWorkerPool() {
+	contractSlice := r.hostContractor.Contracts()
+	contractMap := make(map[types.FileContractID]modules.RenterContract)
+	for i := 0; i < len(contractSlice); i++ {
+		contractMap[contractSlice[i].ID] = contractSlice[i]
+	}
+
+	// Add a worker for any contract that does not already have a worker.
+	for id, contract := range contractMap {
+		lockID := r.mu.Lock()
+		_, exists := r.workerPool[id]
+		if !exists {
+			worker := &worker{
+				contract:   contract,
+				hostPubKey: contract.HostPublicKey,
+
+				downloadChan: make(chan struct{}, 1),
+				killChan:     make(chan struct{}),
+				uploadChan:   make(chan struct{}, 1),
+
+				renter: r,
+			}
+			r.workerPool[id] = worker
+			go worker.threadedWorkLoop()
+		}
+		r.mu.Unlock(lockID)
+	}
+
+	// Remove a worker for any worker that is not in the set of new contracts.
+	lockID := r.mu.Lock()
+	for id, worker := range r.workerPool {
+		_, exists := contractMap[id]
+		if !exists {
+			delete(r.workerPool, id)
+			close(worker.killChan)
+		}
+	}
+	r.mu.Unlock(lockID)
+}
+
 // threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
 // is killed or when the thread group is closed.
 func (w *worker) threadedWorkLoop() {
@@ -100,46 +142,4 @@ func (w *worker) threadedWorkLoop() {
 			return
 		}
 	}
-}
-
-// updateWorkerPool will grab the set of contracts from the contractor and
-// update the worker pool to match.
-func (r *Renter) managedUpdateWorkerPool() {
-	contractSlice := r.hostContractor.Contracts()
-	contractMap := make(map[types.FileContractID]modules.RenterContract)
-	for i := 0; i < len(contractSlice); i++ {
-		contractMap[contractSlice[i].ID] = contractSlice[i]
-	}
-
-	// Add a worker for any contract that does not already have a worker.
-	for id, contract := range contractMap {
-		lockID := r.mu.Lock()
-		_, exists := r.workerPool[id]
-		if !exists {
-			worker := &worker{
-				contract:   contract,
-				hostPubKey: contract.HostPublicKey,
-
-				downloadChan: make(chan struct{}, 1),
-				killChan:     make(chan struct{}),
-				uploadChan:   make(chan struct{}, 1),
-
-				renter: r,
-			}
-			r.workerPool[id] = worker
-			go worker.threadedWorkLoop()
-		}
-		r.mu.Unlock(lockID)
-	}
-
-	// Remove a worker for any worker that is not in the set of new contracts.
-	lockID := r.mu.Lock()
-	for id, worker := range r.workerPool {
-		_, exists := contractMap[id]
-		if !exists {
-			delete(r.workerPool, id)
-			close(worker.killChan)
-		}
-	}
-	r.mu.Unlock(lockID)
 }
