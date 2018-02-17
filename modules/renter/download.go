@@ -301,8 +301,8 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 
 	// Queue the downloads for each chunk.
 	writeOffset := int64(0) // where to write a chunk within the download destination.
+	d.chunksRemaining += maxChunk-minChunk+1
 	for i := minChunk; i <= maxChunk; i++ {
-		d.chunksRemaining++
 		udc := &unfinishedDownloadChunk{
 			destination: params.destination,
 			erasureCode: params.file.erasureCode,
