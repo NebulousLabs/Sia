@@ -13,11 +13,6 @@ import (
 	"time"
 )
 
-const (
-	defaultFilePerm         = 0666
-	downloadFailureCooldown = time.Minute * 30
-)
-
 var (
 	errDownloadRenterClosed = errors.New("download could not be scheduled because renter is shutting down")
 	errInsufficientHosts    = errors.New("insufficient hosts to recover file")

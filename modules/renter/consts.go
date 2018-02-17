@@ -6,6 +6,16 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
+const (
+	// defaultFilePerm defines the default permissions used for a new file if no
+	// permissions are supplied.
+	defaultFilePerm = 0666
+
+	// downloadFailureCooldown defines how long to wait for a worker after a
+	// worker has experienced a download failure.
+	downloadFailureCooldown = time.Second * 3
+)
+
 var (
 	// chunkDownloadTimeout defines the maximum amount of time to wait for a
 	// chunk download to finish before returning in the download-to-upload repair
