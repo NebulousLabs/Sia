@@ -418,7 +418,7 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 		dw = newDownloadDestinationWriteCloserFromWriter(p.Httpwriter)
 		destinationType = "http stream"
 	} else {
-		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, os.FileMode(file.mode))
 		if err != nil {
 			return err
 		}
