@@ -200,7 +200,5 @@ func (writerToWriteCloser) Close() error { return nil }
 // This function is primarily used with http streams, which do not implement a
 // Close function.
 func newDownloadDestinationWriteCloserFromWriter(w io.Writer) downloadDestination {
-	var wtwc writerToWriteCloser
-	wtwc.Writer = w
-	return newDownloadDestinationWriteCloser(wtwc)
+	return newDownloadDestinationWriteCloser(writerToWriteCloser{Writer: w})
 }
