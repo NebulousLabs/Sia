@@ -213,7 +213,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	so := storageObligation{
 		SectorRoots: initialSectorRoots,
 
-		ContractCost:            h.settings.MinContractPrice,
+		ContractCost:            h.externalSettings().ContractPrice,
 		LockedCollateral:        hostCollateral,
 		PotentialStorageRevenue: hostInitialRevenue,
 		RiskedCollateral:        hostInitialRisk,

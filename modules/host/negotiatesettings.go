@@ -35,7 +35,7 @@ func (h *Host) externalSettings() modules.HostExternalSettings {
 
 	// Calculate contract price
 	_, maxFee := h.tpool.FeeEstimation()
-	contractPrice := maxFee.Mul64(10e3)
+	contractPrice := maxFee.Mul64(10e3) // estimated size of txns host needs to fund
 	if contractPrice.Cmp(h.settings.MinContractPrice) < 0 {
 		contractPrice = h.settings.MinContractPrice
 	}
