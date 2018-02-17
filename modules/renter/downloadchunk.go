@@ -51,7 +51,7 @@ type unfinishedDownloadChunk struct {
 	staticWriteOffset int64 // Offet within the writer to write the completed data.
 
 	// Fetch + Write instructions - read only or otherwise thread safe.
-	staticLatencyTarget uint64
+	staticLatencyTarget time.Duration
 	staticNeedsMemory   bool // Set to true if memory was not pre-allocated for this chunk.
 	staticOverdrive     int
 	staticPriority      uint64

@@ -163,9 +163,9 @@ type (
 		staticSiaPath     string // The path of the siafile at the time the download started.
 
 		// Retrieval settings for the file.
-		staticLatencyTarget uint64 // In milliseconds. Lower latency results in lower total system throughput.
-		staticOverdrive     int    // How many extra pieces to download to prevent slow hosts from being a bottleneck.
-		staticPriority      uint64 // Downloads with higher priority will complete first.
+		staticLatencyTarget time.Duration // In milliseconds. Lower latency results in lower total system throughput.
+		staticOverdrive     int           // How many extra pieces to download to prevent slow hosts from being a bottleneck.
+		staticPriority      uint64        // Downloads with higher priority will complete first.
 
 		// Utilities.
 		log           *persist.Logger // Same log as the renter.
@@ -180,12 +180,12 @@ type (
 		destinationString string              // The string to report to the user for the destination.
 		file              *file               // The file to download.
 
-		latencyTarget uint64 // Workers above this latency will be automatically put on standby initially.
-		length        uint64 // Length of download. Cannot be 0.
-		needsMemory   bool   // Whether new memory needs to be allocated to perform the download.
-		offset        uint64 // Offset within the file to start the download. Must be less than the total filesize.
-		overdrive     int    // How many extra pieces to download to prevent slow hosts from being a bottleneck.
-		priority      uint64 // Files with a higher priority will be downloaded first.
+		latencyTarget time.Duration // Workers above this latency will be automatically put on standby initially.
+		length        uint64        // Length of download. Cannot be 0.
+		needsMemory   bool          // Whether new memory needs to be allocated to perform the download.
+		offset        uint64        // Offset within the file to start the download. Must be less than the total filesize.
+		overdrive     int           // How many extra pieces to download to prevent slow hosts from being a bottleneck.
+		priority      uint64        // Files with a higher priority will be downloaded first.
 	}
 )
 
@@ -323,7 +323,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 			// TODO: There is some sane minimum latency that should actually be
 			// set based on the number of pieces 'n', and the 'n' fastest
 			// workers that we have.
-			staticLatencyTarget: params.latencyTarget + (25 * (i - minChunk)), // TODO: Latency target is dropped by 25ms for each following chunk.
+			staticLatencyTarget: params.latencyTarget + (25 * time.Duration(i-minChunk)), // Increase target by 25ms per chunk.
 			staticNeedsMemory:   params.needsMemory,
 			staticPriority:      params.priority,
 
@@ -434,7 +434,7 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 		destinationString: p.Destination,
 		file:              file,
 
-		latencyTarget: 25e3, // TODO: high default until full latency support is added.
+		latencyTarget: 25e3 * time.Millisecond, // TODO: high default until full latency support is added.
 		length:        p.Length,
 		needsMemory:   true,
 		offset:        p.Offset,

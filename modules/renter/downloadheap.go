@@ -91,6 +91,11 @@ func (r *Renter) managedAddChunkToDownloadHeap(udc *unfinishedDownloadChunk) {
 	// memory from being allocated until the download is complete. If the job is
 	// put in the heap and ends up behind a job which get stuck allocating
 	// memory, you get a deadlock.
+	//
+	// This is functionally equivalent to putting the chunk in the heap with
+	// maximum priority, such that the chunk is immediately removed from the
+	// heap and distributed to workers - the sole purpose of the heap is to
+	// block workers from receiving a chunk until memory has been allocated.
 	if !udc.staticNeedsMemory {
 		r.managedDistributeDownloadChunkToWorkers(udc)
 		return

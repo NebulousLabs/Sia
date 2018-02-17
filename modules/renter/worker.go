@@ -56,67 +56,6 @@ type worker struct {
 	mu       sync.Mutex
 }
 
-// managedKillUploading will disable all uploading for the worker.
-func (w *worker) managedKillUploading() {
-	w.mu.Lock()
-	w.dropUploadChunks()
-	w.uploadTerminated = true
-	w.mu.Unlock()
-}
-
-// managedNextUploadChunk will pull the next potential chunk out of the worker's
-// work queue for uploading.
-func (w *worker) managedNextUploadChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	// Loop through the unprocessed chunks and find some work to do.
-	for range w.unprocessedChunks {
-		// Pull a chunk off of the unprocessed chunks stack.
-		chunk := w.unprocessedChunks[0]
-		w.unprocessedChunks = w.unprocessedChunks[1:]
-		nextChunk, pieceIndex := w.processUploadChunk(chunk)
-		if nextChunk != nil {
-			return nextChunk, pieceIndex
-		}
-	}
-	return nil, 0 // no work found
-}
-
-// managedQueueUploadChunk will take a chunk and add it to the worker's repair
-// stack.
-func (w *worker) managedQueueUploadChunk(uc *unfinishedChunk) {
-	// Check that the worker is allowed to be uploading before grabbing the
-	// worker lock.
-	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
-	goodForUpload := exists && utility.GoodForUpload
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	if !goodForUpload || w.uploadTerminated || w.onUploadCooldown() {
-		// The worker should not be uploading, remove the chunk.
-		w.dropChunk(uc)
-		return
-	}
-	w.unprocessedChunks = append(w.unprocessedChunks, uc)
-
-	// Send a signal informing the work thread that there is work.
-	select {
-	case w.uploadChan <- struct{}{}:
-	default:
-	}
-}
-
-// onUploadCooldown returns true if the worker is on cooldown from failed
-// uploads.
-func (w *worker) onUploadCooldown() bool {
-	requiredCooldown := uploadFailureCooldown
-	for i := 0; i < w.uploadConsecutiveFailures && i < maxConsecutivePenalty; i++ {
-		requiredCooldown *= 2
-	}
-	return time.Now().Before(w.uploadRecentFailure.Add(requiredCooldown))
-}
-
 // threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
 // is killed or when the thread group is closed.
 func (w *worker) threadedWorkLoop() {
