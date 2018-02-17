@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -235,11 +236,29 @@ func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts ma
 // pool object or something, and then that object can worry about breaking and
 // stuff, and can also make sure that the memory goes to only one place.
 func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{}) {
+	// Get the number of good hosts
+	numGoodHosts := 0
+	for _, w := range r.workerPool {
+		w.mu.Lock()
+		utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
+		goodForUpload := exists && utility.GoodForUpload
+		if goodForUpload && !w.terminated && !w.onCooldown() {
+			numGoodHosts++
+		}
+		w.mu.Unlock()
+	}
+	// If there are not enough good hosts for this chunk we ignore it for now
+	nextChunk := heap.Pop(ch).(*unfinishedChunk)
+	if !build.DEBUG && numGoodHosts < nextChunk.piecesNeeded {
+		// Only abort in Release builds. Tests often don't have enough hosts to
+		// restore full redundancy
+		return
+	}
+
 	// Grab the next chunk, loop until we have enough memory, update the amount
 	// of memory available, and then spin up a thread to asynchronously handle
 	// the rest of the chunk tasks.
 	memoryAvailable := r.managedMemoryAvailableGet()
-	nextChunk := heap.Pop(ch).(*unfinishedChunk)
 	for nextChunk.memoryNeeded > memoryAvailable {
 		select {
 		case newFile := <-r.newUploads:

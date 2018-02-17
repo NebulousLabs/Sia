@@ -113,6 +113,20 @@ func (w *worker) processChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, 
 	return nil, 0
 }
 
+// onCooldown returns a value indicating if the worker is currently on a
+// cooldown
+func (w *worker) onCooldown() bool {
+	requiredCooldown := uploadFailureCooldown
+	for i := 0; i < w.uploadConsecutiveFailures && i < maxConsecutivePenalty; i++ {
+		requiredCooldown *= 2
+	}
+	onCooldown := time.Now().Before(w.uploadRecentFailure.Add(requiredCooldown))
+	if !onCooldown {
+		w.lastFailure = nil
+	}
+	return onCooldown
+}
+
 // managedQueueChunkRepair will take a chunk and add it to the worker's repair stack.
 func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 	// Check that the worker is allowed to be uploading.
@@ -120,13 +134,7 @@ func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 	goodForUpload := exists && utility.GoodForUpload
 
 	w.mu.Lock()
-	// Figure out how long the worker would need to be on cooldown.
-	requiredCooldown := uploadFailureCooldown
-	for i := 0; i < w.uploadConsecutiveFailures && i < maxConsecutivePenalty; i++ {
-		requiredCooldown *= 2
-	}
-	onCooldown := time.Now().Before(w.uploadRecentFailure.Add(requiredCooldown))
-	if !goodForUpload || w.terminated || onCooldown {
+	if !goodForUpload || w.terminated || w.onCooldown() {
 		// The worker should not be uploading, remove the chunk.
 		w.dropChunk(uc)
 		w.mu.Unlock()
@@ -144,7 +152,8 @@ func (w *worker) managedQueueChunkRepair(uc *unfinishedChunk) {
 
 // uploadFailed is called if a worker failed to upload part of an unfinished
 // chunk.
-func (w *worker) uploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
+func (w *worker) uploadFailed(uc *unfinishedChunk, pieceIndex uint64, err error) {
+	w.lastFailure = err
 	w.uploadRecentFailure = time.Now()
 	if w.renter.g.Online() {
 		// It's not the worker's fault if we are offline
@@ -165,7 +174,7 @@ func (w *worker) managedUpload(uc *unfinishedChunk, pieceIndex uint64) {
 	if err != nil {
 		w.renter.log.Debugln("Worker failed to acquire an editor:", err)
 		w.mu.Lock()
-		w.uploadFailed(uc, pieceIndex)
+		w.uploadFailed(uc, pieceIndex, err)
 		w.mu.Unlock()
 		return
 	}
@@ -177,7 +186,7 @@ func (w *worker) managedUpload(uc *unfinishedChunk, pieceIndex uint64) {
 	if err != nil {
 		w.renter.log.Debugln("Worker failed to upload via the editor:", err)
 		w.mu.Lock()
-		w.uploadFailed(uc, pieceIndex)
+		w.uploadFailed(uc, pieceIndex, err)
 		w.mu.Unlock()
 		return
 	}

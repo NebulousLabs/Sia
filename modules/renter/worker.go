@@ -29,6 +29,7 @@ type worker struct {
 	uploadChan           chan struct{}     // lowest priority
 
 	// Operation failure statistics for the worker.
+	lastFailure               error     // The most recent failure. Is reset after cooldown.
 	downloadRecentFailure     time.Time // Only modified by the primary download loop.
 	uploadRecentFailure       time.Time // Only modified by primary repair loop.
 	uploadConsecutiveFailures int
