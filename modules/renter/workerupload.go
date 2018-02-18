@@ -230,8 +230,10 @@ func (w *worker) managedUploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.mu.Lock()
 	uc.piecesRegistered--
 	uc.pieceUsage[pieceIndex] = false
-	uc.notifyStandbyWorkers()
 	uc.mu.Unlock()
+
+	// Notify the standby workers of the chunk
+	uc.managedNotifyStandbyWorkers()
 
 	// Drop this chunk from the worker. Because the worker is currently on
 	// cooldown, drop all remaining chunks from the worker as well.
