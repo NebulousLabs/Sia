@@ -188,12 +188,12 @@ func runDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp b
 
 	// should have correct length
 	if int64(downbytes.Len()) != length {
-		return errors.New(fmt.Sprintf("downloaded file has incorrect size: %d, %d expected.", downbytes.Len(), length))
+		return fmt.Errorf("downloaded file has incorrect size: %d, %d expected", downbytes.Len(), length)
 	}
 
 	// should be byte-for-byte equal to the original uploaded file
 	if !bytes.Equal(originalBytes.Bytes(), downbytes.Bytes()) {
-		return errors.New(fmt.Sprintf("downloaded content differs from original content"))
+		return fmt.Errorf("downloaded content differs from original content")
 	}
 
 	return nil

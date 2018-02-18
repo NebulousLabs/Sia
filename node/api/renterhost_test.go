@@ -2906,7 +2906,7 @@ func TestRemoteFileRepairMassive(t *testing.T) {
 		}
 		for i, f := range rf.Files {
 			if f.Redundancy != 2 {
-				return errors.New(fmt.Sprintf("file %v only reached %v redundancy", i, f.Redundancy))
+				return fmt.Errorf("file %v only reached %v redundancy", i, f.Redundancy)
 			}
 		}
 		return nil
@@ -3007,7 +3007,7 @@ func TestRemoteFileRepairMassive(t *testing.T) {
 		}
 		for i, f := range rf.Files {
 			if f.Redundancy != 2 {
-				return errors.New(fmt.Sprintf("file %v only reached %v redundancy", i, f.Redundancy))
+				return fmt.Errorf("file %v only reached %v redundancy", i, f.Redundancy)
 			}
 		}
 		return nil
