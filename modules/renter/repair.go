@@ -89,14 +89,21 @@ func (ch *chunkHeap) Pop() interface{} {
 	return x
 }
 
-// notifyStandbyWorkers is called when a worker fails to upload a piece, meaning
+// managedNotifyStandbyWorkers is called when a worker fails to upload a piece, meaning
 // that the standby workers may now be needed to help the piece finish
 // uploading.
-func (uc *unfinishedChunk) notifyStandbyWorkers() {
-	for i := 0; i < len(uc.workersStandby); i++ {
-		uc.workersStandby[i].managedQueueUploadChunk(uc)
-	}
+func (uc *unfinishedChunk) managedNotifyStandbyWorkers() {
+	// Copy the standby workers into a new slice and reset it since we can't
+	// hold the lock while calling the managed function.
+	uc.mu.Lock()
+	standbyWorkers := make([]*worker, 0, len(uc.workersStandby))
+	copy(standbyWorkers, uc.workersStandby)
 	uc.workersStandby = uc.workersStandby[:0]
+	uc.mu.Unlock()
+
+	for i := 0; i < len(standbyWorkers); i++ {
+		standbyWorkers[i].managedQueueUploadChunk(uc)
+	}
 }
 
 // buildUnfinishedChunks will pull all of the unfinished chunks out of a file.
