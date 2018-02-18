@@ -152,8 +152,9 @@ func (w *worker) ownedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfini
 	udc.mu.Lock()
 	chunkComplete := udc.piecesCompleted >= udc.erasureCode.MinPieces()
 	chunkFailed := udc.piecesCompleted+udc.workersRemaining < udc.erasureCode.MinPieces()
-	chunkData, workerHasPiece := udc.staticChunkMap[w.contract.ID]
-	if chunkComplete || chunkFailed || w.ownedOnDownloadCooldown() || !workerHasPiece {
+	pieceData, workerHasPiece := udc.staticChunkMap[w.contract.ID]
+	pieceTaken := udc.pieceUsage[pieceData.index]
+	if chunkComplete || chunkFailed || w.ownedOnDownloadCooldown() || !workerHasPiece || pieceTaken {
 		udc.mu.Unlock()
 		udc.managedRemoveWorker()
 		return nil
@@ -207,7 +208,7 @@ func (w *worker) ownedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfini
 		// Worker can be useful. Register the worker and return the chunk for
 		// downloading.
 		udc.piecesRegistered++
-		udc.pieceUsage[chunkData.index] = true
+		udc.pieceUsage[pieceData.index] = true
 		return udc
 	}
 	// Worker is not needed unless another worker fails, so put this worker on
