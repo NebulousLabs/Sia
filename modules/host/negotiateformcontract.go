@@ -108,7 +108,7 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 
 	// The host verifies that the file contract coming over the wire is
 	// acceptable.
-	err = h.managedVerifyNewContract(txnSet, renterPK)
+	err = h.managedVerifyNewContract(txnSet, renterPK, settings)
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
@@ -198,7 +198,7 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 
 // managedVerifyNewContract checks that an incoming file contract matches the host's
 // expectations for a valid contract.
-func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK crypto.PublicKey) error {
+func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK crypto.PublicKey, eSettings modules.HostExternalSettings) error {
 	// Check that the transaction set is not empty.
 	if len(txnSet) < 1 {
 		return extendErr("zero-length transaction set: ", errEmptyObject)
@@ -212,7 +212,6 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	blockHeight := h.blockHeight
 	lockedStorageCollateral := h.financialMetrics.LockedStorageCollateral
 	publicKey := h.publicKey
-	eSettings := h.externalSettings()
 	iSettings := h.settings
 	unlockHash := h.unlockHash
 	h.mu.RUnlock()
