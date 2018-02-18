@@ -52,7 +52,7 @@ var (
 	// hostCheckupQuantity specifies the number of hosts that get scanned every
 	// time there is a regular scanning operation.
 	hostCheckupQuantity = build.Select(build.Var{
-		Standard: int(200),
+		Standard: int(2500),
 		Dev:      int(6),
 		Testing:  int(5),
 	}).(int)
@@ -60,7 +60,7 @@ var (
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
 	maxScanningThreads = build.Select(build.Var{
-		Standard: int(40),
+		Standard: int(80),
 		Dev:      int(4),
 		Testing:  int(3),
 	}).(int)

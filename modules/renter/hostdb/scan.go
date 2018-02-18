@@ -39,9 +39,8 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 	}
 
 	hdb.scanWait = true
-	scanPool := make(chan modules.HostDBEntry)
-
 	go func() {
+		scanPool := make(chan modules.HostDBEntry)
 		defer close(scanPool)
 
 		// Nobody is emptying the scan list, volunteer.
@@ -53,7 +52,9 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 		}
 		defer hdb.tg.Done()
 
+		starterThread := false
 		for {
+			// If the scanList is empty, this thread can spin down.
 			hdb.mu.Lock()
 			if len(hdb.scanList) == 0 {
 				// Scan list is empty, can exit. Let the world know that nobody
@@ -62,6 +63,7 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 				hdb.mu.Unlock()
 				return
 			}
+
 			// Get the next host, shrink the scan list.
 			entry := hdb.scanList[0]
 			hdb.scanList = hdb.scanList[1:]
@@ -75,7 +77,8 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			}
 
 			// Create new worker thread
-			if hdb.scanningThreads < maxScanningThreads {
+			if hdb.scanningThreads < maxScanningThreads || !starterThread {
+				starterThread = true
 				hdb.scanningThreads++
 				go func() {
 					hdb.threadedProbeHosts(scanPool)
