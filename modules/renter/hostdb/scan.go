@@ -53,12 +53,13 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 		defer hdb.tg.Done()
 
 		// Due to the patterns used to spin up scanning threads, it's possible
-		// that we get to thiis point while all scanning threads are currently
+		// that we get to this point while all scanning threads are currently
 		// used up, completing jobs that were sent out by the previous pool
-		// managing thread. This thread is at risk of deadlocking if there's not
-		// at least one scanning thread accepting work that it created itself,
-		// so we use a starterThread exception and spin up on-thread-too-many on
-		// the first iteration to ensure that we do not deadlock.
+		// managing thread. This thread is at risk of deadlocking if there's
+		// not at least one scanning thread accepting work that it created
+		// itself, so we use a starterThread exception and spin up
+		// one-thread-too-many on the first iteration to ensure that we do not
+		// deadlock.
 		starterThread := false
 		for {
 			// If the scanList is empty, this thread can spin down.
@@ -87,6 +88,8 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			select {
 			case scanPool <- entry:
 				hdb.log.Debugf("Sending host %v for scan, %v hosts remain", entry.PublicKey.String(), scansRemaining)
+				hdb.mu.Unlock()
+				continue
 			default:
 			}
 
