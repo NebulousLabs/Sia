@@ -39,9 +39,8 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 	}
 
 	hdb.scanWait = true
-	scanPool := make(chan modules.HostDBEntry)
-
 	go func() {
+		scanPool := make(chan modules.HostDBEntry)
 		defer close(scanPool)
 
 		// Nobody is emptying the scan list, volunteer.
@@ -53,7 +52,17 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 		}
 		defer hdb.tg.Done()
 
+		// Due to the patterns used to spin up scanning threads, it's possible
+		// that we get to this point while all scanning threads are currently
+		// used up, completing jobs that were sent out by the previous pool
+		// managing thread. This thread is at risk of deadlocking if there's
+		// not at least one scanning thread accepting work that it created
+		// itself, so we use a starterThread exception and spin up
+		// one-thread-too-many on the first iteration to ensure that we do not
+		// deadlock.
+		starterThread := false
 		for {
+			// If the scanList is empty, this thread can spin down.
 			hdb.mu.Lock()
 			if len(hdb.scanList) == 0 {
 				// Scan list is empty, can exit. Let the world know that nobody
@@ -62,6 +71,7 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 				hdb.mu.Unlock()
 				return
 			}
+
 			// Get the next host, shrink the scan list.
 			entry := hdb.scanList[0]
 			hdb.scanList = hdb.scanList[1:]
@@ -74,8 +84,18 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 				entry = recentEntry
 			}
 
-			// Create new worker thread
-			if hdb.scanningThreads < maxScanningThreads {
+			// Try to send this entry to an existing idle worker (non-blocking).
+			select {
+			case scanPool <- entry:
+				hdb.log.Debugf("Sending host %v for scan, %v hosts remain", entry.PublicKey.String(), scansRemaining)
+				hdb.mu.Unlock()
+				continue
+			default:
+			}
+
+			// Create new worker thread.
+			if hdb.scanningThreads < maxScanningThreads || !starterThread {
+				starterThread = true
 				hdb.scanningThreads++
 				go func() {
 					hdb.threadedProbeHosts(scanPool)
