@@ -10,7 +10,7 @@ import (
 
 // RenterContractsGet requests the /renter/contracts resource
 func (c *Client) RenterContractsGet() (rc api.RenterContracts, err error) {
-	err = c.Get("/renter/contracts", &rc)
+	err = c.get("/renter/contracts", &rc)
 	return
 }
 
@@ -21,6 +21,6 @@ func (c *Client) RenterPost(allowance modules.Allowance) (err error) {
 	values.Set("hosts", strconv.FormatUint(allowance.Hosts, 10))
 	values.Set("period", strconv.FormatUint(uint64(allowance.Period), 10))
 	values.Set("renewwindow", strconv.FormatUint(uint64(allowance.RenewWindow), 10))
-	err = c.Post("/renter", values.Encode(), nil)
+	err = c.post("/renter", values.Encode(), nil)
 	return
 }

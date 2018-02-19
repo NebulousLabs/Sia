@@ -8,7 +8,7 @@ import (
 // HostAnnouncePost uses the /host/announce endpoint to announce the host to
 // the network
 func (c *Client) HostAnnouncePost() (err error) {
-	err = c.Post("/host/announce", "", nil)
+	err = c.post("/host/announce", "", nil)
 	return
 }
 
@@ -16,7 +16,7 @@ func (c *Client) HostAnnouncePost() (err error) {
 func (c *Client) HostAcceptingContractsPost(acceptingContracts bool) (err error) {
 	values := url.Values{}
 	values.Set("acceptingcontracts", strconv.FormatBool(acceptingContracts))
-	err = c.Post("/host", values.Encode(), nil)
+	err = c.post("/host", values.Encode(), nil)
 	return
 }
 
@@ -26,6 +26,6 @@ func (c *Client) HostStorageFoldersAddPost(path string, size uint64) (err error)
 	values := url.Values{}
 	values.Set("path", path)
 	values.Set("size", strconv.FormatUint(size, 10))
-	err = c.Post("/host/storage/folders/add", values.Encode(), nil)
+	err = c.post("/host/storage/folders/add", values.Encode(), nil)
 	return
 }
