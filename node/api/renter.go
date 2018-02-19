@@ -117,7 +117,7 @@ type (
 		Contracts []RenterContract `json:"contracts"`
 	}
 
-	// DownloadQueue contains the renter's download queue.
+	// RenterDownloadQueue contains the renter's download queue.
 	RenterDownloadQueue struct {
 		Downloads []DownloadInfo `json:"downloads"`
 	}

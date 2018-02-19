@@ -13,6 +13,7 @@ import (
 )
 
 type (
+	// TpoolFeeGET contains the current estimated fee
 	TpoolFeeGET struct {
 		Minimum types.Currency `json:"minimum"`
 		Maximum types.Currency `json:"maximum"`
@@ -26,6 +27,8 @@ type (
 		Transaction []byte              `json:"transaction"`
 	}
 
+	// TpoolConfirmedGET contains information about whether or not
+	// the transaction has been seen on the blockhain
 	TpoolConfirmedGET struct {
 		Confirmed bool `json:"confirmed"`
 	}
