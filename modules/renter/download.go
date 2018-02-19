@@ -233,6 +233,105 @@ func (d *download) Err() (err error) {
 	return err
 }
 
+// Download performs a file download using the passed parameters and blocks
+// until the download is finished.
+func (r *Renter) Download(p modules.RenterDownloadParameters) error {
+	return r.managedDownload(p, false)
+}
+
+// DownloadAsync performs a file download using the passed parameters without
+// blocking until the download is finished.
+func (r *Renter) DownloadAsync(p modules.RenterDownloadParameters) error {
+	return r.managedDownload(p, true)
+}
+
+// managedDownload performs a file download using the passed parameters.
+func (r *Renter) managedDownload(p modules.RenterDownloadParameters, async bool) error {
+	// Lookup the file associated with the nickname.
+	lockID := r.mu.RLock()
+	file, exists := r.files[p.SiaPath]
+	r.mu.RUnlock(lockID)
+	if !exists {
+		return fmt.Errorf("no file with that path: %s", p.SiaPath)
+	}
+
+	// Validate download parameters.
+	isHTTPResp := p.Httpwriter != nil
+	if p.Async && isHTTPResp {
+		return errors.New("cannot async download to http response")
+	}
+	if isHTTPResp && p.Destination != "" {
+		return errors.New("destination cannot be specified when downloading to http response")
+	}
+	if !isHTTPResp && p.Destination == "" {
+		return errors.New("destination not supplied")
+	}
+	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
+		return errors.New("destination must be an absolute path")
+	}
+	if p.Offset == file.size {
+		return errors.New("offset equals filesize")
+	}
+	// Sentinel: if length == 0, download the entire file.
+	if p.Length == 0 {
+		p.Length = file.size - p.Offset
+	}
+	// Check whether offset and length is valid.
+	if p.Offset < 0 || p.Offset+p.Length > file.size {
+		return fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
+	}
+
+	// Instantiate the correct downloadWriter implementation.
+	var dw downloadDestination
+	var destinationType string
+	if isHTTPResp {
+		dw = newDownloadDestinationWriteCloserFromWriter(p.Httpwriter)
+		destinationType = "http stream"
+	} else {
+		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, os.FileMode(file.mode))
+		if err != nil {
+			return err
+		}
+		dw = osFile
+		destinationType = "file"
+	}
+
+	// Create the download object.
+	d, err := r.newDownload(downloadParams{
+		destination:       dw,
+		destinationType:   destinationType,
+		destinationString: p.Destination,
+		file:              file,
+
+		latencyTarget: 25e3 * time.Millisecond, // TODO: high default until full latency support is added.
+		length:        p.Length,
+		needsMemory:   true,
+		offset:        p.Offset,
+		overdrive:     3, // TODO: moderate default until full overdrive support is added.
+		priority:      5, // TODO: moderate default until full priority support is added.
+	})
+	if err != nil {
+		return err
+	}
+
+	// Add the download object to the download queue.
+	r.downloadHistoryMu.Lock()
+	r.downloadHistory = append(r.downloadHistory, d)
+	r.downloadHistoryMu.Unlock()
+
+	// If async is true we can return right away.
+	if async {
+		return nil
+	}
+	// Otherwise we block until the download has completed.
+	select {
+	case <-d.completeChan:
+		return d.Err()
+	case <-r.tg.StopChan():
+		return errors.New("download interrupted by shutdown")
+	}
+}
+
 // newDownload creates and initializes a download based on the provided
 // parameters.
 func (r *Renter) newDownload(params downloadParams) (*download, error) {
@@ -369,89 +468,6 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		}
 	}
 	return d, nil
-}
-
-// Download performs a file download using the passed parameters.
-func (r *Renter) Download(p modules.RenterDownloadParameters) error {
-	// Lookup the file associated with the nickname.
-	lockID := r.mu.RLock()
-	file, exists := r.files[p.SiaPath]
-	r.mu.RUnlock(lockID)
-	if !exists {
-		return fmt.Errorf("no file with that path: %s", p.SiaPath)
-	}
-
-	// Validate download parameters.
-	isHTTPResp := p.Httpwriter != nil
-	if p.Async && isHTTPResp {
-		return errors.New("cannot async download to http response")
-	}
-	if isHTTPResp && p.Destination != "" {
-		return errors.New("destination cannot be specified when downloading to http response")
-	}
-	if !isHTTPResp && p.Destination == "" {
-		return errors.New("destination not supplied")
-	}
-	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
-		return errors.New("destination must be an absolute path")
-	}
-	if p.Offset == file.size {
-		return errors.New("offset equals filesize")
-	}
-	// Sentinel: if length == 0, download the entire file.
-	if p.Length == 0 {
-		p.Length = file.size - p.Offset
-	}
-	// Check whether offset and length is valid.
-	if p.Offset < 0 || p.Offset+p.Length > file.size {
-		return fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
-	}
-
-	// Instantiate the correct downloadWriter implementation.
-	var dw downloadDestination
-	var destinationType string
-	if isHTTPResp {
-		dw = newDownloadDestinationWriteCloserFromWriter(p.Httpwriter)
-		destinationType = "http stream"
-	} else {
-		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, os.FileMode(file.mode))
-		if err != nil {
-			return err
-		}
-		dw = osFile
-		destinationType = "file"
-	}
-
-	// Create the download object.
-	d, err := r.newDownload(downloadParams{
-		destination:       dw,
-		destinationType:   destinationType,
-		destinationString: p.Destination,
-		file:              file,
-
-		latencyTarget: 25e3 * time.Millisecond, // TODO: high default until full latency support is added.
-		length:        p.Length,
-		needsMemory:   true,
-		offset:        p.Offset,
-		overdrive:     3, // TODO: moderate default until full overdrive support is added.
-		priority:      5, // TODO: moderate default until full priority support is added.
-	})
-	if err != nil {
-		return err
-	}
-
-	// Add the download object to the download queue.
-	r.downloadHistoryMu.Lock()
-	r.downloadHistory = append(r.downloadHistory, d)
-	r.downloadHistoryMu.Unlock()
-
-	// Block until the download has completed.
-	select {
-	case <-d.completeChan:
-		return d.Err()
-	case <-r.tg.StopChan():
-		return errors.New("download interrupted by shutdown")
-	}
 }
 
 // DownloadHistory returns the list of downloads that have been performed. Will

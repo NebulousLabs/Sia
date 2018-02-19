@@ -407,30 +407,15 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-
-	if params.Async { // Create goroutine if `async` param set.
-		// check for errors for 5 seconds to catch validation errors (no file with
-		// that path, invalid parameters, insufficient hosts, etc)
-		errchan := make(chan error)
-		go func() {
-			errchan <- api.renter.Download(params)
-		}()
-		select {
-		case err = <-errchan:
-			if err != nil {
-				WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
-				return
-			}
-		case <-time.After(time.Millisecond * 100):
-		}
+	if params.Async {
+		err = api.renter.DownloadAsync(params)
 	} else {
-		err := api.renter.Download(params)
-		if err != nil {
-			WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
-			return
-		}
+		err = api.renter.Download(params)
 	}
-
+	if err != nil {
+		WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
 	if params.Httpwriter == nil {
 		// `httpresp=true` causes writes to w before this line is run, automatically
 		// adding `200 Status OK` code to response. Calling this results in a
