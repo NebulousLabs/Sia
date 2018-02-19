@@ -3,8 +3,8 @@ package transactionpool
 import (
 	"errors"
 
-	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/demotemutex"
+	"github.com/coreos/bbolt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"

@@ -1,7 +1,7 @@
 package consensus
 
 import (
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 )
 
 // dbBacktrackToCurrentPath is a convenience function to call

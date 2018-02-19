@@ -4,7 +4,7 @@ package consensus
 import (
 	"testing"
 
-	"github.com/NebulousLabs/bolt"
+	"github.com/coreos/bbolt"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"

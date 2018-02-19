@@ -11,8 +11,8 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/fastrand"
+	"github.com/coreos/bbolt"
 )
 
 var (

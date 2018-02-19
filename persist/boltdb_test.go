@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/fastrand"
+	"github.com/coreos/bbolt"
 )
 
 // testInputs and testFilenames are global variables because most tests require
