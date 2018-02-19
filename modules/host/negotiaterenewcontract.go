@@ -186,7 +186,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	renewRevenue := renewBasePrice(so, settings, fc)
 	renewRisk := renewBaseCollateral(so, settings, fc)
 	h.mu.RUnlock()
-	hostTxnSignatures, hostRevisionSignature, newSOID, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, so.SectorRoots, renewCollateral, renewRevenue, renewRisk)
+	hostTxnSignatures, hostRevisionSignature, newSOID, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, so.SectorRoots, renewCollateral, renewRevenue, renewRisk, settings)
 	if err != nil {
 		modules.WriteNegotiationRejection(conn, err) // Error is ignored to preserve type for extendErr
 		return extendErr("failed to finalize contract: ", err)
