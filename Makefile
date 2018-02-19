@@ -51,8 +51,8 @@ vet: release-std
 
 # will always run on some packages for a while.
 lintpkgs = ./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer \
-           ./modules/gateway ./modules/host ./modules/miner ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb \
-           ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/wallet ./modules/transactionpool ./node ./node/api/server ./persist \
+           ./modules/gateway ./modules/host ./modules/miner ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb \
+           ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/wallet ./modules/transactionpool ./node ./node/api ./node/api/server ./persist \
            ./siatest
 lint:
 	golint -min_confidence=1.0 -set_exit_status $(lintpkgs)
