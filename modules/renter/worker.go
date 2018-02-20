@@ -1,7 +1,5 @@
 package renter
 
-// TODO: Add failure cooldowns to the workers, particularly for uploading tasks.
-
 import (
 	"sync"
 	"time"
@@ -16,103 +14,46 @@ import (
 // 'standbyChunks' fields of the worker. The rest of the fields are only
 // interacted with exclusively by the primary worker thread, and only one of
 // those ever exists at a time.
+//
+// The workers have a concept of 'cooldown' for uploads and downloads. If a
+// download or upload operation fails, the assumption is that future attempts
+// are also likely to fail, because whatever condition resulted in the failure
+// will still be present until some time has passed. Without any cooldowns,
+// uploading and downloading with flaky hosts in the worker sets has
+// substantially reduced overall performacne and throughput.
 type worker struct {
 	// The contract and host used by this worker.
 	contract   modules.RenterContract
 	hostPubKey types.SiaPublicKey
 	renter     *Renter
 
-	// Channels that inform the worker of kill signals and of new work.
-	downloadChan         chan downloadWork // higher priority than all uploads
-	killChan             chan struct{}     // highest priority
-	priorityDownloadChan chan downloadWork // higher priority than downloads (used for user-initiated downloads)
-	uploadChan           chan struct{}     // lowest priority
+	// Download variables that are not protected by a mutex, but also do not
+	// need to be protected by a mutex, as they are only accessed by the master
+	// thread for the worker.
+	ownedDownloadConsecutiveFailures int       // How many failures in a row?
+	ownedDownloadRecentFailure       time.Time // How recent was the last failure?
 
-	// Operation failure statistics for the worker.
-	downloadRecentFailure     time.Time // Only modified by the primary download loop.
-	uploadRecentFailure       time.Time // Only modified by primary repair loop.
-	uploadConsecutiveFailures int
+	// Download variables related to queuing work. They have a separate mutex to
+	// minimize lock contention.
+	downloadChan       chan struct{}              // Notifications of new work. Takes priority over uploads.
+	downloadChunks     []*unfinishedDownloadChunk // Yet unprocessed work items.
+	downloadMu         sync.Mutex
+	downloadTerminated bool // Has downloading been terminated for this worker?
 
-	// Two lists of chunks that relate to worker upload tasks. The first list is
-	// the set of chunks that the worker hasn't examined yet. The second list is
-	// the list of chunks that the worker examined, but was unable to process
-	// because other workers had taken on all of the work already. This list is
-	// maintained in case any of the other workers fail - this worker will be
-	// able to pick up the slack.
-	mu                sync.Mutex
-	standbyChunks     []*unfinishedChunk
-	terminated        bool
-	unprocessedChunks []*unfinishedChunk
-}
+	// Upload variables.
+	unprocessedChunks         []*unfinishedChunk // Yet unprocessed work items.
+	uploadChan                chan struct{}      // Notifications of new work.
+	uploadConsecutiveFailures int                // How many times in a row uploading has failed.
+	uploadRecentFailure       time.Time          // How recent was the last failure?
+	uploadTerminated          bool               // Have we stopped uploading?
 
-// threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
-// is killed or when the thread group is closed.
-func (w *worker) threadedWorkLoop() {
-	err := w.renter.tg.Add()
-	if err != nil {
-		return
-	}
-	defer w.renter.tg.Done()
-	// The worker may have upload chunks and it needs to drop them before
-	// terminating.
-	defer w.managedKillUploading()
-
-	for {
-		// Check for priority downloads.
-		select {
-		case d := <-w.priorityDownloadChan:
-			w.download(d)
-			continue
-		default:
-		}
-
-		// Check for standard downloads.
-		select {
-		case d := <-w.downloadChan:
-			w.download(d)
-			continue
-		default:
-		}
-
-		// Perform one step of processing upload work.
-		chunk, pieceIndex := w.managedNextChunk()
-		if chunk != nil {
-			w.managedUpload(chunk, pieceIndex)
-			continue
-		}
-
-		// Determine the maximum amount of time to wait for any standby chunks.
-		var sleepDuration time.Duration
-		w.mu.Lock()
-		numStandby := len(w.standbyChunks)
-		w.mu.Unlock()
-		if numStandby > 0 {
-			// TODO: Pick a random time instead of just a constant time.
-			sleepDuration = time.Second * 3 // TODO: Constant
-		} else {
-			sleepDuration = time.Hour // TODO: Constant
-		}
-
-		// Block until new work is received via the upload or download channels,
-		// or until the standby chunks are ready to be revisited, or until a
-		// kill signal is received.
-		select {
-		case d := <-w.priorityDownloadChan:
-			w.download(d)
-			continue
-		case d := <-w.downloadChan:
-			w.download(d)
-			continue
-		case <-w.uploadChan:
-			continue
-		case <-time.After(sleepDuration):
-			continue
-		case <-w.killChan:
-			return
-		case <-w.renter.tg.StopChan():
-			return
-		}
-	}
+	// Utilities.
+	//
+	// The mutex is only needed when interacting with 'downloadChunks' and
+	// 'unprocessedChunks', as everything else is only accessed from the single
+	// master thread.
+	killChan chan struct{} // Worker will shut down if a signal is sent down this channel.
+	mu       sync.Mutex
 }
 
 // updateWorkerPool will grab the set of contracts from the contractor and
@@ -133,10 +74,9 @@ func (r *Renter) managedUpdateWorkerPool() {
 				contract:   contract,
 				hostPubKey: contract.HostPublicKey,
 
-				downloadChan:         make(chan downloadWork, 1),
-				killChan:             make(chan struct{}),
-				priorityDownloadChan: make(chan downloadWork, 1),
-				uploadChan:           make(chan struct{}, 1),
+				downloadChan: make(chan struct{}, 1),
+				killChan:     make(chan struct{}),
+				uploadChan:   make(chan struct{}, 1),
 
 				renter: r,
 			}
@@ -156,4 +96,50 @@ func (r *Renter) managedUpdateWorkerPool() {
 		}
 	}
 	r.mu.Unlock(lockID)
+}
+
+// threadedWorkLoop repeatedly issues work to a worker, stopping when the worker
+// is killed or when the thread group is closed.
+func (w *worker) threadedWorkLoop() {
+	err := w.renter.tg.Add()
+	if err != nil {
+		return
+	}
+	defer w.renter.tg.Done()
+	defer w.managedKillUploading()
+	defer w.managedKillDownloading()
+
+	for {
+		// Perform one stpe of processing download work.
+		downloadChunk := w.managedNextDownloadChunk()
+		if downloadChunk != nil {
+			// managedDownload will handle removing the worker internally. If
+			// the chunk is dropped from the worker, the worker will be removed
+			// from the chunk. If the worker executes a download (success or
+			// failure), the worker will be removed from the chunk. If the
+			// worker is put on standby, it will not be removed from the chunk.
+			w.managedDownload(downloadChunk)
+			continue
+		}
+
+		// Perform one step of processing upload work.
+		chunk, pieceIndex := w.managedNextUploadChunk()
+		if chunk != nil {
+			w.managedUpload(chunk, pieceIndex)
+			continue
+		}
+
+		// Block until new work is received via the upload or download channels,
+		// or until a kill or stop signal is received.
+		select {
+		case <-w.downloadChan:
+			continue
+		case <-w.uploadChan:
+			continue
+		case <-w.killChan:
+			return
+		case <-w.renter.tg.StopChan():
+			return
+		}
+	}
 }

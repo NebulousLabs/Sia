@@ -813,12 +813,18 @@ lists all files in the download queue.
 {
   "downloads": [
     {
-      "siapath":     "foo/bar.txt",
-      "destination": "/home/users/alice/bar.txt",
-      "filesize":    8192,                  // bytes
-      "received":    4096,                  // bytes
-      "starttime":   "2009-11-10T23:00:00Z", // RFC 3339 time
-      "error": ""
+      "destination":     "/home/users/alice/bar.txt",
+      "destinationtype": "file",
+      "length":          8192,
+      "offset":          2000,
+      "siapath":         "foo/bar.txt",
+
+      "completed":           true,
+      "endtime":             "2009-11-10T23:10:00Z", // RFC 3339 time
+      "error":               "",
+      "received":            8192,
+      "starttime":           "2009-11-10T23:00:00Z", // RFC 3339 time
+      "totaldatatransfered": 10031
     }
   ]
 }

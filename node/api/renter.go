@@ -149,12 +149,19 @@ type (
 
 	// DownloadInfo contains all client-facing information of a file.
 	DownloadInfo struct {
-		SiaPath     string    `json:"siapath"`
-		Destination string    `json:"destination"`
-		Filesize    uint64    `json:"filesize"`
-		Received    uint64    `json:"received"`
-		StartTime   time.Time `json:"starttime"`
-		Error       string    `json:"error"`
+		Destination     string `json:"destination"`     // The destination of the download.
+		DestinationType string `json:"destinationtype"` // Can be "file", "memory buffer", or "http stream".
+		Filesize        uint64 `json:"filesize"`        // DEPRECATED. Same as 'Length'.
+		Length          uint64 `json:"length"`          // The length requested for the download.
+		Offset          uint64 `json:"offset"`          // The offset within the siafile requested for the download.
+		SiaPath         string `json:"siapath"`         // The siapath of the file used for the download.
+
+		Completed           bool      `json:"completed"`           // Whether or not the download has completed.
+		EndTime             time.Time `json:"endtime"`             // The time when the download fully completed.
+		Error               string    `json:"error"`               // Will be the empty string unless there was an error.
+		Received            uint64    `json:"received"`            // Amount of data confirmed and decoded.
+		StartTime           time.Time `json:"starttime"`           // The time when the download was started.
+		TotalDataTransfered uint64    `json:"totaldatatransfered"` // The total amount of data transfered, including negotiation, overdrive etc.
 	}
 )
 
@@ -285,14 +292,21 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 // renterDownloadsHandler handles the API call to request the download queue.
 func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	var downloads []DownloadInfo
-	for _, d := range api.renter.DownloadQueue() {
+	for _, di := range api.renter.DownloadHistory() {
 		downloads = append(downloads, DownloadInfo{
-			SiaPath:     d.SiaPath,
-			Destination: d.Destination.Destination(),
-			Filesize:    d.Filesize,
-			StartTime:   d.StartTime,
-			Received:    d.Received,
-			Error:       d.Error,
+			Destination:     di.Destination,
+			DestinationType: di.DestinationType,
+			Filesize:        di.Length,
+			Length:          di.Length,
+			Offset:          di.Offset,
+			SiaPath:         di.SiaPath,
+
+			Completed:           di.Completed,
+			EndTime:             di.EndTime,
+			Error:               di.Error,
+			Received:            di.Received,
+			StartTime:           di.StartTime,
+			TotalDataTransfered: di.TotalDataTransfered,
 		})
 	}
 	// sort the downloads by newest first
@@ -468,7 +482,7 @@ func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httpro
 		Async:       async,
 		Length:      length,
 		Offset:      offset,
-		Siapath:     siapath,
+		SiaPath:     siapath,
 	}
 	if httpresp {
 		dp.Httpwriter = w

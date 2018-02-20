@@ -447,7 +447,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	}
 
 	// Create a file to upload.
-	filesize := int(45678)
+	filesize := int(45767)
 	path := filepath.Join(st.dir, "test.dat")
 	err = createRandFile(path, filesize)
 	if err != nil {
@@ -483,11 +483,18 @@ func TestRemoteFileRepair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// save a copy of the file contents in memory for verification later
 	orig, err := ioutil.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
+	}
+	downloadedFile, err := ioutil.ReadFile(downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(orig, downloadedFile) {
+		t.Log("Files not equal, lengths:", len(orig), len(downloadedFile))
+		t.Fatal("Uploaded and downloaded file do not have matching data.")
 	}
 
 	// remove the local copy of the file
@@ -515,10 +522,18 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	// verify we still can download
-	downloadPath = filepath.Join(st.dir, "test-downloaded-verify2.dat")
-	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	downloadPath2 := filepath.Join(st.dir, "test-downloaded-verify2.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath2)
 	if err != nil {
 		t.Fatal(err)
+	}
+	downloadedFile2, err := ioutil.ReadFile(downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(orig, downloadedFile2) {
+		t.Log("Files not equal, lengths:", len(orig), len(downloadedFile2))
+		t.Fatal("Uploaded and downloaded file do not have matching data.")
 	}
 
 	// bring up a new host
@@ -614,7 +629,7 @@ func TestRemoteFileRepair(t *testing.T) {
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
-	err = retry(1000, 250*time.Millisecond, func() error {
+	err = retry(500, 250*time.Millisecond, func() error {
 		if err := st.getAPI("/renter/files", &rf); err != nil {
 			return err
 		}
@@ -629,12 +644,9 @@ func TestRemoteFileRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// we have to wait a bit for the download loop to update with the new
-	// contracts. retry the download for up to 90 seconds.
-	downloadPath = filepath.Join(st.dir, "test-downloaded.dat")
-	err = retry(300, time.Millisecond*250, func() error {
-		return st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
-	})
+	// Try to download the repaired file.
+	downloadPath = filepath.Join(st.dir, "test-downloaded3.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1414,7 +1426,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 	// Try downloading the file; should fail
 	downpath := filepath.Join(st.dir, "testdown.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
-	if err == nil || !strings.Contains(err.Error(), "insufficient hosts") {
+	if err == nil || !strings.Contains(err.Error(), "download failed") {
 		t.Fatal("expected insufficient hosts error, got", err)
 	}
 }
