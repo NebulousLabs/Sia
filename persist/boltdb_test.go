@@ -181,6 +181,10 @@ func TestOpenDatabase(t *testing.T) {
 			}
 			return nil
 		})
+		if err != nil {
+			t.Error(err)
+			continue
+		}
 		// Close and delete the newly emptied database.
 		err = db.Close()
 		if err != nil {

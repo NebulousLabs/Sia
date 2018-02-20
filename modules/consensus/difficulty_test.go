@@ -283,12 +283,11 @@ func TestStoreBlockTotals(t *testing.T) {
 	// returned follow a decay. While storing repeatedly, check that the
 	// getBlockTotals values match the values that were stored.
 	err = cs.db.Update(func(tx *bolt.Tx) error {
-		totalTime := int64(0)
-		totalTarget := types.RootDepth
+		var totalTime int64
 		var id types.BlockID
-		parentTimestamp := types.Timestamp(0)
-		currentTimestamp := types.Timestamp(0)
+		var parentTimestamp, currentTimestamp types.Timestamp
 		currentTarget := types.RootTarget
+		totalTarget := types.RootDepth
 		for i := types.BlockHeight(0); i < 8000; i++ {
 			id[i/256] = byte(i % 256)
 			parentTimestamp = currentTimestamp

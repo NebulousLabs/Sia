@@ -67,14 +67,6 @@ var (
 )
 
 var (
-	// defaultScanSleep is the amount of time that the hostdb will sleep if it
-	// cannot successfully get a random number.
-	defaultScanSleep = build.Select(build.Var{
-		Standard: time.Hour + time.Minute*37,
-		Dev:      time.Minute * 5,
-		Testing:  time.Second * 3,
-	}).(time.Duration)
-
 	// maxScanSleep is the maximum amount of time that the hostdb will sleep
 	// between performing scans of the hosts.
 	maxScanSleep = build.Select(build.Var{
