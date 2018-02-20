@@ -358,7 +358,9 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 		newDownloads: make(chan struct{}, 1),
 		downloadHeap: new(downloadChunkHeap),
 
-		newUploads: make(chan *file),
+		// TODO instead of using a buffered channel we should add uploads to
+		// the upload heap directly.
+		newUploads: make(chan *file, 2500),
 
 		workerPool: make(map[types.FileContractID]*worker),
 
