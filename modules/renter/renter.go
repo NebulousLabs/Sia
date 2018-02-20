@@ -435,6 +435,12 @@ func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.
 // CurrentPeriod returns the host contractor's current period
 func (r *Renter) CurrentPeriod() types.BlockHeight { return r.hostContractor.CurrentPeriod() }
 
+// ContractUtility returns the utility field for a given contract, along
+// with a bool indicating if it exists.
+func (r *Renter) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
+	return r.hostContractor.ContractUtility(id)
+}
+
 // PeriodSpending returns the host contractor's period spending
 func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostContractor.PeriodSpending() }
 
