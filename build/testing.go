@@ -62,6 +62,9 @@ func CopyDir(source, dest string) error {
 		return err
 	}
 	files, err := ioutil.ReadDir(source)
+	if err != nil {
+		return err
+	}
 	for _, file := range files {
 		newSource := filepath.Join(source, file.Name())
 		newDest := filepath.Join(dest, file.Name())

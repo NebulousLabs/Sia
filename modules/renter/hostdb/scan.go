@@ -370,9 +370,8 @@ func (hdb *HostDB) threadedScan() {
 		// scanning. The minimums and maximums keep the scan time reasonable,
 		// while the randomness prevents the scanning from always happening at
 		// the same time of day or week.
-		sleepTime := defaultScanSleep
 		sleepRange := uint64(maxScanSleep - minScanSleep)
-		sleepTime = minScanSleep + time.Duration(fastrand.Uint64n(sleepRange))
+		sleepTime := minScanSleep + time.Duration(fastrand.Uint64n(sleepRange))
 
 		// Sleep until it's time for the next scan cycle.
 		select {

@@ -44,6 +44,9 @@ func TestNewGroup(t *testing.T) {
 
 	// Check if nodes are funded
 	cg, err := tg.Nodes()[0].ConsensusGet()
+	if err != nil {
+		t.Fatal("Failed to get consensus: ", err)
+	}
 	for _, node := range tg.Nodes() {
 		wtg, err := node.WalletTransactionsGet(0, cg.Height)
 		if err != nil {
