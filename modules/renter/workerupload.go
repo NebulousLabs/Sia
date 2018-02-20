@@ -167,10 +167,7 @@ func (w *worker) onUploadCooldown() bool {
 func (w *worker) managedProcessUploadChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, pieceIndex uint64) {
 	// Determine the usability value of this worker.
 	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
-	if !exists {
-		return nil, 0
-	}
-	goodForUpload := utility.GoodForUpload
+	goodForUpload := exists && utility.GoodForUpload
 
 	// Determine what sort of help this chunk needs.
 	w.mu.Lock()
