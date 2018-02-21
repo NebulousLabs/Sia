@@ -3,8 +3,8 @@ package transactionpool
 import (
 	"errors"
 
-	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/demotemutex"
+	"github.com/coreos/bbolt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -19,11 +19,11 @@ var (
 )
 
 type (
-	// ObjectIDs are the IDs of objects such as siacoin outputs and file
-	// contracts, and are used to see if there are conflicts or overlaps within
-	// the transaction pool. A TransactionSetID is the hash of a transaction
-	// set.
-	ObjectID         crypto.Hash
+	// ObjectID is the ID of an object such as siacoin output and file
+	// contracts, and is used to see if there is are conflicts or overlaps within
+	// the transaction pool.
+	ObjectID crypto.Hash
+	// TransactionSetID is the hash of a transaction set.
 	TransactionSetID crypto.Hash
 
 	// The TransactionPool tracks incoming transactions, accepting them or

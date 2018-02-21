@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/fastrand"
+	"github.com/coreos/bbolt"
 )
 
 // testInputs and testFilenames are global variables because most tests require
@@ -181,6 +181,10 @@ func TestOpenDatabase(t *testing.T) {
 			}
 			return nil
 		})
+		if err != nil {
+			t.Error(err)
+			continue
+		}
 		// Close and delete the newly emptied database.
 		err = db.Close()
 		if err != nil {

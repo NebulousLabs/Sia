@@ -780,49 +780,25 @@ returns active contracts. Expired contracts are not included.
 {
   "contracts": [
     {
-      // Amount of contract funds that have been spent on downloads.
       "downloadspending": "1234", // hastings
-
-      // Block height that the file contract ends on.
       "endheight": 50000, // block height
-
-      // Fees paid in order to form the file contract.
       "fees": "1234", // hastings
-
-      // Public key of the host the contract was formed with.
       "hostpublickey": {
         "algorithm": "ed25519",
         "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       },
-
-      // ID of the file contract.
       "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-
-      // A signed transaction containing the most recent contract revision.
       "lasttransaction": {},
-
-      // Address of the host the file contract was formed with.
       "netaddress": "12.34.56.78:9",
-
-      // Remaining funds left for the renter to spend on uploads & downloads.
       "renterfunds": "1234", // hastings
-
-      // Size of the file contract, which is typically equal to the number of
-      // bytes that have been uploaded to the host.
       "size": 8192, // bytes
-
-      // Block height that the file contract began on.
       "startheight": 50000, // block height
-
-      // Amount of contract funds that have been spent on storage.
+      "StorageSpending": "1234",
       "storagespending": "1234", // hastings
-
-      // Total cost to the wallet of forming the file contract.
-      // This includes both the fees and the funds allocated in the contract.
       "totalcost": "1234", // hastings
-
-      // Amount of contract funds that have been spent on uploads.
       "uploadspending": "1234" // hastings
+      "goodforupload": true,
+      "goodforrenew": false,
     }
   ]
 }
@@ -837,12 +813,18 @@ lists all files in the download queue.
 {
   "downloads": [
     {
-      "siapath":     "foo/bar.txt",
-      "destination": "/home/users/alice/bar.txt",
-      "filesize":    8192,                  // bytes
-      "received":    4096,                  // bytes
-      "starttime":   "2009-11-10T23:00:00Z", // RFC 3339 time
-      "error": ""
+      "destination":     "/home/users/alice/bar.txt",
+      "destinationtype": "file",
+      "length":          8192,
+      "offset":          2000,
+      "siapath":         "foo/bar.txt",
+
+      "completed":           true,
+      "endtime":             "2009-11-10T23:10:00Z", // RFC 3339 time
+      "error":               "",
+      "received":            8192,
+      "starttime":           "2009-11-10T23:00:00Z", // RFC 3339 time
+      "totaldatatransfered": 10031
     }
   ]
 }

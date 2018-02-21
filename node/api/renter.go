@@ -98,11 +98,22 @@ type (
 		// Block height that the file contract began on.
 		StartHeight types.BlockHeight `json:"startheight"`
 		// Amount of contract funds that have been spent on storage.
-		StorageSpending types.Currency `json:"StorageSpending"`
+		StorageSpending types.Currency `json:"storagespending"`
+		// DEPRECATED: This is the exact same value as StorageSpending, but it has
+		// incorrect capitalization. This was fixed in 1.3.2, but this field is kept
+		// to preserve backwards compatibility on clients who depend on the
+		// incorrect capitalization. This field will be removed in the future, so
+		// clients should switch to the StorageSpending field (above) with the
+		// correct lowercase name.
+		StorageSpendingDeprecated types.Currency `json:"StorageSpending"`
 		// Total cost to the wallet of forming the file contract.
 		TotalCost types.Currency `json:"totalcost"`
 		// Amount of contract funds that have been spent on uploads.
 		UploadSpending types.Currency `json:"uploadspending"`
+		// Signals if contract is good for uploading data
+		GoodForUpload bool `json:"goodforupload"`
+		// Signals if contract is good for a renewal
+		GoodForRenew bool `json:"goodforrenew"`
 	}
 
 	// RenterContracts contains the renter's contracts.
@@ -110,7 +121,7 @@ type (
 		Contracts []RenterContract `json:"contracts"`
 	}
 
-	// DownloadQueue contains the renter's download queue.
+	// RenterDownloadQueue contains the renter's download queue.
 	RenterDownloadQueue struct {
 		Downloads []DownloadInfo `json:"downloads"`
 	}
@@ -138,12 +149,19 @@ type (
 
 	// DownloadInfo contains all client-facing information of a file.
 	DownloadInfo struct {
-		SiaPath     string    `json:"siapath"`
-		Destination string    `json:"destination"`
-		Filesize    uint64    `json:"filesize"`
-		Received    uint64    `json:"received"`
-		StartTime   time.Time `json:"starttime"`
-		Error       string    `json:"error"`
+		Destination     string `json:"destination"`     // The destination of the download.
+		DestinationType string `json:"destinationtype"` // Can be "file", "memory buffer", or "http stream".
+		Filesize        uint64 `json:"filesize"`        // DEPRECATED. Same as 'Length'.
+		Length          uint64 `json:"length"`          // The length requested for the download.
+		Offset          uint64 `json:"offset"`          // The offset within the siafile requested for the download.
+		SiaPath         string `json:"siapath"`         // The siapath of the file used for the download.
+
+		Completed           bool      `json:"completed"`           // Whether or not the download has completed.
+		EndTime             time.Time `json:"endtime"`             // The time when the download fully completed.
+		Error               string    `json:"error"`               // Will be the empty string unless there was an error.
+		Received            uint64    `json:"received"`            // Amount of data confirmed and decoded.
+		StartTime           time.Time `json:"starttime"`           // The time when the download was started.
+		TotalDataTransfered uint64    `json:"totaldatatransfered"` // The total amount of data transfered, including negotiation, overdrive etc.
 	}
 )
 
@@ -239,20 +257,31 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			netAddress = hdbe.NetAddress
 		}
 
+		// Fetch utilities for contract
+		var goodForUpload bool
+		var goodForRenew bool
+		if utility, ok := api.renter.ContractUtility(c.ID); ok {
+			goodForUpload = utility.GoodForUpload
+			goodForRenew = utility.GoodForRenew
+		}
+
 		contracts = append(contracts, RenterContract{
-			DownloadSpending: c.DownloadSpending,
-			EndHeight:        c.EndHeight,
-			Fees:             c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
-			HostPublicKey:    c.HostPublicKey,
-			ID:               c.ID,
-			LastTransaction:  c.Transaction,
-			NetAddress:       netAddress,
-			RenterFunds:      c.RenterFunds,
-			Size:             size,
-			StartHeight:      c.StartHeight,
-			StorageSpending:  c.StorageSpending,
-			TotalCost:        c.TotalCost,
-			UploadSpending:   c.UploadSpending,
+			DownloadSpending:          c.DownloadSpending,
+			EndHeight:                 c.EndHeight,
+			Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
+			GoodForUpload:             goodForUpload,
+			GoodForRenew:              goodForRenew,
+			HostPublicKey:             c.HostPublicKey,
+			ID:                        c.ID,
+			LastTransaction:           c.Transaction,
+			NetAddress:                netAddress,
+			RenterFunds:               c.RenterFunds,
+			Size:                      size,
+			StartHeight:               c.StartHeight,
+			StorageSpending:           c.StorageSpending,
+			StorageSpendingDeprecated: c.StorageSpending,
+			TotalCost:                 c.TotalCost,
+			UploadSpending:            c.UploadSpending,
 		})
 	}
 	WriteJSON(w, RenterContracts{
@@ -263,14 +292,21 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 // renterDownloadsHandler handles the API call to request the download queue.
 func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	var downloads []DownloadInfo
-	for _, d := range api.renter.DownloadQueue() {
+	for _, di := range api.renter.DownloadHistory() {
 		downloads = append(downloads, DownloadInfo{
-			SiaPath:     d.SiaPath,
-			Destination: d.Destination.Destination(),
-			Filesize:    d.Filesize,
-			StartTime:   d.StartTime,
-			Received:    d.Received,
-			Error:       d.Error,
+			Destination:     di.Destination,
+			DestinationType: di.DestinationType,
+			Filesize:        di.Length,
+			Length:          di.Length,
+			Offset:          di.Offset,
+			SiaPath:         di.SiaPath,
+
+			Completed:           di.Completed,
+			EndTime:             di.EndTime,
+			Error:               di.Error,
+			Received:            di.Received,
+			StartTime:           di.StartTime,
+			TotalDataTransfered: di.TotalDataTransfered,
 		})
 	}
 	// sort the downloads by newest first
@@ -446,7 +482,7 @@ func parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httpro
 		Async:       async,
 		Length:      length,
 		Offset:      offset,
-		Siapath:     siapath,
+		SiaPath:     siapath,
 	}
 	if httpresp {
 		dp.Httpwriter = w

@@ -188,12 +188,12 @@ func runDownloadTest(t *testing.T, filesize, offset, length int64, useHttpResp b
 
 	// should have correct length
 	if int64(downbytes.Len()) != length {
-		return errors.New(fmt.Sprintf("downloaded file has incorrect size: %d, %d expected.", downbytes.Len(), length))
+		return fmt.Errorf("downloaded file has incorrect size: %d, %d expected", downbytes.Len(), length)
 	}
 
 	// should be byte-for-byte equal to the original uploaded file
 	if !bytes.Equal(originalBytes.Bytes(), downbytes.Bytes()) {
-		return errors.New(fmt.Sprintf("downloaded content differs from original content"))
+		return fmt.Errorf("downloaded content differs from original content")
 	}
 
 	return nil
@@ -661,6 +661,9 @@ func TestRenterHandlerContracts(t *testing.T) {
 	}
 	if len(contracts.Contracts) != 1 {
 		t.Fatalf("expected renter to have 1 contract; got %v", len(contracts.Contracts))
+	}
+	if !contracts.Contracts[0].GoodForUpload || !contracts.Contracts[0].GoodForRenew {
+		t.Errorf("expected contract to be good for upload and renew")
 	}
 
 	// Check the renter's contract spending.

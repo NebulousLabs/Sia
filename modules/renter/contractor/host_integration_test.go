@@ -632,6 +632,9 @@ func TestContractPresenceLeak(t *testing.T) {
 		var challenge crypto.Hash
 		var signature crypto.Signature
 		conn, err := net.Dial("tcp", string(hostEntry.NetAddress))
+		if err != nil {
+			t.Fatalf("Couldn't dial tpc connection with host @ %v: %v.", string(hostEntry.NetAddress), err)
+		}
 		if err := encoding.WriteObject(conn, modules.RPCDownload); err != nil {
 			t.Fatalf("Couldn't initiate RPC: %v.", err)
 		}

@@ -257,7 +257,7 @@ func (m *Miner) pushToOverflow(elem *mapElement) {
 	m.overflowMapHeap.push(elem)
 }
 
-// ProcessConsensusDigest will update the miner's most recent block.
+// ProcessConsensusChange will update the miner's most recent block.
 func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -105,7 +105,7 @@ func (cm *ContractManager) Close() error {
 	return build.ExtendErr("error while stopping contract manager", cm.tg.Stop())
 }
 
-// newContrctManager returns a contract manager that is ready to be used with
+// newContractManager returns a contract manager that is ready to be used with
 // the provided dependencies.
 func newContractManager(dependencies dependencies, persistDir string) (*ContractManager, error) {
 	cm := &ContractManager{

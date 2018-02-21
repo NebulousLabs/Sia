@@ -6,6 +6,22 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
+const (
+	// defaultFilePerm defines the default permissions used for a new file if no
+	// permissions are supplied.
+	defaultFilePerm = 0666
+
+	// downloadFailureCooldown defines how long to wait for a worker after a
+	// worker has experienced a download failure.
+	downloadFailureCooldown = time.Second * 3
+
+	// memoryPriorityLow is used to request low priority memory
+	memoryPriorityLow = false
+
+	// memoryPriorityHigh is used to request high priority memory
+	memoryPriorityHigh = true
+)
+
 var (
 	// chunkDownloadTimeout defines the maximum amount of time to wait for a
 	// chunk download to finish before returning in the download-to-upload repair
@@ -42,6 +58,14 @@ var (
 		Testing:  5,
 	}).(int)
 
+	// offlineCheckFrequency is how long the renter will wait to check the
+	// online status if it is offline.
+	offlineCheckFrequency = build.Select(build.Var{
+		Dev:      3 * time.Second,
+		Standard: 10 * time.Second,
+		Testing:  250 * time.Millisecond,
+	}).(time.Duration)
+
 	// rebuildChunkHeapInterval defines how long the renter sleeps between
 	// checking on the filesystem health.
 	rebuildChunkHeapInterval = build.Select(build.Var{
@@ -55,5 +79,13 @@ var (
 		Dev:      time.Second * 7,
 		Standard: time.Second * 61,
 		Testing:  time.Second,
+	}).(time.Duration)
+
+	// workerPoolUpdateTimeout is the amount of time that can pass before the
+	// worker pool should be updated.
+	workerPoolUpdateTimeout = build.Select(build.Var{
+		Dev:      30 * time.Second,
+		Standard: 5 * time.Minute,
+		Testing:  3 * time.Second,
 	}).(time.Duration)
 )

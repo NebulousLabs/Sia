@@ -525,6 +525,9 @@ func TestCallingRPCFromRPC(t *testing.T) {
 	err = g2.RPC(g1.Address(), "FOO", func(conn modules.PeerConn) error {
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	select {
 	case err = <-errChan:

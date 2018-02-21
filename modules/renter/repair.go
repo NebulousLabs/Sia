@@ -18,6 +18,9 @@ package renter
 // complete in some way before we send off the next round of upload jobs.
 // Otherwise we might end up with simultenously overlapping repair jobs.
 
+// TODO: Renter will try to download to repair a piece even if there are not
+// enough workers to make any progress on the repair.  This should be fixed.
+
 import (
 	"container/heap"
 	"sync"
@@ -33,6 +36,8 @@ type chunkHeap []*unfinishedChunk
 
 // unfinishedChunk contains a chunk from the filesystem that has not finished
 // uploading, including knowledge of the progress.
+//
+// TODO: rename to unfinishedUploadChunk
 type unfinishedChunk struct {
 	// Information about the file. localPath may be the empty string if the file
 	// is known not to exist locally.
@@ -50,8 +55,8 @@ type unfinishedChunk struct {
 	memoryNeeded   uint64 // memory needed in bytes
 	memoryReleased uint64 // memory that has been returned of memoryNeeded
 	minimumPieces  int    // number of pieces required to recover the file.
-	offset         int64
-	piecesNeeded   int // number of pieces to achieve a 100% complete upload
+	offset         int64  // Offset of the chunk within the file.
+	piecesNeeded   int    // number of pieces to achieve a 100% complete upload
 
 	// The logical data is the data that is presented to the user when the user
 	// requests the chunk. The physical data is all of the pieces that get
@@ -65,7 +70,8 @@ type unfinishedChunk struct {
 	piecesCompleted  int                 // number of pieces that have been fully uploaded.
 	piecesRegistered int                 // number of pieces that are being uploaded, but aren't finished yet.
 	unusedHosts      map[string]struct{} // hosts that aren't yet storing any pieces
-	workersRemaining int                 // number of workers who have received the chunk, but haven't finished processing it.
+	workersRemaining int                 // number of workers still able to upload a piece.
+	workersStandby   []*worker           // workers that can be used if other workers fail
 }
 
 // Implementation of heap.Interface for chunkHeap.
@@ -81,6 +87,23 @@ func (ch *chunkHeap) Pop() interface{} {
 	x := old[n-1]
 	*ch = old[0 : n-1]
 	return x
+}
+
+// managedNotifyStandbyWorkers is called when a worker fails to upload a piece, meaning
+// that the standby workers may now be needed to help the piece finish
+// uploading.
+func (uc *unfinishedChunk) managedNotifyStandbyWorkers() {
+	// Copy the standby workers into a new slice and reset it since we can't
+	// hold the lock while calling the managed function.
+	uc.mu.Lock()
+	standbyWorkers := make([]*worker, 0, len(uc.workersStandby))
+	copy(standbyWorkers, uc.workersStandby)
+	uc.workersStandby = uc.workersStandby[:0]
+	uc.mu.Unlock()
+
+	for i := 0; i < len(standbyWorkers); i++ {
+		standbyWorkers[i].managedQueueUploadChunk(uc)
+	}
 }
 
 // buildUnfinishedChunks will pull all of the unfinished chunks out of a file.
@@ -112,8 +135,8 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			localPath:  trackedFile.RepairPath,
 
 			index:  i,
-			length: f.chunkSize(),
-			offset: int64(i * f.chunkSize()),
+			length: f.staticChunkSize(),
+			offset: int64(i * f.staticChunkSize()),
 
 			// memoryNeeded has to also include the logical data, and also
 			// include the overhead for encryption.
@@ -228,29 +251,14 @@ func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts ma
 // available, fetching the logical data for the chunk (either from the disk or
 // from the network), erasure coding the logical data into the physical data,
 // and then finally passing the work onto the workers.
-//
-// TODO: Need to turn this into a smarter memory pool construction - this
-// construction as it stands has a race condition. Instead of blocking until a
-// memory refresh signal is received, it should just call 'AcquireMemory' on a
-// pool object or something, and then that object can worry about breaking and
-// stuff, and can also make sure that the memory goes to only one place.
 func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{}) {
 	// Grab the next chunk, loop until we have enough memory, update the amount
 	// of memory available, and then spin up a thread to asynchronously handle
 	// the rest of the chunk tasks.
-	memoryAvailable := r.managedMemoryAvailableGet()
 	nextChunk := heap.Pop(ch).(*unfinishedChunk)
-	for nextChunk.memoryNeeded > memoryAvailable {
-		select {
-		case newFile := <-r.newUploads:
-			r.managedInsertFileIntoChunkHeap(newFile, ch, hosts)
-		case <-r.newMemory:
-			memoryAvailable = r.managedMemoryAvailableGet()
-		case <-r.tg.StopChan():
-			return
-		}
+	if !r.memoryManager.Request(nextChunk.memoryNeeded, memoryPriorityLow) {
+		return
 	}
-	r.managedMemoryAvailableSub(nextChunk.memoryNeeded)
 	// Add this thread to the waitgroup. This Add will be released once the
 	// worker threads have been added to the wg.
 	r.heapWG.Add(1)
@@ -259,7 +267,7 @@ func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{
 		r.heapWG.Done()
 		if !workDistributed {
 			// Release any data that did not get distributed to workers.
-			r.managedMemoryAvailableAdd(nextChunk.memoryNeeded - nextChunk.memoryReleased)
+			r.memoryManager.Return(nextChunk.memoryNeeded - nextChunk.memoryReleased)
 		}
 		// Sanity check, make sure memory was returned properly.
 		if nextChunk.logicalChunkData != nil {
@@ -305,16 +313,16 @@ func (r *Renter) threadedRepairScan() {
 	defer r.tg.Done()
 
 	for {
-		// Wait until we are online
+		// Wait until we are online.
 		for !r.g.Online() {
 			select {
 			case <-r.tg.StopChan():
 				return
-			case <-time.After(20 * time.Second):
+			case <-time.After(offlineCheckFrequency):
 			}
 		}
 
-		// Return if the renter has shut d wn.
+		// Return if the renter has shut down.
 		select {
 		case <-r.tg.StopChan():
 			return

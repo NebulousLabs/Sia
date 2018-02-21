@@ -2,29 +2,18 @@
 // network.
 package renter
 
-// CONCURRENCY PATTERNS: The renter has some complex concurrency patterns.
-// Preventing race conditions and deadlocks requires understanding the patterns.
-//
-// The renter itself has a lock that protects all internal state. The renter is
-// allowed to call out to the hostContractor while under lock, which means that
-// calls within the hostContractor should not ever leave the hostContractor -
-// external calls should be able to complete quickly, and without making any
-// external calls or calls that may acquire external locks.
-//
-// The renter has a bunch of worker objects. The worker objects have mutexes
-// which protect them, and the workers need to interact with the renter,
-// sometimes changing state which is prevented by locks. This means that the
-// renter itself can never interact with a worker while the renter is under
-// lock.
-
-// TODO: Change the upload loop to have an upload state, and make it so that
-// instead of occasionally rebuilding the whole file matrix it has just a
-// single matrix that it's constantly pulling chunks from. Have a separate loop
-// which goes through the files and adds them to the matrix. Have the loop
-// listen on the channel for new files, so that they can go directly into the
-// matrix.
+// NOTE: Some of the concurrency patterns in the renter are fairly complex. A
+// lot of this has been cleaned up, though some shadows of previous demons still
+// remain. Be careful when working with anything that involves concurrency.
 
 // TODO: Allow the 'baseMemory' to be set by the user.
+
+// TODO: The repair loop currently receives new upload jobs through a channel.
+// The download loop has a better model, a heap that can be pushed to and popped
+// from concurrently without needing complex channel communication. Migrating
+// the renter to this model should clean up some of the places where uploading
+// bottlenecks, and reduce the amount of channel-ninjitsu required to make the
+// uploading function.
 
 import (
 	"errors"
@@ -155,36 +144,41 @@ type trackedFile struct {
 
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
+//
+// TODO: Separate the workerPool to have its own mutex. The workerPool doesn't
+// interfere with any of the other fields in the renter, should be fine for it
+// to have a separate mutex, that way operations on the worker pool don't block
+// operations on other parts of the struct. If we're going to do it that way,
+// might make sense to split the worker pool off into it's own struct entirely
+// the same way that we split of the memoryManager entirely.
 type Renter struct {
 	// File management.
 	//
 	// tracking contains a list of files that the user intends to maintain. By
 	// default, files loaded through sharing are not maintained by the user.
 	files    map[string]*file
-	tracking map[string]trackedFile // map from nickname to metadata
+	tracking map[string]trackedFile // Map from nickname to metadata.
 
-	// Work management.
+	// Download management. The heap has a separate mutex because it is always
+	// accessed in isolation.
+	downloadHeapMu sync.Mutex         // Used to protect the downloadHeap.
+	downloadHeap   *downloadChunkHeap // A heap of priority-sorted chunks to download.
+	newDownloads   chan struct{}      // Used to notify download heap thread that new downlaods are available.
+
+	// Download history. The history list has its own mutex because it is always
+	// accessed in isolation.
 	//
-	// chunkQueue contains a list of incomplete work that the download loop acts
-	// upon. The chunkQueue is only ever modified by the main download loop
-	// thread, which means it can be accessed and updated without locks.
-	//
-	// downloadQueue contains a complete history of work that has been
-	// submitted to the download loop.
-	chunkQueue    []*chunkDownload // Accessed without locks.
-	downloadQueue []*download
-	newDownloads  chan *download
-	newUploads    chan *file
+	// TODO: Currently the download history doesn't include repair-initiated
+	// downloads, and instead only contains user-initiated downlods.
+	downloadHistory   []*download
+	downloadHistoryMu sync.Mutex
+
+	// Upload management.
+	newUploads chan *file // Used to send new uploads to the upload heap.
+
+	// List of workers that can be used for uploading and/or downloading.
+	memoryManager *memoryManager
 	workerPool    map[types.FileContractID]*worker
-
-	// Memory management - baseMemory tracks how much memory the renter is
-	// allowed to consume, memoryAvailable tracks how much more memory the
-	// renter can allocate before hitting the cap, and newMemory is a channel
-	// used to inform sleeping threads (the download loop and upload loop) that
-	// memory has become available.
-	baseMemory      uint64
-	memoryAvailable uint64
-	newMemory       chan struct{}
 
 	// Utilities.
 	cs             modules.ConsensusSet
@@ -199,127 +193,6 @@ type Renter struct {
 	tpool          modules.TransactionPool
 
 	lastEstimation modules.RenterPriceEstimation // used to cache the last price estimation result
-}
-
-// New returns an initialized renter.
-func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
-	hdb, err := hostdb.New(g, cs, persistDir)
-	if err != nil {
-		return nil, err
-	}
-	hc, err := contractor.New(cs, wallet, tpool, hdb, persistDir)
-	if err != nil {
-		return nil, err
-	}
-
-	return newRenter(g, cs, tpool, hdb, hc, persistDir)
-}
-
-// newRenter initializes a renter and returns it.
-func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
-	if g == nil {
-		return nil, errNilGateway
-	}
-	if cs == nil {
-		return nil, errNilCS
-	}
-	if tpool == nil {
-		return nil, errNilTpool
-	}
-	if hc == nil {
-		return nil, errNilContractor
-	}
-	if hdb == nil && build.Release != "testing" {
-		return nil, errNilHdb
-	}
-
-	r := &Renter{
-		files:    make(map[string]*file),
-		tracking: make(map[string]trackedFile),
-
-		newDownloads: make(chan *download),
-		newUploads:   make(chan *file),
-		workerPool:   make(map[types.FileContractID]*worker),
-
-		baseMemory:      defaultMemory,
-		memoryAvailable: defaultMemory,
-		newMemory:       make(chan struct{}, 1),
-
-		cs:             cs,
-		g:              g,
-		hostDB:         hdb,
-		hostContractor: hc,
-		persistDir:     persistDir,
-		mu:             siasync.New(modules.SafeMutexDelay, 1),
-		tpool:          tpool,
-	}
-	if err := r.initPersist(); err != nil {
-		return nil, err
-	}
-
-	// Subscribe to the consensus set.
-	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
-	if err != nil {
-		return nil, err
-	}
-
-	// Spin up the workers for the work pool.
-	r.managedUpdateWorkerPool()
-	go r.threadedRepairScan()
-	go r.threadedDownloadLoop()
-
-	// Kill workers on shutdown.
-	r.tg.OnStop(func() error {
-		id := r.mu.RLock()
-		for _, worker := range r.workerPool {
-			close(worker.killChan)
-		}
-		r.mu.RUnlock(id)
-		return nil
-	})
-
-	return r, nil
-}
-
-// managedMemoryAvailableAdd adds the amount provided to the renter's total
-// memory available.
-func (r *Renter) managedMemoryAvailableAdd(amt uint64) {
-	id := r.mu.Lock()
-	r.memoryAvailable += amt
-	if r.memoryAvailable > r.baseMemory {
-		r.mu.Unlock(id)
-		r.log.Critical("Memory available now exceeds base memory:", r.memoryAvailable, r.baseMemory)
-		return
-	}
-	r.mu.Unlock(id)
-
-	// Create a notification that more memory is available.
-	select {
-	case r.newMemory <- struct{}{}:
-	default:
-	}
-}
-
-// managedMemoryAvailableGet returns the current amount of memory available to
-// the renter.
-func (r *Renter) managedMemoryAvailableGet() uint64 {
-	id := r.mu.RLock()
-	memAvail := r.memoryAvailable
-	r.mu.RUnlock(id)
-	return memAvail
-}
-
-// managedMemoryAvailableSub subtracts the amount provided from the renter's
-// total memory available.
-func (r *Renter) managedMemoryAvailableSub(amt uint64) {
-	id := r.mu.Lock()
-	if r.memoryAvailable < amt {
-		r.mu.Unlock(id)
-		r.log.Critical("Memory available is underflowing", r.memoryAvailable, amt)
-		return
-	}
-	r.memoryAvailable -= amt
-	r.mu.Unlock(id)
 }
 
 // Close closes the Renter and its dependencies
@@ -435,6 +308,12 @@ func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.
 // CurrentPeriod returns the host contractor's current period
 func (r *Renter) CurrentPeriod() types.BlockHeight { return r.hostContractor.CurrentPeriod() }
 
+// ContractUtility returns the utility field for a given contract, along
+// with a bool indicating if it exists.
+func (r *Renter) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
+	return r.hostContractor.ContractUtility(id)
+}
+
 // PeriodSpending returns the host contractor's period spending
 func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostContractor.PeriodSpending() }
 
@@ -454,3 +333,92 @@ func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 // Enforce that Renter satisfies the modules.Renter interface.
 var _ modules.Renter = (*Renter)(nil)
+
+// newRenter initializes a renter and returns it.
+func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
+	if g == nil {
+		return nil, errNilGateway
+	}
+	if cs == nil {
+		return nil, errNilCS
+	}
+	if tpool == nil {
+		return nil, errNilTpool
+	}
+	if hc == nil {
+		return nil, errNilContractor
+	}
+	if hdb == nil && build.Release != "testing" {
+		return nil, errNilHdb
+	}
+
+	r := &Renter{
+		files:    make(map[string]*file),
+		tracking: make(map[string]trackedFile),
+
+		// Making newDownloads a buffered channel means that most of the time, a
+		// new download will trigger an unnecessary extra iteration of the
+		// download heap loop, searching for a chunk that's not there. This is
+		// preferable to the alternative, where in rare cases the download heap
+		// will miss work altogether.
+		newDownloads: make(chan struct{}, 1),
+		downloadHeap: new(downloadChunkHeap),
+
+		// TODO instead of using a buffered channel we should add uploads to
+		// the upload heap directly.
+		newUploads: make(chan *file, 2500),
+
+		workerPool: make(map[types.FileContractID]*worker),
+
+		cs:             cs,
+		g:              g,
+		hostDB:         hdb,
+		hostContractor: hc,
+		persistDir:     persistDir,
+		mu:             siasync.New(modules.SafeMutexDelay, 1),
+		tpool:          tpool,
+	}
+	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
+
+	// Load all saved data.
+	if err := r.initPersist(); err != nil {
+		return nil, err
+	}
+
+	// Subscribe to the consensus set.
+	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
+	if err != nil {
+		return nil, err
+	}
+
+	// Spin up the workers for the work pool.
+	r.managedUpdateWorkerPool()
+	go r.threadedRepairScan()
+	go r.threadedDownloadLoop()
+
+	// Kill workers on shutdown.
+	r.tg.OnStop(func() error {
+		id := r.mu.RLock()
+		for _, worker := range r.workerPool {
+			close(worker.killChan)
+		}
+		r.mu.RUnlock(id)
+		return nil
+	})
+
+	return r, nil
+}
+
+// New returns an initialized renter.
+func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
+	hdb, err := hostdb.New(g, cs, persistDir)
+	if err != nil {
+		return nil, err
+	}
+	hc, err := contractor.New(cs, wallet, tpool, hdb, persistDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return newRenter(g, cs, tpool, hdb, hc, persistDir)
+}

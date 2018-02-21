@@ -124,24 +124,63 @@ returns active contracts. Expired contracts are not included.
 {
   "contracts": [
     {
+      // Amount of contract funds that have been spent on downloads.
+      "downloadspending": "1234", // hastings
+
       // Block height that the file contract ends on.
       "endheight": 50000, // block height
+
+      // Fees paid in order to form the file contract.
+      "fees": "1234", // hastings
+
+      // Public key of the host the contract was formed with.
+      "hostpublickey": {
+        "algorithm": "ed25519",
+        "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+      },
 
       // ID of the file contract.
       "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 
-      // Address of the host the file contract was formed with.
-      "netaddress": "12.34.56.78:9",
-
       // A signed transaction containing the most recent contract revision.
       "lasttransaction": {},
+
+      // Address of the host the file contract was formed with.
+      "netaddress": "12.34.56.78:9",
 
       // Remaining funds left for the renter to spend on uploads & downloads.
       "renterfunds": "1234", // hastings
 
       // Size of the file contract, which is typically equal to the number of
       // bytes that have been uploaded to the host.
-      "size": 8192 // bytes
+      "size": 8192, // bytes
+
+      // Block height that the file contract began on.
+      "startheight": 50000, // block height
+
+      // DEPRECATED: This is the exact same value as StorageSpending, but it has
+      // incorrect capitalization. This was fixed in 1.3.2, but this field is kept
+      // to preserve backwards compatibility on clients who depend on the
+      // incorrect capitalization. This field will be removed in the future, so
+      // clients should switch to the StorageSpending field (above) with the
+      // correct lowercase name.
+      "StorageSpending": 0,
+
+      // Amount of contract funds that have been spent on storage.
+      "storagespending": "1234", // hastings
+
+      // Total cost to the wallet of forming the file contract.
+      // This includes both the fees and the funds allocated in the contract.
+      "totalcost": "1234", // hastings
+
+      // Amount of contract funds that have been spent on uploads.
+      "uploadspending": "1234" // hastings
+
+      // Signals if contract is good for uploading data
+      "goodforupload": true,
+
+      // Signals if contract is good for a renewal
+      "goodforrenew": false,
     }
   ]
 }
@@ -156,23 +195,55 @@ lists all files in the download queue.
 {
   "downloads": [
     {
-      // Siapath given to the file when it was uploaded.
-      "siapath": "foo/bar.txt",
-
       // Local path that the file will be downloaded to.
       "destination": "/home/users/alice",
 
-      // Size, in bytes, of the file being downloaded.
-      "filesize": 8192, // bytes
+      // What type of destination was used. Can be "file", indicating a download
+      // to disk, can be "buffer", indicating a download to memory, and can be
+      // "http stream", indicating that the download was streamed through the
+      // http API.
+      "destinationtype": "file",
 
-      // Number of bytes downloaded thus far.
+      // Length of the download. If the download was a partial download, this
+      // will indicate the length of the partial download, and not the length of
+      // the full file.
+      "length": 8192, // bytes
+
+      // Offset within the file of the download. For full file downloads, the //
+      offset will be '0'. For partial downloads, the offset may be anywhere //
+      within the file. offset+length will never exceed the full file size.
+      "offset": 0,
+
+      // Siapath given to the file when it was uploaded.
+      "siapath": "foo/bar.txt",
+
+      // Whether or not the download has completed. Will be false initially, and
+      // set to true immediately as the download has been fully written out to
+      // the file, to the http stream, or to the in-memory buffer. Completed
+      // will also be set to true if there is an error that causes the download to
+      // fail.
+      "completed": true,
+
+      // Time at which the download completed. Will be zero if the download has
+      // not yet completed.
+      "endtime": "2009-11-10T23:00:00Z", // RFC 3339 time
+
+      // Error encountered while downloading. If there was no error (yet), it
+      // will be the empty string.
+      "error": ""
+
+      // Number of bytes downloaded thus far. Will only be updated as segments
+      // of the file complete fully. This typically has a resolution of tens of
+      // megabytes.
       "received": 4096, // bytes
 
       // Time at which the download was initiated.
       "starttime": "2009-11-10T23:00:00Z", // RFC 3339 time
 
-      // Error encountered while downloading, if it exists.
-      "error": ""
+      // The total amount of data transfered when downloading the file. This
+      // will eventually include data transferred during contract + payment
+      // negotiation, as well as data from failed piece downloads.
+      "totaldatatransfered": 10321,
     }   
   ]
 }

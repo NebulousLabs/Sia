@@ -34,6 +34,15 @@ func (cs *ContractSet) Acquire(id types.FileContractID) (*SafeContract, bool) {
 		return nil, false
 	}
 	safeContract.mu.Lock()
+	// We need to check if the contract is still in the map or if it has been
+	// deleted in the meantime.
+	cs.mu.Lock()
+	_, ok = cs.contracts[id]
+	cs.mu.Unlock()
+	if !ok {
+		safeContract.mu.Unlock()
+		return nil, false
+	}
 	return safeContract, true
 }
 
@@ -45,6 +54,7 @@ func (cs *ContractSet) Delete(c *SafeContract) {
 	safeContract, ok := cs.contracts[c.header.ID()]
 	if !ok {
 		cs.mu.Unlock()
+		build.Critical("Delete called on already deleted contract")
 		return
 	}
 	delete(cs.contracts, c.header.ID())

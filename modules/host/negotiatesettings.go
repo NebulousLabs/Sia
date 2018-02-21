@@ -32,6 +32,14 @@ func (h *Host) externalSettings() modules.HostExternalSettings {
 	} else {
 		netAddr = h.autoAddress
 	}
+
+	// Calculate contract price
+	_, maxFee := h.tpool.FeeEstimation()
+	contractPrice := maxFee.Mul64(10e3) // estimated size of txns host needs to fund
+	if contractPrice.Cmp(h.settings.MinContractPrice) < 0 {
+		contractPrice = h.settings.MinContractPrice
+	}
+
 	return modules.HostExternalSettings{
 		AcceptingContracts:   h.settings.AcceptingContracts,
 		MaxDownloadBatchSize: h.settings.MaxDownloadBatchSize,
@@ -47,7 +55,7 @@ func (h *Host) externalSettings() modules.HostExternalSettings {
 		Collateral:    h.settings.Collateral,
 		MaxCollateral: h.settings.MaxCollateral,
 
-		ContractPrice:          h.settings.MinContractPrice,
+		ContractPrice:          contractPrice,
 		DownloadBandwidthPrice: h.settings.MinDownloadBandwidthPrice,
 		StoragePrice:           h.settings.MinStoragePrice,
 		UploadBandwidthPrice:   h.settings.MinUploadBandwidthPrice,

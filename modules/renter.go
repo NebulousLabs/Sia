@@ -55,19 +55,18 @@ type ContractUtility struct {
 // DownloadInfo provides information about a file that has been requested for
 // download.
 type DownloadInfo struct {
-	SiaPath     string         `json:"siapath"`
-	Destination DownloadWriter `json:"destination"`
-	Filesize    uint64         `json:"filesize"`
-	Received    uint64         `json:"received"`
-	StartTime   time.Time      `json:"starttime"`
-	Error       string         `json:"error"`
-}
+	Destination     string `json:"destination"`     // The destination of the download.
+	DestinationType string `json:"destinationtype"` // Can be "file", "memory buffer", or "http stream".
+	Length          uint64 `json:"length"`          // The length requested for the download.
+	Offset          uint64 `json:"offset"`          // The offset within the siafile requested for the download.
+	SiaPath         string `json:"siapath"`         // The siapath of the file used for the download.
 
-// DownloadWriter provides an interface which all output writers have to implement.
-type DownloadWriter interface {
-	WriteAt(b []byte, off int64) (int, error)
-	Destination() string
-	Close() error
+	Completed           bool      `json:"completed"`           // Whether or not the download has completed.
+	EndTime             time.Time `json:"endtime"`             // The time when the download fully completed.
+	Error               string    `json:"error"`               // Will be the empty string unless there was an error.
+	Received            uint64    `json:"received"`            // Amount of data confirmed and decoded.
+	StartTime           time.Time `json:"starttime"`           // The time when the download was started.
+	TotalDataTransfered uint64    `json:"totaldatatransfered"` // Total amount of data transfered, including negotiation, etc.
 }
 
 // FileUploadParams contains the information used by the Renter to upload a
@@ -280,6 +279,9 @@ type Renter interface {
 	// Contracts returns the contracts formed by the renter.
 	Contracts() []RenterContract
 
+	// ContractUtility provides the contract utility for a given id
+	ContractUtility(id types.FileContractID) (ContractUtility, bool)
+
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
 	CurrentPeriod() types.BlockHeight
@@ -295,8 +297,8 @@ type Renter interface {
 	// downloads of `offset` and `length` type.
 	Download(params RenterDownloadParameters) error
 
-	// DownloadQueue lists all the files that have been scheduled for download.
-	DownloadQueue() []DownloadInfo
+	// DownloadHistory lists all the files that have been scheduled for download.
+	DownloadHistory() []DownloadInfo
 
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
@@ -350,6 +352,6 @@ type RenterDownloadParameters struct {
 	Httpwriter  io.Writer
 	Length      uint64
 	Offset      uint64
-	Siapath     string
+	SiaPath     string
 	Destination string
 }
