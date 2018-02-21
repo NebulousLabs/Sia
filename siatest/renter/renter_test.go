@@ -52,26 +52,26 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	// Upload file, creating a piece for each host in the group
 	dataPieces := uint64(1)
 	parityPieces := uint64(len(tg.Hosts())) - dataPieces
-	file, err := renter.UploadNewFileBlocking(100, dataPieces, parityPieces)
+	remoteFile, err := renter.UploadNewFileBlocking(100, dataPieces, parityPieces)
 	if err != nil {
-		t.Fatal("Failed to create file for testing: ", err)
+		t.Fatal("Failed to upload a file for testing: ", err)
 	}
 	// Download the file synchronously directly into memory
-	_, err = renter.DownloadByStream(file)
+	_, err = renter.DownloadByStream(remoteFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Download the file synchronously to a file on disk
-	_, err = renter.DownloadToDisk(file, false)
+	_, err = renter.DownloadToDisk(remoteFile, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Download the file asynchronously and wait for the download to finish.
-	downloadingFile, err := renter.DownloadToDisk(file, true)
+	localFile, err := renter.DownloadToDisk(remoteFile, true)
 	if err != nil {
 		t.Error(err)
 	}
-	if err := renter.WaitForDownload(downloadingFile, file); err != nil {
+	if err := renter.WaitForDownload(localFile, remoteFile); err != nil {
 		t.Error(err)
 	}
 }
