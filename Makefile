@@ -38,7 +38,8 @@ run = .
 pkgs = ./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer \
        ./modules/gateway ./modules/host ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor       \
        ./modules/renter/hostdb ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/miner ./modules/wallet   \
-       ./modules/transactionpool ./node ./node/api ./persist ./siatest ./node/api/server ./sync ./types
+       ./modules/transactionpool ./node ./node/api ./persist ./siatest ./siatest/consensus ./siatest/renter               \
+       ./node/api/server ./sync ./types
 
 # fmt calls go fmt on all packages.
 fmt:
@@ -53,7 +54,7 @@ vet: release-std
 lintpkgs = ./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer \
            ./modules/gateway ./modules/host ./modules/miner ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb \
            ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/wallet ./modules/transactionpool ./node ./node/api ./node/api/server ./persist \
-           ./siatest
+           ./siatest ./siatest/consensus ./siatest/renter
 lint:
 	golint -min_confidence=1.0 -set_exit_status $(lintpkgs)
 
