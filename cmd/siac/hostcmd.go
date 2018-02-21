@@ -411,11 +411,9 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 	if err != nil {
 		die("Could not configure host to accept contracts:", err)
 	}
-	fmt.Println(`
-The host has also been configured to accept contracts.
+	fmt.Println(`The host has also been configured to accept contracts.
 To revert this, run:
-	siac host config acceptingcontracts false
-`)
+	siac host config acceptingcontracts false`)
 }
 
 // hostfolderaddcmd adds a folder to the host.
