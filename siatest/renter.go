@@ -160,7 +160,7 @@ func (tn *TestNode) WaitForDownload(tf *TestFile, parent *TestFile) error {
 		if file == nil {
 			return nil
 		}
-		if file.Filesize != file.Received {
+		if !file.Completed {
 			return errors.New("file hasn't finished downloading yet")
 		}
 		return nil

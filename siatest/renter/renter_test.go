@@ -56,20 +56,17 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	if err != nil {
 		t.Fatal("Failed to create file for testing: ", err)
 	}
-	// Download the file synchronously directly into memory and compare the
-	// data to the original
+	// Download the file synchronously directly into memory
 	_, err = renter.DownloadByStream(file)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Download the file synchronously to a file on disk and compare it to the
-	// original
+	// Download the file synchronously to a file on disk
 	_, err = renter.DownloadToDisk(file, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Download the file  asynchronously, wait for the download to finish and
-	// compare it to the original
+	// Download the file asynchronously and wait for the download to finish.
 	downloadingFile, err := renter.DownloadToDisk(file, true)
 	if err != nil {
 		t.Error(err)
