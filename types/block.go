@@ -32,7 +32,7 @@ type (
 		Transactions []Transaction   `json:"transactions"`
 	}
 
-	// A BlockHeader, when encoded, is an 80-byte constant size field
+	// BlockHeader when encoded, is an 80-byte constant size field
 	// containing enough information to do headers-first block downloading.
 	// Hashing the header results in the block ID.
 	BlockHeader struct {
@@ -42,9 +42,12 @@ type (
 		MerkleRoot crypto.Hash `json:"merkleroot"`
 	}
 
+	// BlockHeight refers to the height of the block
 	BlockHeight uint64
-	BlockID     crypto.Hash
-	BlockNonce  [8]byte
+	// BlockID is an identifier used to identify the block
+	BlockID crypto.Hash
+	// BlockNonce {help}
+	BlockNonce [8]byte
 )
 
 // CalculateCoinbase calculates the coinbase for a given height. The coinbase

@@ -10,18 +10,41 @@ import (
 )
 
 var (
-	ErrDoubleSpend                      = errors.New("transaction uses a parent object twice")
-	ErrFileContractOutputSumViolation   = errors.New("file contract has invalid output sums")
-	ErrFileContractWindowEndViolation   = errors.New("file contract window must end at least one block after it starts")
+	// ErrDoubleSpend is an error when a transaction uses a parent object
+	// twice
+	ErrDoubleSpend = errors.New("transaction uses a parent object twice")
+	// ErrFileContractOutputSumViolation is an error when a file contract
+	// has invalid output sums
+	ErrFileContractOutputSumViolation = errors.New("file contract has invalid output sums")
+	// ErrFileContractWindowEndViolation is an error when a file contract
+	// window must end at least one block after it starts
+	ErrFileContractWindowEndViolation = errors.New("file contract window must end at least one block after it starts")
+	// ErrFileContractWindowStartViolation is an error when a file contract
+	// window must start in the future
 	ErrFileContractWindowStartViolation = errors.New("file contract window must start in the future")
-	ErrNonZeroClaimStart                = errors.New("transaction has a siafund output with a non-zero siafund claim")
-	ErrNonZeroRevision                  = errors.New("new file contract has a nonzero revision number")
-	ErrStorageProofWithOutputs          = errors.New("transaction has both a storage proof and other outputs")
-	ErrTimelockNotSatisfied             = errors.New("timelock has not been met")
-	ErrTransactionTooLarge              = errors.New("transaction is too large to fit in a block")
-	ErrZeroMinerFee                     = errors.New("transaction has a zero value miner fee")
-	ErrZeroOutput                       = errors.New("transaction cannot have an output or payout that has zero value")
-	ErrZeroRevision                     = errors.New("transaction has a file contract revision with RevisionNumber=0")
+	// ErrNonZeroClaimStart is an error when a transaction has a siafund
+	// output with a non-zero siafund claim
+	ErrNonZeroClaimStart = errors.New("transaction has a siafund output with a non-zero siafund claim")
+	// ErrNonZeroRevision is an error when a new file contract has a
+	// nonzero revision number
+	ErrNonZeroRevision = errors.New("new file contract has a nonzero revision number")
+	// ErrStorageProofWithOutputs is an error when a transaction has both
+	// a storage proof and other outputs
+	ErrStorageProofWithOutputs = errors.New("transaction has both a storage proof and other outputs")
+	// ErrTimelockNotSatisfied is an error when a timelock has not been met
+	ErrTimelockNotSatisfied = errors.New("timelock has not been met")
+	// ErrTransactionTooLarge is an error when a transaction is too large
+	// to fit in a block
+	ErrTransactionTooLarge = errors.New("transaction is too large to fit in a block")
+	// ErrZeroMinerFee is an error when a transaction has a zero value miner
+	// fee
+	ErrZeroMinerFee = errors.New("transaction has a zero value miner fee")
+	// ErrZeroOutput is an error when a transaction cannot have an output
+	// or payout that has zero value
+	ErrZeroOutput = errors.New("transaction cannot have an output or payout that has zero value")
+	// ErrZeroRevision is an error when a transaction has a file contract
+	// revision with RevisionNumber=0
+	ErrZeroRevision = errors.New("transaction has a file contract revision with RevisionNumber=0")
 )
 
 // correctFileContracts checks that the file contracts adhere to the file

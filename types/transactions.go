@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	// SpecifierLen {help}
 	SpecifierLen = 16
 
 	// UnlockHashChecksumSize is the size of the checksum used to verify
@@ -59,11 +60,20 @@ type (
 	// are constructed by hashing specific fields of the type, along with a
 	// Specifier. While all of these types are hashes, defining type aliases
 	// gives us type safety and makes the code more readable.
-	TransactionID   crypto.Hash
+
+	// TransactionID refers to the identification used to identify a transaction
+	TransactionID crypto.Hash
+	// SiacoinOutputID refers to the identification used to identify a siacoin
+	// output
 	SiacoinOutputID crypto.Hash
+	// SiafundOutputID refers to the identification used to identify a siafund
+	// output
 	SiafundOutputID crypto.Hash
-	FileContractID  crypto.Hash
-	OutputID        crypto.Hash
+	// FileContractID refers to the identification used to identify a file
+	// contract
+	FileContractID crypto.Hash
+	// OutputID refers to the identification used to identify an output
+	OutputID crypto.Hash
 
 	// A Transaction is an atomic component of a block. Transactions can contain
 	// inputs and outputs, file contracts, storage proofs, and even arbitrary

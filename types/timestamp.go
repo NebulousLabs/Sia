@@ -8,7 +8,10 @@ import (
 )
 
 type (
-	Timestamp      uint64
+	// Timestamp is the digital record of the time of occurrence of a particular
+	// event
+	Timestamp uint64
+	// TimestampSlice is an array of timestamps
 	TimestampSlice []Timestamp
 )
 

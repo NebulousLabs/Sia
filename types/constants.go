@@ -13,42 +13,70 @@ import (
 )
 
 var (
-	BlockFrequency         BlockHeight
-	BlockSizeLimit         = uint64(2e6)
+	// BlockFrequency {help}
+	BlockFrequency BlockHeight
+	// BlockSizeLimit {help}
+	BlockSizeLimit = uint64(2e6)
+	// ExtremeFutureThreshold {help}
 	ExtremeFutureThreshold Timestamp
-	FutureThreshold        Timestamp
-	GenesisBlock           Block
+	// FutureThreshold {help}
+	FutureThreshold Timestamp
+	// GenesisBlock is the first block of the block chain
+	GenesisBlock Block
 
-	// The GenesisID is used in many places. Calculating it once saves lots of
+	// GenesisID is used in many places. Calculating it once saves lots of
 	// redundant computation.
 	GenesisID BlockID
 
+	// GenesisSiafundAllocation {help}
 	GenesisSiafundAllocation []SiafundOutput
-	GenesisTimestamp         Timestamp
-	InitialCoinbase          = uint64(300e3)
-	MaturityDelay            BlockHeight
-	MaxAdjustmentDown        *big.Rat
-	MaxAdjustmentUp          *big.Rat
-	MedianTimestampWindow    = uint64(11)
-	MinimumCoinbase          uint64
+	// GenesisTimestamp is the timestamp when genesis block was mined
+	GenesisTimestamp Timestamp
+	// InitialCoinbase {help}
+	InitialCoinbase = uint64(300e3)
+	// MaturityDelay {help}
+	MaturityDelay BlockHeight
+	// MaxAdjustmentDown {help}
+	MaxAdjustmentDown *big.Rat
+	// MaxAdjustmentUp {help}
+	MaxAdjustmentUp *big.Rat
+	// MedianTimestampWindow {help}
+	MedianTimestampWindow = uint64(11)
+	// MinimumCoinbase {help}
+	MinimumCoinbase uint64
 
 	// Oak hardfork constants. Oak is the name of the difficulty algorithm for
 	// Sia following a hardfork at block 135e3.
-	OakDecayDenom           int64
-	OakDecayNum             int64
-	OakHardforkBlock        BlockHeight
-	OakHardforkFixBlock     BlockHeight
-	OakHardforkTxnSizeLimit = uint64(64e3) // 64 KB
-	OakMaxBlockShift        int64
-	OakMaxDrop              *big.Rat
-	OakMaxRise              *big.Rat
 
-	RootDepth        = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
-	RootTarget       Target
+	// OakDecayDenom {help}
+	OakDecayDenom int64
+	// OakDecayNum {help}
+	OakDecayNum int64
+	// OakHardforkBlock {help}
+	OakHardforkBlock BlockHeight
+	// OakHardforkFixBlock {help}
+	OakHardforkFixBlock BlockHeight
+	// OakHardforkTxnSizeLimit {help}
+	OakHardforkTxnSizeLimit = uint64(64e3) // 64 KB
+	// OakMaxBlockShift {help}
+	OakMaxBlockShift int64
+	// OakMaxDrop {help}
+	OakMaxDrop *big.Rat
+	// OakMaxRise {help}
+	OakMaxRise *big.Rat
+
+	// RootDepth {help}
+	RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
+	// RootTarget {help}
+	RootTarget Target
+	// SiacoinPrecision {help}
 	SiacoinPrecision = NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
-	SiafundCount     = NewCurrency64(10000)
-	SiafundPortion   = big.NewRat(39, 1000)
-	TargetWindow     BlockHeight
+	// SiafundCount {help}
+	SiafundCount = NewCurrency64(10000)
+	// SiafundPortion {help}
+	SiafundPortion = big.NewRat(39, 1000)
+	// TargetWindow {help}
+	TargetWindow BlockHeight
 )
 
 // init checks which build constant is in place and initializes the variables

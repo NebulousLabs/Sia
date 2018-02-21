@@ -9,8 +9,10 @@ import (
 )
 
 var (
+	// ProofMissed {help}
 	ProofMissed ProofStatus = false
-	ProofValid  ProofStatus = true
+	// ProofValid {help}
+	ProofValid ProofStatus = true
 )
 
 type (
@@ -90,6 +92,7 @@ type (
 		HashSet  []crypto.Hash            `json:"hashset"`
 	}
 
+	// ProofStatus {help}
 	ProofStatus bool
 )
 
