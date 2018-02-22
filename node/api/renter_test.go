@@ -434,24 +434,6 @@ func TestRenterAsyncDownloadError(t *testing.T) {
 	}
 }
 
-func TestRenterAsyncSpecifyAsyncFalseError(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	st, _ := setupTestDownload(t, 1e4, "test.dat", false)
-	defer st.server.Close()
-
-	// don't wait for the upload to complete, try to download immediately to
-	// intentionally cause a download error
-	downpath := filepath.Join(st.dir, "asyncdown.dat")
-	err := st.getAPI("/renter/downloadasync/test.dat?async=false&destination="+downpath, nil)
-	if err == nil {
-		t.Fatal("/downloadasync does not return error when passing `async=false`")
-	}
-}
-
 // TestRenterAsyncDownload tests that the /renter/downloadasync route works
 // correctly.
 func TestRenterAsyncDownload(t *testing.T) {
