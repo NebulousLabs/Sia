@@ -9,9 +9,11 @@ import (
 )
 
 var (
-	// ProofMissed {help}
+	// ProofMissed indicates that a StorageProof was missed, which means that
+	// no valid proof was submitted within the proof window.
 	ProofMissed ProofStatus = false
-	// ProofValid {help}
+	// ProofValid indicates that a valid StorageProof was submitted within the
+	// proof window.
 	ProofValid ProofStatus = true
 )
 
@@ -92,7 +94,7 @@ type (
 		HashSet  []crypto.Hash            `json:"hashset"`
 	}
 
-	// ProofStatus {help}
+	// ProofStatus indicates whether a StorageProof was valid (true) or missed (false).
 	ProofStatus bool
 )
 

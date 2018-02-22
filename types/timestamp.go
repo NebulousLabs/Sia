@@ -8,8 +8,7 @@ import (
 )
 
 type (
-	// Timestamp is the digital record of the time of occurrence of a particular
-	// event
+	// Timestamp is a Unix timestamp, i.e. the number of the seconds since Jan 1 1970.
 	Timestamp uint64
 	// TimestampSlice is an array of timestamps
 	TimestampSlice []Timestamp

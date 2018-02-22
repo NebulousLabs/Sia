@@ -13,13 +13,24 @@ import (
 )
 
 var (
-	// BlockFrequency {help}
+	// BlockFrequency is the desired number of seconds that
+	// should elapse, on average, between successive Blocks.
 	BlockFrequency BlockHeight
-	// BlockSizeLimit {help}
+	// BlockSizeLimit is the maximum size of a binary-encoded Block
+	// that is permitted by the consensus rules.
 	BlockSizeLimit = uint64(2e6)
-	// ExtremeFutureThreshold {help}
+	// ExtremeFutureThreshold is a temporal limit beyond which Blocks are
+	// discarded by the consensus rules. When incoming Blocks are processed, their
+	// Timestamp is allowed to exceed the processor's current time by a small amount.
+	// But if the Timestamp is further into the future than ExtremeFutureThreshold,
+	// the Block is immediately discarded.
 	ExtremeFutureThreshold Timestamp
-	// FutureThreshold {help}
+	// FutureThreshold is a temporal limit beyond which Blocks are
+	// discarded by the consensus rules. When incoming Blocks are processed, their
+	// Timestamp is allowed to exceed the processor's current time by no more than
+	// FutureThreshold. If the excess duration is larger than FutureThreshold, but
+	// smaller than ExtremeFutureThreshold, the Block may be held in memory until
+	// the Block's Timestamp exceeds the current time by less than FutureThreshold.
 	FutureThreshold Timestamp
 	// GenesisBlock is the first block of the block chain
 	GenesisBlock Block
@@ -28,52 +39,84 @@ var (
 	// redundant computation.
 	GenesisID BlockID
 
-	// GenesisSiafundAllocation {help}
+	// GenesisSiafundAllocation is the set of SiafundOutputs created in the Genesis
+	// block.
 	GenesisSiafundAllocation []SiafundOutput
 	// GenesisTimestamp is the timestamp when genesis block was mined
 	GenesisTimestamp Timestamp
-	// InitialCoinbase {help}
+	// InitialCoinbase is the coinbase reward of the Genesis block.
 	InitialCoinbase = uint64(300e3)
-	// MaturityDelay {help}
+	// MaturityDelay specifies the number of blocks that a maturity-required output
+	// is required to be on hold before it can be spent on the blockchain.
+	// Outputs are maturity-required if they are highly likely to be altered or
+	// invalidated in the event of a small reorg. One example is the block reward,
+	// as a small reorg may invalidate the block reward. Another example is a siafund
+	// payout, as a tiny reorg may change the value of the payout, and thus invalidate
+	// any transactions spending the payout. File contract payouts also are subject to
+	// a maturity delay.
 	MaturityDelay BlockHeight
-	// MaxAdjustmentDown {help}
-	MaxAdjustmentDown *big.Rat
-	// MaxAdjustmentUp {help}
-	MaxAdjustmentUp *big.Rat
-	// MedianTimestampWindow {help}
+	// MaxTargetAdjustmentDown restrict how much the block difficulty is allowed to
+	// change in a single step, which is important to limit the effect of difficulty
+	// raising and lowering attacks.
+	MaxTargetAdjustmentDown *big.Rat
+	// MaxTargetAdjustmentUp restrict how much the block difficulty is allowed to
+	// change in a single step, which is important to limit the effect of difficulty
+	// raising and lowering attacks.
+	MaxTargetAdjustmentUp *big.Rat
+	// MedianTimestampWindow tells us how many blocks to look back when calculating
+	// the median timestamp over the previous n blocks. The timestamp of a block is
+	// not allowed to be less than or equal to the median timestamp of the previous n
+	// blocks, where for Sia this number is typically 11.
 	MedianTimestampWindow = uint64(11)
-	// MinimumCoinbase {help}
+	// MinimumCoinbase is the minimum coinbase reward for a block.
+	// The coinbase decreases in each block after the Genesis block,
+	// but it will not decrease past MinimumCoinbase.
 	MinimumCoinbase uint64
 
 	// Oak hardfork constants. Oak is the name of the difficulty algorithm for
 	// Sia following a hardfork at block 135e3.
 
-	// OakDecayDenom {help}
+	// OakDecayDenom is the denominator for how much the total timestamp is decayed
+	// each step.
 	OakDecayDenom int64
-	// OakDecayNum {help}
+	// OakDecayNum is the numerator for how much the total timestamp is decayed each
+	// step.
 	OakDecayNum int64
-	// OakHardforkBlock {help}
+	// OakHardforkBlock is the height at which the hardfork to switch to the oak
+	// difficulty adjustment algorithm is triggered.
 	OakHardforkBlock BlockHeight
-	// OakHardforkFixBlock {help}
+	// OakHardforkFixBlock is the height at which the hardfork to switch from the broken
+	// oak difficulty adjustment algorithm to the fixed oak difficulty adjustment
+	// algorithm is triggered.
 	OakHardforkFixBlock BlockHeight
-	// OakHardforkTxnSizeLimit {help}
+	// OakHardforkTxnSizeLimit is the maximum size allowed for a transaction, a change
+	// which I believe was implemented simultaneously with the oak hardfork.
 	OakHardforkTxnSizeLimit = uint64(64e3) // 64 KB
-	// OakMaxBlockShift {help}
+	// OakMaxBlockShift is the maximum number of seconds that the oak algorithm will shift
+	// the difficulty.
 	OakMaxBlockShift int64
-	// OakMaxDrop {help}
+	// OakMaxDrop is the drop is the maximum amount that the difficulty will drop each block.
 	OakMaxDrop *big.Rat
-	// OakMaxRise {help}
+	// OakMaxRise is the maximum amount that the difficulty will rise each block.
 	OakMaxRise *big.Rat
 
-	// RootDepth {help}
+	// RootDepth is the cumulative target of all blocks. The root depth is essentially
+	// the maximum possible target, there have been no blocks yet, so there is no
+	// cumulated difficulty yet.
 	RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
-	// RootTarget {help}
+	// RootTarget is the target for the genesis block - basically how much work needs
+	// to be done in order to mine the first block. The difficulty adjustment algorithm
+	// takes over from there.
 	RootTarget Target
-	// SiacoinPrecision {help}
+	// SiacoinPrecision is the number of base units in a siacoin. The Sia network has a very
+	// large number of base units. We call 10^24 of these a siacoin.
+	//
+	// The base unit for Bitcoin is called a satoshi. We call 10^8 satoshis a bitcoin,
+	// even though the code itself only ever works with satoshis.
 	SiacoinPrecision = NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
-	// SiafundCount {help}
+	// SiafundCount is the total number of Siafunds in existence.
 	SiafundCount = NewCurrency64(10000)
-	// SiafundPortion {help}
+	// SiafundPortion is the percentage of siacoins that is taxed from FileContracts.
 	SiafundPortion = big.NewRat(39, 1000)
 	// TargetWindow {help}
 	TargetWindow BlockHeight
@@ -93,11 +136,11 @@ func init() {
 		GenesisTimestamp = Timestamp(1424139000) // Change as necessary.
 		RootTarget = Target{0, 0, 2}             // Standard developer CPUs will be able to mine blocks with the race library activated.
 
-		TargetWindow = 20                        // Difficulty is adjusted based on prior 20 blocks.
-		MaxAdjustmentUp = big.NewRat(120, 100)   // Difficulty adjusts quickly.
-		MaxAdjustmentDown = big.NewRat(100, 120) // Difficulty adjusts quickly.
-		FutureThreshold = 2 * 60                 // 2 minutes.
-		ExtremeFutureThreshold = 4 * 60          // 4 minutes.
+		TargetWindow = 20                              // Difficulty is adjusted based on prior 20 blocks.
+		MaxTargetAdjustmentUp = big.NewRat(120, 100)   // Difficulty adjusts quickly.
+		MaxTargetAdjustmentDown = big.NewRat(100, 120) // Difficulty adjusts quickly.
+		FutureThreshold = 2 * 60                       // 2 minutes.
+		ExtremeFutureThreshold = 4 * 60                // 4 minutes.
 
 		MinimumCoinbase = 30e3
 
@@ -136,8 +179,8 @@ func init() {
 		// only 1 second and testing mining should be happening substantially
 		// faster than that.
 		TargetWindow = 200
-		MaxAdjustmentUp = big.NewRat(10001, 10000)
-		MaxAdjustmentDown = big.NewRat(9999, 10000)
+		MaxTargetAdjustmentUp = big.NewRat(10001, 10000)
+		MaxTargetAdjustmentDown = big.NewRat(9999, 10000)
 		FutureThreshold = 3        // 3 seconds
 		ExtremeFutureThreshold = 6 // 6 seconds
 
@@ -211,8 +254,8 @@ func init() {
 		// difficulty is adjusted four times as often. This does result in
 		// greater difficulty oscillation, a tradeoff that was chosen to be
 		// acceptable due to Sia's more vulnerable position as an altcoin.
-		MaxAdjustmentUp = big.NewRat(25, 10)
-		MaxAdjustmentDown = big.NewRat(10, 25)
+		MaxTargetAdjustmentUp = big.NewRat(25, 10)
+		MaxTargetAdjustmentDown = big.NewRat(10, 25)
 
 		// Blocks will not be accepted if their timestamp is more than 3 hours
 		// into the future, but will be accepted as soon as they are no longer
