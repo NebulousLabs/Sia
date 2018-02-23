@@ -157,7 +157,7 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 	}()
 
 	// create downloader
-	d, err := c.contracts.NewDownloader(host, contract.ID, c.hdb, cancel)
+	d, err := c.contracts.NewDownloader(host, contract.ID, c.hdb, cancel, c.deps)
 	if err != nil {
 		return nil, err
 	}

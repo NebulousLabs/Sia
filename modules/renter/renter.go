@@ -317,6 +317,13 @@ func (r *Renter) ContractUtility(id types.FileContractID) (modules.ContractUtili
 	return r.hostContractor.ContractUtility(id)
 }
 
+// InjectDependencies replaces the current renter dependencies with new ones.
+func (r *Renter) InjectDependencies(deps modules.Dependencies) {
+	id := r.mu.Lock()
+	defer r.mu.Unlock(id)
+	r.deps = deps
+}
+
 // PeriodSpending returns the host contractor's period spending
 func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostContractor.PeriodSpending() }
 

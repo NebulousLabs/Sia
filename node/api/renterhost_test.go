@@ -3028,3 +3028,124 @@ func TestRemoteFileRepairMassive(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+type (
+	replaceValidHostPayout  struct{ Dependencies }
+	replaceCollateralPayout struct{ Dependencies }
+	replaceVoidPayout       struct{ Dependencies }
+)
+
+func (rvhp *replaceValidHostPayout) Disrupt(str string) bool { return str == "ReplaceValidHostPayout" }
+func (rcp *replaceCollateralPayout) Disrupt(str string) bool { return str == "ReplaceCollateralPayout" }
+func (rvcp *replaceVoidPayout) Disrupt(str string) bool      { return str == "ReplaceVoidPayout" }
+
+// TestRenterMaliciousUploadDownload tests if the renter can try to cheat the
+// host by changing the contract revision.
+func TestRenterMaliciousUploadDownload(t *testing.T) {
+	deps := []Dependencies{&replaceValidHostPayout{}, &replaceCollateralPayout{}, &replaceVoidPayout{}}
+	for _, d := range deps {
+		testRenterMaliciousUploadDownload(t, d)
+	}
+}
+func testRenterMaliciousUploadDownload(t *testing.T, deps Dependencies) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+	stH1, err := blankServerTester(t.Name() + " - Host 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stH1.server.Close()
+	testGroup := []*serverTester{st, stH1}
+
+	// Connect the testers to eachother so that they are all on the same
+	// blockchain.
+	err = fullyConnectNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure that every wallet has money in it.
+	err = fundAllNodes(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add storage to every host.
+	err = addStorageToAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = announceAllHosts(testGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance with two hosts.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
+	allowanceValues.Set("hosts", "2")
+	allowanceValues.Set("period", "10")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file to upload.
+	filesize := int(45767)
+	path := filepath.Join(st.dir, "test.dat")
+	err = createRandFile(path, filesize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Inject dependency
+	st.renter.InjectDependencies(deps)
+
+	// upload the file
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// redundancy should reach 2
+	var rf RenterFiles
+	err = retry(60, time.Second, func() error {
+		if err := st.getAPI("/renter/files", &rf); err != nil {
+			return err
+		}
+		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
+			return nil
+		}
+		return errors.New("file not uploaded")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify we can download
+	downloadPath := filepath.Join(st.dir, "test-downloaded-verify.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// save a copy of the file contents in memory for verification later
+	orig, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloadedFile, err := ioutil.ReadFile(downloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(orig, downloadedFile) {
+		t.Log("Files not equal, lengths:", len(orig), len(downloadedFile))
+		t.Fatal("Uploaded and downloaded file do not have matching data.")
+	}
+}

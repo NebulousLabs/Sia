@@ -122,6 +122,13 @@ func (w *Wallet) Height() types.BlockHeight {
 	return types.BlockHeight(height)
 }
 
+// InjectDependencies replaces the current wallet dependencies with new ones.
+func (w *Wallet) InjectDependencies(deps modules.Dependencies) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.deps = deps
+}
+
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future. Keys and addresses are
 // not loaded into the wallet during the call to 'new', but rather during the
