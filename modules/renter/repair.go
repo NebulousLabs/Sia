@@ -185,10 +185,11 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 				newUnfinishedChunks[piece.Chunk].piecesCompleted++
 				delete(newUnfinishedChunks[piece.Chunk].unusedHosts, hpk.String())
 			} else if exists {
-				// TODO / NOTE: This host has a piece, but it's the same piece
-				// that another host has. We may want to take action (such as
-				// deleting this piece from this host) because of this
-				// inefficiency.
+				// This host has a piece, but it is the same piece another host
+				// has. We should still remove the host from the unusedHosts
+				// since one host having multiple pieces of a chunk might lead
+				// to unexpected issues.
+				delete(newUnfinishedChunks[piece.Chunk].unusedHosts, hpk.String())
 			}
 		}
 	}
