@@ -170,7 +170,7 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 
 // newRevision creates a copy of current with its revision number incremented,
 // and with cost transferred from the renter to the host.
-func newRevision(current types.FileContractRevision, cost types.Currency) types.FileContractRevision {
+func newRevision(current types.FileContractRevision, cost types.Currency, deps Dependencies) types.FileContractRevision {
 	rev := current
 
 	// need to manually copy slice memory
@@ -190,19 +190,30 @@ func newRevision(current types.FileContractRevision, cost types.Currency) types.
 	// increment revision number
 	rev.NewRevisionNumber++
 
+	// depending on the injected dependency, try to cheat the host by replacing
+	// valid and missed outputs with the renter's own address
+	if deps.Disrupt("ReplaceValidHostPayout") {
+		rev.NewValidProofOutputs[1].UnlockHash = rev.NewValidProofOutputs[0].UnlockHash
+	}
+	if deps.Disrupt("ReplaceCollateralPayout") {
+		rev.NewMissedProofOutputs[1].UnlockHash = rev.NewValidProofOutputs[0].UnlockHash
+	}
+	if deps.Disrupt("ReplaceVoidPayout") {
+		rev.NewMissedProofOutputs[2].UnlockHash = rev.NewValidProofOutputs[0].UnlockHash
+	}
 	return rev
 }
 
 // newDownloadRevision revises the current revision to cover the cost of
 // downloading data.
-func newDownloadRevision(current types.FileContractRevision, downloadCost types.Currency) types.FileContractRevision {
-	return newRevision(current, downloadCost)
+func newDownloadRevision(current types.FileContractRevision, downloadCost types.Currency, deps Dependencies) types.FileContractRevision {
+	return newRevision(current, downloadCost, deps)
 }
 
 // newUploadRevision revises the current revision to cover the cost of
 // uploading a sector.
-func newUploadRevision(current types.FileContractRevision, merkleRoot crypto.Hash, price, collateral types.Currency) types.FileContractRevision {
-	rev := newRevision(current, price)
+func newUploadRevision(current types.FileContractRevision, merkleRoot crypto.Hash, price, collateral types.Currency, deps Dependencies) types.FileContractRevision {
+	rev := newRevision(current, price, deps)
 
 	// move collateral from host to void
 	rev.NewMissedProofOutputs[1].Value = rev.NewMissedProofOutputs[1].Value.Sub(collateral)
@@ -216,8 +227,8 @@ func newUploadRevision(current types.FileContractRevision, merkleRoot crypto.Has
 
 // newDeleteRevision revises the current revision to cover the cost of
 // deleting a sector.
-func newDeleteRevision(current types.FileContractRevision, merkleRoot crypto.Hash) types.FileContractRevision {
-	rev := newRevision(current, types.ZeroCurrency)
+func newDeleteRevision(current types.FileContractRevision, merkleRoot crypto.Hash, deps Dependencies) types.FileContractRevision {
+	rev := newRevision(current, types.ZeroCurrency, deps)
 	rev.NewFileSize -= modules.SectorSize
 	rev.NewFileMerkleRoot = merkleRoot
 	return rev
@@ -225,8 +236,8 @@ func newDeleteRevision(current types.FileContractRevision, merkleRoot crypto.Has
 
 // newModifyRevision revises the current revision to cover the cost of
 // modifying a sector.
-func newModifyRevision(current types.FileContractRevision, merkleRoot crypto.Hash, uploadCost types.Currency) types.FileContractRevision {
-	rev := newRevision(current, uploadCost)
+func newModifyRevision(current types.FileContractRevision, merkleRoot crypto.Hash, uploadCost types.Currency, deps Dependencies) types.FileContractRevision {
+	rev := newRevision(current, uploadCost, deps)
 	rev.NewFileMerkleRoot = merkleRoot
 	return rev
 }

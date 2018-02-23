@@ -22,6 +22,7 @@ type Downloader struct {
 	closeChan   chan struct{}
 	once        sync.Once
 	hdb         hostDB
+	deps        Dependencies
 }
 
 // Sector retrieves the sector with the specified Merkle root, and revises
@@ -50,7 +51,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	sectorPrice = sectorPrice.MulFloat(1 + hostPriceLeeway)
 
 	// create the download revision
-	rev := newDownloadRevision(contract.LastRevision(), sectorPrice)
+	rev := newDownloadRevision(contract.LastRevision(), sectorPrice, hd.deps)
 
 	// initiate download by confirming host settings
 	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
@@ -141,7 +142,7 @@ func (hd *Downloader) Close() error {
 
 // NewDownloader initiates the download request loop with a host, and returns a
 // Downloader.
-func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileContractID, hdb hostDB, cancel <-chan struct{}) (_ *Downloader, err error) {
+func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileContractID, hdb hostDB, cancel <-chan struct{}, deps Dependencies) (_ *Downloader, err error) {
 	sc, ok := cs.Acquire(id)
 	if !ok {
 		return nil, errors.New("invalid contract")
@@ -194,5 +195,6 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 		conn:        conn,
 		closeChan:   closeChan,
 		hdb:         hdb,
+		deps:        deps,
 	}, nil
 }

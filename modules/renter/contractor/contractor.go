@@ -67,6 +67,9 @@ type Contractor struct {
 	contractUtilities map[types.FileContractID]modules.ContractUtility
 	oldContracts      map[types.FileContractID]modules.RenterContract
 	renewedIDs        map[types.FileContractID]types.FileContractID
+
+	// Contractor's dependencies
+	deps Dependencies
 }
 
 // resolveID returns the ID of the most recent renewal of id.
@@ -197,11 +200,11 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	}
 
 	// Create Contractor using production dependencies.
-	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, contractSet, newPersist(persistDir), logger)
+	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, contractSet, newPersist(persistDir), logger, &ProductionDependencies{})
 }
 
 // newContractor creates a Contractor using the provided dependencies.
-func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, contractSet *proto.ContractSet, p persister, l *persist.Logger) (*Contractor, error) {
+func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, contractSet *proto.ContractSet, p persister, l *persist.Logger, deps Dependencies) (*Contractor, error) {
 	// Create the Contractor object.
 	c := &Contractor{
 		cs:      cs,
@@ -221,6 +224,8 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, co
 		renewedIDs:        make(map[types.FileContractID]types.FileContractID),
 		renewing:          make(map[types.FileContractID]bool),
 		revising:          make(map[types.FileContractID]bool),
+
+		deps: deps,
 	}
 	// Close the contract set and logger upon shutdown.
 	c.tg.AfterStop(func() {

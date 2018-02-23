@@ -350,6 +350,10 @@ type (
 		// Height returns the wallet's internal processed consensus height
 		Height() types.BlockHeight
 
+		// InjectDependencies replaces the current set of dependencies of the
+		// wallet with new ones.
+		InjectDependencies(Dependencies)
+
 		// AddressTransactions returns all of the transactions that are related
 		// to a given address.
 		AddressTransactions(types.UnlockHash) []ProcessedTransaction

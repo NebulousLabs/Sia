@@ -74,6 +74,10 @@ type NodeParams struct {
 	// The high level directory where all the persistence gets stored for the
 	// moudles.
 	Dir string
+
+	// Custom dependencies that can be used to inject specific behavior into
+	// the node's modules
+	deps Dependencies
 }
 
 // Node is a collection of Sia modules operating together as a Sia node.
@@ -282,6 +286,12 @@ func New(params NodeParams) (*Node, error) {
 	}()
 	if err != nil {
 		return nil, errors.Extend(err, errors.New("unable to create explorer"))
+	}
+
+	// Inject custom dependencies if available
+	if params.deps != nil {
+		r.InjectDependencies(params.deps)
+		w.InjectDependencies(params.deps)
 	}
 
 	return &Node{

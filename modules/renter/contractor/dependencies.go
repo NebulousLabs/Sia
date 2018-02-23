@@ -95,3 +95,25 @@ func newPersist(dir string) *stdPersist {
 		filename: filepath.Join(dir, "contractor.json"),
 	}
 }
+
+// These interfaces define the Contractor's dependencies. Mocking implementation
+// complexity can be reduced by defining each dependency as the minimum
+// possible subset of the real dependency.
+type (
+	// Dependencies defines all of the dependencies of the Contractor.
+	Dependencies interface {
+		// disrupt can be inserted in the code as a way to inject problems,
+		Disrupt(string) bool
+	}
+)
+
+type (
+	// ProductionDependencies is an empty struct
+	ProductionDependencies struct{}
+)
+
+// Disrupt will always return false, but can be over-written during testing to
+// trigger disruptions.
+func (*ProductionDependencies) Disrupt(string) bool {
+	return false
+}

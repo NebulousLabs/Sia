@@ -29,11 +29,11 @@ type Editor struct {
 	contractSet *ContractSet
 	conn        net.Conn
 	closeChan   chan struct{}
+	deps        Dependencies
 	once        sync.Once
 	host        modules.HostDBEntry
 	hdb         hostDB
-
-	height types.BlockHeight
+	height      types.BlockHeight
 }
 
 // shutdown terminates the revision loop and signals the goroutine spawned in
@@ -99,7 +99,7 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		SectorIndex: uint64(len(sc.merkleRoots)),
 		Data:        data,
 	}}
-	rev := newUploadRevision(contract.LastRevision(), merkleRoot, sectorPrice, sectorCollateral)
+	rev := newUploadRevision(contract.LastRevision(), merkleRoot, sectorPrice, sectorCollateral, he.deps)
 
 	// run the revision iteration
 	defer func() {
@@ -156,7 +156,7 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 
 // NewEditor initiates the contract revision process with a host, and returns
 // an Editor.
-func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContractID, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}) (_ *Editor, err error) {
+func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContractID, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}, deps Dependencies) (_ *Editor, err error) {
 	sc, ok := cs.Acquire(id)
 	if !ok {
 		return nil, errors.New("invalid contract")
@@ -204,6 +204,7 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		contractSet: cs,
 		conn:        conn,
 		closeChan:   closeChan,
+		deps:        deps,
 	}, nil
 }
 
