@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
@@ -178,6 +179,10 @@ const askPasswordText = "We need to encrypt the new data using the current walle
 const currentPasswordText = "Current Password: "
 const newPasswordText = "New Password: "
 const confirmPasswordText = "Confirm: "
+
+// For an unconfirmed Transaction, the TransactionTimestamp field is set to the
+// maximum value of a uint64.
+const unconfirmedTransactionTimestamp = ^uint64(0)
 
 // passwordPrompt securely reads a password from stdin.
 func passwordPrompt(prompt string) (string, error) {
@@ -469,8 +474,7 @@ func wallettransactionscmd() {
 	if err != nil {
 		die("Could not fetch transaction history:", err)
 	}
-
-	fmt.Println("    [height]                                                   [transaction id]    [net siacoins]   [net siafunds]")
+	fmt.Println("             [timestamp]    [height]                                                   [transaction id]    [net siacoins]   [net siafunds]")
 	txns := append(wtg.ConfirmedTransactions, wtg.UnconfirmedTransactions...)
 	for _, txn := range txns {
 		// Determine the number of outgoing siacoins and siafunds.
@@ -505,6 +509,11 @@ func wallettransactionscmd() {
 		outgoingSiacoinsFloat, _ := new(big.Rat).SetFrac(outgoingSiacoins.Big(), types.SiacoinPrecision.Big()).Float64()
 
 		// Print the results.
+		if uint64(txn.ConfirmationTimestamp) != unconfirmedTransactionTimestamp {
+			fmt.Printf(time.Unix(int64(txn.ConfirmationTimestamp), 0).Format("2006-01-02 15:04:05-0700"))
+		} else {
+			fmt.Printf("             unconfirmed")
+		}
 		if txn.ConfirmationHeight < 1e9 {
 			fmt.Printf("%12v", txn.ConfirmationHeight)
 		} else {
