@@ -87,6 +87,10 @@ func (wal *writeAheadLog) syncResources() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		if len(wal.uncommittedChanges) == 0 {
+			// nothing to sync
+			return
+		}
 
 		err := wal.fileWALTmp.Sync()
 		if err != nil {
@@ -106,7 +110,7 @@ func (wal *writeAheadLog) syncResources() {
 
 	// Now that all the Sync calls have completed, rename the WAL tmp file to
 	// update the WAL.
-	if !wal.cm.dependencies.disrupt("walRename") {
+	if len(wal.uncommittedChanges) != 0 && !wal.cm.dependencies.disrupt("walRename") {
 		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
 		walFileName := filepath.Join(wal.cm.persistDir, walFile)
 		err := wal.cm.dependencies.renameFile(walTmpName, walFileName)
@@ -152,13 +156,6 @@ func (wal *writeAheadLog) commit() {
 	// Sync all open, non-WAL files on the host.
 	wal.syncResources()
 
-	// Extract any unfinished long-running jobs from the list of WAL items.
-	unfinishedAdditions := findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)
-	unfinishedExtensions := findUnfinishedStorageFolderExtensions(wal.uncommittedChanges)
-
-	// Clear the set of uncommitted changes.
-	wal.uncommittedChanges = nil
-
 	// Begin writing to the settings file.
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -201,6 +198,15 @@ func (wal *writeAheadLog) commit() {
 	go func() {
 		defer wg.Done()
 
+		if len(wal.uncommittedChanges) == 0 {
+			// no need to recreate wal
+			return
+		}
+
+		// Extract any unfinished long-running jobs from the list of WAL items.
+		unfinishedAdditions := findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)
+		unfinishedExtensions := findUnfinishedStorageFolderExtensions(wal.uncommittedChanges)
+
 		// Recreate the wal file so that it can receive new updates.
 		var err error
 		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
@@ -215,12 +221,13 @@ func (wal *writeAheadLog) commit() {
 		}
 
 		// Append all of the remaining long running uncommitted changes to the WAL.
-		if len(unfinishedAdditions)+len(unfinishedExtensions) > 0 {
-			wal.appendChange(stateChange{
-				UnfinishedStorageFolderAdditions:  unfinishedAdditions,
-				UnfinishedStorageFolderExtensions: unfinishedExtensions,
-			})
-		}
+		wal.appendChange(stateChange{
+			UnfinishedStorageFolderAdditions:  unfinishedAdditions,
+			UnfinishedStorageFolderExtensions: unfinishedExtensions,
+		})
+
+		// Clear the set of uncommitted changes.
+		wal.uncommittedChanges = nil
 	}()
 	wg.Wait()
 }
