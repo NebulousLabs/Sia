@@ -49,6 +49,9 @@ var (
 	SiafundCount     = NewCurrency64(10000)
 	SiafundPortion   = big.NewRat(39, 1000)
 	TargetWindow     BlockHeight
+
+	// size of each page for paginated API responses
+	DefaultPaginationSize = 50
 )
 
 // init checks which build constant is in place and initializes the variables
