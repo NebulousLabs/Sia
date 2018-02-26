@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/conn"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -210,10 +211,10 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 // initiateRevisionLoop initiates either the editor or downloader loop with
 // host, depending on which rpc was passed.
 func initiateRevisionLoop(host modules.HostDBEntry, contract contractHeader, rpc types.Specifier, cancel <-chan struct{}) (net.Conn, chan struct{}, error) {
-	conn, err := (&net.Dialer{
+	conn, err := conn.Dial(&net.Dialer{
 		Cancel:  cancel,
 		Timeout: 45 * time.Second, // TODO: Constant
-	}).Dial("tcp", string(host.NetAddress))
+	}, "tcp", string(host.NetAddress))
 	if err != nil {
 		return nil, nil, err
 	}
