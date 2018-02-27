@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/node"
@@ -52,46 +51,7 @@ func TestApiHeight(t *testing.T) {
 	}
 }
 
-// TestConsensusHeadersHeightGet tests the /consensus/headers/:height
-// endpoint
-func TestConsensusHeadersHeightGet(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	testdir, err := siatest.TestDir(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a new server
-	testNode, err := siatest.NewNode(node.AllModules(testdir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := testNode.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	// Get current block id using the /consensus endpoint
-	testNode.MineBlock()
-	cg, err := testNode.ConsensusGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Get the current block id using the /consensus/headers/height endpoint
-	// and compare it to the other value
-	chg, err := testNode.ConsensusHeadersHeightGet(cg.Height)
-	if err != nil {
-		t.Fatal("Failed to get header information", err)
-	}
-	if bytes.Compare(chg.BlockID[:], cg.CurrentBlock[:]) != 0 {
-		t.Fatal("BlockIDs do not match")
-	}
-}
-
-// TestConsensusBlocksIDGet tests the /consensus/blocks/:id endpoint
+// TestConsensusBlocksIDGet tests the /consensus/blocks endpoint
 func TestConsensusBlocksIDGet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -112,18 +72,20 @@ func TestConsensusBlocksIDGet(t *testing.T) {
 		}
 	}()
 
-	// Send GET request
+	// Send /consensus request
 	cg, err := testNode.ConsensusGet()
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Get block by id
 	block, err := testNode.ConsensusBlocksIDGet(cg.CurrentBlock)
 	if err != nil {
 		t.Fatal("Failed to retrieve block", err)
 	}
 	// Make sure all of the fields are initialized and not empty
 	var zeroID types.BlockID
-	if bytes.Compare(block.ParentID[:], zeroID[:]) == 0 {
+	if block.ParentID == zeroID {
 		t.Fatal("ParentID wasn't set correctly")
 	}
 	if block.Timestamp == types.Timestamp(0) {
@@ -134,5 +96,24 @@ func TestConsensusBlocksIDGet(t *testing.T) {
 	}
 	if len(block.Transactions) == 0 {
 		t.Fatal("Block doesn't have any transactions even though it should")
+	}
+
+	// Get same block by height
+	block2, err := testNode.ConsensusBlocksHeightGet(cg.Height)
+	if err != nil {
+		t.Fatal("Failed to retrieve block", err)
+	}
+	// block and block2 should be the same
+	if block.ParentID != block2.ParentID {
+		t.Fatal("ParentIDs don't match")
+	}
+	if block.Timestamp != block2.Timestamp {
+		t.Fatal("Timestamps don't match")
+	}
+	if len(block.MinerPayouts) != len(block2.MinerPayouts) {
+		t.Fatal("MinerPayouts don't match")
+	}
+	if len(block.Transactions) != len(block2.Transactions) {
+		t.Fatal("Transactions don't match")
 	}
 }

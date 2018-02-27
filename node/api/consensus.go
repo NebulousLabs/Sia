@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -39,45 +38,46 @@ func (api *API) consensusHandler(w http.ResponseWriter, req *http.Request, _ htt
 	})
 }
 
-// consensusBlocksIDHandler handles the API calls to
-// /consensus/blocks/:id endpoint.
-func (api *API) consensusBlocksIDHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	// Unmarshal BlockID
-	var id types.BlockID
-	if err := id.LoadString(ps.ByName("id")); err != nil {
-		println(err.Error())
-		WriteError(w, Error{"failed to unmarshal blockid"}, http.StatusBadRequest)
-		return
+// consensusBlocksIDHandler handles the API calls to /consensus/blocks
+// endpoint.
+func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	// Get query params and check them.
+	id, height := req.FormValue("id"), req.FormValue("height")
+	if id != "" && height != "" {
+		WriteError(w, Error{"can't specify both id and height"}, http.StatusBadRequest)
 	}
-	// Retrieve block from consensus
-	b, exists := api.cs.BlockByID(id)
+	if id == "" && height == "" {
+		WriteError(w, Error{"either id or height has to be provided"}, http.StatusBadRequest)
+	}
+
+	var b types.Block
+	var exists bool
+
+	// Handle request by id
+	if id != "" {
+		var bid types.BlockID
+		if err := bid.LoadString(id); err != nil {
+			WriteError(w, Error{"failed to unmarshal blockid"}, http.StatusBadRequest)
+			return
+		}
+		b, exists = api.cs.BlockByID(bid)
+	}
+	// Handle request by height
+	if height != "" {
+		h, err := strconv.ParseUint(height, 10, 64)
+		if err != nil {
+			WriteError(w, Error{"failed to parse block height"}, http.StatusBadRequest)
+			return
+		}
+		b, exists = api.cs.BlockAtHeight(types.BlockHeight(h))
+	}
+	// Check if block was found
 	if !exists {
-		WriteError(w, Error{fmt.Sprintf("block with id %v doesn't exist", id)}, http.StatusBadRequest)
+		WriteError(w, Error{"block doesn't exist"}, http.StatusBadRequest)
 		return
 	}
 	// Write response
 	WriteJSON(w, b)
-}
-
-// consensusHeadersHeightHandler handles the API calls to
-// consensus/headers/:height endpoint.
-func (api *API) consensusHeadersHeightHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	// Parse height
-	height, err := strconv.ParseUint(ps.ByName("height"), 10, 64)
-	if err != nil {
-		WriteError(w, Error{"failed to parse height"}, http.StatusBadRequest)
-		return
-	}
-	// Retrieve block at height
-	b, exists := api.cs.BlockAtHeight(types.BlockHeight(height))
-	if !exists {
-		WriteError(w, Error{fmt.Sprintf("could not find block at height %v", height)}, http.StatusBadRequest)
-		return
-	}
-	// Write reponse
-	WriteJSON(w, ConsensusHeadersGET{
-		BlockID: b.ID(),
-	})
 }
 
 // consensusValidateTransactionsetHandler handles the API calls to
