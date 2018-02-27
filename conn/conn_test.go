@@ -13,7 +13,12 @@ import (
 // RLConnection works as expected.
 func TestRLConnectionWrites(t *testing.T) {
 	// Create server
-	ln, err := net.Listen("tcp", ":1234")
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
 	kill := make(chan struct{})
 	wait := make(chan struct{})
 	defer func() {
@@ -45,7 +50,7 @@ func TestRLConnectionWrites(t *testing.T) {
 	}()
 
 	// Create client
-	conn, err := (&net.Dialer{}).Dial("tcp", ":1234")
+	conn, err := (&net.Dialer{}).Dial("tcp", ln.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,15 +77,19 @@ func TestRLConnectionWrites(t *testing.T) {
 // RLConnection works as expected.
 func TestRLConnectionReads(t *testing.T) {
 	// Create server
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
 	serverChan := make(chan net.Conn)
-	go func(sc chan net.Conn) {
-		ln, err := net.Listen("tcp", ":2345")
+	go func() {
 		server, err := ln.Accept()
 		if err != nil {
 			t.Fatal(err)
 		}
-		sc <- server
-	}(serverChan)
+		serverChan <- server
+	}()
 
 	// Create client
 	wait := make(chan struct{})
@@ -89,7 +98,7 @@ func TestRLConnectionReads(t *testing.T) {
 	}()
 	go func() {
 		defer close(wait)
-		conn, err := (&net.Dialer{}).Dial("tcp", ":2345")
+		conn, err := (&net.Dialer{}).Dial("tcp", ln.Addr().String())
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -218,7 +218,7 @@ func initiateRevisionLoop(host modules.HostDBEntry, contract contractHeader, rpc
 	if err != nil {
 		return nil, nil, err
 	}
-	conn := conn.NewRLConn(c, 0, 0)
+	conn := conn.NewRLConn(c, 0, 0, 0, 0)
 
 	closeChan := make(chan struct{})
 	go func() {
