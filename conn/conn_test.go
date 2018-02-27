@@ -73,7 +73,7 @@ func testSingleWrite(conn net.Conn, t *testing.T) {
 	// Set limit
 	packetSize := int64(250)
 	packetsPerSecond := int64(4)
-	client := newRLConn(conn, packetSize, packetsPerSecond)
+	client := NewRLConn(conn, packetSize, packetsPerSecond)
 
 	// Create data to send.
 	dataLen := 1000
@@ -99,7 +99,7 @@ func testMultipleWrites(conn net.Conn, t *testing.T) {
 	packetSize := int64(250)
 	packetsPerSecond := int64(4)
 	maxWriteLen := 10
-	client := newRLConn(conn, packetSize, packetsPerSecond)
+	client := NewRLConn(conn, packetSize, packetsPerSecond)
 
 	// Create data to send.
 	dataLen := 1000

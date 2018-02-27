@@ -211,13 +211,14 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 // initiateRevisionLoop initiates either the editor or downloader loop with
 // host, depending on which rpc was passed.
 func initiateRevisionLoop(host modules.HostDBEntry, contract contractHeader, rpc types.Specifier, cancel <-chan struct{}) (net.Conn, chan struct{}, error) {
-	conn, err := conn.Dial(&net.Dialer{
+	c, err := (&net.Dialer{
 		Cancel:  cancel,
 		Timeout: 45 * time.Second, // TODO: Constant
-	}, "tcp", string(host.NetAddress))
+	}).Dial("tcp", string(host.NetAddress))
 	if err != nil {
 		return nil, nil, err
 	}
+	conn := conn.NewRLConn(c, 0, 0)
 
 	closeChan := make(chan struct{})
 	go func() {

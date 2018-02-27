@@ -17,8 +17,8 @@ type (
 	}
 )
 
-// Dial creates a RateLimitedDialer.
-func newRLConn(conn net.Conn, packetSize int64, packetsPerSecond int64) net.Conn {
+// NewRLConn wraps a net.Conn in a RLConnection.
+func NewRLConn(conn net.Conn, packetSize int64, packetsPerSecond int64) net.Conn {
 	rlc := &RLConnection{
 		conn:             conn,
 		packetSize:       packetSize,
