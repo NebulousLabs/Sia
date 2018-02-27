@@ -9,8 +9,9 @@ import (
 	"github.com/NebulousLabs/fastrand"
 )
 
-// TestRLConnectionSingleWrite tests a single write to a RLConnection.
-func TestRLConnectionSingleWrite(t *testing.T) {
+// TestRLConnectionWrites runs multiple tests that test if writing to a
+// RLConnection works as expected.
+func TestRLConnectionWrites(t *testing.T) {
 	// Create server
 	ln, err := net.Listen("tcp", ":1234")
 	kill := make(chan struct{})
@@ -44,18 +45,26 @@ func TestRLConnectionSingleWrite(t *testing.T) {
 	}()
 
 	// Create client
-	client, err := (&net.Dialer{}).Dial("tcp", ":1234")
+	conn, err := (&net.Dialer{}).Dial("tcp", ":1234")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer conn.Close()
+
+	// Specifiy subtests to run
+	subTests := []struct {
+		name string
+		test func(net.Conn, *testing.T)
+	}{
+		{"TestSingleWrite", testSingleWrite},
+		{"TestMultipleWrites", testMultipleWrites},
+	}
 
 	// Run tests
-	tests := []func(client net.Conn, t *testing.T){
-		testSingleWrite,
-	}
-	for _, test := range tests {
-		test(client, t)
+	for _, test := range subTests {
+		t.Run(test.name, func(t *testing.T) {
+			test.test(conn, t)
+		})
 	}
 }
 
@@ -75,6 +84,42 @@ func testSingleWrite(conn net.Conn, t *testing.T) {
 	_, err := client.Write(data)
 	if err != nil {
 		t.Error(err)
+	}
+	d := time.Since(start)
+	// It should have taken at least dataLen / (packetSize * packetsPerSecond)
+	// seconds.
+	if d.Seconds() < float64(dataLen)/float64(packetSize*packetsPerSecond) {
+		t.Fatalf("Transmission finished too soon. %v seconds.", d.Seconds())
+	}
+}
+
+// testMultipleWrites tests if a multiple rate-limited writes works as expected.
+func testMultipleWrites(conn net.Conn, t *testing.T) {
+	// Set limit
+	packetSize := int64(250)
+	packetsPerSecond := int64(4)
+	maxWriteLen := 10
+	client := newRLConn(conn, packetSize, packetsPerSecond)
+
+	// Create data to send.
+	dataLen := 1000
+	data := fastrand.Bytes(dataLen)
+
+	// Write data and time how long it takes.
+	writtenData := 0
+	start := time.Now()
+	for writtenData < dataLen {
+		// Randomly decide how much data to write during this iteration
+		toWrite := fastrand.Intn(maxWriteLen) + 1
+		if writtenData+toWrite > dataLen {
+			toWrite = dataLen - writtenData
+		}
+		// Write data
+		n, err := client.Write(data[writtenData:])
+		if err != nil {
+			t.Error(err)
+		}
+		writtenData += n
 	}
 	d := time.Since(start)
 	// It should have taken at least dataLen / (packetSize * packetsPerSecond)
