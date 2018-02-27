@@ -9,7 +9,7 @@ import (
 	"github.com/NebulousLabs/fastrand"
 )
 
-// TestRLConnectionWrites runs multiple tests that test if writing to a
+// TestRLConnectionWrites runs multiple tests that check if writing to a
 // RLConnection works as expected.
 func TestRLConnectionWrites(t *testing.T) {
 	// Create server
@@ -17,7 +17,7 @@ func TestRLConnectionWrites(t *testing.T) {
 	kill := make(chan struct{})
 	wait := make(chan struct{})
 	defer func() {
-		defer close(kill)
+		close(kill)
 		<-wait
 	}()
 	go func() {
@@ -68,12 +68,119 @@ func TestRLConnectionWrites(t *testing.T) {
 	}
 }
 
+// TestRLConnectionReads runs multiple tests that check if reading from a
+// RLConnection works as expected.
+func TestRLConnectionReads(t *testing.T) {
+	// Create server
+	serverChan := make(chan net.Conn)
+	go func(sc chan net.Conn) {
+		ln, err := net.Listen("tcp", ":2345")
+		server, err := ln.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		sc <- server
+	}(serverChan)
+
+	// Create client
+	wait := make(chan struct{})
+	defer func() {
+		<-wait
+	}()
+	go func() {
+		defer close(wait)
+		conn, err := (&net.Dialer{}).Dial("tcp", ":2345")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+
+		// Write 100 mb
+		_, _ = conn.Write(fastrand.Bytes(100 * 1 << 20))
+	}()
+
+	// Specifiy subtests to run
+	subTests := []struct {
+		name string
+		test func(net.Conn, *testing.T)
+	}{
+		{"TestSingleRead", testSingleRead},
+		{"TestMultipleReads", testMultipleReads},
+	}
+
+	// Get server conn
+	conn := <-serverChan
+	defer conn.Close()
+
+	// Run tests
+	for _, test := range subTests {
+		t.Run(test.name, func(t *testing.T) {
+			test.test(conn, t)
+		})
+	}
+}
+
+// testSingleRead tests if a single rate-limited read works as expected.
+func testSingleRead(conn net.Conn, t *testing.T) {
+	// Set limit
+	packetSize := int64(250)
+	packetsPerSecond := int64(4)
+	server := NewRLConn(conn, packetSize, packetsPerSecond, 0, 0)
+	dataLen := 1000
+	dataReceived := make([]byte, dataLen)
+
+	// Read data and see how long it takes
+	start := time.Now()
+	n, err := server.Read(dataReceived)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != dataLen {
+		t.Fatal("didn't receive enough data")
+	}
+	d := time.Since(start)
+
+	// It should have taken at least len(dataReceived) / (packetSize * packetsPerSecond)
+	// seconds.
+	if d.Seconds() < float64(dataLen)/float64(packetSize*packetsPerSecond) {
+		t.Fatalf("Transmission finished too soon. %v seconds.", d.Seconds())
+	}
+}
+
+// testMultipleReads tests if multiple rate-limited read work as expected.
+func testMultipleReads(conn net.Conn, t *testing.T) {
+	// Set limit
+	packetSize := int64(250)
+	packetsPerSecond := int64(4)
+	server := NewRLConn(conn, packetSize, packetsPerSecond, 0, 0)
+	dataLen := 1000
+	dataReceived := make([]byte, dataLen)
+
+	// Read data and see how long it takes
+	readData := 0
+	start := time.Now()
+	for readData < dataLen {
+		n, err := server.Read(dataReceived[readData:])
+		if err != nil {
+			t.Fatal(err)
+		}
+		readData += n
+	}
+	d := time.Since(start)
+
+	// It should have taken at least len(dataReceived) / (packetSize * packetsPerSecond)
+	// seconds.
+	if d.Seconds() < float64(dataLen)/float64(packetSize*packetsPerSecond) {
+		t.Fatalf("Transmission finished too soon. %v seconds.", d.Seconds())
+	}
+}
+
 // testSingleWrite tests if a single rate-limited write works as expected.
 func testSingleWrite(conn net.Conn, t *testing.T) {
 	// Set limit
 	packetSize := int64(250)
 	packetsPerSecond := int64(4)
-	client := NewRLConn(conn, packetSize, packetsPerSecond)
+	client := NewRLConn(conn, 0, 0, packetSize, packetsPerSecond)
 
 	// Create data to send.
 	dataLen := 1000
@@ -99,7 +206,7 @@ func testMultipleWrites(conn net.Conn, t *testing.T) {
 	packetSize := int64(250)
 	packetsPerSecond := int64(4)
 	maxWriteLen := 10
-	client := NewRLConn(conn, packetSize, packetsPerSecond)
+	client := NewRLConn(conn, 0, 0, packetSize, packetsPerSecond)
 
 	// Create data to send.
 	dataLen := 1000
