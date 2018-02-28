@@ -12,6 +12,9 @@ import (
 // TestRLConnectionWrites runs multiple tests that check if writing to a
 // RLConnection works as expected.
 func TestRLConnectionWrites(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Reset bandwidthManager at the end.
 	defer func() { BM = nil }()
 	// Create server
@@ -93,6 +96,9 @@ func TestRLConnectionWrites(t *testing.T) {
 // TestRLConnectionReads runs multiple tests that check if reading from a
 // RLConnection works as expected.
 func TestRLConnectionReads(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Reset bandwidthManager at the end.
 	defer func() { BM = nil }()
 	// Create server

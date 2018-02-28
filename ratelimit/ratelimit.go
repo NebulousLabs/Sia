@@ -43,7 +43,7 @@ type (
 	}
 )
 
-// init initializes the bandwidth manager. The first call to Init initializes
+// Init initializes the bandwidth manager. The first call to Init initializes
 // the bandwidthManager object. Subsequent calls to Init will change the global
 // limits.
 func Init(writePPS, readPPS, packetSize int64, cancel chan struct{}) {
