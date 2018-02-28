@@ -74,7 +74,9 @@ func TestRLConnectionWrites(t *testing.T) {
 	packetSize := int64(250)
 	pps := int64(4)
 	dataLen := 1000
-	Init(pps, 0, packetSize, wait)
+	stop := make(chan struct{})
+	defer close(stop)
+	Init(pps, 0, packetSize, stop)
 	client := NewRLConn(conn)
 	defer client.Close()
 	// Run tests
@@ -129,8 +131,8 @@ func TestRLConnectionReads(t *testing.T) {
 		}
 		defer conn.Close()
 
-		// Write 100 mb
-		_, _ = conn.Write(fastrand.Bytes(100 * 1 << 20))
+		// Write 1 mb
+		_, _ = conn.Write(fastrand.Bytes(1 * 1 << 20))
 	}()
 
 	// Specifiy subtests to run
@@ -146,7 +148,9 @@ func TestRLConnectionReads(t *testing.T) {
 	packetSize := int64(250)
 	pps := int64(4)
 	dataLen := 1000
-	Init(0, pps, packetSize, wait)
+	stop := make(chan struct{})
+	defer close(stop)
+	Init(0, pps, packetSize, stop)
 	server := NewRLConn(<-serverChan)
 	defer server.Close()
 	// Run tests
