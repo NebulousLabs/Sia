@@ -366,7 +366,7 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 
 		uploadHeap: uploadHeap{
 			activeChunks: make(map[uploadChunkID]struct{}),
-			newUploads: make(chan struct{}, 1),
+			newUploads:   make(chan struct{}, 1),
 		},
 
 		workerPool: make(map[types.FileContractID]*worker),

@@ -42,10 +42,10 @@ type worker struct {
 
 	// Upload variables.
 	unprocessedChunks         []*unfinishedUploadChunk // Yet unprocessed work items.
-	uploadChan                chan struct{}      // Notifications of new work.
-	uploadConsecutiveFailures int                // How many times in a row uploading has failed.
-	uploadRecentFailure       time.Time          // How recent was the last failure?
-	uploadTerminated          bool               // Have we stopped uploading?
+	uploadChan                chan struct{}            // Notifications of new work.
+	uploadConsecutiveFailures int                      // How many times in a row uploading has failed.
+	uploadRecentFailure       time.Time                // How recent was the last failure?
+	uploadTerminated          bool                     // Have we stopped uploading?
 
 	// Utilities.
 	//

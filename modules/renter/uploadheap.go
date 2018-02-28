@@ -122,6 +122,11 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			renterFile: f,
 			localPath:  trackedFile.RepairPath,
 
+			id: uploadChunkID{
+				fileUID: f.staticUID,
+				index:   i,
+			},
+
 			index:  i,
 			length: f.staticChunkSize(),
 			offset: int64(i * f.staticChunkSize()),
