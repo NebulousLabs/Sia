@@ -37,6 +37,8 @@ type (
 		atomicWritePPS   int64
 		atomicReadPPS    int64
 		atomicPacketSize int64
+		readSignal       chan struct{}
+		writeSignal      chan struct{}
 		threadRunning    bool
 	}
 )
@@ -52,6 +54,8 @@ func Init(writePPS, readPPS, packetSize int64, cancel chan struct{}) {
 		atomicWritePPS:   writePPS,
 		atomicReadPPS:    readPPS,
 		atomicPacketSize: packetSize,
+		writeSignal:      make(chan struct{}),
+		readSignal:       make(chan struct{}),
 	}
 	go BM.threadedWriteLoop(cancel)
 	go BM.threadedReadLoop(cancel)
@@ -61,13 +65,29 @@ func Init(writePPS, readPPS, packetSize int64, cancel chan struct{}) {
 // bandwidthManager.
 func NewRLConn(conn net.Conn) net.Conn {
 	rlc := &RLConn{
-		readChan:   make(chan []byte),
-		writeChan:  make(chan []byte),
+		readChan:   make(chan []byte, 1),
+		writeChan:  make(chan []byte, 1),
 		resultChan: make(chan connResult),
 		conn:       conn,
 	}
 	BM.managedAddConnection(rlc)
 	return rlc
+}
+
+// managedWaitForRead blocks until a connection wants to read some data.
+func (bm *bandwidthManager) managedWaitForRead(cancel chan struct{}) {
+	select {
+	case <-cancel:
+	case <-bm.readSignal:
+	}
+}
+
+// managedWaitForWrite blocks until a connection wants to write some data.
+func (bm *bandwidthManager) managedWaitForWrite(cancel chan struct{}) {
+	select {
+	case <-cancel:
+	case <-bm.writeSignal:
+	}
 }
 
 // threadedRead reads some data from a connection and sends the result through
@@ -107,24 +127,34 @@ func (bm *bandwidthManager) threadedReadLoop(cancel chan struct{}) {
 		default:
 		}
 
-		// Grab a connection.
 		bm.mu.Lock()
+		// If there are no connections we wait for work.
 		if len(bm.conns) == 0 {
-			// There is no connection to grab.
 			bm.mu.Unlock()
+			bm.managedWaitForRead(cancel)
+			workDone = true
+			i = 0
 			continue
 		}
+		// If we reached the last connection without doing any work we wait for
+		// work. If work was done we just start over from index 0 without
+		// waiting.
+		if i >= len(bm.conns) && !workDone {
+			bm.mu.Unlock()
+			bm.managedWaitForRead(cancel)
+			workDone = true
+			i = 0
+			continue
+		}
+		// If we reached the last connection we start over from index 0.
 		if i >= len(bm.conns) {
-			// If no work was done during this iteration we sleep a bit.
-			if !workDone {
-				time.Sleep(time.Millisecond)
-			}
-			workDone = false
-			// Start at the beginning again.
 			i = 0
 		}
+		// Grab a connection.
 		conn := bm.conns[i]
 		bm.mu.Unlock()
+		// Increment the connection index.
+		i++
 
 		// Check if there is work to do.
 		var b []byte
@@ -133,7 +163,6 @@ func (bm *bandwidthManager) threadedReadLoop(cancel chan struct{}) {
 			continue
 		case b = <-conn.readChan:
 		}
-
 		// There is some work to do. Wait some time before doing it.
 		workDone = true
 		pps := atomic.LoadInt64(&bm.atomicReadPPS)
@@ -163,24 +192,34 @@ func (bm *bandwidthManager) threadedWriteLoop(cancel chan struct{}) {
 		default:
 		}
 
-		// Grab a connection.
 		bm.mu.Lock()
+		// If there are no connections we wait for work.
 		if len(bm.conns) == 0 {
-			// There is no connection to grab.
 			bm.mu.Unlock()
+			bm.managedWaitForWrite(cancel)
+			workDone = true
+			i = 0
 			continue
 		}
+		// If we reached the last connection without doing any work we wait for
+		// work. If work was done we just start over from index 0 without
+		// waiting.
+		if i >= len(bm.conns) && !workDone {
+			bm.mu.Unlock()
+			bm.managedWaitForWrite(cancel)
+			workDone = true
+			i = 0
+			continue
+		}
+		// If we reached the last connection we start over from index 0.
 		if i >= len(bm.conns) {
-			// If no work was done during this iteration we sleep a bit.
-			if !workDone {
-				time.Sleep(time.Millisecond)
-			}
-			workDone = false
-			// Start at the beginning again.
 			i = 0
 		}
+		// Grab a connection.
 		conn := bm.conns[i]
 		bm.mu.Unlock()
+		// Increment the connection index.
+		i++
 
 		// Check if there is work to do.
 		var b []byte
@@ -189,7 +228,6 @@ func (bm *bandwidthManager) threadedWriteLoop(cancel chan struct{}) {
 			continue
 		case b = <-conn.writeChan:
 		}
-
 		// There is some work to do. Wait some time before doing it.
 		workDone = true
 		pps := atomic.LoadInt64(&bm.atomicWritePPS)
@@ -253,6 +291,10 @@ func (rlc *RLConn) Read(b []byte) (n int, err error) {
 		// Send work
 		rlc.mu.Lock()
 		rlc.readChan <- data
+		select {
+		case BM.readSignal <- struct{}{}:
+		default:
+		}
 		result := <-rlc.resultChan
 		rlc.mu.Unlock()
 
@@ -303,6 +345,10 @@ func (rlc *RLConn) Write(b []byte) (n int, err error) {
 		// Send work
 		rlc.mu.Lock()
 		rlc.writeChan <- data
+		select {
+		case BM.writeSignal <- struct{}{}:
+		default:
+		}
 		result := <-rlc.resultChan
 		rlc.mu.Unlock()
 
