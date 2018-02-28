@@ -314,6 +314,8 @@ func (r *Renter) managedCleanUpUploadChunk(uc *unfinishedUploadChunk) {
 		uc.released = true
 	}
 	uc.memoryReleased += uint64(memoryReleased)
+	memReleased := uc.memoryReleased
+	memNeeded := uc.memoryNeeded
 	uc.mu.Unlock()
 
 	// If there are pieces available, add the standby workers to collect them.
@@ -342,7 +344,7 @@ func (r *Renter) managedCleanUpUploadChunk(uc *unfinishedUploadChunk) {
 		r.uploadHeap.mu.Unlock()
 	}
 	// Sanity check - all memory should be released if the chunk is complete.
-	if chunkComplete && uc.memoryReleased != uc.memoryNeeded {
+	if chunkComplete && memReleased != memNeeded {
 		r.log.Critical("No workers remaining, but not all memory released:", uc.workersRemaining, uc.piecesRegistered, uc.memoryReleased, uc.memoryNeeded)
 	}
 }

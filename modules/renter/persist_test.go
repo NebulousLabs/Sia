@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -27,6 +28,7 @@ func newTestingFile() *file {
 		masterKey:   crypto.GenerateTwofishKey(),
 		erasureCode: rsc,
 		pieceSize:   encoding.DecUint64(data[6:8]),
+		staticUID:   persist.RandomSuffix(),
 	}
 }
 
