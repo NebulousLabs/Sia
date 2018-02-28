@@ -20,6 +20,7 @@ type (
 		writeChan  chan []byte
 		readChan   chan []byte
 		resultChan chan connResult
+		workSignal chan struct{}
 		conn       net.Conn
 	}
 	// connResult contains the return values of a Read or Write.
@@ -93,31 +94,11 @@ func threadedWrite(b []byte, conn *RLConn) {
 	}
 }
 
-// managedAddConnection adds a new RLConnection to the manager.
-func (bm *bandwidthManager) managedAddConnection(conn *RLConn) {
-	bm.mu.Lock()
-	defer bm.mu.Unlock()
-	bm.conns = append(bm.conns, conn)
-}
-
-// managedRemoveConnection removes a RLConnection from the manager. Should be
-// called implicitly by conn.Close
-func (bm *bandwidthManager) managedRemoveConnection(conn *RLConn) {
-	bm.mu.Lock()
-	defer bm.mu.Unlock()
-	for i, c := range bm.conns {
-		if c == conn {
-			bm.conns = append(bm.conns[:i], bm.conns[i+1:]...)
-		}
-	}
-}
-
 // threadedReadLoop constantly loops over all connections and checks if any
 // connection would like to read a packet.
 func (bm *bandwidthManager) threadedReadLoop(cancel chan struct{}) {
 	i := 0
-	// TODO: If there is no work to do this might consume a log of cpu time.
-	// Add a very short sleep for this thread an the write thread.
+	workDone := false
 	for {
 		// Check for shutdown.
 		select {
@@ -134,6 +115,11 @@ func (bm *bandwidthManager) threadedReadLoop(cancel chan struct{}) {
 			continue
 		}
 		if i >= len(bm.conns) {
+			// If no work was done during this iteration we sleep a bit.
+			if !workDone {
+				time.Sleep(time.Millisecond)
+			}
+			workDone = false
 			// Start at the beginning again.
 			i = 0
 		}
@@ -149,6 +135,7 @@ func (bm *bandwidthManager) threadedReadLoop(cancel chan struct{}) {
 		}
 
 		// There is some work to do. Wait some time before doing it.
+		workDone = true
 		pps := atomic.LoadInt64(&bm.atomicReadPPS)
 		packetSize := atomic.LoadInt64(&bm.atomicPacketSize)
 		packetTime := time.Second * time.Duration(len(b)) / time.Duration(packetSize)
@@ -167,6 +154,7 @@ func (bm *bandwidthManager) threadedReadLoop(cancel chan struct{}) {
 // connection would like to write a packet.
 func (bm *bandwidthManager) threadedWriteLoop(cancel chan struct{}) {
 	i := 0
+	workDone := false
 	for {
 		// Check for shutdown.
 		select {
@@ -183,6 +171,11 @@ func (bm *bandwidthManager) threadedWriteLoop(cancel chan struct{}) {
 			continue
 		}
 		if i >= len(bm.conns) {
+			// If no work was done during this iteration we sleep a bit.
+			if !workDone {
+				time.Sleep(time.Millisecond)
+			}
+			workDone = false
 			// Start at the beginning again.
 			i = 0
 		}
@@ -198,6 +191,7 @@ func (bm *bandwidthManager) threadedWriteLoop(cancel chan struct{}) {
 		}
 
 		// There is some work to do. Wait some time before doing it.
+		workDone = true
 		pps := atomic.LoadInt64(&bm.atomicWritePPS)
 		packetSize := atomic.LoadInt64(&bm.atomicPacketSize)
 		packetTime := time.Second * time.Duration(len(b)) / time.Duration(packetSize)
@@ -209,6 +203,25 @@ func (bm *bandwidthManager) threadedWriteLoop(cancel chan struct{}) {
 			}
 		}
 		go threadedWrite(b, conn)
+	}
+}
+
+// managedAddConnection adds a new RLConnection to the manager.
+func (bm *bandwidthManager) managedAddConnection(conn *RLConn) {
+	bm.mu.Lock()
+	defer bm.mu.Unlock()
+	bm.conns = append(bm.conns, conn)
+}
+
+// managedRemoveConnection removes a RLConnection from the manager. Should be
+// called implicitly by conn.Close
+func (bm *bandwidthManager) managedRemoveConnection(conn *RLConn) {
+	bm.mu.Lock()
+	defer bm.mu.Unlock()
+	for i, c := range bm.conns {
+		if c == conn {
+			bm.conns = append(bm.conns[:i], bm.conns[i+1:]...)
+		}
 	}
 }
 
