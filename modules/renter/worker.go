@@ -41,7 +41,7 @@ type worker struct {
 	downloadTerminated bool // Has downloading been terminated for this worker?
 
 	// Upload variables.
-	unprocessedChunks         []*unfinishedChunk // Yet unprocessed work items.
+	unprocessedChunks         []*unfinishedUploadChunk // Yet unprocessed work items.
 	uploadChan                chan struct{}      // Notifications of new work.
 	uploadConsecutiveFailures int                // How many times in a row uploading has failed.
 	uploadRecentFailure       time.Time          // How recent was the last failure?

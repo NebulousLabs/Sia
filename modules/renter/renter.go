@@ -163,7 +163,7 @@ type Renter struct {
 	// accessed in isolation.
 	downloadHeapMu sync.Mutex         // Used to protect the downloadHeap.
 	downloadHeap   *downloadChunkHeap // A heap of priority-sorted chunks to download.
-	newDownloads   chan struct{}      // Used to notify download heap thread that new downlaods are available.
+	newDownloads   chan struct{}      // Used to notify download loop that new downlaods are available.
 
 	// Download history. The history list has its own mutex because it is always
 	// accessed in isolation.
@@ -174,11 +174,14 @@ type Renter struct {
 	downloadHistoryMu sync.Mutex
 
 	// Upload management.
-	newUploads chan *file // Used to send new uploads to the upload heap.
+	uploadHeap uploadHeap
 
 	// List of workers that can be used for uploading and/or downloading.
 	memoryManager *memoryManager
 	workerPool    map[types.FileContractID]*worker
+
+	// Cache the last price estimation result.
+	lastEstimation modules.RenterPriceEstimation
 
 	// Utilities.
 	cs             modules.ConsensusSet
@@ -188,11 +191,8 @@ type Renter struct {
 	log            *persist.Logger
 	persistDir     string
 	mu             *siasync.RWMutex
-	heapWG         sync.WaitGroup // in-progress chunks join this waitgroup
 	tg             threadgroup.ThreadGroup
 	tpool          modules.TransactionPool
-
-	lastEstimation modules.RenterPriceEstimation // used to cache the last price estimation result
 }
 
 // Close closes the Renter and its dependencies
@@ -364,9 +364,10 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 		newDownloads: make(chan struct{}, 1),
 		downloadHeap: new(downloadChunkHeap),
 
-		// TODO instead of using a buffered channel we should add uploads to
-		// the upload heap directly.
-		newUploads: make(chan *file, 2500),
+		uploadHeap: uploadHeap{
+			activeChunks: make(map[uploadChunkID]struct{}),
+			newUploads: make(chan struct{}, 1),
+		},
 
 		workerPool: make(map[types.FileContractID]*worker),
 
@@ -393,8 +394,8 @@ func newRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.Transac
 
 	// Spin up the workers for the work pool.
 	r.managedUpdateWorkerPool()
-	go r.threadedRepairScan()
 	go r.threadedDownloadLoop()
+	go r.threadedUploadLoop()
 
 	// Kill workers on shutdown.
 	r.tg.OnStop(func() error {

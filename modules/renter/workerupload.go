@@ -9,12 +9,11 @@ import (
 // This function is managed instead of static because it is against convention
 // to be calling functions on other objects (in this case, the renter) while
 // holding a lock.
-func (w *worker) managedDropChunk(uc *unfinishedChunk) {
+func (w *worker) managedDropChunk(uc *unfinishedUploadChunk) {
 	uc.mu.Lock()
 	uc.workersRemaining--
 	uc.mu.Unlock()
-	w.renter.managedReleaseIdleChunkPieces(uc)
-	w.renter.heapWG.Done()
+	w.renter.managedCleanUpUploadChunk(uc)
 }
 
 // managedDropUploadChunks will release all of the upload chunks that the worker
@@ -22,7 +21,7 @@ func (w *worker) managedDropChunk(uc *unfinishedChunk) {
 func (w *worker) managedDropUploadChunks() {
 	// Make a copy of the slice under lock, clear the slice, then drop the
 	// chunks without a lock (managed function).
-	var chunksToDrop []*unfinishedChunk
+	var chunksToDrop []*unfinishedUploadChunk
 	w.mu.Lock()
 	for i := 0; i < len(w.unprocessedChunks); i++ {
 		chunksToDrop = append(chunksToDrop, w.unprocessedChunks[i])
@@ -48,7 +47,7 @@ func (w *worker) managedKillUploading() {
 
 // managedNextUploadChunk will pull the next potential chunk out of the worker's
 // work queue for uploading.
-func (w *worker) managedNextUploadChunk() (nextChunk *unfinishedChunk, pieceIndex uint64) {
+func (w *worker) managedNextUploadChunk() (nextChunk *unfinishedUploadChunk, pieceIndex uint64) {
 	// Loop through the unprocessed chunks and find some work to do.
 	for {
 		// Pull a chunk off of the unprocessed chunks stack.
@@ -72,7 +71,7 @@ func (w *worker) managedNextUploadChunk() (nextChunk *unfinishedChunk, pieceInde
 
 // managedQueueUploadChunk will take a chunk and add it to the worker's repair
 // stack.
-func (w *worker) managedQueueUploadChunk(uc *unfinishedChunk) {
+func (w *worker) managedQueueUploadChunk(uc *unfinishedUploadChunk) {
 	// Check that the worker is allowed to be uploading before grabbing the
 	// worker lock.
 	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
@@ -95,7 +94,7 @@ func (w *worker) managedQueueUploadChunk(uc *unfinishedChunk) {
 }
 
 // managedUpload will perform some upload work.
-func (w *worker) managedUpload(uc *unfinishedChunk, pieceIndex uint64) {
+func (w *worker) managedUpload(uc *unfinishedUploadChunk, pieceIndex uint64) {
 	// Open an editing connection to the host.
 	e, err := w.renter.hostContractor.Editor(w.contract.ID, w.renter.tg.StopChan())
 	if err != nil {
@@ -150,7 +149,7 @@ func (w *worker) managedUpload(uc *unfinishedChunk, pieceIndex uint64) {
 	uc.memoryReleased += uint64(releaseSize)
 	uc.mu.Unlock()
 	w.renter.memoryManager.Return(uint64(releaseSize))
-	w.managedDropChunk(uc)
+	w.renter.managedCleanUpUploadChunk(uc)
 }
 
 // onUploadCooldown returns true if the worker is on cooldown from failed
@@ -164,15 +163,15 @@ func (w *worker) onUploadCooldown() bool {
 }
 
 // managedProcessUploadChunk will process a chunk from the worker chunk queue.
-func (w *worker) managedProcessUploadChunk(uc *unfinishedChunk) (nextChunk *unfinishedChunk, pieceIndex uint64) {
+func (w *worker) managedProcessUploadChunk(uc *unfinishedUploadChunk) (nextChunk *unfinishedUploadChunk, pieceIndex uint64) {
 	// Determine the usability value of this worker.
 	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
 	goodForUpload := exists && utility.GoodForUpload
-
-	// Determine what sort of help this chunk needs.
 	w.mu.Lock()
 	onCooldown := w.onUploadCooldown()
 	w.mu.Unlock()
+
+	// Determine what sort of help this chunk needs.
 	uc.mu.Lock()
 	_, candidateHost := uc.unusedHosts[w.hostPubKey.String()]
 	chunkComplete := uc.piecesNeeded <= uc.piecesCompleted
@@ -185,35 +184,37 @@ func (w *worker) managedProcessUploadChunk(uc *unfinishedChunk) (nextChunk *unfi
 		return nil, 0
 	}
 
+	// If the worker does not need help, add the worker to the sent of standby
+	// chunks.
+	if !needsHelp {
+		uc.workersStandby = append(uc.workersStandby, w)
+		uc.mu.Unlock()
+		w.renter.managedCleanUpUploadChunk(uc)
+		return nil, 0
+	}
+
 	// If the chunk needs help from this worker, find a piece to upload and
 	// return the stats for that piece.
+	//
+	// Select a piece and mark that a piece has been selected.
 	index := 0
-	if needsHelp {
-		// Select a piece and mark that a piece has been selected.
-		for i := 0; i < len(uc.pieceUsage); i++ {
-			if !uc.pieceUsage[i] {
-				index = i
-				uc.pieceUsage[i] = true
-				break
-			}
+	for i := 0; i < len(uc.pieceUsage); i++ {
+		if !uc.pieceUsage[i] {
+			index = i
+			uc.pieceUsage[i] = true
+			break
 		}
-		delete(uc.unusedHosts, w.hostPubKey.String())
-		uc.piecesRegistered++
-		uc.mu.Unlock()
-		return uc, uint64(index)
 	}
-	// Add this worker to the set of standby workers for this chunk.
-	uc.workersStandby = append(uc.workersStandby, w)
+	delete(uc.unusedHosts, w.hostPubKey.String())
+	uc.piecesRegistered++
+	uc.workersRemaining--
 	uc.mu.Unlock()
-
-	// The chunk could need help from this worker, but only if other workers who
-	// are performing uploads experience failures. Put this chunk on standby.
-	return nil, 0
+	return uc, uint64(index)
 }
 
 // managedUploadFailed is called if a worker failed to upload part of an unfinished
 // chunk.
-func (w *worker) managedUploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
+func (w *worker) managedUploadFailed(uc *unfinishedUploadChunk, pieceIndex uint64) {
 	// Mark the failure in the worker if the gateway says we are online. It's
 	// not the worker's fault if we are offline.
 	if w.renter.g.Online() {
@@ -231,9 +232,8 @@ func (w *worker) managedUploadFailed(uc *unfinishedChunk, pieceIndex uint64) {
 
 	// Notify the standby workers of the chunk
 	uc.managedNotifyStandbyWorkers()
+	w.renter.managedCleanUpUploadChunk(uc)
 
-	// Drop this chunk from the worker. Because the worker is currently on
-	// cooldown, drop all remaining chunks from the worker as well.
-	w.managedDropChunk(uc)
+	// Because the worker is now on cooldown, drop all remaining chunks.
 	w.managedDropUploadChunks()
 }

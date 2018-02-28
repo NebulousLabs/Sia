@@ -2,7 +2,6 @@ package renter
 
 // TODO / NOTE: Once the filesystem is tree-based, instead of continually
 // looping through the whole filesystem we can add values to the file metadata
-// indicating the health of each folder + file, and the time of the last scan
 // for each folder + file, where the folder scan time is the least recent time
 // of any file in the folder, and the folder health is the lowest health of any
 // file in the folder. This will allow us to go one folder at a time and focus
@@ -13,10 +12,6 @@ package renter
 // need to be checking for every piece within a contract, and checking that the
 // piece is still available in the contract that we have, that the host did not
 // lose or nullify the piece.
-
-// TODO: Need to make sure that we wait for all standing upload jobs to
-// complete in some way before we send off the next round of upload jobs.
-// Otherwise we might end up with simultenously overlapping repair jobs.
 
 // TODO: Renter will try to download to repair a piece even if there are not
 // enough workers to make any progress on the repair.  This should be fixed.
@@ -29,81 +24,74 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// ChunkHeap is a bunch of chunks sorted by percentage-completion for uploading.
-// This is a temporary situation, once we have a filesystem we can do
-// tree-diving instead to build out our chunk profile. This just simulates that.
-type chunkHeap []*unfinishedChunk
+// uploadHeap contains a priority-sorted heap of all the chunks being uploaded
+// to the renter, along with some metadata.
+type uploadHeap struct {
+	// activeChunks contains a list of all the chunks actively being worked on.
+	// These chunks will either be in the heap, or will be in the queues of some
+	// of the workers. A chunk is added to the activeChunks map as soon as it is
+	// added to the uploadHeap, and it is removed from the map as soon as the
+	// last worker completes work on the chunk.
+	activeChunks map[uploadChunkID]struct{}
+	heap         uploadChunkHeap
+	newUploads   chan struct{}
+	mu           sync.Mutex
+}
 
-// unfinishedChunk contains a chunk from the filesystem that has not finished
-// uploading, including knowledge of the progress.
+// uploadChunkHeap is a bunch of priority-sorted chunks that need to be either
+// uploaded or repaired.
 //
-// TODO: rename to unfinishedUploadChunk
-type unfinishedChunk struct {
-	// Information about the file. localPath may be the empty string if the file
-	// is known not to exist locally.
-	renterFile *file
-	localPath  string
+// TODO: When the file system is adjusted to have a tree structure, the
+// filesystem itself will serve as the uploadChunkHeap, making this structure
+// unnecessary. The repair loop might be moved to repair.go.
+type uploadChunkHeap []*unfinishedUploadChunk
 
-	// Information about the chunk, namely where it exists within the file.
-	//
-	// TODO / NOTE: As we change the file mapper, we're probably going to have
-	// to update these fields. Compatibility shouldn't be an issue because this
-	// struct is not persisted anywhere, it's always built from other
-	// structures.
-	index          uint64
-	length         uint64
-	memoryNeeded   uint64 // memory needed in bytes
-	memoryReleased uint64 // memory that has been returned of memoryNeeded
-	minimumPieces  int    // number of pieces required to recover the file.
-	offset         int64  // Offset of the chunk within the file.
-	piecesNeeded   int    // number of pieces to achieve a 100% complete upload
-
-	// The logical data is the data that is presented to the user when the user
-	// requests the chunk. The physical data is all of the pieces that get
-	// stored across the network.
-	logicalChunkData  []byte
-	physicalChunkData [][]byte
-
-	// Worker synchronization fields. The mutex only protects these fields.
-	mu               sync.Mutex
-	pieceUsage       []bool              // one per piece. 'false' = piece not uploaded. 'true' = piece uploaded.
-	piecesCompleted  int                 // number of pieces that have been fully uploaded.
-	piecesRegistered int                 // number of pieces that are being uploaded, but aren't finished yet.
-	unusedHosts      map[string]struct{} // hosts that aren't yet storing any pieces
-	workersRemaining int                 // number of workers still able to upload a piece.
-	workersStandby   []*worker           // workers that can be used if other workers fail
+// Implementation of heap.Interface for uploadChunkHeap.
+func (uch uploadChunkHeap) Len() int { return len(uch) }
+func (uch uploadChunkHeap) Less(i, j int) bool {
+	return float64(uch[i].piecesCompleted)/float64(uch[i].piecesNeeded) < float64(uch[j].piecesCompleted)/float64(uch[j].piecesNeeded)
 }
-
-// Implementation of heap.Interface for chunkHeap.
-func (ch chunkHeap) Len() int { return len(ch) }
-func (ch chunkHeap) Less(i, j int) bool {
-	return float64(ch[i].piecesCompleted)/float64(ch[i].piecesNeeded) < float64(ch[j].piecesCompleted)/float64(ch[j].piecesNeeded)
-}
-func (ch chunkHeap) Swap(i, j int)       { ch[i], ch[j] = ch[j], ch[i] }
-func (ch *chunkHeap) Push(x interface{}) { *ch = append(*ch, x.(*unfinishedChunk)) }
-func (ch *chunkHeap) Pop() interface{} {
-	old := *ch
+func (uch uploadChunkHeap) Swap(i, j int)       { uch[i], uch[j] = uch[j], uch[i] }
+func (uch *uploadChunkHeap) Push(x interface{}) { *uch = append(*uch, x.(*unfinishedUploadChunk)) }
+func (uch *uploadChunkHeap) Pop() interface{} {
+	old := *uch
 	n := len(old)
 	x := old[n-1]
-	*ch = old[0 : n-1]
+	*uch = old[0 : n-1]
 	return x
 }
 
-// managedNotifyStandbyWorkers is called when a worker fails to upload a piece, meaning
-// that the standby workers may now be needed to help the piece finish
-// uploading.
-func (uc *unfinishedChunk) managedNotifyStandbyWorkers() {
-	// Copy the standby workers into a new slice and reset it since we can't
-	// hold the lock while calling the managed function.
-	uc.mu.Lock()
-	standbyWorkers := make([]*worker, 0, len(uc.workersStandby))
-	copy(standbyWorkers, uc.workersStandby)
-	uc.workersStandby = uc.workersStandby[:0]
-	uc.mu.Unlock()
-
-	for i := 0; i < len(standbyWorkers); i++ {
-		standbyWorkers[i].managedQueueUploadChunk(uc)
+// managedAddChunkToUploadHeap will add a chunk to the upload heap.
+func (uh *uploadHeap) managedPush(uuc *unfinishedUploadChunk) {
+	// Create the unique chunk id.
+	ucid := uploadChunkID{
+		fileUID: uuc.renterFile.staticUID,
+		index:   uuc.index,
 	}
+	// Sanity check: fileUID should not be the empty value.
+	if uuc.renterFile.staticUID == "" {
+		panic("empty string for file UID")
+	}
+
+	// Check whether this chunk is already being repaired. If not, add it to the
+	// upload chunk heap.
+	uh.mu.Lock()
+	_, exists := uh.activeChunks[ucid]
+	if !exists {
+		uh.activeChunks[ucid] = struct{}{}
+		uh.heap.Push(uuc)
+	}
+	uh.mu.Unlock()
+}
+
+// managedPop will pull a chunk off of the upload heap and return it.
+func (uh *uploadHeap) managedPop() (uc *unfinishedUploadChunk) {
+	uh.mu.Lock()
+	if len(uh.heap) > 0 {
+		uc = heap.Pop(&uh.heap).(*unfinishedUploadChunk)
+	}
+	uh.mu.Unlock()
+	return uc
 }
 
 // buildUnfinishedChunks will pull all of the unfinished chunks out of a file.
@@ -111,7 +99,7 @@ func (uc *unfinishedChunk) managedNotifyStandbyWorkers() {
 // TODO / NOTE: This code can be substantially simplified once the files store
 // the HostPubKey instead of the FileContractID, and can be simplified even
 // further once the layout is per-chunk instead of per-filecontract.
-func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*unfinishedChunk {
+func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*unfinishedUploadChunk {
 	// Files are not threadsafe.
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -128,9 +116,9 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	// number of chunks. Changes will be made due to things like sparse files,
 	// and the fact that chunks are going to be different sizes.
 	chunkCount := f.numChunks()
-	newUnfinishedChunks := make([]*unfinishedChunk, chunkCount)
+	newUnfinishedChunks := make([]*unfinishedUploadChunk, chunkCount)
 	for i := uint64(0); i < chunkCount; i++ {
-		newUnfinishedChunks[i] = &unfinishedChunk{
+		newUnfinishedChunks[i] = &unfinishedUploadChunk{
 			renterFile: f,
 			localPath:  trackedFile.RepairPath,
 
@@ -169,7 +157,7 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			saveFile = true
 			continue
 		}
-		if !contractUtility.GoodForUpload {
+		if !contractUtility.GoodForRenew {
 			// We are no longer renewing with this contract, so it does not
 			// count for redundancy.
 			continue
@@ -214,35 +202,22 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			incompleteChunks = append(incompleteChunks, newUnfinishedChunks[i])
 		}
 	}
+	// TODO: Don't return chunks that can't be downloaded, uploaded or otherwise
+	// helped by the upload process.
 	return incompleteChunks
 }
 
 // managedBuildChunkHeap will iterate through all of the files in the renter and
 // construct a chunk heap.
-func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}) *chunkHeap {
-	// Loop through the whole set of files to build the chunk heap.
-	ch := new(chunkHeap)
-	heap.Init(ch)
+func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}) {
+	// Loop through the whole set of files and get a list of chunks to add to
+	// the heap.
 	id := r.mu.Lock()
 	for _, file := range r.files {
-		unfinishedChunks := r.buildUnfinishedChunks(file, hosts)
-		for i := 0; i < len(unfinishedChunks); i++ {
-			heap.Push(ch, unfinishedChunks[i])
+		unfinishedUploadChunks := r.buildUnfinishedChunks(file, hosts)
+		for i := 0; i < len(unfinishedUploadChunks); i++ {
+			r.uploadHeap.managedPush(unfinishedUploadChunks[i])
 		}
-	}
-	r.mu.Unlock(id)
-
-	// Init the heap.
-	return ch
-}
-
-// managedInsertFileIntoChunkHeap will insert all of the chunks of a file into the
-// chunk heap.
-func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts map[string]struct{}) {
-	id := r.mu.Lock()
-	unfinishedChunks := r.buildUnfinishedChunks(f, hosts)
-	for i := 0; i < len(unfinishedChunks); i++ {
-		heap.Push(ch, unfinishedChunks[i])
 	}
 	r.mu.Unlock(id)
 }
@@ -252,38 +227,24 @@ func (r *Renter) managedInsertFileIntoChunkHeap(f *file, ch *chunkHeap, hosts ma
 // available, fetching the logical data for the chunk (either from the disk or
 // from the network), erasure coding the logical data into the physical data,
 // and then finally passing the work onto the workers.
-func (r *Renter) managedPrepareNextChunk(ch *chunkHeap, hosts map[string]struct{}) {
+func (r *Renter) managedPrepareNextChunk(uuc *unfinishedUploadChunk, hosts map[string]struct{}) {
 	// Grab the next chunk, loop until we have enough memory, update the amount
 	// of memory available, and then spin up a thread to asynchronously handle
 	// the rest of the chunk tasks.
-	nextChunk := heap.Pop(ch).(*unfinishedChunk)
-	if !r.memoryManager.Request(nextChunk.memoryNeeded, memoryPriorityLow) {
+	if !r.memoryManager.Request(uuc.memoryNeeded, memoryPriorityLow) {
 		return
 	}
-	// Add this thread to the waitgroup. This Add will be released once the
-	// worker threads have been added to the wg.
-	r.heapWG.Add(1)
-	go func() {
-		workDistributed := r.managedFetchAndRepairChunk(nextChunk)
-		r.heapWG.Done()
-		if !workDistributed {
-			// Release any data that did not get distributed to workers.
-			r.memoryManager.Return(nextChunk.memoryNeeded - nextChunk.memoryReleased)
-		}
-		// Sanity check, make sure memory was returned properly.
-		if nextChunk.logicalChunkData != nil {
-			nextChunk.logicalChunkData = nil
-			r.log.Critical("logical chunk data was not cleaned up correctly")
-		}
-	}()
+	// Fetch the chunk in a separate goroutine, as it can take a long time and
+	// does not need to bottleneck the repair loop.
+	go r.managedFetchAndRepairChunk(uuc)
 }
 
 // managedRefreshHostsAndWorkers will reset the set of hosts and the set of
 // workers for the renter.
 func (r *Renter) managedRefreshHostsAndWorkers() map[string]struct{} {
 	// Grab the current set of contracts and use them to build a list of hosts
-	// that are available for uploading. The hosts are assembled into a map
-	// where the key is the String() representation of the host's SiaPublicKey.
+	// that are currently active. The hosts are assembled into a map where the
+	// key is the String() representation of the host's SiaPublicKey.
 	//
 	// TODO / NOTE: This code can be removed once files store the HostPubKey
 	// of the hosts they are using, instead of just the FileContractID.
@@ -292,21 +253,14 @@ func (r *Renter) managedRefreshHostsAndWorkers() map[string]struct{} {
 	for _, contract := range currentContracts {
 		hosts[contract.HostPublicKey.String()] = struct{}{}
 	}
-
 	// Refresh the worker pool as well.
 	r.managedUpdateWorkerPool()
 	return hosts
 }
 
-// threadedRepairScan is a background thread that checks on the health of files,
+// threadedUploadLoop is a background thread that checks on the health of files,
 // tracking the least healthy files and queuing the worst ones for repair.
-//
-// TODO / NOTE: Once we have upgraded the filesystem, we can replace this with
-// the tree-diving technique discussed in Sprint 5. For now we just iterate
-// through all of our in-memory files and chunks, and maintain a finite list of
-// the worst ones, and then iterate through it again when we need to find more
-// things to repair.
-func (r *Renter) threadedRepairScan() {
+func (r *Renter) threadedUploadLoop() {
 	err := r.tg.Add()
 	if err != nil {
 		return
@@ -314,20 +268,10 @@ func (r *Renter) threadedRepairScan() {
 	defer r.tg.Done()
 
 	for {
-		// Wait until we are online.
-		for !r.g.Online() {
-			select {
-			case <-r.tg.StopChan():
-				return
-			case <-time.After(offlineCheckFrequency):
-			}
-		}
-
-		// Return if the renter has shut down.
-		select {
-		case <-r.tg.StopChan():
+		// Wait until the renter is online to proceed.
+		if !r.managedBlockUntilOnline() {
+			// The renter shut down before the internet connection was restored.
 			return
-		default:
 		}
 
 		// Refresh the worker pool and get the set of hosts that are currently
@@ -335,8 +279,15 @@ func (r *Renter) threadedRepairScan() {
 		hosts := r.managedRefreshHostsAndWorkers()
 
 		// Build a min-heap of chunks organized by upload progress.
-		chunkHeap := r.managedBuildChunkHeap(hosts)
-		r.log.Println("Repairing", chunkHeap.Len(), "chunks")
+		//
+		// TODO: After replacing the filesystem to resemble a tree, we'll be
+		// able to go through the filesystem piecewise instead of doing
+		// everything all at once.
+		r.managedBuildChunkHeap(hosts)
+		r.uploadHeap.mu.Lock()
+		heapLen := r.uploadHeap.heap.Len()
+		r.uploadHeap.mu.Unlock()
+		r.log.Println("Repairing", heapLen, "chunks")
 
 		// Work through the heap. Chunks will be processed one at a time until
 		// the heap is whittled down. When the heap is empty, we wait for new
@@ -344,7 +295,6 @@ func (r *Renter) threadedRepairScan() {
 		// received, we start over with the outer loop that rebuilds the heap
 		// and re-checks the health of all the files.
 		rebuildHeapSignal := time.After(rebuildChunkHeapInterval)
-	LOOP:
 		for {
 			// Return if the renter has shut down.
 			select {
@@ -353,32 +303,32 @@ func (r *Renter) threadedRepairScan() {
 			default:
 			}
 
+			// Break to the outer loop if not online.
 			if !r.g.Online() {
-				break LOOP
-			} else if chunkHeap.Len() > 0 {
-				r.managedPrepareNextChunk(chunkHeap, hosts)
-			} else {
-				// Block until the rebuild signal is received.
-				select {
-				case newFile := <-r.newUploads:
-					// If a new file is received, add its chunks to the repair
-					// heap and loop to start working through those chunks.
-					// Update the worker pool before processing the file, as it
-					// may have been a while since the previous update.
-					hosts = r.managedRefreshHostsAndWorkers()
-					r.managedInsertFileIntoChunkHeap(newFile, chunkHeap, hosts)
-					continue
-				case <-rebuildHeapSignal:
-					// If the rebuild heap signal is received, break out to the
-					// outer loop which will check the health of all filess
-					// again and then rebuild the heap.
-					r.heapWG.Wait()
-					break LOOP
-				case <-r.tg.StopChan():
-					// If the stop signal is received, quit entirely.
-					return
-				}
+				break
 			}
+
+			// If there is work to do, perform the work. managedPrepareNextChunk
+			// will block until enough memory is available to perform the work,
+			// slowing this thread down to using only the resources that are
+			// available.
+			nextChunk := r.uploadHeap.managedPop()
+			if nextChunk != nil {
+				r.managedPrepareNextChunk(nextChunk, hosts)
+				continue
+			}
+			break
+		}
+
+		// Block until new work is required.
+		select {
+		case <-r.uploadHeap.newUploads:
+			// User has uploaded a new file.
+		case <-rebuildHeapSignal:
+			// Time to check the filesystem health again.
+		case <-r.tg.StopChan():
+			// Thre renter has shut down.
+			return
 		}
 	}
 }
