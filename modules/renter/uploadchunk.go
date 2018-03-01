@@ -21,7 +21,7 @@ type uploadChunkID struct {
 type unfinishedUploadChunk struct {
 	// Information about the file. localPath may be the empty string if the file
 	// is known not to exist locally.
-	id uploadChunkID
+	id         uploadChunkID
 	localPath  string
 	renterFile *file
 
@@ -59,7 +59,7 @@ type unfinishedUploadChunk struct {
 	//	+ the worker should increment the number of pieces registered
 	// 	+ the worker should mark the piece usage for the piece it is uploading
 	//	+ the worker should decrement the number of workers remaining
-	//	
+	//
 	// When a worker completes an upload (success or failure):
 	//	+ the worker should decrement the number of pieces registered
 	//  + the worker should call for memory to be released
@@ -76,7 +76,7 @@ type unfinishedUploadChunk struct {
 	pieceUsage       []bool              // 'true' if a piece is either uploaded, or a worker is attempting to upload that piece.
 	piecesCompleted  int                 // number of pieces that have been fully uploaded.
 	piecesRegistered int                 // number of pieces that are being uploaded, but aren't finished yet (may fail).
-	released         bool               // whether this chunk has been released from the active chunks set.
+	released         bool                // whether this chunk has been released from the active chunks set.
 	unusedHosts      map[string]struct{} // hosts that aren't yet storing any pieces or performing any work.
 	workersRemaining int                 // number of inactive workers still able to upload a piece.
 	workersStandby   []*worker           // workers that can be used if other workers fail.
@@ -201,7 +201,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 		// release that as well.
 		chunk.logicalChunkData = nil
 		chunk.workersRemaining = 0
-		r.memoryManager.Return(erasureCodingMemory+pieceCompletedMemory)
+		r.memoryManager.Return(erasureCodingMemory + pieceCompletedMemory)
 		chunk.memoryReleased += erasureCodingMemory + pieceCompletedMemory
 		r.log.Debugln("Fetching logical data of a chunk failed:", err)
 		return
