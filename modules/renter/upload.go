@@ -130,5 +130,9 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	for i := 0; i < len(unfinishedChunks); i++ {
 		r.uploadHeap.managedPush(unfinishedChunks[i])
 	}
+	select {
+	case r.uploadHeap.newUploads <- struct{}{}:
+	default:
+	}
 	return nil
 }
