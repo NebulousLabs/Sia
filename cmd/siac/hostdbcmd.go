@@ -113,7 +113,7 @@ func hostdbcmd() {
 		fmt.Println()
 		fmt.Println(len(offlineHosts), "Offline Hosts:")
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "\t\tPubkey\tAddress\tUptime\tPrice (/ TB / Month)\tDownload Price (/ TB)\tRecent Scans")
+		fmt.Fprintln(w, "\t\tPubkey\tAddress\tPrice (/ TB / Month)\tDownload Price (/ TB)\tUptime\tRecent Scans")
 		for i, host := range offlineHosts {
 			// Compute the total measured uptime and total measured downtime for this
 			// host.
@@ -153,7 +153,8 @@ func hostdbcmd() {
 			// recent scans.
 			price := host.StoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)
 			downloadBWPrice := host.StoragePrice.Mul(modules.BytesPerTerabyte)
-			fmt.Fprintf(w, "\t%v:\t%v\t%v\t%v\t%v\t%.3f\t%s\n", len(offlineHosts)-i, host.PublicKeyString, host.NetAddress, currencyUnits(price), currencyUnits(downloadBWPrice), uptimeRatio, scanHistStr)
+			fmt.Fprintf(w, "\t%v:\t%v\t%v\t%v\t%v\t%.3f\t%s\n", len(offlineHosts)-i, host.PublicKeyString,
+				host.NetAddress, currencyUnits(price), currencyUnits(downloadBWPrice), uptimeRatio, scanHistStr)
 		}
 		w.Flush()
 
