@@ -1,364 +1,158 @@
 package ratelimit
 
 import (
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/NebulousLabs/Sia/build"
 )
 
-// BM is the global bandwidthManager.
-var BM *bandwidthManager
+// rl is the global rate limit object.
+var rl rateLimit
 
 type (
-	// RLConn is a helper struct that wraps a net.Conn and implements the
-	// net.Conn interface.
-	RLConn struct {
-		mu         sync.Mutex
-		writeChan  chan []byte
-		readChan   chan []byte
-		resultChan chan connResult
-		workSignal chan struct{}
-		conn       net.Conn
+	// rateLimit declares the global rate limit for read and write operations
+	// on a io.ReadWriter. Whenever a caller wants to read or write, they have
+	// to wait until readBlock/writeBlock to start the actual read or write
+	// operation. Each caller also pushes these timestamps into the future to
+	// prevent other callers to read or write prematurely.
+	rateLimit struct {
+		atomicPacketSize uint64 // the maximum amount of data a caller can read/write at once
+		atomicWriteBPS   int64  // the bytes per second that can be written.
+		atomicReadBPS    int64  // the bytes per second that can be read.
+
+		wmu        sync.Mutex // locks writeBlock.
+		writeBlock time.Time  // timestamp before which no new write can start.
+
+		rmu       sync.Mutex // locks readBlock.
+		readBlock time.Time  // timestamp before which no new read can start.
 	}
-	// connResult contains the return values of a Read or Write.
-	connResult struct {
-		n   int
-		err error
-	}
-	// bandwidthManager is a singleton that coordinates the RLConnections in
-	// the background to guarantee a fair bandwidth distribution over all the
-	// connections.
-	bandwidthManager struct {
-		mu               sync.Mutex
-		conns            []*RLConn
-		atomicWritePPS   int64
-		atomicReadPPS    int64
-		atomicPacketSize int64
-		readSignal       chan struct{}
-		writeSignal      chan struct{}
-		threadRunning    bool
+	// rlReadWriter is a simple wrapper for the io.ReadWriter interface.
+	rlReadWriter struct {
+		io.ReadWriter
 	}
 )
 
-// Init initializes the bandwidth manager. The first call to Init initializes
-// the bandwidthManager object. Subsequent calls to Init will change the global
-// limits.
-func Init(writePPS, readPPS, packetSize int64, cancel chan struct{}) {
-	// Check if BM already exists
-	if BM != nil {
-		build.Critical("bandwidth manager is already initialized")
-		return
+// NewRLReadWriter wraps a io.ReadWriter into a rlReadWriter.
+func NewRLReadWriter(rw io.ReadWriter) io.ReadWriter {
+	return &rlReadWriter{
+		rw,
 	}
-	BM = &bandwidthManager{
-		atomicWritePPS:   writePPS,
-		atomicReadPPS:    readPPS,
-		atomicPacketSize: packetSize,
-		writeSignal:      make(chan struct{}),
-		readSignal:       make(chan struct{}),
-	}
-	go BM.threadedWriteLoop(cancel)
-	go BM.threadedReadLoop(cancel)
 }
 
-// NewRLConn wraps a net.Conn into a RLConn and adds it to the
-// bandwidthManager.
+// NewRLConn wrap a net.Conn into a rlReadWriter.
 func NewRLConn(conn net.Conn) net.Conn {
-	rlc := &RLConn{
-		readChan:   make(chan []byte, 1),
-		writeChan:  make(chan []byte, 1),
-		resultChan: make(chan connResult),
-		conn:       conn,
-	}
-	BM.managedAddConnection(rlc)
-	return rlc
+	return (io.ReadWriter)(&rlReadWriter{
+		conn,
+	}).(net.Conn)
 }
 
-// managedWaitForRead blocks until a connection wants to read some data.
-func (bm *bandwidthManager) managedWaitForRead(cancel chan struct{}) {
-	select {
-	case <-cancel:
-	case <-bm.readSignal:
-	}
+// SetLimits sets new limits for the global rate limiter.
+func SetLimits(readBPS, writeBPS int64, packetSize uint64) {
+	atomic.StoreInt64(&rl.atomicReadBPS, readBPS)
+	atomic.StoreInt64(&rl.atomicWriteBPS, writeBPS)
+	atomic.StoreUint64(&rl.atomicPacketSize, packetSize)
 }
 
-// managedWaitForWrite blocks until a connection wants to write some data.
-func (bm *bandwidthManager) managedWaitForWrite(cancel chan struct{}) {
-	select {
-	case <-cancel:
-	case <-bm.writeSignal:
-	}
-}
-
-// threadedRead reads some data from a connection and sends the result through
-// the resultChan.
-func threadedRead(b []byte, conn *RLConn) {
-	var err error
-	var n int
-	n, err = conn.conn.Read(b)
-	conn.resultChan <- connResult{
-		n:   n,
-		err: err,
-	}
-}
-
-// threadedWrite writes some data to a connection and sends the result through
-// the resultChan.
-func threadedWrite(b []byte, conn *RLConn) {
-	var err error
-	var n int
-	n, err = conn.conn.Write(b)
-	conn.resultChan <- connResult{
-		n:   n,
-		err: err,
-	}
-}
-
-// threadedReadLoop constantly loops over all connections and checks if any
-// connection would like to read a packet.
-func (bm *bandwidthManager) threadedReadLoop(cancel chan struct{}) {
-	i := 0
-	workDone := false
-	for {
-		// Check for shutdown.
-		select {
-		case <-cancel:
-			return
-		default:
-		}
-
-		bm.mu.Lock()
-		// If there are no connections we wait for work.
-		if len(bm.conns) == 0 {
-			bm.mu.Unlock()
-			bm.managedWaitForRead(cancel)
-			workDone = true
-			i = 0
-			continue
-		}
-		// If we reached the last connection without doing any work we wait for
-		// work. If work was done we just start over from index 0 without
-		// waiting.
-		if i >= len(bm.conns) && !workDone {
-			bm.mu.Unlock()
-			bm.managedWaitForRead(cancel)
-			workDone = true
-			i = 0
-			continue
-		}
-		// If we reached the last connection we start over from index 0.
-		if i >= len(bm.conns) {
-			i = 0
-		}
-		// Grab a connection.
-		conn := bm.conns[i]
-		bm.mu.Unlock()
-		// Increment the connection index.
-		i++
-
-		// Check if there is work to do.
-		var b []byte
-		select {
-		default:
-			continue
-		case b = <-conn.readChan:
-		}
-		// There is some work to do. Wait some time before doing it.
-		workDone = true
-		pps := atomic.LoadInt64(&bm.atomicReadPPS)
-		packetSize := atomic.LoadInt64(&bm.atomicPacketSize)
-		packetTime := time.Second * time.Duration(len(b)) / time.Duration(packetSize)
-		if pps > 0 {
-			select {
-			case <-cancel:
-				return
-			case <-time.After(packetTime / time.Duration(pps)):
-			}
-		}
-		go threadedRead(b, conn)
-	}
-}
-
-// threadedWriteLoop constantly loops over the connections and checks if a
-// connection would like to write a packet.
-func (bm *bandwidthManager) threadedWriteLoop(cancel chan struct{}) {
-	i := 0
-	workDone := false
-	for {
-		// Check for shutdown.
-		select {
-		case <-cancel:
-			return
-		default:
-		}
-
-		bm.mu.Lock()
-		// If there are no connections we wait for work.
-		if len(bm.conns) == 0 {
-			bm.mu.Unlock()
-			bm.managedWaitForWrite(cancel)
-			workDone = true
-			i = 0
-			continue
-		}
-		// If we reached the last connection without doing any work we wait for
-		// work. If work was done we just start over from index 0 without
-		// waiting.
-		if i >= len(bm.conns) && !workDone {
-			bm.mu.Unlock()
-			bm.managedWaitForWrite(cancel)
-			workDone = true
-			i = 0
-			continue
-		}
-		// If we reached the last connection we start over from index 0.
-		if i >= len(bm.conns) {
-			i = 0
-		}
-		// Grab a connection.
-		conn := bm.conns[i]
-		bm.mu.Unlock()
-		// Increment the connection index.
-		i++
-
-		// Check if there is work to do.
-		var b []byte
-		select {
-		default:
-			continue
-		case b = <-conn.writeChan:
-		}
-		// There is some work to do. Wait some time before doing it.
-		workDone = true
-		pps := atomic.LoadInt64(&bm.atomicWritePPS)
-		packetSize := atomic.LoadInt64(&bm.atomicPacketSize)
-		packetTime := time.Second * time.Duration(len(b)) / time.Duration(packetSize)
-		if pps > 0 {
-			select {
-			case <-cancel:
-				return
-			case <-time.After(packetTime / time.Duration(pps)):
-			}
-		}
-		go threadedWrite(b, conn)
-	}
-}
-
-// managedAddConnection adds a new RLConnection to the manager.
-func (bm *bandwidthManager) managedAddConnection(conn *RLConn) {
-	bm.mu.Lock()
-	defer bm.mu.Unlock()
-	bm.conns = append(bm.conns, conn)
-}
-
-// managedRemoveConnection removes a RLConnection from the manager. Should be
-// called implicitly by conn.Close
-func (bm *bandwidthManager) managedRemoveConnection(conn *RLConn) {
-	bm.mu.Lock()
-	defer bm.mu.Unlock()
-	for i, c := range bm.conns {
-		if c == conn {
-			bm.conns = append(bm.conns[:i], bm.conns[i+1:]...)
-		}
-	}
-}
-
-// Close calls the underlying connection's Close method.
-func (rlc *RLConn) Close() error {
-	BM.managedRemoveConnection(rlc)
-	return rlc.conn.Close()
-}
-
-// LocalAddr calls the underlying connection's LocalAddr method.
-func (rlc *RLConn) LocalAddr() net.Addr {
-	return rlc.conn.LocalAddr()
-}
-
-// Read reads from the underlying connection without exceeding the rate limit.
-func (rlc *RLConn) Read(b []byte) (n int, err error) {
-	packetSize := atomic.LoadInt64(&BM.atomicPacketSize)
+// Read reads from the underlying readWriter with the maximum possible speed
+// allowed by the rateLimit.
+func (l *rlReadWriter) Read(b []byte) (n int, err error) {
+	packetSize := atomic.LoadUint64(&rl.atomicPacketSize)
 	for len(b) > 0 {
-		// Prepare work
 		var data []byte
-		if packetSize > 0 && int64(len(b)) > packetSize {
+		if uint64(len(b)) > packetSize {
 			data = b[:packetSize]
 			b = b[packetSize:]
 		} else {
 			data = b
 			b = b[:0]
 		}
-
-		// Send work
-		rlc.mu.Lock()
-		rlc.readChan <- data
-		select {
-		case BM.readSignal <- struct{}{}:
-		default:
-		}
-		result := <-rlc.resultChan
-		rlc.mu.Unlock()
-
-		// Check result
-		n += result.n
-		if result.err != nil {
-			return 0, result.err
+		var read int
+		for len(data) > 0 {
+			read, err = l.readPacket(data)
+			data = data[read:]
+			n += read
+			if err != nil {
+				return
+			}
 		}
 	}
 	return
 }
 
-// RemoteAddr calls the underlying connection's RemoteAddr method.
-func (rlc *RLConn) RemoteAddr() net.Addr {
-	return rlc.conn.RemoteAddr()
-}
-
-// SetDeadline calls the underlying connection's SetDeadline method.
-func (rlc *RLConn) SetDeadline(t time.Time) error {
-	return rlc.conn.SetDeadline(t)
-}
-
-// SetReadDeadline calls the underlying connection's SetReadDeadline method.
-func (rlc *RLConn) SetReadDeadline(t time.Time) error {
-	return rlc.conn.SetReadDeadline(t)
-}
-
-// SetWriteDeadline calls the underlying connection's SetWriteDeadline method.
-func (rlc *RLConn) SetWriteDeadline(t time.Time) error {
-	return rlc.conn.SetWriteDeadline(t)
-}
-
-// Write writes data to the underlying connection without exceeding the rate
-// limit.
-func (rlc *RLConn) Write(b []byte) (n int, err error) {
-	packetSize := atomic.LoadInt64(&BM.atomicPacketSize)
+// Write writes to the underlying readWriter with the maximum possible speed
+// allowed by the rateLimit.
+func (l *rlReadWriter) Write(b []byte) (n int, err error) {
+	packetSize := atomic.LoadUint64(&rl.atomicPacketSize)
 	for len(b) > 0 {
-		// Prepare work
 		var data []byte
-		if packetSize > 0 && int64(len(b)) > packetSize {
+		if uint64(len(b)) > packetSize {
 			data = b[:packetSize]
 			b = b[packetSize:]
 		} else {
 			data = b
 			b = b[:0]
 		}
-
-		// Send work
-		rlc.mu.Lock()
-		rlc.writeChan <- data
-		select {
-		case BM.writeSignal <- struct{}{}:
-		default:
-		}
-		result := <-rlc.resultChan
-		rlc.mu.Unlock()
-
-		// Check result
-		n += result.n
-		if result.err != nil {
-			return 0, result.err
+		var written int
+		for len(data) > 0 {
+			written, err = l.writePacket(data)
+			data = data[written:]
+			n += written
+			if err != nil {
+				return
+			}
 		}
 	}
 	return
+}
+
+// readPacket is a helper function that reads up to a single packet worth of
+// data.
+func (l *rlReadWriter) readPacket(b []byte) (n int, err error) {
+	// Get the current max bandwidth.
+	bps := time.Duration(atomic.LoadInt64(&rl.atomicReadBPS))
+
+	rl.rmu.Lock()
+	// Calculate how long we can take for our read.
+	timeForRead := time.Second / bps * time.Duration(len(b))
+
+	// If the readBlock is in the past we reset it to time.Now() +
+	// timeForRead. Otherwise we just add to the timestamp.
+	wb := rl.readBlock
+	if rl.readBlock.After(time.Now()) {
+		rl.readBlock = rl.readBlock.Add(timeForRead)
+	} else {
+		rl.readBlock = time.Now().Add(timeForRead)
+	}
+	rl.rmu.Unlock()
+
+	// Sleep until it is safe to read.
+	time.Sleep(time.Until(wb))
+	return l.ReadWriter.Read(b)
+}
+
+// writePacket is a helper function that writes up to a single packet worth of
+// data.
+func (l *rlReadWriter) writePacket(b []byte) (n int, err error) {
+	// Get the current max bandwidth.
+	bps := time.Duration(atomic.LoadInt64(&rl.atomicWriteBPS))
+
+	rl.wmu.Lock()
+	// Calculate how long we can take for our write.
+	timeForWrite := time.Second / bps * time.Duration(len(b))
+
+	// If the writeBlock is in the past we reset it to time.Now() +
+	// timeForWrite. Otherwise we just add to the timestamp.
+	wb := rl.writeBlock
+	if rl.writeBlock.After(time.Now()) {
+		rl.writeBlock = rl.writeBlock.Add(timeForWrite)
+	} else {
+		rl.writeBlock = time.Now().Add(timeForWrite)
+	}
+	rl.wmu.Unlock()
+
+	// Sleep until it is safe to write.
+	time.Sleep(time.Until(wb))
+	return l.ReadWriter.Write(b)
 }

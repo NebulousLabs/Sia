@@ -1,248 +1,70 @@
 package ratelimit
 
 import (
-	"io"
-	"net"
+	"bytes"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/fastrand"
 )
 
-// TestRLConnectionWrites runs multiple tests that check if writing to a
-// RLConnection works as expected.
-func TestRLConnectionWrites(t *testing.T) {
+func TestRLSimpleWriteRead(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// Reset bandwidthManager at the end.
-	defer func() { BM = nil }()
-	// Create server
-	ln, err := net.Listen("tcp", ":0")
+
+	// Set limits
+	packetSize := uint64(64)
+	bps := int64(1000)
+	SetLimits(bps, bps, packetSize)
+
+	// Create a io.ReadWriter.
+	rw := bytes.NewBuffer(make([]byte, 0))
+
+	// Wrap it into a rate limited ReadWriter.
+	rlc := NewRLReadWriter(rw)
+
+	// Create 1mb to write.
+	data := fastrand.Bytes(1000)
+
+	// Write data while measuring time.
+	start := time.Now()
+	n, err := rlc.Write(data)
+	d := time.Since(start)
+
+	// Check for errors
+	if n < len(data) {
+		t.Error("Not whole data was written")
+	}
 	if err != nil {
-		t.Fatal(err)
+		t.Error("Failed to write data", err)
 	}
-	defer ln.Close()
+	// Check the duration. We need to subtract packetSize since the time will
+	// be off by one packet. That's because the last written packet will finish
+	// faster than anticipated.
+	if d.Seconds() < float64(uint64(len(data))-packetSize)/float64(bps) {
+		t.Error("Write didn't take long enough", d.Seconds())
+	}
 
-	kill := make(chan struct{})
-	wait := make(chan struct{})
-	defer func() {
-		close(kill)
-		<-wait
-	}()
-	go func() {
-		defer close(wait)
-		server, err := ln.Accept()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer server.Close()
-		buf := make([]byte, 100)
-		for {
-			select {
-			case <-kill:
-				break
-			default:
-			}
-			_, err := server.Read(buf)
-			if err != nil && err != io.EOF {
-				t.Fatal(err)
-			}
-			if err == io.EOF {
-				break
-			}
-		}
-	}()
+	// Read data back from file while measuring time.
+	readData := make([]byte, len(data))
+	start = time.Now()
+	n, err = rlc.Read(readData)
+	d = time.Since(start)
 
-	// Create client
-	conn, err := (&net.Dialer{}).Dial("tcp", ln.Addr().String())
+	// Check for errors
+	if n < len(data) {
+		t.Error("Not whole data was read")
+	}
 	if err != nil {
-		t.Fatal(err)
+		t.Error("Failed to read data", err)
 	}
-	defer conn.Close()
-
-	// Specifiy subtests to run
-	subTests := []struct {
-		name string
-		test func(net.Conn, int, *testing.T)
-	}{
-		{"TestSingleWrite", testSingleWrite},
-		{"TestMultipleWrites", testMultipleWrites},
+	// Check the duration again. Should be the same time.
+	if d.Seconds() < float64(uint64(len(data))-packetSize)/float64(bps) {
+		t.Error("Read didn't take long enough", d.Seconds())
 	}
-
-	// Configure rate limit
-	packetSize := int64(250)
-	pps := int64(4)
-	dataLen := 1000
-	stop := make(chan struct{})
-	defer close(stop)
-	Init(pps, 0, packetSize, stop)
-	client := NewRLConn(conn)
-	defer client.Close()
-	// Run tests
-	for _, test := range subTests {
-		t.Run(test.name, func(t *testing.T) {
-			start := time.Now()
-			test.test(client, dataLen, t)
-			d := time.Since(start)
-
-			// It should have taken at least dataLen / (packetSize * packetsPerSecond)
-			// seconds.
-			if d.Seconds() < float64(dataLen)/float64(packetSize*pps) {
-				t.Fatalf("Transmission finished too soon. %v seconds.", d.Seconds())
-			}
-		})
-	}
-}
-
-// TestRLConnectionReads runs multiple tests that check if reading from a
-// RLConnection works as expected.
-func TestRLConnectionReads(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	// Reset bandwidthManager at the end.
-	defer func() { BM = nil }()
-	// Create server
-	ln, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ln.Close()
-	serverChan := make(chan net.Conn)
-	go func() {
-		server, err := ln.Accept()
-		if err != nil {
-			t.Fatal(err)
-		}
-		serverChan <- server
-	}()
-
-	// Create client
-	wait := make(chan struct{})
-	defer func() {
-		<-wait
-	}()
-	go func() {
-		defer close(wait)
-		conn, err := (&net.Dialer{}).Dial("tcp", ln.Addr().String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer conn.Close()
-
-		// Write 1 mb
-		_, _ = conn.Write(fastrand.Bytes(1 * 1 << 20))
-	}()
-
-	// Specifiy subtests to run
-	subTests := []struct {
-		name string
-		test func(net.Conn, int, *testing.T)
-	}{
-		{"TestSingleRead", testSingleRead},
-		{"TestMultipleReads", testMultipleReads},
-	}
-
-	// Configure rate limit
-	packetSize := int64(250)
-	pps := int64(4)
-	dataLen := 1000
-	stop := make(chan struct{})
-	defer close(stop)
-	Init(0, pps, packetSize, stop)
-	server := NewRLConn(<-serverChan)
-	defer server.Close()
-	// Run tests
-	for _, test := range subTests {
-		t.Run(test.name, func(t *testing.T) {
-			start := time.Now()
-			test.test(server, dataLen, t)
-			d := time.Since(start)
-
-			// It should have taken at least dataLen / (packetSize * packetsPerSecond)
-			// seconds.
-			if d.Seconds() < float64(dataLen)/float64(packetSize*pps) {
-				t.Fatalf("Transmission finished too soon. %v seconds.", d.Seconds())
-			}
-		})
-	}
-}
-
-// testSingleRead tests if a single rate-limited read works as expected.
-func testSingleRead(server net.Conn, dataLen int, t *testing.T) {
-	dataReceived := make([]byte, dataLen)
-
-	n, err := server.Read(dataReceived)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if n != dataLen {
-		t.Fatal("didn't receive enough data")
-	}
-}
-
-// testMultipleReads tests if multiple rate-limited read work as expected.
-func testMultipleReads(server net.Conn, dataLen int, t *testing.T) {
-	maxReadLen := 10
-
-	// Create slice to read into
-	data := make([]byte, dataLen)
-
-	readData := 0
-	for readData < dataLen {
-		// Randomly decide how much data to read during this iteration
-		toRead := fastrand.Intn(maxReadLen) + 1
-		if readData+toRead > dataLen {
-			toRead = dataLen - readData
-		}
-		// Read data
-		n, err := server.Read(data[readData : readData+toRead])
-		if err != nil {
-			t.Fatal(err)
-		}
-		readData += n
-	}
-}
-
-// testSingleWrite tests if a single rate-limited write works as expected.
-func testSingleWrite(client net.Conn, dataLen int, t *testing.T) {
-	// Create data to send.
-	data := fastrand.Bytes(dataLen)
-
-	// Write data
-	n, err := client.Write(data)
-	if err != nil {
-		t.Error(err)
-	}
-	if n != len(data) {
-		t.Error("Not all data was written")
-	}
-}
-
-// testMultipleWrites tests if a multiple rate-limited writes works as expected.
-func testMultipleWrites(client net.Conn, dataLen int, t *testing.T) {
-	maxWriteLen := 10
-
-	// Create data to send.
-	data := fastrand.Bytes(dataLen)
-
-	// Write data
-	writtenData := 0
-	for writtenData < dataLen {
-		// Randomly decide how much data to write during this iteration
-		toWrite := fastrand.Intn(maxWriteLen) + 1
-		if writtenData+toWrite > dataLen {
-			toWrite = dataLen - writtenData
-		}
-		// Write data
-		n, err := client.Write(data[writtenData : writtenData+toWrite])
-		if err != nil {
-			t.Error(err)
-		}
-		if n != toWrite {
-			t.Error("written data != toWrite")
-		}
-		writtenData += n
+	// Check if the read data is the same as the written one.
+	if bytes.Compare(readData, data) != 0 {
+		t.Error("Read data doesn't match written data")
 	}
 }
