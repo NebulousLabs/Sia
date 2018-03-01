@@ -89,7 +89,7 @@ func (uc *unfinishedUploadChunk) managedNotifyStandbyWorkers() {
 	// Copy the standby workers into a new slice and reset it since we can't
 	// hold the lock while calling the managed function.
 	uc.mu.Lock()
-	standbyWorkers := make([]*worker, 0, len(uc.workersStandby))
+	standbyWorkers := make([]*worker, len(uc.workersStandby))
 	copy(standbyWorkers, uc.workersStandby)
 	uc.workersStandby = uc.workersStandby[:0]
 	uc.mu.Unlock()
