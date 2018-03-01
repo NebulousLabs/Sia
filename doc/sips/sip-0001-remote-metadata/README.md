@@ -1,4 +1,4 @@
-# Store renter metadata remotely
+# SIP 1. Store renter metadata remotely
 
 Status: **draft**.
 
