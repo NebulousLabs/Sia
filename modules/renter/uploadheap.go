@@ -136,11 +136,18 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 			//
 			// TODO / NOTE: If we adjust the file to have a flexible encryption
 			// scheme, we'll need to adjust the overhead stuff too.
+			//
+			// TODO: Currently we request memory for all of the pieces as well
+			// as the minimum pieces, but we perhaps don't need to request all
+			// of that.
 			memoryNeeded:  f.pieceSize*uint64(f.erasureCode.NumPieces()+f.erasureCode.MinPieces()) + uint64(f.erasureCode.NumPieces()*crypto.TwofishOverhead),
 			minimumPieces: f.erasureCode.MinPieces(),
 			piecesNeeded:  f.erasureCode.NumPieces(),
-			pieceUsage:    make([]bool, f.erasureCode.NumPieces()),
-			unusedHosts:   make(map[string]struct{}),
+
+			physicalChunkData: make([][]byte, f.erasureCode.NumPieces()),
+
+			pieceUsage:  make([]bool, f.erasureCode.NumPieces()),
+			unusedHosts: make(map[string]struct{}),
 		}
 		// Every chunk can have a different set of unused hosts.
 		for host := range hosts {

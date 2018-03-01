@@ -5,7 +5,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 
 	"github.com/NebulousLabs/errors"
@@ -22,7 +21,7 @@ type uploadChunkID struct {
 type unfinishedUploadChunk struct {
 	// Information about the file. localPath may be the empty string if the file
 	// is known not to exist locally.
-	id         uploadChunkID
+	id uploadChunkID
 	localPath  string
 	renterFile *file
 
@@ -60,7 +59,7 @@ type unfinishedUploadChunk struct {
 	//	+ the worker should increment the number of pieces registered
 	// 	+ the worker should mark the piece usage for the piece it is uploading
 	//	+ the worker should decrement the number of workers remaining
-	//
+	//	
 	// When a worker completes an upload (success or failure):
 	//	+ the worker should decrement the number of pieces registered
 	//  + the worker should call for memory to be released
@@ -77,7 +76,7 @@ type unfinishedUploadChunk struct {
 	pieceUsage       []bool              // 'true' if a piece is either uploaded, or a worker is attempting to upload that piece.
 	piecesCompleted  int                 // number of pieces that have been fully uploaded.
 	piecesRegistered int                 // number of pieces that are being uploaded, but aren't finished yet (may fail).
-	released         bool                // whether this chunk has been released from the active chunks set.
+	released         bool               // whether this chunk has been released from the active chunks set.
 	unusedHosts      map[string]struct{} // hosts that aren't yet storing any pieces or performing any work.
 	workersRemaining int                 // number of inactive workers still able to upload a piece.
 	workersStandby   []*worker           // workers that can be used if other workers fail.
@@ -169,14 +168,41 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedUploadChunk) e
 // managedFetchAndRepairChunk will fetch the logical data for a chunk, create
 // the physical pieces for the chunk, and then distribute them.
 func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
+	// Calculate the amount of memory needed for erasure coding. This will need
+	// to be released if there's an error before erasure coding is complete.
+	erasureCodingMemory := chunk.renterFile.pieceSize * uint64(chunk.renterFile.erasureCode.MinPieces())
+
+	// Calculate the amount of memory to release due to already completed
+	// pieces. This memory gets released during encryption, but needs to be
+	// released if there's a failure before encryption happens.
+	var pieceCompletedMemory uint64
+	for i := 0; i < len(chunk.pieceUsage); i++ {
+		if chunk.pieceUsage[i] {
+			pieceCompletedMemory += chunk.renterFile.pieceSize + crypto.TwofishOverhead
+		}
+	}
+
 	// Ensure that memory is released and that the chunk is cleaned up properly
 	// after the chunk is distributed.
+	//
+	// Need to ensure the erasure coding memory is released as well as the
+	// physical chunk memory. Physical chunk memory is released by setting
+	// 'workersRemaining' to zero if the repair fails before being distributed
+	// to workers. Erasure coding memory is released manually if the repair
+	// fails before the erasure coding occurs.
 	defer r.managedCleanUpUploadChunk(chunk)
 
 	// Fetch the logical data for the chunk.
 	err := r.managedFetchLogicalChunkData(chunk)
 	if err != nil {
-		// Logical data is not available, nothing to do.
+		// Logical data is not available, cannot upload. Chunk will not be
+		// distributed to workers, therefore set workersRemaining equal to zero.
+		// The erasure coding memory has not been released yet, be sure to
+		// release that as well.
+		chunk.logicalChunkData = nil
+		chunk.workersRemaining = 0
+		r.memoryManager.Return(erasureCodingMemory+pieceCompletedMemory)
+		chunk.memoryReleased += erasureCodingMemory + pieceCompletedMemory
 		r.log.Debugln("Fetching logical data of a chunk failed:", err)
 		return
 	}
@@ -190,13 +216,18 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 	// That will also change the amount of memory we need to allocate, and the
 	// number of times we need to return memory.
 	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.Encode(chunk.logicalChunkData)
-	memoryFreed := uint64(len(chunk.logicalChunkData))
 	chunk.logicalChunkData = nil
-	r.memoryManager.Return(memoryFreed)
-	chunk.memoryReleased += memoryFreed
-	memoryFreed = 0
+	r.memoryManager.Return(erasureCodingMemory)
+	chunk.memoryReleased += erasureCodingMemory
 	if err != nil {
-		// Logical data is not available, nothing to do.
+		// Physical data is not available, cannot upload. Chunk will not be
+		// distributed to workers, therefore set workersRemaining equal to zero.
+		chunk.workersRemaining = 0
+		r.memoryManager.Return(pieceCompletedMemory)
+		chunk.memoryReleased += pieceCompletedMemory
+		for i := 0; i < len(chunk.physicalChunkData); i++ {
+			chunk.physicalChunkData[i] = nil
+		}
 		r.log.Debugln("Fetching physical data of a chunk failed:", err)
 		return
 	}
@@ -211,7 +242,6 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 	// any pieces that are not needed.
 	for i := 0; i < len(chunk.pieceUsage); i++ {
 		if chunk.pieceUsage[i] {
-			memoryFreed += uint64(len(chunk.physicalChunkData[i]) + crypto.TwofishOverhead)
 			chunk.physicalChunkData[i] = nil
 		} else {
 			// Encrypt the piece.
@@ -220,9 +250,9 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 		}
 	}
 	// Return the released memory.
-	if memoryFreed > 0 {
-		r.memoryManager.Return(memoryFreed)
-		chunk.memoryReleased += memoryFreed
+	if pieceCompletedMemory > 0 {
+		r.memoryManager.Return(pieceCompletedMemory)
+		chunk.memoryReleased += pieceCompletedMemory
 	}
 
 	// Distribute the chunk to the workers.
@@ -282,8 +312,8 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedUploadChunk) erro
 // from the map of active chunks in the chunk heap.
 func (r *Renter) managedCleanUpUploadChunk(uc *unfinishedUploadChunk) {
 	uc.mu.Lock()
-	memoryReleased := 0
 	piecesAvailable := 0
+	var memoryReleased uint64
 	// Release any unnecessary pieces, counting any pieces that are
 	// currently available.
 	for i := 0; i < len(uc.pieceUsage); i++ {
@@ -297,9 +327,10 @@ func (r *Renter) managedCleanUpUploadChunk(uc *unfinishedUploadChunk) {
 		// will prefer releasing later pieces, which improves computational
 		// complexity for erasure coding.
 		if piecesAvailable >= uc.workersRemaining {
-			uc.pieceUsage[i] = false
-			memoryReleased += len(uc.physicalChunkData[i])
+			memoryReleased += uc.renterFile.pieceSize + crypto.TwofishOverhead
 			uc.physicalChunkData[i] = nil
+			// Mark this piece as taken so that we don't double release memory.
+			uc.pieceUsage[i] = true
 		} else {
 			piecesAvailable++
 		}
@@ -314,8 +345,7 @@ func (r *Renter) managedCleanUpUploadChunk(uc *unfinishedUploadChunk) {
 		uc.released = true
 	}
 	uc.memoryReleased += uint64(memoryReleased)
-	memReleased := uc.memoryReleased
-	memNeeded := uc.memoryNeeded
+	totalMemoryReleased := uc.memoryReleased
 	uc.mu.Unlock()
 
 	// If there are pieces available, add the standby workers to collect them.
@@ -328,23 +358,16 @@ func (r *Renter) managedCleanUpUploadChunk(uc *unfinishedUploadChunk) {
 	}
 	// If required, return the memory to the renter.
 	if memoryReleased > 0 {
-		r.memoryManager.Return(uint64(memoryReleased))
+		r.memoryManager.Return(memoryReleased)
 	}
 	// If required, remove the chunk from the set of active chunks.
 	if chunkComplete && !released {
 		r.uploadHeap.mu.Lock()
-		// Sanity check the uploadChunkID.
-		if uc.id.fileUID == "" {
-			build.Critical("fileUID was not set properly")
-		}
-		if _, exists := r.uploadHeap.activeChunks[uc.id]; !exists {
-			build.Critical("missing entry for uploadChunkID")
-		}
 		delete(r.uploadHeap.activeChunks, uc.id)
 		r.uploadHeap.mu.Unlock()
 	}
 	// Sanity check - all memory should be released if the chunk is complete.
-	if chunkComplete && memReleased != memNeeded {
+	if chunkComplete && totalMemoryReleased != uc.memoryNeeded {
 		r.log.Critical("No workers remaining, but not all memory released:", uc.workersRemaining, uc.piecesRegistered, uc.memoryReleased, uc.memoryNeeded)
 	}
 }
