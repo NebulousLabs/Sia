@@ -140,9 +140,9 @@ type triggerLimitFile struct {
 	sync.Mutex
 }
 
-// createFile will return a file that will return an error if a write will put
+// CreateFile will return a file that will return an error if a write will put
 // the total throughput of the file over 1 MiB.
-func (dig *dependencyIncompleteGrow) createFile(s string) (modules.File, error) {
+func (dig *dependencyIncompleteGrow) CreateFile(s string) (modules.File, error) {
 	osFile, err := os.Create(s)
 	if err != nil {
 		return nil, err
@@ -345,7 +345,7 @@ type dependencyGrowNoFinalize struct {
 
 // disrupt will prevent the growStorageFolder operation from committing a
 // finalized growStorageFolder operation to the WAL.
-func (dependencyGrowNoFinalize) disrupt(s string) bool {
+func (*dependencyGrowNoFinalize) Disrupt(s string) bool {
 	if s == "incompleteGrowStorageFolder" {
 		return true
 	}
@@ -442,7 +442,7 @@ type dependencyLeaveWAL struct {
 }
 
 // disrupt will prevent the WAL file from being removed at shutdown.
-func (dlw *dependencyLeaveWAL) disrupt(s string) bool {
+func (dlw *dependencyLeaveWAL) Disrupt(s string) bool {
 	if s == "cleanWALFile" {
 		return true
 	}

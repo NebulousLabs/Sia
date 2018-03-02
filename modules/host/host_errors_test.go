@@ -17,7 +17,7 @@ type dependencyErrMkdirAll struct {
 	modules.ProductionDependencies
 }
 
-func (dependencyErrMkdirAll) mkdirAll(string, os.FileMode) error {
+func (*dependencyErrMkdirAll) MkdirAll(string, os.FileMode) error {
 	return mockErrMkdirAll
 }
 
@@ -57,7 +57,7 @@ type dependencyErrNewLogger struct {
 	modules.ProductionDependencies
 }
 
-func (dependencyErrNewLogger) newLogger(string) (*persist.Logger, error) {
+func (*dependencyErrNewLogger) NewLogger(string) (*persist.Logger, error) {
 	return nil, mockErrNewLogger
 }
 
@@ -97,7 +97,7 @@ type dependencyErrOpenDatabase struct {
 	modules.ProductionDependencies
 }
 
-func (dependencyErrOpenDatabase) openDatabase(persist.Metadata, string) (*persist.BoltDatabase, error) {
+func (*dependencyErrOpenDatabase) OpenDatabase(persist.Metadata, string) (*persist.BoltDatabase, error) {
 	return nil, mockErrOpenDatabase
 }
 
@@ -137,7 +137,7 @@ type dependencyErrLoadFile struct {
 	modules.ProductionDependencies
 }
 
-func (dependencyErrLoadFile) loadFile(persist.Metadata, interface{}, string) error {
+func (*dependencyErrLoadFile) LoadFile(persist.Metadata, interface{}, string) error {
 	return mockErrLoadFile
 }
 
@@ -177,7 +177,7 @@ type dependencyErrListen struct {
 	modules.ProductionDependencies
 }
 
-func (dependencyErrListen) listen(string, string) (net.Listener, error) {
+func (*dependencyErrListen) Listen(string, string) (net.Listener, error) {
 	return nil, mockErrListen
 }
 

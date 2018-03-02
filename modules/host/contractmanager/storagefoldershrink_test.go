@@ -706,7 +706,7 @@ type dependencyShrinkNoFinalize struct {
 
 // disrupt will prevent the growStorageFolder operation from committing a
 // finalized growStorageFolder operation to the WAL.
-func (dependencyShrinkNoFinalize) disrupt(s string) bool {
+func (*dependencyShrinkNoFinalize) Disrupt(s string) bool {
 	if s == "incompleteShrinkStorageFolder" {
 		return true
 	}

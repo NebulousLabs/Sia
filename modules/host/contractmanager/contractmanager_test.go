@@ -116,7 +116,7 @@ type dependencyErroredStartup struct {
 
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
-func (d *dependencyErroredStartup) disrupt(s string) bool {
+func (d *dependencyErroredStartup) Disrupt(s string) bool {
 	// Cause an error to be returned during startup.
 	if s == "erroredStartup" {
 		return true

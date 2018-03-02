@@ -13,7 +13,7 @@ type quitAfterLoadDeps struct {
 }
 
 // Send a disrupt signal to the quitAfterLoad codebreak.
-func (quitAfterLoadDeps) disrupt(s string) bool {
+func (*quitAfterLoadDeps) Disrupt(s string) bool {
 	if s == "quitAfterLoad" {
 		return true
 	}

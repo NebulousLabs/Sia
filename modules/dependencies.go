@@ -45,10 +45,6 @@ type (
 		// forcibly triggered. In production, disrupt will always return false.
 		Disrupt(string) bool
 
-		// Init performs any necessary initialization for the set of
-		// dependencies.
-		Init()
-
 		// Listen gives the host the ability to receive incoming connections.
 		Listen(string, string) (net.Listener, error)
 
@@ -113,7 +109,7 @@ type (
 	ProductionDependencies struct {
 		shouldInit bool
 		openFiles  map[string]int
-		mu         *sync.Mutex
+		mu         sync.Mutex
 	}
 
 	// ProductionFile is the implementation of the File interface that is used
@@ -134,6 +130,9 @@ func (pf *ProductionFile) Close() error {
 	}
 
 	pf.pd.mu.Lock()
+	if pf.pd.openFiles == nil {
+		pf.pd.openFiles = make(map[string]int)
+	}
 	v, exists := pf.pd.openFiles[pf.File.Name()]
 	if !exists {
 		panic("file not registered")
@@ -151,7 +150,7 @@ func (pf *ProductionFile) Close() error {
 
 // AtLeastOne will return a value that is equal to 1 if debugging is disabled.
 // If debugging is enabled, a higher value may be returned.
-func (ProductionDependencies) AtLeastOne() uint64 {
+func (*ProductionDependencies) AtLeastOne() uint64 {
 	if !build.DEBUG {
 		return 1
 	}
@@ -181,6 +180,9 @@ func (pd *ProductionDependencies) CreateFile(s string) (File, error) {
 	}
 
 	pd.mu.Lock()
+	if pd.openFiles == nil {
+		pd.openFiles = make(map[string]int)
+	}
 	v := pd.openFiles[s]
 	pd.openFiles[s] = v + 1
 	pd.mu.Unlock()
@@ -206,60 +208,47 @@ func (pd *ProductionDependencies) Destruct() {
 
 // DialTimeout creates a tcp connection to a certain address with the specified
 // timeout.
-func (ProductionDependencies) DialTimeout(addr NetAddress, timeout time.Duration) (net.Conn, error) {
+func (*ProductionDependencies) DialTimeout(addr NetAddress, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout("tcp", string(addr), timeout)
 }
 
 // Disrupt can be used to inject specific behavior into a module by overwriting
 // it using a custom dependency.
-func (ProductionDependencies) Disrupt(string) bool {
+func (*ProductionDependencies) Disrupt(string) bool {
 	return false
 }
 
-// Init will create the map and mutex
-func (pd *ProductionDependencies) Init() {
-	if !build.DEBUG {
-		return
-	}
-
-	if !pd.shouldInit {
-		pd.shouldInit = true
-		pd.openFiles = make(map[string]int)
-		pd.mu = new(sync.Mutex)
-	}
-}
-
 // Listen gives the host the ability to receive incoming connections.
-func (ProductionDependencies) Listen(s1, s2 string) (net.Listener, error) {
+func (*ProductionDependencies) Listen(s1, s2 string) (net.Listener, error) {
 	return net.Listen(s1, s2)
 }
 
 // LoadFile loads JSON encoded data from a file.
-func (ProductionDependencies) LoadFile(meta persist.Metadata, data interface{}, filename string) error {
+func (*ProductionDependencies) LoadFile(meta persist.Metadata, data interface{}, filename string) error {
 	return persist.LoadJSON(meta, data, filename)
 }
 
 // SaveFileSync writes JSON encoded data to a file and syncs the file to disk
 // afterwards.
-func (ProductionDependencies) SaveFileSync(meta persist.Metadata, data interface{}, filename string) error {
+func (*ProductionDependencies) SaveFileSync(meta persist.Metadata, data interface{}, filename string) error {
 	return persist.SaveJSON(meta, data, filename)
 }
 
 // MkdirAll gives the host the ability to create chains of folders within the
 // filesystem.
-func (ProductionDependencies) MkdirAll(s string, fm os.FileMode) error {
+func (*ProductionDependencies) MkdirAll(s string, fm os.FileMode) error {
 	return os.MkdirAll(s, fm)
 }
 
 // NewLogger creates a logger that the host can use to log messages and write
 // critical statements.
-func (ProductionDependencies) NewLogger(s string) (*persist.Logger, error) {
+func (*ProductionDependencies) NewLogger(s string) (*persist.Logger, error) {
 	return persist.NewFileLogger(s)
 }
 
 // OpenDatabase creates a database that the host can use to interact with large
 // volumes of persistent data.
-func (ProductionDependencies) OpenDatabase(m persist.Metadata, s string) (*persist.BoltDatabase, error) {
+func (*ProductionDependencies) OpenDatabase(m persist.Metadata, s string) (*persist.BoltDatabase, error) {
 	return persist.OpenDatabase(m, s)
 }
 
@@ -275,6 +264,9 @@ func (pd *ProductionDependencies) OpenFile(s string, i int, fm os.FileMode) (Fil
 	}
 
 	pd.mu.Lock()
+	if pd.openFiles == nil {
+		pd.openFiles = make(map[string]int)
+	}
 	v := pd.openFiles[s]
 	pd.openFiles[s] = v + 1
 	pd.mu.Unlock()
@@ -285,12 +277,12 @@ func (pd *ProductionDependencies) OpenFile(s string, i int, fm os.FileMode) (Fil
 }
 
 // RandRead fills the input bytes with random data.
-func (ProductionDependencies) RandRead(b []byte) (int, error) {
+func (*ProductionDependencies) RandRead(b []byte) (int, error) {
 	return fastrand.Reader.Read(b)
 }
 
 // ReadFile reads a file from the filesystem.
-func (ProductionDependencies) ReadFile(s string) ([]byte, error) {
+func (*ProductionDependencies) ReadFile(s string) ([]byte, error) {
 	return ioutil.ReadFile(s)
 }
 
@@ -301,6 +293,9 @@ func (pd *ProductionDependencies) RemoveFile(s string) error {
 	}
 
 	pd.mu.Lock()
+	if pd.openFiles == nil {
+		pd.openFiles = make(map[string]int)
+	}
 	v, exists := pd.openFiles[s]
 	pd.mu.Unlock()
 	if exists && v > 0 {
@@ -316,6 +311,9 @@ func (pd *ProductionDependencies) RenameFile(s1 string, s2 string) error {
 	}
 
 	pd.mu.Lock()
+	if pd.openFiles == nil {
+		pd.openFiles = make(map[string]int)
+	}
 	v1, exists1 := pd.openFiles[s1]
 	v2, exists2 := pd.openFiles[s2]
 	pd.mu.Unlock()
@@ -329,16 +327,16 @@ func (pd *ProductionDependencies) RenameFile(s1 string, s2 string) error {
 }
 
 // Sleep blocks the calling thread for a certain duration.
-func (ProductionDependencies) Sleep(d time.Duration) {
+func (*ProductionDependencies) Sleep(d time.Duration) {
 	time.Sleep(d)
 }
 
 // Symlink creates a symlink between a source and a destination file.
-func (ProductionDependencies) Symlink(s1, s2 string) error {
+func (*ProductionDependencies) Symlink(s1, s2 string) error {
 	return os.Symlink(s1, s2)
 }
 
 // WriteFile writes a file to the filesystem.
-func (ProductionDependencies) WriteFile(s string, b []byte, fm os.FileMode) error {
+func (*ProductionDependencies) WriteFile(s string, b []byte, fm os.FileMode) error {
 	return ioutil.WriteFile(s, b, fm)
 }

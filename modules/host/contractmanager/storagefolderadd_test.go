@@ -69,7 +69,7 @@ type limitFile struct {
 
 // createFile will return a file that will return an error if a write will put
 // the total throughput of the file over 1 MiB.
-func (dependencyLargeFolder) createFile(s string) (modules.File, error) {
+func (*dependencyLargeFolder) CreateFile(s string) (modules.File, error) {
 	osFile, err := os.Create(s)
 	if err != nil {
 		return nil, err
@@ -261,7 +261,7 @@ func (bf *blockedFile) Truncate(offset int64) error {
 // createFile will return a normal file to all callers except for
 // storageFolderOne, which will have calls to file.Write blocked until a signal
 // is given that the blocks may be released.
-func (d *dependencyBlockSFOne) createFile(s string) (modules.File, error) {
+func (d *dependencyBlockSFOne) CreateFile(s string) (modules.File, error) {
 	// If storageFolderOne, return a file that will not write until the signal
 	// is sent that writing is okay.
 	if strings.Contains(s, "storageFolderOne") {
@@ -504,7 +504,7 @@ type dependencyNoSyncLoop struct {
 
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
-func (dependencyNoSyncLoop) disrupt(s string) bool {
+func (*dependencyNoSyncLoop) Disrupt(s string) bool {
 	if s == "threadedSyncLoopStart" || s == "cleanWALFile" {
 		// Disrupt threadedSyncLoop. The sync loop will exit immediately
 		// instead of executing commits. Also disrupt the process that removes
@@ -658,7 +658,7 @@ type dependencySFAddNoFinish struct {
 
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
-func (d *dependencySFAddNoFinish) disrupt(s string) bool {
+func (d *dependencySFAddNoFinish) Disrupt(s string) bool {
 	if s == "storageFolderAddFinish" {
 		return true
 	}

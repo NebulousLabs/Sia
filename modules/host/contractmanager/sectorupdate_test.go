@@ -348,7 +348,7 @@ type dependencyNoSettingsSave struct {
 
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
-func (d *dependencyNoSettingsSave) disrupt(s string) bool {
+func (d *dependencyNoSettingsSave) Disrupt(s string) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -1656,7 +1656,7 @@ type failureProneFile struct {
 
 // createFile will return a file which will cause errors on Write calls if
 // "storageFolderOne" is in the filepath.
-func (d dependencyFailingWrites) createFile(s string) (modules.File, error) {
+func (d *dependencyFailingWrites) CreateFile(s string) (modules.File, error) {
 	osfile, err := os.Create(s)
 	if err != nil {
 		return nil, err

@@ -204,7 +204,7 @@ type disableScanLoopDeps struct {
 }
 
 // Send a disrupt signal to the quitAfterLoad codebreak.
-func (disableScanLoopDeps) disrupt(s string) bool {
+func (*disableScanLoopDeps) Disrupt(s string) bool {
 	if s == "disableScanLoop" {
 		return true
 	}

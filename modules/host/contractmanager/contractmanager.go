@@ -119,8 +119,6 @@ func newContractManager(dependencies modules.Dependencies, persistDir string) (*
 		persistDir:   persistDir,
 	}
 	cm.wal.cm = cm
-
-	dependencies.Init()
 	cm.tg.AfterStop(func() {
 		dependencies.Destruct()
 	})
