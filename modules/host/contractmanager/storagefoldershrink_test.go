@@ -701,7 +701,7 @@ func TestShrinkStorageFolderIncompleteWriteForce(t *testing.T) {
 // dependencyShrinkNoFinalize will not add a confirmation to the WAL that a
 // shrink storage folder operation has completed.
 type dependencyShrinkNoFinalize struct {
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // disrupt will prevent the growStorageFolder operation from committing a

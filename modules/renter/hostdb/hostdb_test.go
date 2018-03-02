@@ -62,12 +62,12 @@ func makeHostDBEntry() modules.HostDBEntry {
 // newHDBTester returns a tester object wrapping a HostDB and some extra
 // information for testing.
 func newHDBTester(name string) (*hdbTester, error) {
-	return newHDBTesterDeps(name, prodDependencies{})
+	return newHDBTesterDeps(name, &modules.ProductionDependencies{})
 }
 
 // newHDBTesterDeps returns a tester object wrapping a HostDB and some extra
 // information for testing, using the provided dependencies for the hostdb.
-func newHDBTesterDeps(name string, deps dependencies) (*hdbTester, error) {
+func newHDBTesterDeps(name string, deps modules.Dependencies) (*hdbTester, error) {
 	if testing.Short() {
 		panic("should not be calling newHDBTester during short tests")
 	}
@@ -200,7 +200,7 @@ func TestNew(t *testing.T) {
 
 // quitAfterLoadDeps will quit startup in newHostDB
 type disableScanLoopDeps struct {
-	prodDependencies
+	modules.ProductionDependencies
 }
 
 // Send a disrupt signal to the quitAfterLoad codebreak.
@@ -216,7 +216,7 @@ func TestRandomHosts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt, err := newHDBTesterDeps(t.Name(), disableScanLoopDeps{})
+	hdbt, err := newHDBTesterDeps(t.Name(), &disableScanLoopDeps{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,7 +420,7 @@ func TestUpdateHistoricInteractions(t *testing.T) {
 
 	// create a HostDB tester without scanloop to be able to manually increment
 	// the interactions without interference.
-	hdbt, err := newHDBTesterDeps(t.Name(), disableScanLoopDeps{})
+	hdbt, err := newHDBTesterDeps(t.Name(), &disableScanLoopDeps{})
 	if err != nil {
 		t.Fatal(err)
 	}

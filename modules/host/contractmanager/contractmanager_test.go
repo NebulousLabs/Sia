@@ -58,7 +58,7 @@ func newContractManagerTester(name string) (*contractManagerTester, error) {
 
 // newMockedContractManagerTester returns a contract manager tester that uses
 // the input dependencies instead of the production ones.
-func newMockedContractManagerTester(d dependencies, name string) (*contractManagerTester, error) {
+func newMockedContractManagerTester(d modules.Dependencies, name string) (*contractManagerTester, error) {
 	if testing.Short() {
 		panic("use of newContractManagerTester during short testing")
 	}
@@ -111,7 +111,7 @@ func TestNewContractManager(t *testing.T) {
 // dependencyErroredStartupis a mocked dependency that will cause the contract
 // manager to be returned with an error upon startup.
 type dependencyErroredStartup struct {
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as

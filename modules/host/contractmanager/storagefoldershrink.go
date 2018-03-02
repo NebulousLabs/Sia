@@ -85,7 +85,7 @@ func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint3
 
 	// Allow unclean shutdown to be simulated by returning before the state
 	// change gets committed.
-	if wal.cm.dependencies.disrupt("incompleteShrinkStorageFolder") {
+	if wal.cm.dependencies.Disrupt("incompleteShrinkStorageFolder") {
 		return nil
 	}
 

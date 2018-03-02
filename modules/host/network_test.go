@@ -16,7 +16,7 @@ import (
 // blockingPortForward will also cause managedClearPort to always return an
 // error.
 type blockingPortForward struct {
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // disrupt will cause the port forward call to block for 10 seconds, but still
@@ -42,7 +42,7 @@ func TestPortForwardBlocking(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ht, err := newMockHostTester(blockingPortForward{}, "TestPortForwardBlocking")
+	ht, err := newMockHostTester(&blockingPortForward{}, "TestPortForwardBlocking")
 	if err != nil {
 		t.Fatal(err)
 	}

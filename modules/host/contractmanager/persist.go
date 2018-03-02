@@ -59,7 +59,7 @@ func (cm *ContractManager) initSettings() error {
 // loadSettings will load the contract manager settings.
 func (cm *ContractManager) loadSettings() error {
 	var ss savedSettings
-	err := cm.dependencies.loadFile(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile))
+	err := cm.dependencies.LoadFile(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile))
 	if os.IsNotExist(err) {
 		// There is no settings file, this must be the first time that the
 		// contract manager has been run. Initialize with default settings.
@@ -76,13 +76,13 @@ func (cm *ContractManager) loadSettings() error {
 		sf.index = ss.StorageFolders[i].Index
 		sf.path = ss.StorageFolders[i].Path
 		sf.usage = ss.StorageFolders[i].Usage
-		sf.metadataFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
+		sf.metadataFile, err = cm.dependencies.OpenFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
 		if err != nil {
 			// Mark the folder as unavailable and log an error.
 			atomic.StoreUint64(&sf.atomicUnavailable, 1)
 			cm.log.Printf("ERROR: unable to open the %v sector metadata file: %v\n", sf.path, err)
 		}
-		sf.sectorFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
+		sf.sectorFile, err = cm.dependencies.OpenFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
 		if err != nil {
 			// Mark the folder as unavailable and log an error.
 			atomic.StoreUint64(&sf.atomicUnavailable, 1)

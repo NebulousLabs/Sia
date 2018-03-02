@@ -29,7 +29,7 @@ var (
 type HostDB struct {
 	// dependencies
 	cs         modules.ConsensusSet
-	deps       dependencies
+	deps       modules.Dependencies
 	gateway    modules.Gateway
 	log        *persist.Logger
 	mu         sync.RWMutex
@@ -64,13 +64,13 @@ func New(g modules.Gateway, cs modules.ConsensusSet, persistDir string) (*HostDB
 		return nil, errNilCS
 	}
 	// Create HostDB using production dependencies.
-	return newHostDB(g, cs, persistDir, prodDependencies{})
+	return newHostDB(g, cs, persistDir, &modules.ProductionDependencies{})
 }
 
 // newHostDB creates a HostDB using the provided dependencies. It loads the old
 // persistence data, spawns the HostDB's scanning threads, and subscribes it to
 // the consensusSet.
-func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, deps dependencies) (*HostDB, error) {
+func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, deps modules.Dependencies) (*HostDB, error) {
 	// Create the HostDB object.
 	hdb := &HostDB{
 		cs:         cs,
@@ -124,7 +124,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 
 	// Don't perform the remaining startup in the presence of a quitAfterLoad
 	// disruption.
-	if hdb.deps.disrupt("quitAfterLoad") {
+	if hdb.deps.Disrupt("quitAfterLoad") {
 		return hdb, nil
 	}
 
@@ -159,7 +159,7 @@ func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, de
 	// Spawn the scan loop during production, but allow it to be disrupted
 	// during testing. Primary reason is so that we can fill the hostdb with
 	// fake hosts and not have them marked as offline as the scanloop operates.
-	if !hdb.deps.disrupt("disableScanLoop") {
+	if !hdb.deps.Disrupt("disableScanLoop") {
 		go hdb.threadedScan()
 	}
 

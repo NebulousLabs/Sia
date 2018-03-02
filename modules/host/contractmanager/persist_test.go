@@ -15,7 +15,7 @@ import (
 // dependencyNoRecheck prevents the recheck loop from running in the contract
 // manager.
 type dependencyNoRecheck struct {
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // disrupt prevents the recheck loop from running in the contract manager.

@@ -101,13 +101,13 @@ func (ht *hostTester) initWallet() error {
 // extra initialization has been done, for example no blocks have been mined
 // and the wallet keys have not been created.
 func blankHostTester(name string) (*hostTester, error) {
-	return blankMockHostTester(productionDependencies{}, name)
+	return blankMockHostTester(&modules.ProductionDependencies{}, name)
 }
 
 // blankMockHostTester creates a host tester where the modules are created but no
 // extra initialization has been done, for example no blocks have been mined
 // and the wallet keys have not been created.
-func blankMockHostTester(d dependencies, name string) (*hostTester, error) {
+func blankMockHostTester(d modules.Dependencies, name string) (*hostTester, error) {
 	testdir := build.TempDir(modules.HostDir, name)
 
 	// Create the modules.
@@ -162,12 +162,12 @@ func blankMockHostTester(d dependencies, name string) (*hostTester, error) {
 // newHostTester creates a host tester with an initialized wallet and money in
 // that wallet.
 func newHostTester(name string) (*hostTester, error) {
-	return newMockHostTester(productionDependencies{}, name)
+	return newMockHostTester(&modules.ProductionDependencies{}, name)
 }
 
 // newMockHostTester creates a host tester with an initialized wallet and money
 // in that wallet, using the dependencies provided.
-func newMockHostTester(d dependencies, name string) (*hostTester, error) {
+func newMockHostTester(d modules.Dependencies, name string) (*hostTester, error) {
 	// Create a blank host tester.
 	ht, err := blankMockHostTester(d, name)
 	if err != nil {
@@ -285,7 +285,7 @@ func TestHostMultiClose(t *testing.T) {
 	// Set ht.host to something non-nil - nil was returned because startup was
 	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
 	// operation will fail.
-	ht.host, err = newHost(productionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(&modules.ProductionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,18 +1,20 @@
 package wallet
 
+import "github.com/NebulousLabs/Sia/modules"
+
 type (
 	// dependencyAcceptTxnSetFailed is a dependency used to cause a call to
 	// SendSiacoins and SendSiacoinsMulti to fail before AcceptTransactionSet
 	// is called
 	dependencySendSiacoinsInterrupted struct {
-		ProductionDependencies
+		modules.ProductionDependencies
 		f bool // indicates if the next call should fail
 	}
 
 	// dependencyDefragInterrupted is a dependency used to cause a defrag to
 	// fail before AcceptTransactionSet is called
 	dependencyDefragInterrupted struct {
-		ProductionDependencies
+		modules.ProductionDependencies
 		f bool // indicates if the next call should fail
 	}
 )

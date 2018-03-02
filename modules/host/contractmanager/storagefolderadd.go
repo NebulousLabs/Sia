@@ -65,11 +65,11 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 		// Remove any leftover files.
 		sectorLookupName := filepath.Join(usf.Path, metadataFile)
 		sectorHousingName := filepath.Join(usf.Path, sectorFile)
-		err := wal.cm.dependencies.removeFile(sectorLookupName)
+		err := wal.cm.dependencies.RemoveFile(sectorLookupName)
 		if err != nil {
 			wal.cm.log.Println("Unable to remove documented sector metadata lookup:", sectorLookupName, err)
 		}
-		err = wal.cm.dependencies.removeFile(sectorHousingName)
+		err = wal.cm.dependencies.RemoveFile(sectorHousingName)
 		if err != nil {
 			wal.cm.log.Println("Unable to remove documented sector housing:", sectorHousingName, err)
 		}
@@ -151,14 +151,14 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 
 		// Create the files that get used with the storage folder.
 		var err error
-		sf.metadataFile, err = wal.cm.dependencies.createFile(sectorLookupName)
+		sf.metadataFile, err = wal.cm.dependencies.CreateFile(sectorLookupName)
 		if err != nil {
 			return build.ExtendErr("could not create storage folder file", err)
 		}
-		sf.sectorFile, err = wal.cm.dependencies.createFile(sectorHousingName)
+		sf.sectorFile, err = wal.cm.dependencies.CreateFile(sectorHousingName)
 		if err != nil {
 			err = build.ComposeErrors(err, sf.metadataFile.Close())
-			err = build.ComposeErrors(err, wal.cm.dependencies.removeFile(sectorLookupName))
+			err = build.ComposeErrors(err, wal.cm.dependencies.RemoveFile(sectorLookupName))
 			return build.ExtendErr("could not create storage folder file", err)
 		}
 		// Establish the progress fields for the add operation in the storage
@@ -188,7 +188,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	<-syncChan
 
 	// Simulate a disk failure at this point.
-	if wal.cm.dependencies.disrupt("storageFolderAddFinish") {
+	if wal.cm.dependencies.Disrupt("storageFolderAddFinish") {
 		return nil
 	}
 
@@ -208,8 +208,8 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 			// Remove the leftover files from the failed operation.
 			err = build.ComposeErrors(err, sf.sectorFile.Close())
 			err = build.ComposeErrors(err, sf.metadataFile.Close())
-			err = build.ComposeErrors(err, wal.cm.dependencies.removeFile(sectorLookupName))
-			err = build.ComposeErrors(err, wal.cm.dependencies.removeFile(sectorHousingName))
+			err = build.ComposeErrors(err, wal.cm.dependencies.RemoveFile(sectorLookupName))
+			err = build.ComposeErrors(err, wal.cm.dependencies.RemoveFile(sectorHousingName))
 
 			// Signal in the WAL that the unfinished storage folder addition
 			// has failed.
@@ -267,7 +267,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// were added)
 
 	// Simulate power failure at this point for some testing scenarios.
-	if wal.cm.dependencies.disrupt("incompleteAddStorageFolder") {
+	if wal.cm.dependencies.Disrupt("incompleteAddStorageFolder") {
 		return nil
 	}
 
@@ -313,12 +313,12 @@ func (wal *writeAheadLog) commitAddStorageFolder(ssf savedStorageFolder) {
 	}
 
 	var err error
-	sf.metadataFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.path, metadataFile), os.O_RDWR, 0700)
+	sf.metadataFile, err = wal.cm.dependencies.OpenFile(filepath.Join(sf.path, metadataFile), os.O_RDWR, 0700)
 	if err != nil {
 		wal.cm.log.Println("Difficulties opening sector file for ", sf.path, ":", err)
 		return
 	}
-	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.path, sectorFile), os.O_RDWR, 0700)
+	sf.sectorFile, err = wal.cm.dependencies.OpenFile(filepath.Join(sf.path, sectorFile), os.O_RDWR, 0700)
 	if err != nil {
 		wal.cm.log.Println("Difficulties opening sector metadata file for", sf.path, ":", err)
 		sf.metadataFile.Close()

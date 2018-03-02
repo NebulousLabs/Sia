@@ -135,10 +135,10 @@ type Host struct {
 	atomicNormalErrors        uint64
 
 	// Dependencies.
-	cs     modules.ConsensusSet
-	tpool  modules.TransactionPool
-	wallet modules.Wallet
-	dependencies
+	cs           modules.ConsensusSet
+	tpool        modules.TransactionPool
+	wallet       modules.Wallet
+	dependencies modules.Dependencies
 	modules.StorageManager
 
 	// Host ACID fields - these fields need to be updated in serial, ACID
@@ -211,7 +211,7 @@ func (h *Host) checkUnlockHash() error {
 // mocked such that the dependencies can return unexpected errors or unique
 // behaviors during testing, enabling easier testing of the failure modes of
 // the Host.
-func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, listenerAddress string, persistDir string) (*Host, error) {
+func newHost(dependencies modules.Dependencies, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, listenerAddress string, persistDir string) (*Host, error) {
 	// Check that all the dependencies were provided.
 	if cs == nil {
 		return nil, errNilCS
@@ -244,14 +244,14 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 	}()
 
 	// Create the perist directory if it does not yet exist.
-	err = dependencies.mkdirAll(h.persistDir, 0700)
+	err = dependencies.MkdirAll(h.persistDir, 0700)
 	if err != nil {
 		return nil, err
 	}
 
 	// Initialize the logger, and set up the stop call that will close the
 	// logger.
-	h.log, err = dependencies.newLogger(filepath.Join(h.persistDir, logFile))
+	h.log, err = dependencies.NewLogger(filepath.Join(h.persistDir, logFile))
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 
 // New returns an initialized Host.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
-	return newHost(productionDependencies{}, cs, tpool, wallet, address, persistDir)
+	return newHost(&modules.ProductionDependencies{}, cs, tpool, wallet, address, persistDir)
 }
 
 // Close shuts down the host.

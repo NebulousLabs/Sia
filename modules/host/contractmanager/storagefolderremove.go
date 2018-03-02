@@ -35,11 +35,11 @@ func (wal *writeAheadLog) commitStorageFolderRemoval(sfr storageFolderRemoval) {
 	}
 
 	// Delete the files.
-	err := wal.cm.dependencies.removeFile(filepath.Join(sfr.Path, metadataFile))
+	err := wal.cm.dependencies.RemoveFile(filepath.Join(sfr.Path, metadataFile))
 	if err != nil {
 		wal.cm.log.Printf("Error: unable to remove metadata file as storage folder %v is removed\n", sfr.Path)
 	}
-	err = wal.cm.dependencies.removeFile(filepath.Join(sfr.Path, sectorFile))
+	err = wal.cm.dependencies.RemoveFile(filepath.Join(sfr.Path, sectorFile))
 	if err != nil {
 		wal.cm.log.Printf("Error: unable to reomve sector file as storage folder %v is removed\n", sfr.Path)
 	}

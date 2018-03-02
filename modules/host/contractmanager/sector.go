@@ -65,7 +65,7 @@ type (
 
 // readSector will read the sector in the file, starting from the provided
 // location.
-func readSector(f file, sectorIndex uint32) ([]byte, error) {
+func readSector(f modules.File, sectorIndex uint32) ([]byte, error) {
 	b := make([]byte, modules.SectorSize)
 	_, err := f.ReadAt(b, int64(uint64(sectorIndex)*modules.SectorSize))
 	if err != nil {
@@ -75,7 +75,7 @@ func readSector(f file, sectorIndex uint32) ([]byte, error) {
 }
 
 // readFullMetadata will read a full sector metadata file into memory.
-func readFullMetadata(f file, numSectors int) ([]byte, error) {
+func readFullMetadata(f modules.File, numSectors int) ([]byte, error) {
 	sectorLookupBytes := make([]byte, numSectors*sectorMetadataDiskSize)
 	_, err := f.ReadAt(sectorLookupBytes, 0)
 	if err != nil {
@@ -86,7 +86,7 @@ func readFullMetadata(f file, numSectors int) ([]byte, error) {
 
 // writeSector will write the given sector into the given file at the given
 // index.
-func writeSector(f file, sectorIndex uint32, data []byte) error {
+func writeSector(f modules.File, sectorIndex uint32, data []byte) error {
 	_, err := f.WriteAt(data, int64(uint64(sectorIndex)*modules.SectorSize))
 	if err != nil {
 		return build.ExtendErr("unable to write within provided file", err)
@@ -96,7 +96,7 @@ func writeSector(f file, sectorIndex uint32, data []byte) error {
 
 // writeSectorMetadata will take a sector update and write the related metadata
 // to disk.
-func writeSectorMetadata(f file, sectorIndex uint32, id sectorID, count uint16) error {
+func writeSectorMetadata(f modules.File, sectorIndex uint32, id sectorID, count uint16) error {
 	writeData := make([]byte, sectorMetadataDiskSize)
 	copy(writeData, id[:])
 	binary.LittleEndian.PutUint16(writeData[12:], count)

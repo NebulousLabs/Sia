@@ -122,7 +122,7 @@ func TestGrowStorageFolder(t *testing.T) {
 // dependencyIncompleteGrow will start to have disk failures after too much
 // data is written and also after 'triggered' ahs been set to true.
 type dependencyIncompleteGrow struct {
-	productionDependencies
+	modules.ProductionDependencies
 	triggered bool
 	threshold int
 	mu        sync.Mutex
@@ -142,7 +142,7 @@ type triggerLimitFile struct {
 
 // createFile will return a file that will return an error if a write will put
 // the total throughput of the file over 1 MiB.
-func (dig *dependencyIncompleteGrow) createFile(s string) (file, error) {
+func (dig *dependencyIncompleteGrow) createFile(s string) (modules.File, error) {
 	osFile, err := os.Create(s)
 	if err != nil {
 		return nil, err
@@ -340,7 +340,7 @@ func TestGrowStorageFolderIncompleteWrite(t *testing.T) {
 // dependencyGrowNoFinalize will not add a confirmation to the WAL that a
 // growStorageFolder operation has completed.
 type dependencyGrowNoFinalize struct {
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // disrupt will prevent the growStorageFolder operation from committing a
@@ -437,7 +437,7 @@ func TestGrowStorageFolderShutdownAfterWrite(t *testing.T) {
 // dependencyLeaveWAL will leave the WAL on disk during shutdown.
 type dependencyLeaveWAL struct {
 	mu sync.Mutex
-	productionDependencies
+	modules.ProductionDependencies
 	triggered bool
 }
 

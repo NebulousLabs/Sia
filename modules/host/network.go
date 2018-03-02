@@ -156,7 +156,7 @@ func (h *Host) threadedTrackConnectabilityStatus(closeChan chan struct{}) {
 // host established on the network.
 func (h *Host) initNetworking(address string) (err error) {
 	// Create the listener and setup the close procedures.
-	h.listener, err = h.dependencies.listen("tcp", address)
+	h.listener, err = h.dependencies.Listen("tcp", address)
 	if err != nil {
 		return err
 	}
