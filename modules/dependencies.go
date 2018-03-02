@@ -156,13 +156,9 @@ func (*ProductionDependencies) AtLeastOne() uint64 {
 	}
 
 	// Probabilistically return a number greater than one.
-	var val uint64
-	for {
+	val := uint64(1)
+	for fastrand.Intn(2) != 0 {
 		val++
-		coin := fastrand.Intn(2)
-		if coin == 0 {
-			break
-		}
 	}
 	return val
 }
