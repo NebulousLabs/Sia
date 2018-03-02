@@ -306,12 +306,9 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 	if !chainExtended {
 		return false, modules.ErrNonExtendingBlock
 	}
-	// Check if there are any subscribers
-	if len(cs.subscribers) > 0 {
-		// Send any changes to subscribers.
-		for i := 0; i < len(changes); i++ {
-			cs.updateSubscribers(changes[i])
-		}
+	// Send any changes to subscribers.
+	for i := 0; i < len(changes); i++ {
+		cs.updateSubscribers(changes[i])
 	}
 	return chainExtended, nil
 }
