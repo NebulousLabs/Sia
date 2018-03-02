@@ -138,7 +138,7 @@ func TestNewContractManagerErroredStartup(t *testing.T) {
 	testdir := build.TempDir(modules.ContractManagerDir, "TestNewContractManagerErroredStartup")
 	cmd := filepath.Join(testdir, modules.ContractManagerDir)
 	_, err := newContractManager(d, cmd)
-	if err.Error() != "startup disrupted" {
+	if err == nil || err.Error() != "startup disrupted" {
 		t.Fatal("expecting contract manager startup to be disrupted:", err)
 	}
 

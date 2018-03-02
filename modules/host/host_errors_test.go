@@ -119,8 +119,8 @@ func TestHostFailedOpenDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	ht.host, err = newHost(&dependencyErrOpenDatabase{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
-	if !strings.Contains(err.Error(), "simulated OpenDatabase failure") {
-		t.Fatal(err)
+	if err == nil || !strings.Contains(err.Error(), "simulated OpenDatabase failure") {
+		t.Fatal("Opening database should have failed", err)
 	}
 	// Set ht.host to something non-nil - nil was returned because startup was
 	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
