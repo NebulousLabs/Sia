@@ -351,18 +351,10 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		udc.staticWriteOffset = writeOffset
 		writeOffset += int64(udc.staticFetchLength)
 
-		// TODO: Currently only the first two chunks are given overdrive, on the
-		// assumption that even the slow hosts will be able to finish the third
-		// chunk before the fast hosts complete the first chunks. This does
-		// assume however (incorrectly) that the workers internally are already
-		// able to tell when a worker is going to be a big bottleneck when
-		// downloading. On later chunks, if the system is memory-bottlenecked,
-		// the slow hosts could end up hogging all of the memory and slowing the
-		// whole system down. Ideally the fix for that type of scenario would
-		// happen within the worker standby selection though.
-		if i < minChunk+1 || i+3 > maxChunk {
-			udc.staticOverdrive = params.overdrive
-		}
+		// TODO: Currently all chunks are given overdrive. This should probably
+		// be changed once the hostdb knows how to measure host speed/latency
+		// and once we can assign overdrive dynamically.
+		udc.staticOverdrive = params.overdrive
 
 		// Add this chunk to the chunk heap, and notify the download loop that
 		// there is work to do.
