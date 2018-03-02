@@ -43,6 +43,9 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	if reflect.DeepEqual(a, modules.Allowance{}) {
 		return c.managedCancelAllowance()
 	}
+	if reflect.DeepEqual(a, c.allowance) {
+		return nil
+	}
 
 	// sanity checks
 	if a.Hosts == 0 {

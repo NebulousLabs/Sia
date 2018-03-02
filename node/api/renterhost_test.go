@@ -51,6 +51,7 @@ func TestHostObligationAcceptingContracts(t *testing.T) {
 	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
 	allowanceValues.Set("hosts", "1")
 	allowanceValues.Set("period", "10")
+	allowanceValues.Set("renewwindow", "5")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -184,6 +185,7 @@ func TestRenterLocalRepair(t *testing.T) {
 	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
 	allowanceValues.Set("hosts", "2")
 	allowanceValues.Set("period", "10")
+	allowanceValues.Set("renewwindow", "5")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -441,6 +443,7 @@ func TestRemoteFileRepair(t *testing.T) {
 	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
 	allowanceValues.Set("hosts", "2")
 	allowanceValues.Set("period", "10")
+	allowanceValues.Set("renewwindow", "5")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -692,9 +695,12 @@ func TestHostAndRentVanilla(t *testing.T) {
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
 	testPeriod := "20"
+	renewWindow := "10"
 	testPeriodInt := 20
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
+	allowanceValues.Set("renewwindow", renewWindow)
+	allowanceValues.Set("hosts", fmt.Sprint(recommendedHosts))
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -1225,6 +1231,8 @@ func TestRenterUploadDownload(t *testing.T) {
 	testPeriod := "10"
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
+	allowanceValues.Set("renewwindow", testRenewWindow)
+	allowanceValues.Set("hosts", fmt.Sprint(recommendedHosts))
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -1367,6 +1375,8 @@ func TestRenterCancelAllowance(t *testing.T) {
 	testPeriod := "20"
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
+	allowanceValues.Set("renewwindow", testRenewWindow)
+	allowanceValues.Set("hosts", fmt.Sprint(recommendedHosts))
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -1463,6 +1473,8 @@ func TestRenterParallelDelete(t *testing.T) {
 	testPeriod := "10"
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
+	allowanceValues.Set("renewwindow", testRenewWindow)
+	allowanceValues.Set("hosts", fmt.Sprint(recommendedHosts))
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -1585,6 +1597,8 @@ func TestRenterRenew(t *testing.T) {
 	testPeriod := 10
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", strconv.Itoa(testPeriod))
+	allowanceValues.Set("renewwindow", strconv.Itoa(testPeriod/2))
+	allowanceValues.Set("hosts", fmt.Sprint(recommendedHosts))
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -1824,6 +1838,8 @@ func TestHostAndRentReload(t *testing.T) {
 	testPeriod := "10"
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", testPeriod)
+	allowanceValues.Set("renewwindow", testRenewWindow)
+	allowanceValues.Set("hosts", fmt.Sprint(recommendedHosts))
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -2134,6 +2150,7 @@ func TestRedundancyReporting(t *testing.T) {
 	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
 	allowanceValues.Set("hosts", "2")
 	allowanceValues.Set("period", "10")
+	allowanceValues.Set("renewwindow", "5")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -2334,6 +2351,7 @@ func TestUploadedBytesReporting(t *testing.T) {
 	allowanceValues.Set("funds", "50000000000000000000000000000") // 50k SC
 	allowanceValues.Set("hosts", "2")
 	allowanceValues.Set("period", "10")
+	allowanceValues.Set("renewwindow", "5")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)

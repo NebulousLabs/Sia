@@ -27,6 +27,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/ratelimit"
 
 	"github.com/NebulousLabs/threadgroup"
 )
@@ -274,10 +275,16 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 
 // SetSettings will update the settings for the renter.
 func (r *Renter) SetSettings(s modules.RenterSettings) error {
+	// Set allowance.
 	err := r.hostContractor.SetAllowance(s.Allowance)
 	if err != nil {
 		return err
 	}
+	// Set bandwidth limits.
+	if s.DownloadSpeed < 0 || s.UploadSpeed < 0 {
+		return errors.New("download/upload rate limit can't be below 0")
+	}
+	ratelimit.SetLimits(s.DownloadSpeed, s.UploadSpeed, s.PacketSize)
 
 	r.managedUpdateWorkerPool()
 	return nil
