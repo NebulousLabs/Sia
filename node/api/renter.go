@@ -180,7 +180,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 
 	// Scan the allowance amount. (optional parameter)
 	if f := req.FormValue("funds"); f != "" {
-		funds, ok := scanAmount(req.FormValue("funds"))
+		funds, ok := scanAmount(f)
 		if !ok {
 			WriteError(w, Error{"unable to parse funds"}, http.StatusBadRequest)
 			return
