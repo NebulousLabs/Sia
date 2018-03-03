@@ -6,10 +6,13 @@ os:
 go:
   - 1.9
 
+env:
+  - GOBIN=$GOPATH/bin
+
 install:
   - make dependencies
-  - test -z "$(go fmt ./...)"
-  - glyphcheck ./...
+  - test -z "$(go fmt $(go list ./... | grep -v vendor))"
+  - glyphcheck $(go list ./... | grep -v vendor)
   - make dev
 
 script: make test && make test-long && make cover && make bench

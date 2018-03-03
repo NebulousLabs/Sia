@@ -5,32 +5,12 @@ all: release-std
 # dependencies installs all of the dependencies that are required for building
 # Sia.
 dependencies:
-	# Consensus Dependencies
-	go get -u github.com/NebulousLabs/demotemutex
-	go get -u github.com/NebulousLabs/fastrand
-	go get -u github.com/NebulousLabs/merkletree
-	go get -u github.com/NebulousLabs/bolt
-	go get -u golang.org/x/crypto/blake2b
-	go get -u golang.org/x/crypto/ed25519
-	# Module + Daemon Dependencies
-	go get -u github.com/NebulousLabs/entropy-mnemonics
-	go get -u github.com/NebulousLabs/errors
-	go get -u github.com/NebulousLabs/go-upnp
-	go get -u github.com/NebulousLabs/threadgroup
-	go get -u github.com/NebulousLabs/writeaheadlog
-	go get -u github.com/klauspost/reedsolomon
-	go get -u github.com/julienschmidt/httprouter
-	go get -u github.com/inconshreveable/go-update
-	go get -u github.com/kardianos/osext
-	go get -u github.com/inconshreveable/mousetrap
-	# Frontend Dependencies
-	go get -u golang.org/x/crypto/ssh/terminal
-	go get -u github.com/spf13/cobra/...
-	# Developer Dependencies
-	go install -race std
 	go get -u github.com/client9/misspell/cmd/misspell
 	go get -u github.com/golang/lint/golint
 	go get -u github.com/NebulousLabs/glyphcheck
+	go get -u github.com/golang/dep/cmd/dep
+	go install -race std
+	dep ensure && dep prune
 
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
