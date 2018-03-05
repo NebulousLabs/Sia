@@ -142,8 +142,8 @@ type (
 	// A download is a file download that has been queued by the renter.
 	download struct {
 		// Data progress variables.
-		atomicDataReceived        uint64 // Incremented as data completes, will stop at 100% file progress.
-		atomicTotalDataTransfered uint64 // Incremented as data arrives, includes overdrive, contract negotiation, etc.
+		atomicDataReceived         uint64 // Incremented as data completes, will stop at 100% file progress.
+		atomicTotalDataTransferred uint64 // Incremented as data arrives, includes overdrive, contract negotiation, etc.
 
 		// Other progress variables.
 		chunksRemaining uint64        // Number of chunks whose downloads are incomplete.
@@ -476,11 +476,11 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 			Offset:          d.staticOffset,
 			SiaPath:         d.staticSiaPath,
 
-			Completed:           d.staticComplete(),
-			EndTime:             d.endTime,
-			Received:            atomic.LoadUint64(&d.atomicDataReceived),
-			StartTime:           d.staticStartTime,
-			TotalDataTransfered: atomic.LoadUint64(&d.atomicTotalDataTransfered),
+			Completed:            d.staticComplete(),
+			EndTime:              d.endTime,
+			Received:             atomic.LoadUint64(&d.atomicDataReceived),
+			StartTime:            d.staticStartTime,
+			TotalDataTransferred: atomic.LoadUint64(&d.atomicTotalDataTransferred),
 		}
 		// Release download lock before calling d.Err(), which will acquire the
 		// lock. The error needs to be checked separately because we need to

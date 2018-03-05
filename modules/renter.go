@@ -61,12 +61,12 @@ type DownloadInfo struct {
 	Offset          uint64 `json:"offset"`          // The offset within the siafile requested for the download.
 	SiaPath         string `json:"siapath"`         // The siapath of the file used for the download.
 
-	Completed           bool      `json:"completed"`           // Whether or not the download has completed.
-	EndTime             time.Time `json:"endtime"`             // The time when the download fully completed.
-	Error               string    `json:"error"`               // Will be the empty string unless there was an error.
-	Received            uint64    `json:"received"`            // Amount of data confirmed and decoded.
-	StartTime           time.Time `json:"starttime"`           // The time when the download was started.
-	TotalDataTransfered uint64    `json:"totaldatatransfered"` // Total amount of data transfered, including negotiation, etc.
+	Completed            bool      `json:"completed"`            // Whether or not the download has completed.
+	EndTime              time.Time `json:"endtime"`              // The time when the download fully completed.
+	Error                string    `json:"error"`                // Will be the empty string unless there was an error.
+	Received             uint64    `json:"received"`             // Amount of data confirmed and decoded.
+	StartTime            time.Time `json:"starttime"`            // The time when the download was started.
+	TotalDataTransferred uint64    `json:"totaldatatransferred"` // Total amount of data transferred, including negotiation, etc.
 }
 
 // FileUploadParams contains the information used by the Renter to upload a
