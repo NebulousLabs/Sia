@@ -43,7 +43,7 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 	// in. Perhaps even include the data from creating the downloader and other
 	// data sent to and received from the host (like signatures) that aren't
 	// actually payload data.
-	atomic.AddUint64(&udc.download.atomicTotalDataTransfered, udc.staticPieceSize)
+	atomic.AddUint64(&udc.download.atomicTotalDataTransferred, udc.staticPieceSize)
 
 	// Mark the piece as completed. Perform chunk recovery if we newly have
 	// enough pieces to do so. Chunk recovery is an expensive operation that
