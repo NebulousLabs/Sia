@@ -12,7 +12,7 @@ import (
 
 // WalletAddressGet requests a new address from the /wallet/address endpoint
 func (c *Client) WalletAddressGet() (wag api.WalletAddressGET, err error) {
-	err = c.Get("/wallet/address", &wag)
+	err = c.get("/wallet/address", &wag)
 	return
 }
 
@@ -22,13 +22,13 @@ func (c *Client) WalletInitPost(password string, force bool) (wip api.WalletInit
 	values := url.Values{}
 	values.Set("encryptionpassword", password)
 	values.Set("force", strconv.FormatBool(force))
-	err = c.Post("/wallet/init", values.Encode(), &wip)
+	err = c.post("/wallet/init", values.Encode(), &wip)
 	return
 }
 
 // WalletGet requests the /wallet api resource
 func (c *Client) WalletGet() (wg api.WalletGET, err error) {
-	err = c.Get("/wallet", &wg)
+	err = c.get("/wallet", &wg)
 	return
 }
 
@@ -41,7 +41,7 @@ func (c *Client) WalletSiacoinsMultiPost(outputs []types.SiacoinOutput) (wsp api
 		return api.WalletSiacoinsPOST{}, err
 	}
 	values.Set("outputs", string(marshaledOutputs))
-	err = c.Post("/wallet/siacoins", values.Encode(), &wsp)
+	err = c.post("/wallet/siacoins", values.Encode(), &wsp)
 	return
 }
 
@@ -51,14 +51,14 @@ func (c *Client) WalletSiacoinsPost(amount types.Currency, destination types.Unl
 	values := url.Values{}
 	values.Set("amount", amount.String())
 	values.Set("destination", destination.String())
-	err = c.Post("wallet/siacoins", values.Encode(), &wsp)
+	err = c.post("wallet/siacoins", values.Encode(), &wsp)
 	return
 }
 
 // WalletTransactionsGet requests the/wallet/transactions api resource for a
 // certain startheight and endheight
 func (c *Client) WalletTransactionsGet(startHeight types.BlockHeight, endHeight types.BlockHeight) (wtg api.WalletTransactionsGET, err error) {
-	err = c.Get(fmt.Sprintf("/wallet/transactions?startheight=%v&endheight=%v",
+	err = c.get(fmt.Sprintf("/wallet/transactions?startheight=%v&endheight=%v",
 		startHeight, endHeight), &wtg)
 	return
 }
@@ -68,6 +68,6 @@ func (c *Client) WalletTransactionsGet(startHeight types.BlockHeight, endHeight 
 func (c *Client) WalletUnlockPost(password string) (err error) {
 	values := url.Values{}
 	values.Set("encryptionpassword", password)
-	err = c.Post("/wallet/unlock", values.Encode(), nil)
+	err = c.post("/wallet/unlock", values.Encode(), nil)
 	return
 }

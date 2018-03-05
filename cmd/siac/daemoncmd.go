@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/spf13/cobra"
 )
 
@@ -42,20 +43,16 @@ type updateInfo struct {
 	Version   string `json:"version"`
 }
 
-type daemonVersion struct {
-	Version string
-}
-
 // version prints the version of siac and siad.
 func versioncmd() {
 	fmt.Println("Sia Client v" + build.Version)
-	var versioninfo daemonVersion
-	err := getAPI("/daemon/version", &versioninfo)
+	var dvg api.DaemonVersionGet
+	err := getAPI("/daemon/version", &dvg)
 	if err != nil {
 		fmt.Println("Could not get daemon version:", err)
 		return
 	}
-	fmt.Println("Sia Daemon v" + versioninfo.Version)
+	fmt.Println("Sia Daemon v" + dvg.Version)
 }
 
 // stopcmd is the handler for the command `siac stop`.
