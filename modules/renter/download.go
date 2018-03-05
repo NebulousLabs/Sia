@@ -143,7 +143,7 @@ type (
 	download struct {
 		// Data progress variables.
 		atomicDataReceived        uint64 // Incremented as data completes, will stop at 100% file progress.
-		atomicTotalDataTransfered uint64 // Incremented as data arrives, includes overdrive, contract negotiation, etc.
+		atomicTotalDataTransferred uint64 // Incremented as data arrives, includes overdrive, contract negotiation, etc.
 
 		// Other progress variables.
 		chunksRemaining uint64        // Number of chunks whose downloads are incomplete.
@@ -480,7 +480,7 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 			EndTime:             d.endTime,
 			Received:            atomic.LoadUint64(&d.atomicDataReceived),
 			StartTime:           d.staticStartTime,
-			TotalDataTransfered: atomic.LoadUint64(&d.atomicTotalDataTransfered),
+			TotalDataTransferred: atomic.LoadUint64(&d.atomicTotalDataTransferred),
 		}
 		// Release download lock before calling d.Err(), which will acquire the
 		// lock. The error needs to be checked separately because we need to
