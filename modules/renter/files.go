@@ -134,11 +134,12 @@ func (f *file) uploadProgress() float64 {
 // becomes available when this redundancy is >= 1. Assumes that every piece is
 // unique within a file contract. -1 is returned if the file has size 0. It
 // takes one argument, a map of offline contracts for this file.
-func (f *file) redundancy(isOffline func(types.FileContractID) bool) float64 {
+func (f *file) redundancy(isOffline func(types.FileContractID) bool, goodForRenew func(types.FileContractID) bool) float64 {
 	if f.size == 0 {
 		return -1
 	}
 	piecesPerChunk := make([]int, f.numChunks())
+	piecesPerChunkNoRenew := make([]int, f.numChunks())
 	// If the file has non-0 size then the number of chunks should also be
 	// non-0. Therefore the f.size == 0 conditional block above must appear
 	// before this check.
@@ -151,17 +152,41 @@ func (f *file) redundancy(isOffline func(types.FileContractID) bool) float64 {
 		if isOffline(fc.ID) {
 			continue
 		}
+		gfr := goodForRenew(fc.ID)
 		for _, p := range fc.Pieces {
-			piecesPerChunk[p.Chunk]++
+			if gfr {
+				piecesPerChunk[p.Chunk]++
+			}
+			piecesPerChunkNoRenew[p.Chunk]++
 		}
 	}
+	// Find the chunk with the least finished pieces counting only pieces of
+	// contracts that are goodForRenew.
 	minPieces := piecesPerChunk[0]
 	for _, numPieces := range piecesPerChunk {
 		if numPieces < minPieces {
 			minPieces = numPieces
 		}
 	}
-	return float64(minPieces) / float64(f.erasureCode.MinPieces())
+	// Find the chunk with the least finished pieces including pieces from
+	// contracts that are not good for renewal.
+	minPiecesNoRenew := piecesPerChunkNoRenew[0]
+	for _, numPieces := range piecesPerChunkNoRenew {
+		if numPieces < minPiecesNoRenew {
+			minPiecesNoRenew = numPieces
+		}
+	}
+	// If the redundancy is smaller than 1x we return the redundancy that
+	// includes contracts that are not good for renewal. The reason for this is
+	// a better user experience. If the renter operates correctly, redundancy
+	// should never go above numPieces / minPieces and redundancyNoRenew should
+	// never go below 1.
+	redundancy := float64(minPieces) / float64(f.erasureCode.MinPieces())
+	redundancyNoRenew := float64(minPiecesNoRenew) / float64(f.erasureCode.MinPieces())
+	if redundancy < 1 {
+		return redundancyNoRenew
+	}
+	return redundancy
 }
 
 // expiration returns the lowest height at which any of the file's contracts
@@ -239,6 +264,11 @@ func (r *Renter) FileList() []modules.FileInfo {
 		offline := r.hostContractor.IsOffline(id)
 		return offline
 	}
+	goodForRenew := func(id types.FileContractID) bool {
+		id = r.hostContractor.ResolveID(id)
+		cu, ok := r.hostContractor.ContractUtility(id)
+		return ok && cu.GoodForRenew
+	}
 
 	var fileList []modules.FileInfo
 	for _, f := range files {
@@ -256,7 +286,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 			Filesize:       f.size,
 			Renewing:       renewing,
 			Available:      f.available(isOffline),
-			Redundancy:     f.redundancy(isOffline),
+			Redundancy:     f.redundancy(isOffline, goodForRenew),
 			UploadedBytes:  f.uploadedBytes(),
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),

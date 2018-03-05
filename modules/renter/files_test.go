@@ -112,6 +112,9 @@ func TestFileRedundancy(t *testing.T) {
 	neverOffline := func(types.FileContractID) bool {
 		return false
 	}
+	alwaysRenewable := func(types.FileContractID) bool {
+		return true
+	}
 	for _, nData := range nDatas {
 		rsc, _ := NewRSCode(nData, 10)
 		f := &file{
@@ -120,9 +123,8 @@ func TestFileRedundancy(t *testing.T) {
 			contracts:   make(map[types.FileContractID]fileContract),
 			erasureCode: rsc,
 		}
-
 		// Test that an empty file has 0 redundancy.
-		if r := f.redundancy(neverOffline); r != 0 {
+		if r := f.redundancy(neverOffline, alwaysRenewable); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
 		}
 		// Test that a file with 1 filecontract that has a piece for every chunk but
@@ -138,7 +140,7 @@ func TestFileRedundancy(t *testing.T) {
 			fc.Pieces = append(fc.Pieces, pd)
 		}
 		f.contracts[fc.ID] = fc
-		if r := f.redundancy(neverOffline); r != 0 {
+		if r := f.redundancy(neverOffline, alwaysRenewable); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
 		}
 		// Test that adding another filecontract with a piece for every chunk but one
@@ -154,7 +156,7 @@ func TestFileRedundancy(t *testing.T) {
 			fc.Pieces = append(fc.Pieces, pd)
 		}
 		f.contracts[fc.ID] = fc
-		if r := f.redundancy(neverOffline); r != 0 {
+		if r := f.redundancy(neverOffline, alwaysRenewable); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
 		}
 		// Test that adding a file contract with a piece for the missing chunk
@@ -170,7 +172,7 @@ func TestFileRedundancy(t *testing.T) {
 		f.contracts[fc.ID] = fc
 		// 1.0 / MinPieces because the chunk with the least number of pieces has 1 piece.
 		expectedR := 1.0 / float64(f.erasureCode.MinPieces())
-		if r := f.redundancy(neverOffline); r != expectedR {
+		if r := f.redundancy(neverOffline, alwaysRenewable); r != expectedR {
 			t.Errorf("expected %f redundancy, got %f", expectedR, r)
 		}
 		// Test that adding a file contract that has erasureCode.MinPieces() pieces
@@ -189,7 +191,7 @@ func TestFileRedundancy(t *testing.T) {
 		f.contracts[fc.ID] = fc
 		// 1+MinPieces / MinPieces because the chunk with the least number of pieces has 1+MinPieces pieces.
 		expectedR = float64(1+f.erasureCode.MinPieces()) / float64(f.erasureCode.MinPieces())
-		if r := f.redundancy(neverOffline); r != expectedR {
+		if r := f.redundancy(neverOffline, alwaysRenewable); r != expectedR {
 			t.Errorf("expected %f redundancy, got %f", expectedR, r)
 		}
 
@@ -209,7 +211,7 @@ func TestFileRedundancy(t *testing.T) {
 		specificOffline := func(fcid types.FileContractID) bool {
 			return fcid == fc.ID
 		}
-		if r := f.redundancy(specificOffline); r != expectedR {
+		if r := f.redundancy(specificOffline, alwaysRenewable); r != expectedR {
 			t.Errorf("expected redundancy to ignore offline file contracts, wanted %f got %f", expectedR, r)
 		}
 	}
