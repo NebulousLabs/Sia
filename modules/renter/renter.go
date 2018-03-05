@@ -164,7 +164,7 @@ type Renter struct {
 	// accessed in isolation.
 	downloadHeapMu sync.Mutex         // Used to protect the downloadHeap.
 	downloadHeap   *downloadChunkHeap // A heap of priority-sorted chunks to download.
-	newDownloads   chan struct{}      // Used to notify download loop that new downlaods are available.
+	newDownloads   chan struct{}      // Used to notify download loop that new downloads are available.
 
 	// Download history. The history list has its own mutex because it is always
 	// accessed in isolation.

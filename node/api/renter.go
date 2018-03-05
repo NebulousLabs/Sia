@@ -158,7 +158,7 @@ type (
 		Error               string    `json:"error"`               // Will be the empty string unless there was an error.
 		Received            uint64    `json:"received"`            // Amount of data confirmed and decoded.
 		StartTime           time.Time `json:"starttime"`           // The time when the download was started.
-		TotalDataTransfered uint64    `json:"totaldatatransfered"` // The total amount of data transfered, including negotiation, overdrive etc.
+		TotalDataTransfered uint64    `json:"totaldatatransfered"` // The total amount of data transferred, including negotiation, overdrive etc.
 	}
 )
 
