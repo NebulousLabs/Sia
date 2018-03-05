@@ -1,8 +1,5 @@
 package api
 
-// TODO: When setting renter settings, leave empty values unchanged instead of
-// zeroing them out.
-
 import (
 	"fmt"
 	"net/http"
@@ -178,62 +175,81 @@ func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ htt
 
 // renterHandlerPOST handles the API call to set the Renter's settings.
 func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// Scan the allowance amount.
-	funds, ok := scanAmount(req.FormValue("funds"))
-	if !ok {
-		WriteError(w, Error{"unable to parse funds"}, http.StatusBadRequest)
-		return
-	}
+	// Get the existing settings
+	settings := api.renter.Settings()
 
+	// Scan the allowance amount. (optional parameter)
+	if f := req.FormValue("funds"); f != "" {
+		funds, ok := scanAmount(f)
+		if !ok {
+			WriteError(w, Error{"unable to parse funds"}, http.StatusBadRequest)
+			return
+		}
+		settings.Allowance.Funds = funds
+	}
 	// Scan the number of hosts to use. (optional parameter)
-	var hosts uint64
-	if req.FormValue("hosts") != "" {
-		_, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
-		if err != nil {
+	if h := req.FormValue("hosts"); h != "" {
+		var hosts uint64
+		if _, err := fmt.Sscan(h, &hosts); err != nil {
 			WriteError(w, Error{"unable to parse hosts: " + err.Error()}, http.StatusBadRequest)
 			return
-		}
-		if hosts != 0 && hosts < requiredHosts {
+		} else if hosts != 0 && hosts < requiredHosts {
 			WriteError(w, Error{fmt.Sprintf("insufficient number of hosts, need at least %v but have %v", recommendedHosts, hosts)}, http.StatusBadRequest)
+		} else {
+			settings.Allowance.Hosts = hosts
+		}
+	}
+	// Scan the period. (optional parameter)
+	if p := req.FormValue("period"); p != "" {
+		var period types.BlockHeight
+		if _, err := fmt.Sscan(p, &period); err != nil {
+			WriteError(w, Error{"unable to parse period: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
-	} else {
-		hosts = recommendedHosts
+		settings.Allowance.Period = types.BlockHeight(period)
 	}
-
-	// Scan the period.
-	var period types.BlockHeight
-	_, err := fmt.Sscan(req.FormValue("period"), &period)
-	if err != nil {
-		WriteError(w, Error{"unable to parse period: " + err.Error()}, http.StatusBadRequest)
-		return
-	}
-
 	// Scan the renew window. (optional parameter)
-	var renewWindow types.BlockHeight
-	if req.FormValue("renewwindow") != "" {
-		_, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
-		if err != nil {
+	if rw := req.FormValue("renewwindow"); rw != "" {
+		var renewWindow types.BlockHeight
+		if _, err := fmt.Sscan(rw, &renewWindow); err != nil {
 			WriteError(w, Error{"unable to parse renewwindow: " + err.Error()}, http.StatusBadRequest)
 			return
-		}
-		if renewWindow != 0 && renewWindow < requiredRenewWindow {
+		} else if renewWindow != 0 && types.BlockHeight(renewWindow) < requiredRenewWindow {
 			WriteError(w, Error{fmt.Sprintf("renew window is too small, must be at least %v blocks but have %v blocks", requiredRenewWindow, renewWindow)}, http.StatusBadRequest)
 			return
+		} else {
+			settings.Allowance.RenewWindow = types.BlockHeight(renewWindow)
 		}
-	} else {
-		renewWindow = period / 2
 	}
-
+	// Scan the packet size. (optional parameter)
+	if p := req.FormValue("packetsize"); p != "" {
+		var packetSize uint64
+		if _, err := fmt.Sscan(p, &packetSize); err != nil {
+			WriteError(w, Error{"unable to parse packetsize: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		settings.PacketSize = packetSize
+	}
+	// Scan the download speed limit. (optional parameter)
+	if d := req.FormValue("downloadspeed"); d != "" {
+		var downloadSpeed int64
+		if _, err := fmt.Sscan(d, &downloadSpeed); err != nil {
+			WriteError(w, Error{"unable to parse downloadspeed: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		settings.DownloadSpeed = downloadSpeed
+	}
+	// Scan the upload speed limit. (optional parameter)
+	if u := req.FormValue("uploadspeed"); u != "" {
+		var uploadSpeed int64
+		if _, err := fmt.Sscan(u, &uploadSpeed); err != nil {
+			WriteError(w, Error{"unable to parse uploadspeed: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		settings.UploadSpeed = uploadSpeed
+	}
 	// Set the settings in the renter.
-	err = api.renter.SetSettings(modules.RenterSettings{
-		Allowance: modules.Allowance{
-			Funds:       funds,
-			Hosts:       hosts,
-			Period:      period,
-			RenewWindow: renewWindow,
-		},
-	})
+	err := api.renter.SetSettings(settings)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -335,7 +351,7 @@ func (api *API) renterLoadHandler(w http.ResponseWriter, req *http.Request, _ ht
 
 // renterLoadAsciiHandler handles the API call to load a '.sia' file
 // in ASCII form.
-func (api *API) renterLoadAsciiHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (api *API) renterLoadASCIIHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	files, err := api.renter.LoadSharedFilesASCII(req.FormValue("asciisia"))
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
@@ -512,7 +528,7 @@ func (api *API) renterShareHandler(w http.ResponseWriter, req *http.Request, ps 
 
 // renterShareAsciiHandler handles the API call to return a '.sia' file
 // in ascii form.
-func (api *API) renterShareAsciiHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+func (api *API) renterShareASCIIHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	ascii, err := api.renter.ShareFilesASCII(strings.Split(req.FormValue("siapaths"), ","))
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)

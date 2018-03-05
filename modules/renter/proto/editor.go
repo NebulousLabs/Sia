@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/ratelimit"
 )
 
 // cachedMerkleRoot calculates the root of a set of existing Merkle roots.
@@ -210,13 +211,14 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 // initiateRevisionLoop initiates either the editor or downloader loop with
 // host, depending on which rpc was passed.
 func initiateRevisionLoop(host modules.HostDBEntry, contract contractHeader, rpc types.Specifier, cancel <-chan struct{}) (net.Conn, chan struct{}, error) {
-	conn, err := (&net.Dialer{
+	c, err := (&net.Dialer{
 		Cancel:  cancel,
 		Timeout: 45 * time.Second, // TODO: Constant
 	}).Dial("tcp", string(host.NetAddress))
 	if err != nil {
 		return nil, nil, err
 	}
+	conn := ratelimit.NewRLConn(c, cancel)
 
 	closeChan := make(chan struct{})
 	go func() {

@@ -12,7 +12,7 @@ import (
 // buildHttpRoutes sets up and returns an * httprouter.Router.
 // it connected the Router to the given api using the required
 // parameters: requiredUserAgent and requiredPassword
-func (api *API) buildHttpRoutes(requiredUserAgent string, requiredPassword string) {
+func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword string) {
 	router := httprouter.New()
 
 	router.NotFound = http.HandlerFunc(UnrecognizedCallHandler)
