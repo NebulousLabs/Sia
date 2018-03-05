@@ -8,7 +8,7 @@ package renter
 // available to send the downloads off to the workers. The heap is sorted first
 // by priority, but then a few other criteria as well.
 //
-// Some downloads, in particualr downloads issued by the repair code, have
+// Some downloads, in particular downloads issued by the repair code, have
 // already had their memory allocated. These downloads get to skip the heap and
 // go straight for the workers.
 //
@@ -44,7 +44,7 @@ package renter
 // if this was the final unfinished chunk in the download, it'll mark the
 // download as complete.
 
-// The download process has a slighly complicating factor, which is overdrive
+// The download process has a slightly complicating factor, which is overdrive
 // workers. Traditionally, if you need 10 pieces to recover a file, you will use
 // 10 workers. But if you have an overdrive of '2', you will actually use 12
 // workers, meaning you download 2 more pieces than you need. This means that up
@@ -457,7 +457,7 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 // TODO: Currently the DownloadHistory only contains downloads from this
 // session, does not contain downloads that were executed for the purposes of
 // repairing, and has no way to clear the download history if it gets long or
-// unweildly. It's not entirely certain which of the missing features are
+// unwieldy. It's not entirely certain which of the missing features are
 // actually desirable, please consult core team + app dev community before
 // deciding what to implement.
 func (r *Renter) DownloadHistory() []modules.DownloadInfo {

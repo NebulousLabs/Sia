@@ -20,7 +20,7 @@ import (
 // are also likely to fail, because whatever condition resulted in the failure
 // will still be present until some time has passed. Without any cooldowns,
 // uploading and downloading with flaky hosts in the worker sets has
-// substantially reduced overall performacne and throughput.
+// substantially reduced overall performance and throughput.
 type worker struct {
 	// The contract and host used by this worker.
 	contract   modules.RenterContract
