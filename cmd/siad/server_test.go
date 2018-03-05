@@ -78,6 +78,9 @@ func TestLatestRelease(t *testing.T) {
 
 // TestNewServer verifies that NewServer creates a Sia API server correctly.
 func TestNewServer(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	var wg sync.WaitGroup
 	config := Config{}
 	config.Siad.APIaddr = "localhost:0"

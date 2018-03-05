@@ -44,6 +44,9 @@ func (newStub) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown {
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Using a stub implementation of the dependencies is fine, as long as its
 	// non-nil.
 	var stub newStub
