@@ -153,12 +153,12 @@ type (
 		Offset          uint64 `json:"offset"`          // The offset within the siafile requested for the download.
 		SiaPath         string `json:"siapath"`         // The siapath of the file used for the download.
 
-		Completed           bool      `json:"completed"`           // Whether or not the download has completed.
-		EndTime             time.Time `json:"endtime"`             // The time when the download fully completed.
-		Error               string    `json:"error"`               // Will be the empty string unless there was an error.
-		Received            uint64    `json:"received"`            // Amount of data confirmed and decoded.
-		StartTime           time.Time `json:"starttime"`           // The time when the download was started.
-		TotalDataTransfered uint64    `json:"totaldatatransfered"` // The total amount of data transferred, including negotiation, overdrive etc.
+		Completed            bool      `json:"completed"`            // Whether or not the download has completed.
+		EndTime              time.Time `json:"endtime"`              // The time when the download fully completed.
+		Error                string    `json:"error"`                // Will be the empty string unless there was an error.
+		Received             uint64    `json:"received"`             // Amount of data confirmed and decoded.
+		StartTime            time.Time `json:"starttime"`            // The time when the download was started.
+		TotalDataTransferred uint64    `json:"totaldatatransferred"` // The total amount of data transferred, including negotiation, overdrive etc.
 	}
 )
 
@@ -317,12 +317,12 @@ func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _
 			Offset:          di.Offset,
 			SiaPath:         di.SiaPath,
 
-			Completed:           di.Completed,
-			EndTime:             di.EndTime,
-			Error:               di.Error,
-			Received:            di.Received,
-			StartTime:           di.StartTime,
-			TotalDataTransfered: di.TotalDataTransfered,
+			Completed:            di.Completed,
+			EndTime:              di.EndTime,
+			Error:                di.Error,
+			Received:             di.Received,
+			StartTime:            di.StartTime,
+			TotalDataTransferred: di.TotalDataTransferred,
 		})
 	}
 	// sort the downloads by newest first
