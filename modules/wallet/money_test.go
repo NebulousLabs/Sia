@@ -4,6 +4,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -12,7 +13,7 @@ func TestSendSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +83,7 @@ func TestIntegrationSendOverUnder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +111,7 @@ func TestIntegrationSpendHalfHalf(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +134,7 @@ func TestIntegrationSpendUnconfirmed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}

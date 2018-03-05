@@ -39,14 +39,14 @@ func (hdb *HostDB) persistData() (data hdbPersist) {
 
 // saveSync saves the hostdb persistence data to disk and then syncs to disk.
 func (hdb *HostDB) saveSync() error {
-	return hdb.deps.saveFileSync(persistMetadata, hdb.persistData(), filepath.Join(hdb.persistDir, persistFilename))
+	return hdb.deps.SaveFileSync(persistMetadata, hdb.persistData(), filepath.Join(hdb.persistDir, persistFilename))
 }
 
 // load loads the hostdb persistence data from disk.
 func (hdb *HostDB) load() error {
 	// Fetch the data from the file.
 	var data hdbPersist
-	err := hdb.deps.loadFile(persistMetadata, &data, filepath.Join(hdb.persistDir, persistFilename))
+	err := hdb.deps.LoadFile(persistMetadata, &data, filepath.Join(hdb.persistDir, persistFilename))
 	if err != nil {
 		return err
 	}

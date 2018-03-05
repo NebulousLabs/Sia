@@ -99,7 +99,7 @@ func (h *Host) managedForwardPort(port string) error {
 		// Add a blocking placeholder where testing is able to mock behaviors
 		// such as a port forward action that blocks for 10 seconds before
 		// completing.
-		if h.dependencies.disrupt("managedForwardPort") {
+		if h.dependencies.Disrupt("managedForwardPort") {
 			return nil
 		}
 
@@ -136,7 +136,7 @@ func (h *Host) managedForwardPort(port string) error {
 func (h *Host) managedClearPort() error {
 	if build.Release == "testing" {
 		// Allow testing to force an error to be returned here.
-		if h.dependencies.disrupt("managedClearPort return error") {
+		if h.dependencies.Disrupt("managedClearPort return error") {
 			return errors.New("Mocked managedClearPortErr")
 		}
 		return nil

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -15,7 +16,7 @@ func TestDefragWallet(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +62,7 @@ func TestDefragWalletDust(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +126,7 @@ func TestDefragOutputExhaustion(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}

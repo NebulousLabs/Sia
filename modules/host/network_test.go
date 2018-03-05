@@ -16,13 +16,13 @@ import (
 // blockingPortForward will also cause managedClearPort to always return an
 // error.
 type blockingPortForward struct {
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // disrupt will cause the port forward call to block for 10 seconds, but still
 // complete normally. disrupt will also cause managedClearPort to return an
 // error.
-func (blockingPortForward) disrupt(s string) bool {
+func (*blockingPortForward) Disrupt(s string) bool {
 	// Return an error when clearing the port.
 	if s == "managedClearPort return error" {
 		return true
@@ -42,7 +42,7 @@ func TestPortForwardBlocking(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ht, err := newMockHostTester(blockingPortForward{}, "TestPortForwardBlocking")
+	ht, err := newMockHostTester(&blockingPortForward{}, "TestPortForwardBlocking")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestHostWorkingStatus(t *testing.T) {
 	// TODO: this causes an ndf, because it relies on the host tester starting up
 	// and fully returning faster than the first check, which isnt always the
 	// case.  This check is disabled for now, but can be fixed by using the
-	// disrupt() pattern.
+	// Disrupt() pattern.
 	// if ht.host.WorkingStatus() != modules.HostWorkingStatusChecking {
 	// 	t.Fatal("expected working state to initially be modules.HostWorkingStatusChecking")
 	// }
@@ -127,7 +127,7 @@ func TestHostConnectabilityStatus(t *testing.T) {
 	// TODO: this causes an ndf, because it relies on the host tester starting up
 	// and fully returning faster than the first check, which isnt always the
 	// case.  This check is disabled for now, but can be fixed by using the
-	// disrupt() pattern.
+	// Disrupt() pattern.
 	// if ht.host.ConnectabilityStatus() != modules.HostConnectabilityStatusChecking {
 	// 		t.Fatal("expected connectability state to initially be ConnectablityStateChecking")
 	// }

@@ -341,14 +341,14 @@ func TestAddSectorFillLargerFolder(t *testing.T) {
 // dependencyNoSettingsSave is a mocked dependency that will prevent the
 // settings file from saving.
 type dependencyNoSettingsSave struct {
-	productionDependencies
+	modules.ProductionDependencies
 	triggered bool
 	mu        sync.Mutex
 }
 
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
-func (d *dependencyNoSettingsSave) disrupt(s string) bool {
+func (d *dependencyNoSettingsSave) Disrupt(s string) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -1639,7 +1639,7 @@ func TestSectorBalancing(t *testing.T) {
 // dependencyFailingWrites is a mocked dependency that will prevent file writes
 // for some files.
 type dependencyFailingWrites struct {
-	productionDependencies
+	modules.ProductionDependencies
 	triggered *bool
 	mu        *sync.Mutex
 }
@@ -1656,7 +1656,7 @@ type failureProneFile struct {
 
 // createFile will return a file which will cause errors on Write calls if
 // "storageFolderOne" is in the filepath.
-func (d dependencyFailingWrites) createFile(s string) (file, error) {
+func (d *dependencyFailingWrites) CreateFile(s string) (modules.File, error) {
 	osfile, err := os.Create(s)
 	if err != nil {
 		return nil, err

@@ -62,7 +62,7 @@ type Wallet struct {
 	// The wallet's dependencies.
 	cs    modules.ConsensusSet
 	tpool modules.TransactionPool
-	deps  Dependencies
+	deps  modules.Dependencies
 
 	// The following set of fields are responsible for tracking the confirmed
 	// outputs, and for being able to spend them. The seeds are used to derive
@@ -127,10 +127,10 @@ func (w *Wallet) Height() types.BlockHeight {
 // not loaded into the wallet during the call to 'new', but rather during the
 // call to 'Unlock'.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string) (*Wallet, error) {
-	return newWallet(cs, tpool, persistDir, &ProductionDependencies{})
+	return newWallet(cs, tpool, persistDir, &modules.ProductionDependencies{})
 }
 
-func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string, deps Dependencies) (*Wallet, error) {
+func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string, deps modules.Dependencies) (*Wallet, error) {
 	// Check for nil dependencies.
 	if cs == nil {
 		return nil, errNilConsensusSet

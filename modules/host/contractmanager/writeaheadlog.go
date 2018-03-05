@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 )
 
@@ -89,8 +90,8 @@ type (
 		// uncommittedChanges details a list of operations which have been
 		// suggested or queued to be made to the state, but are not yet
 		// guaranteed to have completed.
-		fileSettingsTmp    file
-		fileWALTmp         file
+		fileSettingsTmp    modules.File
+		fileWALTmp         modules.File
 		syncChan           chan struct{}
 		uncommittedChanges []stateChange
 
@@ -120,7 +121,7 @@ func readWALMetadata(decoder *json.Decoder) error {
 }
 
 // writeWALMetadata writes WAL metadata to the input file.
-func writeWALMetadata(f file) error {
+func writeWALMetadata(f modules.File) error {
 	changeBytes, err := json.MarshalIndent(walMetadata, "", "\t")
 	if err != nil {
 		return build.ExtendErr("could not marshal WAL metadata", err)
@@ -166,27 +167,27 @@ func (wal *writeAheadLog) appendChange(sc stateChange) {
 // commitment.
 func (wal *writeAheadLog) commitChange(sc stateChange) {
 	for _, sfa := range sc.StorageFolderAdditions {
-		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
+		for i := uint64(0); i < wal.cm.dependencies.AtLeastOne(); i++ {
 			wal.commitAddStorageFolder(sfa)
 		}
 	}
 	for _, sfe := range sc.StorageFolderExtensions {
-		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
+		for i := uint64(0); i < wal.cm.dependencies.AtLeastOne(); i++ {
 			wal.commitStorageFolderExtension(sfe)
 		}
 	}
 	for _, sfr := range sc.StorageFolderReductions {
-		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
+		for i := uint64(0); i < wal.cm.dependencies.AtLeastOne(); i++ {
 			wal.commitStorageFolderReduction(sfr)
 		}
 	}
 	for _, sfr := range sc.StorageFolderRemovals {
-		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
+		for i := uint64(0); i < wal.cm.dependencies.AtLeastOne(); i++ {
 			wal.commitStorageFolderRemoval(sfr)
 		}
 	}
 	for _, su := range sc.SectorUpdates {
-		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
+		for i := uint64(0); i < wal.cm.dependencies.AtLeastOne(); i++ {
 			wal.commitUpdateSector(su)
 		}
 	}
@@ -196,7 +197,7 @@ func (wal *writeAheadLog) commitChange(sc stateChange) {
 func (wal *writeAheadLog) createWALTmp() {
 	var err error
 	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
-	wal.fileWALTmp, err = wal.cm.dependencies.createFile(walTmpName)
+	wal.fileWALTmp, err = wal.cm.dependencies.CreateFile(walTmpName)
 	if err != nil {
 		wal.cm.log.Severe("Unable to create WAL temporary file:", err)
 		panic("unable to create WAL temporary file, crashing to avoid corruption")
@@ -211,7 +212,7 @@ func (wal *writeAheadLog) createWALTmp() {
 // recoverWAL will read a previous WAL and re-commit all of the changes inside,
 // restoring the program to consistency after an unclean shutdown. The tmp WAL
 // file needs to be open before this function is called.
-func (wal *writeAheadLog) recoverWAL(walFile file) error {
+func (wal *writeAheadLog) recoverWAL(walFile modules.File) error {
 	// Read the WAL metadata to make sure that the version is correct.
 	decoder := json.NewDecoder(walFile)
 	err := readWALMetadata(decoder)
@@ -268,7 +269,7 @@ func (wal *writeAheadLog) load() error {
 			wal.cm.log.Println("ERROR: error closing wal file during contract manager shutdown:", err)
 			return
 		}
-		err = wal.cm.dependencies.removeFile(filepath.Join(wal.cm.persistDir, walFileTmp))
+		err = wal.cm.dependencies.RemoveFile(filepath.Join(wal.cm.persistDir, walFileTmp))
 		if err != nil {
 			wal.cm.log.Println("ERROR: error removing temporary WAL during contract manager shutdown:", err)
 			return
@@ -277,7 +278,7 @@ func (wal *writeAheadLog) load() error {
 
 	// Try opening the WAL file.
 	walFileName := filepath.Join(wal.cm.persistDir, walFile)
-	walFile, err := wal.cm.dependencies.openFile(walFileName, os.O_RDONLY, 0600)
+	walFile, err := wal.cm.dependencies.OpenFile(walFileName, os.O_RDONLY, 0600)
 	if err == nil {
 		// err == nil indicates that there is a WAL file, which means that the
 		// previous shutdown was not clean. Re-commit the changes in the WAL to
@@ -299,7 +300,7 @@ func (wal *writeAheadLog) load() error {
 
 	// Create the tmp settings file and initialize the first write to it. This
 	// is necessary before kicking off the sync loop.
-	wal.fileSettingsTmp, err = wal.cm.dependencies.createFile(filepath.Join(wal.cm.persistDir, settingsFileTmp))
+	wal.fileSettingsTmp, err = wal.cm.dependencies.CreateFile(filepath.Join(wal.cm.persistDir, settingsFileTmp))
 	if err != nil {
 		return build.ExtendErr("unable to prepare the settings temp file", err)
 	}
@@ -311,7 +312,7 @@ func (wal *writeAheadLog) load() error {
 			wal.cm.log.Println("ERROR: unable to close settings temporary file")
 			return
 		}
-		err = wal.cm.dependencies.removeFile(filepath.Join(wal.cm.persistDir, settingsFileTmp))
+		err = wal.cm.dependencies.RemoveFile(filepath.Join(wal.cm.persistDir, settingsFileTmp))
 		if err != nil {
 			wal.cm.log.Println("ERROR: unable to remove settings temporary file")
 			return

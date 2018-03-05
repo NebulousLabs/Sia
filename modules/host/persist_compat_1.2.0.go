@@ -124,7 +124,7 @@ func (h *Host) loadCompatV100(p *persistence) error {
 			MinUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
 		}
 	}
-	err := h.dependencies.loadFile(v112PersistMetadata, &compatPersistence, filepath.Join(h.persistDir, settingsFile))
+	err := h.dependencies.LoadFile(v112PersistMetadata, &compatPersistence, filepath.Join(h.persistDir, settingsFile))
 	if err != nil {
 		return err
 	}
@@ -389,7 +389,7 @@ func (h *Host) upgradeFromV112ToV120() error {
 	}
 	// Try loading the persist again.
 	p := new(persistence)
-	err = h.dependencies.loadFile(v112PersistMetadata, p, filepath.Join(h.persistDir, settingsFile))
+	err = h.dependencies.LoadFile(v112PersistMetadata, p, filepath.Join(h.persistDir, settingsFile))
 	if err != nil {
 		return build.ExtendErr("upgrade appears complete, but having difficulties reloading host after upgrade", err)
 	}
