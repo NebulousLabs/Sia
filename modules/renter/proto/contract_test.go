@@ -15,6 +15,9 @@ import (
 // TestContractUncommittedTxn tests that if a contract revision is left in an
 // uncommitted state, either version of the contract can be recovered.
 func TestContractUncommittedTxn(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// create contract set with one contract
 	dir := build.TempDir(filepath.Join("proto", t.Name()))
 	cs, err := NewContractSet(dir)
