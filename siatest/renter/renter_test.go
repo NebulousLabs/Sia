@@ -85,11 +85,11 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 // in parallel and makes sure that the downloads are blocking each other.
 func testDownloadMultipleLargeSectors(t *testing.T, tg *siatest.TestGroup) {
 	// parallelDownloads is the number of downloads that are run in parallel.
-	parallelDownloads := 50
+	parallelDownloads := 10
 	// fileSize is the size of the downloaded file.
 	fileSize := int(10*modules.SectorSize) + siatest.Fuzz()
 	// set download limits and reset them after test.
-	ratelimit.SetLimits(int64(fileSize), 0, modules.SectorSize)
+	ratelimit.SetLimits(int64(fileSize)*2, 0, modules.SectorSize)
 	defer ratelimit.SetLimits(0, 0, 0)
 	// uniqueRemoteFiles is the number of files that will be uploaded to the
 	// network. Downloads will choose the remote file to download randomly.
