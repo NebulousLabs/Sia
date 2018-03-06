@@ -59,17 +59,37 @@ func (tn *TestNode) DownloadByStream(rf *RemoteFile) (data []byte, err error) {
 
 // DownloadInfo returns the DownloadInfo struct of a file. If it returns nil,
 // the download has either finished, or was never started in the first place.
-func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (*api.DownloadInfo, error) {
+// If the corresponding download info was found, DownloadInfo also performs a
+// few sanity checks on its fields.
+func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (di *api.DownloadInfo, err error) {
 	rdq, err := tn.RenterDownloadsGet()
 	if err != nil {
 		return nil, err
 	}
 	for _, d := range rdq.Downloads {
 		if rf.siaPath == d.SiaPath && lf.path == d.Destination {
-			return &d, nil
+			di = &d
+			break
 		}
 	}
-	return nil, nil
+	if di == nil {
+		// No download info found.
+		return
+	}
+	// Check if length and filesize were set correctly
+	if di.Length != di.Filesize {
+		err = errors.New("filesize != length")
+	}
+	// Received data can't be larger than transfered data
+	if di.Received > di.TotalDataTransferred {
+		err = build.ComposeErrors(err, errors.New("received > TotalDataTransfered"))
+	}
+	// If the download is completed, the amount of received data has to equal
+	// the amount of requested data.
+	if di.Completed && di.Received != di.Length {
+		err = build.ComposeErrors(err, errors.New("completed == true but received != length"))
+	}
+	return
 }
 
 // Files lists the files tracked by the renter
@@ -151,7 +171,8 @@ func (tn *TestNode) UploadNewFileBlocking(filesize int, dataPieces uint64, parit
 // WaitForDownload waits for the download of a file to finish. If a file wasn't
 // scheduled for download it will return instantly without an error. If parent
 // is provided, it will compare the contents of the downloaded file to the
-// contents of tf2 after the download is finished.
+// contents of tf2 after the download is finished. WaitForDownload also
+// verifies the checksum of the downloaded file.
 func (tn *TestNode) WaitForDownload(lf *LocalFile, rf *RemoteFile) error {
 	err := Retry(1000, 100*time.Millisecond, func() error {
 		file, err := tn.DownloadInfo(lf, rf)
@@ -162,7 +183,7 @@ func (tn *TestNode) WaitForDownload(lf *LocalFile, rf *RemoteFile) error {
 			return nil
 		}
 		if !file.Completed {
-			return errors.New("file hasn't finished downloading yet")
+			return errors.New("download hasn't finished yet")
 		}
 		return nil
 	})
@@ -170,10 +191,7 @@ func (tn *TestNode) WaitForDownload(lf *LocalFile, rf *RemoteFile) error {
 		return err
 	}
 	// Verify checksum
-	if err := lf.checkIntegrity(); err != nil {
-		return err
-	}
-	return nil
+	return lf.checkIntegrity()
 }
 
 // WaitForUploadProgress waits for a file to reach a certain upload progress.
