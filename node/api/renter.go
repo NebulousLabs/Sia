@@ -198,6 +198,9 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 		} else {
 			settings.Allowance.Hosts = hosts
 		}
+	} else if settings.Allowance.Hosts == 0 {
+		// Sane defaults if host haven't been set before.
+		settings.Allowance.Hosts = recommendedHosts
 	}
 	// Scan the period. (optional parameter)
 	if p := req.FormValue("period"); p != "" {
@@ -207,6 +210,9 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 			return
 		}
 		settings.Allowance.Period = types.BlockHeight(period)
+	} else if settings.Allowance.Period == 0 {
+		WriteError(w, Error{"period needs to be set if it hasn't been set before"}, http.StatusBadRequest)
+		return
 	}
 	// Scan the renew window. (optional parameter)
 	if rw := req.FormValue("renewwindow"); rw != "" {
@@ -220,6 +226,9 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 		} else {
 			settings.Allowance.RenewWindow = types.BlockHeight(renewWindow)
 		}
+	} else if settings.Allowance.RenewWindow == 0 {
+		// Sane defaults if renew window hasn't been set before.
+		settings.Allowance.RenewWindow = settings.Allowance.Period / 2
 	}
 	// Scan the packet size. (optional parameter)
 	if p := req.FormValue("packetsize"); p != "" {
