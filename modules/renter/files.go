@@ -88,7 +88,7 @@ func (f *file) numChunks() uint64 {
 }
 
 // available indicates whether the file is ready to be downloaded.
-func (f *file) available(contractStatus func(types.FileContractID) (bool, bool)) bool {
+func (f *file) available(contractStatus func(types.FileContractID) (offline bool, goodForRenew bool)) bool {
 	chunkPieces := make([]int, f.numChunks())
 	for _, fc := range f.contracts {
 		if offline, _ := contractStatus(fc.ID); offline {
@@ -148,14 +148,14 @@ func (f *file) redundancy(contractStatus func(types.FileContractID) (bool, bool)
 		return -1
 	}
 	for _, fc := range f.contracts {
-		offline, gfr := contractStatus(fc.ID)
+		offline, goodForRenew := contractStatus(fc.ID)
 
 		// do not count pieces from the contract if the contract is offline
 		if offline {
 			continue
 		}
 		for _, p := range fc.Pieces {
-			if gfr {
+			if goodForRenew {
 				piecesPerChunk[p.Chunk]++
 			}
 			piecesPerChunkNoRenew[p.Chunk]++
