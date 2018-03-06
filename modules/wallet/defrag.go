@@ -182,6 +182,6 @@ func (w *Wallet) threadedDefragWallet() {
 	}
 	w.log.Println("Submitting a transaction set to defragment the wallet's outputs, IDs:")
 	for _, txn := range txnSet {
-		w.log.Println("\t", txn.ID())
+		w.log.Println("Wallet defrag: \t", txn.ID())
 	}
 }

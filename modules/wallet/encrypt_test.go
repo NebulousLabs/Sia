@@ -194,7 +194,7 @@ func TestLock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +257,7 @@ func TestInitFromSeedConcurrentUnlock(t *testing.T) {
 		t.SkipNow()
 	}
 	// create a wallet with some money
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,7 +310,7 @@ func TestUnlockConcurrent(t *testing.T) {
 		t.SkipNow()
 	}
 	// create a wallet with some money
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -349,7 +349,7 @@ func TestInitFromSeed(t *testing.T) {
 		t.SkipNow()
 	}
 	// create a wallet with some money
-	wt, err := createWalletTester("TestInitFromSeed0", &ProductionDependencies{})
+	wt, err := createWalletTester("TestInitFromSeed0", &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -439,7 +439,7 @@ func TestChangeKey(t *testing.T) {
 		t.SkipNow()
 	}
 
-	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}

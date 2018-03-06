@@ -55,7 +55,7 @@ func TestAddStorageFolder(t *testing.T) {
 // dependencyLargeFolder is a mocked dependency that will return files which
 // can only handle 1 MiB of data being written to them.
 type dependencyLargeFolder struct {
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // limitFile will return an error if a call to Write is made that will put the
@@ -69,7 +69,7 @@ type limitFile struct {
 
 // createFile will return a file that will return an error if a write will put
 // the total throughput of the file over 1 MiB.
-func (dependencyLargeFolder) createFile(s string) (file, error) {
+func (*dependencyLargeFolder) CreateFile(s string) (modules.File, error) {
 	osFile, err := os.Create(s)
 	if err != nil {
 		return nil, err
@@ -234,7 +234,7 @@ func TestAddStorageFolderConcurrent(t *testing.T) {
 type dependencyBlockSFOne struct {
 	blockLifted chan struct{}
 	writeCalled chan struct{}
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // blockedFile is the file that gets returned by dependencyBlockSFOne to
@@ -261,7 +261,7 @@ func (bf *blockedFile) Truncate(offset int64) error {
 // createFile will return a normal file to all callers except for
 // storageFolderOne, which will have calls to file.Write blocked until a signal
 // is given that the blocks may be released.
-func (d *dependencyBlockSFOne) createFile(s string) (file, error) {
+func (d *dependencyBlockSFOne) CreateFile(s string) (modules.File, error) {
 	// If storageFolderOne, return a file that will not write until the signal
 	// is sent that writing is okay.
 	if strings.Contains(s, "storageFolderOne") {
@@ -499,12 +499,12 @@ func TestAddStorageFolderDoubleAdd(t *testing.T) {
 
 // dependencyNoSyncLoop is a mocked dependency that will disable the sync loop.
 type dependencyNoSyncLoop struct {
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
-func (dependencyNoSyncLoop) disrupt(s string) bool {
+func (*dependencyNoSyncLoop) Disrupt(s string) bool {
 	if s == "threadedSyncLoopStart" || s == "cleanWALFile" {
 		// Disrupt threadedSyncLoop. The sync loop will exit immediately
 		// instead of executing commits. Also disrupt the process that removes
@@ -653,12 +653,12 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 
 // dependencySFAddNoFinish is a mocked dependency that will prevent the
 type dependencySFAddNoFinish struct {
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
-func (d *dependencySFAddNoFinish) disrupt(s string) bool {
+func (d *dependencySFAddNoFinish) Disrupt(s string) bool {
 	if s == "storageFolderAddFinish" {
 		return true
 	}

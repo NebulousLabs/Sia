@@ -58,7 +58,7 @@ func newContractManagerTester(name string) (*contractManagerTester, error) {
 
 // newMockedContractManagerTester returns a contract manager tester that uses
 // the input dependencies instead of the production ones.
-func newMockedContractManagerTester(d dependencies, name string) (*contractManagerTester, error) {
+func newMockedContractManagerTester(d modules.Dependencies, name string) (*contractManagerTester, error) {
 	if testing.Short() {
 		panic("use of newContractManagerTester during short testing")
 	}
@@ -111,12 +111,12 @@ func TestNewContractManager(t *testing.T) {
 // dependencyErroredStartupis a mocked dependency that will cause the contract
 // manager to be returned with an error upon startup.
 type dependencyErroredStartup struct {
-	productionDependencies
+	modules.ProductionDependencies
 }
 
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
-func (d *dependencyErroredStartup) disrupt(s string) bool {
+func (d *dependencyErroredStartup) Disrupt(s string) bool {
 	// Cause an error to be returned during startup.
 	if s == "erroredStartup" {
 		return true
@@ -138,7 +138,7 @@ func TestNewContractManagerErroredStartup(t *testing.T) {
 	testdir := build.TempDir(modules.ContractManagerDir, "TestNewContractManagerErroredStartup")
 	cmd := filepath.Join(testdir, modules.ContractManagerDir)
 	_, err := newContractManager(d, cmd)
-	if err.Error() != "startup disrupted" {
+	if err == nil || err.Error() != "startup disrupted" {
 		t.Fatal("expecting contract manager startup to be disrupted:", err)
 	}
 

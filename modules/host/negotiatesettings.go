@@ -25,6 +25,9 @@ func (h *Host) capacity() (total, remaining uint64) {
 
 // externalSettings compiles and returns the external settings for the host.
 func (h *Host) externalSettings() modules.HostExternalSettings {
+	// Increment the revision number for the external settings
+	h.revisionNumber++
+
 	totalStorage, remainingStorage := h.capacity()
 	var netAddr modules.NetAddress
 	if h.settings.NetAddress != "" {
@@ -83,7 +86,6 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 	var hes modules.HostExternalSettings
 	var secretKey crypto.SecretKey
 	h.mu.Lock()
-	h.revisionNumber++
 	secretKey = h.secretKey
 	hes = h.externalSettings()
 	h.mu.Unlock()

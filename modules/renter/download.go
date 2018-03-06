@@ -8,7 +8,7 @@ package renter
 // available to send the downloads off to the workers. The heap is sorted first
 // by priority, but then a few other criteria as well.
 //
-// Some downloads, in particualr downloads issued by the repair code, have
+// Some downloads, in particular downloads issued by the repair code, have
 // already had their memory allocated. These downloads get to skip the heap and
 // go straight for the workers.
 //
@@ -44,7 +44,7 @@ package renter
 // if this was the final unfinished chunk in the download, it'll mark the
 // download as complete.
 
-// The download process has a slighly complicating factor, which is overdrive
+// The download process has a slightly complicating factor, which is overdrive
 // workers. Traditionally, if you need 10 pieces to recover a file, you will use
 // 10 workers. But if you have an overdrive of '2', you will actually use 12
 // workers, meaning you download 2 more pieces than you need. This means that up
@@ -142,8 +142,8 @@ type (
 	// A download is a file download that has been queued by the renter.
 	download struct {
 		// Data progress variables.
-		atomicDataReceived        uint64 // Incremented as data completes, will stop at 100% file progress.
-		atomicTotalDataTransfered uint64 // Incremented as data arrives, includes overdrive, contract negotiation, etc.
+		atomicDataReceived         uint64 // Incremented as data completes, will stop at 100% file progress.
+		atomicTotalDataTransferred uint64 // Incremented as data arrives, includes overdrive, contract negotiation, etc.
 
 		// Other progress variables.
 		chunksRemaining uint64        // Number of chunks whose downloads are incomplete.
@@ -351,18 +351,10 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 		udc.staticWriteOffset = writeOffset
 		writeOffset += int64(udc.staticFetchLength)
 
-		// TODO: Currently only the first two chunks are given overdrive, on the
-		// assumption that even the slow hosts will be able to finish the third
-		// chunk before the fast hosts complete the first chunks. This does
-		// assume however (incorrectly) that the workers internally are already
-		// able to tell when a worker is going to be a big bottleneck when
-		// downloading. On later chunks, if the system is memory-bottlenecked,
-		// the slow hosts could end up hogging all of the memory and slowing the
-		// whole system down. Ideally the fix for that type of scenario would
-		// happen within the worker standby selection though.
-		if i < minChunk+1 || i+3 > maxChunk {
-			udc.staticOverdrive = params.overdrive
-		}
+		// TODO: Currently all chunks are given overdrive. This should probably
+		// be changed once the hostdb knows how to measure host speed/latency
+		// and once we can assign overdrive dynamically.
+		udc.staticOverdrive = params.overdrive
 
 		// Add this chunk to the chunk heap, and notify the download loop that
 		// there is work to do.
@@ -465,7 +457,7 @@ func (r *Renter) Download(p modules.RenterDownloadParameters) error {
 // TODO: Currently the DownloadHistory only contains downloads from this
 // session, does not contain downloads that were executed for the purposes of
 // repairing, and has no way to clear the download history if it gets long or
-// unweildly. It's not entirely certain which of the missing features are
+// unwieldy. It's not entirely certain which of the missing features are
 // actually desirable, please consult core team + app dev community before
 // deciding what to implement.
 func (r *Renter) DownloadHistory() []modules.DownloadInfo {
@@ -484,11 +476,11 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 			Offset:          d.staticOffset,
 			SiaPath:         d.staticSiaPath,
 
-			Completed:           d.staticComplete(),
-			EndTime:             d.endTime,
-			Received:            atomic.LoadUint64(&d.atomicDataReceived),
-			StartTime:           d.staticStartTime,
-			TotalDataTransfered: atomic.LoadUint64(&d.atomicTotalDataTransfered),
+			Completed:            d.staticComplete(),
+			EndTime:              d.endTime,
+			Received:             atomic.LoadUint64(&d.atomicDataReceived),
+			StartTime:            d.staticStartTime,
+			TotalDataTransferred: atomic.LoadUint64(&d.atomicTotalDataTransferred),
 		}
 		// Release download lock before calling d.Err(), which will acquire the
 		// lock. The error needs to be checked separately because we need to

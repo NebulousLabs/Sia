@@ -46,7 +46,7 @@ threshold signatures.
 
   This method allows new signature types to be easily added to the currency in
   a way that does not invalidate existing outputs and keys. Adding a new
-  signature type requires a hard fork, but allows easy protection against
+  signature type requires a soft fork, but allows easy protection against
   cryptographic breaks, and easy migration to new cryptography if there are any
   breakthroughs in areas like verification speed, ring signatures, etc.
 

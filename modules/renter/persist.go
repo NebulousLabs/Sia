@@ -117,6 +117,7 @@ func (f *file) UnmarshalSia(r io.Reader) error {
 	if err != nil {
 		return err
 	}
+	f.staticUID = persist.RandomSuffix()
 
 	// Decode erasure coder.
 	var codeType string

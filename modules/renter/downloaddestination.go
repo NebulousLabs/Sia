@@ -55,11 +55,11 @@ func (dw downloadDestinationBuffer) WriteAt(data []byte, offset int64) (int, err
 
 // downloadDestinationWriteCloser is a downloadDestination that writes to an
 // underlying data stream. The data stream is expecting sequential data while
-// the download chunks will be written in an aribtrary order using calls to
+// the download chunks will be written in an arbitrary order using calls to
 // WriteAt. We need to block the calls to WriteAt until all prior data has been
 // written.
 //
-// NOTE: If the caller accedentally leaves a gap between calls to WriteAt, for
+// NOTE: If the caller accidentally leaves a gap between calls to WriteAt, for
 // example writes bytes 0-100 and then writes bytes 110-200, and accidentally
 // never writes bytes 100-110, the downloadDestinationWriteCloser will block
 // forever waiting for those gap bytes to be written.

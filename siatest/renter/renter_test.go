@@ -29,7 +29,7 @@ func TestRenter(t *testing.T) {
 		}
 	}()
 
-	// Specifiy subtests to run
+	// Specify subtests to run
 	subTests := []struct {
 		name string
 		test func(*testing.T, *siatest.TestGroup)

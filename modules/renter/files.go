@@ -37,6 +37,8 @@ type file struct {
 	pieceSize   uint64               // Static - can be accessed without lock.
 	mode        uint32               // actually an os.FileMode
 
+	staticUID string // A UID assigned to the file when it gets created.
+
 	mu sync.RWMutex
 }
 
@@ -186,6 +188,8 @@ func newFile(name string, code modules.ErasureCoder, pieceSize, fileSize uint64)
 		masterKey:   crypto.GenerateTwofishKey(),
 		erasureCode: code,
 		pieceSize:   pieceSize,
+
+		staticUID: persist.RandomSuffix(),
 	}
 }
 

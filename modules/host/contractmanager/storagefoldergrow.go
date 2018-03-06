@@ -211,7 +211,7 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 	}
 
 	// Simulate power failure at this point for some testing scenarios.
-	if wal.cm.dependencies.disrupt("incompleteGrowStorageFolder") {
+	if wal.cm.dependencies.Disrupt("incompleteGrowStorageFolder") {
 		return nil
 	}
 

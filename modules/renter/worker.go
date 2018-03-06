@@ -20,7 +20,7 @@ import (
 // are also likely to fail, because whatever condition resulted in the failure
 // will still be present until some time has passed. Without any cooldowns,
 // uploading and downloading with flaky hosts in the worker sets has
-// substantially reduced overall performacne and throughput.
+// substantially reduced overall performance and throughput.
 type worker struct {
 	// The contract and host used by this worker.
 	contract   modules.RenterContract
@@ -41,11 +41,11 @@ type worker struct {
 	downloadTerminated bool // Has downloading been terminated for this worker?
 
 	// Upload variables.
-	unprocessedChunks         []*unfinishedChunk // Yet unprocessed work items.
-	uploadChan                chan struct{}      // Notifications of new work.
-	uploadConsecutiveFailures int                // How many times in a row uploading has failed.
-	uploadRecentFailure       time.Time          // How recent was the last failure?
-	uploadTerminated          bool               // Have we stopped uploading?
+	unprocessedChunks         []*unfinishedUploadChunk // Yet unprocessed work items.
+	uploadChan                chan struct{}            // Notifications of new work.
+	uploadConsecutiveFailures int                      // How many times in a row uploading has failed.
+	uploadRecentFailure       time.Time                // How recent was the last failure?
+	uploadTerminated          bool                     // Have we stopped uploading?
 
 	// Utilities.
 	//

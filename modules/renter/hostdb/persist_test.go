@@ -9,11 +9,11 @@ import (
 
 // quitAfterLoadDeps will quit startup in newHostDB
 type quitAfterLoadDeps struct {
-	prodDependencies
+	modules.ProductionDependencies
 }
 
 // Send a disrupt signal to the quitAfterLoad codebreak.
-func (quitAfterLoadDeps) disrupt(s string) bool {
+func (*quitAfterLoadDeps) Disrupt(s string) bool {
 	if s == "quitAfterLoad" {
 		return true
 	}
@@ -71,7 +71,7 @@ func TestSaveLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hdbt.hdb, err = newHostDB(hdbt.gateway, hdbt.cs, filepath.Join(hdbt.persistDir, modules.RenterDir), quitAfterLoadDeps{})
+	hdbt.hdb, err = newHostDB(hdbt.gateway, hdbt.cs, filepath.Join(hdbt.persistDir, modules.RenterDir), &quitAfterLoadDeps{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 )
@@ -90,7 +91,7 @@ func TestScanLoop(t *testing.T) {
 	}
 
 	// create a wallet
-	wt, err := createWalletTester("TestScanLoop", &ProductionDependencies{})
+	wt, err := createWalletTester("TestScanLoop", &modules.ProductionDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}

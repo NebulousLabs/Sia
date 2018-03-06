@@ -11,7 +11,7 @@ import (
 
 // RenterContractsGet requests the /renter/contracts resource
 func (c *Client) RenterContractsGet() (rc api.RenterContracts, err error) {
-	err = c.Get("/renter/contracts", &rc)
+	err = c.get("/renter/contracts", &rc)
 	return
 }
 
@@ -20,13 +20,13 @@ func (c *Client) RenterContractsGet() (rc api.RenterContracts, err error) {
 func (c *Client) RenterDownloadGet(siaPath, destination string, offset, length uint64, async bool) (err error) {
 	query := fmt.Sprintf("%s?destination=%s&offset=%d&length=%d&httpresp=false&async=%v",
 		siaPath, destination, offset, length, async)
-	err = c.Get("/renter/download/"+query, nil)
+	err = c.get("/renter/download/"+query, nil)
 	return
 }
 
 // RenterDownloadsGet requests the /renter/downloads resource
 func (c *Client) RenterDownloadsGet() (rdq api.RenterDownloadQueue, err error) {
-	err = c.Get("/renter/downloads", &rdq)
+	err = c.get("/renter/downloads", &rdq)
 	return
 }
 
@@ -34,13 +34,13 @@ func (c *Client) RenterDownloadsGet() (rdq api.RenterDownloadQueue, err error) {
 // a file and return its data.
 func (c *Client) RenterDownloadHTTPResponseGet(siaPath string, offset, length uint64) (resp []byte, err error) {
 	query := fmt.Sprintf("%s?offset=%d&length=%d&httpresp=true", siaPath, offset, length)
-	resp, err = c.GetRawResponse("/renter/download/" + query)
+	resp, err = c.getRawResponse("/renter/download/" + query)
 	return
 }
 
 // RenterFilesGet requests the /renter/files resource
 func (c *Client) RenterFilesGet() (rf api.RenterFiles, err error) {
-	err = c.Get("/renter/files", &rf)
+	err = c.get("/renter/files", &rf)
 	return
 }
 
@@ -51,7 +51,7 @@ func (c *Client) RenterPost(allowance modules.Allowance) (err error) {
 	values.Set("hosts", strconv.FormatUint(allowance.Hosts, 10))
 	values.Set("period", strconv.FormatUint(uint64(allowance.Period), 10))
 	values.Set("renewwindow", strconv.FormatUint(uint64(allowance.RenewWindow), 10))
-	err = c.Post("/renter", values.Encode(), nil)
+	err = c.post("/renter", values.Encode(), nil)
 	return
 }
 
@@ -61,6 +61,6 @@ func (c *Client) RenterUploadPost(path, siaPath string, dataPieces, parityPieces
 	values.Set("source", path)
 	values.Set("datapieces", strconv.FormatUint(dataPieces, 10))
 	values.Set("paritypieces", strconv.FormatUint(parityPieces, 10))
-	err = c.Post(fmt.Sprintf("/renter/upload%v", siaPath), values.Encode(), nil)
+	err = c.post(fmt.Sprintf("/renter/upload%v", siaPath), values.Encode(), nil)
 	return
 }
