@@ -3,6 +3,7 @@ package siatest
 import (
 	"io/ioutil"
 	"math"
+	"os"
 	"path/filepath"
 	"strconv"
 
@@ -31,6 +32,11 @@ func NewFile(size int) (*LocalFile, error) {
 		path:     path,
 		checksum: crypto.HashObject(bytes),
 	}, err
+}
+
+// Delete removes the LocalFile from disk.
+func (lf *LocalFile) Delete() error {
+	return os.Remove(lf.path)
 }
 
 // checkIntegrity compares the in-memory checksum to the checksum of the data

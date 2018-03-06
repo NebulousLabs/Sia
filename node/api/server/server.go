@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/errors"
 )
@@ -59,6 +60,15 @@ func (srv *Server) APIAddress() string {
 // GatewayAddress returns the underlying node's gateway address
 func (srv *Server) GatewayAddress() modules.NetAddress {
 	return srv.node.Gateway.Address()
+}
+
+// HostPublicKey returns the host's public key or an error if the node is no
+// host.
+func (srv *Server) HostPublicKey() (types.SiaPublicKey, error) {
+	if srv.node.Host == nil {
+		return types.SiaPublicKey{}, errors.New("can't get public host key of a non-host node")
+	}
+	return srv.node.Host.PublicKey(), nil
 }
 
 // New creates a new API server from the provided modules. The API will
