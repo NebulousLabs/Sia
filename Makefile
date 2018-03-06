@@ -63,17 +63,23 @@ lint:
 spellcheck:
 	misspell -error .
 
+# debug builds and installs debug binaries.
+debug:
+	go install -tags='debug profile netgo' $(pkgs)
+debug-race:
+	go install -race -tags='debug profile netgo' $(pkgs)
+
 # dev builds and installs developer binaries.
 dev:
+	go install -tags='dev debug profile netgo' $(pkgs)
+dev-race:
 	go install -race -tags='dev debug profile netgo' $(pkgs)
 
 # release builds and installs release binaries.
 release:
-	go install -tags='debug profile netgo' $(pkgs)
-release-race:
-	go install -race -tags='debug profile netgo' $(pkgs)
-release-std:
 	go install -tags 'netgo' -a -ldflags='-s -w' $(pkgs)
+release-race:
+	go install -race -tags 'netgo' -a -ldflags='-s -w' $(pkgs)
 
 # clean removes all directories that get automatically created during
 # development.
