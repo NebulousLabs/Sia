@@ -164,13 +164,20 @@ func testRenterLocalRepair(t *testing.T, tg *siatest.TestGroup) {
 	if err := renter.WaitForDecreasingRedundancy(remoteFile, expectedRedundancy); err != nil {
 		t.Fatal("Redundancy isn't decreasing", err)
 	}
-
+	// We should still be able to download
+	if _, err := renter.DownloadByStream(remoteFile); err != nil {
+		t.Fatal("Failed to download file", err)
+	}
 	// Bring up a new host and check if redundancy increments again.
 	if err := tg.AddNodes(node.HostTemplate); err != nil {
 		t.Fatal("Failed to create a new host", err)
 	}
 	if err := renter.WaitForUploadRedundancy(remoteFile, fi.Redundancy); err != nil {
 		t.Fatal("File wasn't repaired", err)
+	}
+	// We should be able to download
+	if _, err := renter.DownloadByStream(remoteFile); err != nil {
+		t.Fatal("Failed to download file", err)
 	}
 }
 
@@ -212,12 +219,19 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 	if err := renter.WaitForDecreasingRedundancy(remoteFile, expectedRedundancy); err != nil {
 		t.Fatal("Redundancy isn't decreasing", err)
 	}
-
+	// We should still be able to download
+	if _, err := renter.DownloadByStream(remoteFile); err != nil {
+		t.Fatal("Failed to download file", err)
+	}
 	// Bring up new parity hosts and check if redundancy increments again.
 	if err := tg.AddNodeN(node.HostTemplate, int(parityPieces)); err != nil {
 		t.Fatal("Failed to create a new host", err)
 	}
 	if err := renter.WaitForUploadRedundancy(remoteFile, fi.Redundancy); err != nil {
 		t.Fatal("File wasn't repaired", err)
+	}
+	// We should be able to download
+	if _, err := renter.DownloadByStream(remoteFile); err != nil {
+		t.Fatal("Failed to download file", err)
 	}
 }
