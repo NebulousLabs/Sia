@@ -3,6 +3,7 @@ package contractmanager
 import (
 	"encoding/json"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,6 +25,11 @@ func (wal *writeAheadLog) syncResources() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		if wal.fileSettingsTmp == nil {
+			// nothing to sync
+			return
+		}
 
 		tmpFilename := filepath.Join(wal.cm.persistDir, settingsFileTmp)
 		filename := filepath.Join(wal.cm.persistDir, settingsFile)
@@ -81,6 +87,10 @@ func (wal *writeAheadLog) syncResources() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		if len(wal.uncommittedChanges) == 0 {
+			// nothing to sync
+			return
+		}
 
 		err := wal.fileWALTmp.Sync()
 		if err != nil {
@@ -100,7 +110,7 @@ func (wal *writeAheadLog) syncResources() {
 
 	// Now that all the Sync calls have completed, rename the WAL tmp file to
 	// update the WAL.
-	if !wal.cm.dependencies.Disrupt("walRename") {
+	if len(wal.uncommittedChanges) != 0 && !wal.cm.dependencies.Disrupt("walRename") {
 		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
 		walFileName := filepath.Join(wal.cm.persistDir, walFile)
 		err := wal.cm.dependencies.RenameFile(walTmpName, walFileName)
@@ -146,18 +156,19 @@ func (wal *writeAheadLog) commit() {
 	// Sync all open, non-WAL files on the host.
 	wal.syncResources()
 
-	// Extract any unfinished long-running jobs from the list of WAL items.
-	unfinishedAdditions := findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)
-	unfinishedExtensions := findUnfinishedStorageFolderExtensions(wal.uncommittedChanges)
-
-	// Clear the set of uncommitted changes.
-	wal.uncommittedChanges = nil
-
 	// Begin writing to the settings file.
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		newSettings := wal.cm.savedSettings()
+		if reflect.DeepEqual(newSettings, wal.committedSettings) {
+			// no need to write the settings file
+			wal.fileSettingsTmp = nil
+			return
+		}
+		wal.committedSettings = newSettings
 
 		// Begin writing to the settings file, which will be synced during the
 		// next iteration of the sync loop.
@@ -166,8 +177,7 @@ func (wal *writeAheadLog) commit() {
 		if err != nil {
 			wal.cm.log.Severe("Unable to open temporary settings file for writing:", err)
 		}
-		ss := wal.cm.savedSettings()
-		b, err := json.MarshalIndent(ss, "", "\t")
+		b, err := json.MarshalIndent(newSettings, "", "\t")
 		if err != nil {
 			build.ExtendErr("unable to marshal settings data", err)
 		}
@@ -188,6 +198,15 @@ func (wal *writeAheadLog) commit() {
 	go func() {
 		defer wg.Done()
 
+		if len(wal.uncommittedChanges) == 0 {
+			// no need to recreate wal
+			return
+		}
+
+		// Extract any unfinished long-running jobs from the list of WAL items.
+		unfinishedAdditions := findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)
+		unfinishedExtensions := findUnfinishedStorageFolderExtensions(wal.uncommittedChanges)
+
 		// Recreate the wal file so that it can receive new updates.
 		var err error
 		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
@@ -206,6 +225,9 @@ func (wal *writeAheadLog) commit() {
 			UnfinishedStorageFolderAdditions:  unfinishedAdditions,
 			UnfinishedStorageFolderExtensions: unfinishedExtensions,
 		})
+
+		// Clear the set of uncommitted changes.
+		wal.uncommittedChanges = nil
 	}()
 	wg.Wait()
 }

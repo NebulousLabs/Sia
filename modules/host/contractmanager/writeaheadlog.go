@@ -94,6 +94,7 @@ type (
 		fileWALTmp         modules.File
 		syncChan           chan struct{}
 		uncommittedChanges []stateChange
+		committedSettings  savedSettings
 
 		// Utilities. The WAL needs access to the ContractManager because all
 		// mutations to ACID fields of the contract manager happen through the
@@ -307,6 +308,9 @@ func (wal *writeAheadLog) load() error {
 	wal.cm.tg.AfterStop(func() {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
+		if wal.fileSettingsTmp == nil {
+			return
+		}
 		err := wal.fileSettingsTmp.Close()
 		if err != nil {
 			wal.cm.log.Println("ERROR: unable to close settings temporary file")
