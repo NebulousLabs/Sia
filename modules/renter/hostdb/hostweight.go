@@ -239,8 +239,9 @@ func versionAdjustments(entry modules.HostDBEntry) float64 {
 	if build.VersionCmp(entry.Version, "1.3.2") < 0 {
 		base = base * 0.9
 	}
+	// we shouldn't use pre hardfork hosts
 	if build.VersionCmp(entry.Version, "1.3.1") < 0 {
-		base = base / 1000
+		base = math.SmallestNonzeroFloat64
 	}
 	return base
 }
