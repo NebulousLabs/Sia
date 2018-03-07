@@ -2,5 +2,8 @@ package api
 
 // DaemonVersionGet contains information about the running daemon's version.
 type DaemonVersionGet struct {
-	Version string
+	Version     string
+	GitRevision string
+	GitBranch   string
+	BuildTime   string
 }

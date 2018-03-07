@@ -151,8 +151,13 @@ func startDaemon(config Config) (err error) {
 		}
 	}
 
-	// Print the Siad Version
+	// Print the siad Version and GitRevision
 	fmt.Println("Sia Daemon v" + build.Version)
+	if build.GitRevision == "" {
+		fmt.Println("WARN: compiled without build commit or version. To compile correctly, please use the makefile")
+	} else {
+		fmt.Println("Git Revision " + build.GitRevision)
+	}
 
 	// Install a signal handler that will catch exceptions thrown by mmap'd
 	// files.
