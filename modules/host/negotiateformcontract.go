@@ -73,9 +73,9 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// If the host is not accepting contracts, the connection can be closed.
 	// The renter has been given enough information in the host settings to
 	// understand that the connection is going to be closed.
-	h.mu.RLock()
+	h.mu.Lock()
 	settings := h.externalSettings()
-	h.mu.RUnlock()
+	h.mu.Unlock()
 	if !settings.AcceptingContracts {
 		h.log.Debugln("Turning down contract because the host is not accepting contracts.")
 		return nil

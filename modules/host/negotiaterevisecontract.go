@@ -37,11 +37,11 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	}
 
 	// Read some variables from the host for use later in the function.
-	h.mu.RLock()
+	h.mu.Lock()
 	settings := h.externalSettings()
 	secretKey := h.secretKey
 	blockHeight := h.blockHeight
-	h.mu.RUnlock()
+	h.mu.Unlock()
 
 	// The renter is going to send its intended modifications, followed by the
 	// file contract revision that pays for them.

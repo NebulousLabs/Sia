@@ -42,11 +42,11 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	}
 
 	// Grab a set of variables that will be useful later in the function.
-	h.mu.RLock()
+	h.mu.Lock()
 	blockHeight := h.blockHeight
 	secretKey := h.secretKey
 	settings := h.externalSettings()
-	h.mu.RUnlock()
+	h.mu.Unlock()
 
 	// Read the download requests, followed by the file contract revision that
 	// pays for them.
