@@ -236,41 +236,54 @@ func (d *download) Err() (err error) {
 // Download performs a file download using the passed parameters and blocks
 // until the download is finished.
 func (r *Renter) Download(p modules.RenterDownloadParameters) error {
-	return r.managedDownload(p, false)
+	d, err := r.managedDownload(p)
+	if err != nil {
+		return err
+	}
+	// Block until the download has completed
+	select {
+	case <-d.completeChan:
+		return d.Err()
+	case <-r.tg.StopChan():
+		return errors.New("download interrupted by shutdown")
+	}
 }
 
 // DownloadAsync performs a file download using the passed parameters without
 // blocking until the download is finished.
 func (r *Renter) DownloadAsync(p modules.RenterDownloadParameters) error {
-	return r.managedDownload(p, true)
+	_, err := r.managedDownload(p)
+	return err
 }
 
-// managedDownload performs a file download using the passed parameters.
-func (r *Renter) managedDownload(p modules.RenterDownloadParameters, async bool) error {
+// managedDownload performs a file download using the passed parameters and
+// returns the download object and an error that indicates if the download
+// setup was successful.
+func (r *Renter) managedDownload(p modules.RenterDownloadParameters) (*download, error) {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
 	file, exists := r.files[p.SiaPath]
 	r.mu.RUnlock(lockID)
 	if !exists {
-		return fmt.Errorf("no file with that path: %s", p.SiaPath)
+		return nil, fmt.Errorf("no file with that path: %s", p.SiaPath)
 	}
 
 	// Validate download parameters.
 	isHTTPResp := p.Httpwriter != nil
 	if p.Async && isHTTPResp {
-		return errors.New("cannot async download to http response")
+		return nil, errors.New("cannot async download to http response")
 	}
 	if isHTTPResp && p.Destination != "" {
-		return errors.New("destination cannot be specified when downloading to http response")
+		return nil, errors.New("destination cannot be specified when downloading to http response")
 	}
 	if !isHTTPResp && p.Destination == "" {
-		return errors.New("destination not supplied")
+		return nil, errors.New("destination not supplied")
 	}
 	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
-		return errors.New("destination must be an absolute path")
+		return nil, errors.New("destination must be an absolute path")
 	}
 	if p.Offset == file.size {
-		return errors.New("offset equals filesize")
+		return nil, errors.New("offset equals filesize")
 	}
 	// Sentinel: if length == 0, download the entire file.
 	if p.Length == 0 {
@@ -278,7 +291,7 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters, async bool)
 	}
 	// Check whether offset and length is valid.
 	if p.Offset < 0 || p.Offset+p.Length > file.size {
-		return fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
+		return nil, fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
 	}
 
 	// Instantiate the correct downloadWriter implementation.
@@ -290,7 +303,7 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters, async bool)
 	} else {
 		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, os.FileMode(file.mode))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		dw = osFile
 		destinationType = "file"
@@ -311,7 +324,7 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters, async bool)
 		priority:      5, // TODO: moderate default until full priority support is added.
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add the download object to the download queue.
@@ -319,17 +332,8 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters, async bool)
 	r.downloadHistory = append(r.downloadHistory, d)
 	r.downloadHistoryMu.Unlock()
 
-	// If async is true we can return right away.
-	if async {
-		return nil
-	}
-	// Otherwise we block until the download has completed.
-	select {
-	case <-d.completeChan:
-		return d.Err()
-	case <-r.tg.StopChan():
-		return errors.New("download interrupted by shutdown")
-	}
+	// Return the download object
+	return d, nil
 }
 
 // newDownload creates and initializes a download based on the provided
