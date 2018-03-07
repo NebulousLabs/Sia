@@ -44,8 +44,8 @@ func TestFileAvailable(t *testing.T) {
 		erasureCode: rsc,
 		pieceSize:   100,
 	}
-	neverOffline := func(types.FileContractID) bool {
-		return false
+	neverOffline := func(types.FileContractID) (bool, bool) {
+		return false, true
 	}
 
 	if f.available(neverOffline) {
@@ -62,8 +62,8 @@ func TestFileAvailable(t *testing.T) {
 		t.Error("file should be available")
 	}
 
-	specificOffline := func(fcid types.FileContractID) bool {
-		return fcid == fc.ID
+	specificOffline := func(fcid types.FileContractID) (bool, bool) {
+		return fcid == fc.ID, true
 	}
 	if f.available(specificOffline) {
 		t.Error("file should not be available")
@@ -109,8 +109,8 @@ func TestFileUploadProgressPinning(t *testing.T) {
 // with varying number of filecontracts and erasure code settings.
 func TestFileRedundancy(t *testing.T) {
 	nDatas := []int{1, 2, 10}
-	neverOffline := func(types.FileContractID) bool {
-		return false
+	neverOffline := func(types.FileContractID) (bool, bool) {
+		return false, true
 	}
 	for _, nData := range nDatas {
 		rsc, _ := NewRSCode(nData, 10)
@@ -120,7 +120,6 @@ func TestFileRedundancy(t *testing.T) {
 			contracts:   make(map[types.FileContractID]fileContract),
 			erasureCode: rsc,
 		}
-
 		// Test that an empty file has 0 redundancy.
 		if r := f.redundancy(neverOffline); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
@@ -206,8 +205,8 @@ func TestFileRedundancy(t *testing.T) {
 			}
 		}
 		f.contracts[fc.ID] = fc
-		specificOffline := func(fcid types.FileContractID) bool {
-			return fcid == fc.ID
+		specificOffline := func(fcid types.FileContractID) (bool, bool) {
+			return fcid == fc.ID, true
 		}
 		if r := f.redundancy(specificOffline); r != expectedR {
 			t.Errorf("expected redundancy to ignore offline file contracts, wanted %f got %f", expectedR, r)
