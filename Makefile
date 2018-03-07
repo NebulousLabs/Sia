@@ -1,6 +1,5 @@
-# all will build and install developer binaries, which have debugging enabled
-# and much faster mining and block constants.
-all: release-std
+# all will build and install release binaries.
+all: release
 
 # dependencies installs all of the dependencies that are required for building
 # Sia.
