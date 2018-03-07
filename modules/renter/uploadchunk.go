@@ -266,7 +266,8 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 // light as possible.
 func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedUploadChunk) error {
 	// Only download this file if more than 25% of the redundancy is missing.
-	minMissingPiecesToDownload := (chunk.piecesNeeded - chunk.minimumPieces) / 4
+	numParityPieces := float64(chunk.piecesNeeded - chunk.minimumPieces)
+	minMissingPiecesToDownload := int(numParityPieces * remoteRepairDownloadThreshold)
 	download := chunk.piecesCompleted+minMissingPiecesToDownload < chunk.piecesNeeded
 
 	// Download the chunk if it's not on disk.

@@ -111,6 +111,14 @@ var (
 		Testing:  3 * time.Second,
 	}).(time.Duration)
 
+	// remoteRepairDownloadThreshold defines the threshold in percent under
+	// which the renter starts repairing a file that is not available on disk.
+	remoteRepairDownloadThreshold = build.Select(build.Var{
+		Dev:      0.0,  // always download
+		Standard: 0.25, // download if at least 25% are missing
+		Testing:  0.0,  // always download
+	}).(float64)
+
 	// Prime to avoid intersecting with regular events.
 	uploadFailureCooldown = build.Select(build.Var{
 		Dev:      time.Second * 7,
