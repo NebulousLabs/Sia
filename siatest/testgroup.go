@@ -1,17 +1,16 @@
 package siatest
 
 import (
-	"errors"
 	"math"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api/client"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -61,7 +60,7 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	for _, np := range nodeParams {
 		node, err := NewCleanNode(np)
 		if err != nil {
-			return nil, build.ExtendErr("failed to create clean node", err)
+			return nil, errors.AddContext(err, "failed to create clean node")
 		}
 		// Add node to nodes
 		tg.nodes[node] = struct{}{}
@@ -82,7 +81,7 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 
 	// Fully connect nodes
 	if err := fullyConnectNodes(nodes); err != nil {
-		return nil, build.ExtendErr("failed to fully connect nodes", err)
+		return nil, errors.AddContext(err, "failed to fully connect nodes")
 	}
 	// Get a miner and mine some blocks to generate coins
 	if len(tg.miners) == 0 {
@@ -91,40 +90,40 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	miner := tg.Miners()[0]
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
 		if err := miner.MineBlock(); err != nil {
-			return nil, build.ExtendErr("failed to mine block for funding", err)
+			return nil, errors.AddContext(err, "failed to mine block for funding")
 		}
 	}
 	// Fund nodes
 	if err := fundNodes(miner, tg.nodes); err != nil {
-		return nil, build.ExtendErr("failed to fund nodes", err)
+		return nil, errors.AddContext(err, "failed to fund nodes")
 	}
 	// Add storage to hosts
 	if err := addStorageFolderToHosts(tg.hosts); err != nil {
-		return nil, build.ExtendErr("failed to add storage to nodes", err)
+		return nil, errors.AddContext(err, "failed to add storage to nodes")
 	}
 	// Announce hosts
 	if err := announceHosts(tg.hosts); err != nil {
-		return nil, build.ExtendErr("failed to announce hosts", err)
+		return nil, errors.AddContext(err, "failed to announce hosts")
 	}
 	// Mine a block to get the announcements confirmed
 	if err := miner.MineBlock(); err != nil {
-		return nil, build.ExtendErr("failed to mine host announcements", err)
+		return nil, errors.AddContext(err, "failed to mine host announcements")
 	}
 	// Block until all hosts show up as active in the renters' hostdbs
 	if err := hostsInRenterDBCheck(miner, tg.renters, len(tg.hosts)); err != nil {
-		return nil, build.ExtendErr("renter database check failed", err)
+		return nil, errors.AddContext(err, "renter database check failed")
 	}
 	// Set renter allowances
 	if err := setRenterAllowances(tg.renters); err != nil {
-		return nil, build.ExtendErr("failed to set renter allowance", err)
+		return nil, errors.AddContext(err, "failed to set renter allowance")
 	}
 	// Wait for all the renters to form contracts
 	if err := waitForContracts(miner, tg.renters, tg.hosts); err != nil {
-		return nil, build.ExtendErr("renters failed to form contracts", err)
+		return nil, errors.AddContext(err, "renters failed to form contracts")
 	}
 	// Make sure all nodes are synced
 	if err := synchronizationCheck(miner, tg.nodes); err != nil {
-		return nil, build.ExtendErr("synchronization check failed", err)
+		return nil, errors.AddContext(err, "synchronization check failed")
 	}
 	return tg, nil
 }
@@ -150,7 +149,7 @@ func NewGroupFromTemplate(groupParams GroupParams) (*TestGroup, error) {
 
 // addStorageFolderToHosts adds a single storage folder to each host.
 func addStorageFolderToHosts(hosts map[*TestNode]struct{}) error {
-	errors := make([]error, len(hosts))
+	errs := make([]error, len(hosts))
 	wg := new(sync.WaitGroup)
 	i := 0
 	// The following api call is very slow. Using multiple threads speeds that
@@ -158,23 +157,23 @@ func addStorageFolderToHosts(hosts map[*TestNode]struct{}) error {
 	for host := range hosts {
 		wg.Add(1)
 		go func(i int, host *TestNode) {
-			errors[i] = host.HostStorageFoldersAddPost(host.Dir, 1048576)
+			errs[i] = host.HostStorageFoldersAddPost(host.Dir, 1048576)
 			wg.Done()
 		}(i, host)
 		i++
 	}
 	wg.Wait()
-	return build.ComposeErrors(errors...)
+	return errors.Compose(errs...)
 }
 
 // announceHosts adds storage to each host and announces them to the group
 func announceHosts(hosts map[*TestNode]struct{}) error {
 	for host := range hosts {
 		if err := host.HostAcceptingContractsPost(true); err != nil {
-			return build.ExtendErr("failed to set host to accepting contracts", err)
+			return errors.AddContext(err, "failed to set host to accepting contracts")
 		}
 		if err := host.HostAnnouncePost(); err != nil {
-			return build.ExtendErr("failed to announce host", err)
+			return errors.AddContext(err, "failed to announce host")
 		}
 	}
 	return nil
@@ -186,7 +185,7 @@ func fullyConnectNodes(nodes []*TestNode) error {
 	for i, nodeA := range nodes {
 		for _, nodeB := range nodes[i+1:] {
 			if err := nodeA.GatewayConnectPost(nodeB.GatewayAddress()); err != nil && err != client.ErrPeerExists {
-				return build.ExtendErr("failed to connect to peer", err)
+				return errors.AddContext(err, "failed to connect to peer")
 			}
 		}
 	}
@@ -198,7 +197,7 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	// Get the miner's balance
 	wg, err := miner.WalletGet()
 	if err != nil {
-		return build.ExtendErr("failed to get miner's balance", err)
+		return errors.AddContext(err, "failed to get miner's balance")
 	}
 	// Send txnsPerNode outputs to each node
 	txnsPerNode := uint64(25)
@@ -207,7 +206,7 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	for node := range nodes {
 		wag, err := node.WalletAddressGet()
 		if err != nil {
-			return build.ExtendErr("failed to get wallet address", err)
+			return errors.AddContext(err, "failed to get wallet address")
 		}
 		for i := uint64(0); i < txnsPerNode; i++ {
 			scos = append(scos, types.SiacoinOutput{
@@ -219,11 +218,11 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	// Send the transaction
 	_, err = miner.WalletSiacoinsMultiPost(scos)
 	if err != nil {
-		return build.ExtendErr("failed to send funding txn", err)
+		return errors.AddContext(err, "failed to send funding txn")
 	}
 	// Mine the transactions
 	if err := miner.MineBlock(); err != nil {
-		return build.ExtendErr("failed to mine funding txn", err)
+		return errors.AddContext(err, "failed to mine funding txn")
 	}
 	// Make sure every node has at least one confirmed transaction
 	for node := range nodes {
@@ -281,7 +280,7 @@ func mapToSlice(m map[*TestNode]struct{}) []*TestNode {
 func randomDir() string {
 	dir, err := TestDir(strconv.Itoa(fastrand.Intn(math.MaxInt32)))
 	if err != nil {
-		panic(build.ExtendErr("failed to create testing directory", err))
+		panic(errors.AddContext(err, "failed to create testing directory"))
 	}
 	return dir
 }
@@ -329,7 +328,7 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 	}
 	for renter := range renters {
 		numRetries := 0
-		err := build.Retry(1000, 100*time.Millisecond, func() error {
+		err := Retry(1000, 100*time.Millisecond, func() error {
 			if numRetries%10 == 0 {
 				if err := miner.MineBlock(); err != nil {
 					return err
@@ -356,18 +355,18 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 // goroutine.
 func (tg *TestGroup) Close() error {
 	wg := new(sync.WaitGroup)
-	errors := make([]error, len(tg.nodes))
+	errs := make([]error, len(tg.nodes))
 	i := 0
 	for n := range tg.nodes {
 		wg.Add(1)
 		go func(i int, n *TestNode) {
-			errors[i] = n.Close()
+			errs[i] = n.Close()
 			wg.Done()
 		}(i, n)
 		i++
 	}
 	wg.Wait()
-	return build.ComposeErrors(errors...)
+	return errors.Compose(errs...)
 }
 
 // Nodes returns all the nodes of the group

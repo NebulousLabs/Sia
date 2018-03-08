@@ -1,9 +1,13 @@
 package renter
 
 import (
+	"sync"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/siatest"
+	"github.com/NebulousLabs/fastrand"
+	"github.com/NebulousLabs/ratelimit"
 )
 
 // TestRenter executes a number of subtests using the same TestGroup to
@@ -35,6 +39,7 @@ func TestRenter(t *testing.T) {
 		test func(*testing.T, *siatest.TestGroup)
 	}{
 		{"UploadDownload", testUploadDownload},
+		{"DownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
 	}
 	// Run subtests
 	for _, subtest := range subTests {
@@ -52,7 +57,7 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	// Upload file, creating a piece for each host in the group
 	dataPieces := uint64(1)
 	parityPieces := uint64(len(tg.Hosts())) - dataPieces
-	remoteFile, err := renter.UploadNewFileBlocking(100, dataPieces, parityPieces)
+	remoteFile, err := renter.UploadNewFileBlocking(100+siatest.Fuzz(), dataPieces, parityPieces)
 	if err != nil {
 		t.Fatal("Failed to upload a file for testing: ", err)
 	}
@@ -74,4 +79,53 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	if err := renter.WaitForDownload(localFile, remoteFile); err != nil {
 		t.Error(err)
 	}
+}
+
+// testDownloadMultipleLargeSectors downloads multiple large files (>5 Sectors)
+// in parallel and makes sure that the downloads are blocking each other.
+func testDownloadMultipleLargeSectors(t *testing.T, tg *siatest.TestGroup) {
+	// parallelDownloads is the number of downloads that are run in parallel.
+	parallelDownloads := 10
+	// fileSize is the size of the downloaded file.
+	fileSize := int(10*modules.SectorSize) + siatest.Fuzz()
+	// set download limits and reset them after test.
+	ratelimit.SetLimits(int64(fileSize)*2, 0, modules.SectorSize)
+	defer ratelimit.SetLimits(0, 0, 0)
+	// uniqueRemoteFiles is the number of files that will be uploaded to the
+	// network. Downloads will choose the remote file to download randomly.
+	uniqueRemoteFiles := 5
+	// Grab the first of the group's renters
+	renter := tg.Renters()[0]
+
+	// Upload files
+	dataPieces := uint64(len(tg.Hosts())) - 1
+	parityPieces := uint64(1)
+	remoteFiles := make([]*siatest.RemoteFile, 0, uniqueRemoteFiles)
+	for i := 0; i < uniqueRemoteFiles; i++ {
+		remoteFile, err := renter.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+		if err != nil {
+			t.Fatal("Failed to upload a file for testing: ", err)
+		}
+		remoteFiles = append(remoteFiles, remoteFile)
+	}
+
+	// Randomly download using download to file and download to stream methods.
+	wg := new(sync.WaitGroup)
+	for i := 0; i < parallelDownloads; i++ {
+		wg.Add(1)
+		go func() {
+			var err error
+			var rf = remoteFiles[fastrand.Intn(len(remoteFiles))]
+			if fastrand.Intn(2) == 0 {
+				_, err = renter.DownloadByStream(rf)
+			} else {
+				_, err = renter.DownloadToDisk(rf, false)
+			}
+			if err != nil {
+				t.Error("Download failed:", err)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 }
