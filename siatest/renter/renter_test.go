@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/siatest"
 	"github.com/NebulousLabs/fastrand"
@@ -139,6 +140,11 @@ func testRenterLocalRepair(t *testing.T, tg *siatest.TestGroup) {
 	// Grab the first of the group's renters
 	renter := tg.Renters()[0]
 
+	// Check that we have enough hosts for this test.
+	if len(tg.Hosts()) < 2 {
+		t.Fatal("This test requires at least 2 hosts")
+	}
+
 	// Set fileSize and redundancy for upload
 	fileSize := int(modules.SectorSize)
 	dataPieces := uint64(1)
@@ -185,7 +191,12 @@ func testRenterLocalRepair(t *testing.T, tg *siatest.TestGroup) {
 // downloading it after a host goes offline.
 func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 	// Grab the first of the group's renters
-	renter := tg.Renters()[0]
+	r := tg.Renters()[0]
+
+	// Check that we have enough hosts for this test.
+	if len(tg.Hosts()) < 2 {
+		t.Fatal("This test requires at least 2 hosts")
+	}
 
 	// Set fileSize and redundancy for upload
 	fileSize := int(modules.SectorSize)
@@ -193,13 +204,13 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 	parityPieces := uint64(len(tg.Hosts())) - dataPieces
 
 	// Upload file
-	localFile, remoteFile, err := renter.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+	localFile, remoteFile, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Get the file info of the fully uploaded file. Tha way we can compare the
 	// redundancieslater.
-	fi, err := renter.FileInfo(remoteFile)
+	fi, err := r.FileInfo(remoteFile)
 	if err != nil {
 		t.Fatal("failed to get file info", err)
 	}
@@ -216,22 +227,24 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 		}
 	}
 	expectedRedundancy := float64(dataPieces+parityPieces-1) / float64(dataPieces)
-	if err := renter.WaitForDecreasingRedundancy(remoteFile, expectedRedundancy); err != nil {
+	if err := r.WaitForDecreasingRedundancy(remoteFile, expectedRedundancy); err != nil {
 		t.Fatal("Redundancy isn't decreasing", err)
 	}
 	// We should still be able to download
-	if _, err := renter.DownloadByStream(remoteFile); err != nil {
+	if _, err := r.DownloadByStream(remoteFile); err != nil {
 		t.Fatal("Failed to download file", err)
 	}
 	// Bring up new parity hosts and check if redundancy increments again.
 	if err := tg.AddNodeN(node.HostTemplate, int(parityPieces)); err != nil {
 		t.Fatal("Failed to create a new host", err)
 	}
-	if err := renter.WaitForUploadRedundancy(remoteFile, fi.Redundancy); err != nil {
+	// When doing remote repair the redundancy might not reach 100%.
+	expectedRedundancy = (1.0 - renter.RemoteRepairDownloadThreshold) * fi.Redundancy
+	if err := r.WaitForUploadRedundancy(remoteFile, expectedRedundancy); err != nil {
 		t.Fatal("File wasn't repaired", err)
 	}
 	// We should be able to download
-	if _, err := renter.DownloadByStream(remoteFile); err != nil {
+	if _, err := r.DownloadByStream(remoteFile); err != nil {
 		t.Fatal("Failed to download file", err)
 	}
 }

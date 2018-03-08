@@ -264,13 +264,12 @@ func hostsInRenterDBCheck(miner *TestNode, renters map[*TestNode]struct{}, hosts
 					return nil
 				}
 				// Check if the renter has the host in its db.
-				if err := renter.knowsHost(host); err != nil {
-					if numRetries%10 == 0 {
-						if err := miner.MineBlock(); err != nil {
-							return err
-						}
-					}
-					return build.ExtendErr("renter doesn't know host", err)
+				err := errors.AddContext(renter.KnowsHost(host), "renter doesn't know host")
+				if err != nil && numRetries%10 == 0 {
+					return errors.Compose(err, miner.MineBlock())
+				}
+				if err != nil {
+					return err
 				}
 				return nil
 			})

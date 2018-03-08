@@ -252,9 +252,9 @@ func (tn *TestNode) WaitForDecreasingRedundancy(rf *RemoteFile, redundancy float
 	})
 }
 
-// knowsHost checks if tn has a certain host in its hostdb. This check is
+// KnowsHost checks if tn has a certain host in its hostdb. This check is
 // performed using the host's public key.
-func (tn *TestNode) knowsHost(host *TestNode) error {
+func (tn *TestNode) KnowsHost(host *TestNode) error {
 	hdag, err := tn.HostDbActiveGet()
 	if err != nil {
 		return err
