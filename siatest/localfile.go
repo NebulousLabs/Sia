@@ -1,14 +1,13 @@
 package siatest
 
 import (
-	"errors"
 	"io/ioutil"
 	"math"
 	"path/filepath"
 	"strconv"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -39,7 +38,7 @@ func NewFile(size int) (*LocalFile, error) {
 func (lf *LocalFile) checkIntegrity() error {
 	data, err := ioutil.ReadFile(lf.path)
 	if err != nil {
-		return build.ExtendErr("failed to read file from disk", err)
+		return errors.AddContext(err, "failed to read file from disk")
 	}
 	if crypto.HashAll(data) != lf.checksum {
 		return errors.New("checksums don't match")

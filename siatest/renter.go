@@ -1,17 +1,17 @@
 package siatest
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
 	"strconv"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node/api"
+
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -20,13 +20,13 @@ import (
 func (tn *TestNode) DownloadToDisk(rf *RemoteFile, async bool) (*LocalFile, error) {
 	fi, err := tn.FileInfo(rf)
 	if err != nil {
-		return nil, build.ExtendErr("failed to retrieve FileInfo", err)
+		return nil, errors.AddContext(err, "failed to retrieve FileInfo")
 	}
 	// Create a random destination for the download
 	fileName := strconv.Itoa(fastrand.Intn(math.MaxInt32))
 	dest := filepath.Join(SiaTestingDir, fileName)
 	if err := tn.RenterDownloadGet(rf.siaPath, dest, 0, fi.Filesize, async); err != nil {
-		return nil, build.ExtendErr("failed to download file", err)
+		return nil, errors.AddContext(err, "failed to download file")
 	}
 	// Create the TestFile
 	lf := &LocalFile{
@@ -39,7 +39,7 @@ func (tn *TestNode) DownloadToDisk(rf *RemoteFile, async bool) (*LocalFile, erro
 	}
 	// Verify checksum if we downloaded the file blocking
 	if err := lf.checkIntegrity(); err != nil {
-		return lf, build.ExtendErr("downloaded file's checksum doesn't match", err)
+		return lf, errors.AddContext(err, "downloaded file's checksum doesn't match")
 	}
 	return lf, nil
 }
@@ -48,7 +48,7 @@ func (tn *TestNode) DownloadToDisk(rf *RemoteFile, async bool) (*LocalFile, erro
 func (tn *TestNode) DownloadByStream(rf *RemoteFile) (data []byte, err error) {
 	fi, err := tn.FileInfo(rf)
 	if err != nil {
-		return nil, build.ExtendErr("failed to retrieve FileInfo", err)
+		return nil, errors.AddContext(err, "failed to retrieve FileInfo")
 	}
 	data, err = tn.RenterDownloadHTTPResponseGet(rf.siaPath, 0, fi.Filesize)
 	if err == nil && rf.checksum != crypto.HashAll(data) {
@@ -61,11 +61,12 @@ func (tn *TestNode) DownloadByStream(rf *RemoteFile) (data []byte, err error) {
 // the download has either finished, or was never started in the first place.
 // If the corresponding download info was found, DownloadInfo also performs a
 // few sanity checks on its fields.
-func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (di *api.DownloadInfo, err error) {
+func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (*api.DownloadInfo, error) {
 	rdq, err := tn.RenterDownloadsGet()
 	if err != nil {
 		return nil, err
 	}
+	var di *api.DownloadInfo
 	for _, d := range rdq.Downloads {
 		if rf.siaPath == d.SiaPath && lf.path == d.Destination {
 			di = &d
@@ -74,22 +75,22 @@ func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (di *api.Downloa
 	}
 	if di == nil {
 		// No download info found.
-		return
+		return nil, errors.New("download info not found")
 	}
 	// Check if length and filesize were set correctly
 	if di.Length != di.Filesize {
-		err = errors.New("filesize != length")
+		err = errors.AddContext(err, "filesize != length")
 	}
 	// Received data can't be larger than transfered data
 	if di.Received > di.TotalDataTransferred {
-		err = build.ComposeErrors(err, errors.New("received > TotalDataTransfered"))
+		err = errors.AddContext(err, "received > TotalDataTransfered")
 	}
 	// If the download is completed, the amount of received data has to equal
 	// the amount of requested data.
 	if di.Completed && di.Received != di.Length {
-		err = build.ComposeErrors(err, errors.New("completed == true but received != length"))
+		err = errors.AddContext(err, "completed == true but received != length")
 	}
-	return
+	return di, err
 }
 
 // Files lists the files tracked by the renter
@@ -130,7 +131,7 @@ func (tn *TestNode) Upload(lf *LocalFile, dataPieces, parityPieces uint64) (*Rem
 	// Make sure renter tracks file
 	_, err = tn.FileInfo(rf)
 	if err != nil {
-		return rf, build.ExtendErr("uploaded file is not tracked by the renter", err)
+		return rf, errors.AddContext(err, "uploaded file is not tracked by the renter")
 	}
 	return rf, nil
 }
@@ -140,13 +141,13 @@ func (tn *TestNode) UploadNewFile(filesize int, dataPieces uint64, parityPieces 
 	// Create file for upload
 	lf, err := NewFile(filesize)
 	if err != nil {
-		err = build.ExtendErr("failed to create file", err)
+		err = errors.AddContext(err, "failed to create file")
 		return
 	}
 	// Upload file, creating a parity piece for each host in the group
 	rf, err = tn.Upload(lf, dataPieces, parityPieces)
 	if err != nil {
-		err = build.ExtendErr("failed to start upload", err)
+		err = errors.AddContext(err, "failed to start upload")
 		return
 	}
 	return
@@ -177,7 +178,7 @@ func (tn *TestNode) WaitForDownload(lf *LocalFile, rf *RemoteFile) error {
 	err := Retry(1000, 100*time.Millisecond, func() error {
 		file, err := tn.DownloadInfo(lf, rf)
 		if err != nil {
-			return build.ExtendErr("couldn't retrieve DownloadInfo", err)
+			return errors.AddContext(err, "couldn't retrieve DownloadInfo")
 		}
 		if file == nil {
 			return nil
@@ -203,7 +204,7 @@ func (tn *TestNode) WaitForUploadProgress(rf *RemoteFile, progress float64) erro
 	return Retry(1000, 100*time.Millisecond, func() error {
 		file, err := tn.FileInfo(rf)
 		if err != nil {
-			return build.ExtendErr("couldn't retrieve FileInfo", err)
+			return errors.AddContext(err, "couldn't retrieve FileInfo")
 		}
 		if file.UploadProgress < progress {
 			return fmt.Errorf("progress should be %v but was %v", progress, file.UploadProgress)
@@ -223,7 +224,7 @@ func (tn *TestNode) WaitForUploadRedundancy(rf *RemoteFile, redundancy float64) 
 	return Retry(1000, 100*time.Millisecond, func() error {
 		file, err := tn.FileInfo(rf)
 		if err != nil {
-			return build.ExtendErr("couldn't retrieve FileInfo", err)
+			return errors.AddContext(err, "couldn't retrieve FileInfo")
 		}
 		if file.Redundancy < redundancy {
 			return fmt.Errorf("redundancy should be %v but was %v", redundancy, file.Redundancy)

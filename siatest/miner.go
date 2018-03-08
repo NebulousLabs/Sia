@@ -2,13 +2,12 @@ package siatest
 
 import (
 	"bytes"
-	"errors"
 	"unsafe"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 )
 
 // MineBlock makes the underlying node mine a single block and broadcast it.
@@ -16,16 +15,16 @@ func (tn *TestNode) MineBlock() error {
 	// Get the header
 	target, header, err := tn.MinerHeaderGet()
 	if err != nil {
-		return build.ExtendErr("failed to get header for work", err)
+		return errors.AddContext(err, "failed to get header for work")
 	}
 	// Solve the header
 	header, err = solveHeader(target, header)
 	if err != nil {
-		return build.ExtendErr("failed to solve header", err)
+		return errors.AddContext(err, "failed to solve header")
 	}
 	// Submit the header
 	if err := tn.MinerHeaderPost(header); err != nil {
-		return build.ExtendErr("failed to submit header", err)
+		return errors.AddContext(err, "failed to submit header")
 	}
 	return nil
 }
