@@ -30,12 +30,10 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 			return "", errors.New("interrupted by shutdown")
 		default:
 		}
-
 		// Get peers
 		g.mu.RLock()
 		peers := g.Peers()
 		g.mu.RUnlock()
-
 		// Check if there are enough peers. Otherwise wait.
 		if len(peers) < minPeersForIPDiscovery {
 			select {
@@ -44,27 +42,39 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 			}
 			continue
 		}
-
 		// Ask all the peers about our ip in parallel
-		returnChan := make(chan modules.NetAddress)
+		returnChan := make(chan string)
 		for _, peer := range peers {
 			go g.RPC(peer.NetAddress, "DiscoverIP", func(conn modules.PeerConn) error {
 				var address string
 				err := encoding.ReadObject(conn, &address, 100)
-				returnChan <- modules.NetAddress(address)
+				if err != nil {
+					returnChan <- ""
+					g.log.Debugf("DEBUG: failed to receive ip address: %v", err)
+					return err
+				}
+				addr := net.ParseIP(address)
+				if addr == nil {
+					returnChan <- ""
+					g.log.Debug("DEBUG: failed to parse ip address")
+					return errors.New("failed to parse ip address")
+				}
+				returnChan <- addr.String()
 				return err
 			})
 		}
 		// Wait for their responses
 		addresses := make(map[string]int)
+		successfulResponses := 0
 		for i := 0; i < len(peers); i++ {
 			addr := <-returnChan
-			if addr.IsValid() == nil {
-				addresses[addr.Host()]++
+			if addr != "" {
+				addresses[addr]++
+				successfulResponses++
 			}
 		}
 		// If there haven't been enough successful responses we wait some time.
-		if len(addresses) < minPeersForIPDiscovery {
+		if successfulResponses < minPeersForIPDiscovery {
 			select {
 			case <-time.After(peerDiscoveryRetryInterval):
 			case <-g.peerTG.StopChan():
@@ -74,7 +84,7 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 		// If an address was returned by more than half the peers we consider
 		// it valid.
 		for addr, count := range addresses {
-			if count > len(addresses)/2 {
+			if count > successfulResponses/2 {
 				return addr, nil
 			}
 		}

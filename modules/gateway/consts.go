@@ -220,8 +220,8 @@ var (
 	// accept a result.
 	minPeersForIPDiscovery = build.Select(build.Var{
 		Standard: 5,
-		Dev:      1,
-		Testing:  1,
+		Dev:      3,
+		Testing:  2,
 	}).(int)
 
 	// peerDiscoveryRetryInterval is the time we wait when there were not
