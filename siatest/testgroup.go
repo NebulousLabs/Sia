@@ -354,7 +354,7 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 	// from the hosts map.
 	for renter := range renters {
 		numRetries := 0
-		err := build.Retry(100, 100, func() error {
+		err := Retry(1000, 100, func() error {
 			numRetries++
 			contracts := uint64(0)
 			// Get the renter's contracts.
