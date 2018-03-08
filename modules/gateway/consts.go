@@ -212,3 +212,23 @@ var (
 		Testing:  5 * time.Second,
 	}).(time.Duration)
 )
+
+var (
+	// minPeersForIPDiscovery is the minimum number of peer connections we wait
+	// for before we try to discover our public ip from them. It is also the
+	// minimum number of successful replies we expect from our peers before we
+	// accept a result.
+	minPeersForIPDiscovery = build.Select(build.Var{
+		Standard: 5,
+		Dev:      1,
+		Testing:  1,
+	}).(int)
+
+	// peerDiscoveryRetryInterval is the time we wait when there were not
+	// enough peers to determine our public ip address before trying again.
+	peerDiscoveryRetryInterval = build.Select(build.Var{
+		Standard: 10 * time.Second,
+		Dev:      1 * time.Second,
+		Testing:  100 * time.Millisecond,
+	}).(time.Duration)
+)

@@ -64,6 +64,9 @@ func (g *Gateway) threadedLearnHostname() {
 		host, err = myExternalIP()
 	}
 	if err != nil {
+		host, err = g.managedIPFromPeers()
+	}
+	if err != nil {
 		g.log.Println("WARN: failed to discover external IP:", err)
 		return
 	}
