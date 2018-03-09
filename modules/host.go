@@ -122,7 +122,7 @@ type (
 	}
 
 	// HostWorkingStatus reports the working state of a host. Can be one of
-	// "checking", "working", or "not working.
+	// "checking", "working", or "not working".
 	HostWorkingStatus string
 
 	// HostConnectabilityStatus reports the connectability state of a host. Can be
