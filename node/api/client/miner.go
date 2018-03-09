@@ -21,3 +21,15 @@ func (c *Client) MinerHeaderPost(bh types.BlockHeader) (err error) {
 	err = c.post("/miner/header", string(encoding.Marshal(bh)), nil)
 	return
 }
+
+// MinerStartGet uses the /miner/start endpoint to start the cpu miner.
+func (c *Client) MinerStartGet() (err error) {
+	err = c.get("/miner/start", nil)
+	return
+}
+
+// MinerStopGet uses the /miner/stop endpoint to stop the cpu miner.
+func (c *Client) MinerStopGet() (err error) {
+	err = c.get("/miner/stop", nil)
+	return
+}

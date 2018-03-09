@@ -15,6 +15,12 @@ func (c *Client) RenterContractsGet() (rc api.RenterContracts, err error) {
 	return
 }
 
+// RenterDeletePost uses the /renter/delete endpoint to delete a file.
+func (c *Client) RenterDeletePost(siaPath string) (err error) {
+	err = c.post(fmt.Sprintf("/renter/delete/%s", siaPath), "", nil)
+	return err
+}
+
 // RenterDownloadGet uses the /renter/download endpoint to download a file to a
 // destination on disk.
 func (c *Client) RenterDownloadGet(siaPath, destination string, offset, length uint64, async bool) (err error) {
