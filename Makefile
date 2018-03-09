@@ -4,7 +4,7 @@ GIT_REVISION=$(shell git rev-parse --short HEAD)
 GIT_DIRTY=$(shell git diff-index --quiet HEAD -- || echo "✗-")
 
 ldflags= -X github.com/NebulousLabs/Sia/build.GitRevision=${GIT_DIRTY}${GIT_REVISION} \
--X github.com/NebulousLabs/Sia/build.BuildTime=${BUILD_TIME}
+-X "github.com/NebulousLabs/Sia/build.BuildTime=${BUILD_TIME}"
 
 # all will build and install release binaries
 all: release
