@@ -156,6 +156,12 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	return newID
 }
 
+// SetRateLimits sets the bandwidth limits for connections created by the
+// contractSet.
+func (c *Contractor) SetRateLimits(readBPS, writeBPS int64, packetSize uint64) {
+	c.contracts.SetRateLimits(readBPS, writeBPS, packetSize)
+}
+
 // Close closes the Contractor.
 func (c *Contractor) Close() error {
 	return c.tg.Stop()
@@ -222,6 +228,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, co
 		renewing:          make(map[types.FileContractID]bool),
 		revising:          make(map[types.FileContractID]bool),
 	}
+
 	// Close the contract set and logger upon shutdown.
 	c.tg.AfterStop(func() {
 		if err := c.contracts.Close(); err != nil {
