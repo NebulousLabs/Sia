@@ -9,7 +9,6 @@ import (
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/siatest"
 	"github.com/NebulousLabs/fastrand"
-	"github.com/NebulousLabs/ratelimit"
 )
 
 // TestRenter executes a number of subtests using the same TestGroup to
@@ -92,14 +91,20 @@ func testDownloadMultipleLargeSectors(t *testing.T, tg *siatest.TestGroup) {
 	parallelDownloads := 10
 	// fileSize is the size of the downloaded file.
 	fileSize := int(10*modules.SectorSize) + siatest.Fuzz()
-	// set download limits and reset them after test.
-	ratelimit.SetLimits(int64(fileSize)*2, 0, modules.SectorSize)
-	defer ratelimit.SetLimits(0, 0, 0)
 	// uniqueRemoteFiles is the number of files that will be uploaded to the
 	// network. Downloads will choose the remote file to download randomly.
 	uniqueRemoteFiles := 5
 	// Grab the first of the group's renters
 	renter := tg.Renters()[0]
+	// set download limits and reset them after test.
+	if err := renter.RenterPostRateLimit(int64(fileSize)*2, 0, modules.SectorSize); err != nil {
+		t.Fatal("failed to set renter bandwidth limit", err)
+	}
+	defer func() {
+		if err := renter.RenterPostRateLimit(0, 0, modules.SectorSize); err != nil {
+			t.Error("failed to reset renter bandwidth limit", err)
+		}
+	}()
 
 	// Upload files
 	dataPieces := uint64(len(tg.Hosts())) - 1
