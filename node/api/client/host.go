@@ -3,6 +3,8 @@ package client
 import (
 	"net/url"
 	"strconv"
+
+	"github.com/NebulousLabs/Sia/node/api"
 )
 
 // HostAnnouncePost uses the /host/announce endpoint to announce the host to
@@ -27,5 +29,11 @@ func (c *Client) HostStorageFoldersAddPost(path string, size uint64) (err error)
 	values.Set("path", path)
 	values.Set("size", strconv.FormatUint(size, 10))
 	err = c.post("/host/storage/folders/add", values.Encode(), nil)
+	return
+}
+
+// HostGet requests the /host endpoint.
+func (c *Client) HostGet() (hg api.HostGET, err error) {
+	err = c.get("/host", &hg)
 	return
 }
