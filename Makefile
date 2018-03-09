@@ -1,11 +1,9 @@
 # These variables get inserted into ./build/commit.go
-BUILD_TIME=$(shell date +%FT%T%z)
+BUILD_TIME=$(shell date)
 GIT_REVISION=$(shell git rev-parse --short HEAD)
-GIT_BRANCH=$(shell git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 GIT_DIRTY=$(shell git diff-index --quiet HEAD -- || echo "✗-")
 
 ldflags= -X github.com/NebulousLabs/Sia/build.GitRevision=${GIT_DIRTY}${GIT_REVISION} \
--X github.com/NebulousLabs/Sia/build.GitBranch=${GIT_BRANCH} \
 -X github.com/NebulousLabs/Sia/build.BuildTime=${BUILD_TIME}
 
 # all will build and install release binaries

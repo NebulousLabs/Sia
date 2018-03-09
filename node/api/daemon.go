@@ -4,6 +4,5 @@ package api
 type DaemonVersionGet struct {
 	Version     string
 	GitRevision string
-	GitBranch   string
 	BuildTime   string
 }

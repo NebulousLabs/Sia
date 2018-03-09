@@ -49,8 +49,7 @@ func versioncmd() {
 	fmt.Println("\tVersion " + build.Version)
 	if build.GitRevision != "" {
 		fmt.Println("\tGit Revision " + build.GitRevision)
-		fmt.Println("\tGit Branch " + build.GitBranch)
-		fmt.Println("\tBuild Time " + build.BuildTime)
+		fmt.Println("\tBuild Time   " + build.BuildTime)
 	}
 	var dvg api.DaemonVersionGet
 	err := getAPI("/daemon/version", &dvg)
@@ -62,8 +61,7 @@ func versioncmd() {
 	fmt.Println("\tVersion " + dvg.Version)
 	if build.GitRevision != "" {
 		fmt.Println("\tGit Revision " + dvg.GitRevision)
-		fmt.Println("\tGit Branch " + dvg.GitBranch)
-		fmt.Println("\tBuild Time " + dvg.BuildTime)
+		fmt.Println("\tBuild Time   " + dvg.BuildTime)
 	}
 }
 
