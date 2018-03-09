@@ -87,7 +87,9 @@ type (
 
 	// DaemonVersion holds the version information for siad
 	DaemonVersion struct {
-		Version string `json:"version"`
+		Version     string `json:"version"`
+		GitRevision string `json:"gitrevision"`
+		BuildTime   string `json:"buildtime"`
 	}
 	// UpdateInfo indicates whether an update is available, and to what
 	// version.
@@ -358,7 +360,7 @@ func (srv *Server) daemonConstantsHandler(w http.ResponseWriter, _ *http.Request
 
 // daemonVersionHandler handles the API call that requests the daemon's version.
 func (srv *Server) daemonVersionHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	api.WriteJSON(w, DaemonVersion{Version: build.Version})
+	api.WriteJSON(w, DaemonVersion{Version: build.Version, GitRevision: build.GitRevision, BuildTime: build.BuildTime})
 }
 
 // daemonStopHandler handles the API call to stop the daemon cleanly.

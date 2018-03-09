@@ -1,4 +1,12 @@
-# all will build and install release binaries.
+# These variables get inserted into ./build/commit.go
+BUILD_TIME=$(shell date)
+GIT_REVISION=$(shell git rev-parse --short HEAD)
+GIT_DIRTY=$(shell git diff-index --quiet HEAD -- || echo "✗-")
+
+ldflags= -X github.com/NebulousLabs/Sia/build.GitRevision=${GIT_DIRTY}${GIT_REVISION} \
+-X "github.com/NebulousLabs/Sia/build.BuildTime=${BUILD_TIME}"
+
+# all will build and install release binaries
 all: release
 
 # dependencies installs all of the dependencies that are required for building
@@ -64,21 +72,21 @@ spellcheck:
 
 # debug builds and installs debug binaries.
 debug:
-	go install -tags='debug profile netgo' $(pkgs)
+	go install -tags='debug profile netgo' -ldflags='$(ldflags)' $(pkgs)
 debug-race:
-	go install -race -tags='debug profile netgo' $(pkgs)
+	go install -race -tags='debug profile netgo' -ldflags='$(ldflags)' $(pkgs)
 
 # dev builds and installs developer binaries.
 dev:
-	go install -tags='dev debug profile netgo' $(pkgs)
+	go install -tags='dev debug profile netgo' -ldflags='$(ldflags)' $(pkgs)
 dev-race:
-	go install -race -tags='dev debug profile netgo' $(pkgs)
+	go install -race -tags='dev debug profile netgo' -ldflags='$(ldflags)' $(pkgs)
 
 # release builds and installs release binaries.
 release:
-	go install -tags 'netgo' -a -ldflags='-s -w' $(pkgs)
+	go install -tags='netgo' -a -ldflags='-s -w $(ldflags)' $(pkgs)
 release-race:
-	go install -race -tags 'netgo' -a -ldflags='-s -w' $(pkgs)
+	go install -race -tags='netgo' -a -ldflags='-s -w $(ldflags)' $(pkgs)
 
 # clean removes all directories that get automatically created during
 # development.

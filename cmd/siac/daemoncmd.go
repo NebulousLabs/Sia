@@ -45,14 +45,24 @@ type updateInfo struct {
 
 // version prints the version of siac and siad.
 func versioncmd() {
-	fmt.Println("Sia Client v" + build.Version)
+	fmt.Println("Sia Client")
+	fmt.Println("\tVersion " + build.Version)
+	if build.GitRevision != "" {
+		fmt.Println("\tGit Revision " + build.GitRevision)
+		fmt.Println("\tBuild Time   " + build.BuildTime)
+	}
 	var dvg api.DaemonVersionGet
 	err := getAPI("/daemon/version", &dvg)
 	if err != nil {
 		fmt.Println("Could not get daemon version:", err)
 		return
 	}
-	fmt.Println("Sia Daemon v" + dvg.Version)
+	fmt.Println("Sia Daemon")
+	fmt.Println("\tVersion " + dvg.Version)
+	if build.GitRevision != "" {
+		fmt.Println("\tGit Revision " + dvg.GitRevision)
+		fmt.Println("\tBuild Time   " + dvg.BuildTime)
+	}
 }
 
 // stopcmd is the handler for the command `siac stop`.
