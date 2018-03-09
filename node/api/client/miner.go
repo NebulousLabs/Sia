@@ -27,3 +27,9 @@ func (c *Client) MinerStartGet() (err error) {
 	err = c.get("/miner/start", nil)
 	return
 }
+
+// MinerStopGet uses the /miner/stop endpoint to stop the cpu miner.
+func (c *Client) MinerStopGet() (err error) {
+	err = c.get("/miner/stop", nil)
+	return
+}
