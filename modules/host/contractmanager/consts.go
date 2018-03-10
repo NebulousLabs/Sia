@@ -89,8 +89,8 @@ var (
 	// indicate the location of a sector.
 	MaximumSectorsPerStorageFolder = build.Select(build.Var{
 		Dev:      uint64(1 << 20), // 4 TiB
-		Standard: uint64(1 << 32), // 32 PiB
-		Testing:  uint64(1 << 12), // 16 MiB
+		Standard: uint64(1 << 32), // 16 PiB
+		Testing:  uint64(1 << 12), // 16 GiB
 	}).(uint64)
 
 	// maximumStorageFolders defines the maximum number of storage folders that
