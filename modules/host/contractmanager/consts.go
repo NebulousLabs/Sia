@@ -88,9 +88,9 @@ var (
 	// billion sectors because the sector location map only uses 4 bytes to
 	// indicate the location of a sector.
 	MaximumSectorsPerStorageFolder = build.Select(build.Var{
-		Dev:      uint64(1 << 20), // 4 TiB
+		Dev:      uint64(1 << 20), // 256 GiB
 		Standard: uint64(1 << 32), // 16 PiB
-		Testing:  uint64(1 << 12), // 16 GiB
+		Testing:  uint64(1 << 12), // 16 MiB
 	}).(uint64)
 
 	// maximumStorageFolders defines the maximum number of storage folders that
@@ -105,7 +105,7 @@ var (
 	// that a storage folder is allowed to have.
 	MinimumSectorsPerStorageFolder = build.Select(build.Var{
 		Dev:      uint64(1 << 6), // 16 MiB
-		Standard: uint64(1 << 6), // 512 MiB
+		Standard: uint64(1 << 6), // 256 MiB
 		Testing:  uint64(1 << 6), // 256 KiB
 	}).(uint64)
 )
