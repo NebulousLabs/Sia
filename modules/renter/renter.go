@@ -18,6 +18,7 @@ package renter
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -336,6 +337,37 @@ func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
 	id := r.mu.Lock()
 	r.lastEstimation = modules.RenterPriceEstimation{}
 	r.mu.Unlock(id)
+}
+
+// validateSiapath checks that a Siapath is a legal filename.
+// ../ is disallowed to prevent directory traversal, and paths must not begin
+// with / or be empty.
+func validateSiapath(siapath string) error {
+	if siapath == "" {
+		return ErrEmptyFilename
+	}
+	if siapath == ".." {
+		return errors.New("siapath cannot be ..")
+	}
+	if siapath == "." {
+		return errors.New("siapath cannot be .")
+	}
+	// check prefix
+	if strings.HasPrefix(siapath, "/") {
+		return errors.New("siapath cannot begin with /")
+	}
+	if strings.HasPrefix(siapath, "../") {
+		return errors.New("siapath cannot begin with ../")
+	}
+	if strings.HasPrefix(siapath, "./") {
+		return errors.New("siapath connot begin with ./")
+	}
+	for _, pathElem := range strings.Split(siapath, "/") {
+		if pathElem == "." || pathElem == ".." {
+			return errors.New("siapath cannot contain . or .. elements")
+		}
+	}
+	return nil
 }
 
 // Enforce that Renter satisfies the modules.Renter interface.

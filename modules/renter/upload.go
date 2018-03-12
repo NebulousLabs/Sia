@@ -17,7 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -27,30 +26,6 @@ var (
 	// errUploadDirectory is returned if the user tries to upload a directory.
 	errUploadDirectory = errors.New("cannot upload directory")
 )
-
-// validateSiapath checks that a Siapath is a legal filename.
-// ../ is disallowed to prevent directory traversal, and paths must not begin
-// with / or be empty.
-func validateSiapath(siapath string) error {
-	if strings.HasPrefix(siapath, "/") {
-		return errors.New("siapath cannot begin with /")
-	}
-
-	if siapath == "" {
-		return ErrEmptyFilename
-	}
-
-	// TODO: What about names like "This is a sentence and a folder./This is a
-	// folder where the name trails off.../This is a file."
-	if strings.Contains(siapath, "../") {
-		return errors.New("directory traversal is not allowed")
-	}
-	if strings.Contains(siapath, "./") {
-		return errors.New("siapath contains invalid characters")
-	}
-
-	return nil
-}
 
 // validateSource verifies that a sourcePath meets the
 // requirements for upload.
