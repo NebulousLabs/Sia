@@ -331,21 +331,38 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 		return errors.New("consensus set does not support LockedTryTransactionSet method")
 	}
 
-	return cs.LockedTryTransactionSet(func(txnFn func(txns []types.Transaction) (modules.ConsensusChange, error)) error {
-		tp.log.Println("Beginning broadcast of transaction set")
+	tp.log.Println("Beginning broadcast of transaction set")
+	err := cs.LockedTryTransactionSet(func(txnFn func(txns []types.Transaction) (modules.ConsensusChange, error)) error {
 		tp.mu.Lock()
 		defer tp.mu.Unlock()
 		err := tp.acceptTransactionSet(ts, txnFn)
 		if err != nil {
-			tp.log.Println("Transaction set broadcast has failed")
 			return err
 		}
-		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 		// Notify subscribers of an accepted transaction set
 		tp.updateSubscribersTransactions()
-		tp.log.Println("Transaction set broadcast appears to have succeeded")
 		return nil
 	})
+	// In case of certain errors we still want to broadcast the set
+	if err == nil || err == modules.ErrDuplicateTransactionSet || err == errLowMinerFees {
+		// This set was broadcasted before if err != nil. We need to update
+		// it's seen txn height when we rebroadcast it. If we don't do
+		// that, the transaction will be pruned from the tpool and they
+		// might no longer show up in the wallet while still beingt
+		// tracked.
+		if err != nil {
+			tp.mu.Lock()
+			for _, txn := range ts {
+				tp.transactionHeights[txn.ID()] = tp.blockHeight
+			}
+			tp.mu.Unlock()
+		}
+		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
+		tp.log.Println("Transaction set broadcast appears to have succeeded")
+	} else {
+		tp.log.Println("Transaction set broadcast has failed")
+	}
+	return err
 }
 
 // relayTransactionSet is an RPC that accepts a transaction set from a peer. If

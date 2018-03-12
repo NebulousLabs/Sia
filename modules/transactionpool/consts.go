@@ -16,10 +16,6 @@ const (
 
 // Constants related to the size and ease-of-entry of the transaction pool.
 const (
-	// maxTxnAge determines the maximum age of a transaction (in block height)
-	// allowed before the transaction is pruned from the transaction pool.
-	maxTxnAge = types.BlockHeight(24)
-
 	// TransactionPoolFeeExponentiation defines the polynomial rate of growth
 	// required to keep putting transactions into the transaction pool. If the
 	// exponentiation is 2, then doubling the size of the transaction pool

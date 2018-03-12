@@ -21,14 +21,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	// RespendTimeout records the number of blocks that the wallet will wait
-	// before spending an output that has been spent in the past. If the
-	// transaction spending the output has not made it to the transaction pool
-	// after the limit, the assumption is that it never will.
-	RespendTimeout = 40
-)
-
 var (
 	errNilConsensusSet = errors.New("wallet cannot initialize with a nil consensus set")
 	errNilTpool        = errors.New("wallet cannot initialize with a nil transaction pool")
@@ -82,6 +74,11 @@ type Wallet struct {
 	// array can have tens of thousands of elements, it's a performance issue.
 	unconfirmedSets                  map[modules.TransactionSetID][]types.TransactionID
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
+
+	// broadcastedTSets tracks transactions that have been sent to the
+	// transaction pool for broadcasting. This allows the wallet to rebroadcast
+	// them if necessary
+	broadcastedTSets map[modules.TransactionSetID]*broadcastedTSet
 
 	// The wallet's database tracks its seeds, keys, outputs, and
 	// transactions. A global db transaction is maintained in memory to avoid
@@ -147,7 +144,8 @@ func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDi
 		keys:      make(map[types.UnlockHash]spendableKey),
 		lookahead: make(map[types.UnlockHash]uint64),
 
-		unconfirmedSets: make(map[modules.TransactionSetID][]types.TransactionID),
+		unconfirmedSets:  make(map[modules.TransactionSetID][]types.TransactionID),
+		broadcastedTSets: make(map[modules.TransactionSetID]*broadcastedTSet),
 
 		persistDir: persistDir,
 
@@ -173,6 +171,12 @@ func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDi
 		}
 		// Save changes to disk
 		w.syncDB()
+	}
+
+	// retrieve the previously tracked broadcasted tSets from the database
+	w.broadcastedTSets, err = dbLoadBroadcastedTSets(w)
+	if err != nil {
+		return nil, err
 	}
 
 	// make sure we commit on shutdown

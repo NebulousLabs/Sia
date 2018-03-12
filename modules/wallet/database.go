@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -41,10 +42,14 @@ var (
 	// bucketWallet contains various fields needed by the wallet, such as its
 	// UID, EncryptionVerification, and PrimarySeedFile.
 	bucketWallet = []byte("bucketWallet")
+	// bucketBroadcastedTSets contains the transaction sets that are tracked
+	// for rebroadcasting
+	bucketBroadcastedTSets = []byte("bucketBroadcastedTSets")
 
 	dbBuckets = [][]byte{
 		bucketProcessedTransactions,
 		bucketProcessedTxnIndex,
+		bucketBroadcastedTSets,
 		bucketAddrTransactions,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
@@ -211,12 +216,55 @@ func dbGetSpentOutput(tx *bolt.Tx, id types.OutputID) (height types.BlockHeight,
 func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
 }
-
 func dbPutAddrTransactions(tx *bolt.Tx, addr types.UnlockHash, txns []uint64) error {
 	return dbPut(tx.Bucket(bucketAddrTransactions), addr, txns)
 }
 func dbGetAddrTransactions(tx *bolt.Tx, addr types.UnlockHash) (txns []uint64, err error) {
 	err = dbGet(tx.Bucket(bucketAddrTransactions), addr, &txns)
+	return
+}
+func dbPutBroadcastedTSet(tx *bolt.Tx, bts broadcastedTSet) error {
+	persist := persistBTS{
+		FirstTry:     bts.firstTry,
+		LastTry:      bts.lastTry,
+		Transactions: bts.transactions,
+	}
+	// Convert bts.confirmedTxn to a boolean array
+	persist.ConfirmedTxn = make([]bool, len(bts.confirmedTxn))
+	for i, txn := range persist.Transactions {
+		persist.ConfirmedTxn[i] = bts.confirmedTxn[txn.ID()]
+	}
+	return dbPut(tx.Bucket(bucketBroadcastedTSets), bts.id, persist)
+}
+func dbDeleteBroadcastedTSet(tx *bolt.Tx, tSetID modules.TransactionSetID) error {
+	return dbDelete(tx.Bucket(bucketBroadcastedTSets), tSetID)
+}
+
+// dbLoadBroadcastedTSets returns all the broadcasted tSets from the database
+func dbLoadBroadcastedTSets(w *Wallet) (tSets map[modules.TransactionSetID]*broadcastedTSet, err error) {
+	tSets = make(map[modules.TransactionSetID]*broadcastedTSet)
+	err = w.dbTx.Bucket(bucketBroadcastedTSets).ForEach(func(k []byte, v []byte) error {
+		// Load the persisted structure from disk
+		var pbts persistBTS
+		if err := encoding.Unmarshal(v, &pbts); err != nil {
+			return err
+		}
+		// Convert it to the in-memory structure
+		bts := broadcastedTSet{
+			firstTry:     pbts.FirstTry,
+			lastTry:      pbts.LastTry,
+			transactions: pbts.Transactions,
+		}
+		bts.confirmedTxn = make(map[types.TransactionID]bool)
+		for i, txn := range pbts.Transactions {
+			bts.confirmedTxn[txn.ID()] = pbts.ConfirmedTxn[i]
+		}
+
+		bts.id = modules.TransactionSetID(crypto.HashAll(bts.transactions))
+		bts.w = w
+		tSets[bts.id] = &bts
+		return nil
+	})
 	return
 }
 

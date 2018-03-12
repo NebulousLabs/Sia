@@ -444,6 +444,9 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if err := w.applyHistory(w.dbTx, cc); err != nil {
 		w.log.Println("ERROR: failed to apply consensus change:", err)
 	}
+	if err := w.rebroadcastOldTransactions(w.dbTx, cc); err != nil {
+		w.log.Println("ERROR: failed to rebroadcast transactions:", err)
+	}
 	if err := dbPutConsensusChangeID(w.dbTx, cc.ID); err != nil {
 		w.log.Println("ERROR: failed to update consensus change ID:", err)
 	}
@@ -451,6 +454,18 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if cc.Synced {
 		go w.threadedDefragWallet()
 	}
+}
+
+// isRelevantTxn checks if a txn is relevant to the Wallet
+func (w *Wallet) isRelevantTxn(txn types.Transaction) (relevant bool) {
+	// determine whether transaction is relevant to the wallet
+	for _, sci := range txn.SiacoinInputs {
+		relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
+	}
+	for _, sco := range txn.SiacoinOutputs {
+		relevant = relevant || w.isWalletAddress(sco.UnlockHash)
+	}
+	return
 }
 
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
@@ -501,9 +516,25 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 	for _, unconfirmedTxnSet := range diff.AppliedTransactions {
 		// Mark all of the transactions that appeared in this set.
 		//
-		// TODO: Technically only necessary to mark the ones that are relevant
-		// to the wallet, but overhead should be low.
-		w.unconfirmedSets[unconfirmedTxnSet.ID] = unconfirmedTxnSet.IDs
+		relevant := false
+		for i := 0; !relevant && i < len(unconfirmedTxnSet.Transactions); i++ {
+			relevant = relevant || w.isRelevantTxn(unconfirmedTxnSet.Transactions[i])
+		}
+		// Only add relevant unconfirmed transactions to this set. If at least
+		// a single txn is relevant, the set is also relevant.
+		if relevant {
+			w.unconfirmedSets[unconfirmedTxnSet.ID] = unconfirmedTxnSet.IDs
+
+			// If the unconfirmed set doesn't exist yet, add it to broadcastedTSets
+			var err error
+			var bts *broadcastedTSet
+			if _, exists := w.broadcastedTSets[unconfirmedTxnSet.ID]; !exists {
+				bts, err = w.newBroadcastedTSet(unconfirmedTxnSet.Transactions)
+			}
+			if bts != nil && err == nil {
+				w.broadcastedTSets[unconfirmedTxnSet.ID] = bts
+			}
+		}
 
 		// Get the values for the spent outputs.
 		spentSiacoinOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput)
@@ -517,17 +548,8 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(diff *modules.Transaction
 
 		// Add each transaction to our set of unconfirmed transactions.
 		for i, txn := range unconfirmedTxnSet.Transactions {
-			// determine whether transaction is relevant to the wallet
-			relevant := false
-			for _, sci := range txn.SiacoinInputs {
-				relevant = relevant || w.isWalletAddress(sci.UnlockConditions.UnlockHash())
-			}
-			for _, sco := range txn.SiacoinOutputs {
-				relevant = relevant || w.isWalletAddress(sco.UnlockHash)
-			}
-
 			// only create a ProcessedTransaction if txn is relevant
-			if !relevant {
+			if !w.isRelevantTxn(txn) {
 				continue
 			}
 
