@@ -343,22 +343,24 @@ func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
 // ../ is disallowed to prevent directory traversal, and paths must not begin
 // with / or be empty.
 func validateSiapath(siapath string) error {
-	if strings.HasPrefix(siapath, "/") {
-		return errors.New("siapath cannot begin with /")
-	}
-
 	if siapath == "" {
 		return ErrEmptyFilename
 	}
-
-	if strings.Contains(siapath, "../") {
-		return errors.New("directory traversal is not allowed")
+	if siapath == ".." {
+		return errors.New("siapath cannot be ..")
 	}
-
-	if strings.Contains(siapath, "./") {
-		return errors.New("siapath contains invalid characters")
+	if siapath == "." {
+		return errors.New("siapath cannot be .")
 	}
-
+	if strings.HasPrefix(siapath, "/") {
+		return errors.New("siapath cannot begin with /")
+	}
+	if strings.HasPrefix(siapath, "../") {
+		return errors.New("siapath cannot begin with ../")
+	}
+	if strings.HasPrefix(siapath, "./") {
+		return errors.New("siapath connot begin with ./")
+	}
 	return nil
 }
 
