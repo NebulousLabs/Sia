@@ -1,6 +1,7 @@
 package host
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -239,6 +240,18 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 	}
 
 	oldFCR := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0]
+
+	// Host payout addresses shouldn't change
+	if revision.NewValidProofOutputs[1].UnlockHash != oldFCR.NewValidProofOutputs[1].UnlockHash {
+		return errors.New("host payout address changed")
+	}
+	if revision.NewMissedProofOutputs[1].UnlockHash != oldFCR.NewMissedProofOutputs[1].UnlockHash {
+		return errors.New("host payout address changed")
+	}
+	// Make sure the lost collateral still goes to the void
+	if revision.NewMissedProofOutputs[2].UnlockHash != oldFCR.NewMissedProofOutputs[2].UnlockHash {
+		return errors.New("lost collateral address was changed")
+	}
 
 	// Check that all non-volatile fields are the same.
 	if oldFCR.ParentID != revision.ParentID {
