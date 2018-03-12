@@ -352,6 +352,7 @@ func validateSiapath(siapath string) error {
 	if siapath == "." {
 		return errors.New("siapath cannot be .")
 	}
+	// check prefix
 	if strings.HasPrefix(siapath, "/") {
 		return errors.New("siapath cannot begin with /")
 	}
@@ -360,6 +361,13 @@ func validateSiapath(siapath string) error {
 	}
 	if strings.HasPrefix(siapath, "./") {
 		return errors.New("siapath connot begin with ./")
+	}
+	// check Contains
+	if strings.Contains(siapath, "/../") {
+		return errors.New("siapath cannot contain /../")
+	}
+	if strings.Contains(siapath, "/./") {
+		return errors.New("siapath cannot contain /./")
 	}
 	return nil
 }
