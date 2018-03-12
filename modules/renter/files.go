@@ -302,9 +302,9 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 
-	// Check that newName is nonempty.
-	if newName == "" {
-		return ErrEmptyFilename
+	err := validateSiapath(newName)
+	if err != nil {
+		return err
 	}
 
 	// Check that currentName exists and newName doesn't.
@@ -320,7 +320,7 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	// Modify the file and save it to disk.
 	file.mu.Lock()
 	file.name = newName
-	err := r.saveFile(file)
+	err = r.saveFile(file)
 	file.mu.Unlock()
 	if err != nil {
 		return err
