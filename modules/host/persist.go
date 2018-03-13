@@ -172,9 +172,12 @@ func (h *Host) load() error {
 		return err
 	}
 
-	// Get the contract count by observing all of the incomplete storage
-	// obligations in the database.
+	// Get the contract count and locked collateral by observing all of the incomplete
+	// storage obligations in the database.
+	// TODO: both contract count and locked collateral are not correctly updated during
+	// contract renewals. This leads to an offset to the real value over time.
 	h.financialMetrics.ContractCount = 0
+	h.financialMetrics.LockedStorageCollateral = types.NewCurrency64(0)
 	err = h.db.View(func(tx *bolt.Tx) error {
 		cursor := tx.Bucket(bucketStorageObligations).Cursor()
 		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
@@ -185,6 +188,7 @@ func (h *Host) load() error {
 			}
 			if so.ObligationStatus == obligationUnresolved {
 				h.financialMetrics.ContractCount++
+				h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Add(so.LockedCollateral)
 			}
 		}
 		return nil
