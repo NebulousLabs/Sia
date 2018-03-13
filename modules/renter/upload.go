@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -83,6 +84,8 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Create file object.
 	f := newFile(up.SiaPath, up.ErasureCode, pieceSize, uint64(fileInfo.Size()))
 	f.mode = uint32(fileInfo.Mode())
+	f.modTime = fileInfo.ModTime()
+	f.uploadTime = time.Now()
 
 	// Add file to renter.
 	lockID = r.mu.Lock()

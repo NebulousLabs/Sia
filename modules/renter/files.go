@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -36,6 +37,8 @@ type file struct {
 	erasureCode modules.ErasureCoder // Static - can be accessed without lock.
 	pieceSize   uint64               // Static - can be accessed without lock.
 	mode        uint32               // actually an os.FileMode
+	uploadTime  time.Time            // Static - can be accessed without lock.
+	modTime     time.Time            // actually an os.ModTime
 
 	staticUID string // A UID assigned to the file when it gets created.
 
