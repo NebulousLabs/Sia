@@ -287,7 +287,7 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	}
 	// Set ratelimit
 	if s.DownloadSpeed == 0 && s.UploadSpeed == 0 {
-		ratelimit.SetLimits(s.DownloadSpeed, s.UploadSpeed, 0)
+		ratelimit.SetLimits(0, 0, 0)
 	} else {
 		ratelimit.SetLimits(s.DownloadSpeed, s.UploadSpeed, 4*4096)
 	}
