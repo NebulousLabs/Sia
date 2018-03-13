@@ -744,13 +744,13 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 		t.Errorf("expected error to be %v, got %v", contractor.ErrAllowanceZeroWindow, err)
 	}
 	// Try to set a negative bandwidth limit
-	allowanceValues.Set("downloadspeed", "-1")
+	allowanceValues.Set("maxdownloadspeed", "-1")
 	allowanceValues.Set("renewwindow", "1")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err == nil || err.Error() != "download/upload rate limit can't be below 0" {
 		t.Errorf("expected error to be 'download/upload rate limit...'; got %v", err)
 	}
-	allowanceValues.Set("uploadspeed", "-1")
+	allowanceValues.Set("maxuploadspeed", "-1")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err == nil || err.Error() != "download/upload rate limit can't be below 0" {
 		t.Errorf("expected error to be 'download/upload rate limit...'; got %v", err)

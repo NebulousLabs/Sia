@@ -285,7 +285,12 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	if s.DownloadSpeed < 0 || s.UploadSpeed < 0 {
 		return errors.New("download/upload rate limit can't be below 0")
 	}
-	ratelimit.SetLimits(s.DownloadSpeed, s.UploadSpeed, s.PacketSize)
+	// Set ratelimit
+	if s.DownloadSpeed == 0 && s.UploadSpeed == 0 {
+		ratelimit.SetLimits(s.DownloadSpeed, s.UploadSpeed, 0)
+	} else {
+		ratelimit.SetLimits(s.DownloadSpeed, s.UploadSpeed, 4*4096)
+	}
 
 	r.managedUpdateWorkerPool()
 	return nil

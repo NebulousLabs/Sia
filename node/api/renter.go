@@ -230,17 +230,8 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 		// Sane defaults if renew window hasn't been set before.
 		settings.Allowance.RenewWindow = settings.Allowance.Period / 2
 	}
-	// Scan the packet size. (optional parameter)
-	if p := req.FormValue("packetsize"); p != "" {
-		var packetSize uint64
-		if _, err := fmt.Sscan(p, &packetSize); err != nil {
-			WriteError(w, Error{"unable to parse packetsize: " + err.Error()}, http.StatusBadRequest)
-			return
-		}
-		settings.PacketSize = packetSize
-	}
 	// Scan the download speed limit. (optional parameter)
-	if d := req.FormValue("downloadspeed"); d != "" {
+	if d := req.FormValue("maxdownloadspeed"); d != "" {
 		var downloadSpeed int64
 		if _, err := fmt.Sscan(d, &downloadSpeed); err != nil {
 			WriteError(w, Error{"unable to parse downloadspeed: " + err.Error()}, http.StatusBadRequest)
@@ -249,7 +240,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 		settings.DownloadSpeed = downloadSpeed
 	}
 	// Scan the upload speed limit. (optional parameter)
-	if u := req.FormValue("uploadspeed"); u != "" {
+	if u := req.FormValue("maxuploadspeed"); u != "" {
 		var uploadSpeed int64
 		if _, err := fmt.Sscan(u, &uploadSpeed); err != nil {
 			WriteError(w, Error{"unable to parse uploadspeed: " + err.Error()}, http.StatusBadRequest)
