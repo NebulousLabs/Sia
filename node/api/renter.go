@@ -237,7 +237,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 			WriteError(w, Error{"unable to parse downloadspeed: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
-		settings.DownloadSpeed = downloadSpeed
+		settings.MaxDownloadSpeed = downloadSpeed
 	}
 	// Scan the upload speed limit. (optional parameter)
 	if u := req.FormValue("maxuploadspeed"); u != "" {
@@ -246,7 +246,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 			WriteError(w, Error{"unable to parse uploadspeed: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
-		settings.UploadSpeed = uploadSpeed
+		settings.MaxUploadSpeed = uploadSpeed
 	}
 	// Set the settings in the renter.
 	err := api.renter.SetSettings(settings)
