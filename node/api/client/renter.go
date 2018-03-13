@@ -63,11 +63,10 @@ func (c *Client) RenterPostAllowance(allowance modules.Allowance) (err error) {
 
 // RenterPostRateLimit uses the /renter endpoint to change the renter's bandwidth rate
 // limit.
-func (c *Client) RenterPostRateLimit(readBPS, writeBPS int64, packetSize uint64) (err error) {
+func (c *Client) RenterPostRateLimit(readBPS, writeBPS int64) (err error) {
 	values := url.Values{}
-	values.Set("downloadspeed", strconv.FormatInt(readBPS, 10))
-	values.Set("uploadspeed", strconv.FormatInt(writeBPS, 10))
-	values.Set("packetsize", strconv.FormatUint(packetSize, 10))
+	values.Set("maxdownloadspeed", strconv.FormatInt(readBPS, 10))
+	values.Set("maxuploadspeed", strconv.FormatInt(writeBPS, 10))
 	err = c.post("/renter", values.Encode(), nil)
 	return
 }

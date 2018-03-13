@@ -173,7 +173,7 @@ func NewContractSet(dir string) (*ContractSet, error) {
 		wal:       wal,
 		dir:       dir,
 	}
-	// Set the initial rate limit to 'unlimited'.
+	// Set the initial rate limit to 'unlimited' bandwidth with 4kib packets.
 	cs.rl = ratelimit.NewRateLimit(0, 0, 0)
 
 	// Load the contract files.

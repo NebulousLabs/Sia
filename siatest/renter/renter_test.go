@@ -97,11 +97,11 @@ func testDownloadMultipleLargeSectors(t *testing.T, tg *siatest.TestGroup) {
 	// Grab the first of the group's renters
 	renter := tg.Renters()[0]
 	// set download limits and reset them after test.
-	if err := renter.RenterPostRateLimit(int64(fileSize)*2, 0, modules.SectorSize); err != nil {
+	if err := renter.RenterPostRateLimit(int64(fileSize)*2, 0); err != nil {
 		t.Fatal("failed to set renter bandwidth limit", err)
 	}
 	defer func() {
-		if err := renter.RenterPostRateLimit(0, 0, modules.SectorSize); err != nil {
+		if err := renter.RenterPostRateLimit(0, 0); err != nil {
 			t.Error("failed to reset renter bandwidth limit", err)
 		}
 	}()
