@@ -337,7 +337,7 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 		defer tp.mu.Unlock()
 		err := tp.acceptTransactionSet(ts, txnFn)
 		if err != nil {
-			tp.log.Debugln("Transaction set broadcast has failed")
+			tp.log.Debugln("Transaction set broadcast has failed:", err)
 			return err
 		}
 		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
