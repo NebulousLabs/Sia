@@ -1,6 +1,13 @@
 Version History
 ---------------
 
+March 2018:
+
+v1.3.2 (minor release)
+- Improve renter throughput and stability
+- Reduce host I/O when idle
+- Add /tpool/confirmed endpoint
+
 December 2017:
 
 v1.3.1 (minor release)
