@@ -24,6 +24,9 @@ if [ $keysum != "735320b4698010500d230c487e970e12776e88f33ad777ab380a493691dadb1
     exit 1
 fi
 
+# setup build-time vars
+ldflags="-s -w -X 'github.com/NebulousLabs/Sia/build.GitRevision=`git rev-parse --short HEAD`' -X 'github.com/NebulousLabs/Sia/build.BuildTime=`date`'"
+
 for os in darwin linux windows; do
 	echo Packaging ${os}...
 	# create workspace
@@ -36,7 +39,7 @@ for os in darwin linux windows; do
 		if [ "$os" == "windows" ]; then
 			bin=${pkg}.exe
 		fi
-		GOOS=${os} go build -a -tags 'netgo' -ldflags="-s -w" -o $folder/$bin ./cmd/$pkg
+		GOOS=${os} go build -a -tags 'netgo' -ldflags="$ldflags" -o $folder/$bin ./cmd/$pkg
 		openssl dgst -sha256 -sign $keyfile -out $folder/${bin}.sig $folder/$bin
 		# verify signature
 		if [[ -n $pubkeyfile ]]; then
