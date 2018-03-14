@@ -175,7 +175,7 @@ func (x Currency) Sqrt() (c Currency) {
 // x < y.
 func (x Currency) Sub(y Currency) (c Currency) {
 	if x.Cmp(y) < 0 {
-		c = x
+		c = ZeroCurrency
 		build.Critical(ErrNegativeCurrency)
 	} else {
 		c.i.Sub(&x.i, &y.i)
