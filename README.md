@@ -100,7 +100,7 @@ This will download the Sia repo to your `$GOPATH/src` folder and install the
 
 To stay up-to-date, run the previous `go get` command again. Alternatively, you
 can use the Makefile provided in this repo. Run `git pull origin master` to
-pull the latest changes, and `make release-std` to build the new binaries. You
+pull the latest changes, and `make release` to build the new binaries. You
 can also run `make test` and `make test-long` to run the short and full test
 suites, respectively. Finally, `make cover` will generate code coverage reports
 for each package; they are stored in the `cover` folder and can be viewed in
