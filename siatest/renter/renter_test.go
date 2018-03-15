@@ -91,6 +91,7 @@ func testDownloadMultipleLargeSectors(t *testing.T, tg *siatest.TestGroup) {
 	parallelDownloads := 10
 	// fileSize is the size of the downloaded file.
 	fileSize := int(10*modules.SectorSize) + siatest.Fuzz()
+	// set download limits and reset them after test.
 	// uniqueRemoteFiles is the number of files that will be uploaded to the
 	// network. Downloads will choose the remote file to download randomly.
 	uniqueRemoteFiles := 5

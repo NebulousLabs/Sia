@@ -211,10 +211,24 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 		udc.physicalChunkData[i] = nil
 	}
 
+	// Add the chunk to the cache.
+	// TODO this should only happen for the streaming endpoint.
+	recoveredData := recoverWriter.Bytes()
+	cmu.Lock()
+	cacheID := fmt.Sprintf("%v:%v", udc.download.staticSiaPath, udc.staticChunkIndex)
+	for key := range cache {
+		if len(cache) < 5 {
+			break
+		}
+		delete(cache, key)
+	}
+	cache[cacheID] = recoveredData
+	cmu.Unlock()
+
 	// Write the bytes to the requested output.
 	start := udc.staticFetchOffset
 	end := udc.staticFetchOffset + udc.staticFetchLength
-	_, err = udc.destination.WriteAt(recoverWriter.Bytes()[start:end], udc.staticWriteOffset)
+	_, err = udc.destination.WriteAt(recoveredData[start:end], udc.staticWriteOffset)
 	if err != nil {
 		udc.mu.Lock()
 		udc.fail(err)

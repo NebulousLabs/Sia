@@ -10,6 +10,8 @@ package renter
 import (
 	"container/heap"
 	"errors"
+	"fmt"
+	"sync"
 	"time"
 )
 
@@ -153,6 +155,9 @@ func (r *Renter) managedNextDownloadChunk() *unfinishedDownloadChunk {
 	}
 }
 
+var cache map[string][]byte
+var cmu *sync.Mutex
+
 // threadedDownloadLoop utilizes the worker pool to make progress on any queued
 // downloads.
 func (r *Renter) threadedDownloadLoop() {
@@ -194,6 +199,32 @@ LOOP:
 				// Break out of the inner loop and wait for more work.
 				break
 			}
+
+			// Check if we got the chunk cached already.
+			// TODO this is not save. We need to figure out a way to do cache invalidation.
+			cacheID := fmt.Sprintf("%v:%v", nextChunk.download.staticSiaPath, nextChunk.staticChunkIndex)
+			cmu.Lock()
+			data, cached := cache[cacheID]
+			cmu.Unlock()
+			if cached {
+				start := nextChunk.staticFetchOffset
+				end := start + nextChunk.staticFetchLength
+				_, err := nextChunk.destination.WriteAt(data[start:end], nextChunk.staticWriteOffset)
+				if err != nil {
+					r.log.Println("WARN: failed to write cached chunk to destination")
+				}
+
+				// Check if the download is complete now.
+				nextChunk.download.mu.Lock()
+				nextChunk.download.chunksRemaining--
+				if nextChunk.download.chunksRemaining == 0 {
+					nextChunk.download.endTime = time.Now()
+					close(nextChunk.download.completeChan)
+				}
+				nextChunk.download.mu.Unlock()
+				continue
+			}
+
 			// Get the required memory to download this chunk.
 			if !r.managedAcquireMemoryForDownloadChunk(nextChunk) {
 				// The renter shut down before memory could be acquired.

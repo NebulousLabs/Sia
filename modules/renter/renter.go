@@ -432,6 +432,11 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 	}
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
+	// TODO those should not be global. Need a better way to cache streaming
+	// chunks.
+	cache = make(map[string][]byte)
+	cmu = new(sync.Mutex)
+
 	// Load all saved data.
 	if err := r.initPersist(); err != nil {
 		return nil, err

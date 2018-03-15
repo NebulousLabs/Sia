@@ -343,6 +343,10 @@ type Renter interface {
 	// ShareFilesAscii creates an ASCII-encoded '.sia' file.
 	ShareFilesASCII(paths []string) (asciiSia string, err error)
 
+	// Streamer creates a io.ReadSeeker that can be used to stream downloads
+	// from the Sia network.
+	Streamer(siaPath string) (string, io.ReadSeeker, error)
+
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error
 }

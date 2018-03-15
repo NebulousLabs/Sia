@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -537,6 +538,19 @@ func (api *API) renterShareASCIIHandler(w http.ResponseWriter, req *http.Request
 	WriteJSON(w, RenterShareASCII{
 		ASCIIsia: ascii,
 	})
+}
+
+// renterStreamHandler handles downloads from the /renter/stream endpoint
+func (api *API) renterStreamHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	siaPath := req.FormValue("siapath")
+	fileName, streamer, err := api.renter.Streamer(siaPath)
+	if err != nil {
+		WriteError(w, Error{fmt.Sprintf("failed to create download streamer: %v", err)},
+			http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Requesting %v", fileName)
+	http.ServeContent(w, req, fileName, time.Time{}, streamer)
 }
 
 // renterUploadHandler handles the API call to upload a file.
