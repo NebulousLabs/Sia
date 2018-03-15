@@ -382,6 +382,26 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	return nil
 }
 
+// UnconfirmedParents returns any unconfirmed parents the transaction set that
+// is being built by the transaction builder could have.
+func (tb *transactionBuilder) UnconfirmedParents() (parents []types.Transaction) {
+	addedParents := make(map[types.TransactionID]struct{})
+	for _, p := range tb.parents {
+		for _, sci := range p.SiacoinInputs {
+			tSet := tb.wallet.tpool.TransactionSet(crypto.Hash(sci.ParentID))
+			for _, txn := range tSet {
+				txnID := txn.ID()
+				if _, exists := addedParents[txnID]; exists {
+					continue
+				}
+				addedParents[txnID] = struct{}{}
+				parents = append(parents, txn)
+			}
+		}
+	}
+	return
+}
+
 // AddParents adds a set of parents to the transaction.
 func (tb *transactionBuilder) AddParents(newParents []types.Transaction) {
 	tb.parents = append(tb.parents, newParents...)

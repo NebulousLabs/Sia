@@ -450,3 +450,49 @@ func TestParallelBuilders(t *testing.T) {
 		t.Fatal("did not get the expected ending balance", expected, endingSCConfirmed, startingSCConfirmed)
 	}
 }
+
+// TestUnconfirmedParents tests the functionality of the transaction builder's
+// UnconfirmedParents method.
+func TestUnconfirmedParents(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Send all of the wallet's available balance to itself.
+	uc, err := wt.wallet.NextAddress()
+	if err != nil {
+		t.Fatal("Failed to get address", err)
+	}
+	siacoins, _, _ := wt.wallet.ConfirmedBalance()
+	tSet, err := wt.wallet.SendSiacoins(siacoins.Sub(types.SiacoinPrecision), uc.UnlockHash())
+	if err != nil {
+		t.Fatal("Failed to send coins", err)
+	}
+
+	// Create a transaction. That transaction should use siacoin outputs from
+	// the unconfirmed transactions in tSet as inputs and is therefore a child
+	// of tSet.
+	b := wt.wallet.StartTransaction()
+	txnFund := types.NewCurrency64(1e3)
+	err = b.FundSiacoins(txnFund)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// UnconfirmedParents should return the transactions of the transaction set
+	// we used to send money to ourselves.
+	parents := b.UnconfirmedParents()
+	if len(tSet) != len(parents) {
+		t.Fatal("parents should have same length as unconfirmed transaction set")
+	}
+	for i := 0; i < len(tSet); i++ {
+		if tSet[i].ID() != parents[i].ID() {
+			t.Error("returned parent doesn't match transaction of transaction set")
+		}
+	}
+}

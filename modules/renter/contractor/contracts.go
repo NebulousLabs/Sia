@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -74,7 +73,10 @@ func (c *Contractor) managedMarkContractsUtility() error {
 	c.mu.RLock()
 	hostCount := int(c.allowance.Hosts)
 	c.mu.RUnlock()
-	hosts := c.hdb.RandomHosts(hostCount+minScoreHostBuffer, nil)
+	hosts, err := c.hdb.RandomHosts(hostCount+minScoreHostBuffer, nil)
+	if err != nil {
+		return
+	}
 
 	// Find the minimum score that a host is allowed to have to be considered
 	// good for upload.
@@ -547,7 +549,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			return
 		case <-c.interruptMaintenance:
 			return
-		case <-time.After(contractFormationInterval):
+		default:
 		}
 	}
 
@@ -585,7 +587,11 @@ func (c *Contractor) threadedContractMaintenance() {
 	}
 	initialContractFunds := c.allowance.Funds.Div64(c.allowance.Hosts).Div64(3)
 	c.mu.RUnlock()
-	hosts := c.hdb.RandomHosts(neededContracts*2+10, exclude)
+	hosts, err := c.hdb.RandomHosts(neededContracts*2+10, exclude)
+	if err != nil {
+		c.log.Println("WARN: not forming new contracts:", err)
+		return
+	}
 
 	// Form contracts with the hosts one at a time, until we have enough
 	// contracts.
@@ -631,7 +637,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			return
 		case <-c.interruptMaintenance:
 			return
-		case <-time.After(contractFormationInterval):
+		default:
 		}
 	}
 }

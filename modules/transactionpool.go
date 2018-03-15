@@ -143,6 +143,10 @@ type (
 		// transaction pool changes, and should not subscribe to both.
 		TransactionPoolSubscribe(TransactionPoolSubscriber)
 
+		// TransactionSet returns the transaction set the provided object
+		// appears in.
+		TransactionSet(crypto.Hash) []types.Transaction
+
 		// Unsubscribe removes a subscriber from the transaction pool.
 		// This is necessary for clean shutdown of the miner.
 		Unsubscribe(TransactionPoolSubscriber)

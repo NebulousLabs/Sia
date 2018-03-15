@@ -198,6 +198,10 @@ type (
 		// transaction should be dropped.
 		Sign(wholeTransaction bool) ([]types.Transaction, error)
 
+		// UnconfirmedParents returns any unconfirmed parents the transaction set that
+		// is being built by the transaction builder could have.
+		UnconfirmedParents() []types.Transaction
+
 		// View returns the incomplete transaction along with all of its
 		// parents.
 		View() (txn types.Transaction, parents []types.Transaction)

@@ -1,8 +1,6 @@
 package contractor
 
 import (
-	"time"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -10,14 +8,6 @@ import (
 
 // Constants related to contract formation parameters.
 var (
-	// To alleviate potential block propagation issues, the contractor sleeps
-	// between each contract formation.
-	contractFormationInterval = build.Select(build.Var{
-		Dev:      10 * time.Second,
-		Standard: 60 * time.Second,
-		Testing:  10 * time.Millisecond,
-	}).(time.Duration)
-
 	// minContractFundRenewalThreshold defines the ratio of remaining funds to
 	// total contract cost below which the contractor will prematurely renew a
 	// contract.

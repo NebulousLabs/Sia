@@ -225,6 +225,12 @@ func (hdb *HostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
 // RandomHosts implements the HostDB interface's RandomHosts() method. It takes
 // a number of hosts to return, and a slice of netaddresses to ignore, and
 // returns a slice of entries.
-func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) []modules.HostDBEntry {
-	return hdb.hostTree.SelectRandom(n, excludeKeys)
+func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
+	hdb.mu.RLock()
+	pendingScans := len(hdb.scanList)
+	hdb.mu.RUnlock()
+	if pendingScans > 0 {
+		return []modules.HostDBEntry{}, errors.New("Can't get hosts while hostdb is scanning")
+	}
+	return hdb.hostTree.SelectRandom(n, excludeKeys), nil
 }
