@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api/client"
@@ -110,8 +111,8 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		return nil, errors.AddContext(err, "failed to mine host announcements")
 	}
 	// Block until all hosts show up as active in the renters' hostdbs
-	if err := hostsInRenterDBCheck(miner, tg.renters, len(tg.hosts)); err != nil {
-		return nil, errors.AddContext(err, "renter database check failed")
+	if err := hostsInRenterDBCheck(miner, tg.renters, tg.hosts); err != nil {
+		return nil, build.ExtendErr("renter database check failed", err)
 	}
 	// Set renter allowances
 	if err := setRenterAllowances(tg.renters); err != nil {
@@ -184,6 +185,13 @@ func fullyConnectNodes(nodes []*TestNode) error {
 	// Fully connect the nodes
 	for i, nodeA := range nodes {
 		for _, nodeB := range nodes[i+1:] {
+			isPeer, err := nodeA.hasPeer(nodeB)
+			if err != nil {
+				return build.ExtendErr("couldn't determine if nodeB is a peer of nodeA", err)
+			}
+			if isPeer {
+				continue
+			}
 			if err := nodeA.GatewayConnectPost(nodeB.GatewayAddress()); err != nil && err != client.ErrPeerExists {
 				return errors.AddContext(err, "failed to connect to peer")
 			}
@@ -243,25 +251,31 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	return nil
 }
 
-// hostsInRenterDBCheck makes sure that all the renters see numHosts hosts in
-// their database.
-func hostsInRenterDBCheck(miner *TestNode, renters map[*TestNode]struct{}, numHosts int) error {
+// hostsInRenterDBCheck makes sure that all the renters see all hosts in their
+// database.
+func hostsInRenterDBCheck(miner *TestNode, renters map[*TestNode]struct{}, hosts map[*TestNode]struct{}) error {
 	for renter := range renters {
-		err := Retry(100, 100*time.Millisecond, func() error {
-			hdag, err := renter.HostDbActiveGet()
-			if err != nil {
-				return err
-			}
-			if len(hdag.Hosts) != numHosts {
-				if err := miner.MineBlock(); err != nil {
+		for host := range hosts {
+			numRetries := 0
+			err := Retry(100, 100*time.Millisecond, func() error {
+				numRetries++
+				if renter == host {
+					// We don't care if the renter is also a host.
+					return nil
+				}
+				// Check if the renter has the host in its db.
+				err := errors.AddContext(renter.KnowsHost(host), "renter doesn't know host")
+				if err != nil && numRetries%10 == 0 {
+					return errors.Compose(err, miner.MineBlock())
+				}
+				if err != nil {
 					return err
 				}
-				return errors.New("renter doesn't have enough active hosts in hostdb")
+				return nil
+			})
+			if err != nil {
+				return build.ExtendErr("not all renters can see all hosts", err)
 			}
-			return nil
-		})
-		if err != nil {
-			return err
 		}
 	}
 	return nil
@@ -326,26 +340,125 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 	if uint64(len(hosts)) < expectedContracts {
 		expectedContracts = uint64(len(hosts))
 	}
+	// Create a map for easier public key lookups.
+	hostMap := make(map[string]struct{})
+	for host := range hosts {
+		pk, err := host.HostPublicKey()
+		if err != nil {
+			return build.ExtendErr("failed to build hostMap", err)
+		}
+		hostMap[string(pk.Key)] = struct{}{}
+	}
+	// each renter is supposed to have at least expectedContracts with hosts
+	// from the hosts map.
 	for renter := range renters {
 		numRetries := 0
-		err := Retry(1000, 100*time.Millisecond, func() error {
-			if numRetries%10 == 0 {
-				if err := miner.MineBlock(); err != nil {
-					return err
-				}
-			}
+		err := Retry(1000, 100, func() error {
+			numRetries++
+			contracts := uint64(0)
+			// Get the renter's contracts.
 			rc, err := renter.RenterContractsGet()
 			if err != nil {
 				return err
 			}
-			if uint64(len(rc.Contracts)) < expectedContracts {
-				return errors.New("Renter hasn't formed enough contracts")
+			// Count number of contracts
+			for _, c := range rc.Contracts {
+				if _, exists := hostMap[string(c.HostPublicKey.Key)]; exists {
+					contracts++
+				}
+			}
+			// Check if number is sufficient
+			if contracts < expectedContracts {
+				if numRetries%10 == 0 {
+					if err := miner.MineBlock(); err != nil {
+						return err
+					}
+				}
+				return errors.New("renter hasn't formed enough contracts")
 			}
 			return nil
 		})
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// AddNodeN adds n nodes of a given template to the group.
+func (tg *TestGroup) AddNodeN(np node.NodeParams, n int) error {
+	nps := make([]node.NodeParams, n)
+	for i := 0; i < n; i++ {
+		nps[i] = np
+	}
+	return tg.AddNodes(nps...)
+}
+
+// AddNodes creates a node and adds it to the group.
+func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
+	newNodes := make(map[*TestNode]struct{})
+	newHosts := make(map[*TestNode]struct{})
+	for _, np := range nps {
+		// Create the nodes and add them to the group.
+		if np.Dir == "" {
+			np.Dir = randomDir()
+		}
+		node, err := NewCleanNode(np)
+		if err != nil {
+			return build.ExtendErr("failed to create host", err)
+		}
+		// Add node to nodes
+		tg.nodes[node] = struct{}{}
+		// Add node to hosts
+		if np.Host != nil || np.CreateHost {
+			tg.hosts[node] = struct{}{}
+			newHosts[node] = struct{}{}
+		}
+		// Add node to renters
+		if np.Renter != nil || np.CreateRenter {
+			tg.renters[node] = struct{}{}
+		}
+		// Add node to miners
+		if np.Miner != nil || np.CreateMiner {
+			tg.miners[node] = struct{}{}
+		}
+		newNodes[node] = struct{}{}
+	}
+
+	// Fully connect nodes.
+	nodes := mapToSlice(tg.nodes)
+	if err := fullyConnectNodes(nodes); err != nil {
+		return build.ExtendErr("failed to fully connect nodes", err)
+	}
+	// Fund nodes.
+	miner := mapToSlice(tg.miners)[0]
+	if err := fundNodes(miner, newNodes); err != nil {
+		return build.ExtendErr("failed to fund new hosts", err)
+	}
+	// Add storage to host
+	if err := addStorageFolderToHosts(newHosts); err != nil {
+		return build.ExtendErr("failed to add storage to hosts", err)
+	}
+	// Announce host
+	if err := announceHosts(newHosts); err != nil {
+		return build.ExtendErr("failed to announce hosts", err)
+	}
+	// Mine a block to get the announcements confirmed
+	if err := miner.MineBlock(); err != nil {
+		return build.ExtendErr("failed to mine host announcements", err)
+	}
+	// Block until the hosts show up as active in the renters' hostdbs
+	if err := hostsInRenterDBCheck(miner, tg.renters, tg.hosts); err != nil {
+		return build.ExtendErr("renter database check failed", err)
+	}
+	// Wait for all the renters to form contracts if the haven't got enough
+	// contracts already.
+	if err := waitForContracts(miner, tg.renters, tg.hosts); err != nil {
+		return build.ExtendErr("renters failed to form contracts", err)
+	}
+	// Make sure all nodes are synced
+	if err := synchronizationCheck(miner, tg.nodes); err != nil {
+		return build.ExtendErr("synchronization check failed", err)
 	}
 	return nil
 }
@@ -367,6 +480,18 @@ func (tg *TestGroup) Close() error {
 	}
 	wg.Wait()
 	return errors.Compose(errs...)
+}
+
+// RemoveNode removes a node from the group and shuts it down.
+func (tg *TestGroup) RemoveNode(tn *TestNode) error {
+	// Remote node from all data structures.
+	delete(tg.nodes, tn)
+	delete(tg.hosts, tn)
+	delete(tg.renters, tn)
+	delete(tg.miners, tn)
+
+	// Close node.
+	return tn.Close()
 }
 
 // Nodes returns all the nodes of the group

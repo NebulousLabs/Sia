@@ -51,7 +51,7 @@ func (c *Client) WalletSiacoinsPost(amount types.Currency, destination types.Unl
 	values := url.Values{}
 	values.Set("amount", amount.String())
 	values.Set("destination", destination.String())
-	err = c.post("wallet/siacoins", values.Encode(), &wsp)
+	err = c.post("/wallet/siacoins", values.Encode(), &wsp)
 	return
 }
 

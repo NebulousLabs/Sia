@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -137,36 +138,34 @@ func (tn *TestNode) Upload(lf *LocalFile, dataPieces, parityPieces uint64) (*Rem
 }
 
 // UploadNewFile initiates the upload of a filesize bytes large file.
-func (tn *TestNode) UploadNewFile(filesize int, dataPieces uint64, parityPieces uint64) (rf *RemoteFile, err error) {
+func (tn *TestNode) UploadNewFile(filesize int, dataPieces uint64, parityPieces uint64) (*LocalFile, *RemoteFile, error) {
 	// Create file for upload
-	lf, err := NewFile(filesize)
+	localFile, err := NewFile(filesize)
 	if err != nil {
-		err = errors.AddContext(err, "failed to create file")
-		return
+		return nil, nil, errors.AddContext(err, "failed to create file")
 	}
 	// Upload file, creating a parity piece for each host in the group
-	rf, err = tn.Upload(lf, dataPieces, parityPieces)
+	remoteFile, err := tn.Upload(localFile, dataPieces, parityPieces)
 	if err != nil {
-		err = errors.AddContext(err, "failed to start upload")
-		return
+		return nil, nil, errors.AddContext(err, "failed to start upload")
 	}
-	return
+	return localFile, remoteFile, nil
 }
 
 // UploadNewFileBlocking uploads a filesize bytes large file and waits for the
 // upload to reach 100% progress and redundancy.
-func (tn *TestNode) UploadNewFileBlocking(filesize int, dataPieces uint64, parityPieces uint64) (rf *RemoteFile, err error) {
-	rf, err = tn.UploadNewFile(filesize, dataPieces, parityPieces)
+func (tn *TestNode) UploadNewFileBlocking(filesize int, dataPieces uint64, parityPieces uint64) (*LocalFile, *RemoteFile, error) {
+	localFile, remoteFile, err := tn.UploadNewFile(filesize, dataPieces, parityPieces)
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 	// Wait until upload reached the specified progress
-	if err = tn.WaitForUploadProgress(rf, 1); err != nil {
-		return
+	if err = tn.WaitForUploadProgress(remoteFile, 1); err != nil {
+		return nil, nil, err
 	}
 	// Wait until upload reaches a certain redundancy
-	err = tn.WaitForUploadRedundancy(rf, float64((dataPieces+parityPieces))/float64(dataPieces))
-	return
+	err = tn.WaitForUploadRedundancy(remoteFile, float64((dataPieces+parityPieces))/float64(dataPieces))
+	return localFile, remoteFile, err
 }
 
 // WaitForDownload waits for the download of a file to finish. If a file wasn't
@@ -221,7 +220,7 @@ func (tn *TestNode) WaitForUploadRedundancy(rf *RemoteFile, redundancy float64) 
 		return errors.New("file is not tracked by renter")
 	}
 	// Wait until it reaches the redundancy
-	return Retry(1000, 100*time.Millisecond, func() error {
+	return Retry(600, 100*time.Millisecond, func() error {
 		file, err := tn.FileInfo(rf)
 		if err != nil {
 			return errors.AddContext(err, "couldn't retrieve FileInfo")
@@ -231,4 +230,43 @@ func (tn *TestNode) WaitForUploadRedundancy(rf *RemoteFile, redundancy float64) 
 		}
 		return nil
 	})
+}
+
+// WaitForDecreasingRedundancy waits until the redundancy decreases to a
+// certain point.
+func (tn *TestNode) WaitForDecreasingRedundancy(rf *RemoteFile, redundancy float64) error {
+	// Check if file is tracked by renter at all
+	if _, err := tn.FileInfo(rf); err != nil {
+		return errors.New("file is not tracked by renter")
+	}
+	// Wait until it reaches the redundancy
+	return Retry(1000, 100*time.Millisecond, func() error {
+		file, err := tn.FileInfo(rf)
+		if err != nil {
+			return errors.AddContext(err, "couldn't retrieve FileInfo")
+		}
+		if file.Redundancy > redundancy {
+			return fmt.Errorf("redundancy should be %v but was %v", redundancy, file.Redundancy)
+		}
+		return nil
+	})
+}
+
+// KnowsHost checks if tn has a certain host in its hostdb. This check is
+// performed using the host's public key.
+func (tn *TestNode) KnowsHost(host *TestNode) error {
+	hdag, err := tn.HostDbActiveGet()
+	if err != nil {
+		return err
+	}
+	for _, h := range hdag.Hosts {
+		pk, err := host.HostPublicKey()
+		if err != nil {
+			return err
+		}
+		if reflect.DeepEqual(h.PublicKey, pk) {
+			return nil
+		}
+	}
+	return errors.New("host ist unknown")
 }
