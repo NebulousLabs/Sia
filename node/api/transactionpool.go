@@ -124,7 +124,12 @@ func (api *API) tpoolConfirmedGET(w http.ResponseWriter, req *http.Request, ps h
 		WriteError(w, Error{"error decoding transaction id:" + err.Error()}, http.StatusBadRequest)
 		return
 	}
+	confirmed, err := api.tpool.TransactionConfirmed(txid)
+	if err != nil {
+		WriteError(w, Error{"error fetching transaction status:" + err.Error()}, http.StatusBadRequest)
+		return
+	}
 	WriteJSON(w, TpoolConfirmedGET{
-		Confirmed: api.tpool.TransactionConfirmed(txid),
+		Confirmed: confirmed,
 	})
 }
