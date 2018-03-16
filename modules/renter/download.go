@@ -258,6 +258,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 
 		destination:         params.destination,
 		destinationString:   params.destinationString,
+		destinationType:     params.destinationType,
 		staticLatencyTarget: params.latencyTarget,
 		staticLength:        params.length,
 		staticOffset:        params.offset,

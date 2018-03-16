@@ -120,17 +120,13 @@ func (s *streamer) Read(p []byte) (n int, err error) {
 // to the end. Seek returns the new offset relative to the start of the file
 // and an error, if any.
 func (s *streamer) Seek(offset int64, whence int) (int64, error) {
-	println("seek", offset, whence)
 	var newOffset int64
 	switch whence {
 	case io.SeekStart:
-		println("start")
 		newOffset = 0
 	case io.SeekCurrent:
-		println("current")
 		newOffset = s.offset
 	case io.SeekEnd:
-		println("end")
 		s.file.mu.RLock()
 		newOffset = int64(s.file.size)
 		s.file.mu.RUnlock()
@@ -141,6 +137,5 @@ func (s *streamer) Seek(offset int64, whence int) (int64, error) {
 		return s.offset, errors.New("cannot seek to negative offset")
 	}
 	s.offset = newOffset
-	println("new offset", s.offset)
 	return s.offset, nil
 }

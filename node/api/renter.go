@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -549,7 +548,6 @@ func (api *API) renterStreamHandler(w http.ResponseWriter, req *http.Request, ps
 			http.StatusInternalServerError)
 		return
 	}
-	log.Printf("Requesting %v", fileName)
 	http.ServeContent(w, req, fileName, time.Time{}, streamer)
 }
 
