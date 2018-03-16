@@ -44,6 +44,7 @@ type Contractor struct {
 	tg      siasync.ThreadGroup
 	tpool   transactionPool
 	wallet  wallet
+	deps    modules.Dependencies
 
 	// Only one thread should be performing contract maintenance at a time.
 	interruptMaintenance chan struct{}
@@ -192,7 +193,7 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	}
 
 	// Create the contract set.
-	contractSet, err := proto.NewContractSet(filepath.Join(persistDir, "contracts"))
+	contractSet, err := proto.NewContractSet(filepath.Join(persistDir, "contracts"), &modules.ProductionDependencies{})
 	if err != nil {
 		return nil, err
 	}
@@ -203,11 +204,11 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	}
 
 	// Create Contractor using production dependencies.
-	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, contractSet, newPersist(persistDir), logger)
+	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, contractSet, newPersist(persistDir), logger, &modules.ProductionDependencies{})
 }
 
 // newContractor creates a Contractor using the provided dependencies.
-func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, contractSet *proto.ContractSet, p persister, l *persist.Logger) (*Contractor, error) {
+func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, contractSet *proto.ContractSet, p persister, l *persist.Logger, deps modules.Dependencies) (*Contractor, error) {
 	// Create the Contractor object.
 	c := &Contractor{
 		cs:      cs,
@@ -216,6 +217,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, co
 		persist: p,
 		tpool:   tp,
 		wallet:  w,
+		deps:    deps,
 
 		interruptMaintenance: make(chan struct{}),
 

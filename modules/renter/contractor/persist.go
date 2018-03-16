@@ -126,7 +126,7 @@ func convertPersist(dir string) error {
 	}
 
 	// create the contracts directory if it does not yet exist
-	cs, err := proto.NewContractSet(filepath.Join(dir, "contracts"))
+	cs, err := proto.NewContractSet(filepath.Join(dir, "contracts"), &modules.ProductionDependencies{})
 	if err != nil {
 		return err
 	}
