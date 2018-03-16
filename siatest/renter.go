@@ -58,6 +58,15 @@ func (tn *TestNode) DownloadByStream(rf *RemoteFile) (data []byte, err error) {
 	return
 }
 
+// Stream uses the streaming endpoint to download a file.
+func (tn *TestNode) Stream(rf *RemoteFile) (data []byte, err error) {
+	data, err = tn.RenterStreamGet(rf.siaPath)
+	if err == nil && rf.checksum != crypto.HashAll(data) {
+		err = errors.New("downloaded bytes don't match requested data")
+	}
+	return
+}
+
 // DownloadInfo returns the DownloadInfo struct of a file. If it returns nil,
 // the download has either finished, or was never started in the first place.
 // If the corresponding download info was found, DownloadInfo also performs a

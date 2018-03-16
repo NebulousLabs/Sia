@@ -541,7 +541,7 @@ func (api *API) renterShareASCIIHandler(w http.ResponseWriter, req *http.Request
 
 // renterStreamHandler handles downloads from the /renter/stream endpoint
 func (api *API) renterStreamHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	siaPath := req.FormValue("siapath")
+	siaPath := strings.TrimPrefix(ps.ByName("siapath"), "/")
 	fileName, streamer, err := api.renter.Streamer(siaPath)
 	if err != nil {
 		WriteError(w, Error{fmt.Sprintf("failed to create download streamer: %v", err)},

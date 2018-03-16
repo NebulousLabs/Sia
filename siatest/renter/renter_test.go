@@ -82,6 +82,11 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	if err := renter.WaitForDownload(localFile, remoteFile); err != nil {
 		t.Error(err)
 	}
+	// Stream the file.
+	_, err = renter.Stream(remoteFile)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // testDownloadMultipleLargeSectors downloads multiple large files (>5 Sectors)

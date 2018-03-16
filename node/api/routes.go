@@ -70,7 +70,6 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.POST("/renter", RequirePassword(api.renterHandlerPOST, requiredPassword))
 		router.GET("/renter/contracts", api.renterContractsHandler)
 		router.GET("/renter/downloads", api.renterDownloadsHandler)
-		router.GET("/renter/stream", api.renterStreamHandler)
 		router.GET("/renter/files", api.renterFilesHandler)
 		router.GET("/renter/prices", api.renterPricesHandler)
 
@@ -85,6 +84,7 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.GET("/renter/download/*siapath", RequirePassword(api.renterDownloadHandler, requiredPassword))
 		router.GET("/renter/downloadasync/*siapath", RequirePassword(api.renterDownloadAsyncHandler, requiredPassword))
 		router.POST("/renter/rename/*siapath", RequirePassword(api.renterRenameHandler, requiredPassword))
+		router.GET("/renter/stream/*siapath", api.renterStreamHandler)
 		router.POST("/renter/upload/*siapath", RequirePassword(api.renterUploadHandler, requiredPassword))
 
 		// HostDB endpoints.
