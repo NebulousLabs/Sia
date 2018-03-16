@@ -75,7 +75,7 @@ func (s *streamer) Read(p []byte) (n int, err error) {
 	buffer := bytes.NewBuffer([]byte{})
 	d, err := s.r.newDownload(downloadParams{
 		destination:       newDownloadDestinationWriteCloserFromWriter(buffer),
-		destinationType:   "http stream",
+		destinationType:   destinationTypeSeekStream,
 		destinationString: "httpresponse",
 		file:              s.file,
 

@@ -189,6 +189,8 @@ type Renter struct {
 	lastEstimation modules.RenterPriceEstimation
 
 	// Utilities.
+	chunkCache     map[string][]byte
+	cmu            *sync.Mutex
 	cs             modules.ConsensusSet
 	g              modules.Gateway
 	hostContractor hostContractor
@@ -421,21 +423,18 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
+		chunkCache:     make(map[string][]byte),
+		cmu:            new(sync.Mutex),
 		cs:             cs,
+		deps:           deps,
 		g:              g,
 		hostDB:         hdb,
 		hostContractor: hc,
 		persistDir:     persistDir,
 		mu:             siasync.New(modules.SafeMutexDelay, 1),
 		tpool:          tpool,
-		deps:           deps,
 	}
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
-
-	// TODO those should not be global. Need a better way to cache streaming
-	// chunks.
-	cache = make(map[string][]byte)
-	cmu = new(sync.Mutex)
 
 	// Load all saved data.
 	if err := r.initPersist(); err != nil {

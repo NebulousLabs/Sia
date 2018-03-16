@@ -43,6 +43,7 @@ type unfinishedDownloadChunk struct {
 
 	// Fetch + Write instructions - read only or otherwise thread safe.
 	staticChunkIndex  uint64                                     // Required for deriving the encryption keys for each piece.
+	staticCacheID     string                                     // Used to uniquely identify a chunk in the chunk cache.
 	staticChunkMap    map[types.FileContractID]downloadPieceInfo // Maps from file contract ids to the info for the piece associated with that contract
 	staticChunkSize   uint64
 	staticFetchLength uint64 // Length within the logical chunk to fetch.
@@ -72,6 +73,10 @@ type unfinishedDownloadChunk struct {
 	// The download object, mostly to update download progress.
 	download *download
 	mu       sync.Mutex
+
+	// Caching related fields
+	chunkCache map[string][]byte
+	cmu        *sync.Mutex
 }
 
 // fail will set the chunk status to failed. The physical chunk memory will be
@@ -166,6 +171,24 @@ func (udc *unfinishedDownloadChunk) returnMemory() {
 	}
 }
 
+// addChunkToCache adds the chunk to the cache if the download is a streaming
+// endpoint download.
+func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
+	// TODO is it safe to read the type without a lock?
+	if udc.download.destinationType == destinationTypeSeekStream {
+		udc.cmu.Lock()
+		// Prune cache if necessary.
+		for key := range udc.chunkCache {
+			if len(udc.chunkCache) < downloadCacheSize {
+				break
+			}
+			delete(udc.chunkCache, key)
+		}
+		udc.chunkCache[udc.staticCacheID] = data
+		udc.cmu.Unlock()
+	}
+}
+
 // threadedRecoverLogicalData will take all of the pieces that have been
 // downloaded and encode them into the logical data which is then written to the
 // underlying writer for the download.
@@ -211,19 +234,11 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 		udc.physicalChunkData[i] = nil
 	}
 
-	// Add the chunk to the cache.
-	// TODO this should only happen for the streaming endpoint.
+	// Get recovered data
 	recoveredData := recoverWriter.Bytes()
-	cmu.Lock()
-	cacheID := fmt.Sprintf("%v:%v", udc.download.staticSiaPath, udc.staticChunkIndex)
-	for key := range cache {
-		if len(cache) < 5 {
-			break
-		}
-		delete(cache, key)
-	}
-	cache[cacheID] = recoveredData
-	cmu.Unlock()
+
+	// Add the chunk to the cache.
+	udc.addChunkToCache(recoveredData)
 
 	// Write the bytes to the requested output.
 	start := udc.staticFetchOffset

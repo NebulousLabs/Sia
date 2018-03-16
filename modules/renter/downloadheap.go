@@ -10,8 +10,6 @@ package renter
 import (
 	"container/heap"
 	"errors"
-	"fmt"
-	"sync"
 	"time"
 )
 
@@ -155,8 +153,38 @@ func (r *Renter) managedNextDownloadChunk() *unfinishedDownloadChunk {
 	}
 }
 
-var cache map[string][]byte
-var cmu *sync.Mutex
+// managedTryCache tries to retrieve the chunk from the renter's cache. If
+// successful it will write the data to the destination and stop the download
+// if it was the last missing chunk. The function returns true if the chunk was
+// in the cache.
+// TODO in the future we might need cache invalidation. At the
+// moment this doesn't worry us since our files are static.
+func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
+	udc.mu.Lock()
+	defer udc.mu.Unlock()
+	r.cmu.Lock()
+	data, cached := r.chunkCache[udc.staticCacheID]
+	r.cmu.Unlock()
+	if !cached {
+		return false
+	}
+	start := udc.staticFetchOffset
+	end := start + udc.staticFetchLength
+	_, err := udc.destination.WriteAt(data[start:end], udc.staticWriteOffset)
+	if err != nil {
+		r.log.Println("WARN: failed to write cached chunk to destination")
+	}
+
+	// Check if the download is complete now.
+	udc.download.mu.Lock()
+	udc.download.chunksRemaining--
+	if udc.download.chunksRemaining == 0 {
+		udc.download.endTime = time.Now()
+		close(udc.download.completeChan)
+	}
+	udc.download.mu.Unlock()
+	return true
+}
 
 // threadedDownloadLoop utilizes the worker pool to make progress on any queued
 // downloads.
@@ -201,27 +229,7 @@ LOOP:
 			}
 
 			// Check if we got the chunk cached already.
-			// TODO this is not save. We need to figure out a way to do cache invalidation.
-			cacheID := fmt.Sprintf("%v:%v", nextChunk.download.staticSiaPath, nextChunk.staticChunkIndex)
-			cmu.Lock()
-			data, cached := cache[cacheID]
-			cmu.Unlock()
-			if cached {
-				start := nextChunk.staticFetchOffset
-				end := start + nextChunk.staticFetchLength
-				_, err := nextChunk.destination.WriteAt(data[start:end], nextChunk.staticWriteOffset)
-				if err != nil {
-					r.log.Println("WARN: failed to write cached chunk to destination")
-				}
-
-				// Check if the download is complete now.
-				nextChunk.download.mu.Lock()
-				nextChunk.download.chunksRemaining--
-				if nextChunk.download.chunksRemaining == 0 {
-					nextChunk.download.endTime = time.Now()
-					close(nextChunk.download.completeChan)
-				}
-				nextChunk.download.mu.Unlock()
+			if r.managedTryCache(nextChunk) {
 				continue
 			}
 

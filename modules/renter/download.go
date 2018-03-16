@@ -309,6 +309,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 			masterKey:   params.file.masterKey,
 
 			staticChunkIndex: i,
+			staticCacheID:    fmt.Sprintf("%v:%v", d.staticSiaPath, i),
 			staticChunkMap:   chunkMaps[i-minChunk],
 			staticChunkSize:  params.file.staticChunkSize(),
 			staticPieceSize:  params.file.pieceSize,
@@ -329,7 +330,9 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 			physicalChunkData: make([][]byte, params.file.erasureCode.NumPieces()),
 			pieceUsage:        make([]bool, params.file.erasureCode.NumPieces()),
 
-			download: d,
+			download:   d,
+			chunkCache: r.chunkCache,
+			cmu:        r.cmu,
 		}
 
 		// Set the fetchOffset - the offset within the chunk that we start
