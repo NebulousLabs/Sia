@@ -31,6 +31,7 @@ Index
 | [/renter/download/___*siapath___](#renterdownload__siapath___-get)           | GET       |
 | [/renter/downloadasync/___*siapath___](#renterdownloadasync__siapath___-get) | GET       |
 | [/renter/rename/___*siapath___](#renterrename___siapath___-post)              | POST      |
+| [/renter/stream/___*siapath___](#renterstreamsiapath-get)                     | GET       |
 | [/renter/upload/___*siapath___](#renterupload___siapath___-post)              | POST      |
 
 #### /renter [GET]
@@ -410,6 +411,20 @@ newsiapath
 ###### Response
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
+
+#### /renter/stream/*___siapath___ [GET]
+
+downloads a file using http streaming. This call blocks until the data is
+received.
+
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-1)
+```
+*siapath
+```
+
+###### Response
+standard success with the requested data in the body or error response. See
+[#standard-responses](#standard-responses).
 
 #### /renter/upload/___*siapath___ [POST]
 
