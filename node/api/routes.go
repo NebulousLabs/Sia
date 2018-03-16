@@ -168,7 +168,7 @@ func cleanCloseHandler(next http.Handler) http.Handler {
 // UserAgent that contains the specified string.
 func RequireUserAgent(h http.Handler, ua string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if !strings.Contains(req.UserAgent(), ua) {
+		if !strings.Contains(req.UserAgent(), ua) && !whitelisted(req) {
 			WriteError(w, Error{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
 			return
 		}
@@ -193,4 +193,13 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 		}
 		h(w, req, ps)
 	}
+}
+
+// whitelisted allows certain requests to be whitelisted even if they don't
+// have a matching User-Agent.
+func whitelisted(req *http.Request) bool {
+	if strings.HasPrefix(req.URL.Path, "/renter/stream") {
+		return true
+	}
+	return false
 }
