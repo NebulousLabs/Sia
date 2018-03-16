@@ -294,7 +294,7 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		// TODO: In the future we might want the user to be able to configure the
 		// packetSize using the API. For now the sane default is modules.SectorSize
 		// if the user wants to limit the connection.
-		r.hostContractor.SetRateLimits(s.DownloadSpeed, s.UploadSpeed, 4*4096)
+		r.hostContractor.SetRateLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed, 4*4096)
 	}
 
 	r.managedUpdateWorkerPool()
