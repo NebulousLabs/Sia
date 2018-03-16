@@ -242,14 +242,16 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	}
 
 	// ValidProofOutputs shoud have 2 outputs (renter + host) and missed
-	// outputs should have 3 (renter + host + void)
-	if len(fc.ValidProofOutputs) != 2 || len(fc.MissedProofOutputs) != 3 {
+	// outputs should have either 3 or 4 (renter + host + void [+ void])
+	if len(fc.ValidProofOutputs) != 2 || (len(fc.MissedProofOutputs) != 3 && len(fc.MissedProofOutputs) != 4) {
 		return errBadContractOutputCounts
 	}
 	// The unlock hashes of the valid and missed proof outputs for the host
-	// must match the host's unlock hash. The third missed output should point
-	// to the void.
-	if fc.ValidProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[2].UnlockHash != (types.UnlockHash{}) {
+	// must match the host's unlock hash. The third (and possibly fourth)
+	// missed output(s) should point to the void.
+	if fc.ValidProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[1].UnlockHash != unlockHash ||
+		fc.MissedProofOutputs[2].UnlockHash != (types.UnlockHash{}) ||
+		(len(fc.MissedProofOutputs) == 4 && fc.MissedProofOutputs[2].UnlockHash != (types.UnlockHash{})) {
 		return errBadPayoutUnlockHashes
 	}
 	// Check that the payouts for the valid proof outputs and the missed proof

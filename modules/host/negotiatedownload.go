@@ -153,7 +153,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 // host.
 func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractRevision, blockHeight types.BlockHeight, expectedTransfer types.Currency) error {
 	// Check that the revision is well-formed.
-	if len(paymentRevision.NewValidProofOutputs) != 2 || len(paymentRevision.NewMissedProofOutputs) != 3 {
+	if len(paymentRevision.NewValidProofOutputs) != 2 || (len(paymentRevision.NewMissedProofOutputs) != 3 && len(paymentRevision.NewMissedProofOutputs) != 4) {
 		return errBadContractOutputCounts
 	}
 

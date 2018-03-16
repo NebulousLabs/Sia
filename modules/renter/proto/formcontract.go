@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -85,6 +86,16 @@ func (cs *ContractSet) FormContract(params ContractParams, txnBuilder transactio
 			// Once we start doing revisions, we'll move some coins to the host and some to the void.
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
+	}
+	if build.VersionCmp(host.Version, "1.3.0") >= 0 {
+		// After version 1.3.1, file contracts will have an extra void output
+		// in MissedProofOutputs. The renter moves voided coins to
+		// MissedProofOutputs[2], and the host moves voided coins to
+		// MissedProofOutputs[3]. This allows us to calculate the original
+		// amount of funds paid into the contract by the renter and host.
+		fc.MissedProofOutputs = append(fc.MissedProofOutputs, types.SiacoinOutput{
+			Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{},
+		})
 	}
 
 	// Build transaction containing fc, e.g. the File Contract.
