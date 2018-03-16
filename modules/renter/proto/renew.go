@@ -283,8 +283,14 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 		SiafundFee:  types.Tax(startHeight, fc.Payout),
 	}
 
+	// Get old roots
+	oldRoots, err := oldContract.merkleRoots()
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
+
 	// Add contract to set.
-	meta, err := cs.managedInsertContract(header, oldContract.merkleRoots)
+	meta, err := cs.managedInsertContract(header, oldRoots)
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
