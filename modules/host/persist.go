@@ -178,6 +178,8 @@ func (h *Host) load() error {
 	// contract renewals. This leads to an offset to the real value over time.
 	h.financialMetrics.ContractCount = 0
 	h.financialMetrics.LockedStorageCollateral = types.NewCurrency64(0)
+	h.financialMetrics.PotentialContractCompensation = types.NewCurrency64(0)
+	h.financialMetrics.PotentialStorageRevenue = types.NewCurrency64(0)
 	err = h.db.View(func(tx *bolt.Tx) error {
 		cursor := tx.Bucket(bucketStorageObligations).Cursor()
 		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
@@ -189,6 +191,8 @@ func (h *Host) load() error {
 			if so.ObligationStatus == obligationUnresolved {
 				h.financialMetrics.ContractCount++
 				h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Add(so.LockedCollateral)
+				h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Add(so.ContractCost)
+				h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Add(so.PotentialStorageRevenue)
 			}
 		}
 		return nil
