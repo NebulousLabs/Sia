@@ -366,6 +366,13 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 			return bso.Put(soid[:], soBytes)
 		})
 		if err != nil {
+			// Database will rollback when an error is returned. Already added
+			// sectors need to be removed.
+			if len(so.SectorRoots) > 0 {
+				// Error is not checked, we want to call remove on every sector even if
+				// there are problems - disk health information will be updated.
+				_ = h.RemoveSectorBatch(so.SectorRoots)
+			}
 			return err
 		}
 
