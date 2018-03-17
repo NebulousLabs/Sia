@@ -336,6 +336,17 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 			return errors.New("fill me in")
 		}
 
+		// If the storage obligation already has sectors, it means that the
+		// file contract is being renewed, and that the sector should be
+		// re-added with a new expiration height. If there is an error at any
+		// point, all of the sectors should be removed.
+		if len(so.SectorRoots) != 0 {
+			err := h.AddSectorBatch(so.SectorRoots)
+			if err != nil {
+				return err
+			}
+		}
+
 		// Add the storage obligation information to the database.
 		err := h.db.Update(func(tx *bolt.Tx) error {
 			// Sanity check - a storage obligation using the same file contract id
@@ -346,17 +357,6 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 			// contract ids should happen during the negotiation phase, and not
 			// during the 'addStorageObligation' phase.
 			bso := tx.Bucket(bucketStorageObligations)
-
-			// If the storage obligation already has sectors, it means that the
-			// file contract is being renewed, and that the sector should be
-			// re-added with a new expiration height. If there is an error at any
-			// point, all of the sectors should be removed.
-			if len(so.SectorRoots) != 0 {
-				err := h.AddSectorBatch(so.SectorRoots)
-				if err != nil {
-					return err
-				}
-			}
 
 			// Add the storage obligation to the database.
 			soBytes, err := json.Marshal(so)
