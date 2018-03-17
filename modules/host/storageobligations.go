@@ -405,13 +405,9 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
 	}
 
-	// Increase contract count by one only if this is a new filecontract.
-	if len(so.SectorRoots) == 0 {
-		h.financialMetrics.ContractCount++
-	}
-
 	// Update the host financial metrics with regards to this storage
 	// obligation.
+	h.financialMetrics.ContractCount++
 	h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Add(so.ContractCost)
 	h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Add(so.LockedCollateral)
 	h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Add(so.PotentialStorageRevenue)
