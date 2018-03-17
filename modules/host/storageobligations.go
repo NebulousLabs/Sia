@@ -397,7 +397,9 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 	err = h.tpool.AcceptTransactionSet(so.OriginTransactionSet)
 	if err != nil {
 		h.log.Println("Failed to add storage obligation, transaction set was not accepted:", err)
-		return err
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
 	}
 
 	// Queue the action items.
