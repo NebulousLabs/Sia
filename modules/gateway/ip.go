@@ -21,7 +21,8 @@ func (g *Gateway) discoverPeerIP(conn modules.PeerConn) error {
 	return encoding.WriteObject(conn, host)
 }
 
-// managedIPFromPeers asks the peers the node is connected to for the node's public ip address. If not enough peers are available
+// managedIPFromPeers asks the peers the node is connected to for the node's
+// public ip address. If not enough peers are available
 func (g *Gateway) managedIPFromPeers() (string, error) {
 	for {
 		// Check for shutdown signal.
@@ -79,6 +80,7 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 		// it valid.
 		for addr, count := range addresses {
 			if count > successfulResponses/2 {
+				g.log.Println("ip successfully discovered using peers:", addr)
 				return addr, nil
 			}
 		}
