@@ -28,7 +28,6 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
-	"github.com/NebulousLabs/ratelimit"
 
 	"github.com/NebulousLabs/threadgroup"
 )
@@ -133,6 +132,10 @@ type hostContractor interface {
 
 	// ResolveID returns the most recent renewal of the specified ID.
 	ResolveID(types.FileContractID) types.FileContractID
+
+	// SetRateLimits sets the bandwidth limits for connections created by the
+	// contractor and its submodules.
+	SetRateLimits(int64, int64, uint64)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
@@ -281,15 +284,17 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	if err != nil {
 		return err
 	}
-	// Set bandwidth limits.
+	// Set ratelimit
 	if s.MaxDownloadSpeed < 0 || s.MaxUploadSpeed < 0 {
 		return errors.New("download/upload rate limit can't be below 0")
 	}
-	// Set ratelimit
 	if s.MaxDownloadSpeed == 0 && s.MaxUploadSpeed == 0 {
-		ratelimit.SetLimits(0, 0, 0)
+		r.hostContractor.SetRateLimits(0, 0, 0)
 	} else {
-		ratelimit.SetLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed, 4*4096)
+		// TODO: In the future we might want the user to be able to configure
+		// the packetSize using the API. For now the sane default is 16kib if
+		// the user wants to limit the connection.
+		r.hostContractor.SetRateLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed, 4*4096)
 	}
 
 	r.managedUpdateWorkerPool()

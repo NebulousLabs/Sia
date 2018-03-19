@@ -50,13 +50,23 @@ func (c *Client) RenterFilesGet() (rf api.RenterFiles, err error) {
 	return
 }
 
-// RenterPost uses the /renter endpoint to change the renter's allowance
-func (c *Client) RenterPost(allowance modules.Allowance) (err error) {
+// RenterPostAllowance uses the /renter endpoint to change the renter's allowance
+func (c *Client) RenterPostAllowance(allowance modules.Allowance) (err error) {
 	values := url.Values{}
 	values.Set("funds", allowance.Funds.String())
 	values.Set("hosts", strconv.FormatUint(allowance.Hosts, 10))
 	values.Set("period", strconv.FormatUint(uint64(allowance.Period), 10))
 	values.Set("renewwindow", strconv.FormatUint(uint64(allowance.RenewWindow), 10))
+	err = c.post("/renter", values.Encode(), nil)
+	return
+}
+
+// RenterPostRateLimit uses the /renter endpoint to change the renter's bandwidth rate
+// limit.
+func (c *Client) RenterPostRateLimit(readBPS, writeBPS int64) (err error) {
+	values := url.Values{}
+	values.Set("maxdownloadspeed", strconv.FormatInt(readBPS, 10))
+	values.Set("maxuploadspeed", strconv.FormatInt(writeBPS, 10))
 	err = c.post("/renter", values.Encode(), nil)
 	return
 }

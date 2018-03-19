@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/ratelimit"
 
 	"github.com/NebulousLabs/writeaheadlog"
 )
@@ -21,6 +22,7 @@ type ContractSet struct {
 	wal       *writeaheadlog.WAL
 	dir       string
 	mu        sync.Mutex
+	rl        *ratelimit.RateLimit
 }
 
 // Acquire looks up the contract with the specified FileContractID and locks
@@ -97,6 +99,12 @@ func (cs *ContractSet) Return(c *SafeContract) {
 	safeContract.mu.Unlock()
 }
 
+// SetRateLimits sets the bandwidth limits for connections created by the
+// contractSet.
+func (cs *ContractSet) SetRateLimits(readBPS, writeBPS int64, packetSize uint64) {
+	cs.rl.SetLimits(readBPS, writeBPS, packetSize)
+}
+
 // View returns a copy of the contract with the specified ID. The contracts is
 // not locked. Certain fields, including the MerkleRoots, are set to nil for
 // safety reasons. If the contract is not present in the set, View
@@ -165,6 +173,8 @@ func NewContractSet(dir string) (*ContractSet, error) {
 		wal:       wal,
 		dir:       dir,
 	}
+	// Set the initial rate limit to 'unlimited' bandwidth with 4kib packets.
+	cs.rl = ratelimit.NewRateLimit(0, 0, 0)
 
 	// Load the contract files.
 	dirNames, err := d.Readdirnames(-1)

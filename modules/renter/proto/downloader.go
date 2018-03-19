@@ -165,11 +165,11 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 		}
 	}()
 
-	conn, closeChan, err := initiateRevisionLoop(host, contract, modules.RPCDownload, cancel)
+	conn, closeChan, err := initiateRevisionLoop(host, contract, modules.RPCDownload, cancel, cs.rl)
 	if IsRevisionMismatch(err) && len(sc.unappliedTxns) > 0 {
 		// we have desynced from the host. If we have unapplied updates from the
 		// WAL, try applying them.
-		conn, closeChan, err = initiateRevisionLoop(host, sc.unappliedHeader(), modules.RPCDownload, cancel)
+		conn, closeChan, err = initiateRevisionLoop(host, sc.unappliedHeader(), modules.RPCDownload, cancel, cs.rl)
 		if err != nil {
 			return nil, err
 		}

@@ -302,7 +302,7 @@ func randomDir() string {
 // setRenterAllowances sets the allowance of each renter
 func setRenterAllowances(renters map[*TestNode]struct{}) error {
 	for renter := range renters {
-		if err := renter.RenterPost(defaultAllowance); err != nil {
+		if err := renter.RenterPostAllowance(defaultAllowance); err != nil {
 			return err
 		}
 	}

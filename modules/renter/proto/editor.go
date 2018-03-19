@@ -175,11 +175,11 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		}
 	}()
 
-	conn, closeChan, err := initiateRevisionLoop(host, contract, modules.RPCReviseContract, cancel)
+	conn, closeChan, err := initiateRevisionLoop(host, contract, modules.RPCReviseContract, cancel, cs.rl)
 	if IsRevisionMismatch(err) && len(sc.unappliedTxns) > 0 {
 		// we have desynced from the host. If we have unapplied updates from the
 		// WAL, try applying them.
-		conn, closeChan, err = initiateRevisionLoop(host, sc.unappliedHeader(), modules.RPCReviseContract, cancel)
+		conn, closeChan, err = initiateRevisionLoop(host, sc.unappliedHeader(), modules.RPCReviseContract, cancel, cs.rl)
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +210,7 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 
 // initiateRevisionLoop initiates either the editor or downloader loop with
 // host, depending on which rpc was passed.
-func initiateRevisionLoop(host modules.HostDBEntry, contract contractHeader, rpc types.Specifier, cancel <-chan struct{}) (net.Conn, chan struct{}, error) {
+func initiateRevisionLoop(host modules.HostDBEntry, contract contractHeader, rpc types.Specifier, cancel <-chan struct{}, rl *ratelimit.RateLimit) (net.Conn, chan struct{}, error) {
 	c, err := (&net.Dialer{
 		Cancel:  cancel,
 		Timeout: 45 * time.Second, // TODO: Constant
@@ -218,7 +218,7 @@ func initiateRevisionLoop(host modules.HostDBEntry, contract contractHeader, rpc
 	if err != nil {
 		return nil, nil, err
 	}
-	conn := ratelimit.NewRLConn(c, cancel)
+	conn := ratelimit.NewRLConn(c, rl, cancel)
 
 	closeChan := make(chan struct{})
 	go func() {
