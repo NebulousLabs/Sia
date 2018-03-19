@@ -302,7 +302,7 @@ func newHost(dependencies modules.Dependencies, cs modules.ConsensusSet, tpool m
 
 // New returns an initialized Host.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
-	return newHost(&modules.ProductionDependencies{}, cs, tpool, wallet, address, persistDir)
+	return newHost(modules.ProdDependencies, cs, tpool, wallet, address, persistDir)
 }
 
 // Close shuts down the host.

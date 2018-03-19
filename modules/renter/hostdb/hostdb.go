@@ -64,7 +64,7 @@ func New(g modules.Gateway, cs modules.ConsensusSet, persistDir string) (*HostDB
 		return nil, errNilCS
 	}
 	// Create HostDB using production dependencies.
-	return newHostDB(g, cs, persistDir, &modules.ProductionDependencies{})
+	return newHostDB(g, cs, persistDir, modules.ProdDependencies)
 }
 
 // newHostDB creates a HostDB using the provided dependencies. It loads the old

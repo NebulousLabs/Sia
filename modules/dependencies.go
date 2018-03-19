@@ -14,6 +14,11 @@ import (
 	"github.com/NebulousLabs/fastrand"
 )
 
+// ProdDependencies act as a global instance of the production dependencies to
+// avoid having to instantiate new dependencies every time we want to pass
+// production dependencies.
+var ProdDependencies = new(ProductionDependencies)
+
 // Dependencies defines dependencies used by all of Sia's modules. Custom
 // dependencies can be created to inject certain behavior during testing.
 type (

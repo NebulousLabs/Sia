@@ -101,7 +101,7 @@ func (ht *hostTester) initWallet() error {
 // extra initialization has been done, for example no blocks have been mined
 // and the wallet keys have not been created.
 func blankHostTester(name string) (*hostTester, error) {
-	return blankMockHostTester(&modules.ProductionDependencies{}, name)
+	return blankMockHostTester(modules.ProdDependencies, name)
 }
 
 // blankMockHostTester creates a host tester where the modules are created but no
@@ -162,7 +162,7 @@ func blankMockHostTester(d modules.Dependencies, name string) (*hostTester, erro
 // newHostTester creates a host tester with an initialized wallet and money in
 // that wallet.
 func newHostTester(name string) (*hostTester, error) {
-	return newMockHostTester(&modules.ProductionDependencies{}, name)
+	return newMockHostTester(modules.ProdDependencies, name)
 }
 
 // newMockHostTester creates a host tester with an initialized wallet and money
@@ -285,7 +285,7 @@ func TestHostMultiClose(t *testing.T) {
 	// Set ht.host to something non-nil - nil was returned because startup was
 	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
 	// operation will fail.
-	ht.host, err = newHost(&modules.ProductionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(modules.ProdDependencies, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
