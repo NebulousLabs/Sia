@@ -37,14 +37,14 @@ var (
 type Contractor struct {
 	// dependencies
 	cs      consensusSet
+	deps    modules.Dependencies
 	hdb     hostDB
 	log     *persist.Logger
-	persist persister
 	mu      sync.RWMutex
+	persist persister
 	tg      siasync.ThreadGroup
 	tpool   transactionPool
 	wallet  wallet
-	deps    modules.Dependencies
 
 	// Only one thread should be performing contract maintenance at a time.
 	interruptMaintenance chan struct{}
@@ -212,12 +212,12 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, co
 	// Create the Contractor object.
 	c := &Contractor{
 		cs:      cs,
+		deps:    deps,
 		hdb:     hdb,
 		log:     l,
 		persist: p,
 		tpool:   tp,
 		wallet:  w,
-		deps:    deps,
 
 		interruptMaintenance: make(chan struct{}),
 
