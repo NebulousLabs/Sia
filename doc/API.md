@@ -894,7 +894,11 @@ has been downloaded.
 
 ###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-1)
 ```
+async
 destination
+httpresp
+length
+offset
 ```
 
 ###### Response

@@ -355,8 +355,16 @@ has been downloaded.
 
 ###### Query String Parameters
 ```
+// If async is true, the http request will be non blocking. Can't be used with
+async
 // Location on disk that the file will be downloaded to.
 destination 
+// If httresp is true, the data will be written to the http response.
+httpresp
+// Length of the requested data. Has to be <= filesize-offset.
+length
+// Offset relative to the file start from where the download starts.
+offset
 ```
 
 ###### Response
