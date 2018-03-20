@@ -71,7 +71,7 @@ func TestContractUncommittedTxn(t *testing.T) {
 	// the state of the contract should match the initial state
 	// NOTE: can't use reflect.DeepEqual for the header because it contains
 	// types.Currency fields
-	merkleRoots, err := sc.merkleRoots()
+	merkleRoots, err := sc.merkleRoots.merkleRoots()
 	if err != nil {
 		t.Fatal("failed to get merkle roots", err)
 	}
@@ -95,7 +95,7 @@ func TestContractUncommittedTxn(t *testing.T) {
 		t.Fatal("WAL transaction changed")
 	}
 	// the state of the contract should match the initial state
-	merkleRoots, err = sc.merkleRoots()
+	merkleRoots, err = sc.merkleRoots.merkleRoots()
 	if err != nil {
 		t.Fatal("failed to get merkle roots:", err)
 	}
@@ -115,7 +115,7 @@ func TestContractUncommittedTxn(t *testing.T) {
 		t.Fatal("expected 0 unappliedTxns, got", len(sc.unappliedTxns))
 	}
 	// the state of the contract should now match the revised state
-	merkleRoots, err = sc.merkleRoots()
+	merkleRoots, err = sc.merkleRoots.merkleRoots()
 	if err != nil {
 		t.Fatal("failed to get merkle roots:", err)
 	}

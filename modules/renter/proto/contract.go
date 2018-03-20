@@ -2,12 +2,10 @@ package proto
 
 import (
 	"encoding/json"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -128,10 +126,8 @@ type SafeContract struct {
 	headerMu sync.Mutex
 	header   contractHeader
 
-	// merkleRoots are the Merkle roots of each sector stored on the host that
-	// relate to this contract.
-	//merkleRoots []crypto.Hash
-	numMerkleRoots int
+	// merkleRoots are the sector roots covered by this contract.
+	merkleRoots *merkleRoots
 
 	// unappliedTxns are the transactions that were written to the WAL but not
 	// applied to the contract file.
@@ -208,28 +204,6 @@ func (c *SafeContract) Utility() modules.ContractUtility {
 	return c.header.Utility
 }
 
-// merkleRoots returns the contracts merkle roots.
-func (c *SafeContract) merkleRoots() ([]crypto.Hash, error) {
-	merkleRoots := make([]crypto.Hash, 0, c.numMerkleRoots)
-	if _, err := c.f.Seek(contractHeaderSize, io.SeekStart); err != nil {
-		return merkleRoots, err
-	}
-	for {
-		var root crypto.Hash
-		if _, err := io.ReadFull(c.f, root[:]); err == io.EOF {
-			break
-		} else if err != nil {
-			return merkleRoots, errors.AddContext(err, "failed to read root from disk")
-		}
-		merkleRoots = append(merkleRoots, root)
-	}
-	// Sanity check: should have read exactly numMerkleRoots roots.
-	if len(merkleRoots) != c.numMerkleRoots {
-		build.Critical("Number of merkle roots on disk doesn't match numMerkleRoots")
-	}
-	return merkleRoots, nil
-}
-
 func (c *SafeContract) makeUpdateSetHeader(h contractHeader) writeaheadlog.Update {
 	c.headerMu.Lock()
 	id := c.header.ID()
@@ -274,8 +248,11 @@ func (c *SafeContract) applySetRoot(root crypto.Hash, index int) error {
 	if _, err := c.f.WriteAt(root[:], rootOffset); err != nil {
 		return err
 	}
-	if c.numMerkleRoots <= index {
-		c.numMerkleRoots++
+	numMerkleRoots := c.merkleRoots.len()
+	if index == numMerkleRoots {
+		c.merkleRoots.push(root)
+	} else {
+		return c.merkleRoots.insert(index, root)
 	}
 	return nil
 }
@@ -292,7 +269,7 @@ func (c *SafeContract) recordUploadIntent(rev types.FileContractRevision, root c
 
 	t, err := c.wal.NewTransaction([]writeaheadlog.Update{
 		c.makeUpdateSetHeader(newHeader),
-		c.makeUpdateSetRoot(root, c.numMerkleRoots),
+		c.makeUpdateSetRoot(root, c.merkleRoots.len()),
 	})
 	if err != nil {
 		return nil, err
@@ -316,7 +293,7 @@ func (c *SafeContract) commitUpload(t *writeaheadlog.Transaction, signedTxn type
 	if err := c.applySetHeader(newHeader); err != nil {
 		return err
 	}
-	if err := c.applySetRoot(root, c.numMerkleRoots); err != nil {
+	if err := c.applySetRoot(root, c.merkleRoots.len()); err != nil {
 		return err
 	}
 	if err := c.f.Sync(); err != nil {
@@ -441,8 +418,9 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 		return modules.RenterContract{}, err
 	}
 	// write roots
-	for i, root := range roots {
-		if _, err := f.WriteAt(root[:], contractHeaderSize+crypto.HashSize*int64(i)); err != nil {
+	merkleRoots := newMerkleRoots(f)
+	for _, root := range roots {
+		if err := merkleRoots.push(root); err != nil {
 			return modules.RenterContract{}, err
 		}
 	}
@@ -450,10 +428,10 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 		return modules.RenterContract{}, err
 	}
 	sc := &SafeContract{
-		header:         h,
-		numMerkleRoots: len(roots),
-		f:              f,
-		wal:            cs.wal,
+		header:      h,
+		merkleRoots: merkleRoots,
+		f:           f,
+		wal:         cs.wal,
 	}
 	cs.mu.Lock()
 	cs.contracts[h.ID()] = sc
@@ -476,18 +454,9 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 		return err
 	}
 	// read merkleRoots
-	numMerkleRoots := 0
-	if _, err := f.Seek(contractHeaderSize, io.SeekStart); err != nil {
+	merkleRoots, err := loadExistingMerkleRoots(f)
+	if err != nil {
 		return err
-	}
-	for {
-		var root crypto.Hash
-		if _, err := io.ReadFull(f, root[:]); err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-		numMerkleRoots++
 	}
 	// add relevant unapplied transactions
 	var unappliedTxns []*writeaheadlog.Transaction
@@ -518,11 +487,11 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 	}
 	// add to set
 	cs.contracts[header.ID()] = &SafeContract{
-		header:         header,
-		numMerkleRoots: numMerkleRoots,
-		unappliedTxns:  unappliedTxns,
-		f:              f,
-		wal:            cs.wal,
+		header:        header,
+		merkleRoots:   merkleRoots,
+		unappliedTxns: unappliedTxns,
+		f:             f,
+		wal:           cs.wal,
 	}
 	return nil
 }
@@ -551,7 +520,7 @@ func (cs *ContractSet) ConvertV130Contract(c V130Contract, cr V130CachedRevision
 			return errors.New("contract set is missing contract that was just added")
 		}
 		defer cs.Return(sc)
-		if len(cr.MerkleRoots) == sc.numMerkleRoots+1 {
+		if len(cr.MerkleRoots) == sc.merkleRoots.len()+1 {
 			root := cr.MerkleRoots[len(cr.MerkleRoots)-1]
 			_, err = sc.recordUploadIntent(cr.Revision, root, types.ZeroCurrency, types.ZeroCurrency)
 		} else {

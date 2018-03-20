@@ -89,21 +89,14 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient collateral to support upload")
 	}
 
-	// Get merkle roots
-	oldRoots, err := sc.merkleRoots()
-	if err != nil {
-		return modules.RenterContract{}, crypto.Hash{}, err
-	}
-
 	// calculate the new Merkle root
 	sectorRoot := crypto.MerkleRoot(data)
-	newRoots := append(oldRoots, sectorRoot)
-	merkleRoot := cachedMerkleRoot(newRoots)
+	merkleRoot := sc.merkleRoots.newRoot(sectorRoot)
 
 	// create the action and revision
 	actions := []modules.RevisionAction{{
 		Type:        modules.ActionInsert,
-		SectorIndex: uint64(sc.numMerkleRoots),
+		SectorIndex: uint64(sc.merkleRoots.len()),
 		Data:        data,
 	}}
 	rev := newUploadRevision(contract.LastRevision(), merkleRoot, sectorPrice, sectorCollateral)

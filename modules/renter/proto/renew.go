@@ -284,7 +284,7 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	}
 
 	// Get old roots
-	oldRoots, err := oldContract.merkleRoots()
+	oldRoots, err := oldContract.merkleRoots.merkleRoots()
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
