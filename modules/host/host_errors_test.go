@@ -45,7 +45,7 @@ func TestHostFailedMkdirAll(t *testing.T) {
 	// Set ht.host to something non-nil - nil was returned because startup was
 	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
 	// operation will fail.
-	ht.host, err = newHost(&modules.ProductionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(modules.ProdDependencies, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestHostFailedNewLogger(t *testing.T) {
 	// Set ht.host to something non-nil - nil was returned because startup was
 	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
 	// operation will fail.
-	ht.host, err = newHost(&modules.ProductionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(modules.ProdDependencies, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestHostFailedOpenDatabase(t *testing.T) {
 	// Set ht.host to something non-nil - nil was returned because startup was
 	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
 	// operation will fail.
-	ht.host, err = newHost(&modules.ProductionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(modules.ProdDependencies, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +165,7 @@ func TestHostFailedLoadFile(t *testing.T) {
 	// Set ht.host to something non-nil - nil was returned because startup was
 	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
 	// operation will fail.
-	ht.host, err = newHost(&modules.ProductionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(modules.ProdDependencies, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func TestHostFailedListen(t *testing.T) {
 	// Set ht.host to something non-nil - nil was returned because startup was
 	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
 	// operation will fail.
-	ht.host, err = newHost(&modules.ProductionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(modules.ProdDependencies, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}

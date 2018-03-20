@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -20,7 +21,7 @@ func TestContractUncommittedTxn(t *testing.T) {
 	}
 	// create contract set with one contract
 	dir := build.TempDir(filepath.Join("proto", t.Name()))
-	cs, err := NewContractSet(dir)
+	cs, err := NewContractSet(dir, modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +79,7 @@ func TestContractUncommittedTxn(t *testing.T) {
 
 	// close and reopen the contract set
 	cs.Close()
-	cs, err = NewContractSet(dir)
+	cs, err = NewContractSet(dir, modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}

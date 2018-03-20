@@ -124,7 +124,7 @@ func TestConvertPersist(t *testing.T) {
 	}
 
 	// load the contracts
-	cs, err := proto.NewContractSet(filepath.Join(dir, "contracts"))
+	cs, err := proto.NewContractSet(filepath.Join(dir, "contracts"), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}

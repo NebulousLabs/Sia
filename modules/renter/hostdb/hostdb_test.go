@@ -62,7 +62,7 @@ func makeHostDBEntry() modules.HostDBEntry {
 // newHDBTester returns a tester object wrapping a HostDB and some extra
 // information for testing.
 func newHDBTester(name string) (*hdbTester, error) {
-	return newHDBTesterDeps(name, &modules.ProductionDependencies{})
+	return newHDBTesterDeps(name, modules.ProdDependencies)
 }
 
 // newHDBTesterDeps returns a tester object wrapping a HostDB and some extra

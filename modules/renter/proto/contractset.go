@@ -19,10 +19,11 @@ import (
 // to provide operations on the set as a whole.
 type ContractSet struct {
 	contracts map[types.FileContractID]*SafeContract
-	wal       *writeaheadlog.WAL
+	deps      modules.Dependencies
 	dir       string
 	mu        sync.Mutex
 	rl        *ratelimit.RateLimit
+	wal       *writeaheadlog.WAL
 }
 
 // Acquire looks up the contract with the specified FileContractID and locks
@@ -142,7 +143,7 @@ func (cs *ContractSet) Close() error {
 
 // NewContractSet returns a ContractSet storing its contracts in the specified
 // dir.
-func NewContractSet(dir string) (*ContractSet, error) {
+func NewContractSet(dir string, deps modules.Dependencies) (*ContractSet, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
@@ -170,8 +171,9 @@ func NewContractSet(dir string) (*ContractSet, error) {
 
 	cs := &ContractSet{
 		contracts: make(map[types.FileContractID]*SafeContract),
-		wal:       wal,
+		deps:      deps,
 		dir:       dir,
+		wal:       wal,
 	}
 	// Set the initial rate limit to 'unlimited' bandwidth with 4kib packets.
 	cs.rl = ratelimit.NewRateLimit(0, 0, 0)

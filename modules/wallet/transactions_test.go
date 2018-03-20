@@ -14,7 +14,7 @@ func TestIntegrationTransactions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestTransactionsSingleTxn(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestIntegrationTransaction(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestProcessedTxnIndexCompatCode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestIntegrationAddressTransactions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +321,7 @@ func TestAddressTransactionRevertedBlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,7 +374,7 @@ func TestTransactionInputOutputIDs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,7 +437,7 @@ func TestTransactionInputOutputIDs(t *testing.T) {
 // using the near-worst-case scenario of 10,000 transactions to search through
 // with only a single relevant transaction.
 func BenchmarkAddressTransactions(b *testing.B) {
-	wt, err := createWalletTester(b.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(b.Name(), modules.ProdDependencies)
 	if err != nil {
 		b.Fatal(err)
 	}

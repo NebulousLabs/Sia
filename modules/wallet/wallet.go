@@ -127,7 +127,7 @@ func (w *Wallet) Height() types.BlockHeight {
 // not loaded into the wallet during the call to 'new', but rather during the
 // call to 'Unlock'.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string) (*Wallet, error) {
-	return newWallet(cs, tpool, persistDir, &modules.ProductionDependencies{})
+	return newWallet(cs, tpool, persistDir, modules.ProdDependencies)
 }
 
 func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string, deps modules.Dependencies) (*Wallet, error) {

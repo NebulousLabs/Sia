@@ -13,7 +13,7 @@ func TestSendSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestIntegrationSendOverUnder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestIntegrationSpendHalfHalf(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestIntegrationSpendUnconfirmed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}

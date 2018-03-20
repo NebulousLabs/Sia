@@ -228,7 +228,7 @@ func TestRescanning(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestLookaheadGeneration(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +333,7 @@ func TestAdvanceLookaheadNoRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,7 +527,7 @@ func TestDistantWallets(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}

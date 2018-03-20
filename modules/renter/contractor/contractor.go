@@ -37,10 +37,11 @@ var (
 type Contractor struct {
 	// dependencies
 	cs      consensusSet
+	deps    modules.Dependencies
 	hdb     hostDB
 	log     *persist.Logger
-	persist persister
 	mu      sync.RWMutex
+	persist persister
 	tg      siasync.ThreadGroup
 	tpool   transactionPool
 	wallet  wallet
@@ -192,7 +193,7 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	}
 
 	// Create the contract set.
-	contractSet, err := proto.NewContractSet(filepath.Join(persistDir, "contracts"))
+	contractSet, err := proto.NewContractSet(filepath.Join(persistDir, "contracts"), modules.ProdDependencies)
 	if err != nil {
 		return nil, err
 	}
@@ -203,14 +204,15 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	}
 
 	// Create Contractor using production dependencies.
-	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, contractSet, newPersist(persistDir), logger)
+	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, contractSet, newPersist(persistDir), logger, modules.ProdDependencies)
 }
 
 // newContractor creates a Contractor using the provided dependencies.
-func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, contractSet *proto.ContractSet, p persister, l *persist.Logger) (*Contractor, error) {
+func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, contractSet *proto.ContractSet, p persister, l *persist.Logger, deps modules.Dependencies) (*Contractor, error) {
 	// Create the Contractor object.
 	c := &Contractor{
 		cs:      cs,
+		deps:    deps,
 		hdb:     hdb,
 		log:     l,
 		persist: p,
