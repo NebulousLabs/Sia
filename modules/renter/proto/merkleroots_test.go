@@ -190,3 +190,79 @@ func TestDeleteLastRoot(t *testing.T) {
 		t.Fatal("expected 0 cached roots but was", len(merkleRoots.cachedSubTrees))
 	}
 }
+
+// TestDeleteLastRoot tests the deleteLastRoot method by creating many roots
+// and deleting random indices until there are no more roots left.
+func TestDelete(t *testing.T) {
+	dir := build.TempDir(t.Name())
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	filePath := path.Join(dir, "file.dat")
+	file, err := os.Create(filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create many sector roots.
+	numMerkleRoots := 1000
+	merkleRoots := newMerkleRoots(file)
+	for i := 0; i < numMerkleRoots; i++ {
+		hash := crypto.Hash{}
+		copy(hash[:], fastrand.Bytes(crypto.HashSize)[:])
+		merkleRoots.push(hash)
+	}
+
+	for merkleRoots.numMerkleRoots > 0 {
+		// Randomly choose a root to delete.
+		deleteIndex := fastrand.Intn(merkleRoots.numMerkleRoots)
+
+		// Get some metrics to be able to check if delete was working as expected.
+		numRoots := merkleRoots.numMerkleRoots
+		numCached := len(merkleRoots.cachedSubTrees)
+		numUncached := len(merkleRoots.uncachedRoots)
+		cachedIndex, cached := merkleRoots.isIndexCached(deleteIndex)
+
+		if err := merkleRoots.delete(deleteIndex); err != nil {
+			t.Fatal("failed to delete random index", deleteIndex, err)
+		}
+		// Number of roots should have decreased.
+		if merkleRoots.numMerkleRoots != numRoots-1 {
+			t.Fatal("number of roots in memory should have decreased")
+		}
+		// Number of roots on disk should have decreased.
+		if roots, err := merkleRoots.merkleRoots(); err != nil {
+			t.Fatal("failed to get roots from disk")
+		} else if len(roots) != numRoots-1 {
+			t.Fatal("number of roots on disk should have decreased")
+		}
+		// If the number of uncached roots was >0 the cached roots should be
+		// the same and the number of uncached roots should have decreased by 1.
+		if numUncached > 0 && !(len(merkleRoots.cachedSubTrees) == numCached && len(merkleRoots.uncachedRoots) == numUncached-1) {
+			t.Fatal("deletion of uncached root failed")
+		}
+		// If the number of uncached roots was 0, there should be 1 less cached
+		// root and the uncached roots should have length
+		// 2^merkleRootsCacheHeight-1.
+		if numUncached == 0 && !(len(merkleRoots.cachedSubTrees) == numCached-1 && len(merkleRoots.uncachedRoots) == (1<<merkleRootsCacheHeight)-1) {
+			t.Fatal("deletion of cached root failed")
+		}
+		// If the deleted root was cached we expect the cache to have the
+		// correct, updated value.
+		if cached && len(merkleRoots.cachedSubTrees) > cachedIndex {
+			subTreeLen := int(1 << merkleRootsCacheHeight)
+			from := cachedIndex * (1 << merkleRootsCacheHeight)
+			rooots, err := merkleRoots.merkleRoots()
+			roots, err := merkleRoots.merkleRootsFromIndex(from, from+subTreeLen)
+			if err != nil {
+				println("from", from)
+				println("len", len(rooots))
+				println("expectedlen", merkleRoots.numMerkleRoots)
+				t.Fatal("failed to read roots of subTree", err)
+			}
+			if merkleRoots.cachedSubTrees[cachedIndex].sum != newCachedSubTree(roots).sum {
+				t.Fatal("new cached root sum doesn't match expected sum")
+			}
+		}
+	}
+}

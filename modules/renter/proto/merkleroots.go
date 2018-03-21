@@ -117,12 +117,32 @@ func (mr *merkleRoots) delete(i int) error {
 	if i == mr.numMerkleRoots-1 {
 		return mr.deleteLastRoot()
 	}
-	// - swap root at i with last root of mr.uncachedRoots. If that is not
-	// possible because len(mr.uncachedRoots) == 0 we need to delete the last
-	// cache and append its elements to mr.uncachedRoots before we swap.
-	// - if root at i is in a cache we need to reconstruct that cache after swapping.
-	// - call deleteLastRoot to get rid of the swapped element at the end of mr.u
-	panic("not implemented yet")
+	// If we don't have any uncached roots we need to delete the last cached
+	// tree and add its elements to the uncached roots.
+	if len(mr.uncachedRoots) == 0 {
+		mr.cachedSubTrees = mr.cachedSubTrees[:len(mr.cachedSubTrees)-1]
+		rootIndex := len(mr.cachedSubTrees) * (1 << merkleRootsCacheHeight)
+		roots, err := mr.merkleRootsFromIndex(rootIndex, mr.numMerkleRoots)
+		if err != nil {
+			return errors.AddContext(err, "failed to read cached tree's roots")
+		}
+		mr.uncachedRoots = append(mr.uncachedRoots, roots...)
+	}
+	// Swap the root at index i with the last root in mr.uncachedRoots.
+	_, err := mr.file.WriteAt(mr.uncachedRoots[len(mr.uncachedRoots)-1][:], rootIndexToOffset(i))
+	if err != nil {
+		return errors.AddContext(err, "failed to swap root to delete with last one")
+	}
+	// If the deleted root was cached we need to rebuild that cache.
+	if cacheIndex, cached := mr.isIndexCached(i); cached {
+		err = mr.rebuildCachedTree(cacheIndex)
+	}
+	if err != nil {
+		return errors.AddContext(err, "failed to rebuild cached tree")
+	}
+	// Now that the element we want to delete is the last root we can simply
+	// delete it by calling mr.deleteLastRoot.
+	return mr.deleteLastRoot()
 }
 
 // deleteLastRoot deletes the last sector root of the contract.
@@ -289,7 +309,7 @@ func (mr *merkleRoots) merkleRoots() (roots []crypto.Hash, err error) {
 
 // merkleRootsFrom index readds all the merkle roots in range [from;to)
 func (mr *merkleRoots) merkleRootsFromIndex(from, to int) ([]crypto.Hash, error) {
-	merkleRoots := make([]crypto.Hash, 0, mr.numMerkleRoots-1)
+	merkleRoots := make([]crypto.Hash, 0, to-from)
 	if _, err := mr.file.Seek(rootIndexToOffset(from), io.SeekStart); err != nil {
 		return merkleRoots, err
 	}
