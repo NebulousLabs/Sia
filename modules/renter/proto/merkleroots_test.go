@@ -66,7 +66,6 @@ func TestLoadExistingMerkleRoots(t *testing.T) {
 
 // TestInsertMerkleRoot tests the merkleRoots' insert method.
 func TestInsertMerkleRoot(t *testing.T) {
-	// Create a file for the test.
 	dir := build.TempDir(t.Name())
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
@@ -116,5 +115,78 @@ func TestInsertMerkleRoot(t *testing.T) {
 	}
 	if merkleRoots.cachedSubTrees[0].sum != newCachedSubTree(roots[:1<<merkleRootsCacheHeight]).sum {
 		t.Fatal("cachedSubtree doesn't have expected sum")
+	}
+}
+
+// TestDeleteLastRoot tests the deleteLastRoot method.
+func TestDeleteLastRoot(t *testing.T) {
+	dir := build.TempDir(t.Name())
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	filePath := path.Join(dir, "file.dat")
+	file, err := os.Create(filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create sector roots. We choose the number of merkle roots in a way that
+	// makes the first delete remove a uncached root and the second delete has
+	// to remove a cached tree.
+	numMerkleRoots := (1 << merkleRootsCacheHeight) + 1
+	merkleRoots := newMerkleRoots(file)
+	for i := 0; i < numMerkleRoots; i++ {
+		hash := crypto.Hash{}
+		copy(hash[:], fastrand.Bytes(crypto.HashSize)[:])
+		merkleRoots.push(hash)
+	}
+
+	// Delete the last sector root. This should call deleteLastRoot internally.
+	if err := merkleRoots.delete(numMerkleRoots - 1); err != nil {
+		t.Fatal("failed to delete last root", err)
+	}
+	numMerkleRoots--
+	// Check if the number of roots actually decreased.
+	if merkleRoots.numMerkleRoots != numMerkleRoots {
+		t.Fatal("numMerkleRoots wasn't decreased")
+	}
+	// Check if the file was truncated.
+	if roots, err := merkleRoots.merkleRoots(); err != nil {
+		t.Fatal("failed to get roots from disk", err)
+	} else if len(roots) != merkleRoots.numMerkleRoots {
+		t.Fatal("roots on disk don't match number of roots in memory")
+	}
+	// There should be 0 uncached roots now.
+	if len(merkleRoots.uncachedRoots) != 0 {
+		t.Fatal("expected 0 uncached roots but was", len(merkleRoots.uncachedRoots))
+	}
+	// There should be 1 cached roots.
+	if len(merkleRoots.cachedSubTrees) != 1 {
+		t.Fatal("expected 1 cached root but was", len(merkleRoots.cachedSubTrees))
+	}
+
+	// Delete the last sector root again. This time a cached root should be deleted too.
+	if err := merkleRoots.delete(numMerkleRoots - 1); err != nil {
+		t.Fatal("failed to delete last root", err)
+	}
+	numMerkleRoots--
+	// Check if the number of roots actually decreased.
+	if merkleRoots.numMerkleRoots != numMerkleRoots {
+		t.Fatal("numMerkleRoots wasn't decreased")
+	}
+	// Check if the file was truncated.
+	if roots, err := merkleRoots.merkleRoots(); err != nil {
+		t.Fatal("failed to get roots from disk", err)
+	} else if len(roots) != merkleRoots.numMerkleRoots {
+		t.Fatal("roots on disk don't match number of roots in memory")
+	}
+	// There should be 2^merkleRootsCacheHeight - 1 uncached roots now.
+	if len(merkleRoots.uncachedRoots) != (1<<merkleRootsCacheHeight)-1 {
+		t.Fatal("expected 2^merkleRootsCacheHeight - 1 uncached roots but was",
+			len(merkleRoots.uncachedRoots))
+	}
+	// There should be 0 cached roots.
+	if len(merkleRoots.cachedSubTrees) != 0 {
+		t.Fatal("expected 0 cached roots but was", len(merkleRoots.cachedSubTrees))
 	}
 }

@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -126,10 +127,27 @@ func (mr *merkleRoots) delete(i int) error {
 
 // deleteLastRoot deletes the last sector root of the contract.
 func (mr *merkleRoots) deleteLastRoot() error {
-	// - Truncate file
-	// - If len(mr.cachedSubTrees) == 0 delete the last subtree, load its
-	// elements from disk and append them to mr.uncachedRoots
-	panic("not implemented yet")
+	// Decrease the numMerkleRoots counter.
+	mr.numMerkleRoots--
+	// Truncate file to avoid interpreting trailing data as valid.
+	if err := mr.file.Truncate(rootIndexToOffset(mr.numMerkleRoots)); err != nil {
+		return errors.AddContext(err, "failed to delete last root from file")
+	}
+	// If the last element is uncached we can simply remove it from the slice.
+	if len(mr.uncachedRoots) > 0 {
+		mr.uncachedRoots = mr.uncachedRoots[:len(mr.uncachedRoots)-1]
+		return nil
+	}
+	// If it is not uncached we need to delete the last cached tree and load
+	// its elements into mr.uncachedRoots.
+	mr.cachedSubTrees = mr.cachedSubTrees[:len(mr.cachedSubTrees)-1]
+	rootIndex := len(mr.cachedSubTrees) * (1 << merkleRootsCacheHeight)
+	roots, err := mr.merkleRootsFromIndex(rootIndex, mr.numMerkleRoots)
+	if err != nil {
+		return errors.AddContext(err, "failed to read cached tree's roots")
+	}
+	mr.uncachedRoots = append(mr.uncachedRoots, roots...)
+	return nil
 }
 
 // insert inserts a root by replacing a root at an existing index.
@@ -255,23 +273,34 @@ func (mr *merkleRoots) newRoot(newRoot crypto.Hash) crypto.Hash {
 
 // merkleRoots reads all the merkle roots from disk and returns them. This is
 // not very fast and should only be used for testing purposes.
-func (mr *merkleRoots) merkleRoots() ([]crypto.Hash, error) {
-	merkleRoots := make([]crypto.Hash, 0, mr.numMerkleRoots)
-	if _, err := mr.file.Seek(rootIndexToOffset(0), io.SeekStart); err != nil {
+func (mr *merkleRoots) merkleRoots() (roots []crypto.Hash, err error) {
+	// Get roots.
+	roots, err = mr.merkleRootsFromIndex(0, mr.numMerkleRoots)
+	if err != nil {
+		return nil, err
+	}
+	// Sanity check: should have read exactly numMerkleRoots roots.
+	if len(roots) != mr.numMerkleRoots {
+		build.Critical(fmt.Sprintf("Number of merkle roots on disk (%v) doesn't match numMerkleRoots (%v)",
+			len(roots), mr.numMerkleRoots))
+	}
+	return
+}
+
+// merkleRootsFrom index readds all the merkle roots in range [from;to)
+func (mr *merkleRoots) merkleRootsFromIndex(from, to int) ([]crypto.Hash, error) {
+	merkleRoots := make([]crypto.Hash, 0, mr.numMerkleRoots-1)
+	if _, err := mr.file.Seek(rootIndexToOffset(from), io.SeekStart); err != nil {
 		return merkleRoots, err
 	}
-	for {
+	for i := from; to-i > 0; i++ {
 		var root crypto.Hash
 		if _, err := io.ReadFull(mr.file, root[:]); err == io.EOF {
-			break
+			return nil, io.ErrUnexpectedEOF
 		} else if err != nil {
 			return merkleRoots, errors.AddContext(err, "failed to read root from disk")
 		}
 		merkleRoots = append(merkleRoots, root)
-	}
-	// Sanity check: should have read exactly numMerkleRoots roots.
-	if len(merkleRoots) != mr.numMerkleRoots {
-		build.Critical("Number of merkle roots on disk doesn't match numMerkleRoots")
 	}
 	return merkleRoots, nil
 }
@@ -281,14 +310,9 @@ func (mr *merkleRoots) rebuildCachedTree(index int) error {
 	// Find the index of the first root of the cached tree on disk.
 	rootIndex := index * (1 << merkleRootsCacheHeight)
 	// Read all the roots necessary for creating the cached tree.
-	roots := make([]crypto.Hash, 0, (1 << merkleRootsCacheHeight))
-	for i := 0; i < (1 << merkleRootsCacheHeight); i++ {
-		var root crypto.Hash
-		_, err := mr.file.ReadAt(root[:], rootIndexToOffset(rootIndex+i))
-		if err != nil {
-			return errors.AddContext(err, "failed to read sector required for rebuild from disk")
-		}
-		roots = append(roots, root)
+	roots, err := mr.merkleRootsFromIndex(rootIndex, rootIndex+(1<<merkleRootsCacheHeight))
+	if err != nil {
+		return errors.AddContext(err, "failed to read sectors for rebuilding cached tree")
 	}
 	// Replace the old cached tree.
 	mr.cachedSubTrees[index] = newCachedSubTree(roots)
