@@ -68,7 +68,7 @@ func loadExistingMerkleRoots(file *os.File) (mr *merkleRoots, err error) {
 		mr.uncachedRoots = append(mr.uncachedRoots, root)
 
 		// If the uncachedRoots grew too large we add them to the cache.
-		if len(mr.uncachedRoots) == 1<<merkleRootsCacheHeight {
+		if len(mr.uncachedRoots) == (1 << merkleRootsCacheHeight) {
 			st := newCachedSubTree(mr.uncachedRoots)
 			mr.cachedSubTrees = append(mr.cachedSubTrees, st)
 			mr.uncachedRoots = mr.uncachedRoots[:0]
@@ -81,7 +81,7 @@ func loadExistingMerkleRoots(file *os.File) (mr *merkleRoots, err error) {
 // 2^merkleRootsCacheHeight roots.
 func newCachedSubTree(roots []crypto.Hash) *cachedSubTree {
 	// Sanity check the input length.
-	if len(roots) != 1<<merkleRootsCacheHeight {
+	if len(roots) != (1 << merkleRootsCacheHeight) {
 		build.Critical("can't create a cached subTree from the provided number of roots")
 	}
 	return &cachedSubTree{
@@ -137,7 +137,36 @@ func (mr *merkleRoots) insert(index int, root crypto.Hash) error {
 	if index > mr.numMerkleRoots {
 		return errors.New("can't insert at a index greater than the number of roots")
 	}
-	panic("not yet implemented")
+	// Replaced the root on disk.
+	_, err := mr.file.WriteAt(root[:], rootIndexToOffset(index))
+	if err != nil {
+		return errors.AddContext(err, "failed to insert root on disk")
+	}
+
+	// Find out if the root is in mr.cachedSubTree or mr.uncachedRoots.
+	i, cached := mr.isIndexCached(index)
+	// If the root was not cached we can simply replace it in mr.uncachedRoots.
+	if !cached {
+		mr.uncachedRoots[i] = root
+		return nil
+	}
+	// If the root was cached we need to rebuild the cache.
+	if err := mr.rebuildCachedTree(i); err != nil {
+		return errors.AddContext(err, "failed to rebuild cache for inserted root")
+	}
+	return nil
+}
+
+// isIndexCached determines if the root at index i is already cached in
+// mr.cachedSubTree or if it is still in mr.uncachedRoots. It will return true
+// or false and the index of the root in the corresponding data structure.
+func (mr *merkleRoots) isIndexCached(i int) (int, bool) {
+	if i/(1<<merkleRootsCacheHeight) == len(mr.cachedSubTrees) {
+		// Root is not cached. Return the false and the position in
+		// mr.uncachedRoots
+		return i - len(mr.cachedSubTrees)*(1<<merkleRootsCacheHeight), false
+	}
+	return i / (1 << merkleRootsCacheHeight), true
 }
 
 // lenFromFile returns the number of merkle roots by computing it from the
@@ -170,7 +199,7 @@ func (mr *merkleRoots) len() int {
 // uncached merkle roots grows too big we cache them in a new subTree.
 func (mr *merkleRoots) push(root crypto.Hash) error {
 	// Sanity check the number of uncached roots before adding a new one.
-	if len(mr.uncachedRoots) == 1<<merkleRootsCacheHeight {
+	if len(mr.uncachedRoots) == (1 << merkleRootsCacheHeight) {
 		build.Critical("the number of uncachedRoots is too big. They should've been cached by now")
 	}
 	// Calculate the root offset within the file and write it to disk.
@@ -181,7 +210,7 @@ func (mr *merkleRoots) push(root crypto.Hash) error {
 	// Add the root to the unached roots. If uncachedRoots is big enoug we can
 	// cache those roots.
 	mr.uncachedRoots = append(mr.uncachedRoots, root)
-	if len(mr.uncachedRoots) == 1<<merkleRootsCacheHeight {
+	if len(mr.uncachedRoots) == (1 << merkleRootsCacheHeight) {
 		mr.cachedSubTrees = append(mr.cachedSubTrees, newCachedSubTree(mr.uncachedRoots))
 		mr.uncachedRoots = mr.uncachedRoots[:0]
 	}
@@ -245,4 +274,23 @@ func (mr *merkleRoots) merkleRoots() ([]crypto.Hash, error) {
 		build.Critical("Number of merkle roots on disk doesn't match numMerkleRoots")
 	}
 	return merkleRoots, nil
+}
+
+// rebuildCachedTree rebuilds the tree in mr.cachedSubTree at index i.
+func (mr *merkleRoots) rebuildCachedTree(index int) error {
+	// Find the index of the first root of the cached tree on disk.
+	rootIndex := index * (1 << merkleRootsCacheHeight)
+	// Read all the roots necessary for creating the cached tree.
+	roots := make([]crypto.Hash, 0, (1 << merkleRootsCacheHeight))
+	for i := 0; i < (1 << merkleRootsCacheHeight); i++ {
+		var root crypto.Hash
+		_, err := mr.file.ReadAt(root[:], rootIndexToOffset(rootIndex+i))
+		if err != nil {
+			return errors.AddContext(err, "failed to read sector required for rebuild from disk")
+		}
+		roots = append(roots, root)
+	}
+	// Replace the old cached tree.
+	mr.cachedSubTrees[index] = newCachedSubTree(roots)
+	return nil
 }
