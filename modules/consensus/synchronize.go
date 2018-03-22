@@ -62,7 +62,7 @@ var (
 		Testing:  3 * time.Second,
 	}).(time.Duration)
 
-	// sendBlkTimeout is the timeout for the SendBlocks RPC.
+	// sendBlkTimeout is the timeout for the SendBlock RPC.
 	sendBlkTimeout = build.Select(build.Var{
 		Standard: 4 * time.Minute,
 		Dev:      30 * time.Second,
@@ -135,7 +135,7 @@ func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 // managedReceiveBlocks is the calling end of the SendBlocks RPC, without the
 // threadgroup wrapping.
 func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr error) {
-	// Set a deadline after which SendBlocks will timeout. During IBD, esepcially,
+	// Set a deadline after which SendBlocks will timeout. During IBD, especially,
 	// SendBlocks will timeout. This is by design so that IBD switches peers to
 	// prevent any one peer from stalling IBD.
 	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
