@@ -251,6 +251,11 @@ func (cs *ContractSet) FormContract(params ContractParams, txnBuilder transactio
 	txn, parentTxns = txnBuilder.View()
 	txnSet = append(parentTxns, txn)
 
+	// Disrupt here before broadcasting and adding the contract to the set.
+	if cs.deps.Disrupt("FormCrashBeforeBroadcast") {
+		return modules.RenterContract{}, errors.New("FormCrashBeforeBroadcast disrupt")
+	}
+
 	// Submit to blockchain.
 	err = tpool.AcceptTransactionSet(txnSet)
 	if err == modules.ErrDuplicateTransactionSet {

@@ -258,6 +258,11 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	txn, parentTxns = txnBuilder.View()
 	txnSet = append(parentTxns, txn)
 
+	// Disrupt here before broadcasting and adding the contract to the set.
+	if cs.deps.Disrupt("RenewCrashBeforeBroadcast") {
+		return modules.RenterContract{}, errors.New("RenewCrashBeforeBroadcast disrupt")
+	}
+
 	// Submit to blockchain.
 	err = tpool.AcceptTransactionSet(txnSet)
 	if err == modules.ErrDuplicateTransactionSet {

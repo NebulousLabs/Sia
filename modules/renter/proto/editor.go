@@ -146,6 +146,11 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		return modules.RenterContract{}, crypto.Hash{}, err
 	}
 
+	// Disrupt here before updating the contract.
+	if cs.deps.Disrupt("UploadCrashBeforeCommit") {
+		return modules.RenterContract{}, errors.New("UploadCrashBeforeCommit disrupt")
+	}
+
 	// update contract
 	err = sc.commitUpload(walTxn, signedTxn, sectorRoot, sectorStoragePrice, sectorBandwidthPrice)
 	if err != nil {

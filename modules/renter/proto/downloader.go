@@ -113,6 +113,11 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 		return modules.RenterContract{}, nil, errors.New("host sent bad sector data")
 	}
 
+	// Disrupt here before updating the contract.
+	if cs.deps.Disrupt("DownloadCrashBeforeCommit") {
+		return modules.RenterContract{}, errors.New("DownloadCrashBeforeCommit disrupt")
+	}
+
 	// update contract and metrics
 	if err := sc.commitDownload(walTxn, signedTxn, sectorPrice); err != nil {
 		return modules.RenterContract{}, nil, err
