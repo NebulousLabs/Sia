@@ -175,6 +175,9 @@ func (mr *merkleRoots) insert(index int, root crypto.Hash) error {
 	if index > mr.numMerkleRoots {
 		return errors.New("can't insert at a index greater than the number of roots")
 	}
+	if index == mr.numMerkleRoots {
+		return mr.push(root)
+	}
 	// Replaced the root on disk.
 	_, err := mr.file.WriteAt(root[:], rootIndexToOffset(index))
 	if err != nil {

@@ -14,6 +14,9 @@ import (
 // TestLoadExistingMerkleRoots tests if it is possible to load existing merkle
 // roots from disk.
 func TestLoadExistingMerkleRoots(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Create a file for the test.
 	dir := build.TempDir(t.Name())
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -66,6 +69,9 @@ func TestLoadExistingMerkleRoots(t *testing.T) {
 
 // TestInsertMerkleRoot tests the merkleRoots' insert method.
 func TestInsertMerkleRoot(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	dir := build.TempDir(t.Name())
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
@@ -120,6 +126,9 @@ func TestInsertMerkleRoot(t *testing.T) {
 
 // TestDeleteLastRoot tests the deleteLastRoot method.
 func TestDeleteLastRoot(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	dir := build.TempDir(t.Name())
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
@@ -194,6 +203,9 @@ func TestDeleteLastRoot(t *testing.T) {
 // TestDeleteLastRoot tests the deleteLastRoot method by creating many roots
 // and deleting random indices until there are no more roots left.
 func TestDelete(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	dir := build.TempDir(t.Name())
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
@@ -252,12 +264,8 @@ func TestDelete(t *testing.T) {
 		if cached && len(merkleRoots.cachedSubTrees) > cachedIndex {
 			subTreeLen := int(1 << merkleRootsCacheHeight)
 			from := cachedIndex * (1 << merkleRootsCacheHeight)
-			rooots, err := merkleRoots.merkleRoots()
 			roots, err := merkleRoots.merkleRootsFromIndex(from, from+subTreeLen)
 			if err != nil {
-				println("from", from)
-				println("len", len(rooots))
-				println("expectedlen", merkleRoots.numMerkleRoots)
 				t.Fatal("failed to read roots of subTree", err)
 			}
 			if merkleRoots.cachedSubTrees[cachedIndex].sum != newCachedSubTree(roots).sum {

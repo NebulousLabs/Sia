@@ -248,13 +248,7 @@ func (c *SafeContract) applySetRoot(root crypto.Hash, index int) error {
 	if _, err := c.f.WriteAt(root[:], rootOffset); err != nil {
 		return err
 	}
-	numMerkleRoots := c.merkleRoots.len()
-	if index == numMerkleRoots {
-		c.merkleRoots.push(root)
-	} else {
-		return c.merkleRoots.insert(index, root)
-	}
-	return nil
+	return c.merkleRoots.insert(index, root)
 }
 
 func (c *SafeContract) recordUploadIntent(rev types.FileContractRevision, root crypto.Hash, storageCost, bandwidthCost types.Currency) (*writeaheadlog.Transaction, error) {
