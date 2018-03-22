@@ -274,3 +274,51 @@ func TestDelete(t *testing.T) {
 		}
 	}
 }
+
+// TestMerkleRootsRandom creates a large number of merkle roots and runs random
+// valid operations on them that shouldn't result in any errors.
+func TestMerkleRootsRandom(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	dir := build.TempDir(t.Name())
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	filePath := path.Join(dir, "file.dat")
+	file, err := os.Create(filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create many sector roots.
+	numMerkleRoots := 10000
+	merkleRoots := newMerkleRoots(file)
+	for i := 0; i < numMerkleRoots; i++ {
+		hash := crypto.Hash{}
+		copy(hash[:], fastrand.Bytes(crypto.HashSize)[:])
+		merkleRoots.push(hash)
+	}
+
+	// Randomly insert or delete elements.
+	for i := 0; i < numMerkleRoots; i++ {
+		operation := fastrand.Intn(2)
+
+		// Delete
+		if operation == 0 {
+			index := fastrand.Intn(merkleRoots.numMerkleRoots)
+			if err := merkleRoots.delete(index); err != nil {
+				t.Fatalf("failed to delete %v: %v", index, err)
+			}
+			continue
+		}
+
+		// Insert
+		var hash crypto.Hash
+		copy(hash[:], fastrand.Bytes(len(hash)))
+		index := fastrand.Intn(merkleRoots.numMerkleRoots + 1)
+		if err := merkleRoots.insert(index, hash); err != nil {
+			t.Fatalf("failed to insert %v at %v: %v", hash, index, err)
+		}
+	}
+}
