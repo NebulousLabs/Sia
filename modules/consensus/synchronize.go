@@ -62,7 +62,7 @@ var (
 		Testing:  3 * time.Second,
 	}).(time.Duration)
 
-	// sendBlkTimeout is the timeout for the SendBlock RPC.
+	// sendBlkTimeout is the timeout for the SendBlk RPC.
 	sendBlkTimeout = build.Select(build.Var{
 		Standard: 4 * time.Minute,
 		Dev:      30 * time.Second,
