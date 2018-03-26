@@ -119,8 +119,9 @@ type HostDBEntry struct {
 
 // HostDBScan represents a single scan event.
 type HostDBScan struct {
-	Timestamp time.Time `json:"timestamp"`
-	Success   bool      `json:"success"`
+	Timestamp   time.Time         `json:"timestamp"`
+	BlockHeight types.BlockHeight `json:"blockHeight"`
+	Success     bool              `json:"success"`
 }
 
 // HostScoreBreakdown provides a piece-by-piece explanation of why a host has

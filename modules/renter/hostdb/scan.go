@@ -177,7 +177,7 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 		// Before appending, make sure that the scan we just performed is
 		// timestamped after the previous scan performed. It may not be if the
 		// system clock has changed.
-		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: newTimestamp, Success: netErr == nil})
+		newEntry.ScanHistory = append(newEntry.ScanHistory, modules.HostDBScan{Timestamp: newTimestamp, BlockHeight: hdb.blockHeight, Success: netErr == nil})
 	}
 
 	// Check whether any of the recent scans demonstrate uptime. The pruning and
@@ -193,7 +193,8 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 	// If the host has been offline for too long, delete the host from the
 	// hostdb. Only delete if there have been enough scans over a long enough
 	// period to be confident that the host really is offline for good.
-	if time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime && !recentUptime && len(newEntry.ScanHistory) >= minScans {
+
+	if newEntry.HistoricUptime+newEntry.HistoricDowntime > maxHostDowntime && !recentUptime && len(newEntry.ScanHistory) >= minScans {
 		err := hdb.hostTree.Remove(newEntry.PublicKey)
 		if err != nil {
 			hdb.log.Println("ERROR: unable to remove host newEntry which has had a ton of downtime:", err)
@@ -206,12 +207,7 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 
 	// Compress any old scans into the historic values.
 	for len(newEntry.ScanHistory) > minScans && time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime {
-		timePassed := newEntry.ScanHistory[1].Timestamp.Sub(newEntry.ScanHistory[0].Timestamp)
-		if newEntry.ScanHistory[0].Success {
-			newEntry.HistoricUptime += timePassed
-		} else {
-			newEntry.HistoricDowntime += timePassed
-		}
+		decayUptimeOrDowntime(&newEntry, newEntry.ScanHistory[1], newEntry.ScanHistory[0])
 		newEntry.ScanHistory = newEntry.ScanHistory[1:]
 	}
 
