@@ -224,6 +224,30 @@ var (
 		Testing:  2,
 	}).(int)
 
+	// timeoutIPDiscovery is the time after which managedIPFromPeers will fail
+	// if the ip couldn't be discovered successfully.
+	timeoutIPDiscovery = build.Select(build.Var{
+		Standard: 5 * time.Minute,
+		Dev:      5 * time.Minute,
+		Testing:  time.Minute,
+	}).(time.Duration)
+
+	// rediscoverIPIntervalSuccess is the time that has to pass after a
+	// successful IP discovery before we rediscover the IP.
+	rediscoverIPIntervalSuccess = build.Select(build.Var{
+		Standard: 6 * time.Hour,
+		Dev:      10 * time.Minute,
+		Testing:  30 * time.Second,
+	}).(time.Duration)
+
+	// rediscoverIPIntervalFailure is the time that has to pass after a failed
+	// IP discovery before we try again.
+	rediscoverIPIntervalFailure = build.Select(build.Var{
+		Standard: 30 * time.Minute,
+		Dev:      5 * time.Minute,
+		Testing:  10 * time.Second,
+	}).(time.Duration)
+
 	// peerDiscoveryRetryInterval is the time we wait when there were not
 	// enough peers to determine our public ip address before trying again.
 	peerDiscoveryRetryInterval = build.Select(build.Var{

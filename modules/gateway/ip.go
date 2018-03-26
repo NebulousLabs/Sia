@@ -22,13 +22,18 @@ func (g *Gateway) discoverPeerIP(conn modules.PeerConn) error {
 }
 
 // managedIPFromPeers asks the peers the node is connected to for the node's
-// public ip address. If not enough peers are available
+// public ip address. If not enough peers are available we wait a bit and try
+// again. In the worst case managedIPFromPeers will fail after a few minutes.
 func (g *Gateway) managedIPFromPeers() (string, error) {
+	// Stop after timeoutIPDiscovery time.
+	timeout := time.After(timeoutIPDiscovery)
 	for {
-		// Check for shutdown signal.
+		// Check for shutdown signal or timeout.
 		select {
 		case <-g.peerTG.StopChan():
 			return "", errors.New("interrupted by shutdown")
+		case <-timeout:
+			return "", errors.New("failed to discover ip in time")
 		default:
 		}
 		// Get peers
@@ -37,7 +42,7 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 		g.mu.RUnlock()
 		// Check if there are enough peers. Otherwise wait.
 		if len(peers) < minPeersForIPDiscovery {
-			g.waitForPeerDiscoverySignal()
+			g.waitForPeerDiscoverySignal(timeout)
 			continue
 		}
 		// Ask all the peers about our ip in parallel
@@ -73,7 +78,7 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 		}
 		// If there haven't been enough successful responses we wait some time.
 		if successfulResponses < minPeersForIPDiscovery {
-			g.waitForPeerDiscoverySignal()
+			g.waitForPeerDiscoverySignal(timeout)
 			continue
 		}
 		// If an address was returned by more than half the peers we consider
@@ -85,15 +90,16 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 			}
 		}
 		// Otherwise we wait before trying again.
-		g.waitForPeerDiscoverySignal()
+		g.waitForPeerDiscoverySignal(timeout)
 	}
 }
 
 // waitForPeerDiscoverySignal blocks for the time specified in
 // peerDiscoveryRetryInterval.
-func (g *Gateway) waitForPeerDiscoverySignal() {
+func (g *Gateway) waitForPeerDiscoverySignal(timeout <-chan time.Time) {
 	select {
 	case <-time.After(peerDiscoveryRetryInterval):
 	case <-g.peerTG.StopChan():
+	case <-timeout:
 	}
 }
