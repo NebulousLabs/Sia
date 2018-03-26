@@ -97,66 +97,6 @@ func newRenterTester(name string) (*renterTester, error) {
 	return rt, nil
 }
 
-// newContractorTester creates a renterTester, but with the supplied
-// hostContractor.
-func newContractorTester(name string, hdb hostDB, hc hostContractor) (*renterTester, error) {
-	// Create the modules.
-	testdir := build.TempDir("renter", name)
-	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
-	if err != nil {
-		return nil, err
-	}
-	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
-	if err != nil {
-		return nil, err
-	}
-	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
-	if err != nil {
-		return nil, err
-	}
-	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
-	if err != nil {
-		return nil, err
-	}
-	key := crypto.GenerateTwofishKey()
-	_, err = w.Encrypt(key)
-	if err != nil {
-		return nil, err
-	}
-	err = w.Unlock(key)
-	if err != nil {
-		return nil, err
-	}
-	r, err := newRenter(g, cs, tp, hdb, hc, filepath.Join(testdir, modules.RenterDir))
-	if err != nil {
-		return nil, err
-	}
-	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
-	if err != nil {
-		return nil, err
-	}
-
-	// Assemble all pieces into a renter tester.
-	rt := &renterTester{
-		cs:      cs,
-		gateway: g,
-		miner:   m,
-		tpool:   tp,
-		wallet:  w,
-
-		renter: r,
-	}
-
-	// Mine blocks until there is money in the wallet.
-	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, err := rt.miner.AddBlock()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return rt, nil
-}
-
 // stubHostDB is the minimal implementation of the hostDB interface. It can be
 // embedded in other mock hostDB types, removing the need to reimplement all
 // of the hostDB's methods on every mock.
