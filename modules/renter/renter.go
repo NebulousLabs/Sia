@@ -472,5 +472,5 @@ func New(g modules.Gateway, cs modules.ConsensusSet, wallet modules.Wallet, tpoo
 		return nil, err
 	}
 
-	return newRenter(g, cs, tpool, hdb, hc, persistDir, &modules.ProductionDependencies{})
+	return newRenter(g, cs, tpool, hdb, hc, persistDir, modules.ProdDependencies)
 }
