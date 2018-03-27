@@ -408,6 +408,18 @@ type (
 		// DustThreshold returns the quantity per byte below which a Currency is
 		// considered to be Dust.
 		DustThreshold() types.Currency
+
+		// SpendableOutputs returns the outputs spendable by the wallet. For
+		// each output, MaturityHeight is the height of the block containing
+		// the output.
+		SpendableOutputs() []ProcessedOutput
+
+		// SignTransaction signs txn using secret keys controlled by w, which
+		// must be unlocked. For each SiacoinInput whose UnlockConditions are
+		// not set, SignTransaction attempts to fill in the UnlockConditions
+		// and adds a corresponding signature. It returns the indices of each
+		// signed input.
+		SignTransaction(txn *types.Transaction) []int
 	}
 
 	// WalletSettings control the behavior of the Wallet.

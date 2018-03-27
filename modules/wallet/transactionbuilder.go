@@ -634,3 +634,87 @@ func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transa
 func (w *Wallet) StartTransaction() modules.TransactionBuilder {
 	return w.RegisterTransaction(types.Transaction{}, nil)
 }
+
+// SpendableOutputs returns the outputs spendable by the wallet. For each
+// output, MaturityHeight is the height of the block containing the output.
+func (w *Wallet) SpendableOutputs() []modules.ProcessedOutput {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	// ensure durability of reported outputs
+	w.syncDB()
+
+	var outputs []modules.ProcessedOutput
+	dbForEachSiacoinOutput(w.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
+		outputs = append(outputs, modules.ProcessedOutput{
+			FundType:       types.SpecifierSiacoinOutput,
+			ID:             types.OutputID(scoid),
+			RelatedAddress: sco.UnlockHash,
+			Value:          sco.Value,
+			WalletAddress:  true,
+		})
+	})
+	dbForEachSiafundOutput(w.dbTx, func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
+		outputs = append(outputs, modules.ProcessedOutput{
+			FundType:       types.SpecifierSiafundOutput,
+			ID:             types.OutputID(sfoid),
+			RelatedAddress: sfo.UnlockHash,
+			Value:          sfo.Value,
+			WalletAddress:  true,
+		})
+	})
+
+	// lookup the confirmation height of each output
+	// TODO: would be much better to store this alongside outputs
+	for i, o := range outputs {
+		txnIndices, _ := dbGetAddrTransactions(w.dbTx, o.RelatedAddress)
+		for _, j := range txnIndices {
+			pt, err := dbGetProcessedTransaction(w.dbTx, j)
+			if err != nil {
+				continue
+			}
+			for _, sco := range pt.Outputs {
+				if sco.ID == o.ID {
+					outputs[i].MaturityHeight = pt.ConfirmationHeight
+					break
+				}
+			}
+		}
+	}
+
+	return outputs
+}
+
+// SignTransaction signs txn using secret keys controlled by w, which must be
+// unlocked. For each SiacoinInput whose UnlockConditions are not set,
+// SignTransaction attempts to fill in the UnlockConditions and adds a
+// corresponding signature. It returns the indices of each signed input.
+func (w *Wallet) SignTransaction(txn *types.Transaction) []int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.unlocked {
+		return nil
+	}
+
+	var signed []int
+	for i, sci := range txn.SiacoinInputs {
+		// identify inputs with unset UnlockConditions
+		if sci.UnlockConditions.SignaturesRequired == 0 {
+			// locate output corresponding to this input
+			sco, err := dbGetSiacoinOutput(w.dbTx, sci.ParentID)
+			if err != nil {
+				continue
+			}
+			// lookup the signing key(s)
+			sk, ok := w.keys[sco.UnlockHash]
+			if !ok {
+				w.log.Critical("wallet is missing a signing key")
+				continue
+			}
+			txn.SiacoinInputs[i].UnlockConditions = sk.UnlockConditions
+			cf := types.CoveredFields{WholeTransaction: true}
+			addSignatures(txn, cf, sk.UnlockConditions, crypto.Hash(sci.ParentID), sk)
+			signed = append(signed, i)
+		}
+	}
+	return signed
+}

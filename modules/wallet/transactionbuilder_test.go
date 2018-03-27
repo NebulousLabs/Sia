@@ -450,3 +450,61 @@ func TestParallelBuilders(t *testing.T) {
 		t.Fatal("did not get the expected ending balance", expected, endingSCConfirmed, startingSCConfirmed)
 	}
 }
+
+func TestSignTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// get an output to spend
+	outputs := wt.wallet.SpendableOutputs()
+
+	// create a transaction that sends an output to the void
+	txn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID: types.SiacoinOutputID(outputs[0].ID),
+		}},
+		SiacoinOutputs: []types.SiacoinOutput{{
+			Value:      outputs[0].Value,
+			UnlockHash: types.UnlockHash{},
+		}},
+	}
+	// sign the transaction
+	signed := wt.wallet.SignTransaction(&txn)
+	if len(signed) != 1 || signed[0] != 0 {
+		t.Fatal("expected signed to equal [0]; got", signed)
+	}
+	// txn should now have unlock condictions and a signature
+	if txn.SiacoinInputs[0].UnlockConditions.SignaturesRequired == 0 {
+		t.Fatal("unlock conditions are still unset")
+	}
+	if len(txn.TransactionSignatures) == 0 {
+		t.Fatal("transaction was not signed")
+	}
+
+	// the resulting transaction should be valid; submit it to the tpool and
+	// mine a block to confirm it
+	err = txn.StandaloneValid(wt.wallet.Height())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.tpool.AcceptTransactionSet([]types.Transaction{txn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt.addBlockNoPayout()
+
+	// the wallet should no longer list the resulting output as spendable
+	outputs = wt.wallet.SpendableOutputs()
+	if len(outputs) != 1 {
+		t.Fatal("expected one output")
+	}
+	if outputs[0].ID == types.OutputID(txn.SiacoinInputs[0].ParentID) {
+		t.Fatal("spent output still listed as spendable")
+	}
+}
