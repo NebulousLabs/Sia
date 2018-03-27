@@ -45,6 +45,11 @@ type (
 		Addresses []types.UnlockHash `json:"addresses"`
 	}
 
+	WalletAddressesPaginatedGET struct {
+		Addresses  []types.UnlockHash `json:"addresses"`
+		Pagination PaginationResponse `json:"pagination"`
+	}
+
 	// WalletInitPOST contains the primary seed that gets generated during a
 	// POST call to /wallet/init.
 	WalletInitPOST struct {
@@ -88,6 +93,13 @@ type (
 	WalletTransactionsGET struct {
 		ConfirmedTransactions   []modules.ProcessedTransaction `json:"confirmedtransactions"`
 		UnconfirmedTransactions []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
+	}
+
+	WalletTransactionsPaginatedGET struct {
+		ConfirmedTransactions             []modules.ProcessedTransaction `json:"confirmedtransactions"`
+		UnconfirmedTransactions           []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
+		ConfirmedTransactionsPagination   PaginationResponse             `json:"confirmed_transactions_pagination"`
+		UnconfirmedTransactionsPagination PaginationResponse             `json:"unconfirmed_transactions_pagination"`
 	}
 
 	// WalletTransactionsGETaddr contains the set of wallet transactions
@@ -179,9 +191,24 @@ func (api *API) walletAddressHandler(w http.ResponseWriter, req *http.Request, _
 
 // walletAddressHandler handles API calls to /wallet/addresses.
 func (api *API) walletAddressesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	WriteJSON(w, WalletAddressesGET{
-		Addresses: api.wallet.AllAddresses(),
-	})
+	paginationRequest := GetPaginationDefaultRequest(req)
+	allAddresses := api.wallet.AllAddresses()
+	if !paginationRequest.HasPaginationQuery || allAddresses == nil {
+		WriteJSON(w, WalletAddressesGET{
+			Addresses: allAddresses,
+		})
+	} else {
+		if !paginationRequest.PaginationQueryIsValid {
+			WriteError(w, Error{"start and limit queries must be nonnegative integers"}, http.StatusBadRequest)
+			return
+		}
+		pagination, paginationResponse := GetPaginationIndicesAndResponse(allAddresses, paginationRequest)
+		addresses := allAddresses[pagination.Start:pagination.End]
+		WriteJSON(w, WalletAddressesPaginatedGET{
+			Addresses:  addresses,
+			Pagination: paginationResponse,
+		})
+	}
 }
 
 // walletBackupHandler handles API calls to /wallet/backup.
@@ -521,10 +548,28 @@ func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Reque
 	}
 	unconfirmedTxns := api.wallet.UnconfirmedTransactions()
 
-	WriteJSON(w, WalletTransactionsGET{
-		ConfirmedTransactions:   confirmedTxns,
-		UnconfirmedTransactions: unconfirmedTxns,
-	})
+	confirmedPaginationRequest := GetPaginationRequest(req, "confirmedTransactionsStart", "confirmedTransactionsLimit")
+	unconfirmedPaginationRequest := GetPaginationRequest(req, "unconfirmedTransactionsStart", "unconfirmedTransactionsLimit")
+
+	if !confirmedPaginationRequest.HasPaginationQuery || !unconfirmedPaginationRequest.HasPaginationQuery || confirmedTxns == nil || unconfirmedTxns == nil {
+		WriteJSON(w, WalletTransactionsGET{
+			ConfirmedTransactions:   confirmedTxns,
+			UnconfirmedTransactions: unconfirmedTxns,
+		})
+	} else {
+		if !confirmedPaginationRequest.PaginationQueryIsValid || !unconfirmedPaginationRequest.PaginationQueryIsValid {
+			WriteError(w, Error{"start and limit queries must be nonnegative integers"}, http.StatusBadRequest)
+			return
+		}
+		confirmedPagination, confirmedPaginationResponse := GetPaginationIndicesAndResponse(confirmedTxns, confirmedPaginationRequest)
+		unconfirmedPagination, unconfirmedPaginationResponse := GetPaginationIndicesAndResponse(unconfirmedTxns, unconfirmedPaginationRequest)
+		WriteJSON(w, WalletTransactionsPaginatedGET{
+			ConfirmedTransactions:             confirmedTxns[confirmedPagination.Start:confirmedPagination.End],
+			UnconfirmedTransactions:           unconfirmedTxns[unconfirmedPagination.Start:unconfirmedPagination.End],
+			ConfirmedTransactionsPagination:   confirmedPaginationResponse,
+			UnconfirmedTransactionsPagination: unconfirmedPaginationResponse,
+		})
+	}
 }
 
 // walletTransactionsAddrHandler handles API calls to
