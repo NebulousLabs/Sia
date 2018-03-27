@@ -71,7 +71,7 @@ returns the ID for the requested transaction and its raw encoded parents and tra
 
 submits a raw transaction to the transaction pool, broadcasting it to the transaction pool's peers.
 
-###### Query String Parameters [(with comments)](/doc/api/Transactionpool.md#query-string-parameters)
+###### Query String Parameters
 
 ```
 parents     string // raw base64 encoded transaction parents
