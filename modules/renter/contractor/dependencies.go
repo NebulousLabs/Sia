@@ -64,12 +64,12 @@ type (
 
 // Because wallet is not directly compatible with modules.Wallet (wrong
 // type signature for StartTransaction), we must provide a bridge type.
-type walletBridge struct {
-	w walletShim
+type WalletBridge struct {
+	W walletShim
 }
 
-func (ws *walletBridge) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
-func (ws *walletBridge) StartTransaction() transactionBuilder         { return ws.w.StartTransaction() }
+func (ws *WalletBridge) NextAddress() (types.UnlockConditions, error) { return ws.W.NextAddress() }
+func (ws *WalletBridge) StartTransaction() transactionBuilder         { return ws.W.StartTransaction() }
 
 // stdPersist implements the persister interface. The filename required by
 // these functions is internal to stdPersist.
@@ -90,7 +90,7 @@ func (p *stdPersist) load(data *contractorPersist) error {
 	return persist.LoadJSON(persistMeta, &data, p.filename)
 }
 
-func newPersist(dir string) *stdPersist {
+func NewPersist(dir string) *stdPersist {
 	return &stdPersist{
 		filename: filepath.Join(dir, "contractor.json"),
 	}

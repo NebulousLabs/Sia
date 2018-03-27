@@ -64,13 +64,13 @@ func New(g modules.Gateway, cs modules.ConsensusSet, persistDir string) (*HostDB
 		return nil, errNilCS
 	}
 	// Create HostDB using production dependencies.
-	return newHostDB(g, cs, persistDir, modules.ProdDependencies)
+	return NewCustomHostDB(g, cs, persistDir, modules.ProdDependencies)
 }
 
-// newHostDB creates a HostDB using the provided dependencies. It loads the old
+// NewCustomHostDB creates a HostDB using the provided dependencies. It loads the old
 // persistence data, spawns the HostDB's scanning threads, and subscribes it to
 // the consensusSet.
-func newHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, deps modules.Dependencies) (*HostDB, error) {
+func NewCustomHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir string, deps modules.Dependencies) (*HostDB, error) {
 	// Create the HostDB object.
 	hdb := &HostDB{
 		cs:         cs,

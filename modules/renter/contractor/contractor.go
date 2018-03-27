@@ -204,11 +204,11 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	}
 
 	// Create Contractor using production dependencies.
-	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, contractSet, newPersist(persistDir), logger, modules.ProdDependencies)
+	return NewCustomContractor(cs, &WalletBridge{W: wallet}, tpool, hdb, contractSet, NewPersist(persistDir), logger, modules.ProdDependencies)
 }
 
-// newContractor creates a Contractor using the provided dependencies.
-func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, contractSet *proto.ContractSet, p persister, l *persist.Logger, deps modules.Dependencies) (*Contractor, error) {
+// NewCustomContractor creates a Contractor using the provided dependencies.
+func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, contractSet *proto.ContractSet, p persister, l *persist.Logger, deps modules.Dependencies) (*Contractor, error) {
 	// Create the Contractor object.
 	c := &Contractor{
 		cs:      cs,
