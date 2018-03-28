@@ -701,11 +701,23 @@ func (w *Wallet) SignTransaction(txn *types.Transaction, toSign map[types.Output
 // the ParentID of each unsigned input to the UnlockHash of that input's
 // desired UnlockConditions. SignTransaction fills in the UnlockConditions for
 // each such input and adds a corresponding signature.
+//
+// SignTransaction must derive all of the keys from scratch, so it is
+// appreciably slower than calling the Wallet.SignTransaction method. Only the
+// first 1 million keys are derived.
 func SignTransaction(txn *types.Transaction, seed modules.Seed, toSign map[types.OutputID]types.UnlockHash) error {
-	// generate 1M keys
+	// generate keys in batches up to 1e6 before giving up
 	keys := make(map[types.UnlockHash]spendableKey, 1e6)
-	for _, sk := range generateKeys(seed, 0, 1e6) {
-		keys[sk.UnlockConditions.UnlockHash()] = sk
+	var keyIndex uint64
+	const keysPerBatch = 1000
+	for len(keys) < 1e6 {
+		for _, sk := range generateKeys(seed, keyIndex, keyIndex+keysPerBatch) {
+			keys[sk.UnlockConditions.UnlockHash()] = sk
+		}
+		keyIndex += keysPerBatch
+		if err := signTransaction(txn, keys, toSign); err == nil {
+			return nil
+		}
 	}
 	return signTransaction(txn, keys, toSign)
 }
