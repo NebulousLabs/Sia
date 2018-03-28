@@ -58,14 +58,8 @@ fmt:
 vet: release-std
 	go vet $(pkgs)
 
-# will always run on some packages for a while.
-lintpkgs = ./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer \
-           ./modules/gateway ./modules/host ./modules/miner ./modules/host/contractmanager ./modules/renter                   \
-           ./modules/renter/contractor ./modules/renter/hostdb ./modules/renter/hostdb/hosttree ./modules/renter/proto        \
-           ./modules/wallet ./modules/transactionpool ./node ./node/api ./node/api/server ./persist ./siatest ./sync ./types  \
-
 lint:
-	golint -min_confidence=1.0 -set_exit_status $(lintpkgs)
+	golint -min_confidence=1.0 -set_exit_status $(pkgs)
 
 # spellcheck checks for misspelled words in comments or strings.
 spellcheck:
