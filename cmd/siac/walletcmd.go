@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -11,8 +13,13 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/entropy-mnemonics"
 )
 
 var (
@@ -146,6 +153,14 @@ A miner fee of 10 SC is levied on all transactions.`,
 		Long: `Send siafunds to an address, and transfer the claim siacoins to your wallet.
 Run 'wallet send --help' to see a list of available units.`,
 		Run: wrap(walletsendsiafundscmd),
+	}
+
+	walletSignCmd = &cobra.Command{
+		Use:   "sign [txn] [tosign]",
+		Short: "Sign a transaction",
+		Long: `Sign the specified inputs of a transaction using one or more keys
+derived from the supplied seed.`,
+		Run: wrap(walletsigncmd),
 	}
 
 	walletSweepCmd = &cobra.Command{
@@ -464,6 +479,43 @@ func walletsweepcmd() {
 		die("Could not sweep seed:", err)
 	}
 	fmt.Printf("Swept %v and %v SF from seed.\n", currencyUnits(swept.Coins), swept.Funds)
+}
+
+// walletsigncmd signs a transaction.
+func walletsigncmd(txnJSON, toSignJSON string) {
+	var txn types.Transaction
+	err := json.Unmarshal([]byte(txnJSON), &txn)
+	if err != nil {
+		die("Invalid transaction:", err)
+	}
+
+	var toSignStrings map[string]string
+	err = json.Unmarshal([]byte(toSignJSON), &toSignStrings)
+	if err != nil {
+		die("Invalid transaction:", err)
+	}
+	toSign := make(map[types.OutputID]types.UnlockHash)
+	for k, v := range toSignStrings {
+		var oid crypto.Hash
+		oid.LoadString(k)
+		var uh types.UnlockHash
+		uh.LoadString(v)
+		toSign[types.OutputID(oid)] = uh
+	}
+
+	seedString, err := passwordPrompt("Seed: ")
+	if err != nil {
+		die("Reading seed failed:", err)
+	}
+	seed, err := modules.StringToSeed(seedString, mnemonics.English)
+	if err != nil {
+		die("Invalid seed:", err)
+	}
+	err = wallet.SignTransaction(&txn, seed, toSign)
+	if err != nil {
+		die("Failed to sign transaction:", err)
+	}
+	fmt.Println(base64.StdEncoding.EncodeToString(encoding.Marshal(txn)))
 }
 
 // wallettransactionscmd lists all of the transactions related to the wallet,
