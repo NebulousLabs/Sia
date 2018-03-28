@@ -737,6 +737,22 @@ func signTransaction(txn *types.Transaction, keys map[types.UnlockHash]spendable
 		addSignatures(txn, cf, sk.UnlockConditions, crypto.Hash(sci.ParentID), sk)
 		signed++
 	}
+	for i, sfi := range txn.SiafundInputs {
+		uh, ok := toSign[types.OutputID(sfi.ParentID)]
+		if !ok {
+			// not signing this input
+			continue
+		}
+		// lookup the signing key(s)
+		sk, ok := keys[uh]
+		if !ok {
+			return errors.New("could not locate signing key for " + uh.String())
+		}
+		txn.SiafundInputs[i].UnlockConditions = sk.UnlockConditions
+		cf := types.CoveredFields{WholeTransaction: true}
+		addSignatures(txn, cf, sk.UnlockConditions, crypto.Hash(sfi.ParentID), sk)
+		signed++
+	}
 	if signed != len(toSign) {
 		return errors.New("toSign references OutputIDs not present in transaction")
 	}
