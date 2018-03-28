@@ -136,11 +136,11 @@ func init() {
 		GenesisTimestamp = Timestamp(1424139000) // Change as necessary.
 		RootTarget = Target{0, 0, 2}             // Standard developer CPUs will be able to mine blocks with the race library activated.
 
-		TargetWindow = 20                              // Difficulty is adjusted based on prior 20 blocks.
-		MaxTargetAdjustmentUp = big.NewRat(120, 100)   // Difficulty adjusts quickly.
-		MaxTargetAdjustmentDown = big.NewRat(100, 120) // Difficulty adjusts quickly.
-		FutureThreshold = 2 * 60                       // 2 minutes.
-		ExtremeFutureThreshold = 4 * 60                // 4 minutes.
+		TargetWindow = 20                        // Difficulty is adjusted based on prior 20 blocks.
+		MaxAdjustmentUp = big.NewRat(120, 100)   // Difficulty adjusts quickly.
+		MaxAdjustmentDown = big.NewRat(100, 120) // Difficulty adjusts quickly.
+		FutureThreshold = 2 * 60                 // 2 minutes.
+		ExtremeFutureThreshold = 4 * 60          // 4 minutes.
 
 		MinimumCoinbase = 30e3
 
@@ -179,8 +179,8 @@ func init() {
 		// only 1 second and testing mining should be happening substantially
 		// faster than that.
 		TargetWindow = 200
-		MaxTargetAdjustmentUp = big.NewRat(10001, 10000)
-		MaxTargetAdjustmentDown = big.NewRat(9999, 10000)
+		MaxAdjustmentUp = big.NewRat(10001, 10000)
+		MaxAdjustmentDown = big.NewRat(9999, 10000)
 		FutureThreshold = 3        // 3 seconds
 		ExtremeFutureThreshold = 6 // 6 seconds
 
@@ -254,8 +254,8 @@ func init() {
 		// difficulty is adjusted four times as often. This does result in
 		// greater difficulty oscillation, a tradeoff that was chosen to be
 		// acceptable due to Sia's more vulnerable position as an altcoin.
-		MaxTargetAdjustmentUp = big.NewRat(25, 10)
-		MaxTargetAdjustmentDown = big.NewRat(10, 25)
+		MaxAdjustmentUp = big.NewRat(25, 10)
+		MaxAdjustmentDown = big.NewRat(10, 25)
 
 		// Blocks will not be accepted if their timestamp is more than 3 hours
 		// into the future, but will be accepted as soon as they are no longer
