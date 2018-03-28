@@ -2,8 +2,8 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/NebulousLabs/Sia/types"
 
@@ -64,8 +64,8 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 	}
 	// Handle request by height
 	if height != "" {
-		h, err := strconv.ParseUint(height, 10, 64)
-		if err != nil {
+		var h uint64
+		if _, err := fmt.Sscan(height, &h); err != nil {
 			WriteError(w, Error{"failed to parse block height"}, http.StatusBadRequest)
 			return
 		}

@@ -1,7 +1,7 @@
 package client
 
 import (
-	"strconv"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/NebulousLabs/Sia/types"
@@ -21,6 +21,6 @@ func (c *Client) ConsensusBlocksIDGet(id types.BlockID) (block types.Block, err 
 
 // ConsensusBlocksHeightGet requests the /consensus/blocks api resource
 func (c *Client) ConsensusBlocksHeightGet(height types.BlockHeight) (block types.Block, err error) {
-	err = c.Get("/consensus/blocks?height="+strconv.FormatUint(uint64(height), 10), &block)
+	err = c.Get("/consensus/blocks?height="+fmt.Sprint(height), &block)
 	return
 }
