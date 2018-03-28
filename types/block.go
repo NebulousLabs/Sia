@@ -32,9 +32,7 @@ type (
 		Transactions []Transaction   `json:"transactions"`
 	}
 
-	// A BlockHeader, when encoded, is an 80-byte constant size field
-	// containing enough information to do headers-first block downloading.
-	// Hashing the header results in the block ID.
+	// A BlockHeader contains the data that, when hashed, produces the Block's ID.
 	BlockHeader struct {
 		ParentID   BlockID     `json:"parentid"`
 		Nonce      BlockNonce  `json:"nonce"`
@@ -42,9 +40,16 @@ type (
 		MerkleRoot crypto.Hash `json:"merkleroot"`
 	}
 
+	// BlockHeight is the number of blocks that exist after the genesis block.
 	BlockHeight uint64
-	BlockID     crypto.Hash
-	BlockNonce  [8]byte
+	// A BlockID is the hash of a BlockHeader. A BlockID uniquely
+	// identifies a Block, and indicates the amount of work performed
+	// to mine that Block. The more leading zeros in the BlockID, the
+	// more work was performed.
+	BlockID crypto.Hash
+	// The BlockNonce is a "scratch space" that miners can freely alter to produce
+	// a BlockID that satisfies a given Target.
+	BlockNonce [8]byte
 )
 
 // CalculateCoinbase calculates the coinbase for a given height. The coinbase
