@@ -60,7 +60,7 @@ func (g *Gateway) threadedLearnHostname() {
 		if err == nil {
 			host, err = d.ExternalIP()
 		}
-		if err != nil {
+		if !build.DEBUG && err != nil {
 			host, err = myExternalIP()
 		}
 		if err != nil {
@@ -70,13 +70,10 @@ func (g *Gateway) threadedLearnHostname() {
 			g.log.Println("WARN: failed to discover external IP:", err)
 		}
 		// If we were unable to discover our IP we try again later.
-		if err != nil {
-			select {
-			case <-g.threads.StopChan():
-				return
-			case <-time.After(rediscoverIPIntervalFailure):
-				continue
-			}
+		if err != nil && g.managedSleep(rediscoverIPIntervalFailure) {
+			continue
+		} else if err != nil {
+			return // shutdown interrupted sleep
 		}
 
 		g.mu.RLock()
@@ -84,7 +81,11 @@ func (g *Gateway) threadedLearnHostname() {
 		g.mu.RUnlock()
 		if err := addr.IsValid(); err != nil {
 			g.log.Printf("WARN: discovered hostname %q is invalid: %v", addr, err)
-			return
+			if err != nil && g.managedSleep(rediscoverIPIntervalFailure) {
+				continue
+			} else if err != nil {
+				return // shutdown interrupted sleep
+			}
 		}
 
 		g.mu.Lock()
@@ -94,10 +95,8 @@ func (g *Gateway) threadedLearnHostname() {
 		g.log.Println("INFO: our address is", addr)
 
 		// Rediscover the IP later in case it changed.
-		select {
-		case <-g.threads.StopChan():
-			return
-		case <-time.After(rediscoverIPIntervalSuccess):
+		if !g.managedSleep(rediscoverIPIntervalSuccess) {
+			return // shutdown interrupted sleep
 		}
 	}
 }

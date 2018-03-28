@@ -42,7 +42,7 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 		g.mu.RUnlock()
 		// Check if there are enough peers. Otherwise wait.
 		if len(peers) < minPeersForIPDiscovery {
-			g.waitForPeerDiscoverySignal(timeout)
+			g.managedSleep(peerDiscoveryRetryInterval)
 			continue
 		}
 		// Ask all the peers about our ip in parallel
@@ -78,7 +78,7 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 		}
 		// If there haven't been enough successful responses we wait some time.
 		if successfulResponses < minPeersForIPDiscovery {
-			g.waitForPeerDiscoverySignal(timeout)
+			g.managedSleep(peerDiscoveryRetryInterval)
 			continue
 		}
 		// If an address was returned by more than half the peers we consider
@@ -90,16 +90,6 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 			}
 		}
 		// Otherwise we wait before trying again.
-		g.waitForPeerDiscoverySignal(timeout)
-	}
-}
-
-// waitForPeerDiscoverySignal blocks for the time specified in
-// peerDiscoveryRetryInterval.
-func (g *Gateway) waitForPeerDiscoverySignal(timeout <-chan time.Time) {
-	select {
-	case <-time.After(peerDiscoveryRetryInterval):
-	case <-g.peerTG.StopChan():
-	case <-timeout:
+		g.managedSleep(peerDiscoveryRetryInterval)
 	}
 }
