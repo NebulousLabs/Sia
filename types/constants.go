@@ -55,14 +55,14 @@ var (
 	// any transactions spending the payout. File contract payouts also are subject to
 	// a maturity delay.
 	MaturityDelay BlockHeight
-	// MaxTargetAdjustmentDown restrict how much the block difficulty is allowed to
+	// MaxAdjustmentDown restrict how much the block difficulty is allowed to
 	// change in a single step, which is important to limit the effect of difficulty
 	// raising and lowering attacks.
-	MaxTargetAdjustmentDown *big.Rat
-	// MaxTargetAdjustmentUp restrict how much the block difficulty is allowed to
+	MaxAdjustmentDown *big.Rat
+	// MaxAdjustmentUp restrict how much the block difficulty is allowed to
 	// change in a single step, which is important to limit the effect of difficulty
 	// raising and lowering attacks.
-	MaxTargetAdjustmentUp *big.Rat
+	MaxAdjustmentUp *big.Rat
 	// MedianTimestampWindow tells us how many blocks to look back when calculating
 	// the median timestamp over the previous n blocks. The timestamp of a block is
 	// not allowed to be less than or equal to the median timestamp of the previous n
