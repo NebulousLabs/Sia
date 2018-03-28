@@ -414,12 +414,11 @@ type (
 		// the output.
 		SpendableOutputs() []ProcessedOutput
 
-		// SignTransaction signs txn using secret keys controlled by w, which
-		// must be unlocked. For each SiacoinInput whose UnlockConditions are
-		// not set, SignTransaction attempts to fill in the UnlockConditions
-		// and adds a corresponding signature. It returns the indices of each
-		// signed input.
-		SignTransaction(txn *types.Transaction) []int
+		// SignTransaction signs txn using secret keys known to the wallet. toSign
+		// maps the ParentID of each unsigned input to the UnlockHash of that input's
+		// desired UnlockConditions. SignTransaction fills in the UnlockConditions for
+		// each such input and adds a corresponding signature.
+		SignTransaction(txn *types.Transaction, toSign map[types.OutputID]types.UnlockHash) error
 	}
 
 	// WalletSettings control the behavior of the Wallet.

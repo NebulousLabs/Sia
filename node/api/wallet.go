@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"path/filepath"
@@ -9,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -65,11 +63,16 @@ type (
 		TransactionIDs []types.TransactionID `json:"transactionids"`
 	}
 
-	// WalletSignPOST contains the signed transaction and a list of the inputs
-	// that were signed.
-	WalletSignPOST struct {
-		Transaction  []byte `json:"transaction"`
-		SignedInputs []int  `json:"signedinputs"`
+	// WalletSignPOSTParams contains the unsigned transaction and a set of
+	// inputs to sign.
+	WalletSignPOSTParams struct {
+		Transaction types.Transaction                   `json:"transaction"`
+		ToSign      map[types.OutputID]types.UnlockHash `json:"tosign"`
+	}
+
+	// WalletSignPOSTResp contains the signed transaction.
+	WalletSignPOSTResp struct {
+		Transaction types.Transaction `json:"transaction"`
 	}
 
 	// WalletSeedsGET contains the seeds used by the wallet.
@@ -622,25 +625,18 @@ func (api *API) walletUnspentHandler(w http.ResponseWriter, req *http.Request, _
 
 // walletSignHandler handles API calls to /wallet/sign.
 func (api *API) walletSignHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	txnBytes, err := base64.StdEncoding.DecodeString(req.FormValue("transaction"))
+	var params WalletSignPOSTParams
+	err := json.NewDecoder(req.Body).Decode(&params)
 	if err != nil {
-		WriteError(w, Error{"invalid transaction: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"invalid parameters: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	var txn types.Transaction
-	err = encoding.Unmarshal(txnBytes, &txn)
+	err = api.wallet.SignTransaction(&params.Transaction, params.ToSign)
 	if err != nil {
-		WriteError(w, Error{"invalid transaction: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"failed to sign transaction: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	if !api.wallet.Unlocked() {
-		WriteError(w, Error{"wallet must be unlocked"}, http.StatusBadRequest)
-		return
-	}
-	signed := api.wallet.SignTransaction(&txn)
-
-	WriteJSON(w, WalletSignPOST{
-		Transaction:  encoding.Marshal(txn),
-		SignedInputs: signed,
+	WriteJSON(w, WalletSignPOSTResp{
+		Transaction: params.Transaction,
 	})
 }

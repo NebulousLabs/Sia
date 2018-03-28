@@ -474,10 +474,13 @@ func TestSignTransaction(t *testing.T) {
 			UnlockHash: types.UnlockHash{},
 		}},
 	}
+
 	// sign the transaction
-	signed := wt.wallet.SignTransaction(&txn)
-	if len(signed) != 1 || signed[0] != 0 {
-		t.Fatal("expected signed to equal [0]; got", signed)
+	err = wt.wallet.SignTransaction(&txn, map[types.OutputID]types.UnlockHash{
+		outputs[0].ID: outputs[0].RelatedAddress,
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 	// txn should now have unlock condictions and a signature
 	if txn.SiacoinInputs[0].UnlockConditions.SignaturesRequired == 0 {

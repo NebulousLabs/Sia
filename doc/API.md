@@ -1314,19 +1314,24 @@ standard success or error response. See
 
 #### /wallet/sign [POST]
 
-Function: Sign a transaction. The wallet will attempt to sign any SiacoinInput
-in the transaction whose UnlockConditions are unset.
+Function: Sign a transaction. The wallet will attempt to sign each input
+specified.
 
-###### Query String Parameters
+###### Request Body
 ```
-transaction string
+{
+  "transaction": { }, // types.Transaction
+  "tosign": {
+    "3689bd3489679aabcde02e01345abcde": "138950f0129d74acd4eade3453b45678",
+    "132cee478a9bb98bdd23cf05376cdf2a": "7cbcd123578234ce0f12fe01a68ba9bf"
+  }
+}
 ```
 
-###### Response [(with comments)](/doc/api/Wallet.md#json-response-7)
+###### Response
 ```javascript
 {
-  "transaction": "AQAAAAAAAADBM1ca",
-  "signedinputs": [0, 1, 6]
+  "transaction": { } // types.Transaction
 }
 ```
 

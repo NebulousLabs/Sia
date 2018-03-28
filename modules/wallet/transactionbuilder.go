@@ -684,37 +684,52 @@ func (w *Wallet) SpendableOutputs() []modules.ProcessedOutput {
 	return outputs
 }
 
-// SignTransaction signs txn using secret keys controlled by w, which must be
-// unlocked. For each SiacoinInput whose UnlockConditions are not set,
-// SignTransaction attempts to fill in the UnlockConditions and adds a
-// corresponding signature. It returns the indices of each signed input.
-func (w *Wallet) SignTransaction(txn *types.Transaction) []int {
+// SignTransaction signs txn using secret keys known to the wallet. toSign
+// maps the ParentID of each unsigned input to the UnlockHash of that input's
+// desired UnlockConditions. SignTransaction fills in the UnlockConditions for
+// each such input and adds a corresponding signature.
+func (w *Wallet) SignTransaction(txn *types.Transaction, toSign map[types.OutputID]types.UnlockHash) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if !w.unlocked {
-		return nil
+		return modules.ErrLockedWallet
 	}
+	return signTransaction(txn, w.keys, toSign)
+}
 
-	var signed []int
-	for i, sci := range txn.SiacoinInputs {
-		// identify inputs with unset UnlockConditions
-		if sci.UnlockConditions.SignaturesRequired == 0 {
-			// locate output corresponding to this input
-			sco, err := dbGetSiacoinOutput(w.dbTx, sci.ParentID)
-			if err != nil {
-				continue
-			}
-			// lookup the signing key(s)
-			sk, ok := w.keys[sco.UnlockHash]
-			if !ok {
-				w.log.Critical("wallet is missing a signing key")
-				continue
-			}
-			txn.SiacoinInputs[i].UnlockConditions = sk.UnlockConditions
-			cf := types.CoveredFields{WholeTransaction: true}
-			addSignatures(txn, cf, sk.UnlockConditions, crypto.Hash(sci.ParentID), sk)
-			signed = append(signed, i)
-		}
+// SignTransaction signs txn using secret keys derived from seed. toSign maps
+// the ParentID of each unsigned input to the UnlockHash of that input's
+// desired UnlockConditions. SignTransaction fills in the UnlockConditions for
+// each such input and adds a corresponding signature.
+func SignTransaction(txn *types.Transaction, seed modules.Seed, toSign map[types.OutputID]types.UnlockHash) error {
+	// generate 1M keys
+	keys := make(map[types.UnlockHash]spendableKey, 1e6)
+	for _, sk := range generateKeys(seed, 0, 1e6) {
+		keys[sk.UnlockConditions.UnlockHash()] = sk
 	}
-	return signed
+	return signTransaction(txn, keys, toSign)
+}
+
+func signTransaction(txn *types.Transaction, keys map[types.UnlockHash]spendableKey, toSign map[types.OutputID]types.UnlockHash) error {
+	signed := 0
+	for i, sci := range txn.SiacoinInputs {
+		uh, ok := toSign[types.OutputID(sci.ParentID)]
+		if !ok {
+			// not signing this input
+			continue
+		}
+		// lookup the signing key(s)
+		sk, ok := keys[uh]
+		if !ok {
+			return errors.New("could not locate signing key for " + uh.String())
+		}
+		txn.SiacoinInputs[i].UnlockConditions = sk.UnlockConditions
+		cf := types.CoveredFields{WholeTransaction: true}
+		addSignatures(txn, cf, sk.UnlockConditions, crypto.Hash(sci.ParentID), sk)
+		signed++
+	}
+	if signed != len(toSign) {
+		return errors.New("toSign references OutputIDs not present in transaction")
+	}
+	return nil
 }
