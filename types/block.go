@@ -40,8 +40,7 @@ type (
 		MerkleRoot crypto.Hash `json:"merkleroot"`
 	}
 
-	// BlockHeight is the number of blocks between a given block and the Genesis block.
-	// The BlockHeight of the Genesis block is 0.
+	// BlockHeight is the number of blocks that exist after the genesis block.
 	BlockHeight uint64
 	// A BlockID is the hash of a BlockHeader. A BlockID uniquely
 	// identifies a Block, and indicates the amount of work performed

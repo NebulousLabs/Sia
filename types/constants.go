@@ -118,7 +118,9 @@ var (
 	SiafundCount = NewCurrency64(10000)
 	// SiafundPortion is the percentage of siacoins that is taxed from FileContracts.
 	SiafundPortion = big.NewRat(39, 1000)
-	// TargetWindow {help}
+	// TargetWindow is the number of blocks to look backwards when determining how much
+	// time has passed vs. how many blocks have been created. It's only used in the old,
+	// broken difficulty adjustment algorithm.
 	TargetWindow BlockHeight
 )
 
