@@ -477,7 +477,7 @@ func TestSignTransaction(t *testing.T) {
 
 	// sign the transaction
 	err = wt.wallet.SignTransaction(&txn, map[types.OutputID]types.UnlockHash{
-		outputs[0].ID: outputs[0].RelatedAddress,
+		outputs[0].ID: outputs[0].UnlockHash,
 	})
 	if err != nil {
 		t.Fatal(err)

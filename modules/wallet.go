@@ -100,6 +100,16 @@ type (
 		Outputs []ProcessedOutput `json:"outputs"`
 	}
 
+	// A SpendableOutput is a SiacoinOutput or SiafundOutput that the wallet
+	// can spend.
+	SpendableOutput struct {
+		ID                 types.OutputID    `json:"id"`
+		FundType           types.Specifier   `json:"fundtype"`
+		UnlockHash         types.UnlockHash  `json:"unlockhash"`
+		Value              types.Currency    `json:"value"`
+		ConfirmationHeight types.BlockHeight `json:"confirmationheight"`
+	}
+
 	// TransactionBuilder is used to construct custom transactions. A transaction
 	// builder is initialized via 'RegisterTransaction' and then can be modified by
 	// adding funds or other fields. The transaction is completed by calling
@@ -409,10 +419,8 @@ type (
 		// considered to be Dust.
 		DustThreshold() types.Currency
 
-		// SpendableOutputs returns the outputs spendable by the wallet. For
-		// each output, MaturityHeight is the height of the block containing
-		// the output.
-		SpendableOutputs() []ProcessedOutput
+		// SpendableOutputs returns the outputs spendable by the wallet.
+		SpendableOutputs() []SpendableOutput
 
 		// SignTransaction signs txn using secret keys known to the wallet. toSign
 		// maps the ParentID of each unsigned input to the UnlockHash of that input's

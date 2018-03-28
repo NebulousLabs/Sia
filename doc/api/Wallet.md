@@ -757,13 +757,10 @@ returns a list of outputs that the wallet can spend.
       // Height of block in which the output appeared. To calculate the
       // number of confirmations, subtract this number from the current
       // block height.
-      "maturityheight": 50000,
-
-      // Irrelevant field shared by ProcessedOutput; always true.
-      "walletaddress": true,
+      "confirmationheight": 50000,
 
       // UnlockHash of the output.
-      "relatedaddress": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "unlockhash": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
 
       // Amount of funds in the output; hastings for siacoin outputs, and
       // siafunds for siafund outputs.

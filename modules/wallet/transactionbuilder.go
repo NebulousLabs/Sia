@@ -635,38 +635,35 @@ func (w *Wallet) StartTransaction() modules.TransactionBuilder {
 	return w.RegisterTransaction(types.Transaction{}, nil)
 }
 
-// SpendableOutputs returns the outputs spendable by the wallet. For each
-// output, MaturityHeight is the height of the block containing the output.
-func (w *Wallet) SpendableOutputs() []modules.ProcessedOutput {
+// SpendableOutputs returns the outputs spendable by the wallet.
+func (w *Wallet) SpendableOutputs() []modules.SpendableOutput {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	// ensure durability of reported outputs
 	w.syncDB()
 
-	var outputs []modules.ProcessedOutput
+	var outputs []modules.SpendableOutput
 	dbForEachSiacoinOutput(w.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		outputs = append(outputs, modules.ProcessedOutput{
-			FundType:       types.SpecifierSiacoinOutput,
-			ID:             types.OutputID(scoid),
-			RelatedAddress: sco.UnlockHash,
-			Value:          sco.Value,
-			WalletAddress:  true,
+		outputs = append(outputs, modules.SpendableOutput{
+			FundType:   types.SpecifierSiacoinOutput,
+			ID:         types.OutputID(scoid),
+			UnlockHash: sco.UnlockHash,
+			Value:      sco.Value,
 		})
 	})
 	dbForEachSiafundOutput(w.dbTx, func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
-		outputs = append(outputs, modules.ProcessedOutput{
-			FundType:       types.SpecifierSiafundOutput,
-			ID:             types.OutputID(sfoid),
-			RelatedAddress: sfo.UnlockHash,
-			Value:          sfo.Value,
-			WalletAddress:  true,
+		outputs = append(outputs, modules.SpendableOutput{
+			FundType:   types.SpecifierSiafundOutput,
+			ID:         types.OutputID(sfoid),
+			UnlockHash: sfo.UnlockHash,
+			Value:      sfo.Value,
 		})
 	})
 
-	// lookup the confirmation height of each output
-	// TODO: would be much better to store this alongside outputs
+	// set the confirmation height for each output
+outer:
 	for i, o := range outputs {
-		txnIndices, _ := dbGetAddrTransactions(w.dbTx, o.RelatedAddress)
+		txnIndices, _ := dbGetAddrTransactions(w.dbTx, o.UnlockHash)
 		for _, j := range txnIndices {
 			pt, err := dbGetProcessedTransaction(w.dbTx, j)
 			if err != nil {
@@ -674,8 +671,8 @@ func (w *Wallet) SpendableOutputs() []modules.ProcessedOutput {
 			}
 			for _, sco := range pt.Outputs {
 				if sco.ID == o.ID {
-					outputs[i].MaturityHeight = pt.ConfirmationHeight
-					break
+					outputs[i].ConfirmationHeight = pt.ConfirmationHeight
+					continue outer
 				}
 			}
 		}

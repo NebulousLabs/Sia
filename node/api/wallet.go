@@ -114,7 +114,7 @@ type (
 	// MaturityHeight field of each output indicates the height of the block
 	// that the output appeared in.
 	WalletUnspentGET struct {
-		Outputs []modules.ProcessedOutput `json:"outputs"`
+		Outputs []modules.SpendableOutput `json:"outputs"`
 	}
 
 	// WalletVerifyAddressGET contains a bool indicating if the address passed to

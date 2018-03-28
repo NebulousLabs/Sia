@@ -1479,9 +1479,8 @@ returns a list of outputs that the wallet can spend.
     {
       "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       "fundtype": "siacoin output",
-      "maturityheight": 50000,
-      "walletaddress": true,
-      "relatedaddress": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "confirmationheight": 50000,
+      "unlockhash": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
       "value": "1234" // big int
     }
   ]
