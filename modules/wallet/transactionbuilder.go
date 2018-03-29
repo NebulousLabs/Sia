@@ -719,6 +719,8 @@ func SignTransaction(txn *types.Transaction, seed modules.Seed, toSign map[types
 	return signTransaction(txn, keys, toSign)
 }
 
+// signTransaction signs the specified inputs of txn using the specified keys.
+// It returns an error if any of the specified inputs cannot be signed.
 func signTransaction(txn *types.Transaction, keys map[types.UnlockHash]spendableKey, toSign map[types.OutputID]types.UnlockHash) error {
 	signed := 0
 	for i, sci := range txn.SiacoinInputs {

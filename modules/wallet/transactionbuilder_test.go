@@ -451,6 +451,8 @@ func TestParallelBuilders(t *testing.T) {
 	}
 }
 
+// TestSignTransaction constructs a valid, signed transaction using the
+// wallet's SpendableOutputs and SignTransaction methods.
 func TestSignTransaction(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
