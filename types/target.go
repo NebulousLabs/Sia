@@ -21,6 +21,8 @@ type (
 )
 
 var (
+	// ErrNegativeTarget is an error when a negative value used when converting
+	// to target
 	ErrNegativeTarget = errors.New("negative value used when converting to target")
 )
 
@@ -43,16 +45,16 @@ func (x Target) Cmp(y Target) int {
 }
 
 // Difficulty returns the difficulty associated with a given target.
-func (t Target) Difficulty() Currency {
-	if t == (Target{}) {
+func (x Target) Difficulty() Currency {
+	if x == (Target{}) {
 		return NewCurrency(RootDepth.Int())
 	}
-	return NewCurrency(new(big.Int).Div(RootDepth.Int(), t.Int()))
+	return NewCurrency(new(big.Int).Div(RootDepth.Int(), x.Int()))
 }
 
 // Int converts a Target to a big.Int.
-func (t Target) Int() *big.Int {
-	return new(big.Int).SetBytes(t[:])
+func (x Target) Int() *big.Int {
+	return new(big.Int).SetBytes(x[:])
 }
 
 // IntToTarget converts a big.Int to a Target. Negative inputs trigger a panic.
@@ -75,12 +77,12 @@ func IntToTarget(i *big.Int) (t Target) {
 }
 
 // Inverse returns the inverse of a Target as a big.Rat
-func (t Target) Inverse() *big.Rat {
-	return new(big.Rat).Inv(t.Rat())
+func (x Target) Inverse() *big.Rat {
+	return new(big.Rat).Inv(x.Rat())
 }
 
-// Mul multiplies the difficulty of a target by y. The product is defined by:
-//		y / x
+// MulDifficulty multiplies the difficulty of a target by y. The product is defined by:
+// y / x
 func (x Target) MulDifficulty(y *big.Rat) (t Target) {
 	product := new(big.Rat).Mul(y, x.Inverse())
 	product = product.Inv(product)
@@ -88,8 +90,8 @@ func (x Target) MulDifficulty(y *big.Rat) (t Target) {
 }
 
 // Rat converts a Target to a big.Rat.
-func (t Target) Rat() *big.Rat {
-	return new(big.Rat).SetInt(t.Int())
+func (x Target) Rat() *big.Rat {
+	return new(big.Rat).SetInt(x.Int())
 }
 
 // RatToTarget converts a big.Rat to a Target.

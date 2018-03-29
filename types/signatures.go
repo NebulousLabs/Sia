@@ -15,15 +15,33 @@ import (
 )
 
 var (
-	ErrEntropyKey                = errors.New("transaction tries to sign an entproy public key")
-	ErrFrivolousSignature        = errors.New("transaction contains a frivolous signature")
-	ErrInvalidPubKeyIndex        = errors.New("transaction contains a signature that points to a nonexistent public key")
+	// ErrEntropyKey is the error when a transaction tries to sign an entropy
+	// public key
+	ErrEntropyKey = errors.New("transaction tries to sign an entropy public key")
+	// ErrFrivolousSignature is the error when a transaction contains a frivolous
+	// signature
+	ErrFrivolousSignature = errors.New("transaction contains a frivolous signature")
+	// ErrInvalidPubKeyIndex is the error when a transaction contains a signature
+	// that points to a nonexistent public key
+	ErrInvalidPubKeyIndex = errors.New("transaction contains a signature that points to a nonexistent public key")
+	// ErrInvalidUnlockHashChecksum is the error when the provided unlock hash has
+	// an invalid checksum
 	ErrInvalidUnlockHashChecksum = errors.New("provided unlock hash has an invalid checksum")
-	ErrMissingSignatures         = errors.New("transaction has inputs with missing signatures")
-	ErrPrematureSignature        = errors.New("timelock on signature has not expired")
-	ErrPublicKeyOveruse          = errors.New("public key was used multiple times while signing transaction")
-	ErrSortedUniqueViolation     = errors.New("sorted unique violation")
-	ErrUnlockHashWrongLen        = errors.New("marshalled unlock hash is the wrong length")
+	// ErrMissingSignatures is the error when a transaction has inputs with missing
+	// signatures
+	ErrMissingSignatures = errors.New("transaction has inputs with missing signatures")
+	// ErrPrematureSignature is the error when the timelock on signature has not
+	// expired
+	ErrPrematureSignature = errors.New("timelock on signature has not expired")
+	// ErrPublicKeyOveruse is the error when public key was used multiple times while
+	// signing transaction
+	ErrPublicKeyOveruse = errors.New("public key was used multiple times while signing transaction")
+	// ErrSortedUniqueViolation is the error when a sorted unique violation occurs
+	ErrSortedUniqueViolation = errors.New("sorted unique violation")
+	// ErrUnlockHashWrongLen is the error when a marshalled unlock hash is the wrong
+	// length
+	ErrUnlockHashWrongLen = errors.New("marshalled unlock hash is the wrong length")
+	// ErrWholeTransactionViolation is the error when there's a covered fields violation
 	ErrWholeTransactionViolation = errors.New("covered fields violation")
 
 	// FullCoveredFields is a covered fileds object where the
@@ -35,7 +53,10 @@ var (
 	// by this implementation. If a signature's type is unrecognized, the
 	// signature is treated as valid. Signatures using the special "entropy"
 	// type are always treated as invalid; see Consensus.md for more details.
+
+	// SignatureEd25519 is a specifier for Ed22519
 	SignatureEd25519 = Specifier{'e', 'd', '2', '5', '5', '1', '9'}
+	// SignatureEntropy is a specifier for entropy
 	SignatureEntropy = Specifier{'e', 'n', 't', 'r', 'o', 'p', 'y'}
 )
 

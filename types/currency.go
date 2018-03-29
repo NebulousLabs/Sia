@@ -64,8 +64,8 @@ func (x Currency) Add(y Currency) (c Currency) {
 
 // Big returns the value of c as a *big.Int. Importantly, it does not provide
 // access to the c's internal big.Int object, only a copy.
-func (c Currency) Big() *big.Int {
-	return new(big.Int).Set(&c.i)
+func (x Currency) Big() *big.Int {
+	return new(big.Int).Set(&x.i)
 }
 
 // Cmp compares two Currency values. The return value follows the convention
@@ -116,7 +116,7 @@ func (x Currency) Mul64(y uint64) (c Currency) {
 
 // COMPATv0.4.0 - until the first 10e3 blocks have been archived, MulFloat is
 // needed while verifying the first set of blocks.
-//
+
 // MulFloat returns a new Currency value y = c * x, where x is a float64.
 // Behavior is undefined when x is negative.
 func (x Currency) MulFloat(y float64) (c Currency) {
@@ -158,8 +158,8 @@ func (x Currency) RoundDown(y Currency) (c Currency) {
 }
 
 // IsZero returns true if the value is 0, false otherwise.
-func (c Currency) IsZero() bool {
-	return c.i.Sign() <= 0
+func (x Currency) IsZero() bool {
+	return x.i.Sign() <= 0
 }
 
 // Sqrt returns a new Currency value y = sqrt(c). Result is rounded down to the
@@ -188,9 +188,9 @@ func (x Currency) Sub(y Currency) (c Currency) {
 // rather than have all user-facing points do input checking, the input
 // checking should happen at the base type. This minimizes the chances of a
 // rogue user causing a build.Critical to be triggered.
-func (c Currency) Uint64() (u uint64, err error) {
-	if c.Cmp(NewCurrency64(math.MaxUint64)) > 0 {
+func (x Currency) Uint64() (u uint64, err error) {
+	if x.Cmp(NewCurrency64(math.MaxUint64)) > 0 {
 		return 0, ErrUint64Overflow
 	}
-	return c.Big().Uint64(), nil
+	return x.Big().Uint64(), nil
 }

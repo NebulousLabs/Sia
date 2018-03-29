@@ -64,7 +64,7 @@ lintpkgs = ./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./m
            ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/wallet ./modules/transactionpool ./node ./node/api ./node/api/server ./persist \
            ./siatest ./siatest/consensus ./siatest/renter ./siatest/wallet
 lint:
-	golint -min_confidence=1.0 -set_exit_status $(lintpkgs)
+	golint -min_confidence=1.0 -set_exit_status $(pkgs)
 
 # spellcheck checks for misspelled words in comments or strings.
 spellcheck:
