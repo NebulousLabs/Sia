@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/wallet"
@@ -489,18 +488,10 @@ func walletsigncmd(txnJSON, toSignJSON string) {
 		die("Invalid transaction:", err)
 	}
 
-	var toSignStrings map[string]string
-	err = json.Unmarshal([]byte(toSignJSON), &toSignStrings)
+	var toSign map[types.OutputID]types.UnlockHash
+	err = json.Unmarshal([]byte(toSignJSON), &toSign)
 	if err != nil {
 		die("Invalid transaction:", err)
-	}
-	toSign := make(map[types.OutputID]types.UnlockHash)
-	for k, v := range toSignStrings {
-		var oid crypto.Hash
-		oid.LoadString(k)
-		var uh types.UnlockHash
-		uh.LoadString(v)
-		toSign[types.OutputID(oid)] = uh
 	}
 
 	seedString, err := passwordPrompt("Seed: ")
