@@ -70,10 +70,11 @@ func (g *Gateway) threadedLearnHostname() {
 			g.log.Println("WARN: failed to discover external IP:", err)
 		}
 		// If we were unable to discover our IP we try again later.
-		if err != nil && g.managedSleep(rediscoverIPIntervalFailure) {
+		if err != nil {
+			if !g.managedSleep(rediscoverIPIntervalFailure) {
+				return // shutdown interrupted sleep
+			}
 			continue
-		} else if err != nil {
-			return // shutdown interrupted sleep
 		}
 
 		g.mu.RLock()
@@ -81,10 +82,11 @@ func (g *Gateway) threadedLearnHostname() {
 		g.mu.RUnlock()
 		if err := addr.IsValid(); err != nil {
 			g.log.Printf("WARN: discovered hostname %q is invalid: %v", addr, err)
-			if err != nil && g.managedSleep(rediscoverIPIntervalFailure) {
+			if err != nil {
+				if !g.managedSleep(rediscoverIPIntervalFailure) {
+					return // shutdown interrupted sleep
+				}
 				continue
-			} else if err != nil {
-				return // shutdown interrupted sleep
 			}
 		}
 
