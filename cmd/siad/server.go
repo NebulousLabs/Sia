@@ -79,8 +79,8 @@ type (
 		RootTarget types.Target `json:"roottarget"`
 		RootDepth  types.Target `json:"rootdepth"`
 
-		MaxAdjustmentUp   *big.Rat `json:"maxadjustmentup"`
-		MaxAdjustmentDown *big.Rat `json:"maxadjustmentdown"`
+		MaxTargetAdjustmentUp   *big.Rat `json:"maxtargetadjustmentup"`
+		MaxTargetAdjustmentDown *big.Rat `json:"maxtargetadjustmentdown"`
 
 		SiacoinPrecision types.Currency `json:"siacoinprecision"`
 	}
@@ -349,8 +349,8 @@ func (srv *Server) daemonConstantsHandler(w http.ResponseWriter, _ *http.Request
 		RootTarget: types.RootTarget,
 		RootDepth:  types.RootDepth,
 
-		MaxAdjustmentUp:   types.MaxAdjustmentUp,
-		MaxAdjustmentDown: types.MaxAdjustmentDown,
+		MaxTargetAdjustmentUp:   types.MaxTargetAdjustmentUp,
+		MaxTargetAdjustmentDown: types.MaxTargetAdjustmentDown,
 
 		SiacoinPrecision: types.SiacoinPrecision,
 	}
