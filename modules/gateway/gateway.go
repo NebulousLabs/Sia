@@ -233,10 +233,12 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 
 	// Register RPCs.
 	g.RegisterRPC("ShareNodes", g.shareNodes)
+	g.RegisterRPC("DiscoverIP", g.discoverPeerIP)
 	g.RegisterConnectCall("ShareNodes", g.requestNodes)
 	// Establish the de-registration of the RPCs.
 	g.threads.OnStop(func() {
 		g.UnregisterRPC("ShareNodes")
+		g.UnregisterRPC("DiscoverIP")
 		g.UnregisterConnectCall("ShareNodes")
 	})
 

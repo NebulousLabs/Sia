@@ -41,9 +41,7 @@ func myExternalIP() (string, error) {
 	return strings.TrimSpace(string(buf)), nil
 }
 
-// threadedLearnHostname discovers the external IP of the Gateway. Once the IP
-// has been discovered, it registers the ShareNodes RPC to be called on new
-// connections, advertising the IP to other nodes.
+// threadedLearnHostname discovers the external IP of the Gateway regularly.
 func (g *Gateway) threadedLearnHostname() {
 	if err := g.threads.Add(); err != nil {
 		return
@@ -54,33 +52,55 @@ func (g *Gateway) threadedLearnHostname() {
 		return
 	}
 
-	// try UPnP first, then fallback to myexternalip.com
-	var host string
-	d, err := upnp.Discover()
-	if err == nil {
-		host, err = d.ExternalIP()
-	}
-	if err != nil {
-		host, err = myExternalIP()
-	}
-	if err != nil {
-		g.log.Println("WARN: failed to discover external IP:", err)
-		return
-	}
+	for {
+		// try UPnP first, then fallback to myexternalip.com and peer-to-peer
+		// discovery.
+		var host string
+		d, err := upnp.Discover()
+		if err == nil {
+			host, err = d.ExternalIP()
+		}
+		if !build.DEBUG && err != nil {
+			host, err = myExternalIP()
+		}
+		if err != nil {
+			host, err = g.managedIPFromPeers()
+		}
+		if err != nil {
+			g.log.Println("WARN: failed to discover external IP:", err)
+		}
+		// If we were unable to discover our IP we try again later.
+		if err != nil {
+			if !g.managedSleep(rediscoverIPIntervalFailure) {
+				return // shutdown interrupted sleep
+			}
+			continue
+		}
 
-	g.mu.RLock()
-	addr := modules.NetAddress(net.JoinHostPort(host, g.port))
-	g.mu.RUnlock()
-	if err := addr.IsValid(); err != nil {
-		g.log.Printf("WARN: discovered hostname %q is invalid: %v", addr, err)
-		return
+		g.mu.RLock()
+		addr := modules.NetAddress(net.JoinHostPort(host, g.port))
+		g.mu.RUnlock()
+		if err := addr.IsValid(); err != nil {
+			g.log.Printf("WARN: discovered hostname %q is invalid: %v", addr, err)
+			if err != nil {
+				if !g.managedSleep(rediscoverIPIntervalFailure) {
+					return // shutdown interrupted sleep
+				}
+				continue
+			}
+		}
+
+		g.mu.Lock()
+		g.myAddr = addr
+		g.mu.Unlock()
+
+		g.log.Println("INFO: our address is", addr)
+
+		// Rediscover the IP later in case it changed.
+		if !g.managedSleep(rediscoverIPIntervalSuccess) {
+			return // shutdown interrupted sleep
+		}
 	}
-
-	g.mu.Lock()
-	g.myAddr = addr
-	g.mu.Unlock()
-
-	g.log.Println("INFO: our address is", addr)
 }
 
 // threadedForwardPort adds a port mapping to the router.
