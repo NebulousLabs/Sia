@@ -1,11 +1,11 @@
 package wallet
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 
 	"github.com/coreos/bbolt"
 )
@@ -396,14 +396,14 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 	for _, block := range cc.AppliedBlocks {
 		consensusHeight, err := dbGetConsensusHeight(tx)
 		if err != nil {
-			return err
+			return errors.AddContext(err, "failed to consensus height")
 		}
 		// Increment the consensus height.
 		if block.ID() != types.GenesisID {
 			consensusHeight++
 			err = dbPutConsensusHeight(tx, consensusHeight)
 			if err != nil {
-				return err
+				return errors.AddContext(err, "failed to store consensus height in database")
 			}
 		}
 
@@ -411,7 +411,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 		for _, pt := range pts {
 			err := dbAppendProcessedTransaction(tx, pt)
 			if err != nil {
-				return fmt.Errorf("could not put processed transaction: %v", err)
+				return errors.AddContext(err, "could not put processed transaction")
 			}
 		}
 	}

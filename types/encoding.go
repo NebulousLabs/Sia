@@ -14,6 +14,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/errors"
 )
 
 // sanityCheckWriter checks that the bytes written to w exactly match the
@@ -176,7 +177,8 @@ func (d *decHelper) NextPrefix(elemSize uintptr) uint64 {
 		return 0
 	}
 	if n > 1<<31-1 || n*uint64(elemSize) > encoding.MaxSliceSize {
-		d.err = encoding.ErrSliceTooLarge
+		d.err = errors.AddContext(encoding.ErrSliceTooLarge,
+			fmt.Sprintf("n: %d, elemSize: %d", n, elemSize))
 		return 0
 	}
 	return n
@@ -323,7 +325,7 @@ func (cf CoveredFields) MarshalSia(w io.Writer) error {
 
 // MarshalSiaSize returns the encoded size of cf.
 func (cf CoveredFields) MarshalSiaSize() (size int) {
-	size += 1 // WholeTransaction
+	size++ // WholeTransaction
 	size += 8 + len(cf.SiacoinInputs)*8
 	size += 8 + len(cf.SiacoinOutputs)*8
 	size += 8 + len(cf.FileContracts)*8

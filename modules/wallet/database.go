@@ -2,13 +2,14 @@ package wallet
 
 import (
 	"encoding/binary"
-	"errors"
+	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/fastrand"
 
 	"github.com/coreos/bbolt"
@@ -249,7 +250,8 @@ func dbAddProcessedTransactionAddrs(tx *bolt.Tx, pt modules.ProcessedTransaction
 	}
 	for addr := range addrs {
 		if err := dbAddAddrTransaction(tx, addr, txn); err != nil {
-			return err
+			return errors.AddContext(err, fmt.Sprintf("failed to add txn %v to address %v",
+				pt.TransactionID, addr))
 		}
 	}
 	return nil
@@ -299,22 +301,25 @@ func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) 
 	b := tx.Bucket(bucketProcessedTransactions)
 	key, err := b.NextSequence()
 	if err != nil {
-		return err
+		return errors.AddContext(err, "failed to get next sequence from bucket")
 	}
 	// big-endian is used so that the keys are properly sorted
 	keyBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(keyBytes, key)
 	if err = b.Put(keyBytes, encoding.Marshal(pt)); err != nil {
-		return err
+		return errors.AddContext(err, "failed to store processed txn in database")
 	}
 
 	// add used index to bucketProcessedTxnIndex
 	if err = dbPutTransactionIndex(tx, pt.TransactionID, keyBytes); err != nil {
-		return err
+		return errors.AddContext(err, "failed to store txn index in database")
 	}
 
 	// also add this txid to the bucketAddrTransactions
-	return dbAddProcessedTransactionAddrs(tx, pt, key)
+	if err = dbAddProcessedTransactionAddrs(tx, pt, key); err != nil {
+		return errors.AddContext(err, "failed to add processed transaction to addresses in database")
+	}
+	return nil
 }
 
 func dbGetLastProcessedTransaction(tx *bolt.Tx) (pt modules.ProcessedTransaction, err error) {
