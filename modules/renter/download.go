@@ -155,12 +155,12 @@ type (
 		staticStartTime time.Time // Set immediately when the download object is created.
 
 		// Basic information about the file.
-		destination       downloadDestination
-		destinationString string // The string reported to the user to indicate the download's destination.
-		destinationType   string // "memory buffer", "http stream", "file", etc.
-		staticLength      uint64 // Length to download starting from the offset.
-		staticOffset      uint64 // Offset within the file to start the download.
-		staticSiaPath     string // The path of the siafile at the time the download started.
+		destination           downloadDestination
+		destinationString     string // The string reported to the user to indicate the download's destination.
+		staticDestinationType string // "memory buffer", "http stream", "file", etc.
+		staticLength          uint64 // Length to download starting from the offset.
+		staticOffset          uint64 // Offset within the file to start the download.
+		staticSiaPath         string // The path of the siafile at the time the download started.
 
 		// Retrieval settings for the file.
 		staticLatencyTarget time.Duration // In milliseconds. Lower latency results in lower total system throughput.
@@ -256,15 +256,15 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 
 		staticStartTime: time.Now(),
 
-		destination:         params.destination,
-		destinationString:   params.destinationString,
-		destinationType:     params.destinationType,
-		staticLatencyTarget: params.latencyTarget,
-		staticLength:        params.length,
-		staticOffset:        params.offset,
-		staticOverdrive:     params.overdrive,
-		staticSiaPath:       params.file.name,
-		staticPriority:      params.priority,
+		destination:           params.destination,
+		destinationString:     params.destinationString,
+		staticDestinationType: params.destinationType,
+		staticLatencyTarget:   params.latencyTarget,
+		staticLength:          params.length,
+		staticOffset:          params.offset,
+		staticOverdrive:       params.overdrive,
+		staticSiaPath:         params.file.name,
+		staticPriority:        params.priority,
 
 		log:           r.log,
 		memoryManager: r.memoryManager,
@@ -333,7 +333,7 @@ func (r *Renter) newDownload(params downloadParams) (*download, error) {
 
 			download:   d,
 			chunkCache: r.chunkCache,
-			cmu:        r.cmu,
+			cacheMu:    r.cmu,
 		}
 
 		// Set the fetchOffset - the offset within the chunk that we start
@@ -475,7 +475,7 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 		d.mu.Lock() // Lock required for d.endTime only.
 		downloads[i] = modules.DownloadInfo{
 			Destination:     d.destinationString,
-			DestinationType: d.destinationType,
+			DestinationType: d.staticDestinationType,
 			Length:          d.staticLength,
 			Offset:          d.staticOffset,
 			SiaPath:         d.staticSiaPath,

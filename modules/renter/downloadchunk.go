@@ -76,7 +76,7 @@ type unfinishedDownloadChunk struct {
 
 	// Caching related fields
 	chunkCache map[string][]byte
-	cmu        *sync.Mutex
+	cacheMu    *sync.Mutex
 }
 
 // fail will set the chunk status to failed. The physical chunk memory will be
@@ -168,24 +168,6 @@ func (udc *unfinishedDownloadChunk) returnMemory() {
 	if uint64(udc.memoryAllocated) > maxMemory {
 		udc.download.memoryManager.Return(udc.memoryAllocated - maxMemory)
 		udc.memoryAllocated = maxMemory
-	}
-}
-
-// addChunkToCache adds the chunk to the cache if the download is a streaming
-// endpoint download.
-func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
-	// TODO is it safe to read the type without a lock?
-	if udc.download.destinationType == destinationTypeSeekStream {
-		udc.cmu.Lock()
-		// Prune cache if necessary.
-		for key := range udc.chunkCache {
-			if len(udc.chunkCache) < downloadCacheSize {
-				break
-			}
-			delete(udc.chunkCache, key)
-		}
-		udc.chunkCache[udc.staticCacheID] = data
-		udc.cmu.Unlock()
 	}
 }
 
