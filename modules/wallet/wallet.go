@@ -254,5 +254,7 @@ func (w *Wallet) Settings() modules.WalletSettings {
 
 // SetSettings will update the settings for the wallet.
 func (w *Wallet) SetSettings(s modules.WalletSettings) {
+	w.mu.Lock()
 	w.defragDisabled = s.NoDefrag
+	w.mu.Unlock()
 }
