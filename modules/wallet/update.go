@@ -121,6 +121,7 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 		}
 		if err != nil {
 			w.log.Severe("Could not update siacoin output:", err)
+			return err
 		}
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
@@ -139,6 +140,7 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 		}
 		if err != nil {
 			w.log.Severe("Could not update siafund output:", err)
+			return err
 		}
 	}
 	for _, diff := range cc.SiafundPoolDiffs {
@@ -150,6 +152,7 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 		}
 		if err != nil {
 			w.log.Severe("Could not update siafund pool:", err)
+			return err
 		}
 	}
 	return nil
@@ -172,6 +175,7 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 				w.log.Println("A wallet transaction has been reverted due to a reorg:", txid)
 				if err := dbDeleteLastProcessedTransaction(tx); err != nil {
 					w.log.Severe("Could not revert transaction:", err)
+					return err
 				}
 			}
 		}
@@ -182,6 +186,7 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 				w.log.Println("Miner payout has been reverted due to a reorg:", block.MinerPayoutID(uint64(i)), "::", mp.Value.HumanString())
 				if err := dbDeleteLastProcessedTransaction(tx); err != nil {
 					w.log.Severe("Could not revert transaction:", err)
+					return err
 				}
 				break // there will only ever be one miner transaction
 			}
@@ -431,21 +436,26 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	defer w.mu.Unlock()
 
 	if needRescan, err := w.updateLookahead(w.dbTx, cc); err != nil {
-		w.log.Println("ERROR: failed to update lookahead:", err)
+		w.log.Severe("ERROR: failed to update lookahead:", err)
+		w.dbRollback = true
 	} else if needRescan {
 		go w.threadedResetSubscriptions()
 	}
 	if err := w.updateConfirmedSet(w.dbTx, cc); err != nil {
-		w.log.Println("ERROR: failed to update confirmed set:", err)
+		w.log.Severe("ERROR: failed to update confirmed set:", err)
+		w.dbRollback = true
 	}
 	if err := w.revertHistory(w.dbTx, cc.RevertedBlocks); err != nil {
-		w.log.Println("ERROR: failed to revert consensus change:", err)
+		w.log.Severe("ERROR: failed to revert consensus change:", err)
+		w.dbRollback = true
 	}
 	if err := w.applyHistory(w.dbTx, cc); err != nil {
-		w.log.Println("ERROR: failed to apply consensus change:", err)
+		w.log.Severe("ERROR: failed to apply consensus change:", err)
+		w.dbRollback = true
 	}
 	if err := dbPutConsensusChangeID(w.dbTx, cc.ID); err != nil {
-		w.log.Println("ERROR: failed to update consensus change ID:", err)
+		w.log.Severe("ERROR: failed to update consensus change ID:", err)
+		w.dbRollback = true
 	}
 
 	if cc.Synced {
