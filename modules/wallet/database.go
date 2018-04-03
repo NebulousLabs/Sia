@@ -88,7 +88,7 @@ func (w *Wallet) threadedDBUpdate() {
 			// If the database is having problems, we need to close it to
 			// protect it. This will likely cause a panic somewhere when another
 			// caller tries to access dbTx but it is nil.
-			w.log.Severe("ERROR: syncDB encountered an error. Closing the wallet db to protect the database, wallet may crash.", err)
+			w.log.Severe("ERROR: syncDB encountered an error. Closing database to protect wallet. wallet may crash:", err)
 			w.db.Close()
 			return
 		}
@@ -102,7 +102,6 @@ func (w *Wallet) syncDB() error {
 	// atomic update there  was a failure, and that failure needs to be rolled
 	// back. An error will be returned.
 	if w.dbRollback {
-		w.log.Severe("ERROR: database rollback requested. Performing rollback to protect the database and refusing to open a new dbTX, wallet may crash.")
 		w.dbTx.Rollback()
 		return errors.New("database unable to sync - rollback requested")
 	}
