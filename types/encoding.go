@@ -14,7 +14,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/errors"
 )
 
 // sanityCheckWriter checks that the bytes written to w exactly match the
@@ -133,7 +132,7 @@ func (d *decHelper) Read(p []byte) (int, error) {
 	}
 	d.n += n
 	if d.n > encoding.MaxObjectSize {
-		d.err = encoding.ErrObjectTooLarge
+		d.err = encoding.ErrObjectTooLarge(d.n)
 	}
 	return n, d.err
 }
@@ -177,8 +176,7 @@ func (d *decHelper) NextPrefix(elemSize uintptr) uint64 {
 		return 0
 	}
 	if n > 1<<31-1 || n*uint64(elemSize) > encoding.MaxSliceSize {
-		d.err = errors.AddContext(encoding.ErrSliceTooLarge,
-			fmt.Sprintf("n: %d, elemSize: %d", n, elemSize))
+		d.err = encoding.ErrSliceTooLarge{Len: n, ElemSize: uint64(elemSize)}
 		return 0
 	}
 	return n
