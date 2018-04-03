@@ -87,8 +87,13 @@ type Wallet struct {
 	// transactions. A global db transaction is maintained in memory to avoid
 	// excessive disk writes. Any operations involving dbTx must hold an
 	// exclusive lock.
-	db   *persist.BoltDatabase
-	dbTx *bolt.Tx
+	//
+	// If dbRollback is set, then when the database syncs it will perform a
+	// rollback instead of a commit. For safety reasons, the db will close and
+	// the wallet will close if a rollback is performed.
+	db         *persist.BoltDatabase
+	dbRollback bool
+	dbTx       *bolt.Tx
 
 	persistDir string
 	log        *persist.Logger
@@ -249,5 +254,7 @@ func (w *Wallet) Settings() modules.WalletSettings {
 
 // SetSettings will update the settings for the wallet.
 func (w *Wallet) SetSettings(s modules.WalletSettings) {
+	w.mu.Lock()
 	w.defragDisabled = s.NoDefrag
+	w.mu.Unlock()
 }

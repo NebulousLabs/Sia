@@ -82,25 +82,44 @@ func (w *Wallet) threadedDBUpdate() {
 			return
 		}
 		w.mu.Lock()
-		w.syncDB()
+		err := w.syncDB()
 		w.mu.Unlock()
+		if err != nil {
+			// If the database is having problems, we need to close it to
+			// protect it. This will likely cause a panic somewhere when another
+			// caller tries to access dbTx but it is nil.
+			w.log.Severe("ERROR: syncDB encountered an error. Closing database to protect wallet. wallet may crash:", err)
+			w.db.Close()
+			return
+		}
 	}
 }
 
 // syncDB commits the current global transaction and immediately begins a
 // new one. It must be called with a write-lock.
-func (w *Wallet) syncDB() {
+func (w *Wallet) syncDB() error {
+	// If the rollback flag is set, it means that somewhere in the middle of an
+	// atomic update there  was a failure, and that failure needs to be rolled
+	// back. An error will be returned.
+	if w.dbRollback {
+		w.dbTx.Rollback()
+		return errors.New("database unable to sync - rollback requested")
+	}
+
 	// commit the current tx
 	err := w.dbTx.Commit()
 	if err != nil {
 		w.log.Severe("ERROR: failed to apply database update:", err)
 		w.dbTx.Rollback()
+		return errors.AddContext(err, "unable to commit dbTx in syncDB")
 	}
 	// begin a new tx
 	w.dbTx, err = w.db.Begin(true)
 	if err != nil {
 		w.log.Severe("ERROR: failed to start database update:", err)
+		return errors.AddContext(err, "unable to begin new dbTx in syncDB")
 	}
+	return nil
 }
 
 // dbReset wipes and reinitializes a wallet database.
