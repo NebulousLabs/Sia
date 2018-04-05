@@ -39,7 +39,7 @@ var (
 	// the consensus set in a single iteration during the initial blockchain
 	// download.
 	MaxCatchUpBlocks = build.Select(build.Var{
-		Standard: types.BlockHeight(10),
+		Standard: types.BlockHeight(25),
 		Dev:      types.BlockHeight(50),
 		Testing:  types.BlockHeight(3),
 	}).(types.BlockHeight)
@@ -57,21 +57,21 @@ var (
 
 	// relayHeaderTimeout is the timeout for the RelayHeader RPC.
 	relayHeaderTimeout = build.Select(build.Var{
-		Standard: 3 * time.Minute,
+		Standard: 60 * time.Second,
 		Dev:      20 * time.Second,
 		Testing:  3 * time.Second,
 	}).(time.Duration)
 
 	// sendBlkTimeout is the timeout for the SendBlk RPC.
 	sendBlkTimeout = build.Select(build.Var{
-		Standard: 4 * time.Minute,
+		Standard: 90 * time.Second,
 		Dev:      30 * time.Second,
 		Testing:  4 * time.Second,
 	}).(time.Duration)
 
 	// sendBlocksTimeout is the timeout for the SendBlocks RPC.
 	sendBlocksTimeout = build.Select(build.Var{
-		Standard: 5 * time.Minute,
+		Standard: 120 * time.Second,
 		Dev:      40 * time.Second,
 		Testing:  5 * time.Second,
 	}).(time.Duration)
