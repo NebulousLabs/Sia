@@ -111,10 +111,29 @@ type (
 	// StorageObligation contains information about a storage obligation that
 	// the host has accepted.
 	StorageObligation struct {
-		NegotiationHeight types.BlockHeight `json:"negotiationheight"`
+		ObligationId             types.FileContractID `json:"obligationid"`
+		FileSize                 uint64               `json:"filesize"`
+		SectorRootsCount         uint64               `json:"sectorrootscount"`
+		ContractCost             types.Currency       `json:"contractcost"`
+		LockedCollateral         types.Currency       `json:"lockedcollateral"`
+		PotentialDownloadRevenue types.Currency       `json:"potentialdownloadrevenue"`
+		PotentialStorageRevenue  types.Currency       `json:"potentialstoragerevenue"`
+		PotentialUploadRevenue   types.Currency       `json:"potentialuploadrevenue"`
+		RiskedCollateral         types.Currency       `json:"riskedcollateral"`
+		TransactionFeesAdded     types.Currency       `json:"transactionfeesadded"`
 
+		// The negotiation height specifies the block height at which the file
+		// contract was negotiated. The expiration height and the proof deadline
+		// are equal to the window start and window end. Between the expiration height
+		// and the proof deadline, the host must submit the storage proof.
+		NegotiationHeight types.BlockHeight `json:"negotiationheight"`
+		ExpirationHeight  types.BlockHeight `json:"expirationheight"`
+		ProofDeadLine     types.BlockHeight `json:"proofdeadline"`
+
+		// Variables indicating whether the critical transactions in a storage
+		// obligation have been confirmed on the blockchain.
 		OriginConfirmed     bool   `json:"originconfirmed"`
-		RevisionConstructed bool   `json:"revisionconstructed"`
+		RevisionConstructed bool   `json:"revisioncontructed"`
 		RevisionConfirmed   bool   `json:"revisionconfirmed"`
 		ProofConstructed    bool   `json:"proofconstructed"`
 		ProofConfirmed      bool   `json:"proofconfirmed"`

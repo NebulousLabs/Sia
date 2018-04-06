@@ -870,7 +870,20 @@ func (h *Host) StorageObligations() (sos []modules.StorageObligation) {
 				return build.ExtendErr("unable to unmarshal storage obligation:", err)
 			}
 			mso := modules.StorageObligation{
+				ObligationId:             so.id(),
+				FileSize:                 so.fileSize(),
+				SectorRootsCount:         uint64(len(so.SectorRoots)),
+				ContractCost:             so.ContractCost,
+				LockedCollateral:         so.LockedCollateral,
+				PotentialDownloadRevenue: so.PotentialDownloadRevenue,
+				PotentialStorageRevenue:  so.PotentialStorageRevenue,
+				PotentialUploadRevenue:   so.PotentialUploadRevenue,
+				RiskedCollateral:         so.RiskedCollateral,
+				TransactionFeesAdded:     so.TransactionFeesAdded,
+
 				NegotiationHeight: so.NegotiationHeight,
+				ExpirationHeight:  so.expiration(),
+				ProofDeadLine:     so.proofDeadline(),
 
 				OriginConfirmed:     so.OriginConfirmed,
 				RevisionConstructed: so.RevisionConstructed,
