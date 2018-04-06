@@ -39,7 +39,7 @@ var (
 	// the consensus set in a single iteration during the initial blockchain
 	// download.
 	MaxCatchUpBlocks = build.Select(build.Var{
-		Standard: types.BlockHeight(25),
+		Standard: types.BlockHeight(10),
 		Dev:      types.BlockHeight(50),
 		Testing:  types.BlockHeight(3),
 	}).(types.BlockHeight)
@@ -71,7 +71,7 @@ var (
 
 	// sendBlocksTimeout is the timeout for the SendBlocks RPC.
 	sendBlocksTimeout = build.Select(build.Var{
-		Standard: 120 * time.Second,
+		Standard: 180 * time.Second,
 		Dev:      40 * time.Second,
 		Testing:  5 * time.Second,
 	}).(time.Duration)
