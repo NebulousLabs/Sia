@@ -133,7 +133,7 @@ type (
 		// Variables indicating whether the critical transactions in a storage
 		// obligation have been confirmed on the blockchain.
 		OriginConfirmed     bool   `json:"originconfirmed"`
-		RevisionConstructed bool   `json:"revisioncontructed"`
+		RevisionConstructed bool   `json:"revisionconstructed"`
 		RevisionConfirmed   bool   `json:"revisionconfirmed"`
 		ProofConstructed    bool   `json:"proofconstructed"`
 		ProofConfirmed      bool   `json:"proofconfirmed"`
