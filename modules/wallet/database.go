@@ -262,10 +262,14 @@ func dbAddAddrTransaction(tx *bolt.Tx, addr types.UnlockHash, txn uint64) error 
 func dbAddProcessedTransactionAddrs(tx *bolt.Tx, pt modules.ProcessedTransaction, txn uint64) error {
 	addrs := make(map[types.UnlockHash]struct{})
 	for _, input := range pt.Inputs {
-		addrs[input.RelatedAddress] = struct{}{}
+		if input.WalletAddress {
+			addrs[input.RelatedAddress] = struct{}{}
+		}
 	}
 	for _, output := range pt.Outputs {
-		addrs[output.RelatedAddress] = struct{}{}
+		if output.WalletAddress {
+			addrs[output.RelatedAddress] = struct{}{}
+		}
 	}
 	for addr := range addrs {
 		if err := dbAddAddrTransaction(tx, addr, txn); err != nil {
