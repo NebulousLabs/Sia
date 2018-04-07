@@ -46,7 +46,7 @@ func createWalletTester(name string, deps modules.Dependencies) (*walletTester, 
 	if err != nil {
 		return nil, err
 	}
-	w, err := newWallet(cs, tp, filepath.Join(testdir, modules.WalletDir), deps)
+	w, err := NewCustomWallet(cs, tp, filepath.Join(testdir, modules.WalletDir), deps)
 	if err != nil {
 		return nil, err
 	}

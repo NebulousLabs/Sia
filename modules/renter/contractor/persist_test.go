@@ -63,7 +63,7 @@ func TestSaveLoad(t *testing.T) {
 	}
 
 	// use stdPersist instead of mock
-	c.persist = newPersist(build.TempDir("contractor", t.Name()))
+	c.persist = NewPersist(build.TempDir("contractor", t.Name()))
 	os.MkdirAll(build.TempDir("contractor", t.Name()), 0700)
 
 	// save, clear, and reload
@@ -115,7 +115,7 @@ func TestConvertPersist(t *testing.T) {
 
 	// load the persist
 	var p contractorPersist
-	err = newPersist(dir).load(&p)
+	err = NewPersist(dir).load(&p)
 	if err != nil {
 		t.Fatal(err)
 	}

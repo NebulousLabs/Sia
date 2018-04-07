@@ -294,7 +294,7 @@ func TestAllowanceSpending(t *testing.T) {
 	}
 
 	var minerRewards types.Currency
-	w := c.wallet.(*walletBridge).w.(modules.Wallet)
+	w := c.wallet.(*WalletBridge).W.(modules.Wallet)
 	txns, err := w.Transactions(0, 1000)
 	if err != nil {
 		t.Fatal(err)
@@ -522,7 +522,7 @@ func (ws *testWalletShim) StartTransaction() modules.TransactionBuilder {
 // TestWalletBridge tests the walletBridge type.
 func TestWalletBridge(t *testing.T) {
 	shim := new(testWalletShim)
-	bridge := walletBridge{shim}
+	bridge := WalletBridge{shim}
 	bridge.NextAddress()
 	if !shim.nextAddressCalled {
 		t.Error("NextAddress was not called on the shim")
