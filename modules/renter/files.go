@@ -36,6 +36,7 @@ type file struct {
 	erasureCode modules.ErasureCoder // Static - can be accessed without lock.
 	pieceSize   uint64               // Static - can be accessed without lock.
 	mode        uint32               // actually an os.FileMode
+	deleted     bool                 // indicates if the file has been deleted.
 
 	staticUID string // A UID assigned to the file when it gets created.
 
@@ -245,6 +246,9 @@ func (r *Renter) DeleteFile(nickname string) error {
 	// delete the file's associated contract data.
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	// mark the file as deleted
+	f.deleted = true
 
 	// TODO: delete the sectors of the file as well.
 
