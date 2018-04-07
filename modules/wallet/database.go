@@ -262,16 +262,17 @@ func dbAddAddrTransaction(tx *bolt.Tx, addr types.UnlockHash, txn uint64) error 
 func dbAddProcessedTransactionAddrs(tx *bolt.Tx, pt modules.ProcessedTransaction, txn uint64) error {
 	addrs := make(map[types.UnlockHash]struct{})
 	for _, input := range pt.Inputs {
-		if input.WalletAddress {
-			addrs[input.RelatedAddress] = struct{}{}
-		}
+		addrs[input.RelatedAddress] = struct{}{}
 	}
 	for _, output := range pt.Outputs {
-		if output.WalletAddress {
-			addrs[output.RelatedAddress] = struct{}{}
-		}
+		addrs[output.RelatedAddress] = struct{}{}
 	}
 	for addr := range addrs {
+		if addr == (types.UnlockHash{}) {
+			// skip the void address; it's associated with too many
+			// transactions, which is problematic for large wallets
+			continue
+		}
 		if err := dbAddAddrTransaction(tx, addr, txn); err != nil {
 			return errors.AddContext(err, fmt.Sprintf("failed to add txn %v to address %v",
 				pt.TransactionID, addr))
