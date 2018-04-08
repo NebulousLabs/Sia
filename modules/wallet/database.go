@@ -265,6 +265,10 @@ func dbAddProcessedTransactionAddrs(tx *bolt.Tx, pt modules.ProcessedTransaction
 		addrs[input.RelatedAddress] = struct{}{}
 	}
 	for _, output := range pt.Outputs {
+		// miner fees don't have an address, so skip them
+		if output.FundType == types.SpecifierMinerFee {
+			continue
+		}
 		addrs[output.RelatedAddress] = struct{}{}
 	}
 	for addr := range addrs {

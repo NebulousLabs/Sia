@@ -383,8 +383,9 @@ func (w *Wallet) computeProcessedTransactionsFromBlock(tx *bolt.Tx, block types.
 
 		for _, fee := range txn.MinerFees {
 			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
-				FundType: types.SpecifierMinerFee,
-				Value:    fee,
+				FundType:       types.SpecifierMinerFee,
+				MaturityHeight: consensusHeight + types.MaturityDelay,
+				Value:          fee,
 			})
 		}
 		pts = append(pts, pt)
