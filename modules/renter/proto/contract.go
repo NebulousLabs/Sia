@@ -45,14 +45,15 @@ type contractHeader struct {
 	SecretKey crypto.SecretKey
 
 	// Same as modules.RenterContract.
-	StartHeight      types.BlockHeight
-	DownloadSpending types.Currency
-	StorageSpending  types.Currency
-	UploadSpending   types.Currency
-	TotalCost        types.Currency
 	ContractFee      types.Currency
-	TxnFee           types.Currency
+	DownloadSpending types.Currency
 	SiafundFee       types.Currency
+	StartHeight      types.BlockHeight
+	StorageSpending  types.Currency
+	TotalCost        types.Currency
+	TxnFee           types.Currency
+	UploadSpending   types.Currency
+	Utility          modules.ContractUtility
 }
 
 // validate returns an error if the contractHeader is invalid.
@@ -129,6 +130,42 @@ func (c *SafeContract) Metadata() modules.RenterContract {
 		TxnFee:           h.TxnFee,
 		SiafundFee:       h.SiafundFee,
 	}
+}
+
+// UpdateUtility updates the utility field of a contract.
+func (c *SafeContract) UpdateUtility(utility modules.ContractUtility) error {
+	// Get current header
+	c.headerMu.Lock()
+	newHeader := c.header
+	c.headerMu.Unlock()
+
+	// Construct new header
+	newHeader.Utility = utility
+
+	// Record the intent to change the header in the wal.
+	t, err := c.wal.NewTransaction([]writeaheadlog.Update{
+		c.makeUpdateSetHeader(newHeader),
+	})
+	if err != nil {
+		return err
+	}
+	// Signal that the setup is completed.
+	if err := <-t.SignalSetupComplete(); err != nil {
+		return err
+	}
+	// Apply the change.
+	if err := c.applySetHeader(newHeader); err != nil {
+		return err
+	}
+	// Sync the change to disk.
+	if err := c.f.Sync(); err != nil {
+		return err
+	}
+	// Signal that the update has been applied.
+	if err := t.SignalUpdatesApplied(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *SafeContract) makeUpdateSetHeader(h contractHeader) writeaheadlog.Update {
