@@ -28,6 +28,16 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 	return c.currentPeriod + c.allowance.Period
 }
 
+// ContractUtility returns the ContractUtility for a contract with a given id.
+func (c *Contractor) contractUtility(id types.FileContractID) modules.ContractUtility {
+	sc, exists := c.contracts.Acquire(c.resolveID(id))
+	if !exists {
+		return modules.ContractUtility{}
+	}
+	defer c.contracts.Return(sc)
+	return sc.Utility()
+}
+
 // managedInterruptContractMaintenance will issue an interrupt signal to any
 // running maintenance, stopping that maintenance. If there are multiple threads
 // running maintenance, they will all be stopped.
@@ -56,7 +66,7 @@ func (c *Contractor) managedInterruptContractMaintenance() {
 // managedMarkContractsUtility checks every active contract in the contractor and
 // figures out whether the contract is useful for uploading, and whehter the
 // contract should be renewed.
-func (c *Contractor) managedMarkContractsUtility() {
+func (c *Contractor) managedMarkContractsUtility() error {
 	// Pull a new set of hosts from the hostdb that could be used as a new set
 	// to match the allowance. The lowest scoring host of these new hosts will
 	// be used as a baseline for determining whether our existing contracts are
@@ -130,10 +140,11 @@ func (c *Contractor) managedMarkContractsUtility() {
 		}()
 
 		// Apply changes.
-		c.mu.Lock()
-		c.contractUtilities[contract.ID] = utility
-		c.mu.Unlock()
+		if err := c.updateContractUtility(contract.ID, utility); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // managedNewContract negotiates an initial file contract with the specified
@@ -186,9 +197,7 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 	// For convenience
 	contract := sc.Metadata()
 	// Sanity check - should not be renewing a bad contract.
-	c.mu.RLock()
-	utility := c.contractUtilities[contract.ID]
-	c.mu.RUnlock()
+	utility := c.contractUtility(contract.ID)
 	if !utility.GoodForRenew {
 		c.log.Critical("Renewing a contract that has been marked as !GoodForRenew")
 	}
@@ -269,7 +278,10 @@ func (c *Contractor) threadedContractMaintenance() {
 
 	// Update the utility fields for this contract based on the most recent
 	// hostdb.
-	c.managedMarkContractsUtility()
+	if err := c.managedMarkContractsUtility(); err != nil {
+		c.log.Println("Failed to update contracUtilities", err)
+		return
+	}
 
 	// Figure out which contracts need to be renewed, and while we have the
 	// lock, figure out the end height for the new contracts and also the amount
@@ -344,7 +356,8 @@ func (c *Contractor) threadedContractMaintenance() {
 		// Iterate through the contracts again, figuring out which contracts to
 		// renew and how much extra funds to renew them with.
 		for _, contract := range c.contracts.ViewAll() {
-			if !c.contractUtilities[contract.ID].GoodForRenew {
+			utility := c.contractUtility(contract.ID)
+			if !utility.GoodForRenew {
 				continue
 			}
 			if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight {
@@ -464,9 +477,7 @@ func (c *Contractor) threadedContractMaintenance() {
 				return
 			}
 			// Return the contract if it's not useful for renewing.
-			c.mu.RLock()
-			oldUtility := c.contractUtilities[id]
-			c.mu.RUnlock()
+			oldUtility := c.contractUtility(id)
 			if !oldUtility.GoodForRenew {
 				c.log.Printf("Contract %v slated for renew is marked not good for renew", id)
 				c.contracts.Return(oldContract)
@@ -489,10 +500,16 @@ func (c *Contractor) threadedContractMaintenance() {
 				GoodForUpload: true,
 				GoodForRenew:  true,
 			}
-			c.contractUtilities[newContract.ID] = newUtility
+			if err := c.updateContractUtility(newContract.ID, newUtility); err != nil {
+				c.log.Println("Failed to update the contract utilities", err)
+				return
+			}
 			oldUtility.GoodForRenew = false
 			oldUtility.GoodForUpload = false
-			c.contractUtilities[id] = oldUtility
+			if err := c.updateContractUtility(id, oldUtility); err != nil {
+				c.log.Println("Failed to update the contract utilities", err)
+				return
+			}
 			c.mu.Unlock()
 			// If the contract is a mid-cycle renew, add the contract line to
 			// the new contract. The contract line is not included/extended if
@@ -543,7 +560,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	c.mu.RLock()
 	uploadContracts := 0
 	for _, id := range c.contracts.IDs() {
-		if c.contractUtilities[id].GoodForUpload {
+		if c.contractUtility(id).GoodForUpload {
 			uploadContracts++
 		}
 	}
@@ -583,9 +600,13 @@ func (c *Contractor) threadedContractMaintenance() {
 
 		// Add this contract to the contractor and save.
 		c.mu.Lock()
-		c.contractUtilities[newContract.ID] = modules.ContractUtility{
+		err = c.updateContractUtility(newContract.ID, modules.ContractUtility{
 			GoodForUpload: true,
 			GoodForRenew:  true,
+		})
+		if err != nil {
+			c.log.Println("Failed to update the contract utilities", err)
+			return
 		}
 		err = c.saveSync()
 		c.mu.Unlock()
@@ -608,4 +629,15 @@ func (c *Contractor) threadedContractMaintenance() {
 		case <-time.After(contractFormationInterval):
 		}
 	}
+}
+
+// updateContractUtility updates the ContractUtility for a contract with a
+// given id.
+func (c *Contractor) updateContractUtility(id types.FileContractID, utility modules.ContractUtility) error {
+	sc, exists := c.contracts.Acquire(c.resolveID(id))
+	if !exists {
+		return errors.New("can't update non-existing contract")
+	}
+	defer c.contracts.Return(sc)
+	return sc.UpdateUtility(utility)
 }

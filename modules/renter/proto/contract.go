@@ -168,6 +168,13 @@ func (c *SafeContract) UpdateUtility(utility modules.ContractUtility) error {
 	return nil
 }
 
+// Utility returns the contract utility for the contract.
+func (c *SafeContract) Utility() modules.ContractUtility {
+	c.headerMu.Lock()
+	defer c.headerMu.Unlock()
+	return c.header.Utility
+}
+
 func (c *SafeContract) makeUpdateSetHeader(h contractHeader) writeaheadlog.Update {
 	c.headerMu.Lock()
 	id := c.header.ID()
