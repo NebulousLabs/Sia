@@ -86,7 +86,7 @@ release-race:
 # clean removes all directories that get automatically created during
 # development.
 clean:
-	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
+	rm -rf cover doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf release 
 
 test:
 	go test -short -tags='debug testing netgo' -timeout=5s $(pkgs) -run=$(run)
@@ -103,13 +103,12 @@ test-mem:
 bench: clean fmt
 	go test -tags='debug testing netgo' -timeout=500s -run=XXX -bench=$(run) $(pkgs)
 cover: clean
-	@mkdir -p cover/modules
-	@mkdir -p cover/modules/renter
-	@mkdir -p cover/modules/host
-	@for package in $(pkgs); do                                                                                                 \
-		go test -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package -run=$(run) \
-		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                                      \
-		&& rm cover/$$package.out ;                                                                                             \
+	@mkdir -p cover
+	@for package in $(pkgs); do                                                                                                          \
+		mkdir -p `dirname cover/$$package`                                                                                        \
+		&& go test -tags='testing debug netgo' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package -run=$(run) \
+		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                                               \
+		&& rm cover/$$package.out ;                                                                                                      \
 	done
 
 # whitepaper builds the whitepaper from whitepaper.tex. pdflatex has to be
