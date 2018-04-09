@@ -416,6 +416,12 @@ standard success or error response. See
 
 downloads a file using http streaming. This call blocks until the data is
 received.
+The streaming endpoint also uses caching internally to prevent siad from
+redownloading the same chunk multiple times when only parts of a file are
+requested at once. This might lead to a substantial increase in ram usage and
+therefore it is not recommended to stream multiple files in parallel at the
+moment. This restriction will be removed together with the caching once partial
+downloads are supported in the future.
 
 ###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-1)
 ```

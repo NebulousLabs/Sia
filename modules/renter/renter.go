@@ -192,6 +192,7 @@ type Renter struct {
 	chunkCache     map[string][]byte
 	cmu            *sync.Mutex
 	cs             modules.ConsensusSet
+	deps           modules.Dependencies
 	g              modules.Gateway
 	hostContractor hostContractor
 	hostDB         hostDB
@@ -200,7 +201,6 @@ type Renter struct {
 	mu             *siasync.RWMutex
 	tg             threadgroup.ThreadGroup
 	tpool          modules.TransactionPool
-	deps           modules.Dependencies
 }
 
 // Close closes the Renter and its dependencies

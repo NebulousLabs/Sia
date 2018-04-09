@@ -60,7 +60,8 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	// Upload file, creating a piece for each host in the group
 	dataPieces := uint64(1)
 	parityPieces := uint64(len(tg.Hosts())) - dataPieces
-	_, remoteFile, err := renter.UploadNewFileBlocking(100+siatest.Fuzz(), dataPieces, parityPieces)
+	fileSize := 100 + siatest.Fuzz()
+	localFile, remoteFile, err := renter.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
 	if err != nil {
 		t.Fatal("Failed to upload a file for testing: ", err)
 	}
@@ -75,7 +76,7 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 	// Download the file asynchronously and wait for the download to finish.
-	localFile, err := renter.DownloadToDisk(remoteFile, true)
+	localFile, err = renter.DownloadToDisk(remoteFile, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -84,6 +85,11 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	}
 	// Stream the file.
 	_, err = renter.Stream(remoteFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Stream the file partially.
+	_, err = renter.StreamPartial(remoteFile, localFile, 0, uint64(fileSize/2))
 	if err != nil {
 		t.Fatal(err)
 	}

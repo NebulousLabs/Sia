@@ -31,14 +31,14 @@ func min(values ...uint64) uint64 {
 	return min
 }
 
-// Streamer create a io.ReadSeeker that can be used to stream downloads from
+// Streamer creates an io.ReadSeeker that can be used to stream downloads from
 // the sia network.
 func (r *Renter) Streamer(siaPath string) (string, io.ReadSeeker, error) {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
 	file, exists := r.files[siaPath]
 	r.mu.RUnlock(lockID)
-	if !exists {
+	if !exists || file.deleted {
 		return "", nil, fmt.Errorf("no file with that path: %s", siaPath)
 	}
 	// Create the streamer
@@ -69,7 +69,7 @@ func (s *streamer) Read(p []byte) (n int, err error) {
 	remainingData := uint64(fileSize - s.offset)
 	requestedData := uint64(len(p))
 	remainingChunk := chunkSize - uint64(s.offset)%chunkSize
-	length := min(chunkSize, remainingData, requestedData, remainingChunk)
+	length := min(remainingData, requestedData, remainingChunk)
 
 	// Download data
 	buffer := bytes.NewBuffer([]byte{})
@@ -79,22 +79,16 @@ func (s *streamer) Read(p []byte) (n int, err error) {
 		destinationString: "httpresponse",
 		file:              s.file,
 
-		latencyTarget: 25e3 * time.Millisecond, // TODO high default until full latency suport is added.
+		latencyTarget: 50 * time.Millisecond, // TODO low default until full latency suport is added.
 		length:        length,
 		needsMemory:   true,
 		offset:        uint64(s.offset),
-		overdrive:     3,  // TODO: moderate default until full overdrive support is added.
-		priority:      10, // TODO: high default until full priority support is added.
+		overdrive:     5,    // TODO: high default until full overdrive support is added.
+		priority:      1000, // TODO: high default until full priority support is added.
 	})
 	if err != nil {
 		return 0, errors.AddContext(err, "failed to create new download")
 	}
-
-	// Add the download object to the download queue.
-	// TODO: Maybe this is not necessary for streams?
-	s.r.downloadHistoryMu.Lock()
-	s.r.downloadHistory = append(s.r.downloadHistory, d)
-	s.r.downloadHistoryMu.Unlock()
 
 	// Block until the download has completed.
 	select {
