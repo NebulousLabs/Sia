@@ -869,6 +869,16 @@ func (h *Host) StorageObligations() (sos []modules.StorageObligation) {
 			if err != nil {
 				return build.ExtendErr("unable to unmarshal storage obligation:", err)
 			}
+			statusString := map[storageObligationStatus]string{
+				obligationFailed:     modules.ObligationStatusFailed,
+				obligationRejected:   modules.ObligationStatusRejected,
+				obligationSucceeded:  modules.ObligationStatusSucceeded,
+				obligationUnresolved: modules.ObligationStatusUnresolved,
+			}[so.ObligationStatus]
+			if statusString == "" {
+				h.log.Severe("WARN: invalid obligation status encountered when reading database.")
+				return build.ExtendErr("unable to parse obligation status.", err)
+			}
 			mso := modules.StorageObligation{
 				ObligationId:             so.id(),
 				FileSize:                 so.fileSize(),
@@ -890,7 +900,7 @@ func (h *Host) StorageObligations() (sos []modules.StorageObligation) {
 				RevisionConfirmed:   so.RevisionConfirmed,
 				ProofConstructed:    so.ProofConstructed,
 				ProofConfirmed:      so.ProofConfirmed,
-				ObligationStatus:    uint64(so.ObligationStatus),
+				ObligationStatus:    statusString,
 			}
 			sos = append(sos, mso)
 			return nil

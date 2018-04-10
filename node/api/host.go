@@ -69,38 +69,9 @@ func folderIndex(folderPath string, storageFolders []modules.StorageFolderMetada
 
 // hostContractInfoHandler handles the API call to get the contract information of the host.
 // Information is retrieved via the storage obligations from the host database.
-// TODO: filters are hard coded. Adding or removing storage obligation statuses will
-// currently break the API.
 func (api *API) hostContractInfoHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	statusStr := req.FormValue("status")
-	if statusStr == "" {
-		WriteError(w, Error{"Status must be provided to a /host/contracts call."}, http.StatusBadRequest)
-		return
-	}
-	var filter uint64
-	switch statusStr {
-	case "unresolved":
-		filter = 0
-	case "rejected":
-		filter = 1
-	case "succeeded":
-		filter = 2
-	case "failed":
-		filter = 3
-	case "all":
-		filter = 4
-	default:
-		WriteError(w, Error{"Unable to parse contract status."}, http.StatusBadRequest)
-		return
-	}
-	sos := []modules.StorageObligation{}
-	for _, so := range api.host.StorageObligations() {
-		if so.ObligationStatus == filter || filter == 4 {
-			sos = append(sos, so)
-		}
-	}
 	cg := ContractInfoGET{
-		Contracts: sos,
+		Contracts: api.host.StorageObligations(),
 	}
 	WriteJSON(w, cg)
 }

@@ -7,6 +7,14 @@ import (
 const (
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
+	// ObligationStatusFailed is the status for failed storage obligations
+	ObligationStatusFailed = "failed"
+	// ObligationStatusRejected is the status for rejected storage obligations
+	ObligationStatusRejected = "rejected"
+	// ObligationStatusSucceeded is the status for succeeded storage obligations
+	ObligationStatusSucceeded = "succeeded"
+	// ObligationStatusUnresolved is the status for unresolved storage obligations
+	ObligationStatusUnresolved = "unresolved"
 )
 
 var (
@@ -137,7 +145,7 @@ type (
 		RevisionConfirmed   bool   `json:"revisionconfirmed"`
 		ProofConstructed    bool   `json:"proofconstructed"`
 		ProofConfirmed      bool   `json:"proofconfirmed"`
-		ObligationStatus    uint64 `json:"obligationstatus"`
+		ObligationStatus    string `json:"obligationstatus"`
 	}
 
 	// HostWorkingStatus reports the working state of a host. Can be one of
