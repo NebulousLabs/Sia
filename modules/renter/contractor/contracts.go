@@ -511,7 +511,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 			oldUtility.GoodForRenew = false
 			oldUtility.GoodForUpload = false
-			if err := c.updateContractUtility(id, oldUtility); err != nil {
+			if err := oldContract.UpdateUtility(oldUtility); err != nil {
 				c.log.Println("Failed to update the contract utilities", err)
 				return
 			}
