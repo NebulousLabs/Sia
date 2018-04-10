@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -47,11 +48,8 @@ func cmpRoots(m1, m2 *merkleRoots) error {
 		}
 	}
 	for i := 0; i < len(m1.cachedSubTrees); i++ {
-		if m1.cachedSubTrees[i].height != m2.cachedSubTrees[i].height {
-			return errors.New("cached root height doesn't match")
-		}
-		if m1.cachedSubTrees[i].sum != m2.cachedSubTrees[i].sum {
-			return errors.New("cached root sum doesn't match")
+		if !reflect.DeepEqual(m1.cachedSubTrees[i], m2.cachedSubTrees[i]) {
+			return fmt.Errorf("cached trees at index %v don't match", i)
 		}
 	}
 	return nil
