@@ -67,12 +67,17 @@ func (tn *TestNode) Stream(rf *RemoteFile) (data []byte, err error) {
 	return
 }
 
-// StreamPartial uses the streaming endpoint to download a partial file. A
-// local file can be provided optionally to implicitly check the checksum of
-// the downloaded data.
+// StreamPartial uses the streaming endpoint to download a partial file in
+// range [from;to]. A local file can be provided optionally to implicitly check
+// the checksum of the downloaded data.
 func (tn *TestNode) StreamPartial(rf *RemoteFile, lf *LocalFile, from, to uint64) (data []byte, err error) {
 	data, err = tn.RenterStreamPartialGet(rf.siaPath, from, to)
 	if err != nil {
+		return
+	}
+	if uint64(len(data)) != to-from+1 {
+		err = fmt.Errorf("length of downloaded data should be %v but was %v",
+			to-from+1, len(data))
 		return
 	}
 	if lf != nil {
@@ -83,7 +88,7 @@ func (tn *TestNode) StreamPartial(rf *RemoteFile, lf *LocalFile, from, to uint64
 			return
 		}
 		if checksum != crypto.HashBytes(data) {
-			err = errors.New("downloaded bytes don't match requested data")
+			err = fmt.Errorf("downloaded bytes don't match requested data %v-%v", from, to)
 			return
 		}
 	}
