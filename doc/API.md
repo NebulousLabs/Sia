@@ -724,6 +724,7 @@ Renter
 | [/renter/download/*___siapath___](#renterdownloadsiapath-get)           | GET       |
 | [/renter/downloadasync/*___siapath___](#renterdownloadasyncsiapath-get) | GET       |
 | [/renter/rename/*___siapath___](#renterrenamesiapath-post)              | POST      |
+| [/renter/stream/*___siapath___](#renterstreamsiapath-get)               | GET       |
 | [/renter/upload/*___siapath___](#renteruploadsiapath-post)              | POST      |
 
 For examples and detailed descriptions of request and response parameters,
@@ -941,6 +942,26 @@ newsiapath
 
 ###### Response
 standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /renter/stream/*___siapath___ [GET]
+
+downloads a file using http streaming. This call blocks until the data is
+received.
+The streaming endpoint also uses caching internally to prevent siad from
+redownloading the same chunk multiple times when only parts of a file are
+requested at once. This might lead to a substantial increase in ram usage and
+therefore it is not recommended to stream multiple files in parallel at the
+moment. This restriction will be removed together with the caching once partial
+downloads are supported in the future.
+
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-1)
+```
+*siapath
+```
+
+###### Response
+standard success with the requested data in the body or error response. See
 [#standard-responses](#standard-responses).
 
 #### /renter/upload/*___siapath___ [POST]

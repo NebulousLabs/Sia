@@ -71,6 +71,20 @@ func (c *Client) RenterPostRateLimit(readBPS, writeBPS int64) (err error) {
 	return
 }
 
+// RenterStreamGet uses the /renter/stream endpoint to download data as a
+// stream.
+func (c *Client) RenterStreamGet(siaPath string) (resp []byte, err error) {
+	resp, err = c.getRawResponse("/renter/stream/" + siaPath)
+	return
+}
+
+// RenterStreamPartialGet uses the /renter/stream endpoint to download a part
+// of data as a stream.
+func (c *Client) RenterStreamPartialGet(siaPath string, start, end uint64) (resp []byte, err error) {
+	resp, err = c.getRawPartialResponse("/renter/stream/"+siaPath, start, end)
+	return
+}
+
 // RenterUploadPost uses the /renter/upload endpoin to upload a file
 func (c *Client) RenterUploadPost(path, siaPath string, dataPieces, parityPieces uint64) (err error) {
 	values := url.Values{}

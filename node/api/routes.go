@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -8,6 +9,10 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/julienschmidt/httprouter"
 )
+
+// unrestrictedContextKey is a context key that is set to allow a route to be
+// called without the Sia-Agent being set.
+type unrestrictedContextKey struct{}
 
 // buildHttpRoutes sets up and returns an * httprouter.Router.
 // it connected the Router to the given api using the required
@@ -84,6 +89,7 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.GET("/renter/download/*siapath", RequirePassword(api.renterDownloadHandler, requiredPassword))
 		router.GET("/renter/downloadasync/*siapath", RequirePassword(api.renterDownloadAsyncHandler, requiredPassword))
 		router.POST("/renter/rename/*siapath", RequirePassword(api.renterRenameHandler, requiredPassword))
+		router.GET("/renter/stream/*siapath", Unrestricted(api.renterStreamHandler))
 		router.POST("/renter/upload/*siapath", RequirePassword(api.renterUploadHandler, requiredPassword))
 
 		// HostDB endpoints.
@@ -167,7 +173,7 @@ func cleanCloseHandler(next http.Handler) http.Handler {
 // UserAgent that contains the specified string.
 func RequireUserAgent(h http.Handler, ua string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if !strings.Contains(req.UserAgent(), ua) {
+		if !strings.Contains(req.UserAgent(), ua) && !isUnrestricted(req) {
 			WriteError(w, Error{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
 			return
 		}
@@ -192,4 +198,18 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 		}
 		h(w, req, ps)
 	}
+}
+
+// Unrestricted can be used to whitelist api routes from requiring the
+// Sia-Agent to be set.
+func Unrestricted(h httprouter.Handle) httprouter.Handle {
+	return httprouter.Handle(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		req = req.WithContext(context.WithValue(req.Context(), unrestrictedContextKey{}, 0))
+		h(w, req, ps)
+	})
+}
+
+// isUnrestricted checks if a context has the unrestrictedContextKey set.
+func isUnrestricted(req *http.Request) bool {
+	return req.Context().Value(unrestrictedContextKey{}) != nil
 }

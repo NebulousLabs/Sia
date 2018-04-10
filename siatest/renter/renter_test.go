@@ -60,7 +60,8 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	// Upload file, creating a piece for each host in the group
 	dataPieces := uint64(1)
 	parityPieces := uint64(len(tg.Hosts())) - dataPieces
-	_, remoteFile, err := renter.UploadNewFileBlocking(100+siatest.Fuzz(), dataPieces, parityPieces)
+	fileSize := 100 + siatest.Fuzz()
+	localFile, remoteFile, err := renter.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
 	if err != nil {
 		t.Fatal("Failed to upload a file for testing: ", err)
 	}
@@ -75,12 +76,26 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 	// Download the file asynchronously and wait for the download to finish.
-	localFile, err := renter.DownloadToDisk(remoteFile, true)
+	localFile, err = renter.DownloadToDisk(remoteFile, true)
 	if err != nil {
 		t.Error(err)
 	}
 	if err := renter.WaitForDownload(localFile, remoteFile); err != nil {
 		t.Error(err)
+	}
+	// Stream the file.
+	_, err = renter.Stream(remoteFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Stream the file partially a few times. At least 1 byte is streamed.
+	for i := 0; i < 5; i++ {
+		from := fastrand.Intn(fileSize - 1)             // [0..fileSize-2]
+		to := from + 1 + fastrand.Intn(fileSize-from-1) // [from+1..fileSize-1]
+		_, err = renter.StreamPartial(remoteFile, localFile, uint64(from), uint64(to))
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -91,6 +106,7 @@ func testDownloadMultipleLargeSectors(t *testing.T, tg *siatest.TestGroup) {
 	parallelDownloads := 10
 	// fileSize is the size of the downloaded file.
 	fileSize := int(10*modules.SectorSize) + siatest.Fuzz()
+	// set download limits and reset them after test.
 	// uniqueRemoteFiles is the number of files that will be uploaded to the
 	// network. Downloads will choose the remote file to download randomly.
 	uniqueRemoteFiles := 5

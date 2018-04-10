@@ -66,6 +66,14 @@ const (
 
 	// memoryPriorityHigh is used to request high priority memory
 	memoryPriorityHigh = true
+
+	// destinationTypeSeekStream is the destination type used for downloads
+	// from the /renter/stream endpoint.
+	destinationTypeSeekStream = "httpseekstream"
+
+	// downloadCacheSize is the cache size of the /renter/stream cache in
+	// chunks.
+	downloadCacheSize = 2
 )
 
 var (

@@ -194,6 +194,12 @@ LOOP:
 				// Break out of the inner loop and wait for more work.
 				break
 			}
+
+			// Check if we got the chunk cached already.
+			if r.managedTryCache(nextChunk) {
+				continue
+			}
+
 			// Get the required memory to download this chunk.
 			if !r.managedAcquireMemoryForDownloadChunk(nextChunk) {
 				// The renter shut down before memory could be acquired.
