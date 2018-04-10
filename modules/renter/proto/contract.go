@@ -129,6 +129,7 @@ func (c *SafeContract) Metadata() modules.RenterContract {
 		ContractFee:      h.ContractFee,
 		TxnFee:           h.TxnFee,
 		SiafundFee:       h.SiafundFee,
+		Utility:          h.Utility,
 	}
 }
 

@@ -30,12 +30,11 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 
 // ContractUtility returns the ContractUtility for a contract with a given id.
 func (c *Contractor) contractUtility(id types.FileContractID) modules.ContractUtility {
-	sc, exists := c.contracts.Acquire(c.resolveID(id))
+	rc, exists := c.contracts.View(c.resolveID(id))
 	if !exists {
 		return modules.ContractUtility{}
 	}
-	defer c.contracts.Return(sc)
-	return sc.Utility()
+	return rc.Utility
 }
 
 // managedInterruptContractMaintenance will issue an interrupt signal to any
