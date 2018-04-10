@@ -27,7 +27,7 @@ type (
 	// ContractInfoGET contains the information that is returned after a GET request
 	// to /host/contracts - information for the host about stored obligations.
 	ContractInfoGET struct {
-		Contracts []modules.StorageObligation `json:"obligations"`
+		Contracts []modules.StorageObligation `json:"contracts"`
 	}
 
 	// HostGET contains the information that is returned after a GET request to
