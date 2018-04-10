@@ -134,7 +134,7 @@ func (c *SafeContract) Metadata() modules.RenterContract {
 }
 
 // updateUtility updates the utility field of a contract.
-func (c *SafeContract) updateUtility(utility modules.ContractUtility) error {
+func (c *SafeContract) UpdateUtility(utility modules.ContractUtility) error {
 	// Get current header
 	c.headerMu.Lock()
 	newHeader := c.header

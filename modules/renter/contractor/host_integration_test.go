@@ -349,7 +349,7 @@ func TestIntegrationRenew(t *testing.T) {
 
 	// renew the contract
 	c.mu.Lock()
-	err = c.contracts.UpdateContractUtility(contract.ID, modules.ContractUtility{GoodForRenew: true})
+	err = c.updateContractUtility(contract.ID, modules.ContractUtility{GoodForRenew: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +385,7 @@ func TestIntegrationRenew(t *testing.T) {
 
 	// renew to a lower height
 	c.mu.Lock()
-	err = c.contracts.UpdateContractUtility(contract.ID, modules.ContractUtility{GoodForRenew: true})
+	err = c.updateContractUtility(contract.ID, modules.ContractUtility{GoodForRenew: true})
 	if err != nil {
 		t.Fatal(err)
 	}
