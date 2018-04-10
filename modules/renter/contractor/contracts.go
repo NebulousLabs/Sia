@@ -139,7 +139,7 @@ func (c *Contractor) managedMarkContractsUtility() error {
 		}()
 
 		// Apply changes.
-		if err := c.updateContractUtility(contract.ID, utility); err != nil {
+		if err := c.contracts.UpdateContractUtility(contract.ID, utility); err != nil {
 			return err
 		}
 	}
@@ -499,13 +499,13 @@ func (c *Contractor) threadedContractMaintenance() {
 				GoodForUpload: true,
 				GoodForRenew:  true,
 			}
-			if err := c.updateContractUtility(newContract.ID, newUtility); err != nil {
+			if err := c.contracts.UpdateContractUtility(newContract.ID, newUtility); err != nil {
 				c.log.Println("Failed to update the contract utilities", err)
 				return
 			}
 			oldUtility.GoodForRenew = false
 			oldUtility.GoodForUpload = false
-			if err := c.updateContractUtility(id, oldUtility); err != nil {
+			if err := c.contracts.UpdateContractUtility(id, oldUtility); err != nil {
 				c.log.Println("Failed to update the contract utilities", err)
 				return
 			}
@@ -599,7 +599,7 @@ func (c *Contractor) threadedContractMaintenance() {
 
 		// Add this contract to the contractor and save.
 		c.mu.Lock()
-		err = c.updateContractUtility(newContract.ID, modules.ContractUtility{
+		err = c.contracts.UpdateContractUtility(newContract.ID, modules.ContractUtility{
 			GoodForUpload: true,
 			GoodForRenew:  true,
 		})
@@ -628,15 +628,4 @@ func (c *Contractor) threadedContractMaintenance() {
 		case <-time.After(contractFormationInterval):
 		}
 	}
-}
-
-// updateContractUtility updates the ContractUtility for a contract with a
-// given id.
-func (c *Contractor) updateContractUtility(id types.FileContractID, utility modules.ContractUtility) error {
-	sc, exists := c.contracts.Acquire(c.resolveID(id))
-	if !exists {
-		return errors.New("can't update non-existing contract")
-	}
-	defer c.contracts.Return(sc)
-	return sc.UpdateUtility(utility)
 }

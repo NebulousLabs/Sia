@@ -49,6 +49,20 @@ func (cs *ContractSet) Acquire(id types.FileContractID) (*SafeContract, bool) {
 	return safeContract, true
 }
 
+// UpdateContractUtility updates the ContractUtility for a contract with a
+// given id.
+func (cs *ContractSet) UpdateContractUtility(id types.FileContractID, utility modules.ContractUtility) error {
+	cs.mu.Lock()
+	safeContract, ok := cs.contracts[id]
+	cs.mu.Unlock()
+	if !ok {
+		return errors.New("can't update non-existing contract")
+	}
+	safeContract.mu.Lock()
+	defer safeContract.mu.Unlock()
+	return safeContract.updateUtility(utility)
+}
+
 // Delete removes a contract from the set. The contract must have been
 // previously acquired by Acquire. If the contract is not present in the set,
 // Delete is a no-op.
