@@ -1,6 +1,10 @@
+// TODO currently the cached trees are not persisted and we build them at
+// startup. For petabytes of data this might take a long time.
+
 package proto
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -15,13 +19,16 @@ import (
 // subTree.
 const merkleRootsCacheHeight = 7
 
+// merkleRootsPerCache is the number of merkle roots in a cached subTree of
+// merkleRootsCacheHeight height.
+const merkleRootsPerCache = 1 << merkleRootsCacheHeight
+
 type (
 	// merkleRoots is a helper struct that makes it easier to add/insert/remove
 	// merkleRoots within a SafeContract.
 	merkleRoots struct {
 		// cachedSubTrees are cached trees that can be used to more efficiently
-		// compute the merkle root of a contract. The cached trees are not
-		// persisted and are computed after startup.
+		// compute the merkle root of a contract.
 		cachedSubTrees []*cachedSubTree
 		// uncachedRoots contains the sector roots that are not part of a
 		// cached subTree. The uncachedRoots slice should never get longer than
@@ -35,45 +42,44 @@ type (
 		numMerkleRoots int
 	}
 
+	// cachedSubTree is a cached subTree of a merkle tree. A height of 0 means
+	// that the sum is the hash of a leaf. A subTree of height 1 means sum is
+	// the root of 2 leaves. A subTree of height 2 contains the root of 4
+	// leaves and so on.
 	cachedSubTree struct {
-		height int
-		sum    crypto.Hash
+		height int         // height of the subTree
+		sum    crypto.Hash // root of the subTree
 	}
 )
 
 // loadExistingMerkleRoots reads creates a merkleRoots object from existing
 // merkle roots.
-func loadExistingMerkleRoots(file *os.File) (mr *merkleRoots, err error) {
-	mr = &merkleRoots{
+func loadExistingMerkleRoots(file *os.File) (*merkleRoots, error) {
+	mr := &merkleRoots{
 		file: file,
 	}
 	// Get the number of roots stored in the file.
+	var err error
 	mr.numMerkleRoots, err = mr.lenFromFile()
 	if err != nil {
-		return
+		return nil, err
 	}
 	// Seek to the first root's offset.
-	if _, err = file.Seek(rootIndexToOffset(0), io.SeekStart); err != nil {
-		return
+	if _, err = file.Seek(fileOffsetFromRootIndex(0), io.SeekStart); err != nil {
+		return nil, err
 	}
 	// Read the roots from the file without reading all of them at once.
+	r := bufio.NewReader(file)
 	for i := 0; i < mr.numMerkleRoots; i++ {
 		var root crypto.Hash
-		if _, err = io.ReadFull(file, root[:]); err == io.EOF {
+		if _, err = io.ReadFull(r, root[:]); err == io.EOF {
 			break
 		} else if err != nil {
-			return
+			return nil, err
 		}
 
-		// Append the root to the unachedRoots
-		mr.uncachedRoots = append(mr.uncachedRoots, root)
-
-		// If the uncachedRoots grew too large we add them to the cache.
-		if len(mr.uncachedRoots) == (1 << merkleRootsCacheHeight) {
-			st := newCachedSubTree(mr.uncachedRoots)
-			mr.cachedSubTrees = append(mr.cachedSubTrees, st)
-			mr.uncachedRoots = mr.uncachedRoots[:0]
-		}
+		// Append the root to the uncachedRoots
+		mr.appendRoot(root)
 	}
 	return mr, nil
 }
@@ -82,7 +88,7 @@ func loadExistingMerkleRoots(file *os.File) (mr *merkleRoots, err error) {
 // 2^merkleRootsCacheHeight roots.
 func newCachedSubTree(roots []crypto.Hash) *cachedSubTree {
 	// Sanity check the input length.
-	if len(roots) != (1 << merkleRootsCacheHeight) {
+	if len(roots) != merkleRootsPerCache {
 		build.Critical("can't create a cached subTree from the provided number of roots")
 	}
 	return &cachedSubTree{
@@ -100,9 +106,9 @@ func newMerkleRoots(file *os.File) *merkleRoots {
 	}
 }
 
-// rootIndexToOffset calculates the offset of the merkle root at index i from
+// fileOffsetFromRootIndex calculates the offset of the merkle root at index i from
 // the beginning of the contract file.
-func rootIndexToOffset(i int) int64 {
+func fileOffsetFromRootIndex(i int) int64 {
 	return contractHeaderSize + crypto.HashSize*int64(i)
 }
 
@@ -121,7 +127,7 @@ func (mr *merkleRoots) delete(i int) error {
 	// tree and add its elements to the uncached roots.
 	if len(mr.uncachedRoots) == 0 {
 		mr.cachedSubTrees = mr.cachedSubTrees[:len(mr.cachedSubTrees)-1]
-		rootIndex := len(mr.cachedSubTrees) * (1 << merkleRootsCacheHeight)
+		rootIndex := len(mr.cachedSubTrees) * merkleRootsPerCache
 		roots, err := mr.merkleRootsFromIndex(rootIndex, mr.numMerkleRoots)
 		if err != nil {
 			return errors.AddContext(err, "failed to read cached tree's roots")
@@ -129,7 +135,7 @@ func (mr *merkleRoots) delete(i int) error {
 		mr.uncachedRoots = append(mr.uncachedRoots, roots...)
 	}
 	// Swap the root at index i with the last root in mr.uncachedRoots.
-	_, err := mr.file.WriteAt(mr.uncachedRoots[len(mr.uncachedRoots)-1][:], rootIndexToOffset(i))
+	_, err := mr.file.WriteAt(mr.uncachedRoots[len(mr.uncachedRoots)-1][:], fileOffsetFromRootIndex(i))
 	if err != nil {
 		return errors.AddContext(err, "failed to swap root to delete with last one")
 	}
@@ -150,7 +156,7 @@ func (mr *merkleRoots) deleteLastRoot() error {
 	// Decrease the numMerkleRoots counter.
 	mr.numMerkleRoots--
 	// Truncate file to avoid interpreting trailing data as valid.
-	if err := mr.file.Truncate(rootIndexToOffset(mr.numMerkleRoots)); err != nil {
+	if err := mr.file.Truncate(fileOffsetFromRootIndex(mr.numMerkleRoots)); err != nil {
 		return errors.AddContext(err, "failed to delete last root from file")
 	}
 	// If the last element is uncached we can simply remove it from the slice.
@@ -161,7 +167,7 @@ func (mr *merkleRoots) deleteLastRoot() error {
 	// If it is not uncached we need to delete the last cached tree and load
 	// its elements into mr.uncachedRoots.
 	mr.cachedSubTrees = mr.cachedSubTrees[:len(mr.cachedSubTrees)-1]
-	rootIndex := len(mr.cachedSubTrees) * (1 << merkleRootsCacheHeight)
+	rootIndex := len(mr.cachedSubTrees) * merkleRootsPerCache
 	roots, err := mr.merkleRootsFromIndex(rootIndex, mr.numMerkleRoots)
 	if err != nil {
 		return errors.AddContext(err, "failed to read cached tree's roots")
@@ -179,7 +185,7 @@ func (mr *merkleRoots) insert(index int, root crypto.Hash) error {
 		return mr.push(root)
 	}
 	// Replaced the root on disk.
-	_, err := mr.file.WriteAt(root[:], rootIndexToOffset(index))
+	_, err := mr.file.WriteAt(root[:], fileOffsetFromRootIndex(index))
 	if err != nil {
 		return errors.AddContext(err, "failed to insert root on disk")
 	}
@@ -205,29 +211,29 @@ func (mr *merkleRoots) isIndexCached(i int) (int, bool) {
 	if i/(1<<merkleRootsCacheHeight) == len(mr.cachedSubTrees) {
 		// Root is not cached. Return the false and the position in
 		// mr.uncachedRoots
-		return i - len(mr.cachedSubTrees)*(1<<merkleRootsCacheHeight), false
+		return i - len(mr.cachedSubTrees)*merkleRootsPerCache, false
 	}
-	return i / (1 << merkleRootsCacheHeight), true
+	return i / merkleRootsPerCache, true
 }
 
 // lenFromFile returns the number of merkle roots by computing it from the
 // filesize.
 func (mr *merkleRoots) lenFromFile() (int, error) {
-	offset, err := mr.file.Seek(0, io.SeekEnd)
+	stat, err := mr.file.Stat()
 	if err != nil {
 		return 0, err
 	}
+	size := stat.Size()
 	// If we haven't written a single root yet we just return 0.
-	rootStart := rootIndexToOffset(0)
-	if offset < rootStart {
+	if size < contractHeaderSize {
 		return 0, nil
 	}
 
 	// Sanity check contract file length.
-	if (offset-rootStart)%crypto.HashSize != 0 {
-		build.Critical("contract file has unexpected length and might be corrupted.")
+	if (size-contractHeaderSize)%crypto.HashSize != 0 {
+		return 0, errors.New("contract file has unexpected length and might be corrupted")
 	}
-	return int((offset - rootStart) / crypto.HashSize), nil
+	return int((size - contractHeaderSize) / crypto.HashSize), nil
 }
 
 // len returns the number of merkle roots. It should always return the same
@@ -236,25 +242,31 @@ func (mr *merkleRoots) len() int {
 	return mr.numMerkleRoots
 }
 
+// appendRoot appends a root to the in-memory structure of the merkleRoots. If
+// the length of the uncachedRoots grows too large they will be compressed into
+// a cachedSubTree.
+func (mr *merkleRoots) appendRoot(root crypto.Hash) {
+	mr.uncachedRoots = append(mr.uncachedRoots, root)
+	if len(mr.uncachedRoots) == merkleRootsPerCache {
+		mr.cachedSubTrees = append(mr.cachedSubTrees, newCachedSubTree(mr.uncachedRoots))
+		mr.uncachedRoots = mr.uncachedRoots[:0]
+	}
+}
+
 // push appends a merkle root to the end of the contract. If the number of
 // uncached merkle roots grows too big we cache them in a new subTree.
 func (mr *merkleRoots) push(root crypto.Hash) error {
 	// Sanity check the number of uncached roots before adding a new one.
-	if len(mr.uncachedRoots) == (1 << merkleRootsCacheHeight) {
+	if len(mr.uncachedRoots) == merkleRootsPerCache {
 		build.Critical("the number of uncachedRoots is too big. They should've been cached by now")
 	}
 	// Calculate the root offset within the file and write it to disk.
-	rootOffset := rootIndexToOffset(mr.len())
+	rootOffset := fileOffsetFromRootIndex(mr.len())
 	if _, err := mr.file.WriteAt(root[:], rootOffset); err != nil {
 		return err
 	}
-	// Add the root to the unached roots. If uncachedRoots is big enoug we can
-	// cache those roots.
-	mr.uncachedRoots = append(mr.uncachedRoots, root)
-	if len(mr.uncachedRoots) == (1 << merkleRootsCacheHeight) {
-		mr.cachedSubTrees = append(mr.cachedSubTrees, newCachedSubTree(mr.uncachedRoots))
-		mr.uncachedRoots = mr.uncachedRoots[:0]
-	}
+	// Add the root to the unached roots.
+	mr.appendRoot(root)
 
 	// Increment the number of roots.
 	mr.numMerkleRoots++
@@ -313,12 +325,13 @@ func (mr *merkleRoots) merkleRoots() (roots []crypto.Hash, err error) {
 // merkleRootsFrom index readds all the merkle roots in range [from;to)
 func (mr *merkleRoots) merkleRootsFromIndex(from, to int) ([]crypto.Hash, error) {
 	merkleRoots := make([]crypto.Hash, 0, to-from)
-	if _, err := mr.file.Seek(rootIndexToOffset(from), io.SeekStart); err != nil {
+	if _, err := mr.file.Seek(fileOffsetFromRootIndex(from), io.SeekStart); err != nil {
 		return merkleRoots, err
 	}
+	r := bufio.NewReader(mr.file)
 	for i := from; to-i > 0; i++ {
 		var root crypto.Hash
-		if _, err := io.ReadFull(mr.file, root[:]); err == io.EOF {
+		if _, err := io.ReadFull(r, root[:]); err == io.EOF {
 			return nil, io.ErrUnexpectedEOF
 		} else if err != nil {
 			return merkleRoots, errors.AddContext(err, "failed to read root from disk")
@@ -331,7 +344,7 @@ func (mr *merkleRoots) merkleRootsFromIndex(from, to int) ([]crypto.Hash, error)
 // rebuildCachedTree rebuilds the tree in mr.cachedSubTree at index i.
 func (mr *merkleRoots) rebuildCachedTree(index int) error {
 	// Find the index of the first root of the cached tree on disk.
-	rootIndex := index * (1 << merkleRootsCacheHeight)
+	rootIndex := index * merkleRootsPerCache
 	// Read all the roots necessary for creating the cached tree.
 	roots, err := mr.merkleRootsFromIndex(rootIndex, rootIndex+(1<<merkleRootsCacheHeight))
 	if err != nil {

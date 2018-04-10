@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"testing"
@@ -10,6 +11,51 @@ import (
 	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/fastrand"
 )
+
+// cmpRoots is a helper function that compares the in-memory file structure and
+// on-disk roots of two merkleRoots objects.
+func cmpRoots(m1, m2 *merkleRoots) error {
+	roots1, err1 := m1.merkleRoots()
+	roots2, err2 := m2.merkleRoots()
+	if err1 != nil || err2 != nil {
+		return errors.AddContext(errors.Compose(err1, err2), "failed to compare on-disk roots")
+	}
+	if len(roots1) != len(roots2) {
+		return fmt.Errorf("len of roots on disk doesn't match %v != %v",
+			len(roots1), len(roots2))
+	}
+	if len(m1.uncachedRoots) != len(m2.uncachedRoots) {
+		return fmt.Errorf("len of uncachedRoots doesn't match %v != %v",
+			len(m1.uncachedRoots), len(m2.uncachedRoots))
+	}
+	if len(m1.cachedSubTrees) != len(m2.cachedSubTrees) {
+		return fmt.Errorf("len of cached subTrees doesn't match %v != %v",
+			len(m1.cachedSubTrees), len(m2.cachedSubTrees))
+	}
+	if m1.numMerkleRoots != m2.numMerkleRoots {
+		return fmt.Errorf("numMerkleRoots fields don't match %v != %v",
+			m1.numMerkleRoots, m2.numMerkleRoots)
+	}
+	for i := 0; i < len(roots1); i++ {
+		if roots1[i] != roots2[i] {
+			return errors.New("on-disk roots don't match")
+		}
+	}
+	for i := 0; i < len(m1.uncachedRoots); i++ {
+		if m1.uncachedRoots[i] != m2.uncachedRoots[i] {
+			return errors.New("uncached roots don't match")
+		}
+	}
+	for i := 0; i < len(m1.cachedSubTrees); i++ {
+		if m1.cachedSubTrees[i].height != m2.cachedSubTrees[i].height {
+			return errors.New("cached root height doesn't match")
+		}
+		if m1.cachedSubTrees[i].sum != m2.cachedSubTrees[i].sum {
+			return errors.New("cached root sum doesn't match")
+		}
+	}
+	return nil
+}
 
 // TestLoadExistingMerkleRoots tests if it is possible to load existing merkle
 // roots from disk.
@@ -97,7 +143,7 @@ func TestInsertMerkleRoot(t *testing.T) {
 	if err := merkleRoots.insert(merkleRoots.len()-1, newHash); err != nil {
 		t.Fatal("failed to insert root", err)
 	}
-	// Check if the second-to-last root matches the new hash.
+	// Check if the last root matches the new hash.
 	roots, err := merkleRoots.merkleRoots()
 	if err != nil {
 		t.Fatal("failed to get roots from disk", err)
@@ -105,13 +151,21 @@ func TestInsertMerkleRoot(t *testing.T) {
 	if roots[len(roots)-1] != newHash {
 		t.Fatal("root wasn't updated correctly on disk")
 	}
-
+	// Reload the roots. The in-memory structure and the roots on disk should
+	// still be consistent.
+	loadedRoots, err := loadExistingMerkleRoots(merkleRoots.file)
+	if err != nil {
+		t.Fatal("failed to load existing roots", err)
+	}
+	if err := cmpRoots(merkleRoots, loadedRoots); err != nil {
+		t.Fatal("loaded roots are inconsistent", err)
+	}
 	// Replace the first root with the new hash. It should be cached and
 	// therefore the first cached tree should also change.
 	if err := merkleRoots.insert(0, newHash); err != nil {
 		t.Fatal("failed to insert root", err)
 	}
-	// Check if the second-to-last root matches the new hash.
+	// Check if the first root matches the new hash.
 	roots, err = merkleRoots.merkleRoots()
 	if err != nil {
 		t.Fatal("failed to get roots from disk", err)
@@ -119,8 +173,17 @@ func TestInsertMerkleRoot(t *testing.T) {
 	if roots[0] != newHash {
 		t.Fatal("root wasn't updated correctly on disk")
 	}
-	if merkleRoots.cachedSubTrees[0].sum != newCachedSubTree(roots[:1<<merkleRootsCacheHeight]).sum {
+	if merkleRoots.cachedSubTrees[0].sum != newCachedSubTree(roots[:merkleRootsPerCache]).sum {
 		t.Fatal("cachedSubtree doesn't have expected sum")
+	}
+	// Reload the roots. The in-memory structure and the roots on disk should
+	// still be consistent.
+	loadedRoots, err = loadExistingMerkleRoots(merkleRoots.file)
+	if err != nil {
+		t.Fatal("failed to load existing roots", err)
+	}
+	if err := cmpRoots(merkleRoots, loadedRoots); err != nil {
+		t.Fatal("loaded roots are inconsistent", err)
 	}
 }
 
@@ -142,7 +205,7 @@ func TestDeleteLastRoot(t *testing.T) {
 	// Create sector roots. We choose the number of merkle roots in a way that
 	// makes the first delete remove a uncached root and the second delete has
 	// to remove a cached tree.
-	numMerkleRoots := (1 << merkleRootsCacheHeight) + 1
+	numMerkleRoots := merkleRootsPerCache + 1
 	merkleRoots := newMerkleRoots(file)
 	for i := 0; i < numMerkleRoots; i++ {
 		hash := crypto.Hash{}
@@ -198,9 +261,19 @@ func TestDeleteLastRoot(t *testing.T) {
 	if len(merkleRoots.cachedSubTrees) != 0 {
 		t.Fatal("expected 0 cached roots but was", len(merkleRoots.cachedSubTrees))
 	}
+
+	// Reload the roots. The in-memory structure and the roots on disk should
+	// still be consistent.
+	loadedRoots, err := loadExistingMerkleRoots(merkleRoots.file)
+	if err != nil {
+		t.Fatal("failed to load existing roots", err)
+	}
+	if err := cmpRoots(merkleRoots, loadedRoots); err != nil {
+		t.Fatal("loaded roots are inconsistent", err)
+	}
 }
 
-// TestDeleteLastRoot tests the deleteLastRoot method by creating many roots
+// TestDelete tests the deleteRoot method by creating many roots
 // and deleting random indices until there are no more roots left.
 func TestDelete(t *testing.T) {
 	if testing.Short() {
@@ -226,6 +299,16 @@ func TestDelete(t *testing.T) {
 	}
 
 	for merkleRoots.numMerkleRoots > 0 {
+		// 1% chance to reload the roots and check if they are consistent.
+		if fastrand.Intn(100) == 0 {
+			loadedRoots, err := loadExistingMerkleRoots(merkleRoots.file)
+			if err != nil {
+				t.Fatal("failed to load existing roots", err)
+			}
+			if err := cmpRoots(loadedRoots, merkleRoots); err != nil {
+				t.Fatal(err)
+			}
+		}
 		// Randomly choose a root to delete.
 		deleteIndex := fastrand.Intn(merkleRoots.numMerkleRoots)
 
@@ -262,8 +345,8 @@ func TestDelete(t *testing.T) {
 		// If the deleted root was cached we expect the cache to have the
 		// correct, updated value.
 		if cached && len(merkleRoots.cachedSubTrees) > cachedIndex {
-			subTreeLen := int(1 << merkleRootsCacheHeight)
-			from := cachedIndex * (1 << merkleRootsCacheHeight)
+			subTreeLen := merkleRootsPerCache
+			from := cachedIndex * merkleRootsPerCache
 			roots, err := merkleRoots.merkleRootsFromIndex(from, from+subTreeLen)
 			if err != nil {
 				t.Fatal("failed to read roots of subTree", err)
@@ -302,6 +385,16 @@ func TestMerkleRootsRandom(t *testing.T) {
 
 	// Randomly insert or delete elements.
 	for i := 0; i < numMerkleRoots; i++ {
+		// 1% chance to reload the roots and check if they are consistent.
+		if fastrand.Intn(100) == 0 {
+			loadedRoots, err := loadExistingMerkleRoots(merkleRoots.file)
+			if err != nil {
+				t.Fatal("failed to load existing roots")
+			}
+			if err := cmpRoots(loadedRoots, merkleRoots); err != nil {
+				t.Fatal(err)
+			}
+		}
 		operation := fastrand.Intn(2)
 
 		// Delete
