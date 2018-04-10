@@ -877,7 +877,7 @@ func (h *Host) StorageObligations() (sos []modules.StorageObligation) {
 			}[so.ObligationStatus]
 			if statusString == "" {
 				h.log.Severe("WARN: invalid obligation status encountered when reading database.")
-				return build.ExtendErr("unable to parse obligation status.", err)
+				return nil
 			}
 			mso := modules.StorageObligation{
 				ObligationId:             so.id(),
