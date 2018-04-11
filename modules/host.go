@@ -7,14 +7,6 @@ import (
 const (
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
-	// ObligationStatusFailed is the status for failed storage obligations
-	ObligationStatusFailed = "failed"
-	// ObligationStatusRejected is the status for rejected storage obligations
-	ObligationStatusRejected = "rejected"
-	// ObligationStatusSucceeded is the status for succeeded storage obligations
-	ObligationStatusSucceeded = "succeeded"
-	// ObligationStatusUnresolved is the status for unresolved storage obligations
-	ObligationStatusUnresolved = "unresolved"
 )
 
 var (
