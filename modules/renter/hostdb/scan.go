@@ -290,6 +290,23 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	hdb.mu.Unlock()
 }
 
+// waitForScans is a helper function that blocks until the hostDB's scanList is
+// empty.
+func (hdb *HostDB) managedWaitForScans() {
+	for {
+		hdb.mu.Lock()
+		length := len(hdb.scanList)
+		hdb.mu.Unlock()
+		if length == 0 {
+			break
+		}
+		select {
+		case <-hdb.tg.StopChan():
+		case <-time.After(time.Second):
+		}
+	}
+}
+
 // threadedProbeHosts pulls hosts from the thread pool and runs a scan on them.
 func (hdb *HostDB) threadedProbeHosts(scanPool <-chan modules.HostDBEntry) {
 	err := hdb.tg.Add()
@@ -328,6 +345,27 @@ func (hdb *HostDB) threadedScan() {
 		return
 	}
 	defer hdb.tg.Done()
+
+	// Wait for the potential initial scan to finish
+	hdb.managedWaitForScans()
+
+	// The initial scan might have been interrupted. Queue one scan for every
+	// announced host that was missed by the initial scan and wait for the
+	// scans to finish before starting the scan loop.
+	allHosts := hdb.hostTree.All()
+	hdb.mu.Lock()
+	for _, host := range allHosts {
+		if len(host.ScanHistory) == 0 && host.HistoricUptime == 0 && host.HistoricDowntime == 0 {
+			hdb.queueScan(host)
+		}
+	}
+	hdb.mu.Unlock()
+	hdb.managedWaitForScans()
+
+	// Set the flag to indicate that the initial scan is complete.
+	hdb.mu.Lock()
+	hdb.initialScanComplete = true
+	hdb.mu.Unlock()
 
 	for {
 		// Set up a scan for the hostCheckupQuanity most valuable hosts in the

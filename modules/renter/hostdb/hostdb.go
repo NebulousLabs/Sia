@@ -19,8 +19,9 @@ import (
 )
 
 var (
-	errNilCS      = errors.New("cannot create hostdb with nil consensus set")
-	errNilGateway = errors.New("cannot create hostdb with nil gateway")
+	errInitialScanIncomplete = errors.New("initial hostdb scan is not yet completed")
+	errNilCS                 = errors.New("cannot create hostdb with nil consensus set")
+	errNilGateway            = errors.New("cannot create hostdb with nil gateway")
 )
 
 // The HostDB is a database of potential hosts. It assigns a weight to each
@@ -45,10 +46,11 @@ type HostDB struct {
 	// handful of goroutines constantly waiting on the channel for hosts to
 	// scan. The scan map is used to prevent duplicates from entering the scan
 	// pool.
-	scanList        []modules.HostDBEntry
-	scanMap         map[string]struct{}
-	scanWait        bool
-	scanningThreads int
+	initialScanComplete bool
+	scanList            []modules.HostDBEntry
+	scanMap             map[string]struct{}
+	scanWait            bool
+	scanningThreads     int
 
 	blockHeight types.BlockHeight
 	lastChange  modules.ConsensusChangeID
@@ -227,10 +229,10 @@ func (hdb *HostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
 // returns a slice of entries.
 func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
 	hdb.mu.RLock()
-	pendingScans := len(hdb.scanList)
+	initialScanComplete := hdb.initialScanComplete
 	hdb.mu.RUnlock()
-	if pendingScans > 0 {
-		return []modules.HostDBEntry{}, errors.New("Can't get hosts while hostdb is scanning")
+	if !initialScanComplete {
+		return []modules.HostDBEntry{}, errInitialScanIncomplete
 	}
 	return hdb.hostTree.SelectRandom(n, excludeKeys), nil
 }
