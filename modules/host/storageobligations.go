@@ -27,6 +27,9 @@ package host
 
 // TODO: Make sure that not too many action items are being created.
 
+// TODO: The ProofConstructed and NegotiationHeight fields of storageObligation
+// are not set or used.
+
 import (
 	"encoding/binary"
 	"encoding/json"
