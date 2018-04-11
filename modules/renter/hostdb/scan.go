@@ -346,8 +346,18 @@ func (hdb *HostDB) threadedScan() {
 	}
 	defer hdb.tg.Done()
 
-	// Wait for the potential initial scan to finish
-	hdb.managedWaitForScans()
+	// Wait until the consensus set is synced. Only then we can be sure that
+	// the initial scan covers the whole network.
+	for {
+		if hdb.cs.Synced() {
+			break
+		}
+		select {
+		case <-hdb.tg.StopChan():
+			return
+		case <-time.After(time.Second):
+		}
+	}
 
 	// The initial scan might have been interrupted. Queue one scan for every
 	// announced host that was missed by the initial scan and wait for the

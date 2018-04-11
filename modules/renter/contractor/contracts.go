@@ -75,7 +75,7 @@ func (c *Contractor) managedMarkContractsUtility() error {
 	c.mu.RUnlock()
 	hosts, err := c.hdb.RandomHosts(hostCount+minScoreHostBuffer, nil)
 	if err != nil {
-		return
+		return err
 	}
 
 	// Find the minimum score that a host is allowed to have to be considered

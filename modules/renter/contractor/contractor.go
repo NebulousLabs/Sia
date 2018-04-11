@@ -8,7 +8,6 @@ package contractor
 // renter lock.
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,6 +18,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 )
 
 var (
@@ -247,12 +247,6 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-
-	// Mark contract utility.
-	// TODO we probably have to force this to succeed even if there is a scan
-	// going on. Otherwise all the contract utilities might end up
-	// uninitialized.
-	c.managedMarkContractsUtility()
 
 	// Subscribe to the consensus set.
 	err = cs.ConsensusSetSubscribe(c, c.lastChange, c.tg.StopChan())

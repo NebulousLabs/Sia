@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	errInitialScanIncomplete = errors.New("initial hostdb scan is not yet completed")
+	ErrInitialScanIncomplete = errors.New("initial hostdb scan is not yet completed")
 	errNilCS                 = errors.New("cannot create hostdb with nil consensus set")
 	errNilGateway            = errors.New("cannot create hostdb with nil gateway")
 )
@@ -163,6 +163,8 @@ func NewCustomHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir stri
 	// fake hosts and not have them marked as offline as the scanloop operates.
 	if !hdb.deps.Disrupt("disableScanLoop") {
 		go hdb.threadedScan()
+	} else {
+		hdb.initialScanComplete = true
 	}
 
 	return hdb, nil
@@ -232,7 +234,7 @@ func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) ([]modul
 	initialScanComplete := hdb.initialScanComplete
 	hdb.mu.RUnlock()
 	if !initialScanComplete {
-		return []modules.HostDBEntry{}, errInitialScanIncomplete
+		return []modules.HostDBEntry{}, ErrInitialScanIncomplete
 	}
 	return hdb.hostTree.SelectRandom(n, excludeKeys), nil
 }
