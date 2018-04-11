@@ -101,6 +101,23 @@ func TestHostObligationAcceptingContracts(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Get contracts via API call
+	var cts ContractInfoGET
+	err = st.getAPI("/host/contracts", &cts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// There should be some contracts returned
+	if len(cts.Contracts) == 0 {
+		t.Fatal("No contracts returned from /host/contracts API call.")
+	}
+
+	// Check if the number of contracts are equal to the number of storage obligations
+	if len(cts.Contracts) != len(st.host.StorageObligations()) {
+		t.Fatal("Number of contracts returned by API call and host method don't match.")
+	}
+
 	// set acceptingcontracts = false, mine some blocks, verify we can download
 	settings := st.host.InternalSettings()
 	settings.AcceptingContracts = false
@@ -199,11 +216,14 @@ func TestHostAndRentVanilla(t *testing.T) {
 	}
 
 	// Check the host, who should now be reporting file contracts.
-	//
-	// TODO: Switch to using an API call.
-	obligations := st.host.StorageObligations()
-	if len(obligations) != 1 {
-		t.Error("Host has wrong number of obligations:", len(obligations))
+	var cts ContractInfoGET
+	err = st.getAPI("/host/contracts", &cts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(cts.Contracts) != 1 {
+		t.Error("Host has wrong number of obligations:", len(cts.Contracts))
 	}
 
 	// Create a file.
@@ -319,11 +339,16 @@ func TestHostAndRentVanilla(t *testing.T) {
 
 	// Check that the host was able to get the file contract confirmed on the
 	// blockchain.
-	obligations = st.host.StorageObligations()
-	if len(obligations) != 1 {
-		t.Error("Host has wrong number of obligations:", len(obligations))
+	cts = ContractInfoGET{}
+	err = st.getAPI("/host/contracts", &cts)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !obligations[0].OriginConfirmed {
+
+	if len(cts.Contracts) != 1 {
+		t.Error("Host has wrong number of obligations:", len(cts.Contracts))
+	}
+	if !cts.Contracts[0].OriginConfirmed {
 		t.Error("host has not seen the file contract on the blockchain")
 	}
 
@@ -336,10 +361,15 @@ func TestHostAndRentVanilla(t *testing.T) {
 		time.Sleep(time.Millisecond * 200)
 	}
 
+	cts = ContractInfoGET{}
+	err = st.getAPI("/host/contracts", &cts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	success := false
-	obligations = st.host.StorageObligations()
-	for _, obligation := range obligations {
-		if obligation.ProofConfirmed {
+	for _, contract := range cts.Contracts {
+		if contract.ProofConfirmed {
 			success = true
 			break
 		}
