@@ -130,7 +130,7 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 
 // ContractUtility returns the utility fields for the given contract.
 func (c *Contractor) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
-	return c.contractUtility(id)
+	return c.staticContractUtility(id)
 }
 
 // CurrentPeriod returns the height at which the current allowance period
@@ -239,9 +239,7 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 	}
 
 	// Mark contract utility.
-	if err := c.managedMarkContractsUtility(); err != nil {
-		return nil, err
-	}
+	cm.managedMarkContractsUtility()
 
 	// Subscribe to the consensus set.
 	err = cs.ConsensusSetSubscribe(c, c.lastChange, c.tg.StopChan())

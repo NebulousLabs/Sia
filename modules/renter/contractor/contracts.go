@@ -29,8 +29,8 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 	return c.currentPeriod + c.allowance.Period
 }
 
-// ContractUtility returns the ContractUtility for a contract with a given id.
-func (c *Contractor) contractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
+// staticContractUtility returns the ContractUtility for a contract with a given id.
+func (c *Contractor) staticContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
 	rc, exists := c.contracts.View(c.resolveID(id))
 	if !exists {
 		return modules.ContractUtility{}, false
@@ -200,7 +200,7 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 	// For convenience
 	contract := sc.Metadata()
 	// Sanity check - should not be renewing a bad contract.
-	utility, ok := c.contractUtility(contract.ID)
+	utility, ok := c.staticContractUtility(contract.ID)
 	if !ok || !utility.GoodForRenew {
 		c.log.Critical(fmt.Sprintf("Renewing a contract that has been marked as !GoodForRenew %v/%v",
 			ok, utility.GoodForRenew))
@@ -360,7 +360,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		// Iterate through the contracts again, figuring out which contracts to
 		// renew and how much extra funds to renew them with.
 		for _, contract := range c.contracts.ViewAll() {
-			utility, ok := c.contractUtility(contract.ID)
+			utility, ok := c.staticContractUtility(contract.ID)
 			if !ok || !utility.GoodForRenew {
 				continue
 			}
@@ -481,7 +481,7 @@ func (c *Contractor) threadedContractMaintenance() {
 				return
 			}
 			// Return the contract if it's not useful for renewing.
-			oldUtility, ok := c.contractUtility(id)
+			oldUtility, ok := c.staticContractUtility(id)
 			if !ok || !oldUtility.GoodForRenew {
 				c.log.Printf("Contract %v slated for renew is marked not good for renew %v/%v",
 					id, ok, oldUtility.GoodForRenew)
@@ -565,7 +565,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	c.mu.RLock()
 	uploadContracts := 0
 	for _, id := range c.contracts.IDs() {
-		if cu, ok := c.contractUtility(id); ok && cu.GoodForUpload {
+		if cu, ok := c.staticContractUtility(id); ok && cu.GoodForUpload {
 			uploadContracts++
 		}
 	}
@@ -639,10 +639,10 @@ func (c *Contractor) threadedContractMaintenance() {
 // updateContractUtility is a helper function that acquires a contract, updates
 // its ContractUtility and returns the contract again.
 func (c *Contractor) updateContractUtility(id types.FileContractID, utility modules.ContractUtility) error {
-	sc, ok := c.contracts.Acquire(id)
+	safeContract, ok := c.contracts.Acquire(id)
 	if !ok {
 		return errors.New("failed to acquire contract for update")
 	}
-	defer c.contracts.Return(sc)
-	return sc.UpdateUtility(utility)
+	defer c.contracts.Return(safeContract)
+	return safeContract.UpdateUtility(utility)
 }
