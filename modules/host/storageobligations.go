@@ -139,12 +139,12 @@ type storageObligation struct {
 
 	// Variables indicating whether the critical transactions in a storage
 	// obligation have been confirmed on the blockchain.
-	OriginConfirmed     bool
-	RevisionConstructed bool
-	RevisionConfirmed   bool
-	ProofConstructed    bool
-	ProofConfirmed      bool
 	ObligationStatus    storageObligationStatus
+	OriginConfirmed     bool
+	ProofConfirmed      bool
+	ProofConstructed    bool
+	RevisionConfirmed   bool
+	RevisionConstructed bool
 }
 
 // getStorageObligation fetches a storage obligation from the database tx.
@@ -870,27 +870,27 @@ func (h *Host) StorageObligations() (sos []modules.StorageObligation) {
 				return build.ExtendErr("unable to unmarshal storage obligation:", err)
 			}
 			mso := modules.StorageObligation{
-				ObligationId:             so.id(),
-				FileSize:                 so.fileSize(),
-				SectorRootsCount:         uint64(len(so.SectorRoots)),
 				ContractCost:             so.ContractCost,
+				DataSize:                 so.fileSize(),
 				LockedCollateral:         so.LockedCollateral,
+				ObligationId:             so.id(),
 				PotentialDownloadRevenue: so.PotentialDownloadRevenue,
 				PotentialStorageRevenue:  so.PotentialStorageRevenue,
 				PotentialUploadRevenue:   so.PotentialUploadRevenue,
 				RiskedCollateral:         so.RiskedCollateral,
+				SectorRootsCount:         uint64(len(so.SectorRoots)),
 				TransactionFeesAdded:     so.TransactionFeesAdded,
 
-				NegotiationHeight: so.NegotiationHeight,
 				ExpirationHeight:  so.expiration(),
+				NegotiationHeight: so.NegotiationHeight,
 				ProofDeadLine:     so.proofDeadline(),
 
-				OriginConfirmed:     so.OriginConfirmed,
-				RevisionConstructed: so.RevisionConstructed,
-				RevisionConfirmed:   so.RevisionConfirmed,
-				ProofConstructed:    so.ProofConstructed,
-				ProofConfirmed:      so.ProofConfirmed,
 				ObligationStatus:    so.ObligationStatus.String(),
+				OriginConfirmed:     so.OriginConfirmed,
+				RevisionConfirmed:   so.RevisionConfirmed,
+				RevisionConstructed: so.RevisionConstructed,
+				ProofConfirmed:      so.ProofConfirmed,
+				ProofConstructed:    so.ProofConstructed,
 			}
 			sos = append(sos, mso)
 			return nil
