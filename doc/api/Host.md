@@ -485,7 +485,7 @@ Get contract information from the host database. This call will return all stora
     // obligationRejected:	the storage obligation was never started, no revenues gained or lost
     // obligationSucceeded:	the storage obligation was completed, revenues were gained
     // obligationUnresolved: 	the storage obligation has an uninitialized value. When the "proofdeadline" is in the past this might be a stale obligation.
-    "obligationstatus":		obligationFailed,
+    "obligationstatus":		"obligationFailed",
 
     // Origin confirmed indicates whether the file contract was seen on the blockchain for this storage obligation.
     "originconfirmed":		true,
