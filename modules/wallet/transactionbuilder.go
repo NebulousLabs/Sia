@@ -3,6 +3,7 @@ package wallet
 import (
 	"bytes"
 	"errors"
+	"math"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -642,6 +643,7 @@ func (w *Wallet) SpendableOutputs() []modules.SpendableOutput {
 	// ensure durability of reported outputs
 	w.syncDB()
 
+	// build initial list of confirmed outputs
 	var outputs []modules.SpendableOutput
 	dbForEachSiacoinOutput(w.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
 		outputs = append(outputs, modules.SpendableOutput{
@@ -660,6 +662,23 @@ func (w *Wallet) SpendableOutputs() []modules.SpendableOutput {
 		})
 	})
 
+	// don't include outputs marked as spent in pending transactions
+	pending := make(map[types.OutputID]struct{})
+	for _, pt := range w.unconfirmedProcessedTransactions {
+		for _, input := range pt.Inputs {
+			if input.WalletAddress {
+				pending[input.ParentID] = struct{}{}
+			}
+		}
+	}
+	filtered := outputs[:0]
+	for _, o := range outputs {
+		if _, ok := pending[o.ID]; !ok {
+			filtered = append(filtered, o)
+		}
+	}
+	outputs = filtered
+
 	// set the confirmation height for each output
 outer:
 	for i, o := range outputs {
@@ -674,6 +693,21 @@ outer:
 					outputs[i].ConfirmationHeight = pt.ConfirmationHeight
 					continue outer
 				}
+			}
+		}
+	}
+
+	// add unconfirmed outputs
+	for _, pt := range w.unconfirmedProcessedTransactions {
+		for _, o := range pt.Outputs {
+			if o.WalletAddress {
+				outputs = append(outputs, modules.SpendableOutput{
+					FundType:           types.SpecifierSiacoinOutput,
+					ID:                 o.ID,
+					UnlockHash:         o.RelatedAddress,
+					Value:              o.Value,
+					ConfirmationHeight: types.BlockHeight(math.MaxUint64), // unconfirmed
+				})
 			}
 		}
 	}
