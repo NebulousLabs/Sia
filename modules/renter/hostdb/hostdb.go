@@ -19,6 +19,8 @@ import (
 )
 
 var (
+	// ErrInitialScanIncomplete is returned whenever an operation is not
+	// allowed to be executed before the initial host scan has finished.
 	ErrInitialScanIncomplete = errors.New("initial hostdb scan is not yet completed")
 	errNilCS                 = errors.New("cannot create hostdb with nil consensus set")
 	errNilGateway            = errors.New("cannot create hostdb with nil gateway")
