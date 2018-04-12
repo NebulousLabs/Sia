@@ -175,7 +175,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	}
 
 	contractValue := contract.RenterFunds
-	c.log.Printf("Formed contract with %v for %v", host.NetAddress, contractValue.HumanString())
+	c.log.Printf("Formed contract %v with %v for %v", contract.ID, host.NetAddress, contractValue.HumanString())
 	return contract, nil
 }
 
