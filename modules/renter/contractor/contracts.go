@@ -285,7 +285,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	// Update the utility fields for this contract based on the most recent
 	// hostdb.
 	if err := c.managedMarkContractsUtility(); err != nil {
-		c.log.Println("Failed to update contracUtilities", err)
+		c.log.Println("WARNING: wasn't able to mark contracts", err)
 		return
 	}
 
