@@ -110,6 +110,11 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 		return nil
 	}
 
+	// If we don't have enough workers for the file, don't repair it right now.
+	if len(r.workerPool) < f.erasureCode.MinPieces() {
+		return nil
+	}
+
 	// Assemble the set of chunks.
 	//
 	// TODO / NOTE: Future files may have a different method for determining the
