@@ -160,6 +160,7 @@ Consensus
 | Route                                                                       | HTTP verb |
 | --------------------------------------------------------------------------- | --------- |
 | [/consensus](#consensus-get)                                                | GET       |
+| [/consensus/blocks](#consensusblocks-get)                                   | GET       |
 | [/consensus/validate/transactionset](#consensusvalidatetransactionset-post) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
@@ -178,6 +179,21 @@ returns information about the consensus set, such as the current block height.
   "target":       [0,0,0,0,0,0,11,48,125,79,116,89,136,74,42,27,5,14,10,31,23,53,226,238,202,219,5,204,38,32,59,165],
   "difficulty":   "1234"
 }
+```
+
+#### /consensus/blocks [GET]
+
+Returns the block for a given id or height.
+
+###### Query String Parameters
+One of the following parameters can be specified.
+```
+// BlockID of the requested block.
+id 
+
+// BlockHeight of the requested block.
+height
+
 ```
 
 #### /consensus/validate/transactionset [POST]
