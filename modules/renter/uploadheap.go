@@ -320,16 +320,28 @@ func (r *Renter) threadedUploadLoop() {
 				break
 			}
 
-			// If there is work to do, perform the work. managedPrepareNextChunk
-			// will block until enough memory is available to perform the work,
-			// slowing this thread down to using only the resources that are
-			// available.
+			// Check if there is work by trying to pop of the next chunk from
+			// the heap.
 			nextChunk := r.uploadHeap.managedPop()
-			if nextChunk != nil {
-				r.managedPrepareNextChunk(nextChunk, hosts)
+			if nextChunk == nil {
+				break
+			}
+
+			// Make sure we have enough workers for this chunk to reach minimum
+			// redundancy. Otherwise we ignore this chunk for now and try again
+			// the next time we rebuild the heap and refresh the workers.
+			r.mu.RLock()
+			availableWorkers := len(r.workerPool)
+			rm.mu.RUnlock()
+			if availableWorkers < nextChunk.minimumPieces {
 				continue
 			}
-			break
+
+			// Perform the work. managedPrepareNextChunk will block until
+			// enough memory is available to perform the work, slowing this
+			// thread down to using only the resources that are available.
+			r.managedPrepareNextChunk(nextChunk, hosts)
+			continue
 		}
 
 		// Block until new work is required.
