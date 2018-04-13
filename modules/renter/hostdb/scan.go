@@ -253,12 +253,25 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	hdb.mu.RUnlock()
 
 	var settings modules.HostExternalSettings
+	var latency time.Duration
 	err := func() error {
+		// During the initial scan we choose a shorter timeout once we have
+		// scanned a certain number of hosts successfully to finish the scan
+		// more quickly.
+		timeout := hostRequestTimeout
+		hdb.mu.RLock()
+		if !hdb.initialScanComplete && hdb.successfulScans > minScansForSpeedup && hdb.initialScanTimeout < hostRequestTimeout {
+			timeout = hdb.initialScanTimeout
+		}
+		hdb.mu.RUnlock()
+
 		dialer := &net.Dialer{
 			Cancel:  hdb.tg.StopChan(),
-			Timeout: hostRequestTimeout,
+			Timeout: timeout,
 		}
+		start := time.Now()
 		conn, err := dialer.Dial("tcp", string(netAddr))
+		latency = time.Since(start)
 		if err != nil {
 			return err
 		}
@@ -281,19 +294,31 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 		copy(pubkey[:], pubKey.Key)
 		return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 	}()
+	success := false
 	if err != nil {
 		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
 
 	} else {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 		entry.HostExternalSettings = settings
+		success = true
 	}
 
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 	// Update the host tree to have a new entry, including the new error. Then
 	// delete the entry from the scan map as the scan has been successful.
-	hdb.mu.Lock()
 	hdb.updateEntry(entry, err)
-	hdb.mu.Unlock()
+
+	// Update the initial scan timeout if the scan was successful and if the
+	// latency for this scan was greater than the current timeout. We want to
+	// find the worst case latency.
+	if success {
+		hdb.successfulScans++
+		if latency > hdb.initialScanTimeout {
+			hdb.initialScanTimeout = 2 * latency
+		}
+	}
 }
 
 // waitForScans is a helper function that blocks until the hostDB's scanList is

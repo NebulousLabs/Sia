@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb/hosttree"
@@ -48,11 +49,12 @@ type HostDB struct {
 	// handful of goroutines constantly waiting on the channel for hosts to
 	// scan. The scan map is used to prevent duplicates from entering the scan
 	// pool.
-	initialScanComplete bool
-	scanList            []modules.HostDBEntry
-	scanMap             map[string]struct{}
-	scanWait            bool
-	scanningThreads     int
+	successfulScans    uint64
+	initialScanTimeout time.Duration
+	scanList           []modules.HostDBEntry
+	scanMap            map[string]struct{}
+	scanWait           bool
+	scanningThreads    int
 
 	blockHeight types.BlockHeight
 	lastChange  modules.ConsensusChangeID
