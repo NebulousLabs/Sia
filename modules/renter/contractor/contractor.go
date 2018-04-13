@@ -239,7 +239,7 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 	}
 
 	// Mark contract utility.
-	cm.managedMarkContractsUtility()
+	c.managedMarkContractsUtility()
 
 	// Subscribe to the consensus set.
 	err = cs.ConsensusSetSubscribe(c, c.lastChange, c.tg.StopChan())

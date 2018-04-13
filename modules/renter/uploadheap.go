@@ -335,9 +335,9 @@ func (r *Renter) threadedUploadLoop() {
 			// Make sure we have enough workers for this chunk to reach minimum
 			// redundancy. Otherwise we ignore this chunk for now and try again
 			// the next time we rebuild the heap and refresh the workers.
-			r.mu.RLock()
+			id := r.mu.RLock()
 			availableWorkers := len(r.workerPool)
-			rm.mu.RUnlock()
+			r.mu.RUnlock(id)
 			if availableWorkers < nextChunk.minimumPieces {
 				continue
 			}
