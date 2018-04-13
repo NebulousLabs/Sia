@@ -45,14 +45,14 @@ type contractHeader struct {
 	SecretKey crypto.SecretKey
 
 	// Same as modules.RenterContract.
-	ContractFee      types.Currency
-	DownloadSpending types.Currency
-	SiafundFee       types.Currency
 	StartHeight      types.BlockHeight
+	DownloadSpending types.Currency
 	StorageSpending  types.Currency
-	TotalCost        types.Currency
-	TxnFee           types.Currency
 	UploadSpending   types.Currency
+	TotalCost        types.Currency
+	ContractFee      types.Currency
+	TxnFee           types.Currency
+	SiafundFee       types.Currency
 	Utility          modules.ContractUtility
 }
 
@@ -410,6 +410,8 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 	return sc.Metadata(), nil
 }
 
+// loadSafeContract loads a contract from disk and adds it to the contractset
+// if it is valid.
 func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlog.Transaction) error {
 	f, err := os.OpenFile(filename, os.O_RDWR, 0600)
 	if err != nil {
