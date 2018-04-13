@@ -15,18 +15,24 @@ import (
 	"github.com/NebulousLabs/fastrand"
 )
 
-// queueScan will add a host to the queue to be scanned.
+// queueScan will add a host to the queue to be scanned. The host will be added
+// at a random position which means that the order in which queueScan is called
+// is not necessarily the order in which the hosts get scanned. That guarantees
+// a random scan order during the initial scan.
 func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 	// If this entry is already in the scan pool, can return immediately.
 	_, exists := hdb.scanMap[entry.PublicKey.String()]
 	if exists {
 		return
 	}
-
-	// Add the entry to a waitlist, then check if any thread is currently
-	// emptying the waitlist. If not, spawn a thread to empty the waitlist.
+	// Add the entry to a random position in the waitlist.
 	hdb.scanMap[entry.PublicKey.String()] = struct{}{}
 	hdb.scanList = append(hdb.scanList, entry)
+	i := len(hdb.scanList) - 1
+	j := fastrand.Intn(i)
+	hdb.scanList[i], hdb.scanList[j] = hdb.scanList[j], hdb.scanList[i]
+	// Check if any thread is currently emptying the waitlist. If not, spawn a
+	// thread to empty the waitlist.
 	if hdb.scanWait {
 		// Another thread is emptying the scan list, nothing to worry about.
 		return
