@@ -23,8 +23,7 @@ Index
 | Route                                                                       | HTTP verb |
 | --------------------------------------------------------------------------- | --------- |
 | [/consensus](#consensus-get)                                                | GET       |
-| [/consensus/blocks/:id](#consensus-blocks-id-get)                           | GET       |
-| [/consensus/headers/:height](#consensus-headers-height-get)                 | GET       |
+| [/consensus/blocks](#consensusblocks-get)                                   | GET       |
 | [/consensus/validate/transactionset](#consensusvalidatetransactionset-post) | POST      |
 
 #### /consensus [GET]
@@ -52,14 +51,20 @@ returns information about the consensus set, such as the current block height.
 }
 ```
 
-#### /consensus/blocks/:id [GET]
+#### /consensus/blocks [GET]
 
-Returns the block for a given id.
+Returns the block for a given id or height.
 
-#### /consensus/headers/:height [GET]
+###### Query String Parameters
+One of the following parameters can be specified.
+```
+// BlockID of the requested block.
+id 
 
-Returns header information of a block at a given height. At the moment only the
-BlockID is included, but this can be extended as needed.
+// BlockHeight of the requested block.
+height
+
+```
 
 #### /consensus/validate/transactionset [POST]
 
