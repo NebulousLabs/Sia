@@ -34,6 +34,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"strconv"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -148,6 +149,22 @@ type storageObligation struct {
 	ProofConstructed    bool
 	RevisionConfirmed   bool
 	RevisionConstructed bool
+}
+
+func (i storageObligationStatus) String() string {
+	if i == 0 {
+		return "obligationUnresolved"
+	}
+	if i == 1 {
+		return "obligationRejected"
+	}
+	if i == 2 {
+		return "obligationSucceeded"
+	}
+	if i == 3 {
+		return "obligationFailed"
+	}
+	return "storageObligationStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 }
 
 // getStorageObligation fetches a storage obligation from the database tx.
