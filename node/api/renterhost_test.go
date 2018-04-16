@@ -225,6 +225,26 @@ func TestHostAndRentVanilla(t *testing.T) {
 	if len(cts.Contracts) != 1 {
 		t.Error("Host has wrong number of obligations:", len(cts.Contracts))
 	}
+	// Check if the obligation status is unresolved
+	if cts.Contracts[0].ObligationStatus != "obligationUnresolved" {
+		t.Error("Wrong obligation status for new contract:", cts.Contracts[0].ObligationStatus)
+	}
+	// Check if there are no sector roots on a new contract
+	if cts.Contracts[0].SectorRootsCount != 0 {
+		t.Error("Wrong number of sector roots for new contract:", cts.Contracts[0].SectorRootsCount)
+	}
+	// Check if there is locked collateral
+	if cts.Contracts[0].LockedCollateral.IsZero() {
+		t.Error("No locked collateral in contract.")
+	}
+	// Check if risked collateral is not equal to zero
+	if !cts.Contracts[0].RiskedCollateral.IsZero() {
+		t.Error("Risked collateral not zero in new contract.")
+	}
+	// Check if all potential revenues are zero
+	if !(cts.Contracts[0].PotentialDownloadRevenue.IsZero() && cts.Contracts[0].PotentialUploadRevenue.IsZero() && cts.Contracts[0].PotentialStorageRevenue.IsZero()) {
+		t.Error("Potential values not zero in new contract.")
+	}
 
 	// Create a file.
 	path := filepath.Join(st.dir, "test.dat")
@@ -349,7 +369,19 @@ func TestHostAndRentVanilla(t *testing.T) {
 		t.Error("Host has wrong number of obligations:", len(cts.Contracts))
 	}
 	if !cts.Contracts[0].OriginConfirmed {
-		t.Error("host has not seen the file contract on the blockchain")
+		t.Error("Host has not seen the file contract on the blockchain.")
+	}
+	// Check if there are sector roots
+	if cts.Contracts[0].SectorRootsCount == 0 {
+		t.Error("Sector roots count is zero for used obligation.")
+	}
+	// Check if risked collateral is not equal to zero
+	if cts.Contracts[0].RiskedCollateral.IsZero() {
+		t.Error("Risked collateral is zero for used obligation.")
+	}
+	// There should be some potential revenues in this contract
+	if cts.Contracts[0].PotentialDownloadRevenue.IsZero() || cts.Contracts[0].PotentialUploadRevenue.IsZero() || cts.Contracts[0].PotentialStorageRevenue.IsZero() {
+		t.Error("Potential revenue value is zero for used obligation.")
 	}
 
 	// Mine blocks until the host should have submitted a storage proof.
@@ -370,6 +402,10 @@ func TestHostAndRentVanilla(t *testing.T) {
 	success := false
 	for _, contract := range cts.Contracts {
 		if contract.ProofConfirmed {
+			// Sector roots should be removed from storage obligation
+			if contract.SectorRootsCount > 0 {
+				t.Error("There are sector roots on completed storage obligation.")
+			}
 			success = true
 			break
 		}
