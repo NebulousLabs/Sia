@@ -114,12 +114,15 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 		// 	spending.StorageSpending = spending.StorageSpending.Add(pre.StorageSpending)
 		// }
 	}
-	allSpending := spending.TotalAllocated.Add(spending.DownloadSpending).Add(spending.UploadSpending).Add(spending.StorageSpending)
-
-	// If the allowance is smaller than the spending, the unspent funds are 0
-	if !(c.allowance.Funds.Cmp(allSpending) < 0) {
+	// Calculate amount of spent money to get unspent money.
+	allSpending := spending.ContractFees
+	allSpending = allSpending.Add(spending.DownloadSpending)
+	allSpending = allSpending.Add(spending.UploadSpending)
+	allSpending = allSpending.Add(spending.StorageSpending)
+	if c.allowance.Funds.Cmp(allSpending) >= 0 {
 		spending.Unspent = c.allowance.Funds.Sub(allSpending)
 	}
+
 	return spending
 }
 
