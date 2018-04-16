@@ -160,12 +160,13 @@ func rentercmd() {
 	Storage Spending:  %v
 	Upload Spending:   %v
 	Download Spending: %v
+	Fees Spending:     %v
 	Unspent Funds:     %v
 	Total Allocated:   %v
 
 `, currencyUnits(fm.StorageSpending), currencyUnits(fm.UploadSpending),
-		currencyUnits(fm.DownloadSpending), currencyUnits(fm.Unspent),
-		currencyUnits(fm.ContractSpending))
+		currencyUnits(fm.DownloadSpending), currencyUnits(fm.ContractFees),
+		currencyUnits(fm.Unspent), currencyUnits(fm.TotalAllocated))
 
 	// also list files
 	renterfileslistcmd()

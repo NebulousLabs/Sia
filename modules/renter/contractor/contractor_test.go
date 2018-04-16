@@ -321,8 +321,23 @@ func TestAllowanceSpending(t *testing.T) {
 
 	// PeriodSpending should reflect the amount of spending accurately
 	reportedSpending := c.PeriodSpending()
-	if reportedSpending.ContractSpending.Cmp(spent) != 0 {
-		t.Fatal("reported incorrect spending for this billing cycle: got", reportedSpending.ContractSpending.HumanString(), "wanted", spent.HumanString())
+	if reportedSpending.TotalAllocated.Cmp(spent) != 0 {
+		t.Fatal("reported incorrect spending for this billing cycle: got", reportedSpending.TotalAllocated.HumanString(), "wanted", spent.HumanString())
+	}
+	// COMPATv132 totalallocated should equal contractspending field.
+	if reportedSpending.V132contractSpending.Cmp(reportedSpending.TotalAllocated) != 0 {
+		t.Fatal("TotalAllocated should be equal to ContractSpending for compatibility")
+	}
+
+	var expectedFees types.Currency
+	for _, contract := range c.Contracts() {
+		expectedFees = expectedFees.Add(contract.TxnFee)
+		expectedFees = expectedFees.Add(contract.SiafundFee)
+		expectedFees = expectedFees.Add(contract.ContractFee)
+	}
+	if expectedFees.Cmp(reportedSpending.ContractFees) != 0 {
+		t.Fatalf("expected %v reported fees but was %v",
+			expectedFees.HumanString(), reportedSpending.ContractFees.HumanString())
 	}
 
 	// enter a new period. PeriodSpending should reset.
