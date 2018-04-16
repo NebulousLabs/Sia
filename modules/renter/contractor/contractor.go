@@ -60,14 +60,9 @@ type Contractor struct {
 	renewing    map[types.FileContractID]bool // prevent revising during renewal
 	revising    map[types.FileContractID]bool // prevent overlapping revisions
 
-	// The contract utility values are not persisted in any way, instead get
-	// set based on the values in the hostdb at startup. During startup, the
-	// 'managedMarkContractsUtility' needs to be called so that the utility is
-	// set correctly.
-	contracts         *proto.ContractSet
-	contractUtilities map[types.FileContractID]modules.ContractUtility
-	oldContracts      map[types.FileContractID]modules.RenterContract
-	renewedIDs        map[types.FileContractID]types.FileContractID
+	contracts    *proto.ContractSet
+	oldContracts map[types.FileContractID]modules.RenterContract
+	renewedIDs   map[types.FileContractID]types.FileContractID
 }
 
 // resolveID returns the ID of the most recent renewal of id.
@@ -135,10 +130,7 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 
 // ContractUtility returns the utility fields for the given contract.
 func (c *Contractor) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
-	c.mu.RLock()
-	utility, exists := c.contractUtilities[c.resolveID(id)]
-	c.mu.RUnlock()
-	return utility, exists
+	return c.staticContractUtility(id)
 }
 
 // CurrentPeriod returns the height at which the current allowance period
@@ -221,14 +213,13 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 
 		interruptMaintenance: make(chan struct{}),
 
-		contracts:         contractSet,
-		downloaders:       make(map[types.FileContractID]*hostDownloader),
-		editors:           make(map[types.FileContractID]*hostEditor),
-		contractUtilities: make(map[types.FileContractID]modules.ContractUtility),
-		oldContracts:      make(map[types.FileContractID]modules.RenterContract),
-		renewedIDs:        make(map[types.FileContractID]types.FileContractID),
-		renewing:          make(map[types.FileContractID]bool),
-		revising:          make(map[types.FileContractID]bool),
+		contracts:    contractSet,
+		downloaders:  make(map[types.FileContractID]*hostDownloader),
+		editors:      make(map[types.FileContractID]*hostEditor),
+		oldContracts: make(map[types.FileContractID]modules.RenterContract),
+		renewedIDs:   make(map[types.FileContractID]types.FileContractID),
+		renewing:     make(map[types.FileContractID]bool),
+		revising:     make(map[types.FileContractID]bool),
 	}
 
 	// Close the contract set and logger upon shutdown.

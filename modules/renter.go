@@ -233,6 +233,9 @@ type RenterContract struct {
 	StorageSpending  types.Currency
 	UploadSpending   types.Currency
 
+	// Utility contains utility information about the renter.
+	Utility ContractUtility
+
 	// TotalCost indicates the amount of money that the renter spent and/or
 	// locked up while forming a contract. This includes fees, and includes
 	// funds which were allocated (but not necessarily committed) to spend on

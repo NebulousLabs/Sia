@@ -53,6 +53,7 @@ type contractHeader struct {
 	ContractFee      types.Currency
 	TxnFee           types.Currency
 	SiafundFee       types.Currency
+	Utility          modules.ContractUtility
 }
 
 // validate returns an error if the contractHeader is invalid.
@@ -128,7 +129,51 @@ func (c *SafeContract) Metadata() modules.RenterContract {
 		ContractFee:      h.ContractFee,
 		TxnFee:           h.TxnFee,
 		SiafundFee:       h.SiafundFee,
+		Utility:          h.Utility,
 	}
+}
+
+// UpdateUtility updates the utility field of a contract.
+func (c *SafeContract) UpdateUtility(utility modules.ContractUtility) error {
+	// Get current header
+	c.headerMu.Lock()
+	newHeader := c.header
+	c.headerMu.Unlock()
+
+	// Construct new header
+	newHeader.Utility = utility
+
+	// Record the intent to change the header in the wal.
+	t, err := c.wal.NewTransaction([]writeaheadlog.Update{
+		c.makeUpdateSetHeader(newHeader),
+	})
+	if err != nil {
+		return err
+	}
+	// Signal that the setup is completed.
+	if err := <-t.SignalSetupComplete(); err != nil {
+		return err
+	}
+	// Apply the change.
+	if err := c.applySetHeader(newHeader); err != nil {
+		return err
+	}
+	// Sync the change to disk.
+	if err := c.f.Sync(); err != nil {
+		return err
+	}
+	// Signal that the update has been applied.
+	if err := t.SignalUpdatesApplied(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Utility returns the contract utility for the contract.
+func (c *SafeContract) Utility() modules.ContractUtility {
+	c.headerMu.Lock()
+	defer c.headerMu.Unlock()
+	return c.header.Utility
 }
 
 func (c *SafeContract) makeUpdateSetHeader(h contractHeader) writeaheadlog.Update {
@@ -365,6 +410,8 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 	return sc.Metadata(), nil
 }
 
+// loadSafeContract loads a contract from disk and adds it to the contractset
+// if it is valid.
 func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlog.Transaction) error {
 	f, err := os.OpenFile(filename, os.O_RDWR, 0600)
 	if err != nil {
