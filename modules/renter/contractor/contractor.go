@@ -90,7 +90,14 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 
 	var spending modules.ContractorSpending
 	for _, contract := range c.contracts.ViewAll() {
-		spending.ContractSpending = spending.ContractSpending.Add(contract.TotalCost)
+		// Calculate ContractFees
+		spending.ContractFees = spending.ContractFees.Add(contract.ContractFee)
+		spending.ContractFees = spending.ContractFees.Add(contract.TxnFee)
+		spending.ContractFees = spending.ContractFees.Add(contract.SiafundFee)
+		// Calculate TotalAllocated
+		spending.TotalAllocated = spending.TotalAllocated.Add(contract.TotalCost)
+		spending.ContractSpendingDeprecated = spending.TotalAllocated
+		// Calculate Spending
 		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
 		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
 		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
@@ -102,12 +109,15 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 		// 	spending.StorageSpending = spending.StorageSpending.Add(pre.StorageSpending)
 		// }
 	}
-	allSpending := spending.ContractSpending.Add(spending.DownloadSpending).Add(spending.UploadSpending).Add(spending.StorageSpending)
-
-	// If the allowance is smaller than the spending, the unspent funds are 0
-	if !(c.allowance.Funds.Cmp(allSpending) < 0) {
+	// Calculate amount of spent money to get unspent money.
+	allSpending := spending.ContractFees
+	allSpending = allSpending.Add(spending.DownloadSpending)
+	allSpending = allSpending.Add(spending.UploadSpending)
+	allSpending = allSpending.Add(spending.StorageSpending)
+	if c.allowance.Funds.Cmp(allSpending) >= 0 {
 		spending.Unspent = c.allowance.Funds.Sub(allSpending)
 	}
+
 	return spending
 }
 

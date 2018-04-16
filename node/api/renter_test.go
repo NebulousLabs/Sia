@@ -663,7 +663,7 @@ func TestRenterHandlerContracts(t *testing.T) {
 	for _, contract := range contracts.Contracts {
 		expectedContractSpending = expectedContractSpending.Add(contract.TotalCost)
 	}
-	if got := get.FinancialMetrics.ContractSpending; got.Cmp(expectedContractSpending) != 0 {
+	if got := get.FinancialMetrics.TotalAllocated; got.Cmp(expectedContractSpending) != 0 {
 		t.Fatalf("expected contract spending to be %v; got %v", expectedContractSpending, got)
 	}
 }
