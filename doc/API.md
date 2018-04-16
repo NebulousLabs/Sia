@@ -762,9 +762,11 @@ returns the current settings along with metrics on the renter's spending.
     }
   },
   "financialmetrics": {
-    "contractspending": "1234", // hastings
+    "contractfees":     "1234", // hastings
+    "contractspending": "1234", // hastings (deprecated, now totalallocated)
     "downloadspending": "5678", // hastings
     "storagespending":  "1234", // hastings
+    "totalallocated":   "1234", // hastings
     "uploadspending":   "5678", // hastings
     "unspent":          "1234"  // hastings
   },

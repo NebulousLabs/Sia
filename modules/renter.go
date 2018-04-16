@@ -266,7 +266,7 @@ type ContractorSpending struct {
 	// StorageSpending is the money currently spent on storage.
 	StorageSpending types.Currency `json:"storagespending"`
 	// ContractSpending is the total amount of money that the renter has put
-	// into the contract, whether it's locked and the renter gets that money
+	// into contracts, whether it's locked and the renter gets that money
 	// back or whether it's spent and the renter won't get the money back.
 	TotalAllocated types.Currency `json:"totalallocated"`
 	// UploadSpending is the money currently spent on uploads.
