@@ -273,9 +273,9 @@ type ContractorSpending struct {
 	UploadSpending types.Currency `json:"uploadspending"`
 	// Unspent is locked-away, unspent money.
 	Unspent types.Currency `json:"unspent"`
-	// V132contractSpending was renamed to TotalAllocated and always has the
+	// ContractSpendingDeprecated was renamed to TotalAllocated and always has the
 	// same value as TotalAllocated.
-	V132contractSpending types.Currency `json:"contractspending"`
+	ContractSpendingDeprecated types.Currency `json:"contractspending"`
 }
 
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
