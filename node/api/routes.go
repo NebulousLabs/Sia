@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -89,7 +88,7 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.GET("/renter/download/*siapath", RequirePassword(api.renterDownloadHandler, requiredPassword))
 		router.GET("/renter/downloadasync/*siapath", RequirePassword(api.renterDownloadAsyncHandler, requiredPassword))
 		router.POST("/renter/rename/*siapath", RequirePassword(api.renterRenameHandler, requiredPassword))
-		router.GET("/renter/stream/*siapath", Unrestricted(api.renterStreamHandler))
+		router.GET("/renter/stream/*siapath", api.renterStreamHandler)
 		router.POST("/renter/upload/*siapath", RequirePassword(api.renterUploadHandler, requiredPassword))
 
 		// HostDB endpoints.
@@ -200,16 +199,10 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 	}
 }
 
-// Unrestricted can be used to whitelist api routes from requiring the
-// Sia-Agent to be set.
-func Unrestricted(h httprouter.Handle) httprouter.Handle {
-	return httprouter.Handle(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-		req = req.WithContext(context.WithValue(req.Context(), unrestrictedContextKey{}, 0))
-		h(w, req, ps)
-	})
-}
-
-// isUnrestricted checks if a context has the unrestrictedContextKey set.
+// isUnrestricted checks if a request is allowed to bypass the Sia-Agent check.
 func isUnrestricted(req *http.Request) bool {
-	return req.Context().Value(unrestrictedContextKey{}) != nil
+	if strings.HasPrefix(req.URL.Path, "/renter/stream") {
+		return true
+	}
+	return false
 }
