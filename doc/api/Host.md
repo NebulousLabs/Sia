@@ -453,9 +453,6 @@ Get contract information from the host database. This call will return all stora
     // Id of the storageobligation, which is defined by the file contract id of the file contract that governs the storage obligation.
     "obligationid":		"fff48010dcbbd6ba7ffd41bc4b25a3634ee58bbf688d2f06b7d5a0c837304e13",
 
-    // Number of sector roots.
-    "sectorrootscount":		2,
-
     // Potential revenue for downloaded data that the host will reveive upon successful completion of the obligation.
     "potentialdownloadrevenue":	"1234",		// hastings
 
@@ -468,14 +465,17 @@ Get contract information from the host database. This call will return all stora
     // Amount that the host might lose if the submission of the storage proof is not successful.
     "riskedcollateral":		"1234",		// hastings
 
+    // Number of sector roots.
+    "sectorrootscount":		2,
+
     // Amount for transaction fees that the host added to the storage obligation.
     "transactionfeesadded":	"1234",		// hastings
 
     // Experation height is the height at which the storage obligation expires.
-    "experationheight":		123456,		// blocks
+    "expirationheight":		123456,		// blocks
 
     // Negotion height is the height at which the storage obligation was negotiated.
-    "negotionheight":		0,		// blocks
+    "negotiationheight":	0,		// blocks
 
     // The proof deadline is the height by which the storage proof must be submitted.
     "proofdeadline":		123456,		// blocks
@@ -490,15 +490,18 @@ Get contract information from the host database. This call will return all stora
     // Origin confirmed indicates whether the file contract was seen on the blockchain for this storage obligation.
     "originconfirmed":		true,
 
-    // Revision confirmed indicates whether there was a file contract revision seen on the blockchain for this storage obligation.
-    "revisionconfirmed":	true,
-
     // Proof confirmed indicates whether there was a storage proof seen on the blockchain for this storage obligation.
     "proofconfirmed":		true,
 
     // The host has constructed a storage proof
     "proofconstructed":		false
-  ]
+ 
+    // Revision confirmed indicates whether there was a file contract revision seen on the blockchain for this storage obligation.
+    "revisionconfirmed":	true,
+ 
+    // Revision constructed indicates whether there was a file contract revision constructed for this storage obligation.
+    "revisionconstructed":	true,
+ ]
 }
 ```
 

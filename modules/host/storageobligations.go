@@ -907,10 +907,10 @@ func (h *Host) StorageObligations() (sos []modules.StorageObligation) {
 
 				ObligationStatus:    so.ObligationStatus.String(),
 				OriginConfirmed:     so.OriginConfirmed,
-				RevisionConfirmed:   so.RevisionConfirmed,
-				RevisionConstructed: so.RevisionConstructed,
 				ProofConfirmed:      so.ProofConfirmed,
 				ProofConstructed:    so.ProofConstructed,
+				RevisionConfirmed:   so.RevisionConfirmed,
+				RevisionConstructed: so.RevisionConstructed,
 			}
 			sos = append(sos, mso)
 			return nil

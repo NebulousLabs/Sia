@@ -115,11 +115,11 @@ type (
 		DataSize                 uint64               `json:"datasize"`
 		LockedCollateral         types.Currency       `json:"lockedcollateral"`
 		ObligationId             types.FileContractID `json:"obligationid"`
-		SectorRootsCount         uint64               `json:"sectorrootscount"`
 		PotentialDownloadRevenue types.Currency       `json:"potentialdownloadrevenue"`
 		PotentialStorageRevenue  types.Currency       `json:"potentialstoragerevenue"`
 		PotentialUploadRevenue   types.Currency       `json:"potentialuploadrevenue"`
 		RiskedCollateral         types.Currency       `json:"riskedcollateral"`
+		SectorRootsCount         uint64               `json:"sectorrootscount"`
 		TransactionFeesAdded     types.Currency       `json:"transactionfeesadded"`
 
 		// The negotiation height specifies the block height at which the file
@@ -134,10 +134,10 @@ type (
 		// obligation have been confirmed on the blockchain.
 		ObligationStatus    string `json:"obligationstatus"`
 		OriginConfirmed     bool   `json:"originconfirmed"`
-		RevisionConfirmed   bool   `json:"revisionconfirmed"`
-		RevisionConstructed bool   `json:"revisionconstructed"`
 		ProofConfirmed      bool   `json:"proofconfirmed"`
 		ProofConstructed    bool   `json:"proofconstructed"`
+		RevisionConfirmed   bool   `json:"revisionconfirmed"`
+		RevisionConstructed bool   `json:"revisionconstructed"`
 	}
 
 	// HostWorkingStatus reports the working state of a host. Can be one of

@@ -406,22 +406,23 @@ gets a list of all contracts from the host database
       "datasize":			500000,		// bytes
       "lockedcollateral":		"1234",		// hastings
       "obligationid":			"fff48010dcbbd6ba7ffd41bc4b25a3634ee58bbf688d2f06b7d5a0c837304e13",
-      "sectorrootscount":		2,
       "potentialdownloadrevenue":	"1234",		// hastings
       "potentialstoragerevenue":	"1234",		// hastings
       "potentialuploadrevenue":		"1234",		// hastings
       "riskedcollateral":		"1234",		// hastings
+      "sectorrootscount":		2,
       "transactionfeesadded":		"1234",		// hastings
 
       "expirationheight":		123456,		// blocks
-      "negotionheight":			123456,		// blocks
+      "negotiationheight":		123456,		// blocks
       "proofdeadline":			123456,		// blocks
 
       "obligationstatus":		"obligationFailed",
       "originconfirmed":		true,
-      "revisionconfirmed":		false,
       "proofconfirmed":			true,
       "proofconstructed":		true
+      "revisionconfirmed":		false,
+      "revisionconstructed":		false,
     }
   ]
 }
