@@ -23,6 +23,7 @@ var (
 	initPassword      bool   // supply a custom password when creating a wallet
 	renterListVerbose bool   // Show additional info about uploaded files.
 	renterShowHistory bool   // Show download history in addition to download queue.
+	walletSignRaw     bool   // Print signed transaction in base64-encoded binary.
 )
 
 var (
@@ -285,6 +286,7 @@ func main() {
 	walletLoadCmd.AddCommand(walletLoad033xCmd, walletLoadSeedCmd, walletLoadSiagCmd)
 	walletSendCmd.AddCommand(walletSendSiacoinsCmd, walletSendSiafundsCmd)
 	walletUnlockCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Display interactive password prompt even if SIA_WALLET_PASSWORD is set")
+	walletSignCmd.Flags().BoolVarP(&walletSignRaw, "raw", "", false, "Encode signed transaction as base64 instead of JSON")
 
 	root.AddCommand(renterCmd)
 	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd,

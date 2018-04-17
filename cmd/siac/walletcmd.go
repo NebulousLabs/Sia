@@ -506,7 +506,12 @@ func walletsigncmd(txnJSON, toSignJSON string) {
 	if err != nil {
 		die("Failed to sign transaction:", err)
 	}
-	fmt.Println(base64.StdEncoding.EncodeToString(encoding.Marshal(txn)))
+	if walletSignRaw {
+		base64.NewEncoder(base64.StdEncoding, os.Stdout).Write(encoding.Marshal(txn))
+	} else {
+		json.NewEncoder(os.Stdout).Encode(txn)
+	}
+	fmt.Println()
 }
 
 // wallettransactionscmd lists all of the transactions related to the wallet,
