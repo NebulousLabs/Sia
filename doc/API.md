@@ -128,8 +128,8 @@ returns the set of constants in use.
   "roottarget": [0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   "rootdepth":  [255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255],
 
-  "maxadjustmentup":   "5/2",
-  "maxadjustmentdown": "2/5",
+  "maxtargetadjustmentup":   "5/2",
+  "maxtargetadjustmentdown": "2/5",
 
   "siacoinprecision": "1000000000000000000000000" // hastings per siacoin
 }

@@ -83,10 +83,10 @@ returns the set of constants in use.
   "rootdepth": [255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255],
 
   // Largest allowed ratio between the old difficulty and the new difficulty.
-  "maxadjustmentup": "5/2",
+  "maxtargetadjustmentup": "5/2",
 
   // Smallest allowed ratio between the old difficulty and the new difficulty.
-  "maxadjustmentdown": "2/5",
+  "maxtargetadjustmentdown": "2/5",
 
   // Number of Hastings in one siacoin.
   "siacoinprecision": "1000000000000000000000000" // hastings per siacoin
