@@ -140,7 +140,9 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 
 // ContractUtility returns the utility fields for the given contract.
 func (c *Contractor) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
-	return c.staticContractUtility(id)
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.contractUtility(id)
 }
 
 // CurrentPeriod returns the height at which the current allowance period

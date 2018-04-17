@@ -29,6 +29,11 @@ type updateSetHeader struct {
 	Header contractHeader
 }
 
+type v132UpdateSetHeader struct {
+	ID     types.FileContractID
+	Header v132ContractHeader
+}
+
 type updateSetRoot struct {
 	ID    types.FileContractID
 	Root  crypto.Hash
@@ -54,6 +59,26 @@ type contractHeader struct {
 	TxnFee           types.Currency
 	SiafundFee       types.Currency
 	Utility          modules.ContractUtility
+}
+
+type v132ContractHeader struct {
+	// transaction is the signed transaction containing the most recent
+	// revision of the file contract.
+	Transaction types.Transaction
+
+	// secretKey is the key used by the renter to sign the file contract
+	// transaction.
+	SecretKey crypto.SecretKey
+
+	// Same as modules.RenterContract.
+	StartHeight      types.BlockHeight
+	DownloadSpending types.Currency
+	StorageSpending  types.Currency
+	UploadSpending   types.Currency
+	TotalCost        types.Currency
+	ContractFee      types.Currency
+	TxnFee           types.Currency
+	SiafundFee       types.Currency
 }
 
 // validate returns an error if the contractHeader is invalid.
@@ -329,7 +354,7 @@ func (c *SafeContract) commitTxns() error {
 			switch update.Name {
 			case updateNameSetHeader:
 				var u updateSetHeader
-				if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+				if err := unmarshalHeader(update.Instructions, &u); err != nil {
 					return err
 				}
 				if err := c.applySetHeader(u.Header); err != nil {
@@ -363,7 +388,7 @@ func (c *SafeContract) unappliedHeader() (h contractHeader) {
 		for _, update := range t.Updates {
 			if update.Name == updateNameSetHeader {
 				var u updateSetHeader
-				if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+				if err := unmarshalHeader(update.Instructions, &u); err != nil {
 					continue
 				}
 				h = u.Header
@@ -450,7 +475,7 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 		switch update := t.Updates[0]; update.Name {
 		case updateNameSetHeader:
 			var u updateSetHeader
-			if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+			if err := unmarshalHeader(update.Instructions, &u); err != nil {
 				return err
 			}
 			id = u.ID
@@ -588,5 +613,33 @@ func (mrs *MerkleRootSet) UnmarshalJSON(b []byte) error {
 		copy(umrs[i][:], fullBytes[i*crypto.HashSize:(i+1)*crypto.HashSize])
 	}
 	*mrs = umrs
+	return nil
+}
+
+func unmarshalHeader(b []byte, u *updateSetHeader) error {
+	// Try unmarshaling the header.
+	if err := encoding.Unmarshal(b, u); err != nil {
+		// COMPATv132 try unmarshaling the header the old way.
+		var oldHeader v132UpdateSetHeader
+		if err2 := encoding.Unmarshal(b, &oldHeader); err2 != nil {
+			// If unmarshaling the header the old way also doesn't work we
+			// return the original error.
+			return err
+		}
+		// If unmarshaling it the old way was successful we convert it to a new
+		// header.
+		u.Header = contractHeader{
+			Transaction:      oldHeader.Header.Transaction,
+			SecretKey:        oldHeader.Header.SecretKey,
+			StartHeight:      oldHeader.Header.StartHeight,
+			DownloadSpending: oldHeader.Header.DownloadSpending,
+			StorageSpending:  oldHeader.Header.StorageSpending,
+			UploadSpending:   oldHeader.Header.UploadSpending,
+			TotalCost:        oldHeader.Header.TotalCost,
+			ContractFee:      oldHeader.Header.ContractFee,
+			TxnFee:           oldHeader.Header.TxnFee,
+			SiafundFee:       oldHeader.Header.SiafundFee,
+		}
+	}
 	return nil
 }

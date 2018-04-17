@@ -28,8 +28,8 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 	return c.currentPeriod + c.allowance.Period
 }
 
-// staticContractUtility returns the ContractUtility for a contract with a given id.
-func (c *Contractor) staticContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
+// contractUtility returns the ContractUtility for a contract with a given id.
+func (c *Contractor) contractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
 	rc, exists := c.contracts.View(c.resolveID(id))
 	if !exists {
 		return modules.ContractUtility{}, false
@@ -202,7 +202,9 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 	// For convenience
 	contract := sc.Metadata()
 	// Sanity check - should not be renewing a bad contract.
-	utility, ok := c.staticContractUtility(contract.ID)
+	c.mu.RLock()
+	utility, ok := c.contractUtility(contract.ID)
+	c.mu.RUnlock()
 	if !ok || !utility.GoodForRenew {
 		c.log.Critical(fmt.Sprintf("Renewing a contract that has been marked as !GoodForRenew %v/%v",
 			ok, utility.GoodForRenew))
@@ -362,7 +364,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		// Iterate through the contracts again, figuring out which contracts to
 		// renew and how much extra funds to renew them with.
 		for _, contract := range c.contracts.ViewAll() {
-			utility, ok := c.staticContractUtility(contract.ID)
+			utility, ok := c.contractUtility(contract.ID)
 			if !ok || !utility.GoodForRenew {
 				continue
 			}
@@ -483,7 +485,9 @@ func (c *Contractor) threadedContractMaintenance() {
 				return
 			}
 			// Return the contract if it's not useful for renewing.
-			oldUtility, ok := c.staticContractUtility(id)
+			c.mu.RLock()
+			oldUtility, ok := c.contractUtility(id)
+			c.mu.RUnlock()
 			if !ok || !oldUtility.GoodForRenew {
 				c.log.Printf("Contract %v slated for renew is marked not good for renew %v/%v",
 					id, ok, oldUtility.GoodForRenew)
@@ -567,7 +571,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	c.mu.RLock()
 	uploadContracts := 0
 	for _, id := range c.contracts.IDs() {
-		if cu, ok := c.staticContractUtility(id); ok && cu.GoodForUpload {
+		if cu, ok := c.contractUtility(id); ok && cu.GoodForUpload {
 			uploadContracts++
 		}
 	}

@@ -1,6 +1,7 @@
 package siatest
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -89,7 +90,7 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		return nil, errors.New("cannot fund group without miners")
 	}
 	miner := tg.Miners()[0]
-	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+	for i := types.BlockHeight(0); i <= types.MaturityDelay+types.TaxHardforkHeight; i++ {
 		if err := miner.MineBlock(); err != nil {
 			return nil, errors.AddContext(err, "failed to mine block for funding")
 		}
@@ -315,16 +316,33 @@ func synchronizationCheck(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	if err != nil {
 		return err
 	}
+	// Loop until all the blocks have the same CurrentBlock. If we need to mine
+	// a new block in between we need to repeat the check until no block was
+	// mined.
 	for node := range nodes {
 		err := Retry(600, 100*time.Millisecond, func() error {
 			ncg, err := node.ConsensusGet()
 			if err != nil {
 				return err
 			}
-			if mcg.CurrentBlock != ncg.CurrentBlock {
-				return errors.New("the node's current block doesn't equal the miner's")
+			// If the CurrentBlock's match we are done.
+			if mcg.CurrentBlock == ncg.CurrentBlock {
+				return nil
 			}
-			return nil
+			// If the miner's height is greater than the node's we need to
+			// wait a bit longer for them to sync.
+			if mcg.Height > ncg.Height {
+				return fmt.Errorf("the node didn't catch up to the miner's height %v %v",
+					mcg.Height, ncg.Height)
+			}
+			// If the miner's height is smaller than the node's we need a
+			// bit longer for them to sync.
+			if mcg.Height < ncg.Height {
+				return errors.New("the miner didn't catch up to the node's height")
+			}
+			// If the miner's height is equal to the node's but still
+			// doesn't match, it needs to mine a block.
+			return errors.New("the node's current block's id does not equal the miner's")
 		})
 		if err != nil {
 			return err

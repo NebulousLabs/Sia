@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -167,6 +168,10 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	for fcid, fileContract := range f.contracts {
 		recentContract, exists := r.hostContractor.ContractByID(fcid)
 		contractUtility, exists2 := r.hostContractor.ContractUtility(fcid)
+		if (exists && !exists2) || (!exists && exists) {
+			build.Critical("got a contract without utility or vice versa which shouldn't happen",
+				exists, exists2)
+		}
 		if !exists || !exists2 {
 			// File contract does not seem to be part of the host anymore.
 			// Delete this contract and mark the file to be saved.
