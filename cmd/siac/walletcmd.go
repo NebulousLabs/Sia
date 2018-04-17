@@ -157,8 +157,9 @@ Run 'wallet send --help' to see a list of available units.`,
 	walletSignCmd = &cobra.Command{
 		Use:   "sign [txn] [tosign]",
 		Short: "Sign a transaction",
-		Long: `Sign the specified inputs of a transaction using one or more keys
-derived from the supplied seed.`,
+		Long: `Sign the specified inputs of a transaction. If siad is running with an
+unlocked wallet, the /wallet/sign API call will be used. Otherwise, sign will
+prompt for the wallet seed, and the signing key(s) will be regenerated.`,
 		Run: wrap(walletsigncmd),
 	}
 
@@ -494,18 +495,30 @@ func walletsigncmd(txnJSON, toSignJSON string) {
 		die("Invalid transaction:", err)
 	}
 
-	seedString, err := passwordPrompt("Seed: ")
-	if err != nil {
-		die("Reading seed failed:", err)
+	// try API first
+	params, _ := json.Marshal(api.WalletSignPOSTParams{Transaction: txn, ToSign: toSign})
+	var wspr api.WalletSignPOSTResp
+	err = postResp("/wallet/sign", string(params), &wspr)
+	if err == nil {
+		txn = wspr.Transaction
+	} else {
+		// fallback to offline keygen
+		fmt.Println("Signing via API failed: either siad is not running, or your wallet is locked.")
+		fmt.Println("Enter your wallet seed to generate the signing key(s) now and sign without siad.")
+		seedString, err := passwordPrompt("Seed: ")
+		if err != nil {
+			die("Reading seed failed:", err)
+		}
+		seed, err := modules.StringToSeed(seedString, mnemonics.English)
+		if err != nil {
+			die("Invalid seed:", err)
+		}
+		err = wallet.SignTransaction(&txn, seed, toSign)
+		if err != nil {
+			die("Failed to sign transaction:", err)
+		}
 	}
-	seed, err := modules.StringToSeed(seedString, mnemonics.English)
-	if err != nil {
-		die("Invalid seed:", err)
-	}
-	err = wallet.SignTransaction(&txn, seed, toSign)
-	if err != nil {
-		die("Failed to sign transaction:", err)
-	}
+
 	if walletSignRaw {
 		base64.NewEncoder(base64.StdEncoding, os.Stdout).Write(encoding.Marshal(txn))
 	} else {
