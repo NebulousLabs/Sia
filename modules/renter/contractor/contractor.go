@@ -8,6 +8,7 @@ package contractor
 // renter lock.
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,7 +19,6 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
-	"github.com/NebulousLabs/errors"
 )
 
 var (
