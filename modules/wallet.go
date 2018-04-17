@@ -103,11 +103,11 @@ type (
 	// A SpendableOutput is a SiacoinOutput or SiafundOutput that the wallet
 	// can spend.
 	SpendableOutput struct {
-		ID                 types.OutputID    `json:"id"`
-		FundType           types.Specifier   `json:"fundtype"`
-		UnlockHash         types.UnlockHash  `json:"unlockhash"`
-		Value              types.Currency    `json:"value"`
-		ConfirmationHeight types.BlockHeight `json:"confirmationheight"`
+		ID                 types.OutputID         `json:"id"`
+		FundType           types.Specifier        `json:"fundtype"`
+		UnlockConditions   types.UnlockConditions `json:"unlockconditions"`
+		Value              types.Currency         `json:"value"`
+		ConfirmationHeight types.BlockHeight      `json:"confirmationheight"`
 	}
 
 	// TransactionBuilder is used to construct custom transactions. A transaction
@@ -422,11 +422,9 @@ type (
 		// SpendableOutputs returns the outputs spendable by the wallet.
 		SpendableOutputs() []SpendableOutput
 
-		// SignTransaction signs txn using secret keys known to the wallet. toSign
-		// maps the ParentID of each unsigned input to the UnlockHash of that input's
-		// desired UnlockConditions. SignTransaction fills in the UnlockConditions for
-		// each such input and adds a corresponding signature.
-		SignTransaction(txn *types.Transaction, toSign map[types.OutputID]types.UnlockHash) error
+		// SignTransaction signs txn using secret keys known to the wallet, adding a
+		// TransactionSignature for each input whose ParentID is specified in toSign.
+		SignTransaction(txn *types.Transaction, toSign []types.OutputID) error
 	}
 
 	// WalletSettings control the behavior of the Wallet.

@@ -489,7 +489,7 @@ func walletsigncmd(txnJSON, toSignJSON string) {
 		die("Invalid transaction:", err)
 	}
 
-	var toSign map[types.OutputID]types.UnlockHash
+	var toSign []types.OutputID
 	err = json.Unmarshal([]byte(toSignJSON), &toSign)
 	if err != nil {
 		die("Invalid transaction:", err)

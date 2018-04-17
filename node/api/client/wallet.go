@@ -57,7 +57,7 @@ func (c *Client) WalletSiacoinsPost(amount types.Currency, destination types.Unl
 }
 
 // WalletSignPost uses the /wallet/sign api endpoint to sign a transaction.
-func (c *Client) WalletSignPost(txn types.Transaction, toSign map[types.OutputID]types.UnlockHash) (wspr api.WalletSignPOSTResp, err error) {
+func (c *Client) WalletSignPost(txn types.Transaction, toSign []types.OutputID) (wspr api.WalletSignPOSTResp, err error) {
 	buf := new(bytes.Buffer)
 	err = json.NewEncoder(buf).Encode(api.WalletSignPOSTParams{
 		Transaction: txn,

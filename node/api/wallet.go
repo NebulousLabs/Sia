@@ -66,8 +66,8 @@ type (
 	// WalletSignPOSTParams contains the unsigned transaction and a set of
 	// inputs to sign.
 	WalletSignPOSTParams struct {
-		Transaction types.Transaction                   `json:"transaction"`
-		ToSign      map[types.OutputID]types.UnlockHash `json:"tosign"`
+		Transaction types.Transaction `json:"transaction"`
+		ToSign      []types.OutputID  `json:"tosign"`
 	}
 
 	// WalletSignPOSTResp contains the signed transaction.

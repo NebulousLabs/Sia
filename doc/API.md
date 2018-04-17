@@ -1321,11 +1321,10 @@ specified.
 ```
 {
   "transaction": { }, // types.Transaction
-  "tosign": {
-    // types.OutputID -> types.UnlockHash
-    "3689bd3489679aabcde02e01345abcde": "138950f0129d74acd4eade3453b45678",
-    "132cee478a9bb98bdd23cf05376cdf2a": "7cbcd123578234ce0f12fe01a68ba9bf"
-  }
+  "tosign": [
+    "3689bd3489679aabcde02e01345abcde", // types.OutputID
+    "132cee478a9bb98bdd23cf05376cdf2a"
+  ]
 }
 ```
 
@@ -1481,7 +1480,14 @@ returns a list of outputs that the wallet can spend.
       "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       "fundtype": "siacoin output",
       "confirmationheight": 50000,
-      "unlockhash": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "unlockconditions": {
+        "timelock": 0,
+        "publickeys": [{
+          "algorithm": "ed25519",
+          "key": "AADBM1ca/FyURfizmSukoUQ2S0GwXMit1iNSeYgrnhXOPAAA",
+        }],
+        "signaturesrequired": 1
+      }
       "value": "1234" // big int
     }
   ]

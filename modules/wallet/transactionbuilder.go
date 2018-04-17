@@ -647,18 +647,18 @@ func (w *Wallet) SpendableOutputs() []modules.SpendableOutput {
 	var outputs []modules.SpendableOutput
 	dbForEachSiacoinOutput(w.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
 		outputs = append(outputs, modules.SpendableOutput{
-			FundType:   types.SpecifierSiacoinOutput,
-			ID:         types.OutputID(scoid),
-			UnlockHash: sco.UnlockHash,
-			Value:      sco.Value,
+			FundType:         types.SpecifierSiacoinOutput,
+			ID:               types.OutputID(scoid),
+			UnlockConditions: w.keys[sco.UnlockHash].UnlockConditions,
+			Value:            sco.Value,
 		})
 	})
 	dbForEachSiafundOutput(w.dbTx, func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
 		outputs = append(outputs, modules.SpendableOutput{
-			FundType:   types.SpecifierSiafundOutput,
-			ID:         types.OutputID(sfoid),
-			UnlockHash: sfo.UnlockHash,
-			Value:      sfo.Value,
+			FundType:         types.SpecifierSiafundOutput,
+			ID:               types.OutputID(sfoid),
+			UnlockConditions: w.keys[sfo.UnlockHash].UnlockConditions,
+			Value:            sfo.Value,
 		})
 	})
 
@@ -682,7 +682,7 @@ func (w *Wallet) SpendableOutputs() []modules.SpendableOutput {
 	// set the confirmation height for each output
 outer:
 	for i, o := range outputs {
-		txnIndices, _ := dbGetAddrTransactions(w.dbTx, o.UnlockHash)
+		txnIndices, _ := dbGetAddrTransactions(w.dbTx, o.UnlockConditions.UnlockHash())
 		for _, j := range txnIndices {
 			pt, err := dbGetProcessedTransaction(w.dbTx, j)
 			if err != nil {
@@ -704,7 +704,7 @@ outer:
 				outputs = append(outputs, modules.SpendableOutput{
 					FundType:           types.SpecifierSiacoinOutput,
 					ID:                 o.ID,
-					UnlockHash:         o.RelatedAddress,
+					UnlockConditions:   w.keys[o.RelatedAddress].UnlockConditions,
 					Value:              o.Value,
 					ConfirmationHeight: types.BlockHeight(math.MaxUint64), // unconfirmed
 				})
@@ -715,11 +715,9 @@ outer:
 	return outputs
 }
 
-// SignTransaction signs txn using secret keys known to the wallet. toSign
-// maps the ParentID of each unsigned input to the UnlockHash of that input's
-// desired UnlockConditions. SignTransaction fills in the UnlockConditions for
-// each such input and adds a corresponding signature.
-func (w *Wallet) SignTransaction(txn *types.Transaction, toSign map[types.OutputID]types.UnlockHash) error {
+// SignTransaction signs txn using secret keys known to the wallet, adding a
+// TransactionSignature for each input whose ParentID is specified in toSign.
+func (w *Wallet) SignTransaction(txn *types.Transaction, toSign []types.OutputID) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if !w.unlocked {
@@ -728,15 +726,13 @@ func (w *Wallet) SignTransaction(txn *types.Transaction, toSign map[types.Output
 	return signTransaction(txn, w.keys, toSign)
 }
 
-// SignTransaction signs txn using secret keys derived from seed. toSign maps
-// the ParentID of each unsigned input to the UnlockHash of that input's
-// desired UnlockConditions. SignTransaction fills in the UnlockConditions for
-// each such input and adds a corresponding signature.
+// SignTransaction signs txn using secret keys known to the wallet, adding a
+// TransactionSignature for each input whose ParentID is specified in toSign.
 //
 // SignTransaction must derive all of the keys from scratch, so it is
 // appreciably slower than calling the Wallet.SignTransaction method. Only the
 // first 1 million keys are derived.
-func SignTransaction(txn *types.Transaction, seed modules.Seed, toSign map[types.OutputID]types.UnlockHash) error {
+func SignTransaction(txn *types.Transaction, seed modules.Seed, toSign []types.OutputID) error {
 	// generate keys in batches up to 1e6 before giving up
 	keys := make(map[types.UnlockHash]spendableKey, 1e6)
 	var keyIndex uint64
@@ -755,41 +751,40 @@ func SignTransaction(txn *types.Transaction, seed modules.Seed, toSign map[types
 
 // signTransaction signs the specified inputs of txn using the specified keys.
 // It returns an error if any of the specified inputs cannot be signed.
-func signTransaction(txn *types.Transaction, keys map[types.UnlockHash]spendableKey, toSign map[types.OutputID]types.UnlockHash) error {
+func signTransaction(txn *types.Transaction, keys map[types.UnlockHash]spendableKey, toSign []types.OutputID) error {
+	signing := make(map[types.OutputID]bool)
+	for _, oid := range toSign {
+		signing[oid] = true
+	}
+
 	signed := 0
-	for i, sci := range txn.SiacoinInputs {
-		uh, ok := toSign[types.OutputID(sci.ParentID)]
-		if !ok {
-			// not signing this input
+	for _, sci := range txn.SiacoinInputs {
+		if !signing[types.OutputID(sci.ParentID)] {
 			continue
 		}
 		// lookup the signing key(s)
-		sk, ok := keys[uh]
+		sk, ok := keys[sci.UnlockConditions.UnlockHash()]
 		if !ok {
-			return errors.New("could not locate signing key for " + uh.String())
+			return errors.New("could not locate signing key for input" + sci.ParentID.String())
 		}
-		txn.SiacoinInputs[i].UnlockConditions = sk.UnlockConditions
 		cf := types.CoveredFields{WholeTransaction: true}
-		addSignatures(txn, cf, sk.UnlockConditions, crypto.Hash(sci.ParentID), sk)
+		addSignatures(txn, cf, sci.UnlockConditions, crypto.Hash(sci.ParentID), sk)
 		signed++
 	}
-	for i, sfi := range txn.SiafundInputs {
-		uh, ok := toSign[types.OutputID(sfi.ParentID)]
-		if !ok {
-			// not signing this input
+	for _, sfi := range txn.SiafundInputs {
+		if !signing[types.OutputID(sfi.ParentID)] {
 			continue
 		}
 		// lookup the signing key(s)
-		sk, ok := keys[uh]
+		sk, ok := keys[sfi.UnlockConditions.UnlockHash()]
 		if !ok {
-			return errors.New("could not locate signing key for " + uh.String())
+			return errors.New("could not locate signing key for input" + sfi.ParentID.String())
 		}
-		txn.SiafundInputs[i].UnlockConditions = sk.UnlockConditions
 		cf := types.CoveredFields{WholeTransaction: true}
 		addSignatures(txn, cf, sk.UnlockConditions, crypto.Hash(sfi.ParentID), sk)
 		signed++
 	}
-	if signed != len(toSign) {
+	if signed != len(signing) {
 		return errors.New("toSign references OutputIDs not present in transaction")
 	}
 	return nil
