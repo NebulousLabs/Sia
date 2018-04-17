@@ -27,10 +27,14 @@ package host
 
 // TODO: Make sure that not too many action items are being created.
 
+// TODO: The ProofConstructed and NegotiationHeight fields of storageObligation
+// are not set or used.
+
 import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"strconv"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -139,12 +143,28 @@ type storageObligation struct {
 
 	// Variables indicating whether the critical transactions in a storage
 	// obligation have been confirmed on the blockchain.
-	OriginConfirmed     bool
-	RevisionConstructed bool
-	RevisionConfirmed   bool
-	ProofConstructed    bool
-	ProofConfirmed      bool
 	ObligationStatus    storageObligationStatus
+	OriginConfirmed     bool
+	ProofConfirmed      bool
+	ProofConstructed    bool
+	RevisionConfirmed   bool
+	RevisionConstructed bool
+}
+
+func (i storageObligationStatus) String() string {
+	if i == 0 {
+		return "obligationUnresolved"
+	}
+	if i == 1 {
+		return "obligationRejected"
+	}
+	if i == 2 {
+		return "obligationSucceeded"
+	}
+	if i == 3 {
+		return "obligationFailed"
+	}
+	return "storageObligationStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 }
 
 // getStorageObligation fetches a storage obligation from the database tx.
@@ -870,14 +890,27 @@ func (h *Host) StorageObligations() (sos []modules.StorageObligation) {
 				return build.ExtendErr("unable to unmarshal storage obligation:", err)
 			}
 			mso := modules.StorageObligation{
-				NegotiationHeight: so.NegotiationHeight,
+				ContractCost:             so.ContractCost,
+				DataSize:                 so.fileSize(),
+				LockedCollateral:         so.LockedCollateral,
+				ObligationId:             so.id(),
+				PotentialDownloadRevenue: so.PotentialDownloadRevenue,
+				PotentialStorageRevenue:  so.PotentialStorageRevenue,
+				PotentialUploadRevenue:   so.PotentialUploadRevenue,
+				RiskedCollateral:         so.RiskedCollateral,
+				SectorRootsCount:         uint64(len(so.SectorRoots)),
+				TransactionFeesAdded:     so.TransactionFeesAdded,
 
+				ExpirationHeight:  so.expiration(),
+				NegotiationHeight: so.NegotiationHeight,
+				ProofDeadLine:     so.proofDeadline(),
+
+				ObligationStatus:    so.ObligationStatus.String(),
 				OriginConfirmed:     so.OriginConfirmed,
-				RevisionConstructed: so.RevisionConstructed,
-				RevisionConfirmed:   so.RevisionConfirmed,
-				ProofConstructed:    so.ProofConstructed,
 				ProofConfirmed:      so.ProofConfirmed,
-				ObligationStatus:    uint64(so.ObligationStatus),
+				ProofConstructed:    so.ProofConstructed,
+				RevisionConfirmed:   so.RevisionConfirmed,
+				RevisionConstructed: so.RevisionConstructed,
 			}
 			sos = append(sos, mso)
 			return nil

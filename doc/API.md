@@ -273,6 +273,7 @@ Host
 | [/host](#host-get)                                                                         | GET       |
 | [/host](#host-post)                                                                        | POST      |
 | [/host/announce](#hostannounce-post)                                                       | POST      |
+| [/host/contracts](#hostcontracts-get)							     | GET	 |
 | [/host/estimatescore](#hostestimatescore-get)                                              | GET       |
 | [/host/storage](#hoststorage-get)                                                          | GET       |
 | [/host/storage/folders/add](#hoststoragefoldersadd-post)                                   | POST      |
@@ -408,11 +409,46 @@ netaddress string // Optional
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
+#### /host/contracts [GET]
+
+gets a list of all contracts from the host database
+
+###### JSON Response [(with comments)](/doc/api/Host.md#json-response-1)
+```javascript
+{
+  "contracts": [
+    {
+      "contractcost":			"1234",		// hastings
+      "datasize":			500000,		// bytes
+      "lockedcollateral":		"1234",		// hastings
+      "obligationid":			"fff48010dcbbd6ba7ffd41bc4b25a3634ee58bbf688d2f06b7d5a0c837304e13",
+      "potentialdownloadrevenue":	"1234",		// hastings
+      "potentialstoragerevenue":	"1234",		// hastings
+      "potentialuploadrevenue":		"1234",		// hastings
+      "riskedcollateral":		"1234",		// hastings
+      "sectorrootscount":		2,
+      "transactionfeesadded":		"1234",		// hastings
+
+      "expirationheight":		123456,		// blocks
+      "negotiationheight":		123456,		// blocks
+      "proofdeadline":			123456,		// blocks
+
+      "obligationstatus":		"obligationFailed",
+      "originconfirmed":		true,
+      "proofconfirmed":			true,
+      "proofconstructed":		true
+      "revisionconfirmed":		false,
+      "revisionconstructed":		false,
+    }
+  ]
+}
+```
+
 #### /host/storage [GET]
 
 gets a list of folders tracked by the host's storage manager.
 
-###### JSON Response [(with comments)](/doc/api/Host.md#json-response-1)
+###### JSON Response [(with comments)](/doc/api/Host.md#json-response-2)
 ```javascript
 {
   "folders": [
@@ -503,7 +539,7 @@ standard success or error response. See
 returns the estimated HostDB score of the host using its current settings,
 combined with the provided settings.
 
-###### JSON Response [(with comments)](/doc/api/Host.md#json-response-2)
+###### JSON Response [(with comments)](/doc/api/Host.md#json-response-3)
 ```javascript
 {
 	"estimatedscore": "123456786786786786786786786742133",
