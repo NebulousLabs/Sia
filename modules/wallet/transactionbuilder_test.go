@@ -469,8 +469,7 @@ func TestSignTransaction(t *testing.T) {
 	// create a transaction that sends an output to the void
 	txn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
-			ParentID:         types.SiacoinOutputID(outputs[0].ID),
-			UnlockConditions: outputs[0].UnlockConditions,
+			ParentID: types.SiacoinOutputID(outputs[0].ID),
 		}},
 		SiacoinOutputs: []types.SiacoinOutput{{
 			Value:      outputs[0].Value,
@@ -479,7 +478,9 @@ func TestSignTransaction(t *testing.T) {
 	}
 
 	// sign the transaction
-	err = wt.wallet.SignTransaction(&txn, []types.OutputID{outputs[0].ID})
+	err = wt.wallet.SignTransaction(&txn, map[types.OutputID]types.UnlockHash{
+		outputs[0].ID: outputs[0].UnlockHash,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

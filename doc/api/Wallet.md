@@ -512,11 +512,11 @@ specified.
   // unsigned transaction
   "transaction": { }, // types.Transaction
 
-  // inputs to sign; must correspond to ParentIDs of inputs in transaction
-  "tosign": [
-    "3689bd3489679aabcde02e01345abcde",
-    "132cee478a9bb98bdd23cf05376cdf2a"
-  ]
+  // inputs to sign; a mapping from OutputID to UnlockHash
+  "tosign": {
+    "3689bd3489679aabcde02e01345abcde": "138950f0129d74acd4eade3453b45678",
+    "132cee478a9bb98bdd23cf05376cdf2a": "7cbcd123578234ce0f12fe01a68ba9bf"
+  }
 }
 ```
 
@@ -759,15 +759,8 @@ returns a list of outputs that the wallet can spend.
       // block height.
       "confirmationheight": 50000,
 
-      // UnlockConditions that must be satisfied to spend the output.
-      "unlockconditions": {
-        "timelock": 0,
-        "publickeys": [{
-          "algorithm": "ed25519",
-          "key": "AADBM1ca/FyURfizmSukoUQ2S0GwXMit1iNSeYgrnhXOPAAA",
-        }],
-        "signaturesrequired": 1
-      },
+      // UnlockHash of the output.
+      "unlockhash": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
 
       // Amount of funds in the output; hastings for siacoin outputs, and
       // siafunds for siafund outputs.
