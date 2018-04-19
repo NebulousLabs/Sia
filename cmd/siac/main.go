@@ -87,7 +87,7 @@ func main() {
 	updateCmd.AddCommand(updateCheckCmd)
 
 	root.AddCommand(hostCmd)
-	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostFolderCmd, hostSectorCmd)
+	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostFolderCmd, hostContractCmd, hostSectorCmd)
 	hostFolderCmd.AddCommand(hostFolderAddCmd, hostFolderRemoveCmd, hostFolderResizeCmd)
 	hostSectorCmd.AddCommand(hostSectorDeleteCmd)
 	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
