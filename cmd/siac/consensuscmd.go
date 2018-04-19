@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -22,8 +21,7 @@ var (
 // consensuscmd is the handler for the command `siac consensus`.
 // Prints the current state of consensus.
 func consensuscmd() {
-	var cg api.ConsensusGET
-	err := getAPI("/consensus", &cg)
+	cg, err := httpClient.ConsensusGet()
 	if err != nil {
 		die("Could not get current consensus state:", err)
 	}

@@ -58,14 +58,14 @@ func NewCleanNode(nodeParams node.NodeParams) (*TestNode, error) {
 	tn := &TestNode{*s, *c, ""}
 
 	// Init wallet
-	wip, err := tn.WalletInitPost("", false)
+	wip, err := tn.WalletInitPost("", "english", false)
 	if err != nil {
 		return nil, err
 	}
 	tn.primarySeed = wip.PrimarySeed
 
 	// Unlock wallet
-	if err := tn.WalletUnlockPost(tn.primarySeed); err != nil {
+	if err := tn.WalletUnlockPost(tn.primarySeed, "english"); err != nil {
 		return nil, err
 	}
 

@@ -30,6 +30,15 @@ func (c *Client) RenterDownloadGet(siaPath, destination string, offset, length u
 	return
 }
 
+// RenterDownloadFullGet uses the /renter/download endpoint to download a full
+// file.
+func (c *Client) RenterDownloadFullGet(siaPath, destination string, async bool) (err error) {
+	query := fmt.Sprintf("%s?destination=%s&httpresp=false&async=%v",
+		siaPath, destination, async)
+	err = c.get("/renter/download/"+query, nil)
+	return
+}
+
 // RenterDownloadsGet requests the /renter/downloads resource
 func (c *Client) RenterDownloadsGet() (rdq api.RenterDownloadQueue, err error) {
 	err = c.get("/renter/downloads", &rdq)
@@ -44,9 +53,15 @@ func (c *Client) RenterDownloadHTTPResponseGet(siaPath string, offset, length ui
 	return
 }
 
-// RenterFilesGet requests the /renter/files resource
+// RenterFilesGet requests the /renter/files resource.
 func (c *Client) RenterFilesGet() (rf api.RenterFiles, err error) {
 	err = c.get("/renter/files", &rf)
+	return
+}
+
+// RenterGet requests the /renter resource.
+func (c *Client) RenterGet() (rg api.RenterGET, err error) {
+	err = c.get("/renter", &rg)
 	return
 }
 
@@ -61,6 +76,18 @@ func (c *Client) RenterPostAllowance(allowance modules.Allowance) (err error) {
 	return
 }
 
+// RenterCancelAllowance uses the /renter endpoint to cancel the allowance.
+func (c *Client) RenterCancelAllowance() (err error) {
+	err = c.RenterPostAllowance(modules.Allowance{})
+	return
+}
+
+// RenterPricesGet requests the /renter/prices endpoint's resources.
+func (c *Client) RenterPricesGet() (rpg api.RenterPricesGET, err error) {
+	err = c.get("/renter/prices", &rpg)
+	return
+}
+
 // RenterPostRateLimit uses the /renter endpoint to change the renter's bandwidth rate
 // limit.
 func (c *Client) RenterPostRateLimit(readBPS, writeBPS int64) (err error) {
@@ -68,6 +95,12 @@ func (c *Client) RenterPostRateLimit(readBPS, writeBPS int64) (err error) {
 	values.Set("maxdownloadspeed", strconv.FormatInt(readBPS, 10))
 	values.Set("maxuploadspeed", strconv.FormatInt(writeBPS, 10))
 	err = c.post("/renter", values.Encode(), nil)
+	return
+}
+
+// RenterRenamePost uses the /renter/rename/:siapath endpoint to rename a file.
+func (c *Client) RenterRenamePost(siaPathOld, siaPathNew string) (err error) {
+	err = c.post("/renter/rename/"+siaPathOld, "newsiapath="+siaPathNew, nil)
 	return
 }
 
@@ -85,12 +118,21 @@ func (c *Client) RenterStreamPartialGet(siaPath string, start, end uint64) (resp
 	return
 }
 
-// RenterUploadPost uses the /renter/upload endpoin to upload a file
+// RenterUploadPost uses the /renter/upload endpoint to upload a file
 func (c *Client) RenterUploadPost(path, siaPath string, dataPieces, parityPieces uint64) (err error) {
 	values := url.Values{}
 	values.Set("source", path)
 	values.Set("datapieces", strconv.FormatUint(dataPieces, 10))
 	values.Set("paritypieces", strconv.FormatUint(parityPieces, 10))
+	err = c.post(fmt.Sprintf("/renter/upload%v", siaPath), values.Encode(), nil)
+	return
+}
+
+// RenterUploadDefaultPost uses the /renter/upload endpoint with default
+// redundancy settings to upload a file.
+func (c *Client) RenterUploadDefaultPost(path, siaPath string) (err error) {
+	values := url.Values{}
+	values.Set("source", path)
 	err = c.post(fmt.Sprintf("/renter/upload%v", siaPath), values.Encode(), nil)
 	return
 }

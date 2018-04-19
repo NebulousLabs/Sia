@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/NebulousLabs/Sia/node/api"
-
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +32,7 @@ var (
 // minerstartcmd is the handler for the command `siac miner start`.
 // Starts the CPU miner.
 func minerstartcmd() {
-	err := get("/miner/start")
+	err := httpClient.MinerStartGet()
 	if err != nil {
 		die("Could not start miner:", err)
 	}
@@ -44,8 +42,7 @@ func minerstartcmd() {
 // minercmd is the handler for the command `siac miner`.
 // Prints the status of the miner.
 func minercmd() {
-	status := new(api.MinerGET)
-	err := getAPI("/miner", status)
+	status, err := httpClient.MinerGet()
 	if err != nil {
 		die("Could not get miner status:", err)
 	}
@@ -64,7 +61,7 @@ Blocks Mined: %d (%d stale)
 // minerstopcmd is the handler for the command `siac miner stop`.
 // Stops the CPU miner.
 func minerstopcmd() {
-	err := get("/miner/stop")
+	err := httpClient.MinerStopGet()
 	if err != nil {
 		die("Could not stop miner:", err)
 	}
