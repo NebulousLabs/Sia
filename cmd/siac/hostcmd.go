@@ -72,6 +72,25 @@ To configure the host to accept new contracts, set acceptingcontracts to true:
 		Run: wrap(hostconfigcmd),
 	}
 
+	hostContractCmd = &cobra.Command{
+		Use:   "contracts [format] [filter]",
+		Short: "Show host contracts",
+		Long: `Show host contracts sorted by expiration height.
+
+Available formats:
+     value:  show financial information
+     status: show status information
+
+Available filters:
+     all:        show all obligations
+     failed:     show obligations with status failed
+     unresolved: show obligations with status unresolved
+     rejected:   show obligations with status rejected
+     succeeded:  show obligations with status succeeded
+`,
+		Run: wrap(hostcontractcmd),
+	}
+
 	hostFolderAddCmd = &cobra.Command{
 		Use:   "add [path] [size]",
 		Short: "Add a storage folder to the host",
@@ -385,6 +404,58 @@ func hostconfigcmd(param, value string) {
 		die("could not get host score estimate:", err)
 	}
 	fmt.Printf("Estimated conversion rate: %v%%\n", eg.ConversionRate)
+}
+
+// hostcontractcmd is the handler for the command `siac host contracts [format] [filter]`.
+func hostcontractcmd(format, filter string) {
+	switch format {
+	case "value", "status":
+		break
+	default:
+		die("\"" + format + "\" is not a format")
+
+	}
+	switch filter {
+	case "rejected":
+		filter = "obligationRejected"
+	case "failed":
+		filter = "obligationFailed"
+	case "succeeded":
+		filter = "obligationSucceeded"
+	case "unresolved":
+		filter = "obligationUnresolved"
+	case "all":
+		filter = "all"
+	default:
+		die("\"" + filter + "\" is not a filter value")
+	}
+	cg := new(api.ContractInfoGET)
+	err := getAPI("/host/contracts", cg)
+	if err != nil {
+		die("Could not fetch host contract info:", err)
+	}
+	sort.Slice(cg.Contracts, func(i, j int) bool { return cg.Contracts[i].ExpirationHeight < cg.Contracts[j].ExpirationHeight })
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
+	if format == "value" {
+		fmt.Fprintf(w, "Obligation Id\tObligation Status\tContract Cost\tLocked Collateral\tRisked Collateral\tPotential Revenue\tExpiration Height\tTransaction Fees\n")
+		for _, so := range cg.Contracts {
+			if so.ObligationStatus == filter || filter == "all" {
+				potentialRevenue := so.PotentialDownloadRevenue.Add(so.PotentialUploadRevenue).Add(so.PotentialStorageRevenue)
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\n", so.ObligationId, so.ObligationStatus, currencyUnits(so.ContractCost), currencyUnits(so.LockedCollateral),
+					currencyUnits(so.RiskedCollateral), currencyUnits(potentialRevenue), so.ExpirationHeight, currencyUnits(so.TransactionFeesAdded))
+			}
+		}
+	}
+	if format == "status" {
+		fmt.Fprintf(w, "Obligation Id\tObligation Status\tExpiration Height\tOrigin Confirmed\tRevision Constructed\tRevision Confirmed\tProof Constructed\tProof Confirmed\n")
+		for _, so := range cg.Contracts {
+			if so.ObligationStatus == filter || filter == "all" {
+				fmt.Fprintf(w, "%s\t%s\t%d\t%t\t%t\t%t\t%t\t%t\n", so.ObligationId, so.ObligationStatus, so.ExpirationHeight, so.OriginConfirmed,
+					so.RevisionConstructed, so.RevisionConfirmed, so.ProofConstructed, so.ProofConfirmed)
+			}
+		}
+	}
+	w.Flush()
 }
 
 // hostannouncecmd is the handler for the command `siac host announce`.
