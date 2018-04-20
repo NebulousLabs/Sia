@@ -139,9 +139,12 @@ func (mr *merkleRoots) delete(i int) error {
 	if err != nil {
 		return errors.AddContext(err, "failed to swap root to delete with last one")
 	}
-	// If the deleted root was cached we need to rebuild that cache.
-	if cacheIndex, cached := mr.isIndexCached(i); cached {
-		err = mr.rebuildCachedTree(cacheIndex)
+	// If the deleted root was not cached we swap the roots in memory too.
+	// Otherwise we rebuild the cachedSubTree.
+	if index, cached := mr.isIndexCached(i); !cached {
+		mr.uncachedRoots[index] = mr.uncachedRoots[len(mr.uncachedRoots)-1]
+	} else {
+		err = mr.rebuildCachedTree(index)
 	}
 	if err != nil {
 		return errors.AddContext(err, "failed to rebuild cached tree")
@@ -208,7 +211,7 @@ func (mr *merkleRoots) insert(index int, root crypto.Hash) error {
 // mr.cachedSubTree or if it is still in mr.uncachedRoots. It will return true
 // or false and the index of the root in the corresponding data structure.
 func (mr *merkleRoots) isIndexCached(i int) (int, bool) {
-	if i/(1<<merkleRootsCacheHeight) == len(mr.cachedSubTrees) {
+	if i/merkleRootsPerCache == len(mr.cachedSubTrees) {
 		// Root is not cached. Return the false and the position in
 		// mr.uncachedRoots
 		return i - len(mr.cachedSubTrees)*merkleRootsPerCache, false
