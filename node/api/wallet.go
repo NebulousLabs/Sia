@@ -504,12 +504,12 @@ func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 	// Get the start and end blocks.
-	start, err := strconv.Atoi(startheightStr)
+	start, err := strconv.ParseUint(startheightStr, 10, 64)
 	if err != nil {
 		WriteError(w, Error{"parsing integer value for parameter `startheight` failed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	end, err := strconv.Atoi(endheightStr)
+	end, err := strconv.ParseUint(endheightStr, 10, 64)
 	if err != nil {
 		WriteError(w, Error{"parsing integer value for parameter `endheight` failed: " + err.Error()}, http.StatusBadRequest)
 		return

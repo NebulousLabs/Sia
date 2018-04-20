@@ -170,7 +170,7 @@ func addStorageFolderToHosts(hosts map[*TestNode]struct{}) error {
 // announceHosts adds storage to each host and announces them to the group
 func announceHosts(hosts map[*TestNode]struct{}) error {
 	for host := range hosts {
-		if err := host.HostAcceptingContractsPost(true); err != nil {
+		if err := host.HostModifySettingPost(client.HostParamAcceptingContracts, true); err != nil {
 			return errors.AddContext(err, "failed to set host to accepting contracts")
 		}
 		if err := host.HostAnnouncePost(); err != nil {

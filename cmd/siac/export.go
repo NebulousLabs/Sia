@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/spf13/cobra"
@@ -31,8 +30,7 @@ var (
 // renterexportcontracttxnscmd is the handler for the command `siac renter export contract-txns`.
 // Exports the current contract set to JSON.
 func renterexportcontracttxnscmd(destination string) {
-	var cs api.RenterContracts
-	err := getAPI("/renter/contracts", &cs)
+	cs, err := httpClient.RenterContractsGet()
 	if err != nil {
 		die("Could not retrieve contracts:", err)
 	}

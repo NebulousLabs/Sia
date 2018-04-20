@@ -5,9 +5,8 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/spf13/cobra"
-
-	"github.com/NebulousLabs/Sia/node/api"
 )
 
 var (
@@ -50,7 +49,7 @@ var (
 // gatewayconnectcmd is the handler for the command `siac gateway add [address]`.
 // Adds a new peer to the peer list.
 func gatewayconnectcmd(addr string) {
-	err := post("/gateway/connect/"+addr, "")
+	err := httpClient.GatewayConnectPost(modules.NetAddress(addr))
 	if err != nil {
 		die("Could not add peer:", err)
 	}
@@ -60,7 +59,7 @@ func gatewayconnectcmd(addr string) {
 // gatewaydisconnectcmd is the handler for the command `siac gateway remove [address]`.
 // Removes a peer from the peer list.
 func gatewaydisconnectcmd(addr string) {
-	err := post("/gateway/disconnect/"+addr, "")
+	err := httpClient.GatewayDisconnectPost(modules.NetAddress(addr))
 	if err != nil {
 		die("Could not remove peer:", err)
 	}
@@ -70,8 +69,7 @@ func gatewaydisconnectcmd(addr string) {
 // gatewayaddresscmd is the handler for the command `siac gateway address`.
 // Prints the gateway's network address.
 func gatewayaddresscmd() {
-	var info api.GatewayGET
-	err := getAPI("/gateway", &info)
+	info, err := httpClient.GatewayGet()
 	if err != nil {
 		die("Could not get gateway address:", err)
 	}
@@ -81,8 +79,7 @@ func gatewayaddresscmd() {
 // gatewaycmd is the handler for the command `siac gateway`.
 // Prints the gateway's network address and number of peers.
 func gatewaycmd() {
-	var info api.GatewayGET
-	err := getAPI("/gateway", &info)
+	info, err := httpClient.GatewayGet()
 	if err != nil {
 		die("Could not get gateway address:", err)
 	}
@@ -93,8 +90,7 @@ func gatewaycmd() {
 // gatewaylistcmd is the handler for the command `siac gateway list`.
 // Prints a list of all peers.
 func gatewaylistcmd() {
-	var info api.GatewayGET
-	err := getAPI("/gateway", &info)
+	info, err := httpClient.GatewayGet()
 	if err != nil {
 		die("Could not get peer list:", err)
 	}

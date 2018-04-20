@@ -13,3 +13,15 @@ func (c *Client) DaemonStopGet() (err error) {
 	err = c.get("/daemon/stop", nil)
 	return
 }
+
+// DaemonUpdateGet checks for an available daemon update.
+func (c *Client) DaemonUpdateGet() (dig api.DaemonUpdateGet, err error) {
+	err = c.get("/daemon/update", nil)
+	return
+}
+
+// DaemonUpdatePost updates the daemon.
+func (c *Client) DaemonUpdatePost() (err error) {
+	err = c.post("/daemon/update", "", nil)
+	return
+}

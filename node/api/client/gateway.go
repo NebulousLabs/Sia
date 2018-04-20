@@ -23,6 +23,13 @@ func (c *Client) GatewayConnectPost(address modules.NetAddress) (err error) {
 	return
 }
 
+// GatewayDisconnectPost uses the /gateway/disconnect/:address endpoint to
+// disconnect the gateway from a peer.
+func (c *Client) GatewayDisconnectPost(address modules.NetAddress) (err error) {
+	err = c.post("/gateway/disconnect/"+string(address), "", nil)
+	return
+}
+
 // GatewayGet requests the /gateway api resource
 func (c *Client) GatewayGet() (gwg api.GatewayGET, err error) {
 	err = c.get("/gateway", &gwg)
