@@ -152,7 +152,7 @@ type Gateway struct {
 	threads    siasync.ThreadGroup
 
 	// Unique ID
-	id gatewayID
+	staticId gatewayID
 }
 
 type gatewayID [8]byte
@@ -205,7 +205,7 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 	}
 
 	// Set Unique GatewayID
-	fastrand.Read(g.id[:])
+	fastrand.Read(g.staticId[:])
 
 	// Create the logger.
 	g.log, err = persist.NewFileLogger(filepath.Join(g.persistDir, logFile))
