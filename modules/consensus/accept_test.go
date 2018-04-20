@@ -866,7 +866,6 @@ func TestInconsistentCheck(t *testing.T) {
 // This test checks that the hardfork scheduled for block 21,000 rolls through
 // smoothly.
 func TestTaxHardfork(t *testing.T) {
-	t.Skip("Removed tax compat code from testing due to NDFs")
 	if testing.Short() {
 		t.SkipNow()
 	}
