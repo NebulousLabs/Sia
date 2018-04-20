@@ -14,7 +14,7 @@ import (
 // API. It is primarily used as a helper struct to ensure type safety.
 type HostParam string
 
-var (
+const (
 	// HostParamCollateralBudget is the collateral budget of the host in
 	// hastings.
 	HostParamCollateralBudget = HostParam("collateralbudget")

@@ -255,7 +255,7 @@ func walletinitcmd() {
 			die(err)
 		}
 	}
-	er, err := httpClient.WalletInitPost(password, "english", initForce)
+	er, err := httpClient.WalletInitPost(password, initForce)
 	if err != nil {
 		die("Error when encrypting wallet:", err)
 	}
@@ -282,7 +282,7 @@ func walletinitseedcmd() {
 			die(err)
 		}
 	}
-	err = httpClient.WalletInitSeedPost(seed, password, "english", initForce)
+	err = httpClient.WalletInitSeedPost(seed, password, initForce)
 	if err != nil {
 		die("Could not initialize wallet from seed:", err)
 	}
@@ -316,7 +316,7 @@ func walletloadseedcmd() {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	err = httpClient.WalletSeedPost(seed, password, "english")
+	err = httpClient.WalletSeedPost(seed, password)
 	if err != nil {
 		die("Could not add seed:", err)
 	}
@@ -457,7 +457,7 @@ func walletsweepcmd() {
 		die("Reading seed failed:", err)
 	}
 
-	swept, err := httpClient.WalletSweepPost(seed, "english")
+	swept, err := httpClient.WalletSweepPost(seed)
 	if err != nil {
 		die("Could not sweep seed:", err)
 	}
@@ -533,7 +533,7 @@ func walletunlockcmd() {
 	password := os.Getenv("SIA_WALLET_PASSWORD")
 	if password != "" && !initPassword {
 		fmt.Println("Using SIA_WALLET_PASSWORD environment variable")
-		err := httpClient.WalletUnlockPost(password, "english")
+		err := httpClient.WalletUnlockPost(password)
 		if err != nil {
 			fmt.Println("Automatic unlock failed!")
 		} else {
@@ -545,7 +545,7 @@ func walletunlockcmd() {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	err = httpClient.WalletUnlockPost(password, "english")
+	err = httpClient.WalletUnlockPost(password)
 	if err != nil {
 		die("Could not unlock wallet:", err)
 	}

@@ -141,8 +141,8 @@ func main() {
 	}
 	// initialize client
 	root.PersistentFlags().StringVarP(&httpClient.Address, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
-	root.PersistentFlags().StringVarP(&httpClient.Password, "apipassword", "x", apiPassword, "the password for the API's http authentication")
-	root.PersistentFlags().StringVarP(&httpClient.UserAgent, "useragent", "u", "Sia-Agent", "the useragent used by siac to connect to the daemon's API")
+	root.PersistentFlags().StringVarP(&httpClient.Password, "apipassword", "", apiPassword, "the password for the API's http authentication")
+	root.PersistentFlags().StringVarP(&httpClient.UserAgent, "useragent", "", "Sia-Agent", "the useragent used by siac to connect to the daemon's API")
 
 	// run
 	if err := root.Execute(); err != nil {

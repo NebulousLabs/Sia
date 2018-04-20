@@ -35,9 +35,8 @@ func (c *Client) WalletChangePasswordPost(currentPassword, newPassword string) (
 
 // WalletInitPost uses the /wallet/init endpoint to initialize and encrypt a
 // wallet
-func (c *Client) WalletInitPost(password, dictionary string, force bool) (wip api.WalletInitPOST, err error) {
+func (c *Client) WalletInitPost(password string, force bool) (wip api.WalletInitPOST, err error) {
 	values := url.Values{}
-	values.Set("dictionary", dictionary)
 	values.Set("encryptionpassword", password)
 	values.Set("force", strconv.FormatBool(force))
 	err = c.post("/wallet/init", values.Encode(), &wip)
@@ -46,10 +45,9 @@ func (c *Client) WalletInitPost(password, dictionary string, force bool) (wip ap
 
 // WalletInitSeedPost uses the /wallet/init/seed endpoint to initialize and
 // encrypt a wallet using a given seed.
-func (c *Client) WalletInitSeedPost(seed, password, dictionary string, force bool) (err error) {
+func (c *Client) WalletInitSeedPost(seed, password string, force bool) (err error) {
 	values := url.Values{}
 	values.Set("seed", seed)
-	values.Set("dictionary", dictionary)
 	values.Set("encryptionpassword", password)
 	values.Set("force", strconv.FormatBool(force))
 	err = c.post("/wallet/init/seed", values.Encode(), nil)
@@ -70,10 +68,9 @@ func (c *Client) WalletLockPost() (err error) {
 
 // WalletSeedPost uses the /wallet/seed endpoint to add a seed to the wallet's list
 // of seeds.
-func (c *Client) WalletSeedPost(seed, password, dictionary string) (err error) {
+func (c *Client) WalletSeedPost(seed, password string) (err error) {
 	values := url.Values{}
 	values.Set("seed", seed)
-	values.Set("dictionary", dictionary)
 	values.Set("encryptionpassword", password)
 	err = c.post("/wallet/seed", values.Encode(), nil)
 	return
@@ -131,10 +128,9 @@ func (c *Client) WalletSiagKeyPost(keyfiles, password string) (err error) {
 
 // WalletSweepPost uses the /wallet/sweep/seed endpoint to sweep a seed into
 // the current wallet.
-func (c *Client) WalletSweepPost(seed, dictionary string) (wsp api.WalletSweepPOST, err error) {
+func (c *Client) WalletSweepPost(seed string) (wsp api.WalletSweepPOST, err error) {
 	values := url.Values{}
 	values.Set("seed", seed)
-	values.Set("dictionary", dictionary)
 	err = c.post("/wallet/sweep/seed", values.Encode(), &wsp)
 	return
 }
@@ -149,10 +145,9 @@ func (c *Client) WalletTransactionsGet(startHeight types.BlockHeight, endHeight 
 
 // WalletUnlockPost uses the /wallet/unlock endpoint to unlock the wallet with
 // a given encryption key. Per default this key is the seed.
-func (c *Client) WalletUnlockPost(password, dictionary string) (err error) {
+func (c *Client) WalletUnlockPost(password string) (err error) {
 	values := url.Values{}
 	values.Set("encryptionpassword", password)
-	values.Set("dictionary", dictionary)
 	err = c.post("/wallet/unlock", values.Encode(), nil)
 	return
 }
