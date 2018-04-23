@@ -69,13 +69,19 @@ $ cd $GOPATH/src/github.com/NebulousLabs/Sia
 
 # You have three Sia builds to choose from.
 # To build the standard release binary:
-$ make release-std
+$ make release
 # Or to build the release binary with race detection and an array debugging 
 # asserts:
-$ make release
+$ make release-race
 # Or to build the developer binary (with a different genesis block, faster 
 # block times, and other changes):
-$ make
+$ make dev
+# Or build the developer binary with race detection:
+$ make dev-race
+# Build the debugger binary:
+$ make debug
+# Or build debugger binary with race detection:
+$ make debug-race
 ```
 
 <a name="contribute"/>
