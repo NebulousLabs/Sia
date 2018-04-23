@@ -15,13 +15,14 @@ import (
 // A Downloader retrieves sectors by calling the download RPC on a host.
 // Downloaders are NOT thread- safe; calls to Sector must be serialized.
 type Downloader struct {
+	closeChan   chan struct{}
+	conn        net.Conn
 	contractID  types.FileContractID
 	contractSet *ContractSet
-	host        modules.HostDBEntry
-	conn        net.Conn
-	closeChan   chan struct{}
-	once        sync.Once
+	deps        modules.Dependencies
 	hdb         hostDB
+	host        modules.HostDBEntry
+	once        sync.Once
 }
 
 // Sector retrieves the sector with the specified Merkle root, and revises
@@ -114,8 +115,8 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	}
 
 	// Disrupt here before updating the contract.
-	if cs.deps.Disrupt("DownloadCrashBeforeCommit") {
-		return modules.RenterContract{}, errors.New("DownloadCrashBeforeCommit disrupt")
+	if hd.deps.Disrupt("DownloadCrashBeforeCommit") {
+		return modules.RenterContract{}, nil, errors.New("DownloadCrashBeforeCommit disrupt")
 	}
 
 	// update contract and metrics
@@ -146,7 +147,7 @@ func (hd *Downloader) Close() error {
 
 // NewDownloader initiates the download request loop with a host, and returns a
 // Downloader.
-func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileContractID, hdb hostDB, cancel <-chan struct{}) (_ *Downloader, err error) {
+func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileContractID, hdb hostDB, cancel <-chan struct{}, deps modules.Dependencies) (_ *Downloader, err error) {
 	sc, ok := cs.Acquire(id)
 	if !ok {
 		return nil, errors.New("invalid contract")
@@ -198,6 +199,7 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 		host:        host,
 		conn:        conn,
 		closeChan:   closeChan,
+		deps:        deps,
 		hdb:         hdb,
 	}, nil
 }

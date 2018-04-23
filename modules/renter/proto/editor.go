@@ -30,9 +30,10 @@ type Editor struct {
 	contractSet *ContractSet
 	conn        net.Conn
 	closeChan   chan struct{}
-	once        sync.Once
-	host        modules.HostDBEntry
+	deps        modules.Dependencies
 	hdb         hostDB
+	host        modules.HostDBEntry
+	once        sync.Once
 
 	height types.BlockHeight
 }
@@ -147,8 +148,8 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 	}
 
 	// Disrupt here before updating the contract.
-	if cs.deps.Disrupt("UploadCrashBeforeCommit") {
-		return modules.RenterContract{}, errors.New("UploadCrashBeforeCommit disrupt")
+	if he.deps.Disrupt("UploadCrashBeforeCommit") {
+		return modules.RenterContract{}, crypto.Hash{}, errors.New("UploadCrashBeforeCommit disrupt")
 	}
 
 	// update contract
@@ -162,7 +163,7 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 
 // NewEditor initiates the contract revision process with a host, and returns
 // an Editor.
-func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContractID, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}) (_ *Editor, err error) {
+func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContractID, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}, deps modules.Dependencies) (_ *Editor, err error) {
 	sc, ok := cs.Acquire(id)
 	if !ok {
 		return nil, errors.New("invalid contract")
@@ -210,6 +211,7 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		contractSet: cs,
 		conn:        conn,
 		closeChan:   closeChan,
+		deps:        deps,
 	}, nil
 }
 

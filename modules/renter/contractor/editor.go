@@ -171,7 +171,7 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	}()
 
 	// Create the editor.
-	e, err := c.contracts.NewEditor(host, contract.ID, height, c.hdb, cancel)
+	e, err := c.contracts.NewEditor(host, contract.ID, height, c.hdb, cancel, c.deps)
 	if err != nil {
 		return nil, err
 	}
