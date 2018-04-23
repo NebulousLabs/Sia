@@ -348,3 +348,79 @@ func TestDownloadInterrupted(t *testing.T) {
 		t.Fatal("Failed to download the file", err)
 	}
 }
+
+// TestUploadInterrupted let's the upload fail randomly and makes sure that
+// this doesn't corrupt the contract.
+func TestUploadInterrupted(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Inject dependencies to allow us to interrupt the upload.
+	deps := &dependencyRenterInterruptUploadBeforeCommit{}
+
+	// Get a directory for testing.
+	testDir, err := siatest.TestDir(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a group with a single renter and two hosts using the dependencies
+	// for the renter.
+	renterTemplate := node.Renter(testDir + "/renter")
+	renterTemplate.ContractSetDeps = deps
+	tg, err := siatest.NewGroup(renterTemplate, node.Host(testDir+"/host1"),
+		node.Host(testDir+"/host2"), siatest.Miner(testDir+"/miner"))
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Set the bandwidth limit to 1 chunk per second.
+	renter := tg.Renters()[0]
+	dataPieces := uint64(1)
+	parityPieces := uint64(1)
+	chunkSize := siatest.ChunkSize(uint64(dataPieces))
+	if err := renter.RenterPostRateLimit(int64(chunkSize), int64(chunkSize)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Call fail on the dependency every two seconds to allow some uploads to
+	// finish.
+	cancel := make(chan struct{})
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go func() {
+		// Loop until cancel was closed or we reach 5 iterations. Otherwise we
+		// might end up blocking the upload for too long.
+		for i := 0; i < 5; i++ {
+			// Cause the next upload to fail.
+			deps.fail()
+			select {
+			case <-cancel:
+				wg.Done()
+				return
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+		wg.Done()
+	}()
+
+	// Upload a file that's 1 chunk large.
+	_, remoteFile, err := renter.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Stop calling fail on the dependency.
+	close(cancel)
+	wg.Wait()
+	deps.f = false
+	// Download the file.
+	if _, err := renter.DownloadByStream(remoteFile); err != nil {
+		t.Fatal("Failed to download the file", err)
+	}
+}
