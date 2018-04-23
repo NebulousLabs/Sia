@@ -147,7 +147,7 @@ func (hd *Downloader) Close() error {
 
 // NewDownloader initiates the download request loop with a host, and returns a
 // Downloader.
-func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileContractID, hdb hostDB, cancel <-chan struct{}, deps modules.Dependencies) (_ *Downloader, err error) {
+func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileContractID, hdb hostDB, cancel <-chan struct{}) (_ *Downloader, err error) {
 	sc, ok := cs.Acquire(id)
 	if !ok {
 		return nil, errors.New("invalid contract")
@@ -199,7 +199,7 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 		host:        host,
 		conn:        conn,
 		closeChan:   closeChan,
-		deps:        deps,
+		deps:        cs.deps,
 		hdb:         hdb,
 	}, nil
 }

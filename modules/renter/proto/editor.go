@@ -163,7 +163,7 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 
 // NewEditor initiates the contract revision process with a host, and returns
 // an Editor.
-func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContractID, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}, deps modules.Dependencies) (_ *Editor, err error) {
+func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContractID, currentHeight types.BlockHeight, hdb hostDB, cancel <-chan struct{}) (_ *Editor, err error) {
 	sc, ok := cs.Acquire(id)
 	if !ok {
 		return nil, errors.New("invalid contract")
@@ -211,7 +211,7 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		contractSet: cs,
 		conn:        conn,
 		closeChan:   closeChan,
-		deps:        deps,
+		deps:        cs.deps,
 	}, nil
 }
 
