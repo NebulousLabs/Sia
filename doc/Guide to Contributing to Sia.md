@@ -40,7 +40,7 @@ $ mkdir $HOME/golang
 $ echo 'export GOPATH=$HOME/golang' >> $HOME/.profile
 # add bin subdirectory to PATH environmental variable
 $ echo 'export PATH=$PATH:$GOPATH/bin' >> $HOME/.profile
-# resource your profile
+# source your profile
 $ source $HOME/.profile
 ```
 
