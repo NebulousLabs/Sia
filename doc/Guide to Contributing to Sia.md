@@ -119,6 +119,8 @@ $ cd $GOPATH/src/github.com/NebulousLabs/Sia
 # Add your fork as a remote.  Name it whatever is convenient,
 # e.g your GitHub username
 $ git remote add <remote name> https://github.com/<username>/Sia.git
+# Or if you use an SSH key, create the remote with the following
+$ git remote add <remote name> git@github.com:<username>/Sia.git
 ```
 
 <a name="write"/>
