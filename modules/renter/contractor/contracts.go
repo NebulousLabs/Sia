@@ -591,7 +591,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	}
 	initialContractFunds := c.allowance.Funds.Div64(c.allowance.Hosts).Div64(3)
 	c.mu.RUnlock()
-	hosts, err := c.hdb.RandomHosts(neededContracts*2+10, exclude)
+	hosts, err := c.hdb.RandomHosts(neededContracts*2+randomHostsBufferForScore, exclude)
 	if err != nil {
 		c.log.Println("WARN: not forming new contracts:", err)
 		return
