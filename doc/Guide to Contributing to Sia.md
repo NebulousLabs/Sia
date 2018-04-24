@@ -29,21 +29,6 @@ You should install the latest [official Go binary][binary] for your system (if
 not available, [install from source][source]).  If you plan to cross compile 
 Sia, see [Cross Compilation with Go 1.5][cross] by Dave Cheney.  
 
-Now make a workspace directory in which you will store source code and 
-dependencies.  You can choose any filepath except where you installed Go (don't 
-choose `/usr/local`).
-
-```bash
-# make a working directory called golang in your home directory
-$ mkdir $HOME/golang
-# store base path in an environmental variable
-$ echo 'export GOPATH=$HOME/golang' >> $HOME/.profile
-# add bin subdirectory to PATH environmental variable
-$ echo 'export PATH=$PATH:$GOPATH/bin' >> $HOME/.profile
-# source your profile
-$ source $HOME/.profile
-```
-
 <a name="learn-go"/>
 
 ### Learn Go
