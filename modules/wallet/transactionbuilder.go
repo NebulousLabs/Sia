@@ -390,12 +390,21 @@ func (tb *transactionBuilder) UnconfirmedParents() (parents []types.Transaction)
 		for _, sci := range p.SiacoinInputs {
 			tSet := tb.wallet.tpool.TransactionSet(crypto.Hash(sci.ParentID))
 			for _, txn := range tSet {
+				// Add the transaction to the parents.
 				txnID := txn.ID()
 				if _, exists := addedParents[txnID]; exists {
 					continue
 				}
 				addedParents[txnID] = struct{}{}
 				parents = append(parents, txn)
+
+				// When we found the transaction that contains the output that
+				// is spent by sci we stop to avoid adding child transactions.
+				for i := range txn.SiacoinOutputs {
+					if txn.SiacoinOutputID(uint64(i)) == sci.ParentID {
+						break
+					}
+				}
 			}
 		}
 	}
