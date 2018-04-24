@@ -168,7 +168,7 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	for fcid, fileContract := range f.contracts {
 		recentContract, exists := r.hostContractor.ContractByID(fcid)
 		contractUtility, exists2 := r.hostContractor.ContractUtility(fcid)
-		if (exists && !exists2) || (!exists && exists) {
+		if exists != exists2 {
 			build.Critical("got a contract without utility or vice versa which shouldn't happen",
 				exists, exists2)
 		}
