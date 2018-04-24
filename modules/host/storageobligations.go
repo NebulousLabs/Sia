@@ -771,18 +771,6 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 	if !so.ProofConfirmed && blockHeight >= so.expiration()+resubmissionTimeout {
 		h.log.Debugln("Host is attempting a storage proof for", so.id())
 
-		// If the window has closed, the host has failed and the obligation can
-		// be removed.
-		if so.proofDeadline() < blockHeight {
-			h.log.Debugln("storage proof not confirmed by deadline, id", so.id())
-			h.mu.Lock()
-			err := h.removeStorageObligation(so, obligationFailed)
-			h.mu.Unlock()
-			if err != nil {
-				h.log.Println("Error removing storage obligation:", err)
-			}
-			return
-		}
 		// If the obligation has no sector roots, we can remove the obligation and not
 		// submit a storage proof. The host payout for a failed empty contract
 		// includes the contract cost and locked collateral.
@@ -796,7 +784,18 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 			}
 			return
 		}
-
+		// If the window has closed, the host has failed and the obligation can
+		// be removed.
+		if so.proofDeadline() < blockHeight {
+			h.log.Debugln("storage proof not confirmed by deadline, id", so.id())
+			h.mu.Lock()
+			err := h.removeStorageObligation(so, obligationFailed)
+			h.mu.Unlock()
+			if err != nil {
+				h.log.Println("Error removing storage obligation:", err)
+			}
+			return
+		}
 		// Get the index of the segment, and the index of the sector containing
 		// the segment.
 		segmentIndex, err := h.cs.StorageProofSegment(so.id())
