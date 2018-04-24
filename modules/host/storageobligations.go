@@ -576,10 +576,11 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 	if sos == obligationSucceeded {
 		// Empty obligations don't submit a storage proof. The revenue for an empty
 		// storage obligation should equal the contract cost of the obligation
+		revenue := so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue)
 		if len(so.SectorRoots) == 0 {
-			h.log.Printf("Not submitted a storage proof for empty contract. Revenue is %v.\n", so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue))
+			h.log.Printf("Not submitted a storage proof for empty contract. Revenue is %v.\n", revenue)
 		} else {
-			h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue))
+			h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", revenue)
 		}
 
 		// Remove the obligation statistics as potential risk and income.
