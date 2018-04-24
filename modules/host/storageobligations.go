@@ -574,8 +574,15 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 		}
 	}
 	if sos == obligationSucceeded {
+		// Empty obligations don't submit a storage proof. The revenue for an empty
+		// storage obligation should equal the contract cost of the obligation
+		if len(so.SectorRoots) == 0 {
+			h.log.Printf("Not submitted a storage proof for empty contract. Revenue is %v.\n", so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue))
+		} else {
+			h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue))
+		}
+
 		// Remove the obligation statistics as potential risk and income.
-		h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue))
 		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
 		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
 		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
@@ -779,7 +786,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		// submit a storage proof. The host payout for a failed empty contract
 		// includes the contract cost and locked collateral.
 		if len(so.SectorRoots) == 0 {
-			h.logDebugln("storage proof not submitted for empty contract, id", so.id())
+			h.log.Debugln("storage proof not submitted for empty contract, id", so.id())
 			h.mu.Lock()
 			err := h.removeStorageObligation(so, obligationSucceeded)
 			h.mu.Unlock()
