@@ -264,15 +264,13 @@ func (tp *TransactionPool) TransactionSet(oid crypto.Hash) []types.Transaction {
 	var parents []types.Transaction
 	tSetID, exists := tp.knownObjects[ObjectID(oid)]
 	if !exists {
-		return parents
+		return nil
 	}
 	tSet, exists := tp.transactionSets[tSetID]
 	if !exists {
-		return parents
+		return nil
 	}
-	for _, txn := range tSet {
-		parents = append(parents, txn)
-	}
+	parents = append(parents, tSet...)
 	return parents
 }
 
