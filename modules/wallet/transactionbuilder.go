@@ -382,8 +382,8 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	return nil
 }
 
-// UnconfirmedParents returns any unconfirmed parents the transaction set that
-// is being built by the transaction builder could have.
+// UnconfirmedParents returns the unconfirmed parents of the transaction set
+// that is being constructed by the transaction builder.
 func (tb *transactionBuilder) UnconfirmedParents() (parents []types.Transaction) {
 	addedParents := make(map[types.TransactionID]struct{})
 	for _, p := range tb.parents {
