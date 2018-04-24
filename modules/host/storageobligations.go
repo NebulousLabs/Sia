@@ -765,10 +765,23 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 
 		// If the window has closed, the host has failed and the obligation can
 		// be removed.
-		if so.proofDeadline() < blockHeight || len(so.SectorRoots) == 0 {
+		if so.proofDeadline() < blockHeight {
 			h.log.Debugln("storage proof not confirmed by deadline, id", so.id())
 			h.mu.Lock()
 			err := h.removeStorageObligation(so, obligationFailed)
+			h.mu.Unlock()
+			if err != nil {
+				h.log.Println("Error removing storage obligation:", err)
+			}
+			return
+		}
+		// If the obligation has no sector roots, we can remove the obligation and not
+		// submit a storage proof. The host payout for a failed empty contract
+		// includes the contract cost and locked collateral.
+		if len(so.SectorRoots) == 0 {
+			h.logDebugln("storage proof not submitted for empty contract, id", so.id())
+			h.mu.Lock()
+			err := h.removeStorageObligation(so, obligationSucceeded)
 			h.mu.Unlock()
 			if err != nil {
 				h.log.Println("Error removing storage obligation:", err)
