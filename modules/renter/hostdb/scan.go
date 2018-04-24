@@ -302,7 +302,7 @@ func (hdb *HostDB) managedWaitForScans() {
 		}
 		select {
 		case <-hdb.tg.StopChan():
-		case <-time.After(time.Second):
+		case <-time.After(scanCheckInterval):
 		}
 	}
 }
@@ -355,7 +355,7 @@ func (hdb *HostDB) threadedScan() {
 		select {
 		case <-hdb.tg.StopChan():
 			return
-		case <-time.After(time.Second):
+		case <-time.After(scanCheckInterval):
 		}
 	}
 

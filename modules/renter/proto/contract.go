@@ -29,6 +29,9 @@ type updateSetHeader struct {
 	Header contractHeader
 }
 
+// v132UpdateHeader was introduced due to backwards compatibility reasons after
+// changing the format of the contractHeader. It contains the legacy
+// v132ContractHeader.
 type v132UpdateSetHeader struct {
 	ID     types.FileContractID
 	Header v132ContractHeader
@@ -61,6 +64,8 @@ type contractHeader struct {
 	Utility          modules.ContractUtility
 }
 
+// v132ContractHeader is a contractHeader without the Utility field. This field
+// was added after v132 to be able to persist contract utilities.
 type v132ContractHeader struct {
 	// transaction is the signed transaction containing the most recent
 	// revision of the file contract.
