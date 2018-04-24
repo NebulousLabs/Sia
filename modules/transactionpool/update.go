@@ -2,6 +2,7 @@ package transactionpool
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -193,7 +194,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Sanity check - the id of each reverted block should match the recent
 		// parent id.
 		if block.ID() != recentID && !resetSanityCheck {
-			panic("Consensus change series appears to be inconsistent - we are reverting the wrong block.")
+			panic(fmt.Sprintf("Consensus change series appears to be inconsistent - we are reverting the wrong block. bid: %v recent: %v", block.ID(), recentID))
 		}
 		recentID = block.ParentID
 
@@ -220,7 +221,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Sanity check - the parent id of each block should match the current
 		// block id.
 		if block.ParentID != recentID && !resetSanityCheck {
-			panic("Consensus change series appears to be inconsistent - we are applying the wrong block.")
+			panic(fmt.Sprintf("Consensus change series appears to be inconsistent - we are applying the wrong block. pid: %v recent: %v", block.ParentID, recentID))
 		}
 		recentID = block.ID()
 
