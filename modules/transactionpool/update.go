@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -187,8 +186,7 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 		tp.log.Println("NOTE: Upgrading tpool database to support consensus change verification.")
 		resetSanityCheck = true
 	} else if err != nil {
-		tp.log.Println("ERROR: Could not access recentID from tpool:", err)
-		build.Critical("ERROR: Could not access recentID from tpool:", err)
+		tp.log.Critical("ERROR: Could not access recentID from tpool:", err)
 	}
 
 	// Update the database of confirmed transactions.
