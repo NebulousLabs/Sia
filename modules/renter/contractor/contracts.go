@@ -28,9 +28,9 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 	return c.currentPeriod + c.allowance.Period
 }
 
-// contractUtility returns the ContractUtility for a contract with a given id.
-func (c *Contractor) contractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
-	rc, exists := c.contracts.View(c.resolveID(id))
+// readlockContractUtility returns the ContractUtility for a contract with a given id.
+func (c *Contractor) readlockContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
+	rc, exists := c.contracts.View(c.readlockResolveID(id))
 	if !exists {
 		return modules.ContractUtility{}, false
 	}
@@ -73,7 +73,7 @@ func (c *Contractor) managedMarkContractsUtility() error {
 	c.mu.RLock()
 	hostCount := int(c.allowance.Hosts)
 	c.mu.RUnlock()
-	hosts, err := c.hdb.RandomHosts(hostCount+minScoreHostBuffer, nil)
+	hosts, err := c.hdb.RandomHosts(hostCount+randomHostsBufferForScore, nil)
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 	contract := sc.Metadata()
 	// Sanity check - should not be renewing a bad contract.
 	c.mu.RLock()
-	utility, ok := c.contractUtility(contract.ID)
+	utility, ok := c.readlockContractUtility(contract.ID)
 	c.mu.RUnlock()
 	if !ok || !utility.GoodForRenew {
 		c.log.Critical(fmt.Sprintf("Renewing a contract that has been marked as !GoodForRenew %v/%v",
@@ -364,7 +364,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		// Iterate through the contracts again, figuring out which contracts to
 		// renew and how much extra funds to renew them with.
 		for _, contract := range c.contracts.ViewAll() {
-			utility, ok := c.contractUtility(contract.ID)
+			utility, ok := c.readlockContractUtility(contract.ID)
 			if !ok || !utility.GoodForRenew {
 				continue
 			}
@@ -486,7 +486,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 			// Return the contract if it's not useful for renewing.
 			c.mu.RLock()
-			oldUtility, ok := c.contractUtility(id)
+			oldUtility, ok := c.readlockContractUtility(id)
 			c.mu.RUnlock()
 			if !ok || !oldUtility.GoodForRenew {
 				c.log.Printf("Contract %v slated for renew is marked not good for renew %v/%v",
@@ -571,7 +571,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	c.mu.RLock()
 	uploadContracts := 0
 	for _, id := range c.contracts.IDs() {
-		if cu, ok := c.contractUtility(id); ok && cu.GoodForUpload {
+		if cu, ok := c.readlockContractUtility(id); ok && cu.GoodForUpload {
 			uploadContracts++
 		}
 	}

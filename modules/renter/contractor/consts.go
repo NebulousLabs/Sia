@@ -13,9 +13,9 @@ var (
 	// contract.
 	minContractFundRenewalThreshold = float64(0.03) // 3%
 
-	// minScoreHostBuffer defines how many extra hosts are queried when trying
+	// randomHostsBufferForScore defines how many extra hosts are queried when trying
 	// to figure out an appropriate minimum score for the hosts that we have.
-	minScoreHostBuffer = build.Select(build.Var{
+	randomHostsBufferForScore = build.Select(build.Var{
 		Dev:      2,
 		Standard: 10,
 		Testing:  1,

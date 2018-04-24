@@ -65,8 +65,8 @@ type Contractor struct {
 	renewedIDs   map[types.FileContractID]types.FileContractID
 }
 
-// resolveID returns the ID of the most recent renewal of id.
-func (c *Contractor) resolveID(id types.FileContractID) types.FileContractID {
+// readlockResolveID returns the ID of the most recent renewal of id.
+func (c *Contractor) readlockResolveID(id types.FileContractID) types.FileContractID {
 	newID, exists := c.renewedIDs[id]
 	for exists {
 		id = newID
@@ -126,7 +126,7 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContract, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.contracts.View(c.resolveID(id))
+	return c.contracts.View(c.readlockResolveID(id))
 }
 
 // Contracts returns the contracts formed by the contractor in the current
@@ -142,7 +142,7 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 func (c *Contractor) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.contractUtility(id)
+	return c.readlockContractUtility(id)
 }
 
 // CurrentPeriod returns the height at which the current allowance period
@@ -156,7 +156,7 @@ func (c *Contractor) CurrentPeriod() types.BlockHeight {
 // ResolveID returns the ID of the most recent renewal of id.
 func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	c.mu.RLock()
-	newID := c.resolveID(id)
+	newID := c.readlockResolveID(id)
 	c.mu.RUnlock()
 	return newID
 }
