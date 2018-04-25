@@ -200,7 +200,7 @@ type (
 
 		// UnconfirmedParents returns any unconfirmed parents the transaction set that
 		// is being built by the transaction builder could have.
-		UnconfirmedParents() []types.Transaction
+		UnconfirmedParents() ([]types.Transaction, error)
 
 		// View returns the incomplete transaction along with all of its
 		// parents.

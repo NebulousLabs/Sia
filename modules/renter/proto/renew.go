@@ -99,7 +99,10 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 
 	// Create initial transaction set.
 	txn, parentTxns := txnBuilder.View()
-	unconfirmedParents := txnBuilder.UnconfirmedParents()
+	unconfirmedParents, err := txnBuilder.UnconfirmedParents()
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
 	txnSet := append(unconfirmedParents, append(parentTxns, txn)...)
 
 	// Increase Successful/Failed interactions accordingly

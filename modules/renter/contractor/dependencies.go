@@ -38,7 +38,7 @@ type (
 		Drop()
 		FundSiacoins(types.Currency) error
 		Sign(bool) ([]types.Transaction, error)
-		UnconfirmedParents() []types.Transaction
+		UnconfirmedParents() ([]types.Transaction, error)
 		View() (types.Transaction, []types.Transaction)
 		ViewAdded() (parents, coins, funds, signatures []int)
 	}

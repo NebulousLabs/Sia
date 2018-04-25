@@ -486,7 +486,10 @@ func TestUnconfirmedParents(t *testing.T) {
 
 	// UnconfirmedParents should return the transactions of the transaction set
 	// we used to send money to ourselves.
-	parents := b.UnconfirmedParents()
+	parents, err := b.UnconfirmedParents()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(tSet) != len(parents) {
 		t.Fatal("parents should have same length as unconfirmed transaction set")
 	}
