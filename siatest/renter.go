@@ -119,7 +119,7 @@ func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (*api.DownloadIn
 	if di.Length != di.Filesize {
 		err = errors.AddContext(err, "filesize != length")
 	}
-	// Received data can't be larger than transfered data
+	// Received data can't be larger than transferred data
 	if di.Received > di.TotalDataTransferred {
 		err = errors.AddContext(err, "received > TotalDataTransfered")
 	}
