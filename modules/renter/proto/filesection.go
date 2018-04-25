@@ -69,6 +69,13 @@ func (f *fileSection) Sync() error {
 
 // Truncate calls Truncate on the fileSection's underlying file.
 func (f *fileSection) Truncate(size int64) error {
+	currentSize, err := f.Size()
+	if err != nil {
+		return err
+	}
+	if currentSize == f.end-f.start && f.end != -1 {
+		panic("can't shrink section that has reached its max size unless it has no end boundary")
+	}
 	if f.start+size < f.start {
 		panic("can't truncate file to be smaller than the section start")
 	}
