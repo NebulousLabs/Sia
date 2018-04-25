@@ -75,7 +75,7 @@ type hostDB interface {
 	// RandomHosts returns a set of random hosts, weighted by their estimated
 	// usefulness / attractiveness to the renter. RandomHosts will not return
 	// any offline or inactive hosts.
-	RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry
+	RandomHosts(int, []types.SiaPublicKey) ([]modules.HostDBEntry, error)
 
 	// ScoreBreakdown returns a detailed explanation of the various properties
 	// of the host.
@@ -224,7 +224,10 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 	}
 
 	// Grab hosts to perform the estimation.
-	hosts := r.hostDB.RandomHosts(priceEstimationScope, nil)
+	hosts, err := r.hostDB.RandomHosts(priceEstimationScope, nil)
+	if err != nil {
+		return modules.RenterPriceEstimation{}
+	}
 
 	// Check if there are zero hosts, which means no estimation can be made.
 	if len(hosts) == 0 {

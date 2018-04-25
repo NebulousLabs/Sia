@@ -107,8 +107,8 @@ func (stubHostDB) AllHosts() []modules.HostDBEntry      { return nil }
 func (stubHostDB) AverageContractPrice() types.Currency { return types.Currency{} }
 func (stubHostDB) Close() error                         { return nil }
 func (stubHostDB) IsOffline(modules.NetAddress) bool    { return true }
-func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry {
-	return []modules.HostDBEntry{}
+func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
+	return []modules.HostDBEntry{}, nil
 }
 func (stubHostDB) EstimateHostScore(modules.HostDBEntry) modules.HostScoreBreakdown {
 	return modules.HostScoreBreakdown{}
@@ -143,8 +143,8 @@ type pricesStub struct {
 	dbEntries []modules.HostDBEntry
 }
 
-func (ps pricesStub) RandomHosts(n int, exclude []types.SiaPublicKey) []modules.HostDBEntry {
-	return ps.dbEntries
+func (ps pricesStub) RandomHosts(n int, exclude []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
+	return ps.dbEntries, nil
 }
 
 // TestRenterPricesVolatility verifies that the renter caches its price

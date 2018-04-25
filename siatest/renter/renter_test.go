@@ -177,7 +177,7 @@ func testRenterLocalRepair(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 	// Get the file info of the fully uploaded file. Tha way we can compare the
-	// redundancieslater.
+	// redundancies later.
 	fi, err := renter.FileInfo(remoteFile)
 	if err != nil {
 		t.Fatal("failed to get file info", err)

@@ -19,6 +19,7 @@ type (
 		AddTransactionSignature(types.TransactionSignature) uint64
 		FundSiacoins(types.Currency) error
 		Sign(bool) ([]types.Transaction, error)
+		UnconfirmedParents() ([]types.Transaction, error)
 		View() (types.Transaction, []types.Transaction)
 		ViewAdded() (parents, coins, funds, signatures []int)
 	}

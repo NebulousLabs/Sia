@@ -46,6 +46,10 @@ const (
 	// saveFrequency defines how frequently the hostdb will save to disk. Hostdb
 	// will also save immediately prior to shutdown.
 	saveFrequency = 2 * time.Minute
+
+	// scanCheckInterval is the interval used when waiting for the scanList to
+	// empty itself and for waiting on the consensus set to be synced.
+	scanCheckInterval = time.Second
 )
 
 var (

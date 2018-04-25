@@ -124,6 +124,15 @@ var (
 	TargetWindow BlockHeight
 )
 
+var (
+	// TaxHardforkHeight is the height at which the tax hardfork occured.
+	TaxHardforkHeight = build.Select(build.Var{
+		Dev:      BlockHeight(10),
+		Standard: BlockHeight(21e3),
+		Testing:  BlockHeight(10),
+	}).(BlockHeight)
+)
+
 // init checks which build constant is in place and initializes the variables
 // accordingly.
 func init() {

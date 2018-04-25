@@ -97,9 +97,13 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	// add miner fee
 	txnBuilder.AddMinerFee(txnFee)
 
-	// create initial transaction set
+	// Create initial transaction set.
 	txn, parentTxns := txnBuilder.View()
-	txnSet := append(parentTxns, txn)
+	unconfirmedParents, err := txnBuilder.UnconfirmedParents()
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
+	txnSet := append(unconfirmedParents, append(parentTxns, txn)...)
 
 	// Increase Successful/Failed interactions accordingly
 	defer func() {

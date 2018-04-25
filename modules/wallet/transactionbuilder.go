@@ -382,6 +382,43 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	return nil
 }
 
+// UnconfirmedParents returns the unconfirmed parents of the transaction set
+// that is being constructed by the transaction builder.
+func (tb *transactionBuilder) UnconfirmedParents() (parents []types.Transaction, err error) {
+	// Currently we don't need to call UnconfirmedParents after the transaction
+	// was signed so we don't allow doing that. If for some reason our
+	// requirements change, we can remove this check. The only downside is,
+	// that it might lead to transactions being returned that are not actually
+	// parents in case the signed transaction already has child transactions.
+	if tb.signed {
+		return nil, errBuilderAlreadySigned
+	}
+	addedParents := make(map[types.TransactionID]struct{})
+	for _, p := range tb.parents {
+		for _, sci := range p.SiacoinInputs {
+			tSet := tb.wallet.tpool.TransactionSet(crypto.Hash(sci.ParentID))
+			for _, txn := range tSet {
+				// Add the transaction to the parents.
+				txnID := txn.ID()
+				if _, exists := addedParents[txnID]; exists {
+					continue
+				}
+				addedParents[txnID] = struct{}{}
+				parents = append(parents, txn)
+
+				// When we found the transaction that contains the output that
+				// is spent by sci we stop to avoid adding child transactions.
+				for i := range txn.SiacoinOutputs {
+					if txn.SiacoinOutputID(uint64(i)) == sci.ParentID {
+						break
+					}
+				}
+			}
+		}
+	}
+	return
+}
+
 // AddParents adds a set of parents to the transaction.
 func (tb *transactionBuilder) AddParents(newParents []types.Transaction) {
 	tb.parents = append(tb.parents, newParents...)

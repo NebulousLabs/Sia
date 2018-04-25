@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -29,9 +28,9 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 	return c.currentPeriod + c.allowance.Period
 }
 
-// staticContractUtility returns the ContractUtility for a contract with a given id.
-func (c *Contractor) staticContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
-	rc, exists := c.contracts.View(c.resolveID(id))
+// readlockContractUtility returns the ContractUtility for a contract with a given id.
+func (c *Contractor) readlockContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
+	rc, exists := c.contracts.View(c.readlockResolveID(id))
 	if !exists {
 		return modules.ContractUtility{}, false
 	}
@@ -74,7 +73,10 @@ func (c *Contractor) managedMarkContractsUtility() error {
 	c.mu.RLock()
 	hostCount := int(c.allowance.Hosts)
 	c.mu.RUnlock()
-	hosts := c.hdb.RandomHosts(hostCount+minScoreHostBuffer, nil)
+	hosts, err := c.hdb.RandomHosts(hostCount+randomHostsBufferForScore, nil)
+	if err != nil {
+		return err
+	}
 
 	// Find the minimum score that a host is allowed to have to be considered
 	// good for upload.
@@ -200,7 +202,9 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 	// For convenience
 	contract := sc.Metadata()
 	// Sanity check - should not be renewing a bad contract.
-	utility, ok := c.staticContractUtility(contract.ID)
+	c.mu.RLock()
+	utility, ok := c.readlockContractUtility(contract.ID)
+	c.mu.RUnlock()
 	if !ok || !utility.GoodForRenew {
 		c.log.Critical(fmt.Sprintf("Renewing a contract that has been marked as !GoodForRenew %v/%v",
 			ok, utility.GoodForRenew))
@@ -283,7 +287,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	// Update the utility fields for this contract based on the most recent
 	// hostdb.
 	if err := c.managedMarkContractsUtility(); err != nil {
-		c.log.Println("Failed to update contracUtilities", err)
+		c.log.Println("WARNING: wasn't able to mark contracts", err)
 		return
 	}
 
@@ -360,7 +364,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		// Iterate through the contracts again, figuring out which contracts to
 		// renew and how much extra funds to renew them with.
 		for _, contract := range c.contracts.ViewAll() {
-			utility, ok := c.staticContractUtility(contract.ID)
+			utility, ok := c.readlockContractUtility(contract.ID)
 			if !ok || !utility.GoodForRenew {
 				continue
 			}
@@ -481,7 +485,9 @@ func (c *Contractor) threadedContractMaintenance() {
 				return
 			}
 			// Return the contract if it's not useful for renewing.
-			oldUtility, ok := c.staticContractUtility(id)
+			c.mu.RLock()
+			oldUtility, ok := c.readlockContractUtility(id)
+			c.mu.RUnlock()
 			if !ok || !oldUtility.GoodForRenew {
 				c.log.Printf("Contract %v slated for renew is marked not good for renew %v/%v",
 					id, ok, oldUtility.GoodForRenew)
@@ -547,7 +553,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			return
 		case <-c.interruptMaintenance:
 			return
-		case <-time.After(contractFormationInterval):
+		default:
 		}
 	}
 
@@ -565,7 +571,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	c.mu.RLock()
 	uploadContracts := 0
 	for _, id := range c.contracts.IDs() {
-		if cu, ok := c.staticContractUtility(id); ok && cu.GoodForUpload {
+		if cu, ok := c.readlockContractUtility(id); ok && cu.GoodForUpload {
 			uploadContracts++
 		}
 	}
@@ -585,7 +591,11 @@ func (c *Contractor) threadedContractMaintenance() {
 	}
 	initialContractFunds := c.allowance.Funds.Div64(c.allowance.Hosts).Div64(3)
 	c.mu.RUnlock()
-	hosts := c.hdb.RandomHosts(neededContracts*2+10, exclude)
+	hosts, err := c.hdb.RandomHosts(neededContracts*2+randomHostsBufferForScore, exclude)
+	if err != nil {
+		c.log.Println("WARN: not forming new contracts:", err)
+		return
+	}
 
 	// Form contracts with the hosts one at a time, until we have enough
 	// contracts.
@@ -631,7 +641,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			return
 		case <-c.interruptMaintenance:
 			return
-		case <-time.After(contractFormationInterval):
+		default:
 		}
 	}
 }
