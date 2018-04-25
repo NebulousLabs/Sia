@@ -26,6 +26,9 @@ const merkleRootsPerCache = 1 << merkleRootsCacheHeight
 type (
 	// merkleRoots is a helper struct that makes it easier to add/insert/remove
 	// merkleRoots within a SafeContract.
+	// Modifying the merkleRoots is not ACID. This means that the SafeContract
+	// has to make sure it uses the WAL correctly to guarantee ACID updates to
+	// the underlying file.
 	merkleRoots struct {
 		// cachedSubTrees are cached trees that can be used to more efficiently
 		// compute the merkle root of a contract.
@@ -36,7 +39,13 @@ type (
 		// cached subTree in cachedSubTrees.
 		uncachedRoots []crypto.Hash
 
-		// file is the file of the safe contract that contains the root.
+		// file is the file of the safe contract that contains the roots. This
+		// file is usually shared with the SafeContract which means multiple
+		// threads could potentially write to the same file. That's why the
+		// SafeContract should never modify the file beyond the
+		// contractHeaderSize and the merkleRoots should never modify data
+		// before that. Both should also use WriteAt and ReadAt instead of
+		// Write and Read.
 		file *os.File
 		// numMerkleRoots is the number of merkle roots in file.
 		numMerkleRoots int

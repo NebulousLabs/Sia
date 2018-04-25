@@ -133,6 +133,13 @@ type SafeContract struct {
 	// applied to the contract file.
 	unappliedTxns []*writeaheadlog.Transaction
 
+	// file is the file of the safe contract that contains the roots. This
+	// file is usually shared with the SafeContract which means multiple
+	// threads could potentially write to the same file. That's why the
+	// SafeContract should never modify the file beyond the
+	// contractHeaderSize and the merkleRoots should never modify data
+	// before that. Both should also use WriteAt and ReadAt instead of
+	// Write and Read.
 	f   *os.File // TODO: use a dependency for this
 	wal *writeaheadlog.WAL
 	mu  sync.Mutex
