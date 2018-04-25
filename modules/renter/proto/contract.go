@@ -133,16 +133,9 @@ type SafeContract struct {
 	// applied to the contract file.
 	unappliedTxns []*writeaheadlog.Transaction
 
-	// file is the file of the safe contract that contains the roots. This
-	// file is usually shared with the SafeContract which means multiple
-	// threads could potentially write to the same file. That's why the
-	// SafeContract should never modify the file beyond the
-	// contractHeaderSize and the merkleRoots should never modify data
-	// before that. Both should also use WriteAt and ReadAt instead of
-	// Write and Read.
-	f   *os.File // TODO: use a dependency for this
-	wal *writeaheadlog.WAL
-	mu  sync.Mutex
+	headerFile *fileSection
+	wal        *writeaheadlog.WAL
+	mu         sync.Mutex
 }
 
 // Metadata returns the metadata of a renter contract
@@ -194,7 +187,7 @@ func (c *SafeContract) UpdateUtility(utility modules.ContractUtility) error {
 		return err
 	}
 	// Sync the change to disk.
-	if err := c.f.Sync(); err != nil {
+	if err := c.headerFile.Sync(); err != nil {
 		return err
 	}
 	// Signal that the update has been applied.
@@ -241,7 +234,7 @@ func (c *SafeContract) makeUpdateSetRoot(root crypto.Hash, index int) writeahead
 func (c *SafeContract) applySetHeader(h contractHeader) error {
 	headerBytes := make([]byte, contractHeaderSize)
 	copy(headerBytes, encoding.Marshal(h))
-	if _, err := c.f.WriteAt(headerBytes, 0); err != nil {
+	if _, err := c.headerFile.WriteAt(headerBytes, 0); err != nil {
 		return err
 	}
 	c.headerMu.Lock()
@@ -251,10 +244,6 @@ func (c *SafeContract) applySetHeader(h contractHeader) error {
 }
 
 func (c *SafeContract) applySetRoot(root crypto.Hash, index int) error {
-	rootOffset := contractHeaderSize + crypto.HashSize*int64(index)
-	if _, err := c.f.WriteAt(root[:], rootOffset); err != nil {
-		return err
-	}
 	return c.merkleRoots.insert(index, root)
 }
 
@@ -297,7 +286,7 @@ func (c *SafeContract) commitUpload(t *writeaheadlog.Transaction, signedTxn type
 	if err := c.applySetRoot(root, c.merkleRoots.len()); err != nil {
 		return err
 	}
-	if err := c.f.Sync(); err != nil {
+	if err := c.headerFile.Sync(); err != nil {
 		return err
 	}
 	if err := t.SignalUpdatesApplied(); err != nil {
@@ -340,7 +329,7 @@ func (c *SafeContract) commitDownload(t *writeaheadlog.Transaction, signedTxn ty
 	if err := c.applySetHeader(newHeader); err != nil {
 		return err
 	}
-	if err := c.f.Sync(); err != nil {
+	if err := c.headerFile.Sync(); err != nil {
 		return err
 	}
 	if err := t.SignalUpdatesApplied(); err != nil {
@@ -374,7 +363,7 @@ func (c *SafeContract) commitTxns() error {
 				}
 			}
 		}
-		if err := c.f.Sync(); err != nil {
+		if err := c.headerFile.Sync(); err != nil {
 			return err
 		}
 		if err := t.SignalUpdatesApplied(); err != nil {
@@ -410,16 +399,15 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
-	// preallocate space for header + roots
-	if err := f.Truncate(contractHeaderSize + crypto.HashSize*int64(len(roots))); err != nil {
-		return modules.RenterContract{}, err
-	}
+	// create fileSections
+	headerSection := newFileSection(f, 0, contractHeaderSize)
+	rootsSection := newFileSection(f, contractHeaderSize+1, -1)
 	// write header
-	if _, err := f.WriteAt(encoding.Marshal(h), 0); err != nil {
+	if _, err := headerSection.WriteAt(encoding.Marshal(h), 0); err != nil {
 		return modules.RenterContract{}, err
 	}
 	// write roots
-	merkleRoots := newMerkleRoots(f)
+	merkleRoots := newMerkleRoots(rootsSection)
 	for _, root := range roots {
 		if err := merkleRoots.push(root); err != nil {
 			return modules.RenterContract{}, err
@@ -431,7 +419,7 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 	sc := &SafeContract{
 		header:      h,
 		merkleRoots: merkleRoots,
-		f:           f,
+		headerFile:  headerSection,
 		wal:         cs.wal,
 	}
 	cs.mu.Lock()
@@ -447,6 +435,9 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 	if err != nil {
 		return err
 	}
+	headerSection := newFileSection(f, 0, contractHeaderSize)
+	rootsSection := newFileSection(f, contractHeaderSize+1, -1)
+
 	// read header
 	var header contractHeader
 	if err := encoding.NewDecoder(f).Decode(&header); err != nil {
@@ -454,8 +445,9 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 	} else if err := header.validate(); err != nil {
 		return err
 	}
+
 	// read merkleRoots
-	merkleRoots, err := loadExistingMerkleRoots(f)
+	merkleRoots, err := loadExistingMerkleRoots(rootsSection)
 	if err != nil {
 		return err
 	}
@@ -491,7 +483,7 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 		header:        header,
 		merkleRoots:   merkleRoots,
 		unappliedTxns: unappliedTxns,
-		f:             f,
+		headerFile:    headerSection,
 		wal:           cs.wal,
 	}
 	return nil

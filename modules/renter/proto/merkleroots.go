@@ -4,10 +4,9 @@ package proto
 // startup. For petabytes of data this might take a long time.
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -39,14 +38,8 @@ type (
 		// cached subTree in cachedSubTrees.
 		uncachedRoots []crypto.Hash
 
-		// file is the file of the safe contract that contains the roots. This
-		// file is usually shared with the SafeContract which means multiple
-		// threads could potentially write to the same file. That's why the
-		// SafeContract should never modify the file beyond the
-		// contractHeaderSize and the merkleRoots should never modify data
-		// before that. Both should also use WriteAt and ReadAt instead of
-		// Write and Read.
-		file *os.File
+		// rootsFile is the rootsFile of the safe contract that contains the roots.
+		rootsFile *fileSection
 		// numMerkleRoots is the number of merkle roots in file.
 		numMerkleRoots int
 	}
@@ -63,9 +56,9 @@ type (
 
 // loadExistingMerkleRoots reads creates a merkleRoots object from existing
 // merkle roots.
-func loadExistingMerkleRoots(file *os.File) (*merkleRoots, error) {
+func loadExistingMerkleRoots(file *fileSection) (*merkleRoots, error) {
 	mr := &merkleRoots{
-		file: file,
+		rootsFile: file,
 	}
 	// Get the number of roots stored in the file.
 	var err error
@@ -73,12 +66,17 @@ func loadExistingMerkleRoots(file *os.File) (*merkleRoots, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Seek to the first root's offset.
-	if _, err = file.Seek(fileOffsetFromRootIndex(0), io.SeekStart); err != nil {
+	// Get the size of the file and read it.
+	var size int64
+	if size, err = file.Size(); err != nil {
+		return nil, err
+	}
+	fileData := make([]byte, size)
+	if _, err := file.ReadAt(fileData, 0); err != nil {
 		return nil, err
 	}
 	// Read the roots from the file without reading all of them at once.
-	r := bufio.NewReader(file)
+	r := bytes.NewBuffer(fileData)
 	for i := 0; i < mr.numMerkleRoots; i++ {
 		var root crypto.Hash
 		if _, err = io.ReadFull(r, root[:]); err == io.EOF {
@@ -109,16 +107,16 @@ func newCachedSubTree(roots []crypto.Hash) *cachedSubTree {
 // newMerkleRoots creates a new merkleRoots object. This doesn't load existing
 // roots from file and will assume that the file doesn't contain any roots.
 // Don't use this on a file that contains roots.
-func newMerkleRoots(file *os.File) *merkleRoots {
+func newMerkleRoots(file *fileSection) *merkleRoots {
 	return &merkleRoots{
-		file: file,
+		rootsFile: file,
 	}
 }
 
 // fileOffsetFromRootIndex calculates the offset of the merkle root at index i from
 // the beginning of the contract file.
 func fileOffsetFromRootIndex(i int) int64 {
-	return contractHeaderSize + crypto.HashSize*int64(i)
+	return crypto.HashSize * int64(i)
 }
 
 // appendRootMemory appends a root to the in-memory structure of the merkleRoots. If
@@ -151,7 +149,7 @@ func (mr *merkleRoots) delete(i int) error {
 		}
 	}
 	// Swap the root at index i with the last root in mr.uncachedRoots.
-	_, err := mr.file.WriteAt(mr.uncachedRoots[len(mr.uncachedRoots)-1][:], fileOffsetFromRootIndex(i))
+	_, err := mr.rootsFile.WriteAt(mr.uncachedRoots[len(mr.uncachedRoots)-1][:], fileOffsetFromRootIndex(i))
 	if err != nil {
 		return errors.AddContext(err, "failed to swap root to delete with last one")
 	}
@@ -175,7 +173,7 @@ func (mr *merkleRoots) deleteLastRoot() error {
 	// Decrease the numMerkleRoots counter.
 	mr.numMerkleRoots--
 	// Truncate file to avoid interpreting trailing data as valid.
-	if err := mr.file.Truncate(fileOffsetFromRootIndex(mr.numMerkleRoots)); err != nil {
+	if err := mr.rootsFile.Truncate(fileOffsetFromRootIndex(mr.numMerkleRoots)); err != nil {
 		return errors.AddContext(err, "failed to delete last root from file")
 	}
 	// If the last element is uncached we can simply remove it from the slice.
@@ -202,7 +200,7 @@ func (mr *merkleRoots) insert(index int, root crypto.Hash) error {
 		return mr.push(root)
 	}
 	// Replaced the root on disk.
-	_, err := mr.file.WriteAt(root[:], fileOffsetFromRootIndex(index))
+	_, err := mr.rootsFile.WriteAt(root[:], fileOffsetFromRootIndex(index))
 	if err != nil {
 		return errors.AddContext(err, "failed to insert root on disk")
 	}
@@ -236,21 +234,16 @@ func (mr *merkleRoots) isIndexCached(i int) (int, bool) {
 // lenFromFile returns the number of merkle roots by computing it from the
 // filesize.
 func (mr *merkleRoots) lenFromFile() (int, error) {
-	stat, err := mr.file.Stat()
+	size, err := mr.rootsFile.Size()
 	if err != nil {
 		return 0, err
 	}
-	size := stat.Size()
-	// If we haven't written a single root yet we just return 0.
-	if size < contractHeaderSize {
-		return 0, nil
-	}
 
 	// Sanity check contract file length.
-	if (size-contractHeaderSize)%crypto.HashSize != 0 {
+	if size%crypto.HashSize != 0 {
 		return 0, errors.New("contract file has unexpected length and might be corrupted")
 	}
-	return int((size - contractHeaderSize) / crypto.HashSize), nil
+	return int(size / crypto.HashSize), nil
 }
 
 // len returns the number of merkle roots. It should always return the same
@@ -281,7 +274,7 @@ func (mr *merkleRoots) push(root crypto.Hash) error {
 	}
 	// Calculate the root offset within the file and write it to disk.
 	rootOffset := fileOffsetFromRootIndex(mr.len())
-	if _, err := mr.file.WriteAt(root[:], rootOffset); err != nil {
+	if _, err := mr.rootsFile.WriteAt(root[:], rootOffset); err != nil {
 		return err
 	}
 	// Add the root to the unached roots.
@@ -343,10 +336,12 @@ func (mr *merkleRoots) merkleRoots() (roots []crypto.Hash, err error) {
 // merkleRootsFrom index reads all the merkle roots in range [from;to)
 func (mr *merkleRoots) merkleRootsFromIndexFromDisk(from, to int) ([]crypto.Hash, error) {
 	merkleRoots := make([]crypto.Hash, 0, to-from)
-	if _, err := mr.file.Seek(fileOffsetFromRootIndex(from), io.SeekStart); err != nil {
-		return merkleRoots, err
+	// Get the size of the file and read it.
+	fileData := make([]byte, fileOffsetFromRootIndex(to)-fileOffsetFromRootIndex(from))
+	if _, err := mr.rootsFile.ReadAt(fileData, fileOffsetFromRootIndex(from)); err != nil {
+		return nil, err
 	}
-	r := bufio.NewReader(mr.file)
+	r := bytes.NewBuffer(fileData)
 	for i := from; to-i > 0; i++ {
 		var root crypto.Hash
 		if _, err := io.ReadFull(r, root[:]); err == io.EOF {
