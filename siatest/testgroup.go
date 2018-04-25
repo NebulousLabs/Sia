@@ -186,15 +186,23 @@ func fullyConnectNodes(nodes []*TestNode) error {
 	// Fully connect the nodes
 	for i, nodeA := range nodes {
 		for _, nodeB := range nodes[i+1:] {
-			isPeer, err := nodeA.hasPeer(nodeB)
+			err := build.Retry(100, 100*time.Millisecond, func() error {
+				if err := nodeA.GatewayConnectPost(nodeB.GatewayAddress()); err != nil && err != client.ErrPeerExists {
+					return errors.AddContext(err, "failed to connect to peer")
+				}
+				isPeer1, err1 := nodeA.hasPeer(nodeB)
+				isPeer2, err2 := nodeB.hasPeer(nodeA)
+				if err1 != nil || err2 != nil {
+					return build.ExtendErr("couldn't determine if nodeA and nodeB are connected",
+						errors.Compose(err1, err2))
+				}
+				if isPeer1 && isPeer2 {
+					return nil
+				}
+				return errors.New("nodeA and nodeB are not peers of each other")
+			})
 			if err != nil {
-				return build.ExtendErr("couldn't determine if nodeB is a peer of nodeA", err)
-			}
-			if isPeer {
-				continue
-			}
-			if err := nodeA.GatewayConnectPost(nodeB.GatewayAddress()); err != nil && err != client.ErrPeerExists {
-				return errors.AddContext(err, "failed to connect to peer")
+				return err
 			}
 		}
 	}
