@@ -44,12 +44,12 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 	return nil
 }
 
-// pingNode verifies that there is a reachable node at the provided address
+// staticPingNode verifies that there is a reachable node at the provided address
 // by performing the Sia gateway handshake protocol.
-func (g *Gateway) pingNode(addr modules.NetAddress) error {
+func (g *Gateway) staticPingNode(addr modules.NetAddress) error {
 	// Ping the untrusted node to see whether or not there's actually a
 	// reachable node at the provided address.
-	conn, err := g.dial(addr)
+	conn, err := g.staticDial(addr)
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (g *Gateway) pingNode(addr modules.NetAddress) error {
 	// inaccurate NetAddress.
 	ourHeader := sessionHeader{
 		GenesisID:  types.GenesisID,
-		UniqueID:   g.id,
+		UniqueID:   g.staticId,
 		NetAddress: modules.NetAddress(conn.LocalAddr().String()),
 	}
 	if err := exchangeOurHeader(conn, ourHeader); err != nil {
@@ -267,11 +267,14 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		// through, which would cause the node to be pruned even though it may
 		// be a good node. Because nodes are plentiful, this is an acceptable
 		// bug.
-		if err = g.pingNode(node); err != nil {
+		if err = g.staticPingNode(node); err != nil {
 			g.mu.Lock()
-			g.removeNode(node)
+			if len(g.nodes) > pruneNodeListLen {
+				// Check if the number of nodes is still above the threshold.
+				g.removeNode(node)
+				g.log.Debugf("INFO: removing node %q because it could not be reached during a random scan: %v", node, err)
+			}
 			g.mu.Unlock()
-			g.log.Debugf("INFO: removing node %q because it could not be reached during a random scan: %v", node, err)
 		}
 	}
 }

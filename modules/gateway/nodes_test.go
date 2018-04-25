@@ -403,23 +403,18 @@ func TestHealthyNodeListPruning(t *testing.T) {
 	}
 
 	// Spin until all gateways have a nearly full node list.
-	success := false
-	for i := 0; i < 80; i++ {
-		success = true
+	err := build.Retry(1000, 100*time.Millisecond, func() error {
 		for _, g := range gs {
 			g.mu.RLock()
 			gNodeLen := len(g.nodes)
 			g.mu.RUnlock()
 			if gNodeLen < healthyNodeListLen {
-				success = false
-				break
+				return errors.New("node is not connected to a sufficient number of peers")
 			}
 		}
-		if !success {
-			time.Sleep(time.Second * 1)
-		}
-	}
-	if !success {
+		return nil
+	})
+	if err != nil {
 		t.Fatal("peers are not sharing nodes with eachother")
 	}
 
@@ -465,7 +460,7 @@ func TestHealthyNodeListPruning(t *testing.T) {
 	}
 
 	// Close the remaining gateways.
-	err := gs[0].Close()
+	err = gs[0].Close()
 	if err != nil {
 		t.Error(err)
 	}

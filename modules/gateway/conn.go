@@ -19,10 +19,10 @@ func (pc peerConn) RPCAddr() modules.NetAddress {
 	return pc.dialbackAddr
 }
 
-// dial will dial the input address and return a connection. dial appropriately
+// staticDial will staticDial the input address and return a connection. staticDial appropriately
 // handles things like clean shutdown, fast shutdown, and chooses the correct
 // communication protocol.
-func (g *Gateway) dial(addr modules.NetAddress) (net.Conn, error) {
+func (g *Gateway) staticDial(addr modules.NetAddress) (net.Conn, error) {
 	dialer := &net.Dialer{
 		Cancel:  g.threads.StopChan(),
 		Timeout: dialTimeout,
