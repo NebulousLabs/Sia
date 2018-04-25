@@ -345,7 +345,7 @@ func TestDelete(t *testing.T) {
 		if cached && len(merkleRoots.cachedSubTrees) > cachedIndex {
 			subTreeLen := merkleRootsPerCache
 			from := cachedIndex * merkleRootsPerCache
-			roots, err := merkleRoots.merkleRootsFromIndex(from, from+subTreeLen)
+			roots, err := merkleRoots.merkleRootsFromIndexFromDisk(from, from+subTreeLen)
 			if err != nil {
 				t.Fatal("failed to read roots of subTree", err)
 			}

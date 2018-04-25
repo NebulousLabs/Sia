@@ -264,7 +264,7 @@ func (mr *merkleRoots) len() int {
 func (mr *merkleRoots) moveLastCachedSubTreeToUncached() error {
 	mr.cachedSubTrees = mr.cachedSubTrees[:len(mr.cachedSubTrees)-1]
 	rootIndex := len(mr.cachedSubTrees) * merkleRootsPerCache
-	roots, err := mr.merkleRootsFromIndex(rootIndex, mr.numMerkleRoots)
+	roots, err := mr.merkleRootsFromIndexFromDisk(rootIndex, mr.numMerkleRoots)
 	if err != nil {
 		return errors.AddContext(err, "failed to read cached tree's roots")
 	}
@@ -325,11 +325,10 @@ func (mr *merkleRoots) checkNewRoot(newRoot crypto.Hash) crypto.Hash {
 	return tree.Root()
 }
 
-// merkleRoots reads all the merkle roots from disk and returns them. This is
-// not very fast and should only be used for testing purposes.
+// merkleRoots reads all the merkle roots from disk and returns them.
 func (mr *merkleRoots) merkleRoots() (roots []crypto.Hash, err error) {
 	// Get roots.
-	roots, err = mr.merkleRootsFromIndex(0, mr.numMerkleRoots)
+	roots, err = mr.merkleRootsFromIndexFromDisk(0, mr.numMerkleRoots)
 	if err != nil {
 		return nil, err
 	}
@@ -341,8 +340,8 @@ func (mr *merkleRoots) merkleRoots() (roots []crypto.Hash, err error) {
 	return
 }
 
-// merkleRootsFrom index readds all the merkle roots in range [from;to)
-func (mr *merkleRoots) merkleRootsFromIndex(from, to int) ([]crypto.Hash, error) {
+// merkleRootsFrom index reads all the merkle roots in range [from;to)
+func (mr *merkleRoots) merkleRootsFromIndexFromDisk(from, to int) ([]crypto.Hash, error) {
 	merkleRoots := make([]crypto.Hash, 0, to-from)
 	if _, err := mr.file.Seek(fileOffsetFromRootIndex(from), io.SeekStart); err != nil {
 		return merkleRoots, err
@@ -365,7 +364,7 @@ func (mr *merkleRoots) rebuildCachedTree(index int) error {
 	// Find the index of the first root of the cached tree on disk.
 	rootIndex := index * merkleRootsPerCache
 	// Read all the roots necessary for creating the cached tree.
-	roots, err := mr.merkleRootsFromIndex(rootIndex, rootIndex+(1<<merkleRootsCacheHeight))
+	roots, err := mr.merkleRootsFromIndexFromDisk(rootIndex, rootIndex+(1<<merkleRootsCacheHeight))
 	if err != nil {
 		return errors.AddContext(err, "failed to read sectors for rebuilding cached tree")
 	}
