@@ -251,7 +251,7 @@ func TestDeleteLastRoot(t *testing.T) {
 		t.Fatal("roots on disk don't match number of roots in memory")
 	}
 	// There should be 2^merkleRootsCacheHeight - 1 uncached roots now.
-	if len(merkleRoots.uncachedRoots) != (1<<merkleRootsCacheHeight)-1 {
+	if len(merkleRoots.uncachedRoots) != merkleRootsPerCache-1 {
 		t.Fatal("expected 2^merkleRootsCacheHeight - 1 uncached roots but was",
 			len(merkleRoots.uncachedRoots))
 	}

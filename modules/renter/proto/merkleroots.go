@@ -1,7 +1,7 @@
+package proto
+
 // TODO currently the cached trees are not persisted and we build them at
 // startup. For petabytes of data this might take a long time.
-
-package proto
 
 import (
 	"bufio"
@@ -121,6 +121,17 @@ func fileOffsetFromRootIndex(i int) int64 {
 	return contractHeaderSize + crypto.HashSize*int64(i)
 }
 
+// appendRoot appends a root to the in-memory structure of the merkleRoots. If
+// the length of the uncachedRoots grows too large they will be compressed into
+// a cachedSubTree.
+func (mr *merkleRoots) appendRoot(root crypto.Hash) {
+	mr.uncachedRoots = append(mr.uncachedRoots, root)
+	if len(mr.uncachedRoots) == merkleRootsPerCache {
+		mr.cachedSubTrees = append(mr.cachedSubTrees, newCachedSubTree(mr.uncachedRoots))
+		mr.uncachedRoots = mr.uncachedRoots[:0]
+	}
+}
+
 // delete deletes the sector root at a certain index.
 func (mr *merkleRoots) delete(i int) error {
 	// Check if the index is correct
@@ -135,13 +146,9 @@ func (mr *merkleRoots) delete(i int) error {
 	// If we don't have any uncached roots we need to delete the last cached
 	// tree and add its elements to the uncached roots.
 	if len(mr.uncachedRoots) == 0 {
-		mr.cachedSubTrees = mr.cachedSubTrees[:len(mr.cachedSubTrees)-1]
-		rootIndex := len(mr.cachedSubTrees) * merkleRootsPerCache
-		roots, err := mr.merkleRootsFromIndex(rootIndex, mr.numMerkleRoots)
-		if err != nil {
-			return errors.AddContext(err, "failed to read cached tree's roots")
+		if err := mr.moveLastCachedSubTreeToUncached(); err != nil {
+			return err
 		}
-		mr.uncachedRoots = append(mr.uncachedRoots, roots...)
 	}
 	// Swap the root at index i with the last root in mr.uncachedRoots.
 	_, err := mr.file.WriteAt(mr.uncachedRoots[len(mr.uncachedRoots)-1][:], fileOffsetFromRootIndex(i))
@@ -177,14 +184,12 @@ func (mr *merkleRoots) deleteLastRoot() error {
 		return nil
 	}
 	// If it is not uncached we need to delete the last cached tree and load
-	// its elements into mr.uncachedRoots.
-	mr.cachedSubTrees = mr.cachedSubTrees[:len(mr.cachedSubTrees)-1]
-	rootIndex := len(mr.cachedSubTrees) * merkleRootsPerCache
-	roots, err := mr.merkleRootsFromIndex(rootIndex, mr.numMerkleRoots)
-	if err != nil {
-		return errors.AddContext(err, "failed to read cached tree's roots")
+	// its elements into mr.uncachedRoots. This should give us
+	// merkleRootsPerCache-1 uncached roots since we already truncated the file
+	// by 1 root.
+	if err := mr.moveLastCachedSubTreeToUncached(); err != nil {
+		return err
 	}
-	mr.uncachedRoots = append(mr.uncachedRoots, roots...)
 	return nil
 }
 
@@ -254,15 +259,17 @@ func (mr *merkleRoots) len() int {
 	return mr.numMerkleRoots
 }
 
-// appendRoot appends a root to the in-memory structure of the merkleRoots. If
-// the length of the uncachedRoots grows too large they will be compressed into
-// a cachedSubTree.
-func (mr *merkleRoots) appendRoot(root crypto.Hash) {
-	mr.uncachedRoots = append(mr.uncachedRoots, root)
-	if len(mr.uncachedRoots) == merkleRootsPerCache {
-		mr.cachedSubTrees = append(mr.cachedSubTrees, newCachedSubTree(mr.uncachedRoots))
-		mr.uncachedRoots = mr.uncachedRoots[:0]
+// moveLastCachedSubTreeToUncached deletes the last cached subTree and appends
+// its elements to the uncached roots.
+func (mr *merkleRoots) moveLastCachedSubTreeToUncached() error {
+	mr.cachedSubTrees = mr.cachedSubTrees[:len(mr.cachedSubTrees)-1]
+	rootIndex := len(mr.cachedSubTrees) * merkleRootsPerCache
+	roots, err := mr.merkleRootsFromIndex(rootIndex, mr.numMerkleRoots)
+	if err != nil {
+		return errors.AddContext(err, "failed to read cached tree's roots")
 	}
+	mr.uncachedRoots = append(mr.uncachedRoots, roots...)
+	return nil
 }
 
 // push appends a merkle root to the end of the contract. If the number of
