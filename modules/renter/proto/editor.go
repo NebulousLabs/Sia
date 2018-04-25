@@ -91,7 +91,7 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 
 	// calculate the new Merkle root
 	sectorRoot := crypto.MerkleRoot(data)
-	merkleRoot := sc.merkleRoots.newRoot(sectorRoot)
+	merkleRoot := sc.merkleRoots.checkNewRoot(sectorRoot)
 
 	// create the action and revision
 	actions := []modules.RevisionAction{{

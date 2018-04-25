@@ -88,7 +88,7 @@ func loadExistingMerkleRoots(file *os.File) (*merkleRoots, error) {
 		}
 
 		// Append the root to the uncachedRoots
-		mr.appendRoot(root)
+		mr.appendRootMemory(root)
 	}
 	return mr, nil
 }
@@ -121,10 +121,10 @@ func fileOffsetFromRootIndex(i int) int64 {
 	return contractHeaderSize + crypto.HashSize*int64(i)
 }
 
-// appendRoot appends a root to the in-memory structure of the merkleRoots. If
+// appendRootMemory appends a root to the in-memory structure of the merkleRoots. If
 // the length of the uncachedRoots grows too large they will be compressed into
 // a cachedSubTree.
-func (mr *merkleRoots) appendRoot(root crypto.Hash) {
+func (mr *merkleRoots) appendRootMemory(root crypto.Hash) {
 	mr.uncachedRoots = append(mr.uncachedRoots, root)
 	if len(mr.uncachedRoots) == merkleRootsPerCache {
 		mr.cachedSubTrees = append(mr.cachedSubTrees, newCachedSubTree(mr.uncachedRoots))
@@ -285,7 +285,7 @@ func (mr *merkleRoots) push(root crypto.Hash) error {
 		return err
 	}
 	// Add the root to the unached roots.
-	mr.appendRoot(root)
+	mr.appendRootMemory(root)
 
 	// Increment the number of roots.
 	mr.numMerkleRoots++
@@ -294,22 +294,22 @@ func (mr *merkleRoots) push(root crypto.Hash) error {
 
 // root returns the root of the merkle roots.
 func (mr *merkleRoots) root() crypto.Hash {
-	tree := crypto.NewCachedTree(sectorHeight)
+	tree := crypto.NewTree()
 	for _, st := range mr.cachedSubTrees {
-		if err := tree.PushSubTree(st.height, st.sum); err != nil {
+		if err := tree.PushSubTree(st.height, st.sum[:]); err != nil {
 			// This should never fail.
 			build.Critical(err)
 		}
 	}
 	for _, root := range mr.uncachedRoots {
-		tree.Push(root)
+		tree.Push(root[:])
 	}
 	return tree.Root()
 }
 
-// newRoot returns the root of the merkleTree after appending the newRoot
+// checkNewRoot returns the root of the merkleTree after appending the checkNewRoot
 // without actually appending it.
-func (mr *merkleRoots) newRoot(newRoot crypto.Hash) crypto.Hash {
+func (mr *merkleRoots) checkNewRoot(newRoot crypto.Hash) crypto.Hash {
 	tree := crypto.NewCachedTree(sectorHeight)
 	for _, st := range mr.cachedSubTrees {
 		if err := tree.PushSubTree(st.height, st.sum); err != nil {
