@@ -74,11 +74,11 @@ To configure the host to accept new contracts, set acceptingcontracts to true:
 	}
 
 	hostContractCmd = &cobra.Command{
-		Use:   "contracts [format] [filter]",
+		Use:   "contracts",
 		Short: "Show host contracts",
 		Long: `Show host contracts sorted by expiration height.
 
-Available formats:
+Available output types:
      value:  show financial information
      status: show status information
 `,
@@ -396,13 +396,13 @@ func hostconfigcmd(param, value string) {
 	fmt.Printf("Estimated conversion rate: %v%%\n", eg.ConversionRate)
 }
 
-// hostcontractcmd is the handler for the command `siac host contracts [format] [filter]`.
-func hostcontractcmd(format, filter string) {
-	switch format {
+// hostcontractcmd is the handler for the command `siac host contracts [type]`.
+func hostcontractcmd() {
+	switch hostContractOutputType {
 	case "value", "status":
 		break
 	default:
-		die("\"" + format + "\" is not a format")
+		die("\"" + hostContractOutputType + "\" is not a format")
 
 	}
 	cg, err := httpClient.HostContractInfoGet()
@@ -411,7 +411,7 @@ func hostcontractcmd(format, filter string) {
 	}
 	sort.Slice(cg.Contracts, func(i, j int) bool { return cg.Contracts[i].ExpirationHeight < cg.Contracts[j].ExpirationHeight })
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
-	if format == "value" {
+	if hostContractOutputType == "value" {
 		fmt.Fprintf(w, "Obligation Id\tObligation Status\tContract Cost\tLocked Collateral\tRisked Collateral\tPotential Revenue\tExpiration Height\tTransaction Fees\n")
 		for _, so := range cg.Contracts {
 			potentialRevenue := so.PotentialDownloadRevenue.Add(so.PotentialUploadRevenue).Add(so.PotentialStorageRevenue)
@@ -419,8 +419,8 @@ func hostcontractcmd(format, filter string) {
 				currencyUnits(so.RiskedCollateral), currencyUnits(potentialRevenue), so.ExpirationHeight, currencyUnits(so.TransactionFeesAdded))
 		}
 	}
-	if format == "status" {
-		fmt.Fprintf(w, "Obligation Id\tObligation Status\tExpiration Height\tOrigin Confirmed\tRevision Constructed\tRevision Confirmed\tProof Constructed\tProof Confirmed\n")
+	if hostContractOutputType == "status" {
+		fmt.Fprintf(w, "Obligation ID\tObligation Status\tExpiration Height\tOrigin Confirmed\tRevision Constructed\tRevision Confirmed\tProof Constructed\tProof Confirmed\n")
 		for _, so := range cg.Contracts {
 			fmt.Fprintf(w, "%s\t%s\t%d\t%t\t%t\t%t\t%t\t%t\n", so.ObligationId, strings.TrimPrefix(so.ObligationStatus, "obligation"), so.ExpirationHeight, so.OriginConfirmed,
 				so.RevisionConstructed, so.RevisionConfirmed, so.ProofConstructed, so.ProofConfirmed)
