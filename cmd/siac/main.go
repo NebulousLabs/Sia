@@ -19,7 +19,6 @@ var (
 	// Flags.
 	addr                   string // override default API address
 	hostContractOutputType string // output type for host contracts
-	hostContractFilter     string // status filter for host contracts
 	hostVerbose            bool   // display additional host info
 	initForce              bool   // destroy and reencrypt the wallet on init if it already exists
 	initPassword           bool   // supply a custom password when creating a wallet
@@ -269,7 +268,6 @@ func main() {
 	hostSectorCmd.AddCommand(hostSectorDeleteCmd)
 	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
 	hostContractCmd.Flags().StringVarP(&hostContractOutputType, "type", "t", "value", "Select output type")
-	hostContractCmd.Flags().StringVarP(&hostContractFilter, "filter", "f", "all", "Filter on status")
 
 	root.AddCommand(hostdbCmd)
 	hostdbCmd.AddCommand(hostdbViewCmd)
