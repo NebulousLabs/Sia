@@ -11,6 +11,10 @@ import (
 const (
 	// contractExtension is the extension given to contract files.
 	contractExtension = ".contract"
+
+	// rootsDiskLoadBulkSize is the max number of roots we read from disk at
+	// once to avoid using up all the ram.
+	rootsDiskLoadBulkSize = 1024 * crypto.HashSize // 32 kib
 )
 
 var (

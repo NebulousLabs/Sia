@@ -4,7 +4,6 @@ package proto
 // startup. For petabytes of data this might take a long time.
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 
@@ -54,6 +53,22 @@ type (
 	}
 )
 
+// parseRootsFromData takes some data and splits it up into sector roots. It will return an error if the size of the data is not a multiple of crypto.HashSize.
+func parseRootsFromData(b []byte) ([]crypto.Hash, error) {
+	var roots []crypto.Hash
+	if len(b)%crypto.HashSize != 0 {
+		return roots, errors.New("roots have unexpected length and might be corrupted")
+	}
+
+	var root crypto.Hash
+	for len(b) > 0 {
+		copy(root[:], b[:crypto.HashSize])
+		roots = append(roots, root)
+		b = b[crypto.HashSize:]
+	}
+	return roots, nil
+}
+
 // loadExistingMerkleRoots reads creates a merkleRoots object from existing
 // merkle roots.
 func loadExistingMerkleRoots(file *fileSection) (*merkleRoots, error) {
@@ -66,27 +81,26 @@ func loadExistingMerkleRoots(file *fileSection) (*merkleRoots, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Get the size of the file and read it.
-	var size int64
-	if size, err = file.Size(); err != nil {
-		return nil, err
-	}
-	fileData := make([]byte, size)
-	if _, err := file.ReadAt(fileData, 0); err != nil {
-		return nil, err
-	}
 	// Read the roots from the file without reading all of them at once.
-	r := bytes.NewBuffer(fileData)
-	for i := 0; i < mr.numMerkleRoots; i++ {
-		var root crypto.Hash
-		if _, err = io.ReadFull(r, root[:]); err == io.EOF {
+	readOff := int64(0)
+	rootsData := make([]byte, rootsDiskLoadBulkSize)
+	for {
+		n, err := file.ReadAt(rootsData, readOff)
+		if err == io.ErrUnexpectedEOF && n == 0 {
 			break
-		} else if err != nil {
+		}
+		if err == io.EOF && n == 0 {
+			break
+		}
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 			return nil, err
 		}
-
-		// Append the root to the uncachedRoots
-		mr.appendRootMemory(root)
+		roots, err := parseRootsFromData(rootsData[:n])
+		if err != nil {
+			return nil, err
+		}
+		mr.appendRootMemory(roots...)
+		readOff += int64(n)
 	}
 	return mr, nil
 }
@@ -122,11 +136,13 @@ func fileOffsetFromRootIndex(i int) int64 {
 // appendRootMemory appends a root to the in-memory structure of the merkleRoots. If
 // the length of the uncachedRoots grows too large they will be compressed into
 // a cachedSubTree.
-func (mr *merkleRoots) appendRootMemory(root crypto.Hash) {
-	mr.uncachedRoots = append(mr.uncachedRoots, root)
-	if len(mr.uncachedRoots) == merkleRootsPerCache {
-		mr.cachedSubTrees = append(mr.cachedSubTrees, newCachedSubTree(mr.uncachedRoots))
-		mr.uncachedRoots = mr.uncachedRoots[:0]
+func (mr *merkleRoots) appendRootMemory(roots ...crypto.Hash) {
+	for _, root := range roots {
+		mr.uncachedRoots = append(mr.uncachedRoots, root)
+		if len(mr.uncachedRoots) == merkleRootsPerCache {
+			mr.cachedSubTrees = append(mr.cachedSubTrees, newCachedSubTree(mr.uncachedRoots))
+			mr.uncachedRoots = mr.uncachedRoots[:0]
+		}
 	}
 }
 
@@ -336,20 +352,29 @@ func (mr *merkleRoots) merkleRoots() (roots []crypto.Hash, err error) {
 // merkleRootsFrom index reads all the merkle roots in range [from;to)
 func (mr *merkleRoots) merkleRootsFromIndexFromDisk(from, to int) ([]crypto.Hash, error) {
 	merkleRoots := make([]crypto.Hash, 0, to-from)
-	// Get the size of the file and read it.
-	fileData := make([]byte, fileOffsetFromRootIndex(to)-fileOffsetFromRootIndex(from))
-	if _, err := mr.rootsFile.ReadAt(fileData, fileOffsetFromRootIndex(from)); err != nil {
-		return nil, err
-	}
-	r := bytes.NewBuffer(fileData)
-	for i := from; to-i > 0; i++ {
-		var root crypto.Hash
-		if _, err := io.ReadFull(r, root[:]); err == io.EOF {
-			return nil, io.ErrUnexpectedEOF
-		} else if err != nil {
-			return merkleRoots, errors.AddContext(err, "failed to read root from disk")
+	remainingData := fileOffsetFromRootIndex(to) - fileOffsetFromRootIndex(from)
+	readOff := fileOffsetFromRootIndex(from)
+	var rootsData []byte
+	for remainingData > 0 {
+		if remainingData > rootsDiskLoadBulkSize {
+			rootsData = make([]byte, rootsDiskLoadBulkSize)
+		} else {
+			rootsData = make([]byte, remainingData)
 		}
-		merkleRoots = append(merkleRoots, root)
+		n, err := mr.rootsFile.ReadAt(rootsData, readOff)
+		if err == io.ErrUnexpectedEOF || err == io.EOF {
+			return nil, errors.New("merkleRootsFromIndexFromDisk failed: roots have unexpected length")
+		}
+		if err != nil {
+			return nil, err
+		}
+		roots, err := parseRootsFromData(rootsData)
+		if err != nil {
+			return nil, err
+		}
+		merkleRoots = append(merkleRoots, roots...)
+		readOff += int64(n)
+		remainingData -= int64(n)
 	}
 	return merkleRoots, nil
 }
