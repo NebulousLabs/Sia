@@ -215,7 +215,11 @@ func TestDeleteLastRoot(t *testing.T) {
 	}
 
 	// Delete the last sector root. This should call deleteLastRoot internally.
-	if err := merkleRoots.delete(numMerkleRoots - 1); err != nil {
+	lastRoot, truncateSize, err := merkleRoots.prepareDelete(numMerkleRoots - 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := merkleRoots.delete(numMerkleRoots-1, lastRoot, truncateSize); err != nil {
 		t.Fatal("failed to delete last root", err)
 	}
 	numMerkleRoots--
@@ -239,7 +243,11 @@ func TestDeleteLastRoot(t *testing.T) {
 	}
 
 	// Delete the last sector root again. This time a cached root should be deleted too.
-	if err := merkleRoots.delete(numMerkleRoots - 1); err != nil {
+	lastRoot, truncateSize, err = merkleRoots.prepareDelete(numMerkleRoots - 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := merkleRoots.delete(numMerkleRoots-1, lastRoot, truncateSize); err != nil {
 		t.Fatal("failed to delete last root", err)
 	}
 	numMerkleRoots--
@@ -320,7 +328,15 @@ func TestDelete(t *testing.T) {
 		numUncached := len(merkleRoots.uncachedRoots)
 		cachedIndex, cached := merkleRoots.isIndexCached(deleteIndex)
 
-		if err := merkleRoots.delete(deleteIndex); err != nil {
+		// Call delete twice to make sure it's idempotent.
+		lastRoot, truncateSize, err := merkleRoots.prepareDelete(deleteIndex)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := merkleRoots.delete(deleteIndex, lastRoot, truncateSize); err != nil {
+			t.Fatal("failed to delete random index", deleteIndex, err)
+		}
+		if err := merkleRoots.delete(deleteIndex, lastRoot, truncateSize); err != nil {
 			t.Fatal("failed to delete random index", deleteIndex, err)
 		}
 		// Number of roots should have decreased.
@@ -403,7 +419,11 @@ func TestMerkleRootsRandom(t *testing.T) {
 		// Delete
 		if operation == 0 {
 			index := fastrand.Intn(merkleRoots.numMerkleRoots)
-			if err := merkleRoots.delete(index); err != nil {
+			lastRoot, truncateSize, err := merkleRoots.prepareDelete(index)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := merkleRoots.delete(index, lastRoot, truncateSize); err != nil {
 				t.Fatalf("failed to delete %v: %v", index, err)
 			}
 			continue

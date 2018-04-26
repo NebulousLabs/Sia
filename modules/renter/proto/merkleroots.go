@@ -146,51 +146,31 @@ func (mr *merkleRoots) appendRootMemory(roots ...crypto.Hash) {
 	}
 }
 
-// delete deletes the sector root at a certain index.
-func (mr *merkleRoots) delete(i int) error {
-	// Check if the index is correct
-	if i >= mr.numMerkleRoots {
-		build.Critical("can't delete non-existing root")
+// delete deletes the sector root at a certain index by replacing it with the
+// last root and truncates the file to truncateSize after that. This ensures
+// that the operation is indempotent.
+func (mr *merkleRoots) delete(i int, lastRoot crypto.Hash, truncateSize int64) error {
+	// Swap the element at index i with the lastRoot. This might actually
+	// increase mr.numMerkleRoots since there is a chance that i points to an
+	// index after the end of the file. That's why the insert is executed first
+	// before truncating the file or decreasing the numMerkleRoots field.
+	if err := mr.insert(i, lastRoot); err != nil {
+		return errors.AddContext(err, "failed to swap deleted root with newRoot")
+	}
+	// Truncate the file to truncateSize.
+	if err := mr.rootsFile.Truncate(truncateSize); err != nil {
+		return errors.AddContext(err, "failed to truncate file")
+	}
+	// Adjust the numMerkleRoots field. If the number of roots didn't change we
+	// are done.
+	rootsBefore := mr.numMerkleRoots
+	mr.numMerkleRoots = int(truncateSize / crypto.HashSize)
+	if rootsBefore == mr.numMerkleRoots {
 		return nil
 	}
-	// If i is the index of the last element we call deleteLastRoot.
-	if i == mr.numMerkleRoots-1 {
-		return mr.deleteLastRoot()
-	}
-	// If we don't have any uncached roots we need to delete the last cached
-	// tree and add its elements to the uncached roots.
-	if len(mr.uncachedRoots) == 0 {
-		if err := mr.moveLastCachedSubTreeToUncached(); err != nil {
-			return err
-		}
-	}
-	// Swap the root at index i with the last root in mr.uncachedRoots.
-	_, err := mr.rootsFile.WriteAt(mr.uncachedRoots[len(mr.uncachedRoots)-1][:], fileOffsetFromRootIndex(i))
-	if err != nil {
-		return errors.AddContext(err, "failed to swap root to delete with last one")
-	}
-	// If the deleted root was not cached we swap the roots in memory too.
-	// Otherwise we rebuild the cachedSubTree.
-	if index, cached := mr.isIndexCached(i); !cached {
-		mr.uncachedRoots[index] = mr.uncachedRoots[len(mr.uncachedRoots)-1]
-	} else {
-		err = mr.rebuildCachedTree(index)
-	}
-	if err != nil {
-		return errors.AddContext(err, "failed to rebuild cached tree")
-	}
-	// Now that the element we want to delete is the last root we can simply
-	// delete it by calling mr.deleteLastRoot.
-	return mr.deleteLastRoot()
-}
-
-// deleteLastRoot deletes the last sector root of the contract.
-func (mr *merkleRoots) deleteLastRoot() error {
-	// Decrease the numMerkleRoots counter.
-	mr.numMerkleRoots--
-	// Truncate file to avoid interpreting trailing data as valid.
-	if err := mr.rootsFile.Truncate(fileOffsetFromRootIndex(mr.numMerkleRoots)); err != nil {
-		return errors.AddContext(err, "failed to delete last root from file")
+	// Sanity check the number of roots.
+	if rootsBefore != mr.numMerkleRoots+1 {
+		build.Critical("a delete should never delete more than one root at once")
 	}
 	// If the last element is uncached we can simply remove it from the slice.
 	if len(mr.uncachedRoots) > 0 {
@@ -209,8 +189,15 @@ func (mr *merkleRoots) deleteLastRoot() error {
 
 // insert inserts a root by replacing a root at an existing index.
 func (mr *merkleRoots) insert(index int, root crypto.Hash) error {
-	if index > mr.numMerkleRoots {
-		return errors.New("can't insert at a index greater than the number of roots")
+	// If the index does point to an offset beyond the end of the file we fill
+	// in the blanks with empty merkle roots. This usually just means that the
+	// machine crashed during the recovery process and that the next few
+	// updates are probably going to be delete operations that take care of the
+	// blank roots.
+	for index > mr.numMerkleRoots {
+		if err := mr.push(crypto.Hash{}); err != nil {
+			return errors.AddContext(err, "failed to extend roots")
+		}
 	}
 	if index == mr.numMerkleRoots {
 		return mr.push(root)
@@ -377,6 +364,19 @@ func (mr *merkleRoots) merkleRootsFromIndexFromDisk(from, to int) ([]crypto.Hash
 		remainingData -= int64(n)
 	}
 	return merkleRoots, nil
+}
+
+// prepareDelete is a helper function that returns the lastRoot and trunateSize
+// arguments for a certain index to call delete with.
+func (mr *merkleRoots) prepareDelete(index int) (lastRoot crypto.Hash, truncateSize int64, err error) {
+	roots, err := mr.merkleRootsFromIndexFromDisk(mr.numMerkleRoots-1, mr.numMerkleRoots)
+	if err != nil {
+		return crypto.Hash{}, 0, errors.AddContext(err, "failed to get last root")
+	}
+	if len(roots) != 1 {
+		return crypto.Hash{}, 0, fmt.Errorf("expected exactly 1 root but got %v", len(roots))
+	}
+	return roots[0], int64((mr.numMerkleRoots - 1) * crypto.HashSize), nil
 }
 
 // rebuildCachedTree rebuilds the tree in mr.cachedSubTree at index i.
