@@ -398,33 +398,28 @@ func hostconfigcmd(param, value string) {
 
 // hostcontractcmd is the handler for the command `siac host contracts [type]`.
 func hostcontractcmd() {
-	switch hostContractOutputType {
-	case "value", "status":
-		break
-	default:
-		die("\"" + hostContractOutputType + "\" is not a format")
-
-	}
 	cg, err := httpClient.HostContractInfoGet()
 	if err != nil {
 		die("Could not fetch host contract info:", err)
 	}
 	sort.Slice(cg.Contracts, func(i, j int) bool { return cg.Contracts[i].ExpirationHeight < cg.Contracts[j].ExpirationHeight })
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
-	if hostContractOutputType == "value" {
+	switch hostContractOutputType {
+	case "value":
 		fmt.Fprintf(w, "Obligation Id\tObligation Status\tContract Cost\tLocked Collateral\tRisked Collateral\tPotential Revenue\tExpiration Height\tTransaction Fees\n")
 		for _, so := range cg.Contracts {
 			potentialRevenue := so.PotentialDownloadRevenue.Add(so.PotentialUploadRevenue).Add(so.PotentialStorageRevenue)
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\n", so.ObligationId, strings.TrimPrefix(so.ObligationStatus, "obligation"), currencyUnits(so.ContractCost), currencyUnits(so.LockedCollateral),
 				currencyUnits(so.RiskedCollateral), currencyUnits(potentialRevenue), so.ExpirationHeight, currencyUnits(so.TransactionFeesAdded))
 		}
-	}
-	if hostContractOutputType == "status" {
+	case "status":
 		fmt.Fprintf(w, "Obligation ID\tObligation Status\tExpiration Height\tOrigin Confirmed\tRevision Constructed\tRevision Confirmed\tProof Constructed\tProof Confirmed\n")
 		for _, so := range cg.Contracts {
 			fmt.Fprintf(w, "%s\t%s\t%d\t%t\t%t\t%t\t%t\t%t\n", so.ObligationId, strings.TrimPrefix(so.ObligationStatus, "obligation"), so.ExpirationHeight, so.OriginConfirmed,
 				so.RevisionConstructed, so.RevisionConfirmed, so.ProofConstructed, so.ProofConfirmed)
 		}
+	default:
+		die("\"" + hostContractOutputType + "\" is not a format")
 	}
 	w.Flush()
 }
