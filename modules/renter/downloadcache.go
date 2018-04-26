@@ -13,7 +13,7 @@ import (
 // endpoint download.
 // TODO this won't be necessary anymore once we have partial downloads.
 func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
-	if udc.download.staticDestinationType == destinationTypeSeekStream {
+	if udc.download.staticDestinationType != destinationTypeSeekStream {
 		// We only cache streaming chunks since browsers and media players tend to only request a few kib at once when streaming data. That way we can prevent scheduling the same chunk for download over and over.
 		return
 	}
