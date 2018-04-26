@@ -63,6 +63,8 @@ func (c *Client) HostAnnounceAddrPost(address modules.NetAddress) (err error) {
 	return
 }
 
+// HostContractInfoGet uses the /host/contracts endpoint to get information
+// about contracts on the host.
 func (c *Client) HostContractInfoGet() (cg api.ContractInfoGET, err error) {
 	err = c.get("/host/contracts", &cg)
 	return
