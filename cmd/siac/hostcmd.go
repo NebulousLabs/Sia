@@ -81,13 +81,6 @@ To configure the host to accept new contracts, set acceptingcontracts to true:
 Available formats:
      value:  show financial information
      status: show status information
-
-Available filters:
-     all:        show all obligations
-     failed:     show obligations with status failed
-     unresolved: show obligations with status unresolved
-     rejected:   show obligations with status rejected
-     succeeded:  show obligations with status succeeded
 `,
 		Run: wrap(hostcontractcmd),
 	}
@@ -412,20 +405,6 @@ func hostcontractcmd(format, filter string) {
 		die("\"" + format + "\" is not a format")
 
 	}
-	switch filter {
-	case "rejected":
-		filter = "obligationRejected"
-	case "failed":
-		filter = "obligationFailed"
-	case "succeeded":
-		filter = "obligationSucceeded"
-	case "unresolved":
-		filter = "obligationUnresolved"
-	case "all":
-		filter = "all"
-	default:
-		die("\"" + filter + "\" is not a filter value")
-	}
 	cg := new(api.ContractInfoGET)
 	err := getAPI("/host/contracts", cg)
 	if err != nil {
@@ -436,20 +415,16 @@ func hostcontractcmd(format, filter string) {
 	if format == "value" {
 		fmt.Fprintf(w, "Obligation Id\tObligation Status\tContract Cost\tLocked Collateral\tRisked Collateral\tPotential Revenue\tExpiration Height\tTransaction Fees\n")
 		for _, so := range cg.Contracts {
-			if so.ObligationStatus == filter || filter == "all" {
-				potentialRevenue := so.PotentialDownloadRevenue.Add(so.PotentialUploadRevenue).Add(so.PotentialStorageRevenue)
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\n", so.ObligationId, so.ObligationStatus, currencyUnits(so.ContractCost), currencyUnits(so.LockedCollateral),
-					currencyUnits(so.RiskedCollateral), currencyUnits(potentialRevenue), so.ExpirationHeight, currencyUnits(so.TransactionFeesAdded))
-			}
+			potentialRevenue := so.PotentialDownloadRevenue.Add(so.PotentialUploadRevenue).Add(so.PotentialStorageRevenue)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\n", so.ObligationId, strings.TrimPrefix(so.ObligationStatus, "obligation"), currencyUnits(so.ContractCost), currencyUnits(so.LockedCollateral),
+				currencyUnits(so.RiskedCollateral), currencyUnits(potentialRevenue), so.ExpirationHeight, currencyUnits(so.TransactionFeesAdded))
 		}
 	}
 	if format == "status" {
 		fmt.Fprintf(w, "Obligation Id\tObligation Status\tExpiration Height\tOrigin Confirmed\tRevision Constructed\tRevision Confirmed\tProof Constructed\tProof Confirmed\n")
 		for _, so := range cg.Contracts {
-			if so.ObligationStatus == filter || filter == "all" {
-				fmt.Fprintf(w, "%s\t%s\t%d\t%t\t%t\t%t\t%t\t%t\n", so.ObligationId, so.ObligationStatus, so.ExpirationHeight, so.OriginConfirmed,
-					so.RevisionConstructed, so.RevisionConfirmed, so.ProofConstructed, so.ProofConfirmed)
-			}
+			fmt.Fprintf(w, "%s\t%s\t%d\t%t\t%t\t%t\t%t\t%t\n", so.ObligationId, strings.TrimPrefix(so.ObligationStatus, "obligation"), so.ExpirationHeight, so.OriginConfirmed,
+				so.RevisionConstructed, so.RevisionConfirmed, so.ProofConstructed, so.ProofConfirmed)
 		}
 	}
 	w.Flush()

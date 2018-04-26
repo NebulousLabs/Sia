@@ -13,11 +13,12 @@ import (
 
 var (
 	// Flags.
-	hostVerbose       bool // display additional host info
-	initForce         bool // destroy and reencrypt the wallet on init if it already exists
-	initPassword      bool // supply a custom password when creating a wallet
-	renterListVerbose bool // Show additional info about uploaded files.
-	renterShowHistory bool // Show download history in addition to download queue.
+	hostContractOutputType string // output type for host contracts
+	hostVerbose            bool   // display additional host info
+	initForce              bool   // destroy and reencrypt the wallet on init if it already exists
+	initPassword           bool   // supply a custom password when creating a wallet
+	renterListVerbose      bool   // Show additional info about uploaded files.
+	renterShowHistory      bool   // Show download history in addition to download queue.
 )
 
 var (
@@ -91,6 +92,7 @@ func main() {
 	hostFolderCmd.AddCommand(hostFolderAddCmd, hostFolderRemoveCmd, hostFolderResizeCmd)
 	hostSectorCmd.AddCommand(hostSectorDeleteCmd)
 	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
+	hostContractCmd.Flags().StringVarP(&hostContractOutputType, "type", "t", "value", "Select output type")
 
 	root.AddCommand(hostdbCmd)
 	hostdbCmd.AddCommand(hostdbViewCmd)
