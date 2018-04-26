@@ -19,7 +19,7 @@ func newFileSection(f *os.File, start, end int64) *fileSection {
 	if start < 0 {
 		panic("filesection can't start at an index < 0")
 	}
-	if end < start && end != -1 {
+	if end < start && end != remainingFile {
 		panic("the end of a filesection can't be before the start")
 	}
 	return &fileSection{
@@ -44,7 +44,7 @@ func (f *fileSection) Size() (int64, error) {
 	if size < 0 {
 		size = 0
 	}
-	if size > f.end-f.start && f.end != -1 {
+	if size > f.end-f.start && f.end != remainingFile {
 		size = f.end - f.start
 	}
 	return size, nil
@@ -56,7 +56,7 @@ func (f *fileSection) ReadAt(b []byte, off int64) (int, error) {
 	if off < 0 {
 		panic("can't read from an offset before the section start")
 	}
-	if f.start+off+int64(len(b)) > f.end && f.end != -1 {
+	if f.start+off+int64(len(b)) > f.end && f.end != remainingFile {
 		panic("can't read from an offset after the section end")
 	}
 	return f.f.ReadAt(b, f.start+off)
@@ -69,17 +69,13 @@ func (f *fileSection) Sync() error {
 
 // Truncate calls Truncate on the fileSection's underlying file.
 func (f *fileSection) Truncate(size int64) error {
-	currentSize, err := f.Size()
-	if err != nil {
-		return err
-	}
-	if currentSize == f.end-f.start && f.end != -1 {
-		panic("can't shrink section that has reached its max size unless it has no end boundary")
+	if f.end != remainingFile {
+		panic("can't truncate a file that has a end != remainingFile")
 	}
 	if f.start+size < f.start {
 		panic("can't truncate file to be smaller than the section start")
 	}
-	if f.start+size > f.end && f.end != -1 {
+	if f.start+size > f.end && f.end != remainingFile {
 		panic("can't truncate file to be bigger than the section")
 	}
 	return f.f.Truncate(f.start + size)
@@ -91,7 +87,7 @@ func (f *fileSection) WriteAt(b []byte, off int64) (int, error) {
 	if off < 0 {
 		panic("can't read from an offset before the section start")
 	}
-	if f.start+off+int64(len(b)) > f.end && f.end != -1 {
+	if f.start+off+int64(len(b)) > f.end && f.end != remainingFile {
 		panic("can't read from an offset after the section end")
 	}
 	return f.f.WriteAt(b, off+f.start)

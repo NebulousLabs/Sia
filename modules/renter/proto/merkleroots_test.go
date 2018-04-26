@@ -139,8 +139,13 @@ func TestInsertMerkleRoot(t *testing.T) {
 	// Replace the last root with a new hash. It shouldn't be cached and
 	// therefore no cached tree needs to be updated.
 	newHash := crypto.Hash{}
+	insertIndex := merkleRoots.len() - 1
 	copy(newHash[:], fastrand.Bytes(crypto.HashSize)[:])
-	if err := merkleRoots.insert(merkleRoots.len()-1, newHash); err != nil {
+	if err := merkleRoots.insert(insertIndex, newHash); err != nil {
+		t.Fatal("failed to insert root", err)
+	}
+	// Insert again at the same index to make sure insert is idempotent.
+	if err := merkleRoots.insert(insertIndex, newHash); err != nil {
 		t.Fatal("failed to insert root", err)
 	}
 	// Check if the last root matches the new hash.
