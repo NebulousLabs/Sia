@@ -63,6 +63,11 @@ func (c *Client) HostAnnounceAddrPost(address modules.NetAddress) (err error) {
 	return
 }
 
+func (c *Client) HostContractInfoGet() (cg api.ContractInfoGET, err error) {
+	err = c.get("/host/contracts", &cg)
+	return
+}
+
 // HostEstimateScoreGet requests the /host/estimatescore endpoint.
 func (c *Client) HostEstimateScoreGet(param, value string) (eg api.HostEstimateScoreGET, err error) {
 	err = c.get(fmt.Sprintf("/host/estimatescore?%v=%v", param, value), &eg)

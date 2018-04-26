@@ -405,8 +405,7 @@ func hostcontractcmd(format, filter string) {
 		die("\"" + format + "\" is not a format")
 
 	}
-	cg := new(api.ContractInfoGET)
-	err := getAPI("/host/contracts", cg)
+	cg, err := httpClient.HostContractInfoGet()
 	if err != nil {
 		die("Could not fetch host contract info:", err)
 	}
