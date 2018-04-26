@@ -28,9 +28,11 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 	// Add the entry to a random position in the waitlist.
 	hdb.scanMap[entry.PublicKey.String()] = struct{}{}
 	hdb.scanList = append(hdb.scanList, entry)
-	i := len(hdb.scanList) - 1
-	j := fastrand.Intn(i)
-	hdb.scanList[i], hdb.scanList[j] = hdb.scanList[j], hdb.scanList[i]
+	if len(hdb.scanList) > 1 {
+		i := len(hdb.scanList) - 1
+		j := fastrand.Intn(i)
+		hdb.scanList[i], hdb.scanList[j] = hdb.scanList[j], hdb.scanList[i]
+	}
 	// Check if any thread is currently emptying the waitlist. If not, spawn a
 	// thread to empty the waitlist.
 	if hdb.scanWait {
