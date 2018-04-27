@@ -13,7 +13,24 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/fastrand"
+	"math"
 )
+
+// updateUptime decays a host's historic uptime or historic downtime.
+// It also adds the new block height to the historic uptime or historic downtime.
+func updateUptime(entry *modules.HostDBEntry, scan modules.HostDBScan, recentScan modules.HostDBScan) {
+	blocksPassed := scan.BlockHeight - recentScan.BlockHeight
+	timePassed := time.Duration(blocksPassed) * 10 * time.Minute
+	decay := time.Duration(math.Pow(0.5, float64(timePassed)/float64(uptimeHalflife)))
+	entry.HistoricUptime *= decay
+	entry.HistoricDowntime *= decay
+
+	if recentScan.Success {
+		entry.HistoricUptime += timePassed * decay
+	} else {
+		entry.HistoricDowntime += timePassed * decay
+	}
+}
 
 // queueScan will add a host to the queue to be scanned.
 func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
@@ -207,7 +224,7 @@ func (hdb *HostDB) updateEntry(entry modules.HostDBEntry, netErr error) {
 
 	// Compress any old scans into the historic values.
 	for len(newEntry.ScanHistory) > minScans && time.Now().Sub(newEntry.ScanHistory[0].Timestamp) > maxHostDowntime {
-		decayUptimeOrDowntime(&newEntry, newEntry.ScanHistory[1], newEntry.ScanHistory[0])
+		updateUptime(&newEntry, newEntry.ScanHistory[1], newEntry.ScanHistory[0])
 		newEntry.ScanHistory = newEntry.ScanHistory[1:]
 	}
 

@@ -1,13 +1,12 @@
 package hostdb
 
 import (
-	"math"
-	"math/big"
-	"time"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"math"
+	"math/big"
+	"time"
 )
 
 var (
@@ -323,7 +322,14 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 			continue
 		}
 
-		decayUptimeOrDowntime(&entry, scan, recentScan)
+		blocksPassed := scan.BlockHeight - recentScan.BlockHeight
+		timePassed := time.Duration(blocksPassed) * 10 * time.Minute
+
+		if recentScan.Success {
+			uptime += timePassed
+		} else {
+			downtime += timePassed
+		}
 		recentScan = scan
 	}
 	// Sanity check against 0 total time.
@@ -360,22 +366,6 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	// 50%  uptime = 0.000002
 	exp := 100 * math.Min(1-uptimeRatio, 0.20)
 	return math.Pow(uptimeRatio, exp)
-}
-
-// decayHostUpOrDowntime decays a host's historic uptime or historic downtime.
-// It also adds the new block height to the historic uptime or historic downtime.
-func decayUptimeOrDowntime(entry *modules.HostDBEntry, scan modules.HostDBScan, recentScan modules.HostDBScan) {
-	blocksPassed := scan.BlockHeight - recentScan.BlockHeight
-	timePassed := time.Duration(blocksPassed) * 10 * time.Minute
-	decay := time.Duration(math.Pow(0.5, float64(timePassed)/float64(halftimeUpDownTime)))
-
-	if recentScan.Success {
-		entry.HistoricUptime *= decay
-		entry.HistoricUptime += timePassed * decay
-	} else {
-		entry.HistoricDowntime *= decay
-		entry.HistoricDowntime += timePassed * decay
-	}
 }
 
 // calculateHostWeight returns the weight of a host according to the settings of
