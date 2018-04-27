@@ -401,7 +401,7 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 	}
 	// create fileSections
 	headerSection := newFileSection(f, 0, contractHeaderSize)
-	rootsSection := newFileSection(f, contractHeaderSize+1, -1)
+	rootsSection := newFileSection(f, contractHeaderSize, -1)
 	// write header
 	if _, err := headerSection.WriteAt(encoding.Marshal(h), 0); err != nil {
 		return modules.RenterContract{}, err
@@ -436,7 +436,7 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 		return err
 	}
 	headerSection := newFileSection(f, 0, contractHeaderSize)
-	rootsSection := newFileSection(f, contractHeaderSize+1, remainingFile)
+	rootsSection := newFileSection(f, contractHeaderSize, remainingFile)
 
 	// read header
 	var header contractHeader
