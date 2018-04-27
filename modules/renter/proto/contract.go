@@ -436,7 +436,7 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 		return err
 	}
 	headerSection := newFileSection(f, 0, contractHeaderSize)
-	rootsSection := newFileSection(f, contractHeaderSize+1, -1)
+	rootsSection := newFileSection(f, contractHeaderSize+1, remainingFile)
 
 	// read header
 	var header contractHeader

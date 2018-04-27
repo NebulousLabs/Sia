@@ -75,9 +75,6 @@ func (f *fileSection) Truncate(size int64) error {
 	if f.start+size < f.start {
 		panic("can't truncate file to be smaller than the section start")
 	}
-	if f.start+size > f.end && f.end != remainingFile {
-		panic("can't truncate file to be bigger than the section")
-	}
 	return f.f.Truncate(f.start + size)
 }
 

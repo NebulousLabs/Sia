@@ -17,7 +17,7 @@ const (
 	rootsDiskLoadBulkSize = 1024 * crypto.HashSize // 32 kib
 
 	// remainingFile is a constant used to indicate that a fileSection can access
-	// the whole remaining file instead of being boung to a certain end offset.
+	// the whole remaining file instead of being bound to a certain end offset.
 	remainingFile = -1
 )
 
