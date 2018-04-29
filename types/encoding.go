@@ -1158,3 +1158,14 @@ func (uh *UnlockHash) LoadString(strUH string) error {
 	copy(uh[:], byteUnlockHash[:])
 	return nil
 }
+
+// Scan implements the fmt.Scanner interface, allowing UnlockHash values to be
+// scanned from text.
+func (uh *UnlockHash) Scan(s fmt.ScanState, ch rune) error {
+	s.SkipSpace()
+	tok, err := s.Token(false, nil)
+	if err != nil {
+		return err
+	}
+	return uh.LoadString(string(tok))
+}
