@@ -11,6 +11,14 @@ import (
 const (
 	// contractExtension is the extension given to contract files.
 	contractExtension = ".contract"
+
+	// rootsDiskLoadBulkSize is the max number of roots we read from disk at
+	// once to avoid using up all the ram.
+	rootsDiskLoadBulkSize = 1024 * crypto.HashSize // 32 kib
+
+	// remainingFile is a constant used to indicate that a fileSection can access
+	// the whole remaining file instead of being bound to a certain end offset.
+	remainingFile = -1
 )
 
 var (

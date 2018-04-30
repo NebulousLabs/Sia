@@ -82,6 +82,12 @@ func (ct *CachedMerkleTree) Push(h Hash) {
 	ct.CachedTree.Push(h[:])
 }
 
+// PushSubTree is a redefinition of merkletree.CachedTree.PushSubTree, with the
+// added type safety of only accepting a hash.
+func (ct *CachedMerkleTree) PushSubTree(height int, h Hash) error {
+	return ct.CachedTree.PushSubTree(height, h[:])
+}
+
 // Root is a redefinition of merkletree.CachedTree.Root, returning a Hash
 // instead of a []byte.
 func (ct *CachedMerkleTree) Root() (h Hash) {

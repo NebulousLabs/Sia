@@ -135,7 +135,7 @@ func (cs *ContractSet) ViewAll() []modules.RenterContract {
 // Close closes all contracts in a contract set, this means rendering it unusable for I/O
 func (cs *ContractSet) Close() error {
 	for _, c := range cs.contracts {
-		c.f.Close()
+		c.headerFile.Close()
 	}
 	_, err := cs.wal.CloseIncomplete()
 	return err
