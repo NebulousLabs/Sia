@@ -3,6 +3,7 @@ package wallet
 import (
 	"math"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/errors"
@@ -169,6 +170,7 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 			txid := block.Transactions[i].ID()
 			pt, err := dbGetLastProcessedTransaction(tx)
 			if err != nil {
+				build.Critical("can't revert transaction because the bucket is empty")
 				break // bucket is empty
 			}
 			if txid == pt.TransactionID {
@@ -182,7 +184,14 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 
 		// Remove the miner payout transaction if applicable.
 		for i, mp := range block.MinerPayouts {
-			if w.isWalletAddress(mp.UnlockHash) {
+			// If the transaction is relevant to the wallet, it will be the
+			// most recent transaction in bucketProcessedTransactions.
+			pt, err := dbGetLastProcessedTransaction(tx)
+			if err != nil {
+				build.Critical("can't revert miner payout because the bucket is empty")
+				break // bucket is empty
+			}
+			if types.TransactionID(block.ID()) == pt.TransactionID {
 				w.log.Println("Miner payout has been reverted due to a reorg:", block.MinerPayoutID(uint64(i)), "::", mp.Value.HumanString())
 				if err := dbDeleteLastProcessedTransaction(tx); err != nil {
 					w.log.Severe("Could not revert transaction:", err)
