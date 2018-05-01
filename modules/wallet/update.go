@@ -3,7 +3,6 @@ package wallet
 import (
 	"math"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/errors"
@@ -170,7 +169,6 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 			txid := block.Transactions[i].ID()
 			pt, err := dbGetLastProcessedTransaction(tx)
 			if err != nil {
-				build.Critical("can't revert transaction because the bucket is empty")
 				break // bucket is empty
 			}
 			if txid == pt.TransactionID {
@@ -188,7 +186,6 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 			// most recent transaction in bucketProcessedTransactions.
 			pt, err := dbGetLastProcessedTransaction(tx)
 			if err != nil {
-				build.Critical("can't revert miner payout because the bucket is empty")
 				break // bucket is empty
 			}
 			if types.TransactionID(block.ID()) == pt.TransactionID {
