@@ -22,6 +22,13 @@ type downloadPieceInfo struct {
 	root  crypto.Hash
 }
 
+// cacheData contatins the data and the timestamp for the unfinished
+// download chunks
+type cacheData struct {
+	data      []byte
+	timestamp time.Time
+}
+
 // unfinishedDownloadChunk contains a chunk for a download that is in progress.
 //
 // TODO: Currently, if a standby worker is needed, all of the standby workers
@@ -75,7 +82,7 @@ type unfinishedDownloadChunk struct {
 	mu       sync.Mutex
 
 	// Caching related fields
-	chunkCache map[string][]byte
+	chunkCache map[string]cacheData
 	cacheMu    *sync.Mutex
 }
 

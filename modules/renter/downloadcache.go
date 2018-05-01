@@ -9,12 +9,16 @@ import (
 	"github.com/NebulousLabs/errors"
 )
 
+var cd cacheData
+
 // addChunkToCache adds the chunk to the cache if the download is a streaming
 // endpoint download.
 // TODO this won't be necessary anymore once we have partial downloads.
 func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 	if udc.download.staticDestinationType != destinationTypeSeekStream {
-		// We only cache streaming chunks since browsers and media players tend to only request a few kib at once when streaming data. That way we can prevent scheduling the same chunk for download over and over.
+		// We only cache streaming chunks since browsers and media players tend
+		// to only request a few kib at once when streaming data. That way we can
+		// prevent scheduling the same chunk for download over and over.
 		return
 	}
 	udc.cacheMu.Lock()
@@ -27,7 +31,10 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 		}
 		delete(udc.chunkCache, key)
 	}
-	udc.chunkCache[udc.staticCacheID] = data
+
+	cd.data = data
+	cd.timestamp = time.Now()
+	udc.chunkCache[udc.staticCacheID] = cd
 	udc.cacheMu.Unlock()
 }
 
@@ -41,7 +48,8 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 	udc.mu.Lock()
 	defer udc.mu.Unlock()
 	r.cmu.Lock()
-	data, cached := r.chunkCache[udc.staticCacheID]
+	cd, cached := r.chunkCache[udc.staticCacheID]
+	data := cd.data
 	r.cmu.Unlock()
 	if !cached {
 		return false
