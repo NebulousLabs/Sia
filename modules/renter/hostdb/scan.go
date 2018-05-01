@@ -317,6 +317,9 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	// find the worst case latency.
 	if success {
 		hdb.successfulScans++
+		// If the latency is greater than the initialScanTimeout we use twice
+		// the latency for the new timeout. This gives us a little more wiggle
+		// room for outliers in case most hosts have a similar latency.
 		if latency > hdb.initialScanTimeout {
 			hdb.initialScanTimeout = 2 * latency
 		}
