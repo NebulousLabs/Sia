@@ -38,7 +38,7 @@ const (
 	// completed before the dial up timeout for scans is reduced. This ensures
 	// that we have a sufficient sample size of scans for estimating the worst
 	// case timeout.
-	minScansForSpeedup = 100
+	minScansForSpeedup = 25
 
 	// recentInteractionWeightLimit caps the number of recent interactions as a
 	// percentage of the historic interactions, to be certain that a large
