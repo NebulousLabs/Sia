@@ -723,13 +723,11 @@ func TestTransactionMarshalSiaSize(t *testing.T) {
 // works as expected.
 func TestUnlockHashScan(t *testing.T) {
 	// Create a random unlock hash.
-	uh := UnlockHash{}
-	copy(uh[:], fastrand.Bytes(crypto.HashSize))
-	// Convert it to a string.
-	uhStr := uh.String()
-	// Scan the hash from the string.
-	scannedHash := UnlockHash{}
-	fmt.Sscan(uhStr, &scannedHash)
+	var uh UnlockHash
+	fastrand.Read(uh[:])
+	// Convert it to a string and parse the string using Sscan.
+	var scannedHash UnlockHash
+	fmt.Sscan(uh.String(), &scannedHash)
 	// Check if they are equal.
 	if !bytes.Equal(uh[:], scannedHash[:]) {
 		t.Fatal("scanned hash is not equal to original hash")
