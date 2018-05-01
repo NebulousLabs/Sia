@@ -9,8 +9,6 @@ import (
 	"github.com/NebulousLabs/errors"
 )
 
-var cd cacheData
-
 // addChunkToCache adds the chunk to the cache if the download is a streaming
 // endpoint download.
 // TODO this won't be necessary anymore once we have partial downloads.
@@ -38,8 +36,10 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 		delete(udc.chunkCache, oldestKey)
 	}
 
-	cd.data = data
-	cd.timestamp = time.Now()
+	cd := cacheData{
+		data:      data,
+		timestamp: time.Now(),
+	}
 	udc.chunkCache[udc.staticCacheID] = cd
 }
 
