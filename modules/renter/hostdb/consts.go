@@ -40,6 +40,11 @@ const (
 	// case timeout.
 	minScansForSpeedup = 25
 
+	// scanSpeedupMedianMultiplier is the number with which the median of the
+	// initial scans is multiplied to speedup the intial scan after
+	// minScansForSpeedup successful scans.
+	scanSpeedupMedianMultiplier = 5
+
 	// recentInteractionWeightLimit caps the number of recent interactions as a
 	// percentage of the historic interactions, to be certain that a large
 	// amount of activity in a short period of time does not overwhelm the

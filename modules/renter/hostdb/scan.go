@@ -6,6 +6,7 @@ package hostdb
 
 import (
 	"net"
+	"sort"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -257,13 +258,18 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	var settings modules.HostExternalSettings
 	var latency time.Duration
 	err := func() error {
-		// During the initial scan we choose a shorter timeout once we have
-		// scanned a certain number of hosts successfully to finish the scan
-		// more quickly.
 		timeout := hostRequestTimeout
 		hdb.mu.RLock()
-		if !hdb.initialScanComplete && hdb.successfulScans > minScansForSpeedup && hdb.initialScanTimeout < hostRequestTimeout {
-			timeout = hdb.initialScanTimeout
+		if !hdb.initialScanComplete && len(hdb.initialScanLatencies) == minScansForSpeedup {
+			// During an initial scan, when we have at least minScansForSpeedup
+			// active scans in initialScanLatencies, we use
+			// 5*median(initialScanLatencies) as the new hostRequestTimeout to
+			// speedup the scanning process.
+			timeout = hdb.initialScanLatencies[len(hdb.initialScanLatencies)/2]
+			timeout *= scanSpeedupMedianMultiplier
+			if hostRequestTimeout < timeout {
+				timeout = hostRequestTimeout
+			}
 		}
 		hdb.mu.RUnlock()
 
@@ -312,16 +318,14 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	// delete the entry from the scan map as the scan has been successful.
 	hdb.updateEntry(entry, err)
 
-	// Update the initial scan timeout if the scan was successful and if the
-	// latency for this scan was greater than the current timeout. We want to
-	// find the worst case latency.
-	if success {
-		hdb.successfulScans++
-		// If the latency is greater than the initialScanTimeout we use twice
-		// the latency for the new timeout. This gives us a little more wiggle
-		// room for outliers in case most hosts have a similar latency.
-		if latency > hdb.initialScanTimeout {
-			hdb.initialScanTimeout = 2 * latency
+	// Add the scan to the initialScanLatencies if it was successful.
+	if success && len(hdb.initialScanLatencies) < minScansForSpeedup {
+		hdb.initialScanLatencies = append(hdb.initialScanLatencies, latency)
+		// If the slice has reached its maximum size we sort it.
+		if len(hdb.initialScanLatencies) == minScansForSpeedup {
+			sort.Slice(hdb.initialScanLatencies, func(i, j int) bool {
+				return hdb.initialScanLatencies[i] < hdb.initialScanLatencies[j]
+			})
 		}
 	}
 }
