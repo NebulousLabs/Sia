@@ -370,8 +370,9 @@ func dbDeleteLastProcessedTransaction(tx *bolt.Tx) error {
 	// Delete the last processed txn and decrement the sequence.
 	b := tx.Bucket(bucketProcessedTransactions)
 	seq := b.Sequence()
-	key, _ := b.Cursor().Last()
-	return errors.Compose(b.SetSequence(seq-1), b.Delete(key))
+	keyBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(keyBytes, seq)
+	return errors.Compose(b.SetSequence(seq-1), b.Delete(keyBytes))
 }
 
 func dbGetProcessedTransaction(tx *bolt.Tx, index uint64) (pt modules.ProcessedTransaction, err error) {

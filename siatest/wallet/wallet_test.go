@@ -11,12 +11,13 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestTransactionReorg makes sure that a processedTransaction isn't returned
+// by the API after bein reverted.
 func TestTransactionReorg(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
-	// Create 2 miners
 	testdir, err := siatest.TestDir(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -41,11 +42,6 @@ func TestTransactionReorg(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	println("\nTransactions sent")
-	for _, tid := range wsp.TransactionIDs {
-		println("    ", tid.String())
-	}
-	println("")
 	blocks := 1
 	for i := 0; i < blocks; i++ {
 		if err := miner1.MineBlock(); err != nil {
@@ -73,7 +69,6 @@ func TestTransactionReorg(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	println("\ncreate node 2")
 	miner2, err := siatest.NewNode(siatest.Miner(filepath.Join(testdir, "miner2")))
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +87,6 @@ func TestTransactionReorg(t *testing.T) {
 	}
 	// miner1 and miner2 connect. This should cause a reorg that reverts the
 	// transaction from before.
-	println("\nconnecting")
 	if err := miner1.GatewayConnectPost(miner2.GatewayAddress()); err != nil {
 		t.Fatal(err)
 	}
