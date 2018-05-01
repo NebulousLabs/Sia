@@ -87,6 +87,12 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 		}
 	}()
 
+	// Disrupt before sending the signed revision to the host.
+	if hd.deps.Disrupt("InterruptDownloadBeforeSendingRevision") {
+		return modules.RenterContract{}, nil,
+			errors.New("InterruptDownloadBeforeSendingRevision disrupt")
+	}
+
 	// send the revision to the host for approval
 	extendDeadline(hd.conn, 2*time.Minute) // TODO: Constant.
 	signedTxn, err := negotiateRevision(hd.conn, rev, contract.SecretKey)
@@ -97,6 +103,12 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 		defer hd.conn.Close()
 	} else if err != nil {
 		return modules.RenterContract{}, nil, err
+	}
+
+	// Disrupt after sending the signed revision to the host.
+	if hd.deps.Disrupt("InterruptDownloadAfterSendingRevision") {
+		return modules.RenterContract{}, nil,
+			errors.New("InterruptDownloadAfterSendingRevision disrupt")
 	}
 
 	// read sector data, completing one iteration of the download loop
@@ -112,11 +124,6 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 		return modules.RenterContract{}, nil, errors.New("host did not send enough sector data")
 	} else if crypto.MerkleRoot(sector) != root {
 		return modules.RenterContract{}, nil, errors.New("host sent bad sector data")
-	}
-
-	// Disrupt here before updating the contract.
-	if hd.deps.Disrupt("DownloadCrashBeforeCommit") {
-		return modules.RenterContract{}, nil, errors.New("DownloadCrashBeforeCommit disrupt")
 	}
 
 	// update contract and metrics

@@ -1,70 +1,31 @@
 package renter
 
-import (
-	"sync"
+import "github.com/NebulousLabs/Sia/siatest"
 
-	"github.com/NebulousLabs/Sia/modules"
-)
-
-type (
-	// dependencyRenterInterruptDownloadBeforeCommit interrupts a download on the
-	// Renter side after the negotiation with the host but before committing
-	// the changes.
-	dependencyRenterInterruptDownloadBeforeCommit struct {
-		f bool // indicates if the next download should fail
-		modules.ProductionDependencies
-		mu sync.Mutex
-	}
-	// dependencyRenterInterruptUploadBeforeCommit interrupts an upload on the
-	// Renter side after the negotiation with the host but before committing
-	// the changes.
-	dependencyRenterInterruptUploadBeforeCommit struct {
-		f bool // indicates if the next upload should fail
-		modules.ProductionDependencies
-		mu sync.Mutex
-	}
-)
-
-// Disrupt returns true if the correct string is provided and if the flag was
-// set to true by calling fail on the dependency beforehand. After simulating a
-// crash the flag will be set to false and fail has to be called again for
-// another disruption.
-func (d *dependencyRenterInterruptDownloadBeforeCommit) Disrupt(s string) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.f && s == "DownloadCrashBeforeCommit" {
-		d.f = false
-		return true
-	}
-	return false
+// newDependencyInterruptDownloadBeforeSendingRevision creates a new dependency
+// that interrupts the download on the renter side before sending the signed
+// revision to the host.
+func newDependencyInterruptDownloadBeforeSendingRevision() *siatest.DependencyInterruptOnceOnKeyword {
+	return siatest.NewDependencyInterruptOnceOnKeyword("InterruptDownloadBeforeSendingRevision")
 }
 
-// Disrupt returns true if the correct string is provided and if the flag was
-// set to true by calling fail on the dependency beforehand. After simulating a
-// crash the flag will be set to false and fail has to be called again for
-// another disruption.
-func (d *dependencyRenterInterruptUploadBeforeCommit) Disrupt(s string) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.f && s == "UploadCrashBeforeCommit" {
-		d.f = false
-		return true
-	}
-	return false
+// newDependencyInterruptDownloadAfterSendingRevision creates a new dependency
+// thta interrupts the download on the renter side right after receiving the
+// signed revision from the host.
+func newDependencyInterruptDownloadAfterSendingRevision() *siatest.DependencyInterruptOnceOnKeyword {
+	return siatest.NewDependencyInterruptOnceOnKeyword("InterruptDownloadAfterSendingRevision")
 }
 
-// fail causes the next call to Disrupt to return true if the correct string is
-// provided.
-func (d *dependencyRenterInterruptDownloadBeforeCommit) fail() {
-	d.mu.Lock()
-	d.f = true
-	d.mu.Unlock()
+// newDependencyInterruptUploadBeforeSendingRevision creates a new dependency
+// that interrupts the upload on the renter side before sending the signed
+// revision to the host.
+func newDependencyInterruptUploadBeforeSendingRevision() *siatest.DependencyInterruptOnceOnKeyword {
+	return siatest.NewDependencyInterruptOnceOnKeyword("InterruptUploadBeforeSendingRevision")
 }
 
-// fail causes the next call to Disrupt to return true if the correct string is
-// provided.
-func (d *dependencyRenterInterruptUploadBeforeCommit) fail() {
-	d.mu.Lock()
-	d.f = true
-	d.mu.Unlock()
+// newDependencyInterruptUploadAfterSendingRevision creates a new dependency
+// thta interrupts the upload on the renter side right after receiving the
+// signed revision from the host.
+func newDependencyInterruptUploadAfterSendingRevision() *siatest.DependencyInterruptOnceOnKeyword {
+	return siatest.NewDependencyInterruptOnceOnKeyword("InterruptUploadAfterSendingRevision")
 }

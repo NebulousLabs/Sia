@@ -136,6 +136,12 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		return modules.RenterContract{}, crypto.Hash{}, err
 	}
 
+	// Disrupt here before sending the signed revision to the host.
+	if he.deps.Disrupt("InterruptUploadBeforeSendingRevision") {
+		return modules.RenterContract{}, crypto.Hash{},
+			errors.New("InterruptUploadBeforeSendingRevision disrupt")
+	}
+
 	// send revision to host and exchange signatures
 	extendDeadline(he.conn, 2*time.Minute)
 	signedTxn, err := negotiateRevision(he.conn, rev, contract.SecretKey)
@@ -148,8 +154,9 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 	}
 
 	// Disrupt here before updating the contract.
-	if he.deps.Disrupt("UploadCrashBeforeCommit") {
-		return modules.RenterContract{}, crypto.Hash{}, errors.New("UploadCrashBeforeCommit disrupt")
+	if he.deps.Disrupt("InterruptUploadAfterSendingRevision") {
+		return modules.RenterContract{}, crypto.Hash{},
+			errors.New("InterruptUploadAfterSendingRevision disrupt")
 	}
 
 	// update contract

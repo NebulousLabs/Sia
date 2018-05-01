@@ -271,15 +271,39 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 	}
 }
 
-// TestDownloadInterrupted let's the download fail randomly and makes sure that
-// this doesn't corrupt the contract.
-func TestDownloadInterrupted(t *testing.T) {
+// TestDownloadInterruptedBeforeSendingRevision runs testDownloadInterrupted
+// with a dependency that interrupts the download before sending the signed
+// revision to the host.
+func TestDownloadInterruptedBeforeSendingRevision(t *testing.T) {
+	testDownloadInterrupted(t, newDependencyInterruptDownloadBeforeSendingRevision())
+}
+
+// TestDownloadInterruptedAfterSendingRevision runs testDownloadInterrupted
+// with a dependency that interrupts the download after sending the signed
+// revision to the host.
+func TestDownloadInterruptedAfterSendingRevision(t *testing.T) {
+	testDownloadInterrupted(t, newDependencyInterruptDownloadAfterSendingRevision())
+}
+
+// TestUploadInterruptedBeforeSendingRevision runs testUploadInterrupted with a
+// dependency that interrupts the upload before sending the signed revision to
+// the host.
+func TestUploadInterruptedBeforeSendingRevision(t *testing.T) {
+	testUploadInterrupted(t, newDependencyInterruptUploadBeforeSendingRevision())
+}
+
+// TestUploadInterruptedAfterSendingRevision runs testUploadInterrupted with a
+// dependency that interrupts the upload after sending the signed revision to
+// the host.
+func TestUploadInterruptedAfterSendingRevision(t *testing.T) {
+	testUploadInterrupted(t, newDependencyInterruptUploadAfterSendingRevision())
+}
+
+// testDownloadInterrupted interrupts a download using the provided dependencies.
+func testDownloadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnceOnKeyword) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	// Inject dependencies to allow us to interrupt the download.
-	deps := &dependencyRenterInterruptDownloadBeforeCommit{}
 
 	// Get a directory for testing.
 	testDir, err := siatest.TestDir(t.Name())
@@ -324,7 +348,7 @@ func TestDownloadInterrupted(t *testing.T) {
 	go func() {
 		for {
 			// Cause the next download to fail.
-			deps.fail()
+			deps.Fail()
 			select {
 			case <-cancel:
 				wg.Done()
@@ -342,22 +366,19 @@ func TestDownloadInterrupted(t *testing.T) {
 	// Stop calling fail on the dependency.
 	close(cancel)
 	wg.Wait()
-	deps.f = false
+	deps.Disable()
 	// Download the file once more successfully
 	if _, err := renter.DownloadByStream(remoteFile); err != nil {
 		t.Fatal("Failed to download the file", err)
 	}
 }
 
-// TestUploadInterrupted let's the upload fail randomly and makes sure that
-// this doesn't corrupt the contract.
-func TestUploadInterrupted(t *testing.T) {
+// testUploadInterrupted let's the upload fail using the provided dependencies
+// and makes sure that this doesn't corrupt the contract.
+func testUploadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnceOnKeyword) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	// Inject dependencies to allow us to interrupt the upload.
-	deps := &dependencyRenterInterruptUploadBeforeCommit{}
 
 	// Get a directory for testing.
 	testDir, err := siatest.TestDir(t.Name())
@@ -399,7 +420,7 @@ func TestUploadInterrupted(t *testing.T) {
 		// might end up blocking the upload for too long.
 		for i := 0; i < 5; i++ {
 			// Cause the next upload to fail.
-			deps.fail()
+			deps.Fail()
 			select {
 			case <-cancel:
 				wg.Done()
@@ -418,7 +439,7 @@ func TestUploadInterrupted(t *testing.T) {
 	// Stop calling fail on the dependency.
 	close(cancel)
 	wg.Wait()
-	deps.f = false
+	deps.Disable()
 	// Download the file.
 	if _, err := renter.DownloadByStream(remoteFile); err != nil {
 		t.Fatal("Failed to download the file", err)
