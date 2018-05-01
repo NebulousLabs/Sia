@@ -136,7 +136,7 @@ func TestUpdateEntry(t *testing.T) {
 	if !exists {
 		t.Fatal("Entry did not get inserted into the host tree")
 	}
-	updatedEntry.ScanHistory = append([]modules.HostDBScan{{Timestamp: time.Now().Add(maxHostDowntime * -1).Add(time.Hour * -1)}}, updatedEntry.ScanHistory...)
+	updatedEntry.ScanHistory = append([]modules.HostDBScan{{Timestamp: time.Now().Add(maxHostDowntime * -1).Add(time.Hour * -1), BlockHeight: hdbt.hdb.blockHeight}}, updatedEntry.ScanHistory...)
 	err = hdbt.hdb.hostTree.Modify(updatedEntry)
 	if err != nil {
 		t.Fatal(err)
@@ -164,7 +164,7 @@ func TestUpdateEntry(t *testing.T) {
 	if !exists {
 		t.Fatal("Entry did not get inserted into the host tree")
 	}
-	updatedEntry.ScanHistory = append([]modules.HostDBScan{{Success: true, Timestamp: time.Now().Add(time.Hour * 24 * 11 * -1)}}, updatedEntry.ScanHistory...)
+	updatedEntry.ScanHistory = append([]modules.HostDBScan{{Success: true, BlockHeight: hdbt.hdb.blockHeight, Timestamp: time.Now().Add(time.Hour * 24 * 11 * -1)}}, updatedEntry.ScanHistory...)
 	err = hdbt.hdb.hostTree.Modify(updatedEntry)
 	if err != nil {
 		t.Fatal(err)

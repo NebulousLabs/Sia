@@ -1,12 +1,12 @@
 package hostdb
 
 import (
-	"math"
-	"math/big"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"math"
+	"math/big"
+	"time"
 )
 
 var (
@@ -310,10 +310,9 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 	// host.
 	downtime := entry.HistoricDowntime
 	uptime := entry.HistoricUptime
-	recentTime := entry.ScanHistory[0].Timestamp
-	recentSuccess := entry.ScanHistory[0].Success
+	recentScan := entry.ScanHistory[0]
 	for _, scan := range entry.ScanHistory[1:] {
-		if recentTime.After(scan.Timestamp) {
+		if recentScan.Timestamp.After(scan.Timestamp) {
 			if build.DEBUG {
 				hdb.log.Critical("Host entry scan history not sorted.")
 			} else {
@@ -322,13 +321,16 @@ func (hdb *HostDB) uptimeAdjustments(entry modules.HostDBEntry) float64 {
 			// Ignore the unsorted scan entry.
 			continue
 		}
-		if recentSuccess {
-			uptime += scan.Timestamp.Sub(recentTime)
+
+		blocksPassed := scan.BlockHeight - recentScan.BlockHeight
+		timePassed := time.Duration(blocksPassed) * 10 * time.Minute
+
+		if recentScan.Success {
+			uptime += timePassed
 		} else {
-			downtime += scan.Timestamp.Sub(recentTime)
+			downtime += timePassed
 		}
-		recentTime = scan.Timestamp
-		recentSuccess = scan.Success
+		recentScan = scan
 	}
 	// Sanity check against 0 total time.
 	if uptime == 0 && downtime == 0 {

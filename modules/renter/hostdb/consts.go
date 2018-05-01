@@ -34,6 +34,9 @@ const (
 	// scans start getting compressed.
 	minScans = 12
 
+	// uptimeHalflife  is the halftime used to decay the host up and downtime
+	uptimeHalflife = 30 * 24 * time.Hour
+
 	// recentInteractionWeightLimit caps the number of recent interactions as a
 	// percentage of the historic interactions, to be certain that a large
 	// amount of activity in a short period of time does not overwhelm the
