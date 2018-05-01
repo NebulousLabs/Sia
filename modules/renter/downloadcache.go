@@ -25,11 +25,17 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 	// Prune cache if necessary.
 	// TODO insteado of deleting a 'random' key, delete the
 	// least-recently-accessed element of the cache.
-	for key := range udc.chunkCache {
-		if len(udc.chunkCache) < downloadCacheSize {
-			break
+	if len(udc.chunkCache) >= downloadCacheSize {
+		var oldestKey string
+		oldestTime := time.Now().Second()
+
+		for key := range udc.chunkCache {
+			if udc.chunkCache[key].timestamp.Second() < oldestTime {
+				oldestTime = udc.chunkCache[key].timestamp.Second()
+				oldestKey = key
+			}
 		}
-		delete(udc.chunkCache, key)
+		delete(udc.chunkCache, oldestKey)
 	}
 
 	cd.data = data
