@@ -22,9 +22,9 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 		return
 	}
 	udc.cacheMu.Lock()
+	defer udc.cacheMu.Unlock()
+
 	// Prune cache if necessary.
-	// TODO insteado of deleting a 'random' key, delete the
-	// least-recently-accessed element of the cache.
 	if len(udc.chunkCache) >= downloadCacheSize {
 		var oldestKey string
 		oldestTime := time.Now().Second()
@@ -41,7 +41,6 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 	cd.data = data
 	cd.timestamp = time.Now()
 	udc.chunkCache[udc.staticCacheID] = cd
-	udc.cacheMu.Unlock()
 }
 
 // managedTryCache tries to retrieve the chunk from the renter's cache. If
