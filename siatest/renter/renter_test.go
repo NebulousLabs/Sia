@@ -3,7 +3,9 @@ package renter
 import (
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
@@ -39,8 +41,9 @@ func TestRenter(t *testing.T) {
 		name string
 		test func(*testing.T, *siatest.TestGroup)
 	}{
-		{"UploadDownload", testUploadDownload},
-		{"DownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
+		{"TestRenterStreamingCache", testRenterStreamingCache},
+		{"TestUploadDownload", testUploadDownload},
+		{"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
 	}
@@ -267,5 +270,40 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 	// We should be able to download
 	if _, err := r.DownloadByStream(remoteFile); err != nil {
 		t.Fatal("Failed to download file", err)
+	}
+}
+
+// testRenterStreamingCache checks if the chunk cache works correctly.
+func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	r := tg.Renters()[0]
+
+	// Set fileSize and redundancy for upload
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+
+	// Set the bandwidth limit to 1 chunk per second.
+	pieceSize := modules.SectorSize - crypto.TwofishOverhead
+	chunkSize := int64(pieceSize * dataPieces)
+	if err := r.RenterPostRateLimit(chunkSize, chunkSize); err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload a file that is a single chunk big.
+	_, remoteFile, err := r.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Download the same chunk 250 times. This should take at least 250 seconds
+	// without caching but not more than 30 with caching.
+	start := time.Now()
+	for i := 0; i < 250; i++ {
+		if _, err := r.Stream(remoteFile); err != nil {
+			t.Fatal(err)
+		}
+		if time.Since(start) > time.Second*30 {
+			t.Fatal("download took longer than 30 seconds")
+		}
 	}
 }
