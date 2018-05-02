@@ -6,6 +6,7 @@ package hostdb
 
 import (
 	"net"
+	"sort"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -15,18 +16,26 @@ import (
 	"github.com/NebulousLabs/fastrand"
 )
 
-// queueScan will add a host to the queue to be scanned.
+// queueScan will add a host to the queue to be scanned. The host will be added
+// at a random position which means that the order in which queueScan is called
+// is not necessarily the order in which the hosts get scanned. That guarantees
+// a random scan order during the initial scan.
 func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 	// If this entry is already in the scan pool, can return immediately.
 	_, exists := hdb.scanMap[entry.PublicKey.String()]
 	if exists {
 		return
 	}
-
-	// Add the entry to a waitlist, then check if any thread is currently
-	// emptying the waitlist. If not, spawn a thread to empty the waitlist.
+	// Add the entry to a random position in the waitlist.
 	hdb.scanMap[entry.PublicKey.String()] = struct{}{}
 	hdb.scanList = append(hdb.scanList, entry)
+	if len(hdb.scanList) > 1 {
+		i := len(hdb.scanList) - 1
+		j := fastrand.Intn(i)
+		hdb.scanList[i], hdb.scanList[j] = hdb.scanList[j], hdb.scanList[i]
+	}
+	// Check if any thread is currently emptying the waitlist. If not, spawn a
+	// thread to empty the waitlist.
 	if hdb.scanWait {
 		// Another thread is emptying the scan list, nothing to worry about.
 		return
@@ -247,12 +256,30 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	hdb.mu.RUnlock()
 
 	var settings modules.HostExternalSettings
+	var latency time.Duration
 	err := func() error {
+		timeout := hostRequestTimeout
+		hdb.mu.RLock()
+		if !hdb.initialScanComplete && len(hdb.initialScanLatencies) == minScansForSpeedup {
+			// During an initial scan, when we have at least minScansForSpeedup
+			// active scans in initialScanLatencies, we use
+			// 5*median(initialScanLatencies) as the new hostRequestTimeout to
+			// speedup the scanning process.
+			timeout = hdb.initialScanLatencies[len(hdb.initialScanLatencies)/2]
+			timeout *= scanSpeedupMedianMultiplier
+			if hostRequestTimeout < timeout {
+				timeout = hostRequestTimeout
+			}
+		}
+		hdb.mu.RUnlock()
+
 		dialer := &net.Dialer{
 			Cancel:  hdb.tg.StopChan(),
-			Timeout: hostRequestTimeout,
+			Timeout: timeout,
 		}
+		start := time.Now()
 		conn, err := dialer.Dial("tcp", string(netAddr))
+		latency = time.Since(start)
 		if err != nil {
 			return err
 		}
@@ -282,12 +309,24 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 		entry.HostExternalSettings = settings
 	}
+	success := err == nil
 
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 	// Update the host tree to have a new entry, including the new error. Then
 	// delete the entry from the scan map as the scan has been successful.
-	hdb.mu.Lock()
 	hdb.updateEntry(entry, err)
-	hdb.mu.Unlock()
+
+	// Add the scan to the initialScanLatencies if it was successful.
+	if success && len(hdb.initialScanLatencies) < minScansForSpeedup {
+		hdb.initialScanLatencies = append(hdb.initialScanLatencies, latency)
+		// If the slice has reached its maximum size we sort it.
+		if len(hdb.initialScanLatencies) == minScansForSpeedup {
+			sort.Slice(hdb.initialScanLatencies, func(i, j int) bool {
+				return hdb.initialScanLatencies[i] < hdb.initialScanLatencies[j]
+			})
+		}
+	}
 }
 
 // waitForScans is a helper function that blocks until the hostDB's scanList is
