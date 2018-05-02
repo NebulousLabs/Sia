@@ -78,16 +78,7 @@ The JSON formatted block or a standard error response.
             "value": "299999000000000000000000000000"
         }
     ],
-    "nonce": [
-        253,
-        253,
-        0,
-        0,
-        0,
-        0,
-        0,
-        100
-    ],
+    "nonce": [253,253,0,0,0,0,0,100],
     "parentid": "25f6e3b9295a61f69fcb956aca9f0076234ecf2e02d399db5448b6e22f26e81c",
     "timestamp": 1433626546,
     "transactions": [
