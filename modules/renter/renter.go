@@ -363,10 +363,10 @@ func validateSiapath(siapath string) error {
 		return ErrEmptyFilename
 	}
 	if siapath == ".." {
-		return errors.New("siapath cannot be .. ")
+		return errors.New("siapath cannot be '..'")
 	}
 	if siapath == "." {
-		return errors.New("siapath cannot be . ")
+		return errors.New("siapath cannot be '.'")
 	}
 	// check prefix
 	if strings.HasPrefix(siapath, "/") {

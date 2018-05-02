@@ -23,24 +23,25 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 	defer udc.cacheMu.Unlock()
 
 	// Prune cache if necessary.
-	if len(udc.chunkCache) >= downloadCacheSize {
+	for len(udc.chunkCache) >= downloadCacheSize {
 		var oldestKey string
-		oldestTime := time.Now().Second()
+		oldestTime := time.Now()
 
-		for key := range udc.chunkCache {
-			if udc.chunkCache[key].timestamp.Second() < oldestTime {
-				oldestTime = udc.chunkCache[key].timestamp.Second()
-				oldestKey = key
+		// TODO: turn this from a structure where you loop over every element (O(n) per access) to a min heap (O(log n) per access).
+		// currently not a issue due to cache size remaining small (<20)
+		for id, chunk := range udc.chunkCache {
+			if chunk.lastAccess.Before(oldestTime) {
+				oldestTime = chunk.lastAccess
+				oldestKey = id
 			}
 		}
 		delete(udc.chunkCache, oldestKey)
 	}
 
-	cd := cacheData{
-		data:      data,
-		timestamp: time.Now(),
+	udc.chunkCache[udc.staticCacheID] = cacheData{
+		data:       data,
+		lastAccess: time.Now(),
 	}
-	udc.chunkCache[udc.staticCacheID] = cd
 }
 
 // managedTryCache tries to retrieve the chunk from the renter's cache. If
@@ -54,14 +55,14 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 	defer udc.mu.Unlock()
 	r.cmu.Lock()
 	cd, cached := r.chunkCache[udc.staticCacheID]
-	data := cd.data
+	cd.lastAccess = time.Now()
 	r.cmu.Unlock()
 	if !cached {
 		return false
 	}
 	start := udc.staticFetchOffset
 	end := start + udc.staticFetchLength
-	_, err := udc.destination.WriteAt(data[start:end], udc.staticWriteOffset)
+	_, err := udc.destination.WriteAt(cd.data[start:end], udc.staticWriteOffset)
 	if err != nil {
 		r.log.Println("WARN: failed to write cached chunk to destination:", err)
 		udc.fail(errors.AddContext(err, "failed to write cached chunk to destination"))
