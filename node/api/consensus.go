@@ -85,9 +85,9 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 	}
 	// Write response
 	WriteJSON(w, ConsensusBlocksGet{
-		b.ID(),
-		h,
-		b,
+		BlockID:     b.ID(),
+		BlockHeight: h,
+		Block:       b,
 	})
 }
 
