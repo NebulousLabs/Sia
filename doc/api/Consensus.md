@@ -70,6 +70,8 @@ height
 The JSON formatted block or a standard error response.
 ```
 {
+    "height": 1,
+    "id": "0000000018492dfe2a1b2da6ca3534a757796573f84f0eb0eb5f88d75cd10f9f",
     "minerpayouts": [
         {
             "unlockhash": "68a0607b15f21ce643bb47075e539b9e938d7a8e0870951a3c872a2d89ae05194ee3a0f18680",
