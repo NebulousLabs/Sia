@@ -302,15 +302,14 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 		copy(pubkey[:], pubKey.Key)
 		return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 	}()
-	success := false
 	if err != nil {
 		hdb.log.Debugf("Scan of host at %v failed: %v", netAddr, err)
 
 	} else {
 		hdb.log.Debugf("Scan of host at %v succeeded.", netAddr)
 		entry.HostExternalSettings = settings
-		success = true
 	}
+	success := err == nil
 
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
