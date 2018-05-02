@@ -295,6 +295,9 @@ func decodeProcessedTransaction(ptBytes []byte, pt *modules.ProcessedTransaction
 	return err
 }
 
+func dbDeleteTransactionIndex(tx *bolt.Tx, txid types.TransactionID) error {
+	return dbDelete(tx.Bucket(bucketProcessedTxnIndex), txid)
+}
 func dbPutTransactionIndex(tx *bolt.Tx, txid types.TransactionID, key []byte) error {
 	return dbPut(tx.Bucket(bucketProcessedTxnIndex), txid, key)
 }
@@ -346,18 +349,30 @@ func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) 
 }
 
 func dbGetLastProcessedTransaction(tx *bolt.Tx) (pt modules.ProcessedTransaction, err error) {
-	_, val := tx.Bucket(bucketProcessedTransactions).Cursor().Last()
+	seq := tx.Bucket(bucketProcessedTransactions).Sequence()
+	keyBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(keyBytes, seq)
+	val := tx.Bucket(bucketProcessedTransactions).Get(keyBytes)
 	err = decodeProcessedTransaction(val, &pt)
 	return
 }
 
 func dbDeleteLastProcessedTransaction(tx *bolt.Tx) error {
-	// delete the last entry in the bucket. Note that we don't need to
-	// decrement the sequence integer; we only care that the next integer is
-	// larger than the previous one.
+	// Get the last processed txn.
+	pt, err := dbGetLastProcessedTransaction(tx)
+	if err != nil {
+		return errors.New("can't delete from empty bucket")
+	}
+	// Delete its txid from the index bucket.
+	if err := dbDeleteTransactionIndex(tx, pt.TransactionID); err != nil {
+		return errors.AddContext(err, "couldn't delete txn index")
+	}
+	// Delete the last processed txn and decrement the sequence.
 	b := tx.Bucket(bucketProcessedTransactions)
-	key, _ := b.Cursor().Last()
-	return b.Delete(key)
+	seq := b.Sequence()
+	keyBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(keyBytes, seq)
+	return errors.Compose(b.SetSequence(seq-1), b.Delete(keyBytes))
 }
 
 func dbGetProcessedTransaction(tx *bolt.Tx, index uint64) (pt modules.ProcessedTransaction, err error) {

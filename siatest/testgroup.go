@@ -340,8 +340,10 @@ func synchronizationCheck(miner *TestNode, nodes map[*TestNode]struct{}) error {
 			// If the miner's height is greater than the node's we need to
 			// wait a bit longer for them to sync.
 			if mcg.Height > ncg.Height {
-				return fmt.Errorf("the node didn't catch up to the miner's height %v %v",
-					mcg.Height, ncg.Height)
+				gwgMiner, errMiner := miner.GatewayGet()
+				gwgNode, errNode := node.GatewayGet()
+				return errors.Compose(fmt.Errorf("the node didn't catch up to the miner's height %v %v but have %v and %v peers respectively",
+					mcg.Height, ncg.Height, len(gwgNode.Peers), len(gwgMiner.Peers)), errMiner, errNode)
 			}
 			// If the miner's height is smaller than the node's we need a
 			// bit longer for them to sync.

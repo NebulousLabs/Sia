@@ -182,7 +182,13 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 
 		// Remove the miner payout transaction if applicable.
 		for i, mp := range block.MinerPayouts {
-			if w.isWalletAddress(mp.UnlockHash) {
+			// If the transaction is relevant to the wallet, it will be the
+			// most recent transaction in bucketProcessedTransactions.
+			pt, err := dbGetLastProcessedTransaction(tx)
+			if err != nil {
+				break // bucket is empty
+			}
+			if types.TransactionID(block.ID()) == pt.TransactionID {
 				w.log.Println("Miner payout has been reverted due to a reorg:", block.MinerPayoutID(uint64(i)), "::", mp.Value.HumanString())
 				if err := dbDeleteLastProcessedTransaction(tx); err != nil {
 					w.log.Severe("Could not revert transaction:", err)
