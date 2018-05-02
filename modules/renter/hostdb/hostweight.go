@@ -14,9 +14,9 @@ var (
 	// weight to be very large.
 	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(80), nil))
 
-	// collateralExponentiation is the number of times that the collateral is
-	// multiplied into the price.
-	collateralExponentiation = 1
+	// collateralExponentiation is the power to which we raise the weight
+	// during collateral adjustment.
+	collateralExponentiation = 0.75
 
 	// minCollateral is the amount of collateral we weight all hosts as having,
 	// even if they do not have any collateral. This is to temporarily prop up
@@ -85,10 +85,7 @@ func (hdb *HostDB) collateralAdjustments(entry modules.HostDBEntry) float64 {
 	actual := float64(actualU64)
 
 	// Exponentiate the results.
-	weight := float64(1)
-	for i := 0; i < collateralExponentiation; i++ {
-		weight *= actual / base
-	}
+	weight := math.Pow(actual/base, collateralExponentiation)
 
 	// Add in penalties for low MaxCollateral. Hosts should be willing to pay
 	// for at least 100 GB of collateral on a contract.
