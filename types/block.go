@@ -25,7 +25,8 @@ type (
 	// then try to pick a Nonce that results in a block whose BlockID is below a
 	// given Target.
 	Block struct {
-		ParentID     BlockID         `json:"parentid"`
+        BlockID      BlockID         `json:"blockid"`
+        ParentID     BlockID         `json:"parentid"`
 		Nonce        BlockNonce      `json:"nonce"`
 		Timestamp    Timestamp       `json:"timestamp"`
 		MinerPayouts []SiacoinOutput `json:"minerpayouts"`
