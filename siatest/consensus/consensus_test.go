@@ -88,6 +88,9 @@ func TestConsensusBlocksIDGet(t *testing.T) {
 	if block.BlockID != cg.CurrentBlock {
 		t.Fatal("BlockID wasn't set correctly")
 	}
+	if block.BlockHeight != cg.Height {
+		t.Fatal("BlockHeight wasn't set correctly")
+	}
 	if block.ParentID == zeroID {
 		t.Fatal("ParentID wasn't set correctly")
 	}
@@ -106,10 +109,13 @@ func TestConsensusBlocksIDGet(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to retrieve block", err)
 	}
+	// block and block2 should be the same
 	if block.BlockID != block2.BlockID {
 		t.Fatal("BlockID wasn't set correctly")
 	}
-	// block and block2 should be the same
+	if block.BlockHeight != block2.BlockHeight {
+		t.Fatal("BlockID wasn't set correctly")
+	}
 	if block.ParentID != block2.ParentID {
 		t.Fatal("ParentIDs don't match")
 	}

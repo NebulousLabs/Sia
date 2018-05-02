@@ -27,7 +27,8 @@ type ConsensusHeadersGET struct {
 
 // ConsensusBlocksGet wraps a types.Block and adds an id field.
 type ConsensusBlocksGet struct {
-	BlockID types.BlockID `json:"id"`
+	BlockID     types.BlockID     `json:"id"`
+	BlockHeight types.BlockHeight `json:"height"`
 	types.Block
 }
 
@@ -57,6 +58,7 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 	}
 
 	var b types.Block
+	var h types.BlockHeight
 	var exists bool
 
 	// Handle request by id
@@ -66,11 +68,10 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 			WriteError(w, Error{"failed to unmarshal blockid"}, http.StatusBadRequest)
 			return
 		}
-		b, exists = api.cs.BlockByID(bid)
+		b, h, exists = api.cs.BlockByID(bid)
 	}
 	// Handle request by height
 	if height != "" {
-		var h uint64
 		if _, err := fmt.Sscan(height, &h); err != nil {
 			WriteError(w, Error{"failed to parse block height"}, http.StatusBadRequest)
 			return
@@ -85,6 +86,7 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 	// Write response
 	WriteJSON(w, ConsensusBlocksGet{
 		b.ID(),
+		h,
 		b,
 	})
 }
