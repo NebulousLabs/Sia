@@ -25,6 +25,12 @@ type ConsensusHeadersGET struct {
 	BlockID types.BlockID `json:"blockid"`
 }
 
+// ConsensusBlocksGet wraps a types.Block and adds an id field.
+type ConsensusBlocksGet struct {
+	BlockID types.BlockID `json:"id"`
+	types.Block
+}
+
 // consensusHandler handles the API calls to /consensus.
 func (api *API) consensusHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	cbid := api.cs.CurrentBlock().ID()
@@ -77,7 +83,10 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 		return
 	}
 	// Write response
-	WriteJSON(w, b)
+	WriteJSON(w, ConsensusBlocksGet{
+		b.ID(),
+		b,
+	})
 }
 
 // consensusValidateTransactionsetHandler handles the API calls to
