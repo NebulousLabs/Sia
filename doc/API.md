@@ -196,6 +196,47 @@ height
 
 ```
 
+###### Response
+The JSON formatted block or a standard error response.
+```
+{
+    "minerpayouts": [
+        {
+            "unlockhash": "68a0607b15f21ce643bb47075e539b9e938d7a8e0870951a3c872a2d89ae05194ee3a0f18680",
+            "value": "299999000000000000000000000000"
+        }
+    ],
+    "nonce": [
+        253,
+        253,
+        0,
+        0,
+        0,
+        0,
+        0,
+        100
+    ],
+    "parentid": "25f6e3b9295a61f69fcb956aca9f0076234ecf2e02d399db5448b6e22f26e81c",
+    "timestamp": 1433626546,
+    "transactions": [
+        {
+            "arbitrarydata": [
+                "Tm9uU2lhQ9ikb2Lc6jDRfLhhjPflTQ=="
+            ],
+            "filecontractrevisions": [],
+            "filecontracts": [],
+            "minerfees": [],
+            "siacoininputs": [],
+            "siacoinoutputs": [],
+            "siafundinputs": [],
+            "siafundoutputs": [],
+            "storageproofs": [],
+            "transactionsignatures": []
+        }
+    ]
+}
+```
+
 #### /consensus/validate/transactionset [POST]
 
 validates a set of transactions using the current utxo set.
