@@ -61,6 +61,7 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 			return
 		}
 		b, exists = api.cs.BlockByID(bid)
+        b.BlockID = bid
 	}
 	// Handle request by height
 	if height != "" {
@@ -70,6 +71,7 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 			return
 		}
 		b, exists = api.cs.BlockAtHeight(types.BlockHeight(h))
+        b.BlockID = b.ID()
 	}
 	// Check if block was found
 	if !exists {
