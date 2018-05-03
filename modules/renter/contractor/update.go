@@ -7,17 +7,7 @@ import (
 
 // managedArchiveContracts will figure out which contracts are no longer needed
 // and move them to the historic set of contracts.
-//
-// TODO: This function should be performed by threadedContractMaintenance.
-// threadedContractMaintenance will currently quit if there are no hosts, but it
-// should at least run this code before quitting.
 func (c *Contractor) managedArchiveContracts() {
-	err := c.tg.Add()
-	if err != nil {
-		return
-	}
-	defer c.tg.Done()
-
 	// Determine the current block height.
 	c.mu.RLock()
 	currentHeight := c.blockHeight
@@ -90,6 +80,5 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// maintenance.
 	if cc.Synced {
 		go c.threadedContractMaintenance()
-		go c.managedArchiveContracts()
 	}
 }
