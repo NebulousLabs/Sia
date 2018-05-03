@@ -574,8 +574,16 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 		}
 	}
 	if sos == obligationSucceeded {
+		// Empty obligations don't submit a storage proof. The revenue for an empty
+		// storage obligation should equal the contract cost of the obligation
+		revenue := so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue)
+		if len(so.SectorRoots) == 0 {
+			h.log.Printf("No need to submit a storage proof for empty contract. Revenue is %v.\n", revenue)
+		} else {
+			h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", revenue)
+		}
+
 		// Remove the obligation statistics as potential risk and income.
-		h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue))
 		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
 		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
 		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
@@ -763,9 +771,22 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 	if !so.ProofConfirmed && blockHeight >= so.expiration()+resubmissionTimeout {
 		h.log.Debugln("Host is attempting a storage proof for", so.id())
 
+		// If the obligation has no sector roots, we can remove the obligation and not
+		// submit a storage proof. The host payout for a failed empty contract
+		// includes the contract cost and locked collateral.
+		if len(so.SectorRoots) == 0 {
+			h.log.Debugln("storage proof not submitted for empty contract, id", so.id())
+			h.mu.Lock()
+			err := h.removeStorageObligation(so, obligationSucceeded)
+			h.mu.Unlock()
+			if err != nil {
+				h.log.Println("Error removing storage obligation:", err)
+			}
+			return
+		}
 		// If the window has closed, the host has failed and the obligation can
 		// be removed.
-		if so.proofDeadline() < blockHeight || len(so.SectorRoots) == 0 {
+		if so.proofDeadline() < blockHeight {
 			h.log.Debugln("storage proof not confirmed by deadline, id", so.id())
 			h.mu.Lock()
 			err := h.removeStorageObligation(so, obligationFailed)
@@ -775,7 +796,6 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 			}
 			return
 		}
-
 		// Get the index of the segment, and the index of the sector containing
 		// the segment.
 		segmentIndex, err := h.cs.StorageProofSegment(so.id())
