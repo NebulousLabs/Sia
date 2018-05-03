@@ -1,7 +1,6 @@
 package proto
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/ratelimit"
 
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/writeaheadlog"
 )
 
@@ -64,7 +64,8 @@ func (cs *ContractSet) Delete(c *SafeContract) {
 	cs.mu.Unlock()
 	safeContract.mu.Unlock()
 	// delete contract file
-	err := os.Remove(filepath.Join(cs.dir, c.header.ID().String()+contractExtension))
+	path := filepath.Join(cs.dir, c.header.ID().String()+contractExtension)
+	err := errors.Compose(safeContract.headerFile.Close(), os.Remove(path))
 	if err != nil {
 		build.Critical("Failed to delete SafeContract from disk:", err)
 	}
