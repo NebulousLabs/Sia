@@ -27,7 +27,8 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 		var oldestKey string
 		oldestTime := time.Now()
 
-		// TODO: turn this from a structure where you loop over every element (O(n) per access) to a min heap (O(log n) per access).
+		// TODO: turn this from a structure where you loop over every element
+		// (O(n) per access) to a min heap (O(log n) per access).
 		// currently not a issue due to cache size remaining small (<20)
 		for id, chunk := range udc.chunkCache {
 			if chunk.lastAccess.Before(oldestTime) {
@@ -56,6 +57,7 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 	r.cmu.Lock()
 	cd, cached := r.chunkCache[udc.staticCacheID]
 	cd.lastAccess = time.Now()
+	r.chunkCache[udc.staticCacheID] = cd
 	r.cmu.Unlock()
 	if !cached {
 		return false
