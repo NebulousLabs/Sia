@@ -39,7 +39,7 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 		delete(udc.chunkCache, oldestKey)
 	}
 
-	udc.chunkCache[udc.staticCacheID] = cacheData{
+	udc.chunkCache[udc.staticCacheID] = &cacheData{
 		data:       data,
 		lastAccess: time.Now(),
 	}
@@ -56,12 +56,15 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 	defer udc.mu.Unlock()
 	r.cmu.Lock()
 	cd, cached := r.chunkCache[udc.staticCacheID]
-	cd.lastAccess = time.Now()
-	r.chunkCache[udc.staticCacheID] = cd
 	r.cmu.Unlock()
 	if !cached {
 		return false
 	}
+
+	// chunk exists, updating lastAccess and reinserting into map
+	cd.lastAccess = time.Now()
+	r.chunkCache[udc.staticCacheID] = cd
+
 	start := udc.staticFetchOffset
 	end := start + udc.staticFetchLength
 	_, err := udc.destination.WriteAt(cd.data[start:end], udc.staticWriteOffset)

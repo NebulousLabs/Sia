@@ -189,7 +189,7 @@ type Renter struct {
 	lastEstimation modules.RenterPriceEstimation
 
 	// Utilities.
-	chunkCache     map[string]cacheData
+	chunkCache     map[string]*cacheData
 	cmu            *sync.Mutex
 	cs             modules.ConsensusSet
 	deps           modules.Dependencies
@@ -426,7 +426,7 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
-		chunkCache:     make(map[string]cacheData),
+		chunkCache:     make(map[string]*cacheData),
 		cmu:            new(sync.Mutex),
 		cs:             cs,
 		deps:           deps,

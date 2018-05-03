@@ -82,7 +82,7 @@ type unfinishedDownloadChunk struct {
 	mu       sync.Mutex
 
 	// Caching related fields
-	chunkCache map[string]cacheData
+	chunkCache map[string]*cacheData
 	cacheMu    *sync.Mutex
 }
 
