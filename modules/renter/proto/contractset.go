@@ -64,7 +64,10 @@ func (cs *ContractSet) Delete(c *SafeContract) {
 	cs.mu.Unlock()
 	safeContract.mu.Unlock()
 	// delete contract file
-	os.Remove(filepath.Join(cs.dir, c.header.ID().String()+contractExtension))
+	err := os.Remove(filepath.Join(cs.dir, c.header.ID().String()+contractExtension))
+	if err != nil {
+		build.Critical("Failed to delete SafeContract from disk:", err)
+	}
 }
 
 // IDs returns the FileContractID of each contract in the set. The contracts
