@@ -62,6 +62,9 @@ type (
 	}
 )
 
+var typSiaMarshaler = reflect.TypeOf(new(SiaMarshaler)).Elem()
+var typSiaUnmarshaler = reflect.TypeOf(new(SiaUnmarshaler)).Elem()
+
 // Encode writes the encoding of v to the stream. For encoding details, see
 // the package docstring.
 func (e *Encoder) Encode(v interface{}) error {
@@ -93,7 +96,24 @@ func (e *Encoder) encode(val reflect.Value) error {
 	// check for MarshalSia interface first
 	if val.CanInterface() {
 		if m, ok := val.Interface().(SiaMarshaler); ok {
-			return m.MarshalSia(e.w)
+			// Check that the interface isn't actually being satisfied by an
+			// embedded struct. Without this check, only the embedded struct
+			// would be encoded instead of the full struct.
+			safe := true
+			if val.Kind() == reflect.Struct {
+				typ := val.Type()
+				for i := 0; i < typ.NumField(); i++ {
+					if f := typ.Field(i); f.Anonymous {
+						if f.Type.Implements(typSiaMarshaler) || reflect.PtrTo(f.Type).Implements(typSiaMarshaler) {
+							safe = false
+							break
+						}
+					}
+				}
+			}
+			if safe {
+				return m.MarshalSia(e.w)
+			}
 		}
 	}
 
@@ -277,11 +297,28 @@ func (d *Decoder) decode(val reflect.Value) {
 	// check for UnmarshalSia interface first
 	if val.CanAddr() && val.Addr().CanInterface() {
 		if u, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
-			err := u.UnmarshalSia(d.r)
-			if err != nil {
-				panic(err)
+			// Check that the interface isn't actually being satisfied by an
+			// embedded struct. Without this check, only the embedded struct
+			// would be decoded instead of the full struct.
+			safe := true
+			if val.Kind() == reflect.Struct {
+				typ := val.Type()
+				for i := 0; i < typ.NumField(); i++ {
+					if f := typ.Field(i); f.Anonymous {
+						if f.Type.Implements(typSiaUnmarshaler) || reflect.PtrTo(f.Type).Implements(typSiaUnmarshaler) {
+							safe = false
+							break
+						}
+					}
+				}
 			}
-			return
+			if safe {
+				err := u.UnmarshalSia(d.r)
+				if err != nil {
+					panic(err)
+				}
+				return
+			}
 		}
 	}
 

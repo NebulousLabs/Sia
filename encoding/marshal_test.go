@@ -355,6 +355,36 @@ func TestReadWriteFile(t *testing.T) {
 	}
 }
 
+type Foo struct {
+	F int
+}
+
+func (f Foo) MarshalSia(w io.Writer) error {
+	return WriteInt(w, f.F)
+}
+
+func (f *Foo) UnmarshalSia(r io.Reader) error {
+	return NewDecoder(r).Decode(&f.F)
+}
+
+func TestEmbedded(t *testing.T) {
+	type Bar struct {
+		Foo
+		Array [3]int
+	}
+	b := Bar{
+		Foo:   Foo{F: 7},
+		Array: [3]int{1, 2, 3},
+	}
+	var b2 Bar
+	err := Unmarshal(Marshal(b), &b2)
+	if err != nil {
+		t.Fatal(err)
+	} else if b2 != b {
+		t.Fatal(b, b2)
+	}
+}
+
 // i5-4670K, 9a90f86: 33 MB/s
 func BenchmarkEncode(b *testing.B) {
 	buf := new(bytes.Buffer)
