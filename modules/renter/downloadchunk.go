@@ -14,6 +14,13 @@ import (
 	"github.com/NebulousLabs/errors"
 )
 
+// cacheData contatins the data and the timestamp for the unfinished
+// download chunks
+type cacheData struct {
+	data       []byte
+	lastAccess time.Time
+}
+
 // downloadPieceInfo contains all the information required to download and
 // recover a piece of a chunk from a host. It is a value in a map where the key
 // is the file contract id.
@@ -75,7 +82,7 @@ type unfinishedDownloadChunk struct {
 	mu       sync.Mutex
 
 	// Caching related fields
-	chunkCache map[string][]byte
+	chunkCache map[string]*cacheData
 	cacheMu    *sync.Mutex
 }
 

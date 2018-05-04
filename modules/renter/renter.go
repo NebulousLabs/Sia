@@ -189,7 +189,7 @@ type Renter struct {
 	lastEstimation modules.RenterPriceEstimation
 
 	// Utilities.
-	chunkCache     map[string][]byte
+	chunkCache     map[string]*cacheData
 	cmu            *sync.Mutex
 	cs             modules.ConsensusSet
 	deps           modules.Dependencies
@@ -363,10 +363,10 @@ func validateSiapath(siapath string) error {
 		return ErrEmptyFilename
 	}
 	if siapath == ".." {
-		return errors.New("siapath cannot be ..")
+		return errors.New("siapath cannot be '..'")
 	}
 	if siapath == "." {
-		return errors.New("siapath cannot be .")
+		return errors.New("siapath cannot be '.'")
 	}
 	// check prefix
 	if strings.HasPrefix(siapath, "/") {
@@ -426,7 +426,7 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
-		chunkCache:     make(map[string][]byte),
+		chunkCache:     make(map[string]*cacheData),
 		cmu:            new(sync.Mutex),
 		cs:             cs,
 		deps:           deps,
