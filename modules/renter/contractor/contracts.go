@@ -265,6 +265,10 @@ func (c *Contractor) threadedContractMaintenance() {
 		return
 	}
 	defer c.tg.Done()
+
+	// Archive contracts that need to be archived before doing additional maintenance.
+	c.managedArchiveContracts()
+
 	// Nothing to do if there are no hosts.
 	c.mu.RLock()
 	wantedHosts := c.allowance.Hosts

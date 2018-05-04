@@ -5,6 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/fastrand"
@@ -24,7 +27,12 @@ func (cs *ContractSet) mustAcquire(t *testing.T, id types.FileContractID) *SafeC
 // TestContractSet tests that the ContractSet type is safe for concurrent use.
 func TestContractSet(t *testing.T) {
 	// create contract set
-	c1 := &SafeContract{header: contractHeader{Transaction: types.Transaction{
+	testDir := build.TempDir(t.Name())
+	cs, err := NewContractSet(testDir, modules.ProdDependencies)
+	if err != nil {
+		t.Fatal(err)
+	}
+	header1 := contractHeader{Transaction: types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{{
 			ParentID:             types.FileContractID{1},
 			NewValidProofOutputs: []types.SiacoinOutput{{}, {}},
@@ -32,9 +40,8 @@ func TestContractSet(t *testing.T) {
 				PublicKeys: []types.SiaPublicKey{{}, {}},
 			},
 		}},
-	}}}
-	id1 := c1.header.ID()
-	c2 := &SafeContract{header: contractHeader{Transaction: types.Transaction{
+	}}
+	header2 := contractHeader{Transaction: types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{{
 			ParentID:             types.FileContractID{2},
 			NewValidProofOutputs: []types.SiacoinOutput{{}, {}},
@@ -42,17 +49,21 @@ func TestContractSet(t *testing.T) {
 				PublicKeys: []types.SiaPublicKey{{}, {}},
 			},
 		}},
-	}}}
-	id2 := c2.header.ID()
-	cs := &ContractSet{
-		contracts: map[types.FileContractID]*SafeContract{
-			id1: c1,
-			id2: c2,
-		},
+	}}
+	id1 := header1.ID()
+	id2 := header2.ID()
+
+	_, err = cs.managedInsertContract(header1, []crypto.Hash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = cs.managedInsertContract(header2, []crypto.Hash{})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// uncontested acquire/release
-	c1 = cs.mustAcquire(t, id1)
+	c1 := cs.mustAcquire(t, id1)
 	cs.Return(c1)
 
 	// 100 concurrent serialized mutations
@@ -84,11 +95,13 @@ func TestContractSet(t *testing.T) {
 	cs.Return(c1)
 
 	// delete and reinsert id2
-	c2 = cs.mustAcquire(t, id2)
+	c2 := cs.mustAcquire(t, id2)
 	cs.Delete(c2)
-	cs.mu.Lock()
-	cs.contracts[id2] = c2
-	cs.mu.Unlock()
+	roots, err := c2.merkleRoots.merkleRoots()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs.managedInsertContract(c2.header, roots)
 
 	// call all the methods in parallel haphazardly
 	funcs := []func(){
@@ -99,7 +112,7 @@ func TestContractSet(t *testing.T) {
 		func() { cs.Return(cs.mustAcquire(t, id1)) },
 		func() { cs.Return(cs.mustAcquire(t, id2)) },
 		func() {
-			c3 := &SafeContract{header: contractHeader{
+			header3 := contractHeader{
 				Transaction: types.Transaction{
 					FileContractRevisions: []types.FileContractRevision{{
 						ParentID:             types.FileContractID{3},
@@ -109,12 +122,13 @@ func TestContractSet(t *testing.T) {
 						},
 					}},
 				},
-			}}
-			id3 := c3.header.ID()
-			cs.mu.Lock()
-			cs.contracts[id3] = c3
-			cs.mu.Unlock()
-			cs.mustAcquire(t, id3)
+			}
+			id3 := header3.ID()
+			_, err := cs.managedInsertContract(header3, []crypto.Hash{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			c3 := cs.mustAcquire(t, id3)
 			cs.Delete(c3)
 		},
 	}
