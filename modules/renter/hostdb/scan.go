@@ -260,6 +260,9 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	err := func() error {
 		timeout := hostRequestTimeout
 		hdb.mu.RLock()
+		if len(hdb.initialScanLatencies) > minScansForSpeedup {
+			build.Critical("initialScanLatencies should never be greater than minScansForSpeedup")
+		}
 		if !hdb.initialScanComplete && len(hdb.initialScanLatencies) == minScansForSpeedup {
 			// During an initial scan, when we have at least minScansForSpeedup
 			// active scans in initialScanLatencies, we use
