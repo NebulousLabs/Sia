@@ -459,7 +459,7 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
-	clen := c.contracts.Len()
+	clen := c.staticContracts.Len()
 	c.mu.Unlock()
 	if clen != 1 {
 		t.Fatal("expected 1 contract, got", clen)
@@ -505,9 +505,9 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	// delete one of the contracts and set allowance with Funds*2; should
 	// trigger 1 renewal and 1 new contract
 	c.mu.Lock()
-	ids := c.contracts.IDs()
-	contract, _ := c.contracts.Acquire(ids[0])
-	c.contracts.Delete(contract)
+	ids := c.staticContracts.IDs()
+	contract, _ := c.staticContracts.Acquire(ids[0])
+	c.staticContracts.Delete(contract)
 	c.mu.Unlock()
 	a.Funds = a.Funds.Mul64(2)
 	err = c.SetAllowance(a)

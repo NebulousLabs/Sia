@@ -354,12 +354,12 @@ func TestIntegrationRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Unlock()
-	oldContract, _ := c.contracts.Acquire(contract.ID)
+	oldContract, _ := c.staticContracts.Acquire(contract.ID)
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.contracts.Return(oldContract)
+	c.staticContracts.Return(oldContract)
 
 	// check renewed contract
 	if contract.EndHeight != c.blockHeight+200 {
@@ -390,12 +390,12 @@ func TestIntegrationRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.mu.Unlock()
-	oldContract, _ = c.contracts.Acquire(contract.ID)
+	oldContract, _ = c.staticContracts.Acquire(contract.ID)
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.contracts.Return(oldContract)
+	c.staticContracts.Return(oldContract)
 	if contract.EndHeight != c.blockHeight+100 {
 		t.Fatal(contract.EndHeight)
 	}
