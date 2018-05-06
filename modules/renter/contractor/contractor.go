@@ -133,8 +133,6 @@ func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContra
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
 func (c *Contractor) Contracts() []modules.RenterContract {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
 	return c.staticContracts.ViewAll()
 }
 
