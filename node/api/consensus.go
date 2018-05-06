@@ -27,9 +27,13 @@ type ConsensusHeadersGET struct {
 
 // ConsensusBlocksGet wraps a types.Block and adds an id field.
 type ConsensusBlocksGet struct {
-	BlockID     types.BlockID     `json:"id"`
-	BlockHeight types.BlockHeight `json:"height"`
-	types.Block
+	ID           types.BlockID         `json:"id"`
+	Height       types.BlockHeight     `json:"height"`
+	ParentID     types.BlockID         `json:"parentid"`
+	Nonce        types.BlockNonce      `json:"nonce"`
+	Timestamp    types.Timestamp       `json:"timestamp"`
+	MinerPayouts []types.SiacoinOutput `json:"minerpayouts"`
+	Transactions []types.Transaction   `json:"transactions"`
 }
 
 // consensusHandler handles the API calls to /consensus.
@@ -85,9 +89,13 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 	}
 	// Write response
 	WriteJSON(w, ConsensusBlocksGet{
-		BlockID:     b.ID(),
-		BlockHeight: h,
-		Block:       b,
+		ID:           b.ID(),
+		Height:       h,
+		ParentID:     b.ParentID,
+		Nonce:        b.Nonce,
+		Timestamp:    b.Timestamp,
+		MinerPayouts: b.MinerPayouts,
+		Transactions: b.Transactions,
 	})
 }
 
