@@ -264,9 +264,11 @@ func (r *Renter) FileList() []modules.FileInfo {
 	lockID := r.mu.RLock()
 	for _, f := range r.files {
 		files = append(files, f)
+		f.mu.RLock()
 		for cid := range f.contracts {
 			contractIDs[cid] = struct{}{}
 		}
+		f.mu.RUnlock()
 	}
 	r.mu.RUnlock(lockID)
 
