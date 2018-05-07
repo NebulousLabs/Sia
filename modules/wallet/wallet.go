@@ -114,6 +114,11 @@ type Wallet struct {
 
 // Height return the internal processed consensus height of the wallet
 func (w *Wallet) Height() types.BlockHeight {
+	if err := w.tg.Add(); err != nil {
+		return types.BlockHeight(0)
+	}
+	defer w.tg.Done()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -223,6 +228,11 @@ func (w *Wallet) Close() error {
 // AllAddresses returns all addresses that the wallet is able to spend from,
 // including unseeded addresses. Addresses are returned sorted in byte-order.
 func (w *Wallet) AllAddresses() []types.UnlockHash {
+	if err := w.tg.Add(); err != nil {
+		return []types.UnlockHash{}
+	}
+	defer w.tg.Done()
+
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
@@ -239,6 +249,11 @@ func (w *Wallet) AllAddresses() []types.UnlockHash {
 // Rescanning reports whether the wallet is currently rescanning the
 // blockchain.
 func (w *Wallet) Rescanning() bool {
+	if err := w.tg.Add(); err != nil {
+		return false
+	}
+	defer w.tg.Done()
+
 	rescanning := !w.scanLock.TryLock()
 	if !rescanning {
 		w.scanLock.Unlock()
@@ -255,6 +270,11 @@ func (w *Wallet) Settings() modules.WalletSettings {
 
 // SetSettings will update the settings for the wallet.
 func (w *Wallet) SetSettings(s modules.WalletSettings) {
+	if err := w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
 	w.mu.Lock()
 	w.defragDisabled = s.NoDefrag
 	w.mu.Unlock()

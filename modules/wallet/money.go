@@ -18,6 +18,11 @@ type sortedOutputs struct {
 // DustThreshold returns the quantity per byte below which a Currency is
 // considered to be Dust.
 func (w *Wallet) DustThreshold() types.Currency {
+	if err := w.tg.Add(); err != nil {
+		return types.Currency{}
+	}
+	defer w.tg.Done()
+
 	minFee, _ := w.tpool.FeeEstimation()
 	return minFee.Mul64(3)
 }
@@ -25,6 +30,11 @@ func (w *Wallet) DustThreshold() types.Currency {
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
 func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
+	if err := w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
 	// dustThreshold has to be obtained separate from the lock
 	dustThreshold := w.DustThreshold()
 
@@ -61,6 +71,11 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 // the unconfirmed transaction set. Refund outputs are included in this
 // reporting.
 func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency) {
+	if err := w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
 	// dustThreshold has to be obtained separate from the lock
 	dustThreshold := w.DustThreshold()
 
