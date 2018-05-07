@@ -135,7 +135,7 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedUploadChunk) e
 
 	// Create the download.
 	buf := downloadDestinationBuffer(make([]byte, chunk.length))
-	d, err := r.newDownload(downloadParams{
+	d, err := r.managedNewDownload(downloadParams{
 		destination:     buf,
 		destinationType: "buffer",
 		file:            chunk.renterFile,
