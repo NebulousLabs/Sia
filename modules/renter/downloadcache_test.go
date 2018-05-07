@@ -16,7 +16,6 @@ func TestAdd(t *testing.T) {
 		},
 		downloadChunkCache: new(downloadChunkCache),
 	}
-
 	udc.downloadChunkCache.init()
 
 	// Testing Push to Heap
@@ -32,6 +31,22 @@ func TestAdd(t *testing.T) {
 
 	// Popping chunkData back off Heap to work with empty Heap
 	cd := heap.Pop(&udc.downloadChunkCache.chunkCacheHeap).(*chunkData)
+
+	udc.downloadChunkCache.init()
+
+	// Testing Push to Heap
+	old = len(udc.downloadChunkCache.chunkCacheHeap)
+	heap.Push(&udc.downloadChunkCache.chunkCacheHeap, &chunkData{
+		id:         "Push",
+		data:       []byte{},
+		lastAccess: time.Now(),
+	})
+	if len(udc.downloadChunkCache.chunkCacheHeap) <= old {
+		t.Error("chunkData was not pushed onto Heap.")
+	}
+
+	// Popping chunkData back off Heap to work with empty Heap
+	cd = heap.Pop(&udc.downloadChunkCache.chunkCacheHeap).(*chunkData)
 
 	// Fill Cache
 	for i := 0; i < int(udc.downloadChunkCache.cacheSize); i++ {
