@@ -426,7 +426,7 @@ func (c *Contractor) threadedContractMaintenance() {
 				continue
 			}
 
-			blockBytes := types.NewCurrency64(modules.SectorSize * uint64(contract.EndHeight-c.blockHeight))
+			blockBytes := types.NewCurrency64(modules.SectorSize * uint64(contract.EndHeight-blockHeight))
 			sectorStoragePrice := host.StoragePrice.Mul(blockBytes)
 			sectorBandwidthPrice := host.UploadBandwidthPrice.Mul64(modules.SectorSize)
 			sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
