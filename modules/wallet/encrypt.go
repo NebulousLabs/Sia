@@ -278,7 +278,7 @@ func (w *Wallet) Encrypted() (bool, error) {
 	if err := w.tg.Add(); err != nil {
 		return false, err
 	}
-	w.tg.Done()
+	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if build.DEBUG && w.unlocked && !w.encrypted {
@@ -412,19 +412,43 @@ func (w *Wallet) Lock() error {
 		return err
 	}
 	defer w.tg.Done()
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if !w.unlocked {
-		return modules.ErrLockedWallet
-	}
-	w.log.Println("INFO: Locking wallet.")
+	return w.managedLock()
+}
 
-	// Wipe all of the seeds and secret keys. They will be replaced upon
-	// calling 'Unlock' again. Note that since the public keys are not wiped,
-	// we can continue processing blocks.
-	w.wipeSecrets()
-	w.unlocked = false
-	return nil
+// ChangeKey changes the wallet's encryption key from masterKey to newKey.
+func (w *Wallet) ChangeKey(masterKey crypto.TwofishKey, newKey crypto.TwofishKey) error {
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
+
+	return w.managedChangeKey(masterKey, newKey)
+}
+
+// Unlock will decrypt the wallet seed and load all of the addresses into
+// memory.
+func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
+	// By having the wallet's ThreadGroup track the Unlock method, we ensure
+	// that Unlock will never unlock the wallet once the ThreadGroup has been
+	// stopped. Without this precaution, the wallet's Close method would be
+	// unsafe because it would theoretically be possible for another function
+	// to Unlock the wallet in the short interval after Close calls w.Lock
+	// and before Close calls w.mu.Lock.
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
+
+	if !w.scanLock.TryLock() {
+		return errScanInProgress
+	}
+	defer w.scanLock.Unlock()
+
+	w.log.Println("INFO: Unlocking wallet.")
+
+	// Initialize all of the keys in the wallet under a lock. While holding the
+	// lock, also grab the subscriber status.
+	return w.managedUnlock(masterKey)
 }
 
 // managedChangeKey safely performs the database operations required to change
@@ -557,38 +581,27 @@ func (w *Wallet) managedChangeKey(masterKey crypto.TwofishKey, newKey crypto.Two
 	return nil
 }
 
-// ChangeKey changes the wallet's encryption key from masterKey to newKey.
-func (w *Wallet) ChangeKey(masterKey crypto.TwofishKey, newKey crypto.TwofishKey) error {
-	if err := w.tg.Add(); err != nil {
-		return err
+// managedLock will erase all keys from memory and prevent the wallet from
+// spending coins until it is unlocked.
+func (w *Wallet) managedLock() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.unlocked {
+		return modules.ErrLockedWallet
 	}
-	defer w.tg.Done()
+	w.log.Println("INFO: Locking wallet.")
 
-	return w.managedChangeKey(masterKey, newKey)
+	// Wipe all of the seeds and secret keys. They will be replaced upon
+	// calling 'Unlock' again. Note that since the public keys are not wiped,
+	// we can continue processing blocks.
+	w.wipeSecrets()
+	w.unlocked = false
+	return nil
 }
 
-// Unlock will decrypt the wallet seed and load all of the addresses into
-// memory.
-func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
-	// By having the wallet's ThreadGroup track the Unlock method, we ensure
-	// that Unlock will never unlock the wallet once the ThreadGroup has been
-	// stopped. Without this precaution, the wallet's Close method would be
-	// unsafe because it would theoretically be possible for another function
-	// to Unlock the wallet in the short interval after Close calls w.Lock
-	// and before Close calls w.mu.Lock.
-	if err := w.tg.Add(); err != nil {
-		return err
-	}
-	defer w.tg.Done()
-
-	if !w.scanLock.TryLock() {
-		return errScanInProgress
-	}
-	defer w.scanLock.Unlock()
-
-	w.log.Println("INFO: Unlocking wallet.")
-
-	// Initialize all of the keys in the wallet under a lock. While holding the
-	// lock, also grab the subscriber status.
-	return w.managedUnlock(masterKey)
+// managedUnlocked indicates whether the wallet is locked or unlocked.
+func (w *Wallet) managedUnlocked() bool {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.unlocked
 }

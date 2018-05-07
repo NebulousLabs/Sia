@@ -73,7 +73,7 @@ func (srv *Server) Close() error {
 	for _, mod := range mods {
 		if mod.c != nil {
 			if closeErr := mod.c.Close(); closeErr != nil {
-				err = errors.Extend(err, fmt.Errorf("%v.Close failed: %v", mod.name, err))
+				err = errors.Extend(err, fmt.Errorf("%v.Close failed: %v", mod.name, closeErr))
 			}
 		}
 	}

@@ -210,11 +210,8 @@ func (w *Wallet) Close() error {
 	// Once the wallet is locked it cannot be unlocked except using the
 	// unexported unlock method (w.Unlock returns an error if the wallet's
 	// ThreadGroup is stopped).
-	w.mu.RLock()
-	unlocked := w.unlocked
-	w.mu.RUnlock()
-	if unlocked {
-		if err := w.Lock(); err != nil {
+	if w.managedUnlocked() {
+		if err := w.managedLock(); err != nil {
 			errs = append(errs, err)
 		}
 	}
