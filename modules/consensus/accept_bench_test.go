@@ -129,7 +129,10 @@ func BenchmarkAcceptSmallBlocks(b *testing.B) {
 	for j := 0; j < b.N; j++ {
 		// Create a transaction with a miner fee, a normal siacoin output, and
 		// a funded file contract.
-		txnBuilder := cst.wallet.StartTransaction()
+		txnBuilder, err := cst.wallet.StartTransaction()
+		if err != nil {
+			b.Fatal(err)
+		}
 		err = txnBuilder.FundSiacoins(types.NewCurrency64(125e6))
 		if err != nil {
 			b.Fatal(err)

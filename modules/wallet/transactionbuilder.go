@@ -118,7 +118,10 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 // on the transaction builder.
 func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	// dustThreshold has to be obtained separate from the lock
-	dustThreshold := tb.wallet.DustThreshold()
+	dustThreshold, err := tb.wallet.DustThreshold()
+	if err != nil {
+		return err
+	}
 
 	tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock()
@@ -660,14 +663,20 @@ func (w *Wallet) registerTransaction(t types.Transaction, parents []types.Transa
 // modules.TransactionBuilder which can be used to expand the transaction. The
 // most typical call is 'RegisterTransaction(types.Transaction{}, nil)', which
 // registers a new transaction without parents.
-func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transaction) modules.TransactionBuilder {
+func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transaction) (modules.TransactionBuilder, error) {
+	if err := w.tg.Add(); err != nil {
+		return nil, err
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.registerTransaction(t, parents)
+	return w.registerTransaction(t, parents), nil
 }
 
 // StartTransaction is a convenience function that calls
 // RegisterTransaction(types.Transaction{}, nil).
-func (w *Wallet) StartTransaction() modules.TransactionBuilder {
+func (w *Wallet) StartTransaction() (modules.TransactionBuilder, error) {
+	if err := w.tg.Add(); err != nil {
+		return nil, err
+	}
 	return w.RegisterTransaction(types.Transaction{}, nil)
 }

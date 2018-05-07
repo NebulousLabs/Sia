@@ -274,13 +274,16 @@ func (w *Wallet) wipeSecrets() {
 }
 
 // Encrypted returns whether or not the wallet has been encrypted.
-func (w *Wallet) Encrypted() bool {
+func (w *Wallet) Encrypted() (bool, error) {
+	if err := w.tg.Add(); err != nil {
+		return false, err
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if build.DEBUG && w.unlocked && !w.encrypted {
 		panic("wallet is both unlocked and unencrypted")
 	}
-	return w.encrypted
+	return w.encrypted, nil
 }
 
 // Encrypt will create a primary seed for the wallet and encrypt it using
@@ -391,15 +394,21 @@ func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) er
 }
 
 // Unlocked indicates whether the wallet is locked or unlocked.
-func (w *Wallet) Unlocked() bool {
+func (w *Wallet) Unlocked() (bool, error) {
+	if err := w.tg.Add(); err != nil {
+		return false, err
+	}
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	return w.unlocked
+	return w.unlocked, nil
 }
 
 // Lock will erase all keys from memory and prevent the wallet from spending
 // coins until it is unlocked.
 func (w *Wallet) Lock() error {
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if !w.unlocked {

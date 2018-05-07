@@ -18,7 +18,10 @@ var (
 
 // AddressTransactions returns all of the wallet transactions associated with a
 // single unlock hash.
-func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction) {
+func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction, err error) {
+	if err := w.tg.Add(); err != nil {
+		return []modules.ProcessedTransaction{}, err
+	}
 	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -32,12 +35,15 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 		}
 		pts = append(pts, pt)
 	}
-	return pts
+	return pts, nil
 }
 
 // AddressUnconfirmedTransactions returns all of the unconfirmed wallet transactions
 // related to a specific address.
-func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction) {
+func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction, err error) {
+	if err := w.tg.Add(); err != nil {
+		return []modules.ProcessedTransaction{}, err
+	}
 	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -63,12 +69,15 @@ func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modu
 			pts = append(pts, pt)
 		}
 	}
-	return pts
+	return pts, err
 }
 
 // Transaction returns the transaction with the given id. 'False' is returned
 // if the transaction does not exist.
-func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTransaction, found bool) {
+func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTransaction, found bool, err error) {
+	if err := w.tg.Add(); err != nil {
+		return modules.ProcessedTransaction{}, false, err
+	}
 	// ensure durability of reported transaction
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -77,7 +86,7 @@ func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTran
 	// Get the keyBytes for the given txid
 	keyBytes, err := dbGetTransactionIndex(w.dbTx, txid)
 	if err != nil {
-		return modules.ProcessedTransaction{}, false
+		return modules.ProcessedTransaction{}, false, nil
 	}
 
 	// Retrieve the transaction
@@ -88,6 +97,9 @@ func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTran
 // Transactions returns all transactions relevant to the wallet that were
 // confirmed in the range [startHeight, endHeight].
 func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []modules.ProcessedTransaction, err error) {
+	if err := w.tg.Add(); err != nil {
+		return nil, err
+	}
 	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -185,8 +197,11 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 
 // UnconfirmedTransactions returns the set of unconfirmed transactions that are
 // relevant to the wallet.
-func (w *Wallet) UnconfirmedTransactions() []modules.ProcessedTransaction {
+func (w *Wallet) UnconfirmedTransactions() ([]modules.ProcessedTransaction, error) {
+	if err := w.tg.Add(); err != nil {
+		return nil, err
+	}
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	return w.unconfirmedProcessedTransactions
+	return w.unconfirmedProcessedTransactions, nil
 }

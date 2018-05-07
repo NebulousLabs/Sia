@@ -735,13 +735,18 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		revisionTxnIndex := len(so.RevisionTransactionSet) - 1
 		revisionParents := so.RevisionTransactionSet[:revisionTxnIndex]
 		revisionTxn := so.RevisionTransactionSet[revisionTxnIndex]
-		builder := h.wallet.RegisterTransaction(revisionTxn, revisionParents)
+		builder, err := h.wallet.RegisterTransaction(revisionTxn, revisionParents)
+		if err != nil {
+			h.log.Println("Error registering transaction:", err)
+			return
+		}
 		_, feeRecommendation := h.tpool.FeeEstimation()
 		if so.value().Div64(2).Cmp(feeRecommendation) < 0 {
 			// There's no sense submitting the revision if the fee is more than
 			// half of the anticipated revenue - fee market went up
 			// unexpectedly, and the money that the renter paid to cover the
 			// fees is no longer enough.
+			builder.Drop()
 			return
 		}
 		txnSize := uint64(len(encoding.MarshalAll(so.RevisionTransactionSet)) + 300)
@@ -749,18 +754,22 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		err = builder.FundSiacoins(requiredFee)
 		if err != nil {
 			h.log.Println("Error funding transaction fees", err)
+			builder.Drop()
 		}
 		builder.AddMinerFee(requiredFee)
 		if err != nil {
 			h.log.Println("Error adding miner fees", err)
+			builder.Drop()
 		}
 		feeAddedRevisionTransactionSet, err := builder.Sign(true)
 		if err != nil {
 			h.log.Println("Error signing transaction", err)
+			builder.Drop()
 		}
 		err = h.tpool.AcceptTransactionSet(feeAddedRevisionTransactionSet)
 		if err != nil {
 			h.log.Println("Error submitting transaction to transaction pool", err)
+			builder.Drop()
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)
 		// return
@@ -834,12 +843,17 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		copy(sp.Segment[:], base)
 
 		// Create and build the transaction with the storage proof.
-		builder := h.wallet.StartTransaction()
+		builder, err := h.wallet.StartTransaction()
+		if err != nil {
+			h.log.Println("Failed to start transaction:", err)
+			return
+		}
 		_, feeRecommendation := h.tpool.FeeEstimation()
 		if so.value().Cmp(feeRecommendation) < 0 {
 			// There's no sense submitting the storage proof if the fee is more
 			// than the anticipated revenue.
 			h.log.Debugln("Host not submitting storage proof due to a value that does not sufficiently exceed the fee cost")
+			builder.Drop()
 			return
 		}
 		txnSize := uint64(len(encoding.Marshal(sp)) + 300)
@@ -847,6 +861,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		err = builder.FundSiacoins(requiredFee)
 		if err != nil {
 			h.log.Println("Host error when funding a storage proof transaction fee:", err)
+			builder.Drop()
 			return
 		}
 		builder.AddMinerFee(requiredFee)
@@ -854,11 +869,13 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		storageProofSet, err := builder.Sign(true)
 		if err != nil {
 			h.log.Println("Host error when signing the storage proof transaction:", err)
+			builder.Drop()
 			return
 		}
 		err = h.tpool.AcceptTransactionSet(storageProofSet)
 		if err != nil {
 			h.log.Println("Host unable to submit storage proof transaction to transaction pool:", err)
+			builder.Drop()
 			return
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)

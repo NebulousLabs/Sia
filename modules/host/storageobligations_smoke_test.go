@@ -31,12 +31,15 @@ func randSector() (crypto.Hash, []byte) {
 // contract that will form the foundation of a storage obligation.
 func (ht *hostTester) newTesterStorageObligation() (storageObligation, error) {
 	// Create the file contract that will be used in the obligation.
-	builder := ht.wallet.StartTransaction()
+	builder, err := ht.wallet.StartTransaction()
+	if err != nil {
+		return storageObligation{}, err
+	}
 	// Fund the file contract with a payout. The payout needs to be big enough
 	// that the expected revenue is larger than the fee that the host may end
 	// up paying.
 	payout := types.SiacoinPrecision.Mul64(1e3)
-	err := builder.FundSiacoins(payout)
+	err = builder.FundSiacoins(payout)
 	if err != nil {
 		return storageObligation{}, err
 	}

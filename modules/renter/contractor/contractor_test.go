@@ -24,8 +24,8 @@ func (newStub) Synced() bool                               { return true }
 func (newStub) Unsubscribe(modules.ConsensusSetSubscriber) { return }
 
 // wallet stubs
-func (newStub) NextAddress() (uc types.UnlockConditions, err error) { return }
-func (newStub) StartTransaction() modules.TransactionBuilder        { return nil }
+func (newStub) NextAddress() (uc types.UnlockConditions, err error)          { return }
+func (newStub) StartTransaction() (tb modules.TransactionBuilder, err error) { return }
 
 // transaction pool stubs
 func (newStub) AcceptTransactionSet([]types.Transaction) error      { return nil }
@@ -310,7 +310,10 @@ func TestAllowanceSpending(t *testing.T) {
 			}
 		}
 	}
-	balance, _, _ := w.ConfirmedBalance()
+	balance, _, _, err := w.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	spent := minerRewards.Sub(balance)
 	if spent.Cmp(testAllowance.Funds) > 0 {
 		t.Fatal("contractor spent too much money: spent", spent.HumanString(), "allowance funds:", testAllowance.Funds.HumanString())
@@ -535,9 +538,9 @@ func (ws *testWalletShim) NextAddress() (types.UnlockConditions, error) {
 	ws.nextAddressCalled = true
 	return types.UnlockConditions{}, nil
 }
-func (ws *testWalletShim) StartTransaction() modules.TransactionBuilder {
+func (ws *testWalletShim) StartTransaction() (modules.TransactionBuilder, error) {
 	ws.startTxnCalled = true
-	return nil
+	return nil, nil
 }
 
 // TestWalletBridge tests the walletBridge type.

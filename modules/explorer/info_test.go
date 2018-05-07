@@ -87,7 +87,10 @@ func TestFileContractPayoutsMissingProof(t *testing.T) {
 	}
 
 	// Create and fund valid file contracts.
-	builder := et.wallet.StartTransaction()
+	builder, err := et.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	payout := types.NewCurrency64(1e9)
 	err = builder.FundSiacoins(payout)
 	if err != nil {
@@ -189,7 +192,10 @@ func TestFileContractsPayoutValidProof(t *testing.T) {
 
 	// Submit a transaction with the file contract.
 	//oldSiafundPool := cst.cs.dbGetSiafundPool()
-	builder := et.wallet.StartTransaction()
+	builder, err := et.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = builder.FundSiacoins(payout)
 	if err != nil {
 		t.Fatal(err)
@@ -224,7 +230,10 @@ func TestFileContractsPayoutValidProof(t *testing.T) {
 		HashSet:  hashSet,
 	}
 	copy(sp.Segment[:], segment)
-	builder = et.wallet.StartTransaction()
+	builder, err = et.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	builder.AddStorageProof(sp)
 	tSet, err = builder.Sign(true)
 	if err != nil {
