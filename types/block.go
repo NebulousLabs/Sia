@@ -25,6 +25,8 @@ type (
 	// then try to pick a Nonce that results in a block whose BlockID is below a
 	// given Target.
 	Block struct {
+		BlockID 	 BlockID         `json:"blockid"`
+		BlockHeight  BlockHeight     `json:"blockheight"`
 		ParentID     BlockID         `json:"parentid"`
 		Nonce        BlockNonce      `json:"nonce"`
 		Timestamp    Timestamp       `json:"timestamp"`

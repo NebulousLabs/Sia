@@ -210,6 +210,7 @@ func (cs *ConsensusSet) BlockByID(id types.BlockID) (block types.Block, exists b
 			return err
 		}
 		block = pb.Block
+		block.BlockHeight = pb.Height
 		exists = true
 		return nil
 	})

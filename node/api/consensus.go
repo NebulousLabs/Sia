@@ -61,6 +61,7 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 			return
 		}
 		b, exists = api.cs.BlockByID(bid)
+		b.BlockID = bid
 	}
 	// Handle request by height
 	if height != "" {
@@ -70,12 +71,21 @@ func (api *API) consensusBlocksHandler(w http.ResponseWriter, req *http.Request,
 			return
 		}
 		b, exists = api.cs.BlockAtHeight(types.BlockHeight(h))
+		b.BlockID = b.ID()
+		b.BlockHeight = types.BlockHeight(h)
 	}
 	// Check if block was found
 	if !exists {
 		WriteError(w, Error{"block doesn't exist"}, http.StatusBadRequest)
 		return
 	}
+	for i,txn := range b.Transactions {
+		b.Transactions[i].TransactionID = txn.ID()
+		for j,_ := range txn.SiacoinOutputs {
+			b.Transactions[i].SiacoinOutputs[j].SiaCoinOutputID = txn.SiacoinOutputID(uint64(j))
+		}
+	}
+
 	// Write response
 	WriteJSON(w, b)
 }
