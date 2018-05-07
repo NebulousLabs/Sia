@@ -12,50 +12,42 @@ import (
 )
 
 // Required functions for use of heap for chunkCacheHeap
-func (cdpq chunkCacheHeap) Len() int { return len(cdpq) }
+func (cch chunkCacheHeap) Len() int { return len(cch) }
 
 // Less returns the lessor of two elements
-func (cdpq chunkCacheHeap) Less(i, j int) bool { return cdpq[i].lastAccess < cdpq[j].lastAccess }
+func (cch chunkCacheHeap) Less(i, j int) bool { return cch[i].lastAccess.Before(cch[j].lastAccess) }
 
 // Swap swaps two elements from the heap
-func (cdpq chunkCacheHeap) Swap(i, j int) {
-	cdpq[i], cdpq[j] = cdpq[j], cdpq[i]
-	cdpq[i].index = i
-	cdpq[j].index = j
+func (cch chunkCacheHeap) Swap(i, j int) {
+	cch[i], cch[j] = cch[j], cch[i]
+	cch[i].index = i
+	cch[j].index = j
 }
 
 // Push adds an element to the heap
-func (cdpq *chunkCacheHeap) Push(x interface{}) {
-	n := len(*cdpq)
-	cacheData := x.(*cacheData)
-	cacheData.index = n
-	*cdpq = append(*cdpq, cacheData)
+func (cch *chunkCacheHeap) Push(x interface{}) {
+	n := len(*cch)
+	chunkData := x.(*chunkData)
+	chunkData.index = n
+	*cch = append(*cch, chunkData)
 }
 
 // Pop removes element from the heap
-func (cdpq *chunkCacheHeap) Pop() interface{} {
-	old := *cdpq
+func (cch *chunkCacheHeap) Pop() interface{} {
+	old := *cch
 	n := len(old)
-	cacheData := old[n-1]
-	cacheData.index = -1 // for safety
-	*cdpq = old[0 : n-1]
-	return cacheData
-}
-
-// PopNoReturn will pop the element off the heap and is for when you do need the value
-func (cdpq *chunkCacheHeap) PopNoReturn() {
-	old := *cdpq
-	n := len(old)
-	cacheData := old[n-1]
-	cacheData.index = -1 // for safety
-	*cdpq = old[0 : n-1]
+	chunkData := old[n-1]
+	chunkData.index = -1 // for safety
+	*cch = old[0 : n-1]
+	return chunkData
 }
 
 // update, updates the heap and reorders
-func (cdpq *chunkCacheHeap) update(cd *cacheData, data []byte, lastAccess int64) {
+func (cch *chunkCacheHeap) update(cd *chunkData, id string, data []byte, lastAccess time.Time) {
+	cd.id = id
 	cd.data = data
 	cd.lastAccess = lastAccess
-	heap.Fix(cdpq, cd.index)
+	heap.Fix(cch, cd.index)
 }
 
 // addChunkToCache adds the chunk to the cache if the download is a streaming
@@ -73,27 +65,25 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 
 	// Prune cache if necessary.
 	for len(udc.downloadChunkCache.chunkCacheMap) >= downloadCacheSize {
-		var oldestKey string
-		oldestTime := time.Now().Unix()
+		// Remove from Heap
+		cd := heap.Pop(&udc.downloadChunkCache.chunkCacheHeap).(*chunkData)
 
-		// TODO: turn this from a structure where you loop over every element
-		// (O(n) per access) to a min heap (O(log n) per access).
-		// currently not a issue due to cache size remaining small (<20)
-		for id, chunk := range udc.downloadChunkCache.chunkCacheMap {
-			if chunk.lastAccess.Before(oldestTime) {
-				oldestTime = chunk.lastAccess
-				oldestKey = id
-			}
+		// Remove from Map
+		if _, ok := udc.downloadChunkCache.chunkCacheMap[cd.id]; !ok {
+			build.Critical("Cache Data chunk not found in chunkCacheMap.")
 		}
-		delete(udc.downloadChunkCache.chunkCacheMap, oldestKey)
-
-		build.Critical("Cache Data chunk not found in chunkCacheMap.")
+		delete(udc.downloadChunkCache.chunkCacheMap, cd.id)
 	}
 
-	udc.downloadChunkCache.chunkCacheMap[udc.staticCacheID] = &cacheData{
+	// Add chunk to Map and Heap
+	cd := &chunkData{
+		id:         udc.staticCacheID,
 		data:       data,
-		lastAccess: time.Now().Unix(),
+		lastAccess: time.Now(),
 	}
+	udc.downloadChunkCache.chunkCacheMap[udc.staticCacheID] = cd
+	heap.Push(&udc.downloadChunkCache.chunkCacheHeap, cd)
+	udc.downloadChunkCache.chunkCacheHeap.update(cd, cd.id, cd.data, cd.lastAccess)
 }
 
 // managedTryCache tries to retrieve the chunk from the renter's cache. If
@@ -112,9 +102,10 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 		return false
 	}
 
-	// chunk exists, updating lastAccess and reinserting into map
-	cd.lastAccess = time.Now().Unix()
+	// chunk exists, updating lastAccess and reinserting into map, updating heap
+	cd.lastAccess = time.Now()
 	r.downloadChunkCache.chunkCacheMap[udc.staticCacheID] = cd
+	udc.downloadChunkCache.chunkCacheHeap.update(cd, cd.id, cd.data, cd.lastAccess)
 
 	start := udc.staticFetchOffset
 	end := start + udc.staticFetchLength

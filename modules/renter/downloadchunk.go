@@ -16,26 +16,27 @@ import (
 )
 
 type downloadChunkCache struct {
-	chunkCacheMap  map[string]*cacheData
+	chunkCacheMap  map[string]*chunkData
 	chunkCacheHeap chunkCacheHeap
 }
 
 func (dcc *downloadChunkCache) init() {
-	dcc.chunkCacheMap = make(map[string]*cacheData)
+	dcc.chunkCacheMap = make(map[string]*chunkData)
 	dcc.chunkCacheHeap = make(chunkCacheHeap, downloadCacheSize)
 	heap.Init(&dcc.chunkCacheHeap)
 }
 
-// cacheData contatins the data and the timestamp for the unfinished
+// chunkData contatins the data and the timestamp for the unfinished
 // download chunks
-type cacheData struct {
+type chunkData struct {
+	id         string
 	data       []byte
-	lastAccess int64
+	lastAccess time.Time
 	index      int
 }
 
-// chunkCacheHeap is a priority queue and implements heap.Interface and holds cacheData
-type chunkCacheHeap []*cacheData
+// chunkCacheHeap is a priority queue and implements heap.Interface and holds chunkData
+type chunkCacheHeap []*chunkData
 
 // downloadPieceInfo contains all the information required to download and
 // recover a piece of a chunk from a host. It is a value in a map where the key
