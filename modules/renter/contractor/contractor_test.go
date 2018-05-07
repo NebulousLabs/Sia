@@ -370,7 +370,7 @@ func TestAllowanceSpending(t *testing.T) {
 	}
 
 	if newReportedSpending.Unspent.Cmp(reportedSpending.Unspent) <= 0 {
-		t.Fatal("expected newReportedSpending to have more unspent")
+		t.Fatal("expected newReportedSpending to have more unspent", newReportedSpending, reportedSpending)
 	}
 }
 
