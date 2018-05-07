@@ -22,6 +22,7 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 	if err := w.tg.Add(); err != nil {
 		return []modules.ProcessedTransaction{}, err
 	}
+	w.tg.Done()
 	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -44,6 +45,7 @@ func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modu
 	if err := w.tg.Add(); err != nil {
 		return []modules.ProcessedTransaction{}, err
 	}
+	w.tg.Done()
 	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -78,6 +80,7 @@ func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTran
 	if err := w.tg.Add(); err != nil {
 		return modules.ProcessedTransaction{}, false, err
 	}
+	w.tg.Done()
 	// ensure durability of reported transaction
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -100,6 +103,7 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
+	w.tg.Done()
 	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -201,6 +205,7 @@ func (w *Wallet) UnconfirmedTransactions() ([]modules.ProcessedTransaction, erro
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
+	w.tg.Done()
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	return w.unconfirmedProcessedTransactions, nil

@@ -667,6 +667,7 @@ func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transa
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
+	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.registerTransaction(t, parents), nil
@@ -678,5 +679,6 @@ func (w *Wallet) StartTransaction() (modules.TransactionBuilder, error) {
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
+	defer w.tg.Done()
 	return w.RegisterTransaction(types.Transaction{}, nil)
 }

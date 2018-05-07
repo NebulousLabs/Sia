@@ -278,6 +278,7 @@ func (w *Wallet) Encrypted() (bool, error) {
 	if err := w.tg.Add(); err != nil {
 		return false, err
 	}
+	w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if build.DEBUG && w.unlocked && !w.encrypted {
@@ -398,6 +399,7 @@ func (w *Wallet) Unlocked() (bool, error) {
 	if err := w.tg.Add(); err != nil {
 		return false, err
 	}
+	defer w.tg.Done()
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	return w.unlocked, nil
@@ -409,6 +411,7 @@ func (w *Wallet) Lock() error {
 	if err := w.tg.Add(); err != nil {
 		return err
 	}
+	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if !w.unlocked {
