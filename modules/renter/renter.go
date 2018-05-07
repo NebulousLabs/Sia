@@ -16,6 +16,7 @@ package renter
 // uploading function.
 
 import (
+	"container/heap"
 	"errors"
 	"reflect"
 	"strings"
@@ -193,7 +194,8 @@ type Renter struct {
 	lastEstimation modules.RenterPriceEstimation
 
 	// Utilities.
-	chunkCache     map[string]*cacheData
+	chunkCacheMap  map[string]*cacheData
+	chunkCacheHeap chunkCacheHeap
 	cmu            *sync.Mutex
 	cs             modules.ConsensusSet
 	deps           modules.Dependencies
@@ -433,7 +435,8 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
-		chunkCache:     make(map[string]*cacheData),
+		chunkCacheMap:  make(map[string]*cacheData),
+		chunkCacheHeap: make(chunkCacheHeap, downloadCacheSize),
 		cmu:            new(sync.Mutex),
 		cs:             cs,
 		deps:           deps,
@@ -444,6 +447,7 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 		mu:             siasync.New(modules.SafeMutexDelay, 1),
 		tpool:          tpool,
 	}
+	heap.Init(&r.chunkCacheHeap)
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
 	// Load all saved data.

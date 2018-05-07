@@ -2,6 +2,7 @@ package renter
 
 import (
 	"bytes"
+	"container/heap"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -18,8 +19,12 @@ import (
 // download chunks
 type cacheData struct {
 	data       []byte
-	lastAccess time.Time
+	lastAccess int64
+	index      int
 }
+
+// chunkCacheHeap is a priority queue and implements heap.Interface and holds cacheData
+type chunkCacheHeap []*cacheData
 
 // downloadPieceInfo contains all the information required to download and
 // recover a piece of a chunk from a host. It is a value in a map where the key
@@ -82,8 +87,56 @@ type unfinishedDownloadChunk struct {
 	mu       sync.Mutex
 
 	// Caching related fields
-	chunkCache map[string]*cacheData
-	cacheMu    *sync.Mutex
+	chunkCacheMap  map[string]*cacheData
+	chunkCacheHeap chunkCacheHeap
+	cacheMu        *sync.Mutex
+}
+
+// Required functions for use of heap for chunkCacheHeap
+func (cdpq chunkCacheHeap) Len() int { return len(cdpq) }
+
+// Less returns the lessor of two elements
+func (cdpq chunkCacheHeap) Less(i, j int) bool { return cdpq[i].lastAccess < cdpq[j].lastAccess }
+
+// Swap swaps two elements from the heap
+func (cdpq chunkCacheHeap) Swap(i, j int) {
+	cdpq[i], cdpq[j] = cdpq[j], cdpq[i]
+	cdpq[i].index = i
+	cdpq[j].index = j
+}
+
+// Push adds an element to the heap
+func (cdpq *chunkCacheHeap) Push(x interface{}) {
+	n := len(*cdpq)
+	cacheData := x.(*cacheData)
+	cacheData.index = n
+	*cdpq = append(*cdpq, cacheData)
+}
+
+// Pop removes element from the heap
+func (cdpq *chunkCacheHeap) Pop() interface{} {
+	old := *cdpq
+	n := len(old)
+	cacheData := old[n-1]
+	cacheData.index = -1 // for safety
+	*cdpq = old[0 : n-1]
+	return cacheData
+}
+
+// PopNoReturn will pop the element off the heap and is for when you do need the value
+func (cdpq *chunkCacheHeap) PopNoReturn() {
+	old := *cdpq
+	n := len(old)
+	cacheData := old[n-1]
+	cacheData.index = -1 // for safety
+	*cdpq = old[0 : n-1]
+}
+
+// update, updates the heap and reorders
+func (cdpq *chunkCacheHeap) update(cd *cacheData, data []byte, lastAccess int64) {
+	cd.data = data
+	cd.lastAccess = lastAccess
+	heap.Fix(cdpq, cd.index)
 }
 
 // fail will set the chunk status to failed. The physical chunk memory will be

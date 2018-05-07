@@ -6,6 +6,7 @@ package renter
 import (
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/errors"
 )
 
@@ -23,25 +24,27 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 	defer udc.cacheMu.Unlock()
 
 	// Prune cache if necessary.
-	for len(udc.chunkCache) >= downloadCacheSize {
+	for len(udc.chunkCacheMap) >= downloadCacheSize {
 		var oldestKey string
-		oldestTime := time.Now()
+		oldestTime := time.Now().Unix()
 
 		// TODO: turn this from a structure where you loop over every element
 		// (O(n) per access) to a min heap (O(log n) per access).
 		// currently not a issue due to cache size remaining small (<20)
-		for id, chunk := range udc.chunkCache {
+		for id, chunk := range udc.chunkCacheMap {
 			if chunk.lastAccess.Before(oldestTime) {
 				oldestTime = chunk.lastAccess
 				oldestKey = id
 			}
 		}
-		delete(udc.chunkCache, oldestKey)
+		delete(udc.chunkCacheMap, oldestKey)
+
+		build.Critical("Cache Data chunk not found in chunkCacheMap.")
 	}
 
-	udc.chunkCache[udc.staticCacheID] = &cacheData{
+	udc.chunkCacheMap[udc.staticCacheID] = &cacheData{
 		data:       data,
-		lastAccess: time.Now(),
+		lastAccess: time.Now().Unix(),
 	}
 }
 
@@ -55,15 +58,15 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 	udc.mu.Lock()
 	defer udc.mu.Unlock()
 	r.cmu.Lock()
-	cd, cached := r.chunkCache[udc.staticCacheID]
+	cd, cached := r.chunkCacheMap[udc.staticCacheID]
 	r.cmu.Unlock()
 	if !cached {
 		return false
 	}
 
 	// chunk exists, updating lastAccess and reinserting into map
-	cd.lastAccess = time.Now()
-	r.chunkCache[udc.staticCacheID] = cd
+	cd.lastAccess = time.Now().Unix()
+	r.chunkCacheMap[udc.staticCacheID] = cd
 
 	start := udc.staticFetchOffset
 	end := start + udc.staticFetchLength

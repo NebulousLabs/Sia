@@ -437,9 +437,10 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 			physicalChunkData: make([][]byte, params.file.erasureCode.NumPieces()),
 			pieceUsage:        make([]bool, params.file.erasureCode.NumPieces()),
 
-			download:   d,
-			chunkCache: r.chunkCache,
-			cacheMu:    r.cmu,
+			download:       d,
+			chunkCacheMap:  r.chunkCacheMap,
+			chunkCacheHeap: r.chunkCacheHeap,
+			cacheMu:        r.cmu,
 		}
 
 		// Set the fetchOffset - the offset within the chunk that we start
