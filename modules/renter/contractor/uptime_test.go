@@ -31,7 +31,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 	// Block until the contract is registered.
 	err = build.Retry(50, 100*time.Millisecond, func() error {
 		c.mu.Lock()
-		lenC := c.contracts.Len()
+		lenC := c.staticContracts.Len()
 		c.mu.Unlock()
 		if lenC < 1 {
 			return errors.New("allowance forming seems to have failed")
