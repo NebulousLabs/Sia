@@ -310,7 +310,7 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters) (*download,
 	}
 
 	// Create the download object.
-	d, err := r.newDownload(downloadParams{
+	d, err := r.managedNewDownload(downloadParams{
 		destination:       dw,
 		destinationType:   destinationType,
 		destinationString: p.Destination,
@@ -336,9 +336,9 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters) (*download,
 	return d, nil
 }
 
-// newDownload creates and initializes a download based on the provided
+// managedNewDownload creates and initializes a download based on the provided
 // parameters.
-func (r *Renter) newDownload(params downloadParams) (*download, error) {
+func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	// Input validation.
 	if params.file == nil {
 		return nil, errors.New("no file provided when requesting download")
