@@ -15,6 +15,8 @@ import (
 	"github.com/NebulousLabs/errors"
 )
 
+// downloadChunkCache contains a chunkCacheMap for quick look up and a chunkCacheHeap for
+// quick removal of old chunks
 type downloadChunkCache struct {
 	chunkCacheMap  map[string]*chunkData
 	chunkCacheHeap chunkCacheHeap
@@ -22,7 +24,7 @@ type downloadChunkCache struct {
 
 func (dcc *downloadChunkCache) init() {
 	dcc.chunkCacheMap = make(map[string]*chunkData)
-	dcc.chunkCacheHeap = make(chunkCacheHeap, downloadCacheSize)
+	dcc.chunkCacheHeap = make(chunkCacheHeap, 0, downloadCacheSize)
 	heap.Init(&dcc.chunkCacheHeap)
 }
 
