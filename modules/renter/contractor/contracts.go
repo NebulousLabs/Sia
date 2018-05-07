@@ -333,7 +333,7 @@ func (c *Contractor) threadedContractMaintenance() {
 
 		// Check if the contract is expiring. The funds in the contract are
 		// handled differently based on this information.
-		if c.blockHeight+allowance.RenewWindow >= contract.EndHeight {
+		if blockHeight+allowance.RenewWindow >= contract.EndHeight {
 			// The contract is expiring. Some of the funds are locked down
 			// to renew the contract, and then the remaining funds can be
 			// allocated to 'availableFunds'.
