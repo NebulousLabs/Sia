@@ -4,11 +4,59 @@ package renter
 // via the API.
 
 import (
+	"container/heap"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/errors"
 )
+
+// Required functions for use of heap for chunkCacheHeap
+func (cdpq chunkCacheHeap) Len() int { return len(cdpq) }
+
+// Less returns the lessor of two elements
+func (cdpq chunkCacheHeap) Less(i, j int) bool { return cdpq[i].lastAccess < cdpq[j].lastAccess }
+
+// Swap swaps two elements from the heap
+func (cdpq chunkCacheHeap) Swap(i, j int) {
+	cdpq[i], cdpq[j] = cdpq[j], cdpq[i]
+	cdpq[i].index = i
+	cdpq[j].index = j
+}
+
+// Push adds an element to the heap
+func (cdpq *chunkCacheHeap) Push(x interface{}) {
+	n := len(*cdpq)
+	cacheData := x.(*cacheData)
+	cacheData.index = n
+	*cdpq = append(*cdpq, cacheData)
+}
+
+// Pop removes element from the heap
+func (cdpq *chunkCacheHeap) Pop() interface{} {
+	old := *cdpq
+	n := len(old)
+	cacheData := old[n-1]
+	cacheData.index = -1 // for safety
+	*cdpq = old[0 : n-1]
+	return cacheData
+}
+
+// PopNoReturn will pop the element off the heap and is for when you do need the value
+func (cdpq *chunkCacheHeap) PopNoReturn() {
+	old := *cdpq
+	n := len(old)
+	cacheData := old[n-1]
+	cacheData.index = -1 // for safety
+	*cdpq = old[0 : n-1]
+}
+
+// update, updates the heap and reorders
+func (cdpq *chunkCacheHeap) update(cd *cacheData, data []byte, lastAccess int64) {
+	cd.data = data
+	cd.lastAccess = lastAccess
+	heap.Fix(cdpq, cd.index)
+}
 
 // addChunkToCache adds the chunk to the cache if the download is a streaming
 // endpoint download.
@@ -24,25 +72,25 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 	defer udc.cacheMu.Unlock()
 
 	// Prune cache if necessary.
-	for len(udc.chunkCacheMap) >= downloadCacheSize {
+	for len(udc.downloadChunkCache.chunkCacheMap) >= downloadCacheSize {
 		var oldestKey string
 		oldestTime := time.Now().Unix()
 
 		// TODO: turn this from a structure where you loop over every element
 		// (O(n) per access) to a min heap (O(log n) per access).
 		// currently not a issue due to cache size remaining small (<20)
-		for id, chunk := range udc.chunkCacheMap {
+		for id, chunk := range udc.downloadChunkCache.chunkCacheMap {
 			if chunk.lastAccess.Before(oldestTime) {
 				oldestTime = chunk.lastAccess
 				oldestKey = id
 			}
 		}
-		delete(udc.chunkCacheMap, oldestKey)
+		delete(udc.downloadChunkCache.chunkCacheMap, oldestKey)
 
 		build.Critical("Cache Data chunk not found in chunkCacheMap.")
 	}
 
-	udc.chunkCacheMap[udc.staticCacheID] = &cacheData{
+	udc.downloadChunkCache.chunkCacheMap[udc.staticCacheID] = &cacheData{
 		data:       data,
 		lastAccess: time.Now().Unix(),
 	}
@@ -58,7 +106,7 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 	udc.mu.Lock()
 	defer udc.mu.Unlock()
 	r.cmu.Lock()
-	cd, cached := r.chunkCacheMap[udc.staticCacheID]
+	cd, cached := r.downloadChunkCache.chunkCacheMap[udc.staticCacheID]
 	r.cmu.Unlock()
 	if !cached {
 		return false
@@ -66,7 +114,7 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 
 	// chunk exists, updating lastAccess and reinserting into map
 	cd.lastAccess = time.Now().Unix()
-	r.chunkCacheMap[udc.staticCacheID] = cd
+	r.downloadChunkCache.chunkCacheMap[udc.staticCacheID] = cd
 
 	start := udc.staticFetchOffset
 	end := start + udc.staticFetchLength

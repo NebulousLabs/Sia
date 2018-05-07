@@ -16,7 +16,6 @@ package renter
 // uploading function.
 
 import (
-	"container/heap"
 	"errors"
 	"reflect"
 	"strings"
@@ -194,19 +193,18 @@ type Renter struct {
 	lastEstimation modules.RenterPriceEstimation
 
 	// Utilities.
-	chunkCacheMap  map[string]*cacheData
-	chunkCacheHeap chunkCacheHeap
-	cmu            *sync.Mutex
-	cs             modules.ConsensusSet
-	deps           modules.Dependencies
-	g              modules.Gateway
-	hostContractor hostContractor
-	hostDB         hostDB
-	log            *persist.Logger
-	persistDir     string
-	mu             *siasync.RWMutex
-	tg             threadgroup.ThreadGroup
-	tpool          modules.TransactionPool
+	downloadChunkCache *downloadChunkCache
+	cmu                *sync.Mutex
+	cs                 modules.ConsensusSet
+	deps               modules.Dependencies
+	g                  modules.Gateway
+	hostContractor     hostContractor
+	hostDB             hostDB
+	log                *persist.Logger
+	persistDir         string
+	mu                 *siasync.RWMutex
+	tg                 threadgroup.ThreadGroup
+	tpool              modules.TransactionPool
 }
 
 // Close closes the Renter and its dependencies
@@ -435,19 +433,18 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
-		chunkCacheMap:  make(map[string]*cacheData),
-		chunkCacheHeap: make(chunkCacheHeap, downloadCacheSize),
-		cmu:            new(sync.Mutex),
-		cs:             cs,
-		deps:           deps,
-		g:              g,
-		hostDB:         hdb,
-		hostContractor: hc,
-		persistDir:     persistDir,
-		mu:             siasync.New(modules.SafeMutexDelay, 1),
-		tpool:          tpool,
+		downloadChunkCache: new(downloadChunkCache),
+		cmu:                new(sync.Mutex),
+		cs:                 cs,
+		deps:               deps,
+		g:                  g,
+		hostDB:             hdb,
+		hostContractor:     hc,
+		persistDir:         persistDir,
+		mu:                 siasync.New(modules.SafeMutexDelay, 1),
+		tpool:              tpool,
 	}
-	heap.Init(&r.chunkCacheHeap)
+	r.downloadChunkCache.init()
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
 	// Load all saved data.

@@ -13,8 +13,8 @@ func TestAddChunkToCache(t *testing.T) {
 		download: &download{
 			staticDestinationType: destinationTypeSeekStream,
 		},
-		chunkCache: make(map[string]*cacheData),
-		cacheMu:    new(sync.Mutex),
+		chunkCacheMap: make(map[string]*cacheData),
+		cacheMu:       new(sync.Mutex),
 	}
 
 	// Fill Cache
@@ -30,7 +30,7 @@ func TestAddChunkToCache(t *testing.T) {
 
 	// check if the chunk with staticCacheID = "0" was removed
 	// as that would have been the first to be added
-	if _, ok := udc.chunkCache["0"]; ok {
+	if _, ok := udc.chunkCacheMap["0"]; ok {
 		t.Error("The least recently accessed chunk wasn't pruned from the cache")
 	}
 }
