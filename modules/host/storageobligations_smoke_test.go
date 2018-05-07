@@ -587,7 +587,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 // TestAutoRevisionSubmission checks that the host correctly submits a file
 // contract revision to the consensus set.
 func TestAutoRevisionSubmission(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
