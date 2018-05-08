@@ -311,6 +311,20 @@ func (r *Renter) FileList() []modules.FileInfo {
 	return fileList
 }
 
+// GetFile returns file from siaPath provided by user.
+func (r *Renter) GetFile(siaPath string) *file {
+	lockID := r.mu.Lock()
+	defer r.mu.Unlock(lockID)
+
+	// Check that currentName exists and newName doesn't.
+	file, exists := r.files[siaPath]
+	if !exists {
+		return nil
+	}
+
+	return file
+}
+
 // RenameFile takes an existing file and changes the nickname. The original
 // file must exist, and there must not be any file that already has the
 // replacement nickname.

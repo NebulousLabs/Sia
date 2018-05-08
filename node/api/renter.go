@@ -373,6 +373,13 @@ func (api *API) renterRenameHandler(w http.ResponseWriter, req *http.Request, ps
 	WriteSuccess(w)
 }
 
+// renterFileHandler handles the API call to return specific file.
+func (api *API) renterFileHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	WriteJSON(w, RenterFiles{
+		Files: api.renter.GetFile(strings.TrimPrefix(ps.ByName("siapath"), "/"),
+	})
+}
+
 // renterFilesHandler handles the API call to list all of the files.
 func (api *API) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	WriteJSON(w, RenterFiles{
