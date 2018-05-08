@@ -845,21 +845,21 @@ description of the byte encoding.
 Renter
 ------
 
-| Route                                                                                 | HTTP verb |
-| ------------------------------------------------------------------------------------- | --------- |
-| [/renter](#renter-get)                                                                | GET       |
-| [/renter](#renter-post)                                                               | POST      |
-| [/renter/contracts](#rentercontracts-get)                                             | GET       |
-| [/renter/downloads](#renterdownloads-get)                                             | GET       |
-| [/renter/prices](#renterprices-get)                                                   | GET       |
-| [/renter/files](#renterfiles-get)                                                     | GET       |
-| [/renter/file/*___siapath___](#renterfile___siapath___-get)                           | GET       |
-| [/renter/delete/*___siapath___](#renterdeletesiapath-post)                            | POST      |
-| [/renter/download/*___siapath___](#renterdownloadsiapath-get)                         | GET       |
-| [/renter/downloadasync/*___siapath___](#renterdownloadasyncsiapath-get)               | GET       |
-| [/renter/rename/*___siapath___](#renterrenamesiapath-post)                            | POST      |
-| [/renter/stream/*___siapath___](#renterstreamsiapath-get)                             | GET       |
-| [/renter/upload/*___siapath___](#renteruploadsiapath-post)                            | POST      |
+| Route                                                                     | HTTP verb |
+| --------------------------------------------------------------------------| --------- |
+| [/renter](#renter-get)                                                    | GET       |
+| [/renter](#renter-post)                                                   | POST      |
+| [/renter/contracts](#rentercontracts-get)                                 | GET       |
+| [/renter/downloads](#renterdownloads-get)                                 | GET       |
+| [/renter/prices](#renterprices-get)                                       | GET       |
+| [/renter/files](#renterfiles-get)                                         | GET       |
+| [/renter/file/*___siapath___](#renterfile___siapath___-get)               | GET       |
+| [/renter/delete/*___siapath___](#renterdeletesiapath-post)                | POST      |
+| [/renter/download/*___siapath___](#renterdownloadsiapath-get)             | GET       |
+| [/renter/downloadasync/*___siapath___](#renterdownloadasyncsiapath-get)   | GET       |
+| [/renter/rename/*___siapath___](#renterrenamesiapath-post)                | POST      |
+| [/renter/stream/*___siapath___](#renterstreamsiapath-get)                 | GET       |
+| [/renter/upload/*___siapath___](#renteruploadsiapath-post)                | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Renter.md](/doc/api/Renter.md).

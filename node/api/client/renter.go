@@ -58,7 +58,7 @@ func (c *Client) RenterDownloadHTTPResponseGet(siaPath string, offset, length ui
 	return
 }
 
-// RenterFileGet requests the /renter/files resource.
+// RenterFileGet uses the /renter/file/:siapath endpoint to query a file.
 func (c *Client) RenterFileGet(siaPath string) (rf api.RenterFile, err error) {
 	siaPath = strings.TrimPrefix(siaPath, "/")
 	err = c.get("/renter/file/"+siaPath, &rf)

@@ -19,21 +19,21 @@ allocated funds.
 Index
 -----
 
-| Route                                                                                        | HTTP verb |
-| -------------------------------------------------------------------------------------------- | --------- |
-| [/renter](#renter-get)                                                                       | GET       |
-| [/renter](#renter-post)                                                                      | POST      |
-| [/renter/contracts](#rentercontracts-get)                                                    | GET       |
-| [/renter/downloads](#renterdownloads-get)                                                    | GET       |
-| [/renter/files](#renterfiles-get)                                                            | GET       |
-| [/renter/file/*___siapath___](#renterfile___siapath___-get)                                  | GET       |
-| [/renter/prices](#renter-prices-get)                                                         | GET       |
-| [/renter/delete/___*siapath___](#renterdelete___siapath___-post)                             | POST      |
-| [/renter/download/___*siapath___](#renterdownload__siapath___-get)                           | GET       |
-| [/renter/downloadasync/___*siapath___](#renterdownloadasync__siapath___-get)                 | GET       |
-| [/renter/rename/___*siapath___](#renterrename___siapath___-post)                             | POST      |
-| [/renter/stream/___*siapath___](#renterstreamsiapath-get)                                    | GET       |
-| [/renter/upload/___*siapath___](#renterupload___siapath___-post)                             | POST      |
+| Route                                                                           | HTTP verb |
+| ------------------------------------------------------------------------------- | --------- |
+| [/renter](#renter-get)                                                          | GET       |
+| [/renter](#renter-post)                                                         | POST      |
+| [/renter/contracts](#rentercontracts-get)                                       | GET       |
+| [/renter/downloads](#renterdownloads-get)                                       | GET       |
+| [/renter/files](#renterfiles-get)                                               | GET       |
+| [/renter/file/*___siapath___](#renterfile___siapath___-get)                     | GET       |
+| [/renter/prices](#renter-prices-get)                                            | GET       |
+| [/renter/delete/___*siapath___](#renterdelete___siapath___-post)                | POST      |
+| [/renter/download/___*siapath___](#renterdownload__siapath___-get)              | GET       |
+| [/renter/downloadasync/___*siapath___](#renterdownloadasync__siapath___-get)    | GET       |
+| [/renter/rename/___*siapath___](#renterrename___siapath___-post)                | POST      |
+| [/renter/stream/___*siapath___](#renterstreamsiapath-get)                       | GET       |
+| [/renter/upload/___*siapath___](#renterupload___siapath___-post)                | POST      |
 
 #### /renter [GET]
 
@@ -312,7 +312,7 @@ lists the status of all files.
 
 #### /renter/file/*___siapath___ [GET]
 
-lists the statu of specified file.
+lists the status of specified file.
 
 ###### JSON Response
 ```javascript
