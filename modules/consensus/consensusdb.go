@@ -20,18 +20,6 @@ var (
 )
 
 var (
-	// BlockHeight is a bucket that stores the current block height.
-	//
-	// Generally we would just look at BlockPath.Stats(), but there is an error
-	// in boltdb that prevents the bucket stats from updating until a tx is
-	// committed. Wasn't a problem until we started doing the entire block as
-	// one tx.
-	//
-	// DEPRECATED - block.Stats() should be sufficient to determine the block
-	// height, but currently stats are only computed after committing a
-	// transaction, therefore cannot be assumed reliable.
-	BlockHeight = []byte("BlockHeight")
-
 	// BlockMap is a database bucket containing all of the processed blocks,
 	// keyed by their id. This includes blocks that are not currently in the
 	// consensus set, and blocks that may not have been fully validated yet.
@@ -77,12 +65,8 @@ var (
 // createConsensusObjects initialzes the consensus portions of the database.
 func (cs *ConsensusSet) createConsensusDB(tx database.Tx) error {
 	// Set the block height to -1, so the genesis block is at height 0.
-	blockHeight := tx.Bucket(BlockHeight)
 	underflow := types.BlockHeight(0)
-	err := blockHeight.Put(BlockHeight, encoding.Marshal(underflow-1))
-	if err != nil {
-		return err
-	}
+	tx.SetBlockHeight(underflow - 1)
 
 	// Set the siafund pool to 0.
 	setSiafundPool(tx, types.NewCurrency64(0))
@@ -114,13 +98,7 @@ func (cs *ConsensusSet) createConsensusDB(tx database.Tx) error {
 
 // blockHeight returns the height of the blockchain.
 func blockHeight(tx database.Tx) types.BlockHeight {
-	var height types.BlockHeight
-	bh := tx.Bucket(BlockHeight)
-	err := encoding.Unmarshal(bh.Get(BlockHeight), &height)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return height
+	return tx.BlockHeight()
 }
 
 // currentBlockID returns the id of the most recent block in the consensus set.
@@ -197,22 +175,13 @@ func getPath(tx database.Tx, height types.BlockHeight) (id types.BlockID, err er
 // pushPath adds a block to the BlockPath at current height + 1.
 func pushPath(tx database.Tx, bid types.BlockID) {
 	// Fetch and update the block height.
-	bh := tx.Bucket(BlockHeight)
-	heightBytes := bh.Get(BlockHeight)
-	var oldHeight types.BlockHeight
-	err := encoding.Unmarshal(heightBytes, &oldHeight)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	newHeightBytes := encoding.Marshal(oldHeight + 1)
-	err = bh.Put(BlockHeight, newHeightBytes)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	newHeight := tx.BlockHeight() + 1
+	tx.SetBlockHeight(newHeight)
 
 	// Add the block to the block path.
+	newHeightBytes := encoding.Marshal(newHeight)
 	bp := tx.Bucket(BlockPath)
-	err = bp.Put(newHeightBytes, bid[:])
+	err := bp.Put(newHeightBytes, bid[:])
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
@@ -222,23 +191,14 @@ func pushPath(tx database.Tx, bid types.BlockID) {
 // with the largest height.
 func popPath(tx database.Tx) {
 	// Fetch and update the block height.
-	bh := tx.Bucket(BlockHeight)
-	oldHeightBytes := bh.Get(BlockHeight)
-	var oldHeight types.BlockHeight
-	err := encoding.Unmarshal(oldHeightBytes, &oldHeight)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	newHeightBytes := encoding.Marshal(oldHeight - 1)
-	err = bh.Put(BlockHeight, newHeightBytes)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	oldHeight := tx.BlockHeight()
+	oldHeightBytes := encoding.Marshal(oldHeight)
+	tx.SetBlockHeight(oldHeight - 1)
 
 	// Remove the block from the path - make sure to remove the block at
 	// oldHeight.
 	bp := tx.Bucket(BlockPath)
-	err = bp.Delete(oldHeightBytes)
+	err := bp.Delete(oldHeightBytes)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}

@@ -32,6 +32,11 @@ type Tx interface {
 	SiafundPool() types.Currency
 	// SetSiafundPool sets the value of the Siafund pool.
 	SetSiafundPool(pool types.Currency)
+
+	// BlockHeight returns the height of the blockchain.
+	BlockHeight() types.BlockHeight
+	// SetBlockHeight sets the height of the blockchain.
+	SetBlockHeight(height types.BlockHeight)
 }
 
 type txWrapper struct {
@@ -118,6 +123,24 @@ func (tx txWrapper) SiafundPool() types.Currency {
 // SetSiafundPool implements the Tx interface.
 func (tx txWrapper) SetSiafundPool(pool types.Currency) {
 	err := tx.Bucket(siafundPool).Put(siafundPool, encoding.Marshal(pool))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// BlockHeight implements the Tx interface.
+func (tx txWrapper) BlockHeight() types.BlockHeight {
+	var height types.BlockHeight
+	err := encoding.Unmarshal(tx.Bucket(blockHeight).Get(blockHeight), &height)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return height
+}
+
+// SetBlockHeight implements the Tx interface.
+func (tx txWrapper) SetBlockHeight(height types.BlockHeight) {
+	err := tx.Bucket(blockHeight).Put(blockHeight, encoding.Marshal(height))
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
