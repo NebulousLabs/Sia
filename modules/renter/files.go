@@ -311,7 +311,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 	return fileList
 }
 
-// GetFile returns file from siaPath provided by user.
+// GetFile returns file from siaPath queried by user.
 func (r *Renter) GetFile(siaPath string) *file {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)

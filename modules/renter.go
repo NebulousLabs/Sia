@@ -325,7 +325,7 @@ type Renter interface {
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
 
-	// GetFile returns information on specific file requested by user
+	// GetFile returns information on specific file queried by user
 	GetFile() File
 
 	// Host provides the DB entry and score breakdown for the requested host.

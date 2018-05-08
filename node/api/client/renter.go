@@ -58,6 +58,13 @@ func (c *Client) RenterDownloadHTTPResponseGet(siaPath string, offset, length ui
 	return
 }
 
+// RenterFileGet requests the /renter/files resource.
+func (c *Client) RenterFileGet(siaPath string) (rf api.RenterFile, err error) {
+	siaPath = strings.TrimPrefix(siaPath, "/")
+	err = c.get("/renter/files/"+siaPath, &rf)
+	return
+}
+
 // RenterFilesGet requests the /renter/files resource.
 func (c *Client) RenterFilesGet() (rf api.RenterFiles, err error) {
 	err = c.get("/renter/files", &rf)
