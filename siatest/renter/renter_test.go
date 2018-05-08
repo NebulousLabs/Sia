@@ -44,6 +44,7 @@ func TestRenter(t *testing.T) {
 		{"TestRenterStreamingCache", testRenterStreamingCache},
 		{"TestUploadDownload", testUploadDownload},
 		// Add test for single file api
+		{"TestSingleFileGet", testSingleFileGet},
 		{"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
@@ -99,6 +100,37 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 		_, err = renter.StreamPartial(remoteFile, localFile, uint64(from), uint64(to))
 		if err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+// testSingleFileUpload is a subtest that uses an existing TestGroup to test if
+// using the signle file API endpoint works
+func testSingleFileUpload(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	renter := tg.Renters()[0]
+	// Upload file, creating a piece for each host in the group
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+	fileSize := 100 + siatest.Fuzz()
+	localFile, remoteFile, err := renter.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal("Failed to upload a file for testing: ", err)
+	}
+
+	files, err := tg.Files()
+	if err != nil {
+		t.Fatal("Failed to get renter files: ", err)
+	}
+
+	var file modules.FileInfo
+	for f := range files {
+		file, err = tg.File(f.SiaPath)
+		if err != nil {
+			t.Fatal("Failed to request single file", err)
+		}
+		if file != f {
+			t.Fatal("Single file queries does not match file previously requested.")
 		}
 	}
 }
