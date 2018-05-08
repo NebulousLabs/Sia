@@ -19,6 +19,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/threadgroup"
 )
 
 const (
@@ -105,7 +106,7 @@ type Wallet struct {
 
 	// The wallet's ThreadGroup tells tracked functions to shut down and
 	// blocks until they have all exited before returning from Close.
-	tg siasync.ThreadGroup
+	tg threadgroup.ThreadGroup
 
 	// defragDisabled determines if the wallet is set to defrag outputs once it
 	// reaches a certain threshold
@@ -187,13 +188,18 @@ func NewCustomWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, per
 	}
 
 	// make sure we commit on shutdown
-	w.tg.AfterStop(func() {
+	err = w.tg.AfterStop(func() error {
 		err := w.dbTx.Commit()
 		if err != nil {
 			w.log.Println("ERROR: failed to apply database update:", err)
 			w.dbTx.Rollback()
+			return err
 		}
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 	go w.threadedDBUpdate()
 
 	return w, nil
