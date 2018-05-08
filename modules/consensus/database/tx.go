@@ -7,6 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/coreos/bbolt"
 )
 
@@ -26,6 +27,11 @@ type Tx interface {
 
 	// MarkInconsistent marks the database as inconsistent.
 	MarkInconsistent()
+
+	// SiafundPool returns the value of the Siafund pool.
+	SiafundPool() types.Currency
+	// SetSiafundPool sets the value of the Siafund pool.
+	SetSiafundPool(pool types.Currency)
 }
 
 type txWrapper struct {
@@ -96,5 +102,23 @@ func (tx txWrapper) MarkInconsistent() {
 	cerr := tx.Bucket(consistency).Put(consistency, encoding.Marshal(true))
 	if build.DEBUG && cerr != nil {
 		panic(cerr)
+	}
+}
+
+// SiafundPool implements the Tx interface.
+func (tx txWrapper) SiafundPool() types.Currency {
+	var pool types.Currency
+	err := encoding.Unmarshal(tx.Bucket(siafundPool).Get(siafundPool), &pool)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return pool
+}
+
+// SetSiafundPool implements the Tx interface.
+func (tx txWrapper) SetSiafundPool(pool types.Currency) {
+	err := tx.Bucket(siafundPool).Put(siafundPool, encoding.Marshal(pool))
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
 }

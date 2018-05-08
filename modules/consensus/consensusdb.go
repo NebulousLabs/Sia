@@ -60,10 +60,6 @@ var (
 	// SiafundOutputs is a database bucket that contains all of the unspent
 	// siafund outputs.
 	SiafundOutputs = []byte("SiafundOutputs")
-
-	// SiafundPool is a database bucket storing the current value of the
-	// siafund pool.
-	SiafundPool = []byte("SiafundPool")
 )
 
 var (
@@ -441,24 +437,12 @@ func removeSiafundOutput(tx database.Tx, id types.SiafundOutputID) {
 // getSiafundPool returns the current value of the siafund pool. No error is
 // returned as the siafund pool should always be available.
 func getSiafundPool(tx database.Tx) (pool types.Currency) {
-	bucket := tx.Bucket(SiafundPool)
-	poolBytes := bucket.Get(SiafundPool)
-	// An error should only be returned if the object stored in the siafund
-	// pool bucket is either unavailable or otherwise malformed. As this is a
-	// developer error, a panic is appropriate.
-	err := encoding.Unmarshal(poolBytes, &pool)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return pool
+	return tx.SiafundPool()
 }
 
 // setSiafundPool updates the saved siafund pool on disk
 func setSiafundPool(tx database.Tx, c types.Currency) {
-	err := tx.Bucket(SiafundPool).Put(SiafundPool, encoding.Marshal(c))
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.SetSiafundPool(c)
 }
 
 // addDSCO adds a delayed siacoin output to the consnesus set.

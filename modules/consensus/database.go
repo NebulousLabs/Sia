@@ -57,7 +57,7 @@ func (cs *ConsensusSet) initDB(tx database.Tx) error {
 	// Initialization can be detected by looking for the presence of the siafund
 	// pool bucket. (legacy design chioce - ultimately probably not the best way
 	// ot tell).
-	if tx.Bucket(SiafundPool) != nil {
+	if tx.Bucket([]byte("SiafundPool")) != nil {
 		return nil
 	}
 
