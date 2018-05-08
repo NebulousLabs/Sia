@@ -7,8 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/coreos/bbolt"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 var (
@@ -24,7 +23,7 @@ var (
 
 // commitDiffSetSanity performs a series of sanity checks before committing a
 // diff set.
-func commitDiffSetSanity(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
+func commitDiffSetSanity(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	// This function is purely sanity checks.
 	if !build.DEBUG {
 		return
@@ -53,7 +52,7 @@ func commitDiffSetSanity(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirect
 }
 
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
-func commitSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
+func commitSiacoinOutputDiff(tx database.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
 	if scod.Direction == dir {
 		addSiacoinOutput(tx, scod.ID, scod.SiacoinOutput)
 	} else {
@@ -62,7 +61,7 @@ func commitSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir mo
 }
 
 // commitFileContractDiff applies or reverts a FileContractDiff.
-func commitFileContractDiff(tx *bolt.Tx, fcd modules.FileContractDiff, dir modules.DiffDirection) {
+func commitFileContractDiff(tx database.Tx, fcd modules.FileContractDiff, dir modules.DiffDirection) {
 	if fcd.Direction == dir {
 		addFileContract(tx, fcd.ID, fcd.FileContract)
 	} else {
@@ -71,7 +70,7 @@ func commitFileContractDiff(tx *bolt.Tx, fcd modules.FileContractDiff, dir modul
 }
 
 // commitSiafundOutputDiff applies or reverts a Siafund output diff.
-func commitSiafundOutputDiff(tx *bolt.Tx, sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
+func commitSiafundOutputDiff(tx database.Tx, sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
 	if sfod.Direction == dir {
 		addSiafundOutput(tx, sfod.ID, sfod.SiafundOutput)
 	} else {
@@ -80,7 +79,7 @@ func commitSiafundOutputDiff(tx *bolt.Tx, sfod modules.SiafundOutputDiff, dir mo
 }
 
 // commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
-func commitDelayedSiacoinOutputDiff(tx *bolt.Tx, dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
+func commitDelayedSiacoinOutputDiff(tx database.Tx, dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
 	if dscod.Direction == dir {
 		addDSCO(tx, dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
 	} else {
@@ -89,7 +88,7 @@ func commitDelayedSiacoinOutputDiff(tx *bolt.Tx, dscod modules.DelayedSiacoinOut
 }
 
 // commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
-func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
+func commitSiafundPoolDiff(tx database.Tx, sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
 	// Sanity check - siafund pool should only ever increase.
 	if build.DEBUG {
 		if sfpd.Adjusted.Cmp(sfpd.Previous) < 0 {
@@ -117,7 +116,7 @@ func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir module
 
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
 // will be used when applying delayed siacoin outputs in the diff set.
-func createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
+func createUpcomingDelayedOutputMaps(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		createDSCOBucket(tx, pb.Height+types.MaturityDelay)
 	} else if pb.Height >= types.MaturityDelay {
@@ -126,7 +125,7 @@ func createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir module
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
-func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
+func commitNodeDiffs(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		for _, scod := range pb.SiacoinOutputDiffs {
 			commitSiacoinOutputDiff(tx, scod, dir)
@@ -164,7 +163,7 @@ func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection)
 
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
 // are no longer in use.
-func deleteObsoleteDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
+func deleteObsoleteDelayedOutputMaps(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	// There are no outputs that mature in the first MaturityDelay blocks.
 	if dir == modules.DiffApply && pb.Height >= types.MaturityDelay {
 		deleteDSCOBucket(tx, pb.Height)
@@ -174,7 +173,7 @@ func deleteObsoleteDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir module
 }
 
 // updateCurrentPath updates the current path after applying a diff set.
-func updateCurrentPath(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
+func updateCurrentPath(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
 		pushPath(tx, pb.Block.ID())
@@ -184,7 +183,7 @@ func updateCurrentPath(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirectio
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
-func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
+func commitDiffSet(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	// Sanity checks - there are a few so they were moved to another function.
 	if build.DEBUG {
 		commitDiffSetSanity(tx, pb, dir)
@@ -201,7 +200,7 @@ func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 // transactions are allowed to depend on each other. We can't be sure that a
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
-func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
+func generateAndApplyDiff(tx database.Tx, pb *processedBlock) error {
 	// Sanity check - the block being applied should have the current block as
 	// a parent.
 	if build.DEBUG && pb.Block.ParentID != currentBlockID(tx) {

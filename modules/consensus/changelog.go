@@ -22,8 +22,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/coreos/bbolt"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 var (
@@ -53,7 +52,7 @@ type (
 )
 
 // appendChangeLog adds a new change entry to the change log.
-func appendChangeLog(tx *bolt.Tx, ce changeEntry) error {
+func appendChangeLog(tx database.Tx, ce changeEntry) error {
 	// Insert the change entry.
 	cl := tx.Bucket(ChangeLog)
 	ceid := ce.ID()
@@ -94,7 +93,7 @@ func appendChangeLog(tx *bolt.Tx, ce changeEntry) error {
 
 // getEntry returns the change entry with a given id, using a bool to indicate
 // existence.
-func getEntry(tx *bolt.Tx, id modules.ConsensusChangeID) (ce changeEntry, exists bool) {
+func getEntry(tx database.Tx, id modules.ConsensusChangeID) (ce changeEntry, exists bool) {
 	var cn changeNode
 	cl := tx.Bucket(ChangeLog)
 	changeNodeBytes := cl.Get(id[:])
@@ -114,7 +113,7 @@ func (ce *changeEntry) ID() modules.ConsensusChangeID {
 }
 
 // NextEntry returns the entry after the current entry.
-func (ce *changeEntry) NextEntry(tx *bolt.Tx) (nextEntry changeEntry, exists bool) {
+func (ce *changeEntry) NextEntry(tx database.Tx) (nextEntry changeEntry, exists bool) {
 	// Get the change node associated with the provided change entry.
 	ceid := ce.ID()
 	var cn changeNode
@@ -129,7 +128,7 @@ func (ce *changeEntry) NextEntry(tx *bolt.Tx) (nextEntry changeEntry, exists boo
 }
 
 // createChangeLog assumes that no change log exists and creates a new one.
-func (cs *ConsensusSet) createChangeLog(tx *bolt.Tx) error {
+func (cs *ConsensusSet) createChangeLog(tx database.Tx) error {
 	// Create the changelog bucket.
 	cl, err := tx.CreateBucket(ChangeLog)
 	if err != nil {

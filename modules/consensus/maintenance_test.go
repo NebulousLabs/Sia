@@ -30,7 +30,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	mpid0 := pb.Block.MinerPayoutID(0)
 
 	// Apply the single miner payout.
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.Update(func(tx database.Tx) error {
 		applyMinerPayouts(tx, pb)
 		return nil
 	})
@@ -72,7 +72,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	}
 	mpid1 := pb2.Block.MinerPayoutID(0)
 	mpid2 := pb2.Block.MinerPayoutID(1)
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.Update(func(tx database.Tx) error {
 		applyMinerPayouts(tx, pb2)
 		return nil
 	})
@@ -102,12 +102,12 @@ func TestApplyMinerPayouts(t *testing.T) {
 		}
 		cst.cs.db.rmDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, mpid0)
 		cst.cs.db.addSiacoinOutputs(mpid0, types.SiacoinOutput{})
-		_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		_ = cst.cs.db.Update(func(tx database.Tx) error {
 			applyMinerPayouts(tx, pb)
 			return nil
 		})
 	}()
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.Update(func(tx database.Tx) error {
 		applyMinerPayouts(tx, pb)
 		return nil
 	})
@@ -134,12 +134,12 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 		}
 	}()
 	cst.cs.db.addSiacoinOutputs(types.SiacoinOutputID{}, types.SiacoinOutput{})
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.Update(func(tx database.Tx) error {
 		createDSCOBucket(tx, pb.Height)
 		return nil
 	})
 	cst.cs.db.addDelayedSiacoinOutputsHeight(pb.Height, types.SiacoinOutputID{}, types.SiacoinOutput{})
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.Update(func(tx database.Tx) error {
 		applyMaturedSiacoinOutputs(tx, pb)
 		return nil
 	})
@@ -262,7 +262,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.db.addFCExpirations(pb.Height)
 	cst.cs.db.addFCExpirationsHeight(pb.Height, types.FileContractID{})
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	err = cst.cs.db.Update(func(tx database.Tx) error {
 		applyFileContractMaintenance(tx, pb)
 		return nil
 	})

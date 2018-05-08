@@ -6,9 +6,9 @@ import (
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 
 	"github.com/NebulousLabs/errors"
-	"github.com/coreos/bbolt"
 )
 
 // Errors returned by this file.
@@ -144,7 +144,7 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 
 // getBlockTotals returns the block totals values that get stored in
 // storeBlockTotals.
-func (cs *ConsensusSet) getBlockTotals(tx *bolt.Tx, id types.BlockID) (totalTime int64, totalTarget types.Target) {
+func (cs *ConsensusSet) getBlockTotals(tx database.Tx, id types.BlockID) (totalTime int64, totalTarget types.Target) {
 	totalsBytes := tx.Bucket(BucketOak).Get(id[:])
 	totalTime = int64(binary.LittleEndian.Uint64(totalsBytes[:8]))
 	copy(totalTarget[:], totalsBytes[8:])
@@ -154,7 +154,7 @@ func (cs *ConsensusSet) getBlockTotals(tx *bolt.Tx, id types.BlockID) (totalTime
 // storeBlockTotals computes the new total time and total target for the current
 // block and stores that new time in the database. It also returns the new
 // totals.
-func (cs *ConsensusSet) storeBlockTotals(tx *bolt.Tx, currentHeight types.BlockHeight, currentBlockID types.BlockID, prevTotalTime int64, parentTimestamp, currentTimestamp types.Timestamp, prevTotalTarget, targetOfCurrentBlock types.Target) (newTotalTime int64, newTotalTarget types.Target, err error) {
+func (cs *ConsensusSet) storeBlockTotals(tx database.Tx, currentHeight types.BlockHeight, currentBlockID types.BlockID, prevTotalTime int64, parentTimestamp, currentTimestamp types.Timestamp, prevTotalTarget, targetOfCurrentBlock types.Target) (newTotalTime int64, newTotalTarget types.Target, err error) {
 	// Reset the prevTotalTime to a delta of zero just before the hardfork.
 	//
 	// NOTICE: This code is broken, an incorrectly executed hardfork. The
@@ -198,7 +198,7 @@ func (cs *ConsensusSet) storeBlockTotals(tx *bolt.Tx, currentHeight types.BlockH
 //
 // After oak initialization is complete, a specific field in the oak bucket is
 // marked so that oak initialization can be skipped in the future.
-func (cs *ConsensusSet) initOak(tx *bolt.Tx) error {
+func (cs *ConsensusSet) initOak(tx database.Tx) error {
 	// Prep the oak bucket.
 	bucketOak, err := tx.CreateBucketIfNotExists(BucketOak)
 	if err != nil {

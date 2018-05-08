@@ -11,8 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/coreos/bbolt"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 var (
@@ -84,7 +83,7 @@ var (
 )
 
 // createConsensusObjects initialzes the consensus portions of the database.
-func (cs *ConsensusSet) createConsensusDB(tx *bolt.Tx) error {
+func (cs *ConsensusSet) createConsensusDB(tx database.Tx) error {
 	// Enumerate and create the database buckets.
 	buckets := [][]byte{
 		BlockHeight,
@@ -140,7 +139,7 @@ func (cs *ConsensusSet) createConsensusDB(tx *bolt.Tx) error {
 }
 
 // blockHeight returns the height of the blockchain.
-func blockHeight(tx *bolt.Tx) types.BlockHeight {
+func blockHeight(tx database.Tx) types.BlockHeight {
 	var height types.BlockHeight
 	bh := tx.Bucket(BlockHeight)
 	err := encoding.Unmarshal(bh.Get(BlockHeight), &height)
@@ -151,7 +150,7 @@ func blockHeight(tx *bolt.Tx) types.BlockHeight {
 }
 
 // currentBlockID returns the id of the most recent block in the consensus set.
-func currentBlockID(tx *bolt.Tx) types.BlockID {
+func currentBlockID(tx database.Tx) types.BlockID {
 	id, err := getPath(tx, blockHeight(tx))
 	if build.DEBUG && err != nil {
 		panic(err)
@@ -162,7 +161,7 @@ func currentBlockID(tx *bolt.Tx) types.BlockID {
 // dbCurrentBlockID is a convenience function allowing currentBlockID to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbCurrentBlockID() (id types.BlockID) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		id = currentBlockID(tx)
 		return nil
 	})
@@ -173,7 +172,7 @@ func (cs *ConsensusSet) dbCurrentBlockID() (id types.BlockID) {
 }
 
 // currentProcessedBlock returns the most recent block in the consensus set.
-func currentProcessedBlock(tx *bolt.Tx) *processedBlock {
+func currentProcessedBlock(tx database.Tx) *processedBlock {
 	pb, err := getBlockMap(tx, currentBlockID(tx))
 	if build.DEBUG && err != nil {
 		panic(err)
@@ -182,7 +181,7 @@ func currentProcessedBlock(tx *bolt.Tx) *processedBlock {
 }
 
 // getBlockMap returns a processed block with the input id.
-func getBlockMap(tx *bolt.Tx, id types.BlockID) (*processedBlock, error) {
+func getBlockMap(tx database.Tx, id types.BlockID) (*processedBlock, error) {
 	// Look up the encoded block.
 	pbBytes := tx.Bucket(BlockMap).Get(id[:])
 	if pbBytes == nil {
@@ -199,7 +198,7 @@ func getBlockMap(tx *bolt.Tx, id types.BlockID) (*processedBlock, error) {
 }
 
 // addBlockMap adds a processed block to the block map.
-func addBlockMap(tx *bolt.Tx, pb *processedBlock) {
+func addBlockMap(tx database.Tx, pb *processedBlock) {
 	id := pb.Block.ID()
 	err := tx.Bucket(BlockMap).Put(id[:], encoding.Marshal(*pb))
 	if build.DEBUG && err != nil {
@@ -208,7 +207,7 @@ func addBlockMap(tx *bolt.Tx, pb *processedBlock) {
 }
 
 // getPath returns the block id at 'height' in the block path.
-func getPath(tx *bolt.Tx, height types.BlockHeight) (id types.BlockID, err error) {
+func getPath(tx database.Tx, height types.BlockHeight) (id types.BlockID, err error) {
 	idBytes := tx.Bucket(BlockPath).Get(encoding.Marshal(height))
 	if idBytes == nil {
 		return types.BlockID{}, errNilItem
@@ -222,7 +221,7 @@ func getPath(tx *bolt.Tx, height types.BlockHeight) (id types.BlockID, err error
 }
 
 // pushPath adds a block to the BlockPath at current height + 1.
-func pushPath(tx *bolt.Tx, bid types.BlockID) {
+func pushPath(tx database.Tx, bid types.BlockID) {
 	// Fetch and update the block height.
 	bh := tx.Bucket(BlockHeight)
 	heightBytes := bh.Get(BlockHeight)
@@ -247,7 +246,7 @@ func pushPath(tx *bolt.Tx, bid types.BlockID) {
 
 // popPath removes a block from the "end" of the chain, i.e. the block
 // with the largest height.
-func popPath(tx *bolt.Tx) {
+func popPath(tx database.Tx) {
 	// Fetch and update the block height.
 	bh := tx.Bucket(BlockHeight)
 	oldHeightBytes := bh.Get(BlockHeight)
@@ -273,7 +272,7 @@ func popPath(tx *bolt.Tx) {
 
 // isSiacoinOutput returns true if there is a siacoin output of that id in the
 // database.
-func isSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) bool {
+func isSiacoinOutput(tx database.Tx, id types.SiacoinOutputID) bool {
 	bucket := tx.Bucket(SiacoinOutputs)
 	sco := bucket.Get(id[:])
 	return sco != nil
@@ -281,7 +280,7 @@ func isSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) bool {
 
 // getSiacoinOutput fetches a siacoin output from the database. An error is
 // returned if the siacoin output does not exist.
-func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutput, error) {
+func getSiacoinOutput(tx database.Tx, id types.SiacoinOutputID) (types.SiacoinOutput, error) {
 	scoBytes := tx.Bucket(SiacoinOutputs).Get(id[:])
 	if scoBytes == nil {
 		return types.SiacoinOutput{}, errNilItem
@@ -296,7 +295,7 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 
 // addSiacoinOutput adds a siacoin output to the database. An error is returned
 // if the siacoin output is already in the database.
-func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) {
+func addSiacoinOutput(tx database.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) {
 	// While this is not supposed to be allowed, there's a bug in the consensus
 	// code which means that earlier versions have accetped 0-value outputs
 	// onto the blockchain. A hardfork to remove 0-value outputs will fix this,
@@ -319,7 +318,7 @@ func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOu
 
 // removeSiacoinOutput removes a siacoin output from the database. An error is
 // returned if the siacoin output is not in the database prior to removal.
-func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) {
+func removeSiacoinOutput(tx database.Tx, id types.SiacoinOutputID) {
 	scoBucket := tx.Bucket(SiacoinOutputs)
 	// Sanity check - should not be removing an item that is not in the db.
 	if build.DEBUG && scoBucket.Get(id[:]) == nil {
@@ -333,7 +332,7 @@ func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) {
 
 // getFileContract fetches a file contract from the database, returning an
 // error if it is not there.
-func getFileContract(tx *bolt.Tx, id types.FileContractID) (fc types.FileContract, err error) {
+func getFileContract(tx database.Tx, id types.FileContractID) (fc types.FileContract, err error) {
 	fcBytes := tx.Bucket(FileContracts).Get(id[:])
 	if fcBytes == nil {
 		return types.FileContract{}, errNilItem
@@ -347,7 +346,7 @@ func getFileContract(tx *bolt.Tx, id types.FileContractID) (fc types.FileContrac
 
 // addFileContract adds a file contract to the database. An error is returned
 // if the file contract is already in the database.
-func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract) {
+func addFileContract(tx database.Tx, id types.FileContractID, fc types.FileContract) {
 	// Add the file contract to the database.
 	fcBucket := tx.Bucket(FileContracts)
 	// Sanity check - should not be adding a zero-payout file contract.
@@ -376,7 +375,7 @@ func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract
 }
 
 // removeFileContract removes a file contract from the database.
-func removeFileContract(tx *bolt.Tx, id types.FileContractID) {
+func removeFileContract(tx database.Tx, id types.FileContractID) {
 	// Delete the file contract entry.
 	fcBucket := tx.Bucket(FileContracts)
 	fcBytes := fcBucket.Get(id[:])
@@ -412,7 +411,7 @@ var devAddr = types.UnlockHash{243, 113, 199, 11, 206, 158, 184,
 
 // getSiafundOutput fetches a siafund output from the database. An error is
 // returned if the siafund output does not exist.
-func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (types.SiafundOutput, error) {
+func getSiafundOutput(tx database.Tx, id types.SiafundOutputID) (types.SiafundOutput, error) {
 	sfoBytes := tx.Bucket(SiafundOutputs).Get(id[:])
 	if sfoBytes == nil {
 		return types.SiafundOutput{}, errNilItem
@@ -431,7 +430,7 @@ func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (types.SiafundOutpu
 
 // addSiafundOutput adds a siafund output to the database. An error is returned
 // if the siafund output is already in the database.
-func addSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, sfo types.SiafundOutput) {
+func addSiafundOutput(tx database.Tx, id types.SiafundOutputID, sfo types.SiafundOutput) {
 	siafundOutputs := tx.Bucket(SiafundOutputs)
 	// Sanity check - should not be adding a siafund output with a value of
 	// zero.
@@ -450,7 +449,7 @@ func addSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, sfo types.SiafundOu
 
 // removeSiafundOutput removes a siafund output from the database. An error is
 // returned if the siafund output is not in the database prior to removal.
-func removeSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) {
+func removeSiafundOutput(tx database.Tx, id types.SiafundOutputID) {
 	sfoBucket := tx.Bucket(SiafundOutputs)
 	if build.DEBUG && sfoBucket.Get(id[:]) == nil {
 		panic("nil siafund output")
@@ -463,7 +462,7 @@ func removeSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) {
 
 // getSiafundPool returns the current value of the siafund pool. No error is
 // returned as the siafund pool should always be available.
-func getSiafundPool(tx *bolt.Tx) (pool types.Currency) {
+func getSiafundPool(tx database.Tx) (pool types.Currency) {
 	bucket := tx.Bucket(SiafundPool)
 	poolBytes := bucket.Get(SiafundPool)
 	// An error should only be returned if the object stored in the siafund
@@ -477,7 +476,7 @@ func getSiafundPool(tx *bolt.Tx) (pool types.Currency) {
 }
 
 // setSiafundPool updates the saved siafund pool on disk
-func setSiafundPool(tx *bolt.Tx, c types.Currency) {
+func setSiafundPool(tx database.Tx, c types.Currency) {
 	err := tx.Bucket(SiafundPool).Put(SiafundPool, encoding.Marshal(c))
 	if build.DEBUG && err != nil {
 		panic(err)
@@ -485,7 +484,7 @@ func setSiafundPool(tx *bolt.Tx, c types.Currency) {
 }
 
 // addDSCO adds a delayed siacoin output to the consnesus set.
-func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
+func addDSCO(tx database.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
 	// Sanity check - dsco should never have a value of zero.
 	// An error in the consensus code means sometimes there are 0-value dscos
 	// in the blockchain. A hardfork will fix this.
@@ -511,7 +510,7 @@ func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco ty
 }
 
 // removeDSCO removes a delayed siacoin output from the consensus set.
-func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) {
+func removeDSCO(tx database.Tx, bh types.BlockHeight, id types.SiacoinOutputID) {
 	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
 	// Sanity check - should not remove an item not in the db.
 	dscoBucket := tx.Bucket(bucketID)
@@ -526,7 +525,7 @@ func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) {
 
 // createDSCOBucket creates a bucket for the delayed siacoin outputs at the
 // input height.
-func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) {
+func createDSCOBucket(tx database.Tx, bh types.BlockHeight) {
 	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
 	_, err := tx.CreateBucket(bucketID)
 	if build.DEBUG && err != nil {
@@ -536,7 +535,7 @@ func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) {
 
 // deleteDSCOBucket deletes the bucket that held a set of delayed siacoin
 // outputs.
-func deleteDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) {
+func deleteDSCOBucket(tx database.Tx, bh types.BlockHeight) {
 	// Delete the bucket.
 	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
 	bucket := tx.Bucket(bucketID)

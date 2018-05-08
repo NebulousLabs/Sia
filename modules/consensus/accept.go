@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 
 	"github.com/coreos/bbolt"
 )
@@ -31,7 +32,7 @@ func (cs *ConsensusSet) managedBroadcastBlock(b types.Block) {
 // validateHeaderAndBlock does some early, low computation verification on the
 // block. Callers should not assume that validation will happen in a particular
 // order.
-func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block, id types.BlockID) (parent *processedBlock, err error) {
+func (cs *ConsensusSet) validateHeaderAndBlock(tx database.Tx, b types.Block, id types.BlockID) (parent *processedBlock, err error) {
 	// Check if the block is a DoS block - a known invalid block that is expensive
 	// to validate.
 	_, exists := cs.dosBlocks[id]
@@ -78,7 +79,7 @@ func checkHeaderTarget(h types.BlockHeader, target types.Target) bool {
 // validateHeader does some early, low computation verification on the header
 // to determine if the block should be downloaded. Callers should not assume
 // that validation will happen in a particular order.
-func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
+func (cs *ConsensusSet) validateHeader(tx database.Tx, h types.BlockHeader) error {
 	// Check if the block is a DoS block - a known invalid block that is expensive
 	// to validate.
 	id := h.ID()
@@ -147,7 +148,7 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
 // on the block. Such errors are handled outside of the transaction by the
 // caller. Switching to a managed tx through bolt will make this complexity
 // unneeded.
-func (cs *ConsensusSet) addBlockToTree(tx *bolt.Tx, b types.Block, parent *processedBlock) (ce changeEntry, err error) {
+func (cs *ConsensusSet) addBlockToTree(tx database.Tx, b types.Block, parent *processedBlock) (ce changeEntry, err error) {
 	// Prepare the child processed block associated with the parent block.
 	newNode := cs.newChild(tx, parent, b)
 
@@ -241,11 +242,11 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 	// invalid blocks (which includes the children of invalid blocks).
 	chainExtended := false
 	changes := make([]changeEntry, 0, len(blocks))
-	setErr := cs.db.Update(func(tx *bolt.Tx) error {
+	setErr := cs.db.Update(func(tx database.Tx) error {
 		cs.log.Printf("accept: starting block processing loop (%v blocks, height %v)", len(blocks), blockHeight(tx))
 		for i := 0; i < len(blocks); i++ {
 			// Start by checking the header of the block.
-			parent, err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, blocks[i], blockIDs[i])
+			parent, err := cs.validateHeaderAndBlock(tx, blocks[i], blockIDs[i])
 			if err == modules.ErrBlockKnown {
 				// Skip over known blocks.
 				continue

@@ -6,14 +6,13 @@ package consensus
 import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/coreos/bbolt"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 // dbBlockHeight is a convenience function allowing blockHeight to be called
 // without a bolt.Tx.
 func (cs *ConsensusSet) dbBlockHeight() (bh types.BlockHeight) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		bh = blockHeight(tx)
 		return nil
 	})
@@ -26,7 +25,7 @@ func (cs *ConsensusSet) dbBlockHeight() (bh types.BlockHeight) {
 // dbCurrentProcessedBlock is a convenience function allowing
 // currentProcessedBlock to be called without a bolt.Tx.
 func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *processedBlock) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		pb = currentProcessedBlock(tx)
 		return nil
 	})
@@ -39,7 +38,7 @@ func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *processedBlock) {
 // dbGetPath is a convenience function allowing getPath to be called without a
 // bolt.Tx.
 func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID, err error) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		id, err = getPath(tx, bh)
 		return nil
 	})
@@ -52,7 +51,7 @@ func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID, err e
 // dbPushPath is a convenience function allowing pushPath to be called without a
 // bolt.Tx.
 func (cs *ConsensusSet) dbPushPath(bid types.BlockID) {
-	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.Update(func(tx database.Tx) error {
 		pushPath(tx, bid)
 		return nil
 	})
@@ -64,7 +63,7 @@ func (cs *ConsensusSet) dbPushPath(bid types.BlockID) {
 // dbGetBlockMap is a convenience function allowing getBlockMap to be called
 // without a bolt.Tx.
 func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (pb *processedBlock, err error) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		pb, err = getBlockMap(tx, id)
 		return nil
 	})
@@ -77,7 +76,7 @@ func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (pb *processedBlock, err
 // dbGetSiacoinOutput is a convenience function allowing getSiacoinOutput to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetSiacoinOutput(id types.SiacoinOutputID) (sco types.SiacoinOutput, err error) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		sco, err = getSiacoinOutput(tx, id)
 		return nil
 	})
@@ -90,7 +89,7 @@ func (cs *ConsensusSet) dbGetSiacoinOutput(id types.SiacoinOutputID) (sco types.
 // getArbSiacoinOutput is a convenience function fetching a single random
 // siacoin output from the database.
 func (cs *ConsensusSet) getArbSiacoinOutput() (scoid types.SiacoinOutputID, sco types.SiacoinOutput, err error) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		cursor := tx.Bucket(SiacoinOutputs).Cursor()
 		scoidBytes, scoBytes := cursor.First()
 		copy(scoid[:], scoidBytes)
@@ -108,7 +107,7 @@ func (cs *ConsensusSet) getArbSiacoinOutput() (scoid types.SiacoinOutputID, sco 
 // dbGetFileContract is a convenience function allowing getFileContract to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetFileContract(id types.FileContractID) (fc types.FileContract, err error) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		fc, err = getFileContract(tx, id)
 		return nil
 	})
@@ -121,7 +120,7 @@ func (cs *ConsensusSet) dbGetFileContract(id types.FileContractID) (fc types.Fil
 // dbAddFileContract is a convenience function allowing addFileContract to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbAddFileContract(id types.FileContractID, fc types.FileContract) {
-	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.Update(func(tx database.Tx) error {
 		addFileContract(tx, id, fc)
 		return nil
 	})
@@ -133,7 +132,7 @@ func (cs *ConsensusSet) dbAddFileContract(id types.FileContractID, fc types.File
 // dbRemoveFileContract is a convenience function allowing removeFileContract
 // to be called without a bolt.Tx.
 func (cs *ConsensusSet) dbRemoveFileContract(id types.FileContractID) {
-	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.Update(func(tx database.Tx) error {
 		removeFileContract(tx, id)
 		return nil
 	})
@@ -145,7 +144,7 @@ func (cs *ConsensusSet) dbRemoveFileContract(id types.FileContractID) {
 // dbGetSiafundOutput is a convenience function allowing getSiafundOutput to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetSiafundOutput(id types.SiafundOutputID) (sfo types.SiafundOutput, err error) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		sfo, err = getSiafundOutput(tx, id)
 		return nil
 	})
@@ -158,7 +157,7 @@ func (cs *ConsensusSet) dbGetSiafundOutput(id types.SiafundOutputID) (sfo types.
 // dbAddSiafundOutput is a convenience function allowing addSiafundOutput to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbAddSiafundOutput(id types.SiafundOutputID, sfo types.SiafundOutput) {
-	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.Update(func(tx database.Tx) error {
 		addSiafundOutput(tx, id, sfo)
 		return nil
 	})
@@ -170,7 +169,7 @@ func (cs *ConsensusSet) dbAddSiafundOutput(id types.SiafundOutputID, sfo types.S
 // dbGetSiafundPool is a convenience function allowing getSiafundPool to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetSiafundPool() (siafundPool types.Currency) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		siafundPool = getSiafundPool(tx)
 		return nil
 	})
@@ -184,7 +183,7 @@ func (cs *ConsensusSet) dbGetSiafundPool() (siafundPool types.Currency) {
 // fetched without a bolt.Tx. An error is returned if the delayed output is not
 // found at the maturity height indicated by the input.
 func (cs *ConsensusSet) dbGetDSCO(height types.BlockHeight, id types.SiacoinOutputID) (dsco types.SiacoinOutput, err error) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		dscoBucketID := append(prefixDSCO, encoding.Marshal(height)...)
 		dscoBucket := tx.Bucket(dscoBucketID)
 		if dscoBucket == nil {
@@ -211,7 +210,7 @@ func (cs *ConsensusSet) dbGetDSCO(height types.BlockHeight, id types.SiacoinOutp
 // dbStorageProofSegment is a convenience function allowing
 // 'storageProofSegment' to be called during testing without a tx.
 func (cs *ConsensusSet) dbStorageProofSegment(fcid types.FileContractID) (index uint64, err error) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		index, err = storageProofSegment(tx, fcid)
 		return nil
 	})
@@ -224,7 +223,7 @@ func (cs *ConsensusSet) dbStorageProofSegment(fcid types.FileContractID) (index 
 // dbValidStorageProofs is a convenience function allowing 'validStorageProofs'
 // to be called during testing without a tx.
 func (cs *ConsensusSet) dbValidStorageProofs(t types.Transaction) (err error) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		err = validStorageProofs(tx, t)
 		return nil
 	})
@@ -237,7 +236,7 @@ func (cs *ConsensusSet) dbValidStorageProofs(t types.Transaction) (err error) {
 // dbValidFileContractRevisions is a convenience function allowing
 // 'validFileContractRevisions' to be called during testing without a tx.
 func (cs *ConsensusSet) dbValidFileContractRevisions(t types.Transaction) (err error) {
-	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx database.Tx) error {
 		err = validFileContractRevisions(tx, t)
 		return nil
 	})

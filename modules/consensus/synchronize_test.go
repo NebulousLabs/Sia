@@ -17,8 +17,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/coreos/bbolt"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 // TestSynchronize tests that the consensus set can successfully synchronize
@@ -131,7 +130,7 @@ func TestBlockHistory(t *testing.T) {
 	}
 
 	var history [32]types.BlockID
-	_ = cst.cs.db.View(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.View(func(tx database.Tx) error {
 		history = blockHistory(tx)
 		return nil
 	})
@@ -597,7 +596,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 		// Get blockIDs to send.
 		var history [32]types.BlockID
 		cs.mu.RLock()
-		err := cs.db.View(func(tx *bolt.Tx) error {
+		err := cs.db.View(func(tx database.Tx) error {
 			history = blockHistory(tx)
 			return nil
 		})

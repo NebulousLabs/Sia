@@ -9,8 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/coreos/bbolt"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 var (
@@ -29,7 +28,7 @@ var (
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
-func validSiacoins(tx *bolt.Tx, t types.Transaction) error {
+func validSiacoins(tx database.Tx, t types.Transaction) error {
 	scoBucket := tx.Bucket(SiacoinOutputs)
 	var inputSum types.Currency
 	for _, sci := range t.SiacoinInputs {
@@ -59,7 +58,7 @@ func validSiacoins(tx *bolt.Tx, t types.Transaction) error {
 
 // storageProofSegment returns the index of the segment that needs to be proven
 // exists in a file contract.
-func storageProofSegment(tx *bolt.Tx, fcid types.FileContractID) (uint64, error) {
+func storageProofSegment(tx database.Tx, fcid types.FileContractID) (uint64, error) {
 	// Check that the parent file contract exists.
 	fcBucket := tx.Bucket(FileContracts)
 	fcBytes := fcBucket.Get(fcid[:])
@@ -107,7 +106,7 @@ func storageProofSegment(tx *bolt.Tx, fcid types.FileContractID) (uint64, error)
 // zero. A hardfork was added triggering at block 100,000 to enable an
 // optimization where hosts could submit empty storage proofs for files of size
 // 0, saving space on the blockchain in conditions where the renter is content.
-func validStorageProofs100e3(tx *bolt.Tx, t types.Transaction) error {
+func validStorageProofs100e3(tx database.Tx, t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
 		// Check that the storage proof itself is valid.
 		segmentIndex, err := storageProofSegment(tx, sp.ParentID)
@@ -162,7 +161,7 @@ func validStorageProofs100e3(tx *bolt.Tx, t types.Transaction) error {
 
 // validStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
-func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
+func validStorageProofs(tx database.Tx, t types.Transaction) error {
 	if (build.Release == "standard" && blockHeight(tx) < 100e3) || (build.Release == "testing" && blockHeight(tx) < 10) {
 		return validStorageProofs100e3(tx, t)
 	}
@@ -207,7 +206,7 @@ func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
 
 // validFileContractRevision checks that each file contract revision is valid
 // in the context of the current consensus set.
-func validFileContractRevisions(tx *bolt.Tx, t types.Transaction) error {
+func validFileContractRevisions(tx database.Tx, t types.Transaction) error {
 	for _, fcr := range t.FileContractRevisions {
 		fc, err := getFileContract(tx, fcr.ParentID)
 		if err != nil {
@@ -256,7 +255,7 @@ func validFileContractRevisions(tx *bolt.Tx, t types.Transaction) error {
 
 // validSiafunds checks that the siafund portions of the transaction are valid
 // in the context of the consensus set.
-func validSiafunds(tx *bolt.Tx, t types.Transaction) (err error) {
+func validSiafunds(tx database.Tx, t types.Transaction) (err error) {
 	// Compare the number of input siafunds to the output siafunds.
 	var siafundInputSum types.Currency
 	var siafundOutputSum types.Currency
@@ -284,7 +283,7 @@ func validSiafunds(tx *bolt.Tx, t types.Transaction) (err error) {
 
 // validTransaction checks that all fields are valid within the current
 // consensus state. If not an error is returned.
-func validTransaction(tx *bolt.Tx, t types.Transaction) error {
+func validTransaction(tx database.Tx, t types.Transaction) error {
 	// StandaloneValid will check things like signatures and properties that
 	// should be inherent to the transaction. (storage proof rules, etc.)
 	err := t.StandaloneValid(blockHeight(tx))
@@ -331,7 +330,7 @@ func (cs *ConsensusSet) tryTransactionSet(txns []types.Transaction) (modules.Con
 	// manually manage the tx instead of using 'Update', but that has safety
 	// concerns and is more difficult to implement correctly.
 	errSuccess := errors.New("success")
-	err := cs.db.Update(func(tx *bolt.Tx) error {
+	err := cs.db.Update(func(tx database.Tx) error {
 		diffHolder.Height = blockHeight(tx)
 		for _, txn := range txns {
 			err := validTransaction(tx, txn)

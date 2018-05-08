@@ -10,12 +10,13 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 
 	"github.com/coreos/bbolt"
 )
 
 // manageErr handles an error detected by the consistency checks.
-func manageErr(tx *bolt.Tx, err error) {
+func manageErr(tx database.Tx, err error) {
 	markInconsistency(tx)
 	if build.DEBUG {
 		panic(err)
@@ -28,7 +29,7 @@ func manageErr(tx *bolt.Tx, err error) {
 // the elements in sorted order into a merkle tree and taking the root. All
 // consensus sets with the same current block should have identical consensus
 // checksums.
-func consensusChecksum(tx *bolt.Tx) crypto.Hash {
+func consensusChecksum(tx database.Tx) crypto.Hash {
 	// Create a checksum tree.
 	tree := crypto.NewTree()
 
@@ -78,7 +79,7 @@ func consensusChecksum(tx *bolt.Tx) crypto.Hash {
 
 // checkSiacoinCount checks that the number of siacoins countable within the
 // consensus set equal the expected number of siacoins for the block height.
-func checkSiacoinCount(tx *bolt.Tx) {
+func checkSiacoinCount(tx database.Tx) {
 	// Iterate through all the buckets looking for the delayed siacoin output
 	// buckets, and check that they are for the correct heights.
 	var dscoSiacoins types.Currency
@@ -174,7 +175,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 
 // checkSiafundCount checks that the number of siafunds countable within the
 // consensus set equal the expected number of siafunds for the block height.
-func checkSiafundCount(tx *bolt.Tx) {
+func checkSiafundCount(tx database.Tx) {
 	var total types.Currency
 	err := tx.Bucket(SiafundOutputs).ForEach(func(_, siafundOutputBytes []byte) error {
 		var sfo types.SiafundOutput
@@ -195,7 +196,7 @@ func checkSiafundCount(tx *bolt.Tx) {
 
 // checkDSCOs scans the sets of delayed siacoin outputs and checks for
 // consistency.
-func checkDSCOs(tx *bolt.Tx) {
+func checkDSCOs(tx database.Tx) {
 	// Create a map to track which delayed siacoin output maps exist, and
 	// another map to track which ids have appeared in the dsco set.
 	dscoTracker := make(map[types.BlockHeight]struct{})
@@ -280,7 +281,7 @@ func checkDSCOs(tx *bolt.Tx) {
 // consensus set hash matches the hash obtained for the previous block. Then it
 // applies the block again and checks that the consensus set hash matches the
 // original consensus set hash.
-func (cs *ConsensusSet) checkRevertApply(tx *bolt.Tx) {
+func (cs *ConsensusSet) checkRevertApply(tx database.Tx) {
 	current := currentProcessedBlock(tx)
 	// Don't perform the check if this block is the genesis block.
 	if current.Block.ID() == cs.blockRoot.Block.ID() {
@@ -312,7 +313,7 @@ func (cs *ConsensusSet) checkRevertApply(tx *bolt.Tx) {
 
 // checkConsistency runs a series of checks to make sure that the consensus set
 // is consistent with some rules that should always be true.
-func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
+func (cs *ConsensusSet) checkConsistency(tx database.Tx) {
 	if cs.checkingConsistency {
 		return
 	}
@@ -331,7 +332,7 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
 // Useful for detecting database corruption in production without needing to go
 // through the extremely slow process of running a consistency check every
 // block.
-func (cs *ConsensusSet) maybeCheckConsistency(tx *bolt.Tx) {
+func (cs *ConsensusSet) maybeCheckConsistency(tx database.Tx) {
 	if fastrand.Intn(1000) == 0 {
 		cs.checkConsistency(tx)
 	}

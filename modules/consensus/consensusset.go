@@ -14,9 +14,9 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 
 	"github.com/NebulousLabs/demotemutex"
-	"github.com/coreos/bbolt"
 )
 
 var (
@@ -87,7 +87,7 @@ type ConsensusSet struct {
 	blockValidator  blockValidator
 
 	// Utilities
-	db         *persist.BoltDatabase
+	db         database.DB
 	log        *persist.Logger
 	mu         demotemutex.DemoteMutex
 	persistDir string
@@ -186,7 +186,7 @@ func New(gateway modules.Gateway, bootstrap bool, persistDir string) (*Consensus
 
 // BlockAtHeight returns the block at a given height.
 func (cs *ConsensusSet) BlockAtHeight(height types.BlockHeight) (block types.Block, exists bool) {
-	_ = cs.db.View(func(tx *bolt.Tx) error {
+	_ = cs.db.View(func(tx database.Tx) error {
 		id, err := getPath(tx, height)
 		if err != nil {
 			return err
@@ -204,7 +204,7 @@ func (cs *ConsensusSet) BlockAtHeight(height types.BlockHeight) (block types.Blo
 
 // BlockByID returns the block for a given BlockID.
 func (cs *ConsensusSet) BlockByID(id types.BlockID) (block types.Block, height types.BlockHeight, exists bool) {
-	_ = cs.db.View(func(tx *bolt.Tx) error {
+	_ = cs.db.View(func(tx database.Tx) error {
 		pb, err := getBlockMap(tx, id)
 		if err != nil {
 			return err
@@ -226,7 +226,7 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 	}
 	defer cs.tg.Done()
 
-	_ = cs.db.View(func(tx *bolt.Tx) error {
+	_ = cs.db.View(func(tx database.Tx) error {
 		pb, err := getBlockMap(tx, id)
 		if err != nil {
 			return err
@@ -248,7 +248,7 @@ func (cs *ConsensusSet) managedCurrentBlock() (block types.Block) {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 
-	_ = cs.db.View(func(tx *bolt.Tx) error {
+	_ = cs.db.View(func(tx database.Tx) error {
 		pb := currentProcessedBlock(tx)
 		block = pb.Block
 		return nil
@@ -271,7 +271,7 @@ func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	_ = cs.db.View(func(tx *bolt.Tx) error {
+	_ = cs.db.View(func(tx database.Tx) error {
 		pb := currentProcessedBlock(tx)
 		block = pb.Block
 		return nil
@@ -300,7 +300,7 @@ func (cs *ConsensusSet) Height() (height types.BlockHeight) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	_ = cs.db.View(func(tx *bolt.Tx) error {
+	_ = cs.db.View(func(tx database.Tx) error {
 		height = blockHeight(tx)
 		return nil
 	})
@@ -317,7 +317,7 @@ func (cs *ConsensusSet) InCurrentPath(id types.BlockID) (inPath bool) {
 	}
 	defer cs.tg.Done()
 
-	_ = cs.db.View(func(tx *bolt.Tx) error {
+	_ = cs.db.View(func(tx database.Tx) error {
 		pb, err := getBlockMap(tx, id)
 		if err != nil {
 			inPath = false
@@ -345,7 +345,7 @@ func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp 
 	defer cs.tg.Done()
 
 	// Error is not checked because it does not matter.
-	_ = cs.db.View(func(tx *bolt.Tx) error {
+	_ = cs.db.View(func(tx database.Tx) error {
 		pb, err := getBlockMap(tx, id)
 		if err != nil {
 			return err
@@ -367,7 +367,7 @@ func (cs *ConsensusSet) StorageProofSegment(fcid types.FileContractID) (index ui
 	}
 	defer cs.tg.Done()
 
-	_ = cs.db.View(func(tx *bolt.Tx) error {
+	_ = cs.db.View(func(tx database.Tx) error {
 		index, err = storageProofSegment(tx, fcid)
 		return nil
 	})

@@ -11,8 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/coreos/bbolt"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 const (
@@ -96,7 +95,7 @@ func isTimeoutErr(err error) bool {
 // to find a common parent that is reasonably recent, usually the most recent
 // common parent is found, but always a common parent within a factor of 2 is
 // found.
-func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
+func blockHistory(tx database.Tx) (blockIDs [32]types.BlockID) {
 	height := blockHeight(tx)
 	step := types.BlockHeight(1)
 	// The final step is to include the genesis block, which is why the final
@@ -165,7 +164,7 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 	// Get blockIDs to send.
 	var history [32]types.BlockID
 	cs.mu.RLock()
-	err = cs.db.View(func(tx *bolt.Tx) error {
+	err = cs.db.View(func(tx database.Tx) error {
 		history = blockHistory(tx)
 		return nil
 	})
@@ -297,7 +296,7 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 	var start types.BlockHeight
 	var csHeight types.BlockHeight
 	cs.mu.RLock()
-	err = cs.db.View(func(tx *bolt.Tx) error {
+	err = cs.db.View(func(tx database.Tx) error {
 		csHeight = blockHeight(tx)
 		for _, id := range knownBlocks {
 			pb, err := getBlockMap(tx, id)
@@ -344,7 +343,7 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 		// Get the set of blocks to send.
 		var blocks []types.Block
 		cs.mu.RLock()
-		err = cs.db.View(func(tx *bolt.Tx) error {
+		err = cs.db.View(func(tx database.Tx) error {
 			height := blockHeight(tx)
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
 				id, err := getPath(tx, i)
@@ -421,9 +420,9 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 
 	// Start verification inside of a bolt View tx.
 	cs.mu.RLock()
-	err = cs.db.View(func(tx *bolt.Tx) error {
+	err = cs.db.View(func(tx database.Tx) error {
 		// Do some relatively inexpensive checks to validate the header
-		return cs.validateHeader(boltTxWrapper{tx}, h)
+		return cs.validateHeader(tx, h)
 	})
 	cs.mu.RUnlock()
 	// WARN: orphan multithreading logic (dangerous areas, see below)
@@ -494,7 +493,7 @@ func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 	// Lookup the corresponding block.
 	var b types.Block
 	cs.mu.RLock()
-	err = cs.db.View(func(tx *bolt.Tx) error {
+	err = cs.db.View(func(tx database.Tx) error {
 		pb, err := getBlockMap(tx, id)
 		if err != nil {
 			return err

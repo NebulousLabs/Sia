@@ -7,8 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
-
-	"github.com/coreos/bbolt"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 // TestTryValidTransactionSet submits a valid transaction set to the
@@ -336,7 +335,7 @@ func TestValidSiacoins(t *testing.T) {
 	txn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{}},
 	}
-	err = cst.cs.db.View(func(tx *bolt.Tx) error {
+	err = cst.cs.db.View(func(tx database.Tx) error {
 		err := validSiacoins(tx, txn)
 		if err != errMissingSiacoinOutput {
 			t.Fatal(err)
@@ -357,7 +356,7 @@ func TestValidSiacoins(t *testing.T) {
 			ParentID: scoid,
 		}},
 	}
-	err = cst.cs.db.View(func(tx *bolt.Tx) error {
+	err = cst.cs.db.View(func(tx database.Tx) error {
 		err := validSiacoins(tx, txn)
 		if err != errWrongUnlockConditions {
 			t.Fatal(err)
@@ -374,7 +373,7 @@ func TestValidSiacoins(t *testing.T) {
 			Value: types.NewCurrency64(1),
 		}},
 	}
-	err = cst.cs.db.View(func(tx *bolt.Tx) error {
+	err = cst.cs.db.View(func(tx database.Tx) error {
 		err := validSiacoins(tx, txn)
 		if err != errSiacoinInputOutputMismatch {
 			t.Fatal(err)

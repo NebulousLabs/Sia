@@ -3,14 +3,14 @@ package consensus
 import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 
 	siasync "github.com/NebulousLabs/Sia/sync"
-	"github.com/coreos/bbolt"
 )
 
 // computeConsensusChange computes the consensus change from the change entry
 // at index 'i' in the change log. If i is out of bounds, an error is returned.
-func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (modules.ConsensusChange, error) {
+func (cs *ConsensusSet) computeConsensusChange(tx database.Tx, ce changeEntry) (modules.ConsensusChange, error) {
 	cc := modules.ConsensusChange{
 		ID: ce.ID(),
 	}
@@ -104,7 +104,7 @@ func (cs *ConsensusSet) updateSubscribers(ce changeEntry) {
 	}
 	// Get the consensus change and send it to all subscribers.
 	var cc modules.ConsensusChange
-	err := cs.db.View(func(tx *bolt.Tx) error {
+	err := cs.db.View(func(tx database.Tx) error {
 		// Compute the consensus change so it can be sent to subscribers.
 		var err error
 		cc, err = cs.computeConsensusChange(tx, ce)
@@ -137,7 +137,7 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 	var entry changeEntry
 
 	cs.mu.RLock()
-	err := cs.db.View(func(tx *bolt.Tx) error {
+	err := cs.db.View(func(tx database.Tx) error {
 		if start == modules.ConsensusChangeBeginning {
 			// Special case: for modules.ConsensusChangeBeginning, create an
 			// initial node pointing to the genesis block. The subscriber will
@@ -173,7 +173,7 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 		// Send changes in batches of 100 so that we don't hold the
 		// lock for too long.
 		cs.mu.RLock()
-		err = cs.db.View(func(tx *bolt.Tx) error {
+		err = cs.db.View(func(tx database.Tx) error {
 			for i := 0; i < 100 && exists; i++ {
 				select {
 				case <-cancel:

@@ -5,8 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/coreos/bbolt"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 // TestCommitDelayedSiacoinOutputDiffBadMaturity commits a delayed siacoin
@@ -40,7 +39,7 @@ func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 		SiacoinOutput:  dsco,
 		MaturityHeight: maturityHeight,
 	}
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.Update(func(tx database.Tx) error {
 		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		return nil
 	})
@@ -58,7 +57,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	}
 	defer cst.Close()
 	pb := cst.cs.dbCurrentProcessedBlock()
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.Update(func(tx database.Tx) error {
 		commitDiffSet(tx, pb, modules.DiffRevert) // pull the block node out of the consensus set.
 		return nil
 	})
@@ -100,7 +99,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 		MaturityHeight: cst.cs.dbBlockHeight() + types.MaturityDelay,
 	}
 	var siafundPool types.Currency
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	err = cst.cs.db.Update(func(tx database.Tx) error {
 		siafundPool = getSiafundPool(tx)
 		return nil
 	})
@@ -120,11 +119,11 @@ func TestCommitNodeDiffs(t *testing.T) {
 	pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod1)
 	pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
 	pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.Update(func(tx database.Tx) error {
 		createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
 		return nil
 	})
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.Update(func(tx database.Tx) error {
 		commitNodeDiffs(tx, pb, modules.DiffApply)
 		return nil
 	})
@@ -140,7 +139,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cst.cs.db.Update(func(tx database.Tx) error {
 		commitNodeDiffs(tx, pb, modules.DiffRevert)
 		return nil
 	})
@@ -573,7 +572,7 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 		t.Fatal(err)
 	}
 	pb := cst.cs.currentProcessedBlock()
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	err = cst.cs.db.Update(func(tx database.Tx) error {
 		return commitDiffSet(tx, pb, modules.DiffRevert)
 	})
 	if err != nil {
@@ -593,19 +592,19 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 		}
 
 		// Trigger a panic by deleting a map with outputs in it during revert.
-		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		err = cst.cs.db.Update(func(tx database.Tx) error {
 			return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		err = cst.cs.db.Update(func(tx database.Tx) error {
 			return commitNodeDiffs(tx, pb, modules.DiffApply)
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		err = cst.cs.db.Update(func(tx database.Tx) error {
 			return deleteObsoleteDelayedOutputMaps(tx, pb, modules.DiffRevert)
 		})
 		if err != nil {
@@ -614,7 +613,7 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 	}()
 
 	// Trigger a panic by deleting a map with outputs in it during apply.
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+	err = cst.cs.db.Update(func(tx database.Tx) error {
 		return deleteObsoleteDelayedOutputMaps(tx, pb, modules.DiffApply)
 	})
 	if err != nil {

@@ -9,8 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-
-	"github.com/coreos/bbolt"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 const (
@@ -30,7 +29,7 @@ func (cs *ConsensusSet) loadDB() error {
 	}
 
 	// Walk through initialization for Sia.
-	return cs.db.Update(func(tx *bolt.Tx) error {
+	return cs.db.Update(func(tx database.Tx) error {
 		// Check if the database has been initialized.
 		err = cs.initDB(tx)
 		if err != nil {
