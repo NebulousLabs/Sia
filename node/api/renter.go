@@ -125,7 +125,7 @@ type (
 
 	// RenterFile lists the file queried.
 	RenterFile struct {
-		File *file `json:"file"`
+		File FileInfo `json:"file"`
 	}
 
 	// RenterFiles lists the files known to the renter.
@@ -381,7 +381,7 @@ func (api *API) renterRenameHandler(w http.ResponseWriter, req *http.Request, ps
 // renterFileHandler handles the API call to return specific file.
 func (api *API) renterFileHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	WriteJSON(w, RenterFile{
-		Files: api.renter.GetFile(strings.TrimPrefix(ps.ByName("siapath"), "/"),
+		Files: api.renter.File(strings.TrimPrefix(ps.ByName("siapath"), "/"),
 	})
 }
 

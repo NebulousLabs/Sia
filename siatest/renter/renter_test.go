@@ -43,6 +43,7 @@ func TestRenter(t *testing.T) {
 	}{
 		{"TestRenterStreamingCache", testRenterStreamingCache},
 		{"TestUploadDownload", testUploadDownload},
+		// Add test for single file api
 		{"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},

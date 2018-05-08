@@ -322,11 +322,11 @@ type Renter interface {
 	// DownloadHistory lists all the files that have been scheduled for download.
 	DownloadHistory() []DownloadInfo
 
+	// File returns information on specific file queried by user
+	File(siaPath string) (FileInfo, error)
+
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
-
-	// GetFile returns information on specific file queried by user
-	GetFile() File
 
 	// Host provides the DB entry and score breakdown for the requested host.
 	Host(pk types.SiaPublicKey) (HostDBEntry, bool)
