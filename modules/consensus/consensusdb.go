@@ -49,10 +49,6 @@ var (
 	// initialized.
 	BucketOak = []byte("Oak")
 
-	// Consistency is a database bucket with a flag indicating whether
-	// inconsistencies within the database have been detected.
-	Consistency = []byte("Consistency")
-
 	// FileContracts is a database bucket that contains all of the open file
 	// contracts.
 	FileContracts = []byte("FileContracts")
@@ -114,7 +110,7 @@ func (cs *ConsensusSet) createConsensusDB(tx database.Tx) error {
 	// after pushing the genesis block into the path.
 	pushPath(tx, cs.blockRoot.Block.ID())
 	if build.DEBUG {
-		cs.blockRoot.ConsensusChecksum = consensusChecksum(tx)
+		cs.blockRoot.ConsensusChecksum = tx.ConsensusChecksum()
 	}
 	addBlockMap(tx, &cs.blockRoot)
 	return nil

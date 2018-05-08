@@ -6,8 +6,8 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -248,7 +248,7 @@ func generateAndApplyDiff(tx database.Tx, pb *processedBlock) error {
 	// adding and removing blocks. Must happen after the block is added to the
 	// path.
 	if build.DEBUG {
-		pb.ConsensusChecksum = consensusChecksum(tx)
+		pb.ConsensusChecksum = tx.ConsensusChecksum()
 	}
 
 	return blockMap.Put(bid[:], encoding.Marshal(*pb))

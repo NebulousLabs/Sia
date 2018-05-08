@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
 	"github.com/NebulousLabs/Sia/persist"
 )
@@ -72,24 +70,5 @@ func (cs *ConsensusSet) initDB(tx database.Tx) error {
 	if err != nil {
 		return err
 	}
-
-	// Place a 'false' in the consistency bucket to indicate that no
-	// inconsistencies have been found.
-	err = tx.Bucket(Consistency).Put(Consistency, encoding.Marshal(false))
-	if err != nil {
-		return err
-	}
 	return nil
-}
-
-// markInconsistency flags the database to indicate that inconsistency has been
-// detected.
-func markInconsistency(tx database.Tx) {
-	// Place a 'true' in the consistency bucket to indicate that
-	// inconsistencies have been found.
-	err := tx.Bucket(Consistency).Put(Consistency, encoding.Marshal(true))
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-
 }

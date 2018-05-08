@@ -9,7 +9,7 @@ import (
 // without a bolt.Tx.
 func (cs *ConsensusSet) dbConsensusChecksum() (checksum crypto.Hash) {
 	err := cs.db.Update(func(tx database.Tx) error {
-		checksum = consensusChecksum(tx)
+		checksum = tx.ConsensusChecksum()
 		return nil
 	})
 	if err != nil {
