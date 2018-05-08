@@ -382,9 +382,12 @@ func (api *API) renterRenameHandler(w http.ResponseWriter, req *http.Request, ps
 // renterFileHandler handles the API call to return specific file.
 func (api *API) renterFileHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	file, err := api.renter.File(strings.TrimPrefix(ps.ByName("siapath"), "/"))
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
 	WriteJSON(w, RenterFile{
-		File:  file,
-		Error: err,
+		File: file,
 	})
 }
 
