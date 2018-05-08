@@ -151,6 +151,12 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedUploadChunk) e
 		return err
 	}
 
+	// Set the in-memory buffer to nil just to be safe in case of a memory
+	// leak.
+	defer func() {
+		d.destination = nil
+	}()
+
 	// Wait for the download to complete.
 	select {
 	case <-d.completeChan:
