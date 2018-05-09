@@ -29,7 +29,7 @@ type chunkData struct {
 type downloadChunkCache struct {
 	chunkCacheMap  map[string]*chunkData
 	chunkCacheHeap chunkCacheHeap
-	cacheSize      int
+	cacheSize      uint64
 	mu             sync.Mutex
 }
 
@@ -72,14 +72,6 @@ func (cch *chunkCacheHeap) update(cd *chunkData, id string, data []byte, lastAcc
 	heap.Fix(cch, cd.index)
 }
 
-// init initializes the downloadChunkCache
-func (dcc *downloadChunkCache) init(cacheSize int) {
-	dcc.chunkCacheMap = make(map[string]*chunkData)
-	dcc.chunkCacheHeap = make(chunkCacheHeap, 0, cacheSize)
-	cacheSize = cacheSize
-	heap.Init(&dcc.chunkCacheHeap)
-}
-
 // add adds the chunk to the cache if the download is a streaming
 // endpoint download.
 // TODO this won't be necessary anymore once we have partial downloads.
@@ -94,7 +86,7 @@ func (dcc *downloadChunkCache) add(data []byte, udc *unfinishedDownloadChunk) {
 	defer dcc.mu.Unlock()
 
 	// Prune cache if necessary.
-	for len(dcc.chunkCacheMap) >= dcc.cacheSize {
+	for len(dcc.chunkCacheMap) >= int(dcc.cacheSize) {
 		// Remove from Heap
 		cd := heap.Pop(&dcc.chunkCacheHeap).(*chunkData)
 
@@ -114,6 +106,14 @@ func (dcc *downloadChunkCache) add(data []byte, udc *unfinishedDownloadChunk) {
 	dcc.chunkCacheMap[udc.staticCacheID] = cd
 	heap.Push(&dcc.chunkCacheHeap, cd)
 	dcc.chunkCacheHeap.update(cd, cd.id, cd.data, cd.lastAccess)
+}
+
+// init initializes the downloadChunkCache
+func (dcc *downloadChunkCache) init() {
+	dcc.chunkCacheMap = make(map[string]*chunkData)
+	dcc.chunkCacheHeap = make(chunkCacheHeap, 0, defaultDownloadCacheSize)
+	dcc.cacheSize = defaultDownloadCacheSize
+	heap.Init(&dcc.chunkCacheHeap)
 }
 
 // retreive tries to retrieve the chunk from the renter's cache. If
@@ -158,4 +158,9 @@ func (dcc *downloadChunkCache) retreive(udc *unfinishedDownloadChunk) bool {
 	}
 	udc.download.mu.Unlock()
 	return true
+}
+
+// s
+func (r *Renter) setStreamingCacheSize(cacheSize uint64) {
+	r.downloadChunkCache.cacheSize = cacheSize
 }

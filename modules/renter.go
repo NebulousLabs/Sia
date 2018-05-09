@@ -170,7 +170,7 @@ type RenterSettings struct {
 	Allowance         Allowance `json:"allowance"`
 	MaxUploadSpeed    int64     `json:"maxuploadspeed"`
 	MaxDownloadSpeed  int64     `json:"maxdownloadspeed"`
-	DownloadCacheSize int       `json:"downloadcachesize"`
+	DownloadCacheSize uint64    `json:"downloadcachesize"`
 }
 
 // HostDBScans represents a sortable slice of scans.

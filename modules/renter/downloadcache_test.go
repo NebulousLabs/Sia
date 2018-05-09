@@ -7,10 +7,8 @@ import (
 	"time"
 )
 
-// TestAddChunkToCache tests that the oldest chunk is removed
-// TODO: Access modules.RenterSettings
-//    rs := api.renter.Settings()
-func TestAddChunkToCache(t *testing.T) {
+// TestAdd tests that the oldest chunk is removed
+func TestAdd(t *testing.T) {
 	// Initializing minimum variables
 	udc := &unfinishedDownloadChunk{
 		download: &download{
@@ -18,7 +16,7 @@ func TestAddChunkToCache(t *testing.T) {
 		},
 		downloadChunkCache: new(downloadChunkCache),
 	}
-	// TODO: Pass modules.RenterSettings
+
 	udc.downloadChunkCache.init()
 
 	// Testing Push to Heap
@@ -36,16 +34,15 @@ func TestAddChunkToCache(t *testing.T) {
 	cd := heap.Pop(&udc.downloadChunkCache.chunkCacheHeap).(*chunkData)
 
 	// Fill Cache
-	// TODO: parss modules.TenterSettings into addChunkToCache
-	for i := 0; i < downloadCacheSize; i++ {
+	for i := 0; i < int(udc.downloadChunkCache.cacheSize); i++ {
 		udc.staticCacheID = strconv.Itoa(i)
-		udc.addChunkToCache([]byte{})
+		udc.downloadChunkCache.add([]byte{}, udc)
 		time.Sleep(1 * time.Millisecond)
 	}
 
 	// Testing Heap update
-	cd = udc.downloadChunkCache.chunkCacheMap[strconv.Itoa(downloadCacheSize-1)]                   // this should have been the last element added and be at the bottom
-	udc.downloadChunkCache.chunkCacheHeap.update(cd, cd.id, cd.data, time.Now().AddDate(0, -1, 0)) // updating it so it is at the top of Heap
+	cd = udc.downloadChunkCache.chunkCacheMap[strconv.FormatUint(udc.downloadChunkCache.cacheSize-1, 10)] // this should have been the last element added and be at the bottom
+	udc.downloadChunkCache.chunkCacheHeap.update(cd, cd.id, cd.data, time.Now().AddDate(0, -1, 0))        // updating it so it is at the top of Heap
 	if udc.downloadChunkCache.chunkCacheHeap[0] != cd {
 		t.Error("Heap order was not updated.")
 	}
@@ -60,9 +57,8 @@ func TestAddChunkToCache(t *testing.T) {
 	heap.Push(&udc.downloadChunkCache.chunkCacheHeap, cd)
 
 	// Add additional chunk to force deletion of a chunk
-	// TODO: parss modules.TenterSettings into addChunkToCache
-	udc.staticCacheID = strconv.Itoa(downloadCacheSize)
-	udc.addChunkToCache([]byte{})
+	udc.staticCacheID = strconv.FormatUint(udc.downloadChunkCache.cacheSize, 10)
+	udc.downloadChunkCache.add([]byte{}, udc)
 
 	// check if the chunk was removed from Map
 	if _, ok := udc.downloadChunkCache.chunkCacheMap[cd.id]; ok {
