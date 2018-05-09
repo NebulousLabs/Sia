@@ -2,7 +2,6 @@ package renter
 
 import (
 	"bytes"
-	"container/heap"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -14,31 +13,6 @@ import (
 
 	"github.com/NebulousLabs/errors"
 )
-
-// downloadChunkCache contains a chunkCacheMap for quick look up and a chunkCacheHeap for
-// quick removal of old chunks
-type downloadChunkCache struct {
-	chunkCacheMap  map[string]*chunkData
-	chunkCacheHeap chunkCacheHeap
-}
-
-func (dcc *downloadChunkCache) init() {
-	dcc.chunkCacheMap = make(map[string]*chunkData)
-	dcc.chunkCacheHeap = make(chunkCacheHeap, 0, downloadCacheSize)
-	heap.Init(&dcc.chunkCacheHeap)
-}
-
-// chunkData contatins the data and the timestamp for the unfinished
-// download chunks
-type chunkData struct {
-	id         string
-	data       []byte
-	lastAccess time.Time
-	index      int
-}
-
-// chunkCacheHeap is a priority queue and implements heap.Interface and holds chunkData
-type chunkCacheHeap []*chunkData
 
 // downloadPieceInfo contains all the information required to download and
 // recover a piece of a chunk from a host. It is a value in a map where the key
@@ -102,7 +76,6 @@ type unfinishedDownloadChunk struct {
 
 	// Caching related fields
 	downloadChunkCache *downloadChunkCache
-	cacheMu            *sync.Mutex
 }
 
 // fail will set the chunk status to failed. The physical chunk memory will be
@@ -246,7 +219,7 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	recoveredData := recoverWriter.Bytes()
 
 	// Add the chunk to the cache.
-	udc.addChunkToCache(recoveredData)
+	udc.downloadChunkCache.add(recoveredData, udc)
 
 	// Write the bytes to the requested output.
 	start := udc.staticFetchOffset

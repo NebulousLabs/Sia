@@ -5,11 +5,33 @@ package renter
 
 import (
 	"container/heap"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/errors"
 )
+
+// chunkCacheHeap is a priority queue and implements heap.Interface and holds chunkData
+type chunkCacheHeap []*chunkData
+
+// chunkData contatins the data and the timestamp for the unfinished
+// download chunks
+type chunkData struct {
+	id         string
+	data       []byte
+	lastAccess time.Time
+	index      int
+}
+
+// downloadChunkCache contains a chunkCacheMap for quick look up and a chunkCacheHeap for
+// quick removal of old chunks
+type downloadChunkCache struct {
+	chunkCacheMap  map[string]*chunkData
+	chunkCacheHeap chunkCacheHeap
+	cacheSize      int
+	mu             sync.Mutex
+}
 
 // Required functions for use of heap for chunkCacheHeap
 func (cch chunkCacheHeap) Len() int { return len(cch) }
@@ -50,29 +72,37 @@ func (cch *chunkCacheHeap) update(cd *chunkData, id string, data []byte, lastAcc
 	heap.Fix(cch, cd.index)
 }
 
-// addChunkToCache adds the chunk to the cache if the download is a streaming
+// init initializes the downloadChunkCache
+func (dcc *downloadChunkCache) init(cacheSize int) {
+	dcc.chunkCacheMap = make(map[string]*chunkData)
+	dcc.chunkCacheHeap = make(chunkCacheHeap, 0, cacheSize)
+	cacheSize = cacheSize
+	heap.Init(&dcc.chunkCacheHeap)
+}
+
+// add adds the chunk to the cache if the download is a streaming
 // endpoint download.
 // TODO this won't be necessary anymore once we have partial downloads.
-func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
+func (dcc *downloadChunkCache) add(data []byte, udc *unfinishedDownloadChunk) {
 	if udc.download.staticDestinationType != destinationTypeSeekStream {
 		// We only cache streaming chunks since browsers and media players tend
 		// to only request a few kib at once when streaming data. That way we can
 		// prevent scheduling the same chunk for download over and over.
 		return
 	}
-	udc.cacheMu.Lock()
-	defer udc.cacheMu.Unlock()
+	dcc.mu.Lock()
+	defer dcc.mu.Unlock()
 
 	// Prune cache if necessary.
-	for len(udc.downloadChunkCache.chunkCacheMap) >= downloadCacheSize {
+	for len(dcc.chunkCacheMap) >= dcc.cacheSize {
 		// Remove from Heap
-		cd := heap.Pop(&udc.downloadChunkCache.chunkCacheHeap).(*chunkData)
+		cd := heap.Pop(&dcc.chunkCacheHeap).(*chunkData)
 
 		// Remove from Map
-		if _, ok := udc.downloadChunkCache.chunkCacheMap[cd.id]; !ok {
+		if _, ok := dcc.chunkCacheMap[cd.id]; !ok {
 			build.Critical("Cache Data chunk not found in chunkCacheMap.")
 		}
-		delete(udc.downloadChunkCache.chunkCacheMap, cd.id)
+		delete(dcc.chunkCacheMap, cd.id)
 	}
 
 	// Add chunk to Map and Heap
@@ -81,37 +111,38 @@ func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
 		data:       data,
 		lastAccess: time.Now(),
 	}
-	udc.downloadChunkCache.chunkCacheMap[udc.staticCacheID] = cd
-	heap.Push(&udc.downloadChunkCache.chunkCacheHeap, cd)
-	udc.downloadChunkCache.chunkCacheHeap.update(cd, cd.id, cd.data, cd.lastAccess)
+	dcc.chunkCacheMap[udc.staticCacheID] = cd
+	heap.Push(&dcc.chunkCacheHeap, cd)
+	dcc.chunkCacheHeap.update(cd, cd.id, cd.data, cd.lastAccess)
 }
 
-// managedTryCache tries to retrieve the chunk from the renter's cache. If
+// retreive tries to retrieve the chunk from the renter's cache. If
 // successful it will write the data to the destination and stop the download
 // if it was the last missing chunk. The function returns true if the chunk was
 // in the cache.
 // TODO in the future we might need cache invalidation. At the
 // moment this doesn't worry us since our files are static.
-func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
+func (dcc *downloadChunkCache) retreive(udc *unfinishedDownloadChunk) bool {
 	udc.mu.Lock()
 	defer udc.mu.Unlock()
-	r.cmu.Lock()
-	cd, cached := r.downloadChunkCache.chunkCacheMap[udc.staticCacheID]
-	r.cmu.Unlock()
+	dcc.mu.Lock()
+	defer dcc.mu.Unlock()
+
+	cd, cached := dcc.chunkCacheMap[udc.staticCacheID]
 	if !cached {
 		return false
 	}
 
 	// chunk exists, updating lastAccess and reinserting into map, updating heap
 	cd.lastAccess = time.Now()
-	r.downloadChunkCache.chunkCacheMap[udc.staticCacheID] = cd
-	udc.downloadChunkCache.chunkCacheHeap.update(cd, cd.id, cd.data, cd.lastAccess)
+	dcc.chunkCacheMap[udc.staticCacheID] = cd
+	dcc.chunkCacheHeap.update(cd, cd.id, cd.data, cd.lastAccess)
 
 	start := udc.staticFetchOffset
 	end := start + udc.staticFetchLength
 	_, err := udc.destination.WriteAt(cd.data[start:end], udc.staticWriteOffset)
 	if err != nil {
-		r.log.Println("WARN: failed to write cached chunk to destination:", err)
+		// r.log.Println("WARN: failed to write cached chunk to destination:", err)
 		udc.fail(errors.AddContext(err, "failed to write cached chunk to destination"))
 		return true
 	}

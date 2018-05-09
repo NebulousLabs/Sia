@@ -3,12 +3,13 @@ package renter
 import (
 	"container/heap"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 )
 
 // TestAddChunkToCache tests that the oldest chunk is removed
+// TODO: Access modules.RenterSettings
+//    rs := api.renter.Settings()
 func TestAddChunkToCache(t *testing.T) {
 	// Initializing minimum variables
 	udc := &unfinishedDownloadChunk{
@@ -16,8 +17,8 @@ func TestAddChunkToCache(t *testing.T) {
 			staticDestinationType: destinationTypeSeekStream,
 		},
 		downloadChunkCache: new(downloadChunkCache),
-		cacheMu:            new(sync.Mutex),
 	}
+	// TODO: Pass modules.RenterSettings
 	udc.downloadChunkCache.init()
 
 	// Testing Push to Heap
@@ -35,6 +36,7 @@ func TestAddChunkToCache(t *testing.T) {
 	cd := heap.Pop(&udc.downloadChunkCache.chunkCacheHeap).(*chunkData)
 
 	// Fill Cache
+	// TODO: parss modules.TenterSettings into addChunkToCache
 	for i := 0; i < downloadCacheSize; i++ {
 		udc.staticCacheID = strconv.Itoa(i)
 		udc.addChunkToCache([]byte{})
@@ -58,6 +60,7 @@ func TestAddChunkToCache(t *testing.T) {
 	heap.Push(&udc.downloadChunkCache.chunkCacheHeap, cd)
 
 	// Add additional chunk to force deletion of a chunk
+	// TODO: parss modules.TenterSettings into addChunkToCache
 	udc.staticCacheID = strconv.Itoa(downloadCacheSize)
 	udc.addChunkToCache([]byte{})
 

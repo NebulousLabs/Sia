@@ -288,6 +288,7 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 }
 
 // SetSettings will update the settings for the renter.
+// TODO: Add downloadcachesize
 func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	// Set allowance.
 	err := r.hostContractor.SetAllowance(s.Allowance)
@@ -305,6 +306,10 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		// the packetSize using the API. For now the sane default is 16kib if
 		// the user wants to limit the connection.
 		r.hostContractor.SetRateLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed, 4*4096)
+	}
+	// TODO: confirm downloadcachesize is set correctly
+	if s.DownloadCacheSize <= 0 {
+		s.DownloadCacheSize = 2
 	}
 
 	r.managedUpdateWorkerPool()
@@ -444,7 +449,7 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 		mu:                 siasync.New(modules.SafeMutexDelay, 1),
 		tpool:              tpool,
 	}
-	r.downloadChunkCache.init()
+	r.downloadChunkCache.init(RenterSettings.DownloadCacheSize)
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
 	// Load all saved data.

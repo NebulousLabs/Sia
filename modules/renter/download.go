@@ -439,7 +439,6 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 
 			download:           d,
 			downloadChunkCache: r.downloadChunkCache,
-			cacheMu:            r.cmu,
 		}
 
 		// Set the fetchOffset - the offset within the chunk that we start
