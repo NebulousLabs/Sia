@@ -2,6 +2,7 @@ package database
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -51,6 +52,13 @@ type Tx interface {
 	ChangeEntry(id modules.ConsensusChangeID) (ChangeEntry, bool)
 	// AppendChangeEntry appends ce to the list of change entries.
 	AppendChangeEntry(ce ChangeEntry)
+
+	// DifficultyTotals returns the difficulty adjustment parameters for a
+	// given block.
+	DifficultyTotals(id types.BlockID) (totalTime int64, totalTarget types.Target)
+	// SetDifficultyTotals sets the difficulty adjustment parameters for a
+	// given block.
+	SetDifficultyTotals(id types.BlockID, totalTime int64, totalTarget types.Target)
 }
 
 type txWrapper struct {
@@ -229,6 +237,28 @@ func (tx txWrapper) AppendChangeEntry(ce ChangeEntry) {
 
 	// Update the tail ID.
 	err = b.Put(changeLogTailID, ceid[:])
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// DifficultyTotals implements the Tx interface.
+func (tx txWrapper) DifficultyTotals(id types.BlockID) (totalTime int64, totalTarget types.Target) {
+	bytes := tx.Bucket(bucketOak).Get(id[:])
+	if bytes == nil {
+		return 0, types.Target{}
+	}
+	totalTime = int64(binary.LittleEndian.Uint64(bytes[:8]))
+	copy(totalTarget[:], bytes[8:])
+	return
+}
+
+// SetDifficultyTotals implements the Tx interface.
+func (tx txWrapper) SetDifficultyTotals(id types.BlockID, totalTime int64, totalTarget types.Target) {
+	bytes := make([]byte, 40)
+	binary.LittleEndian.PutUint64(bytes[:8], uint64(totalTime))
+	copy(bytes[8:], totalTarget[:])
+	err := tx.Bucket(bucketOak).Put(id[:], bytes)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}

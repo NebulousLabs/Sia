@@ -31,9 +31,7 @@ var (
 
 	// bucketOak is the database bucket that contains all of the fields related
 	// to the oak difficulty adjustment algorithm. The cumulative difficulty and
-	// time values are stored for each block id, and then the key "OakInit"
-	// contains the value "true" if the oak fields have been properly
-	// initialized.
+	// time values are stored for each block id.
 	bucketOak = []byte("Oak")
 
 	// ChangeLog contains a list of atomic changes that have happened to the
@@ -66,18 +64,6 @@ var (
 	siafundPool = []byte("SiafundPool")
 )
 
-var (
-	// fieldOakInit is a field in BucketOak that gets set to "true" after the
-	// oak initialiation process has completed.
-	fieldOakInit = []byte("OakInit")
-)
-
-var (
-	// valueOakInit is the value that the oak init field is set to if the oak
-	// difficulty adjustment fields have been correctly intialized.
-	valueOakInit = []byte("true")
-)
-
 // A DB is a database suitable for storing consensus data.
 type DB interface {
 	Update(func(Tx) error) error
@@ -100,6 +86,7 @@ func Open(filename string) (DB, error) {
 		blockHeight,
 		blockMap,
 		blockPath,
+		bucketOak,
 		changeLog,
 		changeLogTailID,
 		consistency,

@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"bytes"
-	"encoding/binary"
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
@@ -145,10 +143,7 @@ func (cs *ConsensusSet) childTargetOak(parentTotalTime int64, parentTotalTarget,
 // getBlockTotals returns the block totals values that get stored in
 // storeBlockTotals.
 func (cs *ConsensusSet) getBlockTotals(tx database.Tx, id types.BlockID) (totalTime int64, totalTarget types.Target) {
-	totalsBytes := tx.Bucket(BucketOak).Get(id[:])
-	totalTime = int64(binary.LittleEndian.Uint64(totalsBytes[:8]))
-	copy(totalTarget[:], totalsBytes[8:])
-	return
+	return tx.DifficultyTotals(id)
 }
 
 // storeBlockTotals computes the new total time and total target for the current
@@ -182,31 +177,16 @@ func (cs *ConsensusSet) storeBlockTotals(tx database.Tx, currentHeight types.Blo
 
 	// Store the new total time and total target in the database at the
 	// appropriate id.
-	bytes := make([]byte, 40)
-	binary.LittleEndian.PutUint64(bytes[:8], uint64(newTotalTime))
-	copy(bytes[8:], newTotalTarget[:])
-	err = tx.Bucket(BucketOak).Put(currentBlockID[:], bytes)
-	if err != nil {
-		return 0, types.Target{}, errors.Extend(errors.New("unable to store total time values"), err)
-	}
+	tx.SetDifficultyTotals(currentBlockID, newTotalTime, newTotalTarget)
 	return newTotalTime, newTotalTarget, nil
 }
 
 // initOak will initialize all of the oak difficulty adjustment related fields.
 // This is separate from the initialization process for compatibility reasons -
 // some databases will not have these fields at start, so it much be checked.
-//
-// After oak initialization is complete, a specific field in the oak bucket is
-// marked so that oak initialization can be skipped in the future.
 func (cs *ConsensusSet) initOak(tx database.Tx) error {
-	// Prep the oak bucket.
-	bucketOak, err := tx.CreateBucketIfNotExists(BucketOak)
-	if err != nil {
-		return errors.Extend(errors.New("unable to create oak bucket"), err)
-	}
-	// Check whether the init field is set.
-	if bytes.Equal(bucketOak.Get(FieldOakInit), ValueOakInit) {
-		// The oak fields have been initialized, nothing to do.
+	// Check whether oak fields have already been initialized.
+	if _, genesisTarget := tx.DifficultyTotals(types.GenesisID); genesisTarget != (types.Target{}) {
 		return nil
 	}
 
@@ -248,11 +228,5 @@ func (cs *ConsensusSet) initOak(tx database.Tx) error {
 		parentChildTarget = pb.ChildTarget
 	}
 
-	// Tag the initialization field in the oak bucket, indicating that
-	// initialization has completed.
-	err = bucketOak.Put(FieldOakInit, ValueOakInit)
-	if err != nil {
-		return errors.Extend(errors.New("unable to put oak init confirmation into oak bucket"), err)
-	}
 	return nil
 }

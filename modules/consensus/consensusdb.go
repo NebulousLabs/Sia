@@ -25,13 +25,6 @@ var (
 	// consensus set, and blocks that may not have been fully validated yet.
 	BlockMap = []byte("BlockMap")
 
-	// BucketOak is the database bucket that contains all of the fields related
-	// to the oak difficulty adjustment algorithm. The cumulative difficulty and
-	// time values are stored for each block id, and then the key "OakInit"
-	// contains the value "true" if the oak fields have been properly
-	// initialized.
-	BucketOak = []byte("Oak")
-
 	// FileContracts is a database bucket that contains all of the open file
 	// contracts.
 	FileContracts = []byte("FileContracts")
@@ -43,18 +36,6 @@ var (
 	// SiafundOutputs is a database bucket that contains all of the unspent
 	// siafund outputs.
 	SiafundOutputs = []byte("SiafundOutputs")
-)
-
-var (
-	// FieldOakInit is a field in BucketOak that gets set to "true" after the
-	// oak initialiation process has completed.
-	FieldOakInit = []byte("OakInit")
-)
-
-var (
-	// ValueOakInit is the value that the oak init field is set to if the oak
-	// difficulty adjustment fields have been correctly intialized.
-	ValueOakInit = []byte("true")
 )
 
 // createConsensusObjects initialzes the consensus portions of the database.
