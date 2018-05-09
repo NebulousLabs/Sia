@@ -908,6 +908,9 @@ funds // hastings
 hosts
 period      // block height
 renewwindow // block height
+maxdownloadspeed
+maxuploadspeed
+downloadcachesize // Greater than zero
 ```
 
 ###### Response

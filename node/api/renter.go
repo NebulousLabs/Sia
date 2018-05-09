@@ -254,15 +254,13 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 		settings.MaxUploadSpeed = uploadSpeed
 	}
 	// Scan the download cache size. (optional parameter)
-	if dcs := req.FormValue("downloadcachesize"); dc != "" {
-		var downloadCacheSize int
+	if dcs := req.FormValue("downloadcachesize"); dcs != "" {
+		var downloadCacheSize uint64
 		if _, err := fmt.Sscan(dcs, &downloadCacheSize); err != nil {
 			WriteError(w, Error{"unable to parse downloadcachesize: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 		settings.DownloadCacheSize = downloadCacheSize
-	} else {
-		settings.DownloadCacheSize = DefaultDownloadCacheSize
 	}
 	// Set the settings in the renter.
 	err := api.renter.SetSettings(settings)

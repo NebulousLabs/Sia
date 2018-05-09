@@ -129,6 +129,16 @@ period // block height
 // fewer total transaction fees. Storage spending is not affected by the renew
 // window size.
 renewwindow // block height
+
+// Max download speed permitted
+maxdownloadspeed
+
+// Max upload speed permitted
+maxuploadspeed
+
+// Download cache size specifies how many data chunks will be cached while 
+// streaming.  Must be greater than 0
+downloadcachesize
 ```
 
 ###### Response
