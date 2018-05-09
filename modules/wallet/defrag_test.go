@@ -71,7 +71,10 @@ func TestDefragWalletDust(t *testing.T) {
 	dustOutputValue := types.NewCurrency64(10000)
 	noutputs := defragThreshold + 1
 
-	tbuilder := wt.wallet.StartTransaction()
+	tbuilder, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = tbuilder.FundSiacoins(dustOutputValue.Mul64(uint64(noutputs)))
 	if err != nil {
 		t.Fatal(err)
@@ -164,7 +167,11 @@ func TestDefragOutputExhaustion(t *testing.T) {
 				fee := types.SiacoinPrecision.Mul64(10)
 				numOutputs := defragThreshold + 1
 
-				tbuilder := wt.wallet.StartTransaction()
+				tbuilder, err := wt.wallet.StartTransaction()
+				if err != nil {
+					t.Fatal(err)
+				}
+
 				tbuilder.FundSiacoins(txnValue.Mul64(uint64(numOutputs)).Add(fee))
 
 				for i := 0; i < numOutputs; i++ {

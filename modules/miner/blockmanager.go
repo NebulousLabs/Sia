@@ -81,13 +81,17 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	defer m.mu.Unlock()
 
 	// Return a blank header with an error if the wallet is locked.
-	if !m.wallet.Unlocked() {
+	unlocked, err := m.wallet.Unlocked()
+	if err != nil {
+		return types.BlockHeader{}, types.Target{}, err
+	}
+	if !unlocked {
 		return types.BlockHeader{}, types.Target{}, modules.ErrLockedWallet
 	}
 
 	// Check that the wallet has been initialized, and that the miner has
 	// successfully fetched an address.
-	err := m.checkAddress()
+	err = m.checkAddress()
 	if err != nil {
 		return types.BlockHeader{}, types.Target{}, err
 	}

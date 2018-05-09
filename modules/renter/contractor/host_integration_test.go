@@ -32,7 +32,11 @@ func newTestingWallet(testdir string, cs modules.ConsensusSet, tp modules.Transa
 		return nil, err
 	}
 	key := crypto.GenerateTwofishKey()
-	if !w.Encrypted() {
+	encrypted, err := w.Encrypted()
+	if err != nil {
+		return nil, err
+	}
+	if !encrypted {
 		_, err = w.Encrypt(key)
 		if err != nil {
 			return nil, err
@@ -126,7 +130,11 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 		return nil, nil, nil, err
 	}
 	key := crypto.GenerateTwofishKey()
-	if !w.Encrypted() {
+	encrypted, err := w.Encrypted()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if !encrypted {
 		_, err = w.Encrypt(key)
 		if err != nil {
 			return nil, nil, nil, err
@@ -348,12 +356,10 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// renew the contract
-	c.mu.Lock()
-	err = c.updateContractUtility(contract.ID, modules.ContractUtility{GoodForRenew: true})
+	err = c.managedUpdateContractUtility(contract.ID, modules.ContractUtility{GoodForRenew: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.mu.Unlock()
 	oldContract, _ := c.staticContracts.Acquire(contract.ID)
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if err != nil {
@@ -384,12 +390,10 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// renew to a lower height
-	c.mu.Lock()
-	err = c.updateContractUtility(contract.ID, modules.ContractUtility{GoodForRenew: true})
+	err = c.managedUpdateContractUtility(contract.ID, modules.ContractUtility{GoodForRenew: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.mu.Unlock()
 	oldContract, _ = c.staticContracts.Acquire(contract.ID)
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {

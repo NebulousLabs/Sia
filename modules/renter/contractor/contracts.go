@@ -145,9 +145,7 @@ func (c *Contractor) managedMarkContractsUtility() error {
 		}()
 
 		// Apply changes.
-		c.mu.Lock()
-		err := c.updateContractUtility(contract.ID, utility)
-		c.mu.Unlock()
+		err := c.managedUpdateContractUtility(contract.ID, utility)
 		if err != nil {
 			return err
 		}
@@ -185,7 +183,10 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	c.mu.RUnlock()
 
 	// create transaction builder
-	txnBuilder := c.wallet.StartTransaction()
+	txnBuilder, err := c.wallet.StartTransaction()
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
 
 	contract, err := c.staticContracts.FormContract(params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if err != nil {
@@ -241,7 +242,10 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 	c.mu.RUnlock()
 
 	// execute negotiation protocol
-	txnBuilder := c.wallet.StartTransaction()
+	txnBuilder, err := c.wallet.StartTransaction()
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
 	newContract, err := c.staticContracts.Renew(sc, params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
@@ -509,12 +513,11 @@ func (c *Contractor) threadedContractMaintenance() {
 
 			// Update the utility values for the new contract, and for the old
 			// contract.
-			c.mu.Lock()
 			newUtility := modules.ContractUtility{
 				GoodForUpload: true,
 				GoodForRenew:  true,
 			}
-			if err := c.updateContractUtility(newContract.ID, newUtility); err != nil {
+			if err := c.managedUpdateContractUtility(newContract.ID, newUtility); err != nil {
 				c.log.Println("Failed to update the contract utilities", err)
 				return
 			}
@@ -524,7 +527,6 @@ func (c *Contractor) threadedContractMaintenance() {
 				c.log.Println("Failed to update the contract utilities", err)
 				return
 			}
-			c.mu.Unlock()
 			// If the contract is a mid-cycle renew, add the contract line to
 			// the new contract. The contract line is not included/extended if
 			// we are just renewing because the contract is expiring.
@@ -617,8 +619,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		}
 
 		// Add this contract to the contractor and save.
-		c.mu.Lock()
-		err = c.updateContractUtility(newContract.ID, modules.ContractUtility{
+		err = c.managedUpdateContractUtility(newContract.ID, modules.ContractUtility{
 			GoodForUpload: true,
 			GoodForRenew:  true,
 		})
@@ -626,6 +627,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			c.log.Println("Failed to update the contract utilities", err)
 			return
 		}
+		c.mu.Lock()
 		err = c.saveSync()
 		c.mu.Unlock()
 		if err != nil {
@@ -649,9 +651,9 @@ func (c *Contractor) threadedContractMaintenance() {
 	}
 }
 
-// updateContractUtility is a helper function that acquires a contract, updates
+// managedUpdateContractUtility is a helper function that acquires a contract, updates
 // its ContractUtility and returns the contract again.
-func (c *Contractor) updateContractUtility(id types.FileContractID, utility modules.ContractUtility) error {
+func (c *Contractor) managedUpdateContractUtility(id types.FileContractID, utility modules.ContractUtility) error {
 	safeContract, ok := c.staticContracts.Acquire(id)
 	if !ok {
 		return errors.New("failed to acquire contract for update")

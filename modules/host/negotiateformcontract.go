@@ -38,10 +38,17 @@ func (h *Host) managedAddCollateral(settings modules.HostExternalSettings, txnSe
 	parents := txnSet[:len(txnSet)-1]
 	fc := txn.FileContracts[0]
 	hostPortion := contractCollateral(settings, fc)
-	builder = h.wallet.RegisterTransaction(txn, parents)
+	builder, err = h.wallet.RegisterTransaction(txn, parents)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err != nil {
+			builder.Drop()
+		}
+	}()
 	err = builder.FundSiacoins(hostPortion)
 	if err != nil {
-		builder.Drop()
 		return nil, nil, nil, nil, extendErr("could not add collateral: ", ErrorInternal(err.Error()))
 	}
 
