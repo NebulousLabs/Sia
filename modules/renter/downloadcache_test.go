@@ -16,6 +16,7 @@ func TestAdd(t *testing.T) {
 		},
 		downloadChunkCache: new(downloadChunkCache),
 	}
+	// TODO: Pass modules.RenterSettings
 	udc.downloadChunkCache.init()
 
 	// Testing Push to Heap

@@ -254,6 +254,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 		settings.MaxUploadSpeed = uploadSpeed
 	}
 	// Scan the download cache size. (optional parameter)
+<<<<<<< 0ee5798cc36ae3a031a079cc492f9dbb16e434b7
 	if dcs := req.FormValue("downloadcachesize"); dcs != "" {
 		var downloadCacheSize uint64
 		if _, err := fmt.Sscan(dcs, &downloadCacheSize); err != nil {
@@ -261,6 +262,16 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 			return
 		}
 		settings.DownloadCacheSize = downloadCacheSize
+=======
+	if dc := req.FormValue("downloadcachesize"); dc != "" {
+		// TODO: Does this need to be update for downloadcache??
+		// var uploadSpeed int
+		// if _, err := fmt.Sscan(u, &uploadSpeed); err != nil {
+		// 	WriteError(w, Error{"unable to parse uploadspeed: " + err.Error()}, http.StatusBadRequest)
+		// 	return
+		// }
+		settings.DownloadCacheSize = downloadcachesize
+>>>>>>> Change addChunkToCache and manageTryCache methods to add and retreive methods called on the downloadChunkCache
 	}
 	// Set the settings in the renter.
 	err := api.renter.SetSettings(settings)
