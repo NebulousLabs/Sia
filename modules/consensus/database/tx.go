@@ -37,6 +37,14 @@ type Tx interface {
 	BlockHeight() types.BlockHeight
 	// SetBlockHeight sets the height of the blockchain.
 	SetBlockHeight(height types.BlockHeight)
+
+	// PushPath appends a BlockID to the current path.
+	PushPath(id types.BlockID)
+	// PopPath removes the last BlockID in the current path.
+	PopPath()
+	// BlockID returns the ID of the block at the specified height in the
+	// current path.
+	BlockID(height types.BlockHeight) types.BlockID
 }
 
 type txWrapper struct {
@@ -141,6 +149,35 @@ func (tx txWrapper) BlockHeight() types.BlockHeight {
 // SetBlockHeight implements the Tx interface.
 func (tx txWrapper) SetBlockHeight(height types.BlockHeight) {
 	err := tx.Bucket(blockHeight).Put(blockHeight, encoding.Marshal(height))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// BlockID implements the Tx interface.
+func (tx txWrapper) BlockID(height types.BlockHeight) types.BlockID {
+	var id types.BlockID
+	copy(id[:], tx.Bucket(blockPath).Get(encoding.Marshal(height)))
+	return id
+}
+
+// PushPath implements the Tx interface.
+func (tx txWrapper) PushPath(id types.BlockID) {
+	newHeight := tx.BlockHeight() + 1
+	tx.SetBlockHeight(newHeight)
+
+	err := tx.Bucket(blockPath).Put(encoding.Marshal(newHeight), id[:])
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// PopPath implements the Tx interface.
+func (tx txWrapper) PopPath() {
+	oldHeight := tx.BlockHeight()
+	tx.SetBlockHeight(oldHeight - 1)
+
+	err := tx.Bucket(blockPath).Delete(encoding.Marshal(oldHeight))
 	if build.DEBUG && err != nil {
 		panic(err)
 	}

@@ -25,11 +25,6 @@ var (
 	// consensus set, and blocks that may not have been fully validated yet.
 	BlockMap = []byte("BlockMap")
 
-	// BlockPath is a database bucket containing a mapping from the height of a
-	// block to the id of the block at that height. BlockPath only includes
-	// blocks in the current path.
-	BlockPath = []byte("BlockPath")
-
 	// BucketOak is the database bucket that contains all of the fields related
 	// to the oak difficulty adjustment algorithm. The cumulative difficulty and
 	// time values are stored for each block id, and then the key "OakInit"
@@ -160,48 +155,22 @@ func addBlockMap(tx database.Tx, pb *processedBlock) {
 
 // getPath returns the block id at 'height' in the block path.
 func getPath(tx database.Tx, height types.BlockHeight) (id types.BlockID, err error) {
-	idBytes := tx.Bucket(BlockPath).Get(encoding.Marshal(height))
-	if idBytes == nil {
+	id = tx.BlockID(height)
+	if id == (types.BlockID{}) {
 		return types.BlockID{}, errNilItem
-	}
-
-	err = encoding.Unmarshal(idBytes, &id)
-	if build.DEBUG && err != nil {
-		panic(err)
 	}
 	return id, nil
 }
 
 // pushPath adds a block to the BlockPath at current height + 1.
 func pushPath(tx database.Tx, bid types.BlockID) {
-	// Fetch and update the block height.
-	newHeight := tx.BlockHeight() + 1
-	tx.SetBlockHeight(newHeight)
-
-	// Add the block to the block path.
-	newHeightBytes := encoding.Marshal(newHeight)
-	bp := tx.Bucket(BlockPath)
-	err := bp.Put(newHeightBytes, bid[:])
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.PushPath(bid)
 }
 
 // popPath removes a block from the "end" of the chain, i.e. the block
 // with the largest height.
 func popPath(tx database.Tx) {
-	// Fetch and update the block height.
-	oldHeight := tx.BlockHeight()
-	oldHeightBytes := encoding.Marshal(oldHeight)
-	tx.SetBlockHeight(oldHeight - 1)
-
-	// Remove the block from the path - make sure to remove the block at
-	// oldHeight.
-	bp := tx.Bucket(BlockPath)
-	err := bp.Delete(oldHeightBytes)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.PopPath()
 }
 
 // isSiacoinOutput returns true if there is a siacoin output of that id in the
