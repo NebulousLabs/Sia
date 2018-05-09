@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/errors"
 )

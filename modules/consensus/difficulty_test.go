@@ -5,8 +5,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestChildTargetOak checks the childTargetOak function, especially for edge

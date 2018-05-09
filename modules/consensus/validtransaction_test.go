@@ -5,9 +5,9 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
-	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
 
 // TestTryValidTransactionSet submits a valid transaction set to the

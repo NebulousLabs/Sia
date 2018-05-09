@@ -11,10 +11,10 @@ import (
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
-	"github.com/NebulousLabs/Sia/modules/consensus/database"
 
 	"github.com/NebulousLabs/demotemutex"
 )

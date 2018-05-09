@@ -1,8 +1,12 @@
 package database
 
 import (
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/coreos/bbolt"
 )
 
@@ -31,6 +35,15 @@ var (
 	// contains the value "true" if the oak fields have been properly
 	// initialized.
 	bucketOak = []byte("Oak")
+
+	// ChangeLog contains a list of atomic changes that have happened to the
+	// consensus set so that subscribers can subscribe from the most recent
+	// change they have seen.
+	changeLog = []byte("ChangeLog")
+
+	// ChangeLogTailID is a key that points to the id of the current changelog
+	// tail.
+	changeLogTailID = []byte("ChangeLogTailID")
 
 	// consistency is a database bucket with a flag indicating whether
 	// inconsistencies within the database have been detected.
@@ -87,6 +100,8 @@ func Open(filename string) (DB, error) {
 		blockHeight,
 		blockMap,
 		blockPath,
+		changeLog,
+		changeLogTailID,
 		consistency,
 		siacoinOutputs,
 		fileContracts,
@@ -138,4 +153,37 @@ func (w boltWrapper) View(fn func(Tx) error) error {
 
 func (w boltWrapper) Close() error {
 	return w.db.Close()
+}
+
+type (
+	// ChangeEntry records a single atomic change to the consensus set.
+	ChangeEntry struct {
+		RevertedBlocks []types.BlockID
+		AppliedBlocks  []types.BlockID
+	}
+
+	// changeNode contains a change entry and a pointer to the next change
+	// entry, and is the object that gets stored in the database.
+	changeNode struct {
+		Entry ChangeEntry
+		Next  modules.ConsensusChangeID
+	}
+)
+
+// ID returns the id of a change entry.
+func (ce ChangeEntry) ID() modules.ConsensusChangeID {
+	return modules.ConsensusChangeID(crypto.HashObject(ce))
+}
+
+// NextEntry returns the entry after the current entry.
+func (ce *ChangeEntry) NextEntry(tx Tx) (nextEntry ChangeEntry, exists bool) {
+	ceid := ce.ID()
+
+	var cn changeNode
+	err := encoding.Unmarshal(tx.Bucket(changeLog).Get(ceid[:]), &cn)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+
+	return tx.ChangeEntry(cn.Next)
 }

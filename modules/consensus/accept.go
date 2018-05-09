@@ -9,8 +9,8 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/coreos/bbolt"
 )
@@ -148,7 +148,7 @@ func (cs *ConsensusSet) validateHeader(tx database.Tx, h types.BlockHeader) erro
 // on the block. Such errors are handled outside of the transaction by the
 // caller. Switching to a managed tx through bolt will make this complexity
 // unneeded.
-func (cs *ConsensusSet) addBlockToTree(tx database.Tx, b types.Block, parent *processedBlock) (ce changeEntry, err error) {
+func (cs *ConsensusSet) addBlockToTree(tx database.Tx, b types.Block, parent *processedBlock) (ce database.ChangeEntry, err error) {
 	// Prepare the child processed block associated with the parent block.
 	newNode := cs.newChild(tx, parent, b)
 
@@ -157,7 +157,7 @@ func (cs *ConsensusSet) addBlockToTree(tx database.Tx, b types.Block, parent *pr
 	// blockchain.
 	currentNode := currentProcessedBlock(tx)
 	if !newNode.heavierThan(currentNode) {
-		return changeEntry{}, modules.ErrNonExtendingBlock
+		return database.ChangeEntry{}, modules.ErrNonExtendingBlock
 	}
 
 	// Fork the blockchain and put the new heaviest block at the tip of the
@@ -165,7 +165,7 @@ func (cs *ConsensusSet) addBlockToTree(tx database.Tx, b types.Block, parent *pr
 	var revertedBlocks, appliedBlocks []*processedBlock
 	revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, newNode)
 	if err != nil {
-		return changeEntry{}, err
+		return database.ChangeEntry{}, err
 	}
 	for _, rn := range revertedBlocks {
 		ce.RevertedBlocks = append(ce.RevertedBlocks, rn.Block.ID())
@@ -175,7 +175,7 @@ func (cs *ConsensusSet) addBlockToTree(tx database.Tx, b types.Block, parent *pr
 	}
 	err = appendChangeLog(tx, ce)
 	if err != nil {
-		return changeEntry{}, err
+		return database.ChangeEntry{}, err
 	}
 	return ce, nil
 }
@@ -241,7 +241,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 	// Verify the headers for every block, throw out known blocks, and the
 	// invalid blocks (which includes the children of invalid blocks).
 	chainExtended := false
-	changes := make([]changeEntry, 0, len(blocks))
+	changes := make([]database.ChangeEntry, 0, len(blocks))
 	setErr := cs.db.Update(func(tx database.Tx) error {
 		cs.log.Printf("accept: starting block processing loop (%v blocks, height %v)", len(blocks), blockHeight(tx))
 		for i := 0; i < len(blocks); i++ {

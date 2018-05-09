@@ -8,8 +8,8 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
+	"github.com/NebulousLabs/Sia/persist"
 )
 
 const (

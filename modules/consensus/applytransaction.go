@@ -6,8 +6,8 @@ package consensus
 import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and

@@ -5,8 +5,8 @@ package consensus
 
 import (
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // dbBlockHeight is a convenience function allowing blockHeight to be called
