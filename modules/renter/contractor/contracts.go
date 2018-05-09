@@ -185,7 +185,10 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	c.mu.RUnlock()
 
 	// create transaction builder
-	txnBuilder := c.wallet.StartTransaction()
+	txnBuilder, err := c.wallet.StartTransaction()
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
 
 	contract, err := c.staticContracts.FormContract(params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if err != nil {
@@ -241,7 +244,10 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 	c.mu.RUnlock()
 
 	// execute negotiation protocol
-	txnBuilder := c.wallet.StartTransaction()
+	txnBuilder, err := c.wallet.StartTransaction()
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
 	newContract, err := c.staticContracts.Renew(sc, params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet

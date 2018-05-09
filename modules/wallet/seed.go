@@ -405,7 +405,11 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		var txnCoins, txnFunds types.Currency
 
 		// construct a transaction that spends the outputs
-		tb := w.StartTransaction()
+		tb, err := w.StartTransaction()
+		if err != nil {
+			return types.ZeroCurrency, types.ZeroCurrency, err
+		}
+
 		var sweptCoins, sweptFunds types.Currency // total values of swept outputs
 		for _, output := range txnSiacoinOutputs {
 			// construct a siacoin input that spends the output
@@ -512,7 +516,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		// submit the transactions
 		err = w.tpool.AcceptTransactionSet(txnSet)
 		if err != nil {
-			return
+			return types.ZeroCurrency, types.ZeroCurrency, err
 		}
 
 		w.log.Println("Creating a transaction set to sweep a seed, IDs:")

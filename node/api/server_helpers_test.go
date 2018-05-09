@@ -73,7 +73,7 @@ func (srv *Server) Close() error {
 	for _, mod := range mods {
 		if mod.c != nil {
 			if closeErr := mod.c.Close(); closeErr != nil {
-				err = errors.Extend(err, fmt.Errorf("%v.Close failed: %v", mod.name, err))
+				err = errors.Extend(err, fmt.Errorf("%v.Close failed: %v", mod.name, closeErr))
 			}
 		}
 	}
@@ -165,7 +165,11 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	if err != nil {
 		return nil, err
 	}
-	if !w.Encrypted() {
+	encrypted, err := w.Encrypted()
+	if err != nil {
+		return nil, err
+	}
+	if !encrypted {
 		_, err = w.Encrypt(key)
 		if err != nil {
 			return nil, err
@@ -245,7 +249,11 @@ func assembleAuthenticatedServerTester(requiredPassword string, key crypto.Twofi
 	if err != nil {
 		return nil, err
 	}
-	if !w.Encrypted() {
+	encrypted, err := w.Encrypted()
+	if err != nil {
+		return nil, err
+	}
+	if !encrypted {
 		_, err = w.Encrypt(key)
 		if err != nil {
 			return nil, err

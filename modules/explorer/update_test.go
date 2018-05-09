@@ -51,7 +51,10 @@ func TestIntegrationExplorerFileContractMetrics(t *testing.T) {
 
 	// Put a file contract into the chain, and check that the explorer
 	// correctly does all of the counting.
-	builder := et.wallet.StartTransaction()
+	builder, err := et.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	builder.FundSiacoins(types.NewCurrency64(5e9))
 	fcOutputs := []types.SiacoinOutput{{Value: types.NewCurrency64(4805e6)}}
 	fc := types.FileContract{
@@ -102,7 +105,10 @@ func TestIntegrationExplorerFileContractMetrics(t *testing.T) {
 
 	// Put a second file into the explorer to check that multiple files are
 	// handled well.
-	builder = et.wallet.StartTransaction()
+	builder, err = et.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	builder.FundSiacoins(types.NewCurrency64(1e9))
 	fcOutputs = []types.SiacoinOutput{{Value: types.NewCurrency64(961e6)}}
 	fc = types.FileContract{

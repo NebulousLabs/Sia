@@ -504,7 +504,10 @@ func TestIntegrationDoSBlockHandling(t *testing.T) {
 
 	// Mine a block that is valid except for containing a buried invalid
 	// transaction. The transaction has more siacoin inputs than outputs.
-	txnBuilder := cst.wallet.StartTransaction()
+	txnBuilder, err := cst.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = txnBuilder.FundSiacoins(types.NewCurrency64(50))
 	if err != nil {
 		t.Fatal(err)
@@ -794,7 +797,10 @@ func TestBuriedBadTransaction(t *testing.T) {
 
 	// Create a good transaction using the wallet.
 	txnValue := types.NewCurrency64(1200)
-	txnBuilder := cst.wallet.StartTransaction()
+	txnBuilder, err := cst.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = txnBuilder.FundSiacoins(txnValue)
 	if err != nil {
 		t.Fatal(err)
@@ -890,7 +896,10 @@ func TestTaxHardfork(t *testing.T) {
 	}
 
 	// Create and fund a transaction with a file contract.
-	txnBuilder := cst.wallet.StartTransaction()
+	txnBuilder, err := cst.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = txnBuilder.FundSiacoins(payout)
 	if err != nil {
 		t.Fatal(err)
@@ -937,7 +946,10 @@ func TestTaxHardfork(t *testing.T) {
 		NewValidProofOutputs:  fc.ValidProofOutputs,
 		NewMissedProofOutputs: fc.MissedProofOutputs,
 	}
-	txnBuilder = cst.wallet.StartTransaction()
+	txnBuilder, err = cst.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	txnBuilder.AddFileContractRevision(fcr)
 	txnSet, err = txnBuilder.Sign(true)
 	if err != nil {

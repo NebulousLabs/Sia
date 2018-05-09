@@ -180,7 +180,10 @@ type Host struct {
 // from the wallet. That may fail due to the wallet being locked, in which case
 // an error is returned.
 func (h *Host) checkUnlockHash() error {
-	addrs := h.wallet.AllAddresses()
+	addrs, err := h.wallet.AllAddresses()
+	if err != nil {
+		return err
+	}
 	hasAddr := false
 	for _, addr := range addrs {
 		if h.unlockHash == addr {
