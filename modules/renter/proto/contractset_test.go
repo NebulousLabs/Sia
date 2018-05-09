@@ -26,6 +26,9 @@ func (cs *ContractSet) mustAcquire(t *testing.T, id types.FileContractID) *SafeC
 
 // TestContractSet tests that the ContractSet type is safe for concurrent use.
 func TestContractSet(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// create contract set
 	testDir := build.TempDir(t.Name())
 	cs, err := NewContractSet(testDir, modules.ProdDependencies)
