@@ -219,7 +219,7 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	recoveredData := recoverWriter.Bytes()
 
 	// Add the chunk to the cache.
-	udc.downloadChunkCache.add(recoveredData, udc)
+	udc.downloadChunkCache.add(recoveredData, udc.staticCacheID, udc.download.staticDestinationType)
 
 	// Write the bytes to the requested output.
 	start := udc.staticFetchOffset

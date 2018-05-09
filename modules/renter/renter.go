@@ -288,7 +288,6 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 }
 
 // SetSettings will update the settings for the renter.
-// TODO: Add downloadcachesize
 func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	// Set allowance.
 	err := r.hostContractor.SetAllowance(s.Allowance)

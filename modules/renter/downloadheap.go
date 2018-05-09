@@ -196,7 +196,7 @@ LOOP:
 			}
 
 			// Check if we got the chunk cached already.
-			if r.downloadChunkCache.retreive(nextChunk) {
+			if r.downloadChunkCache.retrieve(nextChunk) {
 				continue
 			}
 

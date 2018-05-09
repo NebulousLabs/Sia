@@ -75,8 +75,8 @@ func (cch *chunkCacheHeap) update(cd *chunkData, id string, data []byte, lastAcc
 // add adds the chunk to the cache if the download is a streaming
 // endpoint download.
 // TODO this won't be necessary anymore once we have partial downloads.
-func (dcc *downloadChunkCache) add(data []byte, udc *unfinishedDownloadChunk) {
-	if udc.download.staticDestinationType != destinationTypeSeekStream {
+func (dcc *downloadChunkCache) add(data []byte, cacheID string, destinationType string) {
+	if destinationType != destinationTypeSeekStream {
 		// We only cache streaming chunks since browsers and media players tend
 		// to only request a few kib at once when streaming data. That way we can
 		// prevent scheduling the same chunk for download over and over.
@@ -99,11 +99,11 @@ func (dcc *downloadChunkCache) add(data []byte, udc *unfinishedDownloadChunk) {
 
 	// Add chunk to Map and Heap
 	cd := &chunkData{
-		id:         udc.staticCacheID,
+		id:         cacheID,
 		data:       data,
 		lastAccess: time.Now(),
 	}
-	dcc.chunkCacheMap[udc.staticCacheID] = cd
+	dcc.chunkCacheMap[cacheID] = cd
 	heap.Push(&dcc.chunkCacheHeap, cd)
 	dcc.chunkCacheHeap.update(cd, cd.id, cd.data, cd.lastAccess)
 }
@@ -116,13 +116,16 @@ func (dcc *downloadChunkCache) init() {
 	heap.Init(&dcc.chunkCacheHeap)
 }
 
-// retreive tries to retrieve the chunk from the renter's cache. If
+// retrieve tries to retrieve the chunk from the renter's cache. If
 // successful it will write the data to the destination and stop the download
 // if it was the last missing chunk. The function returns true if the chunk was
 // in the cache.
-// TODO in the future we might need cache invalidation. At the
+// Using the entire unfisihedDownloadChunk as the argument as there are seven different fields
+// used from unfinishedDownloadChunk and it allows using udc.fail()
+//
+// TODO: in the future we might need cache invalidation. At the
 // moment this doesn't worry us since our files are static.
-func (dcc *downloadChunkCache) retreive(udc *unfinishedDownloadChunk) bool {
+func (dcc *downloadChunkCache) retrieve(udc *unfinishedDownloadChunk) bool {
 	udc.mu.Lock()
 	defer udc.mu.Unlock()
 	dcc.mu.Lock()
@@ -142,7 +145,6 @@ func (dcc *downloadChunkCache) retreive(udc *unfinishedDownloadChunk) bool {
 	end := start + udc.staticFetchLength
 	_, err := udc.destination.WriteAt(cd.data[start:end], udc.staticWriteOffset)
 	if err != nil {
-		// r.log.Println("WARN: failed to write cached chunk to destination:", err)
 		udc.fail(errors.AddContext(err, "failed to write cached chunk to destination"))
 		return true
 	}

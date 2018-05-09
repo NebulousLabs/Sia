@@ -36,7 +36,7 @@ func TestAdd(t *testing.T) {
 	// Fill Cache
 	for i := 0; i < int(udc.downloadChunkCache.cacheSize); i++ {
 		udc.staticCacheID = strconv.Itoa(i)
-		udc.downloadChunkCache.add([]byte{}, udc)
+		udc.downloadChunkCache.add([]byte{}, udc.staticCacheID, udc.download.staticDestinationType)
 		time.Sleep(1 * time.Millisecond)
 	}
 
@@ -58,7 +58,7 @@ func TestAdd(t *testing.T) {
 
 	// Add additional chunk to force deletion of a chunk
 	udc.staticCacheID = strconv.FormatUint(udc.downloadChunkCache.cacheSize, 10)
-	udc.downloadChunkCache.add([]byte{}, udc)
+	udc.downloadChunkCache.add([]byte{}, udc.staticCacheID, udc.download.staticDestinationType)
 
 	// check if the chunk was removed from Map
 	if _, ok := udc.downloadChunkCache.chunkCacheMap[cd.id]; ok {
