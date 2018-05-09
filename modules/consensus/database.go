@@ -54,10 +54,9 @@ func (cs *ConsensusSet) openDB(filename string) (err error) {
 // database with all the required buckets and sane initial values.
 func (cs *ConsensusSet) initDB(tx database.Tx) error {
 	// If the database has already been initialized, there is nothing to do.
-	// Initialization can be detected by looking for the presence of the siafund
-	// pool bucket. (legacy design chioce - ultimately probably not the best way
-	// ot tell).
-	if tx.Bucket([]byte("SiafundPool")) != nil {
+	// Initialization can be detected by looking for the genesis entry in the
+	// change log.
+	if _, exists := tx.ChangeEntry(cs.genesisEntry().ID()); exists {
 		return nil
 	}
 
