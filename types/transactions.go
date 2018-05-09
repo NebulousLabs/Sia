@@ -81,7 +81,6 @@ type (
 	// but transactions cannot spend outputs that they create or otherwise be
 	// self-dependent.
 	Transaction struct {
-		TransactionID         TransactionID          `json:"transactionid"`
 		SiacoinInputs         []SiacoinInput         `json:"siacoininputs"`
 		SiacoinOutputs        []SiacoinOutput        `json:"siacoinoutputs"`
 		FileContracts         []FileContract         `json:"filecontracts"`
@@ -109,7 +108,6 @@ type (
 	// UnlockHash is the hash of the UnlockConditions that must be fulfilled
 	// in order to spend the output.
 	SiacoinOutput struct {
-		SiaCoinOutputID SiacoinOutputID 	`json:"siacoinoutputid"`
 		Value           Currency   			`json:"value"`
 		UnlockHash      UnlockHash 			`json:"unlockhash"`
 	}
