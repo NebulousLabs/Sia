@@ -307,10 +307,6 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		// the user wants to limit the connection.
 		r.hostContractor.SetRateLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed, 4*4096)
 	}
-	// TODO: confirm downloadcachesize is set correctly
-	if s.DownloadCacheSize <= 0 {
-		s.DownloadCacheSize = 2
-	}
 
 	r.setStreamingCacheSize(s.DownloadCacheSize)
 	r.managedUpdateWorkerPool()
