@@ -3,6 +3,7 @@ package database
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -26,6 +27,11 @@ type Tx interface {
 	// All consensus sets with the same current block should have identical
 	// consensus checksums.
 	ConsensusChecksum() crypto.Hash
+
+	// CheckCurrencyCounts returns an error if the sum of siacoin outputs,
+	// siafund outputs, and delayed siacoin outputs does not match expected
+	// values.
+	CheckCurrencyCounts() error
 
 	// MarkInconsistent marks the database as inconsistent.
 	MarkInconsistent()
@@ -65,16 +71,6 @@ type txWrapper struct {
 	*bolt.Tx
 }
 
-// manageErr handles an error detected by the consistency checks.
-func manageErr(tx Tx, err error) {
-	tx.MarkInconsistent()
-	if build.DEBUG {
-		panic(err)
-	} else {
-		fmt.Println(err)
-	}
-}
-
 // ConsensusChecksum implements the Tx interface.
 func (tx txWrapper) ConsensusChecksum() crypto.Hash {
 	// Create a checksum tree.
@@ -95,8 +91,8 @@ func (tx txWrapper) ConsensusChecksum() crypto.Hash {
 			tree.Push(v)
 			return nil
 		})
-		if err != nil {
-			manageErr(tx, err)
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
 	}
 
@@ -117,8 +113,8 @@ func (tx txWrapper) ConsensusChecksum() crypto.Hash {
 			return nil
 		})
 	})
-	if err != nil {
-		manageErr(tx, err)
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
 
 	return tree.Root()
@@ -262,4 +258,220 @@ func (tx txWrapper) SetDifficultyTotals(id types.BlockID, totalTime int64, total
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
+}
+
+// CheckCurrencyCounts implements the Tx interface.
+func (tx txWrapper) CheckCurrencyCounts() error {
+	if err := tx.checkSiacoinsCount(); err != nil {
+		return err
+	}
+	if err := tx.checkSiafundsCount(); err != nil {
+		return err
+	}
+	if err := tx.checkDSCOsCount(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkSiacoinCount checks that the number of siacoins countable within the
+// consensus set equal the expected number of siacoins for the block height.
+func (tx txWrapper) checkSiacoinsCount() error {
+	// Iterate through all the buckets looking for the delayed siacoin output
+	// buckets.
+	var dscoSiacoins types.Currency
+	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+		// Check if the bucket is a delayed siacoin output bucket.
+		if !bytes.HasPrefix(name, prefixDSCO) {
+			return nil
+		}
+
+		// Sum up the delayed outputs in this bucket.
+		err := b.ForEach(func(_, delayedOutput []byte) error {
+			var sco types.SiacoinOutput
+			err := encoding.Unmarshal(delayedOutput, &sco)
+			if err != nil {
+				return err
+			}
+			dscoSiacoins = dscoSiacoins.Add(sco.Value)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Add all of the siacoin outputs.
+	var scoSiacoins types.Currency
+	err = tx.Bucket(siacoinOutputs).ForEach(func(_, scoBytes []byte) error {
+		var sco types.SiacoinOutput
+		err := encoding.Unmarshal(scoBytes, &sco)
+		if err != nil {
+			return err
+		}
+		scoSiacoins = scoSiacoins.Add(sco.Value)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Add all of the payouts from file contracts.
+	var fcSiacoins types.Currency
+	err = tx.Bucket(fileContracts).ForEach(func(_, fcBytes []byte) error {
+		var fc types.FileContract
+		err := encoding.Unmarshal(fcBytes, &fc)
+		if err != nil {
+			return err
+		}
+		var fcCoins types.Currency
+		for _, output := range fc.ValidProofOutputs {
+			fcCoins = fcCoins.Add(output.Value)
+		}
+		fcSiacoins = fcSiacoins.Add(fcCoins)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Add all of the siafund claims.
+	pool := tx.SiafundPool()
+	var claimSiacoins types.Currency
+	err = tx.Bucket(siafundOutputs).ForEach(func(_, sfoBytes []byte) error {
+		var sfo types.SiafundOutput
+		err := encoding.Unmarshal(sfoBytes, &sfo)
+		if err != nil {
+			return err
+		}
+
+		coinsPerFund := pool.Sub(sfo.ClaimStart)
+		claimCoins := coinsPerFund.Mul(sfo.Value).Div(types.SiafundCount)
+		claimSiacoins = claimSiacoins.Add(claimCoins)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	expectedSiacoins := types.CalculateNumSiacoins(tx.BlockHeight())
+	totalSiacoins := dscoSiacoins.Add(scoSiacoins).Add(fcSiacoins).Add(claimSiacoins)
+	if !totalSiacoins.Equals(expectedSiacoins) {
+		diagnostics := fmt.Sprintf("Wrong number of siacoins\nDsco: %v\nSco: %v\nFc: %v\nClaim: %v\n", dscoSiacoins, scoSiacoins, fcSiacoins, claimSiacoins)
+		if totalSiacoins.Cmp(expectedSiacoins) < 0 {
+			diagnostics += fmt.Sprintf("total: %v\nexpected: %v\n expected is bigger: %v", totalSiacoins, expectedSiacoins, expectedSiacoins.Sub(totalSiacoins))
+		} else {
+			diagnostics += fmt.Sprintf("total: %v\nexpected: %v\n expected is bigger: %v", totalSiacoins, expectedSiacoins, totalSiacoins.Sub(expectedSiacoins))
+		}
+		return errors.New(diagnostics)
+	}
+
+	return nil
+}
+
+// checkSiafundsCount checks that the number of siafunds countable within the
+// consensus set equal the expected number of siafunds for the block height.
+func (tx txWrapper) checkSiafundsCount() error {
+	var total types.Currency
+	err := tx.Bucket(siafundOutputs).ForEach(func(_, siafundOutputBytes []byte) error {
+		var sfo types.SiafundOutput
+		if err := encoding.Unmarshal(siafundOutputBytes, &sfo); err != nil {
+			return err
+		}
+		total = total.Add(sfo.Value)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if !total.Equals(types.SiafundCount) {
+		return errors.New("wrong number of siafunds in the consensus set")
+	}
+	return nil
+}
+
+// checkDSCOsCount scans the sets of delayed siacoin outputs and checks for
+// consistency.
+func (tx txWrapper) checkDSCOsCount() error {
+	// Create a map to track which delayed siacoin output maps exist, and
+	// another map to track which ids have appeared in the dsco set.
+	dscoTracker := make(map[types.BlockHeight]struct{})
+	idMap := make(map[types.SiacoinOutputID]struct{})
+
+	// Iterate through all the buckets looking for the delayed siacoin output
+	// buckets, and check that they are for the correct heights.
+	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+		// If the bucket is not a delayed siacoin output bucket or a file
+		// contract expiration bucket, skip.
+		if !bytes.HasPrefix(name, prefixDSCO) {
+			return nil
+		}
+
+		// Add the bucket to the dscoTracker.
+		var height types.BlockHeight
+		if err := encoding.Unmarshal(name[len(prefixDSCO):], &height); err != nil {
+			return err
+		}
+		_, exists := dscoTracker[height]
+		if exists {
+			return errors.New("repeat dsco map")
+		}
+		dscoTracker[height] = struct{}{}
+
+		var total types.Currency
+		err := b.ForEach(func(idBytes, delayedOutput []byte) error {
+			// Check that the output id has not appeared in another dsco.
+			var id types.SiacoinOutputID
+			copy(id[:], idBytes)
+			_, exists := idMap[id]
+			if exists {
+				return errors.New("repeat delayed siacoin output")
+			}
+			idMap[id] = struct{}{}
+
+			// Sum the funds in the bucket.
+			var sco types.SiacoinOutput
+			if err := encoding.Unmarshal(delayedOutput, &sco); err != nil {
+				return err
+			}
+			total = total.Add(sco.Value)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		// Check that the minimum value has been achieved - the coinbase from
+		// an earlier block is guaranteed to be in the bucket.
+		minimumValue := types.CalculateCoinbase(height - types.MaturityDelay)
+		if total.Cmp(minimumValue) < 0 {
+			return errors.New("total number of coins in the delayed output bucket is incorrect")
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Check that all of the correct heights are represented.
+	currentHeight := tx.BlockHeight()
+	expectedBuckets := 0
+	for i := currentHeight + 1; i <= currentHeight+types.MaturityDelay; i++ {
+		if i < types.MaturityDelay {
+			continue
+		}
+		_, exists := dscoTracker[i]
+		if !exists {
+			return errors.New("missing a dsco bucket")
+		}
+		expectedBuckets++
+	}
+	if len(dscoTracker) != expectedBuckets {
+		return errors.New("too many dsco buckets")
+	}
+	return nil
 }
