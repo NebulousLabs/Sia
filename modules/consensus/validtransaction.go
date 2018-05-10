@@ -6,7 +6,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
 	"github.com/NebulousLabs/Sia/types"
@@ -29,21 +28,15 @@ var (
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
 func validSiacoins(tx database.Tx, t types.Transaction) error {
-	scoBucket := tx.Bucket(SiacoinOutputs)
 	var inputSum types.Currency
 	for _, sci := range t.SiacoinInputs {
 		// Check that the input spends an existing output.
-		scoBytes := scoBucket.Get(sci.ParentID[:])
-		if scoBytes == nil {
+		sco, err := getSiacoinOutput(tx, sci.ParentID)
+		if err != nil {
 			return errMissingSiacoinOutput
 		}
 
 		// Check that the unlock conditions match the required unlock hash.
-		var sco types.SiacoinOutput
-		err := encoding.Unmarshal(scoBytes, &sco)
-		if build.DEBUG && err != nil {
-			panic(err)
-		}
 		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
 			return errWrongUnlockConditions
 		}

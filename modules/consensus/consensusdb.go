@@ -23,10 +23,6 @@ var (
 	// keyed by their id. This includes blocks that are not currently in the
 	// consensus set, and blocks that may not have been fully validated yet.
 	BlockMap = []byte("BlockMap")
-
-	// SiacoinOutputs is a database bucket that contains all of the unspent
-	// siacoin outputs.
-	SiacoinOutputs = []byte("SiacoinOutputs")
 )
 
 // createConsensusObjects initialzes the consensus portions of the database.
@@ -148,22 +144,16 @@ func popPath(tx database.Tx) {
 // isSiacoinOutput returns true if there is a siacoin output of that id in the
 // database.
 func isSiacoinOutput(tx database.Tx, id types.SiacoinOutputID) bool {
-	bucket := tx.Bucket(SiacoinOutputs)
-	sco := bucket.Get(id[:])
-	return sco != nil
+	_, exists := tx.SiacoinOutput(id)
+	return exists
 }
 
 // getSiacoinOutput fetches a siacoin output from the database. An error is
 // returned if the siacoin output does not exist.
 func getSiacoinOutput(tx database.Tx, id types.SiacoinOutputID) (types.SiacoinOutput, error) {
-	scoBytes := tx.Bucket(SiacoinOutputs).Get(id[:])
-	if scoBytes == nil {
+	sco, exists := tx.SiacoinOutput(id)
+	if !exists {
 		return types.SiacoinOutput{}, errNilItem
-	}
-	var sco types.SiacoinOutput
-	err := encoding.Unmarshal(scoBytes, &sco)
-	if err != nil {
-		return types.SiacoinOutput{}, err
 	}
 	return sco, nil
 }
@@ -180,29 +170,25 @@ func addSiacoinOutput(tx database.Tx, id types.SiacoinOutputID, sco types.Siacoi
 			panic("discovered a zero value siacoin output")
 		}
 	*/
-	siacoinOutputs := tx.Bucket(SiacoinOutputs)
-	// Sanity check - should not be adding an item that exists.
-	if build.DEBUG && siacoinOutputs.Get(id[:]) != nil {
-		panic("repeat siacoin output")
+	if build.DEBUG {
+		// Sanity check - should not be adding an item that exists.
+		if _, exists := tx.SiacoinOutput(id); exists {
+			panic("repeat siacoin output")
+		}
 	}
-	err := siacoinOutputs.Put(id[:], encoding.Marshal(sco))
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.AddSiacoinOutput(id, sco)
 }
 
 // removeSiacoinOutput removes a siacoin output from the database. An error is
 // returned if the siacoin output is not in the database prior to removal.
 func removeSiacoinOutput(tx database.Tx, id types.SiacoinOutputID) {
-	scoBucket := tx.Bucket(SiacoinOutputs)
-	// Sanity check - should not be removing an item that is not in the db.
-	if build.DEBUG && scoBucket.Get(id[:]) == nil {
-		panic("nil siacoin output")
+	if build.DEBUG {
+		// Sanity check - should not be removing an item that is not in the db.
+		if _, exists := tx.SiacoinOutput(id); !exists {
+			panic("nil siacoin output")
+		}
 	}
-	err := scoBucket.Delete(id[:])
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.DeleteSiacoinOutput(id)
 }
 
 // getFileContract fetches a file contract from the database, returning an
@@ -311,9 +297,11 @@ func addDSCO(tx database.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco
 			panic("zero-value dsco being added")
 		}
 	*/
-	// Sanity check - output should not already be in the full set of outputs.
-	if build.DEBUG && tx.Bucket(SiacoinOutputs).Get(id[:]) != nil {
-		panic("dsco already in output set")
+	if build.DEBUG {
+		// Sanity check - output should not already be in the full set of outputs.
+		if _, exists := tx.SiacoinOutput(id); exists {
+			panic("dsco already in output set")
+		}
 	}
 	dscoBucketID := append(prefixDSCO, encoding.EncUint64(uint64(bh))...)
 	dscoBucket := tx.Bucket(dscoBucketID)

@@ -77,6 +77,14 @@ type Tx interface {
 	// DeleteFileContract removes a file contract from the database.
 	DeleteFileContract(id types.FileContractID)
 
+	// SiacoinOutput returns the siacoin output with the specified id, or
+	// false if the output is not present in the database.
+	SiacoinOutput(id types.SiacoinOutputID) (types.SiacoinOutput, bool)
+	// AddSiacoinOutput adds a siacoin output to the database.
+	AddSiacoinOutput(id types.SiacoinOutputID, sfo types.SiacoinOutput)
+	// DeleteSiacoinOutput removes a siacoin output from the database.
+	DeleteSiacoinOutput(id types.SiacoinOutputID)
+
 	// SiafundOutput returns the siafund output with the specified id, or
 	// false if the output is not present in the database.
 	SiafundOutput(id types.SiafundOutputID) (types.SiafundOutput, bool)
@@ -354,6 +362,36 @@ func (tx txWrapper) DeleteFileContract(id types.FileContractID) {
 	// Delete expiration bucket if it is empty
 	if b.Stats().KeyN == 0 {
 		tx.DeleteBucket(expirationBucketID)
+	}
+}
+
+// SiacoinOutput implements the Tx interface.
+func (tx txWrapper) SiacoinOutput(id types.SiacoinOutputID) (types.SiacoinOutput, bool) {
+	sfoBytes := tx.Bucket(siacoinOutputs).Get(id[:])
+	if sfoBytes == nil {
+		return types.SiacoinOutput{}, false
+	}
+	var sfo types.SiacoinOutput
+	err := encoding.Unmarshal(sfoBytes, &sfo)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return sfo, true
+}
+
+// AddSiacoinOutput implements the Tx interface.
+func (tx txWrapper) AddSiacoinOutput(id types.SiacoinOutputID, sfo types.SiacoinOutput) {
+	err := tx.Bucket(siacoinOutputs).Put(id[:], encoding.Marshal(sfo))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// DeleteSiacoinOutput implements the Tx interface.
+func (tx txWrapper) DeleteSiacoinOutput(id types.SiacoinOutputID) {
+	err := tx.Bucket(siacoinOutputs).Delete(id[:])
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
 }
 

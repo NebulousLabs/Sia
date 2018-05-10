@@ -86,24 +86,6 @@ func (cs *ConsensusSet) dbGetSiacoinOutput(id types.SiacoinOutputID) (sco types.
 	return sco, err
 }
 
-// getArbSiacoinOutput is a convenience function fetching a single random
-// siacoin output from the database.
-func (cs *ConsensusSet) getArbSiacoinOutput() (scoid types.SiacoinOutputID, sco types.SiacoinOutput, err error) {
-	dbErr := cs.db.View(func(tx database.Tx) error {
-		cursor := tx.Bucket(SiacoinOutputs).Cursor()
-		scoidBytes, scoBytes := cursor.First()
-		copy(scoid[:], scoidBytes)
-		return encoding.Unmarshal(scoBytes, &sco)
-	})
-	if dbErr != nil {
-		panic(dbErr)
-	}
-	if err != nil {
-		return types.SiacoinOutputID{}, types.SiacoinOutput{}, err
-	}
-	return scoid, sco, nil
-}
-
 // dbGetFileContract is a convenience function allowing getFileContract to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetFileContract(id types.FileContractID) (fc types.FileContract, err error) {

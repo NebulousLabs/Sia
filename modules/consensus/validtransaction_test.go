@@ -347,10 +347,12 @@ func TestValidSiacoins(t *testing.T) {
 	}
 
 	// Create a transaction with invalid unlock conditions.
-	scoid, _, err := cst.cs.getArbSiacoinOutput()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var scoid types.SiacoinOutputID
+	fastrand.Read(scoid[:])
+	cst.cs.db.Update(func(tx database.Tx) error {
+		tx.AddSiacoinOutput(scoid, types.SiacoinOutput{})
+		return nil
+	})
 	txn = types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
 			ParentID: scoid,
