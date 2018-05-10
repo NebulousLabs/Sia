@@ -76,6 +76,14 @@ type Tx interface {
 	AddFileContract(id types.FileContractID, fc types.FileContract)
 	// DeleteFileContract removes a file contract from the database.
 	DeleteFileContract(id types.FileContractID)
+
+	// SiafundOutput returns the siafund output with the specified id, or
+	// false if the output is not present in the database.
+	SiafundOutput(id types.SiafundOutputID) (types.SiafundOutput, bool)
+	// AddSiafundOutput adds a siafund output to the database.
+	AddSiafundOutput(id types.SiafundOutputID, sfo types.SiafundOutput)
+	// DeleteSiafundOutput removes a siafund output from the database.
+	DeleteSiafundOutput(id types.SiafundOutputID)
 }
 
 type txWrapper struct {
@@ -346,6 +354,36 @@ func (tx txWrapper) DeleteFileContract(id types.FileContractID) {
 	// Delete expiration bucket if it is empty
 	if b.Stats().KeyN == 0 {
 		tx.DeleteBucket(expirationBucketID)
+	}
+}
+
+// SiafundOutput implements the Tx interface.
+func (tx txWrapper) SiafundOutput(id types.SiafundOutputID) (types.SiafundOutput, bool) {
+	sfoBytes := tx.Bucket(siafundOutputs).Get(id[:])
+	if sfoBytes == nil {
+		return types.SiafundOutput{}, false
+	}
+	var sfo types.SiafundOutput
+	err := encoding.Unmarshal(sfoBytes, &sfo)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return sfo, true
+}
+
+// AddSiafundOutput implements the Tx interface.
+func (tx txWrapper) AddSiafundOutput(id types.SiafundOutputID, sfo types.SiafundOutput) {
+	err := tx.Bucket(siafundOutputs).Put(id[:], encoding.Marshal(sfo))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// DeleteSiafundOutput implements the Tx interface.
+func (tx txWrapper) DeleteSiafundOutput(id types.SiafundOutputID) {
+	err := tx.Bucket(siafundOutputs).Delete(id[:])
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
 }
 

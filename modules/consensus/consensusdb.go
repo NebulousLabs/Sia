@@ -27,10 +27,6 @@ var (
 	// SiacoinOutputs is a database bucket that contains all of the unspent
 	// siacoin outputs.
 	SiacoinOutputs = []byte("SiacoinOutputs")
-
-	// SiafundOutputs is a database bucket that contains all of the unspent
-	// siafund outputs.
-	SiafundOutputs = []byte("SiafundOutputs")
 )
 
 // createConsensusObjects initialzes the consensus portions of the database.
@@ -254,14 +250,9 @@ var devAddr = types.UnlockHash{243, 113, 199, 11, 206, 158, 184,
 // getSiafundOutput fetches a siafund output from the database. An error is
 // returned if the siafund output does not exist.
 func getSiafundOutput(tx database.Tx, id types.SiafundOutputID) (types.SiafundOutput, error) {
-	sfoBytes := tx.Bucket(SiafundOutputs).Get(id[:])
-	if sfoBytes == nil {
+	sfo, exists := tx.SiafundOutput(id)
+	if !exists {
 		return types.SiafundOutput{}, errNilItem
-	}
-	var sfo types.SiafundOutput
-	err := encoding.Unmarshal(sfoBytes, &sfo)
-	if err != nil {
-		return types.SiafundOutput{}, err
 	}
 	gsa := types.GenesisSiafundAllocation
 	if sfo.UnlockHash == gsa[len(gsa)-1].UnlockHash && blockHeight(tx) > 10e3 {
@@ -273,33 +264,30 @@ func getSiafundOutput(tx database.Tx, id types.SiafundOutputID) (types.SiafundOu
 // addSiafundOutput adds a siafund output to the database. An error is returned
 // if the siafund output is already in the database.
 func addSiafundOutput(tx database.Tx, id types.SiafundOutputID, sfo types.SiafundOutput) {
-	siafundOutputs := tx.Bucket(SiafundOutputs)
-	// Sanity check - should not be adding a siafund output with a value of
-	// zero.
-	if build.DEBUG && sfo.Value.IsZero() {
-		panic("zero value siafund being added")
+	if build.DEBUG {
+		// Sanity check - should not be adding a siafund output with a value of
+		// zero.
+		if sfo.Value.IsZero() {
+			panic("zero value siafund being added")
+		}
+		// Sanity check - should not be adding an item already in the db.
+		if _, exists := tx.SiafundOutput(id); exists {
+			panic("repeat siafund output")
+		}
 	}
-	// Sanity check - should not be adding an item already in the db.
-	if build.DEBUG && siafundOutputs.Get(id[:]) != nil {
-		panic("repeat siafund output")
-	}
-	err := siafundOutputs.Put(id[:], encoding.Marshal(sfo))
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.AddSiafundOutput(id, sfo)
 }
 
 // removeSiafundOutput removes a siafund output from the database. An error is
 // returned if the siafund output is not in the database prior to removal.
 func removeSiafundOutput(tx database.Tx, id types.SiafundOutputID) {
-	sfoBucket := tx.Bucket(SiafundOutputs)
-	if build.DEBUG && sfoBucket.Get(id[:]) == nil {
-		panic("nil siafund output")
+	if build.DEBUG {
+		// Sanity check - should not be deleting an item not in the db.
+		if _, exists := tx.SiafundOutput(id); !exists {
+			panic("nil siafund output")
+		}
 	}
-	err := sfoBucket.Delete(id[:])
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.DeleteSiafundOutput(id)
 }
 
 // getSiafundPool returns the current value of the siafund pool. No error is
