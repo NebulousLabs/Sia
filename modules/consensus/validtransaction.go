@@ -59,18 +59,9 @@ func validSiacoins(tx database.Tx, t types.Transaction) error {
 // storageProofSegment returns the index of the segment that needs to be proven
 // exists in a file contract.
 func storageProofSegment(tx database.Tx, fcid types.FileContractID) (uint64, error) {
-	// Check that the parent file contract exists.
-	fcBucket := tx.Bucket(FileContracts)
-	fcBytes := fcBucket.Get(fcid[:])
-	if fcBytes == nil {
+	fc, exists := tx.FileContract(fcid)
+	if !exists {
 		return 0, errUnrecognizedFileContractID
-	}
-
-	// Decode the file contract.
-	var fc types.FileContract
-	err := encoding.Unmarshal(fcBytes, &fc)
-	if build.DEBUG && err != nil {
-		panic(err)
 	}
 
 	// Get the trigger block id.

@@ -65,6 +65,17 @@ type Tx interface {
 	// SetDifficultyTotals sets the difficulty adjustment parameters for a
 	// given block.
 	SetDifficultyTotals(id types.BlockID, totalTime int64, totalTarget types.Target)
+
+	// FileContract returns the file contract with the specified id, or false
+	// if the contract is not present in the database.
+	FileContract(id types.FileContractID) (types.FileContract, bool)
+	// FileContractExpirations returns the IDs of file contracts expiring at
+	// the specified height.
+	FileContractExpirations(height types.BlockHeight) []types.FileContractID
+	// AddFileContract adds a file contract to the database.
+	AddFileContract(id types.FileContractID, fc types.FileContract)
+	// DeleteFileContract removes a file contract from the database.
+	DeleteFileContract(id types.FileContractID)
 }
 
 type txWrapper struct {
@@ -257,6 +268,84 @@ func (tx txWrapper) SetDifficultyTotals(id types.BlockID, totalTime int64, total
 	err := tx.Bucket(bucketOak).Put(id[:], bytes)
 	if build.DEBUG && err != nil {
 		panic(err)
+	}
+}
+
+// FileContract implements the Tx interface.
+func (tx txWrapper) FileContract(id types.FileContractID) (types.FileContract, bool) {
+	fcBytes := tx.Bucket(fileContracts).Get(id[:])
+	if fcBytes == nil {
+		return types.FileContract{}, false
+	}
+	var fc types.FileContract
+	err := encoding.Unmarshal(fcBytes, &fc)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return fc, true
+}
+
+// FileContractExpirations implements the Tx interface.
+func (tx txWrapper) FileContractExpirations(height types.BlockHeight) []types.FileContractID {
+	fceBucket := tx.Bucket(append(prefixFCEX, encoding.Marshal(height)...))
+	if fceBucket == nil {
+		return nil
+	}
+
+	var ids []types.FileContractID
+	err := fceBucket.ForEach(func(k, _ []byte) error {
+		var id types.FileContractID
+		copy(id[:], k)
+		ids = append(ids, id)
+		return nil
+	})
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return ids
+}
+
+// AddFileContract implements the Tx interface.
+func (tx txWrapper) AddFileContract(id types.FileContractID, fc types.FileContract) {
+	err := tx.Bucket(fileContracts).Put(id[:], encoding.Marshal(fc))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+
+	// Add an entry for when the file contract expires.
+	expirationBucketID := append(prefixFCEX, encoding.Marshal(fc.WindowEnd)...)
+	expirationBucket, err := tx.CreateBucketIfNotExists(expirationBucketID)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = expirationBucket.Put(id[:], []byte{})
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// DeleteFileContract implements the Tx interface.
+func (tx txWrapper) DeleteFileContract(id types.FileContractID) {
+	fc, exists := tx.FileContract(id)
+	if !exists {
+		return
+	}
+	err := tx.Bucket(fileContracts).Delete(id[:])
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+
+	// Delete the entry for the file contract's expiration.
+	expirationBucketID := append(prefixFCEX, encoding.Marshal(fc.WindowEnd)...)
+	b := tx.Bucket(expirationBucketID)
+	err = b.Delete(id[:])
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+
+	// Delete expiration bucket if it is empty
+	if b.Stats().KeyN == 0 {
+		tx.DeleteBucket(expirationBucketID)
 	}
 }
 

@@ -147,26 +147,13 @@ func applyMissedStorageProof(tx database.Tx, pb *processedBlock, fcid types.File
 // expired without an appropriate storage proof, and calls 'applyMissedProof'
 // for the file contract.
 func applyFileContractMaintenance(tx database.Tx, pb *processedBlock) {
-	// Get the bucket pointing to all of the expiring file contracts.
-	fceBucketID := append(prefixFCEX, encoding.Marshal(pb.Height)...)
-	fceBucket := tx.Bucket(fceBucketID)
-	// Finish if there are no expiring file contracts.
-	if fceBucket == nil {
-		return
-	}
-
+	// Get all of the file contracts expiring at this height.
 	var dscods []modules.DelayedSiacoinOutputDiff
 	var fcds []modules.FileContractDiff
-	err := fceBucket.ForEach(func(keyBytes, valBytes []byte) error {
-		var id types.FileContractID
-		copy(id[:], keyBytes)
+	for _, id := range tx.FileContractExpirations(pb.Height) {
 		amspDSCODS, fcd := applyMissedStorageProof(tx, pb, id)
 		fcds = append(fcds, fcd)
 		dscods = append(dscods, amspDSCODS...)
-		return nil
-	})
-	if build.DEBUG && err != nil {
-		panic(err)
 	}
 	for _, dscod := range dscods {
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
@@ -175,10 +162,6 @@ func applyFileContractMaintenance(tx database.Tx, pb *processedBlock) {
 	for _, fcd := range fcds {
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
 		commitFileContractDiff(tx, fcd, modules.DiffApply)
-	}
-	err = tx.DeleteBucket(fceBucketID)
-	if build.DEBUG && err != nil {
-		panic(err)
 	}
 }
 

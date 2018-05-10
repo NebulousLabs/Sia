@@ -16,7 +16,6 @@ import (
 
 var (
 	prefixDSCO = []byte("dsco_")
-	prefixFCEX = []byte("fcex_")
 )
 
 var (
@@ -24,10 +23,6 @@ var (
 	// keyed by their id. This includes blocks that are not currently in the
 	// consensus set, and blocks that may not have been fully validated yet.
 	BlockMap = []byte("BlockMap")
-
-	// FileContracts is a database bucket that contains all of the open file
-	// contracts.
-	FileContracts = []byte("FileContracts")
 
 	// SiacoinOutputs is a database bucket that contains all of the unspent
 	// siacoin outputs.
@@ -217,13 +212,9 @@ func removeSiacoinOutput(tx database.Tx, id types.SiacoinOutputID) {
 // getFileContract fetches a file contract from the database, returning an
 // error if it is not there.
 func getFileContract(tx database.Tx, id types.FileContractID) (fc types.FileContract, err error) {
-	fcBytes := tx.Bucket(FileContracts).Get(id[:])
-	if fcBytes == nil {
+	fc, exists := tx.FileContract(id)
+	if !exists {
 		return types.FileContract{}, errNilItem
-	}
-	err = encoding.Unmarshal(fcBytes, &fc)
-	if err != nil {
-		return types.FileContract{}, err
 	}
 	return fc, nil
 }
@@ -231,61 +222,28 @@ func getFileContract(tx database.Tx, id types.FileContractID) (fc types.FileCont
 // addFileContract adds a file contract to the database. An error is returned
 // if the file contract is already in the database.
 func addFileContract(tx database.Tx, id types.FileContractID, fc types.FileContract) {
-	// Add the file contract to the database.
-	fcBucket := tx.Bucket(FileContracts)
-	// Sanity check - should not be adding a zero-payout file contract.
-	if build.DEBUG && fc.Payout.IsZero() {
-		panic("adding zero-payout file contract")
+	if build.DEBUG {
+		// Sanity check - should not be adding a zero-payout file contract.
+		if fc.Payout.IsZero() {
+			panic("adding zero-payout file contract")
+		}
+		// Sanity check - should not be adding a file contract already in the db.
+		if _, exists := tx.FileContract(id); exists {
+			panic("repeat file contract")
+		}
 	}
-	// Sanity check - should not be adding a file contract already in the db.
-	if build.DEBUG && fcBucket.Get(id[:]) != nil {
-		panic("repeat file contract")
-	}
-	err := fcBucket.Put(id[:], encoding.Marshal(fc))
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-
-	// Add an entry for when the file contract expires.
-	expirationBucketID := append(prefixFCEX, encoding.Marshal(fc.WindowEnd)...)
-	expirationBucket, err := tx.CreateBucketIfNotExists(expirationBucketID)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	err = expirationBucket.Put(id[:], []byte{})
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.AddFileContract(id, fc)
 }
 
 // removeFileContract removes a file contract from the database.
 func removeFileContract(tx database.Tx, id types.FileContractID) {
-	// Delete the file contract entry.
-	fcBucket := tx.Bucket(FileContracts)
-	fcBytes := fcBucket.Get(id[:])
-	// Sanity check - should not be removing a file contract not in the db.
-	if build.DEBUG && fcBytes == nil {
-		panic("nil file contract")
+	if build.DEBUG {
+		// Sanity check - should not be removing a file contract not in the db.
+		if _, exists := tx.FileContract(id); !exists {
+			panic("nil file contract")
+		}
 	}
-	err := fcBucket.Delete(id[:])
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-
-	// Delete the entry for the file contract's expiration. The portion of
-	// 'fcBytes' used to determine the expiration bucket id is the
-	// byte-representation of the file contract window end, which always
-	// appears at bytes 48-56.
-	expirationBucketID := append(prefixFCEX, fcBytes[48:56]...)
-	expirationBucket := tx.Bucket(expirationBucketID)
-	expirationBytes := expirationBucket.Get(id[:])
-	if expirationBytes == nil {
-		panic(errNilItem)
-	}
-	err = expirationBucket.Delete(id[:])
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.DeleteFileContract(id)
 }
 
 // The address of the devs.
