@@ -42,7 +42,7 @@ type unfinishedUploadChunk struct {
 	// The logical data is the data that is presented to the user when the user
 	// requests the chunk. The physical data is all of the pieces that get
 	// stored across the network.
-	logicalChunkData  []byte
+	logicalChunkData  [][]byte
 	physicalChunkData [][]byte
 
 	// Worker synchronization fields. The mutex only protects these fields.
@@ -134,7 +134,7 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedUploadChunk) e
 	}
 
 	// Create the download.
-	buf := downloadDestinationBuffer(make([]byte, chunk.length))
+	buf := NewDownloadDestinationBuffer(chunk.length)
 	d, err := r.managedNewDownload(downloadParams{
 		destination:     buf,
 		destinationType: "buffer",
@@ -167,7 +167,7 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedUploadChunk) e
 		buf = nil
 		return d.Err()
 	}
-	chunk.logicalChunkData = []byte(buf)
+	chunk.logicalChunkData = [][]byte(buf)
 	return nil
 }
 
@@ -221,7 +221,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 	// fact to reduce the total memory required to create the physical data.
 	// That will also change the amount of memory we need to allocate, and the
 	// number of times we need to return memory.
-	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.Encode(chunk.logicalChunkData)
+	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.EncodeShards(chunk.logicalChunkData)
 	chunk.logicalChunkData = nil
 	r.memoryManager.Return(erasureCodingMemory)
 	chunk.memoryReleased += erasureCodingMemory
@@ -300,15 +300,15 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedUploadChunk) erro
 	// TODO: Once we have enabled support for small chunks, we should stop
 	// needing to ignore the EOF errors, because the chunk size should always
 	// match the tail end of the file. Until then, we ignore io.EOF.
-	chunk.logicalChunkData = make([]byte, chunk.length)
-	_, err = osFile.ReadAt(chunk.logicalChunkData, chunk.offset)
+	sr := NewShardReader(osFile)
+	buf := [][]byte(NewDownloadDestinationBuffer(chunk.length))
+	_, err = sr.ReadAt(buf, chunk.offset)
 	if err != nil && err != io.EOF && download {
-		chunk.logicalChunkData = nil
 		return r.managedDownloadLogicalChunkData(chunk)
 	} else if err != nil && err != io.EOF {
-		chunk.logicalChunkData = nil
 		return errors.Extend(err, errors.New("failed to read file locally"))
 	}
+	chunk.logicalChunkData = buf
 
 	// Data successfully read from disk.
 	return nil
