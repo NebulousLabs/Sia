@@ -12,7 +12,7 @@ import (
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func applySiacoinInputs(tx database.Tx, pb *processedBlock, t types.Transaction) {
+func applySiacoinInputs(tx database.Tx, pb *database.Block, t types.Transaction) {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
 	for _, sci := range t.SiacoinInputs {
 		sco, err := getSiacoinOutput(tx, sci.ParentID)
@@ -31,7 +31,7 @@ func applySiacoinInputs(tx database.Tx, pb *processedBlock, t types.Transaction)
 
 // applySiacoinOutputs takes all of the siacoin outputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func applySiacoinOutputs(tx database.Tx, pb *processedBlock, t types.Transaction) {
+func applySiacoinOutputs(tx database.Tx, pb *database.Block, t types.Transaction) {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
 	for i, sco := range t.SiacoinOutputs {
 		scoid := t.SiacoinOutputID(uint64(i))
@@ -48,7 +48,7 @@ func applySiacoinOutputs(tx database.Tx, pb *processedBlock, t types.Transaction
 // applyFileContracts iterates through all of the file contracts in a
 // transaction and applies them to the state, updating the diffs in the proccesed
 // block.
-func applyFileContracts(tx database.Tx, pb *processedBlock, t types.Transaction) {
+func applyFileContracts(tx database.Tx, pb *database.Block, t types.Transaction) {
 	for i, fc := range t.FileContracts {
 		fcid := t.FileContractID(uint64(i))
 		fcd := modules.FileContractDiff{
@@ -75,7 +75,7 @@ func applyFileContracts(tx database.Tx, pb *processedBlock, t types.Transaction)
 // applyTxFileContractRevisions iterates through all of the file contract
 // revisions in a transaction and applies them to the state, updating the diffs
 // in the processed block.
-func applyFileContractRevisions(tx database.Tx, pb *processedBlock, t types.Transaction) {
+func applyFileContractRevisions(tx database.Tx, pb *database.Block, t types.Transaction) {
 	for _, fcr := range t.FileContractRevisions {
 		fc, err := getFileContract(tx, fcr.ParentID)
 		if build.DEBUG && err != nil {
@@ -116,7 +116,7 @@ func applyFileContractRevisions(tx database.Tx, pb *processedBlock, t types.Tran
 // applyTxStorageProofs iterates through all of the storage proofs in a
 // transaction and applies them to the state, updating the diffs in the processed
 // block.
-func applyStorageProofs(tx database.Tx, pb *processedBlock, t types.Transaction) {
+func applyStorageProofs(tx database.Tx, pb *database.Block, t types.Transaction) {
 	for _, sp := range t.StorageProofs {
 		fc, err := getFileContract(tx, sp.ParentID)
 		if build.DEBUG && err != nil {
@@ -148,7 +148,7 @@ func applyStorageProofs(tx database.Tx, pb *processedBlock, t types.Transaction)
 
 // applyTxSiafundInputs takes all of the siafund inputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func applySiafundInputs(tx database.Tx, pb *processedBlock, t types.Transaction) {
+func applySiafundInputs(tx database.Tx, pb *database.Block, t types.Transaction) {
 	for _, sfi := range t.SiafundInputs {
 		// Calculate the volume of siacoins to put in the claim output.
 		sfo, err := getSiafundOutput(tx, sfi.ParentID)
@@ -185,7 +185,7 @@ func applySiafundInputs(tx database.Tx, pb *processedBlock, t types.Transaction)
 }
 
 // applySiafundOutput applies a siafund output to the consensus set.
-func applySiafundOutputs(tx database.Tx, pb *processedBlock, t types.Transaction) {
+func applySiafundOutputs(tx database.Tx, pb *database.Block, t types.Transaction) {
 	for i, sfo := range t.SiafundOutputs {
 		sfoid := t.SiafundOutputID(uint64(i))
 		sfo.ClaimStart = getSiafundPool(tx)
@@ -202,7 +202,7 @@ func applySiafundOutputs(tx database.Tx, pb *processedBlock, t types.Transaction
 // applyTransaction applies the contents of a transaction to the ConsensusSet.
 // This produces a set of diffs, which are stored in the blockNode containing
 // the transaction. No verification is done by this function.
-func applyTransaction(tx database.Tx, pb *processedBlock, t types.Transaction) {
+func applyTransaction(tx database.Tx, pb *database.Block, t types.Transaction) {
 	applySiacoinInputs(tx, pb, t)
 	applySiacoinOutputs(tx, pb, t)
 	applyFileContracts(tx, pb, t)

@@ -142,6 +142,30 @@ func (w boltWrapper) Close() error {
 	return w.db.Close()
 }
 
+// Block is a a block stored in the database along with relevant metadata.
+type Block struct {
+	Block       types.Block
+	Height      types.BlockHeight
+	Depth       types.Target
+	ChildTarget types.Target
+
+	DiffsGenerated            bool
+	SiacoinOutputDiffs        []modules.SiacoinOutputDiff
+	FileContractDiffs         []modules.FileContractDiff
+	SiafundOutputDiffs        []modules.SiafundOutputDiff
+	DelayedSiacoinOutputDiffs []modules.DelayedSiacoinOutputDiff
+	SiafundPoolDiffs          []modules.SiafundPoolDiff
+
+	ConsensusChecksum crypto.Hash
+}
+
+// ChildDepth returns the depth of a blockNode's child nodes. The depth is the
+// "sum" of the current depth and current difficulty. See target.Add for more
+// detailed information.
+func (b *Block) ChildDepth() types.Target {
+	return b.Depth.AddDifficulties(b.ChildTarget)
+}
+
 type (
 	// ChangeEntry records a single atomic change to the consensus set.
 	ChangeEntry struct {

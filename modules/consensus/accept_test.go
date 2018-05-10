@@ -27,7 +27,7 @@ var (
 		Timestamp: 500,
 		ParentID:  mockParentID(),
 	}
-	// parentBlockSerialized is a mock serialized form of a processedBlock.
+	// parentBlockSerialized is a mock serialized form of a database.Block.
 	parentBlockSerialized = []byte{3, 2, 1}
 
 	parentBlockUnmarshaler = mockBlockMarshaler{
@@ -52,7 +52,7 @@ var (
 
 	failingBlockUnmarshaler = mockBlockMarshaler{
 		[]predefinedBlockUnmarshal{
-			{parentBlockSerialized, processedBlock{}, unmarshalFailedErr},
+			{parentBlockSerialized, database.Block{}, unmarshalFailedErr},
 		},
 	}
 
@@ -63,12 +63,12 @@ var (
 
 type (
 	// predefinedBlockUnmarshal is a predefined response from mockBlockMarshaler.
-	// It defines the unmarshaled processedBlock and error code that
+	// It defines the unmarshaled database.Block and error code that
 	// mockBlockMarshaler should return in response to an input serialized byte
 	// slice.
 	predefinedBlockUnmarshal struct {
 		serialized  []byte
-		unmarshaled processedBlock
+		unmarshaled database.Block
 		err         error
 	}
 
@@ -117,9 +117,9 @@ func (m mockBlockMarshaler) Marshal(interface{}) []byte {
 func (m mockBlockMarshaler) Unmarshal(b []byte, v interface{}) error {
 	for _, pu := range m.p {
 		if bytes.Equal(b[:], pu.serialized[:]) {
-			pv, ok := v.(*processedBlock)
+			pv, ok := v.(*database.Block)
 			if !ok {
-				panic("mockBlockMarshaler.Unmarshal expected v to be of type processedBlock")
+				panic("mockBlockMarshaler.Unmarshal expected v to be of type database.Block")
 			}
 			*pv = pu.unmarshaled
 			return pu.err
@@ -135,7 +135,7 @@ func (m *mockBlockMarshaler) AddPredefinedUnmarshal(u predefinedBlockUnmarshal) 
 
 // minimumValidChildTimestamp returns the minimum timestamp of pb that can be
 // considered a valid block.
-func (brh mockBlockRuleHelper) minimumValidChildTimestamp(blockMap *bolt.Bucket, pb *processedBlock) types.Timestamp {
+func (brh mockBlockRuleHelper) minimumValidChildTimestamp(blockMap *bolt.Bucket, pb *database.Block) types.Timestamp {
 	return brh.minTimestamp
 }
 
@@ -152,25 +152,25 @@ func mockParentID() (parentID types.BlockID) {
 	return parentID
 }
 
-// mockParent returns a mock processedBlock with its ChildTarget member
+// mockParent returns a mock database.Block with its ChildTarget member
 // initialized to a dummy value.
-func mockParent() (parent processedBlock) {
+func mockParent() (parent database.Block) {
 	var mockTarget types.Target
 	mockTarget[0] = 56
 	parent.ChildTarget = mockTarget
 	return parent
 }
 
-// mockParent returns a mock processedBlock with its ChildTarget member
+// mockParent returns a mock database.Block with its ChildTarget member
 // initialized to a the maximum value.
-func mockParentHighTarget() (parent processedBlock) {
+func mockParentHighTarget() (parent database.Block) {
 	parent.ChildTarget = types.RootDepth
 	return parent
 }
 
-// mockParent returns a mock processedBlock with its ChildTarget member
+// mockParent returns a mock database.Block with its ChildTarget member
 // initialized to the minimum value.
-func mockParentLowTarget() (parent processedBlock) {
+func mockParentLowTarget() (parent database.Block) {
 	return parent
 }
 

@@ -23,7 +23,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node with a single miner payout.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 	pb.Height = cst.cs.dbBlockHeight()
 	pb.Block.Timestamp = 2 // MinerPayout id is determined by block id + index; add uniqueness to the block id.
 	pb.Block.MinerPayouts = append(pb.Block.MinerPayouts, types.SiacoinOutput{Value: types.NewCurrency64(12)})
@@ -63,7 +63,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	}
 
 	// Apply a processed block with two miner payouts.
-	pb2 := new(processedBlock)
+	pb2 := new(database.Block)
 	pb2.Height = cst.cs.dbBlockHeight()
 	pb2.Block.Timestamp = 5 // MinerPayout id is determined by block id + index; add uniqueness to the block id.
 	pb2.Block.MinerPayouts = []types.SiacoinOutput{
@@ -158,7 +158,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 	pb.Height = cst.cs.height()
 
 	// Create a file contract that's expiring and has 1 missed proof output.
@@ -249,7 +249,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 	pb.Height = cst.cs.height()
 
 	// Create a file contract that's expiring and has 1 missed proof output.

@@ -22,7 +22,7 @@ var (
 
 // commitDiffSetSanity performs a series of sanity checks before committing a
 // diff set.
-func commitDiffSetSanity(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
+func commitDiffSetSanity(tx database.Tx, pb *database.Block, dir modules.DiffDirection) {
 	// This function is purely sanity checks.
 	if !build.DEBUG {
 		return
@@ -114,7 +114,7 @@ func commitSiafundPoolDiff(tx database.Tx, sfpd modules.SiafundPoolDiff, dir mod
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
-func commitNodeDiffs(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
+func commitNodeDiffs(tx database.Tx, pb *database.Block, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		for _, scod := range pb.SiacoinOutputDiffs {
 			commitSiacoinOutputDiff(tx, scod, dir)
@@ -151,7 +151,7 @@ func commitNodeDiffs(tx database.Tx, pb *processedBlock, dir modules.DiffDirecti
 }
 
 // updateCurrentPath updates the current path after applying a diff set.
-func updateCurrentPath(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
+func updateCurrentPath(tx database.Tx, pb *database.Block, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
 		pushPath(tx, pb.Block.ID())
@@ -161,7 +161,7 @@ func updateCurrentPath(tx database.Tx, pb *processedBlock, dir modules.DiffDirec
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
-func commitDiffSet(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
+func commitDiffSet(tx database.Tx, pb *database.Block, dir modules.DiffDirection) {
 	// Sanity checks - there are a few so they were moved to another function.
 	if build.DEBUG {
 		commitDiffSetSanity(tx, pb, dir)
@@ -176,7 +176,7 @@ func commitDiffSet(tx database.Tx, pb *processedBlock, dir modules.DiffDirection
 // transactions are allowed to depend on each other. We can't be sure that a
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
-func generateAndApplyDiff(tx database.Tx, pb *processedBlock) error {
+func generateAndApplyDiff(tx database.Tx, pb *database.Block) error {
 	// Sanity check - the block being applied should have the current block as
 	// a parent.
 	if build.DEBUG && pb.Block.ParentID != currentBlockID(tx) {

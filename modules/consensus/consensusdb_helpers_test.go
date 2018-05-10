@@ -23,7 +23,7 @@ func (cs *ConsensusSet) dbBlockHeight() (bh types.BlockHeight) {
 
 // dbCurrentProcessedBlock is a convenience function allowing
 // currentProcessedBlock to be called without a bolt.Tx.
-func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *processedBlock) {
+func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *database.Block) {
 	dbErr := cs.db.View(func(tx database.Tx) error {
 		pb = currentProcessedBlock(tx)
 		return nil
@@ -61,7 +61,7 @@ func (cs *ConsensusSet) dbPushPath(bid types.BlockID) {
 
 // dbGetBlockMap is a convenience function allowing getBlockMap to be called
 // without a bolt.Tx.
-func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (pb *processedBlock, err error) {
+func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (pb *database.Block, err error) {
 	dbErr := cs.db.View(func(tx database.Tx) error {
 		pb, err = getBlockMap(tx, id)
 		return nil

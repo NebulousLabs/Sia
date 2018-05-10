@@ -304,7 +304,7 @@ func (cs *ConsensusSet) tryTransactionSet(txns []types.Transaction) (modules.Con
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the
 	// consensus set get reverted.
-	diffHolder := new(processedBlock)
+	diffHolder := new(database.Block)
 
 	// Boltdb will only roll back a tx if an error is returned. In the case of
 	// TryTransactionSet, we want to roll back the tx even if there is no

@@ -7,6 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
@@ -96,47 +97,47 @@ func TestIntegrationMinimumValidChildTimestamp(t *testing.T) {
 	}
 }
 
-// TestUnitHeavierThan probes the heavierThan method of the processedBlock type.
+// TestUnitHeavierThan probes the heavierThan method of the database.Block type.
 func TestUnitHeavierThan(t *testing.T) {
 	// Create a light node.
-	pbLight := new(processedBlock)
+	pbLight := new(database.Block)
 	pbLight.Depth[0] = 64
 	pbLight.ChildTarget[0] = 200
 
 	// Create a node that's heavier, but not enough to beat the surpass
 	// threshold.
-	pbMiddle := new(processedBlock)
+	pbMiddle := new(database.Block)
 	pbMiddle.Depth[0] = 60
 	pbMiddle.ChildTarget[0] = 200
 
 	// Create a node that's heavy enough to break the surpass threshold.
-	pbHeavy := new(processedBlock)
+	pbHeavy := new(database.Block)
 	pbHeavy.Depth[0] = 16
 	pbHeavy.ChildTarget[0] = 200
 
 	// pbLight should not be heavier than pbHeavy.
-	if pbLight.heavierThan(pbHeavy) {
+	if heavierThan(pbLight, pbHeavy) {
 		t.Error("light heavier than heavy")
 	}
 	// pbLight should not be heavier than middle.
-	if pbLight.heavierThan(pbMiddle) {
+	if heavierThan(pbLight, pbMiddle) {
 		t.Error("light heavier than middle")
 	}
 	// pbLight should not be heavier than itself.
-	if pbLight.heavierThan(pbLight) {
+	if heavierThan(pbLight, pbLight) {
 		t.Error("light heavier than itself")
 	}
 
 	// pbMiddle should not be heavier than pbLight.
-	if pbMiddle.heavierThan(pbLight) {
+	if heavierThan(pbMiddle, pbLight) {
 		t.Error("middle heaver than light - surpass threshold should not have been broken")
 	}
 	// pbHeavy should be heaver than pbLight.
-	if !pbHeavy.heavierThan(pbLight) {
+	if !heavierThan(pbHeavy, pbLight) {
 		t.Error("heavy is not heavier than light")
 	}
 	// pbHeavy should be heavier than pbMiddle.
-	if !pbHeavy.heavierThan(pbMiddle) {
+	if !heavierThan(pbHeavy, pbMiddle) {
 		t.Error("heavy is not heavier than middle")
 	}
 }
@@ -144,19 +145,19 @@ func TestUnitHeavierThan(t *testing.T) {
 // TestChildDepth probes the childDeath method of the blockNode type.
 func TestChildDepth(t *testing.T) {
 	// Try adding to equal weight nodes, result should be half.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 	pb.Depth[0] = 64
 	pb.ChildTarget[0] = 64
-	childDepth := pb.childDepth()
-	if childDepth[0] != 32 {
+	ChildDepth := pb.ChildDepth()
+	if ChildDepth[0] != 32 {
 		t.Error("unexpected child depth")
 	}
 
 	// Try adding nodes of different weights.
 	pb.Depth[0] = 24
 	pb.ChildTarget[0] = 48
-	childDepth = pb.childDepth()
-	if childDepth[0] != 16 {
+	ChildDepth = pb.ChildDepth()
+	if ChildDepth[0] != 16 {
 		t.Error("unexpected child depth")
 	}
 }
@@ -172,11 +173,11 @@ func TestTargetAdjustmentBase(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a genesis node at timestamp 10,000
-	genesisNode := &processedBlock{
+	genesisNode := &database.Block{
 		Block: types.Block{Timestamp: 10000},
 	}
 	cst.cs.db.addBlockMap(genesisNode)
-	exactTimeNode := &processedBlock{
+	exactTimeNode := &database.Block{
 		Block: types.Block{
 			Nonce:     types.BlockNonce{1, 0, 0, 0, 0, 0, 0, 0},
 			Timestamp: types.Timestamp(10000 + types.BlockFrequency),
@@ -195,7 +196,7 @@ func TestTargetAdjustmentBase(t *testing.T) {
 	}
 
 	// Create a double-speed node and get the base adjustment.
-	doubleSpeedNode := &processedBlock{
+	doubleSpeedNode := &database.Block{
 		Block: types.Block{Timestamp: types.Timestamp(10000 + types.BlockFrequency)},
 	}
 	doubleSpeedNode.Parent = exactTimeNode.Block.ID()
@@ -209,7 +210,7 @@ func TestTargetAdjustmentBase(t *testing.T) {
 	}
 
 	// Create a half-speed node and get the base adjustment.
-	halfSpeedNode := &processedBlock{
+	halfSpeedNode := &database.Block{
 		Block: types.Block{Timestamp: types.Timestamp(10000 + types.BlockFrequency*6)},
 	}
 	halfSpeedNode.Parent = doubleSpeedNode.Block.ID()
@@ -227,14 +228,14 @@ func TestTargetAdjustmentBase(t *testing.T) {
 	}
 	// Create a chain of nodes so that the genesis node is no longer the point
 	// of comparison.
-	comparisonNode := &processedBlock{
+	comparisonNode := &database.Block{
 		Block: types.Block{Timestamp: 125000},
 	}
 	comparisonNode.Parent = halfSpeedNode.Block.ID()
 	cst.cs.db.addBlockMap(comparisonNode)
 	startingNode := comparisonNode
 	for i := types.BlockHeight(0); i < types.TargetWindow; i++ {
-		newNode := new(processedBlock)
+		newNode := new(database.Block)
 		newNode.Parent = startingNode.Block.ID()
 		newNode.Block.Nonce = types.BlockNonce{byte(i), byte(i / 256), 0, 0, 0, 0, 0, 0}
 		cst.cs.db.addBlockMap(newNode)
@@ -303,12 +304,12 @@ func TestSetChildTarget(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a genesis node and a child that took 2x as long as expected.
-	genesisNode := &processedBlock{
+	genesisNode := &database.Block{
 		Block: types.Block{Timestamp: 10000},
 	}
 	genesisNode.ChildTarget[0] = 64
 	cst.cs.db.addBlockMap(genesisNode)
-	doubleTimeNode := &processedBlock{
+	doubleTimeNode := &database.Block{
 		Block: types.Block{Timestamp: types.Timestamp(10000 + types.BlockFrequency*2)},
 	}
 	doubleTimeNode.Parent = genesisNode.Block.ID()
@@ -334,7 +335,7 @@ func TestNewChild(t *testing.T) {
 	}
 	defer cst.closeCst()
 
-	parent := &processedBlock{
+	parent := &database.Block{
 		Height: 12,
 	}
 	parent.Depth[0] = 45

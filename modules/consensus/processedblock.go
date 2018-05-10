@@ -4,9 +4,7 @@ import (
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -22,44 +20,18 @@ import (
 // timestamp to produce a sufficiently heavier block.
 var SurpassThreshold = big.NewRat(20, 100)
 
-// processedBlock is a copy/rename of blockNode, with the pointers to
-// other blockNodes replaced with block ID's, and all the fields
-// exported, so that a block node can be marshalled
-type processedBlock struct {
-	Block       types.Block
-	Height      types.BlockHeight
-	Depth       types.Target
-	ChildTarget types.Target
-
-	DiffsGenerated            bool
-	SiacoinOutputDiffs        []modules.SiacoinOutputDiff
-	FileContractDiffs         []modules.FileContractDiff
-	SiafundOutputDiffs        []modules.SiafundOutputDiff
-	DelayedSiacoinOutputDiffs []modules.DelayedSiacoinOutputDiff
-	SiafundPoolDiffs          []modules.SiafundPoolDiff
-
-	ConsensusChecksum crypto.Hash
-}
-
 // heavierThan returns true if the blockNode is sufficiently heavier than
 // 'cmp'. 'cmp' is expected to be the current block node. "Sufficient" means
-// that the weight of 'bn' exceeds the weight of 'cmp' by:
+// that the weight of 'b' exceeds the weight of 'cmp' by:
 //		(the target of 'cmp' * 'Surpass Threshold')
-func (pb *processedBlock) heavierThan(cmp *processedBlock) bool {
+func heavierThan(b, cmp *database.Block) bool {
 	requirement := cmp.Depth.AddDifficulties(cmp.ChildTarget.MulDifficulty(SurpassThreshold))
-	return requirement.Cmp(pb.Depth) > 0 // Inversed, because the smaller target is actually heavier.
-}
-
-// childDepth returns the depth of a blockNode's child nodes. The depth is the
-// "sum" of the current depth and current difficulty. See target.Add for more
-// detailed information.
-func (pb *processedBlock) childDepth() types.Target {
-	return pb.Depth.AddDifficulties(pb.ChildTarget)
+	return requirement.Cmp(b.Depth) > 0 // Inversed, because the smaller target is actually heavier.
 }
 
 // targetAdjustmentBase returns the magnitude that the target should be
 // adjusted by before a clamp is applied.
-func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, pb *processedBlock) *big.Rat {
+func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, pb *database.Block) *big.Rat {
 	// Grab the block that was generated 'TargetWindow' blocks prior to the
 	// parent. If there are not 'TargetWindow' blocks yet, stop at the genesis
 	// block.
@@ -102,9 +74,9 @@ func clampTargetAdjustment(base *big.Rat) *big.Rat {
 
 // setChildTarget computes the target of a blockNode's child. All children of a node
 // have the same target.
-func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock) {
+func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *database.Block) {
 	// Fetch the parent block.
-	var parent processedBlock
+	var parent database.Block
 	parentBytes := blockMap.Get(pb.Block.ParentID[:])
 	err := encoding.Unmarshal(parentBytes, &parent)
 	if build.DEBUG && err != nil {
@@ -122,13 +94,13 @@ func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock
 
 // newChild creates a blockNode from a block and adds it to the parent's set of
 // children. The new node is also returned. It necessarily modifies the database
-func (cs *ConsensusSet) newChild(tx database.Tx, pb *processedBlock, b types.Block) *processedBlock {
+func (cs *ConsensusSet) newChild(tx database.Tx, pb *database.Block, b types.Block) *database.Block {
 	// Create the child node.
 	childID := b.ID()
-	child := &processedBlock{
+	child := &database.Block{
 		Block:  b,
 		Height: pb.Height + 1,
-		Depth:  pb.childDepth(),
+		Depth:  pb.ChildDepth(),
 	}
 
 	// Push the total values for this block into the oak difficulty adjustment

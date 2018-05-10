@@ -29,7 +29,7 @@ func TestApplySiacoinInputs(t *testing.T) {
 	}
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Fetch the output id's of each siacoin output in the consensus set.
 	var ids []types.SiacoinOutputID
@@ -90,7 +90,7 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Fetch the output id's of each siacoin output in the consensus set.
 	var ids []types.SiacoinOutputID
@@ -130,7 +130,7 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Apply a transaction with a single siacoin output.
 	txn := types.Transaction{
@@ -194,7 +194,7 @@ func TestMisuseApplySiacoinOutputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Apply a transaction with a single siacoin output.
 	txn := types.Transaction{
@@ -226,7 +226,7 @@ func TestApplyFileContracts(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Apply a transaction with a single file contract.
 	txn := types.Transaction{
@@ -293,7 +293,7 @@ func TestMisuseApplyFileContracts(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Apply a transaction with a single file contract.
 	txn := types.Transaction{
@@ -325,7 +325,7 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Apply a transaction with two file contracts - that way there is
 	// something to revise.
@@ -427,7 +427,7 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Trigger a panic from revising a nonexistent file contract.
 	defer func() {
@@ -455,7 +455,7 @@ func TestApplyStorageProofs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 	pb.Height = cst.cs.height()
 
 	// Apply a transaction with two file contracts - there is a reason to
@@ -577,7 +577,7 @@ func TestNonexistentStorageProof(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Trigger a panic by applying a storage proof for a nonexistent file
 	// contract.
@@ -606,7 +606,7 @@ func TestDuplicateStorageProof(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 	pb.Height = cst.cs.height()
 
 	// Create a file contract for the storage proof to prove.
@@ -653,7 +653,7 @@ func TestApplySiafundInputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 	pb.Height = cst.cs.height()
 
 	// Fetch the output id's of each siacoin output in the consensus set.
@@ -703,7 +703,7 @@ func TestMisuseApplySiafundInputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 	pb.Height = cst.cs.height()
 
 	// Fetch the output id's of each siacoin output in the consensus set.
@@ -746,7 +746,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	cst.cs.siafundPool = types.NewCurrency64(101)
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Apply a transaction with a single siafund output.
 	txn := types.Transaction{
@@ -813,7 +813,7 @@ func TestMisuseApplySiafundOutputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(processedBlock)
+	pb := new(database.Block)
 
 	// Apply a transaction with a single siacoin output.
 	txn := types.Transaction{

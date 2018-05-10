@@ -32,7 +32,7 @@ func (cs *ConsensusSet) managedBroadcastBlock(b types.Block) {
 // validateHeaderAndBlock does some early, low computation verification on the
 // block. Callers should not assume that validation will happen in a particular
 // order.
-func (cs *ConsensusSet) validateHeaderAndBlock(tx database.Tx, b types.Block, id types.BlockID) (parent *processedBlock, err error) {
+func (cs *ConsensusSet) validateHeaderAndBlock(tx database.Tx, b types.Block, id types.BlockID) (parent *database.Block, err error) {
 	// Check if the block is a DoS block - a known invalid block that is expensive
 	// to validate.
 	_, exists := cs.dosBlocks[id]
@@ -55,7 +55,7 @@ func (cs *ConsensusSet) validateHeaderAndBlock(tx database.Tx, b types.Block, id
 	if parentBytes == nil {
 		return nil, errOrphan
 	}
-	parent = new(processedBlock)
+	parent = new(database.Block)
 	err = cs.marshaler.Unmarshal(parentBytes, parent)
 	if err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func (cs *ConsensusSet) validateHeader(tx database.Tx, h types.BlockHeader) erro
 	if parentBytes == nil {
 		return errOrphan
 	}
-	var parent processedBlock
+	var parent database.Block
 	err := cs.marshaler.Unmarshal(parentBytes, &parent)
 	if err != nil {
 		return err
@@ -148,7 +148,7 @@ func (cs *ConsensusSet) validateHeader(tx database.Tx, h types.BlockHeader) erro
 // on the block. Such errors are handled outside of the transaction by the
 // caller. Switching to a managed tx through bolt will make this complexity
 // unneeded.
-func (cs *ConsensusSet) addBlockToTree(tx database.Tx, b types.Block, parent *processedBlock) (ce database.ChangeEntry, err error) {
+func (cs *ConsensusSet) addBlockToTree(tx database.Tx, b types.Block, parent *database.Block) (ce database.ChangeEntry, err error) {
 	// Prepare the child processed block associated with the parent block.
 	newNode := cs.newChild(tx, parent, b)
 
@@ -156,13 +156,13 @@ func (cs *ConsensusSet) addBlockToTree(tx database.Tx, b types.Block, parent *pr
 	// current node. If not, return ErrNonExtending and don't fork the
 	// blockchain.
 	currentNode := currentProcessedBlock(tx)
-	if !newNode.heavierThan(currentNode) {
+	if !heavierThan(newNode, currentNode) {
 		return database.ChangeEntry{}, modules.ErrNonExtendingBlock
 	}
 
 	// Fork the blockchain and put the new heaviest block at the tip of the
 	// chain.
-	var revertedBlocks, appliedBlocks []*processedBlock
+	var revertedBlocks, appliedBlocks []*database.Block
 	revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, newNode)
 	if err != nil {
 		return database.ChangeEntry{}, err

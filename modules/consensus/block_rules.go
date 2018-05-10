@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules/consensus/database"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/coreos/bbolt"
@@ -12,7 +13,7 @@ import (
 // blockRuleHelper assists with block validity checks by calculating values
 // on blocks that are relevant to validity rules.
 type blockRuleHelper interface {
-	minimumValidChildTimestamp(*bolt.Bucket, *processedBlock) types.Timestamp
+	minimumValidChildTimestamp(*bolt.Bucket, *database.Block) types.Timestamp
 }
 
 // stdBlockRuleHelper is the standard implementation of blockRuleHelper.
@@ -24,7 +25,7 @@ type stdBlockRuleHelper struct{}
 //
 // To boost performance, minimumValidChildTimestamp is passed a bucket that it
 // can use from inside of a boltdb transaction.
-func (rh stdBlockRuleHelper) minimumValidChildTimestamp(blockMap *bolt.Bucket, pb *processedBlock) types.Timestamp {
+func (rh stdBlockRuleHelper) minimumValidChildTimestamp(blockMap *bolt.Bucket, pb *database.Block) types.Timestamp {
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
 	windowTimes[0] = pb.Block.Timestamp
