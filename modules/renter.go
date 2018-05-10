@@ -326,6 +326,9 @@ type Renter interface {
 	// DownloadHistory lists all the files that have been scheduled for download.
 	DownloadHistory() []DownloadInfo
 
+	// File returns information on specific file queried by user
+	File(siaPath string) (FileInfo, error)
+
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
 

@@ -311,6 +311,62 @@ func (r *Renter) FileList() []modules.FileInfo {
 	return fileList
 }
 
+// File returns file from siaPath queried by user.
+// Update based on FileList
+func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
+	var fileInfo modules.FileInfo
+
+	// Get the file and its contracs
+	contractIDs := make(map[types.FileContractID]struct{})
+	lockID := r.mu.RLock()
+	file, exists := r.files[siaPath]
+	if !exists {
+		return fileInfo, ErrUnknownPath
+	}
+	file.mu.RLock()
+	for cid := range file.contracts {
+		contractIDs[cid] = struct{}{}
+	}
+	file.mu.RUnlock()
+	r.mu.RUnlock(lockID)
+
+	// Build 2 maps that map every contract id to its offline and goodForRenew
+	// status.
+	goodForRenew := make(map[types.FileContractID]bool)
+	offline := make(map[types.FileContractID]bool)
+	for cid := range contractIDs {
+		resolvedID := r.hostContractor.ResolveID(cid)
+		cu, ok := r.hostContractor.ContractUtility(resolvedID)
+		goodForRenew[cid] = ok && cu.GoodForRenew
+		offline[cid] = r.hostContractor.IsOffline(resolvedID)
+	}
+
+	// Build the FileInfo
+	lockID = r.mu.RLock()
+	file.mu.RLock()
+	renewing := true
+	var localPath string
+	tf, exists := r.tracking[file.name]
+	if exists {
+		localPath = tf.RepairPath
+	}
+	fileInfo = modules.FileInfo{
+		SiaPath:        file.name,
+		LocalPath:      localPath,
+		Filesize:       file.size,
+		Renewing:       renewing,
+		Available:      file.available(offline),
+		Redundancy:     file.redundancy(offline, goodForRenew),
+		UploadedBytes:  file.uploadedBytes(),
+		UploadProgress: file.uploadProgress(),
+		Expiration:     file.expiration(),
+	}
+	file.mu.RUnlock()
+	r.mu.RUnlock(lockID)
+
+	return fileInfo, nil
+}
+
 // RenameFile takes an existing file and changes the nickname. The original
 // file must exist, and there must not be any file that already has the
 // replacement nickname.

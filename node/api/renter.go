@@ -123,6 +123,11 @@ type (
 		Downloads []DownloadInfo `json:"downloads"`
 	}
 
+	// RenterFile lists the file queried.
+	RenterFile struct {
+		File modules.FileInfo `json:"file"`
+	}
+
 	// RenterFiles lists the files known to the renter.
 	RenterFiles struct {
 		Files []modules.FileInfo `json:"files"`
@@ -371,6 +376,18 @@ func (api *API) renterRenameHandler(w http.ResponseWriter, req *http.Request, ps
 	}
 
 	WriteSuccess(w)
+}
+
+// renterFileHandler handles the API call to return specific file.
+func (api *API) renterFileHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	file, err := api.renter.File(strings.TrimPrefix(ps.ByName("siapath"), "/"))
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteJSON(w, RenterFile{
+		File: file,
+	})
 }
 
 // renterFilesHandler handles the API call to list all of the files.
