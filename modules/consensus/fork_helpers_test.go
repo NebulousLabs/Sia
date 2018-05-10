@@ -4,29 +4,29 @@ import "github.com/NebulousLabs/Sia/modules/consensus/database"
 
 // dbBacktrackToCurrentPath is a convenience function to call
 // backtrackToCurrentPath without a bolt.Tx.
-func (cs *ConsensusSet) dbBacktrackToCurrentPath(pb *database.Block) (pbs []*database.Block) {
+func (cs *ConsensusSet) dbBacktrackToCurrentPath(b *database.Block) (bs []*database.Block) {
 	_ = cs.db.Update(func(tx database.Tx) error {
-		pbs = backtrackToCurrentPath(tx, pb)
+		bs = backtrackToCurrentPath(tx, b)
 		return nil
 	})
-	return pbs
+	return bs
 }
 
 // dbRevertToNode is a convenience function to call revertToBlock without a
 // bolt.Tx.
-func (cs *ConsensusSet) dbRevertToNode(pb *database.Block) (pbs []*database.Block) {
+func (cs *ConsensusSet) dbRevertToNode(b *database.Block) (bs []*database.Block) {
 	_ = cs.db.Update(func(tx database.Tx) error {
-		pbs = cs.revertToBlock(tx, pb)
+		bs = cs.revertToBlock(tx, b)
 		return nil
 	})
-	return pbs
+	return bs
 }
 
 // dbForkBlockchain is a convenience function to call forkBlockchain without a
 // bolt.Tx.
-func (cs *ConsensusSet) dbForkBlockchain(pb *database.Block) (revertedBlocks, appliedBlocks []*database.Block, err error) {
+func (cs *ConsensusSet) dbForkBlockchain(b *database.Block) (revertedBlocks, appliedBlocks []*database.Block, err error) {
 	updateErr := cs.db.Update(func(tx database.Tx) error {
-		revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, pb)
+		revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, b)
 		return nil
 	})
 	if updateErr != nil {

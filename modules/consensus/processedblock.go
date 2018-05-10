@@ -31,13 +31,13 @@ func heavierThan(b, cmp *database.Block) bool {
 
 // targetAdjustmentBase returns the magnitude that the target should be
 // adjusted by before a clamp is applied.
-func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, pb *database.Block) *big.Rat {
+func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, b *database.Block) *big.Rat {
 	// Grab the block that was generated 'TargetWindow' blocks prior to the
 	// parent. If there are not 'TargetWindow' blocks yet, stop at the genesis
 	// block.
 	var windowSize types.BlockHeight
-	parent := pb.Block.ParentID
-	current := pb.Block.ID()
+	parent := b.Block.ParentID
+	current := b.Block.ID()
 	for windowSize = 0; windowSize < types.TargetWindow && parent != (types.BlockID{}); windowSize++ {
 		current = parent
 		copy(parent[:], blockMap.Get(parent[:])[:32])
@@ -53,7 +53,7 @@ func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, pb *database
 	// The target is converted to a big.Rat to provide infinite precision
 	// during the calculation. The big.Rat is just the int representation of a
 	// target.
-	timePassed := pb.Block.Timestamp - timestamp
+	timePassed := b.Block.Timestamp - timestamp
 	expectedTimePassed := types.BlockFrequency * windowSize
 	return big.NewRat(int64(timePassed), int64(expectedTimePassed))
 }
@@ -74,39 +74,39 @@ func clampTargetAdjustment(base *big.Rat) *big.Rat {
 
 // setChildTarget computes the target of a blockNode's child. All children of a node
 // have the same target.
-func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *database.Block) {
+func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, b *database.Block) {
 	// Fetch the parent block.
 	var parent database.Block
-	parentBytes := blockMap.Get(pb.Block.ParentID[:])
+	parentBytes := blockMap.Get(b.Block.ParentID[:])
 	err := encoding.Unmarshal(parentBytes, &parent)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
 
-	if pb.Height%(types.TargetWindow/2) != 0 {
-		pb.ChildTarget = parent.ChildTarget
+	if b.Height%(types.TargetWindow/2) != 0 {
+		b.ChildTarget = parent.ChildTarget
 		return
 	}
-	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(blockMap, pb))
+	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(blockMap, b))
 	adjustedRatTarget := new(big.Rat).Mul(parent.ChildTarget.Rat(), adjustment)
-	pb.ChildTarget = types.RatToTarget(adjustedRatTarget)
+	b.ChildTarget = types.RatToTarget(adjustedRatTarget)
 }
 
 // newChild creates a blockNode from a block and adds it to the parent's set of
 // children. The new node is also returned. It necessarily modifies the database
-func (cs *ConsensusSet) newChild(tx database.Tx, pb *database.Block, b types.Block) *database.Block {
+func (cs *ConsensusSet) newChild(tx database.Tx, db *database.Block, b types.Block) *database.Block {
 	// Create the child node.
 	childID := b.ID()
 	child := &database.Block{
 		Block:  b,
-		Height: pb.Height + 1,
-		Depth:  pb.ChildDepth(),
+		Height: db.Height + 1,
+		Depth:  db.ChildDepth(),
 	}
 
 	// Push the total values for this block into the oak difficulty adjustment
 	// bucket. The previous totals are required to compute the new totals.
 	prevTotalTime, prevTotalTarget := cs.getBlockTotals(tx, b.ParentID)
-	_, _, err := cs.storeBlockTotals(tx, child.Height, childID, prevTotalTime, pb.Block.Timestamp, b.Timestamp, prevTotalTarget, pb.ChildTarget)
+	_, _, err := cs.storeBlockTotals(tx, child.Height, childID, prevTotalTime, db.Block.Timestamp, b.Timestamp, prevTotalTarget, db.ChildTarget)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
@@ -114,10 +114,10 @@ func (cs *ConsensusSet) newChild(tx database.Tx, pb *database.Block, b types.Blo
 	// Use the difficulty adjustment algorithm to set the target of the child
 	// block and put the new processed block into the database.
 	blockMap := tx.Bucket(BlockMap)
-	if pb.Height < types.OakHardforkBlock {
+	if db.Height < types.OakHardforkBlock {
 		cs.setChildTarget(blockMap, child)
 	} else {
-		child.ChildTarget = cs.childTargetOak(prevTotalTime, prevTotalTarget, pb.ChildTarget, pb.Height, pb.Block.Timestamp)
+		child.ChildTarget = cs.childTargetOak(prevTotalTime, prevTotalTarget, db.ChildTarget, db.Height, db.Block.Timestamp)
 	}
 	err = blockMap.Put(childID[:], encoding.Marshal(*child))
 	if build.DEBUG && err != nil {

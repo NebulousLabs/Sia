@@ -18,16 +18,16 @@ var (
 
 // applyMinerPayouts adds a block's miner payouts to the consensus set as
 // delayed siacoin outputs.
-func applyMinerPayouts(tx database.Tx, pb *database.Block) {
-	for i := range pb.Block.MinerPayouts {
-		mpid := pb.Block.MinerPayoutID(uint64(i))
+func applyMinerPayouts(tx database.Tx, b *database.Block) {
+	for i := range b.Block.MinerPayouts {
+		mpid := b.Block.MinerPayoutID(uint64(i))
 		dscod := modules.DelayedSiacoinOutputDiff{
 			Direction:      modules.DiffApply,
 			ID:             mpid,
-			SiacoinOutput:  pb.Block.MinerPayouts[i],
-			MaturityHeight: pb.Height + types.MaturityDelay,
+			SiacoinOutput:  b.Block.MinerPayouts[i],
+			MaturityHeight: b.Height + types.MaturityDelay,
 		}
-		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+		b.DelayedSiacoinOutputDiffs = append(b.DelayedSiacoinOutputDiffs, dscod)
 		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	}
 }
@@ -35,15 +35,15 @@ func applyMinerPayouts(tx database.Tx, pb *database.Block) {
 // applyMaturedSiacoinOutputs goes through the list of siacoin outputs that
 // have matured and adds them to the consensus set. This also updates the block
 // node diff set.
-func applyMaturedSiacoinOutputs(tx database.Tx, pb *database.Block) {
+func applyMaturedSiacoinOutputs(tx database.Tx, b *database.Block) {
 	// Skip this step if the blockchain is not old enough to have maturing
 	// outputs.
-	if pb.Height < types.MaturityDelay {
+	if b.Height < types.MaturityDelay {
 		return
 	}
 
 	// Iterate through the list of delayed siacoin outputs.
-	ids, scos := tx.DelayedSiacoinOutputs(pb.Height)
+	ids, scos := tx.DelayedSiacoinOutputs(b.Height)
 	for i := range ids {
 		id, sco := ids[i], scos[i]
 
@@ -59,7 +59,7 @@ func applyMaturedSiacoinOutputs(tx database.Tx, pb *database.Block) {
 			ID:            id,
 			SiacoinOutput: sco,
 		}
-		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
+		b.SiacoinOutputDiffs = append(b.SiacoinOutputDiffs, scod)
 		commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
 
 		// Add the delayed output to the ConsensusSet and record the diff in
@@ -68,24 +68,24 @@ func applyMaturedSiacoinOutputs(tx database.Tx, pb *database.Block) {
 			Direction:      modules.DiffRevert,
 			ID:             id,
 			SiacoinOutput:  sco,
-			MaturityHeight: pb.Height,
+			MaturityHeight: b.Height,
 		}
-		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+		b.DelayedSiacoinOutputDiffs = append(b.DelayedSiacoinOutputDiffs, dscod)
 		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	}
 }
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
-func applyMissedStorageProof(tx database.Tx, pb *database.Block, fcid types.FileContractID) (dscods []modules.DelayedSiacoinOutputDiff, fcd modules.FileContractDiff) {
+func applyMissedStorageProof(tx database.Tx, b *database.Block, fcid types.FileContractID) (dscods []modules.DelayedSiacoinOutputDiff, fcd modules.FileContractDiff) {
 	// Sanity checks.
 	fc, err := getFileContract(tx, fcid)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
 	if build.DEBUG {
-		// Check that the file contract in question expires at pb.Height.
-		if fc.WindowEnd != pb.Height {
+		// Check that the file contract in question expires at b.Height.
+		if fc.WindowEnd != b.Height {
 			panic(errStorageProofTiming)
 		}
 	}
@@ -103,7 +103,7 @@ func applyMissedStorageProof(tx database.Tx, pb *database.Block, fcid types.File
 			Direction:      modules.DiffApply,
 			ID:             spoid,
 			SiacoinOutput:  mpo,
-			MaturityHeight: pb.Height + types.MaturityDelay,
+			MaturityHeight: b.Height + types.MaturityDelay,
 		}
 		dscods = append(dscods, dscod)
 	}
@@ -121,21 +121,21 @@ func applyMissedStorageProof(tx database.Tx, pb *database.Block, fcid types.File
 // applyFileContractMaintenance looks for all of the file contracts that have
 // expired without an appropriate storage proof, and calls 'applyMissedProof'
 // for the file contract.
-func applyFileContractMaintenance(tx database.Tx, pb *database.Block) {
+func applyFileContractMaintenance(tx database.Tx, b *database.Block) {
 	// Get all of the file contracts expiring at this height.
 	var dscods []modules.DelayedSiacoinOutputDiff
 	var fcds []modules.FileContractDiff
-	for _, id := range tx.FileContractExpirations(pb.Height) {
-		amspDSCODS, fcd := applyMissedStorageProof(tx, pb, id)
+	for _, id := range tx.FileContractExpirations(b.Height) {
+		amspDSCODS, fcd := applyMissedStorageProof(tx, b, id)
 		fcds = append(fcds, fcd)
 		dscods = append(dscods, amspDSCODS...)
 	}
 	for _, dscod := range dscods {
-		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+		b.DelayedSiacoinOutputDiffs = append(b.DelayedSiacoinOutputDiffs, dscod)
 		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	}
 	for _, fcd := range fcds {
-		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
+		b.FileContractDiffs = append(b.FileContractDiffs, fcd)
 		commitFileContractDiff(tx, fcd, modules.DiffApply)
 	}
 }
@@ -143,8 +143,8 @@ func applyFileContractMaintenance(tx database.Tx, pb *database.Block) {
 // applyMaintenance applies block-level alterations to the consensus set.
 // Maintenance is applied after all of the transactions for the block have been
 // applied.
-func applyMaintenance(tx database.Tx, pb *database.Block) {
-	applyMinerPayouts(tx, pb)
-	applyMaturedSiacoinOutputs(tx, pb)
-	applyFileContractMaintenance(tx, pb)
+func applyMaintenance(tx database.Tx, b *database.Block) {
+	applyMinerPayouts(tx, b)
+	applyMaturedSiacoinOutputs(tx, b)
+	applyFileContractMaintenance(tx, b)
 }

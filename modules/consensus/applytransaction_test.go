@@ -29,7 +29,7 @@ func TestApplySiacoinInputs(t *testing.T) {
 	}
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Fetch the output id's of each siacoin output in the consensus set.
 	var ids []types.SiacoinOutputID
@@ -43,7 +43,7 @@ func TestApplySiacoinInputs(t *testing.T) {
 			{ParentID: ids[0]},
 		},
 	}
-	cst.cs.applySiacoinInputs(pb, txn)
+	cst.cs.applySiacoinInputs(b, txn)
 	exists := cst.cs.db.inSiacoinOutputs(ids[0])
 	if exists {
 		t.Error("Failed to conusme a siacoin output")
@@ -51,13 +51,13 @@ func TestApplySiacoinInputs(t *testing.T) {
 	if cst.cs.db.lenSiacoinOutputs() != 2 {
 		t.Error("siacoin outputs not correctly updated")
 	}
-	if len(pb.SiacoinOutputDiffs) != 1 {
+	if len(b.SiacoinOutputDiffs) != 1 {
 		t.Error("block node was not updated for single transaction")
 	}
-	if pb.SiacoinOutputDiffs[0].Direction != modules.DiffRevert {
+	if b.SiacoinOutputDiffs[0].Direction != modules.DiffRevert {
 		t.Error("wrong diff direction applied when consuming a siacoin output")
 	}
-	if pb.SiacoinOutputDiffs[0].ID != ids[0] {
+	if b.SiacoinOutputDiffs[0].ID != ids[0] {
 		t.Error("wrong id used when consuming a siacoin output")
 	}
 
@@ -68,11 +68,11 @@ func TestApplySiacoinInputs(t *testing.T) {
 			{ParentID: ids[2]},
 		},
 	}
-	cst.cs.applySiacoinInputs(pb, txn)
+	cst.cs.applySiacoinInputs(b, txn)
 	if cst.cs.db.lenSiacoinOutputs() != 0 {
 		t.Error("failed to consume all siacoin outputs in the consensus set")
 	}
-	if len(pb.SiacoinOutputDiffs) != 3 {
+	if len(b.SiacoinOutputDiffs) != 3 {
 		t.Error("processed block was not updated for single transaction")
 	}
 }
@@ -90,7 +90,7 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Fetch the output id's of each siacoin output in the consensus set.
 	var ids []types.SiacoinOutputID
@@ -104,7 +104,7 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 			{ParentID: ids[0]},
 		},
 	}
-	cst.cs.applySiacoinInputs(pb, txn)
+	cst.cs.applySiacoinInputs(b, txn)
 
 	// Trigger the panic that occurs when an output is applied incorrectly, and
 	// perform a catch to read the error that is created.
@@ -114,7 +114,7 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 			t.Error("expecting error after corrupting database")
 		}
 	}()
-	cst.cs.applySiacoinInputs(pb, txn)
+	cst.cs.applySiacoinInputs(b, txn)
 }
 
 // TestApplySiacoinOutputs probes the applySiacoinOutput method of the
@@ -130,13 +130,13 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Apply a transaction with a single siacoin output.
 	txn := types.Transaction{
 		SiacoinOutputs: []types.SiacoinOutput{{}},
 	}
-	cst.cs.applySiacoinOutputs(pb, txn)
+	cst.cs.applySiacoinOutputs(b, txn)
 	scoid := txn.SiacoinOutputID(0)
 	exists := cst.cs.db.inSiacoinOutputs(scoid)
 	if !exists {
@@ -145,13 +145,13 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	if cst.cs.db.lenSiacoinOutputs() != 3 { // 3 because createConsensusSetTester has 2 initially.
 		t.Error("siacoin outputs not correctly updated")
 	}
-	if len(pb.SiacoinOutputDiffs) != 1 {
+	if len(b.SiacoinOutputDiffs) != 1 {
 		t.Error("block node was not updated for single element transaction")
 	}
-	if pb.SiacoinOutputDiffs[0].Direction != modules.DiffApply {
+	if b.SiacoinOutputDiffs[0].Direction != modules.DiffApply {
 		t.Error("wrong diff direction applied when creating a siacoin output")
 	}
-	if pb.SiacoinOutputDiffs[0].ID != scoid {
+	if b.SiacoinOutputDiffs[0].ID != scoid {
 		t.Error("wrong id used when creating a siacoin output")
 	}
 
@@ -162,7 +162,7 @@ func TestApplySiacoinOutputs(t *testing.T) {
 			{Value: types.NewCurrency64(2)},
 		},
 	}
-	cst.cs.applySiacoinOutputs(pb, txn)
+	cst.cs.applySiacoinOutputs(b, txn)
 	scoid0 := txn.SiacoinOutputID(0)
 	scoid1 := txn.SiacoinOutputID(1)
 	exists = cst.cs.db.inSiacoinOutputs(scoid0)
@@ -176,7 +176,7 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	if cst.cs.db.lenSiacoinOutputs() != 5 { // 5 because createConsensusSetTester has 2 initially.
 		t.Error("siacoin outputs not correctly updated")
 	}
-	if len(pb.SiacoinOutputDiffs) != 3 {
+	if len(b.SiacoinOutputDiffs) != 3 {
 		t.Error("block node was not updated correctly")
 	}
 }
@@ -194,13 +194,13 @@ func TestMisuseApplySiacoinOutputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Apply a transaction with a single siacoin output.
 	txn := types.Transaction{
 		SiacoinOutputs: []types.SiacoinOutput{{}},
 	}
-	cst.cs.applySiacoinOutputs(pb, txn)
+	cst.cs.applySiacoinOutputs(b, txn)
 
 	// Trigger the panic that occurs when an output is applied incorrectly, and
 	// perform a catch to read the error that is created.
@@ -210,7 +210,7 @@ func TestMisuseApplySiacoinOutputs(t *testing.T) {
 			t.Error("no panic occurred when misusing applySiacoinInput")
 		}
 	}()
-	cst.cs.applySiacoinOutputs(pb, txn)
+	cst.cs.applySiacoinOutputs(b, txn)
 }
 
 // TestApplyFileContracts probes the applyFileContracts method of the
@@ -226,13 +226,13 @@ func TestApplyFileContracts(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Apply a transaction with a single file contract.
 	txn := types.Transaction{
 		FileContracts: []types.FileContract{{}},
 	}
-	cst.cs.applyFileContracts(pb, txn)
+	cst.cs.applyFileContracts(b, txn)
 	fcid := txn.FileContractID(0)
 	exists := cst.cs.db.inFileContracts(fcid)
 	if !exists {
@@ -241,13 +241,13 @@ func TestApplyFileContracts(t *testing.T) {
 	if cst.cs.db.lenFileContracts() != 1 {
 		t.Error("file contracts not correctly updated")
 	}
-	if len(pb.FileContractDiffs) != 1 {
+	if len(b.FileContractDiffs) != 1 {
 		t.Error("block node was not updated for single element transaction")
 	}
-	if pb.FileContractDiffs[0].Direction != modules.DiffApply {
+	if b.FileContractDiffs[0].Direction != modules.DiffApply {
 		t.Error("wrong diff direction applied when creating a file contract")
 	}
-	if pb.FileContractDiffs[0].ID != fcid {
+	if b.FileContractDiffs[0].ID != fcid {
 		t.Error("wrong id used when creating a file contract")
 	}
 
@@ -258,7 +258,7 @@ func TestApplyFileContracts(t *testing.T) {
 			{Payout: types.NewCurrency64(300e3)},
 		},
 	}
-	cst.cs.applyFileContracts(pb, txn)
+	cst.cs.applyFileContracts(b, txn)
 	fcid0 := txn.FileContractID(0)
 	fcid1 := txn.FileContractID(1)
 	exists = cst.cs.db.inFileContracts(fcid0)
@@ -272,7 +272,7 @@ func TestApplyFileContracts(t *testing.T) {
 	if cst.cs.db.lenFileContracts() != 3 {
 		t.Error("file contracts not correctly updated")
 	}
-	if len(pb.FileContractDiffs) != 3 {
+	if len(b.FileContractDiffs) != 3 {
 		t.Error("block node was not updated correctly")
 	}
 	if cst.cs.siafundPool.Cmp64(10e3) != 0 {
@@ -293,13 +293,13 @@ func TestMisuseApplyFileContracts(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Apply a transaction with a single file contract.
 	txn := types.Transaction{
 		FileContracts: []types.FileContract{{}},
 	}
-	cst.cs.applyFileContracts(pb, txn)
+	cst.cs.applyFileContracts(b, txn)
 
 	// Trigger the panic that occurs when an output is applied incorrectly, and
 	// perform a catch to read the error that is created.
@@ -309,7 +309,7 @@ func TestMisuseApplyFileContracts(t *testing.T) {
 			t.Error("no panic occurred when misusing applySiacoinInput")
 		}
 	}()
-	cst.cs.applyFileContracts(pb, txn)
+	cst.cs.applyFileContracts(b, txn)
 }
 
 // TestApplyFileContractRevisions probes the applyFileContractRevisions method
@@ -325,7 +325,7 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Apply a transaction with two file contracts - that way there is
 	// something to revise.
@@ -335,7 +335,7 @@ func TestApplyFileContractRevisions(t *testing.T) {
 			{Payout: types.NewCurrency64(1)},
 		},
 	}
-	cst.cs.applyFileContracts(pb, txn)
+	cst.cs.applyFileContracts(b, txn)
 	fcid0 := txn.FileContractID(0)
 	fcid1 := txn.FileContractID(1)
 
@@ -348,7 +348,7 @@ func TestApplyFileContractRevisions(t *testing.T) {
 			},
 		},
 	}
-	cst.cs.applyFileContractRevisions(pb, txn)
+	cst.cs.applyFileContractRevisions(b, txn)
 	exists := cst.cs.db.inFileContracts(fcid0)
 	if !exists {
 		t.Error("Revision killed a file contract")
@@ -360,19 +360,19 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	if cst.cs.db.lenFileContracts() != 2 {
 		t.Error("file contracts not correctly updated")
 	}
-	if len(pb.FileContractDiffs) != 4 { // 2 creating the initial contracts, 1 to remove the old, 1 to add the revision.
+	if len(b.FileContractDiffs) != 4 { // 2 creating the initial contracts, 1 to remove the old, 1 to add the revision.
 		t.Error("block node was not updated for single element transaction")
 	}
-	if pb.FileContractDiffs[2].Direction != modules.DiffRevert {
+	if b.FileContractDiffs[2].Direction != modules.DiffRevert {
 		t.Error("wrong diff direction applied when revising a file contract")
 	}
-	if pb.FileContractDiffs[3].Direction != modules.DiffApply {
+	if b.FileContractDiffs[3].Direction != modules.DiffApply {
 		t.Error("wrong diff direction applied when revising a file contract")
 	}
-	if pb.FileContractDiffs[2].ID != fcid0 {
+	if b.FileContractDiffs[2].ID != fcid0 {
 		t.Error("wrong id used when revising a file contract")
 	}
-	if pb.FileContractDiffs[3].ID != fcid0 {
+	if b.FileContractDiffs[3].ID != fcid0 {
 		t.Error("wrong id used when revising a file contract")
 	}
 
@@ -389,7 +389,7 @@ func TestApplyFileContractRevisions(t *testing.T) {
 			},
 		},
 	}
-	cst.cs.applyFileContractRevisions(pb, txn)
+	cst.cs.applyFileContractRevisions(b, txn)
 	exists = cst.cs.db.inFileContracts(fcid0)
 	if !exists {
 		t.Error("Revision ate file contract")
@@ -409,7 +409,7 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	if cst.cs.db.lenFileContracts() != 2 {
 		t.Error("file contracts not correctly updated")
 	}
-	if len(pb.FileContractDiffs) != 8 {
+	if len(b.FileContractDiffs) != 8 {
 		t.Error("block node was not updated correctly")
 	}
 }
@@ -427,7 +427,7 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Trigger a panic from revising a nonexistent file contract.
 	defer func() {
@@ -439,7 +439,7 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 	txn := types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{{}},
 	}
-	cst.cs.applyFileContractRevisions(pb, txn)
+	cst.cs.applyFileContractRevisions(b, txn)
 }
 
 // TestApplyStorageProofs probes the applyStorageProofs method of the consensus
@@ -455,8 +455,8 @@ func TestApplyStorageProofs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
-	pb.Height = cst.cs.height()
+	b := new(database.Block)
+	b.Height = cst.cs.height()
 
 	// Apply a transaction with two file contracts - there is a reason to
 	// create a storage proof.
@@ -478,7 +478,7 @@ func TestApplyStorageProofs(t *testing.T) {
 			},
 		},
 	}
-	cst.cs.applyFileContracts(pb, txn)
+	cst.cs.applyFileContracts(b, txn)
 	fcid0 := txn.FileContractID(0)
 	fcid1 := txn.FileContractID(1)
 	fcid2 := txn.FileContractID(2)
@@ -487,7 +487,7 @@ func TestApplyStorageProofs(t *testing.T) {
 	txn = types.Transaction{
 		StorageProofs: []types.StorageProof{{ParentID: fcid0}},
 	}
-	cst.cs.applyStorageProofs(pb, txn)
+	cst.cs.applyStorageProofs(b, txn)
 	exists := cst.cs.db.inFileContracts(fcid0)
 	if exists {
 		t.Error("Storage proof did not disable a file contract.")
@@ -495,21 +495,21 @@ func TestApplyStorageProofs(t *testing.T) {
 	if cst.cs.db.lenFileContracts() != 2 {
 		t.Error("file contracts not correctly updated")
 	}
-	if len(pb.FileContractDiffs) != 4 { // 3 creating the initial contracts, 1 for the storage proof.
+	if len(b.FileContractDiffs) != 4 { // 3 creating the initial contracts, 1 for the storage proof.
 		t.Error("block node was not updated for single element transaction")
 	}
-	if pb.FileContractDiffs[3].Direction != modules.DiffRevert {
+	if b.FileContractDiffs[3].Direction != modules.DiffRevert {
 		t.Error("wrong diff direction applied when revising a file contract")
 	}
-	if pb.FileContractDiffs[3].ID != fcid0 {
+	if b.FileContractDiffs[3].ID != fcid0 {
 		t.Error("wrong id used when revising a file contract")
 	}
 	spoid0 := fcid0.StorageProofOutputID(types.ProofValid, 0)
-	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid0)
+	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(b.Height+types.MaturityDelay, spoid0)
 	if !exists {
 		t.Error("storage proof output not created after applying a storage proof")
 	}
-	sco := cst.cs.db.getDelayedSiacoinOutputs(pb.Height+types.MaturityDelay, spoid0)
+	sco := cst.cs.db.getDelayedSiacoinOutputs(b.Height+types.MaturityDelay, spoid0)
 	if sco.Value.Cmp64(290e3) != 0 {
 		t.Error("storage proof output was created with the wrong value")
 	}
@@ -521,7 +521,7 @@ func TestApplyStorageProofs(t *testing.T) {
 			{ParentID: fcid2},
 		},
 	}
-	cst.cs.applyStorageProofs(pb, txn)
+	cst.cs.applyStorageProofs(b, txn)
 	exists = cst.cs.db.inFileContracts(fcid1)
 	if exists {
 		t.Error("Storage proof failed to consume file contract.")
@@ -533,7 +533,7 @@ func TestApplyStorageProofs(t *testing.T) {
 	if cst.cs.db.lenFileContracts() != 0 {
 		t.Error("file contracts not correctly updated")
 	}
-	if len(pb.FileContractDiffs) != 6 {
+	if len(b.FileContractDiffs) != 6 {
 		t.Error("block node was not updated correctly")
 	}
 	spoid1 := fcid1.StorageProofOutputID(types.ProofValid, 0)
@@ -542,20 +542,20 @@ func TestApplyStorageProofs(t *testing.T) {
 		t.Error("output created when file contract had no corresponding output")
 	}
 	spoid2 := fcid2.StorageProofOutputID(types.ProofValid, 0)
-	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid2)
+	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(b.Height+types.MaturityDelay, spoid2)
 	if !exists {
 		t.Error("no output created by first output of file contract")
 	}
-	sco = cst.cs.db.getDelayedSiacoinOutputs(pb.Height+types.MaturityDelay, spoid2)
+	sco = cst.cs.db.getDelayedSiacoinOutputs(b.Height+types.MaturityDelay, spoid2)
 	if sco.Value.Cmp64(280e3) != 0 {
 		t.Error("first siacoin output created has wrong value")
 	}
 	spoid3 := fcid2.StorageProofOutputID(types.ProofValid, 1)
-	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid3)
+	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(b.Height+types.MaturityDelay, spoid3)
 	if !exists {
 		t.Error("second output not created for storage proof")
 	}
-	sco = cst.cs.db.getDelayedSiacoinOutputs(pb.Height+types.MaturityDelay, spoid3)
+	sco = cst.cs.db.getDelayedSiacoinOutputs(b.Height+types.MaturityDelay, spoid3)
 	if sco.Value.Cmp64(300e3) != 0 {
 		t.Error("second siacoin output has wrong value")
 	}
@@ -577,7 +577,7 @@ func TestNonexistentStorageProof(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Trigger a panic by applying a storage proof for a nonexistent file
 	// contract.
@@ -590,7 +590,7 @@ func TestNonexistentStorageProof(t *testing.T) {
 	txn := types.Transaction{
 		StorageProofs: []types.StorageProof{{}},
 	}
-	cst.cs.applyStorageProofs(pb, txn)
+	cst.cs.applyStorageProofs(b, txn)
 }
 
 // TestDuplicateStorageProof applies a storage proof which has already been
@@ -606,8 +606,8 @@ func TestDuplicateStorageProof(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node.
-	pb := new(database.Block)
-	pb.Height = cst.cs.height()
+	b := new(database.Block)
+	b.Height = cst.cs.height()
 
 	// Create a file contract for the storage proof to prove.
 	txn0 := types.Transaction{
@@ -620,14 +620,14 @@ func TestDuplicateStorageProof(t *testing.T) {
 			},
 		},
 	}
-	cst.cs.applyFileContracts(pb, txn0)
+	cst.cs.applyFileContracts(b, txn0)
 	fcid := txn0.FileContractID(0)
 
 	// Apply a single storage proof.
 	txn1 := types.Transaction{
 		StorageProofs: []types.StorageProof{{ParentID: fcid}},
 	}
-	cst.cs.applyStorageProofs(pb, txn1)
+	cst.cs.applyStorageProofs(b, txn1)
 
 	// Trigger a panic by applying the storage proof again.
 	defer func() {
@@ -636,8 +636,8 @@ func TestDuplicateStorageProof(t *testing.T) {
 			t.Error("failed to trigger ErrDuplicateValidProofOutput:", r)
 		}
 	}()
-	cst.cs.applyFileContracts(pb, txn0) // File contract was consumed by the first proof.
-	cst.cs.applyStorageProofs(pb, txn1)
+	cst.cs.applyFileContracts(b, txn0) // File contract was consumed by the first proof.
+	cst.cs.applyStorageProofs(b, txn1)
 }
 
 // TestApplySiafundInputs probes the applySiafundInputs method of the consensus
@@ -653,8 +653,8 @@ func TestApplySiafundInputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
-	pb.Height = cst.cs.height()
+	b := new(database.Block)
+	b.Height = cst.cs.height()
 
 	// Fetch the output id's of each siacoin output in the consensus set.
 	var ids []types.SiafundOutputID
@@ -668,7 +668,7 @@ func TestApplySiafundInputs(t *testing.T) {
 			{ParentID: ids[0]},
 		},
 	}
-	cst.cs.applySiafundInputs(pb, txn)
+	cst.cs.applySiafundInputs(b, txn)
 	exists := cst.cs.db.inSiafundOutputs(ids[0])
 	if exists {
 		t.Error("Failed to conusme a siafund output")
@@ -676,13 +676,13 @@ func TestApplySiafundInputs(t *testing.T) {
 	if cst.cs.db.lenSiafundOutputs() != 2 {
 		t.Error("siafund outputs not correctly updated", cst.cs.db.lenSiafundOutputs())
 	}
-	if len(pb.SiafundOutputDiffs) != 1 {
+	if len(b.SiafundOutputDiffs) != 1 {
 		t.Error("block node was not updated for single transaction")
 	}
-	if pb.SiafundOutputDiffs[0].Direction != modules.DiffRevert {
+	if b.SiafundOutputDiffs[0].Direction != modules.DiffRevert {
 		t.Error("wrong diff direction applied when consuming a siafund output")
 	}
-	if pb.SiafundOutputDiffs[0].ID != ids[0] {
+	if b.SiafundOutputDiffs[0].ID != ids[0] {
 		t.Error("wrong id used when consuming a siafund output")
 	}
 	if cst.cs.db.lenDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay) != 2 { // 1 for a block subsidy, 1 for the siafund claim.
@@ -703,8 +703,8 @@ func TestMisuseApplySiafundInputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
-	pb.Height = cst.cs.height()
+	b := new(database.Block)
+	b.Height = cst.cs.height()
 
 	// Fetch the output id's of each siacoin output in the consensus set.
 	var ids []types.SiafundOutputID
@@ -718,7 +718,7 @@ func TestMisuseApplySiafundInputs(t *testing.T) {
 			{ParentID: ids[0]},
 		},
 	}
-	cst.cs.applySiafundInputs(pb, txn)
+	cst.cs.applySiafundInputs(b, txn)
 
 	// Trigger the panic that occurs when an output is applied incorrectly, and
 	// perform a catch to read the error that is created.
@@ -729,7 +729,7 @@ func TestMisuseApplySiafundInputs(t *testing.T) {
 			t.Error(r)
 		}
 	}()
-	cst.cs.applySiafundInputs(pb, txn)
+	cst.cs.applySiafundInputs(b, txn)
 }
 
 // TestApplySiafundOutputs probes the applySiafundOutputs method of the
@@ -746,13 +746,13 @@ func TestApplySiafundOutputs(t *testing.T) {
 	cst.cs.siafundPool = types.NewCurrency64(101)
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Apply a transaction with a single siafund output.
 	txn := types.Transaction{
 		SiafundOutputs: []types.SiafundOutput{{}},
 	}
-	cst.cs.applySiafundOutputs(pb, txn)
+	cst.cs.applySiafundOutputs(b, txn)
 	sfoid := txn.SiafundOutputID(0)
 	exists := cst.cs.db.inSiafundOutputs(sfoid)
 	if !exists {
@@ -761,16 +761,16 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if cst.cs.db.lenSiafundOutputs() != 4 {
 		t.Error("siafund outputs not correctly updated")
 	}
-	if len(pb.SiafundOutputDiffs) != 1 {
+	if len(b.SiafundOutputDiffs) != 1 {
 		t.Error("block node was not updated for single element transaction")
 	}
-	if pb.SiafundOutputDiffs[0].Direction != modules.DiffApply {
+	if b.SiafundOutputDiffs[0].Direction != modules.DiffApply {
 		t.Error("wrong diff direction applied when creating a siafund output")
 	}
-	if pb.SiafundOutputDiffs[0].ID != sfoid {
+	if b.SiafundOutputDiffs[0].ID != sfoid {
 		t.Error("wrong id used when creating a siafund output")
 	}
-	if pb.SiafundOutputDiffs[0].SiafundOutput.ClaimStart.Cmp64(101) != 0 {
+	if b.SiafundOutputDiffs[0].SiafundOutput.ClaimStart.Cmp64(101) != 0 {
 		t.Error("claim start set incorrectly when creating a siafund output")
 	}
 
@@ -781,7 +781,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 			{Value: types.NewCurrency64(2)},
 		},
 	}
-	cst.cs.applySiafundOutputs(pb, txn)
+	cst.cs.applySiafundOutputs(b, txn)
 	sfoid0 := txn.SiafundOutputID(0)
 	sfoid1 := txn.SiafundOutputID(1)
 	exists = cst.cs.db.inSiafundOutputs(sfoid0)
@@ -795,7 +795,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if cst.cs.db.lenSiafundOutputs() != 6 {
 		t.Error("siafund outputs not correctly updated")
 	}
-	if len(pb.SiafundOutputDiffs) != 3 {
+	if len(b.SiafundOutputDiffs) != 3 {
 		t.Error("block node was not updated for single element transaction")
 	}
 }
@@ -813,13 +813,13 @@ func TestMisuseApplySiafundOutputs(t *testing.T) {
 	defer cst.closeCst()
 
 	// Create a block node to use with application.
-	pb := new(database.Block)
+	b := new(database.Block)
 
 	// Apply a transaction with a single siacoin output.
 	txn := types.Transaction{
 		SiafundOutputs: []types.SiafundOutput{{}},
 	}
-	cst.cs.applySiafundOutputs(pb, txn)
+	cst.cs.applySiafundOutputs(b, txn)
 
 	// Trigger the panic that occurs when an output is applied incorrectly, and
 	// perform a catch to read the error that is created.
@@ -829,6 +829,6 @@ func TestMisuseApplySiafundOutputs(t *testing.T) {
 			t.Error("no panic occurred when misusing applySiafundInput")
 		}
 	}()
-	cst.cs.applySiafundOutputs(pb, txn)
+	cst.cs.applySiafundOutputs(b, txn)
 }
 */

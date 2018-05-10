@@ -22,21 +22,21 @@ var (
 
 // commitDiffSetSanity performs a series of sanity checks before committing a
 // diff set.
-func commitDiffSetSanity(tx database.Tx, pb *database.Block, dir modules.DiffDirection) {
+func commitDiffSetSanity(tx database.Tx, b *database.Block, dir modules.DiffDirection) {
 	// This function is purely sanity checks.
 	if !build.DEBUG {
 		return
 	}
 
 	// Diffs should have already been generated for this node.
-	if !pb.DiffsGenerated {
+	if !b.DiffsGenerated {
 		panic(errDiffsNotGenerated)
 	}
 
 	// Current node must be the input node's parent if applying, and
 	// current node must be the input node if reverting.
 	if dir == modules.DiffApply {
-		parent, err := getBlockMap(tx, pb.Block.ParentID)
+		parent, err := getBlockMap(tx, b.Block.ParentID)
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
@@ -44,7 +44,7 @@ func commitDiffSetSanity(tx database.Tx, pb *database.Block, dir modules.DiffDir
 			panic(errWrongAppliedDiffSet)
 		}
 	} else {
-		if pb.Block.ID() != currentBlockID(tx) {
+		if b.Block.ID() != currentBlockID(tx) {
 			panic(errWrongRevertDiffSet)
 		}
 	}
@@ -114,61 +114,61 @@ func commitSiafundPoolDiff(tx database.Tx, sfpd modules.SiafundPoolDiff, dir mod
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
-func commitNodeDiffs(tx database.Tx, pb *database.Block, dir modules.DiffDirection) {
+func commitNodeDiffs(tx database.Tx, b *database.Block, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
-		for _, scod := range pb.SiacoinOutputDiffs {
+		for _, scod := range b.SiacoinOutputDiffs {
 			commitSiacoinOutputDiff(tx, scod, dir)
 		}
-		for _, fcd := range pb.FileContractDiffs {
+		for _, fcd := range b.FileContractDiffs {
 			commitFileContractDiff(tx, fcd, dir)
 		}
-		for _, sfod := range pb.SiafundOutputDiffs {
+		for _, sfod := range b.SiafundOutputDiffs {
 			commitSiafundOutputDiff(tx, sfod, dir)
 		}
-		for _, dscod := range pb.DelayedSiacoinOutputDiffs {
+		for _, dscod := range b.DelayedSiacoinOutputDiffs {
 			commitDelayedSiacoinOutputDiff(tx, dscod, dir)
 		}
-		for _, sfpd := range pb.SiafundPoolDiffs {
+		for _, sfpd := range b.SiafundPoolDiffs {
 			commitSiafundPoolDiff(tx, sfpd, dir)
 		}
 	} else {
-		for i := len(pb.SiacoinOutputDiffs) - 1; i >= 0; i-- {
-			commitSiacoinOutputDiff(tx, pb.SiacoinOutputDiffs[i], dir)
+		for i := len(b.SiacoinOutputDiffs) - 1; i >= 0; i-- {
+			commitSiacoinOutputDiff(tx, b.SiacoinOutputDiffs[i], dir)
 		}
-		for i := len(pb.FileContractDiffs) - 1; i >= 0; i-- {
-			commitFileContractDiff(tx, pb.FileContractDiffs[i], dir)
+		for i := len(b.FileContractDiffs) - 1; i >= 0; i-- {
+			commitFileContractDiff(tx, b.FileContractDiffs[i], dir)
 		}
-		for i := len(pb.SiafundOutputDiffs) - 1; i >= 0; i-- {
-			commitSiafundOutputDiff(tx, pb.SiafundOutputDiffs[i], dir)
+		for i := len(b.SiafundOutputDiffs) - 1; i >= 0; i-- {
+			commitSiafundOutputDiff(tx, b.SiafundOutputDiffs[i], dir)
 		}
-		for i := len(pb.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
-			commitDelayedSiacoinOutputDiff(tx, pb.DelayedSiacoinOutputDiffs[i], dir)
+		for i := len(b.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
+			commitDelayedSiacoinOutputDiff(tx, b.DelayedSiacoinOutputDiffs[i], dir)
 		}
-		for i := len(pb.SiafundPoolDiffs) - 1; i >= 0; i-- {
-			commitSiafundPoolDiff(tx, pb.SiafundPoolDiffs[i], dir)
+		for i := len(b.SiafundPoolDiffs) - 1; i >= 0; i-- {
+			commitSiafundPoolDiff(tx, b.SiafundPoolDiffs[i], dir)
 		}
 	}
 }
 
 // updateCurrentPath updates the current path after applying a diff set.
-func updateCurrentPath(tx database.Tx, pb *database.Block, dir modules.DiffDirection) {
+func updateCurrentPath(tx database.Tx, b *database.Block, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		pushPath(tx, pb.Block.ID())
+		pushPath(tx, b.Block.ID())
 	} else {
 		popPath(tx)
 	}
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
-func commitDiffSet(tx database.Tx, pb *database.Block, dir modules.DiffDirection) {
+func commitDiffSet(tx database.Tx, b *database.Block, dir modules.DiffDirection) {
 	// Sanity checks - there are a few so they were moved to another function.
 	if build.DEBUG {
-		commitDiffSetSanity(tx, pb, dir)
+		commitDiffSetSanity(tx, b, dir)
 	}
 
-	commitNodeDiffs(tx, pb, dir)
-	updateCurrentPath(tx, pb, dir)
+	commitNodeDiffs(tx, b, dir)
+	updateCurrentPath(tx, b, dir)
 }
 
 // generateAndApplyDiff will verify the block and then integrate it into the
@@ -176,29 +176,29 @@ func commitDiffSet(tx database.Tx, pb *database.Block, dir modules.DiffDirection
 // transactions are allowed to depend on each other. We can't be sure that a
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
-func generateAndApplyDiff(tx database.Tx, pb *database.Block) error {
+func generateAndApplyDiff(tx database.Tx, b *database.Block) error {
 	// Sanity check - the block being applied should have the current block as
 	// a parent.
-	if build.DEBUG && pb.Block.ParentID != currentBlockID(tx) {
+	if build.DEBUG && b.Block.ParentID != currentBlockID(tx) {
 		panic(errInvalidSuccessor)
 	}
 
 	// Validate and apply each transaction in the block. They cannot be
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
-	for _, txn := range pb.Block.Transactions {
+	for _, txn := range b.Block.Transactions {
 		err := validTransaction(tx, txn)
 		if err != nil {
 			return err
 		}
-		applyTransaction(tx, pb, txn)
+		applyTransaction(tx, b, txn)
 	}
 
 	// After all of the transactions have been applied, 'maintenance' is
 	// applied on the block. This includes adding any outputs that have reached
 	// maturity, applying any contracts with missed storage proofs, and adding
 	// the miner payouts to the list of delayed outputs.
-	applyMaintenance(tx, pb)
+	applyMaintenance(tx, b)
 
 	// DiffsGenerated are only set to true after the block has been fully
 	// validated and integrated. This is required to prevent later blocks from
@@ -207,20 +207,20 @@ func generateAndApplyDiff(tx database.Tx, pb *database.Block) error {
 	// requiring validation to occur again. when 'DiffsGenerated' is set to
 	// true, validation is skipped, therefore the flag should only be set to
 	// true on fully validated blocks.
-	pb.DiffsGenerated = true
+	b.DiffsGenerated = true
 
 	// Add the block to the current path and block map.
-	bid := pb.Block.ID()
+	bid := b.Block.ID()
 	blockMap := tx.Bucket(BlockMap)
-	updateCurrentPath(tx, pb, modules.DiffApply)
+	updateCurrentPath(tx, b, modules.DiffApply)
 
 	// Sanity check preparation - set the consensus hash at this height so that
 	// during reverting a check can be performed to assure consistency when
 	// adding and removing blocks. Must happen after the block is added to the
 	// path.
 	if build.DEBUG {
-		pb.ConsensusChecksum = tx.ConsensusChecksum()
+		b.ConsensusChecksum = tx.ConsensusChecksum()
 	}
 
-	return blockMap.Put(bid[:], encoding.Marshal(*pb))
+	return blockMap.Put(bid[:], encoding.Marshal(*b))
 }

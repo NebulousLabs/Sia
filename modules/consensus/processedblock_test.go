@@ -90,7 +90,7 @@ func TestIntegrationMinimumValidChildTimestamp(t *testing.T) {
 	if !ok || earliest != genesisTime+1 {
 		t.Error("incorrect child timestamp")
 	}
-	// Median should be genesisTime + 5 for pb11.
+	// Median should be genesisTime + 5 for b11.
 	earliest, ok = cs.MinimumValidChildTimestamp(blockIDs[10])
 	if !ok || earliest != genesisTime+5 {
 		t.Error("incorrect child timestamp")
@@ -100,44 +100,44 @@ func TestIntegrationMinimumValidChildTimestamp(t *testing.T) {
 // TestUnitHeavierThan probes the heavierThan method of the database.Block type.
 func TestUnitHeavierThan(t *testing.T) {
 	// Create a light node.
-	pbLight := new(database.Block)
-	pbLight.Depth[0] = 64
-	pbLight.ChildTarget[0] = 200
+	bLight := new(database.Block)
+	bLight.Depth[0] = 64
+	bLight.ChildTarget[0] = 200
 
 	// Create a node that's heavier, but not enough to beat the surpass
 	// threshold.
-	pbMiddle := new(database.Block)
-	pbMiddle.Depth[0] = 60
-	pbMiddle.ChildTarget[0] = 200
+	bMiddle := new(database.Block)
+	bMiddle.Depth[0] = 60
+	bMiddle.ChildTarget[0] = 200
 
 	// Create a node that's heavy enough to break the surpass threshold.
-	pbHeavy := new(database.Block)
-	pbHeavy.Depth[0] = 16
-	pbHeavy.ChildTarget[0] = 200
+	bHeavy := new(database.Block)
+	bHeavy.Depth[0] = 16
+	bHeavy.ChildTarget[0] = 200
 
-	// pbLight should not be heavier than pbHeavy.
-	if heavierThan(pbLight, pbHeavy) {
+	// bLight should not be heavier than bHeavy.
+	if heavierThan(bLight, bHeavy) {
 		t.Error("light heavier than heavy")
 	}
-	// pbLight should not be heavier than middle.
-	if heavierThan(pbLight, pbMiddle) {
+	// bLight should not be heavier than middle.
+	if heavierThan(bLight, bMiddle) {
 		t.Error("light heavier than middle")
 	}
-	// pbLight should not be heavier than itself.
-	if heavierThan(pbLight, pbLight) {
+	// bLight should not be heavier than itself.
+	if heavierThan(bLight, bLight) {
 		t.Error("light heavier than itself")
 	}
 
-	// pbMiddle should not be heavier than pbLight.
-	if heavierThan(pbMiddle, pbLight) {
+	// bMiddle should not be heavier than bLight.
+	if heavierThan(bMiddle, bLight) {
 		t.Error("middle heaver than light - surpass threshold should not have been broken")
 	}
-	// pbHeavy should be heaver than pbLight.
-	if !heavierThan(pbHeavy, pbLight) {
+	// bHeavy should be heaver than bLight.
+	if !heavierThan(bHeavy, bLight) {
 		t.Error("heavy is not heavier than light")
 	}
-	// pbHeavy should be heavier than pbMiddle.
-	if !heavierThan(pbHeavy, pbMiddle) {
+	// bHeavy should be heavier than bMiddle.
+	if !heavierThan(bHeavy, bMiddle) {
 		t.Error("heavy is not heavier than middle")
 	}
 }
@@ -145,18 +145,18 @@ func TestUnitHeavierThan(t *testing.T) {
 // TestChildDepth probes the childDeath method of the blockNode type.
 func TestChildDepth(t *testing.T) {
 	// Try adding to equal weight nodes, result should be half.
-	pb := new(database.Block)
-	pb.Depth[0] = 64
-	pb.ChildTarget[0] = 64
-	ChildDepth := pb.ChildDepth()
+	b := new(database.Block)
+	b.Depth[0] = 64
+	b.ChildTarget[0] = 64
+	ChildDepth := b.ChildDepth()
 	if ChildDepth[0] != 32 {
 		t.Error("unexpected child depth")
 	}
 
 	// Try adding nodes of different weights.
-	pb.Depth[0] = 24
-	pb.ChildTarget[0] = 48
-	ChildDepth = pb.ChildDepth()
+	b.Depth[0] = 24
+	b.ChildTarget[0] = 48
+	ChildDepth = b.ChildDepth()
 	if ChildDepth[0] != 16 {
 		t.Error("unexpected child depth")
 	}

@@ -83,34 +83,34 @@ func (cs *ConsensusSet) dbCurrentBlockID() (id types.BlockID) {
 
 // currentProcessedBlock returns the most recent block in the consensus set.
 func currentProcessedBlock(tx database.Tx) *database.Block {
-	pb, err := getBlockMap(tx, currentBlockID(tx))
+	b, err := getBlockMap(tx, currentBlockID(tx))
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	return pb
+	return b
 }
 
 // getBlockMap returns a processed block with the input id.
 func getBlockMap(tx database.Tx, id types.BlockID) (*database.Block, error) {
 	// Look up the encoded block.
-	pbBytes := tx.Bucket(BlockMap).Get(id[:])
-	if pbBytes == nil {
+	bBytes := tx.Bucket(BlockMap).Get(id[:])
+	if bBytes == nil {
 		return nil, errNilItem
 	}
 
 	// Decode the block - should never fail.
-	var pb database.Block
-	err := encoding.Unmarshal(pbBytes, &pb)
+	var b database.Block
+	err := encoding.Unmarshal(bBytes, &b)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	return &pb, nil
+	return &b, nil
 }
 
 // addBlockMap adds a processed block to the block map.
-func addBlockMap(tx database.Tx, pb *database.Block) {
-	id := pb.Block.ID()
-	err := tx.Bucket(BlockMap).Put(id[:], encoding.Marshal(*pb))
+func addBlockMap(tx database.Tx, b *database.Block) {
+	id := b.Block.ID()
+	err := tx.Bucket(BlockMap).Put(id[:], encoding.Marshal(*b))
 	if build.DEBUG && err != nil {
 		panic(err)
 	}

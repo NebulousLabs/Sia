@@ -213,19 +213,19 @@ func (cs *ConsensusSet) initOak(tx database.Tx) error {
 		if err != nil {
 			return errors.Extend(errors.New("unable to find block at height"), err)
 		}
-		pb, err := getBlockMap(tx, id)
+		b, err := getBlockMap(tx, id)
 		if err != nil {
 			return errors.Extend(errors.New("unable to find block from id"), err)
 		}
 
 		// Calculate and store the new block totals.
-		totalTime, totalTarget, err = cs.storeBlockTotals(tx, i, id, totalTime, parentTimestamp, pb.Block.Timestamp, totalTarget, parentChildTarget)
+		totalTime, totalTarget, err = cs.storeBlockTotals(tx, i, id, totalTime, parentTimestamp, b.Block.Timestamp, totalTarget, parentChildTarget)
 		if err != nil {
 			return errors.Extend(errors.New("unable to store updated block totals"), err)
 		}
 		// Update the previous values.
-		parentTimestamp = pb.Block.Timestamp
-		parentChildTarget = pb.ChildTarget
+		parentTimestamp = b.Block.Timestamp
+		parentChildTarget = b.ChildTarget
 	}
 
 	return nil

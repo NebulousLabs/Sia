@@ -299,23 +299,23 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 	err = cs.db.View(func(tx database.Tx) error {
 		csHeight = blockHeight(tx)
 		for _, id := range knownBlocks {
-			pb, err := getBlockMap(tx, id)
+			b, err := getBlockMap(tx, id)
 			if err != nil {
 				continue
 			}
-			pathID, err := getPath(tx, pb.Height)
+			pathID, err := getPath(tx, b.Height)
 			if err != nil {
 				continue
 			}
-			if pathID != pb.Block.ID() {
+			if pathID != b.Block.ID() {
 				continue
 			}
-			if pb.Height == csHeight {
+			if b.Height == csHeight {
 				break
 			}
 			found = true
 			// Start from the child of the common block.
-			start = pb.Height + 1
+			start = b.Height + 1
 			break
 		}
 		return nil
@@ -351,16 +351,16 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 					cs.log.Critical("Unable to get path: height", height, ":: request", i)
 					return err
 				}
-				pb, err := getBlockMap(tx, id)
+				b, err := getBlockMap(tx, id)
 				if err != nil {
 					cs.log.Critical("Unable to get block from block map: height", height, ":: request", i, ":: id", id)
 					return err
 				}
-				if pb == nil {
+				if b == nil {
 					cs.log.Critical("getBlockMap yielded 'nil' block:", height, ":: request", i, ":: id", id)
 					return errNilProcBlock
 				}
-				blocks = append(blocks, pb.Block)
+				blocks = append(blocks, b.Block)
 			}
 			moreAvailable = start+MaxCatchUpBlocks <= height
 			start += MaxCatchUpBlocks
@@ -494,11 +494,11 @@ func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 	var b types.Block
 	cs.mu.RLock()
 	err = cs.db.View(func(tx database.Tx) error {
-		pb, err := getBlockMap(tx, id)
+		db, err := getBlockMap(tx, id)
 		if err != nil {
 			return err
 		}
-		b = pb.Block
+		b = db.Block
 		return nil
 	})
 	cs.mu.RUnlock()

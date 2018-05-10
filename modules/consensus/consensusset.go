@@ -191,11 +191,11 @@ func (cs *ConsensusSet) BlockAtHeight(height types.BlockHeight) (block types.Blo
 		if err != nil {
 			return err
 		}
-		pb, err := getBlockMap(tx, id)
+		b, err := getBlockMap(tx, id)
 		if err != nil {
 			return err
 		}
-		block = pb.Block
+		block = b.Block
 		exists = true
 		return nil
 	})
@@ -205,12 +205,12 @@ func (cs *ConsensusSet) BlockAtHeight(height types.BlockHeight) (block types.Blo
 // BlockByID returns the block for a given BlockID.
 func (cs *ConsensusSet) BlockByID(id types.BlockID) (block types.Block, height types.BlockHeight, exists bool) {
 	_ = cs.db.View(func(tx database.Tx) error {
-		pb, err := getBlockMap(tx, id)
+		b, err := getBlockMap(tx, id)
 		if err != nil {
 			return err
 		}
-		block = pb.Block
-		height = pb.Height
+		block = b.Block
+		height = b.Height
 		exists = true
 		return nil
 	})
@@ -227,11 +227,11 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 	defer cs.tg.Done()
 
 	_ = cs.db.View(func(tx database.Tx) error {
-		pb, err := getBlockMap(tx, id)
+		b, err := getBlockMap(tx, id)
 		if err != nil {
 			return err
 		}
-		target = pb.ChildTarget
+		target = b.ChildTarget
 		exists = true
 		return nil
 	})
@@ -249,8 +249,8 @@ func (cs *ConsensusSet) managedCurrentBlock() (block types.Block) {
 	defer cs.mu.RUnlock()
 
 	_ = cs.db.View(func(tx database.Tx) error {
-		pb := currentProcessedBlock(tx)
-		block = pb.Block
+		b := currentProcessedBlock(tx)
+		block = b.Block
 		return nil
 	})
 	return block
@@ -272,8 +272,8 @@ func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
 	defer cs.mu.Unlock()
 
 	_ = cs.db.View(func(tx database.Tx) error {
-		pb := currentProcessedBlock(tx)
-		block = pb.Block
+		b := currentProcessedBlock(tx)
+		block = b.Block
 		return nil
 	})
 	return block
@@ -318,12 +318,12 @@ func (cs *ConsensusSet) InCurrentPath(id types.BlockID) (inPath bool) {
 	defer cs.tg.Done()
 
 	_ = cs.db.View(func(tx database.Tx) error {
-		pb, err := getBlockMap(tx, id)
+		b, err := getBlockMap(tx, id)
 		if err != nil {
 			inPath = false
 			return nil
 		}
-		pathID, err := getPath(tx, pb.Height)
+		pathID, err := getPath(tx, b.Height)
 		if err != nil {
 			inPath = false
 			return nil
@@ -346,11 +346,11 @@ func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp 
 
 	// Error is not checked because it does not matter.
 	_ = cs.db.View(func(tx database.Tx) error {
-		pb, err := getBlockMap(tx, id)
+		b, err := getBlockMap(tx, id)
 		if err != nil {
 			return err
 		}
-		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb)
+		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), b)
 		exists = true
 		return nil
 	})

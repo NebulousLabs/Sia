@@ -18,14 +18,14 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.Close()
-	pb := cst.cs.dbCurrentProcessedBlock()
+	b := cst.cs.dbCurrentProcessedBlock()
 
 	// Backtrack from the current node to the blockchain.
-	nodes := cst.cs.dbBacktrackToCurrentPath(pb)
+	nodes := cst.cs.dbBacktrackToCurrentPath(b)
 	if len(nodes) != 1 {
 		t.Fatal("backtracking to the current node gave incorrect result")
 	}
-	if nodes[0].Block.ID() != pb.Block.ID() {
+	if nodes[0].Block.ID() != b.Block.ID() {
 		t.Error("backtrack returned the wrong node")
 	}
 
@@ -40,22 +40,22 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if err != modules.ErrNonExtendingBlock {
 		t.Fatal(err)
 	}
-	pb, err = cst.cs.dbGetBlockMap(child1.ID())
+	b, err = cst.cs.dbGetBlockMap(child1.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
-	nodes = cst.cs.dbBacktrackToCurrentPath(pb)
+	nodes = cst.cs.dbBacktrackToCurrentPath(b)
 	if len(nodes) != 2 {
 		t.Error("backtracking grabbed wrong number of nodes")
 	}
-	parent, err := cst.cs.dbGetBlockMap(pb.Block.ParentID)
+	parent, err := cst.cs.dbGetBlockMap(b.Block.ParentID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if nodes[0].Block.ID() != parent.Block.ID() {
 		t.Error("grabbed the wrong block as the common block")
 	}
-	if nodes[1].Block.ID() != pb.Block.ID() {
+	if nodes[1].Block.ID() != b.Block.ID() {
 		t.Error("backtracked from the wrong node")
 	}
 }
@@ -71,10 +71,10 @@ func TestRevertToNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.Close()
-	pb := cst.cs.dbCurrentProcessedBlock()
+	b := cst.cs.dbCurrentProcessedBlock()
 
 	// Revert to a grandparent and verify the returned array is correct.
-	parent, err := cst.cs.dbGetBlockMap(pb.Block.ParentID)
+	parent, err := cst.cs.dbGetBlockMap(b.Block.ParentID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestRevertToNode(t *testing.T) {
 	if len(revertedNodes) != 2 {
 		t.Error("wrong number of nodes reverted")
 	}
-	if revertedNodes[0].Block.ID() != pb.Block.ID() {
+	if revertedNodes[0].Block.ID() != b.Block.ID() {
 		t.Error("wrong composition of reverted nodes")
 	}
 	if revertedNodes[1].Block.ID() != parent.Block.ID() {
@@ -101,5 +101,5 @@ func TestRevertToNode(t *testing.T) {
 			t.Error(r)
 		}
 	}()
-	cst.cs.dbRevertToNode(pb)
+	cst.cs.dbRevertToNode(b)
 }

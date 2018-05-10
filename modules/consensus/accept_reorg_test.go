@@ -69,13 +69,13 @@ func (rs *reorgSets) save() {
 		if err != nil {
 			panic(err)
 		}
-		pb, err := rs.cstMain.cs.dbGetBlockMap(id)
+		b, err := rs.cstMain.cs.dbGetBlockMap(id)
 		if err != nil {
 			panic(err)
 		}
 
 		// err is not checked - block may already be in cstBackup.
-		_ = rs.cstBackup.cs.AcceptBlock(pb.Block)
+		_ = rs.cstBackup.cs.AcceptBlock(b.Block)
 	}
 
 	// Check that cstMain and cstBackup are even.
@@ -102,11 +102,11 @@ func (rs *reorgSets) extend() {
 		if err != nil {
 			panic(err)
 		}
-		pb, err := rs.cstAlt.cs.dbGetBlockMap(id)
+		b, err := rs.cstAlt.cs.dbGetBlockMap(id)
 		if err != nil {
 			panic(err)
 		}
-		_ = rs.cstMain.cs.AcceptBlock(pb.Block)
+		_ = rs.cstMain.cs.AcceptBlock(b.Block)
 	}
 
 	// Check that cstMain and cstAlt are even.
@@ -133,11 +133,11 @@ func (rs *reorgSets) restore() {
 		if err != nil {
 			panic(err)
 		}
-		pb, err := rs.cstBackup.cs.dbGetBlockMap(id)
+		b, err := rs.cstBackup.cs.dbGetBlockMap(id)
 		if err != nil {
 			panic(err)
 		}
-		_ = rs.cstMain.cs.AcceptBlock(pb.Block)
+		_ = rs.cstMain.cs.AcceptBlock(b.Block)
 	}
 
 	// Check that cstMain and cstBackup are even.
@@ -292,19 +292,19 @@ func TestBuriedBadFork(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.Close()
-	pb := cst.cs.dbCurrentProcessedBlock()
+	b := cst.cs.dbCurrentProcessedBlock()
 
 	// Create a bad block that builds on a parent, so that it is part of not
 	// the longest fork.
 	badBlock := types.Block{
-		ParentID:     pb.Block.ParentID,
+		ParentID:     b.Block.ParentID,
 		Timestamp:    types.CurrentTimestamp(),
-		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(pb.Height)}},
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(b.Height)}},
 		Transactions: []types.Transaction{{
 			SiacoinInputs: []types.SiacoinInput{{}}, // Will trigger an error on full verification but not partial verification.
 		}},
 	}
-	parent, err := cst.cs.dbGetBlockMap(pb.Block.ParentID)
+	parent, err := cst.cs.dbGetBlockMap(b.Block.ParentID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +320,7 @@ func TestBuriedBadFork(t *testing.T) {
 	block := types.Block{
 		ParentID:     badBlock.ID(),
 		Timestamp:    types.CurrentTimestamp(),
-		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(pb.Height + 1)}},
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(b.Height + 1)}},
 	}
 	block, _ = cst.miner.SolveBlock(block, parent.ChildTarget) // okay because the target will not change
 	err = cst.cs.AcceptBlock(block)

@@ -23,15 +23,15 @@ func (cs *ConsensusSet) dbBlockHeight() (bh types.BlockHeight) {
 
 // dbCurrentProcessedBlock is a convenience function allowing
 // currentProcessedBlock to be called without a bolt.Tx.
-func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *database.Block) {
+func (cs *ConsensusSet) dbCurrentProcessedBlock() (b *database.Block) {
 	dbErr := cs.db.View(func(tx database.Tx) error {
-		pb = currentProcessedBlock(tx)
+		b = currentProcessedBlock(tx)
 		return nil
 	})
 	if dbErr != nil {
 		panic(dbErr)
 	}
-	return pb
+	return b
 }
 
 // dbGetPath is a convenience function allowing getPath to be called without a
@@ -61,15 +61,15 @@ func (cs *ConsensusSet) dbPushPath(bid types.BlockID) {
 
 // dbGetBlockMap is a convenience function allowing getBlockMap to be called
 // without a bolt.Tx.
-func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (pb *database.Block, err error) {
+func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (b *database.Block, err error) {
 	dbErr := cs.db.View(func(tx database.Tx) error {
-		pb, err = getBlockMap(tx, id)
+		b, err = getBlockMap(tx, id)
 		return nil
 	})
 	if dbErr != nil {
 		panic(dbErr)
 	}
-	return pb, err
+	return b, err
 }
 
 // dbGetSiacoinOutput is a convenience function allowing getSiacoinOutput to be

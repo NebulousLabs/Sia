@@ -25,11 +25,11 @@ type stdBlockRuleHelper struct{}
 //
 // To boost performance, minimumValidChildTimestamp is passed a bucket that it
 // can use from inside of a boltdb transaction.
-func (rh stdBlockRuleHelper) minimumValidChildTimestamp(blockMap *bolt.Bucket, pb *database.Block) types.Timestamp {
+func (rh stdBlockRuleHelper) minimumValidChildTimestamp(blockMap *bolt.Bucket, b *database.Block) types.Timestamp {
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
-	windowTimes[0] = pb.Block.Timestamp
-	parent := pb.Block.ParentID
+	windowTimes[0] = b.Block.Timestamp
+	parent := b.Block.ParentID
 	for i := uint64(1); i < types.MedianTimestampWindow; i++ {
 		// If the genesis block is 'parent', use the genesis block timestamp
 		// for all remaining times.

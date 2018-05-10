@@ -133,9 +133,9 @@ func (m *mockBlockMarshaler) AddPredefinedUnmarshal(u predefinedBlockUnmarshal) 
 	m.p = append(m.p, u)
 }
 
-// minimumValidChildTimestamp returns the minimum timestamp of pb that can be
+// minimumValidChildTimestamp returns the minimum timestamp of b that can be
 // considered a valid block.
-func (brh mockBlockRuleHelper) minimumValidChildTimestamp(blockMap *bolt.Bucket, pb *database.Block) types.Timestamp {
+func (brh mockBlockRuleHelper) minimumValidChildTimestamp(blockMap *bolt.Bucket, b *database.Block) types.Timestamp {
 	return brh.minTimestamp
 }
 
@@ -745,7 +745,7 @@ func TestBuriedBadTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.Close()
-	pb := cst.cs.dbCurrentProcessedBlock()
+	b := cst.cs.dbCurrentProcessedBlock()
 
 	// Create a good transaction using the wallet.
 	txnValue := types.NewCurrency64(1200)
@@ -772,12 +772,12 @@ func TestBuriedBadTransaction(t *testing.T) {
 
 	// Create a block with a buried bad transaction.
 	block := types.Block{
-		ParentID:     pb.Block.ID(),
+		ParentID:     b.Block.ID(),
 		Timestamp:    types.CurrentTimestamp(),
-		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(pb.Height + 1)}},
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(b.Height + 1)}},
 		Transactions: txns,
 	}
-	block, _ = cst.miner.SolveBlock(block, pb.ChildTarget)
+	block, _ = cst.miner.SolveBlock(block, b.ChildTarget)
 	err = cst.cs.AcceptBlock(block)
 	if err == nil {
 		t.Error("buried transaction didn't cause an error")
@@ -1043,11 +1043,11 @@ func TestChainedAcceptBlock(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		pb, err := cst.cs.dbGetBlockMap(id)
+		b, err := cst.cs.dbGetBlockMap(id)
 		if err != nil {
 			t.Fatal(err)
 		}
-		blocks = append(blocks, pb.Block)
+		blocks = append(blocks, b.Block)
 	}
 
 	// Create a jumbling of the blocks, so that the set is not in order.

@@ -77,12 +77,12 @@ func (cs *ConsensusSet) computeConsensusChange(tx database.Tx, ce database.Chang
 
 	// Grab the child target and the minimum valid child timestamp.
 	recentBlock := ce.AppliedBlocks[len(ce.AppliedBlocks)-1]
-	pb, err := getBlockMap(tx, recentBlock)
+	b, err := getBlockMap(tx, recentBlock)
 	if err != nil {
 		cs.log.Critical("could not find process block for known block")
 	}
-	cc.ChildTarget = pb.ChildTarget
-	cc.MinimumValidChildTimestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb)
+	cc.ChildTarget = b.ChildTarget
+	cc.MinimumValidChildTimestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), b)
 
 	currentBlock := currentBlockID(tx)
 	if cs.synced && recentBlock == currentBlock {

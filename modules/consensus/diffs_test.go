@@ -11,9 +11,9 @@ func TestCommitNodeDiffs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.Close()
-	pb := cst.cs.dbCurrentProcessedBlock()
+	b := cst.cs.dbCurrentProcessedBlock()
 	_ = cst.cs.db.Update(func(tx database.Tx) error {
-		commitDiffSet(tx, pb, modules.DiffRevert) // pull the block node out of the consensus set.
+		commitDiffSet(tx, b, modules.DiffRevert) // pull the block node out of the consensus set.
 		return nil
 	})
 
@@ -66,20 +66,20 @@ func TestCommitNodeDiffs(t *testing.T) {
 		Previous:  siafundPool,
 		Adjusted:  siafundPool.Add(types.NewCurrency64(1)),
 	}
-	pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod0)
-	pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod1)
-	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd0)
-	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd1)
-	pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod0)
-	pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod1)
-	pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-	pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
+	b.SiacoinOutputDiffs = append(b.SiacoinOutputDiffs, scod0)
+	b.SiacoinOutputDiffs = append(b.SiacoinOutputDiffs, scod1)
+	b.FileContractDiffs = append(b.FileContractDiffs, fcd0)
+	b.FileContractDiffs = append(b.FileContractDiffs, fcd1)
+	b.SiafundOutputDiffs = append(b.SiafundOutputDiffs, sfod0)
+	b.SiafundOutputDiffs = append(b.SiafundOutputDiffs, sfod1)
+	b.DelayedSiacoinOutputDiffs = append(b.DelayedSiacoinOutputDiffs, dscod)
+	b.SiafundPoolDiffs = append(b.SiafundPoolDiffs, sfpd)
 	_ = cst.cs.db.Update(func(tx database.Tx) error {
-		createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+		createUpcomingDelayedOutputMaps(tx, b, modules.DiffApply)
 		return nil
 	})
 	_ = cst.cs.db.Update(func(tx database.Tx) error {
-		commitNodeDiffs(tx, pb, modules.DiffApply)
+		commitNodeDiffs(tx, b, modules.DiffApply)
 		return nil
 	})
 	exists := cst.cs.db.inSiacoinOutputs(scoid)
@@ -95,7 +95,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 		t.Error("intradependent outputs not treated correctly")
 	}
 	_ = cst.cs.db.Update(func(tx database.Tx) error {
-		commitNodeDiffs(tx, pb, modules.DiffRevert)
+		commitNodeDiffs(tx, b, modules.DiffRevert)
 		return nil
 	})
 	exists = cst.cs.db.inSiacoinOutputs(scoid)
@@ -526,9 +526,9 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pb := cst.cs.currentProcessedBlock()
+	b := cst.cs.currentProcessedBlock()
 	err = cst.cs.db.Update(func(tx database.Tx) error {
-		return commitDiffSet(tx, pb, modules.DiffRevert)
+		return commitDiffSet(tx, b, modules.DiffRevert)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -548,19 +548,19 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 
 		// Trigger a panic by deleting a map with outputs in it during revert.
 		err = cst.cs.db.Update(func(tx database.Tx) error {
-			return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+			return createUpcomingDelayedOutputMaps(tx, b, modules.DiffApply)
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		err = cst.cs.db.Update(func(tx database.Tx) error {
-			return commitNodeDiffs(tx, pb, modules.DiffApply)
+			return commitNodeDiffs(tx, b, modules.DiffApply)
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		err = cst.cs.db.Update(func(tx database.Tx) error {
-			return deleteObsoleteDelayedOutputMaps(tx, pb, modules.DiffRevert)
+			return deleteObsoleteDelayedOutputMaps(tx, b, modules.DiffRevert)
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -569,7 +569,7 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 
 	// Trigger a panic by deleting a map with outputs in it during apply.
 	err = cst.cs.db.Update(func(tx database.Tx) error {
-		return deleteObsoleteDelayedOutputMaps(tx, pb, modules.DiffApply)
+		return deleteObsoleteDelayedOutputMaps(tx, b, modules.DiffApply)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -588,8 +588,8 @@ func TestGenerateAndApplyDiffSanity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pb := cst.cs.currentProcessedBlock()
-	cst.cs.commitDiffSet(pb, modules.DiffRevert)
+	b := cst.cs.currentProcessedBlock()
+	cst.cs.commitDiffSet(b, modules.DiffRevert)
 
 	defer func() {
 		r := recover()
@@ -604,11 +604,11 @@ func TestGenerateAndApplyDiffSanity(t *testing.T) {
 		}
 
 		// Trigger errRegenerteDiffs
-		_ = cst.cs.generateAndApplyDiff(pb)
+		_ = cst.cs.generateAndApplyDiff(b)
 	}()
 
 	// Trigger errInvalidSuccessor
-	parent := cst.cs.db.getBlockMap(pb.Parent)
+	parent := cst.cs.db.getBlockMap(b.Parent)
 	parent.DiffsGenerated = false
 	_ = cst.cs.generateAndApplyDiff(parent)
 }
