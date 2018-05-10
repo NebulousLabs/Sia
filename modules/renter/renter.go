@@ -350,9 +350,10 @@ func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostCont
 func (r *Renter) Settings() modules.RenterSettings {
 	download, upload, _ := r.hostContractor.RateLimits()
 	return modules.RenterSettings{
-		Allowance:        r.hostContractor.Allowance(),
-		MaxDownloadSpeed: download,
-		MaxUploadSpeed:   upload,
+		Allowance:         r.hostContractor.Allowance(),
+		DownloadCacheSize: r.downloadChunkCache.cacheSize,
+		MaxDownloadSpeed:  download,
+		MaxUploadSpeed:    upload,
 	}
 }
 

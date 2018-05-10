@@ -8,6 +8,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node/api"
+	"github.com/NebulousLabs/errors"
 )
 
 // RenterContractsGet requests the /renter/contracts resource
@@ -97,6 +98,18 @@ func (c *Client) RenterCancelAllowance() (err error) {
 // RenterPricesGet requests the /renter/prices endpoint's resources.
 func (c *Client) RenterPricesGet() (rpg api.RenterPricesGET, err error) {
 	err = c.get("/renter/prices", &rpg)
+	return
+}
+
+// RenterPostDownloadCacheSize uses the /renter endpoint to change the renter's
+// downloadCacheSize for streaming
+func (c *Client) RenterPostDownloadCacheSize(cacheSize uint64) (err error) {
+	if cacheSize <= 0 {
+		return errors.New("Download Cache Size must be greater than 0")
+	}
+	values := url.Values{}
+	values.Set("downloadCacheSize", strconv.FormatUint(cacheSize, 10))
+	err = c.post("/renter", values.Encode(), nil)
 	return
 }
 

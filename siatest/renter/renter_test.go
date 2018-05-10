@@ -313,6 +313,22 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 	// Grab the first of the group's renters
 	r := tg.Renters()[0]
 
+	// Testing setting downloadCacheSize for streaming
+	// Test setting it to larger than the defaultCacheSize
+	if err := r.RenterPostDownloadCacheSize(4); err != nil {
+		t.Fatal(err, "Could not set DownloadCacheSize to 4")
+	}
+
+	// Test resetting to the value of defaultDownloadCacheSize (2)
+	if err := r.RenterPostDownloadCacheSize(2); err != nil {
+		t.Fatal(err, "Could not set DownloadCacheSize to 2")
+	}
+
+	// Test setting to 0
+	if err := r.RenterPostDownloadCacheSize(0); err == nil {
+		t.Fatal(errors.New("Download Cache Set to 0, should have caused an error"))
+	}
+
 	// Set fileSize and redundancy for upload
 	dataPieces := uint64(1)
 	parityPieces := uint64(len(tg.Hosts())) - dataPieces

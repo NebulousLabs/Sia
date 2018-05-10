@@ -64,7 +64,7 @@ func (cch *chunkCacheHeap) Pop() interface{} {
 	return chunkData
 }
 
-// update, updates the heap and reorders
+// update updates the heap and reorders
 func (cch *chunkCacheHeap) update(cd *chunkData, id string, data []byte, lastAccess time.Time) {
 	cd.id = id
 	cd.data = data
@@ -86,6 +86,11 @@ func (dcc *downloadChunkCache) add(data []byte, cacheID string, destinationType 
 	defer dcc.mu.Unlock()
 
 	// Prune cache if necessary.
+	if dcc.cacheSize == 0 {
+		build.Critical("DownloadCacheSize is set to zero")
+		return
+	}
+
 	for len(dcc.chunkCacheMap) >= int(dcc.cacheSize) {
 		// Remove from Heap
 		cd := heap.Pop(&dcc.chunkCacheHeap).(*chunkData)
