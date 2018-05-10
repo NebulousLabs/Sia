@@ -7,7 +7,6 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -114,16 +113,6 @@ func commitSiafundPoolDiff(tx database.Tx, sfpd modules.SiafundPoolDiff, dir mod
 	}
 }
 
-// createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
-// will be used when applying delayed siacoin outputs in the diff set.
-func createUpcomingDelayedOutputMaps(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
-	if dir == modules.DiffApply {
-		createDSCOBucket(tx, pb.Height+types.MaturityDelay)
-	} else if pb.Height >= types.MaturityDelay {
-		createDSCOBucket(tx, pb.Height)
-	}
-}
-
 // commitNodeDiffs commits all of the diffs in a block node.
 func commitNodeDiffs(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
@@ -161,17 +150,6 @@ func commitNodeDiffs(tx database.Tx, pb *processedBlock, dir modules.DiffDirecti
 	}
 }
 
-// deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
-// are no longer in use.
-func deleteObsoleteDelayedOutputMaps(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
-	// There are no outputs that mature in the first MaturityDelay blocks.
-	if dir == modules.DiffApply && pb.Height >= types.MaturityDelay {
-		deleteDSCOBucket(tx, pb.Height)
-	} else if dir == modules.DiffRevert {
-		deleteDSCOBucket(tx, pb.Height+types.MaturityDelay)
-	}
-}
-
 // updateCurrentPath updates the current path after applying a diff set.
 func updateCurrentPath(tx database.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	// Update the current path.
@@ -189,9 +167,7 @@ func commitDiffSet(tx database.Tx, pb *processedBlock, dir modules.DiffDirection
 		commitDiffSetSanity(tx, pb, dir)
 	}
 
-	createUpcomingDelayedOutputMaps(tx, pb, dir)
 	commitNodeDiffs(tx, pb, dir)
-	deleteObsoleteDelayedOutputMaps(tx, pb, dir)
 	updateCurrentPath(tx, pb, dir)
 }
 
@@ -206,11 +182,6 @@ func generateAndApplyDiff(tx database.Tx, pb *processedBlock) error {
 	if build.DEBUG && pb.Block.ParentID != currentBlockID(tx) {
 		panic(errInvalidSuccessor)
 	}
-
-	// Create the bucket to hold all of the delayed siacoin outputs created by
-	// transactions this block. Needs to happen before any transactions are
-	// applied.
-	createDSCOBucket(tx, pb.Height+types.MaturityDelay)
 
 	// Validate and apply each transaction in the block. They cannot be
 	// validated all at once because some transactions may not be valid until

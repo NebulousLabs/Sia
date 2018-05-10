@@ -14,6 +14,17 @@ import (
 	"github.com/coreos/bbolt"
 )
 
+// bucketSize is a helper function that returns the number of keys in a
+// bucket. Ideally we would use b.Stats().KeyN, but there is a bug in bolt
+// that makes this value unreliable.
+func bucketSize(b *bolt.Bucket) (n int) {
+	b.ForEach(func(_, _ []byte) error {
+		n++
+		return nil
+	})
+	return
+}
+
 // A Tx is a database transaction.
 type Tx interface {
 	Bucket(name []byte) *bolt.Bucket
@@ -92,6 +103,16 @@ type Tx interface {
 	AddSiafundOutput(id types.SiafundOutputID, sfo types.SiafundOutput)
 	// DeleteSiafundOutput removes a siafund output from the database.
 	DeleteSiafundOutput(id types.SiafundOutputID)
+
+	// DelayedSiacoinOutput returns the siacoin outputs that will become
+	// spendable at the specified height.
+	DelayedSiacoinOutputs(height types.BlockHeight) ([]types.SiacoinOutputID, []types.SiacoinOutput)
+	// AddDelayedSiacoinOutput adds a delayed siacoin output at the specified
+	// height.
+	AddDelayedSiacoinOutput(height types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput)
+	// DeleteDelayedSiacoinOutput deletes the delayed siacoin output with the
+	// specified id at the specified height.
+	DeleteDelayedSiacoinOutput(height types.BlockHeight, id types.SiacoinOutputID)
 }
 
 type txWrapper struct {
@@ -360,7 +381,7 @@ func (tx txWrapper) DeleteFileContract(id types.FileContractID) {
 	}
 
 	// Delete expiration bucket if it is empty
-	if b.Stats().KeyN == 0 {
+	if bucketSize(b) == 0 {
 		tx.DeleteBucket(expirationBucketID)
 	}
 }
@@ -422,6 +443,53 @@ func (tx txWrapper) DeleteSiafundOutput(id types.SiafundOutputID) {
 	err := tx.Bucket(siafundOutputs).Delete(id[:])
 	if build.DEBUG && err != nil {
 		panic(err)
+	}
+}
+
+// DelayedSiacoinOutputs implements the Tx interface.
+func (tx txWrapper) DelayedSiacoinOutputs(height types.BlockHeight) (ids []types.SiacoinOutputID, scos []types.SiacoinOutput) {
+	dscoBucket := tx.Bucket(append(prefixDSCO, encoding.Marshal(height)...))
+	if dscoBucket == nil {
+		return nil, nil
+	}
+	err := dscoBucket.ForEach(func(k, v []byte) error {
+		var id types.SiacoinOutputID
+		copy(id[:], k)
+		var sco types.SiacoinOutput
+		err := encoding.Unmarshal(v, &sco)
+		ids = append(ids, id)
+		scos = append(scos, sco)
+		return err
+	})
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return
+}
+
+// AddDelayedSiacoinOutput implements the Tx interface.
+func (tx txWrapper) AddDelayedSiacoinOutput(height types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
+	dscoBucket, err := tx.CreateBucketIfNotExists(append(prefixDSCO, encoding.Marshal(height)...))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = dscoBucket.Put(id[:], encoding.Marshal(sco))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// DeleteDelayedSiacoinOutput implements the Tx interface.
+func (tx txWrapper) DeleteDelayedSiacoinOutput(height types.BlockHeight, id types.SiacoinOutputID) {
+	dscoBucketID := append(prefixDSCO, encoding.Marshal(height)...)
+	dscoBucket := tx.Bucket(dscoBucketID)
+	err := dscoBucket.Delete(id[:])
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	// Delete dscoBucket bucket if it is empty
+	if bucketSize(dscoBucket) == 0 {
+		tx.DeleteBucket(dscoBucketID)
 	}
 }
 

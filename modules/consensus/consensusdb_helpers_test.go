@@ -4,7 +4,6 @@ package consensus
 // compatibility with the test suite.
 
 import (
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -166,21 +165,14 @@ func (cs *ConsensusSet) dbGetSiafundPool() (siafundPool types.Currency) {
 // found at the maturity height indicated by the input.
 func (cs *ConsensusSet) dbGetDSCO(height types.BlockHeight, id types.SiacoinOutputID) (dsco types.SiacoinOutput, err error) {
 	dbErr := cs.db.View(func(tx database.Tx) error {
-		dscoBucketID := append(prefixDSCO, encoding.Marshal(height)...)
-		dscoBucket := tx.Bucket(dscoBucketID)
-		if dscoBucket == nil {
-			err = errNilItem
-			return nil
+		ids, scos := tx.DelayedSiacoinOutputs(height)
+		for i := range ids {
+			if ids[i] == id {
+				dsco = scos[i]
+				return nil
+			}
 		}
-		dscoBytes := dscoBucket.Get(id[:])
-		if dscoBytes == nil {
-			err = errNilItem
-			return nil
-		}
-		err = encoding.Unmarshal(dscoBytes, &dsco)
-		if err != nil {
-			panic(err)
-		}
+		err = errNilItem
 		return nil
 	})
 	if dbErr != nil {

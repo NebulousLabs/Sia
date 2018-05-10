@@ -15,10 +15,6 @@ import (
 )
 
 var (
-	prefixDSCO = []byte("dsco_")
-)
-
-var (
 	// BlockMap is a database bucket containing all of the processed blocks,
 	// keyed by their id. This includes blocks that are not currently in the
 	// consensus set, and blocks that may not have been fully validated yet.
@@ -43,7 +39,6 @@ func (cs *ConsensusSet) createConsensusDB(tx database.Tx) error {
 
 	// Add the miner payout from the genesis block to the delayed siacoin
 	// outputs - unspendable, as the unlock hash is blank.
-	createDSCOBucket(tx, types.MaturityDelay)
 	addDSCO(tx, types.MaturityDelay, cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{
 		Value:      types.CalculateCoinbase(0),
 		UnlockHash: types.UnlockHash{},
@@ -302,58 +297,28 @@ func addDSCO(tx database.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco
 		if _, exists := tx.SiacoinOutput(id); exists {
 			panic("dsco already in output set")
 		}
+		// Sanity check - should not be adding an item already in the db.
+		ids, _ := tx.DelayedSiacoinOutputs(bh)
+		for i := range ids {
+			if ids[i] == id {
+				panic(errRepeatInsert)
+			}
+		}
 	}
-	dscoBucketID := append(prefixDSCO, encoding.EncUint64(uint64(bh))...)
-	dscoBucket := tx.Bucket(dscoBucketID)
-	// Sanity check - should not be adding an item already in the db.
-	if build.DEBUG && dscoBucket.Get(id[:]) != nil {
-		panic(errRepeatInsert)
-	}
-	err := dscoBucket.Put(id[:], encoding.Marshal(sco))
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.AddDelayedSiacoinOutput(bh, id, sco)
 }
 
 // removeDSCO removes a delayed siacoin output from the consensus set.
 func removeDSCO(tx database.Tx, bh types.BlockHeight, id types.SiacoinOutputID) {
-	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
-	// Sanity check - should not remove an item not in the db.
-	dscoBucket := tx.Bucket(bucketID)
-	if build.DEBUG && dscoBucket.Get(id[:]) == nil {
-		panic("nil dsco")
+	if build.DEBUG {
+		// Sanity check - should not be deleting an item not in the db.
+		ids, _ := tx.DelayedSiacoinOutputs(bh)
+		for len(ids) > 0 && ids[0] != id {
+			ids = ids[1:]
+		}
+		if len(ids) == 0 {
+			panic("nil dsco")
+		}
 	}
-	err := dscoBucket.Delete(id[:])
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-}
-
-// createDSCOBucket creates a bucket for the delayed siacoin outputs at the
-// input height.
-func createDSCOBucket(tx database.Tx, bh types.BlockHeight) {
-	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
-	_, err := tx.CreateBucket(bucketID)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-}
-
-// deleteDSCOBucket deletes the bucket that held a set of delayed siacoin
-// outputs.
-func deleteDSCOBucket(tx database.Tx, bh types.BlockHeight) {
-	// Delete the bucket.
-	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
-	bucket := tx.Bucket(bucketID)
-	if build.DEBUG && bucket == nil {
-		panic(errNilBucket)
-	}
-
-	// TODO: Check that the bucket is empty. Using Stats() does not work at the
-	// moment, as there is an error in the boltdb code.
-
-	err := tx.DeleteBucket(bucketID)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.DeleteDelayedSiacoinOutput(bh, id)
 }

@@ -1,50 +1,5 @@
 package consensus
 
-import (
-	"testing"
-
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus/database"
-	"github.com/NebulousLabs/Sia/types"
-)
-
-// TestCommitDelayedSiacoinOutputDiffBadMaturity commits a delayed siacoin
-// output that has a bad maturity height and triggers a panic.
-func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-	cst, err := createConsensusSetTester(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.Close()
-
-	// Trigger an inconsistency check.
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Error("expecting error after corrupting database")
-		}
-	}()
-
-	// Commit a delayed siacoin output with maturity height = cs.height()+1
-	maturityHeight := cst.cs.dbBlockHeight() - 1
-	id := types.SiacoinOutputID{'1'}
-	dsco := types.SiacoinOutput{Value: types.NewCurrency64(1)}
-	dscod := modules.DelayedSiacoinOutputDiff{
-		Direction:      modules.DiffApply,
-		ID:             id,
-		SiacoinOutput:  dsco,
-		MaturityHeight: maturityHeight,
-	}
-	_ = cst.cs.db.Update(func(tx database.Tx) error {
-		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-		return nil
-	})
-}
-
 // TestCommitNodeDiffs probes the commitNodeDiffs method of the consensus set.
 /*
 func TestCommitNodeDiffs(t *testing.T) {
