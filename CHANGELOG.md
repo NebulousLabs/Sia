@@ -8,7 +8,6 @@ v1.3.3 (patch release)
 - Faster contract formation
 - Improved wallet scaling
 
-
 March 2018:
 
 v1.3.2 (patch release)
