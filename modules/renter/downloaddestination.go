@@ -45,11 +45,13 @@ type downloadDestinationBuffer [][]byte
 // the downloadDestinationBuffer and returns the new buffer.
 func NewDownloadDestinationBuffer(length uint64) downloadDestinationBuffer {
 	// Round length up to next multiple of SectorSize.
-	length += modules.SectorSize - length%modules.SectorSize
-	buf := make([][]byte, length/modules.SectorSize)
-	for i := 0; length > 0; i++ {
-		buf[i] = make([]byte, modules.SectorSize)
-		length -= modules.SectorSize
+	if length%pieceSize != 0 {
+		length += pieceSize - length%pieceSize
+	}
+	buf := make([][]byte, 0, length/pieceSize)
+	for length > 0 {
+		buf = append(buf, make([]byte, pieceSize))
+		length -= pieceSize
 	}
 	return buf
 }

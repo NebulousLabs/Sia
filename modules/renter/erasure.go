@@ -1,12 +1,12 @@
 package renter
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/klauspost/reedsolomon"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/errors"
 )
 
 // rsCode is a Reed-Solomon encoder/decoder. It implements the
@@ -45,11 +45,11 @@ func (rs *rsCode) Encode(data []byte) ([][]byte, error) {
 func (rs *rsCode) EncodeShards(pieces [][]byte) ([][]byte, error) {
 	// Check that the caller provided the minimum amount of pieces.
 	if len(pieces) != rs.MinPieces() {
-		return nil, errors.New("too few data pieces given")
+		return nil, fmt.Errorf("invalid number of pieces given %v %v", len(pieces), rs.MinPieces())
 	}
 	// Add the parity shards to pieces.
 	for len(pieces) < rs.NumPieces() {
-		pieces = append(pieces, make([]byte, modules.SectorSize))
+		pieces = append(pieces, make([]byte, pieceSize))
 	}
 	err := rs.enc.Encode(pieces)
 	if err != nil {
