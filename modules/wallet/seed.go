@@ -409,7 +409,11 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		if err != nil {
 			return types.ZeroCurrency, types.ZeroCurrency, err
 		}
-
+		defer func() {
+			if err != nil {
+				tb.Drop()
+			}
+		}()
 		var sweptCoins, sweptFunds types.Currency // total values of swept outputs
 		for _, output := range txnSiacoinOutputs {
 			// construct a siacoin input that spends the output

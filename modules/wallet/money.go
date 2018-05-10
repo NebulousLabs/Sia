@@ -241,7 +241,7 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.
 
 // SendSiafunds creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
-func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
+func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) (txns []types.Transaction, err error) {
 	if err := w.tg.Add(); err != nil {
 		err = modules.ErrWalletShutdown
 		return nil, err
@@ -266,6 +266,11 @@ func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]t
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			txnBuilder.Drop()
+		}
+	}()
 	err = txnBuilder.FundSiacoins(tpoolFee)
 	if err != nil {
 		return nil, err
