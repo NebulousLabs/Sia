@@ -61,9 +61,23 @@ func (dw downloadDestinationBuffer) Close() error {
 	return nil
 }
 
+// ReadFrom reads data from a io.Reader until the buffer is full.
+func (dw downloadDestinationBuffer) ReadFrom(r io.Reader) (int64, error) {
+	var n int64
+	for len(dw) > 0 {
+		read, err := io.ReadFull(r, dw[0])
+		if err != nil {
+			return 0, err
+		}
+		dw = dw[1:]
+		n += int64(read)
+	}
+	return n, nil
+}
+
 // WriteAt writes the provided data to the downloadDestinationBuffer.
 func (dw downloadDestinationBuffer) WriteAt(data []byte, offset int64) (int, error) {
-	if uint64(len(data)+int(offset)) > uint64(len(dw))*modules.SectorSize || offset < 0 {
+	if uint64(len(data))+uint64(offset) > uint64(len(dw))*pieceSize || offset < 0 {
 		return 0, errors.New("write at specified offset exceeds buffer size")
 	}
 	written := len(data)

@@ -300,9 +300,9 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedUploadChunk) erro
 	// TODO: Once we have enabled support for small chunks, we should stop
 	// needing to ignore the EOF errors, because the chunk size should always
 	// match the tail end of the file. Until then, we ignore io.EOF.
-	sr := NewShardReader(osFile)
-	buf := [][]byte(NewDownloadDestinationBuffer(chunk.length))
-	_, err = sr.ReadAt(buf, chunk.offset)
+	buf := NewDownloadDestinationBuffer(chunk.length)
+	sr := io.NewSectionReader(osFile, chunk.offset, int64(chunk.length))
+	_, err = buf.ReadFrom(sr)
 	if err != nil && err != io.EOF && download {
 		return r.managedDownloadLogicalChunkData(chunk)
 	} else if err != nil && err != io.EOF {
