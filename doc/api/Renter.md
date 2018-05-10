@@ -317,48 +317,46 @@ lists the status of specified file.
 ###### JSON Response
 ```javascript
 {
-  "file": [ 
-    {
-      // Path to the file in the renter on the network.
-      "siapath": "foo/bar.txt",
+  "file": {
+    // Path to the file in the renter on the network.
+    "siapath": "foo/bar.txt",
 
-      // Path to the local file on disk.
-      "localpath": "/home/foo/bar.txt",
+    // Path to the local file on disk.
+    "localpath": "/home/foo/bar.txt",
 
-      // Size of the file in bytes.
-      "filesize": 8192, // bytes
+    // Size of the file in bytes.
+    "filesize": 8192, // bytes
 
-      // true if the file is available for download. Files may be available
-      // before they are completely uploaded.
-      "available": true,
+    // true if the file is available for download. Files may be available
+    // before they are completely uploaded.
+    "available": true,
 
-      // true if the file's contracts will be automatically renewed by the
-      // renter.
-      "renewing": true,
+    // true if the file's contracts will be automatically renewed by the
+    // renter.
+    "renewing": true,
 
-      // Average redundancy of the file on the network. Redundancy is
-      // calculated by dividing the amount of data uploaded in the file's open
-      // contracts by the size of the file. Redundancy does not necessarily
-      // correspond to availability. Specifically, a redundancy >= 1 does not
-      // indicate the file is available as there could be a chunk of the file
-      // with 0 redundancy.
-      "redundancy": 5,
+    // Average redundancy of the file on the network. Redundancy is
+    // calculated by dividing the amount of data uploaded in the file's open
+    // contracts by the size of the file. Redundancy does not necessarily
+    // correspond to availability. Specifically, a redundancy >= 1 does not
+    // indicate the file is available as there could be a chunk of the file
+    // with 0 redundancy.
+    "redundancy": 5,
 
-      // Total number of bytes successfully uploaded via current file contracts.
-      // This number includes padding and rendundancy, so a file with a size of
-      // 8192 bytes might be padded to 40 MiB and, with a redundancy of 5,
-      // encoded to 200 MiB for upload.
-      "uploadedbytes": 209715200, // bytes
+    // Total number of bytes successfully uploaded via current file contracts.
+    // This number includes padding and rendundancy, so a file with a size of
+    // 8192 bytes might be padded to 40 MiB and, with a redundancy of 5,
+    // encoded to 200 MiB for upload.
+    "uploadedbytes": 209715200, // bytes
 
-      // Percentage of the file uploaded, including redundancy. Uploading has
-      // completed when uploadprogress is 100. Files may be available for
-      // download before upload progress is 100.
-      "uploadprogress": 100, // percent
+    // Percentage of the file uploaded, including redundancy. Uploading has
+    // completed when uploadprogress is 100. Files may be available for
+    // download before upload progress is 100.
+    "uploadprogress": 100, // percent
 
-      // Block height at which the file ceases availability.
-      "expiration": 60000
-    }   
-  ]
+    // Block height at which the file ceases availability.
+    "expiration": 60000
+  }   
 }
 ```
 

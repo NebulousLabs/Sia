@@ -997,19 +997,17 @@ lists the status of specified file.
 ###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-4)
 ```javascript
 {
-  "file": [
-    {
-      "siapath":        "foo/bar.txt",
-      "localpath":      "/home/foo/bar.txt",
-      "filesize":       8192, // bytes
-      "available":      true,
-      "renewing":       true,
-      "redundancy":     5,
-      "bytesuploaded":  209715200, // total bytes uploaded
-      "uploadprogress": 100, // percent
-      "expiration":     60000
-    }
-  ]
+  "file": {
+    "siapath":        "foo/bar.txt",
+    "localpath":      "/home/foo/bar.txt",
+    "filesize":       8192, // bytes
+    "available":      true,
+    "renewing":       true,
+    "redundancy":     5,
+    "bytesuploaded":  209715200, // total bytes uploaded
+    "uploadprogress": 100, // percent
+    "expiration":     60000
+  }
 }
 ```
 

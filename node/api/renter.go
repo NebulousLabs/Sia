@@ -125,8 +125,7 @@ type (
 
 	// RenterFile lists the file queried.
 	RenterFile struct {
-		File  modules.FileInfo `json:"file"`
-		Error error            `json:"error"`
+		File modules.FileInfo `json:"file"`
 	}
 
 	// RenterFiles lists the files known to the renter.
