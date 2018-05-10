@@ -67,7 +67,7 @@ func (dw downloadDestinationBuffer) ReadFrom(r io.Reader) (int64, error) {
 	for len(dw) > 0 {
 		read, err := io.ReadFull(r, dw[0])
 		if err != nil {
-			return 0, err
+			return n, err
 		}
 		dw = dw[1:]
 		n += int64(read)

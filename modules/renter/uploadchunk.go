@@ -303,9 +303,11 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedUploadChunk) erro
 	buf := NewDownloadDestinationBuffer(chunk.length)
 	sr := io.NewSectionReader(osFile, chunk.offset, int64(chunk.length))
 	_, err = buf.ReadFrom(sr)
-	if err != nil && err != io.EOF && download {
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF && download {
+		r.log.Debugln("failed to read file, downloading instead:", err)
 		return r.managedDownloadLogicalChunkData(chunk)
-	} else if err != nil && err != io.EOF {
+	} else if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		r.log.Debugln("failed to read file locally:", err)
 		return errors.Extend(err, errors.New("failed to read file locally"))
 	}
 	chunk.logicalChunkData = buf
