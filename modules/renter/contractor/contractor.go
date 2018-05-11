@@ -157,6 +157,13 @@ func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	return newID
 }
 
+// RateLimits sets the bandwidth limits for connections created by the
+// contractSet.
+func (c *Contractor) RateLimits() (int64, int64) {
+	download, upload := c.staticContracts.RateLimits()
+	return download, upload
+}
+
 // SetRateLimits sets the bandwidth limits for connections created by the
 // contractSet.
 func (c *Contractor) SetRateLimits(readBPS, writeBPS int64, packetSize uint64) {
