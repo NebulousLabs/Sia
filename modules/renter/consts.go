@@ -50,6 +50,13 @@ var (
 
 	// Erasure-coded piece size
 	pieceSize = modules.SectorSize - crypto.TwofishOverhead
+
+	// maxUploadHeapLength is the maximum amount of data that can be in the
+	// upload chunkHeap at once. This assumes a logical upload speed of 1 Gbps.
+	maxUploadHeapLength = func() uint64 {
+		bps := uint64(125 * 1 << 20) // Gigabit
+		return uint64(rebuildChunkHeapInterval.Seconds()) * bps
+	}()
 )
 
 const (

@@ -235,10 +235,16 @@ func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}) {
 	// Loop through the whole set of files and get a list of chunks to add to
 	// the heap.
 	id := r.mu.Lock()
+	heapLength := uint64(0)
 	for _, file := range r.files {
 		unfinishedUploadChunks := r.buildUnfinishedChunks(file, hosts)
-		for i := 0; i < len(unfinishedUploadChunks); i++ {
+		for i := 0; i < len(unfinishedUploadChunks) && heapLength < maxUploadHeapLength; i++ {
+
 			r.uploadHeap.managedPush(unfinishedUploadChunks[i])
+			heapLength += unfinishedUploadChunks[i].length
+		}
+		if heapLength >= maxUploadHeapLength {
+			break
 		}
 	}
 	r.mu.Unlock(id)
