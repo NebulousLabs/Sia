@@ -1,7 +1,6 @@
 package database
 
 import (
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -166,35 +165,14 @@ func (b *Block) ChildDepth() types.Target {
 	return b.Depth.AddDifficulties(b.ChildTarget)
 }
 
-type (
-	// ChangeEntry records a single atomic change to the consensus set.
-	ChangeEntry struct {
-		RevertedBlocks []types.BlockID
-		AppliedBlocks  []types.BlockID
-	}
-
-	// changeNode contains a change entry and a pointer to the next change
-	// entry, and is the object that gets stored in the database.
-	changeNode struct {
-		Entry ChangeEntry
-		Next  modules.ConsensusChangeID
-	}
-)
+// ChangeEntry records a single atomic change to the consensus set.
+type ChangeEntry struct {
+	RevertedBlocks []types.BlockID
+	AppliedBlocks  []types.BlockID
+	Next           modules.ConsensusChangeID
+}
 
 // ID returns the id of a change entry.
 func (ce ChangeEntry) ID() modules.ConsensusChangeID {
 	return modules.ConsensusChangeID(crypto.HashObject(ce))
-}
-
-// NextEntry returns the entry after the current entry.
-func (ce *ChangeEntry) NextEntry(tx Tx) (nextEntry ChangeEntry, exists bool) {
-	ceid := ce.ID()
-
-	var cn changeNode
-	err := encoding.Unmarshal(tx.Bucket(changeLog).Get(ceid[:]), &cn)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-
-	return tx.ChangeEntry(cn.Next)
 }

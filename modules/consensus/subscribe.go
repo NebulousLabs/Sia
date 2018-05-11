@@ -159,7 +159,7 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 				// perform a rescan of the consensus set.
 				return modules.ErrInvalidConsensusChangeID
 			}
-			entry, exists = entry.NextEntry(tx)
+			entry, exists = getEntry(tx, entry.Next)
 		}
 		return nil
 	})
@@ -185,7 +185,7 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 					return err
 				}
 				subscriber.ProcessConsensusChange(cc)
-				entry, exists = entry.NextEntry(tx)
+				entry, exists = getEntry(tx, entry.Next)
 			}
 			return nil
 		})

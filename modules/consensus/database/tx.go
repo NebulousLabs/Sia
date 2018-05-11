@@ -272,23 +272,23 @@ func (tx txWrapper) AddBlock(b *Block) {
 
 // ChangeEntry implements the Tx interface.
 func (tx txWrapper) ChangeEntry(id modules.ConsensusChangeID) (ChangeEntry, bool) {
-	var cn changeNode
-	changeNodeBytes := tx.Bucket(changeLog).Get(id[:])
-	if changeNodeBytes == nil {
+	changeEntryBytes := tx.Bucket(changeLog).Get(id[:])
+	if changeEntryBytes == nil {
 		return ChangeEntry{}, false
 	}
-	err := encoding.Unmarshal(changeNodeBytes, &cn)
+	var ce ChangeEntry
+	err := encoding.Unmarshal(changeEntryBytes, &ce)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	return cn.Entry, true
+	return ce, true
 }
 
 // AppendChangeEntry implements the Tx interface.
 func (tx txWrapper) AppendChangeEntry(ce ChangeEntry) {
 	ceid := ce.ID()
 	b := tx.Bucket(changeLog)
-	err := b.Put(ceid[:], encoding.Marshal(changeNode{Entry: ce}))
+	err := b.Put(ceid[:], encoding.Marshal(ce))
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
@@ -296,13 +296,13 @@ func (tx txWrapper) AppendChangeEntry(ce ChangeEntry) {
 	// If this is not the first change entry, update the previous entry to
 	// point to this one.
 	if tailID := b.Get(changeLogTailID); tailID != nil {
-		var tailCN changeNode
-		err = encoding.Unmarshal(b.Get(tailID), &tailCN)
+		var tailCE ChangeEntry
+		err = encoding.Unmarshal(b.Get(tailID), &tailCE)
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
-		tailCN.Next = ceid
-		err = b.Put(tailID, encoding.Marshal(tailCN))
+		tailCE.Next = ceid
+		err = b.Put(tailID, encoding.Marshal(tailCE))
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
