@@ -27,12 +27,6 @@ func bucketSize(b *bolt.Bucket) (n int) {
 
 // A Tx is a database transaction.
 type Tx interface {
-	Bucket(name []byte) *bolt.Bucket
-	CreateBucket(name []byte) (*bolt.Bucket, error)
-	CreateBucketIfNotExists(name []byte) (*bolt.Bucket, error)
-	DeleteBucket(name []byte) error
-	ForEach(func([]byte, *bolt.Bucket) error) error
-
 	// ConsensusChecksum grabs a checksum of the consensus set by pushing all
 	// of the elements in sorted order into a Merkle tree and taking the root.
 	// All consensus sets with the same current block should have identical
