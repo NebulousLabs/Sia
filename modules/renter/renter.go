@@ -135,7 +135,7 @@ type hostContractor interface {
 
 	// RateLimits Gets the bandwidth limits for connections created by the
 	// contractor and its submodules.
-	RateLimits() (int64, int64)
+	RateLimits() (int64, int64, uint64)
 
 	// SetRateLimits sets the bandwidth limits for connections created by the
 	// contractor and its submodules.
@@ -347,7 +347,7 @@ func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostCont
 
 // Settings returns the host contractor's allowance
 func (r *Renter) Settings() modules.RenterSettings {
-	download, upload := r.hostContractor.RateLimits()
+	download, upload, _ := r.hostContractor.RateLimits()
 	return modules.RenterSettings{
 		Allowance:        r.hostContractor.Allowance(),
 		MaxDownloadSpeed: download,
