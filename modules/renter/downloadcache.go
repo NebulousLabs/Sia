@@ -80,6 +80,8 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 	if udc.download.chunksRemaining == 0 {
 		udc.download.endTime = time.Now()
 		close(udc.download.completeChan)
+		udc.download.destination.Close()
+		udc.download.destination = nil
 	}
 	udc.download.mu.Unlock()
 	return true
