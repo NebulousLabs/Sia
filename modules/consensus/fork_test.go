@@ -25,7 +25,7 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if len(nodes) != 1 {
 		t.Fatal("backtracking to the current node gave incorrect result")
 	}
-	if nodes[0].Block.ID() != b.Block.ID() {
+	if nodes[0].Block.ID() != b.ID() {
 		t.Error("backtrack returned the wrong node")
 	}
 
@@ -48,14 +48,14 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if len(nodes) != 2 {
 		t.Error("backtracking grabbed wrong number of nodes")
 	}
-	parent, err := cst.cs.dbGetBlockMap(b.Block.ParentID)
+	parent, err := cst.cs.dbGetBlockMap(b.ParentID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if nodes[0].Block.ID() != parent.Block.ID() {
 		t.Error("grabbed the wrong block as the common block")
 	}
-	if nodes[1].Block.ID() != b.Block.ID() {
+	if nodes[1].Block.ID() != b.ID() {
 		t.Error("backtracked from the wrong node")
 	}
 }
@@ -74,7 +74,7 @@ func TestRevertToNode(t *testing.T) {
 	b := cst.cs.dbCurrentProcessedBlock()
 
 	// Revert to a grandparent and verify the returned array is correct.
-	parent, err := cst.cs.dbGetBlockMap(b.Block.ParentID)
+	parent, err := cst.cs.dbGetBlockMap(b.ParentID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestRevertToNode(t *testing.T) {
 	if len(revertedNodes) != 2 {
 		t.Error("wrong number of nodes reverted")
 	}
-	if revertedNodes[0].Block.ID() != b.Block.ID() {
+	if revertedNodes[0].Block.ID() != b.ID() {
 		t.Error("wrong composition of reverted nodes")
 	}
 	if revertedNodes[1].Block.ID() != parent.Block.ID() {

@@ -25,9 +25,9 @@ func TestApplyMinerPayouts(t *testing.T) {
 	// Create a block node with a single miner payout.
 	b := new(database.Block)
 	b.Height = cst.cs.dbBlockHeight()
-	b.Block.Timestamp = 2 // MinerPayout id is determined by block id + index; add uniqueness to the block id.
-	b.Block.MinerPayouts = append(b.Block.MinerPayouts, types.SiacoinOutput{Value: types.NewCurrency64(12)})
-	mpid0 := b.Block.MinerPayoutID(0)
+	b.Timestamp = 2 // MinerPayout id is determined by block id + index; add uniqueness to the block id.
+	b.MinerPayouts = append(b.MinerPayouts, types.SiacoinOutput{Value: types.NewCurrency64(12)})
+	mpid0 := b.MinerPayoutID(0)
 
 	// Apply the single miner payout.
 	_ = cst.cs.db.Update(func(tx database.Tx) error {

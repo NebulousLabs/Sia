@@ -28,8 +28,8 @@ type stdBlockRuleHelper struct{}
 func (rh stdBlockRuleHelper) minimumValidChildTimestamp(blockMap *bolt.Bucket, b *database.Block) types.Timestamp {
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
-	windowTimes[0] = b.Block.Timestamp
-	parent := b.Block.ParentID
+	windowTimes[0] = b.Timestamp
+	parent := b.ParentID
 	for i := uint64(1); i < types.MedianTimestampWindow; i++ {
 		// If the genesis block is 'parent', use the genesis block timestamp
 		// for all remaining times.

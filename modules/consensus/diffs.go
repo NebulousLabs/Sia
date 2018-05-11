@@ -36,7 +36,7 @@ func commitDiffSetSanity(tx database.Tx, b *database.Block, dir modules.DiffDire
 	// Current node must be the input node's parent if applying, and
 	// current node must be the input node if reverting.
 	if dir == modules.DiffApply {
-		parent, err := getBlockMap(tx, b.Block.ParentID)
+		parent, err := getBlockMap(tx, b.ParentID)
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
@@ -44,7 +44,7 @@ func commitDiffSetSanity(tx database.Tx, b *database.Block, dir modules.DiffDire
 			panic(errWrongAppliedDiffSet)
 		}
 	} else {
-		if b.Block.ID() != currentBlockID(tx) {
+		if b.ID() != currentBlockID(tx) {
 			panic(errWrongRevertDiffSet)
 		}
 	}
@@ -154,7 +154,7 @@ func commitNodeDiffs(tx database.Tx, b *database.Block, dir modules.DiffDirectio
 func updateCurrentPath(tx database.Tx, b *database.Block, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		pushPath(tx, b.Block.ID())
+		pushPath(tx, b.ID())
 	} else {
 		popPath(tx)
 	}
@@ -179,14 +179,14 @@ func commitDiffSet(tx database.Tx, b *database.Block, dir modules.DiffDirection)
 func generateAndApplyDiff(tx database.Tx, b *database.Block) error {
 	// Sanity check - the block being applied should have the current block as
 	// a parent.
-	if build.DEBUG && b.Block.ParentID != currentBlockID(tx) {
+	if build.DEBUG && b.ParentID != currentBlockID(tx) {
 		panic(errInvalidSuccessor)
 	}
 
 	// Validate and apply each transaction in the block. They cannot be
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
-	for _, txn := range b.Block.Transactions {
+	for _, txn := range b.Transactions {
 		err := validTransaction(tx, txn)
 		if err != nil {
 			return err
@@ -210,7 +210,7 @@ func generateAndApplyDiff(tx database.Tx, b *database.Block) error {
 	b.DiffsGenerated = true
 
 	// Add the block to the current path and block map.
-	bid := b.Block.ID()
+	bid := b.ID()
 	blockMap := tx.Bucket(BlockMap)
 	updateCurrentPath(tx, b, modules.DiffApply)
 

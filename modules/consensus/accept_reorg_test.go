@@ -79,7 +79,7 @@ func (rs *reorgSets) save() {
 	}
 
 	// Check that cstMain and cstBackup are even.
-	if rs.cstMain.cs.dbCurrentProcessedBlock().Block.ID() != rs.cstBackup.cs.dbCurrentProcessedBlock().Block.ID() {
+	if rs.cstMain.cs.dbCurrentProcessedBlock().ID() != rs.cstBackup.cs.dbCurrentProcessedBlock().ID() {
 		panic("could not save cstMain into cstBackup")
 	}
 	if rs.cstMain.cs.dbConsensusChecksum() != rs.cstBackup.cs.dbConsensusChecksum() {
@@ -297,14 +297,14 @@ func TestBuriedBadFork(t *testing.T) {
 	// Create a bad block that builds on a parent, so that it is part of not
 	// the longest fork.
 	badBlock := types.Block{
-		ParentID:     b.Block.ParentID,
+		ParentID:     b.ParentID,
 		Timestamp:    types.CurrentTimestamp(),
 		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(b.Height)}},
 		Transactions: []types.Transaction{{
 			SiacoinInputs: []types.SiacoinInput{{}}, // Will trigger an error on full verification but not partial verification.
 		}},
 	}
-	parent, err := cst.cs.dbGetBlockMap(b.Block.ParentID)
+	parent, err := cst.cs.dbGetBlockMap(b.ParentID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -219,12 +219,12 @@ func (cs *ConsensusSet) initOak(tx database.Tx) error {
 		}
 
 		// Calculate and store the new block totals.
-		totalTime, totalTarget, err = cs.storeBlockTotals(tx, i, id, totalTime, parentTimestamp, b.Block.Timestamp, totalTarget, parentChildTarget)
+		totalTime, totalTarget, err = cs.storeBlockTotals(tx, i, id, totalTime, parentTimestamp, b.Timestamp, totalTarget, parentChildTarget)
 		if err != nil {
 			return errors.Extend(errors.New("unable to store updated block totals"), err)
 		}
 		// Update the previous values.
-		parentTimestamp = b.Block.Timestamp
+		parentTimestamp = b.Timestamp
 		parentChildTarget = b.ChildTarget
 	}
 

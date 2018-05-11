@@ -19,12 +19,12 @@ var (
 // applyMinerPayouts adds a block's miner payouts to the consensus set as
 // delayed siacoin outputs.
 func applyMinerPayouts(tx database.Tx, b *database.Block) {
-	for i := range b.Block.MinerPayouts {
-		mpid := b.Block.MinerPayoutID(uint64(i))
+	for i := range b.MinerPayouts {
+		mpid := b.MinerPayoutID(uint64(i))
 		dscod := modules.DelayedSiacoinOutputDiff{
 			Direction:      modules.DiffApply,
 			ID:             mpid,
-			SiacoinOutput:  b.Block.MinerPayouts[i],
+			SiacoinOutput:  b.MinerPayouts[i],
 			MaturityHeight: b.Height + types.MaturityDelay,
 		}
 		b.DelayedSiacoinOutputDiffs = append(b.DelayedSiacoinOutputDiffs, dscod)

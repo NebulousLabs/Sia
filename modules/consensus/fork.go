@@ -22,7 +22,7 @@ func backtrackToCurrentPath(tx database.Tx, b *database.Block) []*database.Block
 		// Error is not checked in production code - an error can only indicate
 		// that b.Height > blockHeight(tx).
 		currentPathID, err := getPath(tx, b.Height)
-		if currentPathID == b.Block.ID() {
+		if currentPathID == b.ID() {
 			break
 		}
 		// Sanity check - an error should only indicate that b.Height >
@@ -33,7 +33,7 @@ func backtrackToCurrentPath(tx database.Tx, b *database.Block) []*database.Block
 
 		// Prepend the next block to the list of blocks leading from the
 		// current path to the input block.
-		b, err = getBlockMap(tx, b.Block.ParentID)
+		b, err = getBlockMap(tx, b.ParentID)
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
@@ -48,12 +48,12 @@ func backtrackToCurrentPath(tx database.Tx, b *database.Block) []*database.Block
 func (cs *ConsensusSet) revertToBlock(tx database.Tx, b *database.Block) (revertedBlocks []*database.Block) {
 	// Sanity check - make sure that b is in the current path.
 	currentPathID, err := getPath(tx, b.Height)
-	if build.DEBUG && (err != nil || currentPathID != b.Block.ID()) {
+	if build.DEBUG && (err != nil || currentPathID != b.ID()) {
 		panic(errExternalRevert)
 	}
 
 	// Rewind blocks until 'b' is the current block.
-	for currentBlockID(tx) != b.Block.ID() {
+	for currentBlockID(tx) != b.ID() {
 		block := currentProcessedBlock(tx)
 		commitDiffSet(tx, block, modules.DiffRevert)
 		revertedBlocks = append(revertedBlocks, block)

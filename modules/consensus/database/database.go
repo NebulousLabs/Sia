@@ -144,7 +144,7 @@ func (w boltWrapper) Close() error {
 
 // Block is a a block stored in the database along with relevant metadata.
 type Block struct {
-	Block       types.Block
+	types.Block
 	Height      types.BlockHeight
 	Depth       types.Target
 	ChildTarget types.Target

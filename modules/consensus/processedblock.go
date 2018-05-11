@@ -36,8 +36,8 @@ func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, b *database.
 	// parent. If there are not 'TargetWindow' blocks yet, stop at the genesis
 	// block.
 	var windowSize types.BlockHeight
-	parent := b.Block.ParentID
-	current := b.Block.ID()
+	parent := b.ParentID
+	current := b.ID()
 	for windowSize = 0; windowSize < types.TargetWindow && parent != (types.BlockID{}); windowSize++ {
 		current = parent
 		copy(parent[:], blockMap.Get(parent[:])[:32])
@@ -53,7 +53,7 @@ func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, b *database.
 	// The target is converted to a big.Rat to provide infinite precision
 	// during the calculation. The big.Rat is just the int representation of a
 	// target.
-	timePassed := b.Block.Timestamp - timestamp
+	timePassed := b.Timestamp - timestamp
 	expectedTimePassed := types.BlockFrequency * windowSize
 	return big.NewRat(int64(timePassed), int64(expectedTimePassed))
 }
@@ -77,7 +77,7 @@ func clampTargetAdjustment(base *big.Rat) *big.Rat {
 func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, b *database.Block) {
 	// Fetch the parent block.
 	var parent database.Block
-	parentBytes := blockMap.Get(b.Block.ParentID[:])
+	parentBytes := blockMap.Get(b.ParentID[:])
 	err := encoding.Unmarshal(parentBytes, &parent)
 	if build.DEBUG && err != nil {
 		panic(err)
@@ -106,7 +106,7 @@ func (cs *ConsensusSet) newChild(tx database.Tx, db *database.Block, b types.Blo
 	// Push the total values for this block into the oak difficulty adjustment
 	// bucket. The previous totals are required to compute the new totals.
 	prevTotalTime, prevTotalTarget := cs.getBlockTotals(tx, b.ParentID)
-	_, _, err := cs.storeBlockTotals(tx, child.Height, childID, prevTotalTime, db.Block.Timestamp, b.Timestamp, prevTotalTarget, db.ChildTarget)
+	_, _, err := cs.storeBlockTotals(tx, child.Height, childID, prevTotalTime, db.Timestamp, b.Timestamp, prevTotalTarget, db.ChildTarget)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
@@ -117,7 +117,7 @@ func (cs *ConsensusSet) newChild(tx database.Tx, db *database.Block, b types.Blo
 	if db.Height < types.OakHardforkBlock {
 		cs.setChildTarget(blockMap, child)
 	} else {
-		child.ChildTarget = cs.childTargetOak(prevTotalTime, prevTotalTarget, db.ChildTarget, db.Height, db.Block.Timestamp)
+		child.ChildTarget = cs.childTargetOak(prevTotalTime, prevTotalTarget, db.ChildTarget, db.Height, db.Timestamp)
 	}
 	err = blockMap.Put(childID[:], encoding.Marshal(*child))
 	if build.DEBUG && err != nil {

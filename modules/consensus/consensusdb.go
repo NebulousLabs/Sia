@@ -109,7 +109,7 @@ func getBlockMap(tx database.Tx, id types.BlockID) (*database.Block, error) {
 
 // addBlockMap adds a processed block to the block map.
 func addBlockMap(tx database.Tx, b *database.Block) {
-	id := b.Block.ID()
+	id := b.ID()
 	err := tx.Bucket(BlockMap).Put(id[:], encoding.Marshal(*b))
 	if build.DEBUG && err != nil {
 		panic(err)

@@ -772,7 +772,7 @@ func TestBuriedBadTransaction(t *testing.T) {
 
 	// Create a block with a buried bad transaction.
 	block := types.Block{
-		ParentID:     b.Block.ID(),
+		ParentID:     b.ID(),
 		Timestamp:    types.CurrentTimestamp(),
 		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(b.Height + 1)}},
 		Transactions: txns,
