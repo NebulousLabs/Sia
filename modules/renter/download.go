@@ -209,6 +209,7 @@ func (d *download) managedFail(err error) {
 	d.err = err
 	close(d.completeChan)
 	err = d.destination.Close()
+	d.destination = nil
 	if err != nil {
 		d.log.Println("unable to close download destination:", err)
 	}
@@ -392,7 +393,7 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 				// the same chunk.
 				_, exists := chunkMaps[piece.Chunk-minChunk][resolvedID]
 				if exists {
-					r.log.Println("ERROR: Worker has multiple pieces uploaded for the same chunk.")
+					r.log.Debugln("ERROR: Worker has multiple pieces uploaded for the same chunk.")
 				}
 				chunkMaps[piece.Chunk-minChunk][resolvedID] = downloadPieceInfo{
 					index: piece.Piece,

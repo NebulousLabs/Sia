@@ -96,6 +96,7 @@ func (udc *unfinishedDownloadChunk) fail(err error) {
 		udc.physicalChunkData[i] = nil
 	}
 	udc.download.managedFail(fmt.Errorf("chunk %v failed: %v", udc.staticChunkIndex, err))
+	udc.destination = nil
 }
 
 // managedCleanUp will check if the download has failed, and if not it will add
@@ -108,7 +109,6 @@ func (udc *unfinishedDownloadChunk) managedCleanUp() {
 	if udc.workersRemaining+udc.piecesCompleted < udc.erasureCode.MinPieces() && !udc.failed {
 		udc.fail(errors.New("not enough workers to continue download"))
 	}
-
 	// Return any excess memory.
 	udc.returnMemory()
 
