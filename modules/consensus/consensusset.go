@@ -350,7 +350,7 @@ func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp 
 		if err != nil {
 			return err
 		}
-		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), b)
+		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx, b)
 		exists = true
 		return nil
 	})

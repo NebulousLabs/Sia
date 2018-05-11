@@ -41,27 +41,17 @@ func (cs *ConsensusSet) validateHeaderAndBlock(tx database.Tx, b types.Block, id
 	}
 
 	// Check if the block is already known.
-	blockMap := tx.Bucket(BlockMap)
-	if blockMap == nil {
-		return nil, errNoBlockMap
-	}
-	if blockMap.Get(id[:]) != nil {
+	if _, exists := tx.Block(id); exists {
 		return nil, modules.ErrBlockKnown
 	}
 
 	// Check for the parent.
-	parentID := b.ParentID
-	parentBytes := blockMap.Get(parentID[:])
-	if parentBytes == nil {
+	parent, exists = tx.Block(b.ParentID)
+	if !exists {
 		return nil, errOrphan
 	}
-	parent = new(database.Block)
-	err = cs.marshaler.Unmarshal(parentBytes, parent)
-	if err != nil {
-		return nil, err
-	}
 	// Check that the timestamp is not too far in the past to be acceptable.
-	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, parent)
+	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(tx, parent)
 
 	err = cs.blockValidator.ValidateBlock(b, id, minTimestamp, parent.ChildTarget, parent.Height+1, cs.log)
 	if err != nil {
@@ -89,24 +79,14 @@ func (cs *ConsensusSet) validateHeader(tx database.Tx, h types.BlockHeader) erro
 	}
 
 	// Check if the block is already known.
-	blockMap := tx.Bucket(BlockMap)
-	if blockMap == nil {
-		return errNoBlockMap
-	}
-	if blockMap.Get(id[:]) != nil {
+	if _, exists := tx.Block(id); exists {
 		return modules.ErrBlockKnown
 	}
 
 	// Check for the parent.
-	parentID := h.ParentID
-	parentBytes := blockMap.Get(parentID[:])
-	if parentBytes == nil {
+	parent, exists := tx.Block(h.ParentID)
+	if !exists {
 		return errOrphan
-	}
-	var parent database.Block
-	err := cs.marshaler.Unmarshal(parentBytes, &parent)
-	if err != nil {
-		return err
 	}
 
 	// Check that the target of the new block is sufficient.
@@ -118,7 +98,7 @@ func (cs *ConsensusSet) validateHeader(tx database.Tx, h types.BlockHeader) erro
 	// downloads are implemented.
 
 	// Check that the timestamp is not too far in the past to be acceptable.
-	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
+	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(tx, parent)
 	if minTimestamp > h.Timestamp {
 		return errEarlyTimestamp
 	}

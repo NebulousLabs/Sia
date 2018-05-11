@@ -65,6 +65,12 @@ type Tx interface {
 	// current path.
 	BlockID(height types.BlockHeight) types.BlockID
 
+	// Block returns the Block with the specified id, or false if the block is
+	// not present in the database.
+	Block(id types.BlockID) (*Block, bool)
+	// AddBlock adds a Block to the database.
+	AddBlock(b *Block)
+
 	// ChangeEntry returns the ChangeEntry with the specified id.
 	ChangeEntry(id modules.ConsensusChangeID) (ChangeEntry, bool)
 	// AppendChangeEntry appends ce to the list of change entries.
@@ -236,6 +242,29 @@ func (tx txWrapper) PopPath() {
 	tx.SetBlockHeight(oldHeight - 1)
 
 	err := tx.Bucket(blockPath).Delete(encoding.Marshal(oldHeight))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// Block implements the Tx interface.
+func (tx txWrapper) Block(id types.BlockID) (*Block, bool) {
+	blockBytes := tx.Bucket(blockMap).Get(id[:])
+	if blockBytes == nil {
+		return nil, false
+	}
+	var b Block
+	err := encoding.Unmarshal(blockBytes, &b)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return &b, true
+}
+
+// AddBlock implements the Tx interface.
+func (tx txWrapper) AddBlock(b *Block) {
+	id := b.ID()
+	err := tx.Bucket(blockMap).Put(id[:], encoding.Marshal(*b))
 	if build.DEBUG && err != nil {
 		panic(err)
 	}

@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
 )
@@ -209,9 +208,7 @@ func generateAndApplyDiff(tx database.Tx, b *database.Block) error {
 	// true on fully validated blocks.
 	b.DiffsGenerated = true
 
-	// Add the block to the current path and block map.
-	bid := b.ID()
-	blockMap := tx.Bucket(BlockMap)
+	// Add the block ID to the current path.
 	updateCurrentPath(tx, b, modules.DiffApply)
 
 	// Sanity check preparation - set the consensus hash at this height so that
@@ -222,5 +219,7 @@ func generateAndApplyDiff(tx database.Tx, b *database.Block) error {
 		b.ConsensusChecksum = tx.ConsensusChecksum()
 	}
 
-	return blockMap.Put(bid[:], encoding.Marshal(*b))
+	// Add the block to the database.
+	tx.AddBlock(b)
+	return nil
 }

@@ -8,17 +8,9 @@ package consensus
 
 import (
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-var (
-	// BlockMap is a database bucket containing all of the processed blocks,
-	// keyed by their id. This includes blocks that are not currently in the
-	// consensus set, and blocks that may not have been fully validated yet.
-	BlockMap = []byte("BlockMap")
 )
 
 // createConsensusObjects initialzes the consensus portions of the database.
@@ -92,28 +84,16 @@ func currentProcessedBlock(tx database.Tx) *database.Block {
 
 // getBlockMap returns a processed block with the input id.
 func getBlockMap(tx database.Tx, id types.BlockID) (*database.Block, error) {
-	// Look up the encoded block.
-	bBytes := tx.Bucket(BlockMap).Get(id[:])
-	if bBytes == nil {
+	b, exists := tx.Block(id)
+	if !exists {
 		return nil, errNilItem
 	}
-
-	// Decode the block - should never fail.
-	var b database.Block
-	err := encoding.Unmarshal(bBytes, &b)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return &b, nil
+	return b, nil
 }
 
 // addBlockMap adds a processed block to the block map.
 func addBlockMap(tx database.Tx, b *database.Block) {
-	id := b.ID()
-	err := tx.Bucket(BlockMap).Put(id[:], encoding.Marshal(*b))
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.AddBlock(b)
 }
 
 // getPath returns the block id at 'height' in the block path.

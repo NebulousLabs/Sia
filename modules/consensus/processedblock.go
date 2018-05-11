@@ -4,11 +4,8 @@ import (
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules/consensus/database"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/coreos/bbolt"
 )
 
 // SurpassThreshold is a percentage that dictates how much heavier a competing
@@ -31,7 +28,7 @@ func heavierThan(b, cmp *database.Block) bool {
 
 // targetAdjustmentBase returns the magnitude that the target should be
 // adjusted by before a clamp is applied.
-func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, b *database.Block) *big.Rat {
+func (cs *ConsensusSet) targetAdjustmentBase(tx database.Tx, b *database.Block) *big.Rat {
 	// Grab the block that was generated 'TargetWindow' blocks prior to the
 	// parent. If there are not 'TargetWindow' blocks yet, stop at the genesis
 	// block.
@@ -40,9 +37,9 @@ func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, b *database.
 	current := b.ID()
 	for windowSize = 0; windowSize < types.TargetWindow && parent != (types.BlockID{}); windowSize++ {
 		current = parent
-		copy(parent[:], blockMap.Get(parent[:])[:32])
+		parentBlock, _ := tx.Block(parent)
+		parent = parentBlock.ParentID
 	}
-	timestamp := types.Timestamp(encoding.DecUint64(blockMap.Get(current[:])[40:48]))
 
 	// The target of a child is determined by the amount of time that has
 	// passed between the generation of its immediate parent and its
@@ -53,7 +50,8 @@ func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, b *database.
 	// The target is converted to a big.Rat to provide infinite precision
 	// during the calculation. The big.Rat is just the int representation of a
 	// target.
-	timePassed := b.Timestamp - timestamp
+	cur, _ := tx.Block(current)
+	timePassed := b.Timestamp - cur.Timestamp
 	expectedTimePassed := types.BlockFrequency * windowSize
 	return big.NewRat(int64(timePassed), int64(expectedTimePassed))
 }
@@ -74,20 +72,15 @@ func clampTargetAdjustment(base *big.Rat) *big.Rat {
 
 // setChildTarget computes the target of a blockNode's child. All children of a node
 // have the same target.
-func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, b *database.Block) {
+func (cs *ConsensusSet) setChildTarget(tx database.Tx, b *database.Block) {
 	// Fetch the parent block.
-	var parent database.Block
-	parentBytes := blockMap.Get(b.ParentID[:])
-	err := encoding.Unmarshal(parentBytes, &parent)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	parent, _ := tx.Block(b.ParentID)
 
 	if b.Height%(types.TargetWindow/2) != 0 {
 		b.ChildTarget = parent.ChildTarget
 		return
 	}
-	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(blockMap, b))
+	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(tx, b))
 	adjustedRatTarget := new(big.Rat).Mul(parent.ChildTarget.Rat(), adjustment)
 	b.ChildTarget = types.RatToTarget(adjustedRatTarget)
 }
@@ -113,15 +106,11 @@ func (cs *ConsensusSet) newChild(tx database.Tx, db *database.Block, b types.Blo
 
 	// Use the difficulty adjustment algorithm to set the target of the child
 	// block and put the new processed block into the database.
-	blockMap := tx.Bucket(BlockMap)
 	if db.Height < types.OakHardforkBlock {
-		cs.setChildTarget(blockMap, child)
+		cs.setChildTarget(tx, child)
 	} else {
 		child.ChildTarget = cs.childTargetOak(prevTotalTime, prevTotalTarget, db.ChildTarget, db.Height, db.Timestamp)
 	}
-	err = blockMap.Put(childID[:], encoding.Marshal(*child))
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	tx.AddBlock(child)
 	return child
 }
