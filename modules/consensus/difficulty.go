@@ -192,7 +192,7 @@ func (cs *ConsensusSet) initOak(tx database.Tx) error {
 
 	// If the current height is greater than the hardfork trigger date, return
 	// an error and refuse to initialize.
-	height := blockHeight(tx)
+	height := tx.BlockHeight()
 	if height > types.OakHardforkBlock {
 		return errOakHardforkIncompatibility
 	}

@@ -12,7 +12,7 @@ import (
 // without a bolt.Tx.
 func (cs *ConsensusSet) dbBlockHeight() (bh types.BlockHeight) {
 	dbErr := cs.db.View(func(tx database.Tx) error {
-		bh = blockHeight(tx)
+		bh = tx.BlockHeight()
 		return nil
 	})
 	if dbErr != nil {
@@ -51,7 +51,7 @@ func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID, err e
 // bolt.Tx.
 func (cs *ConsensusSet) dbPushPath(bid types.BlockID) {
 	dbErr := cs.db.Update(func(tx database.Tx) error {
-		pushPath(tx, bid)
+		tx.PushPath(bid)
 		return nil
 	})
 	if dbErr != nil {
@@ -151,7 +151,7 @@ func (cs *ConsensusSet) dbAddSiafundOutput(id types.SiafundOutputID, sfo types.S
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetSiafundPool() (siafundPool types.Currency) {
 	dbErr := cs.db.View(func(tx database.Tx) error {
-		siafundPool = getSiafundPool(tx)
+		siafundPool = tx.SiafundPool()
 		return nil
 	})
 	if dbErr != nil {

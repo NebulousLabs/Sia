@@ -27,7 +27,7 @@ func backtrackToCurrentPath(tx database.Tx, b *database.Block) []*database.Block
 		}
 		// Sanity check - an error should only indicate that b.Height >
 		// blockHeight(tx).
-		if build.DEBUG && err != nil && b.Height <= blockHeight(tx) {
+		if build.DEBUG && err != nil && b.Height <= tx.BlockHeight() {
 			panic(err)
 		}
 

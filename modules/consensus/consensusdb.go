@@ -20,7 +20,7 @@ func (cs *ConsensusSet) createConsensusDB(tx database.Tx) error {
 	tx.SetBlockHeight(underflow - 1)
 
 	// Set the siafund pool to 0.
-	setSiafundPool(tx, types.NewCurrency64(0))
+	tx.SetSiafundPool(types.NewCurrency64(0))
 
 	// Update the siafund output diffs map for the genesis block on disk. This
 	// needs to happen between the database being opened/initilized and the
@@ -38,22 +38,17 @@ func (cs *ConsensusSet) createConsensusDB(tx database.Tx) error {
 
 	// Add the genesis block to the block structures - checksum must be taken
 	// after pushing the genesis block into the path.
-	pushPath(tx, cs.blockRoot.Block.ID())
+	tx.PushPath(cs.blockRoot.Block.ID())
 	if build.DEBUG {
 		cs.blockRoot.ConsensusChecksum = tx.ConsensusChecksum()
 	}
-	addBlockMap(tx, &cs.blockRoot)
+	tx.AddBlock(&cs.blockRoot)
 	return nil
-}
-
-// blockHeight returns the height of the blockchain.
-func blockHeight(tx database.Tx) types.BlockHeight {
-	return tx.BlockHeight()
 }
 
 // currentBlockID returns the id of the most recent block in the consensus set.
 func currentBlockID(tx database.Tx) types.BlockID {
-	id, err := getPath(tx, blockHeight(tx))
+	id, err := getPath(tx, tx.BlockHeight())
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
@@ -91,11 +86,6 @@ func getBlockMap(tx database.Tx, id types.BlockID) (*database.Block, error) {
 	return b, nil
 }
 
-// addBlockMap adds a processed block to the block map.
-func addBlockMap(tx database.Tx, b *database.Block) {
-	tx.AddBlock(b)
-}
-
 // getPath returns the block id at 'height' in the block path.
 func getPath(tx database.Tx, height types.BlockHeight) (id types.BlockID, err error) {
 	id = tx.BlockID(height)
@@ -103,17 +93,6 @@ func getPath(tx database.Tx, height types.BlockHeight) (id types.BlockID, err er
 		return types.BlockID{}, errNilItem
 	}
 	return id, nil
-}
-
-// pushPath adds a block to the BlockPath at current height + 1.
-func pushPath(tx database.Tx, bid types.BlockID) {
-	tx.PushPath(bid)
-}
-
-// popPath removes a block from the "end" of the chain, i.e. the block
-// with the largest height.
-func popPath(tx database.Tx) {
-	tx.PopPath()
 }
 
 // isSiacoinOutput returns true if there is a siacoin output of that id in the
@@ -216,7 +195,7 @@ func getSiafundOutput(tx database.Tx, id types.SiafundOutputID) (types.SiafundOu
 		return types.SiafundOutput{}, errNilItem
 	}
 	gsa := types.GenesisSiafundAllocation
-	if sfo.UnlockHash == gsa[len(gsa)-1].UnlockHash && blockHeight(tx) > 10e3 {
+	if sfo.UnlockHash == gsa[len(gsa)-1].UnlockHash && tx.BlockHeight() > 10e3 {
 		sfo.UnlockHash = devAddr
 	}
 	return sfo, nil
@@ -249,17 +228,6 @@ func removeSiafundOutput(tx database.Tx, id types.SiafundOutputID) {
 		}
 	}
 	tx.DeleteSiafundOutput(id)
-}
-
-// getSiafundPool returns the current value of the siafund pool. No error is
-// returned as the siafund pool should always be available.
-func getSiafundPool(tx database.Tx) (pool types.Currency) {
-	return tx.SiafundPool()
-}
-
-// setSiafundPool updates the saved siafund pool on disk
-func setSiafundPool(tx database.Tx, c types.Currency) {
-	tx.SetSiafundPool(c)
 }
 
 // addDSCO adds a delayed siacoin output to the consnesus set.

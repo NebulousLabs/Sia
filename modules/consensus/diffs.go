@@ -99,16 +99,16 @@ func commitSiafundPoolDiff(tx database.Tx, sfpd modules.SiafundPoolDiff, dir mod
 
 	if dir == modules.DiffApply {
 		// Sanity check - sfpd.Previous should equal the current siafund pool.
-		if build.DEBUG && !getSiafundPool(tx).Equals(sfpd.Previous) {
+		if build.DEBUG && !tx.SiafundPool().Equals(sfpd.Previous) {
 			panic(errApplySiafundPoolDiffMismatch)
 		}
-		setSiafundPool(tx, sfpd.Adjusted)
+		tx.SetSiafundPool(sfpd.Adjusted)
 	} else {
 		// Sanity check - sfpd.Adjusted should equal the current siafund pool.
-		if build.DEBUG && !getSiafundPool(tx).Equals(sfpd.Adjusted) {
+		if build.DEBUG && !tx.SiafundPool().Equals(sfpd.Adjusted) {
 			panic(errRevertSiafundPoolDiffMismatch)
 		}
-		setSiafundPool(tx, sfpd.Previous)
+		tx.SetSiafundPool(sfpd.Previous)
 	}
 }
 
@@ -153,9 +153,9 @@ func commitNodeDiffs(tx database.Tx, b *database.Block, dir modules.DiffDirectio
 func updateCurrentPath(tx database.Tx, b *database.Block, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		pushPath(tx, b.ID())
+		tx.PushPath(b.ID())
 	} else {
-		popPath(tx)
+		tx.PopPath()
 	}
 }
 

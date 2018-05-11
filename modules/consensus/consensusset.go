@@ -301,7 +301,7 @@ func (cs *ConsensusSet) Height() (height types.BlockHeight) {
 	defer cs.mu.Unlock()
 
 	_ = cs.db.View(func(tx database.Tx) error {
-		height = blockHeight(tx)
+		height = tx.BlockHeight()
 		return nil
 	})
 	return height

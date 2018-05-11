@@ -59,7 +59,7 @@ func storageProofSegment(tx database.Tx, fcid types.FileContractID) (uint64, err
 
 	// Get the trigger block id.
 	triggerHeight := fc.WindowStart - 1
-	if triggerHeight > blockHeight(tx) {
+	if triggerHeight > tx.BlockHeight() {
 		return 0, errUnfinishedFileContract
 	}
 	triggerID := tx.BlockID(triggerHeight)
@@ -122,7 +122,7 @@ func validStorageProofs100e3(tx database.Tx, t types.Transaction) error {
 		// crypto.SegmentSize bytes, because the segmentLen would be set to 0
 		// instead of crypto.SegmentSize, due to an error with the modulus
 		// math. This new error has been fixed with the block 100,000 hardfork.
-		if (build.Release == "standard" && blockHeight(tx) < 21e3) || (build.Release == "testing" && blockHeight(tx) < 10) {
+		if (build.Release == "standard" && tx.BlockHeight() < 21e3) || (build.Release == "testing" && tx.BlockHeight() < 10) {
 			segmentLen = uint64(crypto.SegmentSize)
 		}
 
@@ -144,7 +144,7 @@ func validStorageProofs100e3(tx database.Tx, t types.Transaction) error {
 // validStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
 func validStorageProofs(tx database.Tx, t types.Transaction) error {
-	if (build.Release == "standard" && blockHeight(tx) < 100e3) || (build.Release == "testing" && blockHeight(tx) < 10) {
+	if (build.Release == "standard" && tx.BlockHeight() < 100e3) || (build.Release == "testing" && tx.BlockHeight() < 10) {
 		return validStorageProofs100e3(tx, t)
 	}
 
@@ -198,7 +198,7 @@ func validFileContractRevisions(tx database.Tx, t types.Transaction) error {
 		// Check that the height is less than fc.WindowStart - revisions are
 		// not allowed to be submitted once the storage proof window has
 		// opened.  This reduces complexity for unconfirmed transactions.
-		if blockHeight(tx) > fc.WindowStart {
+		if tx.BlockHeight() > fc.WindowStart {
 			return errLateRevision
 		}
 
@@ -268,7 +268,7 @@ func validSiafunds(tx database.Tx, t types.Transaction) (err error) {
 func validTransaction(tx database.Tx, t types.Transaction) error {
 	// StandaloneValid will check things like signatures and properties that
 	// should be inherent to the transaction. (storage proof rules, etc.)
-	err := t.StandaloneValid(blockHeight(tx))
+	err := t.StandaloneValid(tx.BlockHeight())
 	if err != nil {
 		return err
 	}
@@ -313,7 +313,7 @@ func (cs *ConsensusSet) tryTransactionSet(txns []types.Transaction) (modules.Con
 	// concerns and is more difficult to implement correctly.
 	errSuccess := errors.New("success")
 	err := cs.db.Update(func(tx database.Tx) error {
-		diffHolder.Height = blockHeight(tx)
+		diffHolder.Height = tx.BlockHeight()
 		for _, txn := range txns {
 			err := validTransaction(tx, txn)
 			if err != nil {

@@ -96,7 +96,7 @@ func isTimeoutErr(err error) bool {
 // common parent is found, but always a common parent within a factor of 2 is
 // found.
 func blockHistory(tx database.Tx) (blockIDs [32]types.BlockID) {
-	height := blockHeight(tx)
+	height := tx.BlockHeight()
 	step := types.BlockHeight(1)
 	// The final step is to include the genesis block, which is why the final
 	// element is skipped during iteration.
@@ -297,7 +297,7 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 	var csHeight types.BlockHeight
 	cs.mu.RLock()
 	err = cs.db.View(func(tx database.Tx) error {
-		csHeight = blockHeight(tx)
+		csHeight = tx.BlockHeight()
 		for _, id := range knownBlocks {
 			b, err := getBlockMap(tx, id)
 			if err != nil {
@@ -344,7 +344,7 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 		var blocks []types.Block
 		cs.mu.RLock()
 		err = cs.db.View(func(tx database.Tx) error {
-			height := blockHeight(tx)
+			height := tx.BlockHeight()
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
 				id, err := getPath(tx, i)
 				if err != nil {

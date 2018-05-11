@@ -223,7 +223,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 	chainExtended := false
 	changes := make([]database.ChangeEntry, 0, len(blocks))
 	setErr := cs.db.Update(func(tx database.Tx) error {
-		cs.log.Printf("accept: starting block processing loop (%v blocks, height %v)", len(blocks), blockHeight(tx))
+		cs.log.Printf("accept: starting block processing loop (%v blocks, height %v)", len(blocks), tx.BlockHeight())
 		for i := 0; i < len(blocks); i++ {
 			// Start by checking the header of the block.
 			parent, err := cs.validateHeaderAndBlock(tx, blocks[i], blockIDs[i])
@@ -251,7 +251,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 				for _, b := range changeEntry.RevertedBlocks {
 					reverted = append(reverted, b.String()[:6])
 				}
-				cs.log.Printf("accept: added change %v, applying blocks %v, reverting blocks %v (height now %v)", changeEntry.ID(), applied, reverted, blockHeight(tx))
+				cs.log.Printf("accept: added change %v, applying blocks %v, reverting blocks %v (height now %v)", changeEntry.ID(), applied, reverted, tx.BlockHeight())
 			}
 			if err == modules.ErrNonExtendingBlock {
 				err = nil

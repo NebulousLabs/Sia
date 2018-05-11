@@ -61,11 +61,11 @@ func applyFileContracts(tx database.Tx, b *database.Block, t types.Transaction) 
 
 		// Get the portion of the contract that goes into the siafund pool and
 		// add it to the siafund pool.
-		sfp := getSiafundPool(tx)
+		sfp := tx.SiafundPool()
 		sfpd := modules.SiafundPoolDiff{
 			Direction: modules.DiffApply,
 			Previous:  sfp,
-			Adjusted:  sfp.Add(types.Tax(blockHeight(tx), fc.Payout)),
+			Adjusted:  sfp.Add(types.Tax(tx.BlockHeight(), fc.Payout)),
 		}
 		b.SiafundPoolDiffs = append(b.SiafundPoolDiffs, sfpd)
 		commitSiafundPoolDiff(tx, sfpd, modules.DiffApply)
@@ -155,7 +155,7 @@ func applySiafundInputs(tx database.Tx, b *database.Block, t types.Transaction) 
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
-		claimPortion := getSiafundPool(tx).Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
+		claimPortion := tx.SiafundPool().Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 		// Add the claim output to the delayed set of outputs.
 		sco := types.SiacoinOutput{
@@ -188,7 +188,7 @@ func applySiafundInputs(tx database.Tx, b *database.Block, t types.Transaction) 
 func applySiafundOutputs(tx database.Tx, b *database.Block, t types.Transaction) {
 	for i, sfo := range t.SiafundOutputs {
 		sfoid := t.SiafundOutputID(uint64(i))
-		sfo.ClaimStart = getSiafundPool(tx)
+		sfo.ClaimStart = tx.SiafundPool()
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            sfoid,
