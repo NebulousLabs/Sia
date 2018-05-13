@@ -2,6 +2,7 @@ package renter
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -148,6 +149,7 @@ func (f *file) redundancy(offlineMap map[types.FileContractID]bool, goodForRenew
 		build.Critical("cannot get redundancy of a file with 0 chunks")
 		return -1
 	}
+	pieceMap := make(map[string]struct{})
 	for _, fc := range f.contracts {
 		offline := offlineMap[fc.ID]
 		goodForRenew := goodForRenewMap[fc.ID]
@@ -157,6 +159,11 @@ func (f *file) redundancy(offlineMap map[types.FileContractID]bool, goodForRenew
 			continue
 		}
 		for _, p := range fc.Pieces {
+			pieceKey := fmt.Sprintf("%v/%v", p.Chunk, p.Piece)
+			if _, redundant := pieceMap[pieceKey]; redundant {
+				continue
+			}
+			pieceMap[pieceKey] = struct{}{}
 			if goodForRenew {
 				piecesPerChunk[p.Chunk]++
 			}
