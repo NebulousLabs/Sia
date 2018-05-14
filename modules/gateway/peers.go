@@ -174,7 +174,7 @@ func (g *Gateway) managedAcceptConnPeer(conn net.Conn, remoteVersion string) err
 	g.mu.RLock()
 	ourHeader := sessionHeader{
 		GenesisID:  types.GenesisID,
-		UniqueID:   g.id,
+		UniqueID:   g.staticId,
 		NetAddress: g.myAddr,
 	}
 	g.mu.RUnlock()
@@ -217,7 +217,7 @@ func (g *Gateway) managedAcceptConnPeer(conn net.Conn, remoteVersion string) err
 	// do this in a goroutine so that we can begin communicating with the peer
 	// immediately.
 	go func() {
-		err := g.pingNode(remoteAddr)
+		err := g.staticPingNode(remoteAddr)
 		if err == nil {
 			g.mu.Lock()
 			g.addNode(remoteAddr)
@@ -370,7 +370,7 @@ func (g *Gateway) managedConnectPeer(conn net.Conn, remoteVersion string, remote
 	g.mu.RLock()
 	ourHeader := sessionHeader{
 		GenesisID:  types.GenesisID,
-		UniqueID:   g.id,
+		UniqueID:   g.staticId,
 		NetAddress: g.myAddr,
 	}
 	g.mu.RUnlock()
@@ -407,7 +407,7 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	}
 
 	// Dial the peer and perform peer initialization.
-	conn, err := g.dial(addr)
+	conn, err := g.staticDial(addr)
 	if err != nil {
 		return err
 	}

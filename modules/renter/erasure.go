@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/klauspost/reedsolomon"
@@ -34,6 +35,23 @@ func (rs *rsCode) Encode(data []byte) ([][]byte, error) {
 	// err should not be possible if Encode is called on the result of Split,
 	// but no harm in checking anyway.
 	err = rs.enc.Encode(pieces)
+	if err != nil {
+		return nil, err
+	}
+	return pieces, nil
+}
+
+// EncodeShards creates the parity shards for an already sharded input.
+func (rs *rsCode) EncodeShards(pieces [][]byte) ([][]byte, error) {
+	// Check that the caller provided the minimum amount of pieces.
+	if len(pieces) != rs.MinPieces() {
+		return nil, fmt.Errorf("invalid number of pieces given %v %v", len(pieces), rs.MinPieces())
+	}
+	// Add the parity shards to pieces.
+	for len(pieces) < rs.NumPieces() {
+		pieces = append(pieces, make([]byte, pieceSize))
+	}
+	err := rs.enc.Encode(pieces)
 	if err != nil {
 		return nil, err
 	}

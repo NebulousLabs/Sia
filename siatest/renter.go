@@ -52,8 +52,45 @@ func (tn *TestNode) DownloadByStream(rf *RemoteFile) (data []byte, err error) {
 		return nil, errors.AddContext(err, "failed to retrieve FileInfo")
 	}
 	data, err = tn.RenterDownloadHTTPResponseGet(rf.siaPath, 0, fi.Filesize)
-	if err == nil && rf.checksum != crypto.HashAll(data) {
+	if err == nil && rf.checksum != crypto.HashBytes(data) {
 		err = errors.New("downloaded bytes don't match requested data")
+	}
+	return
+}
+
+// Stream uses the streaming endpoint to download a file.
+func (tn *TestNode) Stream(rf *RemoteFile) (data []byte, err error) {
+	data, err = tn.RenterStreamGet(rf.siaPath)
+	if err == nil && rf.checksum != crypto.HashBytes(data) {
+		err = errors.New("downloaded bytes don't match requested data")
+	}
+	return
+}
+
+// StreamPartial uses the streaming endpoint to download a partial file in
+// range [from;to]. A local file can be provided optionally to implicitly check
+// the checksum of the downloaded data.
+func (tn *TestNode) StreamPartial(rf *RemoteFile, lf *LocalFile, from, to uint64) (data []byte, err error) {
+	data, err = tn.RenterStreamPartialGet(rf.siaPath, from, to)
+	if err != nil {
+		return
+	}
+	if uint64(len(data)) != to-from+1 {
+		err = fmt.Errorf("length of downloaded data should be %v but was %v",
+			to-from+1, len(data))
+		return
+	}
+	if lf != nil {
+		var checksum crypto.Hash
+		checksum, err = lf.partialChecksum(from, to+1)
+		if err != nil {
+			err = errors.AddContext(err, "failed to get partial checksum")
+			return
+		}
+		if checksum != crypto.HashBytes(data) {
+			err = fmt.Errorf("downloaded bytes don't match requested data %v-%v", from, to)
+			return
+		}
 	}
 	return
 }
@@ -82,7 +119,7 @@ func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (*api.DownloadIn
 	if di.Length != di.Filesize {
 		err = errors.AddContext(err, "filesize != length")
 	}
-	// Received data can't be larger than transfered data
+	// Received data can't be larger than transferred data
 	if di.Received > di.TotalDataTransferred {
 		err = errors.AddContext(err, "received > TotalDataTransfered")
 	}
@@ -92,6 +129,15 @@ func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (*api.DownloadIn
 		err = errors.AddContext(err, "completed == true but received != length")
 	}
 	return di, err
+}
+
+// File returns the file queried by the user
+func (tn *TestNode) File(siaPath string) (modules.FileInfo, error) {
+	rf, err := tn.RenterFileGet(siaPath)
+	if err != nil {
+		return rf.File, err
+	}
+	return rf.File, err
 }
 
 // Files lists the files tracked by the renter

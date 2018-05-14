@@ -3,7 +3,9 @@ package renter
 import (
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
@@ -39,8 +41,10 @@ func TestRenter(t *testing.T) {
 		name string
 		test func(*testing.T, *siatest.TestGroup)
 	}{
-		{"UploadDownload", testUploadDownload},
-		{"DownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
+		{"TestRenterStreamingCache", testRenterStreamingCache},
+		{"TestUploadDownload", testUploadDownload},
+		{"TestSingleFileGet", testSingleFileGet},
+		{"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
 	}
@@ -60,7 +64,8 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 	// Upload file, creating a piece for each host in the group
 	dataPieces := uint64(1)
 	parityPieces := uint64(len(tg.Hosts())) - dataPieces
-	_, remoteFile, err := renter.UploadNewFileBlocking(100+siatest.Fuzz(), dataPieces, parityPieces)
+	fileSize := 100 + siatest.Fuzz()
+	localFile, remoteFile, err := renter.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
 	if err != nil {
 		t.Fatal("Failed to upload a file for testing: ", err)
 	}
@@ -75,12 +80,57 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 	// Download the file asynchronously and wait for the download to finish.
-	localFile, err := renter.DownloadToDisk(remoteFile, true)
+	localFile, err = renter.DownloadToDisk(remoteFile, true)
 	if err != nil {
 		t.Error(err)
 	}
 	if err := renter.WaitForDownload(localFile, remoteFile); err != nil {
 		t.Error(err)
+	}
+	// Stream the file.
+	_, err = renter.Stream(remoteFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Stream the file partially a few times. At least 1 byte is streamed.
+	for i := 0; i < 5; i++ {
+		from := fastrand.Intn(fileSize - 1)             // [0..fileSize-2]
+		to := from + 1 + fastrand.Intn(fileSize-from-1) // [from+1..fileSize-1]
+		_, err = renter.StreamPartial(remoteFile, localFile, uint64(from), uint64(to))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// testSingleFileGet is a subtest that uses an existing TestGroup to test if
+// using the signle file API endpoint works
+func testSingleFileGet(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	renter := tg.Renters()[0]
+	// Upload file, creating a piece for each host in the group
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+	fileSize := 100 + siatest.Fuzz()
+	_, _, err := renter.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal("Failed to upload a file for testing: ", err)
+	}
+
+	files, err := renter.Files()
+	if err != nil {
+		t.Fatal("Failed to get renter files: ", err)
+	}
+
+	var file modules.FileInfo
+	for _, f := range files {
+		file, err = renter.File(f.SiaPath)
+		if err != nil {
+			t.Fatal("Failed to request single file", err)
+		}
+		if file != f {
+			t.Fatal("Single file queries does not match file previously requested.")
+		}
 	}
 }
 
@@ -91,6 +141,7 @@ func testDownloadMultipleLargeSectors(t *testing.T, tg *siatest.TestGroup) {
 	parallelDownloads := 10
 	// fileSize is the size of the downloaded file.
 	fileSize := int(10*modules.SectorSize) + siatest.Fuzz()
+	// set download limits and reset them after test.
 	// uniqueRemoteFiles is the number of files that will be uploaded to the
 	// network. Downloads will choose the remote file to download randomly.
 	uniqueRemoteFiles := 5
@@ -161,7 +212,7 @@ func testRenterLocalRepair(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 	// Get the file info of the fully uploaded file. Tha way we can compare the
-	// redundancieslater.
+	// redundancies later.
 	fi, err := renter.FileInfo(remoteFile)
 	if err != nil {
 		t.Fatal("failed to get file info", err)
@@ -251,5 +302,40 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 	// We should be able to download
 	if _, err := r.DownloadByStream(remoteFile); err != nil {
 		t.Fatal("Failed to download file", err)
+	}
+}
+
+// testRenterStreamingCache checks if the chunk cache works correctly.
+func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	r := tg.Renters()[0]
+
+	// Set fileSize and redundancy for upload
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+
+	// Set the bandwidth limit to 1 chunk per second.
+	pieceSize := modules.SectorSize - crypto.TwofishOverhead
+	chunkSize := int64(pieceSize * dataPieces)
+	if err := r.RenterPostRateLimit(chunkSize, chunkSize); err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload a file that is a single chunk big.
+	_, remoteFile, err := r.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Download the same chunk 250 times. This should take at least 250 seconds
+	// without caching but not more than 30 with caching.
+	start := time.Now()
+	for i := 0; i < 250; i++ {
+		if _, err := r.Stream(remoteFile); err != nil {
+			t.Fatal(err)
+		}
+		if time.Since(start) > time.Second*30 {
+			t.Fatal("download took longer than 30 seconds")
+		}
 	}
 }

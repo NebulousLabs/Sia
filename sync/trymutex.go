@@ -43,10 +43,12 @@ func (tm *TryMutex) TryLock() bool {
 func (tm *TryMutex) TryLockTimed(t time.Duration) bool {
 	tm.once.Do(tm.init)
 
+	timer := time.NewTimer(t)
 	select {
 	case <-tm.lock:
+		timer.Stop()
 		return true
-	case <-time.After(t):
+	case <-timer.C:
 		return false
 	}
 }

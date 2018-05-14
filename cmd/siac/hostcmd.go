@@ -8,8 +8,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/node/api"
+	"github.com/NebulousLabs/Sia/node/api/client"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/spf13/cobra"
@@ -72,6 +73,18 @@ To configure the host to accept new contracts, set acceptingcontracts to true:
 		Run: wrap(hostconfigcmd),
 	}
 
+	hostContractCmd = &cobra.Command{
+		Use:   "contracts",
+		Short: "Show host contracts",
+		Long: `Show host contracts sorted by expiration height.
+
+Available output types:
+     value:  show financial information
+     status: show status information
+`,
+		Run: wrap(hostcontractcmd),
+	}
+
 	hostFolderAddCmd = &cobra.Command{
 		Use:   "add [path] [size]",
 		Short: "Add a storage folder to the host",
@@ -122,13 +135,11 @@ sector may impact host revenue.`,
 // hostcmd is the handler for the command `siac host`.
 // Prints info about the host and its storage folders.
 func hostcmd() {
-	hg := new(api.HostGET)
-	err := getAPI("/host", hg)
+	hg, err := httpClient.HostGet()
 	if err != nil {
 		die("Could not fetch host settings:", err)
 	}
-	sg := new(api.StorageGET)
-	err = getAPI("/host/storage", sg)
+	sg, err := httpClient.HostStorageGet()
 	if err != nil {
 		die("Could not fetch storage info:", err)
 	}
@@ -284,8 +295,7 @@ RPC Stats:
 	}
 
 	// if wallet is locked print warning
-	walletstatus := new(api.WalletGET)
-	walleterr := getAPI("/wallet", walletstatus)
+	walletstatus, walleterr := httpClient.WalletGet()
 	if walleterr != nil {
 		fmt.Print("\nWarning:\n	Could not get wallet status. A working wallet is needed in order to operate your host. Error: ")
 		fmt.Println(walleterr)
@@ -368,15 +378,14 @@ func hostconfigcmd(param, value string) {
 	default:
 		die("\"" + param + "\" is not a host setting")
 	}
-	err = post("/host", param+"="+value)
+	err = httpClient.HostModifySettingPost(client.HostParam(param), value)
 	if err != nil {
-		die("Could not update host settings:", err)
+		die("Failed to update host settings:", err)
 	}
 	fmt.Println("Host settings updated.")
 
 	// get the estimated conversion rate.
-	var eg api.HostEstimateScoreGET
-	err = getAPI(fmt.Sprintf("/host/estimatescore?%v=%v", param, value), &eg)
+	eg, err := httpClient.HostEstimateScoreGet(param, value)
 	if err != nil {
 		if err.Error() == "cannot call /host/estimatescore without the renter module" {
 			// score estimate requires the renter module
@@ -387,6 +396,34 @@ func hostconfigcmd(param, value string) {
 	fmt.Printf("Estimated conversion rate: %v%%\n", eg.ConversionRate)
 }
 
+// hostcontractcmd is the handler for the command `siac host contracts [type]`.
+func hostcontractcmd() {
+	cg, err := httpClient.HostContractInfoGet()
+	if err != nil {
+		die("Could not fetch host contract info:", err)
+	}
+	sort.Slice(cg.Contracts, func(i, j int) bool { return cg.Contracts[i].ExpirationHeight < cg.Contracts[j].ExpirationHeight })
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
+	switch hostContractOutputType {
+	case "value":
+		fmt.Fprintf(w, "Obligation Id\tObligation Status\tContract Cost\tLocked Collateral\tRisked Collateral\tPotential Revenue\tExpiration Height\tTransaction Fees\n")
+		for _, so := range cg.Contracts {
+			potentialRevenue := so.PotentialDownloadRevenue.Add(so.PotentialUploadRevenue).Add(so.PotentialStorageRevenue)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\n", so.ObligationId, strings.TrimPrefix(so.ObligationStatus, "obligation"), currencyUnits(so.ContractCost), currencyUnits(so.LockedCollateral),
+				currencyUnits(so.RiskedCollateral), currencyUnits(potentialRevenue), so.ExpirationHeight, currencyUnits(so.TransactionFeesAdded))
+		}
+	case "status":
+		fmt.Fprintf(w, "Obligation ID\tObligation Status\tExpiration Height\tOrigin Confirmed\tRevision Constructed\tRevision Confirmed\tProof Constructed\tProof Confirmed\n")
+		for _, so := range cg.Contracts {
+			fmt.Fprintf(w, "%s\t%s\t%d\t%t\t%t\t%t\t%t\t%t\n", so.ObligationId, strings.TrimPrefix(so.ObligationStatus, "obligation"), so.ExpirationHeight, so.OriginConfirmed,
+				so.RevisionConstructed, so.RevisionConfirmed, so.ProofConstructed, so.ProofConfirmed)
+		}
+	default:
+		die("\"" + hostContractOutputType + "\" is not a format")
+	}
+	w.Flush()
+}
+
 // hostannouncecmd is the handler for the command `siac host announce`.
 // Announces yourself as a host to the network. Optionally takes an address to
 // announce as.
@@ -394,9 +431,9 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 	var err error
 	switch len(args) {
 	case 0:
-		err = post("/host/announce", "")
+		err = httpClient.HostAnnouncePost()
 	case 1:
-		err = post("/host/announce", "netaddress="+args[0])
+		err = httpClient.HostAnnounceAddrPost(modules.NetAddress(args[0]))
 	default:
 		cmd.UsageFunc()(cmd)
 		os.Exit(exitCodeUsage)
@@ -407,7 +444,7 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 	fmt.Println("Host announcement submitted to network.")
 
 	// start accepting contracts
-	err = post("/host", "acceptingcontracts=true")
+	err = httpClient.HostModifySettingPost(client.HostParamAcceptingContracts, true)
 	if err != nil {
 		die("Could not configure host to accept contracts:", err)
 	}
@@ -427,9 +464,8 @@ func hostfolderaddcmd(path, size string) {
 	fmt.Sscan(size, &sizeUint64)
 	sizeUint64 /= 64 * modules.SectorSize
 	sizeUint64 *= 64 * modules.SectorSize
-	size = fmt.Sprint(sizeUint64)
 
-	err = post("/host/storage/folders/add", fmt.Sprintf("path=%s&size=%s", abs(path), size))
+	err = httpClient.HostStorageFoldersAddPost(abs(path), sizeUint64)
 	if err != nil {
 		die("Could not add folder:", err)
 	}
@@ -438,7 +474,7 @@ func hostfolderaddcmd(path, size string) {
 
 // hostfolderremovecmd removes a folder from the host.
 func hostfolderremovecmd(path string) {
-	err := post("/host/storage/folders/remove", "path="+abs(path))
+	err := httpClient.HostStorageFoldersRemovePost(abs(path))
 	if err != nil {
 		die("Could not remove folder:", err)
 	}
@@ -456,9 +492,8 @@ func hostfolderresizecmd(path, newsize string) {
 	fmt.Sscan(newsize, &sizeUint64)
 	sizeUint64 /= 64 * modules.SectorSize
 	sizeUint64 *= 64 * modules.SectorSize
-	newsize = fmt.Sprint(sizeUint64)
 
-	err = post("/host/storage/folders/resize", fmt.Sprintf("path=%s&newsize=%s", abs(path), newsize))
+	err = httpClient.HostStorageFoldersResizePost(abs(path), sizeUint64)
 	if err != nil {
 		die("Could not resize folder:", err)
 	}
@@ -467,7 +502,12 @@ func hostfolderresizecmd(path, newsize string) {
 
 // hostsectordeletecmd deletes a sector from the host.
 func hostsectordeletecmd(root string) {
-	err := post("/host/storage/sectors/delete/"+root, "")
+	var hash crypto.Hash
+	err := hash.LoadString(root)
+	if err != nil {
+		die("Could not parse root:", err)
+	}
+	err = httpClient.HostStorageSectorsDeletePost(hash)
 	if err != nil {
 		die("Could not delete sector:", err)
 	}

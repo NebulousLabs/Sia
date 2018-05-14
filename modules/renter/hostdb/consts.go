@@ -34,6 +34,17 @@ const (
 	// scans start getting compressed.
 	minScans = 12
 
+	// minScansForSpeedup is the number of successful scan that needs to be
+	// completed before the dial up timeout for scans is reduced. This ensures
+	// that we have a sufficient sample size of scans for estimating the worst
+	// case timeout.
+	minScansForSpeedup = 25
+
+	// scanSpeedupMedianMultiplier is the number with which the median of the
+	// initial scans is multiplied to speedup the intial scan after
+	// minScansForSpeedup successful scans.
+	scanSpeedupMedianMultiplier = 5
+
 	// recentInteractionWeightLimit caps the number of recent interactions as a
 	// percentage of the historic interactions, to be certain that a large
 	// amount of activity in a short period of time does not overwhelm the
@@ -46,6 +57,10 @@ const (
 	// saveFrequency defines how frequently the hostdb will save to disk. Hostdb
 	// will also save immediately prior to shutdown.
 	saveFrequency = 2 * time.Minute
+
+	// scanCheckInterval is the interval used when waiting for the scanList to
+	// empty itself and for waiting on the consensus set to be synced.
+	scanCheckInterval = time.Second
 )
 
 var (

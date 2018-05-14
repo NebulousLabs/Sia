@@ -150,22 +150,32 @@ func abs(path string) string {
 // rentercmd displays the renter's financial metrics and lists the files it is
 // tracking.
 func rentercmd() {
-	var rg api.RenterGET
-	err := getAPI("/renter", &rg)
+	rg, err := httpClient.RenterGet()
 	if err != nil {
 		die("Could not get renter info:", err)
 	}
 	fm := rg.FinancialMetrics
-	fmt.Printf(`Renter info:
-	Storage Spending:  %v
-	Upload Spending:   %v
-	Download Spending: %v
-	Unspent Funds:     %v
-	Total Allocated:   %v
+	totalSpent := fm.ContractFees.Add(fm.UploadSpending).
+		Add(fm.DownloadSpending).Add(fm.StorageSpending)
+	unspentAllocated := fm.TotalAllocated.Sub(totalSpent)
+	unspentUnallocated := fm.Unspent.Sub(unspentAllocated)
 
-`, currencyUnits(fm.StorageSpending), currencyUnits(fm.UploadSpending),
-		currencyUnits(fm.DownloadSpending), currencyUnits(fm.Unspent),
-		currencyUnits(fm.ContractSpending))
+	fmt.Printf(`Renter info:
+	Allowance:         %v
+	  Spent Funds:     %v
+	    Storage:       %v
+	    Upload:        %v
+	    Download:      %v
+	    Fees:          %v
+	  Unspent Funds:   %v
+	    Allocated:     %v
+	    Unallocated:   %v
+
+`, currencyUnits(rg.Settings.Allowance.Funds), currencyUnits(totalSpent),
+		currencyUnits(fm.StorageSpending), currencyUnits(fm.UploadSpending),
+		currencyUnits(fm.DownloadSpending), currencyUnits(fm.ContractFees),
+		currencyUnits(fm.Unspent), currencyUnits(unspentAllocated),
+		currencyUnits(unspentUnallocated))
 
 	// also list files
 	renterfileslistcmd()
@@ -174,8 +184,7 @@ func rentercmd() {
 // renteruploadscmd is the handler for the command `siac renter uploads`.
 // Lists files currently uploading.
 func renteruploadscmd() {
-	var rf api.RenterFiles
-	err := getAPI("/renter/files", &rf)
+	rf, err := httpClient.RenterFilesGet()
 	if err != nil {
 		die("Could not get upload queue:", err)
 	}
@@ -206,8 +215,7 @@ func renteruploadscmd() {
 // Lists files currently downloading, and optionally previously downloaded
 // files if the -H or --history flag is specified.
 func renterdownloadscmd() {
-	var queue api.RenterDownloadQueue
-	err := getAPI("/renter/downloads", &queue)
+	queue, err := httpClient.RenterDownloadsGet()
 	if err != nil {
 		die("Could not get download queue:", err)
 	}
@@ -249,8 +257,7 @@ func renterdownloadscmd() {
 
 // renterallowancecmd displays the current allowance.
 func renterallowancecmd() {
-	var rg api.RenterGET
-	err := getAPI("/renter", &rg)
+	rg, err := httpClient.RenterGet()
 	if err != nil {
 		die("Could not get allowance:", err)
 	}
@@ -265,7 +272,7 @@ func renterallowancecmd() {
 
 // renterallowancecancelcmd cancels the current allowance.
 func renterallowancecancelcmd() {
-	err := post("/renter", "hosts=0&funds=0&period=0&renewwindow=0")
+	err := httpClient.RenterCancelAllowance()
 	if err != nil {
 		die("error canceling allowance:", err)
 	}
@@ -288,24 +295,36 @@ func rentersetallowancecmd(cmd *cobra.Command, args []string) {
 	}
 	blocks, err := parsePeriod(args[1])
 	if err != nil {
-		die("Could not parse period")
+		die("Could not parse period:", err)
 	}
-	queryString := fmt.Sprintf("funds=%s&period=%s", hastings, blocks)
+	allowance := modules.Allowance{}
+	_, err = fmt.Sscan(hastings, &allowance.Funds)
+	if err != nil {
+		die("Could not parse amount:", err)
+	}
+
+	_, err = fmt.Sscan(blocks, &allowance.Period)
+	if err != nil {
+		die("Could not parse period:", err)
+	}
 	if len(args) > 2 {
-		_, err = strconv.Atoi(args[2])
+		hosts, err := strconv.Atoi(args[2])
 		if err != nil {
 			die("Could not parse host count")
 		}
-		queryString += fmt.Sprintf("&hosts=%s", args[2])
+		allowance.Hosts = uint64(hosts)
 	}
 	if len(args) > 3 {
 		renewWindow, err := parsePeriod(args[3])
 		if err != nil {
 			die("Could not parse renew window")
 		}
-		queryString += fmt.Sprintf("&renewwindow=%s", renewWindow)
+		_, err = fmt.Sscan(renewWindow, &allowance.RenewWindow)
+		if err != nil {
+			die("Could not parse renew window:", err)
+		}
 	}
-	err = post("/renter", queryString)
+	err = httpClient.RenterPostAllowance(allowance)
 	if err != nil {
 		die("Could not set allowance:", err)
 	}
@@ -329,8 +348,7 @@ func (s byValue) Less(i, j int) bool {
 // rentercontractscmd is the handler for the comand `siac renter contracts`.
 // It lists the Renter's contracts.
 func rentercontractscmd() {
-	var rc api.RenterContracts
-	err := getAPI("/renter/contracts", &rc)
+	rc, err := httpClient.RenterContractsGet()
 	if err != nil {
 		die("Could not get contracts:", err)
 	}
@@ -360,16 +378,14 @@ func rentercontractscmd() {
 // rentercontractsviewcmd is the handler for the command `siac renter contracts <id>`.
 // It lists details of a specific contract.
 func rentercontractsviewcmd(cid string) {
-	var rc api.RenterContracts
-	err := getAPI("/renter/contracts", &rc)
+	rc, err := httpClient.RenterContractsGet()
 	if err != nil {
 		die("Could not get contract details: ", err)
 	}
 
 	for _, rc := range rc.Contracts {
 		if rc.ID.String() == cid {
-			var hostInfo api.HostdbHostsGET
-			err = getAPI("/hostdb/hosts/"+rc.HostPublicKey.String(), &hostInfo)
+			hostInfo, err := httpClient.HostDbHostsGet(rc.HostPublicKey)
 			if err != nil {
 				die("Could not fetch details of host: ", err)
 			}
@@ -409,7 +425,7 @@ Contract %v
 // renterfilesdeletecmd is the handler for the command `siac renter delete [path]`.
 // Removes the specified path from the Sia network.
 func renterfilesdeletecmd(path string) {
-	err := post("/renter/delete/"+path, "")
+	err := httpClient.RenterDeletePost(path)
 	if err != nil {
 		die("Could not delete file:", err)
 	}
@@ -423,7 +439,7 @@ func renterfilesdownloadcmd(path, destination string) {
 	done := make(chan struct{})
 	go downloadprogress(done, path)
 
-	err := get("/renter/download/" + path + "?destination=" + destination)
+	err := httpClient.RenterDownloadFullGet(path, destination, false)
 	close(done)
 	if err != nil {
 		die("Could not download file:", err)
@@ -440,8 +456,7 @@ func downloadprogress(done chan struct{}, siapath string) {
 
 		case <-time.Tick(time.Second):
 			// get download progress of file
-			var queue api.RenterDownloadQueue
-			err := getAPI("/renter/downloads", &queue)
+			queue, err := httpClient.RenterDownloadsGet()
 			if err != nil {
 				continue // benign
 			}
@@ -476,7 +491,7 @@ func (s bySiaPath) Less(i, j int) bool { return s[i].SiaPath < s[j].SiaPath }
 // Lists files known to the renter on the network.
 func renterfileslistcmd() {
 	var rf api.RenterFiles
-	err := getAPI("/renter/files", &rf)
+	rf, err := httpClient.RenterFilesGet()
 	if err != nil {
 		die("Could not get file list:", err)
 	}
@@ -517,7 +532,7 @@ func renterfileslistcmd() {
 // renterfilesrenamecmd is the handler for the command `siac renter rename [path] [newpath]`.
 // Renames a file on the Sia network.
 func renterfilesrenamecmd(path, newpath string) {
-	err := post("/renter/rename/"+path, "newsiapath="+newpath)
+	err := httpClient.RenterRenamePost(path, newpath)
 	if err != nil {
 		die("Could not rename file:", err)
 	}
@@ -557,7 +572,7 @@ func renterfilesuploadcmd(source, path string) {
 			fpath, _ := filepath.Rel(source, file)
 			fpath = filepath.Join(path, fpath)
 			fpath = filepath.ToSlash(fpath)
-			err = post("/renter/upload/"+fpath, "source="+abs(file))
+			err = httpClient.RenterUploadDefaultPost(abs(file), fpath)
 			if err != nil {
 				die("Could not upload file:", err)
 			}
@@ -565,7 +580,7 @@ func renterfilesuploadcmd(source, path string) {
 		fmt.Printf("Uploaded %d files into '%s'.\n", len(files), path)
 	} else {
 		// single file
-		err = post("/renter/upload/"+path, "source="+abs(source))
+		err = httpClient.RenterUploadDefaultPost(abs(source), path)
 		if err != nil {
 			die("Could not upload file:", err)
 		}
@@ -576,8 +591,7 @@ func renterfilesuploadcmd(source, path string) {
 // renterpricescmd is the handler for the command `siac renter prices`, which
 // displays the prices of various storage operations.
 func renterpricescmd() {
-	var rpg api.RenterPricesGET
-	err := getAPI("/renter/prices", &rpg)
+	rpg, err := httpClient.RenterPricesGet()
 	if err != nil {
 		die("Could not read the renter prices:", err)
 	}

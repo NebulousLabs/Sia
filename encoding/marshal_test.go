@@ -148,20 +148,20 @@ func TestDecode(t *testing.T) {
 
 	// big slice (larger than MaxSliceSize)
 	err = Unmarshal(EncUint64(MaxSliceSize+1), new([]byte))
-	if err == nil || err.Error() != "could not decode type []uint8: encoded slice is too large" {
+	if err == nil || !strings.Contains(err.Error(), "exceeds size limit") {
 		t.Error("expected large slice error, got", err)
 	}
 
 	// massive slice (larger than MaxInt32)
 	err = Unmarshal(EncUint64(1<<32), new([]byte))
-	if err == nil || err.Error() != "could not decode type []uint8: encoded slice is too large" {
+	if err == nil || !strings.Contains(err.Error(), "exceeds size limit") {
 		t.Error("expected large slice error, got", err)
 	}
 
 	// many small slices (total larger than maxDecodeLen)
 	bigSlice := strings.Split(strings.Repeat("0123456789abcdefghijklmnopqrstuvwxyz", (MaxSliceSize/16)-1), "0")
 	err = Unmarshal(Marshal(bigSlice), new([]string))
-	if err == nil || err.Error() != "could not decode type []string: encoded object exceeds size limit" {
+	if err == nil || !strings.Contains(err.Error(), "exceeds size limit") {
 		t.Error("expected size limit error, got", err)
 	}
 
@@ -178,7 +178,6 @@ func TestDecode(t *testing.T) {
 	if err == nil || err.Error() != "could not decode type [3]uint8: EOF" {
 		t.Error("expected EOF error, got", err)
 	}
-
 }
 
 // TestMarshalUnmarshal tests the Marshal and Unmarshal functions, which are

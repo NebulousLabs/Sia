@@ -58,11 +58,6 @@ fmt:
 vet: release-std
 	go vet $(pkgs)
 
-# will always run on some packages for a while.
-lintpkgs = ./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer \
-           ./modules/gateway ./modules/host ./modules/miner ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb \
-           ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/wallet ./modules/transactionpool ./node ./node/api ./node/api/server ./persist \
-           ./siatest ./siatest/consensus ./siatest/renter ./siatest/wallet
 lint:
 	golint -min_confidence=1.0 -set_exit_status $(pkgs)
 
@@ -91,7 +86,7 @@ release-race:
 # clean removes all directories that get automatically created during
 # development.
 clean:
-	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
+	rm -rf cover doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf release 
 
 test:
 	go test -short -tags='debug testing netgo' -timeout=5s $(pkgs) -run=$(run)
@@ -108,13 +103,12 @@ test-mem:
 bench: clean fmt
 	go test -tags='debug testing netgo' -timeout=500s -run=XXX -bench=$(run) $(pkgs)
 cover: clean
-	@mkdir -p cover/modules
-	@mkdir -p cover/modules/renter
-	@mkdir -p cover/modules/host
-	@for package in $(pkgs); do                                                                                                 \
-		go test -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package -run=$(run) \
-		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                                      \
-		&& rm cover/$$package.out ;                                                                                             \
+	@mkdir -p cover
+	@for package in $(pkgs); do                                                                                                          \
+		mkdir -p `dirname cover/$$package`                                                                                        \
+		&& go test -tags='testing debug netgo' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package -run=$(run) \
+		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                                               \
+		&& rm cover/$$package.out ;                                                                                                      \
 	done
 
 # whitepaper builds the whitepaper from whitepaper.tex. pdflatex has to be

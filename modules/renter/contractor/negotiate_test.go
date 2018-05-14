@@ -139,7 +139,10 @@ func TestNegotiateContract(t *testing.T) {
 		RevisionNumber: 0,
 	}
 
-	txnBuilder := ct.wallet.StartTransaction()
+	txnBuilder, err := ct.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = txnBuilder.FundSiacoins(fc.Payout)
 	if err != nil {
 		t.Fatal(err)
@@ -210,7 +213,10 @@ func TestReviseContract(t *testing.T) {
 		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 	}
 
-	txnBuilder := ct.wallet.StartTransaction()
+	txnBuilder, err := ct.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = txnBuilder.FundSiacoins(fc.Payout)
 	if err != nil {
 		t.Fatal(err)

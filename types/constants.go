@@ -55,14 +55,14 @@ var (
 	// any transactions spending the payout. File contract payouts also are subject to
 	// a maturity delay.
 	MaturityDelay BlockHeight
-	// MaxAdjustmentDown restrict how much the block difficulty is allowed to
+	// MaxTargetAdjustmentDown restrict how much the block difficulty is allowed to
 	// change in a single step, which is important to limit the effect of difficulty
 	// raising and lowering attacks.
-	MaxAdjustmentDown *big.Rat
-	// MaxAdjustmentUp restrict how much the block difficulty is allowed to
+	MaxTargetAdjustmentDown *big.Rat
+	// MaxTargetAdjustmentUp restrict how much the block difficulty is allowed to
 	// change in a single step, which is important to limit the effect of difficulty
 	// raising and lowering attacks.
-	MaxAdjustmentUp *big.Rat
+	MaxTargetAdjustmentUp *big.Rat
 	// MedianTimestampWindow tells us how many blocks to look back when calculating
 	// the median timestamp over the previous n blocks. The timestamp of a block is
 	// not allowed to be less than or equal to the median timestamp of the previous n
@@ -124,6 +124,15 @@ var (
 	TargetWindow BlockHeight
 )
 
+var (
+	// TaxHardforkHeight is the height at which the tax hardfork occured.
+	TaxHardforkHeight = build.Select(build.Var{
+		Dev:      BlockHeight(10),
+		Standard: BlockHeight(21e3),
+		Testing:  BlockHeight(10),
+	}).(BlockHeight)
+)
+
 // init checks which build constant is in place and initializes the variables
 // accordingly.
 func init() {
@@ -138,11 +147,11 @@ func init() {
 		GenesisTimestamp = Timestamp(1424139000) // Change as necessary.
 		RootTarget = Target{0, 0, 2}             // Standard developer CPUs will be able to mine blocks with the race library activated.
 
-		TargetWindow = 20                        // Difficulty is adjusted based on prior 20 blocks.
-		MaxAdjustmentUp = big.NewRat(120, 100)   // Difficulty adjusts quickly.
-		MaxAdjustmentDown = big.NewRat(100, 120) // Difficulty adjusts quickly.
-		FutureThreshold = 2 * 60                 // 2 minutes.
-		ExtremeFutureThreshold = 4 * 60          // 4 minutes.
+		TargetWindow = 20                              // Difficulty is adjusted based on prior 20 blocks.
+		MaxTargetAdjustmentUp = big.NewRat(120, 100)   // Difficulty adjusts quickly.
+		MaxTargetAdjustmentDown = big.NewRat(100, 120) // Difficulty adjusts quickly.
+		FutureThreshold = 2 * 60                       // 2 minutes.
+		ExtremeFutureThreshold = 4 * 60                // 4 minutes.
 
 		MinimumCoinbase = 30e3
 
@@ -181,8 +190,8 @@ func init() {
 		// only 1 second and testing mining should be happening substantially
 		// faster than that.
 		TargetWindow = 200
-		MaxAdjustmentUp = big.NewRat(10001, 10000)
-		MaxAdjustmentDown = big.NewRat(9999, 10000)
+		MaxTargetAdjustmentUp = big.NewRat(10001, 10000)
+		MaxTargetAdjustmentDown = big.NewRat(9999, 10000)
 		FutureThreshold = 3        // 3 seconds
 		ExtremeFutureThreshold = 6 // 6 seconds
 
@@ -256,8 +265,8 @@ func init() {
 		// difficulty is adjusted four times as often. This does result in
 		// greater difficulty oscillation, a tradeoff that was chosen to be
 		// acceptable due to Sia's more vulnerable position as an altcoin.
-		MaxAdjustmentUp = big.NewRat(25, 10)
-		MaxAdjustmentDown = big.NewRat(10, 25)
+		MaxTargetAdjustmentUp = big.NewRat(25, 10)
+		MaxTargetAdjustmentDown = big.NewRat(10, 25)
 
 		// Blocks will not be accepted if their timestamp is more than 3 hours
 		// into the future, but will be accepted as soon as they are no longer

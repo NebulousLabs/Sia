@@ -2,13 +2,14 @@ package wallet
 
 import (
 	"encoding/binary"
-	"errors"
+	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/fastrand"
 
 	"github.com/coreos/bbolt"
@@ -81,25 +82,44 @@ func (w *Wallet) threadedDBUpdate() {
 			return
 		}
 		w.mu.Lock()
-		w.syncDB()
+		err := w.syncDB()
 		w.mu.Unlock()
+		if err != nil {
+			// If the database is having problems, we need to close it to
+			// protect it. This will likely cause a panic somewhere when another
+			// caller tries to access dbTx but it is nil.
+			w.log.Severe("ERROR: syncDB encountered an error. Closing database to protect wallet. wallet may crash:", err)
+			w.db.Close()
+			return
+		}
 	}
 }
 
 // syncDB commits the current global transaction and immediately begins a
 // new one. It must be called with a write-lock.
-func (w *Wallet) syncDB() {
+func (w *Wallet) syncDB() error {
+	// If the rollback flag is set, it means that somewhere in the middle of an
+	// atomic update there  was a failure, and that failure needs to be rolled
+	// back. An error will be returned.
+	if w.dbRollback {
+		w.dbTx.Rollback()
+		return errors.New("database unable to sync - rollback requested")
+	}
+
 	// commit the current tx
 	err := w.dbTx.Commit()
 	if err != nil {
 		w.log.Severe("ERROR: failed to apply database update:", err)
 		w.dbTx.Rollback()
+		return errors.AddContext(err, "unable to commit dbTx in syncDB")
 	}
 	// begin a new tx
 	w.dbTx, err = w.db.Begin(true)
 	if err != nil {
 		w.log.Severe("ERROR: failed to start database update:", err)
+		return errors.AddContext(err, "unable to begin new dbTx in syncDB")
 	}
+	return nil
 }
 
 // dbReset wipes and reinitializes a wallet database.
@@ -245,11 +265,16 @@ func dbAddProcessedTransactionAddrs(tx *bolt.Tx, pt modules.ProcessedTransaction
 		addrs[input.RelatedAddress] = struct{}{}
 	}
 	for _, output := range pt.Outputs {
+		// miner fees don't have an address, so skip them
+		if output.FundType == types.SpecifierMinerFee {
+			continue
+		}
 		addrs[output.RelatedAddress] = struct{}{}
 	}
 	for addr := range addrs {
 		if err := dbAddAddrTransaction(tx, addr, txn); err != nil {
-			return err
+			return errors.AddContext(err, fmt.Sprintf("failed to add txn %v to address %v",
+				pt.TransactionID, addr))
 		}
 	}
 	return nil
@@ -270,6 +295,9 @@ func decodeProcessedTransaction(ptBytes []byte, pt *modules.ProcessedTransaction
 	return err
 }
 
+func dbDeleteTransactionIndex(tx *bolt.Tx, txid types.TransactionID) error {
+	return dbDelete(tx.Bucket(bucketProcessedTxnIndex), txid)
+}
 func dbPutTransactionIndex(tx *bolt.Tx, txid types.TransactionID, key []byte) error {
 	return dbPut(tx.Bucket(bucketProcessedTxnIndex), txid, key)
 }
@@ -299,37 +327,52 @@ func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) 
 	b := tx.Bucket(bucketProcessedTransactions)
 	key, err := b.NextSequence()
 	if err != nil {
-		return err
+		return errors.AddContext(err, "failed to get next sequence from bucket")
 	}
 	// big-endian is used so that the keys are properly sorted
 	keyBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(keyBytes, key)
 	if err = b.Put(keyBytes, encoding.Marshal(pt)); err != nil {
-		return err
+		return errors.AddContext(err, "failed to store processed txn in database")
 	}
 
 	// add used index to bucketProcessedTxnIndex
 	if err = dbPutTransactionIndex(tx, pt.TransactionID, keyBytes); err != nil {
-		return err
+		return errors.AddContext(err, "failed to store txn index in database")
 	}
 
 	// also add this txid to the bucketAddrTransactions
-	return dbAddProcessedTransactionAddrs(tx, pt, key)
+	if err = dbAddProcessedTransactionAddrs(tx, pt, key); err != nil {
+		return errors.AddContext(err, "failed to add processed transaction to addresses in database")
+	}
+	return nil
 }
 
 func dbGetLastProcessedTransaction(tx *bolt.Tx) (pt modules.ProcessedTransaction, err error) {
-	_, val := tx.Bucket(bucketProcessedTransactions).Cursor().Last()
+	seq := tx.Bucket(bucketProcessedTransactions).Sequence()
+	keyBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(keyBytes, seq)
+	val := tx.Bucket(bucketProcessedTransactions).Get(keyBytes)
 	err = decodeProcessedTransaction(val, &pt)
 	return
 }
 
 func dbDeleteLastProcessedTransaction(tx *bolt.Tx) error {
-	// delete the last entry in the bucket. Note that we don't need to
-	// decrement the sequence integer; we only care that the next integer is
-	// larger than the previous one.
+	// Get the last processed txn.
+	pt, err := dbGetLastProcessedTransaction(tx)
+	if err != nil {
+		return errors.New("can't delete from empty bucket")
+	}
+	// Delete its txid from the index bucket.
+	if err := dbDeleteTransactionIndex(tx, pt.TransactionID); err != nil {
+		return errors.AddContext(err, "couldn't delete txn index")
+	}
+	// Delete the last processed txn and decrement the sequence.
 	b := tx.Bucket(bucketProcessedTransactions)
-	key, _ := b.Cursor().Last()
-	return b.Delete(key)
+	seq := b.Sequence()
+	keyBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(keyBytes, seq)
+	return errors.Compose(b.SetSequence(seq-1), b.Delete(keyBytes))
 }
 
 func dbGetProcessedTransaction(tx *bolt.Tx, index uint64) (pt modules.ProcessedTransaction, err error) {

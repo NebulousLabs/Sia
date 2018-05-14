@@ -30,7 +30,7 @@ func NewFile(size int) (*LocalFile, error) {
 	err := ioutil.WriteFile(path, bytes, 0600)
 	return &LocalFile{
 		path:     path,
-		checksum: crypto.HashObject(bytes),
+		checksum: crypto.HashBytes(bytes),
 	}, err
 }
 
@@ -46,7 +46,7 @@ func (lf *LocalFile) checkIntegrity() error {
 	if err != nil {
 		return errors.AddContext(err, "failed to read file from disk")
 	}
-	if crypto.HashAll(data) != lf.checksum {
+	if crypto.HashBytes(data) != lf.checksum {
 		return errors.New("checksums don't match")
 	}
 	return nil
@@ -55,4 +55,13 @@ func (lf *LocalFile) checkIntegrity() error {
 // fileName returns the file name of the file on disk
 func (lf *LocalFile) fileName() string {
 	return filepath.Base(lf.path)
+}
+
+// partialChecksum returns the checksum of a part of the file.
+func (lf *LocalFile) partialChecksum(from, to uint64) (crypto.Hash, error) {
+	data, err := ioutil.ReadFile(lf.path)
+	if err != nil {
+		return crypto.Hash{}, errors.AddContext(err, "failed to read file from disk")
+	}
+	return crypto.HashBytes(data[from:to]), nil
 }

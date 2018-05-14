@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"syscall"
@@ -16,7 +17,6 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/wallet"
-	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/entropy-mnemonics"
 )
@@ -221,8 +221,7 @@ func confirmPassword(prev string) error {
 // walletaddresscmd fetches a new address from the wallet that will be able to
 // receive coins.
 func walletaddresscmd() {
-	addr := new(api.WalletAddressGET)
-	err := getAPI("/wallet/address", addr)
+	addr, err := httpClient.WalletAddressGet()
 	if err != nil {
 		die("Could not generate new address:", err)
 	}
@@ -231,8 +230,7 @@ func walletaddresscmd() {
 
 // walletaddressescmd fetches the list of addresses that the wallet knows.
 func walletaddressescmd() {
-	addrs := new(api.WalletAddressesGET)
-	err := getAPI("/wallet/addresses", addrs)
+	addrs, err := httpClient.WalletAddressesGet()
 	if err != nil {
 		die("Failed to fetch addresses:", err)
 	}
@@ -253,8 +251,7 @@ func walletchangepasswordcmd() {
 	} else if err = confirmPassword(newPassword); err != nil {
 		die(err)
 	}
-	qs := fmt.Sprintf("newpassword=%s&encryptionpassword=%s", newPassword, currentPassword)
-	err = post("/wallet/changepassword", qs)
+	err = httpClient.WalletChangePasswordPost(currentPassword, newPassword)
 	if err != nil {
 		die("Changing the password failed:", err)
 	}
@@ -263,21 +260,17 @@ func walletchangepasswordcmd() {
 
 // walletinitcmd encrypts the wallet with the given password
 func walletinitcmd() {
-	var er api.WalletInitPOST
-	qs := fmt.Sprintf("dictionary=%s", "english")
+	var password string
+	var err error
 	if initPassword {
-		password, err := passwordPrompt("Wallet password: ")
+		password, err = passwordPrompt("Wallet password: ")
 		if err != nil {
 			die("Reading password failed:", err)
 		} else if err = confirmPassword(password); err != nil {
 			die(err)
 		}
-		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
-	if initForce {
-		qs += "&force=true"
-	}
-	err := postResp("/wallet/init", qs, &er)
+	er, err := httpClient.WalletInitPost(password, initForce)
 	if err != nil {
 		die("Error when encrypting wallet:", err)
 	}
@@ -295,20 +288,16 @@ func walletinitseedcmd() {
 	if err != nil {
 		die("Reading seed failed:", err)
 	}
-	qs := fmt.Sprintf("&seed=%s&dictionary=%s", seed, "english")
+	var password string
 	if initPassword {
-		password, err := passwordPrompt("Wallet password: ")
+		password, err = passwordPrompt("Wallet password: ")
 		if err != nil {
 			die("Reading password failed:", err)
 		} else if err = confirmPassword(password); err != nil {
 			die(err)
 		}
-		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
-	if initForce {
-		qs += "&force=true"
-	}
-	err = post("/wallet/init/seed", qs)
+	err = httpClient.WalletInitSeedPost(seed, password, initForce)
 	if err != nil {
 		die("Could not initialize wallet from seed:", err)
 	}
@@ -325,8 +314,7 @@ func walletload033xcmd(source string) {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	qs := fmt.Sprintf("source=%s&encryptionpassword=%s", abs(source), password)
-	err = post("/wallet/033x", qs)
+	err = httpClient.Wallet033xPost(abs(source), password)
 	if err != nil {
 		die("Loading wallet failed:", err)
 	}
@@ -343,8 +331,7 @@ func walletloadseedcmd() {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
-	err = post("/wallet/seed", qs)
+	err = httpClient.WalletSeedPost(seed, password)
 	if err != nil {
 		die("Could not add seed:", err)
 	}
@@ -357,8 +344,7 @@ func walletloadsiagcmd(keyfiles string) {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	qs := fmt.Sprintf("keyfiles=%s&encryptionpassword=%s", keyfiles, password)
-	err = post("/wallet/siagkey", qs)
+	err = httpClient.WalletSiagKeyPost(keyfiles, password)
 	if err != nil {
 		die("Loading siag key failed:", err)
 	}
@@ -367,7 +353,7 @@ func walletloadsiagcmd(keyfiles string) {
 
 // walletlockcmd locks the wallet
 func walletlockcmd() {
-	err := post("/wallet/lock", "")
+	err := httpClient.WalletLockPost()
 	if err != nil {
 		die("Could not lock wallet:", err)
 	}
@@ -375,8 +361,7 @@ func walletlockcmd() {
 
 // walletseedcmd returns the current seed {
 func walletseedscmd() {
-	var seedInfo api.WalletSeedsGET
-	err := getAPI("/wallet/seeds", &seedInfo)
+	seedInfo, err := httpClient.WalletSeedsGet()
 	if err != nil {
 		die("Error retrieving the current seed:", err)
 	}
@@ -403,7 +388,15 @@ func walletsendsiacoinscmd(amount, dest string) {
 	if err != nil {
 		die("Could not parse amount:", err)
 	}
-	err = post("/wallet/siacoins", fmt.Sprintf("amount=%s&destination=%s", hastings, dest))
+	var value types.Currency
+	if _, err := fmt.Sscan(hastings, &value); err != nil {
+		die("Failed to parse amount", err)
+	}
+	var hash types.UnlockHash
+	if _, err := fmt.Sscan(dest, &hash); err != nil {
+		die("Failed to parse destination address", err)
+	}
+	_, err = httpClient.WalletSiacoinsPost(value, hash)
 	if err != nil {
 		die("Could not send siacoins:", err)
 	}
@@ -412,7 +405,15 @@ func walletsendsiacoinscmd(amount, dest string) {
 
 // walletsendsiafundscmd sends siafunds to a destination address.
 func walletsendsiafundscmd(amount, dest string) {
-	err := post("/wallet/siafunds", fmt.Sprintf("amount=%s&destination=%s", amount, dest))
+	var value types.Currency
+	if _, err := fmt.Sscan(amount, &value); err != nil {
+		die("Failed to parse amount", err)
+	}
+	var hash types.UnlockHash
+	if _, err := fmt.Sscan(dest, &hash); err != nil {
+		die("Failed to parse destination address", err)
+	}
+	_, err := httpClient.WalletSiafundsPost(value, hash)
 	if err != nil {
 		die("Could not send siafunds:", err)
 	}
@@ -421,13 +422,11 @@ func walletsendsiafundscmd(amount, dest string) {
 
 // walletbalancecmd retrieves and displays information about the wallet.
 func walletbalancecmd() {
-	status := new(api.WalletGET)
-	err := getAPI("/wallet", status)
+	status, err := httpClient.WalletGet()
 	if err != nil {
 		die("Could not get wallet status:", err)
 	}
-	var fees api.TpoolFeeGET
-	err = getAPI("/tpool/fee", &fees)
+	fees, err := httpClient.TransactionPoolFeeGet()
 	if err != nil {
 		die("Could not get fee estimation:", err)
 	}
@@ -473,8 +472,7 @@ func walletsweepcmd() {
 		die("Reading seed failed:", err)
 	}
 
-	var swept api.WalletSweepPOST
-	err = postResp("/wallet/sweep/seed", fmt.Sprintf("seed=%s&dictionary=%s", seed, "english"), &swept)
+	swept, err := httpClient.WalletSweepPost(seed)
 	if err != nil {
 		die("Could not sweep seed:", err)
 	}
@@ -496,9 +494,7 @@ func walletsigncmd(txnJSON, toSignJSON string) {
 	}
 
 	// try API first
-	params, _ := json.Marshal(api.WalletSignPOSTParams{Transaction: txn, ToSign: toSign})
-	var wspr api.WalletSignPOSTResp
-	err = postResp("/wallet/sign", string(params), &wspr)
+	wspr, err := httpClient.WalletSignPost(txn, toSign)
 	if err == nil {
 		txn = wspr.Transaction
 	} else {
@@ -530,8 +526,7 @@ func walletsigncmd(txnJSON, toSignJSON string) {
 // wallettransactionscmd lists all of the transactions related to the wallet,
 // providing a net flow of siacoins and siafunds for each.
 func wallettransactionscmd() {
-	wtg := new(api.WalletTransactionsGET)
-	err := getAPI("/wallet/transactions?startheight=0&endheight=10000000", wtg)
+	wtg, err := httpClient.WalletTransactionsGet(0, math.MaxUint64)
 	if err != nil {
 		die("Could not fetch transaction history:", err)
 	}
@@ -597,8 +592,7 @@ func walletunlockcmd() {
 	password := os.Getenv("SIA_WALLET_PASSWORD")
 	if password != "" && !initPassword {
 		fmt.Println("Using SIA_WALLET_PASSWORD environment variable")
-		qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
-		err := post("/wallet/unlock", qs)
+		err := httpClient.WalletUnlockPost(password)
 		if err != nil {
 			fmt.Println("Automatic unlock failed!")
 		} else {
@@ -610,8 +604,7 @@ func walletunlockcmd() {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
-	err = post("/wallet/unlock", qs)
+	err = httpClient.WalletUnlockPost(password)
 	if err != nil {
 		die("Could not unlock wallet:", err)
 	}

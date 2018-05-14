@@ -14,13 +14,13 @@ func (c *Client) ConsensusGet() (cg api.ConsensusGET, err error) {
 }
 
 // ConsensusBlocksIDGet requests the /consensus/blocks api resource
-func (c *Client) ConsensusBlocksIDGet(id types.BlockID) (block types.Block, err error) {
-	err = c.get("/consensus/blocks?id="+id.String(), &block)
+func (c *Client) ConsensusBlocksIDGet(id types.BlockID) (cbg api.ConsensusBlocksGet, err error) {
+	err = c.get("/consensus/blocks?id="+id.String(), &cbg)
 	return
 }
 
 // ConsensusBlocksHeightGet requests the /consensus/blocks api resource
-func (c *Client) ConsensusBlocksHeightGet(height types.BlockHeight) (block types.Block, err error) {
-	err = c.get("/consensus/blocks?height="+fmt.Sprint(height), &block)
+func (c *Client) ConsensusBlocksHeightGet(height types.BlockHeight) (cbg api.ConsensusBlocksGet, err error) {
+	err = c.get("/consensus/blocks?height="+fmt.Sprint(height), &cbg)
 	return
 }

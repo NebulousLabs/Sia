@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -75,6 +76,38 @@ func (c *Client) getRawResponse(resource string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, errors.AddContext(err, "request failed")
+	}
+	defer drainAndClose(res.Body)
+
+	if res.StatusCode == http.StatusNotFound {
+		return nil, errors.New("API call not recognized: " + resource)
+	}
+
+	// If the status code is not 2xx, decode and return the accompanying
+	// api.Error.
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return nil, readAPIError(res.Body)
+	}
+
+	if res.StatusCode == http.StatusNoContent {
+		// no reason to read the response
+		return []byte{}, nil
+	}
+	return ioutil.ReadAll(res.Body)
+}
+
+// getRawResponse requests part of the specified resource. The response, if
+// provided, will be returned in a byte slice
+func (c *Client) getRawPartialResponse(resource string, from, to uint64) ([]byte, error) {
+	req, err := c.NewRequest("GET", resource, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", from, to))
+
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, errors.AddContext(err, "request failed")

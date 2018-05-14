@@ -161,6 +161,9 @@ func (f *file) UnmarshalSia(r io.Reader) error {
 
 // saveFile saves a file to the renter directory.
 func (r *Renter) saveFile(f *file) error {
+	if f.deleted {
+		return errors.New("can't save deleted file")
+	}
 	// Create directory structure specified in nickname.
 	fullPath := filepath.Join(r.persistDir, f.name+ShareExtension)
 	err := os.MkdirAll(filepath.Dir(fullPath), 0700)

@@ -24,6 +24,12 @@ var (
 )
 
 type (
+	// ContractInfoGET contains the information that is returned after a GET request
+	// to /host/contracts - information for the host about stored obligations.
+	ContractInfoGET struct {
+		Contracts []modules.StorageObligation `json:"contracts"`
+	}
+
 	// HostGET contains the information that is returned after a GET request to
 	// /host - a bunch of information about the status of the host.
 	HostGET struct {
@@ -59,6 +65,15 @@ func folderIndex(folderPath string, storageFolders []modules.StorageFolderMetada
 		}
 	}
 	return -1, errStorageFolderNotFound
+}
+
+// hostContractInfoHandler handles the API call to get the contract information of the host.
+// Information is retrieved via the storage obligations from the host database.
+func (api *API) hostContractInfoHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	cg := ContractInfoGET{
+		Contracts: api.host.StorageObligations(),
+	}
+	WriteJSON(w, cg)
 }
 
 // hostHandlerGET handles GET requests to the /host API endpoint, returning key

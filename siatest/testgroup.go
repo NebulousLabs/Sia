@@ -1,6 +1,7 @@
 package siatest
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -89,7 +90,7 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		return nil, errors.New("cannot fund group without miners")
 	}
 	miner := tg.Miners()[0]
-	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+	for i := types.BlockHeight(0); i <= types.MaturityDelay+types.TaxHardforkHeight; i++ {
 		if err := miner.MineBlock(); err != nil {
 			return nil, errors.AddContext(err, "failed to mine block for funding")
 		}
@@ -170,7 +171,7 @@ func addStorageFolderToHosts(hosts map[*TestNode]struct{}) error {
 // announceHosts adds storage to each host and announces them to the group
 func announceHosts(hosts map[*TestNode]struct{}) error {
 	for host := range hosts {
-		if err := host.HostAcceptingContractsPost(true); err != nil {
+		if err := host.HostModifySettingPost(client.HostParamAcceptingContracts, true); err != nil {
 			return errors.AddContext(err, "failed to set host to accepting contracts")
 		}
 		if err := host.HostAnnouncePost(); err != nil {
@@ -185,15 +186,23 @@ func fullyConnectNodes(nodes []*TestNode) error {
 	// Fully connect the nodes
 	for i, nodeA := range nodes {
 		for _, nodeB := range nodes[i+1:] {
-			isPeer, err := nodeA.hasPeer(nodeB)
+			err := build.Retry(100, 100*time.Millisecond, func() error {
+				if err := nodeA.GatewayConnectPost(nodeB.GatewayAddress()); err != nil && err != client.ErrPeerExists {
+					return errors.AddContext(err, "failed to connect to peer")
+				}
+				isPeer1, err1 := nodeA.hasPeer(nodeB)
+				isPeer2, err2 := nodeB.hasPeer(nodeA)
+				if err1 != nil || err2 != nil {
+					return build.ExtendErr("couldn't determine if nodeA and nodeB are connected",
+						errors.Compose(err1, err2))
+				}
+				if isPeer1 && isPeer2 {
+					return nil
+				}
+				return errors.New("nodeA and nodeB are not peers of each other")
+			})
 			if err != nil {
-				return build.ExtendErr("couldn't determine if nodeB is a peer of nodeA", err)
-			}
-			if isPeer {
-				continue
-			}
-			if err := nodeA.GatewayConnectPost(nodeB.GatewayAddress()); err != nil && err != client.ErrPeerExists {
-				return errors.AddContext(err, "failed to connect to peer")
+				return err
 			}
 		}
 	}
@@ -315,16 +324,35 @@ func synchronizationCheck(miner *TestNode, nodes map[*TestNode]struct{}) error {
 	if err != nil {
 		return err
 	}
+	// Loop until all the blocks have the same CurrentBlock. If we need to mine
+	// a new block in between we need to repeat the check until no block was
+	// mined.
 	for node := range nodes {
-		err := Retry(100, 100*time.Millisecond, func() error {
+		err := Retry(600, 100*time.Millisecond, func() error {
 			ncg, err := node.ConsensusGet()
 			if err != nil {
 				return err
 			}
-			if mcg.CurrentBlock != ncg.CurrentBlock {
-				return errors.New("the node's current block doesn't equal the miner's")
+			// If the CurrentBlock's match we are done.
+			if mcg.CurrentBlock == ncg.CurrentBlock {
+				return nil
 			}
-			return nil
+			// If the miner's height is greater than the node's we need to
+			// wait a bit longer for them to sync.
+			if mcg.Height > ncg.Height {
+				gwgMiner, errMiner := miner.GatewayGet()
+				gwgNode, errNode := node.GatewayGet()
+				return errors.Compose(fmt.Errorf("the node didn't catch up to the miner's height %v %v but have %v and %v peers respectively",
+					mcg.Height, ncg.Height, len(gwgNode.Peers), len(gwgMiner.Peers)), errMiner, errNode)
+			}
+			// If the miner's height is smaller than the node's we need a
+			// bit longer for them to sync.
+			if mcg.Height < ncg.Height {
+				return errors.New("the miner didn't catch up to the node's height")
+			}
+			// If the miner's height is equal to the node's but still
+			// doesn't match, it needs to mine a block.
+			return errors.New("the node's current block's id does not equal the miner's")
 		})
 		if err != nil {
 			return err
@@ -430,8 +458,12 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 	if err := fullyConnectNodes(nodes); err != nil {
 		return build.ExtendErr("failed to fully connect nodes", err)
 	}
-	// Fund nodes.
+	// Make sure the new nodes are synced.
 	miner := mapToSlice(tg.miners)[0]
+	if err := synchronizationCheck(miner, tg.nodes); err != nil {
+		return build.ExtendErr("synchronization check failed", err)
+	}
+	// Fund nodes.
 	if err := fundNodes(miner, newNodes); err != nil {
 		return build.ExtendErr("failed to fund new hosts", err)
 	}

@@ -91,10 +91,10 @@ func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, pb *processe
 // of total work, which prevents certain classes of difficulty adjusting
 // attacks.
 func clampTargetAdjustment(base *big.Rat) *big.Rat {
-	if base.Cmp(types.MaxAdjustmentUp) > 0 {
-		return types.MaxAdjustmentUp
-	} else if base.Cmp(types.MaxAdjustmentDown) < 0 {
-		return types.MaxAdjustmentDown
+	if base.Cmp(types.MaxTargetAdjustmentUp) > 0 {
+		return types.MaxTargetAdjustmentUp
+	} else if base.Cmp(types.MaxTargetAdjustmentDown) < 0 {
+		return types.MaxTargetAdjustmentDown
 	}
 	return base
 }

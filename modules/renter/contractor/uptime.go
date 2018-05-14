@@ -28,7 +28,7 @@ var uptimeWindow = func() time.Duration {
 // IsOffline indicates whether a contract's host should be considered offline,
 // based on its scan metrics.
 func (c *Contractor) IsOffline(id types.FileContractID) bool {
-	contract, ok := c.contracts.View(id)
+	contract, ok := c.staticContracts.View(id)
 	if !ok {
 		// No contract, assume offline.
 		return true

@@ -46,7 +46,7 @@ func createWalletTester(name string, deps modules.Dependencies) (*walletTester, 
 	if err != nil {
 		return nil, err
 	}
-	w, err := newWallet(cs, tp, filepath.Join(testdir, modules.WalletDir), deps)
+	w, err := NewCustomWallet(cs, tp, filepath.Join(testdir, modules.WalletDir), deps)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,10 @@ func TestAllAddresses(t *testing.T) {
 	wt.wallet.keys[types.UnlockHash{2}] = spendableKey{}
 	wt.wallet.keys[types.UnlockHash{4}] = spendableKey{}
 	wt.wallet.keys[types.UnlockHash{3}] = spendableKey{}
-	addrs := wt.wallet.AllAddresses()
+	addrs, err := wt.wallet.AllAddresses()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i := range addrs {
 		if addrs[i][0] != byte(i) {
 			t.Error("address sorting failed:", i, addrs[i][0])
@@ -235,7 +238,11 @@ func TestRescanning(t *testing.T) {
 	defer wt.closeWt()
 
 	// A fresh wallet should not be rescanning.
-	if wt.wallet.Rescanning() {
+	rescanning, err := wt.wallet.Rescanning()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rescanning {
 		t.Fatal("fresh wallet should not report that a scan is underway")
 	}
 
@@ -253,7 +260,11 @@ func TestRescanning(t *testing.T) {
 
 	// wait for goroutine to start, after which Rescanning should return true
 	time.Sleep(time.Millisecond * 10)
-	if !wt.wallet.Rescanning() {
+	rescanning, err = wt.wallet.Rescanning()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rescanning {
 		t.Fatal("wallet should report that a scan is underway")
 	}
 
@@ -264,7 +275,11 @@ func TestRescanning(t *testing.T) {
 	}
 
 	// Rescanning should now return false again
-	if wt.wallet.Rescanning() {
+	rescanning, err = wt.wallet.Rescanning()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rescanning {
 		t.Fatal("wallet should not report that a scan is underway")
 	}
 }
@@ -339,7 +354,10 @@ func TestAdvanceLookaheadNoRescan(t *testing.T) {
 	}
 	defer wt.closeWt()
 
-	builder := wt.wallet.StartTransaction()
+	builder, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	payout := types.ZeroCurrency
 
 	// Get the current progress
@@ -423,7 +441,10 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 	if err != nil {
 		t.Fatal("Couldn't fetch primary seed from db")
 	}
-	startBal, _, _ := wt.wallet.ConfirmedBalance()
+	startBal, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Send coins to an address with a high seed index, just outside the
 	// lookahead range. It will not be initially detected, but later the
@@ -432,7 +453,10 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 	farAddr := generateSpendableKey(wt.wallet.primarySeed, highIndex).UnlockConditions.UnlockHash()
 	farPayout := types.SiacoinPrecision.Mul64(8888)
 
-	builder := wt.wallet.StartTransaction()
+	builder, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	builder.AddSiacoinOutput(types.SiacoinOutput{
 		UnlockHash: farAddr,
 		Value:      farPayout,
@@ -452,12 +476,18 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 		t.Fatal(err)
 	}
 	wt.addBlockNoPayout()
-	newBal, _, _ := wt.wallet.ConfirmedBalance()
+	newBal, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !startBal.Sub(newBal).Equals(farPayout) {
 		t.Fatal("wallet should not recognize coins sent to very high seed index")
 	}
 
-	builder = wt.wallet.StartTransaction()
+	builder, err = wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	var payout types.Currency
 
 	// choose 10 keys in the lookahead and remember them
@@ -500,7 +530,10 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 	time.Sleep(time.Second * 2)
 
 	// Check that high seed index txn was discovered in the rescan
-	rescanBal, _, _ := wt.wallet.ConfirmedBalance()
+	rescanBal, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !rescanBal.Equals(startBal) {
 		t.Fatal("wallet did not discover txn after rescan")
 	}
@@ -557,8 +590,14 @@ func TestDistantWallets(t *testing.T) {
 	}
 
 	// The second wallet's balance should update accordingly.
-	w1bal, _, _ := wt.wallet.ConfirmedBalance()
-	w2bal, _, _ := w2.ConfirmedBalance()
+	w1bal, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	w2bal, _, _, err := w2.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !w1bal.Equals(w2bal) {
 		t.Fatal("balances do not match:", w1bal, w2bal)
@@ -566,7 +605,10 @@ func TestDistantWallets(t *testing.T) {
 
 	// Send coins to an address with a very high seed index, outside the
 	// lookahead range. w2 should not detect it.
-	tbuilder := wt.wallet.StartTransaction()
+	tbuilder, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	farAddr := generateSpendableKey(wt.wallet.primarySeed, lookaheadBuffer*10).UnlockConditions.UnlockHash()
 	value := types.SiacoinPrecision.Mul64(1e3)
 	tbuilder.AddSiacoinOutput(types.SiacoinOutput{
@@ -587,7 +629,10 @@ func TestDistantWallets(t *testing.T) {
 	}
 	wt.addBlockNoPayout()
 
-	if newBal, _, _ := w2.ConfirmedBalance(); !newBal.Equals(w2bal.Sub(value)) {
+	if newBal, _, _, err := w2.ConfirmedBalance(); !newBal.Equals(w2bal.Sub(value)) {
+		if err != nil {
+			t.Fatal(err)
+		}
 		t.Fatal("wallet should not recognize coins sent to very high seed index")
 	}
 }

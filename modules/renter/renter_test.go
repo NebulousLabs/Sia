@@ -107,8 +107,8 @@ func (stubHostDB) AllHosts() []modules.HostDBEntry      { return nil }
 func (stubHostDB) AverageContractPrice() types.Currency { return types.Currency{} }
 func (stubHostDB) Close() error                         { return nil }
 func (stubHostDB) IsOffline(modules.NetAddress) bool    { return true }
-func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry {
-	return []modules.HostDBEntry{}
+func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
+	return []modules.HostDBEntry{}, nil
 }
 func (stubHostDB) EstimateHostScore(modules.HostDBEntry) modules.HostScoreBreakdown {
 	return modules.HostScoreBreakdown{}
@@ -143,8 +143,8 @@ type pricesStub struct {
 	dbEntries []modules.HostDBEntry
 }
 
-func (ps pricesStub) RandomHosts(n int, exclude []types.SiaPublicKey) []modules.HostDBEntry {
-	return ps.dbEntries
+func (ps pricesStub) RandomHosts(n int, exclude []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
+	return ps.dbEntries, nil
 }
 
 // TestRenterPricesVolatility verifies that the renter caches its price
@@ -187,5 +187,39 @@ func TestRenterPricesVolatility(t *testing.T) {
 	after = rt.renter.PriceEstimation()
 	if reflect.DeepEqual(initial, after) {
 		t.Fatal("expected renter price estimation to change after mining a block")
+	}
+}
+
+// TestRenterSiapathValidate verifies that the validateSiapath function correctly validates SiaPaths.
+func TestRenterSiapathValidate(t *testing.T) {
+	var pathtests = []struct {
+		in    string
+		valid bool
+	}{
+		{"valid/siapath", true},
+		{"../../../directory/traversal", false},
+		{"testpath", true},
+		{"valid/siapath/../with/directory/traversal", false},
+		{"validpath/test", true},
+		{"..validpath/..test", true},
+		{"./invalid/path", false},
+		{".../path", true},
+		{"valid./path", true},
+		{"valid../path", true},
+		{"valid/path./test", true},
+		{"valid/path../test", true},
+		{"test/path", true},
+		{"/leading/slash", false},
+		{"foo/./bar", false},
+		{"", false},
+	}
+	for _, pathtest := range pathtests {
+		err := validateSiapath(pathtest.in)
+		if err != nil && pathtest.valid {
+			t.Fatal("validateSiapath failed on valid path: ", pathtest.in)
+		}
+		if err == nil && !pathtest.valid {
+			t.Fatal("validateSiapath succeeded on invalid path: ", pathtest.in)
+		}
 	}
 }

@@ -249,7 +249,10 @@ func (m *Miner) Close() error {
 // checkAddress checks that the miner has an address, fetching an address from
 // the wallet if not.
 func (m *Miner) checkAddress() error {
-	addrs := m.wallet.AllAddresses()
+	addrs, err := m.wallet.AllAddresses()
+	if err != nil {
+		return err
+	}
 	hasAddr := false
 	for _, addr := range addrs {
 		if m.persist.Address == addr {

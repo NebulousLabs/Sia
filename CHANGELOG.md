@@ -1,16 +1,23 @@
 Version History
 ---------------
 
+May 2018:
+
+v1.3.3 (patch release)
+- Add Streaming API endpoints
+- Faster contract formation
+- Improved wallet scaling
+
 March 2018:
 
-v1.3.2 (minor release)
+v1.3.2 (patch release)
 - Improve renter throughput and stability
 - Reduce host I/O when idle
 - Add /tpool/confirmed endpoint
 
 December 2017:
 
-v1.3.1 (minor release)
+v1.3.1 (patch release)
 - Add new efficient, reliable contract format
 - Faster and smoother file repairs
 - Fix difficulty adjustment hardfork

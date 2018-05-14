@@ -137,7 +137,7 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 
 	// Check that the contract and host are both available, and run some brief
 	// sanity checks to see that the host is not swindling us.
-	contract, haveContract := c.contracts.View(id)
+	contract, haveContract := c.staticContracts.View(id)
 	if !haveContract {
 		return nil, errors.New("no record of that contract")
 	}
@@ -171,7 +171,7 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 	}()
 
 	// Create the editor.
-	e, err := c.contracts.NewEditor(host, contract.ID, height, c.hdb, cancel)
+	e, err := c.staticContracts.NewEditor(host, contract.ID, height, c.hdb, cancel)
 	if err != nil {
 		return nil, err
 	}

@@ -132,7 +132,7 @@ func (d *decHelper) Read(p []byte) (int, error) {
 	}
 	d.n += n
 	if d.n > encoding.MaxObjectSize {
-		d.err = encoding.ErrObjectTooLarge
+		d.err = encoding.ErrObjectTooLarge(d.n)
 	}
 	return n, d.err
 }
@@ -176,7 +176,7 @@ func (d *decHelper) NextPrefix(elemSize uintptr) uint64 {
 		return 0
 	}
 	if n > 1<<31-1 || n*uint64(elemSize) > encoding.MaxSliceSize {
-		d.err = encoding.ErrSliceTooLarge
+		d.err = encoding.ErrSliceTooLarge{Len: n, ElemSize: uint64(elemSize)}
 		return 0
 	}
 	return n
@@ -323,7 +323,7 @@ func (cf CoveredFields) MarshalSia(w io.Writer) error {
 
 // MarshalSiaSize returns the encoded size of cf.
 func (cf CoveredFields) MarshalSiaSize() (size int) {
-	size += 1 // WholeTransaction
+	size++ // WholeTransaction
 	size += 8 + len(cf.SiacoinInputs)*8
 	size += 8 + len(cf.SiacoinOutputs)*8
 	size += 8 + len(cf.FileContracts)*8
@@ -1167,4 +1167,15 @@ func (uh *UnlockHash) LoadString(strUH string) error {
 
 	copy(uh[:], byteUnlockHash[:])
 	return nil
+}
+
+// Scan implements the fmt.Scanner interface, allowing UnlockHash values to be
+// scanned from text.
+func (uh *UnlockHash) Scan(s fmt.ScanState, ch rune) error {
+	s.SkipSpace()
+	tok, err := s.Token(false, nil)
+	if err != nil {
+		return err
+	}
+	return uh.LoadString(string(tok))
 }

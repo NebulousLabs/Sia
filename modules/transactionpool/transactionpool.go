@@ -256,6 +256,24 @@ func (tp *TransactionPool) Transaction(id types.TransactionID) (types.Transactio
 	return txn, necessaryParents, exists
 }
 
+// TransactionSet returns the transaction set the provided object
+// appears in.
+func (tp *TransactionPool) TransactionSet(oid crypto.Hash) []types.Transaction {
+	tp.mu.RLock()
+	defer tp.mu.RUnlock()
+	var parents []types.Transaction
+	tSetID, exists := tp.knownObjects[ObjectID(oid)]
+	if !exists {
+		return nil
+	}
+	tSet, exists := tp.transactionSets[tSetID]
+	if !exists {
+		return nil
+	}
+	parents = append(parents, tSet...)
+	return parents
+}
+
 // Broadcast broadcasts a transaction set to all of the transaction pool's
 // peers.
 func (tp *TransactionPool) Broadcast(ts []types.Transaction) {

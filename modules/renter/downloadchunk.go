@@ -14,6 +14,13 @@ import (
 	"github.com/NebulousLabs/errors"
 )
 
+// cacheData contatins the data and the timestamp for the unfinished
+// download chunks
+type cacheData struct {
+	data       []byte
+	lastAccess time.Time
+}
+
 // downloadPieceInfo contains all the information required to download and
 // recover a piece of a chunk from a host. It is a value in a map where the key
 // is the file contract id.
@@ -43,6 +50,7 @@ type unfinishedDownloadChunk struct {
 
 	// Fetch + Write instructions - read only or otherwise thread safe.
 	staticChunkIndex  uint64                                     // Required for deriving the encryption keys for each piece.
+	staticCacheID     string                                     // Used to uniquely identify a chunk in the chunk cache.
 	staticChunkMap    map[types.FileContractID]downloadPieceInfo // Maps from file contract ids to the info for the piece associated with that contract
 	staticChunkSize   uint64
 	staticFetchLength uint64 // Length within the logical chunk to fetch.
@@ -72,6 +80,10 @@ type unfinishedDownloadChunk struct {
 	// The download object, mostly to update download progress.
 	download *download
 	mu       sync.Mutex
+
+	// Caching related fields
+	chunkCache map[string]*cacheData
+	cacheMu    *sync.Mutex
 }
 
 // fail will set the chunk status to failed. The physical chunk memory will be
@@ -211,10 +223,16 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 		udc.physicalChunkData[i] = nil
 	}
 
+	// Get recovered data
+	recoveredData := recoverWriter.Bytes()
+
+	// Add the chunk to the cache.
+	udc.addChunkToCache(recoveredData)
+
 	// Write the bytes to the requested output.
 	start := udc.staticFetchOffset
 	end := udc.staticFetchOffset + udc.staticFetchLength
-	_, err = udc.destination.WriteAt(recoverWriter.Bytes()[start:end], udc.staticWriteOffset)
+	_, err = udc.destination.WriteAt(recoveredData[start:end], udc.staticWriteOffset)
 	if err != nil {
 		udc.mu.Lock()
 		udc.fail(err)

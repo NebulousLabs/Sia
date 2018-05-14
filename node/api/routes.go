@@ -45,6 +45,7 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.GET("/host", api.hostHandlerGET)                                                   // Get the host status.
 		router.POST("/host", RequirePassword(api.hostHandlerPOST, requiredPassword))              // Change the settings of the host.
 		router.POST("/host/announce", RequirePassword(api.hostAnnounceHandler, requiredPassword)) // Announce the host to the network.
+		router.GET("/host/contracts", api.hostContractInfoHandler)                                // Get info about contracts.
 		router.GET("/host/estimatescore", api.hostEstimateScoreGET)
 
 		// Calls pertaining to the storage manager that the host uses.
@@ -71,6 +72,7 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.GET("/renter/contracts", api.renterContractsHandler)
 		router.GET("/renter/downloads", api.renterDownloadsHandler)
 		router.GET("/renter/files", api.renterFilesHandler)
+		router.GET("/renter/file/*siapath", api.renterFileHandler)
 		router.GET("/renter/prices", api.renterPricesHandler)
 
 		// TODO: re-enable these routes once the new .sia format has been
@@ -84,6 +86,7 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.GET("/renter/download/*siapath", RequirePassword(api.renterDownloadHandler, requiredPassword))
 		router.GET("/renter/downloadasync/*siapath", RequirePassword(api.renterDownloadAsyncHandler, requiredPassword))
 		router.POST("/renter/rename/*siapath", RequirePassword(api.renterRenameHandler, requiredPassword))
+		router.GET("/renter/stream/*siapath", api.renterStreamHandler)
 		router.POST("/renter/upload/*siapath", RequirePassword(api.renterUploadHandler, requiredPassword))
 
 		// HostDB endpoints.
@@ -169,7 +172,7 @@ func cleanCloseHandler(next http.Handler) http.Handler {
 // UserAgent that contains the specified string.
 func RequireUserAgent(h http.Handler, ua string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if !strings.Contains(req.UserAgent(), ua) {
+		if !strings.Contains(req.UserAgent(), ua) && !isUnrestricted(req) {
 			WriteError(w, Error{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
 			return
 		}
@@ -194,4 +197,9 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 		}
 		h(w, req, ps)
 	}
+}
+
+// isUnrestricted checks if a request may bypass the useragent check.
+func isUnrestricted(req *http.Request) bool {
+	return strings.HasPrefix(req.URL.Path, "/renter/stream/")
 }

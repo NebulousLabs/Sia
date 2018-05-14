@@ -32,7 +32,11 @@ func newTestingWallet(testdir string, cs modules.ConsensusSet, tp modules.Transa
 		return nil, err
 	}
 	key := crypto.GenerateTwofishKey()
-	if !w.Encrypted() {
+	encrypted, err := w.Encrypted()
+	if err != nil {
+		return nil, err
+	}
+	if !encrypted {
 		_, err = w.Encrypt(key)
 		if err != nil {
 			return nil, err
@@ -126,7 +130,11 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 		return nil, nil, nil, err
 	}
 	key := crypto.GenerateTwofishKey()
-	if !w.Encrypted() {
+	encrypted, err := w.Encrypted()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if !encrypted {
 		_, err = w.Encrypt(key)
 		if err != nil {
 			return nil, nil, nil, err
@@ -348,15 +356,16 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// renew the contract
-	oldContract, _ := c.contracts.Acquire(contract.ID)
-	c.mu.Lock()
-	c.contractUtilities[contract.ID] = modules.ContractUtility{GoodForRenew: true}
-	c.mu.Unlock()
+	err = c.managedUpdateContractUtility(contract.ID, modules.ContractUtility{GoodForRenew: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldContract, _ := c.staticContracts.Acquire(contract.ID)
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.contracts.Return(oldContract)
+	c.staticContracts.Return(oldContract)
 
 	// check renewed contract
 	if contract.EndHeight != c.blockHeight+200 {
@@ -381,15 +390,16 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// renew to a lower height
-	oldContract, _ = c.contracts.Acquire(contract.ID)
-	c.mu.Lock()
-	c.contractUtilities[contract.ID] = modules.ContractUtility{GoodForRenew: true}
-	c.mu.Unlock()
+	err = c.managedUpdateContractUtility(contract.ID, modules.ContractUtility{GoodForRenew: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldContract, _ = c.staticContracts.Acquire(contract.ID)
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.contracts.Return(oldContract)
+	c.staticContracts.Return(oldContract)
 	if contract.EndHeight != c.blockHeight+100 {
 		t.Fatal(contract.EndHeight)
 	}

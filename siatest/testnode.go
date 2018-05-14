@@ -29,7 +29,7 @@ func NewNode(nodeParams node.NodeParams) (*TestNode, error) {
 		return nil, err
 	}
 	// Fund the node
-	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+	for i := types.BlockHeight(0); i <= types.MaturityDelay+types.TaxHardforkHeight; i++ {
 		if err := tn.MineBlock(); err != nil {
 			return nil, err
 		}

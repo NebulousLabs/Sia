@@ -19,6 +19,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/threadgroup"
 )
 
 const (
@@ -87,8 +88,13 @@ type Wallet struct {
 	// transactions. A global db transaction is maintained in memory to avoid
 	// excessive disk writes. Any operations involving dbTx must hold an
 	// exclusive lock.
-	db   *persist.BoltDatabase
-	dbTx *bolt.Tx
+	//
+	// If dbRollback is set, then when the database syncs it will perform a
+	// rollback instead of a commit. For safety reasons, the db will close and
+	// the wallet will close if a rollback is performed.
+	db         *persist.BoltDatabase
+	dbRollback bool
+	dbTx       *bolt.Tx
 
 	persistDir string
 	log        *persist.Logger
@@ -100,7 +106,7 @@ type Wallet struct {
 
 	// The wallet's ThreadGroup tells tracked functions to shut down and
 	// blocks until they have all exited before returning from Close.
-	tg siasync.ThreadGroup
+	tg threadgroup.ThreadGroup
 
 	// defragDisabled determines if the wallet is set to defrag outputs once it
 	// reaches a certain threshold
@@ -108,7 +114,12 @@ type Wallet struct {
 }
 
 // Height return the internal processed consensus height of the wallet
-func (w *Wallet) Height() types.BlockHeight {
+func (w *Wallet) Height() (types.BlockHeight, error) {
+	if err := w.tg.Add(); err != nil {
+		return types.BlockHeight(0), modules.ErrWalletShutdown
+	}
+	defer w.tg.Done()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.syncDB()
@@ -118,9 +129,9 @@ func (w *Wallet) Height() types.BlockHeight {
 		return encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyConsensusHeight), &height)
 	})
 	if err != nil {
-		return types.BlockHeight(0)
+		return types.BlockHeight(0), err
 	}
-	return types.BlockHeight(height)
+	return types.BlockHeight(height), nil
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -128,10 +139,11 @@ func (w *Wallet) Height() types.BlockHeight {
 // not loaded into the wallet during the call to 'new', but rather during the
 // call to 'Unlock'.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string) (*Wallet, error) {
-	return newWallet(cs, tpool, persistDir, modules.ProdDependencies)
+	return NewCustomWallet(cs, tpool, persistDir, modules.ProdDependencies)
 }
 
-func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string, deps modules.Dependencies) (*Wallet, error) {
+// NewCustomWallet creates a new wallet using custom dependencies.
+func NewCustomWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string, deps modules.Dependencies) (*Wallet, error) {
 	// Check for nil dependencies.
 	if cs == nil {
 		return nil, errNilConsensusSet
@@ -177,13 +189,18 @@ func newWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDi
 	}
 
 	// make sure we commit on shutdown
-	w.tg.AfterStop(func() {
+	err = w.tg.AfterStop(func() error {
 		err := w.dbTx.Commit()
 		if err != nil {
 			w.log.Println("ERROR: failed to apply database update:", err)
 			w.dbTx.Rollback()
+			return err
 		}
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 	go w.threadedDBUpdate()
 
 	return w, nil
@@ -200,8 +217,8 @@ func (w *Wallet) Close() error {
 	// Once the wallet is locked it cannot be unlocked except using the
 	// unexported unlock method (w.Unlock returns an error if the wallet's
 	// ThreadGroup is stopped).
-	if w.Unlocked() {
-		if err := w.Lock(); err != nil {
+	if w.managedUnlocked() {
+		if err := w.managedLock(); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -217,7 +234,12 @@ func (w *Wallet) Close() error {
 
 // AllAddresses returns all addresses that the wallet is able to spend from,
 // including unseeded addresses. Addresses are returned sorted in byte-order.
-func (w *Wallet) AllAddresses() []types.UnlockHash {
+func (w *Wallet) AllAddresses() ([]types.UnlockHash, error) {
+	if err := w.tg.Add(); err != nil {
+		return []types.UnlockHash{}, modules.ErrWalletShutdown
+	}
+	defer w.tg.Done()
+
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
@@ -228,27 +250,44 @@ func (w *Wallet) AllAddresses() []types.UnlockHash {
 	sort.Slice(addrs, func(i, j int) bool {
 		return bytes.Compare(addrs[i][:], addrs[j][:]) < 0
 	})
-	return addrs
+	return addrs, nil
 }
 
 // Rescanning reports whether the wallet is currently rescanning the
 // blockchain.
-func (w *Wallet) Rescanning() bool {
+func (w *Wallet) Rescanning() (bool, error) {
+	if err := w.tg.Add(); err != nil {
+		return false, modules.ErrWalletShutdown
+	}
+	defer w.tg.Done()
+
 	rescanning := !w.scanLock.TryLock()
 	if !rescanning {
 		w.scanLock.Unlock()
 	}
-	return rescanning
+	return rescanning, nil
 }
 
 // Settings returns the wallet's current settings
-func (w *Wallet) Settings() modules.WalletSettings {
+func (w *Wallet) Settings() (modules.WalletSettings, error) {
+	if err := w.tg.Add(); err != nil {
+		return modules.WalletSettings{}, modules.ErrWalletShutdown
+	}
+	defer w.tg.Done()
 	return modules.WalletSettings{
 		NoDefrag: w.defragDisabled,
-	}
+	}, nil
 }
 
 // SetSettings will update the settings for the wallet.
-func (w *Wallet) SetSettings(s modules.WalletSettings) {
+func (w *Wallet) SetSettings(s modules.WalletSettings) error {
+	if err := w.tg.Add(); err != nil {
+		return modules.ErrWalletShutdown
+	}
+	defer w.tg.Done()
+
+	w.mu.Lock()
 	w.defragDisabled = s.NoDefrag
+	w.mu.Unlock()
+	return nil
 }
