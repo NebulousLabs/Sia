@@ -64,14 +64,15 @@ returns the current settings along with metrics on the renter's spending.
     }, 
     // MaxUploadSpeed by defaul is unlimited but can be set by the user to 
     // manage bandwidth
-    "maxuploadspeed":     1234, // BPS
+    "maxuploadspeed":     1234, // bytes per second
 
     // MaxDownloadSpeed by defaul is unlimited but can be set by the user to 
     // manage bandwidth
-    "maxdownloadspeed":   1234, // BPS
+    "maxdownloadspeed":   1234, // bytes per second
 
-    // The DownloadCacheSize is 
-    "downloadcachesize":  4   
+    // The DownloadCacheSize is the number of data chunks that will be cached during
+    // streaming
+    "downloadcachesize":  4  
   },
 
   // Metrics about how much the Renter has spent on storage, uploads, and

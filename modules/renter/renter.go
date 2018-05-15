@@ -135,7 +135,7 @@ type hostContractor interface {
 
 	// RateLimits Gets the bandwidth limits for connections created by the
 	// contractor and its submodules.
-	RateLimits() (int64, int64, uint64)
+	RateLimits() (readBPS int64, writeBPS int64, packetSize uint64)
 
 	// SetRateLimits sets the bandwidth limits for connections created by the
 	// contractor and its submodules.

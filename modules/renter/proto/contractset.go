@@ -106,14 +106,13 @@ func (cs *ContractSet) Return(c *SafeContract) {
 
 // RateLimits sets the bandwidth limits for connections created by the
 // contractSet.
-func (cs *ContractSet) RateLimits() (int64, int64, uint64) {
-	download, upload, packetSize := cs.rl.Limits()
-	return download, upload, packetSize
+func (cs *ContractSet) RateLimits() (readBPS int64, writeBPS int64, packetSize uint64) {
+	return cs.rl.Limits()
 }
 
 // SetRateLimits sets the bandwidth limits for connections created by the
 // contractSet.
-func (cs *ContractSet) SetRateLimits(readBPS, writeBPS int64, packetSize uint64) {
+func (cs *ContractSet) SetRateLimits(readBPS int64, writeBPS int64, packetSize uint64) {
 	cs.rl.SetLimits(readBPS, writeBPS, packetSize)
 }
 
