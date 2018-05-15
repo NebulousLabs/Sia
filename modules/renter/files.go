@@ -319,16 +319,16 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	// Get the file and its contracs
 	contractIDs := make(map[types.FileContractID]struct{})
 	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
 	file, exists := r.files[siaPath]
 	if !exists {
 		return fileInfo, ErrUnknownPath
 	}
 	file.mu.RLock()
+	defer file.mu.RUnlock()
 	for cid := range file.contracts {
 		contractIDs[cid] = struct{}{}
 	}
-	file.mu.RUnlock()
-	r.mu.RUnlock(lockID)
 
 	// Build 2 maps that map every contract id to its offline and goodForRenew
 	// status.
@@ -342,8 +342,6 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	}
 
 	// Build the FileInfo
-	lockID = r.mu.RLock()
-	file.mu.RLock()
 	renewing := true
 	var localPath string
 	tf, exists := r.tracking[file.name]
@@ -361,8 +359,6 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 		UploadProgress: file.uploadProgress(),
 		Expiration:     file.expiration(),
 	}
-	file.mu.RUnlock()
-	r.mu.RUnlock(lockID)
 
 	return fileInfo, nil
 }
