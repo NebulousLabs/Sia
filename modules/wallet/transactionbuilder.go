@@ -745,10 +745,11 @@ outer:
 		}
 	}
 
-	// add unconfirmed outputs
+	// add unconfirmed outputs, except those that are spent in pending
+	// transactions
 	for _, pt := range w.unconfirmedProcessedTransactions {
 		for _, o := range pt.Outputs {
-			if o.WalletAddress {
+			if _, ok := pending[o.ID]; !ok && o.WalletAddress {
 				outputs = append(outputs, modules.SpendableOutput{
 					FundType:           types.SpecifierSiacoinOutput,
 					ID:                 o.ID,
