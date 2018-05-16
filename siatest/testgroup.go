@@ -37,8 +37,8 @@ type (
 )
 
 var (
-	// defaultAllowance is the allowance used for the group's renters
-	defaultAllowance = modules.Allowance{
+	// DefaultAllowance is the allowance used for the group's renters
+	DefaultAllowance = modules.Allowance{
 		Funds:       types.SiacoinPrecision.Mul64(1e3),
 		Hosts:       5,
 		Period:      50,
@@ -311,7 +311,7 @@ func randomDir() string {
 // setRenterAllowances sets the allowance of each renter
 func setRenterAllowances(renters map[*TestNode]struct{}) error {
 	for renter := range renters {
-		if err := renter.RenterPostAllowance(defaultAllowance); err != nil {
+		if err := renter.RenterPostAllowance(DefaultAllowance); err != nil {
 			return err
 		}
 	}
@@ -364,7 +364,7 @@ func synchronizationCheck(miner *TestNode, nodes map[*TestNode]struct{}) error {
 // waitForContracts waits until the renters have formed contracts with the
 // hosts in the group.
 func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map[*TestNode]struct{}) error {
-	expectedContracts := defaultAllowance.Hosts
+	expectedContracts := DefaultAllowance.Hosts
 	if uint64(len(hosts)) < expectedContracts {
 		expectedContracts = uint64(len(hosts))
 	}
