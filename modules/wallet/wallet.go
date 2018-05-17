@@ -184,7 +184,9 @@ func NewCustomWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, per
 			return nil, err
 		}
 		// Save changes to disk
-		w.syncDB()
+		if err = w.syncDB(); err != nil {
+			return nil, err
+		}
 	}
 
 	// make sure we commit on shutdown

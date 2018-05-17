@@ -280,8 +280,10 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			}
 			// Sanity check - If reverted blocks is zero, applied blocks should also
 			// be zero.
-			if build.DEBUG && len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
-				panic("after adding a change entry, there are no applied blocks but there are reverted blocks")
+			if len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
+				err := errors.New("after adding a change entry, there are no applied blocks but there are reverted blocks")
+				build.Critical(err)
+				return err
 			}
 		}
 		return nil
