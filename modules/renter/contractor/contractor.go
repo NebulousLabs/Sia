@@ -55,10 +55,11 @@ type Contractor struct {
 	currentPeriod types.BlockHeight
 	lastChange    modules.ConsensusChangeID
 
-	downloaders map[types.FileContractID]*hostDownloader
-	editors     map[types.FileContractID]*hostEditor
-	renewing    map[types.FileContractID]bool // prevent revising during renewal
-	revising    map[types.FileContractID]bool // prevent overlapping revisions
+	downloaders      map[types.FileContractID]*hostDownloader
+	editors          map[types.FileContractID]*hostEditor
+	firstFailedRenew map[types.FileContractID]types.BlockHeight
+	renewing         map[types.FileContractID]bool // prevent revising during renewal
+	revising         map[types.FileContractID]bool // prevent overlapping revisions
 
 	staticContracts *proto.ContractSet
 	oldContracts    map[types.FileContractID]modules.RenterContract

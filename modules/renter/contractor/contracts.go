@@ -203,6 +203,13 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
 func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.Currency, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
+	// Disrupt the renewal if necessary
+	c.mu.RLock()
+	disrupt := c.deps.Disrupt("RenewFailing")
+	c.mu.RUnlock()
+	if disrupt {
+		return modules.RenterContract{}, errors.New("Disrupt RenewFailing")
+	}
 	// For convenience
 	contract := sc.Metadata()
 	// Sanity check - should not be renewing a bad contract.
@@ -456,6 +463,17 @@ func (c *Contractor) threadedContractMaintenance() {
 		c.log.Printf("renewing %v contracts", len(renewSet))
 	}
 
+	// Remove contracts that are not scheduled for renew from firstFailedRenew.
+	c.mu.Lock()
+	newFirstFailedRenew := make(map[types.FileContractID]types.BlockHeight)
+	for _, r := range renewSet {
+		if _, exists := c.firstFailedRenew[r.id]; exists {
+			newFirstFailedRenew[r.id] = c.firstFailedRenew[r.id]
+		}
+	}
+	c.firstFailedRenew = newFirstFailedRenew
+	c.mu.Unlock()
+
 	// Loop through the contracts and renew them one-by-one.
 	for _, renewal := range renewSet {
 		// Pull the variables out of the renewal.
@@ -502,9 +520,38 @@ func (c *Contractor) threadedContractMaintenance() {
 				return
 			}
 			// Perform the actual renew. If the renew fails, return the
-			// contract.
+			// contract. If the renew fails we check if it has failed before
+			// and remember the height if it hasn't. Once it has failed for a
+			// certain number of blocks in a row and reached its second half of
+			// the renew window, we give up on renewing it and set goodForRenew
+			// to false.
 			newContract, err := c.managedRenew(oldContract, amount, endHeight)
 			if err != nil {
+				// Check if contract has to be replaced.
+				md := oldContract.Metadata()
+				c.mu.RLock()
+				firstRenew, failedBefore := c.firstFailedRenew[md.ID]
+				c.mu.RUnlock()
+				secondHalfOfWindow := blockHeight+allowance.RenewWindow/2 >= md.EndHeight
+				replace := blockHeight-firstRenew >= consecutiveRenewalsBeforeReplacement
+				if failedBefore && secondHalfOfWindow && replace {
+					oldUtility.GoodForRenew = false
+					err := oldContract.UpdateUtility(oldUtility)
+					if err != nil {
+						c.log.Println("WARN: failed to mark contract as !goodForRenew:", err)
+					}
+					c.log.Printf("WARN: failed to renew %v, marked as bad: %v\n", id, err)
+					c.staticContracts.Return(oldContract)
+					return
+				}
+				// If this contract has never failed its renew before we
+				// remember the current blockheight as the first time this has
+				// happened.
+				if !failedBefore {
+					c.mu.Lock()
+					c.firstFailedRenew[oldContract.Metadata().ID] = blockHeight
+					c.mu.Unlock()
+				}
 				c.log.Printf("WARN: failed to renew contract %v: %v\n", id, err)
 				c.staticContracts.Return(oldContract)
 				return

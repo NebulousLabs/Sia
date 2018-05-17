@@ -102,3 +102,17 @@ func NewPersist(dir string) *stdPersist {
 		filename: filepath.Join(dir, "contractor.json"),
 	}
 }
+
+// dependencyRenewFailing will cause the call to managedRenew to fail with an
+// error every time.
+type dependencyRenewFailing struct {
+	modules.Dependencies
+}
+
+// Disrupt will return true if a certain string is provided as an argument.
+func (dependencyRenewFailing) Disrupt(s string) bool {
+	if s == "RenewFailing" {
+		return true
+	}
+	return false
+}
