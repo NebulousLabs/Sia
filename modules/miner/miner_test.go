@@ -327,7 +327,6 @@ func TestIntegrationStartupRescan(t *testing.T) {
 // CPU miner is running.
 func TestMinerCloseDeadlock(t *testing.T) {
 	if testing.Short() {
-		// Can't run this as a short test since we sleep 5s.
 		t.SkipNow()
 	}
 	mt, err := createMinerTester(t.Name())

@@ -395,7 +395,7 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 				// the same chunk.
 				_, exists := chunkMaps[piece.Chunk-minChunk][resolvedID]
 				if exists {
-					r.log.Debugln("ERROR: Worker has multiple pieces uploaded for the same chunk.")
+					r.log.Println("ERROR: Worker has multiple pieces uploaded for the same chunk.")
 				}
 				chunkMaps[piece.Chunk-minChunk][resolvedID] = downloadPieceInfo{
 					index: piece.Piece,
