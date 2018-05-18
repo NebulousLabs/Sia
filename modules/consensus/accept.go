@@ -277,10 +277,9 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			if err != nil {
 				return err
 			}
-			// Sanity check - If reverted blocks is zero, applied blocks should also
-			// be zero.
-			if len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
-				err := errors.New("after adding a change entry, there are no applied blocks but there are reverted blocks")
+			// Sanity check - we should never apply less blocks than we revert.
+			if len(changeEntry.AppliedBlocks) < len(changeEntry.RevertedBlocks) {
+				err := errors.New("after adding a change entry, there are more reverted blocks than applied ones")
 				cs.log.Severe(err)
 				return err
 			}
