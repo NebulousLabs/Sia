@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -282,7 +281,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			// be zero.
 			if len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
 				err := errors.New("after adding a change entry, there are no applied blocks but there are reverted blocks")
-				build.Critical(err)
+				cs.log.Severe(err)
 				return err
 			}
 		}
