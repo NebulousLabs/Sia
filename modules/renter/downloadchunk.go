@@ -14,6 +14,13 @@ import (
 	"github.com/NebulousLabs/errors"
 )
 
+// cacheData contatins the data and the timestamp for the unfinished
+// download chunks
+type cacheData struct {
+	data       []byte
+	lastAccess time.Time
+}
+
 // downloadPieceInfo contains all the information required to download and
 // recover a piece of a chunk from a host. It is a value in a map where the key
 // is the file contract id.
@@ -75,7 +82,7 @@ type unfinishedDownloadChunk struct {
 	mu       sync.Mutex
 
 	// Caching related fields
-	chunkCache map[string][]byte
+	chunkCache map[string]*cacheData
 	cacheMu    *sync.Mutex
 }
 
@@ -89,6 +96,7 @@ func (udc *unfinishedDownloadChunk) fail(err error) {
 		udc.physicalChunkData[i] = nil
 	}
 	udc.download.managedFail(fmt.Errorf("chunk %v failed: %v", udc.staticChunkIndex, err))
+	udc.destination = nil
 }
 
 // managedCleanUp will check if the download has failed, and if not it will add
@@ -101,7 +109,6 @@ func (udc *unfinishedDownloadChunk) managedCleanUp() {
 	if udc.workersRemaining+udc.piecesCompleted < udc.erasureCode.MinPieces() && !udc.failed {
 		udc.fail(errors.New("not enough workers to continue download"))
 	}
-
 	// Return any excess memory.
 	udc.returnMemory()
 
@@ -252,7 +259,9 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 		// destination writer.
 		udc.download.endTime = time.Now()
 		close(udc.download.completeChan)
-		return udc.download.destination.Close()
+		err := udc.download.destination.Close()
+		udc.download.destination = nil
+		return err
 	}
 	return nil
 }

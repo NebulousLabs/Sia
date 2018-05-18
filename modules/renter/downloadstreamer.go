@@ -73,7 +73,7 @@ func (s *streamer) Read(p []byte) (n int, err error) {
 
 	// Download data
 	buffer := bytes.NewBuffer([]byte{})
-	d, err := s.r.newDownload(downloadParams{
+	d, err := s.r.managedNewDownload(downloadParams{
 		destination:       newDownloadDestinationWriteCloserFromWriter(buffer),
 		destinationType:   destinationTypeSeekStream,
 		destinationString: "httpresponse",
@@ -89,6 +89,12 @@ func (s *streamer) Read(p []byte) (n int, err error) {
 	if err != nil {
 		return 0, errors.AddContext(err, "failed to create new download")
 	}
+
+	// Set the in-memory buffer to nil just to be safe in case of a memory
+	// leak.
+	defer func() {
+		d.destination = nil
+	}()
 
 	// Block until the download has completed.
 	select {

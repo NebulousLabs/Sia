@@ -41,6 +41,10 @@ var (
 	// ErrLowBalance is returned if the wallet does not have enough funds to
 	// complete the desired action.
 	ErrLowBalance = errors.New("insufficient balance")
+
+	// ErrWalletShutdown is returned when a method can't continue execution due
+	// to the wallet shutting down.
+	ErrWalletShutdown = errors.New("wallet is shutting down")
 )
 
 type (
@@ -198,6 +202,10 @@ type (
 		// transaction should be dropped.
 		Sign(wholeTransaction bool) ([]types.Transaction, error)
 
+		// UnconfirmedParents returns any unconfirmed parents the transaction set that
+		// is being built by the transaction builder could have.
+		UnconfirmedParents() ([]types.Transaction, error)
+
 		// View returns the incomplete transaction along with all of its
 		// parents.
 		View() (txn types.Transaction, parents []types.Transaction)
@@ -235,7 +243,7 @@ type (
 		// Encrypted returns whether or not the wallet has been encrypted yet.
 		// After being encrypted for the first time, the wallet can only be
 		// unlocked using the encryption password.
-		Encrypted() bool
+		Encrypted() (bool, error)
 
 		// InitFromSeed functions like Encrypt, but using a specified seed.
 		// Unlike Encrypt, the blockchain will be scanned to determine the
@@ -262,7 +270,7 @@ type (
 
 		// Unlocked returns true if the wallet is currently unlocked, false
 		// otherwise.
-		Unlocked() bool
+		Unlocked() (bool, error)
 	}
 
 	// KeyManager manages wallet keys, including the use of seeds, creating and
@@ -272,7 +280,7 @@ type (
 		// AllAddresses returns all addresses that the wallet is able to spend
 		// from, including unseeded addresses. Addresses are returned sorted in
 		// byte-order.
-		AllAddresses() []types.UnlockHash
+		AllAddresses() ([]types.UnlockHash, error)
 
 		// AllSeeds returns all of the seeds that are being tracked by the
 		// wallet, including the primary seed. Only the primary seed is used to
@@ -338,30 +346,30 @@ type (
 		// ConfirmedBalance returns the confirmed balance of the wallet, minus
 		// any outgoing transactions. ConfirmedBalance will include unconfirmed
 		// refund transactions.
-		ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siacoinClaimBalance types.Currency)
+		ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siacoinClaimBalance types.Currency, err error)
 
 		// UnconfirmedBalance returns the unconfirmed balance of the wallet.
 		// Outgoing funds and incoming funds are reported separately. Refund
 		// outputs are included, meaning that sending a single coin to
 		// someone could result in 'outgoing: 12, incoming: 11'. Siafunds are
 		// not considered in the unconfirmed balance.
-		UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency)
+		UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency, err error)
 
 		// Height returns the wallet's internal processed consensus height
-		Height() types.BlockHeight
+		Height() (types.BlockHeight, error)
 
 		// AddressTransactions returns all of the transactions that are related
 		// to a given address.
-		AddressTransactions(types.UnlockHash) []ProcessedTransaction
+		AddressTransactions(types.UnlockHash) ([]ProcessedTransaction, error)
 
 		// AddressUnconfirmedHistory returns all of the unconfirmed
 		// transactions related to a given address.
-		AddressUnconfirmedTransactions(types.UnlockHash) []ProcessedTransaction
+		AddressUnconfirmedTransactions(types.UnlockHash) ([]ProcessedTransaction, error)
 
 		// Transaction returns the transaction with the given id. The bool
 		// indicates whether the transaction is in the wallet database. The
 		// wallet only stores transactions that are related to the wallet.
-		Transaction(types.TransactionID) (ProcessedTransaction, bool)
+		Transaction(types.TransactionID) (ProcessedTransaction, bool, error)
 
 		// Transactions returns all of the transactions that were confirmed at
 		// heights [startHeight, endHeight]. Unconfirmed transactions are not
@@ -370,25 +378,25 @@ type (
 
 		// UnconfirmedTransactions returns all unconfirmed transactions
 		// relative to the wallet.
-		UnconfirmedTransactions() []ProcessedTransaction
+		UnconfirmedTransactions() ([]ProcessedTransaction, error)
 
 		// RegisterTransaction takes a transaction and its parents and returns
 		// a TransactionBuilder which can be used to expand the transaction.
-		RegisterTransaction(t types.Transaction, parents []types.Transaction) TransactionBuilder
+		RegisterTransaction(t types.Transaction, parents []types.Transaction) (TransactionBuilder, error)
 
 		// Rescanning reports whether the wallet is currently rescanning the
 		// blockchain.
-		Rescanning() bool
+		Rescanning() (bool, error)
 
 		// Settings returns the Wallet's current settings.
-		Settings() WalletSettings
+		Settings() (WalletSettings, error)
 
 		// SetSettings sets the Wallet's settings.
-		SetSettings(WalletSettings)
+		SetSettings(WalletSettings) error
 
 		// StartTransaction is a convenience method that calls
 		// RegisterTransaction(types.Transaction{}, nil)
-		StartTransaction() TransactionBuilder
+		StartTransaction() (TransactionBuilder, error)
 
 		// SendSiacoins is a tool for sending siacoins from the wallet to an
 		// address. Sending money usually results in multiple transactions. The
@@ -407,7 +415,7 @@ type (
 
 		// DustThreshold returns the quantity per byte below which a Currency is
 		// considered to be Dust.
-		DustThreshold() types.Currency
+		DustThreshold() (types.Currency, error)
 	}
 
 	// WalletSettings control the behavior of the Wallet.

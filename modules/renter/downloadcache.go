@@ -13,22 +13,36 @@ import (
 // endpoint download.
 // TODO this won't be necessary anymore once we have partial downloads.
 func (udc *unfinishedDownloadChunk) addChunkToCache(data []byte) {
-	if udc.download.staticDestinationType == destinationTypeSeekStream {
-		// We only cache streaming chunks since browsers and media players tend to only request a few kib at once when streaming data. That way we can prevent scheduling the same chunk for download over and over.
+	if udc.download.staticDestinationType != destinationTypeSeekStream {
+		// We only cache streaming chunks since browsers and media players tend
+		// to only request a few kib at once when streaming data. That way we can
+		// prevent scheduling the same chunk for download over and over.
 		return
 	}
 	udc.cacheMu.Lock()
+	defer udc.cacheMu.Unlock()
+
 	// Prune cache if necessary.
-	// TODO insteado of deleting a 'random' key, delete the
-	// least-recently-accessed element of the cache.
-	for key := range udc.chunkCache {
-		if len(udc.chunkCache) < downloadCacheSize {
-			break
+	for len(udc.chunkCache) >= downloadCacheSize {
+		var oldestKey string
+		oldestTime := time.Now()
+
+		// TODO: turn this from a structure where you loop over every element
+		// (O(n) per access) to a min heap (O(log n) per access).
+		// currently not a issue due to cache size remaining small (<20)
+		for id, chunk := range udc.chunkCache {
+			if chunk.lastAccess.Before(oldestTime) {
+				oldestTime = chunk.lastAccess
+				oldestKey = id
+			}
 		}
-		delete(udc.chunkCache, key)
+		delete(udc.chunkCache, oldestKey)
 	}
-	udc.chunkCache[udc.staticCacheID] = data
-	udc.cacheMu.Unlock()
+
+	udc.chunkCache[udc.staticCacheID] = &cacheData{
+		data:       data,
+		lastAccess: time.Now(),
+	}
 }
 
 // managedTryCache tries to retrieve the chunk from the renter's cache. If
@@ -41,14 +55,19 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 	udc.mu.Lock()
 	defer udc.mu.Unlock()
 	r.cmu.Lock()
-	data, cached := r.chunkCache[udc.staticCacheID]
+	cd, cached := r.chunkCache[udc.staticCacheID]
 	r.cmu.Unlock()
 	if !cached {
 		return false
 	}
+
+	// chunk exists, updating lastAccess and reinserting into map
+	cd.lastAccess = time.Now()
+	r.chunkCache[udc.staticCacheID] = cd
+
 	start := udc.staticFetchOffset
 	end := start + udc.staticFetchLength
-	_, err := udc.destination.WriteAt(data[start:end], udc.staticWriteOffset)
+	_, err := udc.destination.WriteAt(cd.data[start:end], udc.staticWriteOffset)
 	if err != nil {
 		r.log.Println("WARN: failed to write cached chunk to destination:", err)
 		udc.fail(errors.AddContext(err, "failed to write cached chunk to destination"))
@@ -61,6 +80,8 @@ func (r *Renter) managedTryCache(udc *unfinishedDownloadChunk) bool {
 	if udc.download.chunksRemaining == 0 {
 		udc.download.endTime = time.Now()
 		close(udc.download.completeChan)
+		udc.download.destination.Close()
+		udc.download.destination = nil
 	}
 	udc.download.mu.Unlock()
 	return true

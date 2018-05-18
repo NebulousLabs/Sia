@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -9,10 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/julienschmidt/httprouter"
 )
-
-// unrestrictedContextKey is a context key that is set to allow a route to be
-// called without the Sia-Agent being set.
-type unrestrictedContextKey struct{}
 
 // buildHttpRoutes sets up and returns an * httprouter.Router.
 // it connected the Router to the given api using the required
@@ -77,6 +72,7 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.GET("/renter/contracts", api.renterContractsHandler)
 		router.GET("/renter/downloads", api.renterDownloadsHandler)
 		router.GET("/renter/files", api.renterFilesHandler)
+		router.GET("/renter/file/*siapath", api.renterFileHandler)
 		router.GET("/renter/prices", api.renterPricesHandler)
 
 		// TODO: re-enable these routes once the new .sia format has been
@@ -90,7 +86,7 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.GET("/renter/download/*siapath", RequirePassword(api.renterDownloadHandler, requiredPassword))
 		router.GET("/renter/downloadasync/*siapath", RequirePassword(api.renterDownloadAsyncHandler, requiredPassword))
 		router.POST("/renter/rename/*siapath", RequirePassword(api.renterRenameHandler, requiredPassword))
-		router.GET("/renter/stream/*siapath", Unrestricted(api.renterStreamHandler))
+		router.GET("/renter/stream/*siapath", api.renterStreamHandler)
 		router.POST("/renter/upload/*siapath", RequirePassword(api.renterUploadHandler, requiredPassword))
 
 		// HostDB endpoints.
@@ -201,16 +197,7 @@ func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 	}
 }
 
-// Unrestricted can be used to whitelist api routes from requiring the
-// Sia-Agent to be set.
-func Unrestricted(h httprouter.Handle) httprouter.Handle {
-	return httprouter.Handle(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-		req = req.WithContext(context.WithValue(req.Context(), unrestrictedContextKey{}, 0))
-		h(w, req, ps)
-	})
-}
-
-// isUnrestricted checks if a context has the unrestrictedContextKey set.
+// isUnrestricted checks if a request may bypass the useragent check.
 func isUnrestricted(req *http.Request) bool {
-	return req.Context().Value(unrestrictedContextKey{}) != nil
+	return strings.HasPrefix(req.URL.Path, "/renter/stream/")
 }

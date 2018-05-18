@@ -190,9 +190,9 @@ type (
 		// bool to indicate whether that block exists.
 		BlockAtHeight(types.BlockHeight) (types.Block, bool)
 
-		// BlocksByID returns a block found for a given ID, with a bool to
-		// indicate whether that block exists.
-		BlockByID(types.BlockID) (types.Block, bool)
+		// BlocksByID returns a block found for a given ID and its height, with
+		// a bool to indicate whether that block exists.
+		BlockByID(types.BlockID) (types.Block, types.BlockHeight, bool)
 
 		// ChildTarget returns the target required to extend the current heaviest
 		// fork. This function is typically used by miners looking to extend the

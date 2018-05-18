@@ -2,8 +2,6 @@ package proto
 
 import (
 	"encoding/json"
-	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -12,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/writeaheadlog"
 )
 
@@ -27,6 +26,14 @@ const (
 type updateSetHeader struct {
 	ID     types.FileContractID
 	Header contractHeader
+}
+
+// v132UpdateHeader was introduced due to backwards compatibility reasons after
+// changing the format of the contractHeader. It contains the legacy
+// v132ContractHeader.
+type v132UpdateSetHeader struct {
+	ID     types.FileContractID
+	Header v132ContractHeader
 }
 
 type updateSetRoot struct {
@@ -54,6 +61,28 @@ type contractHeader struct {
 	TxnFee           types.Currency
 	SiafundFee       types.Currency
 	Utility          modules.ContractUtility
+}
+
+// v132ContractHeader is a contractHeader without the Utility field. This field
+// was added after v132 to be able to persist contract utilities.
+type v132ContractHeader struct {
+	// transaction is the signed transaction containing the most recent
+	// revision of the file contract.
+	Transaction types.Transaction
+
+	// secretKey is the key used by the renter to sign the file contract
+	// transaction.
+	SecretKey crypto.SecretKey
+
+	// Same as modules.RenterContract.
+	StartHeight      types.BlockHeight
+	DownloadSpending types.Currency
+	StorageSpending  types.Currency
+	UploadSpending   types.Currency
+	TotalCost        types.Currency
+	ContractFee      types.Currency
+	TxnFee           types.Currency
+	SiafundFee       types.Currency
 }
 
 // validate returns an error if the contractHeader is invalid.
@@ -97,17 +126,16 @@ type SafeContract struct {
 	headerMu sync.Mutex
 	header   contractHeader
 
-	// merkleRoots are the Merkle roots of each sector stored on the host that
-	// relate to this contract.
-	merkleRoots []crypto.Hash
+	// merkleRoots are the sector roots covered by this contract.
+	merkleRoots *merkleRoots
 
 	// unappliedTxns are the transactions that were written to the WAL but not
 	// applied to the contract file.
 	unappliedTxns []*writeaheadlog.Transaction
 
-	f   *os.File // TODO: use a dependency for this
-	wal *writeaheadlog.WAL
-	mu  sync.Mutex
+	headerFile *fileSection
+	wal        *writeaheadlog.WAL
+	mu         sync.Mutex
 }
 
 // Metadata returns the metadata of a renter contract
@@ -159,7 +187,7 @@ func (c *SafeContract) UpdateUtility(utility modules.ContractUtility) error {
 		return err
 	}
 	// Sync the change to disk.
-	if err := c.f.Sync(); err != nil {
+	if err := c.headerFile.Sync(); err != nil {
 		return err
 	}
 	// Signal that the update has been applied.
@@ -206,7 +234,7 @@ func (c *SafeContract) makeUpdateSetRoot(root crypto.Hash, index int) writeahead
 func (c *SafeContract) applySetHeader(h contractHeader) error {
 	headerBytes := make([]byte, contractHeaderSize)
 	copy(headerBytes, encoding.Marshal(h))
-	if _, err := c.f.WriteAt(headerBytes, 0); err != nil {
+	if _, err := c.headerFile.WriteAt(headerBytes, 0); err != nil {
 		return err
 	}
 	c.headerMu.Lock()
@@ -216,15 +244,7 @@ func (c *SafeContract) applySetHeader(h contractHeader) error {
 }
 
 func (c *SafeContract) applySetRoot(root crypto.Hash, index int) error {
-	rootOffset := contractHeaderSize + crypto.HashSize*int64(index)
-	if _, err := c.f.WriteAt(root[:], rootOffset); err != nil {
-		return err
-	}
-	if len(c.merkleRoots) <= index {
-		c.merkleRoots = append(c.merkleRoots, make([]crypto.Hash, 1+index-len(c.merkleRoots))...)
-	}
-	c.merkleRoots[index] = root
-	return nil
+	return c.merkleRoots.insert(index, root)
 }
 
 func (c *SafeContract) recordUploadIntent(rev types.FileContractRevision, root crypto.Hash, storageCost, bandwidthCost types.Currency) (*writeaheadlog.Transaction, error) {
@@ -237,10 +257,9 @@ func (c *SafeContract) recordUploadIntent(rev types.FileContractRevision, root c
 	newHeader.StorageSpending = newHeader.StorageSpending.Add(storageCost)
 	newHeader.UploadSpending = newHeader.UploadSpending.Add(bandwidthCost)
 
-	rootIndex := len(c.merkleRoots)
 	t, err := c.wal.NewTransaction([]writeaheadlog.Update{
 		c.makeUpdateSetHeader(newHeader),
-		c.makeUpdateSetRoot(root, rootIndex),
+		c.makeUpdateSetRoot(root, c.merkleRoots.len()),
 	})
 	if err != nil {
 		return nil, err
@@ -261,14 +280,13 @@ func (c *SafeContract) commitUpload(t *writeaheadlog.Transaction, signedTxn type
 	newHeader.StorageSpending = newHeader.StorageSpending.Add(storageCost)
 	newHeader.UploadSpending = newHeader.UploadSpending.Add(bandwidthCost)
 
-	rootIndex := len(c.merkleRoots)
 	if err := c.applySetHeader(newHeader); err != nil {
 		return err
 	}
-	if err := c.applySetRoot(root, rootIndex); err != nil {
+	if err := c.applySetRoot(root, c.merkleRoots.len()); err != nil {
 		return err
 	}
-	if err := c.f.Sync(); err != nil {
+	if err := c.headerFile.Sync(); err != nil {
 		return err
 	}
 	if err := t.SignalUpdatesApplied(); err != nil {
@@ -311,7 +329,7 @@ func (c *SafeContract) commitDownload(t *writeaheadlog.Transaction, signedTxn ty
 	if err := c.applySetHeader(newHeader); err != nil {
 		return err
 	}
-	if err := c.f.Sync(); err != nil {
+	if err := c.headerFile.Sync(); err != nil {
 		return err
 	}
 	if err := t.SignalUpdatesApplied(); err != nil {
@@ -329,7 +347,7 @@ func (c *SafeContract) commitTxns() error {
 			switch update.Name {
 			case updateNameSetHeader:
 				var u updateSetHeader
-				if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+				if err := unmarshalHeader(update.Instructions, &u); err != nil {
 					return err
 				}
 				if err := c.applySetHeader(u.Header); err != nil {
@@ -345,7 +363,7 @@ func (c *SafeContract) commitTxns() error {
 				}
 			}
 		}
-		if err := c.f.Sync(); err != nil {
+		if err := c.headerFile.Sync(); err != nil {
 			return err
 		}
 		if err := t.SignalUpdatesApplied(); err != nil {
@@ -363,7 +381,7 @@ func (c *SafeContract) unappliedHeader() (h contractHeader) {
 		for _, update := range t.Updates {
 			if update.Name == updateNameSetHeader {
 				var u updateSetHeader
-				if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+				if err := unmarshalHeader(update.Instructions, &u); err != nil {
 					continue
 				}
 				h = u.Header
@@ -381,17 +399,17 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
-	// preallocate space for header + roots
-	if err := f.Truncate(contractHeaderSize + crypto.HashSize*int64(len(roots))); err != nil {
-		return modules.RenterContract{}, err
-	}
+	// create fileSections
+	headerSection := newFileSection(f, 0, contractHeaderSize)
+	rootsSection := newFileSection(f, contractHeaderSize, -1)
 	// write header
-	if _, err := f.WriteAt(encoding.Marshal(h), 0); err != nil {
+	if _, err := headerSection.WriteAt(encoding.Marshal(h), 0); err != nil {
 		return modules.RenterContract{}, err
 	}
 	// write roots
-	for i, root := range roots {
-		if _, err := f.WriteAt(root[:], contractHeaderSize+crypto.HashSize*int64(i)); err != nil {
+	merkleRoots := newMerkleRoots(rootsSection)
+	for _, root := range roots {
+		if err := merkleRoots.push(root); err != nil {
 			return modules.RenterContract{}, err
 		}
 	}
@@ -400,8 +418,8 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 	}
 	sc := &SafeContract{
 		header:      h,
-		merkleRoots: roots,
-		f:           f,
+		merkleRoots: merkleRoots,
+		headerFile:  headerSection,
 		wal:         cs.wal,
 	}
 	cs.mu.Lock()
@@ -417,6 +435,9 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 	if err != nil {
 		return err
 	}
+	headerSection := newFileSection(f, 0, contractHeaderSize)
+	rootsSection := newFileSection(f, contractHeaderSize, remainingFile)
+
 	// read header
 	var header contractHeader
 	if err := encoding.NewDecoder(f).Decode(&header); err != nil {
@@ -424,19 +445,11 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 	} else if err := header.validate(); err != nil {
 		return err
 	}
+
 	// read merkleRoots
-	var merkleRoots []crypto.Hash
-	if _, err := f.Seek(contractHeaderSize, io.SeekStart); err != nil {
+	merkleRoots, err := loadExistingMerkleRoots(rootsSection)
+	if err != nil {
 		return err
-	}
-	for {
-		var root crypto.Hash
-		if _, err := io.ReadFull(f, root[:]); err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-		merkleRoots = append(merkleRoots, root)
 	}
 	// add relevant unapplied transactions
 	var unappliedTxns []*writeaheadlog.Transaction
@@ -450,7 +463,7 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 		switch update := t.Updates[0]; update.Name {
 		case updateNameSetHeader:
 			var u updateSetHeader
-			if err := encoding.Unmarshal(update.Instructions, &u); err != nil {
+			if err := unmarshalHeader(update.Instructions, &u); err != nil {
 				return err
 			}
 			id = u.ID
@@ -470,7 +483,7 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 		header:        header,
 		merkleRoots:   merkleRoots,
 		unappliedTxns: unappliedTxns,
-		f:             f,
+		headerFile:    headerSection,
 		wal:           cs.wal,
 	}
 	return nil
@@ -500,7 +513,7 @@ func (cs *ContractSet) ConvertV130Contract(c V130Contract, cr V130CachedRevision
 			return errors.New("contract set is missing contract that was just added")
 		}
 		defer cs.Return(sc)
-		if len(cr.MerkleRoots) == len(sc.merkleRoots)+1 {
+		if len(cr.MerkleRoots) == sc.merkleRoots.len()+1 {
 			root := cr.MerkleRoots[len(cr.MerkleRoots)-1]
 			_, err = sc.recordUploadIntent(cr.Revision, root, types.ZeroCurrency, types.ZeroCurrency)
 		} else {
@@ -588,5 +601,33 @@ func (mrs *MerkleRootSet) UnmarshalJSON(b []byte) error {
 		copy(umrs[i][:], fullBytes[i*crypto.HashSize:(i+1)*crypto.HashSize])
 	}
 	*mrs = umrs
+	return nil
+}
+
+func unmarshalHeader(b []byte, u *updateSetHeader) error {
+	// Try unmarshaling the header.
+	if err := encoding.Unmarshal(b, u); err != nil {
+		// COMPATv132 try unmarshaling the header the old way.
+		var oldHeader v132UpdateSetHeader
+		if err2 := encoding.Unmarshal(b, &oldHeader); err2 != nil {
+			// If unmarshaling the header the old way also doesn't work we
+			// return the original error.
+			return err
+		}
+		// If unmarshaling it the old way was successful we convert it to a new
+		// header.
+		u.Header = contractHeader{
+			Transaction:      oldHeader.Header.Transaction,
+			SecretKey:        oldHeader.Header.SecretKey,
+			StartHeight:      oldHeader.Header.StartHeight,
+			DownloadSpending: oldHeader.Header.DownloadSpending,
+			StorageSpending:  oldHeader.Header.StorageSpending,
+			UploadSpending:   oldHeader.Header.UploadSpending,
+			TotalCost:        oldHeader.Header.TotalCost,
+			ContractFee:      oldHeader.Header.ContractFee,
+			TxnFee:           oldHeader.Header.TxnFee,
+			SiafundFee:       oldHeader.Header.SiafundFee,
+		}
+	}
 	return nil
 }

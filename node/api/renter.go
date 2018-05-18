@@ -123,6 +123,11 @@ type (
 		Downloads []DownloadInfo `json:"downloads"`
 	}
 
+	// RenterFile lists the file queried.
+	RenterFile struct {
+		File modules.FileInfo `json:"file"`
+	}
+
 	// RenterFiles lists the files known to the renter.
 	RenterFiles struct {
 		Files []modules.FileInfo `json:"files"`
@@ -373,6 +378,18 @@ func (api *API) renterRenameHandler(w http.ResponseWriter, req *http.Request, ps
 	WriteSuccess(w)
 }
 
+// renterFileHandler handles the API call to return specific file.
+func (api *API) renterFileHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	file, err := api.renter.File(strings.TrimPrefix(ps.ByName("siapath"), "/"))
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteJSON(w, RenterFile{
+		File: file,
+	})
+}
+
 // renterFilesHandler handles the API call to list all of the files.
 func (api *API) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	WriteJSON(w, RenterFiles{
@@ -407,30 +424,15 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-
-	if params.Async { // Create goroutine if `async` param set.
-		// check for errors for 5 seconds to catch validation errors (no file with
-		// that path, invalid parameters, insufficient hosts, etc)
-		errchan := make(chan error)
-		go func() {
-			errchan <- api.renter.Download(params)
-		}()
-		select {
-		case err = <-errchan:
-			if err != nil {
-				WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
-				return
-			}
-		case <-time.After(time.Millisecond * 100):
-		}
+	if params.Async {
+		err = api.renter.DownloadAsync(params)
 	} else {
-		err := api.renter.Download(params)
-		if err != nil {
-			WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
-			return
-		}
+		err = api.renter.Download(params)
 	}
-
+	if err != nil {
+		WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
 	if params.Httpwriter == nil {
 		// `httpresp=true` causes writes to w before this line is run, automatically
 		// adding `200 Status OK` code to response. Calling this results in a

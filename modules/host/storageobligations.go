@@ -574,8 +574,16 @@ func (h *Host) removeStorageObligation(so storageObligation, sos storageObligati
 		}
 	}
 	if sos == obligationSucceeded {
+		// Empty obligations don't submit a storage proof. The revenue for an empty
+		// storage obligation should equal the contract cost of the obligation
+		revenue := so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue)
+		if len(so.SectorRoots) == 0 {
+			h.log.Printf("No need to submit a storage proof for empty contract. Revenue is %v.\n", revenue)
+		} else {
+			h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", revenue)
+		}
+
 		// Remove the obligation statistics as potential risk and income.
-		h.log.Printf("Successfully submitted a storage proof. Revenue is %v.\n", so.ContractCost.Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue))
 		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
 		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
 		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
@@ -727,13 +735,18 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		revisionTxnIndex := len(so.RevisionTransactionSet) - 1
 		revisionParents := so.RevisionTransactionSet[:revisionTxnIndex]
 		revisionTxn := so.RevisionTransactionSet[revisionTxnIndex]
-		builder := h.wallet.RegisterTransaction(revisionTxn, revisionParents)
+		builder, err := h.wallet.RegisterTransaction(revisionTxn, revisionParents)
+		if err != nil {
+			h.log.Println("Error registering transaction:", err)
+			return
+		}
 		_, feeRecommendation := h.tpool.FeeEstimation()
 		if so.value().Div64(2).Cmp(feeRecommendation) < 0 {
 			// There's no sense submitting the revision if the fee is more than
 			// half of the anticipated revenue - fee market went up
 			// unexpectedly, and the money that the renter paid to cover the
 			// fees is no longer enough.
+			builder.Drop()
 			return
 		}
 		txnSize := uint64(len(encoding.MarshalAll(so.RevisionTransactionSet)) + 300)
@@ -741,18 +754,22 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		err = builder.FundSiacoins(requiredFee)
 		if err != nil {
 			h.log.Println("Error funding transaction fees", err)
+			builder.Drop()
 		}
 		builder.AddMinerFee(requiredFee)
 		if err != nil {
 			h.log.Println("Error adding miner fees", err)
+			builder.Drop()
 		}
 		feeAddedRevisionTransactionSet, err := builder.Sign(true)
 		if err != nil {
 			h.log.Println("Error signing transaction", err)
+			builder.Drop()
 		}
 		err = h.tpool.AcceptTransactionSet(feeAddedRevisionTransactionSet)
 		if err != nil {
 			h.log.Println("Error submitting transaction to transaction pool", err)
+			builder.Drop()
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)
 		// return
@@ -763,9 +780,22 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 	if !so.ProofConfirmed && blockHeight >= so.expiration()+resubmissionTimeout {
 		h.log.Debugln("Host is attempting a storage proof for", so.id())
 
+		// If the obligation has no sector roots, we can remove the obligation and not
+		// submit a storage proof. The host payout for a failed empty contract
+		// includes the contract cost and locked collateral.
+		if len(so.SectorRoots) == 0 {
+			h.log.Debugln("storage proof not submitted for empty contract, id", so.id())
+			h.mu.Lock()
+			err := h.removeStorageObligation(so, obligationSucceeded)
+			h.mu.Unlock()
+			if err != nil {
+				h.log.Println("Error removing storage obligation:", err)
+			}
+			return
+		}
 		// If the window has closed, the host has failed and the obligation can
 		// be removed.
-		if so.proofDeadline() < blockHeight || len(so.SectorRoots) == 0 {
+		if so.proofDeadline() < blockHeight {
 			h.log.Debugln("storage proof not confirmed by deadline, id", so.id())
 			h.mu.Lock()
 			err := h.removeStorageObligation(so, obligationFailed)
@@ -775,7 +805,6 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 			}
 			return
 		}
-
 		// Get the index of the segment, and the index of the sector containing
 		// the segment.
 		segmentIndex, err := h.cs.StorageProofSegment(so.id())
@@ -814,12 +843,17 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		copy(sp.Segment[:], base)
 
 		// Create and build the transaction with the storage proof.
-		builder := h.wallet.StartTransaction()
+		builder, err := h.wallet.StartTransaction()
+		if err != nil {
+			h.log.Println("Failed to start transaction:", err)
+			return
+		}
 		_, feeRecommendation := h.tpool.FeeEstimation()
 		if so.value().Cmp(feeRecommendation) < 0 {
 			// There's no sense submitting the storage proof if the fee is more
 			// than the anticipated revenue.
 			h.log.Debugln("Host not submitting storage proof due to a value that does not sufficiently exceed the fee cost")
+			builder.Drop()
 			return
 		}
 		txnSize := uint64(len(encoding.Marshal(sp)) + 300)
@@ -827,6 +861,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		err = builder.FundSiacoins(requiredFee)
 		if err != nil {
 			h.log.Println("Host error when funding a storage proof transaction fee:", err)
+			builder.Drop()
 			return
 		}
 		builder.AddMinerFee(requiredFee)
@@ -834,11 +869,13 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		storageProofSet, err := builder.Sign(true)
 		if err != nil {
 			h.log.Println("Host error when signing the storage proof transaction:", err)
+			builder.Drop()
 			return
 		}
 		err = h.tpool.AcceptTransactionSet(storageProofSet)
 		if err != nil {
 			h.log.Println("Host unable to submit storage proof transaction to transaction pool:", err)
+			builder.Drop()
 			return
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)

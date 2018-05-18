@@ -14,22 +14,26 @@ var (
 
 	// errUnknownAddress is returned if the host is unable to determine a
 	// public address for itself to use in the announcement.
-	errUnknownAddress = errors.New("host cannot announce, does not seem to have a valid address.")
+	errUnknownAddress = errors.New("host cannot announce, does not seem to have a valid address")
 )
 
 // managedAnnounce creates an announcement transaction and submits it to the network.
-func (h *Host) managedAnnounce(addr modules.NetAddress) error {
+func (h *Host) managedAnnounce(addr modules.NetAddress) (err error) {
 	// The wallet needs to be unlocked to add fees to the transaction, and the
 	// host needs to have an active unlock hash that renters can make payment
 	// to.
-	if !h.wallet.Unlocked() {
+	unlocked, err := h.wallet.Unlocked()
+	if err != nil {
+		return err
+	}
+	if !unlocked {
 		return errAnnWalletLocked
 	}
 
 	h.mu.Lock()
 	pubKey := h.publicKey
 	secKey := h.secretKey
-	err := h.checkUnlockHash()
+	err = h.checkUnlockHash()
 	h.mu.Unlock()
 	if err != nil {
 		return err
@@ -43,26 +47,31 @@ func (h *Host) managedAnnounce(addr modules.NetAddress) error {
 	}
 
 	// Create a transaction, with a fee, that contains the full announcement.
-	txnBuilder := h.wallet.StartTransaction()
+	txnBuilder, err := h.wallet.StartTransaction()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			txnBuilder.Drop()
+		}
+	}()
 	_, fee := h.tpool.FeeEstimation()
 	fee = fee.Mul64(600) // Estimated txn size (in bytes) of a host announcement.
 	err = txnBuilder.FundSiacoins(fee)
 	if err != nil {
-		txnBuilder.Drop()
 		return err
 	}
 	_ = txnBuilder.AddMinerFee(fee)
 	_ = txnBuilder.AddArbitraryData(signedAnnouncement)
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
-		txnBuilder.Drop()
 		return err
 	}
 
 	// Add the transactions to the transaction pool.
 	err = h.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
-		txnBuilder.Drop()
 		return err
 	}
 

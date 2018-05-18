@@ -1,7 +1,6 @@
 package proto
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/ratelimit"
 
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/writeaheadlog"
 )
 
@@ -64,7 +64,11 @@ func (cs *ContractSet) Delete(c *SafeContract) {
 	cs.mu.Unlock()
 	safeContract.mu.Unlock()
 	// delete contract file
-	os.Remove(filepath.Join(cs.dir, c.header.ID().String()+contractExtension))
+	path := filepath.Join(cs.dir, c.header.ID().String()+contractExtension)
+	err := errors.Compose(safeContract.headerFile.Close(), os.Remove(path))
+	if err != nil {
+		build.Critical("Failed to delete SafeContract from disk:", err)
+	}
 }
 
 // IDs returns the FileContractID of each contract in the set. The contracts
@@ -100,9 +104,15 @@ func (cs *ContractSet) Return(c *SafeContract) {
 	safeContract.mu.Unlock()
 }
 
+// RateLimits sets the bandwidth limits for connections created by the
+// contractSet.
+func (cs *ContractSet) RateLimits() (readBPS int64, writeBPS int64, packetSize uint64) {
+	return cs.rl.Limits()
+}
+
 // SetRateLimits sets the bandwidth limits for connections created by the
 // contractSet.
-func (cs *ContractSet) SetRateLimits(readBPS, writeBPS int64, packetSize uint64) {
+func (cs *ContractSet) SetRateLimits(readBPS int64, writeBPS int64, packetSize uint64) {
 	cs.rl.SetLimits(readBPS, writeBPS, packetSize)
 }
 
@@ -135,7 +145,7 @@ func (cs *ContractSet) ViewAll() []modules.RenterContract {
 // Close closes all contracts in a contract set, this means rendering it unusable for I/O
 func (cs *ContractSet) Close() error {
 	for _, c := range cs.contracts {
-		c.f.Close()
+		c.headerFile.Close()
 	}
 	_, err := cs.wal.CloseIncomplete()
 	return err

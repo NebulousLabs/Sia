@@ -97,9 +97,13 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	// add miner fee
 	txnBuilder.AddMinerFee(txnFee)
 
-	// create initial transaction set
+	// Create initial transaction set.
 	txn, parentTxns := txnBuilder.View()
-	txnSet := append(parentTxns, txn)
+	unconfirmedParents, err := txnBuilder.UnconfirmedParents()
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
+	txnSet := append(unconfirmedParents, append(parentTxns, txn)...)
 
 	// Increase Successful/Failed interactions accordingly
 	defer func() {
@@ -279,8 +283,14 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 		SiafundFee:  types.Tax(startHeight, fc.Payout),
 	}
 
+	// Get old roots
+	oldRoots, err := oldContract.merkleRoots.merkleRoots()
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
+
 	// Add contract to set.
-	meta, err := cs.managedInsertContract(header, oldContract.merkleRoots)
+	meta, err := cs.managedInsertContract(header, oldRoots)
 	if err != nil {
 		return modules.RenterContract{}, err
 	}

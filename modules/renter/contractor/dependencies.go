@@ -21,11 +21,11 @@ type (
 	// transactionBuilder.
 	walletShim interface {
 		NextAddress() (types.UnlockConditions, error)
-		StartTransaction() modules.TransactionBuilder
+		StartTransaction() (modules.TransactionBuilder, error)
 	}
 	wallet interface {
 		NextAddress() (types.UnlockConditions, error)
-		StartTransaction() transactionBuilder
+		StartTransaction() (transactionBuilder, error)
 	}
 	transactionBuilder interface {
 		AddArbitraryData([]byte) uint64
@@ -38,6 +38,7 @@ type (
 		Drop()
 		FundSiacoins(types.Currency) error
 		Sign(bool) ([]types.Transaction, error)
+		UnconfirmedParents() ([]types.Transaction, error)
 		View() (types.Transaction, []types.Transaction)
 		ViewAdded() (parents, coins, funds, signatures []int)
 	}
@@ -52,7 +53,7 @@ type (
 		Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
 		IncrementSuccessfulInteractions(key types.SiaPublicKey)
 		IncrementFailedInteractions(key types.SiaPublicKey)
-		RandomHosts(n int, exclude []types.SiaPublicKey) []modules.HostDBEntry
+		RandomHosts(n int, exclude []types.SiaPublicKey) ([]modules.HostDBEntry, error)
 		ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
 	}
 
@@ -74,7 +75,7 @@ func (ws *WalletBridge) NextAddress() (types.UnlockConditions, error) { return w
 
 // StartTransaction creates a new transactionBuilder that can be used to create
 // and sign a transaction.
-func (ws *WalletBridge) StartTransaction() transactionBuilder { return ws.W.StartTransaction() }
+func (ws *WalletBridge) StartTransaction() (transactionBuilder, error) { return ws.W.StartTransaction() }
 
 // stdPersist implements the persister interface. The filename required by
 // these functions is internal to stdPersist.

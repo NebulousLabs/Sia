@@ -54,7 +54,10 @@ func TestViewAdded(t *testing.T) {
 	// but do not sign the transaction. The format of this test mimics the way
 	// that the host-renter protocol behaves when building a file contract
 	// transaction.
-	b := wt.wallet.StartTransaction()
+	b, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	txnFund := types.NewCurrency64(100e9)
 	err = b.FundSiacoins(txnFund)
 	if err != nil {
@@ -67,7 +70,10 @@ func TestViewAdded(t *testing.T) {
 	// Create a second builder that extends the first, unsigned transaction. Do
 	// not sign the transaction, but do give the extensions to the original
 	// builder.
-	b2 := wt.wallet.RegisterTransaction(unfinishedTxn, unfinishedParents)
+	b2, err := wt.wallet.RegisterTransaction(unfinishedTxn, unfinishedParents)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = b2.FundSiacoins(txnFund)
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +150,10 @@ func TestDoubleSignError(t *testing.T) {
 	defer wt.closeWt()
 
 	// Create a transaction, add money to it, and then call sign twice.
-	b := wt.wallet.StartTransaction()
+	b, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	txnFund := types.NewCurrency64(100e9)
 	err = b.FundSiacoins(txnFund)
 	if err != nil {
@@ -191,8 +200,14 @@ func TestConcurrentBuilders(t *testing.T) {
 	}
 
 	// Get a baseline balance for the wallet.
-	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
-	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
+	startingSCConfirmed, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	startingOutgoing, startingIncoming, err := wt.wallet.UnconfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !startingOutgoing.IsZero() {
 		t.Fatal(startingOutgoing)
 	}
@@ -201,8 +216,14 @@ func TestConcurrentBuilders(t *testing.T) {
 	}
 
 	// Create two builders at the same time, then add money to each.
-	builder1 := wt.wallet.StartTransaction()
-	builder2 := wt.wallet.StartTransaction()
+	builder1, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
+	builder2, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Fund each builder with a siacoin output that is smaller than all of the
 	// outputs that the wallet should currently have.
 	funding := types.NewCurrency64(10e3).Mul(types.SiacoinPrecision)
@@ -216,7 +237,10 @@ func TestConcurrentBuilders(t *testing.T) {
 	}
 
 	// Get a second reading on the wallet's balance.
-	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	fundedSCConfirmed, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !startingSCConfirmed.Equals(fundedSCConfirmed) {
 		t.Fatal("confirmed siacoin balance changed when no blocks have been mined", startingSCConfirmed, fundedSCConfirmed)
 	}
@@ -284,9 +308,15 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scBal, _, _ := wt.wallet.ConfirmedBalance()
+	scBal, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Use a custom builder so that there is no transaction fee.
-	builder := wt.wallet.StartTransaction()
+	builder, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = builder.FundSiacoins(scBal)
 	if err != nil {
 		t.Fatal(err)
@@ -312,8 +342,14 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	}
 
 	// Get a baseline balance for the wallet.
-	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
-	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
+	startingSCConfirmed, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	startingOutgoing, startingIncoming, err := wt.wallet.UnconfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !startingOutgoing.IsZero() {
 		t.Fatal(startingOutgoing)
 	}
@@ -322,8 +358,14 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	}
 
 	// Create two builders at the same time, then add money to each.
-	builder1 := wt.wallet.StartTransaction()
-	builder2 := wt.wallet.StartTransaction()
+	builder1, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
+	builder2, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Fund each builder with a siacoin output.
 	funding := types.NewCurrency64(10e3).Mul(types.SiacoinPrecision)
 	err = builder1.FundSiacoins(funding)
@@ -337,7 +379,10 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 	}
 
 	// Get a second reading on the wallet's balance.
-	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	fundedSCConfirmed, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !startingSCConfirmed.Equals(fundedSCConfirmed) {
 		t.Fatal("confirmed siacoin balance changed when no blocks have been mined", startingSCConfirmed, fundedSCConfirmed)
 	}
@@ -397,8 +442,14 @@ func TestParallelBuilders(t *testing.T) {
 	}
 
 	// Get a baseline balance for the wallet.
-	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
-	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
+	startingSCConfirmed, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	startingOutgoing, startingIncoming, err := wt.wallet.UnconfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !startingOutgoing.IsZero() {
 		t.Fatal(startingOutgoing)
 	}
@@ -413,8 +464,11 @@ func TestParallelBuilders(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			// Create the builder and fund the transaction.
-			builder := wt.wallet.StartTransaction()
-			err := builder.FundSiacoins(funding)
+			builder, err := wt.wallet.StartTransaction()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = builder.FundSiacoins(funding)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -444,9 +498,67 @@ func TestParallelBuilders(t *testing.T) {
 	}
 
 	// Check the final balance.
-	endingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	endingSCConfirmed, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	expected := startingSCConfirmed.Sub(funding.Mul(types.NewCurrency64(uint64(outputsDesired))))
 	if !expected.Equals(endingSCConfirmed) {
 		t.Fatal("did not get the expected ending balance", expected, endingSCConfirmed, startingSCConfirmed)
+	}
+}
+
+// TestUnconfirmedParents tests the functionality of the transaction builder's
+// UnconfirmedParents method.
+func TestUnconfirmedParents(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name(), &modules.ProductionDependencies{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Send all of the wallet's available balance to itself.
+	uc, err := wt.wallet.NextAddress()
+	if err != nil {
+		t.Fatal("Failed to get address", err)
+	}
+	siacoins, _, _, err := wt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tSet, err := wt.wallet.SendSiacoins(siacoins.Sub(types.SiacoinPrecision), uc.UnlockHash())
+	if err != nil {
+		t.Fatal("Failed to send coins", err)
+	}
+
+	// Create a transaction. That transaction should use siacoin outputs from
+	// the unconfirmed transactions in tSet as inputs and is therefore a child
+	// of tSet.
+	b, err := wt.wallet.StartTransaction()
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnFund := types.NewCurrency64(1e3)
+	err = b.FundSiacoins(txnFund)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// UnconfirmedParents should return the transactions of the transaction set
+	// we used to send money to ourselves.
+	parents, err := b.UnconfirmedParents()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tSet) != len(parents) {
+		t.Fatal("parents should have same length as unconfirmed transaction set")
+	}
+	for i := 0; i < len(tSet); i++ {
+		if tSet[i].ID() != parents[i].ID() {
+			t.Error("returned parent doesn't match transaction of transaction set")
+		}
 	}
 }

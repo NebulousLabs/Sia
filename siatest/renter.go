@@ -119,7 +119,7 @@ func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (*api.DownloadIn
 	if di.Length != di.Filesize {
 		err = errors.AddContext(err, "filesize != length")
 	}
-	// Received data can't be larger than transfered data
+	// Received data can't be larger than transferred data
 	if di.Received > di.TotalDataTransferred {
 		err = errors.AddContext(err, "received > TotalDataTransfered")
 	}
@@ -129,6 +129,15 @@ func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (*api.DownloadIn
 		err = errors.AddContext(err, "completed == true but received != length")
 	}
 	return di, err
+}
+
+// File returns the file queried by the user
+func (tn *TestNode) File(siaPath string) (modules.FileInfo, error) {
+	rf, err := tn.RenterFileGet(siaPath)
+	if err != nil {
+		return rf.File, err
+	}
+	return rf.File, err
 }
 
 // Files lists the files tracked by the renter

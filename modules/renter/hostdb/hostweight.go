@@ -14,14 +14,14 @@ var (
 	// weight to be very large.
 	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(80), nil))
 
-	// collateralExponentiation is the number of times that the collateral is
-	// multiplied into the price.
-	collateralExponentiation = 1
+	// collateralExponentiation is the power to which we raise the weight
+	// during collateral adjustment.
+	collateralExponentiation = 0.75
 
 	// minCollateral is the amount of collateral we weight all hosts as having,
 	// even if they do not have any collateral. This is to temporarily prop up
 	// weak / cheap hosts on the network while the network is bootstrapping.
-	minCollateral = types.SiacoinPrecision.Mul64(5).Div64(tbMonth)
+	minCollateral = types.SiacoinPrecision.Div64(5).Div64(tbMonth)
 
 	// Set a minimum price, below which setting lower prices will no longer put
 	// this host at an advatnage. This price is considered the bar for
@@ -30,7 +30,7 @@ var (
 	//
 	// NOTE: This needs to be intelligently adjusted down as the practical price
 	// of storage changes, and as the price of the siacoin changes.
-	minTotalPrice = types.SiacoinPrecision.Mul64(25).Div64(tbMonth)
+	minTotalPrice = types.SiacoinPrecision.Mul64(1).Div64(tbMonth)
 
 	// priceDiveNormalization reduces the raw value of the price so that not so
 	// many digits are needed when operating on the weight. This also allows the
@@ -85,10 +85,7 @@ func (hdb *HostDB) collateralAdjustments(entry modules.HostDBEntry) float64 {
 	actual := float64(actualU64)
 
 	// Exponentiate the results.
-	weight := float64(1)
-	for i := 0; i < collateralExponentiation; i++ {
-		weight *= actual / base
-	}
+	weight := math.Pow(actual/base, collateralExponentiation)
 
 	// Add in penalties for low MaxCollateral. Hosts should be willing to pay
 	// for at least 100 GB of collateral on a contract.

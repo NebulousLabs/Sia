@@ -104,7 +104,10 @@ func TestIntegrationMiner(t *testing.T) {
 	}
 
 	// Check that the wallet has money.
-	siacoins, _, _ := mt.wallet.ConfirmedBalance()
+	siacoins, _, _, err := mt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Error(err)
+	}
 	if siacoins.IsZero() {
 		t.Error("expecting mining full balance to not be zero")
 	}
@@ -117,7 +120,10 @@ func TestIntegrationMiner(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	morecoins, _, _ := mt.wallet.ConfirmedBalance()
+	morecoins, _, _, err := mt.wallet.ConfirmedBalance()
+	if err != nil {
+		t.Error(err)
+	}
 	if siacoins.Cmp(morecoins) >= 0 {
 		t.Error("wallet is not gaining balance while mining")
 	}
@@ -320,6 +326,9 @@ func TestIntegrationStartupRescan(t *testing.T) {
 // TestMinerCloseDeadlock checks that the miner can cleanly close even if the
 // CPU miner is running.
 func TestMinerCloseDeadlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)

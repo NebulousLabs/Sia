@@ -28,6 +28,10 @@ type ErasureCoder interface {
 	// containing parity data.
 	Encode(data []byte) ([][]byte, error)
 
+	// EncodeShards encodes the input data like Encode but accepts an already
+	// sharded input.
+	EncodeShards(data [][]byte) ([][]byte, error)
+
 	// Recover recovers the original data from pieces and writes it to w.
 	// pieces should be identical to the slice returned by Encode (length and
 	// order must be preserved), but with missing elements set to nil. n is
@@ -315,8 +319,15 @@ type Renter interface {
 	// downloads of `offset` and `length` type.
 	Download(params RenterDownloadParameters) error
 
+	// Download performs a download according to the parameters passed without
+	// blocking, including downloads of `offset` and `length` type.
+	DownloadAsync(params RenterDownloadParameters) error
+
 	// DownloadHistory lists all the files that have been scheduled for download.
 	DownloadHistory() []DownloadInfo
+
+	// File returns information on specific file queried by user
+	File(siaPath string) (FileInfo, error)
 
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo

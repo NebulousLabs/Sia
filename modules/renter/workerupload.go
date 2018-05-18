@@ -2,6 +2,8 @@ package renter
 
 import (
 	"time"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // managedDropChunk will remove a worker from the responsibility of tracking a chunk.
@@ -197,13 +199,19 @@ func (w *worker) managedProcessUploadChunk(uc *unfinishedUploadChunk) (nextChunk
 	// return the stats for that piece.
 	//
 	// Select a piece and mark that a piece has been selected.
-	index := 0
+	index := -1
 	for i := 0; i < len(uc.pieceUsage); i++ {
 		if !uc.pieceUsage[i] {
 			index = i
 			uc.pieceUsage[i] = true
 			break
 		}
+	}
+	if index == -1 {
+		build.Critical("worker was supposed to upload but couldn't find unused piece")
+		uc.mu.Unlock()
+		w.managedDropChunk(uc)
+		return nil, 0
 	}
 	delete(uc.unusedHosts, w.hostPubKey.String())
 	uc.piecesRegistered++

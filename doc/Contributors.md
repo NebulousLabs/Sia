@@ -7,13 +7,14 @@
 ### List of contributors
 * DavidVorick (Owner)
 * lukechampine (Lead Developer)
+* ChrisSchinnerl (Nebulous Developer)
+* Msevey (Nebulous Developer)
 * VoidingWarranties
 * avahowell
 * seveibar
 * triazo
 * mnsl
 * mtlynch
-* ChrisSchinnerl
 * Mingling94
 * marcinja
 * RNabel
@@ -52,6 +53,7 @@
 * huetsch
 * mjmay08
 * jfcg
+* pachisi456
 * Google Inc.
 
 

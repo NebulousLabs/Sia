@@ -60,13 +60,13 @@ type Contractor struct {
 	renewing    map[types.FileContractID]bool // prevent revising during renewal
 	revising    map[types.FileContractID]bool // prevent overlapping revisions
 
-	contracts    *proto.ContractSet
-	oldContracts map[types.FileContractID]modules.RenterContract
-	renewedIDs   map[types.FileContractID]types.FileContractID
+	staticContracts *proto.ContractSet
+	oldContracts    map[types.FileContractID]modules.RenterContract
+	renewedIDs      map[types.FileContractID]types.FileContractID
 }
 
-// resolveID returns the ID of the most recent renewal of id.
-func (c *Contractor) resolveID(id types.FileContractID) types.FileContractID {
+// readlockResolveID returns the ID of the most recent renewal of id.
+func (c *Contractor) readlockResolveID(id types.FileContractID) types.FileContractID {
 	newID, exists := c.renewedIDs[id]
 	for exists {
 		id = newID
@@ -89,7 +89,7 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 	defer c.mu.RUnlock()
 
 	var spending modules.ContractorSpending
-	for _, contract := range c.contracts.ViewAll() {
+	for _, contract := range c.staticContracts.ViewAll() {
 		// Calculate ContractFees
 		spending.ContractFees = spending.ContractFees.Add(contract.ContractFee)
 		spending.ContractFees = spending.ContractFees.Add(contract.TxnFee)
@@ -126,21 +126,19 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContract, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.contracts.View(c.resolveID(id))
+	return c.staticContracts.View(c.readlockResolveID(id))
 }
 
 // Contracts returns the contracts formed by the contractor in the current
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
 func (c *Contractor) Contracts() []modules.RenterContract {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.contracts.ViewAll()
+	return c.staticContracts.ViewAll()
 }
 
 // ContractUtility returns the utility fields for the given contract.
 func (c *Contractor) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
-	return c.staticContractUtility(id)
+	return c.managedContractUtility(id)
 }
 
 // CurrentPeriod returns the height at which the current allowance period
@@ -154,15 +152,21 @@ func (c *Contractor) CurrentPeriod() types.BlockHeight {
 // ResolveID returns the ID of the most recent renewal of id.
 func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
 	c.mu.RLock()
-	newID := c.resolveID(id)
+	newID := c.readlockResolveID(id)
 	c.mu.RUnlock()
 	return newID
 }
 
+// RateLimits sets the bandwidth limits for connections created by the
+// contractSet.
+func (c *Contractor) RateLimits() (readBPW int64, writeBPS int64, packetSize uint64) {
+	return c.staticContracts.RateLimits()
+}
+
 // SetRateLimits sets the bandwidth limits for connections created by the
 // contractSet.
-func (c *Contractor) SetRateLimits(readBPS, writeBPS int64, packetSize uint64) {
-	c.contracts.SetRateLimits(readBPS, writeBPS, packetSize)
+func (c *Contractor) SetRateLimits(readBPS int64, writeBPS int64, packetSize uint64) {
+	c.staticContracts.SetRateLimits(readBPS, writeBPS, packetSize)
 }
 
 // Close closes the Contractor.
@@ -223,18 +227,18 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 
 		interruptMaintenance: make(chan struct{}),
 
-		contracts:    contractSet,
-		downloaders:  make(map[types.FileContractID]*hostDownloader),
-		editors:      make(map[types.FileContractID]*hostEditor),
-		oldContracts: make(map[types.FileContractID]modules.RenterContract),
-		renewedIDs:   make(map[types.FileContractID]types.FileContractID),
-		renewing:     make(map[types.FileContractID]bool),
-		revising:     make(map[types.FileContractID]bool),
+		staticContracts: contractSet,
+		downloaders:     make(map[types.FileContractID]*hostDownloader),
+		editors:         make(map[types.FileContractID]*hostEditor),
+		oldContracts:    make(map[types.FileContractID]modules.RenterContract),
+		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
+		renewing:        make(map[types.FileContractID]bool),
+		revising:        make(map[types.FileContractID]bool),
 	}
 
 	// Close the contract set and logger upon shutdown.
 	c.tg.AfterStop(func() {
-		if err := c.contracts.Close(); err != nil {
+		if err := c.staticContracts.Close(); err != nil {
 			c.log.Println("Failed to close contract set:", err)
 		}
 		if err := c.log.Close(); err != nil {
@@ -247,9 +251,6 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-
-	// Mark contract utility.
-	c.managedMarkContractsUtility()
 
 	// Subscribe to the consensus set.
 	err = cs.ConsensusSetSubscribe(c, c.lastChange, c.tg.StopChan())

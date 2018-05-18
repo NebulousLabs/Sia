@@ -183,7 +183,11 @@ func TestHostAnnounceCheckUnlockHash(t *testing.T) {
 		t.Fatal("host did not set a new unlock hash after announce with reset wallet")
 	}
 	hasAddr := false
-	for _, addr := range ht.wallet.AllAddresses() {
+	addrs, err := ht.wallet.AllAddresses()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, addr := range addrs {
 		if addr == newUnlockHash {
 			hasAddr = true
 			break

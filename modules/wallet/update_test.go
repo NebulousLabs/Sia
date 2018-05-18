@@ -26,7 +26,10 @@ func TestUpdate(t *testing.T) {
 	}
 	// since the miner is mining into a wallet address, the wallet should have
 	// added a new transaction
-	_, ok := wt.wallet.Transaction(types.TransactionID(b.ID()))
+	_, ok, err := wt.wallet.Transaction(types.TransactionID(b.ID()))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !ok {
 		t.Fatal("no record of miner transaction")
 	}
@@ -36,7 +39,10 @@ func TestUpdate(t *testing.T) {
 		RevertedBlocks: []types.Block{b},
 	})
 	// transaction should no longer be present
-	_, ok = wt.wallet.Transaction(types.TransactionID(b.ID()))
+	_, ok, err = wt.wallet.Transaction(types.TransactionID(b.ID()))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if ok {
 		t.Fatal("miner transaction was not removed after block was reverted")
 	}
@@ -59,14 +65,20 @@ func TestUpdate(t *testing.T) {
 	}
 
 	// transaction should be present
-	_, ok = wt.wallet.Transaction(txnSet[0].ID())
+	_, ok, err = wt.wallet.Transaction(txnSet[0].ID())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !ok {
 		t.Fatal("no record of transaction")
 	}
 
 	// revert all the blocks
 	wt.wallet.ProcessConsensusChange(revertCC)
-	_, ok = wt.wallet.Transaction(txnSet[0].ID())
+	_, ok, err = wt.wallet.Transaction(txnSet[0].ID())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if ok {
 		t.Fatal("transaction was not removed")
 	}

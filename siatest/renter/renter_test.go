@@ -1,10 +1,12 @@
 package renter
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
@@ -40,8 +42,10 @@ func TestRenter(t *testing.T) {
 		name string
 		test func(*testing.T, *siatest.TestGroup)
 	}{
-		{"UploadDownload", testUploadDownload},
-		{"DownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
+		{"TestRenterStreamingCache", testRenterStreamingCache},
+		{"TestUploadDownload", testUploadDownload},
+		{"TestSingleFileGet", testSingleFileGet},
+		{"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
 	}
@@ -96,6 +100,37 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 		_, err = renter.StreamPartial(remoteFile, localFile, uint64(from), uint64(to))
 		if err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+// testSingleFileGet is a subtest that uses an existing TestGroup to test if
+// using the signle file API endpoint works
+func testSingleFileGet(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	renter := tg.Renters()[0]
+	// Upload file, creating a piece for each host in the group
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+	fileSize := 100 + siatest.Fuzz()
+	_, _, err := renter.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal("Failed to upload a file for testing: ", err)
+	}
+
+	files, err := renter.Files()
+	if err != nil {
+		t.Fatal("Failed to get renter files: ", err)
+	}
+
+	var file modules.FileInfo
+	for _, f := range files {
+		file, err = renter.File(f.SiaPath)
+		if err != nil {
+			t.Fatal("Failed to request single file", err)
+		}
+		if file != f {
+			t.Fatal("Single file queries does not match file previously requested.")
 		}
 	}
 }
@@ -178,7 +213,7 @@ func testRenterLocalRepair(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 	// Get the file info of the fully uploaded file. Tha way we can compare the
-	// redundancieslater.
+	// redundancies later.
 	fi, err := renter.FileInfo(remoteFile)
 	if err != nil {
 		t.Fatal("failed to get file info", err)
@@ -443,5 +478,51 @@ func testUploadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnceOn
 	// Download the file.
 	if _, err := renter.DownloadByStream(remoteFile); err != nil {
 		t.Fatal("Failed to download the file", err)
+	}
+}
+
+// testRenterStreamingCache checks if the chunk cache works correctly.
+func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	r := tg.Renters()[0]
+
+	// Set fileSize and redundancy for upload
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+
+	// Set the bandwidth limit to 1 chunk per second.
+	pieceSize := modules.SectorSize - crypto.TwofishOverhead
+	chunkSize := int64(pieceSize * dataPieces)
+	if err := r.RenterPostRateLimit(chunkSize, chunkSize); err != nil {
+		t.Fatal(err)
+	}
+
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not request RenterGe()")
+	}
+	if rg.Settings.MaxDownloadSpeed != chunkSize {
+		t.Fatal(errors.New("MaxDownloadSpeed doesn't match value set through RenterPostRateLimit"))
+	}
+	if rg.Settings.MaxUploadSpeed != chunkSize {
+		t.Fatal(errors.New("MaxUploadSpeed doesn't match value set through RenterPostRateLimit"))
+	}
+
+	// Upload a file that is a single chunk big.
+	_, remoteFile, err := r.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Download the same chunk 250 times. This should take at least 250 seconds
+	// without caching but not more than 30 with caching.
+	start := time.Now()
+	for i := 0; i < 250; i++ {
+		if _, err := r.Stream(remoteFile); err != nil {
+			t.Fatal(err)
+		}
+		if time.Since(start) > time.Second*30 {
+			t.Fatal("download took longer than 30 seconds")
+		}
 	}
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
 
 // contractorPersist defines what Contractor data persists across sessions.
@@ -141,6 +143,5 @@ func convertPersist(dir string) error {
 	}
 
 	// delete the journal file
-	os.RemoveAll(journalPath)
-	return nil
+	return errors.AddContext(os.Remove(journalPath), "failed to remove journal file")
 }

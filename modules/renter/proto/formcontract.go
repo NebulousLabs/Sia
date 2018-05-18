@@ -98,7 +98,11 @@ func (cs *ContractSet) FormContract(params ContractParams, txnBuilder transactio
 
 	// Create initial transaction set.
 	txn, parentTxns := txnBuilder.View()
-	txnSet := append(parentTxns, txn)
+	unconfirmedParents, err := txnBuilder.UnconfirmedParents()
+	if err != nil {
+		return modules.RenterContract{}, err
+	}
+	txnSet := append(unconfirmedParents, append(parentTxns, txn)...)
 
 	// Increase Successful/Failed interactions accordingly
 	defer func() {

@@ -196,6 +196,87 @@ height
 
 ```
 
+###### Response
+The JSON formatted block or a standard error response.
+```
+{
+    "height": 20032,
+    "id": "00000000000033b9eb57fa63a51adeea857e70f6415ebbfe5df2a01f0d0477f4",
+    "minerpayouts": [
+        {
+            "unlockhash": "c199cd180e19ef7597bcf4beecdd4f211e121d085e24432959c42bdf9030e32b9583e1c2727c",
+            "value": "279978000000000000000000000000"
+        }
+    ],
+    "nonce": [4,12,219,7,0,0,0,0],
+    "parentid": "0000000000009615e8db750eb1226aa5e629bfa7badbfe0b79607ec8b918a44c",
+    "timestamp": 1444516982,
+    "transactions": [
+	{
+	    // ...
+	}
+        {
+            "arbitrarydata": [],
+            "filecontractrevisions": [],
+            "filecontracts": [],
+            "minerfees": [],
+            "siacoininputs": [
+                {
+                    "parentid": "24cbeb9df7eb2d81d0025168fc94bd179909d834f49576e65b51feceaf957a64",
+                    "unlockconditions": {
+                        "publickeys": [
+                            {
+                                "algorithm": "ed25519",
+                                "key": "QET8w7WRbGfcnnpKd1nuQfE3DuNUUq9plyoxwQYDK4U="
+                            }
+                        ],
+                        "signaturesrequired": 1,
+                        "timelock": 0
+                    }
+                }
+            ],
+            "siacoinoutputs": [
+                {
+                    "unlockhash": "d54f500f6c1774d518538dbe87114fe6f7e6c76b5bc8373a890b12ce4b8909a336106a4cd6db",
+                    "value": "1010000000000000000000000000"
+                },
+                {
+                    "unlockhash": "48a56b19bd0be4f24190640acbd0bed9669ea9c18823da2645ec1ad9652f10b06c5d4210f971",
+                    "value": "5780000000000000000000000000"
+                }
+            ],
+            "siafundinputs": [],
+            "siafundoutputs": [],
+            "storageproofs": [],
+            "transactionsignatures": [
+                {
+                    "coveredfields": {
+                        "arbitrarydata": [],
+                        "filecontractrevisions": [],
+                        "filecontracts": [],
+                        "minerfees": [],
+                        "siacoininputs": [],
+                        "siacoinoutputs": [],
+                        "siafundinputs": [],
+                        "siafundoutputs": [],
+                        "storageproofs": [],
+                        "transactionsignatures": [],
+                        "wholetransaction": true
+                    },
+                    "parentid": "24cbeb9df7eb2d81d0025168fc94bd179909d834f49576e65b51feceaf957a64",
+                    "publickeyindex": 0,
+                    "signature": "pByLGMlvezIZWVZmHQs/ynGETETNbxcOY/kr6uivYgqZqCcKTJ0JkWhcFaKJU+3DEA7JAloLRNZe3PTklD3tCQ==",
+                    "timelock": 0
+                }
+            ]
+        },
+        {
+	    // ...
+        }
+    ]
+}
+```
+
 #### /consensus/validate/transactionset [POST]
 
 validates a set of transactions using the current utxo set.
@@ -764,20 +845,21 @@ description of the byte encoding.
 Renter
 ------
 
-| Route                                                                   | HTTP verb |
-| ----------------------------------------------------------------------- | --------- |
-| [/renter](#renter-get)                                                  | GET       |
-| [/renter](#renter-post)                                                 | POST      |
-| [/renter/contracts](#rentercontracts-get)                               | GET       |
-| [/renter/downloads](#renterdownloads-get)                               | GET       |
-| [/renter/prices](#renterprices-get)                                     | GET       |
-| [/renter/files](#renterfiles-get)                                       | GET       |
-| [/renter/delete/*___siapath___](#renterdeletesiapath-post)              | POST      |
-| [/renter/download/*___siapath___](#renterdownloadsiapath-get)           | GET       |
-| [/renter/downloadasync/*___siapath___](#renterdownloadasyncsiapath-get) | GET       |
-| [/renter/rename/*___siapath___](#renterrenamesiapath-post)              | POST      |
-| [/renter/stream/*___siapath___](#renterstreamsiapath-get)               | GET       |
-| [/renter/upload/*___siapath___](#renteruploadsiapath-post)              | POST      |
+| Route                                                                     | HTTP verb |
+| --------------------------------------------------------------------------| --------- |
+| [/renter](#renter-get)                                                    | GET       |
+| [/renter](#renter-post)                                                   | POST      |
+| [/renter/contracts](#rentercontracts-get)                                 | GET       |
+| [/renter/downloads](#renterdownloads-get)                                 | GET       |
+| [/renter/prices](#renterprices-get)                                       | GET       |
+| [/renter/files](#renterfiles-get)                                         | GET       |
+| [/renter/file/*___siapath___](#renterfile___siapath___-get)               | GET       |
+| [/renter/delete/*___siapath___](#renterdeletesiapath-post)                | POST      |
+| [/renter/download/*___siapath___](#renterdownloadsiapath-get)             | GET       |
+| [/renter/downloadasync/*___siapath___](#renterdownloadasyncsiapath-get)   | GET       |
+| [/renter/rename/*___siapath___](#renterrenamesiapath-post)                | POST      |
+| [/renter/stream/*___siapath___](#renterstreamsiapath-get)                 | GET       |
+| [/renter/upload/*___siapath___](#renteruploadsiapath-post)                | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Renter.md](/doc/api/Renter.md).
@@ -795,7 +877,10 @@ returns the current settings along with metrics on the renter's spending.
       "hosts":       24,
       "period":      6048, // blocks
       "renewwindow": 3024  // blocks
-    }
+    },
+    "maxuploadspeed":     1234, // BPS
+    "maxdownloadspeed":   1234, // BPS
+    "downloadcachesize":  4    
   },
   "financialmetrics": {
     "contractfees":     "1234", // hastings
@@ -908,11 +993,32 @@ lists the status of all files.
 }
 ```
 
+#### /renter/file/*__siapath__ [GET]
+
+lists the status of specified file.
+
+###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-4)
+```javascript
+{
+  "file": {
+    "siapath":        "foo/bar.txt",
+    "localpath":      "/home/foo/bar.txt",
+    "filesize":       8192, // bytes
+    "available":      true,
+    "renewing":       true,
+    "redundancy":     5,
+    "bytesuploaded":  209715200, // total bytes uploaded
+    "uploadprogress": 100, // percent
+    "expiration":     60000
+  }
+}
+```
+
 #### /renter/prices [GET]
 
 lists the estimated prices of performing various storage and data operations.
 
-###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-4)
+###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-5)
 ```javascript
 {
   "downloadterabyte":      "1234", // hastings

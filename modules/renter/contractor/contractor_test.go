@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -24,20 +25,20 @@ func (newStub) Synced() bool                               { return true }
 func (newStub) Unsubscribe(modules.ConsensusSetSubscriber) { return }
 
 // wallet stubs
-func (newStub) NextAddress() (uc types.UnlockConditions, err error) { return }
-func (newStub) StartTransaction() modules.TransactionBuilder        { return nil }
+func (newStub) NextAddress() (uc types.UnlockConditions, err error)          { return }
+func (newStub) StartTransaction() (tb modules.TransactionBuilder, err error) { return }
 
 // transaction pool stubs
 func (newStub) AcceptTransactionSet([]types.Transaction) error      { return nil }
 func (newStub) FeeEstimation() (a types.Currency, b types.Currency) { return }
 
 // hdb stubs
-func (newStub) AllHosts() []modules.HostDBEntry                                 { return nil }
-func (newStub) ActiveHosts() []modules.HostDBEntry                              { return nil }
-func (newStub) Host(types.SiaPublicKey) (settings modules.HostDBEntry, ok bool) { return }
-func (newStub) IncrementSuccessfulInteractions(key types.SiaPublicKey)          { return }
-func (newStub) IncrementFailedInteractions(key types.SiaPublicKey)              { return }
-func (newStub) RandomHosts(int, []types.SiaPublicKey) []modules.HostDBEntry     { return nil }
+func (newStub) AllHosts() []modules.HostDBEntry                                      { return nil }
+func (newStub) ActiveHosts() []modules.HostDBEntry                                   { return nil }
+func (newStub) Host(types.SiaPublicKey) (settings modules.HostDBEntry, ok bool)      { return }
+func (newStub) IncrementSuccessfulInteractions(key types.SiaPublicKey)               { return }
+func (newStub) IncrementFailedInteractions(key types.SiaPublicKey)                   { return }
+func (newStub) RandomHosts(int, []types.SiaPublicKey) ([]modules.HostDBEntry, error) { return nil, nil }
 func (newStub) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown {
 	return modules.HostScoreBreakdown{}
 }
@@ -132,13 +133,13 @@ func TestAllowance(t *testing.T) {
 // its methods.
 type stubHostDB struct{}
 
-func (stubHostDB) AllHosts() (hs []modules.HostDBEntry)                             { return }
-func (stubHostDB) ActiveHosts() (hs []modules.HostDBEntry)                          { return }
-func (stubHostDB) Host(types.SiaPublicKey) (h modules.HostDBEntry, ok bool)         { return }
-func (stubHostDB) IncrementSuccessfulInteractions(key types.SiaPublicKey)           { return }
-func (stubHostDB) IncrementFailedInteractions(key types.SiaPublicKey)               { return }
-func (stubHostDB) PublicKey() (spk types.SiaPublicKey)                              { return }
-func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) (hs []modules.HostDBEntry) { return }
+func (stubHostDB) AllHosts() (hs []modules.HostDBEntry)                                      { return }
+func (stubHostDB) ActiveHosts() (hs []modules.HostDBEntry)                                   { return }
+func (stubHostDB) Host(types.SiaPublicKey) (h modules.HostDBEntry, ok bool)                  { return }
+func (stubHostDB) IncrementSuccessfulInteractions(key types.SiaPublicKey)                    { return }
+func (stubHostDB) IncrementFailedInteractions(key types.SiaPublicKey)                        { return }
+func (stubHostDB) PublicKey() (spk types.SiaPublicKey)                                       { return }
+func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) (hs []modules.HostDBEntry, _ error) { return }
 func (stubHostDB) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown {
 	return modules.HostScoreBreakdown{}
 }
@@ -238,7 +239,11 @@ func TestAllowanceSpending(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = build.Retry(50, 100*time.Millisecond, func() error {
-		if len(c.hdb.RandomHosts(1, nil)) == 0 {
+		hosts, err := c.hdb.RandomHosts(1, nil)
+		if err != nil {
+			return err
+		}
+		if len(hosts) == 0 {
 			return errors.New("host has not been scanned yet")
 		}
 		return nil
@@ -306,7 +311,10 @@ func TestAllowanceSpending(t *testing.T) {
 			}
 		}
 	}
-	balance, _, _ := w.ConfirmedBalance()
+	balance, _, _, err := w.ConfirmedBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
 	spent := minerRewards.Sub(balance)
 	if spent.Cmp(testAllowance.Funds) > 0 {
 		t.Fatal("contractor spent too much money: spent", spent.HumanString(), "allowance funds:", testAllowance.Funds.HumanString())
@@ -359,14 +367,13 @@ func TestAllowanceSpending(t *testing.T) {
 		if reflect.DeepEqual(newReportedSpending, reportedSpending) {
 			return errors.New("reported spending was identical after entering a renew period")
 		}
+		if newReportedSpending.Unspent.Cmp(reportedSpending.Unspent) <= 0 {
+			return fmt.Errorf("expected newReportedSpending to have more unspent: %v :: %v", newReportedSpending, reportedSpending)
+		}
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if newReportedSpending.Unspent.Cmp(reportedSpending.Unspent) <= 0 {
-		t.Fatal("expected newReportedSpending to have more unspent")
 	}
 }
 
@@ -399,8 +406,12 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// wait for hostdb to scan host
-	for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
+	// wait for hostdb to scan
+	hosts, err := c.hdb.RandomHosts(1, nil)
+	if err != nil {
+		t.Fatal("failed to get hosts", err)
+	}
+	for i := 0; i < 100 && len(hosts) == 0; i++ {
 		time.Sleep(time.Millisecond * 50)
 	}
 
@@ -450,9 +461,7 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.mu.Lock()
-	clen := c.contracts.Len()
-	c.mu.Unlock()
+	clen := c.staticContracts.Len()
 	if clen != 1 {
 		t.Fatal("expected 1 contract, got", clen)
 	}
@@ -497,9 +506,9 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	// delete one of the contracts and set allowance with Funds*2; should
 	// trigger 1 renewal and 1 new contract
 	c.mu.Lock()
-	ids := c.contracts.IDs()
-	contract, _ := c.contracts.Acquire(ids[0])
-	c.contracts.Delete(contract)
+	ids := c.staticContracts.IDs()
+	contract, _ := c.staticContracts.Acquire(ids[0])
+	c.staticContracts.Delete(contract)
 	c.mu.Unlock()
 	a.Funds = a.Funds.Mul64(2)
 	err = c.SetAllowance(a)
@@ -529,9 +538,9 @@ func (ws *testWalletShim) NextAddress() (types.UnlockConditions, error) {
 	ws.nextAddressCalled = true
 	return types.UnlockConditions{}, nil
 }
-func (ws *testWalletShim) StartTransaction() modules.TransactionBuilder {
+func (ws *testWalletShim) StartTransaction() (modules.TransactionBuilder, error) {
 	ws.startTxnCalled = true
-	return nil
+	return nil, nil
 }
 
 // TestWalletBridge tests the walletBridge type.

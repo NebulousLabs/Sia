@@ -19,20 +19,21 @@ allocated funds.
 Index
 -----
 
-| Route                                                                   | HTTP verb |
-| ----------------------------------------------------------------------- | --------- |
-| [/renter](#renter-get)                                                  | GET       |
-| [/renter](#renter-post)                                                 | POST      |
-| [/renter/contracts](#rentercontracts-get)                               | GET       |
-| [/renter/downloads](#renterdownloads-get)                               | GET       |
-| [/renter/files](#renterfiles-get)                                       | GET       |
-| [/renter/prices](#renter-prices-get)                                    | GET       |
-| [/renter/delete/___*siapath___](#renterdelete___siapath___-post)              | POST      |
-| [/renter/download/___*siapath___](#renterdownload__siapath___-get)           | GET       |
-| [/renter/downloadasync/___*siapath___](#renterdownloadasync__siapath___-get) | GET       |
-| [/renter/rename/___*siapath___](#renterrename___siapath___-post)              | POST      |
-| [/renter/stream/___*siapath___](#renterstreamsiapath-get)                     | GET       |
-| [/renter/upload/___*siapath___](#renterupload___siapath___-post)              | POST      |
+| Route                                                                           | HTTP verb |
+| ------------------------------------------------------------------------------- | --------- |
+| [/renter](#renter-get)                                                          | GET       |
+| [/renter](#renter-post)                                                         | POST      |
+| [/renter/contracts](#rentercontracts-get)                                       | GET       |
+| [/renter/downloads](#renterdownloads-get)                                       | GET       |
+| [/renter/files](#renterfiles-get)                                               | GET       |
+| [/renter/file/*___siapath___](#renterfile___siapath___-get)                     | GET       |
+| [/renter/prices](#renter-prices-get)                                            | GET       |
+| [/renter/delete/___*siapath___](#renterdelete___siapath___-post)                | POST      |
+| [/renter/download/___*siapath___](#renterdownload__siapath___-get)              | GET       |
+| [/renter/downloadasync/___*siapath___](#renterdownloadasync__siapath___-get)    | GET       |
+| [/renter/rename/___*siapath___](#renterrename___siapath___-post)                | POST      |
+| [/renter/stream/___*siapath___](#renterstreamsiapath-get)                       | GET       |
+| [/renter/upload/___*siapath___](#renterupload___siapath___-post)                | POST      |
 
 #### /renter [GET]
 
@@ -60,7 +61,18 @@ returns the current settings along with metrics on the renter's spending.
       // contract is scheduled to end, the contract is renewed automatically.
       // Is always nonzero.
       "renewwindow": 3024 // blocks
-    }
+    }, 
+    // MaxUploadSpeed by defaul is unlimited but can be set by the user to 
+    // manage bandwidth
+    "maxuploadspeed":     1234, // bytes per second
+
+    // MaxDownloadSpeed by defaul is unlimited but can be set by the user to 
+    // manage bandwidth
+    "maxdownloadspeed":   1234, // bytes per second
+
+    // The DownloadCacheSize is the number of data chunks that will be cached during
+    // streaming
+    "downloadcachesize":  4  
   },
 
   // Metrics about how much the Renter has spent on storage, uploads, and
@@ -306,6 +318,56 @@ lists the status of all files.
       "expiration": 60000
     }   
   ]
+}
+```
+
+#### /renter/file/*___siapath___ [GET]
+
+lists the status of specified file.
+
+###### JSON Response
+```javascript
+{
+  "file": {
+    // Path to the file in the renter on the network.
+    "siapath": "foo/bar.txt",
+
+    // Path to the local file on disk.
+    "localpath": "/home/foo/bar.txt",
+
+    // Size of the file in bytes.
+    "filesize": 8192, // bytes
+
+    // true if the file is available for download. Files may be available
+    // before they are completely uploaded.
+    "available": true,
+
+    // true if the file's contracts will be automatically renewed by the
+    // renter.
+    "renewing": true,
+
+    // Average redundancy of the file on the network. Redundancy is
+    // calculated by dividing the amount of data uploaded in the file's open
+    // contracts by the size of the file. Redundancy does not necessarily
+    // correspond to availability. Specifically, a redundancy >= 1 does not
+    // indicate the file is available as there could be a chunk of the file
+    // with 0 redundancy.
+    "redundancy": 5,
+
+    // Total number of bytes successfully uploaded via current file contracts.
+    // This number includes padding and rendundancy, so a file with a size of
+    // 8192 bytes might be padded to 40 MiB and, with a redundancy of 5,
+    // encoded to 200 MiB for upload.
+    "uploadedbytes": 209715200, // bytes
+
+    // Percentage of the file uploaded, including redundancy. Uploading has
+    // completed when uploadprogress is 100. Files may be available for
+    // download before upload progress is 100.
+    "uploadprogress": 100, // percent
+
+    // Block height at which the file ceases availability.
+    "expiration": 60000
+  }   
 }
 ```
 

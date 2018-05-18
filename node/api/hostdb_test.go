@@ -262,7 +262,11 @@ func assembleHostPort(key crypto.TwofishKey, hostHostname string, testdir string
 	if err != nil {
 		return nil, err
 	}
-	if !w.Encrypted() {
+	encrypted, err := w.Encrypted()
+	if err != nil {
+		return nil, err
+	}
+	if !encrypted {
 		_, err = w.Encrypt(key)
 		if err != nil {
 			return nil, err
