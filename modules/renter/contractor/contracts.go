@@ -204,9 +204,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 // I/O.
 func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.Currency, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
 	// Disrupt the renewal if necessary
-	c.mu.RLock()
-	disrupt := c.deps.Disrupt("RenewFailing")
-	c.mu.RUnlock()
+	disrupt := c.staticDeps.Disrupt("RenewFailing")
 	if disrupt {
 		return modules.RenterContract{}, errors.New("Disrupt RenewFailing")
 	}

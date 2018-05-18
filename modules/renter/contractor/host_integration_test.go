@@ -685,7 +685,7 @@ func TestRenewFailing(t *testing.T) {
 
 	// give contractor a dependency that doesn't allow it to renew contracts.
 	c.mu.Lock()
-	c.deps = dependencyRenewFailing{}
+	c.staticDeps = dependencyRenewFailing{}
 	c.mu.Unlock()
 
 	allowance := modules.Allowance{
