@@ -191,18 +191,7 @@ func NewCustomWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, per
 
 	// make sure we commit on shutdown
 	err = w.tg.AfterStop(func() error {
-		// In case a rollback was requested we can't commit.
-		if w.dbRollback {
-			err := errors.New("database unable to sync - rollback requested")
-			return errors.Compose(err, w.dbTx.Rollback())
-		}
-		err := w.dbTx.Commit()
-		if err != nil {
-			w.log.Println("ERROR: failed to apply database update:", err)
-			w.dbTx.Rollback()
-			return err
-		}
-		return nil
+		return errors.Compose(w.syncDB(), w.db.Close())
 	})
 	if err != nil {
 		return nil, err
