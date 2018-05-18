@@ -50,7 +50,11 @@ func (cs *ConsensusSet) revertToBlock(tx *bolt.Tx, pb *processedBlock) (reverted
 	// Sanity check - make sure that pb is in the current path.
 	currentPathID, err := getPath(tx, pb.Height)
 	if err != nil || currentPathID != pb.Block.ID() {
-		build.Critical(errExternalRevert)
+		if build.DEBUG {
+			panic(errExternalRevert) // needs to be panic for TestRevertToNode
+		} else {
+			build.Critical(errExternalRevert)
+		}
 	}
 
 	// Rewind blocks until 'pb' is the current block.

@@ -257,7 +257,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 				return err
 			}
 
-			// Try adding the block to consnesus.
+			// Try adding the block to consensus.
 			changeEntry, err := cs.addBlockToTree(tx, blocks[i], parent)
 			if err == nil {
 				changes = append(changes, changeEntry)
