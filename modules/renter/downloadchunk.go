@@ -219,7 +219,12 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	recoveredData := recoverWriter.Bytes()
 
 	// Add the chunk to the cache.
-	udc.downloadChunkCache.add(recoveredData, udc.staticCacheID, udc.download.staticDestinationType)
+	if udc.download.staticDestinationType == destinationTypeSeekStream {
+		// We only cache streaming chunks since browsers and media players tend
+		// to only request a few kib at once when streaming data. That way we can
+		// prevent scheduling the same chunk for download over and over.
+		udc.downloadChunkCache.Add(udc.staticCacheID, recoveredData)
+	}
 
 	// Write the bytes to the requested output.
 	start := udc.staticFetchOffset

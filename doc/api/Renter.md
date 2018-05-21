@@ -130,10 +130,12 @@ period // block height
 // window size.
 renewwindow // block height
 
-// Max download speed permitted
+// Max download speed permitted, speed provide in bytes per second
+// setting is not persisted and will be reset by a shutdown
 maxdownloadspeed
 
-// Max upload speed permitted
+// Max upload speed permitted, speed provide in bytes per second
+// setting is not persisted and will be reset by a shutdown
 maxuploadspeed
 
 // Download cache size specifies how many data chunks will be cached while 

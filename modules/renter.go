@@ -168,9 +168,9 @@ type RenterPriceEstimation struct {
 // RenterSettings control the behavior of the Renter.
 type RenterSettings struct {
 	Allowance         Allowance `json:"allowance"`
+	DownloadCacheSize uint64    `json:"downloadcachesize"`
 	MaxUploadSpeed    int64     `json:"maxuploadspeed"`
 	MaxDownloadSpeed  int64     `json:"maxdownloadspeed"`
-	DownloadCacheSize uint64    `json:"downloadcachesize"`
 }
 
 // HostDBScans represents a sortable slice of scans.

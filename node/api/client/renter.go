@@ -8,7 +8,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node/api"
-	"github.com/NebulousLabs/errors"
 )
 
 // RenterContractsGet requests the /renter/contracts resource
@@ -101,18 +100,6 @@ func (c *Client) RenterPricesGet() (rpg api.RenterPricesGET, err error) {
 	return
 }
 
-// RenterPostDownloadCacheSize uses the /renter endpoint to change the renter's
-// downloadCacheSize for streaming
-func (c *Client) RenterPostDownloadCacheSize(cacheSize uint64) (err error) {
-	if cacheSize <= 0 {
-		return errors.New("Download Cache Size must be greater than 0")
-	}
-	values := url.Values{}
-	values.Set("downloadCacheSize", strconv.FormatUint(cacheSize, 10))
-	err = c.post("/renter", values.Encode(), nil)
-	return
-}
-
 // RenterPostRateLimit uses the /renter endpoint to change the renter's bandwidth rate
 // limit.
 func (c *Client) RenterPostRateLimit(readBPS, writeBPS int64) (err error) {
@@ -128,6 +115,15 @@ func (c *Client) RenterRenamePost(siaPathOld, siaPathNew string) (err error) {
 	siaPathOld = strings.TrimPrefix(siaPathOld, "/")
 	siaPathNew = strings.TrimPrefix(siaPathNew, "/")
 	err = c.post("/renter/rename/"+siaPathOld, "newsiapath=/"+siaPathNew, nil)
+	return
+}
+
+// RenterSetStreamCacheSizePost uses the /renter endpoint to change the renter's
+// downloadCacheSize for streaming
+func (c *Client) RenterSetStreamCacheSizePost(cacheSize uint64) (err error) {
+	values := url.Values{}
+	values.Set("downloadcachesize", strconv.FormatUint(cacheSize, 10))
+	err = c.post("/renter", values.Encode(), nil)
 	return
 }
 

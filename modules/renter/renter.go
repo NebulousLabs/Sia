@@ -307,7 +307,7 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		r.hostContractor.SetRateLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed, 4*4096)
 	}
 
-	r.setStreamingCacheSize(s.DownloadCacheSize)
+	r.SetStreamingCacheSize(s.DownloadCacheSize)
 	r.managedUpdateWorkerPool()
 	return nil
 }
@@ -446,7 +446,7 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 		mu:                 siasync.New(modules.SafeMutexDelay, 1),
 		tpool:              tpool,
 	}
-	r.downloadChunkCache.init()
+	r.downloadChunkCache.Init()
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
 	// Load all saved data.

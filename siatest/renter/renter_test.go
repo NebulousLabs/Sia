@@ -1,7 +1,6 @@
 package renter
 
 import (
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -315,18 +314,41 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 
 	// Testing setting downloadCacheSize for streaming
 	// Test setting it to larger than the defaultCacheSize
-	if err := r.RenterPostDownloadCacheSize(4); err != nil {
+	if err := r.RenterSetStreamCacheSizePost(4); err != nil {
 		t.Fatal(err, "Could not set DownloadCacheSize to 4")
+	}
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.DownloadCacheSize != 4 {
+		t.Fatal("DownloadCacheSize not set to 4, set to", rg.Settings.DownloadCacheSize)
 	}
 
 	// Test resetting to the value of defaultDownloadCacheSize (2)
-	if err := r.RenterPostDownloadCacheSize(2); err != nil {
+	if err := r.RenterSetStreamCacheSizePost(2); err != nil {
 		t.Fatal(err, "Could not set DownloadCacheSize to 2")
 	}
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.DownloadCacheSize != 2 {
+		t.Fatal("DownloadCacheSize not set to 2, set to", rg.Settings.DownloadCacheSize)
+	}
+
+	prev := rg.Settings.DownloadCacheSize
 
 	// Test setting to 0
-	if err := r.RenterPostDownloadCacheSize(0); err == nil {
-		t.Fatal(errors.New("Download Cache Set to 0, should have caused an error"))
+	if err := r.RenterSetStreamCacheSizePost(0); err != nil {
+		t.Fatal(err, "Error in calling RenterSetStreamCacheSizePost(0)")
+	}
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.DownloadCacheSize == 0 {
+		t.Fatal("DownloadCacheSize set to 0, should have stayed as previous value or", prev)
 	}
 
 	// Set fileSize and redundancy for upload

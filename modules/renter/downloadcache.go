@@ -72,24 +72,12 @@ func (cch *chunkCacheHeap) update(cd *chunkData, id string, data []byte, lastAcc
 	heap.Fix(cch, cd.index)
 }
 
-// add adds the chunk to the cache if the download is a streaming
+// Add adds the chunk to the cache if the download is a streaming
 // endpoint download.
 // TODO this won't be necessary anymore once we have partial downloads.
-func (dcc *downloadChunkCache) add(data []byte, cacheID string, destinationType string) {
-	if destinationType != destinationTypeSeekStream {
-		// We only cache streaming chunks since browsers and media players tend
-		// to only request a few kib at once when streaming data. That way we can
-		// prevent scheduling the same chunk for download over and over.
-		return
-	}
+func (dcc *downloadChunkCache) Add(cacheID string, data []byte) {
 	dcc.mu.Lock()
 	defer dcc.mu.Unlock()
-
-	// Prune cache if necessary.
-	if dcc.cacheSize == 0 {
-		build.Critical("DownloadCacheSize is set to zero")
-		return
-	}
 
 	for len(dcc.chunkCacheMap) >= int(dcc.cacheSize) {
 		// Remove from Heap
@@ -114,14 +102,21 @@ func (dcc *downloadChunkCache) add(data []byte, cacheID string, destinationType 
 }
 
 // init initializes the downloadChunkCache
-func (dcc *downloadChunkCache) init() {
+func (dcc *downloadChunkCache) Init() {
+	dcc.mu.Lock()
+	defer dcc.mu.Unlock()
+	if dcc.cacheSize > 0 {
+		build.Critical("downloadChunkCache already initialized")
+		return
+	}
+
 	dcc.chunkCacheMap = make(map[string]*chunkData)
 	dcc.chunkCacheHeap = make(chunkCacheHeap, 0, defaultDownloadCacheSize)
 	dcc.cacheSize = defaultDownloadCacheSize
 	heap.Init(&dcc.chunkCacheHeap)
 }
 
-// retrieve tries to retrieve the chunk from the renter's cache. If
+// Retrieve tries to retrieve the chunk from the renter's cache. If
 // successful it will write the data to the destination and stop the download
 // if it was the last missing chunk. The function returns true if the chunk was
 // in the cache.
@@ -130,7 +125,9 @@ func (dcc *downloadChunkCache) init() {
 //
 // TODO: in the future we might need cache invalidation. At the
 // moment this doesn't worry us since our files are static.
-func (dcc *downloadChunkCache) retrieve(udc *unfinishedDownloadChunk) bool {
+func (dcc *downloadChunkCache) Retrieve(udc *unfinishedDownloadChunk) bool {
+	// If staticFetchOffset and Length are part of the dcc then the only inputs would be
+	// download and destination
 	udc.mu.Lock()
 	defer udc.mu.Unlock()
 	dcc.mu.Lock()
@@ -156,6 +153,8 @@ func (dcc *downloadChunkCache) retrieve(udc *unfinishedDownloadChunk) bool {
 
 	// Check if the download is complete now.
 	udc.download.mu.Lock()
+	defer udc.download.mu.Unlock()
+
 	udc.download.chunksRemaining--
 	if udc.download.chunksRemaining == 0 {
 		udc.download.endTime = time.Now()
@@ -163,11 +162,16 @@ func (dcc *downloadChunkCache) retrieve(udc *unfinishedDownloadChunk) bool {
 		udc.download.destination.Close()
 		udc.download.destination = nil
 	}
-	udc.download.mu.Unlock()
 	return true
 }
 
-// s
-func (r *Renter) setStreamingCacheSize(cacheSize uint64) {
-	r.downloadChunkCache.cacheSize = cacheSize
+// SetStreamingCacheSize confirms that the cache size is being set
+// to a value greater than zero.  Otherwise it will remain the default
+// value set during the initialization of the downloadChunkCache
+func (r *Renter) SetStreamingCacheSize(cacheSize uint64) {
+	r.downloadChunkCache.mu.Lock()
+	defer r.downloadChunkCache.mu.Unlock()
+	if cacheSize > 0 {
+		r.downloadChunkCache.cacheSize = cacheSize
+	}
 }

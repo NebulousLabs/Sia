@@ -908,8 +908,8 @@ funds // hastings
 hosts
 period      // block height
 renewwindow // block height
-maxdownloadspeed
-maxuploadspeed
+maxdownloadspeed  // bytes per second, not persisted and will be reset by a shutdown
+maxuploadspeed  // bytes per second, not persisted and will be reset by a shutdown
 downloadcachesize // Greater than zero
 ```
 
