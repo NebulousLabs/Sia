@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -362,7 +363,7 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 
-	rg, err := r.RenterGet()
+	rg, err = r.RenterGet()
 	if err != nil {
 		t.Fatal(err, "Could not request RenterGe()")
 	}
