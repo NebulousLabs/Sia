@@ -191,7 +191,7 @@ func NewCustomWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, per
 
 	// make sure we commit on shutdown
 	err = w.tg.AfterStop(func() error {
-		return errors.Compose(w.syncDB(), w.db.Close())
+		return w.syncDB()
 	})
 	if err != nil {
 		return nil, err
