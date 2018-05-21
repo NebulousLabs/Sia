@@ -117,10 +117,7 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 		return
 	}
 
-	height, err := dbGetConsensusHeight(w.dbTx)
-	if err != nil {
-		return
-	} else if startHeight > height || startHeight > endHeight {
+	if startHeight > w.height || startHeight > endHeight {
 		return nil, errOutOfBounds
 	}
 

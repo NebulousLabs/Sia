@@ -25,15 +25,10 @@ func (w *Wallet) managedCreateDefragTransaction() ([]types.Transaction, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	consensusHeight, err := dbGetConsensusHeight(w.dbTx)
-	if err != nil {
-		return nil, err
-	}
-
 	// Collect a value-sorted set of siacoin outputs.
 	var so sortedOutputs
 	err = dbForEachSiacoinOutput(w.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		if w.checkOutput(w.dbTx, consensusHeight, scoid, sco, dustThreshold) == nil {
+		if w.checkOutput(w.dbTx, w.height, scoid, sco, dustThreshold) == nil {
 			so.ids = append(so.ids, scoid)
 			so.outputs = append(so.outputs, sco)
 		}
@@ -112,13 +107,13 @@ func (w *Wallet) managedCreateDefragTransaction() ([]types.Transaction, error) {
 
 	// Mark all outputs that were spent as spent.
 	for _, scoid := range spentScoids {
-		if err = dbPutSpentOutput(w.dbTx, types.OutputID(scoid), consensusHeight); err != nil {
+		if err = dbPutSpentOutput(w.dbTx, types.OutputID(scoid), w.height); err != nil {
 			return nil, err
 		}
 	}
 	// Mark the parent output as spent. Must be done after the transaction is
 	// finished because otherwise the txid and output id will change.
-	if err = dbPutSpentOutput(w.dbTx, types.OutputID(parentTxn.SiacoinOutputID(0)), consensusHeight); err != nil {
+	if err = dbPutSpentOutput(w.dbTx, types.OutputID(parentTxn.SiacoinOutputID(0)), w.height); err != nil {
 		return nil, err
 	}
 

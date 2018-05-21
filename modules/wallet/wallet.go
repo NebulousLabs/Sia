@@ -13,7 +13,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
@@ -96,6 +95,9 @@ type Wallet struct {
 	dbRollback bool
 	dbTx       *bolt.Tx
 
+	// height is the synced height of the wallet.
+	height types.BlockHeight
+
 	persistDir string
 	log        *persist.Logger
 	mu         sync.RWMutex
@@ -122,15 +124,7 @@ func (w *Wallet) Height() (types.BlockHeight, error) {
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
-
-	var height uint64
-	err := w.db.View(func(tx *bolt.Tx) error {
-		return encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyConsensusHeight), &height)
-	})
-	if err != nil {
-		return types.BlockHeight(0), err
-	}
-	return types.BlockHeight(height), nil
+	return w.height, nil
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -174,6 +168,12 @@ func NewCustomWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, per
 	w.dbTx, err = w.db.Begin(true)
 	if err != nil {
 		w.log.Critical("ERROR: failed to start database update:", err)
+	}
+
+	// Init consensus height.
+	w.height, err = dbGetConsensusHeight(w.dbTx)
+	if err != nil {
+		return nil, err
 	}
 
 	// COMPATv131 we need to create the bucketProcessedTxnIndex if it doesn't exist
