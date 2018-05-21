@@ -3,7 +3,6 @@ package renter
 import (
 	"container/heap"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 )
@@ -67,53 +66,56 @@ func TestHeapImplementation(t *testing.T) {
 	}
 }
 
-// TestStreamCache tests that the oldest chunk is removed
+// TestStreamCache tests that when Add() is called, chunks are added and removed
+// from both the Heap and the Map
+// Retrieve() is tested through the Streaming tests in the siatest pacakges
+// SetStreamingCacheSize() is tested through the API endpoint tests in the
+// siatest packages
 func TestStreamCache(t *testing.T) {
 	// Initializing minimum required variables
-	udc := &unfinishedDownloadChunk{
-		mu:                 new(sync.Mutex),
-		downloadChunkCache: new(downloadChunkCache),
-	}
-	udc.downloadChunkCache.Init()
-
-	// call Add
-	// 		length of downloadChunkCache Heap should never exceed cacheSize (DONE)
-	//		when Heap is full, top element should be removed to add a new element (IN PROGRESS)
-	//		Top element should be least recently accessed
+	dcc := new(downloadChunkCache)
+	dcc.Init()
 
 	// Fill Cache
-	// Purposefully trying to fill to a value large to cacheSize to confirm Add
+	// Purposefully trying to fill to a value larger than cacheSize to confirm Add
 	// keeps pruning cache
-	for i := 0; i < int(udc.downloadChunkCache.cacheSize)+5; i++ {
-		udc.downloadChunkCache.Add(strconv.Itoa(i), []byte{})
+	for i := 0; i < int(dcc.cacheSize)+5; i++ {
+		dcc.Add(strconv.Itoa(i), []byte{})
 		time.Sleep(1 * time.Second)
 	}
 	// Confirm that the chunkCacheHeap didn't exceed the cacheSize
-	if len(udc.downloadChunkCache.chunkCacheHeap) > int(udc.downloadChunkCache.cacheSize) {
+	if len(dcc.chunkCacheHeap) > int(dcc.cacheSize) {
 		t.Error("Heap is larger than set cacheSize")
 	}
 
-	// Making the least recently accessed element the most recently accessed element
-	cd := udc.downloadChunkCache.chunkCacheHeap[0]
-	// udc.downloadChunkCache.chunkCacheHeap.update(cd, cd.id, cd.data, time.Now())
+	// Add new chunk with known staticCacheID
+	dcc.Add("chunk1", []byte{}) // "chunk1" should be at the bottom of the Heap
 
-	udc.downloadChunkCache.Add("New", []byte{})
-	if udc.downloadChunkCache.chunkCacheHeap[0] == cd {
-		t.Error("Least recently accessed element still at the top of the heap")
+	// Confirm chunk is in the Map and at the bottom of the Heap
+	cd, ok := dcc.chunkCacheMap["chunk1"]
+	if !ok {
+		t.Error("The chunk1 was not added to the Map")
+	}
+	if cd != dcc.chunkCacheHeap[len(dcc.chunkCacheHeap)-1] {
+		t.Error("The chunk1 is not at the bottom of the Heap")
+	}
+
+	// Make chunk1 least recently accessed element, so it is at the top
+	dcc.chunkCacheHeap.update(cd, cd.id, cd.data, time.Now().Add(-1*time.Hour))
+
+	// Confirm chunk1 is at the top of the heap
+	if dcc.chunkCacheHeap[0] != cd {
+		t.Error("Chunk1 is not at the top of the heap")
 	}
 
 	// Add additional chunk to force deletion of a chunk
-	staticCacheID = strconv.FormatUint(udc.downloadChunkCache.cacheSize, 10)
-	udc.downloadChunkCache.Add(staticCacheID, []byte{})
+	dcc.Add("chunk2", []byte{})
 
 	// check if the chunk was removed from Map
-	if _, ok := udc.downloadChunkCache.chunkCacheMap[cd.id]; ok {
-		t.Error("The least recently accessed chunk wasn't pruned from the cache")
+	if _, ok := dcc.chunkCacheMap["chunk1"]; ok {
+		t.Error("chunk1 wasn't removed from the map")
 	}
-	// test Retrieve
-	// 		should updated the element making it the most recently accessed
-	//		element should be at the bottom of the Heap
-	udc.downloadChunkCache.Retrieve(udc)
-
-	// don't need to test setStreaming cacheSize, that is tested through the API endpoint testing in siaTest
+	if dcc.chunkCacheHeap[0] == cd {
+		t.Error("chunk1 wasn't removed from the heap")
+	}
 }

@@ -126,8 +126,6 @@ func (dcc *downloadChunkCache) Init() {
 // TODO: in the future we might need cache invalidation. At the
 // moment this doesn't worry us since our files are static.
 func (dcc *downloadChunkCache) Retrieve(udc *unfinishedDownloadChunk) bool {
-	// If staticFetchOffset and Length are part of the dcc then the only inputs would be
-	// download and destination
 	udc.mu.Lock()
 	defer udc.mu.Unlock()
 	dcc.mu.Lock()
