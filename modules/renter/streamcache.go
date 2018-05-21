@@ -12,8 +12,8 @@ import (
 	"github.com/NebulousLabs/errors"
 )
 
-// chunkCacheHeap is a priority queue and implements heap.Interface and holds chunkData
-type chunkCacheHeap []*chunkData
+// streamHeap is a priority queue and implements heap.Interface and holds chunkData
+type streamHeap []*chunkData
 
 // chunkData contatins the data and the timestamp for the unfinished
 // download chunks
@@ -24,70 +24,70 @@ type chunkData struct {
 	index      int
 }
 
-// downloadChunkCache contains a chunkCacheMap for quick look up and a chunkCacheHeap for
+// streamCache contains a streamMap for quick look up and a streamHeap for
 // quick removal of old chunks
-type downloadChunkCache struct {
-	chunkCacheMap  map[string]*chunkData
-	chunkCacheHeap chunkCacheHeap
-	cacheSize      uint64
-	mu             sync.Mutex
+type streamCache struct {
+	streamMap  map[string]*chunkData
+	streamHeap streamHeap
+	cacheSize  uint64
+	mu         sync.Mutex
 }
 
-// Required functions for use of heap for chunkCacheHeap
-func (cch chunkCacheHeap) Len() int { return len(cch) }
+// Required functions for use of heap for streamHeap
+func (sh streamHeap) Len() int { return len(sh) }
 
 // Less returns the lessor of two elements
-func (cch chunkCacheHeap) Less(i, j int) bool { return cch[i].lastAccess.Before(cch[j].lastAccess) }
+func (sh streamHeap) Less(i, j int) bool { return sh[i].lastAccess.Before(sh[j].lastAccess) }
 
 // Swap swaps two elements from the heap
-func (cch chunkCacheHeap) Swap(i, j int) {
-	cch[i], cch[j] = cch[j], cch[i]
-	cch[i].index = i
-	cch[j].index = j
+func (sh streamHeap) Swap(i, j int) {
+	sh[i], sh[j] = sh[j], sh[i]
+	sh[i].index = i
+	sh[j].index = j
 }
 
 // Push adds an element to the heap
-func (cch *chunkCacheHeap) Push(x interface{}) {
-	n := len(*cch)
+func (sh *streamHeap) Push(x interface{}) {
+	n := len(*sh)
 	chunkData := x.(*chunkData)
 	chunkData.index = n
-	*cch = append(*cch, chunkData)
+	*sh = append(*sh, chunkData)
 }
 
 // Pop removes element from the heap
-func (cch *chunkCacheHeap) Pop() interface{} {
-	old := *cch
+func (sh *streamHeap) Pop() interface{} {
+	old := *sh
 	n := len(old)
 	chunkData := old[n-1]
 	chunkData.index = -1 // for safety
-	*cch = old[0 : n-1]
+	*sh = old[0 : n-1]
 	return chunkData
 }
 
 // update updates the heap and reorders
-func (cch *chunkCacheHeap) update(cd *chunkData, id string, data []byte, lastAccess time.Time) {
+func (sh *streamHeap) update(cd *chunkData, id string, data []byte, lastAccess time.Time) {
 	cd.id = id
 	cd.data = data
 	cd.lastAccess = lastAccess
-	heap.Fix(cch, cd.index)
+	heap.Fix(sh, cd.index)
 }
 
 // Add adds the chunk to the cache if the download is a streaming
 // endpoint download.
 // TODO this won't be necessary anymore once we have partial downloads.
-func (dcc *downloadChunkCache) Add(cacheID string, data []byte) {
-	dcc.mu.Lock()
-	defer dcc.mu.Unlock()
+func (sc *streamCache) Add(cacheID string, data []byte) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
 
-	for len(dcc.chunkCacheMap) >= int(dcc.cacheSize) {
+	for len(sc.streamMap) >= int(sc.cacheSize) {
 		// Remove from Heap
-		cd := heap.Pop(&dcc.chunkCacheHeap).(*chunkData)
+		cd := heap.Pop(&sc.streamHeap).(*chunkData)
 
 		// Remove from Map
-		if _, ok := dcc.chunkCacheMap[cd.id]; !ok {
-			build.Critical("Cache Data chunk not found in chunkCacheMap.")
+		if _, ok := sc.streamMap[cd.id]; !ok {
+			build.Critical("Cache Data chunk not found in streamMap.")
 		}
-		delete(dcc.chunkCacheMap, cd.id)
+		delete(sc.streamMap, cd.id)
 	}
 
 	// Add chunk to Map and Heap
@@ -96,24 +96,24 @@ func (dcc *downloadChunkCache) Add(cacheID string, data []byte) {
 		data:       data,
 		lastAccess: time.Now(),
 	}
-	dcc.chunkCacheMap[cacheID] = cd
-	heap.Push(&dcc.chunkCacheHeap, cd)
-	dcc.chunkCacheHeap.update(cd, cd.id, cd.data, cd.lastAccess)
+	sc.streamMap[cacheID] = cd
+	heap.Push(&sc.streamHeap, cd)
+	sc.streamHeap.update(cd, cd.id, cd.data, cd.lastAccess)
 }
 
-// init initializes the downloadChunkCache
-func (dcc *downloadChunkCache) Init() {
-	dcc.mu.Lock()
-	defer dcc.mu.Unlock()
-	if dcc.cacheSize > 0 {
-		build.Critical("downloadChunkCache already initialized")
+// init initializes the streamCache
+func (sc *streamCache) Init() {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	if sc.cacheSize > 0 {
+		build.Critical("streamCache already initialized")
 		return
 	}
 
-	dcc.chunkCacheMap = make(map[string]*chunkData)
-	dcc.chunkCacheHeap = make(chunkCacheHeap, 0, defaultDownloadCacheSize)
-	dcc.cacheSize = defaultDownloadCacheSize
-	heap.Init(&dcc.chunkCacheHeap)
+	sc.streamMap = make(map[string]*chunkData)
+	sc.streamHeap = make(streamHeap, 0, defaultDownloadCacheSize)
+	sc.cacheSize = defaultDownloadCacheSize
+	heap.Init(&sc.streamHeap)
 }
 
 // Retrieve tries to retrieve the chunk from the renter's cache. If
@@ -125,21 +125,21 @@ func (dcc *downloadChunkCache) Init() {
 //
 // TODO: in the future we might need cache invalidation. At the
 // moment this doesn't worry us since our files are static.
-func (dcc *downloadChunkCache) Retrieve(udc *unfinishedDownloadChunk) bool {
+func (sc *streamCache) Retrieve(udc *unfinishedDownloadChunk) bool {
 	udc.mu.Lock()
 	defer udc.mu.Unlock()
-	dcc.mu.Lock()
-	defer dcc.mu.Unlock()
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
 
-	cd, cached := dcc.chunkCacheMap[udc.staticCacheID]
+	cd, cached := sc.streamMap[udc.staticCacheID]
 	if !cached {
 		return false
 	}
 
 	// chunk exists, updating lastAccess and reinserting into map, updating heap
 	cd.lastAccess = time.Now()
-	dcc.chunkCacheMap[udc.staticCacheID] = cd
-	dcc.chunkCacheHeap.update(cd, cd.id, cd.data, cd.lastAccess)
+	sc.streamMap[udc.staticCacheID] = cd
+	sc.streamHeap.update(cd, cd.id, cd.data, cd.lastAccess)
 
 	start := udc.staticFetchOffset
 	end := start + udc.staticFetchLength
@@ -165,11 +165,11 @@ func (dcc *downloadChunkCache) Retrieve(udc *unfinishedDownloadChunk) bool {
 
 // SetStreamingCacheSize confirms that the cache size is being set
 // to a value greater than zero.  Otherwise it will remain the default
-// value set during the initialization of the downloadChunkCache
+// value set during the initialization of the streamCache
 func (r *Renter) SetStreamingCacheSize(cacheSize uint64) {
-	r.downloadChunkCache.mu.Lock()
-	defer r.downloadChunkCache.mu.Unlock()
+	r.streamCache.mu.Lock()
+	defer r.streamCache.mu.Unlock()
 	if cacheSize > 0 {
-		r.downloadChunkCache.cacheSize = cacheSize
+		r.streamCache.cacheSize = cacheSize
 	}
 }

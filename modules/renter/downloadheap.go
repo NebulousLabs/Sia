@@ -196,7 +196,7 @@ LOOP:
 			}
 
 			// Check if we got the chunk cached already.
-			if r.downloadChunkCache.Retrieve(nextChunk) {
+			if r.streamCache.Retrieve(nextChunk) {
 				continue
 			}
 

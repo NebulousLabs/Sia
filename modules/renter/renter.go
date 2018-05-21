@@ -193,18 +193,18 @@ type Renter struct {
 	lastEstimation modules.RenterPriceEstimation
 
 	// Utilities.
-	downloadChunkCache *downloadChunkCache
-	cmu                *sync.Mutex
-	cs                 modules.ConsensusSet
-	deps               modules.Dependencies
-	g                  modules.Gateway
-	hostContractor     hostContractor
-	hostDB             hostDB
-	log                *persist.Logger
-	persistDir         string
-	mu                 *siasync.RWMutex
-	tg                 threadgroup.ThreadGroup
-	tpool              modules.TransactionPool
+	streamCache    *streamCache
+	cmu            *sync.Mutex
+	cs             modules.ConsensusSet
+	deps           modules.Dependencies
+	g              modules.Gateway
+	hostContractor hostContractor
+	hostDB         hostDB
+	log            *persist.Logger
+	persistDir     string
+	mu             *siasync.RWMutex
+	tg             threadgroup.ThreadGroup
+	tpool          modules.TransactionPool
 }
 
 // Close closes the Renter and its dependencies
@@ -351,7 +351,7 @@ func (r *Renter) Settings() modules.RenterSettings {
 	download, upload, _ := r.hostContractor.RateLimits()
 	return modules.RenterSettings{
 		Allowance:         r.hostContractor.Allowance(),
-		DownloadCacheSize: r.downloadChunkCache.cacheSize,
+		DownloadCacheSize: r.streamCache.cacheSize,
 		MaxDownloadSpeed:  download,
 		MaxUploadSpeed:    upload,
 	}
@@ -435,18 +435,18 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
-		downloadChunkCache: new(downloadChunkCache),
-		cmu:                new(sync.Mutex),
-		cs:                 cs,
-		deps:               deps,
-		g:                  g,
-		hostDB:             hdb,
-		hostContractor:     hc,
-		persistDir:         persistDir,
-		mu:                 siasync.New(modules.SafeMutexDelay, 1),
-		tpool:              tpool,
+		streamCache:    new(streamCache),
+		cmu:            new(sync.Mutex),
+		cs:             cs,
+		deps:           deps,
+		g:              g,
+		hostDB:         hdb,
+		hostContractor: hc,
+		persistDir:     persistDir,
+		mu:             siasync.New(modules.SafeMutexDelay, 1),
+		tpool:          tpool,
 	}
-	r.downloadChunkCache.Init()
+	r.streamCache.Init()
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
 	// Load all saved data.
