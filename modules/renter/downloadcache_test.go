@@ -10,29 +10,29 @@ import (
 // TestHeapImplementation tests that the downloadChunkCache heap functions properly
 func TestHeapImplementation(t *testing.T) {
 	// Initializing minimum variables
-	downloadChunkCache := new(downloadChunkCache)
-	downloadChunkCache.Init()
+	dcc := new(downloadChunkCache)
+	dcc.Init()
 
 	// Testing Push to Heap
-	old := len(downloadChunkCache.chunkCacheHeap)
-	heap.Push(&downloadChunkCache.chunkCacheHeap, &chunkData{
+	length := len(dcc.chunkCacheHeap)
+	heap.Push(&dcc.chunkCacheHeap, &chunkData{
 		id:         "Push",
 		data:       []byte{},
 		lastAccess: time.Now(),
 	})
 
 	// Confirming the length of the heap increased by 1
-	if len(downloadChunkCache.chunkCacheHeap) != old+1 {
-		t.Error("Length of heap did not change, chunkData was not pushed onto Heap. Length of heap is still ", len(downloadChunkCache.chunkCacheHeap))
+	if len(dcc.chunkCacheHeap) != length+1 {
+		t.Error("Length of heap did not change, chunkData was not pushed onto Heap. Length of heap is still ", len(dcc.chunkCacheHeap))
 	}
 	// Confirming the chunk added was the one expected
-	if downloadChunkCache.chunkCacheHeap[0].id != "Push" {
-		t.Error("Chunk on top of heap is not the chunk that was just pushed on, chunkData.id =", downloadChunkCache.chunkCacheHeap[0].id)
+	if dcc.chunkCacheHeap[0].id != "Push" {
+		t.Error("Chunk on top of heap is not the chunk that was just pushed on, chunkData.id =", dcc.chunkCacheHeap[0].id)
 	}
 
 	// Add more chunks to heap
 	for i := 0; i < 3; i++ {
-		heap.Push(&downloadChunkCache.chunkCacheHeap, &chunkData{
+		heap.Push(&dcc.chunkCacheHeap, &chunkData{
 			id:         strconv.Itoa(i),
 			data:       []byte{},
 			lastAccess: time.Now(),
@@ -42,33 +42,33 @@ func TestHeapImplementation(t *testing.T) {
 
 	// Testing Heap update
 	// Confirming recently accessed elements get moved to the bottom of Heap
-	cd := downloadChunkCache.chunkCacheHeap[0]
-	downloadChunkCache.chunkCacheHeap.update(cd, cd.id, cd.data, time.Now())
-	if downloadChunkCache.chunkCacheHeap[len(downloadChunkCache.chunkCacheHeap)-1] != cd {
+	cd := dcc.chunkCacheHeap[0]
+	dcc.chunkCacheHeap.update(cd, cd.id, cd.data, time.Now())
+	if dcc.chunkCacheHeap[len(dcc.chunkCacheHeap)-1] != cd {
 		t.Error("Heap order was not updated. Recently accessed element not at bottom of heap")
 	}
 	// Confirming least recently accessed element is moved to the top of Heap
-	cd = downloadChunkCache.chunkCacheHeap[len(downloadChunkCache.chunkCacheHeap)-1]
-	downloadChunkCache.chunkCacheHeap.update(cd, cd.id, cd.data, time.Now().Add(-1*time.Hour))
-	if downloadChunkCache.chunkCacheHeap[0] != cd {
+	cd = dcc.chunkCacheHeap[len(dcc.chunkCacheHeap)-1]
+	dcc.chunkCacheHeap.update(cd, cd.id, cd.data, time.Now().Add(-1*time.Hour))
+	if dcc.chunkCacheHeap[0] != cd {
 		t.Error("Heap order was not updated. Least recently accessed element is not at top of heap")
 	}
 
 	// Testing Pop of Heap
 	// Confirming element at the top of heap is removed
-	cd = downloadChunkCache.chunkCacheHeap[0]
-	length := len(downloadChunkCache.chunkCacheHeap)
-	if pop := heap.Pop(&downloadChunkCache.chunkCacheHeap).(*chunkData); pop != cd {
+	cd = dcc.chunkCacheHeap[0]
+	length = len(dcc.chunkCacheHeap)
+	if pop := heap.Pop(&dcc.chunkCacheHeap).(*chunkData); pop != cd {
 		t.Error("Element at the top of the Heap was not popped off")
 	}
-	if len(downloadChunkCache.chunkCacheHeap) != length-1 {
+	if len(dcc.chunkCacheHeap) != length-1 {
 		t.Error("Heap length was not reduced by 1")
 	}
 }
 
 // TestStreamCache tests that when Add() is called, chunks are added and removed
 // from both the Heap and the Map
-// Retrieve() is tested through the Streaming tests in the siatest pacakges
+// Retrieve() is tested through the Streaming tests in the siatest packages
 // SetStreamingCacheSize() is tested through the API endpoint tests in the
 // siatest packages
 func TestStreamCache(t *testing.T) {
@@ -77,7 +77,7 @@ func TestStreamCache(t *testing.T) {
 	dcc.Init()
 
 	// Fill Cache
-	// Purposefully trying to fill to a value larger than cacheSize to confirm Add
+	// Purposefully trying to fill to a value larger than cacheSize to confirm Add()
 	// keeps pruning cache
 	for i := 0; i < int(dcc.cacheSize)+5; i++ {
 		dcc.Add(strconv.Itoa(i), []byte{})
@@ -111,7 +111,7 @@ func TestStreamCache(t *testing.T) {
 	// Add additional chunk to force deletion of a chunk
 	dcc.Add("chunk2", []byte{})
 
-	// check if the chunk was removed from Map
+	// check if chunk1 was removed from Map
 	if _, ok := dcc.chunkCacheMap["chunk1"]; ok {
 		t.Error("chunk1 wasn't removed from the map")
 	}
