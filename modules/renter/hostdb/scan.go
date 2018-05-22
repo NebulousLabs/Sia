@@ -314,6 +314,11 @@ func (hdb *HostDB) managedScanHost(entry modules.HostDBEntry) {
 	}
 	success := err == nil
 
+	// The scan result is not reliable if we went offline during the scan.
+	if !hdb.gateway.Online() {
+		return
+	}
+
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 	// Update the host tree to have a new entry, including the new error. Then
