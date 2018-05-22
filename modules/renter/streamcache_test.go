@@ -72,6 +72,9 @@ func TestHeapImplementation(t *testing.T) {
 // SetStreamingCacheSize() is tested through the API endpoint tests in the
 // siatest packages
 func TestStreamCache(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Initializing minimum required variables
 	sc := new(streamCache)
 	sc.Init()
@@ -81,7 +84,6 @@ func TestStreamCache(t *testing.T) {
 	// keeps pruning cache
 	for i := 0; i < int(sc.cacheSize)+5; i++ {
 		sc.Add(strconv.Itoa(i), []byte{})
-		time.Sleep(1 * time.Second)
 	}
 	// Confirm that the streamHeap didn't exceed the cacheSize
 	if len(sc.streamHeap) > int(sc.cacheSize) {
