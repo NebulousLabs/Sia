@@ -256,6 +256,7 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 			// break out of the loop while still holding to lock to avoid
 			// updating subscribers before the new module is appended to the
 			// list of subscribers.
+			defer cs.mu.Unlock()
 			break
 		}
 		cs.mu.Unlock()
@@ -276,7 +277,6 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 		}
 	}
 	cs.subscribers = append(cs.subscribers, subscriber)
-	cs.mu.Unlock()
 	return nil
 }
 
