@@ -95,15 +95,10 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 	return cc, nil
 }
 
-// managedUpdateSubscribers will inform all subscribers of a new update to the
+// updateSubscribers will inform all subscribers of a new update to the
 // consensus set. updateSubscribers does not alter the changelog, the changelog
 // must be updated beforehand.
-func (cs *ConsensusSet) managedUpdateSubscribers(ce changeEntry) {
-	cs.subscribeLock.Lock()
-	defer cs.subscribeLock.Unlock()
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-
+func (cs *ConsensusSet) updateSubscribers(ce changeEntry) {
 	if len(cs.subscribers) == 0 {
 		return
 	}
@@ -133,7 +128,7 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 	cancel <-chan struct{}) (modules.ConsensusChangeID, error) {
 
 	if start == modules.ConsensusChangeRecent {
-		return modules.ConsensusChangeID{}, nil
+		return start, nil
 	}
 
 	// 'exists' and 'entry' are going to be pointed to the first entry that
@@ -208,6 +203,17 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 	return latestChangeID, nil
 }
 
+// recentConsensusChangeID gets the ConsensusChangeID of the most recent
+// change.
+func (cs *ConsensusSet) recentConsensusChangeID() (cid modules.ConsensusChangeID, err error) {
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		cl := tx.Bucket(ChangeLog)
+		copy(cid[:], cl.Get(ChangeLogTailID))
+		return nil
+	})
+	return
+}
+
 // ConsensusSetSubscribe adds a subscriber to the list of subscribers, and
 // gives them every consensus change that has occurred since the change with
 // the provided id.
@@ -223,30 +229,35 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 	}
 	defer cs.tg.Done()
 
-	// Get the input module caught up to the current consensus set without
-	// holding the subscribeLock to make sure we don't block the consensus
-	// module.
-	start, err = cs.managedInitializeSubscribe(subscriber, start, cancel)
-	if err != nil {
-		return err
-	}
-
-	// Get the subscribeLock before updating the subscribers.
-	cs.subscribeLock.Lock()
-	defer cs.subscribeLock.Unlock()
-
-	// Call managedInitializeSubscribe again while holding the subscribeLock.
-	// There is a chance that the other subscribers have been updated since we
-	// called managedInitializeSubscribe. This time there should only be 1 or 2
-	// changes missing from the subscribing module so blocking shouldn't be an
-	// issue.
-	_, err = cs.managedInitializeSubscribe(subscriber, start, cancel)
-	if err != nil {
-		return err
+	// Call managedInitializeSubscribe until the new module is up-to-date.
+	cs.mu.Lock()
+	for {
+		// Check if the start equals the most recent change id. If it does we
+		// are done.
+		recentID, err := cs.recentConsensusChangeID()
+		if err != nil {
+			cs.mu.Unlock()
+			return err
+		}
+		if start == recentID {
+			break
+		}
+		// If it doesn't, we need to call managedInitializeSubscribe again.
+		cs.mu.Unlock()
+		start, err = cs.managedInitializeSubscribe(subscriber, start, cancel)
+		if err != nil {
+			return err
+		}
+		// Check for shutdown.
+		select {
+		case <-cs.tg.StopChan():
+			return siasync.ErrStopped
+		default:
+		}
+		cs.mu.Lock()
 	}
 
 	// Add the module to the list of subscribers.
-	cs.mu.Lock()
 	// Sanity check - subscriber should not be already subscribed.
 	for _, s := range cs.subscribers {
 		if s == subscriber {

@@ -8,7 +8,6 @@ package consensus
 
 import (
 	"errors"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -56,13 +55,6 @@ type ConsensusSet struct {
 	// unlikely to grow beyond 1kb, and cannot by manipulated by an attacker as
 	// the function of adding a subscriber should not be exposed.
 	subscribers []modules.ConsensusSetSubscriber
-
-	// subscribeLock is a mutex that is held whenever a a new subscriber is
-	// added or when existing subscribers are updated. This guarantees that a
-	// newly added subscriber doesn't miss out of updates after receiving all
-	// the updates but before being added as a subscriber.
-	// The subscribeLock needs to be locked before consensusSet.mu.
-	subscribeLock sync.Mutex
 
 	// dosBlocks are blocks that are invalid, but the invalidity is only
 	// discoverable during an expensive step of validation. These blocks are
