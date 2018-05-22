@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
@@ -128,7 +130,9 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 	cancel <-chan struct{}) (modules.ConsensusChangeID, error) {
 
 	if start == modules.ConsensusChangeRecent {
-		return start, nil
+		cs.mu.Lock()
+		defer cs.mu.Unlock()
+		return cs.recentConsensusChangeID()
 	}
 
 	// 'exists' and 'entry' are going to be pointed to the first entry that
@@ -208,7 +212,11 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 func (cs *ConsensusSet) recentConsensusChangeID() (cid modules.ConsensusChangeID, err error) {
 	err = cs.db.View(func(tx *bolt.Tx) error {
 		cl := tx.Bucket(ChangeLog)
-		copy(cid[:], cl.Get(ChangeLogTailID))
+		d := cl.Get(ChangeLogTailID)
+		if d == nil {
+			return errors.New("failed to retrieve recentConsensusChangeID")
+		}
+		copy(cid[:], d[:])
 		return nil
 	})
 	return
