@@ -307,9 +307,11 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 		return false, modules.ErrNonExtendingBlock
 	}
 	// Send any changes to subscribers.
+	cs.mu.Unlock()
 	for i := 0; i < len(changes); i++ {
-		cs.updateSubscribers(changes[i])
+		cs.managedUpdateSubscribers(changes[i])
 	}
+	cs.mu.Lock()
 	return chainExtended, nil
 }
 

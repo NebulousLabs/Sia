@@ -8,11 +8,12 @@ package consensus
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/sync"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/demotemutex"
@@ -56,6 +57,13 @@ type ConsensusSet struct {
 	// the function of adding a subscriber should not be exposed.
 	subscribers []modules.ConsensusSetSubscriber
 
+	// subscribeLock is a mutex that is held whenever a a new subscriber is
+	// added or when existing subscribers are updated. This guarantees that a
+	// newly added subscriber doesn't miss out of updates after receiving all
+	// the updates but before being added as a subscriber.
+	// The subscribeLock needs to be locked before consensusSet.mu.
+	subscribeLock sync.Mutex
+
 	// dosBlocks are blocks that are invalid, but the invalidity is only
 	// discoverable during an expensive step of validation. These blocks are
 	// recorded to eliminate a DoS vector where an expensive-to-validate block
@@ -91,7 +99,7 @@ type ConsensusSet struct {
 	log        *persist.Logger
 	mu         demotemutex.DemoteMutex
 	persistDir string
-	tg         sync.ThreadGroup
+	tg         siasync.ThreadGroup
 }
 
 // New returns a new ConsensusSet, containing at least the genesis block. If
