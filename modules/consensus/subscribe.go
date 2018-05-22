@@ -230,31 +230,34 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 	defer cs.tg.Done()
 
 	// Call managedInitializeSubscribe until the new module is up-to-date.
-	cs.mu.Lock()
 	for {
+		start, err = cs.managedInitializeSubscribe(subscriber, start, cancel)
+		if err != nil {
+			return err
+		}
 		// Check if the start equals the most recent change id. If it does we
-		// are done.
+		// are done. If it doesn't, we need to call managedInitializeSubscribe
+		// again.
+		cs.mu.Lock()
 		recentID, err := cs.recentConsensusChangeID()
 		if err != nil {
 			cs.mu.Unlock()
 			return err
 		}
 		if start == recentID {
+			// break out of the loop while still holding to lock to avoid
+			// updating subscribers before the new module is appended to the
+			// list of subscribers.
 			break
 		}
-		// If it doesn't, we need to call managedInitializeSubscribe again.
 		cs.mu.Unlock()
-		start, err = cs.managedInitializeSubscribe(subscriber, start, cancel)
-		if err != nil {
-			return err
-		}
+
 		// Check for shutdown.
 		select {
 		case <-cs.tg.StopChan():
 			return siasync.ErrStopped
 		default:
 		}
-		cs.mu.Lock()
 	}
 
 	// Add the module to the list of subscribers.
