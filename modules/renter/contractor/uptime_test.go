@@ -89,7 +89,7 @@ func TestIntegrationReplaceOffline(t *testing.T) {
 			return errors.New("waiting for at least two hosts to show up")
 		}
 		for _, host := range hosts {
-			if len(host.ScanHistory) < 2 {
+			if len(host.ScanHistory) < 3 {
 				return errors.New("waiting for the hosts to have been scanned")
 			}
 		}
