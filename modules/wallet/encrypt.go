@@ -244,7 +244,7 @@ func (w *Wallet) rescanMessage(done chan struct{}) {
 
 	for {
 		w.mu.Lock()
-		height := w.height
+		height, _ := dbGetConsensusHeight(w.dbTx)
 		w.mu.Unlock()
 		print("\rWallet: scanned to height ", height, "...")
 

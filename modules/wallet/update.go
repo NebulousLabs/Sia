@@ -3,7 +3,6 @@ package wallet
 import (
 	"math"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/errors"
@@ -205,11 +204,7 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 			if err != nil {
 				return err
 			}
-			if consensusHeight != w.height {
-				build.Critical("consensus height from database is out of sync with in-memory height")
-			}
-			w.height++
-			err = dbPutConsensusHeight(tx, w.height)
+			err = dbPutConsensusHeight(tx, consensusHeight-1)
 			if err != nil {
 				return err
 			}
@@ -411,23 +406,20 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 	spentSiafundOutputs := computeSpentSiafundOutputSet(cc.SiafundOutputDiffs)
 
 	for _, block := range cc.AppliedBlocks {
+		consensusHeight, err := dbGetConsensusHeight(tx)
+		if err != nil {
+			return errors.AddContext(err, "failed to consensus height")
+		}
 		// Increment the consensus height.
 		if block.ID() != types.GenesisID {
-			consensusHeight, err := dbGetConsensusHeight(tx)
-			if err != nil {
-				return errors.AddContext(err, "failed to consensus height")
-			}
-			if consensusHeight != w.height {
-				build.Critical("consensus height from database is out of sync with in-memory height")
-			}
-			w.height++
-			err = dbPutConsensusHeight(tx, w.height)
+			consensusHeight++
+			err = dbPutConsensusHeight(tx, consensusHeight)
 			if err != nil {
 				return errors.AddContext(err, "failed to store consensus height in database")
 			}
 		}
 
-		pts := w.computeProcessedTransactionsFromBlock(tx, block, spentSiacoinOutputs, spentSiafundOutputs, w.height)
+		pts := w.computeProcessedTransactionsFromBlock(tx, block, spentSiacoinOutputs, spentSiafundOutputs, consensusHeight)
 		for _, pt := range pts {
 			err := dbAppendProcessedTransaction(tx, pt)
 			if err != nil {
@@ -435,6 +427,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 			}
 		}
 	}
+
 	return nil
 }
 
