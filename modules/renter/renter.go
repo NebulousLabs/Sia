@@ -193,18 +193,18 @@ type Renter struct {
 	lastEstimation modules.RenterPriceEstimation
 
 	// Utilities.
-	streamCache    *streamCache
-	cmu            *sync.Mutex
-	cs             modules.ConsensusSet
-	deps           modules.Dependencies
-	g              modules.Gateway
-	hostContractor hostContractor
-	hostDB         hostDB
-	log            *persist.Logger
-	persistDir     string
-	mu             *siasync.RWMutex
-	tg             threadgroup.ThreadGroup
-	tpool          modules.TransactionPool
+	staticStreamCache *streamCache
+	cmu               *sync.Mutex
+	cs                modules.ConsensusSet
+	deps              modules.Dependencies
+	g                 modules.Gateway
+	hostContractor    hostContractor
+	hostDB            hostDB
+	log               *persist.Logger
+	persistDir        string
+	mu                *siasync.RWMutex
+	tg                threadgroup.ThreadGroup
+	tpool             modules.TransactionPool
 }
 
 // Close closes the Renter and its dependencies
@@ -307,7 +307,7 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		r.hostContractor.SetRateLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed, 4*4096)
 	}
 
-	r.SetStreamingCacheSize(s.StreamCacheSize)
+	r.staticStreamCache.SetStreamingCacheSize(s.StreamCacheSize)
 	r.managedUpdateWorkerPool()
 	return nil
 }
@@ -353,7 +353,7 @@ func (r *Renter) Settings() modules.RenterSettings {
 		Allowance:        r.hostContractor.Allowance(),
 		MaxDownloadSpeed: download,
 		MaxUploadSpeed:   upload,
-		StreamCacheSize:  r.streamCache.cacheSize,
+		StreamCacheSize:  r.staticStreamCache.cacheSize,
 	}
 }
 
@@ -435,18 +435,18 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
-		streamCache:    new(streamCache),
-		cmu:            new(sync.Mutex),
-		cs:             cs,
-		deps:           deps,
-		g:              g,
-		hostDB:         hdb,
-		hostContractor: hc,
-		persistDir:     persistDir,
-		mu:             siasync.New(modules.SafeMutexDelay, 1),
-		tpool:          tpool,
+		staticStreamCache: new(streamCache),
+		cmu:               new(sync.Mutex),
+		cs:                cs,
+		deps:              deps,
+		g:                 g,
+		hostDB:            hdb,
+		hostContractor:    hc,
+		persistDir:        persistDir,
+		mu:                siasync.New(modules.SafeMutexDelay, 1),
+		tpool:             tpool,
 	}
-	r.streamCache.Init()
+	r.staticStreamCache.Init()
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
 	// Load all saved data.

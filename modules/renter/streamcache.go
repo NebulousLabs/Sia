@@ -163,10 +163,10 @@ func (sc *streamCache) Retrieve(udc *unfinishedDownloadChunk) bool {
 // SetStreamingCacheSize confirms that the cache size is being set
 // to a value greater than zero.  Otherwise it will remain the default
 // value set during the initialization of the streamCache
-func (r *Renter) SetStreamingCacheSize(cacheSize uint64) {
-	r.streamCache.mu.Lock()
-	defer r.streamCache.mu.Unlock()
+func (sc *streamCache) SetStreamingCacheSize(cacheSize uint64) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
 	if cacheSize > 0 {
-		r.streamCache.cacheSize = cacheSize
+		sc.cacheSize = cacheSize
 	}
 }
