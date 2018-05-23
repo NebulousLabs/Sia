@@ -17,7 +17,7 @@ func TestIntegrationChangeLog(t *testing.T) {
 	t.Parallel()
 	// Get a blank consensus set tester so that the mocked subscriber can join
 	// immediately after genesis.
-	cst, err := blankConsensusSetTester(t.Name())
+	cst, err := blankConsensusSetTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}

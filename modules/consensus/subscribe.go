@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -177,7 +178,7 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 	}
 
 	// Send all remaining consensus changes to the subscriber.
-	var latestChangeID modules.ConsensusChangeID
+	latestChangeID := entry.ID()
 	for exists {
 		// Send changes in batches of 100 so that we don't hold the
 		// lock for too long.
@@ -242,6 +243,9 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 		start, err = cs.managedInitializeSubscribe(subscriber, start, cancel)
 		if err != nil {
 			return err
+		}
+		if cs.staticDeps.Disrupt("SleepAfterInitializeSubscribe") {
+			time.Sleep(10 * time.Second)
 		}
 		// Check if the start equals the most recent change id. If it does we
 		// are done. If it doesn't, we need to call managedInitializeSubscribe

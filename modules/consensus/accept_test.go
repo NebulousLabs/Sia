@@ -1001,7 +1001,7 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := blankConsensusSetTester(t.Name())
+	cst, err := blankConsensusSetTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1080,7 +1080,7 @@ func TestChainedAcceptBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.Close()
-	cst2, err := blankConsensusSetTester(t.Name() + "2")
+	cst2, err := blankConsensusSetTester(t.Name()+"2", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
