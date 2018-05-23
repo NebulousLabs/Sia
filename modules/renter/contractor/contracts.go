@@ -523,8 +523,8 @@ func (c *Contractor) threadedContractMaintenance() {
 			// certain number of blocks in a row and reached its second half of
 			// the renew window, we give up on renewing it and set goodForRenew
 			// to false.
-			newContract, err := c.managedRenew(oldContract, amount, endHeight)
-			if err != nil {
+			newContract, errRenew := c.managedRenew(oldContract, amount, endHeight)
+			if errRenew != nil {
 				// Check if contract has to be replaced.
 				md := oldContract.Metadata()
 				c.mu.RLock()
@@ -538,7 +538,7 @@ func (c *Contractor) threadedContractMaintenance() {
 					if err != nil {
 						c.log.Println("WARN: failed to mark contract as !goodForRenew:", err)
 					}
-					c.log.Printf("WARN: failed to renew %v, marked as bad: %v\n", id, err)
+					c.log.Printf("WARN: failed to renew %v, marked as bad: %v\n", id, errRenew)
 					c.staticContracts.Return(oldContract)
 					return
 				}
@@ -550,7 +550,7 @@ func (c *Contractor) threadedContractMaintenance() {
 					c.firstFailedRenew[oldContract.Metadata().ID] = blockHeight
 					c.mu.Unlock()
 				}
-				c.log.Printf("WARN: failed to renew contract %v: %v\n", id, err)
+				c.log.Printf("WARN: failed to renew contract %v: %v\n", id, errRenew)
 				c.staticContracts.Return(oldContract)
 				return
 			}
