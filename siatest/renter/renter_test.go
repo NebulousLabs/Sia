@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/siatest"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -46,6 +47,7 @@ func TestRenter(t *testing.T) {
 		{"TestUploadDownload", testUploadDownload},
 		{"TestSingleFileGet", testSingleFileGet},
 		{"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
+		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
 	}
@@ -349,5 +351,34 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 		if time.Since(start) > time.Second*30 {
 			t.Fatal("download took longer than 30 seconds")
 		}
+	}
+}
+
+// testRenterDownloadAfterRenew makes sure that we can still download a file
+// after the contract period has ended.
+func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	renter := tg.Renters()[0]
+	// Upload file, creating a piece for each host in the group
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+	fileSize := 100 + siatest.Fuzz()
+	_, remoteFile, err := renter.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal("Failed to upload a file for testing: ", err)
+	}
+	// Mine enough blocks for the next period to start. This means the
+	// contracts should be renewed and the data should still be availeble for
+	// download.
+	miner := tg.Miners()[0]
+	for i := types.BlockHeight(0); i < siatest.DefaultAllowance.Period; i++ {
+		if err := miner.MineBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Download the file synchronously directly into memory.
+	_, err = renter.DownloadByStream(remoteFile)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
