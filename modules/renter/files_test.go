@@ -181,7 +181,8 @@ func TestFileRedundancy(t *testing.T) {
 			for iPiece := uint64(0); iPiece < uint64(f.erasureCode.MinPieces()); iPiece++ {
 				fc.Pieces = append(fc.Pieces, pieceData{
 					Chunk: iChunk,
-					Piece: iPiece,
+					// add 1 since the same piece can't count towards redundancy twice.
+					Piece: iPiece + 1,
 				})
 			}
 		}
