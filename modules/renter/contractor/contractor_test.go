@@ -368,7 +368,8 @@ func TestAllowanceSpending(t *testing.T) {
 			return errors.New("reported spending was identical after entering a renew period")
 		}
 		if newReportedSpending.Unspent.Cmp(reportedSpending.Unspent) <= 0 {
-			return fmt.Errorf("expected newReportedSpending to have more unspent: %v :: %v", newReportedSpending, reportedSpending)
+			return fmt.Errorf("expected newReportedSpending to have more unspent: %v <= %v",
+				newReportedSpending.Unspent.HumanString(), reportedSpending.Unspent.HumanString())
 		}
 		return nil
 	})
