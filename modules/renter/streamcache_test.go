@@ -2,6 +2,7 @@ package renter
 
 import (
 	"container/heap"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -15,18 +16,19 @@ func TestHeapImplementation(t *testing.T) {
 
 	// Testing Push to Heap
 	length := len(sc.streamHeap)
-	heap.Push(&sc.streamHeap, &chunkData{
+	cd := &chunkData{
 		id:         "Push",
 		data:       []byte{},
 		lastAccess: time.Now(),
-	})
+	}
+	heap.Push(&sc.streamHeap, cd)
 
 	// Confirming the length of the heap increased by 1
 	if len(sc.streamHeap) != length+1 {
 		t.Error("Length of heap did not change, chunkData was not pushed onto Heap. Length of heap is still ", len(sc.streamHeap))
 	}
 	// Confirming the chunk added was the one expected
-	if sc.streamHeap[0].id != "Push" {
+	if !reflect.DeepEqual(cd, sc.streamHeap[0]) {
 		t.Error("Chunk on top of heap is not the chunk that was just pushed on, chunkData.id =", sc.streamHeap[0].id)
 	}
 
@@ -37,20 +39,19 @@ func TestHeapImplementation(t *testing.T) {
 			data:       []byte{},
 			lastAccess: time.Now(),
 		})
-		time.Sleep(1 * time.Second)
 	}
 
 	// Testing Heap update
 	// Confirming recently accessed elements get moved to the bottom of Heap
-	cd := sc.streamHeap[0]
+	cd = sc.streamHeap[0]
 	sc.streamHeap.update(cd, cd.id, cd.data, time.Now())
-	if sc.streamHeap[len(sc.streamHeap)-1] != cd {
+	if !reflect.DeepEqual(cd, sc.streamHeap[len(sc.streamHeap)-1]) {
 		t.Error("Heap order was not updated. Recently accessed element not at bottom of heap")
 	}
 	// Confirming least recently accessed element is moved to the top of Heap
 	cd = sc.streamHeap[len(sc.streamHeap)-1]
 	sc.streamHeap.update(cd, cd.id, cd.data, time.Now().Add(-1*time.Hour))
-	if sc.streamHeap[0] != cd {
+	if !reflect.DeepEqual(cd, sc.streamHeap[0]) {
 		t.Error("Heap order was not updated. Least recently accessed element is not at top of heap")
 	}
 
@@ -58,7 +59,7 @@ func TestHeapImplementation(t *testing.T) {
 	// Confirming element at the top of heap is removed
 	cd = sc.streamHeap[0]
 	length = len(sc.streamHeap)
-	if pop := heap.Pop(&sc.streamHeap).(*chunkData); pop != cd {
+	if pop := heap.Pop(&sc.streamHeap).(*chunkData); !reflect.DeepEqual(cd, pop) {
 		t.Error("Element at the top of the Heap was not popped off")
 	}
 	if len(sc.streamHeap) != length-1 {
@@ -98,7 +99,7 @@ func TestStreamCache(t *testing.T) {
 	if !ok {
 		t.Error("The chunk1 was not added to the Map")
 	}
-	if cd != sc.streamHeap[len(sc.streamHeap)-1] {
+	if !reflect.DeepEqual(cd, sc.streamHeap[len(sc.streamHeap)-1]) {
 		t.Error("The chunk1 is not at the bottom of the Heap")
 	}
 
@@ -106,7 +107,7 @@ func TestStreamCache(t *testing.T) {
 	sc.streamHeap.update(cd, cd.id, cd.data, time.Now().Add(-1*time.Hour))
 
 	// Confirm chunk1 is at the top of the heap
-	if sc.streamHeap[0] != cd {
+	if !reflect.DeepEqual(cd, sc.streamHeap[0]) {
 		t.Error("Chunk1 is not at the top of the heap")
 	}
 
@@ -117,7 +118,7 @@ func TestStreamCache(t *testing.T) {
 	if _, ok := sc.streamMap["chunk1"]; ok {
 		t.Error("chunk1 wasn't removed from the map")
 	}
-	if sc.streamHeap[0] == cd {
+	if reflect.DeepEqual(cd, sc.streamHeap[0]) {
 		t.Error("chunk1 wasn't removed from the heap")
 	}
 }
