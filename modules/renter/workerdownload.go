@@ -29,12 +29,14 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 	// unregistered with the chunk.
 	d, err := w.renter.hostContractor.Downloader(w.contract.ID, w.renter.tg.StopChan())
 	if err != nil {
+		w.renter.log.Debugln("worker failed to create downloader:", err)
 		udc.managedUnregisterWorker(w)
 		return
 	}
 	defer d.Close()
 	data, err := d.Sector(udc.staticChunkMap[w.contract.ID].root)
 	if err != nil {
+		w.renter.log.Debugln("worker failed to download sector:", err)
 		udc.managedUnregisterWorker(w)
 		return
 	}

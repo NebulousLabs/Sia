@@ -61,7 +61,18 @@ returns the current settings along with metrics on the renter's spending.
       // contract is scheduled to end, the contract is renewed automatically.
       // Is always nonzero.
       "renewwindow": 3024 // blocks
-    }
+    }, 
+    // MaxUploadSpeed by defaul is unlimited but can be set by the user to 
+    // manage bandwidth
+    "maxuploadspeed":     1234, // bytes per second
+
+    // MaxDownloadSpeed by defaul is unlimited but can be set by the user to 
+    // manage bandwidth
+    "maxdownloadspeed":   1234, // bytes per second
+
+    // The DownloadCacheSize is the number of data chunks that will be cached during
+    // streaming
+    "downloadcachesize":  4  
   },
 
   // Metrics about how much the Renter has spent on storage, uploads, and

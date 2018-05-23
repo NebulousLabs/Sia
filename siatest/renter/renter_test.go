@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -319,6 +320,17 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 	chunkSize := int64(pieceSize * dataPieces)
 	if err := r.RenterPostRateLimit(chunkSize, chunkSize); err != nil {
 		t.Fatal(err)
+	}
+
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not request RenterGe()")
+	}
+	if rg.Settings.MaxDownloadSpeed != chunkSize {
+		t.Fatal(errors.New("MaxDownloadSpeed doesn't match value set through RenterPostRateLimit"))
+	}
+	if rg.Settings.MaxUploadSpeed != chunkSize {
+		t.Fatal(errors.New("MaxUploadSpeed doesn't match value set through RenterPostRateLimit"))
 	}
 
 	// Upload a file that is a single chunk big.

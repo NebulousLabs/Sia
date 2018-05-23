@@ -880,7 +880,10 @@ returns the current settings along with metrics on the renter's spending.
       "hosts":       24,
       "period":      6048, // blocks
       "renewwindow": 3024  // blocks
-    }
+    },
+    "maxuploadspeed":     1234, // BPS
+    "maxdownloadspeed":   1234, // BPS
+    "downloadcachesize":  4    
   },
   "financialmetrics": {
     "contractfees":     "1234", // hastings

@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -366,14 +367,13 @@ func TestAllowanceSpending(t *testing.T) {
 		if reflect.DeepEqual(newReportedSpending, reportedSpending) {
 			return errors.New("reported spending was identical after entering a renew period")
 		}
+		if newReportedSpending.Unspent.Cmp(reportedSpending.Unspent) <= 0 {
+			return fmt.Errorf("expected newReportedSpending to have more unspent: %v :: %v", newReportedSpending, reportedSpending)
+		}
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if newReportedSpending.Unspent.Cmp(reportedSpending.Unspent) <= 0 {
-		t.Fatal("expected newReportedSpending to have more unspent", newReportedSpending, reportedSpending)
 	}
 }
 
