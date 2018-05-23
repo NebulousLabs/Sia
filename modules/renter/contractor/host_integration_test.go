@@ -722,9 +722,7 @@ func TestRenewFailing(t *testing.T) {
 		if _, err := m.AddBlock(); err != nil {
 			t.Fatal(err)
 		}
-		c.mu.RLock()
-		blockHeight = c.blockHeight
-		c.mu.RUnlock()
+		blockHeight++
 	}
 	// contract should still be goodForRenew.
 	cu, ok := c.ContractUtility(contract.ID)
@@ -741,7 +739,7 @@ func TestRenewFailing(t *testing.T) {
 		}
 	}
 	// contract should no longer be goodForRenew.
-	err = build.Retry(100, 100, func() error {
+	err = build.Retry(1000, 100, func() error {
 		// contract should be !goodForRenew now.
 		cu, ok = c.ContractUtility(contract.ID)
 		if !ok {
