@@ -45,7 +45,7 @@ func TestHeapImplementation(t *testing.T) {
 	// Confirming recently accessed elements get moved to the bottom of Heap
 	cd = sc.streamHeap[0]
 	sc.streamHeap.update(cd, cd.id, cd.data, time.Now())
-	if !reflect.DeepEqual(cd, sc.streamHeap[len(sc.streamHeap)-1]) {
+	if reflect.DeepEqual(cd, sc.streamHeap[0]) {
 		t.Error("Heap order was not updated. Recently accessed element not at bottom of heap")
 	}
 	// Confirming least recently accessed element is moved to the top of Heap
