@@ -107,7 +107,13 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 	// Calculate spending from contracts that were renewed during the current period
 	for _, old := range c.oldContracts {
 		if old.EndHeight >= c.currentPeriod {
+			// Calculate ContractFees
+			spending.ContractFees = spending.ContractFees.Add(old.ContractFee)
+			spending.ContractFees = spending.ContractFees.Add(old.TxnFee)
+			spending.ContractFees = spending.ContractFees.Add(old.SiafundFee)
+			// Calculate TotalAllocated
 			spending.TotalAllocated = spending.TotalAllocated.Add(old.TotalCost)
+			// Calculate Spending
 			spending.DownloadSpending = spending.DownloadSpending.Add(old.DownloadSpending)
 			spending.UploadSpending = spending.UploadSpending.Add(old.UploadSpending)
 			spending.StorageSpending = spending.StorageSpending.Add(old.StorageSpending)
