@@ -76,16 +76,8 @@ func (sc *streamCache) Add(cacheID string, data []byte) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
-	for len(sc.streamMap) >= int(sc.cacheSize) {
-		// Remove from Heap
-		cd := heap.Pop(&sc.streamHeap).(*chunkData)
-
-		// Remove from Map
-		if _, ok := sc.streamMap[cd.id]; !ok {
-			build.Critical("Cache Data chunk not found in streamMap.")
-		}
-		delete(sc.streamMap, cd.id)
-	}
+	// pruning cache to cacheSize - 1 to make room to add the new chunk
+	sc.pruneCache(sc.cacheSize - 1)
 
 	// Add chunk to Map and Heap
 	cd := &chunkData{
@@ -111,6 +103,20 @@ func (sc *streamCache) Init() {
 	sc.streamHeap = make(streamHeap, 0, defaultStreamCacheSize)
 	sc.cacheSize = defaultStreamCacheSize
 	heap.Init(&sc.streamHeap)
+}
+
+// pruneCache prunes the cache until it is the length of cacheSize
+func (sc *streamCache) pruneCache(size uint64) {
+	for len(sc.streamMap) > int(size) {
+		// Remove from Heap
+		cd := heap.Pop(&sc.streamHeap).(*chunkData)
+
+		// Remove from Map
+		if _, ok := sc.streamMap[cd.id]; !ok {
+			build.Critical("Cache Data chunk not found in streamMap.")
+		}
+		delete(sc.streamMap, cd.id)
+	}
 }
 
 // Retrieve tries to retrieve the chunk from the renter's cache. If
@@ -162,11 +168,14 @@ func (sc *streamCache) Retrieve(udc *unfinishedDownloadChunk) bool {
 
 // SetStreamingCacheSize confirms that the cache size is being set
 // to a value greater than zero.  Otherwise it will remain the default
-// value set during the initialization of the streamCache
+// value set during the initialization of the streamCache.
+// It will also prune the cache to ensure the cache is always
+// less than or equal to whatever the cacheSize is set to
 func (sc *streamCache) SetStreamingCacheSize(cacheSize uint64) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 	if cacheSize > 0 {
 		sc.cacheSize = cacheSize
 	}
+	sc.pruneCache(sc.cacheSize)
 }

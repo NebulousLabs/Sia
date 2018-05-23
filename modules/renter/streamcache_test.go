@@ -80,6 +80,9 @@ func TestStreamCache(t *testing.T) {
 	sc := new(streamCache)
 	sc.Init()
 
+	// Setting cacheSize to large value so reducing it can be tested
+	sc.cacheSize = 10
+
 	// Fill Cache
 	// Purposefully trying to fill to a value larger than cacheSize to confirm Add()
 	// keeps pruning cache
@@ -89,6 +92,14 @@ func TestStreamCache(t *testing.T) {
 	// Confirm that the streamHeap didn't exceed the cacheSize
 	if len(sc.streamHeap) > int(sc.cacheSize) {
 		t.Error("Heap is larger than set cacheSize")
+	}
+
+	// Reduce cacheSize and call Add() to confirm cache is pruned
+	sc.cacheSize = 2
+	sc.Add("", []byte{})
+	// Confirm that the length of streamHeap is the cacheSize
+	if len(sc.streamHeap) != int(sc.cacheSize) {
+		t.Error("Heap is not equal to the cacheSize")
 	}
 
 	// Add new chunk with known staticCacheID
