@@ -139,7 +139,7 @@ maxdownloadspeed
 maxuploadspeed
 
 // Stream cache size specifies how many data chunks will be cached while 
-// streaming.  Must be greater than 0
+// streaming.  
 streamcachesize
 ```
 

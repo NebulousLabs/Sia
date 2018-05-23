@@ -33,7 +33,7 @@ type streamCache struct {
 // Required functions for use of heap for streamHeap
 func (sh streamHeap) Len() int { return len(sh) }
 
-// Less returns the lessor of two elements
+// Less returns the lesser of two elements
 func (sh streamHeap) Less(i, j int) bool { return sh[i].lastAccess.Before(sh[j].lastAccess) }
 
 // Swap swaps two elements from the heap
@@ -88,21 +88,6 @@ func (sc *streamCache) Add(cacheID string, data []byte) {
 	sc.streamMap[cacheID] = cd
 	heap.Push(&sc.streamHeap, cd)
 	sc.streamHeap.update(cd, cd.id, cd.data, cd.lastAccess)
-}
-
-// init initializes the streamCache
-func (sc *streamCache) Init() {
-	sc.mu.Lock()
-	defer sc.mu.Unlock()
-	if sc.cacheSize > 0 {
-		build.Critical("streamCache already initialized")
-		return
-	}
-
-	sc.streamMap = make(map[string]*chunkData)
-	sc.streamHeap = make(streamHeap, 0, defaultStreamCacheSize)
-	sc.cacheSize = defaultStreamCacheSize
-	heap.Init(&sc.streamHeap)
 }
 
 // pruneCache prunes the cache until it is the length of size
@@ -166,16 +151,25 @@ func (sc *streamCache) Retrieve(udc *unfinishedDownloadChunk) bool {
 	return true
 }
 
-// SetStreamingCacheSize confirms that the cache size is being set
-// to a value greater than zero.  Otherwise it will remain the default
-// value set during the initialization of the streamCache.
+// SetStreamingCacheSize sets the cache size.  When calling, add check
+// to make sure cacheSize is greater than zero.  Otherwise it will remain
+// the default value set during the initialization of the streamCache.
 // It will also prune the cache to ensure the cache is always
 // less than or equal to whatever the cacheSize is set to
 func (sc *streamCache) SetStreamingCacheSize(cacheSize uint64) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	if cacheSize > 0 {
-		sc.cacheSize = cacheSize
-	}
+	sc.cacheSize = cacheSize
 	sc.pruneCache(sc.cacheSize)
+}
+
+// newStreamCache creates a new streamCache
+func newStreamCache() *streamCache {
+	streamHeap := make(streamHeap, 0, defaultStreamCacheSize)
+	heap.Init(&streamHeap)
+	return &streamCache{
+		streamMap:  make(map[string]*chunkData),
+		streamHeap: streamHeap,
+		cacheSize:  defaultStreamCacheSize,
+	}
 }

@@ -194,7 +194,6 @@ type Renter struct {
 
 	// Utilities.
 	staticStreamCache *streamCache
-	cmu               *sync.Mutex
 	cs                modules.ConsensusSet
 	deps              modules.Dependencies
 	g                 modules.Gateway
@@ -307,7 +306,11 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		r.hostContractor.SetRateLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed, 4*4096)
 	}
 
-	r.staticStreamCache.SetStreamingCacheSize(s.StreamCacheSize)
+	// Set StreamingCacheSize
+	if s.StreamCacheSize > 0 {
+		r.staticStreamCache.SetStreamingCacheSize(s.StreamCacheSize)
+	}
+
 	r.managedUpdateWorkerPool()
 	return nil
 }
@@ -435,8 +438,7 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
-		staticStreamCache: new(streamCache),
-		cmu:               new(sync.Mutex),
+		staticStreamCache: newStreamCache(),
 		cs:                cs,
 		deps:              deps,
 		g:                 g,
@@ -446,7 +448,6 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 		mu:                siasync.New(modules.SafeMutexDelay, 1),
 		tpool:             tpool,
 	}
-	r.staticStreamCache.Init()
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
 	// Load all saved data.

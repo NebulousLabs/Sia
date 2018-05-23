@@ -11,8 +11,7 @@ import (
 // TestHeapImplementation tests that the streamCache heap functions properly
 func TestHeapImplementation(t *testing.T) {
 	// Initializing minimum variables
-	sc := new(streamCache)
-	sc.Init()
+	sc := newStreamCache()
 
 	// Testing Push to Heap
 	length := len(sc.streamHeap)
@@ -37,7 +36,7 @@ func TestHeapImplementation(t *testing.T) {
 		heap.Push(&sc.streamHeap, &chunkData{
 			id:         strconv.Itoa(i),
 			data:       []byte{},
-			lastAccess: time.Now(),
+			lastAccess: time.Now().Add(-1 * time.Minute),
 		})
 	}
 
@@ -77,8 +76,7 @@ func TestStreamCache(t *testing.T) {
 		t.SkipNow()
 	}
 	// Initializing minimum required variables
-	sc := new(streamCache)
-	sc.Init()
+	sc := newStreamCache()
 
 	// Setting cacheSize to large value so reducing it can be tested
 	sc.cacheSize = 10
