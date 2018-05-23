@@ -257,7 +257,7 @@ func TestWorkingStatus(t *testing.T) {
 		t.Fatal("uploading has failed")
 	}
 
-	err = retry(30, time.Second, func() error {
+	err = build.Retry(30, time.Second, func() error {
 		var hg HostGET
 		st.getAPI("/host", &hg)
 
@@ -290,7 +290,7 @@ func TestConnectabilityStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = retry(30, time.Second, func() error {
+	err = build.Retry(30, time.Second, func() error {
 		var hg HostGET
 		st.getAPI("/host", &hg)
 
