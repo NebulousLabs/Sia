@@ -307,7 +307,7 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		r.hostContractor.SetRateLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed, 4*4096)
 	}
 
-	r.SetStreamingCacheSize(s.DownloadCacheSize)
+	r.SetStreamingCacheSize(s.StreamCacheSize)
 	r.managedUpdateWorkerPool()
 	return nil
 }
@@ -350,10 +350,10 @@ func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostCont
 func (r *Renter) Settings() modules.RenterSettings {
 	download, upload, _ := r.hostContractor.RateLimits()
 	return modules.RenterSettings{
-		Allowance:         r.hostContractor.Allowance(),
-		DownloadCacheSize: r.streamCache.cacheSize,
-		MaxDownloadSpeed:  download,
-		MaxUploadSpeed:    upload,
+		Allowance:        r.hostContractor.Allowance(),
+		MaxDownloadSpeed: download,
+		MaxUploadSpeed:   upload,
+		StreamCacheSize:  r.streamCache.cacheSize,
 	}
 }
 

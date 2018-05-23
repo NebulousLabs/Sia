@@ -71,9 +71,9 @@ const (
 	// from the /renter/stream endpoint.
 	destinationTypeSeekStream = "httpseekstream"
 
-	// defaultDownloadCacheSize is the default cache size of the /renter/stream cache in
+	// defaultStreamCacheSize is the default cache size of the /renter/stream cache in
 	// chunks, the user can set a custom cache size through the API
-	defaultDownloadCacheSize = 2
+	defaultStreamCacheSize = 2
 )
 
 var (

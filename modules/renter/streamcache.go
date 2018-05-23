@@ -1,8 +1,5 @@
 package renter
 
-// TODO expose the downloadCacheSize as a variable and allow users to set it
-// via the API.
-
 import (
 	"container/heap"
 	"sync"
@@ -111,8 +108,8 @@ func (sc *streamCache) Init() {
 	}
 
 	sc.streamMap = make(map[string]*chunkData)
-	sc.streamHeap = make(streamHeap, 0, defaultDownloadCacheSize)
-	sc.cacheSize = defaultDownloadCacheSize
+	sc.streamHeap = make(streamHeap, 0, defaultStreamCacheSize)
+	sc.cacheSize = defaultStreamCacheSize
 	heap.Init(&sc.streamHeap)
 }
 

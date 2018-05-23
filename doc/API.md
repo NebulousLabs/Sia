@@ -883,7 +883,7 @@ returns the current settings along with metrics on the renter's spending.
     },
     "maxuploadspeed":     1234, // BPS
     "maxdownloadspeed":   1234, // BPS
-    "downloadcachesize":  4    
+    "streamcachesize":  4    
   },
   "financialmetrics": {
     "contractfees":     "1234", // hastings
@@ -910,7 +910,7 @@ period      // block height
 renewwindow // block height
 maxdownloadspeed  // bytes per second, not persisted and will be reset by a shutdown
 maxuploadspeed  // bytes per second, not persisted and will be reset by a shutdown
-downloadcachesize // Greater than zero
+streamcachesize // Greater than zero, not persisted and will be reset by a shutdown
 ```
 
 ###### Response

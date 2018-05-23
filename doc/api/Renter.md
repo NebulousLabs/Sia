@@ -70,9 +70,9 @@ returns the current settings along with metrics on the renter's spending.
     // manage bandwidth
     "maxdownloadspeed":   1234, // bytes per second
 
-    // The DownloadCacheSize is the number of data chunks that will be cached during
+    // The StreamCacheSize is the number of data chunks that will be cached during
     // streaming
-    "downloadcachesize":  4  
+    "streamcachesize":  4  
   },
 
   // Metrics about how much the Renter has spent on storage, uploads, and
@@ -138,9 +138,9 @@ maxdownloadspeed
 // setting is not persisted and will be reset by a shutdown
 maxuploadspeed
 
-// Download cache size specifies how many data chunks will be cached while 
+// Stream cache size specifies how many data chunks will be cached while 
 // streaming.  Must be greater than 0
-downloadcachesize
+streamcachesize
 ```
 
 ###### Response

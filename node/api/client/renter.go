@@ -119,10 +119,10 @@ func (c *Client) RenterRenamePost(siaPathOld, siaPathNew string) (err error) {
 }
 
 // RenterSetStreamCacheSizePost uses the /renter endpoint to change the renter's
-// downloadCacheSize for streaming
+// streamCacheSize for streaming
 func (c *Client) RenterSetStreamCacheSizePost(cacheSize uint64) (err error) {
 	values := url.Values{}
-	values.Set("downloadcachesize", strconv.FormatUint(cacheSize, 10))
+	values.Set("streamcachesize", strconv.FormatUint(cacheSize, 10))
 	err = c.post("/renter", values.Encode(), nil)
 	return
 }
