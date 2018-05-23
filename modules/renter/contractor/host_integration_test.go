@@ -733,13 +733,13 @@ func TestRenewFailing(t *testing.T) {
 		t.Fatal("contract should be goodForRenew but wasn't")
 	}
 	// mine consecutiveRenewalsBeforeReplacement more blocks.
-	for i := types.BlockHeight(0); i < consecutiveRenewalsBeforeReplacement+1; i++ {
+	for i := types.BlockHeight(0); i < consecutiveRenewalsBeforeReplacement; i++ {
 		if _, err := m.AddBlock(); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// contract should no longer be goodForRenew.
-	err = build.Retry(1000, 100, func() error {
+	err = build.Retry(600, 100*time.Millisecond, func() error {
 		// contract should be !goodForRenew now.
 		cu, ok = c.ContractUtility(contract.ID)
 		if !ok {
