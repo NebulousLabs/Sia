@@ -105,7 +105,7 @@ func (sc *streamCache) Init() {
 	heap.Init(&sc.streamHeap)
 }
 
-// pruneCache prunes the cache until it is the length of cacheSize
+// pruneCache prunes the cache until it is the length of size
 func (sc *streamCache) pruneCache(size uint64) {
 	for len(sc.streamMap) > int(size) {
 		// Remove from Heap
