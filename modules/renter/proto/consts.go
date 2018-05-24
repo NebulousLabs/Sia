@@ -22,11 +22,11 @@ const (
 )
 
 var (
-	// connTimeout determines the number of seconds the dialer will wait
-	// for a connect to complete
+	// connTimeout determines the number of seconds before a dial-up or
+	// revision negotiation times out.
 	connTimeout = build.Select(build.Var{
 		Dev:      10 * time.Second,
-		Standard: 60 * time.Second,
+		Standard: 2 * time.Minute,
 		Testing:  5 * time.Second,
 	}).(time.Duration)
 
