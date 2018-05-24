@@ -42,7 +42,7 @@ var (
 		Funds:       types.SiacoinPrecision.Mul64(1e3),
 		Hosts:       5,
 		Period:      50,
-		RenewWindow: 10,
+		RenewWindow: 24,
 	}
 )
 

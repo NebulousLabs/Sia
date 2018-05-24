@@ -203,11 +203,6 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
 func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.Currency, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
-	// Disrupt the renewal if necessary
-	disrupt := c.staticDeps.Disrupt("RenewFailing")
-	if disrupt {
-		return modules.RenterContract{}, errors.New("Disrupt RenewFailing")
-	}
 	// For convenience
 	contract := sc.Metadata()
 	// Sanity check - should not be renewing a bad contract.
