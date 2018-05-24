@@ -225,4 +225,15 @@ func TestModuleDesync(t *testing.T) {
 			t.Fatal("Update IDs don't match")
 		}
 	}
+
+	// Make sure the last update is the recent one in the database.
+	cst.cs.mu.Lock()
+	recentChangeID, err := cst.cs.recentConsensusChangeID()
+	cst.cs.mu.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updates[len(updates)-1].ID != recentChangeID {
+		t.Fatal("last update doesn't equal recentChangeID")
+	}
 }
