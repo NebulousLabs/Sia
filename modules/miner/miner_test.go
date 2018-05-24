@@ -326,6 +326,9 @@ func TestIntegrationStartupRescan(t *testing.T) {
 // TestMinerCloseDeadlock checks that the miner can cleanly close even if the
 // CPU miner is running.
 func TestMinerCloseDeadlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	mt, err := createMinerTester(t.Name())
 	if err != nil {
 		t.Fatal(err)

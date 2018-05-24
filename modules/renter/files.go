@@ -2,6 +2,7 @@ package renter
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -148,6 +149,7 @@ func (f *file) redundancy(offlineMap map[types.FileContractID]bool, goodForRenew
 		build.Critical("cannot get redundancy of a file with 0 chunks")
 		return -1
 	}
+	pieceMap := make(map[string]struct{})
 	for _, fc := range f.contracts {
 		offline := offlineMap[fc.ID]
 		goodForRenew := goodForRenewMap[fc.ID]
@@ -157,6 +159,11 @@ func (f *file) redundancy(offlineMap map[types.FileContractID]bool, goodForRenew
 			continue
 		}
 		for _, p := range fc.Pieces {
+			pieceKey := fmt.Sprintf("%v/%v", p.Chunk, p.Piece)
+			if _, redundant := pieceMap[pieceKey]; redundant {
+				continue
+			}
+			pieceMap[pieceKey] = struct{}{}
 			if goodForRenew {
 				piecesPerChunk[p.Chunk]++
 			}
@@ -319,16 +326,16 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	// Get the file and its contracs
 	contractIDs := make(map[types.FileContractID]struct{})
 	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
 	file, exists := r.files[siaPath]
 	if !exists {
 		return fileInfo, ErrUnknownPath
 	}
 	file.mu.RLock()
+	defer file.mu.RUnlock()
 	for cid := range file.contracts {
 		contractIDs[cid] = struct{}{}
 	}
-	file.mu.RUnlock()
-	r.mu.RUnlock(lockID)
 
 	// Build 2 maps that map every contract id to its offline and goodForRenew
 	// status.
@@ -342,8 +349,6 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	}
 
 	// Build the FileInfo
-	lockID = r.mu.RLock()
-	file.mu.RLock()
 	renewing := true
 	var localPath string
 	tf, exists := r.tracking[file.name]
@@ -361,8 +366,6 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 		UploadProgress: file.uploadProgress(),
 		Expiration:     file.expiration(),
 	}
-	file.mu.RUnlock()
-	r.mu.RUnlock(lockID)
 
 	return fileInfo, nil
 }

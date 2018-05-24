@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -147,9 +148,12 @@ func TestTransactionPoolRawHandlerPOST(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	retry(100, time.Millisecond*100, func() error {
+	err = build.Retry(100, time.Millisecond*100, func() error {
 		return st3.getAPI("/tpool/raw/"+lastTxn.ID().String(), &trg)
 	})
+	if err != nil {
+		t.Fatal("Txn was not broadcast to the third server", err)
+	}
 
 	// Mine a block on the first server, which should clear its transaction
 	// pool.

@@ -208,7 +208,10 @@ func (d *download) managedFail(err error) {
 	// Mark the download as complete and set the error.
 	d.err = err
 	close(d.completeChan)
-	err = d.destination.Close()
+	if d.destination != nil {
+		err = d.destination.Close()
+		d.destination = nil
+	}
 	if err != nil {
 		d.log.Println("unable to close download destination:", err)
 	}

@@ -133,6 +133,10 @@ type hostContractor interface {
 	// ResolveID returns the most recent renewal of the specified ID.
 	ResolveID(types.FileContractID) types.FileContractID
 
+	// RateLimits Gets the bandwidth limits for connections created by the
+	// contractor and its submodules.
+	RateLimits() (readBPS int64, writeBPS int64, packetSize uint64)
+
 	// SetRateLimits sets the bandwidth limits for connections created by the
 	// contractor and its submodules.
 	SetRateLimits(int64, int64, uint64)
@@ -343,8 +347,11 @@ func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostCont
 
 // Settings returns the host contractor's allowance
 func (r *Renter) Settings() modules.RenterSettings {
+	download, upload, _ := r.hostContractor.RateLimits()
 	return modules.RenterSettings{
-		Allowance: r.hostContractor.Allowance(),
+		Allowance:        r.hostContractor.Allowance(),
+		MaxDownloadSpeed: download,
+		MaxUploadSpeed:   upload,
 	}
 }
 
