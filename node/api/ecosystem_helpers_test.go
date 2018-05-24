@@ -149,7 +149,7 @@ func fullyConnectNodes(sts []*serverTester) error {
 		for _, stb := range sts[i+1:] {
 			// Try connecting to the other node until both have the other in
 			// their peer list.
-			err = retry(100, time.Millisecond*100, func() error {
+			err = build.Retry(100, time.Millisecond*100, func() error {
 				// NOTE: this check depends on string-matching an error in the
 				// gateway. If that error changes at all, this string will need to
 				// be updated.

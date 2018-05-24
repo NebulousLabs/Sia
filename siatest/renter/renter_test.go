@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/siatest"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -46,6 +47,7 @@ func TestRenter(t *testing.T) {
 		{"TestUploadDownload", testUploadDownload},
 		{"TestSingleFileGet", testSingleFileGet},
 		{"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
+		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
 	}
@@ -311,6 +313,45 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 	// Grab the first of the group's renters
 	r := tg.Renters()[0]
 
+	// Testing setting StreamCacheSize for streaming
+	// Test setting it to larger than the defaultCacheSize
+	if err := r.RenterSetStreamCacheSizePost(4); err != nil {
+		t.Fatal(err, "Could not set StreamCacheSize to 4")
+	}
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize != 4 {
+		t.Fatal("StreamCacheSize not set to 4, set to", rg.Settings.StreamCacheSize)
+	}
+
+	// Test resetting to the value of defaultStreamCacheSize (2)
+	if err := r.RenterSetStreamCacheSizePost(2); err != nil {
+		t.Fatal(err, "Could not set StreamCacheSize to 2")
+	}
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize != 2 {
+		t.Fatal("StreamCacheSize not set to 2, set to", rg.Settings.StreamCacheSize)
+	}
+
+	prev := rg.Settings.StreamCacheSize
+
+	// Test setting to 0
+	if err := r.RenterSetStreamCacheSizePost(0); err != nil {
+		t.Fatal(err, "Error in calling RenterSetStreamCacheSizePost(0)")
+	}
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize == 0 {
+		t.Fatal("StreamCacheSize set to 0, should have stayed as previous value or", prev)
+	}
+
 	// Set fileSize and redundancy for upload
 	dataPieces := uint64(1)
 	parityPieces := uint64(len(tg.Hosts())) - dataPieces
@@ -322,7 +363,7 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 
-	rg, err := r.RenterGet()
+	rg, err = r.RenterGet()
 	if err != nil {
 		t.Fatal(err, "Could not request RenterGe()")
 	}
@@ -349,5 +390,34 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 		if time.Since(start) > time.Second*30 {
 			t.Fatal("download took longer than 30 seconds")
 		}
+	}
+}
+
+// testRenterDownloadAfterRenew makes sure that we can still download a file
+// after the contract period has ended.
+func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	renter := tg.Renters()[0]
+	// Upload file, creating a piece for each host in the group
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+	fileSize := 100 + siatest.Fuzz()
+	_, remoteFile, err := renter.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal("Failed to upload a file for testing: ", err)
+	}
+	// Mine enough blocks for the next period to start. This means the
+	// contracts should be renewed and the data should still be availeble for
+	// download.
+	miner := tg.Miners()[0]
+	for i := types.BlockHeight(0); i < siatest.DefaultAllowance.Period; i++ {
+		if err := miner.MineBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Download the file synchronously directly into memory.
+	_, err = renter.DownloadByStream(remoteFile)
+	if err != nil {
+		t.Fatal(err)
 	}
 }

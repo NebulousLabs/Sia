@@ -196,7 +196,7 @@ LOOP:
 			}
 
 			// Check if we got the chunk cached already.
-			if r.managedTryCache(nextChunk) {
+			if r.staticStreamCache.Retrieve(nextChunk) {
 				continue
 			}
 

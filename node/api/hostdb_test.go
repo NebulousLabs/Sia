@@ -380,7 +380,7 @@ func TestHostDBScanOnlineOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		if err := st.getAPI("/hostdb/active", &ah); err != nil {
 			return err
 		}
@@ -405,7 +405,7 @@ func TestHostDBScanOnlineOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		// Get the hostdb internals.
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			return err
@@ -565,7 +565,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Pull the host's net address and pubkey from the hostdb.
-	err = retry(100, time.Millisecond*200, func() error {
+	err = build.Retry(100, time.Millisecond*200, func() error {
 		// Get the hostdb internals.
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			return err
@@ -622,7 +622,7 @@ func TestHostDBAndRenterDownloadDynamicIPs(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	err = retry(100, time.Millisecond*100, func() error {
+	err = build.Retry(100, time.Millisecond*100, func() error {
 		err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
 		if err != nil {
 			return err
@@ -769,7 +769,7 @@ func TestHostDBAndRenterUploadDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Pull the host's net address and pubkey from the hostdb.
-	err = retry(50, time.Millisecond*100, func() error {
+	err = build.Retry(50, time.Millisecond*100, func() error {
 		// Get the hostdb internals.
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			return err
@@ -986,7 +986,7 @@ func TestHostDBAndRenterFormDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Pull the host's net address and pubkey from the hostdb.
-	err = retry(50, time.Millisecond*100, func() error {
+	err = build.Retry(50, time.Millisecond*100, func() error {
 		// Get the hostdb internals.
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			return err
@@ -1141,7 +1141,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	var ah HostdbActiveGET
-	err = retry(50, 100*time.Millisecond, func() error {
+	err = build.Retry(50, 100*time.Millisecond, func() error {
 		if err := st.getAPI("/hostdb/active", &ah); err != nil {
 			return err
 		}
@@ -1242,7 +1242,7 @@ func TestHostDBAndRenterRenewDynamicIPs(t *testing.T) {
 		t.Fatal()
 	}
 	// Pull the host's net address and pubkey from the hostdb.
-	err = retry(50, time.Millisecond*100, func() error {
+	err = build.Retry(50, time.Millisecond*100, func() error {
 		// Get the hostdb internals.
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			return err
