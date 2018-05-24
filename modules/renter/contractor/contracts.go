@@ -465,11 +465,11 @@ func (c *Contractor) threadedContractMaintenance() {
 	c.mu.Lock()
 	newFirstFailedRenew := make(map[types.FileContractID]types.BlockHeight)
 	for _, r := range renewSet {
-		if _, exists := c.firstFailedRenew[r.id]; exists {
-			newFirstFailedRenew[r.id] = c.firstFailedRenew[r.id]
+		if _, exists := c.numFailedRenews[r.id]; exists {
+			newFirstFailedRenew[r.id] = c.numFailedRenews[r.id]
 		}
 	}
-	c.firstFailedRenew = newFirstFailedRenew
+	c.numFailedRenews = newFirstFailedRenew
 	c.mu.Unlock()
 
 	// Loop through the contracts and renew them one-by-one.
@@ -518,20 +518,24 @@ func (c *Contractor) threadedContractMaintenance() {
 				return
 			}
 			// Perform the actual renew. If the renew fails, return the
-			// contract. If the renew fails we check if it has failed before
-			// and remember the height if it hasn't. Once it has failed for a
-			// certain number of blocks in a row and reached its second half of
-			// the renew window, we give up on renewing it and set goodForRenew
-			// to false.
+			// contract. If the renew fails we check how often it has failed
+			// before. Once it has failed for a certain number of blocks in a
+			// row and reached its second half of the renew window, we give up
+			// on renewing it and set goodForRenew to false.
 			newContract, errRenew := c.managedRenew(oldContract, amount, endHeight)
 			if errRenew != nil {
+				// Increment the number of failed renews for the contract.
+				c.mu.Lock()
+				c.numFailedRenews[oldContract.Metadata().ID]++
+				c.mu.Unlock()
+
 				// Check if contract has to be replaced.
 				md := oldContract.Metadata()
 				c.mu.RLock()
-				firstRenew, failedBefore := c.firstFailedRenew[md.ID]
+				numRenews, failedBefore := c.numFailedRenews[md.ID]
 				c.mu.RUnlock()
 				secondHalfOfWindow := blockHeight+allowance.RenewWindow/2 >= md.EndHeight
-				replace := blockHeight-firstRenew >= consecutiveRenewalsBeforeReplacement
+				replace := numRenews >= consecutiveRenewalsBeforeReplacement
 				if failedBefore && secondHalfOfWindow && replace {
 					oldUtility.GoodForRenew = false
 					err := oldContract.UpdateUtility(oldUtility)
@@ -542,15 +546,11 @@ func (c *Contractor) threadedContractMaintenance() {
 					c.staticContracts.Return(oldContract)
 					return
 				}
-				// If this contract has never failed its renew before we
-				// remember the current blockheight as the first time this has
-				// happened.
-				if !failedBefore {
-					c.mu.Lock()
-					c.firstFailedRenew[oldContract.Metadata().ID] = blockHeight
-					c.mu.Unlock()
-				}
-				c.log.Printf("WARN: failed to renew contract %v: %v\n", id, errRenew)
+
+				// Seems like it doesn't have to be replaced yet. Log the
+				// failure and number of renews that have failed so far.
+				c.log.Printf("WARN: failed to renew contract %v [%v]: %v\n",
+					id, numRenews, errRenew)
 				c.staticContracts.Return(oldContract)
 				return
 			}
