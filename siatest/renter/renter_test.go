@@ -2,6 +2,7 @@ package renter
 
 import (
 	"fmt"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -363,12 +364,15 @@ func TestRenewFailing(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	renterDir, err := siatest.TestDir(filepath.Join(t.Name(), "renter"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a group for the subtests
 	groupParams := siatest.GroupParams{
-		Hosts:   2,
-		Renters: 1,
-		Miners:  1,
+		Hosts:  3,
+		Miners: 1,
 	}
 	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
@@ -380,6 +384,18 @@ func TestRenewFailing(t *testing.T) {
 		}
 	}()
 
+	// Add a renter with a custom allowance to give it plenty of time to renew
+	// the contract later.
+	renterParams := node.Renter(renterDir)
+	renterParams.Allowance = siatest.DefaultAllowance
+	renterParams.Allowance.Hosts = uint64(len(tg.Hosts()) - 1)
+	renterParams.Allowance.Period = 100
+	renterParams.Allowance.RenewWindow = 50
+	if err = tg.AddNodes(renterParams); err != nil {
+		t.Fatal(err)
+	}
+	renter := tg.Renters()[0]
+
 	// Lock the wallet of one of the hosts to let the renew with that host
 	// fail.
 	if err := tg.Hosts()[0].WalletLockPost(); err != nil {
@@ -387,10 +403,13 @@ func TestRenewFailing(t *testing.T) {
 	}
 
 	// All the contracts of the renter should be goodForRenew.
-	renter := tg.Renters()[0]
 	rcg, err := renter.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
+	}
+	if uint64(len(rcg.Contracts)) != renterParams.Allowance.Hosts {
+		t.Fatalf("renter had %v contracts but should have %v",
+			len(rcg.Contracts), renterParams.Allowance.Hosts)
 	}
 	for _, c := range rcg.Contracts {
 		if !c.GoodForRenew {
@@ -427,9 +446,10 @@ func TestRenewFailing(t *testing.T) {
 		}
 	}
 
-	// We should be within the renew window now. Somewhere between now and the
-	// contract's EndHeight one of the contracts should be marked as
-	// !goodForUpload.
+	// We should be within the renew window now. We keep mining blocks until
+	// the host with the locked wallet has been replaced. This should happen
+	// before we reach the endHeight of the contracts.
+	replaced := false
 	err = build.Retry(int(rcg.Contracts[0].EndHeight-blockHeight), 100*time.Millisecond, func() error {
 		// contract should be !goodForRenew now.
 		rcg, err = renter.RenterContractsGet()
@@ -437,18 +457,28 @@ func TestRenewFailing(t *testing.T) {
 			t.Fatal(err)
 		}
 		notGoodForRenew := 0
+		goodForRenew := 0
 		for _, c := range rcg.Contracts {
 			if !c.GoodForRenew {
 				notGoodForRenew++
+			} else {
+				goodForRenew++
 			}
 		}
-		if notGoodForRenew != 1 {
+		if !replaced && notGoodForRenew != 1 && goodForRenew != 1 {
 			err := fmt.Errorf("there should be exactly 1 contract that is !goodForRenew but was %v",
 				notGoodForRenew)
 			return errors.Compose(miner.MineBlock(), err)
 		}
+		replaced = true
+		if replaced && notGoodForRenew != 1 && goodForRenew != 2 {
+			return fmt.Errorf("contract was set to !goodForRenew but hasn't been replaced yet")
+		}
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // testRenterDownloadAfterRenew makes sure that we can still download a file
