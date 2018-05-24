@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/node"
@@ -56,76 +57,152 @@ func TestConsensusBlocksIDGet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testdir, err := siatest.TestDir(t.Name())
-	if err != nil {
-		t.Fatal(err)
+	// Create a testgroup
+	groupParams := siatest.GroupParams{
+		Hosts:   1,
+		Renters: 1,
+		Miners:  1,
 	}
-
-	// Create a new server
-	testNode, err := siatest.NewNode(node.AllModules(testdir))
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("Failed to create group: ", err)
 	}
 	defer func() {
-		if err := testNode.Close(); err != nil {
+		if err := tg.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
+	testNode := tg.Miners()[0]
+
 	// Send /consensus request
-	cg, err := testNode.ConsensusGet()
+	endBlock, err := testNode.ConsensusGet()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("Failed to call ConsensusGet():", err)
 	}
 
-	// Get block by id
-	block, err := testNode.ConsensusBlocksIDGet(cg.CurrentBlock)
-	if err != nil {
-		t.Fatal("Failed to retrieve block", err)
-	}
-	// Make sure all of the fields are initialized and not empty
+	// Loop over blocks and compare
+	var i types.BlockHeight
 	var zeroID types.BlockID
-	if block.ID != cg.CurrentBlock {
-		t.Fatal("BlockID wasn't set correctly")
-	}
-	if block.Height != cg.Height {
-		t.Fatal("BlockHeight wasn't set correctly")
-	}
-	if block.ParentID == zeroID {
-		t.Fatal("ParentID wasn't set correctly")
-	}
-	if block.Timestamp == types.Timestamp(0) {
-		t.Fatal("Timestamp wasn't set correctly")
-	}
-	if len(block.MinerPayouts) == 0 {
-		t.Fatal("Block has no miner payouts")
-	}
-	if len(block.Transactions) == 0 {
-		t.Fatal("Block doesn't have any transactions even though it should")
-	}
+	for i = 0; i <= endBlock.Height; i++ {
+		cbhg, err := testNode.ConsensusBlocksHeightGet(i)
+		if err != nil {
+			t.Fatal("Failed to retrieve block by height:", err)
+		}
+		cbig, err := testNode.ConsensusBlocksIDGet(cbhg.ID)
+		if err != nil {
+			t.Fatal("Failed to retrieve block by ID:", err)
+		}
+		// Confirm blocks received by both endpoints are the same
+		if !reflect.DeepEqual(cbhg, cbig) {
+			t.Fatal("Blocks not equal")
+		}
+		// Confirm Fields were set properly
+		// Ignore ParentID and MinerPayouts for genisis block
+		if cbig.ParentID == zeroID && i != 0 {
+			t.Fatal("ParentID wasn't set correctly")
+		}
+		if len(cbig.MinerPayouts) == 0 && i != 0 {
+			t.Fatal("Block has no miner payouts")
+		}
+		if cbig.Timestamp == types.Timestamp(0) {
+			t.Fatal("Timestamp wasn't set correctly")
+		}
+		if len(cbig.Transactions) == 0 {
+			t.Fatal("Block doesn't have any transactions even though it should")
+		}
 
-	// Get same block by height
-	block2, err := testNode.ConsensusBlocksHeightGet(cg.Height)
-	if err != nil {
-		t.Fatal("Failed to retrieve block", err)
-	}
-	// block and block2 should be the same
-	if block.ID != block2.ID {
-		t.Fatal("BlockID wasn't set correctly")
-	}
-	if block.Height != block2.Height {
-		t.Fatal("BlockID wasn't set correctly")
-	}
-	if block.ParentID != block2.ParentID {
-		t.Fatal("ParentIDs don't match")
-	}
-	if block.Timestamp != block2.Timestamp {
-		t.Fatal("Timestamps don't match")
-	}
-	if len(block.MinerPayouts) != len(block2.MinerPayouts) {
-		t.Fatal("MinerPayouts don't match")
-	}
-	if len(block.Transactions) != len(block2.Transactions) {
-		t.Fatal("Transactions don't match")
+		// Verify IDs
+		for _, tx := range cbhg.Transactions {
+			// Building transaction of type Transaction to use as
+			// comparison for ID creatation
+			txn := types.Transaction{
+				SiacoinInputs:         tx.SiacoinInputs,
+				FileContractRevisions: tx.FileContractRevisions,
+				StorageProofs:         tx.StorageProofs,
+				SiafundInputs:         tx.SiafundInputs,
+				MinerFees:             tx.MinerFees,
+				ArbitraryData:         tx.ArbitraryData,
+				TransactionSignatures: tx.TransactionSignatures,
+			}
+			if len(tx.SiacoinOutputs) != 0 {
+				// Finish building Transaction
+				for _, sco := range tx.SiacoinOutputs {
+					txn.SiacoinOutputs = append(txn.SiacoinOutputs, types.SiacoinOutput{
+						Value:      sco.Value,
+						UnlockHash: sco.UnlockHash,
+					})
+				}
+				// Verify SiacoinOutput IDs
+				for i, sco := range tx.SiacoinOutputs {
+					if sco.ID != txn.SiacoinOutputID(uint64(i)) {
+						t.Fatalf("SiacoinOutputID not as expected, got %v expected %v", sco.ID, txn.SiacoinOutputID(uint64(i)))
+					}
+				}
+			}
+			if len(tx.FileContracts) != 0 {
+				// Finish building transaction
+				for i, fc := range tx.FileContracts {
+					txn.FileContracts = append(txn.FileContracts, types.FileContract{
+						FileSize:       fc.FileSize,
+						FileMerkleRoot: fc.FileMerkleRoot,
+						WindowStart:    fc.WindowStart,
+						WindowEnd:      fc.WindowEnd,
+						Payout:         fc.Payout,
+						UnlockHash:     fc.UnlockHash,
+						RevisionNumber: fc.RevisionNumber,
+					})
+					for _, vp := range fc.ValidProofOutputs {
+						txn.FileContracts[i].ValidProofOutputs = append(txn.FileContracts[i].ValidProofOutputs, types.SiacoinOutput{
+							Value:      vp.Value,
+							UnlockHash: vp.UnlockHash,
+						})
+					}
+					for _, mp := range fc.MissedProofOutputs {
+						txn.FileContracts[i].MissedProofOutputs = append(txn.FileContracts[i].MissedProofOutputs, types.SiacoinOutput{
+							Value:      mp.Value,
+							UnlockHash: mp.UnlockHash,
+						})
+					}
+				}
+				// FileContracts
+				for i, fc := range tx.FileContracts {
+					// Verify FileContract ID
+					fcid := txn.FileContractID(uint64(i))
+					if fc.ID != fcid {
+						t.Fatalf("FileContract ID not as expected, got %v expected %v", fc.ID, fcid)
+					}
+					// Verify ValidProof IDs
+					for j, vp := range fc.ValidProofOutputs {
+						if vp.ID != fcid.StorageProofOutputID(types.ProofValid, uint64(j)) {
+							t.Fatalf("File Contract ValidProofOutputID not as expected, got %v expected %v", vp.ID, fcid.StorageProofOutputID(types.ProofValid, uint64(j)))
+						}
+					}
+					// Verify MissedProof IDs
+					for j, mp := range fc.MissedProofOutputs {
+						if mp.ID != fcid.StorageProofOutputID(types.ProofMissed, uint64(j)) {
+							t.Fatalf("File Contract MissedProofOutputID not as expected, got %v expected %v", mp.ID, fcid.StorageProofOutputID(types.ProofMissed, uint64(j)))
+						}
+					}
+				}
+			}
+			if len(tx.SiafundOutputs) != 0 {
+				// Finish building transaction
+				for _, sfo := range tx.SiafundOutputs {
+					txn.SiafundOutputs = append(txn.SiafundOutputs, types.SiafundOutput{
+						Value:      sfo.Value,
+						UnlockHash: sfo.UnlockHash,
+						ClaimStart: types.ZeroCurrency,
+					})
+				}
+				// Verify SiafundOutput IDs
+				for i, sfo := range tx.SiafundOutputs {
+					// Failing, switch back to !=
+					if sfo.ID != txn.SiafundOutputID(uint64(i)) {
+						t.Fatalf("SiafundOutputID not as expected, got %v expected %v", sfo.ID, txn.SiafundOutputID(uint64(i)))
+					}
+				}
+			}
+		}
 	}
 }
