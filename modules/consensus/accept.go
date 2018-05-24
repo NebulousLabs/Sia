@@ -277,7 +277,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			if err != nil {
 				return err
 			}
-			// Sanity check - we should never apply less blocks than we revert.
+			// Sanity check - we should never apply fewer blocks than we revert.
 			if len(changeEntry.AppliedBlocks) < len(changeEntry.RevertedBlocks) {
 				err := errors.New("after adding a change entry, there are more reverted blocks than applied ones")
 				cs.log.Severe(err)
