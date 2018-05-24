@@ -313,6 +313,45 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 	// Grab the first of the group's renters
 	r := tg.Renters()[0]
 
+	// Testing setting StreamCacheSize for streaming
+	// Test setting it to larger than the defaultCacheSize
+	if err := r.RenterSetStreamCacheSizePost(4); err != nil {
+		t.Fatal(err, "Could not set StreamCacheSize to 4")
+	}
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize != 4 {
+		t.Fatal("StreamCacheSize not set to 4, set to", rg.Settings.StreamCacheSize)
+	}
+
+	// Test resetting to the value of defaultStreamCacheSize (2)
+	if err := r.RenterSetStreamCacheSizePost(2); err != nil {
+		t.Fatal(err, "Could not set StreamCacheSize to 2")
+	}
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize != 2 {
+		t.Fatal("StreamCacheSize not set to 2, set to", rg.Settings.StreamCacheSize)
+	}
+
+	prev := rg.Settings.StreamCacheSize
+
+	// Test setting to 0
+	if err := r.RenterSetStreamCacheSizePost(0); err != nil {
+		t.Fatal(err, "Error in calling RenterSetStreamCacheSizePost(0)")
+	}
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize == 0 {
+		t.Fatal("StreamCacheSize set to 0, should have stayed as previous value or", prev)
+	}
+
 	// Set fileSize and redundancy for upload
 	dataPieces := uint64(1)
 	parityPieces := uint64(len(tg.Hosts())) - dataPieces
@@ -324,7 +363,7 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err)
 	}
 
-	rg, err := r.RenterGet()
+	rg, err = r.RenterGet()
 	if err != nil {
 		t.Fatal(err, "Could not request RenterGe()")
 	}
