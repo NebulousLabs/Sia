@@ -407,14 +407,17 @@ func TestRenewFailing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if uint64(len(rcg.Contracts)) != renterParams.Allowance.Hosts {
-		t.Fatalf("renter had %v contracts but should have %v",
-			len(rcg.Contracts), renterParams.Allowance.Hosts)
-	}
 	for _, c := range rcg.Contracts {
 		if !c.GoodForRenew {
 			t.Fatal("renter got a contract that is !goodForRenew")
 		}
+	}
+	if uint64(len(rcg.Contracts)) != renterParams.Allowance.Hosts {
+		for i, c := range rcg.Contracts {
+			fmt.Println(i, c.HostPublicKey)
+		}
+		t.Fatalf("renter had %v contracts but should have %v",
+			len(rcg.Contracts), renterParams.Allowance.Hosts)
 	}
 
 	// Wait until the contract is supposed to be renewed.

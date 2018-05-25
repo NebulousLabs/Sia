@@ -71,6 +71,24 @@ func (g *Gateway) addPeer(p *peer) {
 	go g.threadedListenPeer(p)
 }
 
+// callInitRPCs calls the rpcs that are registered to be called upon connecting
+// to a peer.
+func (g *Gateway) callInitRPCs(addr modules.NetAddress) {
+	for name, fn := range g.initRPCs {
+		go func(name string, fn modules.RPCFunc) {
+			if g.threads.Add() != nil {
+				return
+			}
+			defer g.threads.Done()
+
+			err := g.managedRPC(addr, name, fn)
+			if err != nil {
+				g.log.Debugf("INFO: RPC %q on peer %q failed: %v", name, addr, err)
+			}
+		}(name, fn)
+	}
+}
+
 // randomOutboundPeer returns a random outbound peer.
 func (g *Gateway) randomOutboundPeer() (modules.NetAddress, error) {
 	// Get the list of outbound peers.
@@ -456,19 +474,7 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	g.log.Debugln("INFO: connected to new peer", addr)
 
 	// call initRPCs
-	for name, fn := range g.initRPCs {
-		go func(name string, fn modules.RPCFunc) {
-			if g.threads.Add() != nil {
-				return
-			}
-			defer g.threads.Done()
-
-			err := g.managedRPC(addr, name, fn)
-			if err != nil {
-				g.log.Debugf("INFO: RPC %q on peer %q failed: %v", name, addr, err)
-			}
-		}(name, fn)
-	}
+	g.callInitRPCs(addr)
 
 	return nil
 }

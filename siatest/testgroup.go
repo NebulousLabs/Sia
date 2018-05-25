@@ -474,10 +474,6 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 	if err := fullyConnectNodes(nodes); err != nil {
 		return build.ExtendErr("failed to fully connect nodes", err)
 	}
-	// Mine a block for some coins to fund the new nodes.
-	if err := miner.MineBlock(); err != nil {
-		return build.ExtendErr("failed to mine block for funding", err)
-	}
 	// Make sure the new nodes are synced.
 	if err := synchronizationCheck(miner, tg.nodes); err != nil {
 		return build.ExtendErr("synchronization check 1 failed", err)
