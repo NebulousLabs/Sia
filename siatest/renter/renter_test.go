@@ -435,12 +435,6 @@ func TestRenewFailing(t *testing.T) {
 	}
 	renter := tg.Renters()[0]
 
-	// Lock the wallet of one of the hosts to let the renew with that host
-	// fail.
-	if err := tg.Hosts()[0].WalletLockPost(); err != nil {
-		t.Fatal(err)
-	}
-
 	// All the contracts of the renter should be goodForRenew.
 	rcg, err := renter.RenterContractsGet()
 	if err != nil {
@@ -459,6 +453,24 @@ func TestRenewFailing(t *testing.T) {
 			len(rcg.Contracts), renterParams.Allowance.Hosts)
 	}
 
+	// Create a map of the hosts in the group.
+	hostMap := make(map[string]*siatest.TestNode)
+	for _, host := range tg.Hosts() {
+		pk, err := host.HostPublicKey()
+		if err != nil {
+			t.Fatal(err)
+		}
+		hostMap[pk.String()] = host
+	}
+	// Lock the wallet of one of the used hosts to make the renew fail.
+	for _, c := range rcg.Contracts {
+		if host, used := hostMap[c.HostPublicKey.String()]; used {
+			if err := host.WalletLockPost(); err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+	}
 	// Wait until the contract is supposed to be renewed.
 	cg, err := renter.ConsensusGet()
 	if err != nil {
@@ -498,11 +510,20 @@ func TestRenewFailing(t *testing.T) {
 	// We should be within the second half of the renew window now. We keep
 	// mining blocks until the host with the locked wallet has been replaced.
 	// This should happen before we reach the endHeight of the contracts.
-	// We need a pretty large retry window for this since
-	// threadedContractMaintenance can take quite some time to finish and we
-	// need it to be executed after every mined block.
 	replaced := false
-	err = build.Retry(int(rcg.Contracts[0].EndHeight-blockHeight), 5*time.Second, func() error {
+	tries := types.BlockHeight(0)
+	err = build.Retry(1000, 250*time.Millisecond, func() error {
+		// Once we reach the endheight the test fails.
+		if rcg.Contracts[0].EndHeight < blockHeight {
+			t.Fatal("We reached the endHeight of the contract before it was replaced")
+		}
+		// Every now and then we trigger a new threadedContractMaintenance.
+		if tries%50 == 0 {
+			blockHeight++
+			if err := miner.MineBlock(); err != nil {
+				return err
+			}
+		}
 		// contract should be !goodForRenew now.
 		rcg, err = renter.RenterContractsGet()
 		if err != nil {
@@ -518,9 +539,8 @@ func TestRenewFailing(t *testing.T) {
 			}
 		}
 		if !replaced && notGoodForRenew != 1 && goodForRenew != 1 {
-			err := fmt.Errorf("there should be exactly 1 contract that is !goodForRenew but was %v",
+			return fmt.Errorf("there should be exactly 1 contract that is !goodForRenew but was %v",
 				notGoodForRenew)
-			return errors.Compose(miner.MineBlock(), err)
 		}
 		replaced = true
 		if replaced && notGoodForRenew != 1 && goodForRenew != 2 {
