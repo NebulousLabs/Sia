@@ -1,12 +1,12 @@
 package siatest
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api/client"
 	"github.com/NebulousLabs/Sia/node/api/server"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
 
 // TestNode is a helper struct for testing that contains a server and a client
@@ -16,6 +16,34 @@ type TestNode struct {
 	client.Client
 	params      node.NodeParams
 	primarySeed string
+}
+
+// RestartNode restarts a TestNode
+// TODO: add safety checks to check for if node is current running or stopped
+func (tn *TestNode) RestartNode() error {
+	err := tn.StopNode()
+	if err != nil {
+		return errors.AddContext(err, "Could not stop node")
+	}
+	err = tn.StartNode()
+	if err != nil {
+		return errors.AddContext(err, "Could not start node")
+	}
+	return nil
+}
+
+// StartNode starts a TestNode from an active group
+func (tn *TestNode) StartNode() error {
+	err := tn.LoadNode(tn.params)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// StopNode stops a TestNode
+func (tn *TestNode) StopNode() error {
+	return errors.AddContext(tn.Close(), "failed to stop node")
 }
 
 // NewNode creates a new funded TestNode
@@ -72,4 +100,19 @@ func NewCleanNode(nodeParams node.NodeParams) (*TestNode, error) {
 
 	// Return TestNode
 	return tn, nil
+}
+
+// LoadNode loads a TestNode when betwen restarted
+func (tn *TestNode) LoadNode(nodeParams node.NodeParams) error {
+	userAgent := "Sia-Agent"
+	password := "password"
+
+	// Create server
+	s, err := server.New(":0", userAgent, password, nodeParams)
+	if err != nil {
+		return err
+	}
+	tn.Server = *s
+
+	return nil
 }

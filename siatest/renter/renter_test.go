@@ -54,6 +54,7 @@ func TestRenter(t *testing.T) {
 		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
+		{"TestRenterPersistData", testRenterPersistData},
 	}
 	// Run subtests
 	for _, subtest := range subTests {
@@ -713,6 +714,76 @@ func TestRenewFailing(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// testRenterPersistData checks if the RenterSettings are persisted
+func testRenterPersistData(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	r := tg.Renters()[0]
+
+	// Check settings, settings should be defaults
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	// Current defaults are 2,0,0 for StreamCacheSize, MaxDownloadSpeed
+	// and MaxUploadSpeed
+	if rg.Settings.StreamCacheSize != 2 {
+		t.Fatal("StreamCacheSize not set to default of 2, set to", rg.Settings.StreamCacheSize)
+	}
+	if rg.Settings.MaxDownloadSpeed != 0 {
+		t.Fatal("MaxDownloadSpeed not set to default of 0, set to", rg.Settings.MaxDownloadSpeed)
+	}
+	if rg.Settings.MaxUploadSpeed != 0 {
+		t.Fatal("MaxUploadSpeed not set to default of 0, set to", rg.Settings.MaxUploadSpeed)
+	}
+
+	// set settings to new values
+	cacheSize := uint64(4)
+	ds := int64(20)
+	us := int64(10)
+	if err := r.RenterSetStreamCacheSizePost(cacheSize); err != nil {
+		t.Fatalf("%v: Could not set StreamCacheSize to %v", err, cacheSize)
+	}
+	if err := r.RenterPostRateLimit(ds, us); err != nil {
+		t.Fatalf("%v: Could not set RateLimts to %v and %v", err, us, ds)
+	}
+
+	// Confirm Settings were updated
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize != cacheSize {
+		t.Fatalf("StreamCacheSize not set to %v, set to %v", cacheSize, rg.Settings.StreamCacheSize)
+	}
+	if rg.Settings.MaxDownloadSpeed != ds {
+		t.Fatalf("MaxDownloadSpeed not set to %v, set to %v", ds, rg.Settings.MaxDownloadSpeed)
+	}
+	if rg.Settings.MaxUploadSpeed != us {
+		t.Fatalf("MaxUploadSpeed not set to %v, set to %v", us, rg.Settings.MaxUploadSpeed)
+	}
+
+	// restart node
+	err = r.RestartNode()
+	if err != nil {
+		t.Fatal("Failed to restart node:", err)
+	}
+
+	// check settings, settings should be new values
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize != cacheSize {
+		t.Fatalf("StreamCacheSize not persisted as %v, set to %v", cacheSize, rg.Settings.StreamCacheSize)
+	}
+	if rg.Settings.MaxDownloadSpeed != ds {
+		t.Fatalf("MaxDownloadSpeed not persisted as %v, set to %v", ds, rg.Settings.MaxDownloadSpeed)
+	}
+	if rg.Settings.MaxUploadSpeed != us {
+		t.Fatalf("MaxUploadSpeed not persisted as %v, set to %v", us, rg.Settings.MaxUploadSpeed)
 	}
 }
 
