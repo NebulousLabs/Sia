@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"text/tabwriter"
 	"time"
+	"bufio"
 
 	"github.com/spf13/cobra"
 
@@ -272,11 +273,20 @@ func renterallowancecmd() {
 
 // renterallowancecancelcmd cancels the current allowance.
 func renterallowancecancelcmd() {
-	err := httpClient.RenterCancelAllowance()
-	if err != nil {
-		die("error canceling allowance:", err)
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Canceling your allowance will destroy all your contracts and uploaded files immediately.
+		Do you want to continue? [y/N]: ")
+	wantornot, _ := reader.ReadString('\n')
+	if wantornot == "Y"{
+		err := httpClient.RenterCancelAllowance()
+		if err != nil {
+			die("error canceling allowance:", err)
+		}
+		fmt.Println("Allowance canceled.")
 	}
-	fmt.Println("Allowance canceled.")
+	else {
+		die("As directed by the user")
+	}
 }
 
 // rentersetallowancecmd allows the user to set the allowance.
