@@ -449,11 +449,21 @@ func TestRenewFailing(t *testing.T) {
 		}
 	}
 
-	// We should be within the renew window now. We keep mining blocks until
-	// the host with the locked wallet has been replaced. This should happen
-	// before we reach the endHeight of the contracts.
+	// mine enough blocks to reach the second half of the renew window.
+	for ; blockHeight+rg.Settings.Allowance.RenewWindow/2 < rcg.Contracts[0].EndHeight; blockHeight++ {
+		if err := miner.MineBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// We should be within the second half of the renew window now. We keep
+	// mining blocks until the host with the locked wallet has been replaced.
+	// This should happen before we reach the endHeight of the contracts.
+	// We need a pretty large retry window for this since
+	// threadedContractMaintenance can take quite some time to finish and we
+	// need it to be executed after every mined block.
 	replaced := false
-	err = build.Retry(int(rcg.Contracts[0].EndHeight-blockHeight), 100*time.Millisecond, func() error {
+	err = build.Retry(int(rcg.Contracts[0].EndHeight-blockHeight), 5*time.Second, func() error {
 		// contract should be !goodForRenew now.
 		rcg, err = renter.RenterContractsGet()
 		if err != nil {
