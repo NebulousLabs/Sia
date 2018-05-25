@@ -90,7 +90,7 @@ func TestHostObligationAcceptingContracts(t *testing.T) {
 
 	// redundancy should reach 1
 	var rf RenterFiles
-	err = retry(120, time.Millisecond*250, func() error {
+	err = build.Retry(120, time.Millisecond*250, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Available {
 			return nil
@@ -1479,7 +1479,7 @@ func TestHostAndRentReload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = retry(100, time.Millisecond*100, func() error {
+	err = build.Retry(100, time.Millisecond*100, func() error {
 		var hosts HostdbActiveGET
 		err := st.getAPI("/hostdb/active", &hosts)
 		if err != nil {
@@ -1732,7 +1732,7 @@ func TestRedundancyReporting(t *testing.T) {
 
 	// redundancy should reach 2
 	var rf RenterFiles
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
 			return nil
@@ -1747,7 +1747,7 @@ func TestRedundancyReporting(t *testing.T) {
 	stH1.server.Close()
 
 	// wait for the redundancy to decrement
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
 			return nil
@@ -1805,12 +1805,12 @@ func TestRedundancyReporting(t *testing.T) {
 
 	// Wait until the host shows back up in the hostdb.
 	var ah HostdbActiveGET
-	err = retry(250, time.Millisecond*250, func() error {
+	err = build.Retry(1000, 100*time.Millisecond, func() error {
 		if err = st.getAPI("/hostdb/active", &ah); err != nil {
 			t.Fatal(err)
 		}
 		if len(ah.Hosts) != 2 {
-			return errors.New("not enough hosts in hostdb")
+			return fmt.Errorf("not enough hosts in hostdb, number of hosts is: %v", len(ah.Hosts))
 		}
 		for _, host := range ah.Hosts {
 			if len(host.ScanHistory) < 2 {
@@ -1835,7 +1835,7 @@ func TestRedundancyReporting(t *testing.T) {
 	}
 
 	// Redundancy should re-report at 2.
-	err = retry(250, 100*time.Millisecond, func() error {
+	err = build.Retry(250, 100*time.Millisecond, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
 			return nil
@@ -2073,7 +2073,7 @@ func TestRenterMissingHosts(t *testing.T) {
 
 	// redundancy should reach 1.5
 	var rf RenterFiles
-	err = retry(20, time.Second, func() error {
+	err = build.Retry(20, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1.5 {
 			return nil
@@ -2098,7 +2098,7 @@ func TestRenterMissingHosts(t *testing.T) {
 	}
 
 	// redundancy should not decrement, we have a backup host we can use.
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1.5 {
 			return nil
@@ -2123,7 +2123,7 @@ func TestRenterMissingHosts(t *testing.T) {
 	}
 
 	// wait for the redundancy to decrement
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
 			return nil
@@ -2148,7 +2148,7 @@ func TestRenterMissingHosts(t *testing.T) {
 	}
 
 	// wait for the redundancy to decrement
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 0 {
 			return nil
@@ -2238,7 +2238,7 @@ func TestRepairLoopBlocking(t *testing.T) {
 
 	// redundancy should reach 2
 	var rf RenterFiles
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 2 {
 			return nil
@@ -2269,7 +2269,7 @@ func TestRepairLoopBlocking(t *testing.T) {
 	}
 
 	// wait for the redundancy to decrement
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 1 && rf.Files[0].Redundancy == 1 {
 			return nil
@@ -2380,7 +2380,7 @@ func TestRepairLoopBlocking(t *testing.T) {
 	}
 
 	// redundancy should reach 2 for the second file
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) >= 2 && rf.Files[1].Redundancy >= 2 {
 			return nil
@@ -2471,7 +2471,7 @@ func TestRemoteFileRepairMassive(t *testing.T) {
 
 	// redundancy should reach 2 for all files
 	var rf RenterFiles
-	err = retry(600, time.Second, func() error {
+	err = build.Retry(600, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) != numUploads {
 			return errors.New("file not uploaded")
@@ -2500,7 +2500,7 @@ func TestRemoteFileRepairMassive(t *testing.T) {
 	}
 
 	// wait for the redundancy to decrement
-	err = retry(60, time.Second, func() error {
+	err = build.Retry(60, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) != numUploads {
 			return errors.New("file not uploaded")
@@ -2572,7 +2572,7 @@ func TestRemoteFileRepairMassive(t *testing.T) {
 
 	// redundancy should increment back to 2 as the renter uploads to the new
 	// host using the download-to-upload strategy
-	err = retry(300, time.Second, func() error {
+	err = build.Retry(300, time.Second, func() error {
 		st.getAPI("/renter/files", &rf)
 		if len(rf.Files) != numUploads {
 			return errors.New("file not uploaded")

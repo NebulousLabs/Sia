@@ -55,13 +55,9 @@ func (h *Host) managedAddRenewCollateral(so storageObligation, settings modules.
 	if err != nil {
 		return
 	}
-	defer func() {
-		if err != nil {
-			builder.Drop()
-		}
-	}()
 	err = builder.FundSiacoins(hostPortion)
 	if err != nil {
+		builder.Drop()
 		return nil, nil, nil, nil, extendErr("could not add collateral: ", ErrorInternal(err.Error()))
 	}
 

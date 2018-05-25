@@ -82,6 +82,9 @@ type NodeParams struct {
 	RenterDeps      modules.Dependencies
 	WalletDeps      modules.Dependencies
 
+	// Custom settings for modules
+	Allowance modules.Allowance
+
 	// The high level directory where all the persistence gets stored for the
 	// moudles.
 	Dir string

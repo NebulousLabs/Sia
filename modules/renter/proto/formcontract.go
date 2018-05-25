@@ -274,6 +274,10 @@ func (cs *ContractSet) FormContract(params ContractParams, txnBuilder transactio
 		ContractFee: host.ContractPrice,
 		TxnFee:      txnFee,
 		SiafundFee:  types.Tax(startHeight, fc.Payout),
+		Utility: modules.ContractUtility{
+			GoodForUpload: true,
+			GoodForRenew:  true,
+		},
 	}
 
 	// Add contract to set.

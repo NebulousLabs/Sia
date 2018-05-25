@@ -143,6 +143,13 @@ func (c *Client) WalletTransactionsGet(startHeight types.BlockHeight, endHeight 
 	return
 }
 
+// WalletTransactionGet requests the /wallet/transaction/:id api resource for a
+// certain TransactionID.
+func (c *Client) WalletTransactionGet(id types.TransactionID) (wtg api.WalletTransactionGETid, err error) {
+	err = c.get("/wallet/transaction/"+id.String(), wtg)
+	return
+}
+
 // WalletUnlockPost uses the /wallet/unlock endpoint to unlock the wallet with
 // a given encryption key. Per default this key is the seed.
 func (c *Client) WalletUnlockPost(password string) (err error) {

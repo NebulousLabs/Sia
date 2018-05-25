@@ -115,6 +115,9 @@ func (tpt *tpoolTester) Close() error {
 
 // TestIntegrationNewNilInputs tries to trigger a panic with nil inputs.
 func TestIntegrationNewNilInputs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Create a gateway and consensus set.
 	testdir := build.TempDir(modules.TransactionPoolDir, t.Name())
 	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))

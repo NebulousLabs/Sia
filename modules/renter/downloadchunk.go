@@ -14,13 +14,6 @@ import (
 	"github.com/NebulousLabs/errors"
 )
 
-// cacheData contatins the data and the timestamp for the unfinished
-// download chunks
-type cacheData struct {
-	data       []byte
-	lastAccess time.Time
-}
-
 // downloadPieceInfo contains all the information required to download and
 // recover a piece of a chunk from a host. It is a value in a map where the key
 // is the file contract id.
@@ -82,8 +75,7 @@ type unfinishedDownloadChunk struct {
 	mu       sync.Mutex
 
 	// Caching related fields
-	chunkCache map[string]*cacheData
-	cacheMu    *sync.Mutex
+	staticStreamCache *streamCache
 }
 
 // fail will set the chunk status to failed. The physical chunk memory will be
@@ -227,7 +219,12 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	recoveredData := recoverWriter.Bytes()
 
 	// Add the chunk to the cache.
-	udc.addChunkToCache(recoveredData)
+	if udc.download.staticDestinationType == destinationTypeSeekStream {
+		// We only cache streaming chunks since browsers and media players tend
+		// to only request a few kib at once when streaming data. That way we can
+		// prevent scheduling the same chunk for download over and over.
+		udc.staticStreamCache.Add(udc.staticCacheID, recoveredData)
+	}
 
 	// Write the bytes to the requested output.
 	start := udc.staticFetchOffset

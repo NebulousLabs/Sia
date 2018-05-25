@@ -14,6 +14,7 @@ import (
 type TestNode struct {
 	server.Server
 	client.Client
+	params      node.NodeParams
 	primarySeed string
 }
 
@@ -55,7 +56,7 @@ func NewCleanNode(nodeParams node.NodeParams) (*TestNode, error) {
 	c.Password = password
 
 	// Create TestNode
-	tn := &TestNode{*s, *c, ""}
+	tn := &TestNode{*s, *c, nodeParams, ""}
 
 	// Init wallet
 	wip, err := tn.WalletInitPost("", false)
