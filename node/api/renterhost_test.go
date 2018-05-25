@@ -914,9 +914,9 @@ func TestRenterCancelAllowance(t *testing.T) {
 	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
-	testPeriod := "20"
+	testPeriod := 20
 	allowanceValues.Set("funds", testFunds)
-	allowanceValues.Set("period", testPeriod)
+	allowanceValues.Set("period", fmt.Sprint(testPeriod))
 	allowanceValues.Set("renewwindow", testRenewWindow)
 	allowanceValues.Set("hosts", fmt.Sprint(recommendedHosts))
 	err = st.stdPostAPI("/renter", allowanceValues)
@@ -975,8 +975,21 @@ func TestRenterCancelAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Try downloading the file; should fail
+	// Try downloading the file; should succeed.
 	downpath := filepath.Join(st.dir, "testdown.dat")
+	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
+	if err != nil {
+		t.Fatal("downloading file failed", err)
+	}
+
+	// Mine enough blocks for the period to pass and the contracts to expire.
+	for i := 0; i < testPeriod; i++ {
+		if _, err := st.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Try downloading the file; should fail.
 	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
 	if err == nil || !strings.Contains(err.Error(), "download failed") {
 		t.Fatal("expected insufficient hosts error, got", err)

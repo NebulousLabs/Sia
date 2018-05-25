@@ -84,7 +84,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 // managedCancelAllowance handles the special case where the allowance is empty.
 func (c *Contractor) managedCancelAllowance() error {
 	c.log.Println("INFO: canceling allowance")
-	// first need to invalidate any active editors/downloaders
+	// first need to invalidate any active editors
 	// NOTE: this code is the same as in managedRenewContracts
 	ids := c.staticContracts.IDs()
 	c.mu.Lock()
@@ -104,13 +104,9 @@ func (c *Contractor) managedCancelAllowance() error {
 	for _, id := range ids {
 		c.mu.RLock()
 		e, eok := c.editors[id]
-		d, dok := c.downloaders[id]
 		c.mu.RUnlock()
 		if eok {
 			e.invalidate()
-		}
-		if dok {
-			d.invalidate()
 		}
 	}
 
@@ -127,14 +123,21 @@ func (c *Contractor) managedCancelAllowance() error {
 	// Issue an interrupt to any in-progress contract maintenance thread.
 	c.managedInterruptContractMaintenance()
 
-	// Cycle through all contracts and delete them.
+	// Cycle through all contracts and mark them as !goodForRenew and !goodForUpload
 	ids = c.staticContracts.IDs()
 	for _, id := range ids {
 		contract, exists := c.staticContracts.Acquire(id)
 		if !exists {
 			continue
 		}
-		c.staticContracts.Delete(contract)
+		utility := contract.Utility()
+		utility.GoodForRenew = false
+		utility.GoodForUpload = false
+		err := contract.UpdateUtility(utility)
+		c.staticContracts.Return(contract)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

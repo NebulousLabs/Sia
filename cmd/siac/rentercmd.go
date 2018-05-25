@@ -273,7 +273,9 @@ func renterallowancecmd() {
 
 // renterallowancecancelcmd cancels the current allowance.
 func renterallowancecancelcmd() {
-	fmt.Println("Canceling your allowance will destroy all contracts and uploaded files immediately.")
+	fmt.Println(`Canceling your allowance will disable uploading new files,
+repairing existing files, and renewing existing files. All files will cease
+to be accessible after a short period of time.`)
 again:
 	fmt.Print("Do you want to continue? [y/n] ")
 	var resp string
