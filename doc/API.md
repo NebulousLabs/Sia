@@ -908,9 +908,9 @@ funds // hastings
 hosts
 period      // block height
 renewwindow // block height
-maxdownloadspeed  // bytes per second, not persisted and will be reset by a shutdown
-maxuploadspeed  // bytes per second, not persisted and will be reset by a shutdown
-streamcachesize // number of data chunks cached when streaming, not persisted and will be reset by a shutdown
+maxdownloadspeed  // bytes per second
+maxuploadspeed  // bytes per second
+streamcachesize // number of data chunks cached when streaming
 ```
 
 ###### Response

@@ -18,6 +18,7 @@ package renter
 import (
 	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -311,6 +312,15 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 		r.staticStreamCache.SetStreamingCacheSize(s.StreamCacheSize)
 	}
 
+	// Persist Data
+	r.tracking["MaxDownloadSpeed"] = trackedFile{RepairPath: strconv.FormatInt(s.MaxDownloadSpeed, 10)}
+	r.tracking["MaxUploadSpeed"] = trackedFile{RepairPath: strconv.FormatInt(s.MaxUploadSpeed, 10)}
+	r.tracking["StreamCacheSize"] = trackedFile{RepairPath: strconv.FormatUint(s.StreamCacheSize, 10)}
+	err = r.saveSync()
+	if err != nil {
+		return err
+	}
+
 	r.managedUpdateWorkerPool()
 	return nil
 }
@@ -438,15 +448,14 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
-		staticStreamCache: newStreamCache(),
-		cs:                cs,
-		deps:              deps,
-		g:                 g,
-		hostDB:            hdb,
-		hostContractor:    hc,
-		persistDir:        persistDir,
-		mu:                siasync.New(modules.SafeMutexDelay, 1),
-		tpool:             tpool,
+		cs:             cs,
+		deps:           deps,
+		g:              g,
+		hostDB:         hdb,
+		hostContractor: hc,
+		persistDir:     persistDir,
+		mu:             siasync.New(modules.SafeMutexDelay, 1),
+		tpool:          tpool,
 	}
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
@@ -454,6 +463,31 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 	if err := r.initPersist(); err != nil {
 		return nil, err
 	}
+
+	// Set RenterSettings to persisted data
+	settings := r.Settings()
+	if d, ok := r.tracking["MaxDownloadSpeed"]; ok {
+		ds, err := strconv.ParseInt(d.RepairPath, 10, 64)
+		if err != nil {
+			r.log.Println("Could not persist MaxDownloadSpeed:", err)
+			ds = defaultMaxDownloadSpeed
+		}
+		settings.MaxDownloadSpeed = ds
+	}
+	if u, ok := r.tracking["MaxUploadSpee"]; ok {
+		us, err := strconv.ParseInt(u.RepairPath, 10, 64)
+		if err != nil {
+			r.log.Println("Could not persist MaxUploadSpeed:", err)
+			us = defaultMaxUploadSpeed
+		}
+		settings.MaxUploadSpeed = us
+	}
+	if _, ok := r.tracking["StreamCacheSize"]; !ok {
+		r.tracking["StreamCacheSize"] = trackedFile{RepairPath: strconv.FormatUint(defaultStreamCacheSize, 10)}
+	}
+	r.staticStreamCache = r.newStreamCache()
+	settings.StreamCacheSize = r.staticStreamCache.cacheSize
+	r.SetSettings(settings)
 
 	// Subscribe to the consensus set.
 	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())

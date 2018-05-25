@@ -74,6 +74,12 @@ const (
 	// defaultStreamCacheSize is the default cache size of the /renter/stream cache in
 	// chunks, the user can set a custom cache size through the API
 	defaultStreamCacheSize = 2
+
+	// default MaxDownloadSpeed and MaxUploadSpeed are set to zero to
+	// indicate no limit, the user can set a custom MaxDownloadSpeed
+	// and/or MaxUploadSpeed through the API
+	defaultMaxDownloadSpeed = 0
+	defaultMaxUploadSpeed   = 0
 )
 
 var (
