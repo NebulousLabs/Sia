@@ -423,7 +423,9 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 			return err
 		}
 	}
-	return nil
+	// Mine of 1 final block to ensure contracts are mined and show
+	// up in a block
+	return miner.MineBlock()
 }
 
 // AddNodeN adds n nodes of a given template to the group.

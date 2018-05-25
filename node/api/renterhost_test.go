@@ -1810,7 +1810,7 @@ func TestRedundancyReporting(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(ah.Hosts) != 2 {
-			return errors.New("not enough hosts in hostdb")
+			return fmt.Errorf("not enough hosts in hostdb, number of hosts is: %v", len(ah.Hosts))
 		}
 		for _, host := range ah.Hosts {
 			if len(host.ScanHistory) < 2 {
