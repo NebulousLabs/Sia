@@ -36,15 +36,15 @@ var (
 // contracts.
 type Contractor struct {
 	// dependencies
-	cs      consensusSet
-	deps    modules.Dependencies
-	hdb     hostDB
-	log     *persist.Logger
-	mu      sync.RWMutex
-	persist persister
-	tg      siasync.ThreadGroup
-	tpool   transactionPool
-	wallet  wallet
+	cs         consensusSet
+	hdb        hostDB
+	log        *persist.Logger
+	mu         sync.RWMutex
+	persist    persister
+	staticDeps modules.Dependencies
+	tg         siasync.ThreadGroup
+	tpool      transactionPool
+	wallet     wallet
 
 	// Only one thread should be performing contract maintenance at a time.
 	interruptMaintenance chan struct{}
@@ -55,10 +55,11 @@ type Contractor struct {
 	currentPeriod types.BlockHeight
 	lastChange    modules.ConsensusChangeID
 
-	downloaders map[types.FileContractID]*hostDownloader
-	editors     map[types.FileContractID]*hostEditor
-	renewing    map[types.FileContractID]bool // prevent revising during renewal
-	revising    map[types.FileContractID]bool // prevent overlapping revisions
+	downloaders     map[types.FileContractID]*hostDownloader
+	editors         map[types.FileContractID]*hostEditor
+	numFailedRenews map[types.FileContractID]types.BlockHeight
+	renewing        map[types.FileContractID]bool // prevent revising during renewal
+	revising        map[types.FileContractID]bool // prevent overlapping revisions
 
 	staticContracts *proto.ContractSet
 	oldContracts    map[types.FileContractID]modules.RenterContract
@@ -217,13 +218,13 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, contractSet *proto.ContractSet, p persister, l *persist.Logger, deps modules.Dependencies) (*Contractor, error) {
 	// Create the Contractor object.
 	c := &Contractor{
-		cs:      cs,
-		deps:    deps,
-		hdb:     hdb,
-		log:     l,
-		persist: p,
-		tpool:   tp,
-		wallet:  w,
+		cs:         cs,
+		staticDeps: deps,
+		hdb:        hdb,
+		log:        l,
+		persist:    p,
+		tpool:      tp,
+		wallet:     w,
 
 		interruptMaintenance: make(chan struct{}),
 

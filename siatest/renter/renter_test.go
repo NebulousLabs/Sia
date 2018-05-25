@@ -1,17 +1,21 @@
 package renter
 
 import (
-	"errors"
+	"fmt"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/siatest"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -390,6 +394,150 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 		if time.Since(start) > time.Second*30 {
 			t.Fatal("download took longer than 30 seconds")
 		}
+	}
+}
+
+// TestRenewFailing checks if a contract gets marked as !goodForRenew after
+// failing multiple times in a row.
+func TestRenewFailing(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	renterDir, err := siatest.TestDir(filepath.Join(t.Name(), "renter"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a group for the subtests
+	groupParams := siatest.GroupParams{
+		Hosts:  3,
+		Miners: 1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Add a renter with a custom allowance to give it plenty of time to renew
+	// the contract later.
+	renterParams := node.Renter(renterDir)
+	renterParams.Allowance = siatest.DefaultAllowance
+	renterParams.Allowance.Hosts = uint64(len(tg.Hosts()) - 1)
+	renterParams.Allowance.Period = 100
+	renterParams.Allowance.RenewWindow = 50
+	if err = tg.AddNodes(renterParams); err != nil {
+		t.Fatal(err)
+	}
+	renter := tg.Renters()[0]
+
+	// All the contracts of the renter should be goodForRenew.
+	rcg, err := renter.RenterContractsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range rcg.Contracts {
+		if !c.GoodForRenew {
+			t.Fatal("renter got a contract that is !goodForRenew")
+		}
+	}
+	if uint64(len(rcg.Contracts)) != renterParams.Allowance.Hosts {
+		for i, c := range rcg.Contracts {
+			fmt.Println(i, c.HostPublicKey)
+		}
+		t.Fatalf("renter had %v contracts but should have %v",
+			len(rcg.Contracts), renterParams.Allowance.Hosts)
+	}
+
+	// Create a map of the hosts in the group.
+	hostMap := make(map[string]*siatest.TestNode)
+	for _, host := range tg.Hosts() {
+		pk, err := host.HostPublicKey()
+		if err != nil {
+			t.Fatal(err)
+		}
+		hostMap[pk.String()] = host
+	}
+	// Lock the wallet of one of the used hosts to make the renew fail.
+	for _, c := range rcg.Contracts {
+		if host, used := hostMap[c.HostPublicKey.String()]; used {
+			if err := host.WalletLockPost(); err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+	}
+	// Wait until the contract is supposed to be renewed.
+	cg, err := renter.ConsensusGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rg, err := renter.RenterGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	miner := tg.Miners()[0]
+	blockHeight := cg.Height
+	for blockHeight+rg.Settings.Allowance.RenewWindow < rcg.Contracts[0].EndHeight {
+		if err := miner.MineBlock(); err != nil {
+			t.Fatal(err)
+		}
+		blockHeight++
+	}
+
+	// contracts should still be goodForRenew.
+	rcg, err = renter.RenterContractsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range rcg.Contracts {
+		if !c.GoodForRenew {
+			t.Fatal("renter got a contract that is !goodForRenew")
+		}
+	}
+
+	// mine enough blocks to reach the second half of the renew window.
+	for ; blockHeight+rg.Settings.Allowance.RenewWindow/2 < rcg.Contracts[0].EndHeight; blockHeight++ {
+		if err := miner.MineBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// We should be within the second half of the renew window now. We keep
+	// mining blocks until the host with the locked wallet has been replaced.
+	// This should happen before we reach the endHeight of the contracts.
+	replaced := false
+	err = build.Retry(int(rcg.Contracts[0].EndHeight-blockHeight), 5*time.Second, func() error {
+		// contract should be !goodForRenew now.
+		rcg, err = renter.RenterContractsGet()
+		if err != nil {
+			t.Fatal(err)
+		}
+		notGoodForRenew := 0
+		goodForRenew := 0
+		for _, c := range rcg.Contracts {
+			if !c.GoodForRenew {
+				notGoodForRenew++
+			} else {
+				goodForRenew++
+			}
+		}
+		if !replaced && notGoodForRenew != 1 && goodForRenew != 1 {
+			return fmt.Errorf("there should be exactly 1 contract that is !goodForRenew but was %v",
+				notGoodForRenew)
+		}
+		replaced = true
+		if replaced && notGoodForRenew != 1 && goodForRenew != 2 {
+			return fmt.Errorf("contract was set to !goodForRenew but hasn't been replaced yet")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -352,6 +352,10 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 // the accept is successful, the transaction will be relayed to the gateway's
 // other peers.
 func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
+	if err := tp.tg.Add(); err != nil {
+		return err
+	}
+	defer tp.tg.Done()
 	err := conn.SetDeadline(time.Now().Add(relayTransactionSetTimeout))
 	if err != nil {
 		return err

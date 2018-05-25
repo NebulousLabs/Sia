@@ -102,6 +102,11 @@ func (sc *streamCache) pruneCache(size uint64) {
 		}
 		delete(sc.streamMap, cd.id)
 	}
+
+	// Sanity check to confirm the Map and Heap where both pruned
+	if len(sc.streamHeap) != len(sc.streamMap) {
+		build.Critical("streamHeap and streamMap are not the same length")
+	}
 }
 
 // Retrieve tries to retrieve the chunk from the renter's cache. If
