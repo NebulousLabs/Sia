@@ -66,6 +66,46 @@ func TestHeapImplementation(t *testing.T) {
 	}
 }
 
+// TestPruneCache tests to make sure that pruneCache always prunes the cache
+// to the given size
+func TestPruneCache(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// Initializing minimum required variables
+	sc := newStreamCache()
+
+	// Setting cacheSize to large value so reducing it can be tested
+	sc.cacheSize = 10
+
+	// Fill Cache
+	// Purposefully trying to fill to a value larger than cacheSize to confirm
+	// cacheSize won't be exceeded
+	for i := 0; i < int(sc.cacheSize)+5; i++ {
+		sc.Add(strconv.Itoa(i), []byte{})
+	}
+	// Confirm that the streamHeap didn't exceed the cacheSize
+	if len(sc.streamHeap) != int(sc.cacheSize) || len(sc.streamMap) != len(sc.streamHeap) {
+		t.Error("Cache is not equal to the cacheSize")
+	}
+
+	// Prune the cache down to 2
+	sc.pruneCache(2)
+
+	// Confirm that the length of streamHeap was reduced to 2
+	if len(sc.streamHeap) != 2 || len(sc.streamMap) != 2 {
+		t.Error("Cache was not pruned")
+	}
+
+	// Confirm calling pruneCache on a value larger than
+	// the cache size doesn't change the cache
+	sc.pruneCache(20)
+	if len(sc.streamHeap) != 2 || len(sc.streamMap) != 2 {
+		t.Error("Cache size was changed by pruning to larger value")
+	}
+
+}
+
 // TestStreamCache tests that when Add() is called, chunks are added and removed
 // from both the Heap and the Map
 // Retrieve() is tested through the Streaming tests in the siatest packages
@@ -88,16 +128,15 @@ func TestStreamCache(t *testing.T) {
 		sc.Add(strconv.Itoa(i), []byte{})
 	}
 	// Confirm that the streamHeap didn't exceed the cacheSize
-	if len(sc.streamHeap) > int(sc.cacheSize) {
-		t.Error("Heap is larger than set cacheSize")
+	if len(sc.streamHeap) != int(sc.cacheSize) || len(sc.streamMap) != len(sc.streamHeap) {
+		t.Error("Cache is not equal to the cacheSize")
 	}
 
 	// Reduce cacheSize and call Add() to confirm cache is pruned
 	sc.cacheSize = 2
 	sc.Add("", []byte{})
-	// Confirm that the length of streamHeap is the cacheSize
-	if len(sc.streamHeap) != int(sc.cacheSize) {
-		t.Error("Heap is not equal to the cacheSize")
+	if len(sc.streamHeap) != int(sc.cacheSize) || len(sc.streamMap) != len(sc.streamHeap) {
+		t.Error("Cache is not equal to the cacheSize")
 	}
 
 	// Add new chunk with known staticCacheID
@@ -123,7 +162,7 @@ func TestStreamCache(t *testing.T) {
 	// Add additional chunk to force deletion of a chunk
 	sc.Add("chunk2", []byte{})
 
-	// check if chunk1 was removed from Map
+	// check if chunk1 was removed from Map and Heap
 	if _, ok := sc.streamMap["chunk1"]; ok {
 		t.Error("chunk1 wasn't removed from the map")
 	}
