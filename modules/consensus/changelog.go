@@ -121,8 +121,8 @@ func (ce *changeEntry) NextEntry(tx *bolt.Tx) (nextEntry changeEntry, exists boo
 	cl := tx.Bucket(ChangeLog)
 	changeNodeBytes := cl.Get(ceid[:])
 	err := encoding.Unmarshal(changeNodeBytes, &cn)
-	if build.DEBUG && err != nil {
-		panic(err)
+	if err != nil {
+		build.Critical(err)
 	}
 
 	return getEntry(tx, cn.Next)

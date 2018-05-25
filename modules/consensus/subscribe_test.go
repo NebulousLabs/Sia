@@ -1,9 +1,11 @@
 package consensus
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
+	bolt "github.com/coreos/bbolt"
 )
 
 // mockSubscriber receives and holds changes to the consensus set, remembering
@@ -146,5 +148,92 @@ func TestUnsubscribe(t *testing.T) {
 	}
 	if len(ms.updates) != msLen+1 {
 		t.Error("mock subscriber was not correctly unsubscribed")
+	}
+}
+
+// TestModuletDesync is a reproduction test for the bug that caused a module to
+// desync while subscribing to the consensus set.
+func TestModuleDesync(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	deps := &dependencySleepAfterInitializeSubscribe{}
+	cst, err := blankConsensusSetTester(t.Name(), deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	// Mine some blocks.
+	for i := 0; i < 10; i++ {
+		if _, err := cst.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Enable the dependency.
+	ms := newMockSubscriber()
+	deps.enable()
+
+	// Subscribe to the consensusSet non-blocking.
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err = cst.cs.ConsensusSetSubscribe(&ms, modules.ConsensusChangeBeginning, cst.cs.tg.StopChan())
+		if err != nil {
+			t.Error("consensus set returning the wrong error during an invalid subscription:", err)
+		}
+		wg.Done()
+	}()
+
+	// Mine some more blocks to make sure the module falls behind.
+	for i := 0; i < 10; i++ {
+		if _, err := cst.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Wait for the module to be subscribed.
+	wg.Wait()
+
+	// Get all the updates from the consensusSet.
+	updates := make([]modules.ConsensusChange, 0)
+	cst.cs.mu.Lock()
+	err = cst.cs.db.View(func(tx *bolt.Tx) error {
+		entry := cst.cs.genesisEntry()
+		exists := true
+		for ; exists; entry, exists = entry.NextEntry(tx) {
+			cc, err := cst.cs.computeConsensusChange(tx, entry)
+			if err != nil {
+				return err
+			}
+			updates = append(updates, cc)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.cs.mu.Unlock()
+
+	// The received updates should match.
+	if len(updates) != len(ms.updates) {
+		t.Fatal("Number of updates doesn't match")
+	}
+	for i := 0; i < len(updates); i++ {
+		if updates[i].ID != ms.updates[i].ID {
+			t.Fatal("Update IDs don't match")
+		}
+	}
+
+	// Make sure the last update is the recent one in the database.
+	cst.cs.mu.Lock()
+	recentChangeID, err := cst.cs.recentConsensusChangeID()
+	cst.cs.mu.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updates[len(updates)-1].ID != recentChangeID {
+		t.Fatal("last update doesn't equal recentChangeID")
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/fastrand"
 
 	"github.com/coreos/bbolt"
@@ -123,7 +124,27 @@ func (w *Wallet) initPersist() error {
 	if err != nil {
 		return err
 	}
-	return w.tg.AfterStop(func() error { return w.db.Close() })
+	err = w.tg.AfterStop(func() error {
+		var err error
+		if w.dbRollback {
+			// rollback txn if necessry.
+			err = errors.New("database unable to sync - rollback requested")
+			err = errors.Compose(err, w.dbTx.Rollback())
+		} else {
+			// else commit the transaction.
+			err = w.dbTx.Commit()
+		}
+		if err != nil {
+			w.log.Severe("ERROR: failed to apply database update:", err)
+			return errors.AddContext(err, "unable to commit dbTx in syncDB")
+		}
+		return w.db.Close()
+	})
+	if err != nil {
+		return err
+	}
+	go w.threadedDBUpdate()
+	return nil
 }
 
 // createBackup copies the wallet database to dst.

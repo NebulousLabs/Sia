@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -258,7 +257,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 				return err
 			}
 
-			// Try adding the block to consnesus.
+			// Try adding the block to consensus.
 			changeEntry, err := cs.addBlockToTree(tx, blocks[i], parent)
 			if err == nil {
 				changes = append(changes, changeEntry)
@@ -278,10 +277,11 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			if err != nil {
 				return err
 			}
-			// Sanity check - If reverted blocks is zero, applied blocks should also
-			// be zero.
-			if build.DEBUG && len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
-				panic("after adding a change entry, there are no applied blocks but there are reverted blocks")
+			// Sanity check - we should never apply fewer blocks than we revert.
+			if len(changeEntry.AppliedBlocks) < len(changeEntry.RevertedBlocks) {
+				err := errors.New("after adding a change entry, there are more reverted blocks than applied ones")
+				cs.log.Severe(err)
+				return err
 			}
 		}
 		return nil

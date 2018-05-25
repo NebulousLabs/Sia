@@ -113,19 +113,19 @@ func announceAllHosts(sts []*serverTester) error {
 	// Block until every node has completed the scan of every other node, so
 	// that each node has a full hostdb.
 	for _, st := range sts {
-		var ah HostdbActiveGET
-		for i := 0; i < 100; i++ {
+		err := build.Retry(600, 100*time.Millisecond, func() error {
+			var ah HostdbActiveGET
 			err = st.getAPI("/hostdb/active", &ah)
 			if err != nil {
 				return err
 			}
-			if len(ah.Hosts) >= len(sts) {
-				break
+			if len(ah.Hosts) < len(sts) {
+				return errors.New("one of the nodes hostdbs was unable to find at least one host announcement")
 			}
-			time.Sleep(time.Millisecond * 100)
-		}
-		if len(ah.Hosts) < len(sts) {
-			return errors.New("one of the nodes hostdbs was unable to find at least one host announcement")
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 	}
 	return nil

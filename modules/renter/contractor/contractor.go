@@ -277,6 +277,5 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 	if err != nil {
 		return nil, err
 	}
-
 	return c, nil
 }

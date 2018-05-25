@@ -28,7 +28,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 	// Create 8 remote peers.
 	remoteCSTs := make([]*consensusSetTester, 8)
 	for i := range remoteCSTs {
-		cst, err := blankConsensusSetTester(t.Name() + strconv.Itoa(i))
+		cst, err := blankConsensusSetTester(t.Name()+strconv.Itoa(i), modules.ProdDependencies)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -36,7 +36,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		remoteCSTs[i] = cst
 	}
 	// Create the "local" peer.
-	localCST, err := blankConsensusSetTester(t.Name() + "- local")
+	localCST, err := blankConsensusSetTester(t.Name()+"- local", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +330,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	func() {
 		inboundCSTs := make([]*consensusSetTester, 8)
 		for i := 0; i < len(inboundCSTs); i++ {
-			inboundCST, err := blankConsensusSetTester(filepath.Join(t.Name(), " - inbound "+strconv.Itoa(i)))
+			inboundCST, err := blankConsensusSetTester(filepath.Join(t.Name(), " - inbound "+strconv.Itoa(i)), modules.ProdDependencies)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -463,11 +463,11 @@ func TestGenesisBlockSync(t *testing.T) {
 
 	// Create two consensus sets that have zero blocks each (except for the
 	// genesis block).
-	cst1, err := blankConsensusSetTester(t.Name() + "1")
+	cst1, err := blankConsensusSetTester(t.Name()+"1", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst2, err := blankConsensusSetTester(t.Name() + "2")
+	cst2, err := blankConsensusSetTester(t.Name()+"2", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
