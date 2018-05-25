@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
+	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/NebulousLabs/Sia/siatest"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -742,5 +743,150 @@ func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
 	_, err = renter.DownloadByStream(remoteFile)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestRenterSpendingReporting checks the accuracy for the reported
+// spending
+func TestRenterSpendingReporting(t *testing.T) {
+	// Create a group for the subtests
+	groupParams := siatest.GroupParams{
+		Hosts:  1,
+		Miners: 1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Create Renter
+	renterDir, err := siatest.TestDir(t.Name(), "renter")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := siatest.NewCleanNode(node.Renter(renterDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Call Gateway
+	m := tg.Miners()[0]
+	err = r.GatewayConnectPost(m.GatewayAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mwg, err := m.WalletGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rwag, err := r.WalletAddressGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = m.WalletSiacoinsPost(mwg.ConfirmedSiacoinBalance.Div64(2), rwag.Address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = m.MineBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get Wallet Confirmed Siacoin Balance
+	var wg api.WalletGET
+	err = build.Retry(100, 100*time.Millisecond, func() error {
+		wg, err = r.WalletGet()
+		if err != nil {
+			return err
+		}
+
+		if wg.ConfirmedSiacoinBalance.Cmp(types.ZeroCurrency) == 0 {
+			return errors.New("confirmed siacoin balance should be greater should be greater than 0")
+
+		}
+		return nil
+	})
+	if err != nil {
+		// move up
+		t.Fatal("Failed to get wallet:", err)
+	}
+	initialBal := wg.ConfirmedSiacoinBalance
+
+	// Set Allowance
+	var Period, RenewWindow types.BlockHeight
+	Period = 50
+	RenewWindow = 10
+	allowance := modules.Allowance{
+		Funds:       types.NewCurrency64(1000000000000000000),
+		Hosts:       5,
+		Period:      Period,
+		RenewWindow: RenewWindow,
+	}
+	r.RenterPostAllowance(allowance)
+
+	// Compare Spending
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal("Failed to get RenterGet:", err)
+	}
+	wg, err = r.WalletGet()
+	if err != nil {
+		t.Fatal("Failed to get wallet:", err)
+	}
+
+	// Setting variables to easier reference
+	fm := rg.FinancialMetrics
+	// allowance := rg.Settings.Allowance
+
+	totalSpent := fm.ContractFees.Add(fm.UploadSpending).
+		Add(fm.DownloadSpending).Add(fm.StorageSpending)
+	total := totalSpent.Add(fm.Unspent)
+	unspentAllocated := fm.TotalAllocated.Sub(totalSpent)
+	unspentUnallocated := fm.Unspent.Sub(unspentAllocated)
+
+	value := initialBal.Sub(allowance.Funds).Add(unspentUnallocated)
+	if value.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
+		t.Fatalf("Renter Spending does not equal wallet unspent, %v != %v", value, wg.ConfirmedSiacoinBalance)
+	}
+	// Check that renter financial metrics add up to allowance
+	if total.Cmp(allowance.Funds) != 0 {
+		t.Fatalf("Combined Total of reported spending and unspent funds not equal to allowance, %v != %v", total, allowance.Funds)
+	}
+
+	// check renter financial metrics against contracts
+	rc, err := r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Failed to get RenterContracts:", err)
+	}
+	var spending modules.ContractorSpending
+	for _, contract := range rc.Contracts {
+		// Calculate ContractFees
+		spending.ContractFees = spending.ContractFees.Add(contract.Fees)
+		// Calculate TotalAllocated
+		spending.TotalAllocated = spending.TotalAllocated.Add(contract.TotalCost)
+		// Calculate Spending
+		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
+		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
+		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
+	}
+
+	// Compare contract fees
+	if fm.ContractFees.Cmp(spending.ContractFees) != 0 {
+		t.Fatalf("Financial Metrics Contract Fees not equal to Renter Contract Fees, %v != %v", fm.ContractFees, spending.ContractFees)
+	}
+	// Compare Total Allocated
+	if fm.TotalAllocated.Cmp(spending.TotalAllocated) != 0 {
+		t.Fatalf("Financial Metrics Total Allocated not equal to Renter Total Allocated, %v != %v", fm.TotalAllocated, spending.TotalAllocated)
+	}
+	// Compare Spending
+	allSpending := spending.ContractFees.Add(spending.UploadSpending).
+		Add(spending.DownloadSpending).Add(spending.StorageSpending)
+	if totalSpent.Cmp(allSpending) != 0 {
+		t.Fatalf("Financial Metrics Spending not equal to Renter Spending, %v != %v", totalSpent, allSpending)
 	}
 }
