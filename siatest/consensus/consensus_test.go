@@ -115,7 +115,7 @@ func TestConsensusBlocksIDGet(t *testing.T) {
 		// Verify IDs
 		for _, tx := range cbhg.Transactions {
 			// Building transaction of type Transaction to use as
-			// comparison for ID creatation
+			// comparison for ID creation
 			txn := types.Transaction{
 				SiacoinInputs:         tx.SiacoinInputs,
 				FileContractRevisions: tx.FileContractRevisions,
@@ -125,82 +125,76 @@ func TestConsensusBlocksIDGet(t *testing.T) {
 				ArbitraryData:         tx.ArbitraryData,
 				TransactionSignatures: tx.TransactionSignatures,
 			}
-			if len(tx.SiacoinOutputs) != 0 {
-				// Finish building Transaction
-				for _, sco := range tx.SiacoinOutputs {
-					txn.SiacoinOutputs = append(txn.SiacoinOutputs, types.SiacoinOutput{
-						Value:      sco.Value,
-						UnlockHash: sco.UnlockHash,
+			for _, sco := range tx.SiacoinOutputs {
+				txn.SiacoinOutputs = append(txn.SiacoinOutputs, types.SiacoinOutput{
+					Value:      sco.Value,
+					UnlockHash: sco.UnlockHash,
+				})
+			}
+			for i, fc := range tx.FileContracts {
+				txn.FileContracts = append(txn.FileContracts, types.FileContract{
+					FileSize:       fc.FileSize,
+					FileMerkleRoot: fc.FileMerkleRoot,
+					WindowStart:    fc.WindowStart,
+					WindowEnd:      fc.WindowEnd,
+					Payout:         fc.Payout,
+					UnlockHash:     fc.UnlockHash,
+					RevisionNumber: fc.RevisionNumber,
+				})
+				for _, vp := range fc.ValidProofOutputs {
+					txn.FileContracts[i].ValidProofOutputs = append(txn.FileContracts[i].ValidProofOutputs, types.SiacoinOutput{
+						Value:      vp.Value,
+						UnlockHash: vp.UnlockHash,
 					})
 				}
-				// Verify SiacoinOutput IDs
-				for i, sco := range tx.SiacoinOutputs {
-					if sco.ID != txn.SiacoinOutputID(uint64(i)) {
-						t.Fatalf("SiacoinOutputID not as expected, got %v expected %v", sco.ID, txn.SiacoinOutputID(uint64(i)))
+				for _, mp := range fc.MissedProofOutputs {
+					txn.FileContracts[i].MissedProofOutputs = append(txn.FileContracts[i].MissedProofOutputs, types.SiacoinOutput{
+						Value:      mp.Value,
+						UnlockHash: mp.UnlockHash,
+					})
+				}
+			}
+			for _, sfo := range tx.SiafundOutputs {
+				txn.SiafundOutputs = append(txn.SiafundOutputs, types.SiafundOutput{
+					Value:      sfo.Value,
+					UnlockHash: sfo.UnlockHash,
+					ClaimStart: types.ZeroCurrency,
+				})
+			}
+
+			// Verify SiacoinOutput IDs
+			for i, sco := range tx.SiacoinOutputs {
+				if sco.ID != txn.SiacoinOutputID(uint64(i)) {
+					t.Fatalf("SiacoinOutputID not as expected, got %v expected %v", sco.ID, txn.SiacoinOutputID(uint64(i)))
+				}
+			}
+
+			// FileContracts
+			for i, fc := range tx.FileContracts {
+				// Verify FileContract ID
+				fcid := txn.FileContractID(uint64(i))
+				if fc.ID != fcid {
+					t.Fatalf("FileContract ID not as expected, got %v expected %v", fc.ID, fcid)
+				}
+				// Verify ValidProof IDs
+				for j, vp := range fc.ValidProofOutputs {
+					if vp.ID != fcid.StorageProofOutputID(types.ProofValid, uint64(j)) {
+						t.Fatalf("File Contract ValidProofOutputID not as expected, got %v expected %v", vp.ID, fcid.StorageProofOutputID(types.ProofValid, uint64(j)))
+					}
+				}
+				// Verify MissedProof IDs
+				for j, mp := range fc.MissedProofOutputs {
+					if mp.ID != fcid.StorageProofOutputID(types.ProofMissed, uint64(j)) {
+						t.Fatalf("File Contract MissedProofOutputID not as expected, got %v expected %v", mp.ID, fcid.StorageProofOutputID(types.ProofMissed, uint64(j)))
 					}
 				}
 			}
-			if len(tx.FileContracts) != 0 {
-				// Finish building transaction
-				for i, fc := range tx.FileContracts {
-					txn.FileContracts = append(txn.FileContracts, types.FileContract{
-						FileSize:       fc.FileSize,
-						FileMerkleRoot: fc.FileMerkleRoot,
-						WindowStart:    fc.WindowStart,
-						WindowEnd:      fc.WindowEnd,
-						Payout:         fc.Payout,
-						UnlockHash:     fc.UnlockHash,
-						RevisionNumber: fc.RevisionNumber,
-					})
-					for _, vp := range fc.ValidProofOutputs {
-						txn.FileContracts[i].ValidProofOutputs = append(txn.FileContracts[i].ValidProofOutputs, types.SiacoinOutput{
-							Value:      vp.Value,
-							UnlockHash: vp.UnlockHash,
-						})
-					}
-					for _, mp := range fc.MissedProofOutputs {
-						txn.FileContracts[i].MissedProofOutputs = append(txn.FileContracts[i].MissedProofOutputs, types.SiacoinOutput{
-							Value:      mp.Value,
-							UnlockHash: mp.UnlockHash,
-						})
-					}
-				}
-				// FileContracts
-				for i, fc := range tx.FileContracts {
-					// Verify FileContract ID
-					fcid := txn.FileContractID(uint64(i))
-					if fc.ID != fcid {
-						t.Fatalf("FileContract ID not as expected, got %v expected %v", fc.ID, fcid)
-					}
-					// Verify ValidProof IDs
-					for j, vp := range fc.ValidProofOutputs {
-						if vp.ID != fcid.StorageProofOutputID(types.ProofValid, uint64(j)) {
-							t.Fatalf("File Contract ValidProofOutputID not as expected, got %v expected %v", vp.ID, fcid.StorageProofOutputID(types.ProofValid, uint64(j)))
-						}
-					}
-					// Verify MissedProof IDs
-					for j, mp := range fc.MissedProofOutputs {
-						if mp.ID != fcid.StorageProofOutputID(types.ProofMissed, uint64(j)) {
-							t.Fatalf("File Contract MissedProofOutputID not as expected, got %v expected %v", mp.ID, fcid.StorageProofOutputID(types.ProofMissed, uint64(j)))
-						}
-					}
-				}
-			}
-			if len(tx.SiafundOutputs) != 0 {
-				// Finish building transaction
-				for _, sfo := range tx.SiafundOutputs {
-					txn.SiafundOutputs = append(txn.SiafundOutputs, types.SiafundOutput{
-						Value:      sfo.Value,
-						UnlockHash: sfo.UnlockHash,
-						ClaimStart: types.ZeroCurrency,
-					})
-				}
-				// Verify SiafundOutput IDs
-				for i, sfo := range tx.SiafundOutputs {
-					// Failing, switch back to !=
-					if sfo.ID != txn.SiafundOutputID(uint64(i)) {
-						t.Fatalf("SiafundOutputID not as expected, got %v expected %v", sfo.ID, txn.SiafundOutputID(uint64(i)))
-					}
+
+			// Verify SiafundOutput IDs
+			for i, sfo := range tx.SiafundOutputs {
+				// Failing, switch back to !=
+				if sfo.ID != txn.SiafundOutputID(uint64(i)) {
+					t.Fatalf("SiafundOutputID not as expected, got %v expected %v", sfo.ID, txn.SiafundOutputID(uint64(i)))
 				}
 			}
 		}
