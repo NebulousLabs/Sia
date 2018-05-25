@@ -465,32 +465,34 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 	}
 
 	// Set RenterSettings to persisted data
-	settings := r.Settings()
+	var ds, us int64
+	var err error
 	if d, ok := r.tracking["MaxDownloadSpeed"]; ok {
-		ds, err := strconv.ParseInt(d.RepairPath, 10, 64)
+		ds, err = strconv.ParseInt(d.RepairPath, 10, 64)
 		if err != nil {
 			r.log.Println("Could not persist MaxDownloadSpeed:", err)
 			ds = defaultMaxDownloadSpeed
 		}
-		settings.MaxDownloadSpeed = ds
 	}
 	if u, ok := r.tracking["MaxUploadSpee"]; ok {
-		us, err := strconv.ParseInt(u.RepairPath, 10, 64)
+		us, err = strconv.ParseInt(u.RepairPath, 10, 64)
 		if err != nil {
 			r.log.Println("Could not persist MaxUploadSpeed:", err)
 			us = defaultMaxUploadSpeed
 		}
-		settings.MaxUploadSpeed = us
 	}
 	if _, ok := r.tracking["StreamCacheSize"]; !ok {
 		r.tracking["StreamCacheSize"] = trackedFile{RepairPath: strconv.FormatUint(defaultStreamCacheSize, 10)}
 	}
 	r.staticStreamCache = r.newStreamCache()
+	settings := r.Settings()
+	settings.MaxDownloadSpeed = ds
+	settings.MaxUploadSpeed = us
 	settings.StreamCacheSize = r.staticStreamCache.cacheSize
 	r.SetSettings(settings)
 
 	// Subscribe to the consensus set.
-	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
+	err = cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
 	if err != nil {
 		return nil, err
 	}

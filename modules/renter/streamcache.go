@@ -2,6 +2,7 @@ package renter
 
 import (
 	"container/heap"
+	"flag"
 	"strconv"
 	"sync"
 	"time"
@@ -176,7 +177,9 @@ func (r *Renter) newStreamCache() *streamCache {
 	cacheSize, err := strconv.ParseUint(r.tracking["StreamCacheSize"].RepairPath, 10, 64)
 	if err != nil {
 		cacheSize = defaultStreamCacheSize
-		r.log.Println("Could not persist cacheSize:", err)
+		if flag.Lookup("test.v") == nil {
+			r.log.Println("Could not persist cacheSize:", err)
+		}
 	}
 	return &streamCache{
 		streamMap:  make(map[string]*chunkData),
