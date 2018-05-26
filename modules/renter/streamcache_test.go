@@ -74,8 +74,7 @@ func TestPruneCache(t *testing.T) {
 		t.SkipNow()
 	}
 	// Initializing minimum required variables
-	r := &Renter{}
-	sc := r.newStreamCache()
+	sc := newStreamCache()
 
 	// Setting cacheSize to large value so reducing it can be tested
 	sc.cacheSize = 10

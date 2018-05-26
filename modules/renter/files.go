@@ -241,7 +241,7 @@ func (r *Renter) DeleteFile(nickname string) error {
 		return ErrUnknownPath
 	}
 	delete(r.files, nickname)
-	delete(r.tracking, nickname)
+	delete(r.persist.Tracking, nickname)
 
 	err := persist.RemoveFile(filepath.Join(r.persistDir, f.name+ShareExtension))
 	if err != nil {
@@ -297,7 +297,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 		f.mu.RLock()
 		renewing := true
 		var localPath string
-		tf, exists := r.tracking[f.name]
+		tf, exists := r.persist.Tracking[f.name]
 		if exists {
 			localPath = tf.RepairPath
 		}
@@ -351,7 +351,7 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	// Build the FileInfo
 	renewing := true
 	var localPath string
-	tf, exists := r.tracking[file.name]
+	tf, exists := r.persist.Tracking[file.name]
 	if exists {
 		localPath = tf.RepairPath
 	}
@@ -404,9 +404,9 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	// Update the entries in the renter.
 	delete(r.files, currentName)
 	r.files[newName] = file
-	if t, ok := r.tracking[currentName]; ok {
-		delete(r.tracking, currentName)
-		r.tracking[newName] = t
+	if t, ok := r.persist.Tracking[currentName]; ok {
+		delete(r.persist.Tracking, currentName)
+		r.persist.Tracking[newName] = t
 	}
 	err = r.saveSync()
 	if err != nil {

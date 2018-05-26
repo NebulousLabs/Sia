@@ -19,7 +19,6 @@ type TestNode struct {
 }
 
 // RestartNode restarts a TestNode
-// TODO: add safety checks to check for if node is current running or stopped
 func (tn *TestNode) RestartNode() error {
 	err := tn.StopNode()
 	if err != nil {
@@ -36,7 +35,7 @@ func (tn *TestNode) RestartNode() error {
 func (tn *TestNode) StartNode() error {
 	err := tn.LoadNode(tn.params)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "failed to start node")
 	}
 	return nil
 }

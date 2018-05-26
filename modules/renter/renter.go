@@ -18,7 +18,6 @@ package renter
 import (
 	"errors"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -166,8 +165,7 @@ type Renter struct {
 	//
 	// tracking contains a list of files that the user intends to maintain. By
 	// default, files loaded through sharing are not maintained by the user.
-	files    map[string]*file
-	tracking map[string]trackedFile // Map from nickname to metadata.
+	files map[string]*file
 
 	// Download management. The heap has a separate mutex because it is always
 	// accessed in isolation.
@@ -201,6 +199,7 @@ type Renter struct {
 	hostContractor    hostContractor
 	hostDB            hostDB
 	log               *persist.Logger
+	persist           persistence
 	persistDir        string
 	mu                *siasync.RWMutex
 	tg                threadgroup.ThreadGroup
@@ -313,9 +312,9 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	}
 
 	// Persist Data
-	r.tracking["MaxDownloadSpeed"] = trackedFile{RepairPath: strconv.FormatInt(s.MaxDownloadSpeed, 10)}
-	r.tracking["MaxUploadSpeed"] = trackedFile{RepairPath: strconv.FormatInt(s.MaxUploadSpeed, 10)}
-	r.tracking["StreamCacheSize"] = trackedFile{RepairPath: strconv.FormatUint(s.StreamCacheSize, 10)}
+	r.persist.MaxdownloadSpeed = s.MaxDownloadSpeed
+	r.persist.MaxUploadSpeed = s.MaxUploadSpeed
+	r.persist.StreamCacheSize = s.StreamCacheSize
 	err = r.saveSync()
 	if err != nil {
 		return err
@@ -430,8 +429,7 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 	}
 
 	r := &Renter{
-		files:    make(map[string]*file),
-		tracking: make(map[string]trackedFile),
+		files: make(map[string]*file),
 
 		// Making newDownloads a buffered channel means that most of the time, a
 		// new download will trigger an unnecessary extra iteration of the
@@ -448,14 +446,15 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
-		cs:             cs,
-		deps:           deps,
-		g:              g,
-		hostDB:         hdb,
-		hostContractor: hc,
-		persistDir:     persistDir,
-		mu:             siasync.New(modules.SafeMutexDelay, 1),
-		tpool:          tpool,
+		staticStreamCache: newStreamCache(),
+		cs:                cs,
+		deps:              deps,
+		g:                 g,
+		hostDB:            hdb,
+		hostContractor:    hc,
+		persistDir:        persistDir,
+		mu:                siasync.New(modules.SafeMutexDelay, 1),
+		tpool:             tpool,
 	}
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
@@ -465,34 +464,23 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 	}
 
 	// Set RenterSettings to persisted data
-	var ds, us int64
-	var err error
-	if d, ok := r.tracking["MaxDownloadSpeed"]; ok {
-		ds, err = strconv.ParseInt(d.RepairPath, 10, 64)
-		if err != nil {
-			r.log.Println("Could not persist MaxDownloadSpeed:", err)
-			ds = defaultMaxDownloadSpeed
-		}
+	if r.persist.MaxdownloadSpeed == 0 {
+		r.persist.MaxdownloadSpeed = defaultMaxDownloadSpeed
 	}
-	if u, ok := r.tracking["MaxUploadSpee"]; ok {
-		us, err = strconv.ParseInt(u.RepairPath, 10, 64)
-		if err != nil {
-			r.log.Println("Could not persist MaxUploadSpeed:", err)
-			us = defaultMaxUploadSpeed
-		}
+	if r.persist.MaxUploadSpeed == 0 {
+		r.persist.MaxUploadSpeed = defaultMaxUploadSpeed
 	}
-	if _, ok := r.tracking["StreamCacheSize"]; !ok {
-		r.tracking["StreamCacheSize"] = trackedFile{RepairPath: strconv.FormatUint(defaultStreamCacheSize, 10)}
+	if r.persist.StreamCacheSize == 0 {
+		r.persist.StreamCacheSize = defaultStreamCacheSize
 	}
-	r.staticStreamCache = r.newStreamCache()
 	settings := r.Settings()
-	settings.MaxDownloadSpeed = ds
-	settings.MaxUploadSpeed = us
-	settings.StreamCacheSize = r.staticStreamCache.cacheSize
+	settings.MaxDownloadSpeed = r.persist.MaxdownloadSpeed
+	settings.MaxUploadSpeed = r.persist.MaxUploadSpeed
+	settings.StreamCacheSize = r.persist.StreamCacheSize
 	r.SetSettings(settings)
 
 	// Subscribe to the consensus set.
-	err = cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
+	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
 	if err != nil {
 		return nil, err
 	}

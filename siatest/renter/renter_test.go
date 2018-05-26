@@ -722,7 +722,7 @@ func testRenterPersistData(t *testing.T, tg *siatest.TestGroup) {
 	// Grab the first of the group's renters
 	r := tg.Renters()[0]
 
-	// Check settings, settings should be defaults
+	// Check Settings, should be defaults
 	rg, err := r.RenterGet()
 	if err != nil {
 		t.Fatal(err, "Could not get Renter through RenterGet()")
@@ -739,7 +739,7 @@ func testRenterPersistData(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal("MaxUploadSpeed not set to default of 0, set to", rg.Settings.MaxUploadSpeed)
 	}
 
-	// set settings to new values
+	// Set StreamCacheSize, MaxDownloadSpeed, and MaxUploadSpeed to new values
 	cacheSize := uint64(4)
 	ds := int64(20)
 	us := int64(10)
@@ -747,7 +747,7 @@ func testRenterPersistData(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatalf("%v: Could not set StreamCacheSize to %v", err, cacheSize)
 	}
 	if err := r.RenterPostRateLimit(ds, us); err != nil {
-		t.Fatalf("%v: Could not set RateLimts to %v and %v", err, us, ds)
+		t.Fatalf("%v: Could not set RateLimts to %v and %v", err, ds, us)
 	}
 
 	// Confirm Settings were updated
@@ -765,13 +765,13 @@ func testRenterPersistData(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatalf("MaxUploadSpeed not set to %v, set to %v", us, rg.Settings.MaxUploadSpeed)
 	}
 
-	// restart node
+	// Restart node
 	err = r.RestartNode()
 	if err != nil {
 		t.Fatal("Failed to restart node:", err)
 	}
 
-	// check settings, settings should be new values
+	// check Settings, settings should be values set through API endpoints
 	rg, err = r.RenterGet()
 	if err != nil {
 		t.Fatal(err, "Could not get Renter through RenterGet()")

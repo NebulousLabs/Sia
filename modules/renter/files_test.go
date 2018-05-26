@@ -262,7 +262,7 @@ func TestRenterFileListLocalPath(t *testing.T) {
 	f := newTestingFile()
 	f.name = "testname"
 	rt.renter.files["test"] = f
-	rt.renter.tracking[f.name] = trackedFile{
+	rt.renter.persist.Tracking[f.name] = trackedFile{
 		RepairPath: "TestPath",
 	}
 	rt.renter.mu.Unlock(id)
@@ -438,13 +438,13 @@ func TestRenterRenameFile(t *testing.T) {
 	}
 
 	// Renaming should also update the tracking set
-	rt.renter.tracking["1"] = trackedFile{"foo"}
+	rt.renter.persist.Tracking["1"] = trackedFile{"foo"}
 	err = rt.renter.RenameFile("1", "1b")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, oldexists := rt.renter.tracking["1"]
-	_, newexists := rt.renter.tracking["1b"]
+	_, oldexists := rt.renter.persist.Tracking["1"]
+	_, newexists := rt.renter.persist.Tracking["1b"]
 	if oldexists || !newexists {
 		t.Error("renaming should have updated the entry in the tracking set")
 	}

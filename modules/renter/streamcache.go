@@ -2,8 +2,6 @@ package renter
 
 import (
 	"container/heap"
-	"flag"
-	"strconv"
 	"sync"
 	"time"
 
@@ -171,19 +169,12 @@ func (sc *streamCache) SetStreamingCacheSize(cacheSize uint64) {
 }
 
 // newStreamCache creates a new streamCache
-func (r *Renter) newStreamCache() *streamCache {
+func newStreamCache() *streamCache {
 	streamHeap := make(streamHeap, 0, defaultStreamCacheSize)
 	heap.Init(&streamHeap)
-	cacheSize, err := strconv.ParseUint(r.tracking["StreamCacheSize"].RepairPath, 10, 64)
-	if err != nil {
-		cacheSize = defaultStreamCacheSize
-		if flag.Lookup("test.v") == nil {
-			r.log.Println("Could not persist cacheSize:", err)
-		}
-	}
+	// cacheSize not set as it is persisted
 	return &streamCache{
 		streamMap:  make(map[string]*chunkData),
 		streamHeap: streamHeap,
-		cacheSize:  cacheSize,
 	}
 }

@@ -44,6 +44,17 @@ var (
 	shareVersion = "0.4"
 )
 
+type (
+	// persist contains all of the persistent renter data.
+	persistence struct {
+		MaxdownloadSpeed int64
+		MaxUploadSpeed   int64
+		StreamCacheSize  uint64
+		Repairing        map[string]string
+		Tracking         map[string]trackedFile
+	}
+)
+
 // MarshalSia implements the encoding.SiaMarshaller interface, writing the
 // file data to w.
 func (f *file) MarshalSia(w io.Writer) error {
@@ -190,11 +201,7 @@ func (r *Renter) saveFile(f *file) error {
 
 // saveSync stores the current renter data to disk and then syncs to disk.
 func (r *Renter) saveSync() error {
-	data := struct {
-		Tracking map[string]trackedFile
-	}{r.tracking}
-
-	return persist.SaveJSON(saveMetadata, data, filepath.Join(r.persistDir, PersistFilename))
+	return persist.SaveJSON(saveMetadata, r.persist, filepath.Join(r.persistDir, PersistFilename))
 }
 
 // load fetches the saved renter data from disk.
@@ -235,16 +242,13 @@ func (r *Renter) load() error {
 	}
 
 	// Load contracts, repair set, and entropy.
-	data := struct {
-		Tracking  map[string]trackedFile
-		Repairing map[string]string // COMPATv0.4.8
-	}{}
-	err = persist.LoadJSON(saveMetadata, &data, filepath.Join(r.persistDir, PersistFilename))
+	r.persist = persistence{
+		Repairing: make(map[string]string),
+		Tracking:  make(map[string]trackedFile),
+	}
+	err = persist.LoadJSON(saveMetadata, &r.persist, filepath.Join(r.persistDir, PersistFilename))
 	if err != nil {
 		return err
-	}
-	if data.Tracking != nil {
-		r.tracking = data.Tracking
 	}
 
 	return nil
