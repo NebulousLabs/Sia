@@ -30,9 +30,10 @@ type Editor struct {
 	contractSet *ContractSet
 	conn        net.Conn
 	closeChan   chan struct{}
-	once        sync.Once
-	host        modules.HostDBEntry
+	deps        modules.Dependencies
 	hdb         hostDB
+	host        modules.HostDBEntry
+	once        sync.Once
 
 	height types.BlockHeight
 }
@@ -134,6 +135,12 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		return modules.RenterContract{}, crypto.Hash{}, err
 	}
 
+	// Disrupt here before sending the signed revision to the host.
+	if he.deps.Disrupt("InterruptUploadBeforeSendingRevision") {
+		return modules.RenterContract{}, crypto.Hash{},
+			errors.New("InterruptUploadBeforeSendingRevision disrupt")
+	}
+
 	// send revision to host and exchange signatures
 	extendDeadline(he.conn, connTimeout)
 	signedTxn, err := negotiateRevision(he.conn, rev, contract.SecretKey)
@@ -143,6 +150,12 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		he.conn.Close()
 	} else if err != nil {
 		return modules.RenterContract{}, crypto.Hash{}, err
+	}
+
+	// Disrupt here before updating the contract.
+	if he.deps.Disrupt("InterruptUploadAfterSendingRevision") {
+		return modules.RenterContract{}, crypto.Hash{},
+			errors.New("InterruptUploadAfterSendingRevision disrupt")
 	}
 
 	// update contract
@@ -204,6 +217,7 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		contractSet: cs,
 		conn:        conn,
 		closeChan:   closeChan,
+		deps:        cs.deps,
 	}, nil
 }
 
