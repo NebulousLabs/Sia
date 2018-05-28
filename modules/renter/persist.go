@@ -37,7 +37,7 @@ var (
 
 	settingsMetadata = persist.Metadata{
 		Header:  "Renter Persistence",
-		Version: currentPersistVersion,
+		Version: persistVersion,
 	}
 
 	shareHeader  = [15]byte{'S', 'i', 'a', ' ', 'S', 'h', 'a', 'r', 'e', 'd', ' ', 'F', 'i', 'l', 'e'}
