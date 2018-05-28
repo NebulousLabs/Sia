@@ -312,7 +312,7 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	}
 
 	// Persist Data
-	r.persist.MaxdownloadSpeed = s.MaxDownloadSpeed
+	r.persist.MaxDownloadSpeed = s.MaxDownloadSpeed
 	r.persist.MaxUploadSpeed = s.MaxUploadSpeed
 	r.persist.StreamCacheSize = s.StreamCacheSize
 	err = r.saveSync()
@@ -464,17 +464,13 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 	}
 
 	// Set RenterSettings to persisted data
-	if r.persist.MaxdownloadSpeed == 0 {
-		r.persist.MaxdownloadSpeed = defaultMaxDownloadSpeed
-	}
-	if r.persist.MaxUploadSpeed == 0 {
-		r.persist.MaxUploadSpeed = defaultMaxUploadSpeed
-	}
-	if r.persist.StreamCacheSize == 0 {
-		r.persist.StreamCacheSize = defaultStreamCacheSize
+	if settingsMetadata.Version != currentPersistVersion {
+		r.persist.MaxDownloadSpeed = DefaultMaxDownloadSpeed
+		r.persist.MaxUploadSpeed = DefaultMaxUploadSpeed
+		r.persist.StreamCacheSize = DefaultStreamCacheSize
 	}
 	settings := r.Settings()
-	settings.MaxDownloadSpeed = r.persist.MaxdownloadSpeed
+	settings.MaxDownloadSpeed = r.persist.MaxDownloadSpeed
 	settings.MaxUploadSpeed = r.persist.MaxUploadSpeed
 	settings.StreamCacheSize = r.persist.StreamCacheSize
 	r.SetSettings(settings)

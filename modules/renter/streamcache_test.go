@@ -11,7 +11,7 @@ import (
 // TestHeapImplementation tests that the streamCache heap functions properly
 func TestHeapImplementation(t *testing.T) {
 	// Initializing minimum variables
-	streamHeap := make(streamHeap, 0, defaultStreamCacheSize)
+	streamHeap := make(streamHeap, 0, DefaultStreamCacheSize)
 	heap.Init(&streamHeap)
 
 	// Testing Push to Heap

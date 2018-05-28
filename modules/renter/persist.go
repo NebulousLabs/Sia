@@ -35,9 +35,9 @@ var (
 	// ErrNonShareSuffix is an error when the suffix of a file does not match the defined share extension
 	ErrNonShareSuffix = errors.New("suffix of file must be " + ShareExtension)
 
-	saveMetadata = persist.Metadata{
+	settingsMetadata = persist.Metadata{
 		Header:  "Renter Persistence",
-		Version: "0.4",
+		Version: currentPersistVersion,
 	}
 
 	shareHeader  = [15]byte{'S', 'i', 'a', ' ', 'S', 'h', 'a', 'r', 'e', 'd', ' ', 'F', 'i', 'l', 'e'}
@@ -47,10 +47,9 @@ var (
 type (
 	// persist contains all of the persistent renter data.
 	persistence struct {
-		MaxdownloadSpeed int64
+		MaxDownloadSpeed int64
 		MaxUploadSpeed   int64
 		StreamCacheSize  uint64
-		Repairing        map[string]string
 		Tracking         map[string]trackedFile
 	}
 )
@@ -201,7 +200,7 @@ func (r *Renter) saveFile(f *file) error {
 
 // saveSync stores the current renter data to disk and then syncs to disk.
 func (r *Renter) saveSync() error {
-	return persist.SaveJSON(saveMetadata, r.persist, filepath.Join(r.persistDir, PersistFilename))
+	return persist.SaveJSON(settingsMetadata, r.persist, filepath.Join(r.persistDir, PersistFilename))
 }
 
 // load fetches the saved renter data from disk.
@@ -243,10 +242,9 @@ func (r *Renter) load() error {
 
 	// Load contracts, repair set, and entropy.
 	r.persist = persistence{
-		Repairing: make(map[string]string),
-		Tracking:  make(map[string]trackedFile),
+		Tracking: make(map[string]trackedFile),
 	}
-	err = persist.LoadJSON(saveMetadata, &r.persist, filepath.Join(r.persistDir, PersistFilename))
+	err = persist.LoadJSON(settingsMetadata, &r.persist, filepath.Join(r.persistDir, PersistFilename))
 	if err != nil {
 		return err
 	}

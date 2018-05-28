@@ -727,15 +727,13 @@ func testRenterPersistData(t *testing.T, tg *siatest.TestGroup) {
 	if err != nil {
 		t.Fatal(err, "Could not get Renter through RenterGet()")
 	}
-	// Current defaults are 2,0,0 for StreamCacheSize, MaxDownloadSpeed
-	// and MaxUploadSpeed
-	if rg.Settings.StreamCacheSize != 2 {
+	if rg.Settings.StreamCacheSize != renter.DefaultStreamCacheSize {
 		t.Fatal("StreamCacheSize not set to default of 2, set to", rg.Settings.StreamCacheSize)
 	}
-	if rg.Settings.MaxDownloadSpeed != 0 {
+	if rg.Settings.MaxDownloadSpeed != renter.DefaultMaxDownloadSpeed {
 		t.Fatal("MaxDownloadSpeed not set to default of 0, set to", rg.Settings.MaxDownloadSpeed)
 	}
-	if rg.Settings.MaxUploadSpeed != 0 {
+	if rg.Settings.MaxUploadSpeed != renter.DefaultMaxUploadSpeed {
 		t.Fatal("MaxUploadSpeed not set to default of 0, set to", rg.Settings.MaxUploadSpeed)
 	}
 

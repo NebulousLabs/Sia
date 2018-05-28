@@ -170,7 +170,7 @@ func (sc *streamCache) SetStreamingCacheSize(cacheSize uint64) {
 
 // newStreamCache creates a new streamCache
 func newStreamCache() *streamCache {
-	streamHeap := make(streamHeap, 0, defaultStreamCacheSize)
+	streamHeap := make(streamHeap, 0, DefaultStreamCacheSize)
 	heap.Init(&streamHeap)
 	// cacheSize not set as it is persisted
 	return &streamCache{

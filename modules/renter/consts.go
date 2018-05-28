@@ -53,6 +53,10 @@ var (
 )
 
 const (
+	// currentPersistVersion defines the Sia version that the persistence was
+	// last updated
+	currentPersistVersion = "1.3.3"
+
 	// defaultFilePerm defines the default permissions used for a new file if no
 	// permissions are supplied.
 	defaultFilePerm = 0666
@@ -71,15 +75,17 @@ const (
 	// from the /renter/stream endpoint.
 	destinationTypeSeekStream = "httpseekstream"
 
-	// defaultStreamCacheSize is the default cache size of the /renter/stream cache in
+	// DefaultStreamCacheSize is the default cache size of the /renter/stream cache in
 	// chunks, the user can set a custom cache size through the API
-	defaultStreamCacheSize = 2
+	DefaultStreamCacheSize = 2
 
-	// default MaxDownloadSpeed and MaxUploadSpeed are set to zero to
-	// indicate no limit, the user can set a custom MaxDownloadSpeed
-	// and/or MaxUploadSpeed through the API
-	defaultMaxDownloadSpeed = 0
-	defaultMaxUploadSpeed   = 0
+	// DefaultMaxDownloadSpeed is set to zero to indicate no limit, the user
+	// can set a custom MaxDownloadSpeed through the API
+	DefaultMaxDownloadSpeed = 0
+
+	// DefaultMaxUploadSpeed is set to zero to indicate no limit, the user
+	// can set a custom MaxUploadSpeed through the API
+	DefaultMaxUploadSpeed = 0
 )
 
 var (
