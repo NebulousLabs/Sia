@@ -45,6 +45,11 @@ var (
 		Period:      50,
 		RenewWindow: 24,
 	}
+
+	// RenterInitialBalance is the initial ConfirmedSiacoinBalance
+	// of the renter wallet before the allowance is set when creating
+	// a testgroup
+	RenterInitialBalance map[*TestNode]types.Currency
 )
 
 // NewGroup creates a group of TestNodes from node params. All the nodes will
@@ -117,6 +122,7 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		return nil, build.ExtendErr("renter database check failed", err)
 	}
 	// Set renter allowances
+	RenterInitialBalance = make(map[*TestNode]types.Currency)
 	if err := setRenterAllowances(tg.renters); err != nil {
 		return nil, errors.AddContext(err, "failed to set renter allowance")
 	}
@@ -312,6 +318,15 @@ func randomDir() string {
 // setRenterAllowances sets the allowance of each renter
 func setRenterAllowances(renters map[*TestNode]struct{}) error {
 	for renter := range renters {
+		// Get RenterInitialBalance
+		if _, ok := RenterInitialBalance[renter]; !ok {
+			wg, err := renter.WalletGet()
+			if err != nil {
+				return errors.AddContext(err, "could not get wallet for renter within setRenterAllowances")
+			}
+			RenterInitialBalance[renter] = wg.ConfirmedSiacoinBalance
+		}
+		// Set allowance
 		allowance := DefaultAllowance
 		if !reflect.DeepEqual(renter.params.Allowance, modules.Allowance{}) {
 			allowance = renter.params.Allowance

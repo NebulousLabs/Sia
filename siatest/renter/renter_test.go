@@ -12,7 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
-	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/NebulousLabs/Sia/siatest"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -48,13 +47,14 @@ func TestRenter(t *testing.T) {
 		name string
 		test func(*testing.T, *siatest.TestGroup)
 	}{
-		// {"TestRenterStreamingCache", testRenterStreamingCache},
-		// {"TestUploadDownload", testUploadDownload},
-		// {"TestSingleFileGet", testSingleFileGet},
-		// {"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
-		// {"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
-		// {"TestRenterLocalRepair", testRenterLocalRepair},
-		// {"TestRenterRemoteRepair", testRenterRemoteRepair},
+		{"TestRenterStreamingCache", testRenterStreamingCache},
+		{"TestUploadDownload", testUploadDownload},
+		{"TestSingleFileGet", testSingleFileGet},
+		{"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
+		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
+		{"TestRenterLocalRepair", testRenterLocalRepair},
+		{"TestRenterRemoteRepair", testRenterRemoteRepair},
+		{"TestRenterSpendingReporting", testRenterSpendingReporting},
 	}
 	// Run subtests
 	for _, subtest := range subTests {
@@ -746,100 +746,16 @@ func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
 	}
 }
 
-// TestRenterSpendingReporting checks the accuracy for the reported
+// testRenterSpendingReporting checks the accuracy for the reported
 // spending
-func TestRenterSpendingReporting(t *testing.T) {
-	// Create a group for the subtests
-	// Creating without Renter, Renter will be added later so
-	// starting Wallet balance can be recorded
-	groupParams := siatest.GroupParams{
-		Hosts:  1,
-		Miners: 1,
-	}
-	tg, err := siatest.NewGroupFromTemplate(groupParams)
-	if err != nil {
-		t.Fatal("Failed to create group: ", err)
-	}
-	defer func() {
-		if err := tg.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}()
+func testRenterSpendingReporting(t *testing.T, tg *siatest.TestGroup) {
+	// Get Renter
+	r := tg.Renters()[0]
 
-	// Create Renter
-	renterDir, err := siatest.TestDir(t.Name(), "renter")
-	if err != nil {
-		t.Fatal(err)
-	}
-	r, err := siatest.NewCleanNode(node.Renter(renterDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Add Renter to Group
-	m := tg.Miners()[0]
-	err = r.GatewayConnectPost(m.GatewayAddress())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Send Siacoin to Renter
-	mwg, err := m.WalletGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	rwag, err := r.WalletAddressGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = m.WalletSiacoinsPost(mwg.ConfirmedSiacoinBalance.Div64(2), rwag.Address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = m.MineBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Get Wallet Confirmed Siacoin Balance
-	var wg api.WalletGET
-	err = build.Retry(100, 100*time.Millisecond, func() error {
-		wg, err = r.WalletGet()
-		if err != nil {
-			return err
-		}
-
-		if wg.ConfirmedSiacoinBalance.Cmp(types.ZeroCurrency) == 0 {
-			return errors.New("confirmed siacoin balance should be greater should be greater than 0")
-
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal("Failed to get wallet:", err)
-	}
-	initialBal := wg.ConfirmedSiacoinBalance
-
-	// Set Renter Allowance
-	var Period, RenewWindow types.BlockHeight
-	Period = 25
-	RenewWindow = 5
-	allowance := modules.Allowance{
-		Funds:       types.NewCurrency64(100000000), // using small allowance value to speed up test
-		Hosts:       5,
-		Period:      Period,
-		RenewWindow: RenewWindow,
-	}
-	r.RenterPostAllowance(allowance)
-
-	// Compare Spending
+	// Getting initial financial metrics
 	rg, err := r.RenterGet()
 	if err != nil {
 		t.Fatal("Failed to get RenterGet:", err)
-	}
-	wg, err = r.WalletGet()
-	if err != nil {
-		t.Fatal("Failed to get wallet:", err)
 	}
 
 	// Setting variables to easier reference
@@ -847,32 +763,45 @@ func TestRenterSpendingReporting(t *testing.T) {
 	totalSpent := fm.ContractFees.Add(fm.UploadSpending).
 		Add(fm.DownloadSpending).Add(fm.StorageSpending)
 	total := totalSpent.Add(fm.Unspent)
-	unspentAllocated := fm.TotalAllocated.Sub(totalSpent)
-	unspentUnallocated := fm.Unspent.Sub(unspentAllocated)
+	allowance := rg.Settings.Allowance
 
-	// Upload files until renew is triggered so there are old contracts
-	for unspentUnallocated.Cmp(types.ZeroCurrency) > 0 {
+	// Upload and download files to show spending and trigger renew
+	// so there are old contracts
+	var remoteFiles []*siatest.RemoteFile
+	for i := 0; i < int(rg.Settings.Allowance.RenewWindow); i++ {
 		// Upload file, creating a piece for each host in the group
 		dataPieces := uint64(1)
-		parityPieces := uint64(len(tg.Hosts()))
+		parityPieces := uint64(1)
 		fileSize := 100 + siatest.Fuzz()
-		_, _, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+		_, rf, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
 		if err != nil {
 			t.Fatal("Failed to upload a file for testing: ", err)
 		}
-
-		fm = rg.FinancialMetrics
-		totalSpent = fm.ContractFees.Add(fm.UploadSpending).
-			Add(fm.DownloadSpending).Add(fm.StorageSpending)
-		total = totalSpent.Add(fm.Unspent)
-		unspentAllocated = fm.TotalAllocated.Sub(totalSpent)
-		unspentUnallocated = fm.Unspent.Sub(unspentAllocated)
+		remoteFiles = append(remoteFiles, rf)
+	}
+	for _, rf := range remoteFiles {
+		// Download the file synchronously to a file on disk
+		_, err = r.DownloadToDisk(rf, false)
+		if err != nil {
+			t.Fatal("Could not DownloadToDisk:", err)
+		}
 	}
 
-	// Check remaining funds of allowance
-	remainingAllowanceFunds := initialBal.Sub(allowance.Funds).Add(unspentUnallocated)
-	if remainingAllowanceFunds.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		t.Fatalf("Renter Spending does not equal wallet unspent, %v != %v", remainingAllowanceFunds, wg.ConfirmedSiacoinBalance)
+	// Getting financial metrics after uploads and downloads
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal("Failed to get RenterGet:", err)
+	}
+
+	fm = rg.FinancialMetrics
+	totalSpent = fm.ContractFees.Add(fm.UploadSpending).
+		Add(fm.DownloadSpending).Add(fm.StorageSpending)
+	total = totalSpent.Add(fm.Unspent)
+	allowance = rg.Settings.Allowance
+
+	wg, err := r.WalletGet()
+	if err != nil {
+		t.Fatal("Failed to get wallet:", err)
 	}
 
 	// Check that renter financial metrics add up to allowance
@@ -880,11 +809,12 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatalf("Combined Total of reported spending and unspent funds not equal to allowance, %v != %v", total, allowance.Funds)
 	}
 
-	// check renter financial metrics against contracts
+	// check renter financial metrics against contracts contract spending
 	rc, err := r.RenterContractsGet()
 	if err != nil {
-		t.Fatal("Failed to get RenterContracts:", err)
+		t.Fatal("Could not get contracts:", err)
 	}
+
 	var spending modules.ContractorSpending
 	for _, contract := range rc.Contracts {
 		// Calculate ContractFees
@@ -910,5 +840,12 @@ func TestRenterSpendingReporting(t *testing.T) {
 		Add(spending.DownloadSpending).Add(spending.StorageSpending)
 	if totalSpent.Cmp(allSpending) != 0 {
 		t.Fatalf("Financial Metrics Spending not equal to Renter Spending, %v != %v", totalSpent, allSpending)
+	}
+
+	// Check balance after spending, TotalAllocated is spending
+	// and unspentAllocated
+	balanceAfterSpending := siatest.RenterInitialBalance[r].Sub(fm.TotalAllocated)
+	if balanceAfterSpending.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
+		t.Fatalf("Renter Spending does not equal wallet unspent, %v != %v", balanceAfterSpending, wg.ConfirmedSiacoinBalance)
 	}
 }
