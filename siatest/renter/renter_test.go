@@ -54,7 +54,6 @@ func TestRenter(t *testing.T) {
 		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
-		{"TestRenterSpendingReporting", testRenterSpendingReporting},
 	}
 	// Run subtests
 	for _, subtest := range subTests {
@@ -746,9 +745,28 @@ func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
 	}
 }
 
-// testRenterSpendingReporting checks the accuracy for the reported
+// TestRenterSpendingReporting checks the accuracy for the reported
 // spending
-func testRenterSpendingReporting(t *testing.T, tg *siatest.TestGroup) {
+func TestRenterSpendingReporting(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a group for the subtests
+	groupParams := siatest.GroupParams{
+		Hosts:   2,
+		Renters: 1,
+		Miners:  1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 	// Get Renter
 	r := tg.Renters()[0]
 
