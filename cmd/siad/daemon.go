@@ -192,7 +192,7 @@ func startDaemon(config Config) (err error) {
 
 	// listen for kill signals
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, os.Kill)
+	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
 
 	// Print a 'startup complete' message.
 	startupTime := time.Since(loadStart)
