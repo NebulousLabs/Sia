@@ -460,11 +460,15 @@ func (r *Renter) LoadSharedFilesASCII(asciiSia string) ([]string, error) {
 }
 
 func (r *Renter) updatePersistVersionFrom040To133() error {
-	settingsMetadata.Version = persistVersion040
-	err := persist.LoadJSON(settingsMetadata, &r.persist, filepath.Join(r.persistDir, PersistFilename))
+	metadata := persist.Metadata{
+		Header:  settingsMetadata.Header,
+		Version: persistVersion040,
+	}
+
+	err := persist.LoadJSON(metadata, &r.persist, filepath.Join(r.persistDir, PersistFilename))
 	if err != nil {
 		return err
 	}
-	settingsMetadata.Version = persistVersion133
-	return persist.SaveJSON(settingsMetadata, r.persist, filepath.Join(r.persistDir, PersistFilename))
+	metadata.Version = persistVersion133
+	return persist.SaveJSON(metadata, r.persist, filepath.Join(r.persistDir, PersistFilename))
 }
