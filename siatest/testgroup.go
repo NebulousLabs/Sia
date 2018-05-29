@@ -279,9 +279,12 @@ func randomDir() string {
 func setRenterAllowances(renters map[*TestNode]struct{}) error {
 	for renter := range renters {
 		// Set allowance
+		if renter.Params.SkipSetAllowance {
+			continue
+		}
 		allowance := DefaultAllowance
-		if !reflect.DeepEqual(renter.params.Allowance, modules.Allowance{}) {
-			allowance = renter.params.Allowance
+		if !reflect.DeepEqual(renter.Params.Allowance, modules.Allowance{}) {
+			allowance = renter.Params.Allowance
 		}
 		if err := renter.RenterPostAllowance(allowance); err != nil {
 			return err
@@ -480,6 +483,30 @@ func (tg *TestGroup) SetupNodes(setHosts, setNodes, setRenters map[*TestNode]str
 	// Wait for all the renters to form contracts if the haven't got enough
 	// contracts already.
 	if err := waitForContracts(miner, tg.renters, tg.hosts); err != nil {
+		return build.ExtendErr("renters failed to form contracts", err)
+	}
+	// Make sure all nodes are synced
+	if err := synchronizationCheck(miner, tg.nodes); err != nil {
+		return build.ExtendErr("synchronization check 2 failed", err)
+	}
+	return nil
+}
+
+// SetRenterAllowance finished the setup for the renter test node
+func (tg *TestGroup) SetRenterAllowance(renter *TestNode, allowance modules.Allowance) error {
+	if _, ok := tg.renters[renter]; !ok {
+		return errors.New("Can not set allowance for renter not in test group")
+	}
+	miner := mapToSlice(tg.miners)[0]
+	r := make(map[*TestNode]struct{})
+	r[renter] = struct{}{}
+	// Set renter allowances
+	if err := setRenterAllowances(r); err != nil {
+		return build.ExtendErr("failed to set renter allowance", err)
+	}
+	// Wait for all the renters to form contracts if the haven't got enough
+	// contracts already.
+	if err := waitForContracts(miner, r, tg.hosts); err != nil {
 		return build.ExtendErr("renters failed to form contracts", err)
 	}
 	// Make sure all nodes are synced
