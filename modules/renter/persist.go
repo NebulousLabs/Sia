@@ -10,11 +10,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -57,121 +55,6 @@ type (
 		Tracking         map[string]trackedFile
 	}
 )
-
-// MarshalSia implements the encoding.SiaMarshaller interface, writing the
-// file data to w.
-func (f *file) MarshalSia(w io.Writer) error {
-	enc := encoding.NewEncoder(w)
-
-	// encode easy fields
-	err := enc.EncodeAll(
-		f.name,
-		f.size,
-		f.masterKey,
-		f.pieceSize,
-		f.mode,
-	)
-	if err != nil {
-		return err
-	}
-	// COMPATv0.4.3 - encode the bytesUploaded and chunksUploaded fields
-	// TODO: the resulting .sia file may confuse old clients.
-	err = enc.EncodeAll(f.pieceSize*f.numChunks()*uint64(f.erasureCode.NumPieces()), f.numChunks())
-	if err != nil {
-		return err
-	}
-
-	// encode erasureCode
-	switch code := f.erasureCode.(type) {
-	case *rsCode:
-		err = enc.EncodeAll(
-			"Reed-Solomon",
-			uint64(code.dataPieces),
-			uint64(code.numPieces-code.dataPieces),
-		)
-		if err != nil {
-			return err
-		}
-	default:
-		if build.DEBUG {
-			panic("unknown erasure code")
-		}
-		return errors.New("unknown erasure code")
-	}
-	// encode contracts
-	if err := enc.Encode(uint64(len(f.contracts))); err != nil {
-		return err
-	}
-	for _, c := range f.contracts {
-		if err := enc.Encode(c); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// UnmarshalSia implements the encoding.SiaUnmarshaller interface,
-// reconstructing a file from the encoded bytes read from r.
-func (f *file) UnmarshalSia(r io.Reader) error {
-	dec := encoding.NewDecoder(r)
-
-	// COMPATv0.4.3 - decode bytesUploaded and chunksUploaded into dummy vars.
-	var bytesUploaded, chunksUploaded uint64
-
-	// Decode easy fields.
-	err := dec.DecodeAll(
-		&f.name,
-		&f.size,
-		&f.masterKey,
-		&f.pieceSize,
-		&f.mode,
-		&bytesUploaded,
-		&chunksUploaded,
-	)
-	if err != nil {
-		return err
-	}
-	f.staticUID = persist.RandomSuffix()
-
-	// Decode erasure coder.
-	var codeType string
-	if err := dec.Decode(&codeType); err != nil {
-		return err
-	}
-	switch codeType {
-	case "Reed-Solomon":
-		var nData, nParity uint64
-		err = dec.DecodeAll(
-			&nData,
-			&nParity,
-		)
-		if err != nil {
-			return err
-		}
-		rsc, err := NewRSCode(int(nData), int(nParity))
-		if err != nil {
-			return err
-		}
-		f.erasureCode = rsc
-	default:
-		return errors.New("unrecognized erasure code type: " + codeType)
-	}
-
-	// Decode contracts.
-	var nContracts uint64
-	if err := dec.Decode(&nContracts); err != nil {
-		return err
-	}
-	f.contracts = make(map[types.FileContractID]fileContract)
-	var contract fileContract
-	for i := uint64(0); i < nContracts; i++ {
-		if err := dec.Decode(&contract); err != nil {
-			return err
-		}
-		f.contracts[contract.ID] = contract
-	}
-	return nil
-}
 
 // saveFile saves a file to the renter directory.
 func (r *Renter) saveFile(f *file) error {

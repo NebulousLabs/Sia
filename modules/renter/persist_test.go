@@ -1,7 +1,6 @@
 package renter
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,25 +51,6 @@ func equalFiles(f1, f2 *file) error {
 		return fmt.Errorf("pieceSizes do not match: %v %v", f1.pieceSize, f2.pieceSize)
 	}
 	return nil
-}
-
-// TestFileMarshalling tests the MarshalSia and UnmarshalSia functions of the
-// file type.
-func TestFileMarshalling(t *testing.T) {
-	savedFile := newTestingFile()
-	buf := new(bytes.Buffer)
-	savedFile.MarshalSia(buf)
-
-	loadedFile := new(file)
-	err := loadedFile.UnmarshalSia(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = equalFiles(savedFile, loadedFile)
-	if err != nil {
-		t.Fatal(err)
-	}
 }
 
 // TestFileShareLoad tests the sharing/loading functions of the renter.
