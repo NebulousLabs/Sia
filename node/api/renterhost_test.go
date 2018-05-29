@@ -975,6 +975,28 @@ func TestRenterCancelAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Give it some time to mark the contracts as !goodForUpload and
+	// !goodForRenew.
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		var rc RenterContracts
+		err = st.getAPI("/renter/contracts", &rc)
+		if err != nil {
+			return errors.New("couldn't get renter stats")
+		}
+		for _, c := range rc.Contracts {
+			if c.GoodForUpload {
+				return errors.New("contract shouldn't be goodForUpload")
+			}
+			if c.GoodForRenew {
+				return errors.New("contract shouldn't be goodForRenew")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Try downloading the file; should succeed.
 	downpath := filepath.Join(st.dir, "testdown.dat")
 	err = st.stdGetAPI("/renter/download/test?destination=" + downpath)
