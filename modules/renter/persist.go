@@ -42,6 +42,10 @@ var (
 
 	shareHeader  = [15]byte{'S', 'i', 'a', ' ', 'S', 'h', 'a', 'r', 'e', 'd', ' ', 'F', 'i', 'l', 'e'}
 	shareVersion = "0.4"
+
+	// Persist Version Numbers
+	persistVersion040 = "0.4"
+	persistVersion133 = "1.3.3"
 )
 
 type (
@@ -240,13 +244,19 @@ func (r *Renter) load() error {
 		return err
 	}
 
-	// Load contracts, repair set, and entropy.
+	// Load contracts and entropy.
 	r.persist = persistence{
 		Tracking: make(map[string]trackedFile),
 	}
 	err = persist.LoadJSON(settingsMetadata, &r.persist, filepath.Join(r.persistDir, PersistFilename))
 	if err != nil {
-		return err
+		err = r.updatePersistVersionFrom040To133()
+		if err != nil {
+			return err
+		}
+		if err = r.load(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -447,4 +457,14 @@ func (r *Renter) LoadSharedFilesASCII(asciiSia string) ([]string, error) {
 
 	dec := base64.NewDecoder(base64.URLEncoding, bytes.NewBufferString(asciiSia))
 	return r.loadSharedFiles(dec)
+}
+
+func (r *Renter) updatePersistVersionFrom040To133() error {
+	settingsMetadata.Version = persistVersion040
+	err := persist.LoadJSON(settingsMetadata, &r.persist, filepath.Join(r.persistDir, PersistFilename))
+	if err != nil {
+		return err
+	}
+	settingsMetadata.Version = persistVersion133
+	return persist.SaveJSON(settingsMetadata, r.persist, filepath.Join(r.persistDir, PersistFilename))
 }
