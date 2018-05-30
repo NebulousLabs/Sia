@@ -2,6 +2,8 @@ package renter
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -54,7 +56,6 @@ func TestRenter(t *testing.T) {
 		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
-		{"TestRenterPersistData", testRenterPersistData},
 	}
 	// Run subtests
 	for _, subtest := range subTests {
@@ -521,7 +522,7 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 	prev := rg.Settings.StreamCacheSize
 
 	// Test setting to 0
-	if err := r.RenterSetStreamCacheSizePost(0); err != nil {
+	if err := r.RenterSetStreamCacheSizePost(0); err == nil {
 		t.Fatal(err, "Error in calling RenterSetStreamCacheSizePost(0)")
 	}
 	rg, err = r.RenterGet()
@@ -717,10 +718,62 @@ func TestRenewFailing(t *testing.T) {
 	}
 }
 
-// testRenterPersistData checks if the RenterSettings are persisted
-func testRenterPersistData(t *testing.T, tg *siatest.TestGroup) {
-	// Grab the first of the group's renters
-	r := tg.Renters()[0]
+// TestRenterPersistData checks if the RenterSettings are persisted
+func TestRenterPersistData(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Get test directory
+	testdir, err := siatest.TestDir(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Copying legacy file to test directory
+	renterDir := filepath.Join(testdir, "renter")
+	destination := filepath.Join(renterDir, "renter.json")
+	err = os.MkdirAll(renterDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	from, err := os.Open("../../compatibility/renter_v04.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	to, err := os.OpenFile(destination, os.O_RDWR|os.O_CREATE, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = io.Copy(to, from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = from.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err = to.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create new node from legacy renter.json persistence file
+	r, err := siatest.NewNode(node.AllModules(testdir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err = r.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Set renter allowance to finish renter set up
+	// Currently /renter POST endpoint errors if the allowance
+	// is not previously set or passed in as an argument
+	err = r.RenterPostAllowance(siatest.DefaultAllowance)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Check Settings, should be defaults
 	rg, err := r.RenterGet()
@@ -728,13 +781,16 @@ func testRenterPersistData(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal(err, "Could not get Renter through RenterGet()")
 	}
 	if rg.Settings.StreamCacheSize != renter.DefaultStreamCacheSize {
-		t.Fatal("StreamCacheSize not set to default of 2, set to", rg.Settings.StreamCacheSize)
+		t.Fatalf("StreamCacheSize not set to default of %v, set to %v",
+			renter.DefaultStreamCacheSize, rg.Settings.StreamCacheSize)
 	}
 	if rg.Settings.MaxDownloadSpeed != renter.DefaultMaxDownloadSpeed {
-		t.Fatal("MaxDownloadSpeed not set to default of 0, set to", rg.Settings.MaxDownloadSpeed)
+		t.Fatalf("MaxDownloadSpeed not set to default of %v, set to %v",
+			renter.DefaultMaxDownloadSpeed, rg.Settings.MaxDownloadSpeed)
 	}
 	if rg.Settings.MaxUploadSpeed != renter.DefaultMaxUploadSpeed {
-		t.Fatal("MaxUploadSpeed not set to default of 0, set to", rg.Settings.MaxUploadSpeed)
+		t.Fatalf("MaxUploadSpeed not set to default of %v, set to %v",
+			renter.DefaultMaxUploadSpeed, rg.Settings.MaxUploadSpeed)
 	}
 
 	// Set StreamCacheSize, MaxDownloadSpeed, and MaxUploadSpeed to new values
