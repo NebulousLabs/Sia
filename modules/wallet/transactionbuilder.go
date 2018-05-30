@@ -761,6 +761,17 @@ outer:
 		}
 	}
 
+	// add UnlockConditions for each output. If we don't know the
+	// UnlockConditions, they aren't actually spendable.
+	filtered = outputs[:0]
+	for _, o := range outputs {
+		if sk, ok := w.keys[o.UnlockHash]; ok {
+			o.UnlockConditions = sk.UnlockConditions
+			filtered = append(filtered, o)
+		}
+	}
+	outputs = filtered
+
 	return outputs
 }
 

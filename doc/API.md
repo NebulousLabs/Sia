@@ -1659,6 +1659,10 @@ returns a list of outputs that the wallet can spend.
       "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       "fundtype": "siacoin output",
       "confirmationheight": 50000,
+      "unlockconditions": {
+        "publickeys": [{"algorithm":"ed25519","key":"/XUGj8PxMDkqdae6Js6ubcERxfxnXN7XPjZyANBZH1I="}],
+        "signaturesrequired": 1
+      },
       "unlockhash": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
       "value": "1234" // big int
     }

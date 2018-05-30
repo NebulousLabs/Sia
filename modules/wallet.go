@@ -107,11 +107,12 @@ type (
 	// A SpendableOutput is a SiacoinOutput or SiafundOutput that the wallet
 	// can spend.
 	SpendableOutput struct {
-		ID                 types.OutputID    `json:"id"`
-		FundType           types.Specifier   `json:"fundtype"`
-		UnlockHash         types.UnlockHash  `json:"unlockhash"`
-		Value              types.Currency    `json:"value"`
-		ConfirmationHeight types.BlockHeight `json:"confirmationheight"`
+		ID                 types.OutputID         `json:"id"`
+		FundType           types.Specifier        `json:"fundtype"`
+		UnlockConditions   types.UnlockConditions `json:"unlockconditions"`
+		UnlockHash         types.UnlockHash       `json:"unlockhash"`
+		Value              types.Currency         `json:"value"`
+		ConfirmationHeight types.BlockHeight      `json:"confirmationheight"`
 	}
 
 	// TransactionBuilder is used to construct custom transactions. A transaction

@@ -759,7 +759,18 @@ returns a list of outputs that the wallet can spend.
       // block height.
       "confirmationheight": 50000,
 
-      // UnlockHash of the output.
+      // Unlock conditions of the output. These conditions must be met in
+      // order to spend the output.
+      "unlockconditions": {
+        "timelock": 0,
+        "publickeys": [{
+          "algorithm": "ed25519",
+          "key": "/XUGj8PxMDkqdae6Js6ubcERxfxnXN7XPjZyANBZH1I="
+        }],
+        "signaturesrequired": 1
+      },
+
+      // Hash of the unlock conditions, commonly known as the "address".
       "unlockhash": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
 
       // Amount of funds in the output; hastings for siacoin outputs, and
