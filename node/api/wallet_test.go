@@ -687,7 +687,7 @@ func TestWalletTransactionGETid(t *testing.T) {
 		t.Fatal(err)
 	}
 	// There should be at least one unconfirmed transaction:
-	err = retry(50, time.Millisecond*100, func() error {
+	err = build.Retry(50, time.Millisecond*100, func() error {
 		if len(wtg.UnconfirmedTransactions) < 1 {
 			return errors.New("unconfirmed transaction not found")
 		}

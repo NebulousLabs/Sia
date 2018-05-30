@@ -456,6 +456,17 @@ func (c *Contractor) threadedContractMaintenance() {
 		c.log.Printf("renewing %v contracts", len(renewSet))
 	}
 
+	// Remove contracts that are not scheduled for renew from firstFailedRenew.
+	c.mu.Lock()
+	newFirstFailedRenew := make(map[types.FileContractID]types.BlockHeight)
+	for _, r := range renewSet {
+		if _, exists := c.numFailedRenews[r.id]; exists {
+			newFirstFailedRenew[r.id] = c.numFailedRenews[r.id]
+		}
+	}
+	c.numFailedRenews = newFirstFailedRenew
+	c.mu.Unlock()
+
 	// Loop through the contracts and renew them one-by-one.
 	for _, renewal := range renewSet {
 		// Pull the variables out of the renewal.
@@ -502,10 +513,39 @@ func (c *Contractor) threadedContractMaintenance() {
 				return
 			}
 			// Perform the actual renew. If the renew fails, return the
-			// contract.
-			newContract, err := c.managedRenew(oldContract, amount, endHeight)
-			if err != nil {
-				c.log.Printf("WARN: failed to renew contract %v: %v\n", id, err)
+			// contract. If the renew fails we check how often it has failed
+			// before. Once it has failed for a certain number of blocks in a
+			// row and reached its second half of the renew window, we give up
+			// on renewing it and set goodForRenew to false.
+			newContract, errRenew := c.managedRenew(oldContract, amount, endHeight)
+			if errRenew != nil {
+				// Increment the number of failed renews for the contract.
+				c.mu.Lock()
+				c.numFailedRenews[oldContract.Metadata().ID]++
+				c.mu.Unlock()
+
+				// Check if contract has to be replaced.
+				md := oldContract.Metadata()
+				c.mu.RLock()
+				numRenews, failedBefore := c.numFailedRenews[md.ID]
+				c.mu.RUnlock()
+				secondHalfOfWindow := blockHeight+allowance.RenewWindow/2 >= md.EndHeight
+				replace := numRenews >= consecutiveRenewalsBeforeReplacement
+				if failedBefore && secondHalfOfWindow && replace {
+					oldUtility.GoodForRenew = false
+					err := oldContract.UpdateUtility(oldUtility)
+					if err != nil {
+						c.log.Println("WARN: failed to mark contract as !goodForRenew:", err)
+					}
+					c.log.Printf("WARN: failed to renew %v, marked as bad: %v\n", id, errRenew)
+					c.staticContracts.Return(oldContract)
+					return
+				}
+
+				// Seems like it doesn't have to be replaced yet. Log the
+				// failure and number of renews that have failed so far.
+				c.log.Printf("WARN: failed to renew contract %v [%v]: %v\n",
+					id, numRenews, errRenew)
 				c.staticContracts.Return(oldContract)
 				return
 			}

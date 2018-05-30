@@ -1,7 +1,6 @@
 package contractor
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +8,8 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -171,15 +172,19 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// wait for goroutine in ProcessConsensusChange to finish
-	time.Sleep(100 * time.Millisecond)
-	c.maintenanceLock.Lock()
-	c.maintenanceLock.Unlock()
 
 	// downloader should have been invalidated
-	_, err = downloader.Sector(crypto.Hash{})
-	if err != errInvalidDownloader {
-		t.Error("expected invalid downloader error; got", err)
+	err = build.Retry(50, 100*time.Millisecond, func() error {
+		// wait for goroutine in ProcessConsensusChange to finish
+		c.maintenanceLock.Lock()
+		c.maintenanceLock.Unlock()
+		_, err2 := downloader.Sector(crypto.Hash{})
+		if err2 != errInvalidDownloader {
+			return errors.AddContext(err, "expected invalid downloader error")
+		}
+		return downloader.Close()
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-	downloader.Close()
 }

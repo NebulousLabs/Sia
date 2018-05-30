@@ -20,8 +20,6 @@ import (
 	"errors"
 	"io"
 	"sync"
-
-	"github.com/NebulousLabs/Sia/modules"
 )
 
 // downloadDestination is a wrapper for the different types of writing that we
@@ -82,8 +80,8 @@ func (dw downloadDestinationBuffer) WriteAt(data []byte, offset int64) (int, err
 	}
 	written := len(data)
 	for len(data) > 0 {
-		shardIndex := offset / int64(modules.SectorSize)
-		sliceIndex := offset % int64(modules.SectorSize)
+		shardIndex := offset / int64(pieceSize)
+		sliceIndex := offset % int64(pieceSize)
 		n := copy(dw[shardIndex][sliceIndex:], data)
 		data = data[n:]
 		offset += int64(n)

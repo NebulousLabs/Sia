@@ -208,7 +208,10 @@ func (d *download) managedFail(err error) {
 	// Mark the download as complete and set the error.
 	d.err = err
 	close(d.completeChan)
-	err = d.destination.Close()
+	if d.destination != nil {
+		err = d.destination.Close()
+		d.destination = nil
+	}
 	if err != nil {
 		d.log.Println("unable to close download destination:", err)
 	}
@@ -434,9 +437,8 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 			physicalChunkData: make([][]byte, params.file.erasureCode.NumPieces()),
 			pieceUsage:        make([]bool, params.file.erasureCode.NumPieces()),
 
-			download:   d,
-			chunkCache: r.chunkCache,
-			cacheMu:    r.cmu,
+			download:          d,
+			staticStreamCache: r.staticStreamCache,
 		}
 
 		// Set the fetchOffset - the offset within the chunk that we start

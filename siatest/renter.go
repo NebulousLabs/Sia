@@ -220,6 +220,7 @@ func (tn *TestNode) UploadNewFileBlocking(filesize int, dataPieces uint64, parit
 // contents of tf2 after the download is finished. WaitForDownload also
 // verifies the checksum of the downloaded file.
 func (tn *TestNode) WaitForDownload(lf *LocalFile, rf *RemoteFile) error {
+	var downloadErr error
 	err := Retry(1000, 100*time.Millisecond, func() error {
 		file, err := tn.DownloadInfo(lf, rf)
 		if err != nil {
@@ -231,10 +232,13 @@ func (tn *TestNode) WaitForDownload(lf *LocalFile, rf *RemoteFile) error {
 		if !file.Completed {
 			return errors.New("download hasn't finished yet")
 		}
+		if file.Error != "" {
+			downloadErr = errors.New(file.Error)
+		}
 		return nil
 	})
-	if err != nil {
-		return err
+	if err != nil || downloadErr != nil {
+		return errors.Compose(err, downloadErr)
 	}
 	// Verify checksum
 	return lf.checkIntegrity()

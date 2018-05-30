@@ -212,13 +212,14 @@ The JSON formatted block or a standard error response.
     "parentid": "0000000000009615e8db750eb1226aa5e629bfa7badbfe0b79607ec8b918a44c",
     "timestamp": 1444516982,
     "transactions": [
-	{
+        {
 	    // ...
-	}
+        },
         {
             "arbitrarydata": [],
             "filecontractrevisions": [],
             "filecontracts": [],
+            "id": "3c98ec79b990461f353c22bb06bcfb10e702f529ad7d27a43c4448273553d90a",
             "minerfees": [],
             "siacoininputs": [
                 {
@@ -237,10 +238,12 @@ The JSON formatted block or a standard error response.
             ],
             "siacoinoutputs": [
                 {
+                    "id": "1f9da81e23522f79590ac67ac0b668828c52b341cbf04df4959bb7040c072f29",
                     "unlockhash": "d54f500f6c1774d518538dbe87114fe6f7e6c76b5bc8373a890b12ce4b8909a336106a4cd6db",
                     "value": "1010000000000000000000000000"
                 },
                 {
+                    "id": "14978a4c54f5ebd910ea41537de014f8423574c13d132e8713fab5af09ec08ca",
                     "unlockhash": "48a56b19bd0be4f24190640acbd0bed9669ea9c18823da2645ec1ad9652f10b06c5d4210f971",
                     "value": "5780000000000000000000000000"
                 }
@@ -877,7 +880,10 @@ returns the current settings along with metrics on the renter's spending.
       "hosts":       24,
       "period":      6048, // blocks
       "renewwindow": 3024  // blocks
-    }
+    },
+    "maxuploadspeed":     1234, // BPS
+    "maxdownloadspeed":   1234, // BPS
+    "streamcachesize":  4    
   },
   "financialmetrics": {
     "contractfees":     "1234", // hastings
@@ -902,6 +908,9 @@ funds // hastings
 hosts
 period      // block height
 renewwindow // block height
+maxdownloadspeed  // bytes per second, not persisted and will be reset by a shutdown
+maxuploadspeed  // bytes per second, not persisted and will be reset by a shutdown
+streamcachesize // number of data chunks cached when streaming, not persisted and will be reset by a shutdown
 ```
 
 ###### Response

@@ -5,7 +5,6 @@ package wallet
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -19,6 +18,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/threadgroup"
 )
 
@@ -185,24 +185,10 @@ func NewCustomWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, per
 			return nil, err
 		}
 		// Save changes to disk
-		w.syncDB()
-	}
-
-	// make sure we commit on shutdown
-	err = w.tg.AfterStop(func() error {
-		err := w.dbTx.Commit()
-		if err != nil {
-			w.log.Println("ERROR: failed to apply database update:", err)
-			w.dbTx.Rollback()
-			return err
+		if err = w.syncDB(); err != nil {
+			return nil, err
 		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
-	go w.threadedDBUpdate()
-
 	return w, nil
 }
 

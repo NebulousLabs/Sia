@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -272,6 +273,21 @@ func renterallowancecmd() {
 
 // renterallowancecancelcmd cancels the current allowance.
 func renterallowancecancelcmd() {
+	fmt.Println(`Canceling your allowance will disable uploading new files,
+repairing existing files, and renewing existing files. All files will cease
+to be accessible after a short period of time.`)
+again:
+	fmt.Print("Do you want to continue? [y/n] ")
+	var resp string
+	fmt.Scanln(&resp)
+	switch strings.ToLower(resp) {
+	case "y", "yes":
+		// continue below
+	case "n", "no":
+		return
+	default:
+		goto again
+	}
 	err := httpClient.RenterCancelAllowance()
 	if err != nil {
 		die("error canceling allowance:", err)

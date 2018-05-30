@@ -13,6 +13,9 @@ import (
 // TestLogger checks that the basic functions of the file logger work as
 // designed.
 func TestLogger(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Create a folder for the log file.
 	testdir := build.TempDir(persistDir, t.Name())
 	err := os.MkdirAll(testdir, 0700)

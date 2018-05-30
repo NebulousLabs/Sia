@@ -1,6 +1,9 @@
 package consensus
 
 import (
+	"errors"
+	"time"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
@@ -95,7 +98,7 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 	return cc, nil
 }
 
-// readLockUpdateSubscribers will inform all subscribers of a new update to the
+// updateSubscribers will inform all subscribers of a new update to the
 // consensus set. updateSubscribers does not alter the changelog, the changelog
 // must be updated beforehand.
 func (cs *ConsensusSet) updateSubscribers(ce changeEntry) {
@@ -125,17 +128,18 @@ func (cs *ConsensusSet) updateSubscribers(ce changeEntry) {
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.
 func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID,
-	cancel <-chan struct{}) error {
+	cancel <-chan struct{}) (modules.ConsensusChangeID, error) {
 
 	if start == modules.ConsensusChangeRecent {
-		return nil
+		cs.mu.Lock()
+		defer cs.mu.Unlock()
+		return cs.recentConsensusChangeID()
 	}
 
 	// 'exists' and 'entry' are going to be pointed to the first entry that
 	// has not yet been seen by subscriber.
 	var exists bool
 	var entry changeEntry
-
 	cs.mu.RLock()
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		if start == modules.ConsensusChangeBeginning {
@@ -165,16 +169,23 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 	})
 	cs.mu.RUnlock()
 	if err != nil {
-		return err
+		return modules.ConsensusChangeID{}, err
+	}
+
+	// Nothing to do if the changeEntry doesn't exist.
+	if !exists {
+		return start, nil
 	}
 
 	// Send all remaining consensus changes to the subscriber.
+	latestChangeID := entry.ID()
 	for exists {
 		// Send changes in batches of 100 so that we don't hold the
 		// lock for too long.
 		cs.mu.RLock()
 		err = cs.db.View(func(tx *bolt.Tx) error {
 			for i := 0; i < 100 && exists; i++ {
+				latestChangeID = entry.ID()
 				select {
 				case <-cancel:
 					return siasync.ErrStopped
@@ -191,10 +202,25 @@ func (cs *ConsensusSet) managedInitializeSubscribe(subscriber modules.ConsensusS
 		})
 		cs.mu.RUnlock()
 		if err != nil {
-			return err
+			return modules.ConsensusChangeID{}, err
 		}
 	}
-	return nil
+	return latestChangeID, nil
+}
+
+// recentConsensusChangeID gets the ConsensusChangeID of the most recent
+// change.
+func (cs *ConsensusSet) recentConsensusChangeID() (cid modules.ConsensusChangeID, err error) {
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		cl := tx.Bucket(ChangeLog)
+		d := cl.Get(ChangeLogTailID)
+		if d == nil {
+			return errors.New("failed to retrieve recentConsensusChangeID")
+		}
+		copy(cid[:], d[:])
+		return nil
+	})
+	return
 }
 
 // ConsensusSetSubscribe adds a subscriber to the list of subscribers, and
@@ -212,14 +238,42 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 	}
 	defer cs.tg.Done()
 
-	// Get the input module caught up to the current consensus set.
-	err = cs.managedInitializeSubscribe(subscriber, start, cancel)
-	if err != nil {
-		return err
+	// Call managedInitializeSubscribe until the new module is up-to-date.
+	for {
+		start, err = cs.managedInitializeSubscribe(subscriber, start, cancel)
+		if err != nil {
+			return err
+		}
+		if cs.staticDeps.Disrupt("SleepAfterInitializeSubscribe") {
+			time.Sleep(10 * time.Second)
+		}
+		// Check if the start equals the most recent change id. If it does we
+		// are done. If it doesn't, we need to call managedInitializeSubscribe
+		// again.
+		cs.mu.Lock()
+		recentID, err := cs.recentConsensusChangeID()
+		if err != nil {
+			cs.mu.Unlock()
+			return err
+		}
+		if start == recentID {
+			// break out of the loop while still holding to lock to avoid
+			// updating subscribers before the new module is appended to the
+			// list of subscribers.
+			defer cs.mu.Unlock()
+			break
+		}
+		cs.mu.Unlock()
+
+		// Check for shutdown.
+		select {
+		case <-cs.tg.StopChan():
+			return siasync.ErrStopped
+		default:
+		}
 	}
 
 	// Add the module to the list of subscribers.
-	cs.mu.Lock()
 	// Sanity check - subscriber should not be already subscribed.
 	for _, s := range cs.subscribers {
 		if s == subscriber {
@@ -227,7 +281,6 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 		}
 	}
 	cs.subscribers = append(cs.subscribers, subscriber)
-	cs.mu.Unlock()
 	return nil
 }
 

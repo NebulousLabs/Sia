@@ -102,15 +102,15 @@ func (w *Wallet) syncDB() error {
 	// atomic update there  was a failure, and that failure needs to be rolled
 	// back. An error will be returned.
 	if w.dbRollback {
-		w.dbTx.Rollback()
-		return errors.New("database unable to sync - rollback requested")
+		err := errors.New("database unable to sync - rollback requested")
+		return errors.Compose(err, w.dbTx.Rollback())
 	}
 
 	// commit the current tx
 	err := w.dbTx.Commit()
 	if err != nil {
 		w.log.Severe("ERROR: failed to apply database update:", err)
-		w.dbTx.Rollback()
+		err = errors.Compose(err, w.dbTx.Rollback())
 		return errors.AddContext(err, "unable to commit dbTx in syncDB")
 	}
 	// begin a new tx

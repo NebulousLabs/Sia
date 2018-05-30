@@ -26,7 +26,9 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.syncDB()
+	if err = w.syncDB(); err != nil {
+		return
+	}
 
 	txnIndices, _ := dbGetAddrTransactions(w.dbTx, uh)
 	for _, i := range txnIndices {
@@ -49,7 +51,9 @@ func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modu
 	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.syncDB()
+	if err = w.syncDB(); err != nil {
+		return
+	}
 
 	// Scan the full list of unconfirmed transactions to see if there are any
 	// related transactions.
@@ -84,7 +88,9 @@ func (w *Wallet) Transaction(txid types.TransactionID) (pt modules.ProcessedTran
 	// ensure durability of reported transaction
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.syncDB()
+	if err = w.syncDB(); err != nil {
+		return
+	}
 
 	// Get the keyBytes for the given txid
 	keyBytes, err := dbGetTransactionIndex(w.dbTx, txid)
@@ -107,7 +113,9 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 	// ensure durability of reported transactions
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.syncDB()
+	if err = w.syncDB(); err != nil {
+		return
+	}
 
 	height, err := dbGetConsensusHeight(w.dbTx)
 	if err != nil {

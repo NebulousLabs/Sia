@@ -96,12 +96,18 @@ const (
 	// that both the host and the renter can have time to process large Merkle
 	// tree calculations that may be involved with renewing a file contract.
 	NegotiateRenewContractTime = 600 * time.Second
+)
 
+var (
 	// NegotiateSettingsTime establishes the minimum amount of time that the
 	// connection deadline is expected to be set to when settings are being
 	// requested from the host. The deadline is long enough that the connection
 	// should be successful even if both parties are on Tor.
-	NegotiateSettingsTime = 120 * time.Second
+	NegotiateSettingsTime = build.Select(build.Var{
+		Dev:      120 * time.Second,
+		Standard: 120 * time.Second,
+		Testing:  3 * time.Second,
+	}).(time.Duration)
 )
 
 var (

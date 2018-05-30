@@ -91,7 +91,7 @@ func (cst *consensusSetTester) mineSiacoins() {
 
 // blankConsensusSetTester creates a consensusSetTester that has only the
 // genesis block.
-func blankConsensusSetTester(name string) (*consensusSetTester, error) {
+func blankConsensusSetTester(name string, deps modules.Dependencies) (*consensusSetTester, error) {
 	testdir := build.TempDir(modules.ConsensusDir, name)
 
 	// Create modules.
@@ -99,7 +99,7 @@ func blankConsensusSetTester(name string) (*consensusSetTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs, err := New(g, false, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := NewCustomConsensusSet(g, false, filepath.Join(testdir, modules.ConsensusDir), deps)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func blankConsensusSetTester(name string) (*consensusSetTester, error) {
 // createConsensusSetTester creates a consensusSetTester that's ready for use,
 // including siacoins and siafunds available in the wallet.
 func createConsensusSetTester(name string) (*consensusSetTester, error) {
-	cst, err := blankConsensusSetTester(name)
+	cst, err := blankConsensusSetTester(name, modules.ProdDependencies)
 	if err != nil {
 		return nil, err
 	}
