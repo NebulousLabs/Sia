@@ -548,6 +548,7 @@ func (tg *TestGroup) RemoveNode(tn *TestNode) error {
 	return tn.Close()
 }
 
+// Sync syncs the node of the test group
 func (tg *TestGroup) Sync() error {
 	var miner *TestNode
 	var height types.BlockHeight
