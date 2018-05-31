@@ -102,13 +102,22 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
 		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
 		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
-		// TODO: fix PreviousContracts
-		// for _, pre := range contract.PreviousContracts {
-		// 	spending.ContractSpending = spending.ContractSpending.Add(pre.TotalCost)
-		// 	spending.DownloadSpending = spending.DownloadSpending.Add(pre.DownloadSpending)
-		// 	spending.UploadSpending = spending.UploadSpending.Add(pre.UploadSpending)
-		// 	spending.StorageSpending = spending.StorageSpending.Add(pre.StorageSpending)
-		// }
+	}
+
+	// Calculate spending from contracts that were renewed during the current period
+	for _, old := range c.oldContracts {
+		if old.StartHeight >= c.currentPeriod {
+			// Calculate ContractFees
+			spending.ContractFees = spending.ContractFees.Add(old.ContractFee)
+			spending.ContractFees = spending.ContractFees.Add(old.TxnFee)
+			spending.ContractFees = spending.ContractFees.Add(old.SiafundFee)
+			// Calculate TotalAllocated
+			spending.TotalAllocated = spending.TotalAllocated.Add(old.TotalCost)
+			// Calculate Spending
+			spending.DownloadSpending = spending.DownloadSpending.Add(old.DownloadSpending)
+			spending.UploadSpending = spending.UploadSpending.Add(old.UploadSpending)
+			spending.StorageSpending = spending.StorageSpending.Add(old.StorageSpending)
+		}
 	}
 	// Calculate amount of spent money to get unspent money.
 	allSpending := spending.ContractFees

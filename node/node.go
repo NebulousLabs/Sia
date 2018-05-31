@@ -85,6 +85,9 @@ type NodeParams struct {
 	// Custom settings for modules
 	Allowance modules.Allowance
 
+	// The following fields are used to skip parts of the node set up
+	SkipSetAllowance bool
+
 	// The high level directory where all the persistence gets stored for the
 	// moudles.
 	Dir string

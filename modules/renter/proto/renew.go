@@ -274,13 +274,18 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 
 	// Construct contract header.
 	header := contractHeader{
-		Transaction: revisionTxn,
-		SecretKey:   ourSK,
-		StartHeight: startHeight,
-		TotalCost:   funding,
-		ContractFee: host.ContractPrice,
-		TxnFee:      txnFee,
-		SiafundFee:  types.Tax(startHeight, fc.Payout),
+		Transaction:     revisionTxn,
+		SecretKey:       ourSK,
+		StartHeight:     startHeight,
+		TotalCost:       funding,
+		ContractFee:     host.ContractPrice,
+		TxnFee:          txnFee,
+		SiafundFee:      types.Tax(startHeight, fc.Payout),
+		StorageSpending: basePrice,
+		Utility: modules.ContractUtility{
+			GoodForUpload: true,
+			GoodForRenew:  true,
+		},
 	}
 
 	// Get old roots

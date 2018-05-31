@@ -66,7 +66,7 @@ func (c *Contractor) managedInterruptContractMaintenance() {
 }
 
 // managedMarkContractsUtility checks every active contract in the contractor and
-// figures out whether the contract is useful for uploading, and whehter the
+// figures out whether the contract is useful for uploading, and whether the
 // contract should be renewed.
 func (c *Contractor) managedMarkContractsUtility() error {
 	// Pull a new set of hosts from the hostdb that could be used as a new set
@@ -337,7 +337,6 @@ func (c *Contractor) threadedContractMaintenance() {
 	for _, contract := range c.staticContracts.ViewAll() {
 		// Calculate the cost of the contract line.
 		contractLineCost := contract.TotalCost
-		// TODO: add previous contracts here
 
 		// Check if the contract is expiring. The funds in the contract are
 		// handled differently based on this information.
@@ -393,7 +392,6 @@ func (c *Contractor) threadedContractMaintenance() {
 			// subtracting out all of the fees, and then all of the unused
 			// money that was allocated (the RenterFunds).
 			renewAmount := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee).Sub(contract.RenterFunds)
-			// TODO: add previous contracts here
 
 			// Get an estimate for how much the fees will cost.
 			//
@@ -570,9 +568,6 @@ func (c *Contractor) threadedContractMaintenance() {
 			// If the contract is a mid-cycle renew, add the contract line to
 			// the new contract. The contract line is not included/extended if
 			// we are just renewing because the contract is expiring.
-			if _, exists := refreshSet[id]; exists {
-				// TODO: update PreviousContracts
-			}
 
 			// Lock the contractor as we update it to use the new contract
 			// instead of the old contract.
