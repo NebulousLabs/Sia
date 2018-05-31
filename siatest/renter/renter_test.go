@@ -792,7 +792,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Set allowance
 	if err = tg.SetRenterAllowance(r, siatest.DefaultAllowance); err != nil {
-		t.Fatal("Failed to set renter:", err)
+		t.Fatal("Failed to set renter allowance:", err)
 	}
 
 	// Get initial Contracts to check for contract renewal later
@@ -817,7 +817,8 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 	balanceAfterSetAllowance := initialBalance.Sub(fm.TotalAllocated)
 	if balanceAfterSetAllowance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		t.Fatalf("Renter Reported Spending does not equal wallet confirmed balance, \n%v != \n%v", balanceAfterSetAllowance, wg.ConfirmedSiacoinBalance)
+		t.Fatalf("Renter Reported Spending does not equal wallet confirmed balance, \n%v != \n%v",
+			balanceAfterSetAllowance, wg.ConfirmedSiacoinBalance)
 	}
 
 	// Upload and download files to show spending
@@ -859,16 +860,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 	// Waiting for nodes to sync
 	if err = tg.Sync(); err != nil {
 		t.Fatal(err)
-	}
-
-	// Check spending after contract renewal
-	wg, err = r.WalletGet()
-	if err != nil {
-		t.Fatal("Failed to get wallet:", err)
-	}
-	rg, err = r.RenterGet()
-	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
 	}
 
 	// Get renewed renter contracts
@@ -936,10 +927,11 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Check that renter financial metrics add up to allowance
 	if total.Cmp(allowance.Funds) != 0 {
-		t.Fatalf("Combined Total of reported spending and unspent funds not equal to allowance, \n%v != \n%v", total, allowance.Funds)
+		t.Fatalf("Combined Total of reported spending and unspent funds not equal to allowance, \n%v != \n%v",
+			total, allowance.Funds)
 	}
 
-	// Check renter financial metrics against contracts contract spending
+	// Check renter financial metrics against contract spending
 	var spending modules.ContractorSpending
 	for _, contract := range initialContracts {
 		if contract.StartHeight >= rg.CurrentPeriod {
@@ -966,17 +958,20 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Compare contract fees
 	if fm.ContractFees.Cmp(spending.ContractFees) != 0 {
-		t.Fatalf("Financial Metrics Contract Fees not equal to Renter Contract Fees, \n%v != \n%v", fm.ContractFees, spending.ContractFees)
+		t.Fatalf("Financial Metrics Contract Fees not equal to Renter Contract Fees, \n%v != \n%v",
+			fm.ContractFees, spending.ContractFees)
 	}
 	// Compare Total Allocated
 	if fm.TotalAllocated.Cmp(spending.TotalAllocated) != 0 {
-		t.Fatalf("Financial Metrics Total Allocated not equal to Renter Total Allocated, \n%v != \n%v", fm.TotalAllocated, spending.TotalAllocated)
+		t.Fatalf("Financial Metrics Total Allocated not equal to Renter Total Allocated, \n%v != \n%v",
+			fm.TotalAllocated, spending.TotalAllocated)
 	}
 	// Compare Spending
 	allSpending := spending.ContractFees.Add(spending.UploadSpending).
 		Add(spending.DownloadSpending).Add(spending.StorageSpending)
 	if totalSpent.Cmp(allSpending) != 0 {
-		t.Fatalf("Financial Metrics Spending not equal to Renter Spending, \n%v != \n%v", totalSpent, allSpending)
+		t.Fatalf("Financial Metrics Spending not equal to Renter Spending, \n%v != \n%v",
+			totalSpent, allSpending)
 	}
 
 	// Check balance after spending, TotalAllocated is spending
