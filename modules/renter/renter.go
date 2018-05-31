@@ -15,6 +15,11 @@ package renter
 // bottlenecks, and reduce the amount of channel-ninjitsu required to make the
 // uploading function.
 
+// TODO: Allow user to configure the packet size when ratelimiting the renter.
+// Currently the default is set to 16kb. That's going to require updating the
+// API and extending the settings object, and then tweaking the
+// setBandwidthLimits function.
+
 import (
 	"errors"
 	"reflect"
@@ -165,8 +170,7 @@ type Renter struct {
 	//
 	// tracking contains a list of files that the user intends to maintain. By
 	// default, files loaded through sharing are not maintained by the user.
-	files    map[string]*file
-	tracking map[string]trackedFile // Map from nickname to metadata.
+	files map[string]*file
 
 	// Download management. The heap has a separate mutex because it is always
 	// accessed in isolation.
@@ -200,6 +204,7 @@ type Renter struct {
 	hostContractor    hostContractor
 	hostDB            hostDB
 	log               *persist.Logger
+	persist           persistence
 	persistDir        string
 	mu                *siasync.RWMutex
 	tg                threadgroup.ThreadGroup
@@ -286,31 +291,69 @@ func (r *Renter) PriceEstimation() modules.RenterPriceEstimation {
 	return est
 }
 
+// setBandwidthLimits will change the bandwidth limits of the renter based on
+// the persist values for the bandwidth.
+func (r *Renter) setBandwidthLimits(downloadSpeed int64, uploadSpeed int64) error {
+	// Input validation.
+	if downloadSpeed < 0 || uploadSpeed < 0 {
+		return errors.New("download/upload rate limit can't be below 0")
+	}
+
+	// Check for sentinal "no limits" value.
+	if downloadSpeed == 0 && uploadSpeed == 0 {
+		r.hostContractor.SetRateLimits(0, 0, 0)
+	} else {
+		// Set the rate limits according to the provided values.
+		r.hostContractor.SetRateLimits(downloadSpeed, uploadSpeed, 4*4096)
+	}
+	return nil
+}
+
 // SetSettings will update the settings for the renter.
+//
+// NOTE: This function can't be atomic. Typically we try to have user requests
+// be atomic, so that either everything changes or nothing changes, but since
+// these changes happen progressively, it's possible for some of the settings
+// (like the allowance) to succeed, but then if the bandwidth limits for example
+// are bad, then the allowance will update but the bandwidth will not update.
 func (r *Renter) SetSettings(s modules.RenterSettings) error {
+	// Early input valudation.
+	if s.MaxDownloadSpeed < 0 || s.MaxUploadSpeed < 0 {
+		return errors.New("bandwidth limits cannot be negative")
+	}
+	if s.StreamCacheSize <= 0 {
+		return errors.New("stream cache size needs to be 1 or larger")
+	}
+
 	// Set allowance.
 	err := r.hostContractor.SetAllowance(s.Allowance)
 	if err != nil {
 		return err
 	}
-	// Set ratelimit
-	if s.MaxDownloadSpeed < 0 || s.MaxUploadSpeed < 0 {
-		return errors.New("download/upload rate limit can't be below 0")
+
+	// Set the bandwidth limits.
+	err = r.setBandwidthLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed)
+	if err != nil {
+		return err
 	}
-	if s.MaxDownloadSpeed == 0 && s.MaxUploadSpeed == 0 {
-		r.hostContractor.SetRateLimits(0, 0, 0)
-	} else {
-		// TODO: In the future we might want the user to be able to configure
-		// the packetSize using the API. For now the sane default is 16kib if
-		// the user wants to limit the connection.
-		r.hostContractor.SetRateLimits(s.MaxDownloadSpeed, s.MaxUploadSpeed, 4*4096)
-	}
+	r.persist.MaxDownloadSpeed = s.MaxDownloadSpeed
+	r.persist.MaxUploadSpeed = s.MaxUploadSpeed
 
 	// Set StreamingCacheSize
-	if s.StreamCacheSize > 0 {
-		r.staticStreamCache.SetStreamingCacheSize(s.StreamCacheSize)
+	err = r.staticStreamCache.SetStreamingCacheSize(s.StreamCacheSize)
+	if err != nil {
+		return err
+	}
+	r.persist.StreamCacheSize = s.StreamCacheSize
+
+	// Save the changes.
+	err = r.saveSync()
+	if err != nil {
+		return err
 	}
 
+	// Update the worker pool so that the changes are immediately apparent to
+	// users.
 	r.managedUpdateWorkerPool()
 	return nil
 }
@@ -420,8 +463,7 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 	}
 
 	r := &Renter{
-		files:    make(map[string]*file),
-		tracking: make(map[string]trackedFile),
+		files: make(map[string]*file),
 
 		// Making newDownloads a buffered channel means that most of the time, a
 		// new download will trigger an unnecessary extra iteration of the
@@ -438,25 +480,40 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 
 		workerPool: make(map[types.FileContractID]*worker),
 
-		staticStreamCache: newStreamCache(),
-		cs:                cs,
-		deps:              deps,
-		g:                 g,
-		hostDB:            hdb,
-		hostContractor:    hc,
-		persistDir:        persistDir,
-		mu:                siasync.New(modules.SafeMutexDelay, 1),
-		tpool:             tpool,
+		cs:             cs,
+		deps:           deps,
+		g:              g,
+		hostDB:         hdb,
+		hostContractor: hc,
+		persistDir:     persistDir,
+		mu:             siasync.New(modules.SafeMutexDelay, 1),
+		tpool:          tpool,
 	}
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
 	// Load all saved data.
+	id := r.mu.Lock()
 	if err := r.initPersist(); err != nil {
+		r.mu.Unlock(id)
+		return nil, err
+	}
+	r.mu.Unlock(id)
+
+	// Set the bandwidth limits, sincce the contractor doesn't persist them.
+	//
+	// TODO: Reconsider the way that the bandwidth limits are allocated to the
+	// renter module, becaause really it seems they only impact the contractor.
+	// The renter itself doesn't actually do any uploading or downloading.
+	err := r.setBandwidthLimits(r.persist.MaxDownloadSpeed, r.persist.MaxUploadSpeed)
+	if err != nil {
 		return nil, err
 	}
 
+	// Initialize the streaming cache.
+	r.staticStreamCache = newStreamCache(r.persist.StreamCacheSize)
+
 	// Subscribe to the consensus set.
-	err := cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
+	err = cs.ConsensusSetSubscribe(r, modules.ConsensusChangeRecent, r.tg.StopChan())
 	if err != nil {
 		return nil, err
 	}

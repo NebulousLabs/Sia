@@ -161,20 +161,26 @@ func (sc *streamCache) Retrieve(udc *unfinishedDownloadChunk) bool {
 // the default value set during the initialization of the streamCache.
 // It will also prune the cache to ensure the cache is always
 // less than or equal to whatever the cacheSize is set to
-func (sc *streamCache) SetStreamingCacheSize(cacheSize uint64) {
+func (sc *streamCache) SetStreamingCacheSize(cacheSize uint64) error {
+	if cacheSize == 0 {
+		return errors.New("cache size cannot be zero")
+	}
+
 	sc.mu.Lock()
-	defer sc.mu.Unlock()
 	sc.cacheSize = cacheSize
 	sc.pruneCache(sc.cacheSize)
+	sc.mu.Unlock()
+	return nil
 }
 
-// newStreamCache creates a new streamCache
-func newStreamCache() *streamCache {
-	streamHeap := make(streamHeap, 0, defaultStreamCacheSize)
+// initStreamCache initializes the streaming cache of the renter.
+func newStreamCache(cacheSize uint64) *streamCache {
+	streamHeap := make(streamHeap, 0, cacheSize)
 	heap.Init(&streamHeap)
+
 	return &streamCache{
 		streamMap:  make(map[string]*chunkData),
 		streamHeap: streamHeap,
-		cacheSize:  defaultStreamCacheSize,
+		cacheSize:  cacheSize,
 	}
 }

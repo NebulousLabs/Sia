@@ -106,7 +106,7 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	defer f.mu.Unlock()
 
 	// If the file is not being tracked, don't repair it.
-	trackedFile, exists := r.tracking[f.name]
+	trackedFile, exists := r.persist.Tracking[f.name]
 	if !exists {
 		return nil
 	}
