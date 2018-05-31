@@ -1,9 +1,0 @@
-"Renter Persistence"
-"1.3.3"
-"c60d1ebbff6eff23c61904025824d90c6e7ecc06a59fef32cf357017816b9269"
-{
-	"MaxDownloadSpeed": 0,
-	"MaxUploadSpeed": 0,
-	"StreamCacheSize": 2,
-	"Tracking": null
-}

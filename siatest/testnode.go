@@ -33,10 +33,16 @@ func (tn *TestNode) RestartNode() error {
 
 // StartNode starts a TestNode from an active group
 func (tn *TestNode) StartNode() error {
-	err := tn.LoadNode(tn.params)
+	userAgent := "Sia-Agent"
+	password := "password"
+
+	// Create server
+	s, err := server.New(":0", userAgent, password, tn.params)
 	if err != nil {
-		return errors.AddContext(err, "failed to start node")
+		return err
 	}
+	tn.Server = *s
+
 	return nil
 }
 
@@ -99,19 +105,4 @@ func NewCleanNode(nodeParams node.NodeParams) (*TestNode, error) {
 
 	// Return TestNode
 	return tn, nil
-}
-
-// LoadNode loads a TestNode when betwen restarted
-func (tn *TestNode) LoadNode(nodeParams node.NodeParams) error {
-	userAgent := "Sia-Agent"
-	password := "password"
-
-	// Create server
-	s, err := server.New(":0", userAgent, password, nodeParams)
-	if err != nil {
-		return err
-	}
-	tn.Server = *s
-
-	return nil
 }

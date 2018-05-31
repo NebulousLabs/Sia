@@ -340,7 +340,10 @@ func (r *Renter) SetSettings(s modules.RenterSettings) error {
 	r.persist.MaxUploadSpeed = s.MaxUploadSpeed
 
 	// Set StreamingCacheSize
-	r.staticStreamCache.SetStreamingCacheSize(s.StreamCacheSize)
+	err = r.staticStreamCache.SetStreamingCacheSize(s.StreamCacheSize)
+	if err != nil {
+		return err
+	}
 	r.persist.StreamCacheSize = s.StreamCacheSize
 
 	// Save the changes.
