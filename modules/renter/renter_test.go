@@ -27,6 +27,7 @@ type renterTester struct {
 	walletKey crypto.TwofishKey
 
 	renter *Renter
+	dir    string
 }
 
 // Close shuts down the renter tester.
@@ -85,6 +86,7 @@ func newRenterTester(name string) (*renterTester, error) {
 		wallet:  w,
 
 		renter: r,
+		dir:    testdir,
 	}
 
 	// Mine blocks until there is money in the wallet.

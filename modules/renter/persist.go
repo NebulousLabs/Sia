@@ -207,11 +207,12 @@ func (r *Renter) saveSync() error {
 	return persist.SaveJSON(settingsMetadata, r.persist, filepath.Join(r.persistDir, PersistFilename))
 }
 
-// load fetches the saved renter data from disk.
-func (r *Renter) load() error {
+// loadSiaFiles walks through the directory searching for siafiles and loading
+// them into memory.
+func (r *Renter) loadSiaFiles() error {
 	// Recursively load all files found in renter directory. Errors
 	// encountered during loading are logged, but are not considered fatal.
-	err := filepath.Walk(r.persistDir, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(r.persistDir, func(path string, info os.FileInfo, err error) error {
 		// This error is non-nil if filepath.Walk couldn't stat a file or
 		// folder.
 		if err != nil {
@@ -240,26 +241,40 @@ func (r *Renter) load() error {
 		}
 		return nil
 	})
+}
+
+// load fetches the saved renter data from disk.
+func (r *Renter) loadSettings() error {
+	r.persist = persistence{
+		Tracking: make(map[string]trackedFile),
+	}
+	err := persist.LoadJSON(settingsMetadata, &r.persist, filepath.Join(r.persistDir, PersistFilename))
+	if os.IsNotExist(err) {
+		// No persistence yet, set the defaults and continue.
+		r.persist.MaxDownloadSpeed = DefaultMaxDownloadSpeed
+		r.persist.MaxUploadSpeed = DefaultMaxUploadSpeed
+		r.persist.StreamCacheSize = DefaultStreamCacheSize
+	} else if err == persist.ErrBadVersion {
+		// Outdated version, try the 040 to 133 upgrade.
+		err = r.updatePersistVersionFrom040To133()
+		if err != nil {
+			// Nothing left to try.
+			return err
+		}
+		// Re-load the settings now that the file has been upgraded.
+		return r.loadSettings()
+	}
+
+	// Set the bandwidth limits on the contractor, which was already initialized
+	// without bandwidth limits.
+	err = r.setBandwidthLimits(r.persist.MaxDownloadSpeed, r.persist.MaxUploadSpeed)
 	if err != nil {
 		return err
 	}
 
-	// Load contracts and entropy.
-	r.persist = persistence{
-		Tracking: make(map[string]trackedFile),
-	}
-	err = persist.LoadJSON(settingsMetadata, &r.persist, filepath.Join(r.persistDir, PersistFilename))
-	if err != nil {
-		err = r.updatePersistVersionFrom040To133()
-		if err != nil {
-			return err
-		}
-		if err = r.load(); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	// Need to set the settings for the values that are harvested from disk at
+	// startup.
+	return r.saveSync()
 }
 
 // shareFiles writes the specified files to w. First a header is written,
@@ -428,11 +443,13 @@ func (r *Renter) initPersist() error {
 	}
 
 	// Load the prior persistence structures.
-	err = r.load()
-	if err != nil && !os.IsNotExist(err) {
+	err = r.loadSettings()
+	if err != nil {
 		return err
 	}
-	return nil
+
+	// Load the siafiles into memory.
+	return r.loadSiaFiles()
 }
 
 // LoadSharedFiles loads a .sia file into the renter. It returns the nicknames
@@ -470,5 +487,8 @@ func (r *Renter) updatePersistVersionFrom040To133() error {
 		return err
 	}
 	metadata.Version = persistVersion133
+	r.persist.MaxDownloadSpeed = DefaultMaxDownloadSpeed
+	r.persist.MaxUploadSpeed = DefaultMaxUploadSpeed
+	r.persist.StreamCacheSize = DefaultStreamCacheSize
 	return persist.SaveJSON(metadata, r.persist, filepath.Join(r.persistDir, PersistFilename))
 }

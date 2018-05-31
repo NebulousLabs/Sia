@@ -168,13 +168,14 @@ func (sc *streamCache) SetStreamingCacheSize(cacheSize uint64) {
 	sc.pruneCache(sc.cacheSize)
 }
 
-// newStreamCache creates a new streamCache
-func newStreamCache() *streamCache {
-	streamHeap := make(streamHeap, 0, DefaultStreamCacheSize)
+// initStreamCache initializes the streaming cache of the renter.
+func newStreamCache(cacheSize uint64) *streamCache {
+	streamHeap := make(streamHeap, 0, cacheSize)
 	heap.Init(&streamHeap)
 	// cacheSize not set as it is persisted
 	return &streamCache{
 		streamMap:  make(map[string]*chunkData),
 		streamHeap: streamHeap,
+		cacheSize:  cacheSize,
 	}
 }

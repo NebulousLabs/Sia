@@ -74,10 +74,7 @@ func TestPruneCache(t *testing.T) {
 		t.SkipNow()
 	}
 	// Initializing minimum required variables
-	sc := newStreamCache()
-
-	// Setting cacheSize to large value so reducing it can be tested
-	sc.cacheSize = 10
+	sc := newStreamCache(10)
 
 	// Fill Cache
 	// Purposefully trying to fill to a value larger than cacheSize to confirm
@@ -117,10 +114,7 @@ func TestStreamCache(t *testing.T) {
 		t.SkipNow()
 	}
 	// Initializing minimum required variables
-	sc := newStreamCache()
-
-	// Setting cacheSize to large value so reducing it can be tested
-	sc.cacheSize = 10
+	sc := newStreamCache(10)
 
 	// Fill Cache
 	// Purposefully trying to fill to a value larger than cacheSize to confirm Add()
