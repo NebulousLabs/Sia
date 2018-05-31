@@ -279,12 +279,12 @@ func randomDir() string {
 func setRenterAllowances(renters map[*TestNode]struct{}) error {
 	for renter := range renters {
 		// Set allowance
-		if renter.Params.SkipSetAllowance {
+		if renter.params.SkipSetAllowance {
 			continue
 		}
 		allowance := DefaultAllowance
-		if !reflect.DeepEqual(renter.Params.Allowance, modules.Allowance{}) {
-			allowance = renter.Params.Allowance
+		if !reflect.DeepEqual(renter.params.Allowance, modules.Allowance{}) {
+			allowance = renter.params.Allowance
 		}
 		if err := renter.RenterPostAllowance(allowance); err != nil {
 			return err
@@ -501,6 +501,7 @@ func (tg *TestGroup) SetRenterAllowance(renter *TestNode, allowance modules.Allo
 	r := make(map[*TestNode]struct{})
 	r[renter] = struct{}{}
 	// Set renter allowances
+	renter.params.SkipSetAllowance = false
 	if err := setRenterAllowances(r); err != nil {
 		return build.ExtendErr("failed to set renter allowance", err)
 	}
@@ -545,6 +546,22 @@ func (tg *TestGroup) RemoveNode(tn *TestNode) error {
 
 	// Close node.
 	return tn.Close()
+}
+
+func (tg *TestGroup) Sync() error {
+	var miner *TestNode
+	var height types.BlockHeight
+	for m := range tg.miners {
+		cg, err := m.ConsensusGet()
+		if err != nil {
+			return err
+		}
+		if cg.Height > height {
+			miner = m
+			height = cg.Height
+		}
+	}
+	return synchronizationCheck(miner, tg.nodes)
 }
 
 // Nodes returns all the nodes of the group

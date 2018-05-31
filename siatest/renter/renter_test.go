@@ -788,12 +788,11 @@ func TestRenterSpendingReporting(t *testing.T) {
 	initialBalance := wg.ConfirmedSiacoinBalance
 
 	// Set allowance
-	r.Params.SkipSetAllowance = false
 	if err = tg.SetRenterAllowance(r, siatest.DefaultAllowance); err != nil {
 		t.Fatal("Failed to set renter:", err)
 	}
 
-	// Get a Contract for check of contract renewal
+	// Get initial Contracts to check for contract renewal later
 	rc, err := r.RenterContractsGet()
 	if err != nil {
 		t.Fatal("Could not get contracts:", err)
@@ -807,20 +806,19 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Failed to get RenterGet:", err)
 	}
 	fm := rg.FinancialMetrics
-	totalSpent := fm.ContractFees.Add(fm.UploadSpending).
-		Add(fm.DownloadSpending).Add(fm.StorageSpending)
-	total := totalSpent.Add(fm.Unspent)
-	allowance := rg.Settings.Allowance
+	// allowance := rg.Settings.Allowance
+	// totalSpent := fm.ContractFees.Add(fm.UploadSpending).
+	// 	Add(fm.DownloadSpending).Add(fm.StorageSpending)
+	// total := totalSpent.Add(fm.Unspent)
 
-	// Check balance after allowance is set, TotalAllocated is spending
-	// and unspentAllocated
+	// Check balance after allowance is set
 	wg, err = r.WalletGet()
 	if err != nil {
 		t.Fatal("Failed to get wallet:", err)
 	}
-	balanceAfterSpending := initialBalance.Sub(fm.TotalAllocated)
-	if balanceAfterSpending.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		t.Fatalf("Renter Spending does not equal wallet unspent, \n%v != \n%v", balanceAfterSpending, wg.ConfirmedSiacoinBalance)
+	balanceAfterSetAllowance := initialBalance.Sub(fm.TotalAllocated)
+	if balanceAfterSetAllowance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
+		t.Fatalf("Renter Reported Spending does not equal wallet confirmed balance, \n%v != \n%v", balanceAfterSetAllowance, wg.ConfirmedSiacoinBalance)
 	}
 
 	// Upload and download files to show spending
@@ -842,12 +840,42 @@ func TestRenterSpendingReporting(t *testing.T) {
 		}
 	}
 
+	// Capture total spending for initial period
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal("Failed to get RenterGet:", err)
+	}
+	fm = rg.FinancialMetrics
+	totalSpentInitialPeriod := fm.ContractFees.Add(fm.UploadSpending).
+		Add(fm.DownloadSpending).Add(fm.StorageSpending)
+
 	// Mine blocks to force contract renewal
 	m := tg.Miners()[0]
-	for i := 0; i < int(rg.Settings.Allowance.Period); i++ {
+	for i := 0; i < int(rg.Settings.Allowance.Period+types.MaturityDelay); i++ {
 		if err = m.MineBlock(); err != nil {
 			t.Fatal("Error mining block:", err)
 		}
+	}
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check spending after contract renewal
+	wg, err = r.WalletGet()
+	if err != nil {
+		t.Fatal("Failed to get wallet:", err)
+	}
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal("Failed to get RenterGet:", err)
+	}
+
+	balanceAfterRenewal := initialBalance.Sub(totalSpentInitialPeriod).Sub(rg.FinancialMetrics.TotalAllocated)
+	if balanceAfterRenewal.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
+		fmt.Println("Difference:", balanceAfterRenewal.Sub(wg.ConfirmedSiacoinBalance).HumanString())
+		t.Fatalf("Renter Spending does not equal wallet unspent, \n%v != \n%v", balanceAfterRenewal, wg.ConfirmedSiacoinBalance)
 	}
 
 	// Get renewed renter contracts
@@ -890,10 +918,10 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	fm = rg.FinancialMetrics
-	totalSpent = fm.ContractFees.Add(fm.UploadSpending).
+	totalSpent := fm.ContractFees.Add(fm.UploadSpending).
 		Add(fm.DownloadSpending).Add(fm.StorageSpending)
-	total = totalSpent.Add(fm.Unspent)
-	allowance = rg.Settings.Allowance
+	total := totalSpent.Add(fm.Unspent)
+	allowance := rg.Settings.Allowance
 
 	wg, err = r.WalletGet()
 	if err != nil {
@@ -947,8 +975,9 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Check balance after spending, TotalAllocated is spending
 	// and unspentAllocated
-	balanceAfterSpending = initialBalance.Sub(fm.TotalAllocated)
+	balanceAfterSpending := initialBalance.Sub(fm.TotalAllocated).Sub(totalSpentInitialPeriod)
 	if balanceAfterSpending.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
+		fmt.Println("Difference:", balanceAfterSpending.Sub(wg.ConfirmedSiacoinBalance).HumanString())
 		t.Fatalf("Renter Spending does not equal wallet unspent, \n%v != \n%v", balanceAfterSpending, wg.ConfirmedSiacoinBalance)
 	}
 }

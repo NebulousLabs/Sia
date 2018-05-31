@@ -14,7 +14,7 @@ import (
 type TestNode struct {
 	server.Server
 	client.Client
-	Params      node.NodeParams
+	params      node.NodeParams
 	primarySeed string
 }
 
