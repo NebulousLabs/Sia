@@ -806,10 +806,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Failed to get RenterGet:", err)
 	}
 	fm := rg.FinancialMetrics
-	// allowance := rg.Settings.Allowance
-	// totalSpent := fm.ContractFees.Add(fm.UploadSpending).
-	// 	Add(fm.DownloadSpending).Add(fm.StorageSpending)
-	// total := totalSpent.Add(fm.Unspent)
 
 	// Check balance after allowance is set
 	wg, err = r.WalletGet()
@@ -870,12 +866,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 	rg, err = r.RenterGet()
 	if err != nil {
 		t.Fatal("Failed to get RenterGet:", err)
-	}
-
-	balanceAfterRenewal := initialBalance.Sub(totalSpentInitialPeriod).Sub(rg.FinancialMetrics.TotalAllocated)
-	if balanceAfterRenewal.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		fmt.Println("Difference:", balanceAfterRenewal.Sub(wg.ConfirmedSiacoinBalance).HumanString())
-		t.Fatalf("Renter Spending does not equal wallet unspent, \n%v != \n%v", balanceAfterRenewal, wg.ConfirmedSiacoinBalance)
 	}
 
 	// Get renewed renter contracts
@@ -975,9 +965,10 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Check balance after spending, TotalAllocated is spending
 	// and unspentAllocated
-	balanceAfterSpending := initialBalance.Sub(fm.TotalAllocated).Sub(totalSpentInitialPeriod)
-	if balanceAfterSpending.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		fmt.Println("Difference:", balanceAfterSpending.Sub(wg.ConfirmedSiacoinBalance).HumanString())
-		t.Fatalf("Renter Spending does not equal wallet unspent, \n%v != \n%v", balanceAfterSpending, wg.ConfirmedSiacoinBalance)
+	balanceAfterRenewal := initialBalance.Sub(fm.TotalAllocated).Sub(totalSpentInitialPeriod)
+	if balanceAfterRenewal.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
+		fmt.Println("Difference:", balanceAfterRenewal.Sub(wg.ConfirmedSiacoinBalance).HumanString())
+		t.Fatalf("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance, \n%v != \n%v",
+			balanceAfterRenewal, wg.ConfirmedSiacoinBalance)
 	}
 }
