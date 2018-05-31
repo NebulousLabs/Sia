@@ -15,6 +15,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
+	"github.com/NebulousLabs/Sia/node/api"
 	"github.com/NebulousLabs/Sia/siatest"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -886,7 +887,11 @@ func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
 // spending
 func TestRenterSpendingReporting(t *testing.T) {
 	// Skipping Test until it can be fixed
-	t.Skip("TODO: Test currently broken")
+	// TODO:
+	// - Occasional failure due to contract renewal,
+	// Erros: "ID from renewedContracts found in initialContracts"
+	// - Initial balance - spending != current wallet balance
+	// t.Skip("TODO: Test currently broken")
 
 	if testing.Short() {
 		t.SkipNow()
@@ -932,30 +937,13 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Failed to set renter allowance:", err)
 	}
 
-	// Get initial Contracts to check for contract renewal later
-	rc, err := r.RenterContractsGet()
+	// Check that the funds allocated when setting the allowance
+	// are reflected correctly in the wallet balance
+	expectedBalance, walletBalance, err := checkBalanceVsSpending(r, initialBalance)
 	if err != nil {
-		t.Fatal("Could not get contracts:", err)
-	}
-	initialContracts := rc.Contracts
-
-	// Getting initial financial metrics
-	// Setting variables to easier reference
-	rg, err := r.RenterGet()
-	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
-	}
-	fm := rg.FinancialMetrics
-
-	// Check balance after allowance is set
-	wg, err = r.WalletGet()
-	if err != nil {
-		t.Fatal("Failed to get wallet:", err)
-	}
-	balanceAfterSetAllowance := initialBalance.Sub(fm.TotalAllocated)
-	if balanceAfterSetAllowance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		t.Fatalf("Renter Reported Spending does not equal wallet confirmed balance, \n%v != \n%v",
-			balanceAfterSetAllowance, wg.ConfirmedSiacoinBalance)
+		t.Log("Difference:", expectedBalance.Sub(walletBalance).HumanString())
+		t.Fatalf("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance, \n%v != \n%v",
+			expectedBalance, walletBalance)
 	}
 
 	// Upload and download files to show spending
@@ -977,18 +965,29 @@ func TestRenterSpendingReporting(t *testing.T) {
 		}
 	}
 
-	// Capture total spending for initial period
-	rg, err = r.RenterGet()
+	// Get initial Contracts to check for contract renewal later
+	rc, err := r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Could not get contracts:", err)
+	}
+	initialContracts := rc.Contracts
+
+	// Check to confirm upload and download spending was captured correctly
+	// and reflected in the wallet balance
+	expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
+	if err != nil {
+		t.Log("Difference:", expectedBalance.Sub(walletBalance).HumanString())
+		t.Fatalf("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance, \n%v != \n%v",
+			expectedBalance, walletBalance)
+	}
+
+	// Mine blocks to force contract renewal within the same period
+	rg, err := r.RenterGet()
 	if err != nil {
 		t.Fatal("Failed to get RenterGet:", err)
 	}
-	fm = rg.FinancialMetrics
-	totalSpentInitialPeriod := fm.ContractFees.Add(fm.UploadSpending).
-		Add(fm.DownloadSpending).Add(fm.StorageSpending)
-
-	// Mine blocks to force contract renewal
 	m := tg.Miners()[0]
-	for i := 0; i < int(rg.Settings.Allowance.Period+types.MaturityDelay); i++ {
+	for i := 0; i < int(rg.Settings.Allowance.Period-rg.Settings.Allowance.RenewWindow+types.MaturityDelay); i++ {
 		if err = m.MineBlock(); err != nil {
 			t.Fatal("Error mining block:", err)
 		}
@@ -1006,10 +1005,123 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 	renewedContracts := rc.Contracts
 
+	// Check Contracts
+	if err = checkContracts(initialContracts, renewedContracts); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check contract spending against reported spending
+	if err = checkContractVsReportedSpending(r, initialContracts, renewedContracts); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reset initial contracts as current renewed contracts
+	initialContracts = renewedContracts
+
+	// TODO: Failing
+	// Check to confirm reported spending is still accurate with the renewed contracts
+	// and reflected in the wallet balance
+	expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
+	if err != nil {
+		t.Log("ExpectedBalance:", expectedBalance.HumanString())
+		t.Log("walletBalance  :", walletBalance.HumanString())
+		t.Log("Difference:", walletBalance.Sub(expectedBalance).HumanString())
+		t.Fatal(err)
+	}
+
+	// Record total spending of initial Period
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal("Failed to get RenterGet:", err)
+	}
+	fm := rg.FinancialMetrics
+	totalSpentInitialPeriod := fm.ContractFees.Add(fm.UploadSpending).
+		Add(fm.DownloadSpending).Add(fm.StorageSpending)
+
+	// Record current Wallet Balance
+	wg, err = r.WalletGet()
+	if err != nil {
+		t.Fatal("Failed to get wallet:", err)
+	}
+	initialPeriodEndBalance := wg.ConfirmedSiacoinBalance
+
+	// Mine blocks to force contract renewal and new period
+	for i := 0; i < int(rg.Settings.Allowance.RenewWindow+types.MaturityDelay); i++ {
+		if err = m.MineBlock(); err != nil {
+			t.Fatal("Error mining block:", err)
+		}
+	}
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check if Unspent unallocated funds were released after allowance period
+	// was exceeded
+	wg, err = r.WalletGet()
+	if err != nil {
+		t.Fatal("Failed to get wallet:", err)
+	}
+	if initialPeriodEndBalance.Cmp(wg.ConfirmedSiacoinBalance) > 0 {
+		t.Log("Before renewal balance:", initialPeriodEndBalance.HumanString())
+		t.Log("After renewal balance:", wg.ConfirmedSiacoinBalance.HumanString())
+		t.Fatal("Unspent Unallocated funds not released after contract renewal")
+	}
+
+	// Get renewed renter contracts
+	rc, err = r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Could not get contracts:", err)
+	}
+	renewedContracts = rc.Contracts
+
+	// Check Contracts
+	if err = checkContracts(initialContracts, renewedContracts); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check contract spending against reported spending
+	if err = checkContractVsReportedSpending(r, initialContracts, renewedContracts); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check to confirm reported spending is still accurate with the renewed contracts
+	// and a new period and reflected in the wallet balance
+	expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance.Sub(totalSpentInitialPeriod))
+	if err != nil {
+		t.Log("Difference:", expectedBalance.Sub(walletBalance).HumanString())
+		t.Fatal(err)
+	}
+}
+
+func checkBalanceVsSpending(r *siatest.TestNode, initialBalance types.Currency) (expectedBalance, walletBalance types.Currency, err error) {
+	// Getting initial financial metrics
+	// Setting variables to easier reference
+	rg, err := r.RenterGet()
+	if err != nil {
+		return types.ZeroCurrency, types.ZeroCurrency, err
+	}
+	fm := rg.FinancialMetrics
+
+	// Check balance after allowance is set
+	wg, err := r.WalletGet()
+	if err != nil {
+		return types.ZeroCurrency, types.ZeroCurrency, err
+	}
+	balanceAfterSetAllowance := initialBalance.Sub(fm.TotalAllocated)
+	if balanceAfterSetAllowance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
+		return balanceAfterSetAllowance, wg.ConfirmedSiacoinBalance,
+			errors.New("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance")
+	}
+	return types.ZeroCurrency, types.ZeroCurrency, nil
+}
+
+func checkContracts(initialContracts, renewedContracts []api.RenterContract) error {
 	// Confirm contracts were renewed, this will also mean there are old contracts
 	// Verify there are the same number of initialContracts as renewedContracts
 	if len(initialContracts) != len(renewedContracts) {
-		t.Fatal("Initial and renewed contracts are not the same length")
+		return errors.New("Initial and renewed contracts are not the same length")
 	}
 
 	// Create Maps for comparison
@@ -1022,56 +1134,51 @@ func TestRenterSpendingReporting(t *testing.T) {
 	for _, c := range renewedContracts {
 		// Verify that all the contracts were renewed
 		if _, ok := initialContractIDMap[c.ID]; ok {
-			t.Fatal("ID from renewedContracts found in initialContracts")
+			return errors.New("ID from renewedContracts found in initialContracts")
 		}
 		// Verifying that Renewed Contracts have the same HostPublicKey
 		// as an initial contract
 		if _, ok := initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)]; !ok {
-			t.Fatal("Host Public Key from renewedContracts not found in initialContracts")
+			return errors.New("Host Public Key from renewedContracts not found in initialContracts")
 		}
 		// Confirm Renewed contract has storage spending
 		// Confirm Renewed contract no upload or download spending
 		if c.StorageSpending.Cmp(types.ZeroCurrency) < 1 {
-			t.Fatal("Storage Spending on renewed contract not greater than Zero")
+			return errors.New("Storage Spending on renewed contract not greater than Zero")
 		}
 		if c.UploadSpending.Cmp(types.ZeroCurrency) != 0 {
-			t.Fatal("Upload spending on renewed contract not equal to zero, upload spending =",
-				c.UploadSpending)
+			return errors.New("Upload spending on renewed contract not equal to zero")
 		}
 		if c.DownloadSpending.Cmp(types.ZeroCurrency) != 0 {
-			t.Fatal("Download spending on renewed contract not equal to zero, upload spending =",
-				c.DownloadSpending)
+			return errors.New("Download spending on renewed contract not equal to zero")
 		}
-
 	}
+	return nil
+}
+
+func checkContractVsReportedSpending(r *siatest.TestNode, initialContracts, renewedContracts []api.RenterContract) error {
 	// Getting financial metrics after uploads, downloads, and
 	// contract renewal
-	rg, err = r.RenterGet()
+	rg, err := r.RenterGet()
 	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
+		return err
 	}
 
-	fm = rg.FinancialMetrics
+	fm := rg.FinancialMetrics
 	totalSpent := fm.ContractFees.Add(fm.UploadSpending).
 		Add(fm.DownloadSpending).Add(fm.StorageSpending)
 	total := totalSpent.Add(fm.Unspent)
 	allowance := rg.Settings.Allowance
 
-	wg, err = r.WalletGet()
-	if err != nil {
-		t.Fatal("Failed to get wallet:", err)
-	}
-
 	// Check that renter financial metrics add up to allowance
 	if total.Cmp(allowance.Funds) != 0 {
-		t.Fatalf("Combined Total of reported spending and unspent funds not equal to allowance, \n%v != \n%v",
-			total, allowance.Funds)
+		return errors.New("Combined Total of reported spending and unspent funds not equal to allowance")
 	}
 
 	// Check renter financial metrics against contract spending
 	var spending modules.ContractorSpending
 	for _, contract := range initialContracts {
-		if contract.StartHeight >= rg.CurrentPeriod {
+		if contract.EndHeight >= rg.CurrentPeriod {
 			// Calculate ContractFees
 			spending.ContractFees = spending.ContractFees.Add(contract.Fees)
 			// Calculate TotalAllocated
@@ -1095,30 +1202,26 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Compare contract fees
 	if fm.ContractFees.Cmp(spending.ContractFees) != 0 {
-		t.Fatalf("Financial Metrics Contract Fees not equal to Renter Contract Fees, \n%v != \n%v",
-			fm.ContractFees, spending.ContractFees)
+		return errors.New("Financial Metrics Contract Fees not equal to Renter Contract Fees")
 	}
 	// Compare Total Allocated
 	if fm.TotalAllocated.Cmp(spending.TotalAllocated) != 0 {
-		t.Fatalf("Financial Metrics Total Allocated not equal to Renter Total Allocated, \n%v != \n%v",
-			fm.TotalAllocated, spending.TotalAllocated)
+		return errors.New("Financial Metrics Total Allocated not equal to Renter Total Allocated")
 	}
-	// Compare Spending
-	allSpending := spending.ContractFees.Add(spending.UploadSpending).
-		Add(spending.DownloadSpending).Add(spending.StorageSpending)
-	if totalSpent.Cmp(allSpending) != 0 {
-		t.Fatalf("Financial Metrics Spending not equal to Renter Spending, \n%v != \n%v",
-			totalSpent, allSpending)
+	// Compare Upload Spending
+	if fm.UploadSpending.Cmp(spending.UploadSpending) != 0 {
+		return errors.New("Financial Metrics Upload Spending not equal to Renter Upload Spending")
+	}
+	// Compare Download Spending
+	if fm.DownloadSpending.Cmp(spending.DownloadSpending) != 0 {
+		return errors.New("Financial Metrics Download Spending not equal to Renter Download Spending")
+	}
+	// Compare Storage Spending
+	if fm.StorageSpending.Cmp(spending.StorageSpending) != 0 {
+		return errors.New("Financial Metrics Storage Spending not equal to Renter Storage Spending")
 	}
 
-	// Check balance after spending, TotalAllocated is spending
-	// and unspentAllocated
-	balanceAfterRenewal := initialBalance.Sub(fm.TotalAllocated).Sub(totalSpentInitialPeriod)
-	if balanceAfterRenewal.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		fmt.Println("Difference:", balanceAfterRenewal.Sub(wg.ConfirmedSiacoinBalance).HumanString())
-		t.Fatalf("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance, \n%v != \n%v",
-			balanceAfterRenewal, wg.ConfirmedSiacoinBalance)
-	}
+	return nil
 }
 
 // TestRedundancyReporting verifies that redundancy reporting is accurate if
