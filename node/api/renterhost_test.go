@@ -983,6 +983,10 @@ func TestRenterCancelAllowance(t *testing.T) {
 		if err != nil {
 			return errors.New("couldn't get renter stats")
 		}
+		// Should still have 1 contract.
+		if uint64(len(rc.Contracts)) != recommendedHosts {
+			return errors.New("expected the same number of contracts as before")
+		}
 		for _, c := range rc.Contracts {
 			if c.GoodForUpload {
 				return errors.New("contract shouldn't be goodForUpload")
