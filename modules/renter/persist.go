@@ -254,9 +254,13 @@ func (r *Renter) loadSettings() error {
 		r.persist.MaxDownloadSpeed = DefaultMaxDownloadSpeed
 		r.persist.MaxUploadSpeed = DefaultMaxUploadSpeed
 		r.persist.StreamCacheSize = DefaultStreamCacheSize
+		err = r.saveSync()
+		if err != nil {
+			return err
+		}
 	} else if err == persist.ErrBadVersion {
 		// Outdated version, try the 040 to 133 upgrade.
-		err = r.updatePersistVersionFrom040To133()
+		err = convertPersistVersionFrom040To133(filepath.Join(r.persistDir, PersistFilename))
 		if err != nil {
 			// Nothing left to try.
 			return err
@@ -269,14 +273,7 @@ func (r *Renter) loadSettings() error {
 
 	// Set the bandwidth limits on the contractor, which was already initialized
 	// without bandwidth limits.
-	err = r.setBandwidthLimits(r.persist.MaxDownloadSpeed, r.persist.MaxUploadSpeed)
-	if err != nil {
-		return err
-	}
-
-	// Need to set the settings for the values that are harvested from disk at
-	// startup.
-	return r.saveSync()
+	return r.setBandwidthLimits(r.persist.MaxDownloadSpeed, r.persist.MaxUploadSpeed)
 }
 
 // shareFiles writes the specified files to w. First a header is written,
@@ -478,21 +475,24 @@ func (r *Renter) LoadSharedFilesASCII(asciiSia string) ([]string, error) {
 	return r.loadSharedFiles(dec)
 }
 
-// updatePErsistVersionFrom040to133 upgrades a legacy persist file to the next
+// convertPersistVersionFrom040to133 upgrades a legacy persist file to the next
 // version, adding new fields with their default values.
-func (r *Renter) updatePersistVersionFrom040To133() error {
+func convertPersistVersionFrom040To133(path string) error {
 	metadata := persist.Metadata{
 		Header:  settingsMetadata.Header,
 		Version: persistVersion040,
 	}
+	p := persistence{
+		Tracking: make(map[string]trackedFile),
+	}
 
-	err := persist.LoadJSON(metadata, &r.persist, filepath.Join(r.persistDir, PersistFilename))
+	err := persist.LoadJSON(metadata, &p, path)
 	if err != nil {
 		return err
 	}
 	metadata.Version = persistVersion133
-	r.persist.MaxDownloadSpeed = DefaultMaxDownloadSpeed
-	r.persist.MaxUploadSpeed = DefaultMaxUploadSpeed
-	r.persist.StreamCacheSize = DefaultStreamCacheSize
-	return persist.SaveJSON(metadata, r.persist, filepath.Join(r.persistDir, PersistFilename))
+	p.MaxDownloadSpeed = DefaultMaxDownloadSpeed
+	p.MaxUploadSpeed = DefaultMaxUploadSpeed
+	p.StreamCacheSize = DefaultStreamCacheSize
+	return persist.SaveJSON(metadata, p, path)
 }

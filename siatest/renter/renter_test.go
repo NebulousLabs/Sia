@@ -523,7 +523,7 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 
 	// Test setting to 0
 	if err := r.RenterSetStreamCacheSizePost(0); err == nil {
-		t.Fatal(err, "Error in calling RenterSetStreamCacheSizePost(0)")
+		t.Fatal(err, "expected setting stream cache size to zero to fail with an error")
 	}
 	rg, err = r.RenterGet()
 	if err != nil {

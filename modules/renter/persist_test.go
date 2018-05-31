@@ -235,7 +235,10 @@ func TestRenterSaveLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rt.renter.Close()
+	err = rt.renter.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// load should now load the files into memory.
 	rt.renter, err = New(rt.gateway, rt.cs, rt.wallet, rt.tpool, filepath.Join(rt.dir, modules.RenterDir))
@@ -292,13 +295,16 @@ func TestRenterPaths(t *testing.T) {
 	rt.renter.saveFile(f2)
 	rt.renter.saveFile(f3)
 
-	// Load the files into the renter.
-	id := rt.renter.mu.Lock()
-	err = rt.renter.initPersist()
-	rt.renter.mu.Unlock(id)
-	if err != nil && !os.IsNotExist(err) {
+	// Restart the renter to re-do the init cycle.
+	err = rt.renter.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
+	rt.renter, err = New(rt.gateway, rt.cs, rt.wallet, rt.tpool, filepath.Join(rt.dir, modules.RenterDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Check that the files were loaded properly.
 	if err := equalFiles(f1, rt.renter.files[f1.name]); err != nil {
 		t.Fatal(err)
