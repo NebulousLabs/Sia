@@ -263,6 +263,8 @@ func (r *Renter) loadSettings() error {
 		}
 		// Re-load the settings now that the file has been upgraded.
 		return r.loadSettings()
+	} else if err != nil {
+		return err
 	}
 
 	// Set the bandwidth limits on the contractor, which was already initialized
@@ -476,6 +478,8 @@ func (r *Renter) LoadSharedFilesASCII(asciiSia string) ([]string, error) {
 	return r.loadSharedFiles(dec)
 }
 
+// updatePErsistVersionFrom040to133 upgrades a legacy persist file to the next
+// version, adding new fields with their default values.
 func (r *Renter) updatePersistVersionFrom040To133() error {
 	metadata := persist.Metadata{
 		Header:  settingsMetadata.Header,
