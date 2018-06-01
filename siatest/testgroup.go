@@ -91,7 +91,7 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 			return nil, errors.AddContext(err, "failed to mine block for funding")
 		}
 	}
-	// Fully connect nodes
+
 	return tg, tg.setupNodes(tg.hosts, tg.nodes, tg.renters)
 }
 

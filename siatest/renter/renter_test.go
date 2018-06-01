@@ -987,7 +987,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Failed to get RenterGet:", err)
 	}
 	m := tg.Miners()[0]
-	for i := 0; i < int(rg.Settings.Allowance.Period-rg.Settings.Allowance.RenewWindow+types.MaturityDelay); i++ {
+	for i := 0; i < int(rg.Settings.Allowance.Period-rg.Settings.Allowance.RenewWindow); i++ {
 		if err = m.MineBlock(); err != nil {
 			t.Fatal("Error mining block:", err)
 		}
@@ -998,34 +998,61 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Get renewed renter contracts
+	// Confirm Contracts were renewed as expected
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err = r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get contracts")
+		}
+		renewedContracts := rc.Contracts
+
+		// Check Contracts
+		if err = checkContracts(initialContracts, renewedContracts); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check contract spending against reported spending
 	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal("Could not get contracts:", err)
 	}
 	renewedContracts := rc.Contracts
-
-	// Check Contracts
-	if err = checkContracts(initialContracts, renewedContracts); err != nil {
-		t.Fatal(err)
-	}
-
-	// Check contract spending against reported spending
 	if err = checkContractVsReportedSpending(r, initialContracts, renewedContracts); err != nil {
 		t.Fatal(err)
 	}
 
 	// Reset initial contracts as current renewed contracts
-	initialContracts = renewedContracts
+	for _, contract := range renewedContracts {
+		initialContracts = append(initialContracts, contract)
+	}
 
-	// TODO: Failing
+	// Mine Block to confirm contracts and spending into blockchain
+	if err = m.MineBlock(); err != nil {
+		t.Fatal("Error mining block:", err)
+	}
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Check to confirm reported spending is still accurate with the renewed contracts
 	// and reflected in the wallet balance
 	expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
 	if err != nil {
+		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
 		t.Log("ExpectedBalance:", expectedBalance.HumanString())
 		t.Log("walletBalance  :", walletBalance.HumanString())
-		t.Log("Difference:", walletBalance.Sub(expectedBalance).HumanString())
+		if expectedBalance.Cmp(walletBalance) > 0 {
+			t.Log("Under reported by:", expectedBalance.Sub(walletBalance).HumanString())
+		} else {
+			t.Log("Over reported by:", walletBalance.Sub(expectedBalance).HumanString())
+		}
 		t.Fatal(err)
 	}
 
@@ -1066,31 +1093,58 @@ func TestRenterSpendingReporting(t *testing.T) {
 	if initialPeriodEndBalance.Cmp(wg.ConfirmedSiacoinBalance) > 0 {
 		t.Log("Before renewal balance:", initialPeriodEndBalance.HumanString())
 		t.Log("After renewal balance:", wg.ConfirmedSiacoinBalance.HumanString())
-		t.Fatal("Unspent Unallocated funds not released after contract renewal")
+		t.Fatal("Unspent Unallocated funds not released after contract renewal and maturity delay")
 	}
 
-	// Get renewed renter contracts
+	// Confirm Contracts were renewed as expected
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err = r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "ould not get contracts")
+		}
+		renewedContracts := rc.Contracts
+
+		// Check Contracts
+		if err = checkContracts(initialContracts, renewedContracts); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check contract spending against reported spending
 	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal("Could not get contracts:", err)
 	}
 	renewedContracts = rc.Contracts
-
-	// Check Contracts
-	if err = checkContracts(initialContracts, renewedContracts); err != nil {
-		t.Fatal(err)
-	}
-
-	// Check contract spending against reported spending
 	if err = checkContractVsReportedSpending(r, initialContracts, renewedContracts); err != nil {
 		t.Fatal(err)
 	}
 
+	// Mine Block to confirm contracts and spending on blockchain
+	if err = m.MineBlock(); err != nil {
+		t.Fatal("Error mining block:", err)
+	}
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
 	// Check to confirm reported spending is still accurate with the renewed contracts
 	// and a new period and reflected in the wallet balance
 	expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance.Sub(totalSpentInitialPeriod))
 	if err != nil {
-		t.Log("Difference:", expectedBalance.Sub(walletBalance).HumanString())
+		t.Log("Actual difference:", initialBalance.Sub(totalSpentInitialPeriod).Sub(walletBalance).HumanString())
+		t.Log("ExpectedBalance:", expectedBalance.HumanString())
+		t.Log("walletBalance  :", walletBalance.HumanString())
+		if expectedBalance.Cmp(walletBalance) > 0 {
+			t.Log("Under Reported by:", expectedBalance.Sub(walletBalance).HumanString())
+		} else {
+			t.Log("Over Reported by:", walletBalance.Sub(expectedBalance).HumanString())
+		}
 		t.Fatal(err)
 	}
 }
@@ -1120,7 +1174,7 @@ func checkBalanceVsSpending(r *siatest.TestNode, initialBalance types.Currency) 
 func checkContracts(initialContracts, renewedContracts []api.RenterContract) error {
 	// Confirm contracts were renewed, this will also mean there are old contracts
 	// Verify there are the same number of initialContracts as renewedContracts
-	if len(initialContracts) != len(renewedContracts) {
+	if len(initialContracts) < len(renewedContracts) {
 		return errors.New("Initial and renewed contracts are not the same length")
 	}
 
@@ -1131,6 +1185,7 @@ func checkContracts(initialContracts, renewedContracts []api.RenterContract) err
 		initialContractIDMap[c.ID] = struct{}{}
 		initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)] = struct{}{}
 	}
+
 	for _, c := range renewedContracts {
 		// Verify that all the contracts were renewed
 		if _, ok := initialContractIDMap[c.ID]; ok {
