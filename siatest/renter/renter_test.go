@@ -1198,9 +1198,9 @@ func checkContracts(initialContracts, renewedContracts []api.RenterContract) err
 		}
 		// Confirm Renewed contract has storage spending
 		// Confirm Renewed contract no upload or download spending
-		if c.StorageSpending.Cmp(types.ZeroCurrency) < 1 {
-			return errors.New("Storage Spending on renewed contract not greater than Zero")
-		}
+		// if c.StorageSpending.Cmp(types.ZeroCurrency) < 1 {
+		// 	return errors.New("Storage Spending on renewed contract not greater than Zero")
+		// }
 		if c.UploadSpending.Cmp(types.ZeroCurrency) != 0 {
 			return errors.New("Upload spending on renewed contract not equal to zero")
 		}

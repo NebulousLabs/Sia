@@ -463,6 +463,8 @@ func (c *Contractor) threadedContractMaintenance() {
 				// are enough funds available to perform the refresh, and
 				// then execute.
 				refreshAmount := contract.TotalCost.Mul64(2)
+				// TODO adjust to be siacoin per block based
+
 				if refreshAmount.Cmp(fundsAvailable) < 0 {
 					renewSet = append(renewSet, renewal{
 						id:     contract.ID,
