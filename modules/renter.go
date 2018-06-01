@@ -313,8 +313,8 @@ type Renter interface {
 	// Contracts returns the contracts formed by the renter.
 	Contracts() []RenterContract
 
-	// ContractUtility provides the contract utility for a given id
-	ContractUtility(id types.FileContractID) (ContractUtility, bool)
+	// ContractUtility provides the contract utility for a given host key.
+	ContractUtility(pk types.SiaPublicKey) (ContractUtility, bool)
 
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.

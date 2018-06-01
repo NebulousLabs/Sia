@@ -284,10 +284,10 @@ func (r *Renter) FileList() []modules.FileInfo {
 	goodForRenew := make(map[types.FileContractID]bool)
 	offline := make(map[types.FileContractID]bool)
 	for cid := range contractIDs {
-		resolvedID := r.hostContractor.ResolveID(cid)
-		cu, ok := r.hostContractor.ContractUtility(resolvedID)
+		resolvedKey := r.hostContractor.ResolveIDToPubKey(cid)
+		cu, ok := r.hostContractor.ContractUtility(resolvedKey)
 		goodForRenew[cid] = ok && cu.GoodForRenew
-		offline[cid] = r.hostContractor.IsOffline(resolvedID)
+		offline[cid] = r.hostContractor.IsOffline(resolvedKey)
 	}
 
 	// Build the list of FileInfos.
@@ -342,10 +342,10 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	goodForRenew := make(map[types.FileContractID]bool)
 	offline := make(map[types.FileContractID]bool)
 	for cid := range contractIDs {
-		resolvedID := r.hostContractor.ResolveID(cid)
-		cu, ok := r.hostContractor.ContractUtility(resolvedID)
+		resolvedKey := r.hostContractor.ResolveIDToPubKey(cid)
+		cu, ok := r.hostContractor.ContractUtility(resolvedKey)
 		goodForRenew[cid] = ok && cu.GoodForRenew
-		offline[cid] = r.hostContractor.IsOffline(resolvedID)
+		offline[cid] = r.hostContractor.IsOffline(resolvedKey)
 	}
 
 	// Build the FileInfo

@@ -84,34 +84,6 @@ func TestNew(t *testing.T) {
 	}
 }
 
-// TestResolveID tests the ResolveID method.
-func TestResolveID(t *testing.T) {
-	c := &Contractor{
-		renewedIDs: map[types.FileContractID]types.FileContractID{
-			{1}: {2},
-			{2}: {3},
-			{3}: {4},
-			{5}: {6},
-		},
-	}
-	tests := []struct {
-		id       types.FileContractID
-		resolved types.FileContractID
-	}{
-		{types.FileContractID{0}, types.FileContractID{0}},
-		{types.FileContractID{1}, types.FileContractID{4}},
-		{types.FileContractID{2}, types.FileContractID{4}},
-		{types.FileContractID{3}, types.FileContractID{4}},
-		{types.FileContractID{4}, types.FileContractID{4}},
-		{types.FileContractID{5}, types.FileContractID{6}},
-	}
-	for _, test := range tests {
-		if r := c.ResolveID(test.id); r != test.resolved {
-			t.Errorf("expected %v -> %v, got %v", test.id, test.resolved, r)
-		}
-	}
-}
-
 // TestAllowance tests the Allowance method.
 func TestAllowance(t *testing.T) {
 	c := &Contractor{
@@ -278,7 +250,7 @@ func TestAllowanceSpending(t *testing.T) {
 	// allowance.
 	for i := 0; i < 15; i++ {
 		for _, contract := range c.Contracts() {
-			ed, err := c.Editor(contract.ID, nil)
+			ed, err := c.Editor(contract.HostPublicKey, nil)
 			if err != nil {
 				continue
 			}

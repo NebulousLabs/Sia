@@ -27,14 +27,14 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 
 	// Fetch the sector. If fetching the sector fails, the worker needs to be
 	// unregistered with the chunk.
-	d, err := w.renter.hostContractor.Downloader(w.contract.ID, w.renter.tg.StopChan())
+	d, err := w.renter.hostContractor.Downloader(w.contract.HostPublicKey, w.renter.tg.StopChan())
 	if err != nil {
 		w.renter.log.Debugln("worker failed to create downloader:", err)
 		udc.managedUnregisterWorker(w)
 		return
 	}
 	defer d.Close()
-	data, err := d.Sector(udc.staticChunkMap[w.contract.ID].root)
+	data, err := d.Sector(udc.staticChunkMap[string(w.contract.HostPublicKey.Key)].root)
 	if err != nil {
 		w.renter.log.Debugln("worker failed to download sector:", err)
 		udc.managedUnregisterWorker(w)
@@ -54,7 +54,7 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 	udc.piecesCompleted++
 	udc.piecesRegistered--
 	if udc.piecesCompleted <= udc.erasureCode.MinPieces() {
-		udc.physicalChunkData[udc.staticChunkMap[w.contract.ID].index] = data
+		udc.physicalChunkData[udc.staticChunkMap[string(w.contract.HostPublicKey.Key)].index] = data
 	}
 	if udc.piecesCompleted == udc.erasureCode.MinPieces() {
 		go udc.threadedRecoverLogicalData()
@@ -127,7 +127,7 @@ func (w *worker) managedQueueDownloadChunk(udc *unfinishedDownloadChunk) {
 func (udc *unfinishedDownloadChunk) managedUnregisterWorker(w *worker) {
 	udc.mu.Lock()
 	udc.piecesRegistered--
-	udc.pieceUsage[udc.staticChunkMap[w.contract.ID].index] = false
+	udc.pieceUsage[udc.staticChunkMap[string(w.contract.HostPublicKey.Key)].index] = false
 	udc.mu.Unlock()
 }
 
@@ -154,7 +154,7 @@ func (w *worker) ownedProcessDownloadChunk(udc *unfinishedDownloadChunk) *unfini
 	udc.mu.Lock()
 	chunkComplete := udc.piecesCompleted >= udc.erasureCode.MinPieces()
 	chunkFailed := udc.piecesCompleted+udc.workersRemaining < udc.erasureCode.MinPieces()
-	pieceData, workerHasPiece := udc.staticChunkMap[w.contract.ID]
+	pieceData, workerHasPiece := udc.staticChunkMap[string(w.contract.HostPublicKey.Key)]
 	pieceTaken := udc.pieceUsage[pieceData.index]
 	if chunkComplete || chunkFailed || w.ownedOnDownloadCooldown() || !workerHasPiece || pieceTaken {
 		udc.mu.Unlock()

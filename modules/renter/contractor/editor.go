@@ -71,7 +71,7 @@ func (he *hostEditor) invalidate() {
 // Address returns the NetAddress of the host.
 func (he *hostEditor) Address() modules.NetAddress { return he.netAddress }
 
-// ContractID returns the ID of the contract being revised.
+// ContractID returns the id of the contract being revised.
 func (he *hostEditor) ContractID() types.FileContractID { return he.id }
 
 // EndHeight returns the height at which the host is no longer obligated to
@@ -115,14 +115,16 @@ func (he *hostEditor) Upload(data []byte) (_ crypto.Hash, err error) {
 
 // Editor returns a Editor object that can be used to upload, modify, and
 // delete sectors on a host.
-func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ Editor, err error) {
-	id = c.ResolveID(id)
+func (c *Contractor) Editor(pk types.SiaPublicKey, cancel <-chan struct{}) (_ Editor, err error) {
 	c.mu.RLock()
+	id, gotID := c.pubKeysToContractID[string(pk.Key)]
 	cachedEditor, haveEditor := c.editors[id]
 	height := c.blockHeight
 	renewing := c.renewing[id]
 	c.mu.RUnlock()
-
+	if !gotID {
+		return nil, errors.New("failed to get filecontract id from key")
+	}
 	if renewing {
 		// Cannot use the editor if the contract is being renewed.
 		return nil, errors.New("currently renewing that contract")
@@ -182,7 +184,7 @@ func (c *Contractor) Editor(id types.FileContractID, cancel <-chan struct{}) (_ 
 		contractor: c,
 		editor:     e,
 		endHeight:  contract.EndHeight,
-		id:         contract.ID,
+		id:         id,
 		netAddress: host.NetAddress,
 	}
 	c.mu.Lock()

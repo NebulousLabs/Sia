@@ -166,8 +166,9 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	// map, also increment the 'piecesCompleted' value.
 	saveFile := false
 	for fcid, fileContract := range f.contracts {
-		recentContract, exists := r.hostContractor.ContractByID(fcid)
-		contractUtility, exists2 := r.hostContractor.ContractUtility(fcid)
+		pk := r.hostContractor.ResolveIDToPubKey(fcid)
+		recentContract, exists := r.hostContractor.ContractByPublicKey(pk)
+		contractUtility, exists2 := r.hostContractor.ContractUtility(pk)
 		if exists != exists2 {
 			build.Critical("got a contract without utility or vice versa which shouldn't happen",
 				exists, exists2)

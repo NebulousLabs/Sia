@@ -49,7 +49,7 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	contract := c.Contracts()[0]
 
 	// revise the contract
-	editor, err := c.Editor(contract.ID, nil)
+	editor, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	contract := c.Contracts()[0]
 
 	// revise the contract
-	editor, err := c.Editor(contract.ID, nil)
+	editor, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	editor.Close()
 
 	// create a downloader
-	downloader, err := c.Downloader(contract.ID, nil)
+	downloader, err := c.Downloader(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

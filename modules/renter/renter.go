@@ -113,12 +113,12 @@ type hostContractor interface {
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
-	// ContractByID returns the contract associated with the file contract id.
-	ContractByID(types.FileContractID) (modules.RenterContract, bool)
+	// ContractByPublicKey returns the contract associated with the host key.
+	ContractByPublicKey(types.SiaPublicKey) (modules.RenterContract, bool)
 
 	// ContractUtility returns the utility field for a given contract, along
 	// with a bool indicating if it exists.
-	ContractUtility(types.FileContractID) (modules.ContractUtility, bool)
+	ContractUtility(types.SiaPublicKey) (modules.ContractUtility, bool)
 
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
@@ -130,17 +130,17 @@ type hostContractor interface {
 
 	// Editor creates an Editor from the specified contract ID, allowing the
 	// insertion, deletion, and modification of sectors.
-	Editor(types.FileContractID, <-chan struct{}) (contractor.Editor, error)
+	Editor(types.SiaPublicKey, <-chan struct{}) (contractor.Editor, error)
 
 	// IsOffline reports whether the specified host is considered offline.
-	IsOffline(types.FileContractID) bool
+	IsOffline(types.SiaPublicKey) bool
 
 	// Downloader creates a Downloader from the specified contract ID,
 	// allowing the retrieval of sectors.
-	Downloader(types.FileContractID, <-chan struct{}) (contractor.Downloader, error)
+	Downloader(types.SiaPublicKey, <-chan struct{}) (contractor.Downloader, error)
 
-	// ResolveID returns the most recent renewal of the specified ID.
-	ResolveID(types.FileContractID) types.FileContractID
+	// ResolveIDToPubKey returns the public key of a host given a contract id.
+	ResolveIDToPubKey(types.FileContractID) types.SiaPublicKey
 
 	// RateLimits Gets the bandwidth limits for connections created by the
 	// contractor and its submodules.
@@ -393,8 +393,8 @@ func (r *Renter) CurrentPeriod() types.BlockHeight { return r.hostContractor.Cur
 
 // ContractUtility returns the utility field for a given contract, along
 // with a bool indicating if it exists.
-func (r *Renter) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
-	return r.hostContractor.ContractUtility(id)
+func (r *Renter) ContractUtility(pk types.SiaPublicKey) (modules.ContractUtility, bool) {
+	return r.hostContractor.ContractUtility(pk)
 }
 
 // PeriodSpending returns the host contractor's period spending
