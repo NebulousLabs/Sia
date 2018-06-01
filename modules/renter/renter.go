@@ -77,6 +77,10 @@ type hostDB interface {
 	// Host returns the HostDBEntry for a given host.
 	Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
 
+	// initialScanComplete returns a boolean indicating if the initial scan of the
+	// hostdb is completed.
+	InitialScanComplete() (bool, error)
+
 	// RandomHosts returns a set of random hosts, weighted by their estimated
 	// usefulness / attractiveness to the renter. RandomHosts will not return
 	// any offline or inactive hosts.
@@ -89,6 +93,9 @@ type hostDB interface {
 	// EstimateHostScore returns the estimated score breakdown of a host with the
 	// provided settings.
 	EstimateHostScore(modules.HostDBEntry) modules.HostScoreBreakdown
+
+	// QueuedScans returns the currently queued scans of the hostdb.
+	QueuedScans() ([]modules.HostDBEntry, error)
 }
 
 // A hostContractor negotiates, revises, renews, and provides access to file
@@ -366,6 +373,13 @@ func (r *Renter) AllHosts() []modules.HostDBEntry { return r.hostDB.AllHosts() }
 
 // Host returns the host associated with the given public key
 func (r *Renter) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) { return r.hostDB.Host(spk) }
+
+// QueuedScans returns the currently queued scans of the hostdb.
+func (r *Renter) QueuedScans() ([]modules.HostDBEntry, error) { return r.hostDB.QueuedScans() }
+
+// InitialScanComplete returns a boolean indicating if the initial scan of the
+// hostdb is completed.
+func (r *Renter) InitialScanComplete() (bool, error) { return r.hostDB.InitialScanComplete() }
 
 // ScoreBreakdown returns the score breakdown
 func (r *Renter) ScoreBreakdown(e modules.HostDBEntry) modules.HostScoreBreakdown {

@@ -230,6 +230,18 @@ func (hdb *HostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
 	return host, exists
 }
 
+// InitialScanComplete returns a boolean indicating if the initial scan of the
+// hostdb is completed.
+func (hdb *HostDB) InitialScanComplete() (complete bool, err error) {
+	if err = hdb.tg.Add(); err != nil {
+		return
+	}
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+	complete = hdb.initialScanComplete
+	return
+}
+
 // RandomHosts implements the HostDB interface's RandomHosts() method. It takes
 // a number of hosts to return, and a slice of netaddresses to ignore, and
 // returns a slice of entries.
@@ -241,4 +253,17 @@ func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) ([]modul
 		return []modules.HostDBEntry{}, ErrInitialScanIncomplete
 	}
 	return hdb.hostTree.SelectRandom(n, excludeKeys), nil
+}
+
+// QueuedScans returns the currently queued scans of the hostdb.
+func (hdb *HostDB) QueuedScans() (hosts []modules.HostDBEntry, err error) {
+	if err = hdb.tg.Add(); err != nil {
+		return []modules.HostDBEntry{}, err
+	}
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+	for _, host := range hdb.scanList {
+		hosts = append(hosts, host)
+	}
+	return
 }

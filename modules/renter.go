@@ -347,6 +347,10 @@ type Renter interface {
 	// Host provides the DB entry and score breakdown for the requested host.
 	Host(pk types.SiaPublicKey) (HostDBEntry, bool)
 
+	// InitialScanComplete returns a boolean indicating if the initial scan of the
+	// hostdb is completed.
+	InitialScanComplete() (bool, error)
+
 	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
 	// contain multiple files. The paths of the added files are returned.
 	LoadSharedFiles(source string) ([]string, error)
@@ -386,6 +390,9 @@ type Renter interface {
 	// from the Sia network and also returns the fileName of the streamed
 	// resource.
 	Streamer(siaPath string) (string, io.ReadSeeker, error)
+
+	// QueuedScans returns the currently queued scans of the hostdb.
+	QueuedScans() ([]HostDBEntry, error)
 
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error
