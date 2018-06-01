@@ -86,14 +86,13 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 	if len(tg.miners) == 0 {
 		return nil, errors.New("cannot fund group without miners")
 	}
-	// Fully connect nodes
 	miner := tg.Miners()[0]
 	for i := types.BlockHeight(0); i <= types.MaturityDelay+types.TaxHardforkHeight; i++ {
 		if err := miner.MineBlock(); err != nil {
 			return nil, errors.AddContext(err, "failed to mine block for funding")
 		}
 	}
-
+	// Fully connect nodes
 	return tg, tg.setupNodes(tg.hosts, tg.nodes, tg.renters)
 }
 
@@ -446,8 +445,20 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 // setupNodes does the set up required for creating a test group
 // and add nodes to a group
 func (tg *TestGroup) setupNodes(setHosts, setNodes, setRenters map[*TestNode]struct{}) error {
-	// Fully connect nodes.
-	miner := mapToSlice(tg.miners)[0]
+	// Find richest miner.
+	var miner *TestNode
+	var balance types.Currency
+	for m := range tg.miners {
+		wg, err := m.WalletGet()
+		if err != nil {
+			return errors.New("failed to find richest miner")
+		}
+		if wg.ConfirmedSiacoinBalance.Cmp(balance) > 0 {
+			miner = m
+			balance = wg.ConfirmedSiacoinBalance
+		}
+	}
+	// Get all the nodes.
 	nodes := mapToSlice(tg.nodes)
 	if err := fullyConnectNodes(nodes); err != nil {
 		return build.ExtendErr("failed to fully connect nodes", err)
