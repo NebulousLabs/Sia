@@ -94,7 +94,7 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		}
 	}
 
-	return tg, tg.SetupNodes(tg.hosts, tg.nodes, tg.renters)
+	return tg, tg.setupNodes(tg.hosts, tg.nodes, tg.renters)
 }
 
 // NewGroupFromTemplate will create hosts, renters and miners according to the
@@ -440,12 +440,12 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 		newNodes[node] = struct{}{}
 	}
 
-	return tg.SetupNodes(newHosts, newNodes, newRenters)
+	return tg.setupNodes(newHosts, newNodes, newRenters)
 }
 
-// SetupNodes does the set up required for creating a test group
+// setupNodes does the set up required for creating a test group
 // and add nodes to a group
-func (tg *TestGroup) SetupNodes(setHosts, setNodes, setRenters map[*TestNode]struct{}) error {
+func (tg *TestGroup) setupNodes(setHosts, setNodes, setRenters map[*TestNode]struct{}) error {
 	// Fully connect nodes.
 	miner := mapToSlice(tg.miners)[0]
 	nodes := mapToSlice(tg.nodes)
