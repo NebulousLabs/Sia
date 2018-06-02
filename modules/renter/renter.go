@@ -492,12 +492,9 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 	r.memoryManager = newMemoryManager(defaultMemory, r.tg.StopChan())
 
 	// Load all saved data.
-	id := r.mu.Lock()
 	if err := r.initPersist(); err != nil {
-		r.mu.Unlock(id)
 		return nil, err
 	}
-	r.mu.Unlock(id)
 
 	// Set the bandwidth limits, sincce the contractor doesn't persist them.
 	//
