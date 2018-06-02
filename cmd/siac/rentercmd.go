@@ -14,6 +14,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node/api"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -158,8 +159,16 @@ func rentercmd() {
 	fm := rg.FinancialMetrics
 	totalSpent := fm.ContractFees.Add(fm.UploadSpending).
 		Add(fm.DownloadSpending).Add(fm.StorageSpending)
-	unspentAllocated := fm.TotalAllocated.Sub(totalSpent)
-	unspentUnallocated := fm.Unspent.Sub(unspentAllocated)
+	// Calculate unspent allocated
+	unspentAllocated := types.ZeroCurrency
+	if fm.TotalAllocated.Cmp(totalSpent) >= 0 {
+		unspentAllocated = fm.TotalAllocated.Sub(totalSpent)
+	}
+	// Calculate unspent unallocated
+	unspentUnallocated := types.ZeroCurrency
+	if fm.Unspent.Cmp(unspentAllocated) >= 0 {
+		unspentUnallocated = fm.Unspent.Sub(unspentAllocated)
+	}
 
 	fmt.Printf(`Renter info:
 	Allowance:         %v
