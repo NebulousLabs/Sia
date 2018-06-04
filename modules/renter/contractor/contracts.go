@@ -351,7 +351,8 @@ func (c *Contractor) threadedContractMaintenance() {
 	blockHeight := c.blockHeight
 	c.mu.RUnlock()
 
-	// Grab the end height that should be used for the contracts.
+	// Grab the end height that should be used for the contracts created
+	// in the current period.
 	endHeight = currentPeriod + allowance.Period
 
 	// Determine how many funds have been used already in this billing
@@ -423,6 +424,9 @@ func (c *Contractor) threadedContractMaintenance() {
 			// renewal.
 			oldContractSpent := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee).Sub(contract.RenterFunds)
 			oldContractLength := blockHeight - contract.StartHeight
+			if oldContractLength <= 1 {
+				oldContractLength = types.BlockHeight(1)
+			}
 			spentPerBlock := oldContractSpent.Div64(uint64(oldContractLength))
 			renewAmount := spentPerBlock.Mul64(uint64(allowance.Period))
 
@@ -554,6 +558,10 @@ func (c *Contractor) threadedContractMaintenance() {
 				c.staticContracts.Return(oldContract)
 				return
 			}
+
+			// Calculate endHeight for renewed contracts
+			endHeight = currentPeriod + (2 * allowance.Period)
+
 			// Perform the actual renew. If the renew fails, return the
 			// contract. If the renew fails we check how often it has failed
 			// before. Once it has failed for a certain number of blocks in a
