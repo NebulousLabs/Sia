@@ -1,13 +1,14 @@
 package proto
 
 import (
-	"errors"
 	"net"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
 
 const (
@@ -108,6 +109,7 @@ func (cs *ContractSet) FormContract(params ContractParams, txnBuilder transactio
 	defer func() {
 		if err != nil {
 			hdb.IncrementFailedInteractions(host.PublicKey)
+			err = errors.Extend(err, modules.ErrHostFault)
 		} else {
 			hdb.IncrementSuccessfulInteractions(host.PublicKey)
 		}
