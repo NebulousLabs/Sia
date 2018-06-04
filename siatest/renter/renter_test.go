@@ -3,6 +3,7 @@ package renter
 import (
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -780,7 +781,7 @@ func TestRedundancyReporting(t *testing.T) {
 
 	// Stop a host.
 	host := tg.Hosts()[0]
-	if err := host.StopNode(); err != nil {
+	if err := tg.StopNode(host); err != nil {
 		t.Fatal(err)
 	}
 
@@ -791,7 +792,41 @@ func TestRedundancyReporting(t *testing.T) {
 	}
 
 	// Restart the host.
-	if err := host.StartNode(); err != nil {
+	if err := tg.StartNode(host); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := host.HostAnnouncePost(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait until the host shows up as active again.
+	pk, err := host.HostPublicKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = build.Retry(60, time.Second, func() error {
+		hdag, err := renter.HostDbActiveGet()
+		if err != nil {
+			return err
+		}
+		for _, h := range hdag.Hosts {
+			if reflect.DeepEqual(h.PublicKey, pk) {
+				return nil
+			}
+		}
+		miner := tg.Miners()[0]
+		if err := miner.MineBlock(); err != nil {
+			t.Fatal(err)
+		}
+		return errors.New("host still not active")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	miner := tg.Miners()[0]
+	if err := miner.MineBlock(); err != nil {
 		t.Fatal(err)
 	}
 

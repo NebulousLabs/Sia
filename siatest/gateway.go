@@ -1,6 +1,8 @@
 package siatest
 
-import "github.com/NebulousLabs/Sia/build"
+import (
+	"github.com/NebulousLabs/Sia/build"
+)
 
 // hasPeer checks if peer is a peer of tn.
 func (tn *TestNode) hasPeer(peer *TestNode) (bool, error) {
