@@ -2,6 +2,8 @@ package renter
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -714,6 +716,129 @@ func TestRenewFailing(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestRenterPersistData checks if the RenterSettings are persisted
+func TestRenterPersistData(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Get test directory
+	testdir, err := siatest.TestDir(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Copying legacy file to test directory
+	renterDir := filepath.Join(testdir, "renter")
+	destination := filepath.Join(renterDir, "renter.json")
+	err = os.MkdirAll(renterDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	from, err := os.Open("../../compatibility/renter_v04.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	to, err := os.OpenFile(destination, os.O_RDWR|os.O_CREATE, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = io.Copy(to, from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = from.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err = to.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create new node from legacy renter.json persistence file
+	r, err := siatest.NewNode(node.AllModules(testdir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err = r.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Set renter allowance to finish renter set up
+	// Currently /renter POST endpoint errors if the allowance
+	// is not previously set or passed in as an argument
+	err = r.RenterPostAllowance(siatest.DefaultAllowance)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check Settings, should be defaults
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize != renter.DefaultStreamCacheSize {
+		t.Fatalf("StreamCacheSize not set to default of %v, set to %v",
+			renter.DefaultStreamCacheSize, rg.Settings.StreamCacheSize)
+	}
+	if rg.Settings.MaxDownloadSpeed != renter.DefaultMaxDownloadSpeed {
+		t.Fatalf("MaxDownloadSpeed not set to default of %v, set to %v",
+			renter.DefaultMaxDownloadSpeed, rg.Settings.MaxDownloadSpeed)
+	}
+	if rg.Settings.MaxUploadSpeed != renter.DefaultMaxUploadSpeed {
+		t.Fatalf("MaxUploadSpeed not set to default of %v, set to %v",
+			renter.DefaultMaxUploadSpeed, rg.Settings.MaxUploadSpeed)
+	}
+
+	// Set StreamCacheSize, MaxDownloadSpeed, and MaxUploadSpeed to new values
+	cacheSize := uint64(4)
+	ds := int64(20)
+	us := int64(10)
+	if err := r.RenterSetStreamCacheSizePost(cacheSize); err != nil {
+		t.Fatalf("%v: Could not set StreamCacheSize to %v", err, cacheSize)
+	}
+	if err := r.RenterPostRateLimit(ds, us); err != nil {
+		t.Fatalf("%v: Could not set RateLimts to %v and %v", err, ds, us)
+	}
+
+	// Confirm Settings were updated
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize != cacheSize {
+		t.Fatalf("StreamCacheSize not set to %v, set to %v", cacheSize, rg.Settings.StreamCacheSize)
+	}
+	if rg.Settings.MaxDownloadSpeed != ds {
+		t.Fatalf("MaxDownloadSpeed not set to %v, set to %v", ds, rg.Settings.MaxDownloadSpeed)
+	}
+	if rg.Settings.MaxUploadSpeed != us {
+		t.Fatalf("MaxUploadSpeed not set to %v, set to %v", us, rg.Settings.MaxUploadSpeed)
+	}
+
+	// Restart node
+	err = r.RestartNode()
+	if err != nil {
+		t.Fatal("Failed to restart node:", err)
+	}
+
+	// check Settings, settings should be values set through API endpoints
+	rg, err = r.RenterGet()
+	if err != nil {
+		t.Fatal(err, "Could not get Renter through RenterGet()")
+	}
+	if rg.Settings.StreamCacheSize != cacheSize {
+		t.Fatalf("StreamCacheSize not persisted as %v, set to %v", cacheSize, rg.Settings.StreamCacheSize)
+	}
+	if rg.Settings.MaxDownloadSpeed != ds {
+		t.Fatalf("MaxDownloadSpeed not persisted as %v, set to %v", ds, rg.Settings.MaxDownloadSpeed)
+	}
+	if rg.Settings.MaxUploadSpeed != us {
+		t.Fatalf("MaxUploadSpeed not persisted as %v, set to %v", us, rg.Settings.MaxUploadSpeed)
 	}
 }
 
