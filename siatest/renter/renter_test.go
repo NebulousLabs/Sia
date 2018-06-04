@@ -397,7 +397,7 @@ func testDownloadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnce
 			case <-cancel:
 				wg.Done()
 				return
-			case <-time.After(100 * time.Millisecond):
+			case <-time.After(10 * time.Millisecond):
 			}
 		}
 	}()
@@ -469,7 +469,7 @@ func testUploadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnceOn
 			case <-cancel:
 				wg.Done()
 				return
-			case <-time.After(100 * time.Millisecond):
+			case <-time.After(10 * time.Millisecond):
 			}
 		}
 		wg.Done()
@@ -523,8 +523,8 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 	prev := rg.Settings.StreamCacheSize
 
 	// Test setting to 0
-	if err := r.RenterSetStreamCacheSizePost(0); err != nil {
-		t.Fatal(err, "Error in calling RenterSetStreamCacheSizePost(0)")
+	if err := r.RenterSetStreamCacheSizePost(0); err == nil {
+		t.Fatal(err, "expected setting stream cache size to zero to fail with an error")
 	}
 	rg, err = r.RenterGet()
 	if err != nil {
