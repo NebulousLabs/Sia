@@ -778,7 +778,11 @@ func TestRedundancyReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO Stop one of the hosts
+	// Stop a host.
+	host := tg.Hosts()[0]
+	if err := host.StopNode(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Redundancy should decrease.
 	expectedRedundancy := float64(dataPieces+parityPieces-1) / float64(dataPieces)
@@ -786,7 +790,10 @@ func TestRedundancyReporting(t *testing.T) {
 		t.Fatal("Redundancy isn't decreasing", err)
 	}
 
-	// TODO Start the host
+	// Restart the host.
+	if err := host.StartNode(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Redundancy should go back to normal.
 	expectedRedundancy = float64(dataPieces+parityPieces) / float64(dataPieces)
