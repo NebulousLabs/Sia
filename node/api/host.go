@@ -73,7 +73,6 @@ func (api *API) hostContractInfoHandler(w http.ResponseWriter, req *http.Request
 	cg := ContractInfoGET{
 		Contracts: api.host.StorageObligations(),
 	}
-
 	WriteJSON(w, cg)
 }
 

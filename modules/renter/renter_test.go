@@ -150,7 +150,6 @@ func (pricesStub) InitialScanComplete() (bool, error) { return true, nil }
 func (ps pricesStub) RandomHosts(n int, exclude []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
 	return ps.dbEntries, nil
 }
-func (pricesStub) QueuedScans() ([]modules.HostDBEntry, error) { return nil, nil }
 
 // TestRenterPricesVolatility verifies that the renter caches its price
 // estimation, and subsequent calls result in non-volatile results.

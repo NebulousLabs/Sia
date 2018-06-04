@@ -38,8 +38,7 @@ type (
 
 	// HostDBGet holds information about the hostdb.
 	HostDBGet struct {
-		InitialScanComplete bool                  `json:"initialscancomplete"`
-		QueuedScans         []modules.HostDBEntry `json:"queuedscans"`
+		InitialScanComplete bool `json:"initialscancomplete"`
 	}
 )
 
@@ -51,14 +50,8 @@ func (api *API) hostdbHandler(w http.ResponseWriter, req *http.Request, _ httpro
 		WriteError(w, Error{"Failed to get initial scan status" + err.Error()}, http.StatusInternalServerError)
 		return
 	}
-	scans, err := api.renter.QueuedScans()
-	if err != nil {
-		WriteError(w, Error{"Failed to get queued scans" + err.Error()}, http.StatusInternalServerError)
-		return
-	}
 	WriteJSON(w, HostDBGet{
 		InitialScanComplete: isc,
-		QueuedScans:         scans,
 	})
 }
 

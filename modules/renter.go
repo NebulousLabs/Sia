@@ -391,9 +391,6 @@ type Renter interface {
 	// resource.
 	Streamer(siaPath string) (string, io.ReadSeeker, error)
 
-	// QueuedScans returns the currently queued scans of the hostdb.
-	QueuedScans() ([]HostDBEntry, error)
-
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error
 }

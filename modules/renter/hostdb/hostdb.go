@@ -254,16 +254,3 @@ func (hdb *HostDB) RandomHosts(n int, excludeKeys []types.SiaPublicKey) ([]modul
 	}
 	return hdb.hostTree.SelectRandom(n, excludeKeys), nil
 }
-
-// QueuedScans returns the currently queued scans of the hostdb.
-func (hdb *HostDB) QueuedScans() (hosts []modules.HostDBEntry, err error) {
-	if err = hdb.tg.Add(); err != nil {
-		return []modules.HostDBEntry{}, err
-	}
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-	for _, host := range hdb.scanList {
-		hosts = append(hosts, host)
-	}
-	return
-}
