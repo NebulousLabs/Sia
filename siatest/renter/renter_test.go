@@ -2,8 +2,6 @@ package renter
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -396,7 +394,7 @@ func testDownloadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnce
 			case <-cancel:
 				wg.Done()
 				return
-			case <-time.After(10 * time.Millisecond):
+			case <-time.After(100 * time.Millisecond):
 			}
 		}
 	}()
@@ -468,7 +466,7 @@ func testUploadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnceOn
 			case <-cancel:
 				wg.Done()
 				return
-			case <-time.After(10 * time.Millisecond):
+			case <-time.After(100 * time.Millisecond):
 			}
 		}
 		wg.Done()
@@ -522,8 +520,8 @@ func testRenterStreamingCache(t *testing.T, tg *siatest.TestGroup) {
 	prev := rg.Settings.StreamCacheSize
 
 	// Test setting to 0
-	if err := r.RenterSetStreamCacheSizePost(0); err == nil {
-		t.Fatal(err, "expected setting stream cache size to zero to fail with an error")
+	if err := r.RenterSetStreamCacheSizePost(0); err != nil {
+		t.Fatal(err, "Error in calling RenterSetStreamCacheSizePost(0)")
 	}
 	rg, err = r.RenterGet()
 	if err != nil {
@@ -718,129 +716,6 @@ func TestRenewFailing(t *testing.T) {
 	}
 }
 
-// TestRenterPersistData checks if the RenterSettings are persisted
-func TestRenterPersistData(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
-	// Get test directory
-	testdir, err := siatest.TestDir(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Copying legacy file to test directory
-	renterDir := filepath.Join(testdir, "renter")
-	destination := filepath.Join(renterDir, "renter.json")
-	err = os.MkdirAll(renterDir, 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	from, err := os.Open("../../compatibility/renter_v04.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	to, err := os.OpenFile(destination, os.O_RDWR|os.O_CREATE, 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = io.Copy(to, from)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = from.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err = to.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create new node from legacy renter.json persistence file
-	r, err := siatest.NewNode(node.AllModules(testdir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err = r.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	// Set renter allowance to finish renter set up
-	// Currently /renter POST endpoint errors if the allowance
-	// is not previously set or passed in as an argument
-	err = r.RenterPostAllowance(siatest.DefaultAllowance)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Check Settings, should be defaults
-	rg, err := r.RenterGet()
-	if err != nil {
-		t.Fatal(err, "Could not get Renter through RenterGet()")
-	}
-	if rg.Settings.StreamCacheSize != renter.DefaultStreamCacheSize {
-		t.Fatalf("StreamCacheSize not set to default of %v, set to %v",
-			renter.DefaultStreamCacheSize, rg.Settings.StreamCacheSize)
-	}
-	if rg.Settings.MaxDownloadSpeed != renter.DefaultMaxDownloadSpeed {
-		t.Fatalf("MaxDownloadSpeed not set to default of %v, set to %v",
-			renter.DefaultMaxDownloadSpeed, rg.Settings.MaxDownloadSpeed)
-	}
-	if rg.Settings.MaxUploadSpeed != renter.DefaultMaxUploadSpeed {
-		t.Fatalf("MaxUploadSpeed not set to default of %v, set to %v",
-			renter.DefaultMaxUploadSpeed, rg.Settings.MaxUploadSpeed)
-	}
-
-	// Set StreamCacheSize, MaxDownloadSpeed, and MaxUploadSpeed to new values
-	cacheSize := uint64(4)
-	ds := int64(20)
-	us := int64(10)
-	if err := r.RenterSetStreamCacheSizePost(cacheSize); err != nil {
-		t.Fatalf("%v: Could not set StreamCacheSize to %v", err, cacheSize)
-	}
-	if err := r.RenterPostRateLimit(ds, us); err != nil {
-		t.Fatalf("%v: Could not set RateLimts to %v and %v", err, ds, us)
-	}
-
-	// Confirm Settings were updated
-	rg, err = r.RenterGet()
-	if err != nil {
-		t.Fatal(err, "Could not get Renter through RenterGet()")
-	}
-	if rg.Settings.StreamCacheSize != cacheSize {
-		t.Fatalf("StreamCacheSize not set to %v, set to %v", cacheSize, rg.Settings.StreamCacheSize)
-	}
-	if rg.Settings.MaxDownloadSpeed != ds {
-		t.Fatalf("MaxDownloadSpeed not set to %v, set to %v", ds, rg.Settings.MaxDownloadSpeed)
-	}
-	if rg.Settings.MaxUploadSpeed != us {
-		t.Fatalf("MaxUploadSpeed not set to %v, set to %v", us, rg.Settings.MaxUploadSpeed)
-	}
-
-	// Restart node
-	err = r.RestartNode()
-	if err != nil {
-		t.Fatal("Failed to restart node:", err)
-	}
-
-	// check Settings, settings should be values set through API endpoints
-	rg, err = r.RenterGet()
-	if err != nil {
-		t.Fatal(err, "Could not get Renter through RenterGet()")
-	}
-	if rg.Settings.StreamCacheSize != cacheSize {
-		t.Fatalf("StreamCacheSize not persisted as %v, set to %v", cacheSize, rg.Settings.StreamCacheSize)
-	}
-	if rg.Settings.MaxDownloadSpeed != ds {
-		t.Fatalf("MaxDownloadSpeed not persisted as %v, set to %v", ds, rg.Settings.MaxDownloadSpeed)
-	}
-	if rg.Settings.MaxUploadSpeed != us {
-		t.Fatalf("MaxUploadSpeed not persisted as %v, set to %v", us, rg.Settings.MaxUploadSpeed)
-	}
-}
-
 // testRenterDownloadAfterRenew makes sure that we can still download a file
 // after the contract period has ended.
 func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
@@ -870,21 +745,18 @@ func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
 	}
 }
 
-// TestRenterSpendingReporting checks the accuracy for the reported
-// spending
-func TestRenterSpendingReporting(t *testing.T) {
-	// Skipping Test until it can be fixed
-	t.Skip("TODO: Test currently broken")
-
+// TestRedundancyReporting verifies that redundancy reporting is accurate if
+// contracts become offline.
+func TestRedundancyReporting(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
-	// Create a testgroup, creating without renter so the renter's
-	// initial balance can be obtained
+	// Create a group for testing.
 	groupParams := siatest.GroupParams{
-		Hosts:  2,
-		Miners: 1,
+		Hosts:   2,
+		Renters: 1,
+		Miners:  1,
 	}
 	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
@@ -896,215 +768,29 @@ func TestRenterSpendingReporting(t *testing.T) {
 		}
 	}()
 
-	// Add a Renter node
-	renterDir, err := siatest.TestDir(filepath.Join(t.Name(), "renter"))
+	// Upload a file.
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts()) - 1)
+
+	renter := tg.Renters()[0]
+	_, rf, err := renter.UploadNewFileBlocking(100, dataPieces, parityPieces)
 	if err != nil {
 		t.Fatal(err)
 	}
-	renterParams := node.Renter(renterDir)
-	renterParams.SkipSetAllowance = true
-	if err = tg.AddNodes(renterParams); err != nil {
-		t.Fatal(err)
+
+	// TODO Stop one of the hosts
+
+	// Redundancy should decrease.
+	expectedRedundancy := float64(dataPieces+parityPieces-1) / float64(dataPieces)
+	if err := renter.WaitForDecreasingRedundancy(rf, expectedRedundancy); err != nil {
+		t.Fatal("Redundancy isn't decreasing", err)
 	}
 
-	// Get renter's initial siacoin balance
-	r := tg.Renters()[0]
-	wg, err := r.WalletGet()
-	if err != nil {
-		t.Fatal("Failed to get wallet:", err)
-	}
-	initialBalance := wg.ConfirmedSiacoinBalance
+	// TODO Start the host
 
-	// Set allowance
-	if err = tg.SetRenterAllowance(r, siatest.DefaultAllowance); err != nil {
-		t.Fatal("Failed to set renter allowance:", err)
-	}
-
-	// Get initial Contracts to check for contract renewal later
-	rc, err := r.RenterContractsGet()
-	if err != nil {
-		t.Fatal("Could not get contracts:", err)
-	}
-	initialContracts := rc.Contracts
-
-	// Getting initial financial metrics
-	// Setting variables to easier reference
-	rg, err := r.RenterGet()
-	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
-	}
-	fm := rg.FinancialMetrics
-
-	// Check balance after allowance is set
-	wg, err = r.WalletGet()
-	if err != nil {
-		t.Fatal("Failed to get wallet:", err)
-	}
-	balanceAfterSetAllowance := initialBalance.Sub(fm.TotalAllocated)
-	if balanceAfterSetAllowance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		t.Fatalf("Renter Reported Spending does not equal wallet confirmed balance, \n%v != \n%v",
-			balanceAfterSetAllowance, wg.ConfirmedSiacoinBalance)
-	}
-
-	// Upload and download files to show spending
-	var remoteFiles []*siatest.RemoteFile
-	for i := 0; i < 10; i++ {
-		dataPieces := uint64(1)
-		parityPieces := uint64(1)
-		fileSize := 100 + siatest.Fuzz()
-		_, rf, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
-		if err != nil {
-			t.Fatal("Failed to upload a file for testing: ", err)
-		}
-		remoteFiles = append(remoteFiles, rf)
-	}
-	for _, rf := range remoteFiles {
-		_, err = r.DownloadToDisk(rf, false)
-		if err != nil {
-			t.Fatal("Could not DownloadToDisk:", err)
-		}
-	}
-
-	// Capture total spending for initial period
-	rg, err = r.RenterGet()
-	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
-	}
-	fm = rg.FinancialMetrics
-	totalSpentInitialPeriod := fm.ContractFees.Add(fm.UploadSpending).
-		Add(fm.DownloadSpending).Add(fm.StorageSpending)
-
-	// Mine blocks to force contract renewal
-	m := tg.Miners()[0]
-	for i := 0; i < int(rg.Settings.Allowance.Period+types.MaturityDelay); i++ {
-		if err = m.MineBlock(); err != nil {
-			t.Fatal("Error mining block:", err)
-		}
-	}
-
-	// Waiting for nodes to sync
-	if err = tg.Sync(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Get renewed renter contracts
-	rc, err = r.RenterContractsGet()
-	if err != nil {
-		t.Fatal("Could not get contracts:", err)
-	}
-	renewedContracts := rc.Contracts
-
-	// Confirm contracts were renewed, this will also mean there are old contracts
-	// Verify there are the same number of initialContracts as renewedContracts
-	if len(initialContracts) != len(renewedContracts) {
-		t.Fatal("Initial and renewed contracts are not the same length")
-	}
-
-	// Create Maps for comparison
-	initialContractIDMap := make(map[types.FileContractID]struct{})
-	initialContractKeyMap := make(map[crypto.Hash]struct{})
-	for _, c := range initialContracts {
-		initialContractIDMap[c.ID] = struct{}{}
-		initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)] = struct{}{}
-	}
-	for _, c := range renewedContracts {
-		// Verify that all the contracts were renewed
-		if _, ok := initialContractIDMap[c.ID]; ok {
-			t.Fatal("ID from renewedContracts found in initialContracts")
-		}
-		// Verifying that Renewed Contracts have the same HostPublicKey
-		// as an initial contract
-		if _, ok := initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)]; !ok {
-			t.Fatal("Host Public Key from renewedContracts not found in initialContracts")
-		}
-		// Confirm Renewed contract has storage spending
-		// Confirm Renewed contract no upload or download spending
-		if c.StorageSpending.Cmp(types.ZeroCurrency) < 1 {
-			t.Fatal("Storage Spending on renewed contract not greater than Zero")
-		}
-		if c.UploadSpending.Cmp(types.ZeroCurrency) != 0 {
-			t.Fatal("Upload spending on renewed contract not equal to zero, upload spending =",
-				c.UploadSpending)
-		}
-		if c.DownloadSpending.Cmp(types.ZeroCurrency) != 0 {
-			t.Fatal("Download spending on renewed contract not equal to zero, upload spending =",
-				c.DownloadSpending)
-		}
-
-	}
-	// Getting financial metrics after uploads, downloads, and
-	// contract renewal
-	rg, err = r.RenterGet()
-	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
-	}
-
-	fm = rg.FinancialMetrics
-	totalSpent := fm.ContractFees.Add(fm.UploadSpending).
-		Add(fm.DownloadSpending).Add(fm.StorageSpending)
-	total := totalSpent.Add(fm.Unspent)
-	allowance := rg.Settings.Allowance
-
-	wg, err = r.WalletGet()
-	if err != nil {
-		t.Fatal("Failed to get wallet:", err)
-	}
-
-	// Check that renter financial metrics add up to allowance
-	if total.Cmp(allowance.Funds) != 0 {
-		t.Fatalf("Combined Total of reported spending and unspent funds not equal to allowance, \n%v != \n%v",
-			total, allowance.Funds)
-	}
-
-	// Check renter financial metrics against contract spending
-	var spending modules.ContractorSpending
-	for _, contract := range initialContracts {
-		if contract.StartHeight >= rg.CurrentPeriod {
-			// Calculate ContractFees
-			spending.ContractFees = spending.ContractFees.Add(contract.Fees)
-			// Calculate TotalAllocated
-			spending.TotalAllocated = spending.TotalAllocated.Add(contract.TotalCost)
-			// Calculate Spending
-			spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
-			spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
-			spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
-		}
-	}
-	for _, contract := range renewedContracts {
-		// Calculate ContractFees
-		spending.ContractFees = spending.ContractFees.Add(contract.Fees)
-		// Calculate TotalAllocated
-		spending.TotalAllocated = spending.TotalAllocated.Add(contract.TotalCost)
-		// Calculate Spending
-		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
-		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
-		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
-	}
-
-	// Compare contract fees
-	if fm.ContractFees.Cmp(spending.ContractFees) != 0 {
-		t.Fatalf("Financial Metrics Contract Fees not equal to Renter Contract Fees, \n%v != \n%v",
-			fm.ContractFees, spending.ContractFees)
-	}
-	// Compare Total Allocated
-	if fm.TotalAllocated.Cmp(spending.TotalAllocated) != 0 {
-		t.Fatalf("Financial Metrics Total Allocated not equal to Renter Total Allocated, \n%v != \n%v",
-			fm.TotalAllocated, spending.TotalAllocated)
-	}
-	// Compare Spending
-	allSpending := spending.ContractFees.Add(spending.UploadSpending).
-		Add(spending.DownloadSpending).Add(spending.StorageSpending)
-	if totalSpent.Cmp(allSpending) != 0 {
-		t.Fatalf("Financial Metrics Spending not equal to Renter Spending, \n%v != \n%v",
-			totalSpent, allSpending)
-	}
-
-	// Check balance after spending, TotalAllocated is spending
-	// and unspentAllocated
-	balanceAfterRenewal := initialBalance.Sub(fm.TotalAllocated).Sub(totalSpentInitialPeriod)
-	if balanceAfterRenewal.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		fmt.Println("Difference:", balanceAfterRenewal.Sub(wg.ConfirmedSiacoinBalance).HumanString())
-		t.Fatalf("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance, \n%v != \n%v",
-			balanceAfterRenewal, wg.ConfirmedSiacoinBalance)
+	// Redundancy should go back to normal.
+	expectedRedundancy = float64(dataPieces+parityPieces) / float64(dataPieces)
+	if err := renter.WaitForUploadRedundancy(rf, expectedRedundancy); err != nil {
+		t.Fatal("Redundancy is not increasing")
 	}
 }
