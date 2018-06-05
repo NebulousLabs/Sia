@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -1109,5 +1110,96 @@ func TestRenterSpendingReporting(t *testing.T) {
 		fmt.Println("Difference:", balanceAfterRenewal.Sub(wg.ConfirmedSiacoinBalance).HumanString())
 		t.Fatalf("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance, \n%v != \n%v",
 			balanceAfterRenewal, wg.ConfirmedSiacoinBalance)
+	}
+}
+
+// TestRedundancyReporting verifies that redundancy reporting is accurate if
+// contracts become offline.
+func TestRedundancyReporting(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a group for testing.
+	groupParams := siatest.GroupParams{
+		Hosts:   2,
+		Renters: 1,
+		Miners:  1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Upload a file.
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts()) - 1)
+
+	renter := tg.Renters()[0]
+	_, rf, err := renter.UploadNewFileBlocking(100, dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Stop a host.
+	host := tg.Hosts()[0]
+	if err := tg.StopNode(host); err != nil {
+		t.Fatal(err)
+	}
+
+	// Redundancy should decrease.
+	expectedRedundancy := float64(dataPieces+parityPieces-1) / float64(dataPieces)
+	if err := renter.WaitForDecreasingRedundancy(rf, expectedRedundancy); err != nil {
+		t.Fatal("Redundancy isn't decreasing", err)
+	}
+
+	// Restart the host.
+	if err := tg.StartNode(host); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := host.HostAnnouncePost(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait until the host shows up as active again.
+	pk, err := host.HostPublicKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = build.Retry(60, time.Second, func() error {
+		hdag, err := renter.HostDbActiveGet()
+		if err != nil {
+			return err
+		}
+		for _, h := range hdag.Hosts {
+			if reflect.DeepEqual(h.PublicKey, pk) {
+				return nil
+			}
+		}
+		miner := tg.Miners()[0]
+		if err := miner.MineBlock(); err != nil {
+			t.Fatal(err)
+		}
+		return errors.New("host still not active")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	miner := tg.Miners()[0]
+	if err := miner.MineBlock(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Redundancy should go back to normal.
+	expectedRedundancy = float64(dataPieces+parityPieces) / float64(dataPieces)
+	if err := renter.WaitForUploadRedundancy(rf, expectedRedundancy); err != nil {
+		t.Fatal("Redundancy is not increasing")
 	}
 }
