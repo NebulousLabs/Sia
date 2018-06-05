@@ -383,6 +383,11 @@ func rentercontractscmd() {
 	}
 	sort.Sort(byValue(rc.Contracts))
 	fmt.Println("Showing", len(rc.Contracts), "Contracts:")
+	var totalStored uint64
+	for _, c := range rc.Contracts {
+		totalStored += c.Size
+	}
+	fmt.Printf("Total stored in contracts: %9s\n", filesizeUnits(int64(totalStored)))
 	w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
 	for _, c := range rc.Contracts {
