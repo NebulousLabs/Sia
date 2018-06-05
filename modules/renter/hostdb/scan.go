@@ -61,6 +61,9 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 		}
 		defer hdb.tg.Done()
 
+		// Block scan when a specific dependency is provided.
+		hdb.deps.Disrupt("BlockScan")
+
 		// Due to the patterns used to spin up scanning threads, it's possible
 		// that we get to this point while all scanning threads are currently
 		// used up, completing jobs that were sent out by the previous pool
@@ -106,7 +109,12 @@ func (hdb *HostDB) queueScan(entry modules.HostDBEntry) {
 			if hdb.scanningThreads < maxScanningThreads || !starterThread {
 				starterThread = true
 				hdb.scanningThreads++
+				if err := hdb.tg.Add(); err != nil {
+					hdb.mu.Unlock()
+					return
+				}
 				go func() {
+					defer hdb.tg.Done()
 					hdb.threadedProbeHosts(scanPool)
 					hdb.mu.Lock()
 					hdb.scanningThreads--
@@ -351,11 +359,6 @@ func (hdb *HostDB) managedWaitForScans() {
 
 // threadedProbeHosts pulls hosts from the thread pool and runs a scan on them.
 func (hdb *HostDB) threadedProbeHosts(scanPool <-chan modules.HostDBEntry) {
-	err := hdb.tg.Add()
-	if err != nil {
-		return
-	}
-	defer hdb.tg.Done()
 	for hostEntry := range scanPool {
 		// Block until hostdb has internet connectivity.
 		for {
@@ -400,6 +403,9 @@ func (hdb *HostDB) threadedScan() {
 		case <-time.After(scanCheckInterval):
 		}
 	}
+
+	// Block scan when a specific dependency is provided.
+	hdb.deps.Disrupt("BlockScan")
 
 	// The initial scan might have been interrupted. Queue one scan for every
 	// announced host that was missed by the initial scan and wait for the

@@ -229,6 +229,9 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 // database.
 func hostsInRenterDBCheck(miner *TestNode, renters map[*TestNode]struct{}, hosts map[*TestNode]struct{}) error {
 	for renter := range renters {
+		if renter.params.SkipHostDiscovery {
+			continue
+		}
 		for host := range hosts {
 			numRetries := 0
 			err := Retry(100, 100*time.Millisecond, func() error {
