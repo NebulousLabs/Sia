@@ -382,12 +382,16 @@ func rentercontractscmd() {
 		return
 	}
 	sort.Sort(byValue(rc.Contracts))
-	fmt.Println("Contracts:")
+	fmt.Println("Showing", len(rc.Contracts), "Contracts:")
 	w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
 	for _, c := range rc.Contracts {
+		address := c.NetAddress
+		if address == "" {
+			address = "Host Removed"
+		}
 		fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\t%v\t%v\n",
-			c.NetAddress,
+			address,
 			currencyUnits(c.RenterFunds),
 			currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
 			currencyUnits(c.Fees),
@@ -525,6 +529,11 @@ func renterfileslistcmd() {
 		return
 	}
 	fmt.Println("Tracking", len(rf.Files), "files:")
+	var totalStored uint64
+	for _, file := range rf.Files {
+		totalStored += file.Filesize
+	}
+	fmt.Printf("Total uploaded: %9s\n", filesizeUnits(int64(totalStored)))
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	if renterListVerbose {
 		fmt.Fprintln(w, "File size\tAvailable\tUploaded\tProgress\tRedundancy\tRenewing\tSia path")
