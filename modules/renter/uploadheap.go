@@ -18,11 +18,13 @@ package renter
 
 import (
 	"container/heap"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // uploadHeap contains a priority-sorted heap of all the chunks being uploaded
@@ -62,7 +64,7 @@ func (uch *uploadChunkHeap) Pop() interface{} {
 	return x
 }
 
-// managedAddChunkToUploadHeap will add a chunk to the upload heap.
+// managedPush will add a chunk to the upload heap.
 func (uh *uploadHeap) managedPush(uuc *unfinishedUploadChunk) {
 	// Create the unique chunk id.
 	ucid := uploadChunkID{
@@ -237,6 +239,30 @@ func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}) {
 	// the heap.
 	id := r.mu.Lock()
 	for _, file := range r.files {
+		// check for local file
+		tf, exists := r.persist.Tracking[file.name]
+		if exists {
+			// Build maps that map contract id to its offline and goodForRenew
+			// status
+			contractIDs := make(map[types.FileContractID]struct{})
+			for cid := range file.contracts {
+				contractIDs[cid] = struct{}{}
+			}
+			goodForRenew := make(map[types.FileContractID]bool)
+			offline := make(map[types.FileContractID]bool)
+			for cid := range contractIDs {
+				resolvedID := r.hostContractor.ResolveID(cid)
+				cu, ok := r.hostContractor.ContractUtility(resolvedID)
+				goodForRenew[cid] = ok && cu.GoodForRenew
+				offline[cid] = r.hostContractor.IsOffline(resolvedID)
+			}
+			// Check if local file is missing and redundancy is less than 1
+			// log warning to renter log
+			if _, err := os.Stat(tf.RepairPath); os.IsNotExist(err) && file.redundancy(offline, goodForRenew) < 1 {
+				r.log.Println("File not found on disk:", tf.RepairPath)
+			}
+		}
+
 		unfinishedUploadChunks := r.buildUnfinishedChunks(file, hosts)
 		for i := 0; i < len(unfinishedUploadChunks); i++ {
 			r.uploadHeap.managedPush(unfinishedUploadChunks[i])
@@ -362,7 +388,7 @@ func (r *Renter) threadedUploadLoop() {
 		case <-rebuildHeapSignal:
 			// Time to check the filesystem health again.
 		case <-r.tg.StopChan():
-			// Thre renter has shut down.
+			// The renter has shut down.
 			return
 		}
 	}

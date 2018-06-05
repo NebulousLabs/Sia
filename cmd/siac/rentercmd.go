@@ -554,6 +554,9 @@ func renterfileslistcmd() {
 				redundancyStr = "-"
 			}
 			uploadProgressStr := fmt.Sprintf("%.2f%%", file.UploadProgress)
+			if _, err := os.Stat(file.LocalPath); os.IsNotExist(err) && file.Redundancy < 1 {
+				uploadProgressStr = fmt.Sprintf("Local File Lost")
+			}
 			if file.UploadProgress == -1 {
 				uploadProgressStr = "-"
 			}
