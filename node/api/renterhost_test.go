@@ -1007,6 +1007,9 @@ func TestRenterCancelAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal("downloading file failed", err)
 	}
+	// Wait for a few seconds to make sure that the upload heap is rebuilt.
+	// The rebuilt interval is 3 seconds. Sleep for 5 to be safe.
+	time.Sleep(5 * time.Second)
 
 	// Try to upload a file after the allowance was cancelled. Should fail.
 	err = st.stdPostAPI("/renter/upload/test2", uploadValues)
