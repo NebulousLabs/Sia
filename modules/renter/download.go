@@ -522,17 +522,10 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 }
 
 // ClearDownloadHistory clears the renter's download history
-func (r *Renter) ClearDownloadHistory() error {
+func (r *Renter) ClearDownloadHistory() {
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
-
-	for s := range r.downloadHistory {
-		err := r.RemoveFromDownloadHistory(s)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	r.downloadHistory = make(map[string]*download)
 }
 
 // RemoveFromDownloadHistory removes a provided download from

@@ -61,6 +61,7 @@ func TestRenter(t *testing.T) {
 		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
+		{"TestClearDownloadHistory", testClearDownloadHistory},
 	}
 	// Run subtests
 	for _, subtest := range subTests {
@@ -2167,5 +2168,78 @@ func TestRenterOldContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
 
+// testClearDownloadHistory makes sure that the download history is
+// properly cleared when called through the API
+func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	r := tg.Renters()[0]
+
+	rdg, err := r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	numDownloads := len(rdg.Downloads)
+	if numDownloads == 0 {
+		// Upload and download files to show build download history
+		var remoteFiles []*siatest.RemoteFile
+		for i := 0; i < 10; i++ {
+			dataPieces := uint64(1)
+			parityPieces := uint64(1)
+			fileSize := 100 + siatest.Fuzz()
+			_, rf, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+			if err != nil {
+				t.Fatal("Failed to upload a file for testing: ", err)
+			}
+			remoteFiles = append(remoteFiles, rf)
+		}
+		for _, rf := range remoteFiles {
+			_, err := r.DownloadToDisk(rf, false)
+			if err != nil {
+				t.Fatal("Could not DownloadToDisk:", err)
+			}
+		}
+		rdg, err = r.RenterDownloadsGet()
+		if err != nil {
+			t.Fatal("Could not get download history:", err)
+		}
+		// Confirm download history is not empty
+		if len(rdg.Downloads) != len(remoteFiles) {
+			t.Fatalf("Not all downloads added to download history: only %v downloads added, expected %v", len(rdg.Downloads), len(remoteFiles))
+		}
+		numDownloads = len(rdg.Downloads)
+	}
+
+	// Check removing 1 download from history
+	siaPath := rdg.Downloads[0].SiaPath
+	err = r.RenterClearDownloadPost(siaPath)
+	if err != nil {
+		t.Fatal("Error in API endpoint to remove download from history:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	if len(rdg.Downloads) != numDownloads-1 {
+		t.Fatalf("Download history not reduced: history has %v downloads, expected %v", len(rdg.Downloads), numDownloads-1)
+	}
+	for _, d := range rdg.Downloads {
+		if d.SiaPath == siaPath {
+			t.Fatal("Specified download not removed from history")
+		}
+	}
+
+	// Check clearing download history
+	err = r.RenterClearDownloadsPost()
+	if err != nil {
+		t.Fatal("Error in API endpoint to clear download history:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	if len(rdg.Downloads) != 0 {
+		t.Fatalf("Download history not cleared: history has %v downloads, expected 0", len(rdg.Downloads))
+	}
 }

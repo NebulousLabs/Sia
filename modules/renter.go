@@ -350,7 +350,7 @@ type Renter interface {
 	DownloadAsync(params RenterDownloadParameters) error
 
 	// ClearDownloadHistory clears the download history of the renter.
-	ClearDownloadHistory() error
+	ClearDownloadHistory()
 
 	// DownloadHistory lists all the files that have been scheduled for download.
 	DownloadHistory() []DownloadInfo

@@ -364,11 +364,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 
 // renterClearDownloadsHandler handles the API call to request the download queue.
 func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	err := api.renter.ClearDownloadHistory()
-	if err != nil {
-		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
-		return
-	}
+	api.renter.ClearDownloadHistory()
 
 	WriteSuccess(w)
 }

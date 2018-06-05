@@ -43,6 +43,19 @@ func (c *Client) RenterDownloadFullGet(siaPath, destination string, async bool) 
 	return
 }
 
+// RenterClearDownloadPost requests the /renter/downloads/clear/*siapath resource
+func (c *Client) RenterClearDownloadPost(siaPath string) (err error) {
+	siaPath = strings.TrimPrefix(siaPath, "/")
+	err = c.post(fmt.Sprintf("/renter/downloads/clear/%s", siaPath), "", nil)
+	return
+}
+
+// RenterClearDownloadsPost requests the /renter/downloads/clear resource
+func (c *Client) RenterClearDownloadsPost() (err error) {
+	err = c.post("/renter/downloads/clear", "", nil)
+	return
+}
+
 // RenterDownloadsGet requests the /renter/downloads resource
 func (c *Client) RenterDownloadsGet() (rdq api.RenterDownloadQueue, err error) {
 	err = c.get("/renter/downloads", &rdq)
