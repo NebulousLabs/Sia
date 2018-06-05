@@ -703,6 +703,9 @@ func TestRenewFailing(t *testing.T) {
 				goodForRenew++
 			}
 		}
+		if err := miner.MineBlock(); err != nil {
+			return err
+		}
 		if !replaced && notGoodForRenew != 1 && goodForRenew != 1 {
 			return fmt.Errorf("there should be exactly 1 contract that is !goodForRenew but was %v",
 				notGoodForRenew)

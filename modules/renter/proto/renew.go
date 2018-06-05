@@ -1,19 +1,20 @@
 package proto
 
 import (
-	"errors"
 	"net"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
 
 // Renew negotiates a new contract for data already stored with a host, and
 // submits the new contract transaction to tpool. The new contract is added to
 // the ContractSet and its metadata is returned.
-func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (modules.RenterContract, error) {
+func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool, hdb hostDB, cancel <-chan struct{}) (rc modules.RenterContract, err error) {
 	// for convenience
 	contract := oldContract.header
 
@@ -89,7 +90,7 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	}
 
 	// build transaction containing fc
-	err := txnBuilder.FundSiacoins(funding)
+	err = txnBuilder.FundSiacoins(funding)
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
@@ -110,6 +111,7 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 		// A revision mismatch might not be the host's fault.
 		if err != nil && !IsRevisionMismatch(err) {
 			hdb.IncrementFailedInteractions(contract.HostPublicKey())
+			err = errors.Extend(err, modules.ErrHostFault)
 		} else if err == nil {
 			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}

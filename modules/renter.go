@@ -7,7 +7,18 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
+
+// ErrHostFault is an error that is usually extended to indicate that an error
+// is the host's fault.
+var ErrHostFault = errors.New("host has returned an error")
+
+// IsHostsFault indicates if a returned error is the host's fault.
+func IsHostsFault(err error) bool {
+	return errors.Contains(err, ErrHostFault)
+}
 
 const (
 	// RenterDir is the name of the directory that is used to store the

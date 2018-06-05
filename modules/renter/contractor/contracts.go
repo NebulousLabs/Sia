@@ -517,10 +517,13 @@ func (c *Contractor) threadedContractMaintenance() {
 			// on renewing it and set goodForRenew to false.
 			newContract, errRenew := c.managedRenew(oldContract, amount, endHeight)
 			if errRenew != nil {
-				// Increment the number of failed renews for the contract.
-				c.mu.Lock()
-				c.numFailedRenews[oldContract.Metadata().ID]++
-				c.mu.Unlock()
+				// Increment the number of failed renews for the contract if it
+				// was the host's fault.
+				if modules.IsHostsFault(errRenew) {
+					c.mu.Lock()
+					c.numFailedRenews[oldContract.Metadata().ID]++
+					c.mu.Unlock()
+				}
 
 				// Check if contract has to be replaced.
 				md := oldContract.Metadata()

@@ -1,7 +1,6 @@
 package proto
 
 import (
-	"errors"
 	"net"
 	"sync"
 	"time"
@@ -11,6 +10,8 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/ratelimit"
 )
 
@@ -107,6 +108,7 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		// Increase Successful/Failed interactions accordingly
 		if err != nil {
 			he.hdb.IncrementFailedInteractions(he.host.PublicKey)
+			err = errors.Extend(err, modules.ErrHostFault)
 		} else {
 			he.hdb.IncrementSuccessfulInteractions(he.host.PublicKey)
 		}
@@ -182,6 +184,7 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		// a revision mismatch is not necessarily the host's fault
 		if err != nil && !IsRevisionMismatch(err) {
 			hdb.IncrementFailedInteractions(contract.HostPublicKey())
+			err = errors.Extend(err, modules.ErrHostFault)
 		} else if err == nil {
 			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}
