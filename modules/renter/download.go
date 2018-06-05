@@ -331,7 +331,7 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters) (*download,
 
 	// Add the download object to the download queue.
 	r.downloadHistoryMu.Lock()
-	r.downloadHistory[d.destinationString] = d
+	r.downloadHistory[d.staticSiaPath] = d
 	r.downloadHistoryMu.Unlock()
 
 	// Return the download object
@@ -527,7 +527,7 @@ func (r *Renter) ClearDownloadHistory() error {
 	defer r.downloadHistoryMu.Unlock()
 
 	for s := range r.downloadHistory {
-		err := r.removeFromDownloadHistory(s)
+		err := r.RemoveFromDownloadHistory(s)
 		if err != nil {
 			return err
 		}
@@ -535,11 +535,14 @@ func (r *Renter) ClearDownloadHistory() error {
 	return nil
 }
 
-// removeFromDownloadHistory removes a provided download from
+// RemoveFromDownloadHistory removes a provided download from
 // the download history
-func (r *Renter) removeFromDownloadHistory(destinationString string) error {
-	delete(r.downloadHistory, destinationString)
-	if _, ok := r.downloadHistory[destinationString]; ok {
+func (r *Renter) RemoveFromDownloadHistory(staticSiaPath string) error {
+	r.downloadHistoryMu.Lock()
+	defer r.downloadHistoryMu.Unlock()
+
+	delete(r.downloadHistory, staticSiaPath)
+	if _, ok := r.downloadHistory[staticSiaPath]; ok {
 		return errors.New("Download not remove from history")
 	}
 	return nil

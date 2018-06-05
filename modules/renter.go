@@ -349,8 +349,15 @@ type Renter interface {
 	// blocking, including downloads of `offset` and `length` type.
 	DownloadAsync(params RenterDownloadParameters) error
 
+	// ClearDownloadHistory clears the download history of the renter.
+	ClearDownloadHistory() error
+
 	// DownloadHistory lists all the files that have been scheduled for download.
 	DownloadHistory() []DownloadInfo
+
+	// RemoveFromDownloadHistory removes a given download from the download
+	// history of the renter.
+	RemoveFromDownloadHistory(staticSiaPath string) error
 
 	// File returns information on specific file queried by user
 	File(siaPath string) (FileInfo, error)
