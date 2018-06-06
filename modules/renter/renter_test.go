@@ -145,6 +145,8 @@ type pricesStub struct {
 	dbEntries []modules.HostDBEntry
 }
 
+func (pricesStub) InitialScanComplete() (bool, error) { return true, nil }
+
 func (ps pricesStub) RandomHosts(n int, exclude []types.SiaPublicKey) ([]modules.HostDBEntry, error) {
 	return ps.dbEntries, nil
 }

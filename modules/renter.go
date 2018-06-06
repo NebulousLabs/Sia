@@ -347,6 +347,10 @@ type Renter interface {
 	// Host provides the DB entry and score breakdown for the requested host.
 	Host(pk types.SiaPublicKey) (HostDBEntry, bool)
 
+	// InitialScanComplete returns a boolean indicating if the initial scan of the
+	// hostdb is completed.
+	InitialScanComplete() (bool, error)
+
 	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
 	// contain multiple files. The paths of the added files are returned.
 	LoadSharedFiles(source string) ([]string, error)

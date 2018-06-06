@@ -90,6 +90,7 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.POST("/renter/upload/*siapath", RequirePassword(api.renterUploadHandler, requiredPassword))
 
 		// HostDB endpoints.
+		router.GET("/hostdb", api.hostdbHandler)
 		router.GET("/hostdb/active", api.hostdbActiveHandler)
 		router.GET("/hostdb/all", api.hostdbAllHandler)
 		router.GET("/hostdb/hosts/:pubkey", api.hostdbHostsHandler)

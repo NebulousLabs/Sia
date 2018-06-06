@@ -77,6 +77,10 @@ type hostDB interface {
 	// Host returns the HostDBEntry for a given host.
 	Host(types.SiaPublicKey) (modules.HostDBEntry, bool)
 
+	// initialScanComplete returns a boolean indicating if the initial scan of the
+	// hostdb is completed.
+	InitialScanComplete() (bool, error)
+
 	// RandomHosts returns a set of random hosts, weighted by their estimated
 	// usefulness / attractiveness to the renter. RandomHosts will not return
 	// any offline or inactive hosts.
@@ -366,6 +370,10 @@ func (r *Renter) AllHosts() []modules.HostDBEntry { return r.hostDB.AllHosts() }
 
 // Host returns the host associated with the given public key
 func (r *Renter) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) { return r.hostDB.Host(spk) }
+
+// InitialScanComplete returns a boolean indicating if the initial scan of the
+// hostdb is completed.
+func (r *Renter) InitialScanComplete() (bool, error) { return r.hostDB.InitialScanComplete() }
 
 // ScoreBreakdown returns the score breakdown
 func (r *Renter) ScoreBreakdown(e modules.HostDBEntry) modules.HostScoreBreakdown {

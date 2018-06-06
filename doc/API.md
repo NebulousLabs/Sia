@@ -656,12 +656,27 @@ Host DB
 
 | Route                                                   | HTTP verb |
 | ------------------------------------------------------- | --------- |
+| [/hostdb](#hostdb-get-example)                          | GET       |
 | [/hostdb/active](#hostdbactive-get-example)             | GET       |
 | [/hostdb/all](#hostdball-get-example)                   | GET       |
 | [/hostdb/hosts/:___pubkey___](#hostdbhostspubkey-get-example) | GET       |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [HostDB.md](/doc/api/HostDB.md).
+
+#### /hostdb [GET] [(example)](/doc/api/HostDB.md#hostdb-get)
+
+shows some general information about the state of the hostdb.
+
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response)
+
+Either the following JSON struct or an error response. See [#standard-responses](#standard-responses).
+
+```javascript
+{
+    "initialscancomplete": false
+}
+```
 
 #### /hostdb/active [GET] [(example)](/doc/api/HostDB.md#active-hosts)
 
@@ -672,7 +687,7 @@ lists all of the active hosts known to the renter, sorted by preference.
 numhosts // Optional
 ```
 
-###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response)
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-1)
 ```javascript
 {
   "hosts": [
@@ -702,7 +717,7 @@ numhosts // Optional
 lists all of the hosts known to the renter. Hosts are not guaranteed to be in
 any particular order, and the order may change in subsequent calls.
 
-###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-1)
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-2)
 ```javascript
 {
   "hosts": [
@@ -740,7 +755,7 @@ overall.
 :pubkey
 ```
 
-###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-2)
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-3)
 ```javascript
 {
   "entry": {
