@@ -271,8 +271,8 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 // dropping contracts which are no longer worthwhile, and adding contracts if
 // there are not enough.
 //
-// Between each network call, the thread checks whether a maintenance iterrupt
-// signal is being sent. If so, maintannce returns, yielding to whatever thread
+// Between each network call, the thread checks whether a maintenance interrupt
+// signal is being sent. If so, maintenance returns, yielding to whatever thread
 // issued the interrupt.
 func (c *Contractor) threadedContractMaintenance() {
 	// Threading protection.
@@ -447,7 +447,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			estimatedFees := host.ContractPrice.Add(maxTxnFee).Add(siafundFee)
 			renewAmount = renewAmount.Add(estimatedFees)
 
-			// Determine if there is enough funds available to suppliement
+			// Determine if there is enough funds available to supplement
 			// with a 33% bonus, and if there is, add a 33% bonus.
 			moneyBuffer := renewAmount.Div64(3)
 			if moneyBuffer.Cmp(fundsAvailable) < 0 {
@@ -464,6 +464,7 @@ func (c *Contractor) threadedContractMaintenance() {
 				amount: renewAmount,
 			})
 		} else {
+			fmt.Println("Refreshing 1")
 			// Check if the contract has exhausted its funding and requires
 			// premature renewal.
 			host, _ := c.hdb.Host(contract.HostPublicKey)
@@ -481,6 +482,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
 			percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds.Big(), contract.TotalCost.Big()).Float64()
 			if contract.RenterFunds.Cmp(sectorPrice.Mul64(3)) < 0 || percentRemaining < minContractFundRenewalThreshold {
+				fmt.Println("Refreshing 2")
 				// This contract does need to be refreshed. Make sure there
 				// are enough funds available to perform the refresh, and
 				// then execute.
@@ -488,11 +490,14 @@ func (c *Contractor) threadedContractMaintenance() {
 				// TODO adjust to be siacoin per block based
 
 				if refreshAmount.Cmp(fundsAvailable) < 0 {
+					fmt.Println("Refreshing 3")
+					refreshSet[contract.ID] = struct{}{}
 					renewSet = append(renewSet, renewal{
 						id:     contract.ID,
 						amount: refreshAmount,
 					})
 				} else {
+					fmt.Println("Refreshing 4")
 					c.log.Println("WARN: cannot refresh empty contract due to low allowance.")
 				}
 			}
