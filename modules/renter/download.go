@@ -522,21 +522,26 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 }
 
 // ClearDownloadHistory clears the renter's download history
-func (r *Renter) ClearDownloadHistory() {
+func (r *Renter) ClearDownloadHistory() error {
+	if err := r.tg.Add(); err != nil {
+		return err
+	}
+	defer r.tg.Done()
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
 	r.downloadHistory = make(map[string]*download)
+	return nil
 }
 
 // RemoveFromDownloadHistory removes a provided download from
 // the download history
 func (r *Renter) RemoveFromDownloadHistory(staticSiaPath string) error {
+	if err := r.tg.Add(); err != nil {
+		return err
+	}
+	defer r.tg.Done()
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
-
 	delete(r.downloadHistory, staticSiaPath)
-	if _, ok := r.downloadHistory[staticSiaPath]; ok {
-		return errors.New("Download not remove from history")
-	}
 	return nil
 }

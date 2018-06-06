@@ -2180,14 +2180,14 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	if err != nil {
 		t.Fatal("Could not get download history:", err)
 	}
-	numDownloads := len(rdg.Downloads)
-	if numDownloads == 0 {
+	numDownloads := 5
+	if len(rdg.Downloads) < numDownloads {
 		// Upload and download files to show build download history
 		var remoteFiles []*siatest.RemoteFile
-		for i := 0; i < 10; i++ {
-			dataPieces := uint64(1)
-			parityPieces := uint64(1)
-			fileSize := 100 + siatest.Fuzz()
+		dataPieces := uint64(1)
+		parityPieces := uint64(1)
+		fileSize := 100 + siatest.Fuzz()
+		for i := 0; i < numDownloads-len(rdg.Downloads); i++ {
 			_, rf, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
 			if err != nil {
 				t.Fatal("Failed to upload a file for testing: ", err)
@@ -2205,10 +2205,9 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 			t.Fatal("Could not get download history:", err)
 		}
 		// Confirm download history is not empty
-		if len(rdg.Downloads) != len(remoteFiles) {
+		if len(rdg.Downloads) != numDownloads {
 			t.Fatalf("Not all downloads added to download history: only %v downloads added, expected %v", len(rdg.Downloads), len(remoteFiles))
 		}
-		numDownloads = len(rdg.Downloads)
 	}
 
 	// Check removing 1 download from history
