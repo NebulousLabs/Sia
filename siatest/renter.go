@@ -201,17 +201,14 @@ func (tn *TestNode) UploadNewFile(filesize int, dataPieces uint64, parityPieces 
 // UploadNewFileBlocking uploads a filesize bytes large file and waits for the
 // upload to reach 100% progress and redundancy.
 func (tn *TestNode) UploadNewFileBlocking(filesize int, dataPieces uint64, parityPieces uint64) (*LocalFile, *RemoteFile, error) {
-	fmt.Println("Upload")
 	localFile, remoteFile, err := tn.UploadNewFile(filesize, dataPieces, parityPieces)
 	if err != nil {
 		return nil, nil, err
 	}
-	fmt.Println("Progress")
 	// Wait until upload reached the specified progress
 	if err = tn.WaitForUploadProgress(remoteFile, 1); err != nil {
 		return nil, nil, err
 	}
-	fmt.Println("Redundancy")
 	// Wait until upload reaches a certain redundancy
 	err = tn.WaitForUploadRedundancy(remoteFile, float64((dataPieces+parityPieces))/float64(dataPieces))
 	return localFile, remoteFile, err
@@ -256,11 +253,9 @@ func (tn *TestNode) WaitForUploadProgress(rf *RemoteFile, progress float64) erro
 	return Retry(1000, 100*time.Millisecond, func() error {
 		file, err := tn.FileInfo(rf)
 		if err != nil {
-			fmt.Println(err)
 			return errors.AddContext(err, "couldn't retrieve FileInfo")
 		}
 		if file.UploadProgress < progress {
-			fmt.Println(file.UploadProgress)
 			return fmt.Errorf("progress should be %v but was %v", progress, file.UploadProgress)
 		}
 		return nil

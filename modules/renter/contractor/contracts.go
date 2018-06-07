@@ -464,7 +464,6 @@ func (c *Contractor) threadedContractMaintenance() {
 				amount: renewAmount,
 			})
 		} else {
-			fmt.Println("Refreshing 1")
 			// Check if the contract has exhausted its funding and requires
 			// premature renewal.
 			host, _ := c.hdb.Host(contract.HostPublicKey)
@@ -482,7 +481,6 @@ func (c *Contractor) threadedContractMaintenance() {
 			sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
 			percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds.Big(), contract.TotalCost.Big()).Float64()
 			if contract.RenterFunds.Cmp(sectorPrice.Mul64(3)) < 0 || percentRemaining < minContractFundRenewalThreshold {
-				fmt.Println("Refreshing 2")
 				// This contract does need to be refreshed. Make sure there
 				// are enough funds available to perform the refresh, and
 				// then execute.
@@ -490,14 +488,12 @@ func (c *Contractor) threadedContractMaintenance() {
 				// TODO adjust to be siacoin per block based
 
 				if refreshAmount.Cmp(fundsAvailable) < 0 {
-					fmt.Println("Refreshing 3")
 					refreshSet[contract.ID] = struct{}{}
 					renewSet = append(renewSet, renewal{
 						id:     contract.ID,
 						amount: refreshAmount,
 					})
 				} else {
-					fmt.Println("Refreshing 4")
 					c.log.Println("WARN: cannot refresh empty contract due to low allowance.")
 				}
 			}

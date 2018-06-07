@@ -951,11 +951,13 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 	}
 
 	// Confirm contract end heights were set properly
+	// End height should be the end of the next period as
+	// the contracts are renewed due to reaching the renew
+	// window
 	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal("Could not get renter contracts:", err)
 	}
-	var remainingFunds types.Currency
 	for _, c := range rc.Contracts {
 		if c.EndHeight != currentPeriodStart+(2*rg.Settings.Allowance.Period) {
 			t.Log("Endheight:", c.EndHeight)
@@ -963,12 +965,10 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 			t.Log("Current Period:", currentPeriodStart)
 			t.Fatal("Contract endheight not set to Current period + 2 * Allowance Period")
 		}
-
-		// Used to make sure contract with most remaining funds is renewed
-		if c.RenterFunds.Cmp(remainingFunds) >= 0 {
-			remainingFunds = c.RenterFunds
-		}
 	}
+
+	// Capturing end height to compare against renewed contracts
+	endHeight := rc.Contracts[0].EndHeight
 
 	// Set contracts to oldContracts
 	oldContracts = rc.Contracts
@@ -981,7 +981,7 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 	for _, h := range hosts {
 		err = h.HostModifySettingPost(client.HostParamMinUploadBandwidthPrice, maxUploadPrice)
 		if err != nil {
-			t.Fatal("Could not set Host Settings:", err)
+			t.Fatal("Could not set Host Upload Price:", err)
 		}
 	}
 
@@ -995,19 +995,16 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 	// Upload files to force contract renewal due to running out of funds
 	dataPieces := uint64(1)
 	parityPieces := uint64(1)
-	times, err := remainingFunds.Div(maxUploadPrice).Uint64()
+	// TODO: Currently statically setting chunkSize, can it be dynamically
+	// set to reduce the chance of test potentially failing due to not enough
+	// data being uploaded?
+	// If this can be dynamically set, this could be split off into a method
+	// to be used in other tests
+	chunkSize := siatest.ChunkSize(100)
+
+	_, _, err = r.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
 	if err != nil {
-		t.Fatal(err)
-	}
-	// TODO: need to some how relate this to renterfunds/totalcost = 3% which triggers the renewal
-	fmt.Println(times)
-	t.Fatal()
-	chunkSize := siatest.ChunkSize(times + 1)
-	for i := 0; i < 5; i++ {
-		_, _, err := r.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
-		if err != nil {
-			t.Fatal("Failed to upload a file for testing: ", err)
-		}
+		t.Fatal("Failed to upload a file for testing: ", err)
 	}
 
 	// Waiting for nodes to sync
@@ -1019,7 +1016,7 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 	}
 
 	// Confirm Contracts were renewed as expected
-	err = build.Retry(60, 100*time.Millisecond, func() error {
+	err = build.Retry(600, 100*time.Millisecond, func() error {
 		rc, err = r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get contracts")
@@ -1047,14 +1044,14 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 	}
 
 	// Confirm contract end heights were set properly
+	// End height should not have changed since the renewal
+	// was due to running out of funds
 	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal("Could not get renter contracts:", err)
 	}
 	for _, c := range rc.Contracts {
-		// DEBUG, PRINTLN CAN BE REMOVE
-		fmt.Println("Contract ID:", c.ID)
-		if c.EndHeight != currentPeriodStart+(2*rg.Settings.Allowance.Period) {
+		if c.EndHeight != endHeight {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", rg.Settings.Allowance.Period)
 			t.Log("Current Period:", currentPeriodStart)
