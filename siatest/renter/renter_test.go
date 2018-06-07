@@ -3,7 +3,6 @@ package renter
 import (
 	"fmt"
 	"io"
-	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -920,7 +919,9 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 
 	// Mine blocks to renew contracts based on renew window
 	m := tg.Miners()[0]
-	for i := 0; i < int(rg.Settings.Allowance.Period-rg.Settings.Allowance.RenewWindow); i++ {
+	period := rg.Settings.Allowance.Period
+	rw := rg.Settings.Allowance.RenewWindow
+	for i := 0; i < int(period-rw); i++ {
 		if err = m.MineBlock(); err != nil {
 			t.Fatal("Error mining block:", err)
 		}
@@ -959,7 +960,7 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal("Could not get renter contracts:", err)
 	}
 	for _, c := range rc.Contracts {
-		if c.EndHeight != currentPeriodStart+(2*rg.Settings.Allowance.Period) {
+		if c.EndHeight != currentPeriodStart+(2*rg.Settings.Allowance.Period) && c.GoodForRenew {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", rg.Settings.Allowance.Period)
 			t.Log("Current Period:", currentPeriodStart)
@@ -1030,16 +1031,6 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 		return nil
 	})
 	if err != nil {
-		rc, err = r.RenterContractsGet()
-		if err != nil {
-			t.Log(errors.AddContext(err, "could not get contracts"))
-		}
-		for _, c := range rc.Contracts {
-			percentRemaining, _ := big.NewRat(0, 1).SetFrac(c.RenterFunds.Big(), c.TotalCost.Big()).Float64()
-			t.Log(c.ID)
-			t.Log("Percent remaining", percentRemaining)
-			t.Log("Renewal Threshold", float64(0.03))
-		}
 		t.Fatal(err)
 	}
 
@@ -1051,7 +1042,7 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal("Could not get renter contracts:", err)
 	}
 	for _, c := range rc.Contracts {
-		if c.EndHeight != endHeight {
+		if c.EndHeight != endHeight && c.GoodForRenew {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", rg.Settings.Allowance.Period)
 			t.Log("Current Period:", currentPeriodStart)
@@ -1373,7 +1364,7 @@ func checkContracts(oldContracts, renewedContracts []api.RenterContract) error {
 	// Confirm contracts were renewed, this will also mean there are old contracts
 	// Verify there are the same number of oldContracts as renewedContracts
 	if len(oldContracts) < len(renewedContracts) {
-		return errors.New("Initial and renewed contracts are not the same length")
+		return errors.New("Too many renewed contracts")
 	}
 
 	// Create Maps for comparison
@@ -1386,19 +1377,21 @@ func checkContracts(oldContracts, renewedContracts []api.RenterContract) error {
 
 	for _, c := range renewedContracts {
 		// Verify that all the contracts were renewed
-		if _, ok := initialContractIDMap[c.ID]; ok {
-			return errors.New("ID from renewedContracts found in oldContracts")
-		}
-		// Verifying that Renewed Contracts have the same HostPublicKey
-		// as an initial contract
-		if _, ok := initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)]; !ok {
-			return errors.New("Host Public Key from renewedContracts not found in oldContracts")
-		}
-		if c.UploadSpending.Cmp(types.ZeroCurrency) != 0 {
-			return errors.New("Upload spending on renewed contract not equal to zero")
-		}
-		if c.DownloadSpending.Cmp(types.ZeroCurrency) != 0 {
-			return errors.New("Download spending on renewed contract not equal to zero")
+		if c.GoodForRenew {
+			if _, ok := initialContractIDMap[c.ID]; ok {
+				return errors.New("ID from renewedContracts found in oldContracts")
+			}
+			// Verifying that Renewed Contracts have the same HostPublicKey
+			// as an initial contract
+			if _, ok := initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)]; !ok {
+				return errors.New("Host Public Key from renewedContracts not found in oldContracts")
+			}
+			if c.UploadSpending.Cmp(types.ZeroCurrency) != 0 && c.GoodForUpload {
+				return errors.New("Upload spending on renewed contract not equal to zero")
+			}
+			if c.DownloadSpending.Cmp(types.ZeroCurrency) != 0 {
+				return errors.New("Download spending on renewed contract not equal to zero")
+			}
 		}
 	}
 	return nil
