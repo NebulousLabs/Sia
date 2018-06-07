@@ -238,9 +238,9 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	if fc.WindowEnd < fc.WindowStart+eSettings.WindowSize {
 		return errSmallWindow
 	}
-	// WindowEnd must not be more than settings.MaxDuration blocks into the
+	// WindowStart must not be more than settings.MaxDuration blocks into the
 	// future.
-	if fc.WindowEnd > blockHeight+eSettings.MaxDuration {
+	if fc.WindowStart > blockHeight+eSettings.MaxDuration {
 		return errLongDuration
 	}
 
