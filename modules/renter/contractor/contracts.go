@@ -484,10 +484,10 @@ func (c *Contractor) threadedContractMaintenance() {
 				// This contract does need to be refreshed. Make sure there
 				// are enough funds available to perform the refresh, and
 				// then execute.
-				refreshAmount := contract.TotalCost.Mul64(2)
-				// TODO adjust to be siacoin per block based
-				// Should be siacoin spent per block for the length of
-				// time that the contract was open, ie blockheight - startheight
+				oldDuration := blockHeight - contract.StartHeight
+				newDuration := endHeight - blockHeight
+				spendPerBlock := contract.TotalCost.Div64(uint64(oldDuration))
+				refreshAmount := spendPerBlock.Mul64(uint64(newDuration))
 
 				if refreshAmount.Cmp(fundsAvailable) < 0 {
 					refreshSet[contract.ID] = struct{}{}
