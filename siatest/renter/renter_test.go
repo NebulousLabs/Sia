@@ -1063,13 +1063,6 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 // TestRenterSpendingReporting checks the accuracy for the reported
 // spending
 func TestRenterSpendingReporting(t *testing.T) {
-	// Skipping Test until it can be fixed
-	// TODO:
-	// - Occasional failure due to contract renewal,
-	// Errors: "ID from renewedContracts found in oldContracts"
-	// - Initial balance - spending != current wallet balance
-	t.Skip("TODO: Test currently broken")
-
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -1149,6 +1142,19 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 	oldContracts := rc.Contracts
 
+	// Record spending from initial contracts
+	var spending modules.ContractorSpending
+	for _, contract := range oldContracts {
+		// Calculate ContractFees
+		spending.ContractFees = spending.ContractFees.Add(contract.Fees)
+		// Calculate Spending
+		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
+		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
+		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
+	}
+	totalSpentInitialPeriod := spending.ContractFees.Add(spending.UploadSpending).
+		Add(spending.DownloadSpending).Add(spending.StorageSpending)
+
 	// Check to confirm upload and download spending was captured correctly
 	// and reflected in the wallet balance
 	expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
@@ -1221,7 +1227,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 	// Check to confirm reported spending is still accurate with the renewed contracts
 	// and reflected in the wallet balance
 	err = build.Retry(120, 1*time.Second, func() error {
-
 		// Check Contracts
 		if expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance); err != nil {
 			if expectedBalance.Cmp(walletBalance) > 0 {
@@ -1233,7 +1238,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		}
 		return nil
 	})
-	// expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
 	if err != nil {
 		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
 		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
@@ -1247,15 +1251,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Record total spending of initial Period
-	rg, err = r.RenterGet()
-	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
-	}
-	fm := rg.FinancialMetrics
-	totalSpentInitialPeriod := fm.ContractFees.Add(fm.UploadSpending).
-		Add(fm.DownloadSpending).Add(fm.StorageSpending)
-
 	// Record current Wallet Balance
 	wg, err = r.WalletGet()
 	if err != nil {
@@ -1264,7 +1259,11 @@ func TestRenterSpendingReporting(t *testing.T) {
 	initialPeriodEndBalance := wg.ConfirmedSiacoinBalance
 
 	// Mine blocks to force contract renewal and new period
-	for i := 0; i < int(rg.Settings.Allowance.RenewWindow+types.MaturityDelay); i++ {
+	cg, _ := r.ConsensusGet()
+	blockHeight := cg.Height
+	endHeight := renewedContracts[0].EndHeight
+	rw := rg.Settings.Allowance.RenewWindow
+	for i := 0; i < int(endHeight-rw-blockHeight+types.MaturityDelay); i++ {
 		if err = m.MineBlock(); err != nil {
 			t.Fatal("Error mining block:", err)
 		}
@@ -1324,13 +1323,21 @@ func TestRenterSpendingReporting(t *testing.T) {
 	if err = tg.Sync(); err != nil {
 		t.Fatal(err)
 	}
+
 	// Check to confirm reported spending is still accurate with the renewed contracts
 	// and a new period and reflected in the wallet balance
-	expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance.Sub(totalSpentInitialPeriod))
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		_, _, err = checkBalanceVsSpending(r, initialBalance.Sub(totalSpentInitialPeriod))
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
+		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance.Sub(totalSpentInitialPeriod))
 		t.Log("Actual difference:", initialBalance.Sub(totalSpentInitialPeriod).Sub(walletBalance).HumanString())
 		t.Log("ExpectedBalance:", expectedBalance.HumanString())
-		t.Log("walletBalance  :", walletBalance.HumanString())
+		t.Log("walletBalance:", walletBalance.HumanString())
 		if expectedBalance.Cmp(walletBalance) > 0 {
 			t.Log("Under Reported by:", expectedBalance.Sub(walletBalance).HumanString())
 		} else {
@@ -1354,9 +1361,9 @@ func checkBalanceVsSpending(r *siatest.TestNode, initialBalance types.Currency) 
 	if err != nil {
 		return types.ZeroCurrency, types.ZeroCurrency, err
 	}
-	balanceAfterSetAllowance := initialBalance.Sub(fm.TotalAllocated)
-	if balanceAfterSetAllowance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		return balanceAfterSetAllowance, wg.ConfirmedSiacoinBalance,
+	expectedBalance = initialBalance.Sub(fm.TotalAllocated)
+	if expectedBalance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
+		return expectedBalance, wg.ConfirmedSiacoinBalance,
 			errors.New("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance")
 	}
 	return types.ZeroCurrency, types.ZeroCurrency, nil
@@ -1419,7 +1426,7 @@ func checkContractVsReportedSpending(r *siatest.TestNode, oldContracts, renewedC
 	// Check renter financial metrics against contract spending
 	var spending modules.ContractorSpending
 	for _, contract := range oldContracts {
-		if contract.EndHeight >= rg.CurrentPeriod {
+		if contract.EndHeight > rg.CurrentPeriod {
 			// Calculate ContractFees
 			spending.ContractFees = spending.ContractFees.Add(contract.Fees)
 			// Calculate TotalAllocated
