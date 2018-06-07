@@ -37,9 +37,7 @@ func (g *Gateway) managedIPFromPeers() (string, error) {
 		default:
 		}
 		// Get peers
-		g.mu.RLock()
 		peers := g.Peers()
-		g.mu.RUnlock()
 		// Check if there are enough peers. Otherwise wait.
 		if len(peers) < minPeersForIPDiscovery {
 			g.managedSleep(peerDiscoveryRetryInterval)
