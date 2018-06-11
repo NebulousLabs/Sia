@@ -105,7 +105,7 @@ func (sc *streamCache) pruneCache(size uint64) {
 
 	// Sanity check to confirm the Map and Heap where both pruned
 	if len(sc.streamHeap) != len(sc.streamMap) {
-		build.Critical("streamHeap and streamMap are not the same length")
+		build.Critical("streamHeap and streamMap are not the same length, %v and %v", len(sc.streamHeap), len(sc.streamMap))
 	}
 }
 
@@ -113,7 +113,7 @@ func (sc *streamCache) pruneCache(size uint64) {
 // successful it will write the data to the destination and stop the download
 // if it was the last missing chunk. The function returns true if the chunk was
 // in the cache.
-// Using the entire unfisihedDownloadChunk as the argument as there are seven different fields
+// Using the entire unfinishedDownloadChunk as the argument as there are seven different fields
 // used from unfinishedDownloadChunk and it allows using udc.fail()
 //
 // TODO: in the future we might need cache invalidation. At the
