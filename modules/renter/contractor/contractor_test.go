@@ -116,69 +116,6 @@ func (stubHostDB) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown
 	return modules.HostScoreBreakdown{}
 }
 
-// TestAllowancePeriodTracking verifies that the contractor tracks its current
-// period correctly as renewals occur.
-func TestAllowancePeriodTracking(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	_, c, m, err := newTestingTrio(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// set an allowance
-	c.mu.Lock()
-	initialHeight := c.blockHeight
-	c.mu.Unlock()
-	testAllowance := modules.Allowance{
-		Funds:       types.SiacoinPrecision.Mul64(5000),
-		RenewWindow: 10,
-		Hosts:       1,
-		Period:      20,
-	}
-	err = c.SetAllowance(testAllowance)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = build.Retry(50, 100*time.Millisecond, func() error {
-		if len(c.Contracts()) != 1 {
-			return errors.New("allowance forming seems to have failed")
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err)
-	}
-	if c.CurrentPeriod() != initialHeight {
-		t.Fatal("expected current period to start at", initialHeight, "got", c.CurrentPeriod())
-	}
-	// mine until one before the renew window, current period should stay
-	// constant
-	for i := types.BlockHeight(0); i < testAllowance.RenewWindow-1; i++ {
-		_, err = m.AddBlock()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	if c.CurrentPeriod() != initialHeight {
-		t.Fatal("current period should not have incremented, wanted", initialHeight, "got", c.CurrentPeriod())
-	}
-	// mine another another block. current period should increment.
-	_, err = m.AddBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.mu.Lock()
-	height := c.blockHeight
-	c.mu.Unlock()
-	if c.CurrentPeriod() != height {
-		t.Fatal("unexpected period", c.CurrentPeriod(), "wanted", height)
-	}
-}
-
 // TestAllowanceSpending verifies that the contractor will not spend more or
 // less than the allowance if uploading causes repeated early renewal, and that
 // correct spending metrics are returned, even across renewals.
