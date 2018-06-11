@@ -551,7 +551,7 @@ func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Reque
 		WriteError(w, Error{"parsing integer value for parameter `startheight` failed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	end, err := strconv.ParseUint(endheightStr, 10, 64)
+	end, err := strconv.ParseInt(endheightStr, 10, 64)
 	if err != nil {
 		WriteError(w, Error{"parsing integer value for parameter `endheight` failed: " + err.Error()}, http.StatusBadRequest)
 		return
