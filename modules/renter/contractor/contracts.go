@@ -186,12 +186,11 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	c.mu.Lock()
 	c.contractIDToPubKey[contract.ID] = contract.HostPublicKey
 	_, exists := c.pubKeysToContractID[string(contract.HostPublicKey.Key)]
+	if exists {
+		c.log.Println("We are forming a new contract but the host's pubKey is already mapped to a filecontract's id")
+	}
 	c.pubKeysToContractID[string(contract.HostPublicKey.Key)] = contract.ID
 	c.mu.Unlock()
-
-	if exists {
-		build.Critical("We are forming a new contract but the host's pubKey is already mapped to a filecontract's id")
-	}
 
 	contractValue := contract.RenterFunds
 	c.log.Printf("Formed contract %v with %v for %v", contract.ID, host.NetAddress, contractValue.HumanString())
@@ -278,7 +277,8 @@ func (c *Contractor) threadedContractMaintenance() {
 	}
 	defer c.tg.Done()
 
-	// Archive contracts that need to be archived before doing additional maintenance.
+	// Archive contracts that need to be archived before doing additional
+	// maintenance.
 	c.managedArchiveContracts()
 
 	// Nothing to do if there are no hosts.

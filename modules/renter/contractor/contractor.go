@@ -126,9 +126,9 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 // exists. The contract will be resolved if possible to the most recent child
 // contract.
 func (c *Contractor) ContractByPublicKey(pk types.SiaPublicKey) (modules.RenterContract, bool) {
-	c.mu.Lock()
+	c.mu.RLock()
 	id, ok := c.pubKeysToContractID[string(pk.Key)]
-	c.mu.Unlock()
+	c.mu.RUnlock()
 	if !ok {
 		return modules.RenterContract{}, false
 	}
