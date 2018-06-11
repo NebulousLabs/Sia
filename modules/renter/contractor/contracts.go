@@ -185,8 +185,13 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	// Add a mapping from the contract's id to the public key of the host.
 	c.mu.Lock()
 	c.contractIDToPubKey[contract.ID] = contract.HostPublicKey
+	_, exists := c.pubKeysToContractID[string(contract.HostPublicKey.Key)]
 	c.pubKeysToContractID[string(contract.HostPublicKey.Key)] = contract.ID
 	c.mu.Unlock()
+
+	if exists {
+		build.Critical("We are forming a new contract but the host's pubKey is already mapped to a filecontract's id")
+	}
 
 	contractValue := contract.RenterFunds
 	c.log.Printf("Formed contract %v with %v for %v", contract.ID, host.NetAddress, contractValue.HumanString())
@@ -246,7 +251,9 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 		return modules.RenterContract{}, err
 	}
 
-	// Add a mapping from the contract's id to the public key of the host.
+	// Add a mapping from the contract's id to the public key of the host. This
+	// will destroy the previous mapping from pubKey to contract id but other
+	// modules are only interested in the most recent contract anyway.
 	c.mu.Lock()
 	c.contractIDToPubKey[newContract.ID] = newContract.HostPublicKey
 	c.pubKeysToContractID[string(newContract.HostPublicKey.Key)] = newContract.ID
@@ -318,7 +325,6 @@ func (c *Contractor) threadedContractMaintenance() {
 	var endHeight types.BlockHeight
 	var fundsAvailable types.Currency
 	var renewSet []renewal
-	refreshSet := make(map[string]struct{})
 
 	c.mu.RLock()
 	currentPeriod := c.currentPeriod
@@ -439,7 +445,6 @@ func (c *Contractor) threadedContractMaintenance() {
 				// then execute.
 				refreshAmount := contract.TotalCost.Mul64(2)
 				if refreshAmount.Cmp(fundsAvailable) < 0 {
-					refreshSet[string(contract.HostPublicKey.Key)] = struct{}{}
 					renewSet = append(renewSet, renewal{
 						id:     contract.ID,
 						amount: refreshAmount,

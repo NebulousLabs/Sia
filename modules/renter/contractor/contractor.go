@@ -144,9 +144,9 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 
 // ContractUtility returns the utility fields for the given contract.
 func (c *Contractor) ContractUtility(pk types.SiaPublicKey) (modules.ContractUtility, bool) {
-	c.mu.Lock()
+	c.mu.RLock()
 	id, ok := c.pubKeysToContractID[string(pk.Key)]
-	c.mu.Unlock()
+	c.mu.RUnlock()
 	if !ok {
 		return modules.ContractUtility{}, false
 	}
