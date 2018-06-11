@@ -102,6 +102,31 @@ func TestPruneCache(t *testing.T) {
 		t.Error("Cache size was changed by pruning to larger value")
 	}
 
+	// Confirm the same chunk won't be added if already added
+	id := sc.streamHeap[0].id
+	for i := 0; i < 5; i++ {
+		sc.Add(id, []byte{})
+	}
+
+	// Manually remove ID and confirm it no longer exists in the Heap of Cache
+	cd := heap.Pop(&sc.streamHeap).(*chunkData)
+	if cd.id != id {
+		t.Fatal("Wrong chunk popped from Heap")
+	}
+	delete(sc.streamMap, cd.id)
+
+	// Check for any duplicate chunks
+	for len(sc.streamHeap) > 0 {
+		cd = heap.Pop(&sc.streamHeap).(*chunkData)
+		if cd.id == id {
+			t.Fatal("Duplicate ID found")
+		}
+	}
+	for k := range sc.streamMap {
+		if k == id {
+			t.Fatal("Duplicate ID found")
+		}
+	}
 }
 
 // TestStreamCache tests that when Add() is called, chunks are added and removed
