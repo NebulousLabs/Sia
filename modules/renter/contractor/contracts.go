@@ -281,6 +281,20 @@ func (c *Contractor) threadedContractMaintenance() {
 	// maintenance.
 	c.managedArchiveContracts()
 
+	// Prune unknown public keys from the contractor"s map.
+	allContracts := c.staticContracts.ViewAll()
+	pks := make(map[string]struct{})
+	for _, c := range allContracts {
+		pks[string(c.HostPublicKey.Key)] = struct{}{}
+	}
+	c.mu.Lock()
+	for pk := range c.pubKeysToContractID {
+		if _, exists := pks[pk]; !exists {
+			delete(c.pubKeysToContractID, pk)
+		}
+	}
+	c.mu.Unlock()
+
 	// Nothing to do if there are no hosts.
 	c.mu.RLock()
 	wantedHosts := c.allowance.Hosts
