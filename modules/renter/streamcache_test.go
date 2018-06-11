@@ -103,29 +103,13 @@ func TestPruneCache(t *testing.T) {
 	}
 
 	// Confirm the same chunk won't be added if already added
-	id := sc.streamHeap[0].id
+	sc.pruneCache(0)
+	id := "test"
 	for i := 0; i < 5; i++ {
 		sc.Add(id, []byte{})
 	}
-
-	// Manually remove ID and confirm it no longer exists in the Heap of Cache
-	cd := heap.Pop(&sc.streamHeap).(*chunkData)
-	if cd.id != id {
-		t.Fatal("Wrong chunk popped from Heap")
-	}
-	delete(sc.streamMap, cd.id)
-
-	// Check for any duplicate chunks
-	for len(sc.streamHeap) > 0 {
-		cd = heap.Pop(&sc.streamHeap).(*chunkData)
-		if cd.id == id {
-			t.Fatal("Duplicate ID found")
-		}
-	}
-	for k := range sc.streamMap {
-		if k == id {
-			t.Fatal("Duplicate ID found")
-		}
+	if len(sc.streamHeap) != 1 || len(sc.streamMap) != 1 {
+		t.Fatalf("Chunk added more the once.\nHeap length: %v\nMap length: %v\n", len(sc.streamHeap), len(sc.streamMap))
 	}
 }
 
