@@ -102,6 +102,15 @@ func TestPruneCache(t *testing.T) {
 		t.Error("Cache size was changed by pruning to larger value")
 	}
 
+	// Confirm the same chunk won't be added if already added
+	sc.pruneCache(0)
+	id := "test"
+	for i := 0; i < 5; i++ {
+		sc.Add(id, []byte{})
+	}
+	if len(sc.streamHeap) != 1 || len(sc.streamMap) != 1 {
+		t.Fatalf("Chunk added more the once.\nHeap length: %v\nMap length: %v\n", len(sc.streamHeap), len(sc.streamMap))
+	}
 }
 
 // TestStreamCache tests that when Add() is called, chunks are added and removed

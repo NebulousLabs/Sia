@@ -13,7 +13,7 @@ import (
 	"github.com/NebulousLabs/fastrand"
 )
 
-// TestIntegrationAutoRenew tests that contracts are automatically renwed at
+// TestIntegrationAutoRenew tests that contracts are automatically renewed at
 // the expected block height.
 func TestIntegrationAutoRenew(t *testing.T) {
 	if testing.Short() {

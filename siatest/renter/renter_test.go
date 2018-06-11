@@ -114,7 +114,7 @@ func testUploadDownload(t *testing.T, tg *siatest.TestGroup) {
 }
 
 // testSingleFileGet is a subtest that uses an existing TestGroup to test if
-// using the signle file API endpoint works
+// using the single file API endpoint works
 func testSingleFileGet(t *testing.T, tg *siatest.TestGroup) {
 	// Grab the first of the group's renters
 	renter := tg.Renters()[0]
@@ -404,7 +404,7 @@ func testDownloadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnce
 	// Try downloading the file 5 times.
 	for i := 0; i < 5; i++ {
 		if _, err := renter.DownloadByStream(remoteFile); err == nil {
-			t.Fatal("Download shouldn't suceed since it was interrupted")
+			t.Fatal("Download shouldn't succeed since it was interrupted")
 		}
 	}
 	// Stop calling fail on the dependency.
@@ -805,7 +805,7 @@ func TestRenterPersistData(t *testing.T) {
 		t.Fatalf("%v: Could not set StreamCacheSize to %v", err, cacheSize)
 	}
 	if err := r.RenterPostRateLimit(ds, us); err != nil {
-		t.Fatalf("%v: Could not set RateLimts to %v and %v", err, ds, us)
+		t.Fatalf("%v: Could not set RateLimits to %v and %v", err, ds, us)
 	}
 
 	// Confirm Settings were updated
@@ -859,7 +859,7 @@ func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal("Failed to upload a file for testing: ", err)
 	}
 	// Mine enough blocks for the next period to start. This means the
-	// contracts should be renewed and the data should still be availeble for
+	// contracts should be renewed and the data should still be available for
 	// download.
 	miner := tg.Miners()[0]
 	for i := types.BlockHeight(0); i < siatest.DefaultAllowance.Period; i++ {
