@@ -59,7 +59,6 @@ func TestRenter(t *testing.T) {
 		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
-		{"TestRenterContractEndHeight", testRenterContractEndHeight},
 	}
 	// Run subtests
 	for _, subtest := range subTests {
@@ -885,9 +884,29 @@ func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
 	}
 }
 
-// testRenterContractEndHeight makes sure that the endheight of renewed
+// TestRenterContractEndHeight makes sure that the endheight of renewed
 // contracts is set properly
-func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
+func TestRenterContractEndHeight(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a group for the subtests
+	groupParams := siatest.GroupParams{
+		Hosts:   5,
+		Renters: 1,
+		Miners:  1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	// Get Renter
 	r := tg.Renters()[0]
 	rg, err := r.RenterGet()
@@ -993,6 +1012,7 @@ func testRenterContractEndHeight(t *testing.T, tg *siatest.TestGroup) {
 	if err = tg.Sync(); err != nil {
 		t.Fatal(err)
 	}
+
 	// Upload files to force contract renewal due to running out of funds
 	dataPieces := uint64(1)
 	parityPieces := uint64(1)
