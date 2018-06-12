@@ -43,16 +43,21 @@ func (c *Client) RenterDownloadFullGet(siaPath, destination string, async bool) 
 	return
 }
 
-// RenterClearDownloadPost requests the /renter/downloads/clear/*siapath resource
-func (c *Client) RenterClearDownloadPost(siaPath string) (err error) {
-	siaPath = strings.TrimPrefix(siaPath, "/")
-	err = c.post(fmt.Sprintf("/renter/downloads/clear/%s", siaPath), "", nil)
+// RenterClearDownloadsPost requests the /renter/downloads/clear resource
+func (c *Client) RenterClearDownloadsPost(after, before int64) (err error) {
+	values := url.Values{}
+	values.Set("after", strconv.FormatInt(after, 10))
+	values.Set("before", strconv.FormatInt(before, 10))
+	err = c.post("/renter/downloads/clear", values.Encode(), nil)
 	return
 }
 
-// RenterClearDownloadsPost requests the /renter/downloads/clear resource
-func (c *Client) RenterClearDownloadsPost() (err error) {
-	err = c.post("/renter/downloads/clear", "", nil)
+// RenterRemoveDownloadPost requests the /renter/downloads/remove/*siapath resource
+func (c *Client) RenterRemoveDownloadPost(siaPath string, timestamp int64) (err error) {
+	siaPath = strings.TrimPrefix(siaPath, "/")
+	values := url.Values{}
+	values.Set("timestamp", strconv.FormatInt(timestamp, 10))
+	err = c.post(fmt.Sprintf("/renter/downloads/remove/%s", siaPath), values.Encode(), nil)
 	return
 }
 

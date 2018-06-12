@@ -72,7 +72,7 @@ func (api *API) buildHTTPRoutes(requiredUserAgent string, requiredPassword strin
 		router.GET("/renter/contracts", api.renterContractsHandler)
 		router.GET("/renter/downloads", api.renterDownloadsHandler)
 		router.POST("/renter/downloads/clear", RequirePassword(api.renterClearDownloadsHandler, requiredPassword))
-		router.POST("/renter/downloads/clear/*siapath", RequirePassword(api.renterClearDownloadHandler, requiredPassword))
+		router.POST("/renter/downloads/remove/*siapath", RequirePassword(api.renterRemoveDownloadHandler, requiredPassword))
 		router.GET("/renter/files", api.renterFilesHandler)
 		router.GET("/renter/file/*siapath", api.renterFileHandler)
 		router.GET("/renter/prices", api.renterPricesHandler)

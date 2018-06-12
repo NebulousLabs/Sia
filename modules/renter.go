@@ -81,7 +81,7 @@ type DownloadInfo struct {
 	EndTime              time.Time `json:"endtime"`              // The time when the download fully completed.
 	Error                string    `json:"error"`                // Will be the empty string unless there was an error.
 	Received             uint64    `json:"received"`             // Amount of data confirmed and decoded.
-	StartTime            time.Time `json:"starttime"`            // The time when the download was started.
+	StartTime            int64     `json:"starttime"`            // The time when the download was started.
 	TotalDataTransferred uint64    `json:"totaldatatransferred"` // Total amount of data transferred, including negotiation, etc.
 }
 
@@ -352,12 +352,20 @@ type Renter interface {
 	// ClearDownloadHistory clears the download history of the renter.
 	ClearDownloadHistory() error
 
+	// ClearDownloadHistoryAfter clears the download history of the renter
+	// after a given timestamp
+	ClearDownloadHistoryAfter(after int64) error
+
+	// ClearDownloadHistoryBefore clears the download history of the renter.
+	// before a given timestamp
+	ClearDownloadHistoryBefore(before int64) error
+
 	// DownloadHistory lists all the files that have been scheduled for download.
 	DownloadHistory() []DownloadInfo
 
 	// RemoveFromDownloadHistory removes a given download from the download
 	// history of the renter.
-	RemoveFromDownloadHistory(staticSiaPath string) error
+	RemoveFromDownloadHistory(staticSiaPath string, timestamp int64) error
 
 	// File returns information on specific file queried by user
 	File(siaPath string) (FileInfo, error)

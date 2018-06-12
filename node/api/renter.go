@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -163,7 +163,7 @@ type (
 		EndTime              time.Time `json:"endtime"`              // The time when the download fully completed.
 		Error                string    `json:"error"`                // Will be the empty string unless there was an error.
 		Received             uint64    `json:"received"`             // Amount of data confirmed and decoded.
-		StartTime            time.Time `json:"starttime"`            // The time when the download was started.
+		StartTime            int64     `json:"starttime"`            // The time when the download was started.
 		TotalDataTransferred uint64    `json:"totaldatatransferred"` // The total amount of data transferred, including negotiation, overdrive etc.
 	}
 )
@@ -362,16 +362,56 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 	})
 }
 
-// renterClearDownloadsHandler handles the API call to request the download queue.
-func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	api.renter.ClearDownloadHistory()
+// renterClearDownloadsHandler handles the API call to request to clear the download queue.
+func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	after, err := strconv.ParseInt(req.FormValue("after"), 10, 64)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+	before, err := strconv.ParseInt(req.FormValue("before"), 10, 64)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+	if before <= 0 && after <= 0 {
+		err := api.renter.ClearDownloadHistory()
+		if err != nil {
+			WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+			return
+		}
+		WriteSuccess(w)
+	}
 
-	WriteSuccess(w)
+	if after > 0 {
+		err = api.renter.ClearDownloadHistoryAfter(after)
+		if err != nil {
+			WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+			return
+		}
+		WriteSuccess(w)
+	}
+
+	if before > 0 {
+		err = api.renter.ClearDownloadHistoryBefore(before)
+		if err != nil {
+			WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+			return
+		}
+		WriteSuccess(w)
+	}
 }
 
-// renterClearDownloadHandler handles the API call to request the download queue.
-func (api *API) renterClearDownloadHandler(w http.ResponseWriter, _ *http.Request, ps httprouter.Params) {
-	err := api.renter.RemoveFromDownloadHistory(strings.TrimPrefix(ps.ByName("siapath"), "/"))
+// renterRemoveDownloadHandler handles the API call to request to remove
+// a specific download from the download queue.
+func (api *API) renterRemoveDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	t, err := strconv.ParseInt(req.FormValue("timestamp"), 10, 64)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+
+	err = api.renter.RemoveFromDownloadHistory(strings.TrimPrefix(ps.ByName("siapath"), "/"), t)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -400,8 +440,6 @@ func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _
 			TotalDataTransferred: di.TotalDataTransferred,
 		})
 	}
-	// sort the downloads by newest first
-	sort.Slice(downloads, func(i, j int) bool { return downloads[i].StartTime.After(downloads[j].StartTime) })
 	WriteJSON(w, RenterDownloadQueue{
 		Downloads: downloads,
 	})

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -2180,24 +2181,18 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	if err != nil {
 		t.Fatal("Could not get download history:", err)
 	}
-	numDownloads := 5
+	numDownloads := 10
 	if len(rdg.Downloads) < numDownloads {
-		// Upload and download files to show build download history
-		var remoteFiles []*siatest.RemoteFile
-		dataPieces := uint64(1)
-		parityPieces := uint64(1)
-		fileSize := 100 + siatest.Fuzz()
-		for i := 0; i < numDownloads-len(rdg.Downloads); i++ {
-			_, rf, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
-			if err != nil {
-				t.Fatal("Failed to upload a file for testing: ", err)
-			}
-			remoteFiles = append(remoteFiles, rf)
+		remainingDownloads := numDownloads - len(rdg.Downloads)
+		// Download files to build download history
+		rf, err := r.RenterFilesGet()
+		if err != nil {
+			t.Fatal(err)
 		}
-		for _, rf := range remoteFiles {
-			_, err := r.DownloadToDisk(rf, false)
+		for i := 0; i < remainingDownloads; i++ {
+			err = r.RenterDownloadGet(rf.Files[0].SiaPath, "", 0, rf.Files[0].Filesize, false)
 			if err != nil {
-				t.Fatal("Could not DownloadToDisk:", err)
+				t.Fatal("Could not Download file:", err)
 			}
 		}
 		rdg, err = r.RenterDownloadsGet()
@@ -2206,13 +2201,15 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 		}
 		// Confirm download history is not empty
 		if len(rdg.Downloads) != numDownloads {
-			t.Fatalf("Not all downloads added to download history: only %v downloads added, expected %v", len(rdg.Downloads), len(remoteFiles))
+			t.Fatalf("Not all downloads added to download history: only %v downloads added, expected %v", len(rdg.Downloads), numDownloads)
 		}
 	}
+	numDownloads = len(rdg.Downloads)
 
 	// Check removing 1 download from history
 	siaPath := rdg.Downloads[0].SiaPath
-	err = r.RenterClearDownloadPost(siaPath)
+	timestamp := rdg.Downloads[0].StartTime
+	err = r.RenterRemoveDownloadPost(siaPath, timestamp)
 	if err != nil {
 		t.Fatal("Error in API endpoint to remove download from history:", err)
 	}
@@ -2223,14 +2220,19 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	if len(rdg.Downloads) != numDownloads-1 {
 		t.Fatalf("Download history not reduced: history has %v downloads, expected %v", len(rdg.Downloads), numDownloads-1)
 	}
-	for _, d := range rdg.Downloads {
-		if d.SiaPath == siaPath {
-			t.Fatal("Specified download not removed from history")
-		}
+	i := sort.Search(len(rdg.Downloads), func(i int) bool {
+		return rdg.Downloads[i].SiaPath == siaPath && rdg.Downloads[i].StartTime == timestamp
+	})
+	if i < len(rdg.Downloads) {
+		t.Fatal("Specified download not removed from history")
 	}
 
+	// Check Clear Before
+
+	// Check Clear After
+
 	// Check clearing download history
-	err = r.RenterClearDownloadsPost()
+	err = r.RenterClearDownloadsPost(0, 0)
 	if err != nil {
 		t.Fatal("Error in API endpoint to clear download history:", err)
 	}

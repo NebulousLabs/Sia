@@ -487,8 +487,6 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 		newDownloads: make(chan struct{}, 1),
 		downloadHeap: new(downloadChunkHeap),
 
-		downloadHistory: make(map[string]*download),
-
 		uploadHeap: uploadHeap{
 			activeChunks: make(map[uploadChunkID]struct{}),
 			newUploads:   make(chan struct{}, 1),
