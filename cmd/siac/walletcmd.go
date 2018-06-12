@@ -467,7 +467,7 @@ func walletsweepcmd() {
 // wallettransactionscmd lists all of the transactions related to the wallet,
 // providing a net flow of siacoins and siafunds for each.
 func wallettransactionscmd() {
-	wtg, err := httpClient.WalletTransactionsGet(0, math.MaxUint64)
+	wtg, err := httpClient.WalletTransactionsGet(0, math.MaxInt64)
 	if err != nil {
 		die("Could not fetch transaction history:", err)
 	}
