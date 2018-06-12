@@ -991,6 +991,53 @@ lists all files in the download queue.
 }
 ```
 
+#### /renter/downloads/clear [POST]
+
+clears the download history of the renter.
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /renter/downloads/clear/after/:timestamp [POST]
+
+clears all downloads from the download history of the renter after the given timestamp.
+
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters)
+```
+timestamp
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /renter/downloads/clear/before/:timestamp [POST]
+
+clears all downloads from the download history of the renter before the given timestamp.
+
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters)
+```
+timestamp
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /renter/downloads/remove/:timestamp [POST]
+
+removes a specific download from the download history of the renter based on the given timestamp.
+
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters)
+```
+timestamp
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
 #### /renter/files [GET]
 
 lists the status of all files.
