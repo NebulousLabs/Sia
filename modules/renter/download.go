@@ -569,16 +569,14 @@ func (r *Renter) ClearDownloadHistoryBefore(timestamp int64) error {
 
 // RemoveFromDownloadHistory removes a provided download from
 // the download history
-func (r *Renter) RemoveFromDownloadHistory(staticSiaPath string, timestamp int64) error {
+func (r *Renter) RemoveFromDownloadHistory(timestamp int64) error {
 	if err := r.tg.Add(); err != nil {
 		return err
 	}
 	defer r.tg.Done()
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
-	i := sort.Search(len(r.downloadHistory), func(i int) bool {
-		return r.downloadHistory[i].staticSiaPath == staticSiaPath && r.downloadHistory[i].staticStartTime.UnixNano() == timestamp
-	})
+	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.UnixNano() == timestamp })
 	if i >= len(r.downloadHistory) {
 		return errors.New("Download not found in Download History")
 	}

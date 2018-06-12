@@ -44,20 +44,26 @@ func (c *Client) RenterDownloadFullGet(siaPath, destination string, async bool) 
 }
 
 // RenterClearDownloadsPost requests the /renter/downloads/clear resource
-func (c *Client) RenterClearDownloadsPost(after, before int64) (err error) {
-	values := url.Values{}
-	values.Set("after", strconv.FormatInt(after, 10))
-	values.Set("before", strconv.FormatInt(before, 10))
-	err = c.post("/renter/downloads/clear", values.Encode(), nil)
+func (c *Client) RenterClearDownloadsPost() (err error) {
+	err = c.post("/renter/downloads/clear", "", nil)
 	return
 }
 
-// RenterRemoveDownloadPost requests the /renter/downloads/remove/*siapath resource
-func (c *Client) RenterRemoveDownloadPost(siaPath string, timestamp int64) (err error) {
-	siaPath = strings.TrimPrefix(siaPath, "/")
-	values := url.Values{}
-	values.Set("timestamp", strconv.FormatInt(timestamp, 10))
-	err = c.post(fmt.Sprintf("/renter/downloads/remove/%s", siaPath), values.Encode(), nil)
+// RenterClearDownloadsAfterPost requests the /renter/downloads/clear/after/:timestamp resource
+func (c *Client) RenterClearDownloadsAfterPost(after int64) (err error) {
+	err = c.post("/renter/downloads/clear/after/"+strconv.FormatInt(after, 10), "", nil)
+	return
+}
+
+// RenterClearDownloadsBeforePost requests the /renter/downloads/clear/before/:timestamp resource
+func (c *Client) RenterClearDownloadsBeforePost(before int64) (err error) {
+	err = c.post("/renter/downloads/clear/before/"+strconv.FormatInt(before, 10), "", nil)
+	return
+}
+
+// RenterRemoveDownloadPost requests the /renter/downloads/remove/:timestamp resource
+func (c *Client) RenterRemoveDownloadPost(timestamp int64) (err error) {
+	err = c.post("/renter/downloads/remove/"+strconv.FormatInt(timestamp, 10), "", nil)
 	return
 }
 

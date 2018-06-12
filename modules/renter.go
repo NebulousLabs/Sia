@@ -365,7 +365,7 @@ type Renter interface {
 
 	// RemoveFromDownloadHistory removes a given download from the download
 	// history of the renter.
-	RemoveFromDownloadHistory(staticSiaPath string, timestamp int64) error
+	RemoveFromDownloadHistory(timestamp int64) error
 
 	// File returns information on specific file queried by user
 	File(siaPath string) (FileInfo, error)

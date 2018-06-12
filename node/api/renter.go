@@ -363,55 +363,61 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 }
 
 // renterClearDownloadsHandler handles the API call to request to clear the download queue.
-func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	after, err := strconv.ParseInt(req.FormValue("after"), 10, 64)
+func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	err := api.renter.ClearDownloadHistory()
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	before, err := strconv.ParseInt(req.FormValue("before"), 10, 64)
+	WriteSuccess(w)
+}
+
+// renterClearDownloadsAfterHandler handles the API call to request to clear
+// the download queue after a given timestamp.
+func (api *API) renterClearDownloadsAfterHandler(w http.ResponseWriter, _ *http.Request, ps httprouter.Params) {
+	after, err := strconv.ParseInt(ps.ByName("after"), 10, 64)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	if before <= 0 && after <= 0 {
-		err := api.renter.ClearDownloadHistory()
-		if err != nil {
-			WriteError(w, Error{err.Error()}, http.StatusBadRequest)
-			return
-		}
-		WriteSuccess(w)
+
+	err = api.renter.ClearDownloadHistoryAfter(after)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
 	}
 
-	if after > 0 {
-		err = api.renter.ClearDownloadHistoryAfter(after)
-		if err != nil {
-			WriteError(w, Error{err.Error()}, http.StatusBadRequest)
-			return
-		}
-		WriteSuccess(w)
+	WriteSuccess(w)
+}
+
+// renterClearDownloadsBeforeHandler handles the API call to request to clear
+// the download queue before a given timestamp.
+func (api *API) renterClearDownloadsBeforeHandler(w http.ResponseWriter, _ *http.Request, ps httprouter.Params) {
+	before, err := strconv.ParseInt(ps.ByName("before"), 10, 64)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
 	}
 
-	if before > 0 {
-		err = api.renter.ClearDownloadHistoryBefore(before)
-		if err != nil {
-			WriteError(w, Error{err.Error()}, http.StatusBadRequest)
-			return
-		}
-		WriteSuccess(w)
+	err = api.renter.ClearDownloadHistoryBefore(before)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
 	}
+
+	WriteSuccess(w)
 }
 
 // renterRemoveDownloadHandler handles the API call to request to remove
 // a specific download from the download queue.
-func (api *API) renterRemoveDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	t, err := strconv.ParseInt(req.FormValue("timestamp"), 10, 64)
+func (api *API) renterRemoveDownloadHandler(w http.ResponseWriter, _ *http.Request, ps httprouter.Params) {
+	timestamp, err := strconv.ParseInt(ps.ByName("timestamp"), 10, 64)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
-	err = api.renter.RemoveFromDownloadHistory(strings.TrimPrefix(ps.ByName("siapath"), "/"), t)
+	err = api.renter.RemoveFromDownloadHistory(timestamp)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
