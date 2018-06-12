@@ -1152,6 +1152,12 @@ func TestRedundancyReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Mine a block to trigger contract maintenance.
+	miner := tg.Miners()[0]
+	if err := miner.MineBlock(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Redundancy should decrease.
 	expectedRedundancy := float64(dataPieces+parityPieces-1) / float64(dataPieces)
 	if err := renter.WaitForDecreasingRedundancy(rf, expectedRedundancy); err != nil {
@@ -1160,10 +1166,6 @@ func TestRedundancyReporting(t *testing.T) {
 
 	// Restart the host.
 	if err := tg.StartNode(host); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := host.HostAnnouncePost(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1182,17 +1184,27 @@ func TestRedundancyReporting(t *testing.T) {
 				return nil
 			}
 		}
+		// If host is not active, announce it again and mine a block.
+		if err := host.HostAnnouncePost(); err != nil {
+			return (err)
+		}
 		miner := tg.Miners()[0]
 		if err := miner.MineBlock(); err != nil {
-			t.Fatal(err)
+			return (err)
 		}
-		return errors.New("host still not active")
+		if err := tg.Sync(); err != nil {
+			return (err)
+		}
+		hg, err := host.HostGet()
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("host with address %v not active", hg.InternalSettings.NetAddress)
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	miner := tg.Miners()[0]
 	if err := miner.MineBlock(); err != nil {
 		t.Fatal(err)
 	}
