@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -551,10 +552,17 @@ func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Reque
 		WriteError(w, Error{"parsing integer value for parameter `startheight` failed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	end, err := strconv.ParseUint(endheightStr, 10, 64)
+	// Parse endheightStr as an Int to account for negative numbers. If endInt is
+	// negative, explicitly set var end to MaxUint64.
+	var end uint64
+	endInt, err := strconv.ParseInt(endheightStr, 10, 64)
 	if err != nil {
 		WriteError(w, Error{"parsing integer value for parameter `endheight` failed: " + err.Error()}, http.StatusBadRequest)
 		return
+	}
+	end = uint64(endInt)
+	if endInt < 0 {
+		end = math.MaxUint64
 	}
 	confirmedTxns, err := api.wallet.Transactions(types.BlockHeight(start), types.BlockHeight(end))
 	if err != nil {

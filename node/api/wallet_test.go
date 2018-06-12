@@ -677,6 +677,15 @@ func TestWalletTransactionGETid(t *testing.T) {
 	if len(wtg.UnconfirmedTransactions) != 2 {
 		t.Fatal("expecting two unconfirmed transactions in sender wallet")
 	}
+	// Check that undocumented API behaviour used in Sia-UI still works with
+	// current API.
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=-1", &wtg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wtg.UnconfirmedTransactions) != 2 {
+		t.Fatal("expecting two unconfirmed transactions in sender wallet")
+	}
 	// Get the id of the non-change output sent to the receiving wallet.
 	expectedOutputID := wtg.UnconfirmedTransactions[1].Outputs[0].ID
 
