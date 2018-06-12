@@ -291,7 +291,7 @@ func acceptableVersion(version string) error {
 	if !build.IsVersion(version) {
 		return invalidVersionError(version)
 	}
-	if build.VersionCmp(version, minAcceptableVersion) < 0 {
+	if build.VersionCmp(version, minimumAcceptablePeerVersion) < 0 {
 		return insufficientVersionError(version)
 	}
 	return nil
