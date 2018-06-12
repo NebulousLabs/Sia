@@ -3,11 +3,13 @@ package renter
 import (
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -2184,13 +2186,29 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	numDownloads := 10
 	if len(rdg.Downloads) < numDownloads {
 		remainingDownloads := numDownloads - len(rdg.Downloads)
-		// Download files to build download history
 		rf, err := r.RenterFilesGet()
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Check if the renter has any files
+		// Upload a file if none
+		if len(rf.Files) == 0 {
+			dataPieces := uint64(1)
+			parityPieces := uint64(1)
+			fileSize := 100 + siatest.Fuzz()
+			_, _, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+			if err != nil {
+				t.Fatal("Failed to upload a file for testing: ", err)
+			}
+			rf, err = r.RenterFilesGet()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Download files to build download history
+		dest := filepath.Join(siatest.SiaTestingDir, strconv.Itoa(fastrand.Intn(math.MaxInt32)))
 		for i := 0; i < remainingDownloads; i++ {
-			err = r.RenterDownloadGet(rf.Files[0].SiaPath, "", 0, rf.Files[0].Filesize, false)
+			err = r.RenterDownloadGet(rf.Files[0].SiaPath, dest, 0, rf.Files[0].Filesize, false)
 			if err != nil {
 				t.Fatal("Could not Download file:", err)
 			}
@@ -2225,8 +2243,34 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	}
 
 	// Check Clear Before
+	timestamp = rdg.Downloads[len(rdg.Downloads)/2].StartTime
+	err = r.RenterClearDownloadsBeforePost(timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to clear download history before timestamp:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime < timestamp })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Download found that was before given time")
+	}
 
 	// Check Clear After
+	timestamp = rdg.Downloads[len(rdg.Downloads)/2].StartTime
+	err = r.RenterClearDownloadsAfterPost(timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to clear download history after timestamp:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime > timestamp })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Download found that was after given time")
+	}
 
 	// Check clearing download history
 	err = r.RenterClearDownloadsPost()

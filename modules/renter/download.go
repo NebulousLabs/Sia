@@ -543,10 +543,10 @@ func (r *Renter) ClearDownloadHistoryAfter(timestamp int64) error {
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
 	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.UnixNano() == timestamp })
-	if i >= len(r.downloadHistory) {
+	if i > len(r.downloadHistory) {
 		return errors.New("Timestamp not found in Download History")
 	}
-	r.downloadHistory = r.downloadHistory[:i]
+	r.downloadHistory = r.downloadHistory[:i-1]
 	return nil
 }
 
@@ -560,10 +560,10 @@ func (r *Renter) ClearDownloadHistoryBefore(timestamp int64) error {
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
 	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.UnixNano() == timestamp })
-	if i >= len(r.downloadHistory) {
+	if i > len(r.downloadHistory) {
 		return errors.New("Timestamp not found in Download History")
 	}
-	r.downloadHistory = r.downloadHistory[i+1:]
+	r.downloadHistory = r.downloadHistory[i:]
 	return nil
 }
 

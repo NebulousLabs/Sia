@@ -375,7 +375,7 @@ func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, _ *http.Reque
 // renterClearDownloadsAfterHandler handles the API call to request to clear
 // the download queue after a given timestamp.
 func (api *API) renterClearDownloadsAfterHandler(w http.ResponseWriter, _ *http.Request, ps httprouter.Params) {
-	after, err := strconv.ParseInt(ps.ByName("after"), 10, 64)
+	after, err := strconv.ParseInt(ps.ByName("timestamp"), 10, 64)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -393,7 +393,7 @@ func (api *API) renterClearDownloadsAfterHandler(w http.ResponseWriter, _ *http.
 // renterClearDownloadsBeforeHandler handles the API call to request to clear
 // the download queue before a given timestamp.
 func (api *API) renterClearDownloadsBeforeHandler(w http.ResponseWriter, _ *http.Request, ps httprouter.Params) {
-	before, err := strconv.ParseInt(ps.ByName("before"), 10, 64)
+	before, err := strconv.ParseInt(ps.ByName("timestamp"), 10, 64)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
