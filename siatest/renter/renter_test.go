@@ -1302,9 +1302,15 @@ func TestRenterCancelAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to get files")
 	}
-	if len(renterFiles.Files) != 2 || renterFiles.Files[1].UploadProgress > 0 || renterFiles.Files[1].Redundancy > 0 {
-		t.Fatal("uploading a file after cancelling allowance should fail",
-			renterFiles.Files[1].UploadProgress, renterFiles.Files[1].Redundancy)
+	if len(renterFiles.Files) != 2 {
+		t.Fatal("There should be exactly 2 tracked files")
+	}
+	fileInfo, err := renter.File(rf2.SiaPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fileInfo.UploadProgress > 0 || fileInfo.UploadedBytes > 0 || fileInfo.Redundancy > 0 {
+		t.Fatal("Uploading a file after canceling the allowance should fail")
 	}
 
 	// Mine enough blocks for the period to pass and the contracts to expire.
@@ -1328,12 +1334,12 @@ func TestRenterCancelAllowance(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	// Try downloading the file; should fail.
 	if _, err := renter.DownloadByStream(rf2); err == nil {
-		t.Fatal("downloading file succeeded even though it shouldnt", err)
+		t.Error("downloading file succeeded even though it shouldnt", err)
 	}
 
 	// The uploaded files should have 0x redundancy now.
@@ -1348,7 +1354,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }
 
