@@ -109,6 +109,7 @@ func TestFileRedundancy(t *testing.T) {
 	neverOffline := make(map[types.FileContractID]bool)
 	goodForRenew := make(map[types.FileContractID]bool)
 	for i := 0; i < 5; i++ {
+		neverOffline[types.FileContractID{byte(i)}] = false
 		goodForRenew[types.FileContractID{byte(i)}] = true
 	}
 
@@ -207,6 +208,9 @@ func TestFileRedundancy(t *testing.T) {
 		}
 		f.contracts[fc.ID] = fc
 		specificOffline := make(map[types.FileContractID]bool)
+		for fcid := range goodForRenew {
+			specificOffline[fcid] = false
+		}
 		specificOffline[fc.ID] = true
 		if r := f.redundancy(specificOffline, goodForRenew); r != expectedR {
 			t.Errorf("expected redundancy to ignore offline file contracts, wanted %f got %f", expectedR, r)
