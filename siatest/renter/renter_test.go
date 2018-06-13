@@ -1343,7 +1343,6 @@ func TestRenterCancelAllowance(t *testing.T) {
 			t.Fatal("Failed to get files")
 		}
 		if len(rf.Files) != 2 || rf.Files[0].Redundancy != 0 || rf.Files[1].Redundancy != 0 {
-			fmt.Println(rf.Files[0].Redundancy, rf.Files[1].Redundancy)
 			return errors.New("file redundancy should be 0 now")
 		}
 		return nil
