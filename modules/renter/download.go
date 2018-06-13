@@ -151,8 +151,9 @@ type (
 		err             error         // Only set if there was an error which prevented the download from completing.
 
 		// Timestamp information.
-		endTime         time.Time // Set immediately before closing 'completeChan'.
-		staticStartTime time.Time // Set immediately when the download object is created.
+		endTime             time.Time // Set immediately before closing 'completeChan'.
+		staticStartTime     time.Time // Set immediately when the download object is created.
+		staticStartTimeUnix int64     // Set off of staticStartTime.
 
 		// Basic information about the file.
 		destination           downloadDestination
@@ -375,6 +376,7 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 		log:           r.log,
 		memoryManager: r.memoryManager,
 	}
+	d.staticStartTimeUnix = d.staticStartTime.UnixNano()
 
 	// Determine which chunks to download.
 	minChunk := params.offset / params.file.staticChunkSize()
@@ -505,7 +507,8 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 			Completed:            d.staticComplete(),
 			EndTime:              d.endTime,
 			Received:             atomic.LoadUint64(&d.atomicDataReceived),
-			StartTime:            d.staticStartTime.UnixNano(),
+			StartTime:            d.staticStartTime,
+			StartTimeUnix:        d.staticStartTimeUnix,
 			TotalDataTransferred: atomic.LoadUint64(&d.atomicTotalDataTransferred),
 		}
 		// Release download lock before calling d.Err(), which will acquire the
@@ -535,14 +538,14 @@ func (r *Renter) ClearDownloadHistory() error {
 
 // ClearDownloadHistoryAfter clears the download history after
 // the given timestamp
-func (r *Renter) ClearDownloadHistoryAfter(timestamp int64) error {
+func (r *Renter) ClearDownloadHistoryAfter(timestamp time.Time) error {
 	if err := r.tg.Add(); err != nil {
 		return err
 	}
 	defer r.tg.Done()
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
-	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.UnixNano() == timestamp })
+	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(timestamp) })
 	if i > len(r.downloadHistory) {
 		return errors.New("Timestamp not found in Download History")
 	}
@@ -552,14 +555,14 @@ func (r *Renter) ClearDownloadHistoryAfter(timestamp int64) error {
 
 // ClearDownloadHistoryBefore clears the download history before
 // the given timestamp
-func (r *Renter) ClearDownloadHistoryBefore(timestamp int64) error {
+func (r *Renter) ClearDownloadHistoryBefore(timestamp time.Time) error {
 	if err := r.tg.Add(); err != nil {
 		return err
 	}
 	defer r.tg.Done()
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
-	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.UnixNano() == timestamp })
+	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(timestamp) })
 	if i > len(r.downloadHistory) {
 		return errors.New("Timestamp not found in Download History")
 	}
@@ -569,14 +572,14 @@ func (r *Renter) ClearDownloadHistoryBefore(timestamp int64) error {
 
 // RemoveFromDownloadHistory removes a provided download from
 // the download history
-func (r *Renter) RemoveFromDownloadHistory(timestamp int64) error {
+func (r *Renter) RemoveFromDownloadHistory(timestamp time.Time) error {
 	if err := r.tg.Add(); err != nil {
 		return err
 	}
 	defer r.tg.Done()
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
-	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.UnixNano() == timestamp })
+	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.Equal(timestamp) })
 	if i >= len(r.downloadHistory) {
 		return errors.New("Download not found in Download History")
 	}

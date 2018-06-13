@@ -2252,7 +2252,7 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	if err != nil {
 		t.Fatal("Could not get download history:", err)
 	}
-	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime < timestamp })
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Before(timestamp) })
 	if i < len(rdg.Downloads) {
 		t.Fatal("Download found that was before given time")
 	}
@@ -2267,7 +2267,7 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	if err != nil {
 		t.Fatal("Could not get download history:", err)
 	}
-	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime > timestamp })
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.After(timestamp) })
 	if i < len(rdg.Downloads) {
 		t.Fatal("Download found that was after given time")
 	}

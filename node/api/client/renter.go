@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node/api"
@@ -50,20 +51,20 @@ func (c *Client) RenterClearDownloadsPost() (err error) {
 }
 
 // RenterClearDownloadsAfterPost requests the /renter/downloads/clear/after/:timestamp resource
-func (c *Client) RenterClearDownloadsAfterPost(after int64) (err error) {
-	err = c.post("/renter/downloads/clear/after/"+strconv.FormatInt(after, 10), "", nil)
+func (c *Client) RenterClearDownloadsAfterPost(after time.Time) (err error) {
+	err = c.post("/renter/downloads/clear/after/"+strconv.FormatInt(after.UnixNano(), 10), "", nil)
 	return
 }
 
 // RenterClearDownloadsBeforePost requests the /renter/downloads/clear/before/:timestamp resource
-func (c *Client) RenterClearDownloadsBeforePost(before int64) (err error) {
-	err = c.post("/renter/downloads/clear/before/"+strconv.FormatInt(before, 10), "", nil)
+func (c *Client) RenterClearDownloadsBeforePost(before time.Time) (err error) {
+	err = c.post("/renter/downloads/clear/before/"+strconv.FormatInt(before.UnixNano(), 10), "", nil)
 	return
 }
 
 // RenterRemoveDownloadPost requests the /renter/downloads/remove/:timestamp resource
-func (c *Client) RenterRemoveDownloadPost(timestamp int64) (err error) {
-	err = c.post("/renter/downloads/remove/"+strconv.FormatInt(timestamp, 10), "", nil)
+func (c *Client) RenterRemoveDownloadPost(timestamp time.Time) (err error) {
+	err = c.post("/renter/downloads/remove/"+strconv.FormatInt(timestamp.UnixNano(), 10), "", nil)
 	return
 }
 

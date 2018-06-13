@@ -247,7 +247,7 @@ func renterdownloadscmd() {
 	} else {
 		fmt.Println("Downloading", len(downloading), "files:")
 		for _, file := range downloading {
-			fmt.Printf("%s: %5.1f%% %s -> %s\n", time.Unix(file.StartTime, 0).Format("Jan 02 03:04 PM"), 100*float64(file.Received)/float64(file.Filesize), file.SiaPath, file.Destination)
+			fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float64(file.Received)/float64(file.Filesize), file.SiaPath, file.Destination)
 		}
 	}
 	if !renterShowHistory {
@@ -266,7 +266,7 @@ func renterdownloadscmd() {
 	} else {
 		fmt.Println("Downloaded", len(downloaded), "files:")
 		for _, file := range downloaded {
-			fmt.Printf("%s: %s -> %s\n", time.Unix(file.StartTime, 0).Format("Jan 02 03:04 PM"), file.SiaPath, file.Destination)
+			fmt.Printf("%s: %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), file.SiaPath, file.Destination)
 		}
 	}
 }
@@ -570,9 +570,9 @@ func downloadprogress(done chan struct{}, siapath string) {
 				continue // file hasn't appeared in queue yet
 			}
 			pct := 100 * float64(d.Received) / float64(d.Filesize)
-			elapsed := time.Since(time.Unix(d.StartTime, 0))
+			elapsed := time.Since(d.StartTime)
 			elapsed -= elapsed % time.Second // round to nearest second
-			mbps := (float64(d.Received*8) / 1e6) / time.Since(time.Unix(d.StartTime, 0)).Seconds()
+			mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
 			fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
 		}
 	}
