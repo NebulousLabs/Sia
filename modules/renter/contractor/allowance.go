@@ -74,6 +74,23 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		c.log.Println("Unable to save contractor after setting allowance:", err)
 	}
 
+	// Cycle through all contracts and unlock them again since they might have
+	// been locked by managedCancelAllowance previously.
+	ids := c.staticContracts.IDs()
+	for _, id := range ids {
+		contract, exists := c.staticContracts.Acquire(id)
+		if !exists {
+			continue
+		}
+		utility := contract.Utility()
+		utility.Locked = false
+		err := contract.UpdateUtility(utility)
+		c.staticContracts.Return(contract)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Interrupt any existing maintenance and launch a new round of
 	// maintenance.
 	c.managedInterruptContractMaintenance()
@@ -133,6 +150,7 @@ func (c *Contractor) managedCancelAllowance() error {
 		utility := contract.Utility()
 		utility.GoodForRenew = false
 		utility.GoodForUpload = false
+		utility.Locked = true
 		err := contract.UpdateUtility(utility)
 		c.staticContracts.Return(contract)
 		if err != nil {
