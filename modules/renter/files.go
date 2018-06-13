@@ -151,8 +151,14 @@ func (f *file) redundancy(offlineMap map[types.FileContractID]bool, goodForRenew
 	}
 	pieceMap := make(map[string]struct{})
 	for _, fc := range f.contracts {
-		offline := offlineMap[fc.ID]
-		goodForRenew := goodForRenewMap[fc.ID]
+		offline, exists1 := offlineMap[fc.ID]
+		goodForRenew, exists2 := goodForRenewMap[fc.ID]
+		if exists1 != exists2 {
+			build.Critical("contract can't be in one map but not in the other")
+		}
+		if !exists1 {
+			continue
+		}
 
 		// do not count pieces from the contract if the contract is offline
 		if offline {
