@@ -1013,16 +1013,12 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Upload files to force contract renewal due to running out of funds
+	// Set upload parameters
 	dataPieces := uint64(1)
 	parityPieces := uint64(1)
-	// TODO: Currently statically setting chunkSize, can it be dynamically
-	// set to reduce the chance of test potentially failing due to not enough
-	// data being uploaded?
-	// If this can be dynamically set, this could be split off into a method
-	// to be used in other tests that need to force renewals of contracts
-	chunkSize := siatest.ChunkSize(100)
+	chunkSize := siatest.ChunkSize(50)
 
+	// Upload once to show upload spending
 	_, _, err = r.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
 	if err != nil {
 		t.Fatal("Failed to upload a file for testing: ", err)
@@ -1036,19 +1032,41 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Confirm Contracts were renewed as expected
-	err = build.Retry(600, 100*time.Millisecond, func() error {
+	// Get current upload spend, previously contracts had zero upload spend
+	rc, err = r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Could not get renter contracts:", err)
+	}
+	startingUploadSpend := rc.Contracts[0].UploadSpending
+
+	// Upload files to force contract renewal due to running out of funds
+	err = build.Retry(60, 1*time.Second, func() error {
+		_, _, err = r.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
+		if err != nil {
+			t.Fatal("Failed to upload a file for testing: ", err)
+		}
+
+		// Waiting for nodes to sync
+		if err = m.MineBlock(); err != nil {
+			t.Fatal("Error mining block:", err)
+		}
+		if err = tg.Sync(); err != nil {
+			t.Fatal(err)
+		}
+
 		rc, err = r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get contracts")
 		}
 		renewedContracts := rc.Contracts
 
-		// Check Contracts
-		if err = checkContracts(oldContracts, renewedContracts); err != nil {
-			return err
+		// Upload spending will have reduced after contract renewal
+		for _, c := range renewedContracts {
+			if c.UploadSpending.Cmp(startingUploadSpend) <= 0 && c.GoodForUpload {
+				return nil
+			}
 		}
-		return nil
+		return errors.New("no renewed contract found")
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1062,7 +1080,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal("Could not get renter contracts:", err)
 	}
 	for _, c := range rc.Contracts {
-		if c.EndHeight != endHeight && c.GoodForRenew {
+		if c.EndHeight != endHeight && c.GoodForRenew && c.UploadSpending.Cmp(startingUploadSpend) <= 0 {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", rg.Settings.Allowance.Period)
 			t.Log("Current Period:", currentPeriodStart)
@@ -1458,14 +1476,16 @@ func checkContractVsReportedSpending(r *siatest.TestNode, oldContracts, renewedC
 		}
 	}
 	for _, contract := range renewedContracts {
-		// Calculate ContractFees
-		spending.ContractFees = spending.ContractFees.Add(contract.Fees)
-		// Calculate TotalAllocated
-		spending.TotalAllocated = spending.TotalAllocated.Add(contract.TotalCost)
-		// Calculate Spending
-		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
-		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
-		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
+		if contract.GoodForRenew {
+			// Calculate ContractFees
+			spending.ContractFees = spending.ContractFees.Add(contract.Fees)
+			// Calculate TotalAllocated
+			spending.TotalAllocated = spending.TotalAllocated.Add(contract.TotalCost)
+			// Calculate Spending
+			spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
+			spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
+			spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
+		}
 	}
 
 	// Compare contract fees
