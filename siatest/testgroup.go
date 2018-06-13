@@ -234,7 +234,7 @@ func hostsInRenterDBCheck(miner *TestNode, renters map[*TestNode]struct{}, hosts
 		}
 		for host := range hosts {
 			numRetries := 0
-			err := Retry(100, 100*time.Millisecond, func() error {
+			err := Retry(600, 100*time.Millisecond, func() error {
 				numRetries++
 				if renter == host {
 					// We don't care if the renter is also a host.

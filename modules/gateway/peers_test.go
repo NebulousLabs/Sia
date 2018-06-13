@@ -414,6 +414,7 @@ func TestUnitAcceptableVersion(t *testing.T) {
 		"0.3.3",
 		"0.3.9.9.9.9.9.9.9.9.9.9",
 		"0.3.9999999999",
+		"1.3.0",
 	}
 	for _, v := range insufficientVersions {
 		err := acceptableVersion(v)
@@ -422,8 +423,9 @@ func TestUnitAcceptableVersion(t *testing.T) {
 		}
 	}
 	validVersions := []string{
-		minAcceptableVersion,
+		minimumAcceptablePeerVersion,
 		"1.4.0",
+		"1.3.1",
 		"1.6.0",
 		"1.6.1",
 		"1.9",
@@ -746,7 +748,7 @@ func TestAcceptConnRejectsVersions(t *testing.T) {
 		// Test that acceptConn succeeds when the remote peer's version is
 		// minAcceptableVersion
 		{
-			remoteVersion:       minAcceptableVersion,
+			remoteVersion:       minimumAcceptablePeerVersion,
 			versionResponseWant: build.Version,
 			msg:                 "acceptConn should accept a remote peer whose version is 0.4.0",
 		},
