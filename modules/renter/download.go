@@ -524,65 +524,49 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 	return downloads
 }
 
-// ClearDownloadHistory clears the renter's download history
-func (r *Renter) ClearDownloadHistory() error {
+// ClearDownloadHistory clears the renter's download history based on
+// provided start and end times
+func (r *Renter) ClearDownloadHistory(start, end time.Time) error {
 	if err := r.tg.Add(); err != nil {
 		return err
 	}
 	defer r.tg.Done()
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
-	r.downloadHistory = r.downloadHistory[:0]
-	return nil
-}
 
-// ClearDownloadHistoryAfter clears the download history after
-// the given timestamp
-func (r *Renter) ClearDownloadHistoryAfter(timestamp time.Time) error {
-	if err := r.tg.Add(); err != nil {
-		return err
+	// Clear download history if both start and end times are zero values
+	if start.Equal(time.Unix(0, 0)) && end.Equal(time.Unix(0, 0)) {
+		r.downloadHistory = r.downloadHistory[:0]
+		return nil
 	}
-	defer r.tg.Done()
-	r.downloadHistoryMu.Lock()
-	defer r.downloadHistoryMu.Unlock()
-	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(timestamp) })
+
+	// If Start is zero value, search for end time to clear history
+	if start.Equal(time.Unix(0, 0)) {
+		i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.Before(end) })
+		if i > len(r.downloadHistory) {
+			// End time is before all downloads, clear to the end of the download history
+			r.downloadHistory = r.downloadHistory[:0]
+			return nil
+		}
+		r.downloadHistory = r.downloadHistory[i:]
+		return nil
+	}
+
+	// Clear range of downloads from history
+	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.Before(start) })
 	if i > len(r.downloadHistory) {
-		return errors.New("Timestamp not found in Download History")
+		// Start times before all downloads will result in an error
+		return errors.New("start time before all downloads")
 	}
+	// linear search for end
+	for j := i; j < len(r.downloadHistory); j++ {
+		if r.downloadHistory[j].staticStartTime.Before(end) {
+			//remove section from array
+			r.downloadHistory = append(r.downloadHistory[:i-1], r.downloadHistory[i:]...)
+			return nil
+		}
+	}
+	// End times before all downloads will result in clearing to the end of the download history
 	r.downloadHistory = r.downloadHistory[:i-1]
-	return nil
-}
-
-// ClearDownloadHistoryBefore clears the download history before
-// the given timestamp
-func (r *Renter) ClearDownloadHistoryBefore(timestamp time.Time) error {
-	if err := r.tg.Add(); err != nil {
-		return err
-	}
-	defer r.tg.Done()
-	r.downloadHistoryMu.Lock()
-	defer r.downloadHistoryMu.Unlock()
-	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(timestamp) })
-	if i > len(r.downloadHistory) {
-		return errors.New("Timestamp not found in Download History")
-	}
-	r.downloadHistory = r.downloadHistory[i:]
-	return nil
-}
-
-// RemoveFromDownloadHistory removes a provided download from
-// the download history
-func (r *Renter) RemoveFromDownloadHistory(timestamp time.Time) error {
-	if err := r.tg.Add(); err != nil {
-		return err
-	}
-	defer r.tg.Done()
-	r.downloadHistoryMu.Lock()
-	defer r.downloadHistoryMu.Unlock()
-	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.Equal(timestamp) })
-	if i >= len(r.downloadHistory) {
-		return errors.New("Download not found in Download History")
-	}
-	r.downloadHistory = append(r.downloadHistory[:i], r.downloadHistory[i+1:]...)
 	return nil
 }

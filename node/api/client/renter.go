@@ -45,26 +45,11 @@ func (c *Client) RenterDownloadFullGet(siaPath, destination string, async bool) 
 }
 
 // RenterClearDownloadsPost requests the /renter/downloads/clear resource
-func (c *Client) RenterClearDownloadsPost() (err error) {
-	err = c.post("/renter/downloads/clear", "", nil)
-	return
-}
-
-// RenterClearDownloadsAfterPost requests the /renter/downloads/clear/after/:timestamp resource
-func (c *Client) RenterClearDownloadsAfterPost(after time.Time) (err error) {
-	err = c.post("/renter/downloads/clear/after/"+strconv.FormatInt(after.UnixNano(), 10), "", nil)
-	return
-}
-
-// RenterClearDownloadsBeforePost requests the /renter/downloads/clear/before/:timestamp resource
-func (c *Client) RenterClearDownloadsBeforePost(before time.Time) (err error) {
-	err = c.post("/renter/downloads/clear/before/"+strconv.FormatInt(before.UnixNano(), 10), "", nil)
-	return
-}
-
-// RenterRemoveDownloadPost requests the /renter/downloads/remove/:timestamp resource
-func (c *Client) RenterRemoveDownloadPost(timestamp time.Time) (err error) {
-	err = c.post("/renter/downloads/remove/"+strconv.FormatInt(timestamp.UnixNano(), 10), "", nil)
+func (c *Client) RenterClearDownloadsPost(start, end time.Time) (err error) {
+	values := url.Values{}
+	values.Set("start", strconv.FormatInt(start.UnixNano(), 10))
+	values.Set("end", strconv.FormatInt(end.UnixNano(), 10))
+	err = c.post("/renter/downloads/clear", values.Encode(), nil)
 	return
 }
 
