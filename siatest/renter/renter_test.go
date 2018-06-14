@@ -1302,9 +1302,15 @@ func TestRenterCancelAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to get files")
 	}
-	if len(renterFiles.Files) != 2 || renterFiles.Files[1].UploadProgress > 0 || renterFiles.Files[1].Redundancy > 0 {
-		t.Fatal("uploading a file after cancelling allowance should fail",
-			renterFiles.Files[1].UploadProgress, renterFiles.Files[1].Redundancy)
+	if len(renterFiles.Files) != 2 {
+		t.Fatal("There should be exactly 2 tracked files")
+	}
+	fileInfo, err := renter.File(rf2.SiaPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fileInfo.UploadProgress > 0 || fileInfo.UploadedBytes > 0 || fileInfo.Redundancy > 0 {
+		t.Fatal("Uploading a file after canceling the allowance should fail")
 	}
 
 	// Mine enough blocks for the period to pass and the contracts to expire.
@@ -1328,12 +1334,12 @@ func TestRenterCancelAllowance(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	// Try downloading the file; should fail.
 	if _, err := renter.DownloadByStream(rf2); err == nil {
-		t.Fatal("downloading file succeeded even though it shouldnt", err)
+		t.Error("downloading file succeeded even though it shouldnt", err)
 	}
 
 	// The uploaded files should have 0x redundancy now.
@@ -1344,6 +1350,96 @@ func TestRenterCancelAllowance(t *testing.T) {
 		}
 		if len(rf.Files) != 2 || rf.Files[0].Redundancy != 0 || rf.Files[1].Redundancy != 0 {
 			return errors.New("file redundancy should be 0 now")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// TestRenterCancelAllowance tests that setting an empty allowance causes
+// uploads, downloads, and renewals to cease.
+func TestRenterResetAllowance(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a group for testing.
+	groupParams := siatest.GroupParams{
+		Hosts:   2,
+		Renters: 1,
+		Miners:  1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	renter := tg.Renters()[0]
+
+	// Cancel the allowance
+	if err := renter.RenterCancelAllowance(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Give it some time to mark the contracts as !goodForUpload and
+	// !goodForRenew.
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err := renter.RenterContractsGet()
+		if err != nil {
+			return err
+		}
+		// Should still have 2 contract.
+		if len(rc.Contracts) != groupParams.Hosts {
+			return fmt.Errorf("expected %v contracts", groupParams.Hosts)
+		}
+		for _, c := range rc.Contracts {
+			if c.GoodForUpload {
+				return errors.New("contract shouldn't be goodForUpload")
+			}
+			if c.GoodForRenew {
+				return errors.New("contract shouldn't be goodForRenew")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set the allowance again.
+	if err := renter.RenterPostAllowance(siatest.DefaultAllowance); err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine a block to start the threadedContractMaintenance.
+	if err := tg.Miners()[0].MineBlock(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Give it some time to mark the contracts as goodForUpload and
+	// goodForRenew again.
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err := renter.RenterContractsGet()
+		if err != nil {
+			return err
+		}
+		// Should still have 2 contract.
+		if len(rc.Contracts) != groupParams.Hosts {
+			return fmt.Errorf("expected %v contracts", groupParams.Hosts)
+		}
+		for _, c := range rc.Contracts {
+			if !c.GoodForUpload {
+				return errors.New("contract should be goodForUpload")
+			}
+			if !c.GoodForRenew {
+				return errors.New("contract should be goodForRenew")
+			}
 		}
 		return nil
 	})
