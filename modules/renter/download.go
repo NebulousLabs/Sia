@@ -540,11 +540,11 @@ func (r *Renter) ClearDownloadHistory(start, end time.Time) error {
 		return nil
 	}
 
-	// If Start is zero value, search for end time to clear history
-	if start.Equal(time.Unix(0, 0)) {
-		i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.Before(end) })
+	// If End is zero value, search for end time to clear history
+	if end.Equal(time.Unix(0, 0)) {
+		i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(start) })
 		if i > len(r.downloadHistory) {
-			// End time is before all downloads, clear to the end of the download history
+			// Start time is After all downloads, clear entire download history
 			r.downloadHistory = r.downloadHistory[:0]
 			return nil
 		}
@@ -553,20 +553,23 @@ func (r *Renter) ClearDownloadHistory(start, end time.Time) error {
 	}
 
 	// Clear range of downloads from history
-	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.Before(start) })
+	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(end) })
 	if i > len(r.downloadHistory) {
-		// Start times before all downloads will result in an error
-		return errors.New("start time before all downloads")
+		// End time after all downloads will result in an error
+		return errors.New("end time after all downloads")
 	}
-	// linear search for end
-	for j := i; j < len(r.downloadHistory); j++ {
-		if r.downloadHistory[j].staticStartTime.Before(end) {
-			//remove section from array
-			r.downloadHistory = append(r.downloadHistory[:i-1], r.downloadHistory[i:]...)
-			return nil
+	// linear search for start
+	if !start.Equal(time.Unix(0, 0)) && !start.After(r.downloadHistory[len(r.downloadHistory)-1].staticStartTime) {
+		for j := i - 1; j < len(r.downloadHistory); j++ {
+			if r.downloadHistory[j].staticStartTime.After(start) {
+				//remove section from array
+				r.downloadHistory = append(r.downloadHistory[:i-1], r.downloadHistory[j:]...)
+				return nil
+			}
 		}
 	}
-	// End times before all downloads will result in clearing to the end of the download history
+
+	// Start time is zero value or is after all downloads, clear the rest of the download history
 	r.downloadHistory = r.downloadHistory[:i-1]
 	return nil
 }

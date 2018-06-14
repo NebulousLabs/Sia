@@ -44,8 +44,39 @@ func (c *Client) RenterDownloadFullGet(siaPath, destination string, async bool) 
 	return
 }
 
-// RenterClearDownloadsPost requests the /renter/downloads/clear resource
-func (c *Client) RenterClearDownloadsPost(start, end time.Time) (err error) {
+// RenterClearAllDownloadsPost requests the /renter/downloads/clear resource
+// with no parameters
+func (c *Client) RenterClearAllDownloadsPost() (err error) {
+	values := url.Values{}
+	values.Set("start", "")
+	values.Set("end", "")
+	err = c.post("/renter/downloads/clear", values.Encode(), nil)
+	return
+}
+
+// RenterClearDownloadsAfterPost requests the /renter/downloads/clear resource
+// with only the end time provided
+func (c *Client) RenterClearDownloadsAfterPost(end time.Time) (err error) {
+	values := url.Values{}
+	values.Set("start", "")
+	values.Set("end", strconv.FormatInt(end.UnixNano(), 10))
+	err = c.post("/renter/downloads/clear", values.Encode(), nil)
+	return
+}
+
+// RenterClearDownloadsBeforePost requests the /renter/downloads/clear resource
+// with only the start time provided
+func (c *Client) RenterClearDownloadsBeforePost(start time.Time) (err error) {
+	values := url.Values{}
+	values.Set("start", strconv.FormatInt(start.UnixNano(), 10))
+	values.Set("end", "")
+	err = c.post("/renter/downloads/clear", values.Encode(), nil)
+	return
+}
+
+// RenterClearDownloadsRangePost requests the /renter/downloads/clear resource
+// with both start and end times provided
+func (c *Client) RenterClearDownloadsRangePost(start, end time.Time) (err error) {
 	values := url.Values{}
 	values.Set("start", strconv.FormatInt(start.UnixNano(), 10))
 	values.Set("end", strconv.FormatInt(end.UnixNano(), 10))

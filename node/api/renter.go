@@ -388,7 +388,7 @@ func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, req *http.Req
 	}
 	endTime := time.Unix(0, endInt)
 
-	if startTime.Before(endTime) {
+	if startTime.Before(endTime) && !startTime.Equal(time.Unix(0, 0)) {
 		WriteError(w, Error{"start time can not be before end time"}, http.StatusBadRequest)
 		return
 	}

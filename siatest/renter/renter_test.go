@@ -2224,9 +2224,10 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	}
 	numDownloads = len(rdg.Downloads)
 
-	// Check removing 1 download from history
+	// Check removing one download from history
+	// Remove First Download
 	timestamp := rdg.Downloads[0].StartTime
-	err = r.RenterRemoveDownloadPost(timestamp)
+	err = r.RenterClearDownloadsRangePost(timestamp, timestamp)
 	if err != nil {
 		t.Fatal("Error in API endpoint to remove download from history:", err)
 	}
@@ -2237,13 +2238,30 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	if len(rdg.Downloads) != numDownloads-1 {
 		t.Fatalf("Download history not reduced: history has %v downloads, expected %v", len(rdg.Downloads), numDownloads-1)
 	}
-	i := sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime == timestamp })
+	i := sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Equal(timestamp) })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Specified download not removed from history")
+	}
+	// Remove Last Download
+	timestamp = rdg.Downloads[len(rdg.Downloads)-1].StartTime
+	err = r.RenterClearDownloadsRangePost(timestamp, timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to remove download from history:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	if len(rdg.Downloads) != numDownloads-2 {
+		t.Fatalf("Download history not reduced: history has %v downloads, expected %v", len(rdg.Downloads), numDownloads-1)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Equal(timestamp) })
 	if i < len(rdg.Downloads) {
 		t.Fatal("Specified download not removed from history")
 	}
 
 	// Check Clear Before
-	timestamp = rdg.Downloads[len(rdg.Downloads)/2].StartTime
+	timestamp = rdg.Downloads[len(rdg.Downloads)-2].StartTime
 	err = r.RenterClearDownloadsBeforePost(timestamp)
 	if err != nil {
 		t.Fatal("Error in API endpoint to clear download history before timestamp:", err)
@@ -2258,7 +2276,7 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	}
 
 	// Check Clear After
-	timestamp = rdg.Downloads[len(rdg.Downloads)/2].StartTime
+	timestamp = rdg.Downloads[1].StartTime
 	err = r.RenterClearDownloadsAfterPost(timestamp)
 	if err != nil {
 		t.Fatal("Error in API endpoint to clear download history after timestamp:", err)
@@ -2272,8 +2290,26 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal("Download found that was after given time")
 	}
 
+	// Check clear range
+	start := rdg.Downloads[1].StartTime
+	end := rdg.Downloads[len(rdg.Downloads)-1].StartTime
+	err = r.RenterClearDownloadsRangePost(start, end)
+	if err != nil {
+		t.Fatal("Error in API endpoint to remove range of downloads from history:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool {
+		return rdg.Downloads[i].StartTime.Before(start) && rdg.Downloads[i].StartTime.After(end)
+	})
+	if i < len(rdg.Downloads) {
+		t.Fatal("Not all downloads from range removed from history")
+	}
+
 	// Check clearing download history
-	err = r.RenterClearDownloadsPost()
+	err = r.RenterClearAllDownloadsPost()
 	if err != nil {
 		t.Fatal("Error in API endpoint to clear download history:", err)
 	}
