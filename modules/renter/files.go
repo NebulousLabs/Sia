@@ -292,6 +292,9 @@ func (r *Renter) FileList() []modules.FileInfo {
 	for cid := range contractIDs {
 		resolvedKey := r.hostContractor.ResolveIDToPubKey(cid)
 		cu, ok := r.hostContractor.ContractUtility(resolvedKey)
+		if !ok {
+			continue
+		}
 		goodForRenew[cid] = ok && cu.GoodForRenew
 		offline[cid] = r.hostContractor.IsOffline(resolvedKey)
 	}
@@ -350,6 +353,9 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	for cid := range contractIDs {
 		resolvedKey := r.hostContractor.ResolveIDToPubKey(cid)
 		cu, ok := r.hostContractor.ContractUtility(resolvedKey)
+		if !ok {
+			continue
+		}
 		goodForRenew[cid] = ok && cu.GoodForRenew
 		offline[cid] = r.hostContractor.IsOffline(resolvedKey)
 	}
