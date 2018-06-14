@@ -552,8 +552,8 @@ func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Reque
 		WriteError(w, Error{"parsing integer value for parameter `startheight` failed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	// Parse endheightStr as an Int to account for negative numbers. If endInt is
-	// negative, explicitly set var end to MaxUint64.
+	// Check if endheightStr is set to -1. If it is, we use MaxUint64 as the
+	// end. Otherwise we parse the argument as an unsigned integer.
 	var end uint64
 	if endheightStr == "-1" {
 		end = math.MaxUint64
