@@ -294,8 +294,11 @@ func newHost(dependencies modules.Dependencies, cs modules.ConsensusSet, tpool m
 		}
 	})
 
-	// Initialize the networking.
+	// Initialize the networking. We need to hold the lock while doing so since
+	// the previous load subscribed the host to the consenus set.
+	h.mu.Lock()
 	err = h.initNetworking(listenerAddress)
+	h.mu.Unlock()
 	if err != nil {
 		h.log.Println("Could not initialize host networking:", err)
 		return nil, err
