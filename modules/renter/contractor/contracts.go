@@ -563,7 +563,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 
 			// Calculate endHeight for renewed contracts
-			endHeight = currentPeriod + (2 * allowance.Period)
+			endHeight = currentPeriod + allowance.Period
 
 			// Perform the actual renew. If the renew fails, return the
 			// contract. If the renew fails we check how often it has failed

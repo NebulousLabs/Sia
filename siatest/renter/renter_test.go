@@ -1258,10 +1258,8 @@ func TestRenterSpendingReporting(t *testing.T) {
 	err = build.Retry(120, 1*time.Second, func() error {
 		// Check Contracts
 		if expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance); err != nil {
-			if expectedBalance.Cmp(walletBalance) > 0 {
-				t.Log("Under reported by:", expectedBalance.Sub(walletBalance).HumanString())
-			} else {
-				t.Log("Over reported by:", walletBalance.Sub(expectedBalance).HumanString())
+			if expectedBalance.Cmp(walletBalance) != 0 {
+				return errors.New("expected balance not equal to wallet balance")
 			}
 			return err
 		}
