@@ -96,9 +96,12 @@ func (c *Contractor) managedMarkContractsUtility() error {
 	// Update utility fields for each contract.
 	for _, contract := range c.staticContracts.ViewAll() {
 		utility := func() (u modules.ContractUtility) {
-			// Start the contract in good standing.
-			u.GoodForUpload = true
-			u.GoodForRenew = true
+			// Start the contract in good standing if the utility wasn't
+			// locked.
+			if !u.Locked {
+				u.GoodForUpload = true
+				u.GoodForRenew = true
+			}
 
 			host, exists := c.hdb.Host(contract.HostPublicKey)
 			// Contract has no utility if the host is not in the database.
@@ -553,6 +556,8 @@ func (c *Contractor) threadedContractMaintenance() {
 				replace := numRenews >= consecutiveRenewalsBeforeReplacement
 				if failedBefore && secondHalfOfWindow && replace {
 					oldUtility.GoodForRenew = false
+					oldUtility.GoodForUpload = false
+					oldUtility.Locked = true
 					err := oldContract.UpdateUtility(oldUtility)
 					if err != nil {
 						c.log.Println("WARN: failed to mark contract as !goodForRenew:", err)

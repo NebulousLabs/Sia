@@ -12,3 +12,8 @@ type (
 		siaPath  string
 	}
 )
+
+// SiaPath returns the siaPath of a remote file.
+func (rf RemoteFile) SiaPath() string {
+	return rf.siaPath
+}

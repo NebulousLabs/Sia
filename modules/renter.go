@@ -65,6 +65,7 @@ type Allowance struct {
 type ContractUtility struct {
 	GoodForUpload bool
 	GoodForRenew  bool
+	Locked        bool // Locked utilities can only be set to false.
 }
 
 // DownloadInfo provides information about a file that has been requested for
