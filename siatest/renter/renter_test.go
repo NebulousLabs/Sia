@@ -936,18 +936,8 @@ func TestRenterContractEndHeight(t *testing.T) {
 	// Set contracts to oldContracts
 	oldContracts := rc.Contracts
 
-	// Mine blocks to renew contracts based on renew window
-	m := tg.Miners()[0]
-	period := rg.Settings.Allowance.Period
-	rw := rg.Settings.Allowance.RenewWindow
-	for i := 0; i < int(period-rw); i++ {
-		if err = m.MineBlock(); err != nil {
-			t.Fatal("Error mining block:", err)
-		}
-	}
-
-	// Waiting for nodes to sync
-	if err = tg.Sync(); err != nil {
+	// Mine blocks to force contract renewal within the same period
+	if err = renewContractsByRenewWindow(r, tg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1006,6 +996,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 	}
 
 	// Waiting for nodes to sync
+	m := tg.Miners()[0]
 	if err = m.MineBlock(); err != nil {
 		t.Fatal("Error mining block:", err)
 	}
@@ -1194,19 +1185,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Mine blocks to force contract renewal within the same period
-	rg, err := r.RenterGet()
-	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
-	}
-	m := tg.Miners()[0]
-	for i := 0; i < int(rg.Settings.Allowance.Period-rg.Settings.Allowance.RenewWindow); i++ {
-		if err = m.MineBlock(); err != nil {
-			t.Fatal("Error mining block:", err)
-		}
-	}
-
-	// Waiting for nodes to sync
-	if err = tg.Sync(); err != nil {
+	if err = renewContractsByRenewWindow(r, tg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1244,6 +1223,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Mine Block to confirm contracts and spending into blockchain
+	m := tg.Miners()[0]
 	if err = m.MineBlock(); err != nil {
 		t.Fatal("Error mining block:", err)
 	}
@@ -1289,6 +1269,10 @@ func TestRenterSpendingReporting(t *testing.T) {
 	cg, _ := r.ConsensusGet()
 	blockHeight := cg.Height
 	endHeight := renewedContracts[0].EndHeight
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal("Failed to get renter:", err)
+	}
 	rw := rg.Settings.Allowance.RenewWindow
 	for i := 0; i < int(endHeight-rw-blockHeight+types.MaturityDelay); i++ {
 		if err = m.MineBlock(); err != nil {
@@ -1507,6 +1491,25 @@ func checkContractVsReportedSpending(r *siatest.TestNode, oldContracts, renewedC
 		return errors.New("Financial Metrics Storage Spending not equal to Renter Storage Spending")
 	}
 
+	return nil
+}
+
+func renewContractsByRenewWindow(renter *siatest.TestNode, tg *siatest.TestGroup) error {
+	rg, err := renter.RenterGet()
+	if err != nil {
+		return errors.AddContext(err, "failed to get RenterGet")
+	}
+	m := tg.Miners()[0]
+	for i := 0; i < int(rg.Settings.Allowance.Period-rg.Settings.Allowance.RenewWindow); i++ {
+		if err = m.MineBlock(); err != nil {
+			return errors.AddContext(err, "error mining block")
+		}
+	}
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		return err
+	}
 	return nil
 }
 
