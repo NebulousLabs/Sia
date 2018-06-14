@@ -555,14 +555,14 @@ func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Reque
 	// Parse endheightStr as an Int to account for negative numbers. If endInt is
 	// negative, explicitly set var end to MaxUint64.
 	var end uint64
-	endInt, err := strconv.ParseInt(endheightStr, 10, 64)
+	if endheightStr == "-1" {
+		end = math.MaxUint64
+	} else {
+		end, err = strconv.ParseUint(endheightStr, 10, 64)
+	}
 	if err != nil {
 		WriteError(w, Error{"parsing integer value for parameter `endheight` failed: " + err.Error()}, http.StatusBadRequest)
 		return
-	}
-	end = uint64(endInt)
-	if endInt < 0 {
-		end = math.MaxUint64
 	}
 	confirmedTxns, err := api.wallet.Transactions(types.BlockHeight(start), types.BlockHeight(end))
 	if err != nil {
