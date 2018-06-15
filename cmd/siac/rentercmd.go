@@ -537,7 +537,7 @@ func renterfilesdownloadcmd(path, destination string) {
 	done := make(chan struct{})
 	go downloadprogress(done, path)
 
-	err := httpClient.RenterDownloadFullGet(path, destination, false)
+	err := httpClient.RenterDownloadFullGet(path, destination, renterDownloadAsync)
 	close(done)
 	if err != nil {
 		die("Could not download file:", err)
