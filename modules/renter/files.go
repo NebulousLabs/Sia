@@ -297,7 +297,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 	}
 
 	// Build the list of FileInfos.
-	var fileList []modules.FileInfo
+	fileList := []modules.FileInfo{}
 	for _, f := range files {
 		lockID := r.mu.RLock()
 		f.mu.RLock()
@@ -329,7 +329,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	var fileInfo modules.FileInfo
 
-	// Get the file and its contracs
+	// Get the file and its contracts
 	contractIDs := make(map[types.FileContractID]struct{})
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
