@@ -25,6 +25,7 @@ Index
 | [/renter](#renter-post)                                                         | POST      |
 | [/renter/contracts](#rentercontracts-get)                                       | GET       |
 | [/renter/downloads](#renterdownloads-get)                                       | GET       |
+| [/renter/downloads/clear](#renterdownloadsclear-post)                           | POST      |
 | [/renter/files](#renterfiles-get)                                               | GET       |
 | [/renter/file/*___siapath___](#renterfile___siapath___-get)                     | GET       |
 | [/renter/prices](#renter-prices-get)                                            | GET       |
@@ -274,56 +275,32 @@ lists all files in the download queue.
       // will eventually include data transferred during contract + payment
       // negotiation, as well as data from failed piece downloads.
       "totaldatatransfered": 10321,
-    }   
+    }
   ]
 }
 ```
 #### /renter/downloads/clear [POST]
 
-clears the download history of the renter.
+Clears the download history of the renter for a range
+of unix time stamps.  Both parameters are optional, if
+no parameters are provided, the entire download history
+will be cleared.  To clear a single download, provide the
+timestamp for the download as both parameters.  Since
+download history is displayed from newest to oldest, providing
+only the start parameter will clear all downloads before, or
+older than the start timestamp.  Conversely, providing only
+the end parameter will clear all downloads after, or
+newer than the end timestamp.
 
-###### Response
-standard success or error response. See
-[#standard-responses](#standard-responses).
-
-#### /renter/downloads/clear/after/:timestamp [POST]
-
-clears all downloads from the download history of the renter after the given timestamp.
-
-###### Path Parameters [(with comments)]
-``` // unix timestamp found in the download history 
-timestamp
+###### Timestamp Parameters [(with comments)]
+```
+start   // Optional - unix timestamp found in the download history
+end     // Optional - unix timestamp found in the download history
 ```
 
 ###### Response
 standard success or error response. See
-[#standard-responses](#standard-responses).
-
-#### /renter/downloads/clear/before/:timestamp [POST]
-
-clears all downloads from the download history of the renter before the given timestamp.
-
-###### Path Parameters [(with comments)]
-``` // unix timestamp found in the download history 
-timestamp
-```
-
-###### Response
-standard success or error response. See
-[#standard-responses](#standard-responses).
-
-#### /renter/downloads/remove/:timestamp [POST]
-
-removes a specific download from the download history of the renter based on the given timestamp.
-
-###### Path Parameters [(with comments)]
-``` // unix timestamp found in the download history 
-timestamp
-```
-
-###### Response
-standard success or error response. See
-[#standard-responses](#standard-responses).
+[API.md#standard-responses](/doc/API.md#standard-responses).
 
 #### /renter/files [GET]
 

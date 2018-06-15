@@ -540,7 +540,7 @@ func (r *Renter) ClearDownloadHistory(start, end time.Time) error {
 		return nil
 	}
 
-	// If End is zero value, search for end time to clear history
+	// If End is zero value, search for start time to clear history
 	if end.Equal(time.Unix(0, 0)) {
 		i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(start) })
 		if i > len(r.downloadHistory) {
