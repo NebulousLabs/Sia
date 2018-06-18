@@ -273,58 +273,59 @@ func (r *Renter) DeleteFile(nickname string) error {
 
 // FileList returns all of the files that the renter has.
 func (r *Renter) FileList() []modules.FileInfo {
-	// Get all the files and their contracts
-	var files []*file
-	contractIDs := make(map[types.FileContractID]struct{})
+	// Get all the files holding the readlock.
 	lockID := r.mu.RLock()
-	for _, f := range r.files {
-		files = append(files, f)
-		f.mu.RLock()
-		for cid := range f.contracts {
-			contractIDs[cid] = struct{}{}
-		}
-		f.mu.RUnlock()
+	files := make([]*siafile.SiaFile, 0, len(r.files))
+	for _, file := range r.files {
+		files = append(files, file)
 	}
 	r.mu.RUnlock(lockID)
 
+	// Save host keys in map. We can't do that under the same lock since we
+	// need to call a public method on the file.
+	pks := make(map[string]types.SiaPublicKey)
+	for _, f := range r.files {
+		for _, pk := range f.HostPublicKeys() {
+			pks[string(pk.Key)] = pk
+		}
+	}
+
 	// Build 2 maps that map every contract id to its offline and goodForRenew
 	// status.
-	goodForRenew := make(map[types.FileContractID]bool)
-	offline := make(map[types.FileContractID]bool)
-	for cid := range contractIDs {
-		resolvedKey := r.hostContractor.ResolveIDToPubKey(cid)
-		cu, ok := r.hostContractor.ContractUtility(resolvedKey)
+	goodForRenew := make(map[string]bool)
+	offline := make(map[string]bool)
+	for _, pk := range pks {
+		cu, ok := r.hostContractor.ContractUtility(pk)
 		if !ok {
 			continue
 		}
-		goodForRenew[cid] = ok && cu.GoodForRenew
-		offline[cid] = r.hostContractor.IsOffline(resolvedKey)
+		goodForRenew[string(pk.Key)] = ok && cu.GoodForRenew
+		offline[string(pk.Key)] = r.hostContractor.IsOffline(pk)
 	}
 
 	// Build the list of FileInfos.
 	fileList := []modules.FileInfo{}
 	for _, f := range files {
-		lockID := r.mu.RLock()
-		f.mu.RLock()
-		renewing := true
 		var localPath string
-		tf, exists := r.persist.Tracking[f.name]
+		siaPath := f.SiaPath()
+		lockID := r.mu.RLock()
+		tf, exists := r.persist.Tracking[siaPath]
+		r.mu.RUnlock(lockID)
 		if exists {
 			localPath = tf.RepairPath
 		}
+
 		fileList = append(fileList, modules.FileInfo{
-			SiaPath:        f.name,
+			SiaPath:        f.SiaPath(),
 			LocalPath:      localPath,
-			Filesize:       f.size,
-			Renewing:       renewing,
-			Available:      f.available(offline),
-			Redundancy:     f.redundancy(offline, goodForRenew),
-			UploadedBytes:  f.uploadedBytes(),
-			UploadProgress: f.uploadProgress(),
-			Expiration:     f.expiration(),
+			Filesize:       f.Size(),
+			Renewing:       true,
+			Available:      f.Available(offline),
+			Redundancy:     f.Redundancy(offline, goodForRenew),
+			UploadedBytes:  f.UploadedBytes(),
+			UploadProgress: f.UploadProgress(),
+			Expiration:     f.Expiration(),
 		})
-		f.mu.RUnlock()
-		r.mu.RUnlock(lockID)
 	}
 	return fileList
 }
@@ -345,21 +346,21 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 
 	// Build 2 maps that map every contract id to its offline and goodForRenew
 	// status.
-	goodForRenew := make(map[types.FileContractID]bool)
-	offline := make(map[types.FileContractID]bool)
-	for pk := range pks {
+	goodForRenew := make(map[string]bool)
+	offline := make(map[string]bool)
+	for _, pk := range pks {
 		cu, ok := r.hostContractor.ContractUtility(pk)
 		if !ok {
 			continue
 		}
-		goodForRenew[cid] = ok && cu.GoodForRenew
-		offline[cid] = r.hostContractor.IsOffline(pk)
+		goodForRenew[string(pk.Key)] = ok && cu.GoodForRenew
+		offline[string(pk.Key)] = r.hostContractor.IsOffline(pk)
 	}
 
 	// Build the FileInfo
 	renewing := true
 	var localPath string
-	tf, exists := r.persist.Tracking[file.Name()]
+	tf, exists := r.persist.Tracking[file.SiaPath()]
 	if exists {
 		localPath = tf.RepairPath
 	}
@@ -401,8 +402,8 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	}
 
 	// Modify the file and save it to disk.
-	file.Rename(newName)
-	err = r.saveFile(siaFileToFile(file))
+	file.Rename(newName) // TODO: violation of locking convention
+	err = r.saveFile(file)
 	if err != nil {
 		return err
 	}

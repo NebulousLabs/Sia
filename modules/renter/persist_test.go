@@ -9,46 +9,41 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 
 	"github.com/NebulousLabs/fastrand"
 )
 
 // newTestingFile initializes a file object with random parameters.
-func newTestingFile() *file {
+func newTestingFile() *siafile.SiaFile {
 	data := fastrand.Bytes(8)
 	nData := fastrand.Intn(10)
 	nParity := fastrand.Intn(10)
 	rsc, _ := NewRSCode(nData+1, nParity+1)
 
-	return &file{
-		name:        "testfile-" + strconv.Itoa(int(data[0])),
-		size:        encoding.DecUint64(data[1:5]),
-		masterKey:   crypto.GenerateTwofishKey(),
-		erasureCode: rsc,
-		pieceSize:   encoding.DecUint64(data[6:8]),
-		staticUID:   persist.RandomSuffix(),
-	}
+	name := "testfile-" + strconv.Itoa(int(data[0]))
+	masterKey := crypto.GenerateTwofishKey()
+
+	return siafile.New(name, rsc, masterKey)
 }
 
 // equalFiles is a helper function that compares two files for equality.
-func equalFiles(f1, f2 *file) error {
+func equalFiles(f1, f2 *siafile.SiaFile) error {
 	if f1 == nil || f2 == nil {
 		return fmt.Errorf("one or both files are nil")
 	}
-	if f1.name != f2.name {
-		return fmt.Errorf("names do not match: %v %v", f1.name, f2.name)
+	if f1.SiaPath() != f2.SiaPath() {
+		return fmt.Errorf("names do not match: %v %v", f1.SiaPath(), f2.SiaPath())
 	}
-	if f1.size != f2.size {
-		return fmt.Errorf("sizes do not match: %v %v", f1.size, f2.size)
+	if f1.Size() != f2.Size() {
+		return fmt.Errorf("sizes do not match: %v %v", f1.Size(), f2.Size())
 	}
-	if f1.masterKey != f2.masterKey {
-		return fmt.Errorf("keys do not match: %v %v", f1.masterKey, f2.masterKey)
+	if f1.MasterKey() != f2.MasterKey() {
+		return fmt.Errorf("keys do not match: %v %v", f1.MasterKey(), f2.MasterKey())
 	}
-	if f1.pieceSize != f2.pieceSize {
-		return fmt.Errorf("pieceSizes do not match: %v %v", f1.pieceSize, f2.pieceSize)
+	if f1.PieceSize() != f2.PieceSize() {
+		return fmt.Errorf("pieceSizes do not match: %v %v", f1.PieceSize(), f2.PieceSize())
 	}
 	return nil
 }
@@ -67,57 +62,57 @@ func TestFileShareLoad(t *testing.T) {
 	// Create a file and add it to the renter.
 	savedFile := newTestingFile()
 	id := rt.renter.mu.Lock()
-	rt.renter.files[savedFile.name] = savedFile
+	rt.renter.files[savedFile.SiaPath()] = savedFile
 	rt.renter.mu.Unlock(id)
 
 	// Share .sia file to disk.
 	path := filepath.Join(build.SiaTestingDir, "renter", t.Name(), "test.sia")
-	err = rt.renter.ShareFiles([]string{savedFile.name}, path)
+	err = rt.renter.ShareFiles([]string{savedFile.SiaPath()}, path)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Remove the file from the renter.
-	delete(rt.renter.files, savedFile.name)
+	delete(rt.renter.files, savedFile.SiaPath())
 
 	// Load the .sia file back into the renter.
 	names, err := rt.renter.LoadSharedFiles(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(names) != 1 || names[0] != savedFile.name {
+	if len(names) != 1 || names[0] != savedFile.SiaPath() {
 		t.Fatal("nickname not loaded properly:", names)
 	}
-	err = equalFiles(rt.renter.files[savedFile.name], savedFile)
+	err = equalFiles(rt.renter.files[savedFile.SiaPath()], savedFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Share and load multiple files.
 	savedFile2 := newTestingFile()
-	rt.renter.files[savedFile2.name] = savedFile2
+	rt.renter.files[savedFile2.SiaPath()] = savedFile2
 	path = filepath.Join(build.SiaTestingDir, "renter", t.Name(), "test2.sia")
-	err = rt.renter.ShareFiles([]string{savedFile.name, savedFile2.name}, path)
+	err = rt.renter.ShareFiles([]string{savedFile.SiaPath(), savedFile2.SiaPath()}, path)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Remove the files from the renter.
-	delete(rt.renter.files, savedFile.name)
-	delete(rt.renter.files, savedFile2.name)
+	delete(rt.renter.files, savedFile.SiaPath())
+	delete(rt.renter.files, savedFile2.SiaPath())
 
 	names, err = rt.renter.LoadSharedFiles(path)
 	if err != nil {
 		t.Fatal(nil)
 	}
-	if len(names) != 2 || (names[0] != savedFile2.name && names[1] != savedFile2.name) {
+	if len(names) != 2 || (names[0] != savedFile2.SiaPath() && names[1] != savedFile2.SiaPath()) {
 		t.Fatal("nicknames not loaded properly:", names)
 	}
-	err = equalFiles(rt.renter.files[savedFile.name], savedFile)
+	err = equalFiles(rt.renter.files[savedFile.SiaPath()], savedFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = equalFiles(rt.renter.files[savedFile2.name], savedFile2)
+	err = equalFiles(rt.renter.files[savedFile2.SiaPath()], savedFile2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,26 +132,26 @@ func TestFileShareLoadASCII(t *testing.T) {
 	// Create a file and add it to the renter.
 	savedFile := newTestingFile()
 	id := rt.renter.mu.Lock()
-	rt.renter.files[savedFile.name] = savedFile
+	rt.renter.files[savedFile.SiaPath()] = savedFile
 	rt.renter.mu.Unlock(id)
 
-	ascii, err := rt.renter.ShareFilesASCII([]string{savedFile.name})
+	ascii, err := rt.renter.ShareFilesASCII([]string{savedFile.SiaPath()})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Remove the file from the renter.
-	delete(rt.renter.files, savedFile.name)
+	delete(rt.renter.files, savedFile.SiaPath())
 
 	names, err := rt.renter.LoadSharedFilesASCII(ascii)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(names) != 1 || names[0] != savedFile.name {
+	if len(names) != 1 || names[0] != savedFile.SiaPath() {
 		t.Fatal("nickname not loaded properly")
 	}
 
-	err = equalFiles(rt.renter.files[savedFile.name], savedFile)
+	err = equalFiles(rt.renter.files[savedFile.SiaPath()], savedFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,15 +181,15 @@ func TestRenterSaveLoad(t *testing.T) {
 	}
 
 	// Create and save some files
-	var f1, f2, f3 *file
+	var f1, f2, f3 *siafile.SiaFile
 	f1 = newTestingFile()
 	f2 = newTestingFile()
 	f3 = newTestingFile()
 	// names must not conflict
-	for f2.name == f1.name || f2.name == f3.name {
+	for f2.SiaPath() == f1.SiaPath() || f2.SiaPath() == f3.SiaPath() {
 		f2 = newTestingFile()
 	}
-	for f3.name == f1.name || f3.name == f2.name {
+	for f3.SiaPath() == f1.SiaPath() || f3.SiaPath() == f2.SiaPath() {
 		f3 = newTestingFile()
 	}
 	rt.renter.saveFile(f1)
@@ -226,13 +221,13 @@ func TestRenterSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := equalFiles(f1, rt.renter.files[f1.name]); err != nil {
+	if err := equalFiles(f1, rt.renter.files[f1.SiaPath()]); err != nil {
 		t.Fatal(err)
 	}
-	if err := equalFiles(f2, rt.renter.files[f2.name]); err != nil {
+	if err := equalFiles(f2, rt.renter.files[f2.SiaPath()]); err != nil {
 		t.Fatal(err)
 	}
-	if err := equalFiles(f3, rt.renter.files[f3.name]); err != nil {
+	if err := equalFiles(f3, rt.renter.files[f3.SiaPath()]); err != nil {
 		t.Fatal(err)
 	}
 
@@ -266,11 +261,11 @@ func TestRenterPaths(t *testing.T) {
 	//   foo/bar.sia
 	//   foo/bar/baz.sia
 	f1 := newTestingFile()
-	f1.name = "foo"
+	f1.Rename("foo")
 	f2 := newTestingFile()
-	f2.name = "foo/bar"
+	f2.Rename("foo/bar")
 	f3 := newTestingFile()
-	f3.name = "foo/bar/baz"
+	f3.Rename("foo/bar/baz")
 	rt.renter.saveFile(f1)
 	rt.renter.saveFile(f2)
 	rt.renter.saveFile(f3)
@@ -286,13 +281,13 @@ func TestRenterPaths(t *testing.T) {
 	}
 
 	// Check that the files were loaded properly.
-	if err := equalFiles(f1, rt.renter.files[f1.name]); err != nil {
+	if err := equalFiles(f1, rt.renter.files[f1.SiaPath()]); err != nil {
 		t.Fatal(err)
 	}
-	if err := equalFiles(f2, rt.renter.files[f2.name]); err != nil {
+	if err := equalFiles(f2, rt.renter.files[f2.SiaPath()]); err != nil {
 		t.Fatal(err)
 	}
-	if err := equalFiles(f3, rt.renter.files[f3.name]); err != nil {
+	if err := equalFiles(f3, rt.renter.files[f3.SiaPath()]); err != nil {
 		t.Fatal(err)
 	}
 
@@ -310,7 +305,7 @@ func TestRenterPaths(t *testing.T) {
 		return nil
 	})
 	// walk will descend into foo/bar/, reading baz, bar, and finally foo
-	expWalkStr := (f3.name + ".sia") + (f2.name + ".sia") + (f1.name + ".sia")
+	expWalkStr := (f3.SiaPath() + ".sia") + (f2.SiaPath() + ".sia") + (f1.SiaPath() + ".sia")
 	if filepath.ToSlash(walkStr) != expWalkStr {
 		t.Fatalf("Bad walk string: expected %v, got %v", expWalkStr, walkStr)
 	}

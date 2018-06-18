@@ -476,7 +476,7 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 	}
 
 	r := &Renter{
-		files: make(map[string]*file),
+		files: make(map[string]*siafile.SiaFile),
 
 		// Making newDownloads a buffered channel means that most of the time, a
 		// new download will trigger an unnecessary extra iteration of the

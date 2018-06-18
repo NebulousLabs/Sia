@@ -81,8 +81,8 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Create file object.
-	f := newFile(up.SiaPath, up.ErasureCode, pieceSize, uint64(fileInfo.Size()))
-	f.mode = uint32(fileInfo.Mode())
+	f := fileToSiaFile(newFile(up.SiaPath, up.ErasureCode, pieceSize, uint64(fileInfo.Size())))
+	f.SetMode(fileInfo.Mode())
 
 	// Add file to renter.
 	lockID = r.mu.Lock()

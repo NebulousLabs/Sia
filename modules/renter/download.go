@@ -132,6 +132,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -178,7 +179,7 @@ type (
 		destination       downloadDestination // The place to write the downloaded data.
 		destinationType   string              // "file", "buffer", "http stream", etc.
 		destinationString string              // The string to report to the user for the destination.
-		file              *file               // The file to download.
+		file              *siafile.SiaFile    // The file to download.
 
 		latencyTarget time.Duration // Workers above this latency will be automatically put on standby initially.
 		length        uint64        // Length of download. Cannot be 0.
@@ -352,7 +353,7 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	if params.offset < 0 {
 		return nil, errors.New("download offset cannot be a negative number")
 	}
-	if params.offset+params.length > params.file.size {
+	if params.offset+params.length > params.file.Size() {
 		return nil, errors.New("download is requesting data past the boundary of the file")
 	}
 
@@ -369,7 +370,7 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 		staticLength:          params.length,
 		staticOffset:          params.offset,
 		staticOverdrive:       params.overdrive,
-		staticSiaPath:         params.file.name,
+		staticSiaPath:         params.file.SiaPath(),
 		staticPriority:        params.priority,
 
 		log:           r.log,
@@ -377,34 +378,26 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	}
 
 	// Determine which chunks to download.
-	minChunk := params.offset / params.file.staticChunkSize()
-	maxChunk := (params.offset + params.length - 1) / params.file.staticChunkSize()
+	minChunk := params.offset / params.file.ChunkSize()
+	maxChunk := (params.offset + params.length - 1) / params.file.ChunkSize()
 
 	// For each chunk, assemble a mapping from the contract id to the index of
 	// the piece within the chunk that the contract is responsible for.
 	chunkMaps := make([]map[string]downloadPieceInfo, maxChunk-minChunk+1)
 	for i := range chunkMaps {
 		chunkMaps[i] = make(map[string]downloadPieceInfo)
-	}
-	params.file.mu.Lock()
-	for id, contract := range params.file.contracts {
-		resolvedKey := r.hostContractor.ResolveIDToPubKey(id)
-		for _, piece := range contract.Pieces {
-			if piece.Chunk >= minChunk && piece.Chunk <= maxChunk {
-				// Sanity check - the same worker should not have two pieces for
-				// the same chunk.
-				_, exists := chunkMaps[piece.Chunk-minChunk][string(resolvedKey.Key)]
-				if exists {
-					r.log.Println("ERROR: Worker has multiple pieces uploaded for the same chunk.")
-				}
-				chunkMaps[piece.Chunk-minChunk][string(resolvedKey.Key)] = downloadPieceInfo{
-					index: piece.Piece,
-					root:  piece.MerkleRoot,
-				}
+		for j := uint64(0); j < uint64(params.file.NumPieces()); j++ {
+			piece, err := params.file.Piece(uint64(i), j)
+			if err != nil {
+				return nil, err
+			}
+			chunkMaps[i][string(piece.HostPubKey.Key)] = downloadPieceInfo{
+				index: j,
+				root:  piece.MerkleRoot,
 			}
 		}
+
 	}
-	params.file.mu.Unlock()
 
 	// Queue the downloads for each chunk.
 	writeOffset := int64(0) // where to write a chunk within the download destination.
@@ -412,14 +405,14 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	for i := minChunk; i <= maxChunk; i++ {
 		udc := &unfinishedDownloadChunk{
 			destination: params.destination,
-			erasureCode: params.file.erasureCode,
-			masterKey:   params.file.masterKey,
+			erasureCode: params.file.ErasureCode(),
+			masterKey:   params.file.MasterKey(),
 
 			staticChunkIndex: i,
 			staticCacheID:    fmt.Sprintf("%v:%v", d.staticSiaPath, i),
 			staticChunkMap:   chunkMaps[i-minChunk],
-			staticChunkSize:  params.file.staticChunkSize(),
-			staticPieceSize:  params.file.pieceSize,
+			staticChunkSize:  params.file.ChunkSize(),
+			staticPieceSize:  params.file.PieceSize(),
 
 			// TODO: 25ms is just a guess for a good default. Really, we want to
 			// set the latency target such that slower workers will pick up the
@@ -434,8 +427,8 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 			staticNeedsMemory:   params.needsMemory,
 			staticPriority:      params.priority,
 
-			physicalChunkData: make([][]byte, params.file.erasureCode.NumPieces()),
-			pieceUsage:        make([]bool, params.file.erasureCode.NumPieces()),
+			physicalChunkData: make([][]byte, params.file.ErasureCode().NumPieces()),
+			pieceUsage:        make([]bool, params.file.ErasureCode().NumPieces()),
 
 			download:          d,
 			staticStreamCache: r.staticStreamCache,
@@ -444,16 +437,16 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 		// Set the fetchOffset - the offset within the chunk that we start
 		// downloading from.
 		if i == minChunk {
-			udc.staticFetchOffset = params.offset % params.file.staticChunkSize()
+			udc.staticFetchOffset = params.offset % params.file.ChunkSize()
 		} else {
 			udc.staticFetchOffset = 0
 		}
 		// Set the fetchLength - the number of bytes to fetch within the chunk
 		// that we start downloading from.
-		if i == maxChunk && (params.length+params.offset)%params.file.staticChunkSize() != 0 {
-			udc.staticFetchLength = ((params.length + params.offset) % params.file.staticChunkSize()) - udc.staticFetchOffset
+		if i == maxChunk && (params.length+params.offset)%params.file.ChunkSize() != 0 {
+			udc.staticFetchLength = ((params.length + params.offset) % params.file.ChunkSize()) - udc.staticFetchOffset
 		} else {
-			udc.staticFetchLength = params.file.staticChunkSize() - udc.staticFetchOffset
+			udc.staticFetchLength = params.file.ChunkSize() - udc.staticFetchOffset
 		}
 		// Set the writeOffset within the destination for where the data should
 		// be written.

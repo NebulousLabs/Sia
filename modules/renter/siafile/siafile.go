@@ -1,10 +1,12 @@
 package siafile
 
 import (
+	"encoding/base32"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/Sia/crypto"
 )
@@ -31,7 +33,7 @@ type (
 
 		// utility fields. These are not persisted.
 		erasureCode modules.ErasureCoder
-		mu          sync.Mutex
+		mu          sync.RWMutex
 		uid         string
 	}
 
@@ -63,8 +65,69 @@ type (
 
 	// Piece represents a single piece of a chunk on disk
 	Piece struct {
-		keyNonce  [4]byte     // nonce used for encrypting the piece
-		pubKeyOff uint16      // offset in the pubKeyTable
-		root      crypto.Hash // merkle root of the piece
+		KeyNonce   [4]byte            // nonce used for encrypting the piece
+		HostPubKey types.SiaPublicKey // public key of the host
+		MerkleRoot crypto.Hash        // merkle root of the piece
 	}
 )
+
+// New create a new SiaFile.
+func New(siaPath string, erasureCode modules.ErasureCoder, masterKey crypto.TwofishKey) *SiaFile {
+	file := &SiaFile{
+		metadata: Metadata{
+			masterKey: masterKey,
+			pieceSize: modules.SectorSize - crypto.TwofishOverhead,
+			siaPath:   siaPath,
+		},
+		erasureCode: erasureCode,
+		uid:         base32.StdEncoding.EncodeToString(fastrand.Bytes(20))[:20],
+	}
+	return file
+}
+
+// AddPiece adds an uploaded piece to the file. It also updates the host table
+// if the public key of the host is not aleady known.
+func (sf *SiaFile) AddPiece(pk types.SiaPublicKey, chunkIndex, pieceIndex uint64, merkleRoot crypto.Hash) error {
+	panic("Not implemented yet")
+}
+
+// ErasureCode returns the erasure coder used by the file.
+func (sf *SiaFile) ErasureCode() modules.ErasureCoder {
+	sf.mu.RLock()
+	sf.mu.RUnlock()
+	return sf.erasureCode
+}
+
+// NumChunks returns the number of chunks the file consists of.
+func (sf *SiaFile) NumChunks() uint64 {
+	// empty files still need at least one chunk
+	if sf.metadata.fileSize == 0 {
+		return 1
+	}
+	n := uint64(sf.metadata.fileSize) / sf.chunkSize()
+	// last chunk will be padded, unless chunkSize divides file evenly.
+	if uint64(sf.metadata.fileSize)%sf.chunkSize() != 0 {
+		n++
+	}
+	return n
+}
+
+// NumPieces returns the number of pieces each chunk in the file consists of.
+func (sf *SiaFile) NumPieces() uint64 {
+	sf.mu.RLock()
+	defer sf.mu.RUnlock()
+	return uint64(sf.erasureCode.NumPieces())
+}
+
+// Piece returns the piece the index pieceIndex from within the chunk at the
+// index chunkIndex.
+func (sf *SiaFile) Piece(chunkIndex, pieceIndex uint64) (Piece, error) {
+	// TODO should return a deep copy to make sure that the caller can't modify
+	// the chunks without holding a lock.
+	panic("Not implemented yet")
+}
+
+// UID returns a unique identifier for this file.
+func (sf *SiaFile) UID() string {
+	panic("Not implemented yet")
+}
