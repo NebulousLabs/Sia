@@ -190,7 +190,9 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	c.contractIDToPubKey[contract.ID] = contract.HostPublicKey
 	_, exists := c.pubKeysToContractID[string(contract.HostPublicKey.Key)]
 	if exists {
-		c.log.Println("We are forming a new contract but the host's pubKey is already mapped to a filecontract's id")
+		c.mu.Unlock()
+		txnBuilder.Drop()
+		return modules.RenterContract{}, fmt.Errorf("We already have a contract with host %v", contract.HostPublicKey)
 	}
 	c.pubKeysToContractID[string(contract.HostPublicKey.Key)] = contract.ID
 	c.mu.Unlock()
