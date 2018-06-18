@@ -133,7 +133,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/errors"
 )
@@ -382,22 +381,22 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 
 	// For each chunk, assemble a mapping from the contract id to the index of
 	// the piece within the chunk that the contract is responsible for.
-	chunkMaps := make([]map[types.FileContractID]downloadPieceInfo, maxChunk-minChunk+1)
+	chunkMaps := make([]map[string]downloadPieceInfo, maxChunk-minChunk+1)
 	for i := range chunkMaps {
-		chunkMaps[i] = make(map[types.FileContractID]downloadPieceInfo)
+		chunkMaps[i] = make(map[string]downloadPieceInfo)
 	}
 	params.file.mu.Lock()
 	for id, contract := range params.file.contracts {
-		resolvedID := r.hostContractor.ResolveID(id)
+		resolvedKey := r.hostContractor.ResolveIDToPubKey(id)
 		for _, piece := range contract.Pieces {
 			if piece.Chunk >= minChunk && piece.Chunk <= maxChunk {
 				// Sanity check - the same worker should not have two pieces for
 				// the same chunk.
-				_, exists := chunkMaps[piece.Chunk-minChunk][resolvedID]
+				_, exists := chunkMaps[piece.Chunk-minChunk][string(resolvedKey.Key)]
 				if exists {
 					r.log.Println("ERROR: Worker has multiple pieces uploaded for the same chunk.")
 				}
-				chunkMaps[piece.Chunk-minChunk][resolvedID] = downloadPieceInfo{
+				chunkMaps[piece.Chunk-minChunk][string(resolvedKey.Key)] = downloadPieceInfo{
 					index: piece.Piece,
 					root:  piece.MerkleRoot,
 				}

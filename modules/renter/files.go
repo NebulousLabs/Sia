@@ -149,7 +149,9 @@ func (f *file) redundancy(offlineMap map[types.FileContractID]bool, goodForRenew
 		build.Critical("cannot get redundancy of a file with 0 chunks")
 		return -1
 	}
-	pieceMap := make(map[string]struct{})
+	// pieceRenewMap stores each encountered piece and a boolean to indicate if
+	// that piece was already encountered on a goodForRenew contract.
+	pieceRenewMap := make(map[string]bool)
 	for _, fc := range f.contracts {
 		offline, exists1 := offlineMap[fc.ID]
 		goodForRenew, exists2 := goodForRenewMap[fc.ID]
@@ -166,10 +168,21 @@ func (f *file) redundancy(offlineMap map[types.FileContractID]bool, goodForRenew
 		}
 		for _, p := range fc.Pieces {
 			pieceKey := fmt.Sprintf("%v/%v", p.Chunk, p.Piece)
-			if _, redundant := pieceMap[pieceKey]; redundant {
+			// If the piece is redundant we need to check if the same piece was
+			// encountered on a goodForRenew contract before. If it wasn't we
+			// need to increase the piecesPerChunk counter and set the value of
+			// the pieceKey entry to true. Otherwise we just ignore the piece.
+			if gfr, redundant := pieceRenewMap[pieceKey]; redundant && gfr {
+				continue
+			} else if redundant && !gfr {
+				pieceRenewMap[pieceKey] = true
+				piecesPerChunk[p.Chunk]++
 				continue
 			}
-			pieceMap[pieceKey] = struct{}{}
+			pieceRenewMap[pieceKey] = goodForRenew
+
+			// If the contract is goodForRenew, increment the entry in both
+			// maps. If not, only the one in piecesPerChunkNoRenew.
 			if goodForRenew {
 				piecesPerChunk[p.Chunk]++
 			}
@@ -290,10 +303,13 @@ func (r *Renter) FileList() []modules.FileInfo {
 	goodForRenew := make(map[types.FileContractID]bool)
 	offline := make(map[types.FileContractID]bool)
 	for cid := range contractIDs {
-		resolvedID := r.hostContractor.ResolveID(cid)
-		cu, ok := r.hostContractor.ContractUtility(resolvedID)
+		resolvedKey := r.hostContractor.ResolveIDToPubKey(cid)
+		cu, ok := r.hostContractor.ContractUtility(resolvedKey)
+		if !ok {
+			continue
+		}
 		goodForRenew[cid] = ok && cu.GoodForRenew
-		offline[cid] = r.hostContractor.IsOffline(resolvedID)
+		offline[cid] = r.hostContractor.IsOffline(resolvedKey)
 	}
 
 	// Build the list of FileInfos.
@@ -348,10 +364,13 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	goodForRenew := make(map[types.FileContractID]bool)
 	offline := make(map[types.FileContractID]bool)
 	for cid := range contractIDs {
-		resolvedID := r.hostContractor.ResolveID(cid)
-		cu, ok := r.hostContractor.ContractUtility(resolvedID)
+		resolvedKey := r.hostContractor.ResolveIDToPubKey(cid)
+		cu, ok := r.hostContractor.ContractUtility(resolvedKey)
+		if !ok {
+			continue
+		}
 		goodForRenew[cid] = ok && cu.GoodForRenew
-		offline[cid] = r.hostContractor.IsOffline(resolvedID)
+		offline[cid] = r.hostContractor.IsOffline(resolvedKey)
 	}
 
 	// Build the FileInfo

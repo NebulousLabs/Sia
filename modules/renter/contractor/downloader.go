@@ -103,13 +103,16 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 
 // Downloader returns a Downloader object that can be used to download sectors
 // from a host.
-func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{}) (_ Downloader, err error) {
-	id = c.ResolveID(id)
+func (c *Contractor) Downloader(pk types.SiaPublicKey, cancel <-chan struct{}) (_ Downloader, err error) {
 	c.mu.RLock()
+	id, gotID := c.pubKeysToContractID[string(pk.Key)]
 	cachedDownloader, haveDownloader := c.downloaders[id]
 	height := c.blockHeight
 	renewing := c.renewing[id]
 	c.mu.RUnlock()
+	if !gotID {
+		return nil, errors.New("failed to get filecontract id from key")
+	}
 	if renewing {
 		return nil, errors.New("currently renewing that contract")
 	} else if haveDownloader {
@@ -164,11 +167,10 @@ func (c *Contractor) Downloader(id types.FileContractID, cancel <-chan struct{})
 
 	// cache downloader
 	hd := &hostDownloader{
-		clients:      1,
-		contractID:   contract.ID,
-		contractor:   c,
-		downloader:   d,
-		hostSettings: host.HostExternalSettings,
+		clients:    1,
+		contractor: c,
+		downloader: d,
+		contractID: id,
 	}
 	c.mu.Lock()
 	c.downloaders[contract.ID] = hd

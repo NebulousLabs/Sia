@@ -290,7 +290,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 		// Fetch utilities for contract
 		var goodForUpload bool
 		var goodForRenew bool
-		if utility, ok := api.renter.ContractUtility(c.ID); ok {
+		if utility, ok := api.renter.ContractUtility(c.HostPublicKey); ok {
 			goodForUpload = utility.GoodForUpload
 			goodForRenew = utility.GoodForRenew
 		}
