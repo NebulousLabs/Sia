@@ -171,7 +171,7 @@ func rentercmd() {
 	}
 
 	fmt.Printf(`Renter info:
-	Allowance:         %v
+	Period Spending:   %v
 	  Spent Funds:     %v
 	    Storage:       %v
 	    Upload:        %v
@@ -180,12 +180,17 @@ func rentercmd() {
 	  Unspent Funds:   %v
 	    Allocated:     %v
 	    Unallocated:   %v
+	Previous Spending:
+	  Withheld Funds:  %v
+	  Release Block:   %v
+	  Spent Funds:	   %v
 
 `, currencyUnits(rg.Settings.Allowance.Funds), currencyUnits(totalSpent),
 		currencyUnits(fm.StorageSpending), currencyUnits(fm.UploadSpending),
 		currencyUnits(fm.DownloadSpending), currencyUnits(fm.ContractFees),
 		currencyUnits(fm.Unspent), currencyUnits(unspentAllocated),
-		currencyUnits(unspentUnallocated))
+		currencyUnits(unspentUnallocated), currencyUnits(fm.WithheldFunds),
+		fm.ReleaseBlock, currencyUnits(fm.PreviousSpending))
 
 	// also list files
 	renterfileslistcmd()

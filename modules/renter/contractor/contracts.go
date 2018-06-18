@@ -490,7 +490,6 @@ func (c *Contractor) threadedContractMaintenance() {
 				refreshAmount := spendPerBlock.Mul64(uint64(newDuration))
 
 				if refreshAmount.Cmp(fundsAvailable) < 0 {
-					refreshSet[contract.ID] = struct{}{}
 					renewSet = append(renewSet, renewal{
 						id:     contract.ID,
 						amount: refreshAmount,

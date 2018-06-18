@@ -916,6 +916,8 @@ func TestRenterContractEndHeight(t *testing.T) {
 
 	// Record the start period at the beginning of test
 	currentPeriodStart := rg.CurrentPeriod
+	period := rg.Settings.Allowance.Period
+	renewWindow := rg.Settings.Allowance.RenewWindow
 
 	// Get contracts
 	rc, err := r.RenterContractsGet()
@@ -925,9 +927,9 @@ func TestRenterContractEndHeight(t *testing.T) {
 
 	// Confirm contract end heights were set properly
 	for _, c := range rc.Contracts {
-		if c.EndHeight != currentPeriodStart+rg.Settings.Allowance.Period {
+		if c.EndHeight != currentPeriodStart+period {
 			t.Log("Endheight:", c.EndHeight)
-			t.Log("Allowance Period:", rg.Settings.Allowance.Period)
+			t.Log("Allowance Period:", period)
 			t.Log("Current Period:", currentPeriodStart)
 			t.Fatal("Contract endheight not set to Current period + Allowance Period")
 		}
@@ -969,11 +971,12 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal("Could not get renter contracts:", err)
 	}
 	for _, c := range rc.Contracts {
-		if c.EndHeight != currentPeriodStart+(2*rg.Settings.Allowance.Period) && c.GoodForRenew {
+		if c.EndHeight != currentPeriodStart+(2*period)-renewWindow && c.GoodForRenew {
 			t.Log("Endheight:", c.EndHeight)
-			t.Log("Allowance Period:", rg.Settings.Allowance.Period)
+			t.Log("Allowance Period:", period)
+			t.Log("Renew Window:", renewWindow)
 			t.Log("Current Period:", currentPeriodStart)
-			t.Fatal("Contract endheight not set to Current period + 2 * Allowance Period")
+			t.Fatal("Contract endheight not set to Current period + 2 * Allowance Period - Renew Window")
 		}
 	}
 
@@ -1072,10 +1075,9 @@ func TestRenterContractEndHeight(t *testing.T) {
 	}
 	for _, c := range rc.Contracts {
 		if c.EndHeight != endHeight && c.GoodForRenew && c.UploadSpending.Cmp(startingUploadSpend) <= 0 {
-			t.Log("Endheight:", c.EndHeight)
-			t.Log("Allowance Period:", rg.Settings.Allowance.Period)
+			t.Log("Allowance Period:", period)
 			t.Log("Current Period:", currentPeriodStart)
-			t.Fatal("Contract endheight not set to Current period + 2 * Allowance Period")
+			t.Fatalf("Contract endheight Changed, EH was %v, expected %v\n", c.EndHeight, endHeight)
 		}
 	}
 }
@@ -1112,6 +1114,18 @@ func TestRenterSpendingReporting(t *testing.T) {
 	renterParams.SkipSetAllowance = true
 	if err = tg.AddNodes(renterParams); err != nil {
 		t.Fatal(err)
+	}
+
+	// Get largest WindowSize from Hosts
+	var windowSize types.BlockHeight
+	for _, h := range tg.Hosts() {
+		hg, err := h.HostGet()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if hg.ExternalSettings.WindowSize >= windowSize {
+			windowSize = hg.ExternalSettings.WindowSize
+		}
 	}
 
 	// Get renter's initial siacoin balance
@@ -1162,19 +1176,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 	oldContracts := rc.Contracts
 
-	// Record spending from initial contracts
-	var spending modules.ContractorSpending
-	for _, contract := range oldContracts {
-		// Calculate ContractFees
-		spending.ContractFees = spending.ContractFees.Add(contract.Fees)
-		// Calculate Spending
-		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
-		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
-		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
-	}
-	totalSpentInitialPeriod := spending.ContractFees.Add(spending.UploadSpending).
-		Add(spending.DownloadSpending).Add(spending.StorageSpending)
-
 	// Check to confirm upload and download spending was captured correctly
 	// and reflected in the wallet balance
 	expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
@@ -1213,7 +1214,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Could not get contracts:", err)
 	}
 	renewedContracts := rc.Contracts
-	if err = checkContractVsReportedSpending(r, oldContracts, renewedContracts); err != nil {
+	if err = checkContractVsReportedSpending(r, windowSize, oldContracts, renewedContracts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1321,7 +1322,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Could not get contracts:", err)
 	}
 	renewedContracts = rc.Contracts
-	if err = checkContractVsReportedSpending(r, oldContracts, renewedContracts); err != nil {
+	if err = checkContractVsReportedSpending(r, windowSize, oldContracts, renewedContracts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1338,15 +1339,15 @@ func TestRenterSpendingReporting(t *testing.T) {
 	// Check to confirm reported spending is still accurate with the renewed contracts
 	// and a new period and reflected in the wallet balance
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		_, _, err = checkBalanceVsSpending(r, initialBalance.Sub(totalSpentInitialPeriod))
+		_, _, err = checkBalanceVsSpending(r, initialBalance)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance.Sub(totalSpentInitialPeriod))
-		t.Log("Actual difference:", initialBalance.Sub(totalSpentInitialPeriod).Sub(walletBalance).HumanString())
+		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
+		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
 		t.Log("ExpectedBalance:", expectedBalance.HumanString())
 		t.Log("walletBalance:", walletBalance.HumanString())
 		if expectedBalance.Cmp(walletBalance) > 0 {
@@ -1374,7 +1375,7 @@ func checkBalanceVsSpending(r *siatest.TestNode, initialBalance types.Currency) 
 	if err != nil {
 		return types.ZeroCurrency, types.ZeroCurrency, err
 	}
-	expectedBalance = initialBalance.Sub(fm.TotalAllocated)
+	expectedBalance = initialBalance.Sub(fm.TotalAllocated).Sub(fm.WithheldFunds).Sub(fm.PreviousSpending)
 	if expectedBalance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
 		return expectedBalance, wg.ConfirmedSiacoinBalance,
 			errors.New("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance")
@@ -1424,7 +1425,13 @@ func checkContracts(oldContracts, renewedContracts []api.RenterContract) error {
 
 // checkContractVsReportedSpending confirms that the spending recorded in
 // the renter's contracts matches the reported spending for the renter
-func checkContractVsReportedSpending(r *siatest.TestNode, oldContracts, renewedContracts []api.RenterContract) error {
+func checkContractVsReportedSpending(r *siatest.TestNode, WindowSize types.BlockHeight, oldContracts, renewedContracts []api.RenterContract) error {
+	// Get Current BlockHeight
+	cg, err := r.ConsensusGet()
+	if err != nil {
+		return err
+	}
+
 	// Getting financial metrics after uploads, downloads, and
 	// contract renewal
 	rg, err := r.RenterGet()
@@ -1446,7 +1453,7 @@ func checkContractVsReportedSpending(r *siatest.TestNode, oldContracts, renewedC
 	// Check renter financial metrics against contract spending
 	var spending modules.ContractorSpending
 	for _, contract := range oldContracts {
-		if contract.EndHeight > rg.CurrentPeriod {
+		if contract.StartHeight >= rg.CurrentPeriod {
 			// Calculate ContractFees
 			spending.ContractFees = spending.ContractFees.Add(contract.Fees)
 			// Calculate TotalAllocated
@@ -1455,6 +1462,16 @@ func checkContractVsReportedSpending(r *siatest.TestNode, oldContracts, renewedC
 			spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
 			spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
 			spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
+		} else if contract.EndHeight+WindowSize+types.MaturityDelay > cg.Height {
+			// Calculated funds that are being withheld in contracts
+			spending.WithheldFunds = spending.WithheldFunds.Add(contract.RenterFunds)
+			// Record the largest window size for worst case when reporting the spending
+			if WindowSize >= spending.ReleaseBlock {
+				spending.ReleaseBlock = WindowSize
+			}
+			// Calculate Previous spending
+			spending.PreviousSpending = spending.PreviousSpending.Add(contract.Fees).
+				Add(contract.DownloadSpending).Add(contract.UploadSpending).Add(contract.StorageSpending)
 		}
 	}
 	for _, contract := range renewedContracts {
@@ -1472,6 +1489,8 @@ func checkContractVsReportedSpending(r *siatest.TestNode, oldContracts, renewedC
 
 	// Compare contract fees
 	if fm.ContractFees.Cmp(spending.ContractFees) != 0 {
+		fmt.Println("FM Fees:", fm.ContractFees.HumanString())
+		fmt.Println("Spend Fees:", spending.ContractFees.HumanString())
 		return errors.New("Financial Metrics Contract Fees not equal to Renter Contract Fees")
 	}
 	// Compare Total Allocated
@@ -1489,6 +1508,18 @@ func checkContractVsReportedSpending(r *siatest.TestNode, oldContracts, renewedC
 	// Compare Storage Spending
 	if fm.StorageSpending.Cmp(spending.StorageSpending) != 0 {
 		return errors.New("Financial Metrics Storage Spending not equal to Renter Storage Spending")
+	}
+	// Compare Withheld Funds
+	if fm.WithheldFunds.Cmp(spending.WithheldFunds) != 0 {
+		return errors.New("Financial Metrics Withheld Funds not equal to Renter Withheld Funds")
+	}
+	// Compare Release Block
+	if fm.ReleaseBlock != spending.ReleaseBlock {
+		return errors.New("Financial Metrics Release Block not equal to Renter Release Block")
+	}
+	// Compare Previous Spending
+	if fm.PreviousSpending.Cmp(spending.PreviousSpending) != 0 {
+		return errors.New("Financial Metrics Previous Spending not equal to Renter Previous Spending")
 	}
 
 	return nil

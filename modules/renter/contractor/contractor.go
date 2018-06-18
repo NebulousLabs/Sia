@@ -95,9 +95,11 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
 	}
 
-	// Calculate spending from contracts that were renewed during the current period
+	// Calculate needed spending to be reported from old contracts
 	for _, old := range c.oldContracts {
-		if old.EndHeight > c.currentPeriod {
+		host, exist := c.hdb.Host(old.HostPublicKey)
+		if old.StartHeight >= c.currentPeriod {
+			// Calculate spending from contracts that were renewed during the current period
 			// Calculate ContractFees
 			spending.ContractFees = spending.ContractFees.Add(old.ContractFee)
 			spending.ContractFees = spending.ContractFees.Add(old.TxnFee)
@@ -108,6 +110,16 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 			spending.DownloadSpending = spending.DownloadSpending.Add(old.DownloadSpending)
 			spending.UploadSpending = spending.UploadSpending.Add(old.UploadSpending)
 			spending.StorageSpending = spending.StorageSpending.Add(old.StorageSpending)
+		} else if exist && old.EndHeight+host.WindowSize+types.MaturityDelay > c.blockHeight {
+			// Calculate funds that are being withheld in contracts
+			spending.WithheldFunds = spending.WithheldFunds.Add(old.RenterFunds)
+			// Record the largest window size for worst case when reporting the spending
+			if host.WindowSize >= spending.ReleaseBlock {
+				spending.ReleaseBlock = host.WindowSize
+			}
+			// Calculate Previous spending
+			spending.PreviousSpending = spending.PreviousSpending.Add(old.ContractFee).Add(old.TxnFee).
+				Add(old.SiafundFee).Add(old.DownloadSpending).Add(old.UploadSpending).Add(old.StorageSpending)
 		}
 	}
 	// Calculate amount of spent money to get unspent money.

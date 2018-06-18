@@ -56,10 +56,12 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 
 	// If we have entered the next period, update currentPeriod
-	// NOTE: "period" refers to the duration of contracts
+	// NOTE: "period" refers to the duration of contracts, whereas "cycle"
+	// refers to how frequently the period metrics are reset.
 	// TODO: How to make this more explicit.
-	if c.blockHeight >= c.currentPeriod+c.allowance.Period-c.allowance.RenewWindow {
-		c.currentPeriod += c.allowance.Period
+	cycleLen := c.allowance.Period - c.allowance.RenewWindow
+	if c.blockHeight >= c.currentPeriod+cycleLen {
+		c.currentPeriod += cycleLen
 		// COMPATv1.0.4-lts
 		// if we were storing a special metrics contract, it will be invalid
 		// after we enter the next period.

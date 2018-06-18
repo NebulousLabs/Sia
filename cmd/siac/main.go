@@ -15,7 +15,7 @@ var (
 	// Flags.
 	hostContractOutputType string // output type for host contracts
 	hostVerbose            bool   // display additional host info
-	initForce              bool   // destroy and reencrypt the wallet on init if it already exists
+	initForce              bool   // destroy and re-encrypt the wallet on init if it already exists
 	initPassword           bool   // supply a custom password when creating a wallet
 	renterListVerbose      bool   // Show additional info about uploaded files.
 	renterShowHistory      bool   // Show download history in addition to download queue.
