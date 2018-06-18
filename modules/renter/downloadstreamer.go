@@ -38,7 +38,7 @@ func (r *Renter) Streamer(siaPath string) (string, io.ReadSeeker, error) {
 	lockID := r.mu.RLock()
 	file, exists := r.files[siaPath]
 	r.mu.RUnlock(lockID)
-	if !exists || file.deleted {
+	if !exists || file.Deleted() {
 		return "", nil, fmt.Errorf("no file with that path: %s", siaPath)
 	}
 	// Create the streamer
@@ -46,7 +46,7 @@ func (r *Renter) Streamer(siaPath string) (string, io.ReadSeeker, error) {
 		file: file,
 		r:    r,
 	}
-	return file.name, s, nil
+	return file.Name(), s, nil
 }
 
 // Read implements the standard Read interface. It will download the requested

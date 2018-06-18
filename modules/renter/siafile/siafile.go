@@ -1,13 +1,14 @@
 package siafile
 
 import (
-	"crypto"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 type (
@@ -32,17 +33,17 @@ type (
 
 		// utility fields. These are not persisted.
 		erasureCode modules.ErasureCoder
-		f           *os.File
+		filePath    string
 		mu          sync.Mutex
 		uid         string
 	}
 
 	// Metadata is the metadata of a SiaFile and is JSON encoded.
 	Metadata struct {
-		version   [16]byte          // version of the sia file format used
-		fileSize  int64             // total size of the file re
-		mode      os.FileMode       // unix filemode of the sia file - uint32
-		masterKey crypto.TwofishKey // masterkey used to encrypt pieces
+		version        [16]byte          // version of the sia file format used
+		staticFileSize int64             // total size of the file re
+		mode           os.FileMode       // unix filemode of the sia file - uint32
+		masterKey      crypto.TwofishKey // masterkey used to encrypt pieces
 
 		// following timestamps will be persisted using int64 unix timestamps
 		modTime    time.Time // time of last content modification

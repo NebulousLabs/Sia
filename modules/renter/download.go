@@ -285,16 +285,16 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters) (*download,
 	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
 		return nil, errors.New("destination must be an absolute path")
 	}
-	if p.Offset == file.size {
+	if p.Offset == file.Size() {
 		return nil, errors.New("offset equals filesize")
 	}
 	// Sentinel: if length == 0, download the entire file.
 	if p.Length == 0 {
-		p.Length = file.size - p.Offset
+		p.Length = file.Size() - p.Offset
 	}
 	// Check whether offset and length is valid.
-	if p.Offset < 0 || p.Offset+p.Length > file.size {
-		return nil, fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
+	if p.Offset < 0 || p.Offset+p.Length > file.Size() {
+		return nil, fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.Size()-1)
 	}
 
 	// Instantiate the correct downloadWriter implementation.
@@ -304,7 +304,7 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters) (*download,
 		dw = newDownloadDestinationWriteCloserFromWriter(p.Httpwriter)
 		destinationType = "http stream"
 	} else {
-		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, os.FileMode(file.mode))
+		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, file.Mode())
 		if err != nil {
 			return nil, err
 		}

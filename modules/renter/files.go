@@ -1,7 +1,6 @@
 package renter
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
 
 var (
@@ -262,24 +263,11 @@ func (r *Renter) DeleteFile(nickname string) error {
 	delete(r.files, nickname)
 	delete(r.persist.Tracking, nickname)
 
-	err := persist.RemoveFile(filepath.Join(r.persistDir, f.name+ShareExtension))
-	if err != nil {
-		r.log.Println("WARN: couldn't remove file :", err)
-	}
-
 	r.saveSync()
 	r.mu.Unlock(lockID)
 
-	// delete the file's associated contract data.
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	// mark the file as deleted
-	f.deleted = true
-
 	// TODO: delete the sectors of the file as well.
-
-	return nil
+	return errors.AddContext(f.Delete(), "failed to delete file")
 }
 
 // FileList returns all of the files that the renter has.
