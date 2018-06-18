@@ -15,6 +15,7 @@ type (
 		staticFileSize int64             // total size of the file
 		masterKey      crypto.TwofishKey // masterkey used to encrypt pieces
 		trackingPath   string            // file to the local copy of the file used for repairing
+		siaPath        string
 
 		// The following fields are the usual unix timestamps of files.
 		modTime    time.Time // time of last content modification
@@ -48,6 +49,11 @@ type (
 	}
 )
 
+// Available indicates whether the file is ready to be downloaded.
+func (sf *SiaFile) Available(offline map[types.FileContractID]bool) bool {
+	panic("not implemented yet")
+}
+
 // Delete removes the file from disk and marks it as deleted. Once the file is
 // deleted, certain methods should return an error.
 func (sf *SiaFile) Delete() error {
@@ -56,6 +62,12 @@ func (sf *SiaFile) Delete() error {
 
 // Deleted indicates if this file has been deleted by the user.
 func (sf *SiaFile) Deleted() bool {
+	panic("not implemented yet")
+}
+
+// Expiration returns the lowest height at which any of the file's contracts
+// will expire.
+func (sf *SiaFile) Expiration() types.BlockHeight {
 	panic("not implemented yet")
 }
 
@@ -70,12 +82,39 @@ func (sf *SiaFile) Mode() os.FileMode {
 	panic("not implemented yet")
 }
 
-// Name returns the file's name.
-func (sf *SiaFile) Name() string {
+// Redundancy returns the redundancy of the least redundant chunk. A file
+// becomes available when this redundancy is >= 1. Assumes that every piece is
+// unique within a file contract. -1 is returned if the file has size 0. It
+// takes one argument, a map of offline contracts for this file.
+func (sf *SiaFile) Redundancy(offlineMap map[types.FileContractID]bool, goodForRenewMap map[types.FileContractID]bool) float64 {
+	panic("not implemented yet")
+}
+
+// Rename changes the name of the file to a new one.
+func (sf *SiaFile) Rename(newName string) string {
+	panic("not implemented yet")
+}
+
+// SiaPath returns the file's sia path.
+func (sf *SiaFile) SiaPath() string {
 	panic("not implemented yet")
 }
 
 // Size returns the file's size.
 func (sf *SiaFile) Size() uint64 {
+	panic("not implemented yet")
+}
+
+// UploadedBytes indicates how many bytes of the file have been uploaded via
+// current file contracts. Note that this includes padding and redundancy, so
+// uploadedBytes can return a value much larger than the file's original filesize.
+func (sf *SiaFile) UploadedBytes() uint64 {
+	panic("not implemented yet")
+}
+
+// UploadProgress indicates what percentage of the file (plus redundancy) has
+// been uploaded. Note that a file may be Available long before UploadProgress
+// reaches 100%, and UploadProgress may report a value greater than 100%.
+func (sf *SiaFile) UploadProgress() float64 {
 	panic("not implemented yet")
 }

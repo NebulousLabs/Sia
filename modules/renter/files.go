@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -334,50 +335,44 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	var fileInfo modules.FileInfo
 
 	// Get the file and its contracts
-	contractIDs := make(map[types.FileContractID]struct{})
 	lockID := r.mu.RLock()
-	defer r.mu.RUnlock(lockID)
 	file, exists := r.files[siaPath]
+	r.mu.RUnlock(lockID)
 	if !exists {
 		return fileInfo, ErrUnknownPath
 	}
-	file.mu.RLock()
-	defer file.mu.RUnlock()
-	for cid := range file.contracts {
-		contractIDs[cid] = struct{}{}
-	}
+	pks := file.HostPublicKeys()
 
 	// Build 2 maps that map every contract id to its offline and goodForRenew
 	// status.
 	goodForRenew := make(map[types.FileContractID]bool)
 	offline := make(map[types.FileContractID]bool)
-	for cid := range contractIDs {
-		resolvedKey := r.hostContractor.ResolveIDToPubKey(cid)
-		cu, ok := r.hostContractor.ContractUtility(resolvedKey)
+	for pk := range pks {
+		cu, ok := r.hostContractor.ContractUtility(pk)
 		if !ok {
 			continue
 		}
 		goodForRenew[cid] = ok && cu.GoodForRenew
-		offline[cid] = r.hostContractor.IsOffline(resolvedKey)
+		offline[cid] = r.hostContractor.IsOffline(pk)
 	}
 
 	// Build the FileInfo
 	renewing := true
 	var localPath string
-	tf, exists := r.persist.Tracking[file.name]
+	tf, exists := r.persist.Tracking[file.Name()]
 	if exists {
 		localPath = tf.RepairPath
 	}
 	fileInfo = modules.FileInfo{
-		SiaPath:        file.name,
+		SiaPath:        file.SiaPath(),
 		LocalPath:      localPath,
-		Filesize:       file.size,
+		Filesize:       file.Size(),
 		Renewing:       renewing,
-		Available:      file.available(offline),
-		Redundancy:     file.redundancy(offline, goodForRenew),
-		UploadedBytes:  file.uploadedBytes(),
-		UploadProgress: file.uploadProgress(),
-		Expiration:     file.expiration(),
+		Available:      file.Available(offline),
+		Redundancy:     file.Redundancy(offline, goodForRenew),
+		UploadedBytes:  file.UploadedBytes(),
+		UploadProgress: file.UploadProgress(),
+		Expiration:     file.Expiration(),
 	}
 
 	return fileInfo, nil
@@ -406,10 +401,8 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	}
 
 	// Modify the file and save it to disk.
-	file.mu.Lock()
-	file.name = newName
-	err = r.saveFile(file)
-	file.mu.Unlock()
+	file.Rename(newName)
+	err = r.saveFile(siaFileToFile(file))
 	if err != nil {
 		return err
 	}
@@ -429,4 +422,16 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	// Delete the old .sia file.
 	oldPath := filepath.Join(r.persistDir, currentName+ShareExtension)
 	return os.RemoveAll(oldPath)
+}
+
+// fileToSiaFile converts a legacy file to a SiaFile. Fields that can't be
+// populated using the legacy file remain blank.
+func fileToSiaFile(f *file) *siafile.SiaFile {
+	panic("not implemented yet")
+}
+
+// siaFileToFile converts a SiaFile to a legacy file. Fields that don't exist
+// in the legacy file will get lost and therefore not persisted.
+func siaFileToFile(sf *siafile.SiaFile) *file {
+	panic("not implemented yet")
 }

@@ -31,7 +31,6 @@ type (
 
 		// utility fields. These are not persisted.
 		erasureCode modules.ErasureCoder
-		filePath    string
 		mu          sync.Mutex
 		uid         string
 	}
