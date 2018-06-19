@@ -391,7 +391,7 @@ func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreak
 // Contracts returns an array of host contractor's active contracts
 func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
 
-// Contracts returns an array of host contractor's old contracts
+// OldContracts returns an array of host contractor's old contracts
 func (r *Renter) OldContracts() []modules.RenterContract { return r.hostContractor.OldContracts() }
 
 // CurrentPeriod returns the host contractor's current period

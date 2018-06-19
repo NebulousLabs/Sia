@@ -157,6 +157,8 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 // OldContracts returns the contracts formed by the contractor that have
 // expired
 func (c *Contractor) OldContracts() []modules.RenterContract {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	contracts := make([]modules.RenterContract, 0, len(c.oldContracts))
 	for _, c := range c.oldContracts {
 		contracts = append(contracts, c)

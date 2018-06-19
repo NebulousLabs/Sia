@@ -59,6 +59,7 @@ func TestRenter(t *testing.T) {
 		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
+		{"TestRenterOldContracts", testRenterOldContracts},
 	}
 	// Run subtests
 	for _, subtest := range subTests {
@@ -1877,4 +1878,63 @@ func TestRenterResetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// testRenterOldContracts tests the API endpoint for old contracts
+func testRenterOldContracts(t *testing.T, tg *siatest.TestGroup) {
+	// Get renter and current contracts
+	r := tg.Renters()[0]
+	rc, err := r.RenterContractsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Record old contracts and current contracts that are good for renew
+	oldContracts := rc.OldContracts
+	for _, c := range rc.Contracts {
+		if c.GoodForRenew {
+			oldContracts = append(oldContracts, c)
+		}
+	}
+
+	// Renew contracts
+	if err = renewContractsByRenewWindow(r, tg); err != nil {
+		t.Fatal(err)
+	}
+
+	// Confirm Contracts were renewed as expected, all original
+	// contracts should have been renewed if GoodForRenew = true
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err = r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get contracts")
+		}
+
+		// Check Contracts
+		// Check OldContracts against recorded old contracts
+		if len(oldContracts) != len(rc.OldContracts) {
+			return errors.New("number of old contracts don't match")
+		}
+
+		// Create Maps for comparison
+		initialContractIDMap := make(map[types.FileContractID]struct{})
+		for _, c := range oldContracts {
+			initialContractIDMap[c.ID] = struct{}{}
+		}
+
+		for _, c := range rc.OldContracts {
+			// Verify that all the contracts marked as GoodForRenew
+			// were renewed
+			if _, ok := initialContractIDMap[c.ID]; !ok {
+				return errors.New("ID from rc.OldContracts not found in oldContracts")
+			}
+		}
+		return nil
+
+	})
+	if err != nil {
+		t.Logf("Number of contracts, expected %v got %v", len(oldContracts), len(rc.OldContracts))
+		t.Fatal(err)
+	}
+
 }
