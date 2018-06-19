@@ -242,13 +242,7 @@ func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}) {
 	offline := make(map[types.FileContractID]bool)
 	for _, file := range r.files {
 		file.mu.RLock()
-		// Build maps that map contract id to its offline and goodForRenew
-		// status
-		contractIDs := make(map[types.FileContractID]struct{})
 		for cid := range file.contracts {
-			contractIDs[cid] = struct{}{}
-		}
-		for cid := range contractIDs {
 			resolvedID := r.hostContractor.ResolveIDToPubKey(cid)
 			cu, ok := r.hostContractor.ContractUtility(resolvedID)
 			goodForRenew[cid] = ok && cu.GoodForRenew
