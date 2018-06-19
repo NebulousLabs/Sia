@@ -382,36 +382,74 @@ func rentercontractscmd() {
 	if err != nil {
 		die("Could not get contracts:", err)
 	}
-	if len(rc.Contracts) == 0 {
+	if len(rc.Contracts) == 0 && len(rc.OldContracts) == 0 {
 		fmt.Println("No contracts have been formed.")
 		return
 	}
-	sort.Sort(byValue(rc.Contracts))
-	fmt.Println("Showing", len(rc.Contracts), "Contracts:")
-	var totalStored uint64
-	for _, c := range rc.Contracts {
-		totalStored += c.Size
+	if len(rc.Contracts) == 0 && !renterAllContracts {
+		fmt.Println("No active contracts.")
+		return
 	}
-	fmt.Printf("Total stored in contracts: %9s\n", filesizeUnits(int64(totalStored)))
-	w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
-	for _, c := range rc.Contracts {
-		address := c.NetAddress
-		if address == "" {
-			address = "Host Removed"
+	if len(rc.Contracts) != 0 {
+		sort.Sort(byValue(rc.Contracts))
+		fmt.Println("Showing", len(rc.Contracts), "Active Contracts:")
+		var totalStored uint64
+		for _, c := range rc.Contracts {
+			totalStored += c.Size
 		}
-		fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\t%v\t%v\n",
-			address,
-			currencyUnits(c.RenterFunds),
-			currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
-			currencyUnits(c.Fees),
-			filesizeUnits(int64(c.Size)),
-			c.EndHeight,
-			c.ID,
-			c.GoodForUpload,
-			c.GoodForRenew)
+		fmt.Printf("Total stored in contracts: %9s\n", filesizeUnits(int64(totalStored)))
+		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
+		for _, c := range rc.Contracts {
+			address := c.NetAddress
+			if address == "" {
+				address = "Host Removed"
+			}
+			fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\t%v\t%v\n",
+				address,
+				currencyUnits(c.RenterFunds),
+				currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
+				currencyUnits(c.Fees),
+				filesizeUnits(int64(c.Size)),
+				c.EndHeight,
+				c.ID,
+				c.GoodForUpload,
+				c.GoodForRenew)
+		}
+		w.Flush()
 	}
-	w.Flush()
+	if renterAllContracts {
+		if len(rc.OldContracts) == 0 {
+			fmt.Println("No expired contracts")
+			return
+		}
+		sort.Sort(byValue(rc.OldContracts))
+		fmt.Println("Showing", len(rc.OldContracts), "Active Contracts:")
+		var totalStored uint64
+		for _, c := range rc.OldContracts {
+			totalStored += c.Size
+		}
+		fmt.Printf("Total stored in contracts: %9s\n", filesizeUnits(int64(totalStored)))
+		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
+		for _, c := range rc.OldContracts {
+			address := c.NetAddress
+			if address == "" {
+				address = "Host Removed"
+			}
+			fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\t%v\t%v\n",
+				address,
+				currencyUnits(c.RenterFunds),
+				currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
+				currencyUnits(c.Fees),
+				filesizeUnits(int64(c.Size)),
+				c.EndHeight,
+				c.ID,
+				c.GoodForUpload,
+				c.GoodForRenew)
+		}
+		w.Flush()
+	}
 }
 
 // rentercontractsviewcmd is the handler for the command `siac renter contracts <id>`.
@@ -421,8 +459,9 @@ func rentercontractsviewcmd(cid string) {
 	if err != nil {
 		die("Could not get contract details: ", err)
 	}
+	contracts := append(rc.Contracts, rc.OldContracts...)
 
-	for _, rc := range rc.Contracts {
+	for _, rc := range contracts {
 		if rc.ID.String() == cid {
 			hostInfo, err := httpClient.HostDbHostsGet(rc.HostPublicKey)
 			if err != nil {

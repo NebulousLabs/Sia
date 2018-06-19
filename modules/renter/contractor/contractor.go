@@ -154,6 +154,16 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 	return c.staticContracts.ViewAll()
 }
 
+// OldContracts returns the contracts formed by the contractor that have
+// expired
+func (c *Contractor) OldContracts() []modules.RenterContract {
+	contracts := make([]modules.RenterContract, 0, len(c.oldContracts))
+	for _, c := range c.oldContracts {
+		contracts = append(contracts, c)
+	}
+	return contracts
+}
+
 // ContractUtility returns the utility fields for the given contract.
 func (c *Contractor) ContractUtility(pk types.SiaPublicKey) (modules.ContractUtility, bool) {
 	c.mu.RLock()
