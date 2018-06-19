@@ -2291,9 +2291,9 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	}
 
 	// Check clear range
-	start := rdg.Downloads[1].StartTime
-	end := rdg.Downloads[len(rdg.Downloads)-1].StartTime
-	err = r.RenterClearDownloadsRangePost(start, end)
+	newest := rdg.Downloads[1].StartTime
+	oldest := rdg.Downloads[len(rdg.Downloads)-1].StartTime
+	err = r.RenterClearDownloadsRangePost(newest, oldest)
 	if err != nil {
 		t.Fatal("Error in API endpoint to remove range of downloads from history:", err)
 	}
@@ -2302,7 +2302,7 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal("Could not get download history:", err)
 	}
 	i = sort.Search(len(rdg.Downloads), func(i int) bool {
-		return rdg.Downloads[i].StartTime.Before(start) && rdg.Downloads[i].StartTime.After(end)
+		return rdg.Downloads[i].StartTime.Before(newest) && rdg.Downloads[i].StartTime.After(oldest)
 	})
 	if i < len(rdg.Downloads) {
 		t.Fatal("Not all downloads from range removed from history")

@@ -285,17 +285,15 @@ Clears the download history of the renter for a range
 of unix time stamps.  Both parameters are optional, if
 no parameters are provided, the entire download history
 will be cleared.  To clear a single download, provide the
-timestamp for the download as both parameters.  Since
-download history is displayed from newest to oldest, providing
-only the start parameter will clear all downloads before, or
-older than the start timestamp.  Conversely, providing only
-the end parameter will clear all downloads after, or
-newer than the end timestamp.
+timestamp for the download as both parameters.  Providing
+only the newest parameter will clear all downloads older
+than the timestamp.  Conversely, providing only the oldest
+parameter will clear all downloads newer than the timestamp.
 
 ###### Timestamp Parameters [(with comments)]
 ```
-start   // Optional - unix timestamp found in the download history
-end     // Optional - unix timestamp found in the download history
+newest   // Optional - unix timestamp found in the download history
+oldest   // Optional - unix timestamp found in the download history
 ```
 
 ###### Response

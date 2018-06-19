@@ -365,35 +365,30 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 
 // renterClearDownloadsHandler handles the API call to request to clear the download queue.
 func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	var startInt, endInt int64
+	var newestInt, oldestInt int64
 	var err error
 
-	startStr, endStr := req.FormValue("start"), req.FormValue("end")
+	newestStr, oldestStr := req.FormValue("newest"), req.FormValue("oldest")
 
-	if startStr != "" {
-		startInt, err = strconv.ParseInt(startStr, 10, 64)
+	if newestStr != "" {
+		newestInt, err = strconv.ParseInt(newestStr, 10, 64)
 		if err != nil {
-			WriteError(w, Error{"parsing integer value for parameter `start` failed: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"parsing integer value for parameter `newest` failed: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 	}
-	startTime := time.Unix(0, startInt)
+	newestTime := time.Unix(0, newestInt)
 
-	if endStr != "" {
-		endInt, err = strconv.ParseInt(endStr, 10, 64)
+	if oldestStr != "" {
+		oldestInt, err = strconv.ParseInt(oldestStr, 10, 64)
 		if err != nil {
-			WriteError(w, Error{"parsing integer value for parameter `end` failed: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"parsing integer value for parameter `oldest` failed: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 	}
-	endTime := time.Unix(0, endInt)
+	oldestTime := time.Unix(0, oldestInt)
 
-	if startTime.Before(endTime) && !startTime.Equal(time.Unix(0, 0)) {
-		WriteError(w, Error{"start time can not be before end time"}, http.StatusBadRequest)
-		return
-	}
-
-	err = api.renter.ClearDownloadHistory(startTime, endTime)
+	err = api.renter.ClearDownloadHistory(newestTime, oldestTime)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return

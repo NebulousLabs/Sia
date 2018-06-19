@@ -151,9 +151,8 @@ type (
 		err             error         // Only set if there was an error which prevented the download from completing.
 
 		// Timestamp information.
-		endTime             time.Time // Set immediately before closing 'completeChan'.
-		staticStartTime     time.Time // Set immediately when the download object is created.
-		staticStartTimeUnix int64     // Set off of staticStartTime.
+		endTime         time.Time // Set immediately before closing 'completeChan'.
+		staticStartTime time.Time // Set immediately when the download object is created.
 
 		// Basic information about the file.
 		destination           downloadDestination
@@ -376,7 +375,6 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 		log:           r.log,
 		memoryManager: r.memoryManager,
 	}
-	d.staticStartTimeUnix = d.staticStartTime.UnixNano()
 
 	// Determine which chunks to download.
 	minChunk := params.offset / params.file.staticChunkSize()
@@ -508,7 +506,7 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 			EndTime:              d.endTime,
 			Received:             atomic.LoadUint64(&d.atomicDataReceived),
 			StartTime:            d.staticStartTime,
-			StartTimeUnix:        d.staticStartTimeUnix,
+			StartTimeUnix:        d.staticStartTime.UnixNano(),
 			TotalDataTransferred: atomic.LoadUint64(&d.atomicTotalDataTransferred),
 		}
 		// Release download lock before calling d.Err(), which will acquire the
@@ -525,8 +523,8 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 }
 
 // ClearDownloadHistory clears the renter's download history based on
-// provided start and end times
-func (r *Renter) ClearDownloadHistory(start, end time.Time) error {
+// provided newest and oldest timestamps
+func (r *Renter) ClearDownloadHistory(newest, oldest time.Time) error {
 	if err := r.tg.Add(); err != nil {
 		return err
 	}
@@ -534,17 +532,21 @@ func (r *Renter) ClearDownloadHistory(start, end time.Time) error {
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
 
-	// Clear download history if both start and end times are zero values
-	if start.Equal(time.Unix(0, 0)) && end.Equal(time.Unix(0, 0)) {
+	if newest.Before(oldest) && !newest.Equal(time.Unix(0, 0)) {
+		return errors.New("newest timestamp can not be before oldest timestamp")
+	}
+
+	// Clear download history if both newest and oldest timestamps are zero values
+	if newest.Equal(time.Unix(0, 0)) && oldest.Equal(time.Unix(0, 0)) {
 		r.downloadHistory = r.downloadHistory[:0]
 		return nil
 	}
 
-	// If End is zero value, search for start time to clear history
-	if end.Equal(time.Unix(0, 0)) {
-		i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(start) })
+	// If oldest timestamp is zero value, search for newest timestamps to clear history
+	if oldest.Equal(time.Unix(0, 0)) {
+		i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(newest) })
 		if i > len(r.downloadHistory) {
-			// Start time is After all downloads, clear entire download history
+			// Newest timestamp is older than all downloads, clear entire download history
 			r.downloadHistory = r.downloadHistory[:0]
 			return nil
 		}
@@ -553,23 +555,23 @@ func (r *Renter) ClearDownloadHistory(start, end time.Time) error {
 	}
 
 	// Clear range of downloads from history
-	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(end) })
+	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(oldest) })
 	if i > len(r.downloadHistory) {
-		// End time after all downloads will result in an error
-		return errors.New("end time after all downloads")
+		// Oldest timestamp newer than all downloads
+		return nil
 	}
-	// linear search for start
-	if !start.Equal(time.Unix(0, 0)) && !start.After(r.downloadHistory[len(r.downloadHistory)-1].staticStartTime) {
-		for j := i - 1; j < len(r.downloadHistory); j++ {
-			if r.downloadHistory[j].staticStartTime.After(start) {
-				//remove section from array
-				r.downloadHistory = append(r.downloadHistory[:i-1], r.downloadHistory[j:]...)
-				return nil
-			}
+	// linear search for newest timestamp
+	if !newest.Equal(time.Unix(0, 0)) && !newest.After(r.downloadHistory[len(r.downloadHistory)-1].staticStartTime) {
+		j := i
+		for j < len(r.downloadHistory) && r.downloadHistory[j].staticStartTime.Before(newest) {
+			j++
 		}
+		//remove section from array
+		r.downloadHistory = append(r.downloadHistory[:i-1], r.downloadHistory[j:]...)
+		return nil
 	}
 
-	// Start time is zero value or is after all downloads, clear the rest of the download history
+	// Newest timestamp is zero value or is newer than all downloads, clear the rest of the download history
 	r.downloadHistory = r.downloadHistory[:i-1]
 	return nil
 }

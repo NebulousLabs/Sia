@@ -48,38 +48,38 @@ func (c *Client) RenterDownloadFullGet(siaPath, destination string, async bool) 
 // with no parameters
 func (c *Client) RenterClearAllDownloadsPost() (err error) {
 	values := url.Values{}
-	values.Set("start", "")
-	values.Set("end", "")
+	values.Set("newest", "")
+	values.Set("oldest", "")
 	err = c.post("/renter/downloads/clear", values.Encode(), nil)
 	return
 }
 
 // RenterClearDownloadsAfterPost requests the /renter/downloads/clear resource
-// with only the end time provided
-func (c *Client) RenterClearDownloadsAfterPost(end time.Time) (err error) {
+// with only the oldest timestamp provided
+func (c *Client) RenterClearDownloadsAfterPost(oldest time.Time) (err error) {
 	values := url.Values{}
-	values.Set("start", "")
-	values.Set("end", strconv.FormatInt(end.UnixNano(), 10))
+	values.Set("newest", "")
+	values.Set("oldest", strconv.FormatInt(oldest.UnixNano(), 10))
 	err = c.post("/renter/downloads/clear", values.Encode(), nil)
 	return
 }
 
 // RenterClearDownloadsBeforePost requests the /renter/downloads/clear resource
-// with only the start time provided
-func (c *Client) RenterClearDownloadsBeforePost(start time.Time) (err error) {
+// with only the newest timestamp provided
+func (c *Client) RenterClearDownloadsBeforePost(newest time.Time) (err error) {
 	values := url.Values{}
-	values.Set("start", strconv.FormatInt(start.UnixNano(), 10))
-	values.Set("end", "")
+	values.Set("newest", strconv.FormatInt(newest.UnixNano(), 10))
+	values.Set("oldest", "")
 	err = c.post("/renter/downloads/clear", values.Encode(), nil)
 	return
 }
 
 // RenterClearDownloadsRangePost requests the /renter/downloads/clear resource
-// with both start and end times provided
-func (c *Client) RenterClearDownloadsRangePost(start, end time.Time) (err error) {
+// with both newest and oldest timestamps provided
+func (c *Client) RenterClearDownloadsRangePost(newest, oldest time.Time) (err error) {
 	values := url.Values{}
-	values.Set("start", strconv.FormatInt(start.UnixNano(), 10))
-	values.Set("end", strconv.FormatInt(end.UnixNano(), 10))
+	values.Set("newest", strconv.FormatInt(newest.UnixNano(), 10))
+	values.Set("oldest", strconv.FormatInt(oldest.UnixNano(), 10))
 	err = c.post("/renter/downloads/clear", values.Encode(), nil)
 	return
 }
