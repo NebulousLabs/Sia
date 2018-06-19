@@ -424,7 +424,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			// renewal.
 			oldContractSpent := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee).Sub(contract.RenterFunds)
 			oldContractLength := blockHeight - contract.StartHeight
-			if oldContractLength <= 1 {
+			if oldContractLength == 0 {
 				oldContractLength = types.BlockHeight(1)
 			}
 			spentPerBlock := oldContractSpent.Div64(uint64(oldContractLength))
