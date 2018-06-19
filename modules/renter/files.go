@@ -1,17 +1,13 @@
 package renter
 
 import (
-	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/siafile"
-	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/errors"
@@ -72,183 +68,6 @@ func deriveKey(masterKey crypto.TwofishKey, chunkIndex, pieceIndex uint64) crypt
 	return crypto.TwofishKey(crypto.HashAll(masterKey, chunkIndex, pieceIndex))
 }
 
-// staticChunkSize returns the size of one chunk.
-func (f *file) staticChunkSize() uint64 {
-	return f.pieceSize * uint64(f.erasureCode.MinPieces())
-}
-
-// numChunks returns the number of chunks that f was split into.
-func (f *file) numChunks() uint64 {
-	// empty files still need at least one chunk
-	if f.size == 0 {
-		return 1
-	}
-	n := f.size / f.staticChunkSize()
-	// last chunk will be padded, unless chunkSize divides file evenly.
-	if f.size%f.staticChunkSize() != 0 {
-		n++
-	}
-	return n
-}
-
-// available indicates whether the file is ready to be downloaded.
-func (f *file) available(offline map[types.FileContractID]bool) bool {
-	chunkPieces := make([]int, f.numChunks())
-	for _, fc := range f.contracts {
-		if offline[fc.ID] {
-			continue
-		}
-		for _, p := range fc.Pieces {
-			chunkPieces[p.Chunk]++
-		}
-	}
-	for _, n := range chunkPieces {
-		if n < f.erasureCode.MinPieces() {
-			return false
-		}
-	}
-	return true
-}
-
-// uploadedBytes indicates how many bytes of the file have been uploaded via
-// current file contracts. Note that this includes padding and redundancy, so
-// uploadedBytes can return a value much larger than the file's original filesize.
-func (f *file) uploadedBytes() uint64 {
-	var uploaded uint64
-	for _, fc := range f.contracts {
-		// Note: we need to multiply by SectorSize here instead of
-		// f.pieceSize because the actual bytes uploaded include overhead
-		// from TwoFish encryption
-		uploaded += uint64(len(fc.Pieces)) * modules.SectorSize
-	}
-	return uploaded
-}
-
-// uploadProgress indicates what percentage of the file (plus redundancy) has
-// been uploaded. Note that a file may be Available long before UploadProgress
-// reaches 100%, and UploadProgress may report a value greater than 100%.
-func (f *file) uploadProgress() float64 {
-	uploaded := f.uploadedBytes()
-	desired := modules.SectorSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
-
-	return math.Min(100*(float64(uploaded)/float64(desired)), 100)
-}
-
-// redundancy returns the redundancy of the least redundant chunk. A file
-// becomes available when this redundancy is >= 1. Assumes that every piece is
-// unique within a file contract. -1 is returned if the file has size 0. It
-// takes one argument, a map of offline contracts for this file.
-func (f *file) redundancy(offlineMap map[types.FileContractID]bool, goodForRenewMap map[types.FileContractID]bool) float64 {
-	if f.size == 0 {
-		return -1
-	}
-	piecesPerChunk := make([]int, f.numChunks())
-	piecesPerChunkNoRenew := make([]int, f.numChunks())
-	// If the file has non-0 size then the number of chunks should also be
-	// non-0. Therefore the f.size == 0 conditional block above must appear
-	// before this check.
-	if len(piecesPerChunk) == 0 {
-		build.Critical("cannot get redundancy of a file with 0 chunks")
-		return -1
-	}
-	// pieceRenewMap stores each encountered piece and a boolean to indicate if
-	// that piece was already encountered on a goodForRenew contract.
-	pieceRenewMap := make(map[string]bool)
-	for _, fc := range f.contracts {
-		offline, exists1 := offlineMap[fc.ID]
-		goodForRenew, exists2 := goodForRenewMap[fc.ID]
-		if exists1 != exists2 {
-			build.Critical("contract can't be in one map but not in the other")
-		}
-		if !exists1 {
-			continue
-		}
-
-		// do not count pieces from the contract if the contract is offline
-		if offline {
-			continue
-		}
-		for _, p := range fc.Pieces {
-			pieceKey := fmt.Sprintf("%v/%v", p.Chunk, p.Piece)
-			// If the piece is redundant we need to check if the same piece was
-			// encountered on a goodForRenew contract before. If it wasn't we
-			// need to increase the piecesPerChunk counter and set the value of
-			// the pieceKey entry to true. Otherwise we just ignore the piece.
-			if gfr, redundant := pieceRenewMap[pieceKey]; redundant && gfr {
-				continue
-			} else if redundant && !gfr {
-				pieceRenewMap[pieceKey] = true
-				piecesPerChunk[p.Chunk]++
-				continue
-			}
-			pieceRenewMap[pieceKey] = goodForRenew
-
-			// If the contract is goodForRenew, increment the entry in both
-			// maps. If not, only the one in piecesPerChunkNoRenew.
-			if goodForRenew {
-				piecesPerChunk[p.Chunk]++
-			}
-			piecesPerChunkNoRenew[p.Chunk]++
-		}
-	}
-	// Find the chunk with the least finished pieces counting only pieces of
-	// contracts that are goodForRenew.
-	minPieces := piecesPerChunk[0]
-	for _, numPieces := range piecesPerChunk {
-		if numPieces < minPieces {
-			minPieces = numPieces
-		}
-	}
-	// Find the chunk with the least finished pieces including pieces from
-	// contracts that are not good for renewal.
-	minPiecesNoRenew := piecesPerChunkNoRenew[0]
-	for _, numPieces := range piecesPerChunkNoRenew {
-		if numPieces < minPiecesNoRenew {
-			minPiecesNoRenew = numPieces
-		}
-	}
-	// If the redundancy is smaller than 1x we return the redundancy that
-	// includes contracts that are not good for renewal. The reason for this is
-	// a better user experience. If the renter operates correctly, redundancy
-	// should never go above numPieces / minPieces and redundancyNoRenew should
-	// never go below 1.
-	redundancy := float64(minPieces) / float64(f.erasureCode.MinPieces())
-	redundancyNoRenew := float64(minPiecesNoRenew) / float64(f.erasureCode.MinPieces())
-	if redundancy < 1 {
-		return redundancyNoRenew
-	}
-	return redundancy
-}
-
-// expiration returns the lowest height at which any of the file's contracts
-// will expire.
-func (f *file) expiration() types.BlockHeight {
-	if len(f.contracts) == 0 {
-		return 0
-	}
-	lowest := ^types.BlockHeight(0)
-	for _, fc := range f.contracts {
-		if fc.WindowStart < lowest {
-			lowest = fc.WindowStart
-		}
-	}
-	return lowest
-}
-
-// newFile creates a new file object.
-func newFile(name string, code modules.ErasureCoder, pieceSize, fileSize uint64) *file {
-	return &file{
-		name:        name,
-		size:        fileSize,
-		contracts:   make(map[types.FileContractID]fileContract),
-		masterKey:   crypto.GenerateTwofishKey(),
-		erasureCode: code,
-		pieceSize:   pieceSize,
-
-		staticUID: persist.RandomSuffix(),
-	}
-}
-
 // DeleteFile removes a file entry from the renter and deletes its data from
 // the hosts it is stored on.
 //
@@ -290,17 +109,19 @@ func (r *Renter) FileList() []modules.FileInfo {
 		}
 	}
 
-	// Build 2 maps that map every contract id to its offline and goodForRenew
+	// Build 2 maps that map every pubkey to its offline and goodForRenew
 	// status.
 	goodForRenew := make(map[string]bool)
 	offline := make(map[string]bool)
+	contracts := make(map[string]modules.RenterContract)
 	for _, pk := range pks {
-		cu, ok := r.hostContractor.ContractUtility(pk)
+		contract, ok := r.hostContractor.ContractByPublicKey(pk)
 		if !ok {
 			continue
 		}
-		goodForRenew[string(pk.Key)] = ok && cu.GoodForRenew
+		goodForRenew[string(pk.Key)] = ok && contract.Utility.GoodForRenew
 		offline[string(pk.Key)] = r.hostContractor.IsOffline(pk)
+		contracts[string(pk.Key)] = contract
 	}
 
 	// Build the list of FileInfos.
@@ -324,7 +145,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 			Redundancy:     f.Redundancy(offline, goodForRenew),
 			UploadedBytes:  f.UploadedBytes(),
 			UploadProgress: f.UploadProgress(),
-			Expiration:     f.Expiration(),
+			Expiration:     f.Expiration(contracts),
 		})
 	}
 	return fileList
@@ -348,13 +169,15 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 	// status.
 	goodForRenew := make(map[string]bool)
 	offline := make(map[string]bool)
+	contracts := make(map[string]modules.RenterContract)
 	for _, pk := range pks {
-		cu, ok := r.hostContractor.ContractUtility(pk)
+		contract, ok := r.hostContractor.ContractByPublicKey(pk)
 		if !ok {
 			continue
 		}
-		goodForRenew[string(pk.Key)] = ok && cu.GoodForRenew
+		goodForRenew[string(pk.Key)] = ok && contract.Utility.GoodForRenew
 		offline[string(pk.Key)] = r.hostContractor.IsOffline(pk)
+		contracts[string(pk.Key)] = contract
 	}
 
 	// Build the FileInfo
@@ -373,7 +196,7 @@ func (r *Renter) File(siaPath string) (modules.FileInfo, error) {
 		Redundancy:     file.Redundancy(offline, goodForRenew),
 		UploadedBytes:  file.UploadedBytes(),
 		UploadProgress: file.UploadProgress(),
-		Expiration:     file.Expiration(),
+		Expiration:     file.Expiration(contracts),
 	}
 
 	return fileInfo, nil

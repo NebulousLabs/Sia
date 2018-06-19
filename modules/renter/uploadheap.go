@@ -169,50 +169,49 @@ func (r *Renter) buildUnfinishedChunks(f *siafile.SiaFile, hosts map[string]stru
 	// Iterate through the pieces of the file and mark which hosts are already
 	// in use for the chunk. As you delete hosts from the 'unusedHosts' map,
 	// also increment the 'piecesCompleted' value.
-	for i := uint64(0); i < f.NumChunks(); i++ {
-		for j := uint64(0); j < f.NumPieces(); j++ {
-			// Get the piece.
-			piece, err := f.Piece(i, j)
-			if err != nil {
-				r.log.Println("failed to get piece for building incomplete chunks")
-				return nil
-			}
+	for chunkIndex := uint64(0); chunkIndex < f.NumChunks(); chunkIndex++ {
+		pieces, err := f.Pieces(chunkIndex)
+		if err != nil {
+			r.log.Println("failed to get pieces for building incomplete chunks")
+			return nil
+		}
+		for pieceIndex, pieceSet := range pieces {
+			for _, piece := range pieceSet {
+				// Get the contract for the piece.
+				pk, exists := pks[string(piece.HostPubKey.Key)]
+				if !exists {
+					build.Critical("Couldn't find public key in map. This should never happen")
+				}
+				contractUtility, exists2 := r.hostContractor.ContractUtility(pk)
+				if exists != exists2 {
+					build.Critical("got a contract without utility or vice versa which shouldn't happen",
+						exists, exists2)
+				}
+				if !exists || !exists2 {
+					// File contract does not seem to be part of the host anymore.
+					continue
+				}
+				if !contractUtility.GoodForRenew {
+					// We are no longer renewing with this contract, so it does not
+					// count for redundancy.
+					continue
+				}
 
-			// Get the contract for the piece.
-			pk, exists := pks[string(piece.HostPubKey.Key)]
-			if !exists {
-				build.Critical("Couldn't find public key in map. This should never happen")
+				// Mark the chunk set based on the pieces in this contract.
+				_, exists = newUnfinishedChunks[chunkIndex].unusedHosts[pk.String()]
+				redundantPiece := newUnfinishedChunks[chunkIndex].pieceUsage[pieceIndex]
+				if exists && !redundantPiece {
+					newUnfinishedChunks[chunkIndex].pieceUsage[pieceIndex] = true
+					newUnfinishedChunks[chunkIndex].piecesCompleted++
+					delete(newUnfinishedChunks[chunkIndex].unusedHosts, pk.String())
+				} else if exists {
+					// This host has a piece, but it is the same piece another host
+					// has. We should still remove the host from the unusedHosts
+					// since one host having multiple pieces of a chunk might lead
+					// to unexpected issues.
+					delete(newUnfinishedChunks[chunkIndex].unusedHosts, pk.String())
+				}
 			}
-			contractUtility, exists2 := r.hostContractor.ContractUtility(pk)
-			if exists != exists2 {
-				build.Critical("got a contract without utility or vice versa which shouldn't happen",
-					exists, exists2)
-			}
-			if !exists || !exists2 {
-				// File contract does not seem to be part of the host anymore.
-				continue
-			}
-			if !contractUtility.GoodForRenew {
-				// We are no longer renewing with this contract, so it does not
-				// count for redundancy.
-				continue
-			}
-
-			// Mark the chunk set based on the pieces in this contract.
-			_, exists = newUnfinishedChunks[i].unusedHosts[pk.String()]
-			redundantPiece := newUnfinishedChunks[i].pieceUsage[j]
-			if exists && !redundantPiece {
-				newUnfinishedChunks[i].pieceUsage[j] = true
-				newUnfinishedChunks[i].piecesCompleted++
-				delete(newUnfinishedChunks[i].unusedHosts, pk.String())
-			} else if exists {
-				// This host has a piece, but it is the same piece another host
-				// has. We should still remove the host from the unusedHosts
-				// since one host having multiple pieces of a chunk might lead
-				// to unexpected issues.
-				delete(newUnfinishedChunks[i].unusedHosts, pk.String())
-			}
-
 		}
 	}
 

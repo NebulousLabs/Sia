@@ -5,8 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 )
 
 // TestFileNumChunks checks the numChunks method of the file type.
@@ -29,40 +32,34 @@ func TestFileNumChunks(t *testing.T) {
 
 	for _, test := range tests {
 		rsc, _ := NewRSCode(test.piecesPerChunk, 1) // can't use 0
-		f := &file{size: test.size, erasureCode: rsc, pieceSize: test.pieceSize}
-		if f.numChunks() != test.expNumChunks {
-			t.Errorf("Test %v: expected %v, got %v", test, test.expNumChunks, f.numChunks())
+		f := siafile.New(t.Name(), rsc, test.pieceSize, test.size)
+		if f.NumChunks() != test.expNumChunks {
+			t.Errorf("Test %v: expected %v, got %v", test, test.expNumChunks, f.NumChunks())
 		}
 	}
 }
 
 // TestFileAvailable probes the available method of the file type.
 func TestFileAvailable(t *testing.T) {
-	rsc, _ := NewRSCode(1, 10)
-	f := &file{
-		size:        1000,
-		erasureCode: rsc,
-		pieceSize:   100,
-	}
-	neverOffline := make(map[types.FileContractID]bool)
+	rsc, _ := NewRSCode(1, 1) // can't use 0
+	f := siafile.New(t.Name(), rsc, pieceSize, 100)
+	neverOffline := make(map[string]bool)
 
-	if f.available(neverOffline) {
+	if f.Available(neverOffline) {
 		t.Error("file should not be available")
 	}
 
-	var fc fileContract
-	for i := uint64(0); i < f.numChunks(); i++ {
-		fc.Pieces = append(fc.Pieces, pieceData{Chunk: i, Piece: 0})
+	for i := uint64(0); i < f.NumChunks(); i++ {
+		f.AddPiece(types.SiaPublicKey{}, i, 0, crypto.Hash{})
 	}
-	f.contracts = map[types.FileContractID]fileContract{{}: fc}
 
-	if !f.available(neverOffline) {
+	if !f.Available(neverOffline) {
 		t.Error("file should be available")
 	}
 
-	specificOffline := make(map[types.FileContractID]bool)
-	specificOffline[fc.ID] = true
-	if f.available(specificOffline) {
+	specificOffline := make(map[string]bool)
+	specificOffline[string(types.SiaPublicKey{}.Key)] = true
+	if f.Available(specificOffline) {
 		t.Error("file should not be available")
 	}
 }
@@ -70,35 +67,34 @@ func TestFileAvailable(t *testing.T) {
 // TestFileUploadedBytes tests that uploadedBytes() returns a value equal to
 // the number of sectors stored via contract times the size of each sector.
 func TestFileUploadedBytes(t *testing.T) {
-	f := &file{}
 	// ensure that a piece fits within a sector
-	f.pieceSize = modules.SectorSize / 2
-	f.contracts = make(map[types.FileContractID]fileContract)
-	f.contracts[types.FileContractID{}] = fileContract{
-		ID:     types.FileContractID{},
-		IP:     modules.NetAddress(""),
-		Pieces: make([]pieceData, 4),
+	rsc, _ := NewRSCode(1, 3)
+	f := siafile.New(t.Name(), rsc, modules.SectorSize/2, 1000)
+	for i := uint64(0); i < 4; i++ {
+		err := f.AddPiece(types.SiaPublicKey{}, uint64(0), i, crypto.Hash{})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	if f.uploadedBytes() != 4*modules.SectorSize {
-		t.Errorf("expected uploadedBytes to be 8, got %v", f.uploadedBytes())
+	if f.UploadedBytes() != 4*modules.SectorSize {
+		t.Errorf("expected uploadedBytes to be 8, got %v", f.UploadedBytes())
 	}
 }
 
 // TestFileUploadProgressPinning verifies that uploadProgress() returns at most
 // 100%, even if more pieces have been uploaded,
 func TestFileUploadProgressPinning(t *testing.T) {
-	f := &file{}
-	f.pieceSize = 2
-	f.contracts = make(map[types.FileContractID]fileContract)
-	f.contracts[types.FileContractID{}] = fileContract{
-		ID:     types.FileContractID{},
-		IP:     modules.NetAddress(""),
-		Pieces: make([]pieceData, 4),
-	}
 	rsc, _ := NewRSCode(1, 1)
-	f.erasureCode = rsc
-	if f.uploadProgress() != 100 {
-		t.Fatal("expected uploadProgress to report 100%")
+	f := siafile.New(t.Name(), rsc, 2, 4)
+	for i := uint64(0); i < 2; i++ {
+		err1 := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(0)}}, uint64(0), i, crypto.Hash{})
+		err2 := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(1)}}, uint64(0), i, crypto.Hash{})
+		if err := errors.Compose(err1, err2); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if f.UploadProgress() != 100 {
+		t.Fatal("expected uploadProgress to report 100% but was", f.UploadProgress())
 	}
 }
 
@@ -106,113 +102,88 @@ func TestFileUploadProgressPinning(t *testing.T) {
 // with varying number of filecontracts and erasure code settings.
 func TestFileRedundancy(t *testing.T) {
 	nDatas := []int{1, 2, 10}
-	neverOffline := make(map[types.FileContractID]bool)
-	goodForRenew := make(map[types.FileContractID]bool)
-	for i := 0; i < 5; i++ {
-		neverOffline[types.FileContractID{byte(i)}] = false
-		goodForRenew[types.FileContractID{byte(i)}] = true
+	neverOffline := make(map[string]bool)
+	goodForRenew := make(map[string]bool)
+	for i := 0; i < 6; i++ {
+		neverOffline[string([]byte{byte(i)})] = false
+		goodForRenew[string([]byte{byte(i)})] = true
 	}
 
 	for _, nData := range nDatas {
 		rsc, _ := NewRSCode(nData, 10)
-		f := &file{
-			size:        1000,
-			pieceSize:   100,
-			contracts:   make(map[types.FileContractID]fileContract),
-			erasureCode: rsc,
-		}
+		f := siafile.New(t.Name(), rsc, 100, 1000)
 		// Test that an empty file has 0 redundancy.
-		if r := f.redundancy(neverOffline, goodForRenew); r != 0 {
+		if r := f.Redundancy(neverOffline, goodForRenew); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
 		}
-		// Test that a file with 1 filecontract that has a piece for every chunk but
+		// Test that a file with 1 host that has a piece for every chunk but
 		// one chunk still has a redundancy of 0.
-		fc := fileContract{
-			ID: types.FileContractID{0},
-		}
-		for i := uint64(0); i < f.numChunks()-1; i++ {
-			pd := pieceData{
-				Chunk: i,
-				Piece: 0,
+		for i := uint64(0); i < f.NumChunks()-1; i++ {
+			err := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(0)}}, i, 0, crypto.Hash{})
+			if err != nil {
+				t.Fatal(err)
 			}
-			fc.Pieces = append(fc.Pieces, pd)
 		}
-		f.contracts[fc.ID] = fc
-		if r := f.redundancy(neverOffline, goodForRenew); r != 0 {
+		if r := f.Redundancy(neverOffline, goodForRenew); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
 		}
-		// Test that adding another filecontract with a piece for every chunk but one
+		// Test that adding another host with a piece for every chunk but one
 		// chunk still results in a file with redundancy 0.
-		fc = fileContract{
-			ID: types.FileContractID{1},
-		}
-		for i := uint64(0); i < f.numChunks()-1; i++ {
-			pd := pieceData{
-				Chunk: i,
-				Piece: 1,
+		for i := uint64(0); i < f.NumChunks()-1; i++ {
+			err := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(1)}}, i, 1, crypto.Hash{})
+			if err != nil {
+				t.Fatal(err)
 			}
-			fc.Pieces = append(fc.Pieces, pd)
 		}
-		f.contracts[fc.ID] = fc
-		if r := f.redundancy(neverOffline, goodForRenew); r != 0 {
+		if r := f.Redundancy(neverOffline, goodForRenew); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
 		}
 		// Test that adding a file contract with a piece for the missing chunk
 		// results in a file with redundancy > 0 && <= 1.
-		fc = fileContract{
-			ID: types.FileContractID{2},
+		err := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(2)}}, f.NumChunks()-1, 0, crypto.Hash{})
+		if err != nil {
+			t.Fatal(err)
 		}
-		pd := pieceData{
-			Chunk: f.numChunks() - 1,
-			Piece: 0,
-		}
-		fc.Pieces = append(fc.Pieces, pd)
-		f.contracts[fc.ID] = fc
 		// 1.0 / MinPieces because the chunk with the least number of pieces has 1 piece.
-		expectedR := 1.0 / float64(f.erasureCode.MinPieces())
-		if r := f.redundancy(neverOffline, goodForRenew); r != expectedR {
+		expectedR := 1.0 / float64(f.ErasureCode().MinPieces())
+		if r := f.Redundancy(neverOffline, goodForRenew); r != expectedR {
 			t.Errorf("expected %f redundancy, got %f", expectedR, r)
 		}
 		// Test that adding a file contract that has erasureCode.MinPieces() pieces
 		// per chunk for all chunks results in a file with redundancy > 1.
-		fc = fileContract{
-			ID: types.FileContractID{3},
-		}
-		for iChunk := uint64(0); iChunk < f.numChunks(); iChunk++ {
-			for iPiece := uint64(0); iPiece < uint64(f.erasureCode.MinPieces()); iPiece++ {
-				fc.Pieces = append(fc.Pieces, pieceData{
-					Chunk: iChunk,
-					// add 1 since the same piece can't count towards redundancy twice.
-					Piece: iPiece + 1,
-				})
+		for iChunk := uint64(0); iChunk < f.NumChunks(); iChunk++ {
+			for iPiece := uint64(1); iPiece < uint64(f.ErasureCode().MinPieces()); iPiece++ {
+				err := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(3)}}, iChunk, iPiece, crypto.Hash{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(4)}}, iChunk, uint64(f.ErasureCode().MinPieces()), crypto.Hash{})
+			if err != nil {
+				t.Fatal(err)
 			}
 		}
-		f.contracts[fc.ID] = fc
 		// 1+MinPieces / MinPieces because the chunk with the least number of pieces has 1+MinPieces pieces.
-		expectedR = float64(1+f.erasureCode.MinPieces()) / float64(f.erasureCode.MinPieces())
-		if r := f.redundancy(neverOffline, goodForRenew); r != expectedR {
+		expectedR = float64(1+f.ErasureCode().MinPieces()) / float64(f.ErasureCode().MinPieces())
+		if r := f.Redundancy(neverOffline, goodForRenew); r != expectedR {
 			t.Errorf("expected %f redundancy, got %f", expectedR, r)
 		}
 
 		// verify offline file contracts are not counted in the redundancy
-		fc = fileContract{
-			ID: types.FileContractID{4},
-		}
-		for iChunk := uint64(0); iChunk < f.numChunks(); iChunk++ {
-			for iPiece := uint64(0); iPiece < uint64(f.erasureCode.MinPieces()); iPiece++ {
-				fc.Pieces = append(fc.Pieces, pieceData{
-					Chunk: iChunk,
-					Piece: iPiece,
-				})
+		for iChunk := uint64(0); iChunk < f.NumChunks(); iChunk++ {
+			for iPiece := uint64(0); iPiece < uint64(f.ErasureCode().MinPieces()); iPiece++ {
+				err := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(5)}}, iChunk, iPiece, crypto.Hash{})
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
-		f.contracts[fc.ID] = fc
-		specificOffline := make(map[types.FileContractID]bool)
-		for fcid := range goodForRenew {
-			specificOffline[fcid] = false
+		specificOffline := make(map[string]bool)
+		for pk := range goodForRenew {
+			specificOffline[pk] = false
 		}
-		specificOffline[fc.ID] = true
-		if r := f.redundancy(specificOffline, goodForRenew); r != expectedR {
+		specificOffline[string(byte(5))] = true
+		if r := f.Redundancy(specificOffline, goodForRenew); r != expectedR {
 			t.Errorf("expected redundancy to ignore offline file contracts, wanted %f got %f", expectedR, r)
 		}
 	}
@@ -220,33 +191,43 @@ func TestFileRedundancy(t *testing.T) {
 
 // TestFileExpiration probes the expiration method of the file type.
 func TestFileExpiration(t *testing.T) {
-	f := &file{
-		contracts: make(map[types.FileContractID]fileContract),
-	}
-
-	if f.expiration() != 0 {
+	f := newTestingFile()
+	contracts := make(map[string]modules.RenterContract)
+	if f.Expiration(contracts) != 0 {
 		t.Error("file with no pieces should report as having no time remaining")
+	}
+	// Create 3 public keys
+	pk1 := types.SiaPublicKey{Key: []byte{0}}
+	pk2 := types.SiaPublicKey{Key: []byte{1}}
+	pk3 := types.SiaPublicKey{Key: []byte{2}}
+
+	// Add a piece for each key to the file.
+	err1 := f.AddPiece(pk1, 0, 0, crypto.Hash{})
+	err2 := f.AddPiece(pk2, 0, 1, crypto.Hash{})
+	err3 := f.AddPiece(pk3, 0, 2, crypto.Hash{})
+	if err := errors.Compose(err1, err2, err3); err != nil {
+		t.Fatal(err)
 	}
 
 	// Add a contract.
-	fc := fileContract{}
-	fc.WindowStart = 100
-	f.contracts[types.FileContractID{0}] = fc
-	if f.expiration() != 100 {
+	fc := modules.RenterContract{}
+	fc.EndHeight = 100
+	contracts[string(pk1.Key)] = fc
+	if f.Expiration(contracts) != 100 {
 		t.Error("file did not report lowest WindowStart")
 	}
 
 	// Add a contract with a lower WindowStart.
-	fc.WindowStart = 50
-	f.contracts[types.FileContractID{1}] = fc
-	if f.expiration() != 50 {
+	fc.EndHeight = 50
+	contracts[string(pk2.Key)] = fc
+	if f.Expiration(contracts) != 50 {
 		t.Error("file did not report lowest WindowStart")
 	}
 
 	// Add a contract with a higher WindowStart.
-	fc.WindowStart = 75
-	f.contracts[types.FileContractID{2}] = fc
-	if f.expiration() != 50 {
+	fc.EndHeight = 75
+	contracts[string(pk3.Key)] = fc
+	if f.Expiration(contracts) != 50 {
 		t.Error("file did not report lowest WindowStart")
 	}
 }

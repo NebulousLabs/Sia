@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 
@@ -23,9 +22,8 @@ func newTestingFile() *siafile.SiaFile {
 	rsc, _ := NewRSCode(nData+1, nParity+1)
 
 	name := "testfile-" + strconv.Itoa(int(data[0]))
-	masterKey := crypto.GenerateTwofishKey()
 
-	return siafile.New(name, rsc, masterKey)
+	return siafile.New(name, rsc, pieceSize, 1000)
 }
 
 // equalFiles is a helper function that compares two files for equality.

@@ -2,6 +2,9 @@ package siafile
 
 import (
 	"encoding/base32"
+	"encoding/binary"
+	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -32,6 +35,7 @@ type (
 		chunks []Chunk
 
 		// utility fields. These are not persisted.
+		deleted     bool
 		erasureCode modules.ErasureCoder
 		mu          sync.RWMutex
 		uid         string
@@ -58,9 +62,7 @@ type (
 		extensionInfo [16]byte
 
 		// pieces are the pieces of the file the chunk consists of.
-		// The number of pieces should equal the number of
-		// dataPieces + parityPieces
-		pieces []Piece
+		pieces [][]Piece
 	}
 
 	// Piece represents a single piece of a chunk on disk
@@ -72,23 +74,61 @@ type (
 )
 
 // New create a new SiaFile.
-func New(siaPath string, erasureCode modules.ErasureCoder, masterKey crypto.TwofishKey) *SiaFile {
+func New(siaPath string, erasureCode modules.ErasureCoder, pieceSize, fileSize uint64) *SiaFile {
 	file := &SiaFile{
 		metadata: Metadata{
-			masterKey: masterKey,
-			pieceSize: modules.SectorSize - crypto.TwofishOverhead,
+			fileSize:  int64(fileSize),
+			masterKey: crypto.GenerateTwofishKey(),
+			pieceSize: pieceSize,
 			siaPath:   siaPath,
 		},
 		erasureCode: erasureCode,
 		uid:         base32.StdEncoding.EncodeToString(fastrand.Bytes(20))[:20],
 	}
+	chunks := make([]Chunk, file.NumChunks())
+	for i := range chunks {
+		chunks[i].erasureCodeType = [4]byte{0, 0, 0, 1}
+		binary.LittleEndian.PutUint32(chunks[i].erasureCodeParams[0:4], uint32(erasureCode.MinPieces()))
+		binary.LittleEndian.PutUint32(chunks[i].erasureCodeParams[4:8], uint32(erasureCode.NumPieces()-erasureCode.MinPieces()))
+		chunks[i].pieces = make([][]Piece, erasureCode.NumPieces())
+	}
+	file.chunks = chunks
 	return file
 }
 
 // AddPiece adds an uploaded piece to the file. It also updates the host table
 // if the public key of the host is not aleady known.
 func (sf *SiaFile) AddPiece(pk types.SiaPublicKey, chunkIndex, pieceIndex uint64, merkleRoot crypto.Hash) error {
-	panic("Not implemented yet")
+	sf.mu.Lock()
+	defer sf.mu.Unlock()
+
+	// Get the index of the host in the public key table.
+	tableIndex := -1
+	for i, hpk := range sf.pubKeyTable {
+		if reflect.DeepEqual(hpk, pk) {
+			tableIndex = i
+			break
+		}
+	}
+	// If we don't know the host yet, we add it to the table.
+	if tableIndex == -1 {
+		sf.pubKeyTable = append(sf.pubKeyTable, pk)
+		tableIndex = len(sf.pubKeyTable) - 1
+	}
+	// Check if the chunkIndex is valid.
+	if chunkIndex >= uint64(len(sf.chunks)) {
+		return fmt.Errorf("chunkIndex %v out of bounds (%v)", chunkIndex, len(sf.chunks))
+	}
+	// Check if the pieceIndex is valid.
+	if pieceIndex >= uint64(len(sf.chunks[chunkIndex].pieces)) {
+		return fmt.Errorf("pieceIndex %v out of bounds (%v)", pieceIndex, len(sf.chunks[chunkIndex].pieces))
+	}
+	// Add the piece to the chunk.
+	sf.chunks[chunkIndex].pieces[pieceIndex] = append(sf.chunks[chunkIndex].pieces[pieceIndex], Piece{
+		HostPubKey: pk,
+		MerkleRoot: merkleRoot,
+	})
+	return nil
 }
 
 // ErasureCode returns the erasure coder used by the file.
@@ -98,7 +138,9 @@ func (sf *SiaFile) ErasureCode() modules.ErasureCoder {
 	return sf.erasureCode
 }
 
-// NumChunks returns the number of chunks the file consists of.
+// NumChunks returns the number of chunks the file consists of. This will
+// return the number of chunks the file consists of even if the file is not
+// fully uploaded yet.
 func (sf *SiaFile) NumChunks() uint64 {
 	// empty files still need at least one chunk
 	if sf.metadata.fileSize == 0 {
@@ -112,22 +154,21 @@ func (sf *SiaFile) NumChunks() uint64 {
 	return n
 }
 
-// NumPieces returns the number of pieces each chunk in the file consists of.
-func (sf *SiaFile) NumPieces() uint64 {
+// Pieces returns all the pieces for a chunk in a slice of slices that contains
+// all the pieces for a certain index.
+func (sf *SiaFile) Pieces(chunkIndex uint64) ([][]Piece, error) {
 	sf.mu.RLock()
 	defer sf.mu.RUnlock()
-	return uint64(sf.erasureCode.NumPieces())
-}
-
-// Piece returns the piece the index pieceIndex from within the chunk at the
-// index chunkIndex.
-func (sf *SiaFile) Piece(chunkIndex, pieceIndex uint64) (Piece, error) {
-	// TODO should return a deep copy to make sure that the caller can't modify
-	// the chunks without holding a lock.
-	panic("Not implemented yet")
+	if chunkIndex >= uint64(len(sf.chunks)) {
+		return nil, fmt.Errorf("index %v out of bounds (%v)",
+			chunkIndex, len(sf.chunks))
+	}
+	return sf.chunks[chunkIndex].pieces, nil
 }
 
 // UID returns a unique identifier for this file.
 func (sf *SiaFile) UID() string {
-	panic("Not implemented yet")
+	sf.mu.RLock()
+	defer sf.mu.RUnlock()
+	return sf.uid
 }

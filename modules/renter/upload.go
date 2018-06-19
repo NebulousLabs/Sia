@@ -20,6 +20,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 )
 
 var (
@@ -81,7 +82,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Create file object.
-	f := fileToSiaFile(newFile(up.SiaPath, up.ErasureCode, pieceSize, uint64(fileInfo.Size())))
+	f := siafile.New(up.SiaPath, up.ErasureCode, pieceSize, uint64(fileInfo.Size()))
 	f.SetMode(fileInfo.Mode())
 
 	// Add file to renter.

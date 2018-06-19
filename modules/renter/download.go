@@ -384,16 +384,18 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	// For each chunk, assemble a mapping from the contract id to the index of
 	// the piece within the chunk that the contract is responsible for.
 	chunkMaps := make([]map[string]downloadPieceInfo, maxChunk-minChunk+1)
-	for i := range chunkMaps {
-		chunkMaps[i] = make(map[string]downloadPieceInfo)
-		for j := uint64(0); j < uint64(params.file.NumPieces()); j++ {
-			piece, err := params.file.Piece(uint64(i), j)
-			if err != nil {
-				return nil, err
-			}
-			chunkMaps[i][string(piece.HostPubKey.Key)] = downloadPieceInfo{
-				index: j,
-				root:  piece.MerkleRoot,
+	for chunkIndex := range chunkMaps {
+		chunkMaps[chunkIndex] = make(map[string]downloadPieceInfo)
+		pieces, err := params.file.Pieces(uint64(chunkIndex))
+		if err != nil {
+			return nil, err
+		}
+		for pieceIndex, pieceSet := range pieces {
+			for _, piece := range pieceSet {
+				chunkMaps[chunkIndex][string(piece.HostPubKey.Key)] = downloadPieceInfo{
+					index: uint64(pieceIndex),
+					root:  piece.MerkleRoot,
+				}
 			}
 		}
 
