@@ -125,8 +125,8 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 			spending.PreviousSpending = spending.PreviousSpending.Add(old.ContractFee).Add(old.TxnFee).
 				Add(old.SiafundFee).Add(old.DownloadSpending).Add(old.UploadSpending).Add(old.StorageSpending)
 		}
-
 	}
+
 	// Calculate amount of spent money to get unspent money.
 	allSpending := spending.ContractFees
 	allSpending = allSpending.Add(spending.DownloadSpending)

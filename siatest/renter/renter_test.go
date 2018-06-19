@@ -1618,7 +1618,7 @@ func renewContractsBySpending(renter *siatest.TestNode, tg *siatest.TestGroup) (
 	// Set upload parameters
 	dataPieces := uint64(1)
 	parityPieces := uint64(1)
-	chunkSize := siatest.ChunkSize(50)
+	chunkSize := siatest.ChunkSize(25)
 
 	// Upload once to show upload spending
 	_, _, err = renter.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)

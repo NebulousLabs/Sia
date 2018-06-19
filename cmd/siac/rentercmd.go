@@ -392,12 +392,20 @@ func rentercontractscmd() {
 	}
 	if len(rc.Contracts) != 0 {
 		sort.Sort(byValue(rc.Contracts))
-		fmt.Println("Showing", len(rc.Contracts), "Active Contracts:")
 		var totalStored uint64
+		var totalRemaining, totalSpent, totalFees types.Currency
 		for _, c := range rc.Contracts {
 			totalStored += c.Size
+			totalRemaining = totalRemaining.Add(c.RenterFunds)
+			totalSpent = totalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
+			totalFees = totalFees.Add(c.Fees)
 		}
-		fmt.Printf("Total stored in contracts: %9s\n", filesizeUnits(int64(totalStored)))
+		fmt.Println("Active Contract Summary:")
+		fmt.Printf("Number of Contracts:  %v\n", len(rc.Contracts))
+		fmt.Printf("Total stored:         %9s\n", filesizeUnits(int64(totalStored)))
+		fmt.Printf("Total Remaining:      %v\n", currencyUnits(totalRemaining))
+		fmt.Printf("Total Spent:          %v\n", currencyUnits(totalSpent))
+		fmt.Printf("Total Fees:           %v\n", currencyUnits(totalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
 		for _, c := range rc.Contracts {
@@ -424,14 +432,22 @@ func rentercontractscmd() {
 			return
 		}
 		sort.Sort(byValue(rc.OldContracts))
-		fmt.Println("Showing", len(rc.OldContracts), "Active Contracts:")
 		var totalStored uint64
+		var totalWithheld, totalSpent, totalFees types.Currency
 		for _, c := range rc.OldContracts {
 			totalStored += c.Size
+			totalWithheld = totalWithheld.Add(c.RenterFunds)
+			totalSpent = totalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
+			totalFees = totalFees.Add(c.Fees)
 		}
-		fmt.Printf("Total stored in contracts: %9s\n", filesizeUnits(int64(totalStored)))
+		fmt.Println("\nExpired Contract Summary:")
+		fmt.Printf("Number of Contracts: %v\n", len(rc.OldContracts))
+		fmt.Printf("Total stored:        %9s\n", filesizeUnits(int64(totalStored)))
+		fmt.Printf("Total Withheld:      %v\n", currencyUnits(totalWithheld))
+		fmt.Printf("Total Spent:         %v\n", currencyUnits(totalSpent))
+		fmt.Printf("Total Fees:          %v\n", currencyUnits(totalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
+		fmt.Fprintln(w, "Host\tWithheld Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
 		for _, c := range rc.OldContracts {
 			address := c.NetAddress
 			if address == "" {
