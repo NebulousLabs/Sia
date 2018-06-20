@@ -182,12 +182,8 @@ func (r *Renter) buildUnfinishedChunks(f *siafile.SiaFile, hosts map[string]stru
 				if !exists {
 					build.Critical("Couldn't find public key in map. This should never happen")
 				}
-				contractUtility, exists2 := r.hostContractor.ContractUtility(pk)
-				if exists != exists2 {
-					build.Critical("got a contract without utility or vice versa which shouldn't happen",
-						exists, exists2)
-				}
-				if !exists || !exists2 {
+				contractUtility, exists := r.hostContractor.ContractUtility(pk)
+				if !exists {
 					// File contract does not seem to be part of the host anymore.
 					continue
 				}
@@ -231,34 +227,47 @@ func (r *Renter) buildUnfinishedChunks(f *siafile.SiaFile, hosts map[string]stru
 // managedBuildChunkHeap will iterate through all of the files in the renter and
 // construct a chunk heap.
 func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}) {
+	// Get all the files holding the readlock.
+	lockID := r.mu.RLock()
+	files := make([]*siafile.SiaFile, 0, len(r.files))
+	for _, file := range r.files {
+		files = append(files, file)
+	}
+	r.mu.RUnlock(lockID)
+
 	// Save host keys in map. We can't do that under the same lock since we
 	// need to call a public method on the file.
 	pks := make(map[string]types.SiaPublicKey)
 	goodForRenew := make(map[string]bool)
 	offline := make(map[string]bool)
-	for _, f := range r.files {
+	for _, f := range files {
 		for _, pk := range f.HostPublicKeys() {
 			pks[string(pk.Key)] = pk
 		}
 	}
+
+	// Build 2 maps that map every pubkey to its offline and goodForRenew
+	// status.
+	for _, pk := range pks {
+		cu, ok := r.hostContractor.ContractUtility(pk)
+		if !ok {
+			continue
+		}
+		goodForRenew[string(pk.Key)] = ok && cu.GoodForRenew
+		offline[string(pk.Key)] = r.hostContractor.IsOffline(pk)
+	}
+
 	// Loop through the whole set of files and get a list of chunks to add to
 	// the heap.
-	for _, file := range r.files {
-		for _, pk := range pks {
-			cu, ok := r.hostContractor.ContractUtility(pk)
-			if !ok {
-				continue
-			}
-			goodForRenew[string(pk.Key)] = ok && cu.GoodForRenew
-			offline[string(pk.Key)] = r.hostContractor.IsOffline(pk)
-		}
-
+	for _, file := range files {
+		id := r.mu.Lock()
 		unfinishedUploadChunks := r.buildUnfinishedChunks(file, hosts)
+		r.mu.Unlock(id)
 		for i := 0; i < len(unfinishedUploadChunks); i++ {
 			r.uploadHeap.managedPush(unfinishedUploadChunks[i])
 		}
 	}
-	for _, file := range r.files {
+	for _, file := range files {
 		// check for local file
 		id := r.mu.RLock()
 		tf, exists := r.persist.Tracking[file.SiaPath()]
