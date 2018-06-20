@@ -541,7 +541,7 @@ func renterfileslistcmd() {
 	fmt.Printf("Total uploaded: %9s\n", filesizeUnits(int64(totalStored)))
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	if renterListVerbose {
-		fmt.Fprintln(w, "File size\tAvailable\tUploaded\tProgress\tRedundancy\tRenewing\tSia path")
+		fmt.Fprintln(w, "File size\tAvailable\tUploaded\tProgress\tRedundancy\tRenewing\tOn Disk\tRecoverable\tSia path")
 	}
 	sort.Sort(bySiaPath(rf.Files))
 	for _, file := range rf.Files {
@@ -554,10 +554,13 @@ func renterfileslistcmd() {
 				redundancyStr = "-"
 			}
 			uploadProgressStr := fmt.Sprintf("%.2f%%", file.UploadProgress)
+			_, err := os.Stat(file.LocalPath)
+			onDiskStr := yesNo(!os.IsNotExist(err))
+			recoverableStr := yesNo(!(file.Redundancy < 1))
 			if file.UploadProgress == -1 {
 				uploadProgressStr = "-"
 			}
-			fmt.Fprintf(w, "\t%s\t%9s\t%8s\t%10s\t%s", availableStr, filesizeUnits(int64(file.UploadedBytes)), uploadProgressStr, redundancyStr, renewingStr)
+			fmt.Fprintf(w, "\t%s\t%9s\t%8s\t%10s\t%s\t%s\t%s", availableStr, filesizeUnits(int64(file.UploadedBytes)), uploadProgressStr, redundancyStr, renewingStr, onDiskStr, recoverableStr)
 		}
 		fmt.Fprintf(w, "\t%s", file.SiaPath)
 		if !renterListVerbose && !file.Available {

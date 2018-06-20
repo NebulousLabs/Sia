@@ -104,7 +104,7 @@ package renter
 // That's going to need to be changed to a partial sector. This is probably
 // going to result in downloading that's 64-byte aligned instead of perfectly
 // byte-aligned. Further, the encryption and erasure coding may also have
-// alignment requirements which interefere with how the call to Sector can work.
+// alignment requirements which interfere with how the call to Sector can work.
 // So you need to make sure that in 'managedDownload' you download at least
 // enough data to fit the alignment requirements of all 3 steps (download from
 // host, encryption, erasure coding). After the logical data has been recovered,

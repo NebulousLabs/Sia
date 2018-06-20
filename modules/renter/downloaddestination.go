@@ -23,7 +23,7 @@ import (
 )
 
 // downloadDestination is a wrapper for the different types of writing that we
-// can do when reovering and writing the logical data of a file. The wrapper
+// can do when recovering and writing the logical data of a file. The wrapper
 // needs to convert the various write-at calls into writes that make sense to
 // the underlying file, buffer, or stream.
 //

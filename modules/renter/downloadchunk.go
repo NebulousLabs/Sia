@@ -48,7 +48,7 @@ type unfinishedDownloadChunk struct {
 	staticFetchLength uint64 // Length within the logical chunk to fetch.
 	staticFetchOffset uint64 // Offset within the logical chunk that is being downloaded.
 	staticPieceSize   uint64
-	staticWriteOffset int64 // Offet within the writer to write the completed data.
+	staticWriteOffset int64 // Offset within the writer to write the completed data.
 
 	// Fetch + Write instructions - read only or otherwise thread safe.
 	staticLatencyTarget time.Duration
@@ -154,7 +154,7 @@ func (udc *unfinishedDownloadChunk) returnMemory() {
 	if udc.piecesCompleted >= udc.erasureCode.MinPieces() {
 		// udc.piecesRegistered is guaranteed to be at most equal to the number
 		// of overdrive pieces, meaning it will be equal to or less than
-		// initalMemory.
+		// initialMemory.
 		maxMemory = uint64(udc.piecesCompleted+udc.piecesRegistered) * udc.staticPieceSize
 	}
 	// If the chunk recovery has completed, the maximum number of pieces is the

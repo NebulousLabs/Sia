@@ -575,7 +575,7 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 	if req.FormValue("datapieces") != "" || req.FormValue("paritypieces") != "" {
 		// Check that both values have been supplied.
 		if req.FormValue("datapieces") == "" || req.FormValue("paritypieces") == "" {
-			WriteError(w, Error{"must provide both the datapieces paramaeter and the paritypieces parameter if specifying erasure coding parameters"}, http.StatusBadRequest)
+			WriteError(w, Error{"must provide both the datapieces parameter and the paritypieces parameter if specifying erasure coding parameters"}, http.StatusBadRequest)
 			return
 		}
 
