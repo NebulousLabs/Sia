@@ -384,21 +384,28 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	// For each chunk, assemble a mapping from the contract id to the index of
 	// the piece within the chunk that the contract is responsible for.
 	chunkMaps := make([]map[string]downloadPieceInfo, maxChunk-minChunk+1)
-	for chunkIndex := range chunkMaps {
-		chunkMaps[chunkIndex] = make(map[string]downloadPieceInfo)
+	for chunkIndex := minChunk; chunkIndex <= maxChunk; chunkIndex++ {
+		// Create the map.
+		chunkMaps[chunkIndex-minChunk] = make(map[string]downloadPieceInfo)
+		// Get the pieces for the chunk.
 		pieces, err := params.file.Pieces(uint64(chunkIndex))
 		if err != nil {
 			return nil, err
 		}
 		for pieceIndex, pieceSet := range pieces {
 			for _, piece := range pieceSet {
-				chunkMaps[chunkIndex][string(piece.HostPubKey.Key)] = downloadPieceInfo{
+				// Sanity check - the same worker should not have two pieces for
+				// the same chunk.
+				_, exists := chunkMaps[chunkIndex-minChunk][string(piece.HostPubKey.Key)]
+				if exists {
+					r.log.Println("ERROR: Worker has multiple pieces uploaded for the same chunk.")
+				}
+				chunkMaps[chunkIndex-minChunk][string(piece.HostPubKey.Key)] = downloadPieceInfo{
 					index: uint64(pieceIndex),
 					root:  piece.MerkleRoot,
 				}
 			}
 		}
-
 	}
 
 	// Queue the downloads for each chunk.

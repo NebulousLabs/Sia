@@ -88,13 +88,10 @@ func (sf *SiaFile) ChunkSize() uint64 {
 
 // Delete removes the file from disk and marks it as deleted. Once the file is
 // deleted, certain methods should return an error.
-// TODO: This will actually delete the file from disk once we change the
-// persistence structure to use the new file format.
-func (sf *SiaFile) Delete() error {
+func (sf *SiaFile) Delete() {
 	sf.mu.Lock()
 	defer sf.mu.Unlock()
 	sf.deleted = true
-	return nil
 }
 
 // Deleted indicates if this file has been deleted by the user.

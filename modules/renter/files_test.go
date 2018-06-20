@@ -245,6 +245,7 @@ func TestRenterFileListLocalPath(t *testing.T) {
 	defer rt.Close()
 	id := rt.renter.mu.Lock()
 	f := newTestingFile()
+	rt.renter.files[f.SiaPath()] = f
 	rt.renter.persist.Tracking[f.SiaPath()] = trackedFile{
 		RepairPath: "TestPath",
 	}
@@ -277,7 +278,7 @@ func TestRenterDeleteFile(t *testing.T) {
 
 	// Put a file in the renter.
 	file1 := newTestingFile()
-	rt.renter.files["1"] = file1
+	rt.renter.files[file1.SiaPath()] = file1
 	// Delete a different file.
 	err = rt.renter.DeleteFile("one")
 	if err != ErrUnknownPath {
@@ -342,11 +343,11 @@ func TestRenterFileList(t *testing.T) {
 
 	// Put a file in the renter.
 	file1 := newTestingFile()
-	rt.renter.files["1"] = file1
+	rt.renter.files[file1.SiaPath()] = file1
 	if len(rt.renter.FileList()) != 1 {
 		t.Error("FileList is not returning the only file in the renter")
 	}
-	if rt.renter.FileList()[0].SiaPath != "one" {
+	if rt.renter.FileList()[0].SiaPath != file1.SiaPath() {
 		t.Error("FileList is not returning the correct filename for the only file")
 	}
 

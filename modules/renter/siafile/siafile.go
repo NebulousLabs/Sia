@@ -163,7 +163,13 @@ func (sf *SiaFile) Pieces(chunkIndex uint64) ([][]Piece, error) {
 		return nil, fmt.Errorf("index %v out of bounds (%v)",
 			chunkIndex, len(sf.chunks))
 	}
-	return sf.chunks[chunkIndex].pieces, nil
+	// Return a deep-copy to avoid race conditions.
+	pieces := make([][]Piece, len(sf.chunks[chunkIndex].pieces))
+	for pieceIndex := range pieces {
+		pieces[pieceIndex] = make([]Piece, len(sf.chunks[chunkIndex].pieces[pieceIndex]))
+		copy(pieces[pieceIndex], sf.chunks[chunkIndex].pieces[pieceIndex])
+	}
+	return pieces, nil
 }
 
 // UID returns a unique identifier for this file.

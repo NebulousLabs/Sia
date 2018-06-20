@@ -10,10 +10,12 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -57,6 +59,121 @@ type (
 	}
 )
 
+// MarshalSia implements the encoding.SiaMarshaller interface, writing the
+// file data to w.
+func (f *file) MarshalSia(w io.Writer) error {
+	enc := encoding.NewEncoder(w)
+
+	// encode easy fields
+	err := enc.EncodeAll(
+		f.name,
+		f.size,
+		f.masterKey,
+		f.pieceSize,
+		f.mode,
+	)
+	if err != nil {
+		return err
+	}
+	// COMPATv0.4.3 - encode the bytesUploaded and chunksUploaded fields
+	// TODO: the resulting .sia file may confuse old clients.
+	err = enc.EncodeAll(f.pieceSize*f.numChunks()*uint64(f.erasureCode.NumPieces()), f.numChunks())
+	if err != nil {
+		return err
+	}
+
+	// encode erasureCode
+	switch code := f.erasureCode.(type) {
+	case *rsCode:
+		err = enc.EncodeAll(
+			"Reed-Solomon",
+			uint64(code.dataPieces),
+			uint64(code.numPieces-code.dataPieces),
+		)
+		if err != nil {
+			return err
+		}
+	default:
+		if build.DEBUG {
+			panic("unknown erasure code")
+		}
+		return errors.New("unknown erasure code")
+	}
+	// encode contracts
+	if err := enc.Encode(uint64(len(f.contracts))); err != nil {
+		return err
+	}
+	for _, c := range f.contracts {
+		if err := enc.Encode(c); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// UnmarshalSia implements the encoding.SiaUnmarshaller interface,
+// reconstructing a file from the encoded bytes read from r.
+func (f *file) UnmarshalSia(r io.Reader) error {
+	dec := encoding.NewDecoder(r)
+
+	// COMPATv0.4.3 - decode bytesUploaded and chunksUploaded into dummy vars.
+	var bytesUploaded, chunksUploaded uint64
+
+	// Decode easy fields.
+	err := dec.DecodeAll(
+		&f.name,
+		&f.size,
+		&f.masterKey,
+		&f.pieceSize,
+		&f.mode,
+		&bytesUploaded,
+		&chunksUploaded,
+	)
+	if err != nil {
+		return err
+	}
+	f.staticUID = persist.RandomSuffix()
+
+	// Decode erasure coder.
+	var codeType string
+	if err := dec.Decode(&codeType); err != nil {
+		return err
+	}
+	switch codeType {
+	case "Reed-Solomon":
+		var nData, nParity uint64
+		err = dec.DecodeAll(
+			&nData,
+			&nParity,
+		)
+		if err != nil {
+			return err
+		}
+		rsc, err := NewRSCode(int(nData), int(nParity))
+		if err != nil {
+			return err
+		}
+		f.erasureCode = rsc
+	default:
+		return errors.New("unrecognized erasure code type: " + codeType)
+	}
+
+	// Decode contracts.
+	var nContracts uint64
+	if err := dec.Decode(&nContracts); err != nil {
+		return err
+	}
+	f.contracts = make(map[types.FileContractID]fileContract)
+	var contract fileContract
+	for i := uint64(0); i < nContracts; i++ {
+		if err := dec.Decode(&contract); err != nil {
+			return err
+		}
+		f.contracts[contract.ID] = contract
+	}
+	return nil
+}
+
 // saveFile saves a file to the renter directory.
 func (r *Renter) saveFile(f *siafile.SiaFile) error {
 	if f.Deleted() { // TODO: violation of locking convention
@@ -77,7 +194,7 @@ func (r *Renter) saveFile(f *siafile.SiaFile) error {
 	defer handle.Close()
 
 	// Write file data.
-	err = shareFiles([]*siafile.SiaFile{f}, handle)
+	err = r.shareFiles([]*siafile.SiaFile{f}, handle)
 	if err != nil {
 		return err
 	}
@@ -162,11 +279,11 @@ func (r *Renter) loadSettings() error {
 
 // shareFiles writes the specified files to w. First a header is written,
 // followed by the gzipped concatenation of each file.
-func shareFiles(siaFiles []*siafile.SiaFile, w io.Writer) error {
+func (r *Renter) shareFiles(siaFiles []*siafile.SiaFile, w io.Writer) error {
 	// Convert files to old type.
 	files := make([]*file, 0, len(siaFiles))
 	for _, sf := range siaFiles {
-		files = append(files, siaFileToFile(sf))
+		files = append(files, r.siaFileToFile(sf))
 	}
 	// Write header.
 	err := encoding.NewEncoder(w).EncodeAll(
@@ -219,7 +336,7 @@ func (r *Renter) ShareFiles(nicknames []string, shareDest string) error {
 		files[i] = f
 	}
 
-	err = shareFiles(files, handle)
+	err = r.shareFiles(files, handle)
 	if err != nil {
 		os.Remove(shareDest)
 		return err
@@ -244,7 +361,7 @@ func (r *Renter) ShareFilesASCII(nicknames []string) (string, error) {
 	}
 
 	buf := new(bytes.Buffer)
-	err := shareFiles(files, base64.NewEncoder(base64.URLEncoding, buf))
+	err := r.shareFiles(files, base64.NewEncoder(base64.URLEncoding, buf))
 	if err != nil {
 		return "", err
 	}
@@ -304,12 +421,12 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 	// Add files to renter.
 	names := make([]string, numFiles)
 	for i, f := range files {
-		r.files[f.name] = fileToSiaFile(f)
+		r.files[f.name] = r.fileToSiaFile(f)
 		names[i] = f.name
 	}
 	// Save the files.
 	for _, f := range files {
-		r.saveFile(fileToSiaFile(f))
+		r.saveFile(r.fileToSiaFile(f))
 	}
 
 	return names, nil
