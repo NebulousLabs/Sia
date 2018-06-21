@@ -134,7 +134,7 @@ func (sf *SiaFile) HostPublicKeys() []types.SiaPublicKey {
 // MasterKey returns the masterkey used to encrypt the file.
 func (sf *SiaFile) MasterKey() crypto.TwofishKey {
 	sf.mu.RLock()
-	sf.mu.RUnlock()
+	defer sf.mu.RUnlock()
 	return sf.metadata.masterKey
 }
 
@@ -158,7 +158,7 @@ func (sf *SiaFile) PieceSize() uint64 {
 // takes one argument, a map of offline contracts for this file.
 func (sf *SiaFile) Redundancy(offlineMap map[string]bool, goodForRenewMap map[string]bool) float64 {
 	sf.mu.RLock()
-	sf.mu.RUnlock()
+	defer sf.mu.RUnlock()
 	if sf.metadata.fileSize == 0 {
 		return -1
 	}

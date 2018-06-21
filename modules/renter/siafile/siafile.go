@@ -1,10 +1,10 @@
 package siafile
 
 import (
+	"bytes"
 	"encoding/base32"
 	"encoding/binary"
 	"fmt"
-	"reflect"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -105,7 +105,7 @@ func (sf *SiaFile) AddPiece(pk types.SiaPublicKey, chunkIndex, pieceIndex uint64
 	// Get the index of the host in the public key table.
 	tableIndex := -1
 	for i, hpk := range sf.pubKeyTable {
-		if reflect.DeepEqual(hpk, pk) {
+		if hpk.Algorithm == pk.Algorithm && bytes.Equal(hpk.Key, pk.Key) {
 			tableIndex = i
 			break
 		}
@@ -134,7 +134,7 @@ func (sf *SiaFile) AddPiece(pk types.SiaPublicKey, chunkIndex, pieceIndex uint64
 // ErasureCode returns the erasure coder used by the file.
 func (sf *SiaFile) ErasureCode() modules.ErasureCoder {
 	sf.mu.RLock()
-	sf.mu.RUnlock()
+	defer sf.mu.RUnlock()
 	return sf.erasureCode
 }
 
@@ -142,6 +142,8 @@ func (sf *SiaFile) ErasureCode() modules.ErasureCoder {
 // return the number of chunks the file consists of even if the file is not
 // fully uploaded yet.
 func (sf *SiaFile) NumChunks() uint64 {
+	sf.mu.RLock()
+	defer sf.mu.RUnlock()
 	// empty files still need at least one chunk
 	if sf.metadata.fileSize == 0 {
 		return 1
@@ -160,8 +162,7 @@ func (sf *SiaFile) Pieces(chunkIndex uint64) ([][]Piece, error) {
 	sf.mu.RLock()
 	defer sf.mu.RUnlock()
 	if chunkIndex >= uint64(len(sf.chunks)) {
-		return nil, fmt.Errorf("index %v out of bounds (%v)",
-			chunkIndex, len(sf.chunks))
+		panic(fmt.Sprintf("index %v out of bounds (%v)", chunkIndex, len(sf.chunks)))
 	}
 	// Return a deep-copy to avoid race conditions.
 	pieces := make([][]Piece, len(sf.chunks[chunkIndex].pieces))
