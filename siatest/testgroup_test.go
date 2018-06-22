@@ -18,7 +18,7 @@ func TestNewGroup(t *testing.T) {
 		Miners:  2,
 	}
 	// Create the group
-	tg, err := NewGroupFromTemplate(groupParams)
+	tg, err := NewGroupFromTemplate(siatestTestDir(t), groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -70,7 +70,7 @@ func TestNewGroupNoMiner(t *testing.T) {
 		Miners:  0,
 	}
 	// Create the group
-	_, err := NewGroupFromTemplate(groupParams)
+	_, err := NewGroupFromTemplate(siatestTestDir(t), groupParams)
 	if err == nil {
 		t.Fatal("Creating a group without miners should fail: ", err)
 	}
@@ -88,7 +88,7 @@ func TestNewGroupNoRenterHost(t *testing.T) {
 		Miners:  5,
 	}
 	// Create the group
-	tg, err := NewGroupFromTemplate(groupParams)
+	tg, err := NewGroupFromTemplate(siatestTestDir(t), groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}

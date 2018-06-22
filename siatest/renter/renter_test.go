@@ -35,7 +35,7 @@ func TestRenter(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t), groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -350,16 +350,13 @@ func testDownloadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnce
 	}
 
 	// Get a directory for testing.
-	testDir, err := siatest.TestDir(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+	testDir := renterTestDir(t)
 
 	// Create a group with a single renter and two hosts using the dependencies
 	// for the renter.
 	renterTemplate := node.Renter(testDir + "/renter")
 	renterTemplate.ContractSetDeps = deps
-	tg, err := siatest.NewGroup(renterTemplate, node.Host(testDir+"/host1"),
+	tg, err := siatest.NewGroup(testDir, renterTemplate, node.Host(testDir+"/host1"),
 		node.Host(testDir+"/host2"), siatest.Miner(testDir+"/miner"))
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
@@ -425,16 +422,13 @@ func testUploadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnceOn
 	}
 
 	// Get a directory for testing.
-	testDir, err := siatest.TestDir(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+	testDir := renterTestDir(t)
 
 	// Create a group with a single renter and two hosts using the dependencies
 	// for the renter.
 	renterTemplate := node.Renter(testDir + "/renter")
 	renterTemplate.ContractSetDeps = deps
-	tg, err := siatest.NewGroup(renterTemplate, node.Host(testDir+"/host1"),
+	tg, err := siatest.NewGroup(testDir, renterTemplate, node.Host(testDir+"/host1"),
 		node.Host(testDir+"/host2"), siatest.Miner(testDir+"/miner"))
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
@@ -581,17 +575,15 @@ func TestRenewFailing(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	renterDir, err := siatest.TestDir(filepath.Join(t.Name(), "renter"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Create testing directory.
+	testDir := renterTestDir(t)
 
 	// Create a group for the subtests
 	groupParams := siatest.GroupParams{
 		Hosts:  3,
 		Miners: 1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	tg, err := siatest.NewGroupFromTemplate(testDir, groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -603,7 +595,7 @@ func TestRenewFailing(t *testing.T) {
 
 	// Add a renter with a custom allowance to give it plenty of time to renew
 	// the contract later.
-	renterParams := node.Renter(renterDir)
+	renterParams := node.Renter(filepath.Join(testDir, "renter"))
 	renterParams.Allowance = siatest.DefaultAllowance
 	renterParams.Allowance.Hosts = uint64(len(tg.Hosts()) - 1)
 	renterParams.Allowance.Period = 100
@@ -729,15 +721,12 @@ func TestRenterPersistData(t *testing.T) {
 	}
 
 	// Get test directory
-	testdir, err := siatest.TestDir(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+	testDir := renterTestDir(t)
 
 	// Copying legacy file to test directory
-	renterDir := filepath.Join(testdir, "renter")
+	renterDir := filepath.Join(testDir, "renter")
 	destination := filepath.Join(renterDir, "renter.json")
-	err = os.MkdirAll(renterDir, 0700)
+	err := os.MkdirAll(renterDir, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -761,7 +750,7 @@ func TestRenterPersistData(t *testing.T) {
 	}
 
 	// Create new node from legacy renter.json persistence file
-	r, err := siatest.NewNode(node.AllModules(testdir))
+	r, err := siatest.NewNode(node.AllModules(testDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -890,7 +879,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 		Hosts:  2,
 		Miners: 1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t), groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -901,7 +890,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}()
 
 	// Add a Renter node
-	renterDir, err := siatest.TestDir(filepath.Join(t.Name(), "renter"))
+	renterDir := filepath.Join(renterTestDir(t), "renter")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1126,7 +1115,7 @@ func TestRedundancyReporting(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t), groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -1229,7 +1218,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t), groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -1371,7 +1360,7 @@ func TestRenterResetAllowance(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t), groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}

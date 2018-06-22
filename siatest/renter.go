@@ -1,11 +1,10 @@
 package siatest
 
 import (
+	"encoding/hex"
 	"fmt"
-	"math"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -24,8 +23,8 @@ func (tn *TestNode) DownloadToDisk(rf *RemoteFile, async bool) (*LocalFile, erro
 		return nil, errors.AddContext(err, "failed to retrieve FileInfo")
 	}
 	// Create a random destination for the download
-	fileName := strconv.Itoa(fastrand.Intn(math.MaxInt32))
-	dest := filepath.Join(SiaTestingDir, fileName)
+	fileName := fmt.Sprintf("%dbytes-%s", fi.Filesize, hex.EncodeToString(fastrand.Bytes(4)))
+	dest := filepath.Join(DataDir(), fileName)
 	if err := tn.RenterDownloadGet(rf.siaPath, dest, 0, fi.Filesize, async); err != nil {
 		return nil, errors.AddContext(err, "failed to download file")
 	}

@@ -1,11 +1,11 @@
 package siatest
 
 import (
+	"encoding/hex"
+	"fmt"
 	"io/ioutil"
-	"math"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/errors"
@@ -24,8 +24,8 @@ type (
 // NewFile creates and returns a new LocalFile. It will write size random bytes
 // to the file and give the file a random name.
 func NewFile(size int) (*LocalFile, error) {
-	fileName := strconv.Itoa(fastrand.Intn(math.MaxInt32))
-	path := filepath.Join(SiaTestingDir, fileName)
+	fileName := fmt.Sprintf("%dbytes-%s", size, hex.EncodeToString(fastrand.Bytes(4)))
+	path := filepath.Join(DataDir(), fileName)
 	bytes := fastrand.Bytes(size)
 	err := ioutil.WriteFile(path, bytes, 0600)
 	return &LocalFile{

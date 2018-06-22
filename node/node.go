@@ -90,7 +90,7 @@ type NodeParams struct {
 	SkipHostDiscovery bool
 
 	// The high level directory where all the persistence gets stored for the
-	// moudles.
+	// modules.
 	Dir string
 }
 
