@@ -286,14 +286,14 @@ of unix time stamps.  Both parameters are optional, if
 no parameters are provided, the entire download history
 will be cleared.  To clear a single download, provide the
 timestamp for the download as both parameters.  Providing
-only the newest parameter will clear all downloads older
-than the timestamp.  Conversely, providing only the oldest
+only the before parameter will clear all downloads older
+than the timestamp.  Conversely, providing only the after
 parameter will clear all downloads newer than the timestamp.
 
 ###### Timestamp Parameters [(with comments)]
 ```
-newest   // Optional - unix timestamp found in the download history
-oldest   // Optional - unix timestamp found in the download history
+before   // Optional - unix timestamp found in the download history
+after   // Optional - unix timestamp found in the download history
 ```
 
 ###### Response
