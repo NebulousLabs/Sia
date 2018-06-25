@@ -532,41 +532,37 @@ func (r *Renter) ClearDownloadHistory(before, after time.Time) error {
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
 
-	if before.Before(after) && !before.Equal(time.Unix(0, 0)) {
-		return errors.New("before timestamp can not be before after timestamp")
+	if before.Before(after) && !before.IsZero() {
+		return errors.New("before timestamp can not be newer then after timestamp")
 	}
 
 	// Clear download history if both before and after timestamps are zero values
-	if before.Equal(time.Unix(0, 0)) && after.Equal(time.Unix(0, 0)) {
+	if before.IsZero() && after.IsZero() {
 		r.downloadHistory = r.downloadHistory[:0]
 		return nil
 	}
 
-	// If after timestamp is zero value, search for before timestamps to clear history
-	if after.Equal(time.Unix(0, 0)) {
+	// If after timestamp is zero value, search for before timestamp to clear history
+	if after.IsZero() {
 		i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(before) })
-		if i > len(r.downloadHistory) {
-			// before timestamp is older than all downloads, clear entire download history
-			r.downloadHistory = r.downloadHistory[:0]
-			return nil
-		}
 		r.downloadHistory = r.downloadHistory[i:]
 		return nil
 	}
 
-	// Clear range of downloads from history
+	// Search for after timestamp in download history
 	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(after) })
 	if i > len(r.downloadHistory) {
-		// after timestamp newer than all downloads
+		// Before and after timestamps are newer than all downloads
+		// no downloads to clear
 		return nil
 	}
 	// linear search for before timestamp
-	if !before.Equal(time.Unix(0, 0)) && !before.After(r.downloadHistory[len(r.downloadHistory)-1].staticStartTime) {
+	if !before.IsZero() && !before.After(r.downloadHistory[len(r.downloadHistory)-1].staticStartTime) {
 		j := i
 		for j < len(r.downloadHistory) && r.downloadHistory[j].staticStartTime.Before(before) {
 			j++
 		}
-		//remove section from array
+		// Clear range of downloads from history
 		r.downloadHistory = append(r.downloadHistory[:i-1], r.downloadHistory[j:]...)
 		return nil
 	}

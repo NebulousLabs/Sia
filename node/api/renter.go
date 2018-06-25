@@ -365,27 +365,26 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 
 // renterClearDownloadsHandler handles the API call to request to clear the download queue.
 func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	var beforeInt, afterInt int64
+	var beforeTime, afterTime time.Time
 	var err error
 
 	beforeStr, afterStr := req.FormValue("before"), req.FormValue("after")
 	if beforeStr != "" {
-		beforeInt, err = strconv.ParseInt(beforeStr, 10, 64)
+		beforeInt, err := strconv.ParseInt(beforeStr, 10, 64)
 		if err != nil {
 			WriteError(w, Error{"parsing integer value for parameter `before` failed: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
+		beforeTime = time.Unix(0, beforeInt)
 	}
-	beforeTime := time.Unix(0, beforeInt)
-
 	if afterStr != "" {
-		afterInt, err = strconv.ParseInt(afterStr, 10, 64)
+		afterInt, err := strconv.ParseInt(afterStr, 10, 64)
 		if err != nil {
 			WriteError(w, Error{"parsing integer value for parameter `after` failed: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
+		afterTime = time.Unix(0, afterInt)
 	}
-	afterTime := time.Unix(0, afterInt)
 
 	err = api.renter.ClearDownloadHistory(beforeTime, afterTime)
 	if err != nil {
