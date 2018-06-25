@@ -34,10 +34,19 @@ func siatestTestDir(t *testing.T) string {
 	return path
 }
 
-// DataDir returns a temporary directory that will be used to create temporary
-// files for uploading.
-func DataDir() string {
-	path := filepath.Join(SiaTestingDir, "siatest", "data")
+// filesDir returns the path to the files directory of the TestNode. The files
+// directory is where new files are stored before being uploaded.
+func (tn *TestNode) filesDir() string {
+	path := filepath.Join(tn.Dir, "files")
+	if err := os.MkdirAll(path, 0777); err != nil {
+		panic(err)
+	}
+	return path
+}
+
+// downloadsDir returns the path to the download directory of the TestNode.
+func (tn *TestNode) downloadsDir() string {
+	path := filepath.Join(tn.Dir, "downloads")
 	if err := os.MkdirAll(path, 0777); err != nil {
 		panic(err)
 	}

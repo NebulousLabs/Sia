@@ -19,7 +19,7 @@ func TestInitialScanComplete(t *testing.T) {
 	}
 
 	// Get a directory for testing.
-	testDir := renterTestDir(t)
+	testDir := renterTestDir(t.Name())
 
 	// Create a group. The renter should block the scanning thread using a
 	// dependency.

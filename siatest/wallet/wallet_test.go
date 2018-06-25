@@ -19,7 +19,7 @@ func TestTransactionReorg(t *testing.T) {
 	}
 
 	// Create testing directory.
-	testdir := walletTestDir(t)
+	testdir := walletTestDir(t.Name())
 
 	// Create two miners
 	miner1, err := siatest.NewNode(siatest.Miner(filepath.Join(testdir, "miner1")))

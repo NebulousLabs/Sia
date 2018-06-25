@@ -1,7 +1,6 @@
 package siatest
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -13,9 +12,9 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api/client"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/errors"
-	"github.com/NebulousLabs/fastrand"
 )
 
 type (
@@ -302,7 +301,7 @@ func randomNodeDir(parentDir string, nodeParams *node.NodeParams) {
 	if nodeParams.Miner != nil || nodeParams.CreateMiner {
 		nodeDir += "m"
 	}
-	nodeDir += fmt.Sprintf("-%s", hex.EncodeToString(fastrand.Bytes(4)))
+	nodeDir += fmt.Sprintf("-%s", persist.RandomSuffix())
 	nodeParams.Dir = filepath.Join(parentDir, nodeDir)
 }
 

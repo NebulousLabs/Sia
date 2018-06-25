@@ -14,7 +14,7 @@ func TestApiHeight(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testDir := consensusTestDir(t)
+	testDir := consensusTestDir(t.Name())
 
 	// Create a new server
 	testNode, err := siatest.NewNode(node.AllModules(testDir))
@@ -60,7 +60,7 @@ func TestConsensusBlocksIDGet(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(consensusTestDir(t), groupParams)
+	tg, err := siatest.NewGroupFromTemplate(consensusTestDir(t.Name()), groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
