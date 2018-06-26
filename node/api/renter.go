@@ -274,7 +274,7 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 
 // renterContractsHandler handles the API call to request the Renter's contracts.
 func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	Contracts := []RenterContract{}
+	contracts := []RenterContract{}
 	for _, c := range api.renter.Contracts() {
 		var size uint64
 		if len(c.Transaction.FileContractRevisions) != 0 {
@@ -296,7 +296,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			goodForRenew = utility.GoodForRenew
 		}
 
-		Contracts = append(Contracts, RenterContract{
+		contracts = append(contracts, RenterContract{
 			DownloadSpending:          c.DownloadSpending,
 			EndHeight:                 c.EndHeight,
 			Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
@@ -357,7 +357,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 		})
 	}
 	WriteJSON(w, RenterContracts{
-		Contracts:    Contracts,
+		Contracts:    contracts,
 		OldContracts: oldContracts,
 	})
 }

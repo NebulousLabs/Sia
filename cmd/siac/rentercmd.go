@@ -171,7 +171,8 @@ func rentercmd() {
 	}
 
 	fmt.Printf(`Renter info:
-	Period Spending:   %v
+	Allowance:         %v
+	Period Spending:
 	  Spent Funds:     %v
 	    Storage:       %v
 	    Upload:        %v
@@ -400,12 +401,13 @@ func rentercontractscmd() {
 			totalSpent = totalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
 			totalFees = totalFees.Add(c.Fees)
 		}
-		fmt.Println("Active Contract Summary:")
-		fmt.Printf("Number of Contracts:  %v\n", len(rc.Contracts))
-		fmt.Printf("Total stored:         %9s\n", filesizeUnits(int64(totalStored)))
-		fmt.Printf("Total Remaining:      %v\n", currencyUnits(totalRemaining))
-		fmt.Printf("Total Spent:          %v\n", currencyUnits(totalSpent))
-		fmt.Printf("Total Fees:           %v\n", currencyUnits(totalFees))
+		fmt.Printf(`Active Contract Summary:
+		"Number of Contracts:  %v
+		"Total stored:         %9s
+		"Total Remaining:      %v
+		"Total Spent:          %v
+		"Total Fees:           %v
+		`, len(rc.Contracts), filesizeUnits(int64(totalStored)), currencyUnits(totalRemaining), currencyUnits(totalSpent), currencyUnits(totalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
 		for _, c := range rc.Contracts {
@@ -440,12 +442,14 @@ func rentercontractscmd() {
 			totalSpent = totalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
 			totalFees = totalFees.Add(c.Fees)
 		}
-		fmt.Println("\nExpired Contract Summary:")
-		fmt.Printf("Number of Contracts: %v\n", len(rc.OldContracts))
-		fmt.Printf("Total stored:        %9s\n", filesizeUnits(int64(totalStored)))
-		fmt.Printf("Total Withheld:      %v\n", currencyUnits(totalWithheld))
-		fmt.Printf("Total Spent:         %v\n", currencyUnits(totalSpent))
-		fmt.Printf("Total Fees:          %v\n", currencyUnits(totalFees))
+		fmt.Printf(`
+		Expired Contract Summary:
+		"Number of Contracts:  %v
+		"Total stored:         %9s
+		"Total Remaining:      %v
+		"Total Spent:          %v
+		"Total Fees:           %v
+		`, len(rc.OldContracts), filesizeUnits(int64(totalStored)), currencyUnits(totalWithheld), currencyUnits(totalSpent), currencyUnits(totalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "Host\tWithheld Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
 		for _, c := range rc.OldContracts {
