@@ -523,7 +523,7 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 }
 
 // ClearDownloadHistory clears the renter's download history inclusive
-//  of the provided before and after timestamps
+// of the provided before and after timestamps
 func (r *Renter) ClearDownloadHistory(before, after time.Time) error {
 	if err := r.tg.Add(); err != nil {
 		return err
@@ -532,6 +532,7 @@ func (r *Renter) ClearDownloadHistory(before, after time.Time) error {
 	r.downloadHistoryMu.Lock()
 	defer r.downloadHistoryMu.Unlock()
 
+	// Timestamp validation
 	if before.Before(after) && !before.IsZero() {
 		return errors.New("before timestamp can not be newer then after timestamp")
 	}
@@ -542,32 +543,53 @@ func (r *Renter) ClearDownloadHistory(before, after time.Time) error {
 		return nil
 	}
 
-	// If after timestamp is zero value, search for before timestamp to clear history
+	// If timestamp is zero, we manually set the index, otherwise we search for the timestamp
+	var beforeIndex, afterIndex int
+	if before.IsZero() {
+		beforeIndex = len(r.downloadHistory) - 1
+	} else {
+		beforeIndex = sort.Search(len(r.downloadHistory), func(i int) bool {
+			return r.downloadHistory[i].staticStartTime.UnixNano() >= before.UnixNano()
+		})
+	}
 	if after.IsZero() {
-		i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(before) })
-		r.downloadHistory = r.downloadHistory[i:]
-		return nil
+		afterIndex = 0
+	} else {
+		afterIndex = sort.Search(len(r.downloadHistory), func(i int) bool {
+			return r.downloadHistory[i].staticStartTime.UnixNano() >= after.UnixNano()
+		})
 	}
 
-	// Search for after timestamp in download history
-	i := sort.Search(len(r.downloadHistory), func(i int) bool { return r.downloadHistory[i].staticStartTime.After(after) })
-	if i > len(r.downloadHistory) {
-		// Before and after timestamps are newer than all downloads
-		// no downloads to clear
-		return nil
-	}
-	// linear search for before timestamp
-	if !before.IsZero() && !before.After(r.downloadHistory[len(r.downloadHistory)-1].staticStartTime) {
-		j := i
-		for j < len(r.downloadHistory) && r.downloadHistory[j].staticStartTime.Before(before) {
-			j++
+	// Checking for cases when the same timestamp is submitted,
+	// so the user wants to delete a specific download
+	if beforeIndex == afterIndex {
+		// Checking for cases where the timestamp is not in
+		// the array
+		if afterIndex == len(r.downloadHistory) {
+			return nil
 		}
-		// Clear range of downloads from history
-		r.downloadHistory = append(r.downloadHistory[:i-1], r.downloadHistory[j:]...)
-		return nil
+		if !r.downloadHistory[afterIndex].staticStartTime.Equal(after) {
+			return nil
+		}
 	}
 
+	// This is for the case when the timestamp is not a download but is
+	// within the bounds of the array, we don't want the next download to be
+	// cleared since the user didn't submit that download's timestamp
+	if !before.IsZero() && !r.downloadHistory[beforeIndex].staticStartTime.Equal(before) {
+		beforeIndex--
+	}
+
+	// Manually set indices if we didn't find any element.
+	if afterIndex == len(r.downloadHistory) && !before.IsZero() {
+		// Checking for before not equal to zero for case of only after
+		// is submitted but it is before all the timestamps
+		afterIndex = 0
+	}
+	if beforeIndex == len(r.downloadHistory) {
+		beforeIndex = len(r.downloadHistory) - 1
+	}
 	// before timestamp is zero value or is newer than all downloads, clear the rest of the download history
-	r.downloadHistory = r.downloadHistory[:i-1]
+	r.downloadHistory = append(r.downloadHistory[:afterIndex], r.downloadHistory[beforeIndex+1:]...)
 	return nil
 }
