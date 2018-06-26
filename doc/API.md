@@ -1006,7 +1006,7 @@ parameter will clear all downloads newer than the timestamp.
 ###### Timestamp Parameters [(with comments)](/doc/api/Renter.md#timestamp-parameters)
 ```
 before   // Optional
-after   // Optional
+after    // Optional
 ```
 
 ###### Response

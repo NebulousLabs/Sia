@@ -563,8 +563,7 @@ func (r *Renter) ClearDownloadHistory(before, after time.Time) error {
 	// Checking for cases when the same timestamp is submitted,
 	// so the user wants to delete a specific download
 	if beforeIndex == afterIndex {
-		// Checking for cases where the timestamp is not in
-		// the array
+		// Checking for cases where the timestamp is not in the history
 		if afterIndex == len(r.downloadHistory) {
 			return nil
 		}
@@ -576,7 +575,7 @@ func (r *Renter) ClearDownloadHistory(before, after time.Time) error {
 	// This is for the case when the timestamp is not a download but is
 	// within the bounds of the array, we don't want the next download to be
 	// cleared since the user didn't submit that download's timestamp
-	if !before.IsZero() && !r.downloadHistory[beforeIndex].staticStartTime.Equal(before) {
+	if beforeIndex != len(r.downloadHistory) && !before.IsZero() && !r.downloadHistory[beforeIndex].staticStartTime.Equal(before) {
 		beforeIndex--
 	}
 
@@ -589,7 +588,7 @@ func (r *Renter) ClearDownloadHistory(before, after time.Time) error {
 	if beforeIndex == len(r.downloadHistory) {
 		beforeIndex = len(r.downloadHistory) - 1
 	}
-	// before timestamp is zero value or is newer than all downloads, clear the rest of the download history
+
 	r.downloadHistory = append(r.downloadHistory[:afterIndex], r.downloadHistory[beforeIndex+1:]...)
 	return nil
 }

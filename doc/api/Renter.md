@@ -292,7 +292,7 @@ parameter will clear all downloads newer than the timestamp.
 
 ###### Timestamp Parameters [(with comments)]
 ```
-before   // Optional - unix timestamp found in the download history
+before  // Optional - unix timestamp found in the download history
 after   // Optional - unix timestamp found in the download history
 ```
 
