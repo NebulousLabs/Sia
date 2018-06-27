@@ -323,6 +323,7 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 // with a dependency that interrupts the download before sending the signed
 // revision to the host.
 func TestDownloadInterruptedBeforeSendingRevision(t *testing.T) {
+	t.Parallel()
 	testDownloadInterrupted(t, newDependencyInterruptDownloadBeforeSendingRevision())
 }
 
@@ -330,6 +331,7 @@ func TestDownloadInterruptedBeforeSendingRevision(t *testing.T) {
 // with a dependency that interrupts the download after sending the signed
 // revision to the host.
 func TestDownloadInterruptedAfterSendingRevision(t *testing.T) {
+	t.Parallel()
 	testDownloadInterrupted(t, newDependencyInterruptDownloadAfterSendingRevision())
 }
 
@@ -337,6 +339,7 @@ func TestDownloadInterruptedAfterSendingRevision(t *testing.T) {
 // dependency that interrupts the upload before sending the signed revision to
 // the host.
 func TestUploadInterruptedBeforeSendingRevision(t *testing.T) {
+	t.Parallel()
 	testUploadInterrupted(t, newDependencyInterruptUploadBeforeSendingRevision())
 }
 
@@ -344,6 +347,7 @@ func TestUploadInterruptedBeforeSendingRevision(t *testing.T) {
 // dependency that interrupts the upload after sending the signed revision to
 // the host.
 func TestUploadInterruptedAfterSendingRevision(t *testing.T) {
+	t.Parallel()
 	testUploadInterrupted(t, newDependencyInterruptUploadAfterSendingRevision())
 }
 
@@ -593,6 +597,7 @@ func TestRenewFailing(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	renterDir, err := siatest.TestDir(filepath.Join(t.Name(), "renter"))
 	if err != nil {
 		t.Fatal(err)
@@ -739,6 +744,7 @@ func TestRenterPersistData(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Get test directory
 	testdir, err := siatest.TestDir(t.Name())
@@ -892,6 +898,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a group for the subtests
 	groupParams := siatest.GroupParams{
@@ -1027,6 +1034,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a testgroup, creating without renter so the renter's
 	// initial balance can be obtained
@@ -1093,7 +1101,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		printDebug(r)
 		t.Fatal(err)
 	}
 
@@ -1101,7 +1108,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 	// are reflected correctly in the wallet balance
 	expectedBalance, walletBalance, err := checkBalanceVsSpending(r, initialBalance)
 	if err != nil {
-		printDebug(r)
 		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
 		t.Log("ExpectedBalance:", expectedBalance.HumanString())
 		t.Log("walletBalance  :", walletBalance.HumanString())
@@ -1149,7 +1155,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		printDebug(r)
 		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
 		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
 		t.Log("ExpectedBalance:", expectedBalance.HumanString())
@@ -1183,7 +1188,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		printDebug(r)
 		t.Fatal(err)
 	}
 
@@ -1204,7 +1208,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Could not get contracts:", err)
 	}
 	if err = checkContractVsReportedSpending(r, windowSize, rc.OldContracts, rc.Contracts); err != nil {
-		printDebug(r)
 		t.Fatal(err)
 	}
 
@@ -1218,7 +1221,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		printDebug(r)
 		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
 		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
 		t.Log("ExpectedBalance:", expectedBalance.HumanString())
@@ -1266,7 +1268,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Failed to get wallet:", err)
 	}
 	if initialPeriodEndBalance.Cmp(wg.ConfirmedSiacoinBalance) > 0 {
-		printDebug(r)
 		t.Fatal("Unspent Unallocated funds not released after contract renewal and maturity delay")
 	}
 
@@ -1285,7 +1286,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		printDebug(r)
 		t.Fatal(err)
 	}
 
@@ -1305,7 +1305,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Could not get contracts:", err)
 	}
 	if err = checkContractVsReportedSpending(r, windowSize, rc.OldContracts, rc.Contracts); err != nil {
-		printDebug(r)
 		t.Fatal(err)
 	}
 
@@ -1319,7 +1318,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		printDebug(r)
 		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
 		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
 		t.Log("ExpectedBalance:", expectedBalance.HumanString())
@@ -1364,7 +1362,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		printDebug(r)
 		t.Fatal(err)
 	}
 
@@ -1385,7 +1382,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	if err = checkContractVsReportedSpending(r, windowSize, rc.OldContracts, rc.Contracts); err != nil {
-		printDebug(r)
 		t.Fatal(err)
 	}
 
@@ -1399,7 +1395,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		printDebug(r)
 		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
 		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
 		t.Log("ExpectedBalance:", expectedBalance.HumanString())
@@ -1433,7 +1428,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		printDebug(r)
 		t.Fatal(err)
 	}
 
@@ -1453,7 +1447,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Could not get contracts:", err)
 	}
 	if err = checkContractVsReportedSpending(r, windowSize, rc.OldContracts, rc.Contracts); err != nil {
-		printDebug(r)
 		t.Fatal(err)
 	}
 
@@ -1467,7 +1460,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		printDebug(r)
 		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
 		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
 		t.Log("ExpectedBalance:", expectedBalance.HumanString())
@@ -1478,47 +1470,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 			t.Log("Over reported by:", walletBalance.Sub(expectedBalance).HumanString())
 		}
 		t.Fatal(err)
-	}
-}
-
-func printDebug(r *siatest.TestNode) {
-	rg, err := r.RenterGet()
-	if err != nil {
-		fmt.Println("Could not get renter:", err)
-	}
-	fmt.Println("---Renter Settings---")
-	fmt.Println("CP:", rg.CurrentPeriod)
-	fmt.Println("TA:", rg.FinancialMetrics.TotalAllocated.HumanString())
-	fmt.Println("WF:", rg.FinancialMetrics.WithheldFunds.HumanString())
-	fmt.Println("PS:", rg.FinancialMetrics.PreviousSpending.HumanString())
-	fmt.Println("Fees:", rg.FinancialMetrics.ContractFees.HumanString())
-	fmt.Println("DS:", rg.FinancialMetrics.DownloadSpending.HumanString())
-	fmt.Println("US:", rg.FinancialMetrics.UploadSpending.HumanString())
-	fmt.Println("SS:", rg.FinancialMetrics.StorageSpending.HumanString())
-	fmt.Println("")
-
-	rc, _ := r.RenterContractsGet()
-	fmt.Println("---Old contracts---")
-	for _, c := range rc.OldContracts {
-		fmt.Println("ID", c.ID)
-		fmt.Println("SH", c.StartHeight)
-		fmt.Println("EH", c.EndHeight)
-		fmt.Println("US", c.UploadSpending.HumanString())
-		fmt.Println("DS", c.DownloadSpending.HumanString())
-		fmt.Println("SS", c.StorageSpending.HumanString())
-		fmt.Println("Fees", c.Fees.HumanString())
-		fmt.Println("RF", c.RenterFunds.HumanString())
-	}
-	fmt.Println("---Renewed contracts---")
-	for _, c := range rc.Contracts {
-		fmt.Println("ID", c.ID)
-		fmt.Println("SH", c.StartHeight)
-		fmt.Println("EH", c.EndHeight)
-		fmt.Println("US", c.UploadSpending.HumanString())
-		fmt.Println("DS", c.DownloadSpending.HumanString())
-		fmt.Println("SS", c.StorageSpending.HumanString())
-		fmt.Println("Fees", c.Fees.HumanString())
-		fmt.Println("RF", c.RenterFunds.HumanString())
 	}
 }
 
@@ -1548,10 +1499,6 @@ func checkBalanceVsSpending(r *siatest.TestNode, initialBalance types.Currency) 
 
 // checkContracts confirms that contracts are renewed as expected
 func checkContracts(numHosts, numRenewals int, oldContracts, renewedContracts []api.RenterContract) error {
-	// DEBUG *******************
-	fmt.Println("Active Contracts:", len(renewedContracts))
-	fmt.Println("Expired Contracts:", len(oldContracts))
-	//**************************
 	if len(renewedContracts) != numHosts {
 		err := fmt.Sprintf("Incorrect number of Active contracts: have %v expected %v", len(renewedContracts), numHosts)
 		return errors.New(err)
@@ -1737,9 +1684,6 @@ func renewContractsByRenewWindow(renter *siatest.TestNode, tg *siatest.TestGroup
 // renewContractsBySpending uploads files until the contracts renew
 // due to running out of funds
 func renewContractsBySpending(renter *siatest.TestNode, tg *siatest.TestGroup) (startingUploadSpend types.Currency, err error) {
-	//DEBUG*************************
-	fmt.Println("Renew Contracts by spending")
-	//******************************
 	// Renew contracts by running out of funds
 	// Set upload price to max price
 	maxStoragePrice := types.SiacoinPrecision.Mul64(30e3).Div(modules.BlockBytesPerMonthTerabyte) // 30k SC / TB / Month
@@ -1809,6 +1753,7 @@ func TestRedundancyReporting(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a group for testing.
 	groupParams := siatest.GroupParams{
@@ -1912,6 +1857,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a group for testing.
 	groupParams := siatest.GroupParams{
@@ -2054,6 +2000,7 @@ func TestRenterResetAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a group for testing.
 	groupParams := siatest.GroupParams{
