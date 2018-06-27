@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -14,12 +13,12 @@ import (
 type (
 	// Metadata is the metadata of a SiaFile and is JSON encoded.
 	Metadata struct {
-		version      [16]byte          // version of the sia file format used
-		fileSize     int64             // total size of the file
-		masterKey    crypto.TwofishKey // masterkey used to encrypt pieces
-		pieceSize    uint64            // size of a single piece of the file
-		trackingPath string            // file to the local copy of the file used for repairing
-		siaPath      string
+		version   [16]byte          // version of the sia file format used
+		fileSize  int64             // total size of the file
+		masterKey crypto.TwofishKey // masterkey used to encrypt pieces
+		pieceSize uint64            // size of a single piece of the file
+		localPath string            // file to the local copy of the file used for repairing
+		siaPath   string            // the path of the file on the Sia network
 
 		// The following fields are the usual unix timestamps of files.
 		modTime    time.Time // time of last content modification
@@ -32,10 +31,10 @@ type (
 		uid  int         // id of the user who owns the file
 		gid  int         // id of the group that owns the file
 
-		// chunkHeaderSize is the size of each of the following chunk's metadata.
-		chunkHeaderSize uint64
-		// chunkBodySize is the size of each of the following chunk's bodies.
-		chunkBodySize uint64
+		// chunkMetadataSize is the amount of space allocated within the
+		// siafile for the metadata of a single chunk. It allows us to do
+		// random access operations on the file in constant time.
+		chunkMetadataSize uint64
 
 		// The following fields are the offsets for data that is written to disk
 		// after the pubKeyTable. We reserve a generous amount of space for the
@@ -43,9 +42,9 @@ type (
 		// need to resize later on.
 		//
 		// chunkOffset is the offset of the first chunk, forced to be a factor of
-		// 4096, default 16kib
+		// 4096, default 4kib
 		//
-		// pubKeyTableOffset is the office of the publicKeyTable within the
+		// pubKeyTableOffset is the offset of the publicKeyTable within the
 		// file.
 		//
 		chunkOffset       int64
@@ -53,37 +52,11 @@ type (
 	}
 )
 
-// Available indicates whether the file is ready to be downloaded.
-func (sf *SiaFile) Available(offline map[string]bool) bool {
-	sf.mu.RLock()
-	defer sf.mu.RUnlock()
-	// We need to find at least erasureCode.MinPieces different pieces for each
-	// chunk for the file to be available.
-	for _, chunk := range sf.chunks {
-		piecesForChunk := 0
-		for _, pieceSet := range chunk.pieces {
-			for _, piece := range pieceSet {
-				if !offline[string(piece.HostPubKey.Key)] {
-					piecesForChunk++
-					break // break out since we only count unique pieces
-				}
-			}
-			if piecesForChunk >= sf.erasureCode.MinPieces() {
-				break // we already have enough pieces for this chunk.
-			}
-		}
-		if piecesForChunk < sf.erasureCode.MinPieces() {
-			return false // this chunk isn't available.
-		}
-	}
-	return true
-}
-
 // ChunkSize returns the size of a single chunk of the file.
-func (sf *SiaFile) ChunkSize() uint64 {
+func (sf *SiaFile) ChunkSize(chunkIndex uint64) uint64 {
 	sf.mu.RLock()
 	defer sf.mu.RUnlock()
-	return sf.chunkSize()
+	return sf.chunkSize(chunkIndex)
 }
 
 // Delete removes the file from disk and marks it as deleted. Once the file is
@@ -131,6 +104,13 @@ func (sf *SiaFile) HostPublicKeys() []types.SiaPublicKey {
 	return sf.pubKeyTable
 }
 
+// LocalPath returns the path of the local data of the file.
+func (sf *SiaFile) LocalPath() string {
+	sf.mu.RLock()
+	defer sf.mu.RUnlock()
+	return sf.metadata.localPath
+}
+
 // MasterKey returns the masterkey used to encrypt the file.
 func (sf *SiaFile) MasterKey() crypto.TwofishKey {
 	sf.mu.RLock()
@@ -152,78 +132,6 @@ func (sf *SiaFile) PieceSize() uint64 {
 	return sf.metadata.pieceSize
 }
 
-// Redundancy returns the redundancy of the least redundant chunk. A file
-// becomes available when this redundancy is >= 1. Assumes that every piece is
-// unique within a file contract. -1 is returned if the file has size 0. It
-// takes one argument, a map of offline contracts for this file.
-func (sf *SiaFile) Redundancy(offlineMap map[string]bool, goodForRenewMap map[string]bool) float64 {
-	sf.mu.RLock()
-	defer sf.mu.RUnlock()
-	if sf.metadata.fileSize == 0 {
-		return -1
-	}
-
-	minPiecesRenew := ^uint64(0)
-	minPiecesNoRenew := ^uint64(0)
-	for _, chunk := range sf.chunks {
-		// Loop over chunks and remember how many unique pieces of the chunk
-		// were goodForRenew and how many were not.
-		numPiecesRenew := uint64(0)
-		numPiecesNoRenew := uint64(0)
-		for _, pieceSet := range chunk.pieces {
-			// Remember if we encountered a goodForRenew piece or a
-			// !goodForRenew piece that was at least online.
-			foundGoodForRenew := false
-			foundOnline := false
-			for _, piece := range pieceSet {
-				offline, exists1 := offlineMap[string(piece.HostPubKey.Key)]
-				goodForRenew, exists2 := goodForRenewMap[string(piece.HostPubKey.Key)]
-				if exists1 != exists2 {
-					build.Critical("contract can't be in one map but not in the other")
-				}
-				if !exists1 || offline {
-					continue
-				}
-				// If we found a goodForRenew piece we can stop.
-				if goodForRenew {
-					foundGoodForRenew = true
-					break
-				}
-				// Otherwise we continue since there might be other hosts with
-				// the same piece that are goodForRenew. We still remember that
-				// we found an online piece though.
-				foundOnline = true
-			}
-			if foundGoodForRenew {
-				numPiecesRenew++
-				numPiecesNoRenew++
-			} else if foundOnline {
-				numPiecesNoRenew++
-			}
-		}
-		// Remember the smallest number of goodForRenew pieces encountered.
-		if numPiecesRenew < minPiecesRenew {
-			minPiecesRenew = numPiecesRenew
-		}
-		// Remember the smallest number of !goodForRenew pieces encountered.
-		if numPiecesNoRenew < minPiecesNoRenew {
-			minPiecesNoRenew = numPiecesNoRenew
-		}
-	}
-
-	// If the redundancy is smaller than 1x we return the redundancy that
-	// includes contracts that are not good for renewal. The reason for this is
-	// a better user experience. If the renter operates correctly, redundancy
-	// should never go above numPieces / minPieces and redundancyNoRenew should
-	// never go below 1.
-	redundancy := float64(minPiecesRenew) / float64(sf.erasureCode.MinPieces())
-	redundancyNoRenew := float64(minPiecesNoRenew) / float64(sf.erasureCode.MinPieces())
-	if redundancy < 1 {
-		return redundancyNoRenew
-	}
-	return redundancy
-}
-
 // Rename changes the name of the file to a new one.
 // TODO: This will actually rename the file on disk once we persist the new
 // file format.
@@ -239,6 +147,14 @@ func (sf *SiaFile) SetMode(mode os.FileMode) {
 	sf.mu.Lock()
 	defer sf.mu.Unlock()
 	sf.metadata.mode = mode
+}
+
+// SetLocalPath changes the local path of the file which is used to repair
+// the file from disk.
+func (sf *SiaFile) SetLocalPath(path string) {
+	sf.mu.Lock()
+	defer sf.mu.Unlock()
+	sf.metadata.localPath = path
 }
 
 // SiaPath returns the file's sia path.
@@ -278,11 +194,14 @@ func (sf *SiaFile) UploadedBytes() uint64 {
 // reaches 100%, and UploadProgress may report a value greater than 100%.
 func (sf *SiaFile) UploadProgress() float64 {
 	uploaded := sf.UploadedBytes()
-	desired := modules.SectorSize * uint64(sf.ErasureCode().NumPieces()) * sf.NumChunks()
+	var desired uint64
+	for i := uint64(0); i < sf.NumChunks(); i++ {
+		desired += modules.SectorSize * uint64(sf.ErasureCode(i).NumPieces())
+	}
 	return math.Min(100*(float64(uploaded)/float64(desired)), 100)
 }
 
 // ChunkSize returns the size of a single chunk of the file.
-func (sf *SiaFile) chunkSize() uint64 {
-	return sf.metadata.pieceSize * uint64(sf.erasureCode.MinPieces())
+func (sf *SiaFile) chunkSize(chunkIndex uint64) uint64 {
+	return sf.metadata.pieceSize * uint64(sf.chunks[chunkIndex].erasureCode.MinPieces())
 }

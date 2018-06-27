@@ -28,6 +28,23 @@ var (
 	errUploadDirectory = errors.New("cannot upload directory")
 )
 
+// newFile is a helper to more easily create a new Siafile for testing.
+func newFile(name string, rsc modules.ErasureCoder, pieceSize, fileSize uint64, mode os.FileMode, source string) *siafile.SiaFile {
+	numChunks := 1
+	chunkSize := pieceSize * uint64(rsc.MinPieces())
+	if fileSize > 0 {
+		numChunks = int(fileSize / chunkSize)
+		if fileSize%chunkSize != 0 {
+			numChunks++
+		}
+	}
+	ecs := make([]modules.ErasureCoder, numChunks)
+	for i := 0; i < numChunks; i++ {
+		ecs[i] = rsc
+	}
+	return siafile.New(name, ecs, pieceSize, fileSize, mode, source)
+}
+
 // validateSource verifies that a sourcePath meets the
 // requirements for upload.
 func validateSource(sourcePath string) error {
@@ -82,14 +99,13 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Create file object.
-	f := siafile.New(up.SiaPath, up.ErasureCode, pieceSize, uint64(fileInfo.Size()))
-	f.SetMode(fileInfo.Mode())
+	f := newFile(up.SiaPath, up.ErasureCode, pieceSize, uint64(fileInfo.Size()), fileInfo.Mode(), up.Source)
 
 	// Add file to renter.
 	lockID = r.mu.Lock()
 	r.files[up.SiaPath] = f
 	r.persist.Tracking[up.SiaPath] = trackedFile{
-		RepairPath: up.Source,
+		RepairPath: f.LocalPath(),
 	}
 	r.saveSync()
 	err = r.saveFile(f)

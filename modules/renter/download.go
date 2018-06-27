@@ -378,8 +378,18 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	}
 
 	// Determine which chunks to download.
-	minChunk := params.offset / params.file.ChunkSize()
-	maxChunk := (params.offset + params.length - 1) / params.file.ChunkSize()
+	minChunk, minChunkOffset := params.file.ChunkIndexByOffset(params.offset)
+	maxChunk, maxChunkOffset := params.file.ChunkIndexByOffset(params.offset + params.length)
+	if minChunk == params.file.NumChunks() || maxChunk == params.file.NumChunks() {
+		return nil, errors.New("download is requesting a chunk that is past the boundary of the file")
+	}
+	// If the maxChunkOffset is exactly 0 we need to subtract 1 chunk. e.g. if
+	// the chunkSize is 100 bytes and we want to download 100 bytes from offset
+	// 0, maxChunk would be 1 and maxChunkOffset would be 0. We want maxChunk
+	// to be 0 though since we don't actually need any data from chunk 1.
+	if maxChunk > 0 && maxChunkOffset == 0 {
+		maxChunk--
+	}
 
 	// For each chunk, assemble a mapping from the contract id to the index of
 	// the piece within the chunk that the contract is responsible for.
@@ -414,13 +424,13 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	for i := minChunk; i <= maxChunk; i++ {
 		udc := &unfinishedDownloadChunk{
 			destination: params.destination,
-			erasureCode: params.file.ErasureCode(),
+			erasureCode: params.file.ErasureCode(i),
 			masterKey:   params.file.MasterKey(),
 
 			staticChunkIndex: i,
 			staticCacheID:    fmt.Sprintf("%v:%v", d.staticSiaPath, i),
 			staticChunkMap:   chunkMaps[i-minChunk],
-			staticChunkSize:  params.file.ChunkSize(),
+			staticChunkSize:  params.file.ChunkSize(i),
 			staticPieceSize:  params.file.PieceSize(),
 
 			// TODO: 25ms is just a guess for a good default. Really, we want to
@@ -436,8 +446,8 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 			staticNeedsMemory:   params.needsMemory,
 			staticPriority:      params.priority,
 
-			physicalChunkData: make([][]byte, params.file.ErasureCode().NumPieces()),
-			pieceUsage:        make([]bool, params.file.ErasureCode().NumPieces()),
+			physicalChunkData: make([][]byte, params.file.ErasureCode(i).NumPieces()),
+			pieceUsage:        make([]bool, params.file.ErasureCode(i).NumPieces()),
 
 			download:          d,
 			staticStreamCache: r.staticStreamCache,
@@ -446,16 +456,16 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 		// Set the fetchOffset - the offset within the chunk that we start
 		// downloading from.
 		if i == minChunk {
-			udc.staticFetchOffset = params.offset % params.file.ChunkSize()
+			udc.staticFetchOffset = minChunkOffset
 		} else {
 			udc.staticFetchOffset = 0
 		}
 		// Set the fetchLength - the number of bytes to fetch within the chunk
 		// that we start downloading from.
-		if i == maxChunk && (params.length+params.offset)%params.file.ChunkSize() != 0 {
-			udc.staticFetchLength = ((params.length + params.offset) % params.file.ChunkSize()) - udc.staticFetchOffset
+		if i == maxChunk && maxChunkOffset != 0 {
+			udc.staticFetchLength = maxChunkOffset - udc.staticFetchOffset
 		} else {
-			udc.staticFetchLength = params.file.ChunkSize() - udc.staticFetchOffset
+			udc.staticFetchLength = params.file.ChunkSize(i) - udc.staticFetchOffset
 		}
 		// Set the writeOffset within the destination for where the data should
 		// be written.

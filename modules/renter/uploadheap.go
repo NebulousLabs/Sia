@@ -111,7 +111,14 @@ func (r *Renter) buildUnfinishedChunks(f *siafile.SiaFile, hosts map[string]stru
 	}
 
 	// If we don't have enough workers for the file, don't repair it right now.
-	if len(r.workerPool) < f.ErasureCode().MinPieces() {
+	minWorkers := 0
+	for i := uint64(0); i < f.NumChunks(); i++ {
+		minPieces := f.ErasureCode(i).MinPieces()
+		if minPieces > minWorkers {
+			minWorkers = minPieces
+		}
+	}
+	if len(r.workerPool) < minWorkers {
 		return nil
 	}
 
@@ -133,8 +140,8 @@ func (r *Renter) buildUnfinishedChunks(f *siafile.SiaFile, hosts map[string]stru
 			},
 
 			index:  i,
-			length: f.ChunkSize(),
-			offset: int64(i * f.ChunkSize()),
+			length: f.ChunkSize(i),
+			offset: int64(i * f.ChunkSize(i)),
 
 			// memoryNeeded has to also include the logical data, and also
 			// include the overhead for encryption.
@@ -145,13 +152,13 @@ func (r *Renter) buildUnfinishedChunks(f *siafile.SiaFile, hosts map[string]stru
 			// TODO: Currently we request memory for all of the pieces as well
 			// as the minimum pieces, but we perhaps don't need to request all
 			// of that.
-			memoryNeeded:  f.PieceSize()*uint64(f.ErasureCode().NumPieces()+f.ErasureCode().MinPieces()) + uint64(f.ErasureCode().NumPieces()*crypto.TwofishOverhead),
-			minimumPieces: f.ErasureCode().MinPieces(),
-			piecesNeeded:  f.ErasureCode().NumPieces(),
+			memoryNeeded:  f.PieceSize()*uint64(f.ErasureCode(i).NumPieces()+f.ErasureCode(i).MinPieces()) + uint64(f.ErasureCode(i).NumPieces()*crypto.TwofishOverhead),
+			minimumPieces: f.ErasureCode(i).MinPieces(),
+			piecesNeeded:  f.ErasureCode(i).NumPieces(),
 
-			physicalChunkData: make([][]byte, f.ErasureCode().NumPieces()),
+			physicalChunkData: make([][]byte, f.ErasureCode(i).NumPieces()),
 
-			pieceUsage:  make([]bool, f.ErasureCode().NumPieces()),
+			pieceUsage:  make([]bool, f.ErasureCode(i).NumPieces()),
 			unusedHosts: make(map[string]struct{}),
 		}
 		// Every chunk can have a different set of unused hosts.

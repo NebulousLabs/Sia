@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/errors"
 )
@@ -32,7 +31,7 @@ func TestFileNumChunks(t *testing.T) {
 
 	for _, test := range tests {
 		rsc, _ := NewRSCode(test.piecesPerChunk, 1) // can't use 0
-		f := siafile.New(t.Name(), rsc, test.pieceSize, test.size)
+		f := newFile(t.Name(), rsc, test.pieceSize, test.size, 0777, "")
 		if f.NumChunks() != test.expNumChunks {
 			t.Errorf("Test %v: expected %v, got %v", test, test.expNumChunks, f.NumChunks())
 		}
@@ -42,7 +41,7 @@ func TestFileNumChunks(t *testing.T) {
 // TestFileAvailable probes the available method of the file type.
 func TestFileAvailable(t *testing.T) {
 	rsc, _ := NewRSCode(1, 1) // can't use 0
-	f := siafile.New(t.Name(), rsc, pieceSize, 100)
+	f := newFile(t.Name(), rsc, pieceSize, 100, 0777, "")
 	neverOffline := make(map[string]bool)
 
 	if f.Available(neverOffline) {
@@ -69,7 +68,7 @@ func TestFileAvailable(t *testing.T) {
 func TestFileUploadedBytes(t *testing.T) {
 	// ensure that a piece fits within a sector
 	rsc, _ := NewRSCode(1, 3)
-	f := siafile.New(t.Name(), rsc, modules.SectorSize/2, 1000)
+	f := newFile(t.Name(), rsc, modules.SectorSize/2, 1000, 0777, "")
 	for i := uint64(0); i < 4; i++ {
 		err := f.AddPiece(types.SiaPublicKey{}, uint64(0), i, crypto.Hash{})
 		if err != nil {
@@ -85,7 +84,7 @@ func TestFileUploadedBytes(t *testing.T) {
 // 100%, even if more pieces have been uploaded,
 func TestFileUploadProgressPinning(t *testing.T) {
 	rsc, _ := NewRSCode(1, 1)
-	f := siafile.New(t.Name(), rsc, 2, 4)
+	f := newFile(t.Name(), rsc, 2, 4, 0777, "")
 	for i := uint64(0); i < 2; i++ {
 		err1 := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(0)}}, uint64(0), i, crypto.Hash{})
 		err2 := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(1)}}, uint64(0), i, crypto.Hash{})
@@ -111,7 +110,7 @@ func TestFileRedundancy(t *testing.T) {
 
 	for _, nData := range nDatas {
 		rsc, _ := NewRSCode(nData, 10)
-		f := siafile.New(t.Name(), rsc, 100, 1000)
+		f := newFile(t.Name(), rsc, 100, 1000, 0777, "")
 		// Test that an empty file has 0 redundancy.
 		if r := f.Redundancy(neverOffline, goodForRenew); r != 0 {
 			t.Error("expected 0 redundancy, got", r)
@@ -145,33 +144,33 @@ func TestFileRedundancy(t *testing.T) {
 			t.Fatal(err)
 		}
 		// 1.0 / MinPieces because the chunk with the least number of pieces has 1 piece.
-		expectedR := 1.0 / float64(f.ErasureCode().MinPieces())
+		expectedR := 1.0 / float64(f.ErasureCode(0).MinPieces())
 		if r := f.Redundancy(neverOffline, goodForRenew); r != expectedR {
 			t.Errorf("expected %f redundancy, got %f", expectedR, r)
 		}
 		// Test that adding a file contract that has erasureCode.MinPieces() pieces
 		// per chunk for all chunks results in a file with redundancy > 1.
 		for iChunk := uint64(0); iChunk < f.NumChunks(); iChunk++ {
-			for iPiece := uint64(1); iPiece < uint64(f.ErasureCode().MinPieces()); iPiece++ {
+			for iPiece := uint64(1); iPiece < uint64(f.ErasureCode(0).MinPieces()); iPiece++ {
 				err := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(3)}}, iChunk, iPiece, crypto.Hash{})
 				if err != nil {
 					t.Fatal(err)
 				}
 			}
-			err := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(4)}}, iChunk, uint64(f.ErasureCode().MinPieces()), crypto.Hash{})
+			err := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(4)}}, iChunk, uint64(f.ErasureCode(0).MinPieces()), crypto.Hash{})
 			if err != nil {
 				t.Fatal(err)
 			}
 		}
 		// 1+MinPieces / MinPieces because the chunk with the least number of pieces has 1+MinPieces pieces.
-		expectedR = float64(1+f.ErasureCode().MinPieces()) / float64(f.ErasureCode().MinPieces())
+		expectedR = float64(1+f.ErasureCode(0).MinPieces()) / float64(f.ErasureCode(0).MinPieces())
 		if r := f.Redundancy(neverOffline, goodForRenew); r != expectedR {
 			t.Errorf("expected %f redundancy, got %f", expectedR, r)
 		}
 
 		// verify offline file contracts are not counted in the redundancy
 		for iChunk := uint64(0); iChunk < f.NumChunks(); iChunk++ {
-			for iPiece := uint64(0); iPiece < uint64(f.ErasureCode().MinPieces()); iPiece++ {
+			for iPiece := uint64(0); iPiece < uint64(f.ErasureCode(0).MinPieces()); iPiece++ {
 				err := f.AddPiece(types.SiaPublicKey{Key: []byte{byte(5)}}, iChunk, iPiece, crypto.Hash{})
 				if err != nil {
 					t.Fatal(err)
@@ -191,7 +190,8 @@ func TestFileRedundancy(t *testing.T) {
 
 // TestFileExpiration probes the expiration method of the file type.
 func TestFileExpiration(t *testing.T) {
-	f := newTestingFile()
+	rsc, _ := NewRSCode(1, 2)
+	f := newFile(t.Name(), rsc, pieceSize, 1000, 0777, "")
 	contracts := make(map[string]modules.RenterContract)
 	if f.Expiration(contracts) != 0 {
 		t.Error("file with no pieces should report as having no time remaining")
@@ -245,9 +245,10 @@ func TestRenterFileListLocalPath(t *testing.T) {
 	defer rt.Close()
 	id := rt.renter.mu.Lock()
 	f := newTestingFile()
+	f.SetLocalPath("TestPath")
 	rt.renter.files[f.SiaPath()] = f
 	rt.renter.persist.Tracking[f.SiaPath()] = trackedFile{
-		RepairPath: "TestPath",
+		RepairPath: f.LocalPath(),
 	}
 	rt.renter.mu.Unlock(id)
 	files := rt.renter.FileList()
@@ -414,7 +415,9 @@ func TestRenterRenameFile(t *testing.T) {
 	}
 
 	// Renaming should also update the tracking set
-	rt.renter.persist.Tracking["1"] = trackedFile{"foo"}
+	rt.renter.persist.Tracking["1"] = trackedFile{
+		RepairPath: f2.LocalPath(),
+	}
 	err = rt.renter.RenameFile("1", "1b")
 	if err != nil {
 		t.Fatal(err)

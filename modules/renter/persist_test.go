@@ -23,7 +23,7 @@ func newTestingFile() *siafile.SiaFile {
 
 	name := "testfile-" + strconv.Itoa(int(data[0]))
 
-	return siafile.New(name, rsc, pieceSize, 1000)
+	return newFile(name, rsc, pieceSize, 1000, 0777, "")
 }
 
 // equalFiles is a helper function that compares two files for equality.

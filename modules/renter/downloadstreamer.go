@@ -64,10 +64,14 @@ func (s *streamer) Read(p []byte) (n int, err error) {
 	}
 
 	// Calculate how much we can download. We never download more than a single chunk.
-	chunkSize := s.file.ChunkSize()
+	chunkIndex, chunkOffset := s.file.ChunkIndexByOffset(uint64(s.offset))
+	if chunkIndex == s.file.NumChunks() {
+		return 0, io.EOF
+	}
+	chunkSize := s.file.ChunkSize(chunkIndex)
 	remainingData := uint64(fileSize - s.offset)
 	requestedData := uint64(len(p))
-	remainingChunk := chunkSize - uint64(s.offset)%chunkSize
+	remainingChunk := chunkSize - chunkOffset
 	length := min(remainingData, requestedData, remainingChunk)
 
 	// Download data

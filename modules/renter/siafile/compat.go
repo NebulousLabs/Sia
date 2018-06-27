@@ -17,6 +17,7 @@ type (
 		FileSize    uint64
 		MasterKey   crypto.TwofishKey
 		ErasureCode modules.ErasureCoder
+		RepairPath  string
 		PieceSize   uint64
 		Mode        os.FileMode
 		Deleted     bool
@@ -40,18 +41,17 @@ func NewFromFileData(fd FileData) *SiaFile {
 			pieceSize: fd.PieceSize,
 			siaPath:   fd.Name,
 		},
-		deleted:     fd.Deleted,
-		erasureCode: fd.ErasureCode,
-		uid:         fd.UID,
+		deleted: fd.Deleted,
+		uid:     fd.UID,
 	}
-	chunks := make([]Chunk, file.NumChunks())
-	for i := range chunks {
-		chunks[i].erasureCodeType = [4]byte{0, 0, 0, 1}
-		binary.LittleEndian.PutUint32(chunks[i].erasureCodeParams[0:4], uint32(file.erasureCode.MinPieces()))
-		binary.LittleEndian.PutUint32(chunks[i].erasureCodeParams[4:8], uint32(file.erasureCode.NumPieces()-file.erasureCode.MinPieces()))
-		chunks[i].pieces = make([][]Piece, file.erasureCode.NumPieces())
+	file.chunks = make([]Chunk, len(fd.Chunks))
+	for i := range file.chunks {
+		file.chunks[i].erasureCode = fd.ErasureCode
+		file.chunks[i].erasureCodeType = [4]byte{0, 0, 0, 1}
+		binary.LittleEndian.PutUint32(file.chunks[i].erasureCodeParams[0:4], uint32(file.chunks[i].erasureCode.MinPieces()))
+		binary.LittleEndian.PutUint32(file.chunks[i].erasureCodeParams[4:8], uint32(file.chunks[i].erasureCode.NumPieces()-file.chunks[i].erasureCode.MinPieces()))
+		file.chunks[i].pieces = make([][]Piece, file.chunks[i].erasureCode.NumPieces())
 	}
-	file.chunks = chunks
 
 	// Populate the pubKeyTable of the file and add the pieces.
 	pubKeyMap := make(map[string]int)
@@ -83,7 +83,8 @@ func (sf *SiaFile) ExportFileData() FileData {
 		Name:        sf.metadata.siaPath,
 		FileSize:    uint64(sf.metadata.fileSize),
 		MasterKey:   sf.metadata.masterKey,
-		ErasureCode: sf.erasureCode,
+		ErasureCode: sf.chunks[0].erasureCode,
+		RepairPath:  sf.metadata.localPath,
 		PieceSize:   sf.metadata.pieceSize,
 		Mode:        sf.metadata.mode,
 		Deleted:     sf.deleted,

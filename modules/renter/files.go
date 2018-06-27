@@ -261,12 +261,13 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 
 // fileToSiaFile converts a legacy file to a SiaFile. Fields that can't be
 // populated using the legacy file remain blank.
-func (r *Renter) fileToSiaFile(f *file) *siafile.SiaFile {
+func (r *Renter) fileToSiaFile(f *file, repairPath string) *siafile.SiaFile {
 	fileData := siafile.FileData{
 		Name:        f.name,
 		FileSize:    f.size,
 		MasterKey:   f.masterKey,
 		ErasureCode: f.erasureCode,
+		RepairPath:  repairPath,
 		PieceSize:   f.pieceSize,
 		Mode:        os.FileMode(f.mode),
 		Deleted:     f.deleted,

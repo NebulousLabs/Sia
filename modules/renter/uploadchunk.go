@@ -177,7 +177,7 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedUploadChunk) e
 func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 	// Calculate the amount of memory needed for erasure coding. This will need
 	// to be released if there's an error before erasure coding is complete.
-	erasureCodingMemory := chunk.renterFile.PieceSize() * uint64(chunk.renterFile.ErasureCode().MinPieces())
+	erasureCodingMemory := chunk.renterFile.PieceSize() * uint64(chunk.renterFile.ErasureCode(chunk.index).MinPieces())
 
 	// Calculate the amount of memory to release due to already completed
 	// pieces. This memory gets released during encryption, but needs to be
@@ -222,7 +222,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 	// fact to reduce the total memory required to create the physical data.
 	// That will also change the amount of memory we need to allocate, and the
 	// number of times we need to return memory.
-	chunk.physicalChunkData, err = chunk.renterFile.ErasureCode().EncodeShards(chunk.logicalChunkData)
+	chunk.physicalChunkData, err = chunk.renterFile.ErasureCode(chunk.index).EncodeShards(chunk.logicalChunkData)
 	chunk.logicalChunkData = nil
 	r.memoryManager.Return(erasureCodingMemory)
 	chunk.memoryReleased += erasureCodingMemory
