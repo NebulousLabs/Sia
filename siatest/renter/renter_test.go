@@ -31,6 +31,7 @@ func TestRenter(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a group for the subtests
 	groupParams := siatest.GroupParams{
@@ -1106,18 +1107,15 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Check that the funds allocated when setting the allowance
 	// are reflected correctly in the wallet balance
-	expectedBalance, walletBalance, err := checkBalanceVsSpending(r, initialBalance)
-	if err != nil {
-		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
-		t.Log("ExpectedBalance:", expectedBalance.HumanString())
-		t.Log("walletBalance  :", walletBalance.HumanString())
-		if expectedBalance.Cmp(walletBalance) > 0 {
-			t.Log("Under reported by:", expectedBalance.Sub(walletBalance).HumanString())
-		} else {
-			t.Log("Over reported by:", walletBalance.Sub(expectedBalance).HumanString())
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		err = checkBalanceVsSpending(r, initialBalance)
+		if err != nil {
+			return err
 		}
-		t.Fatalf("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance, \n%v != \n%v",
-			expectedBalance, walletBalance)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Upload and download files to show spending
@@ -1148,22 +1146,13 @@ func TestRenterSpendingReporting(t *testing.T) {
 	// Check to confirm upload and download spending was captured correctly
 	// and reflected in the wallet balance
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		_, _, err = checkBalanceVsSpending(r, initialBalance)
+		err = checkBalanceVsSpending(r, initialBalance)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
-		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
-		t.Log("ExpectedBalance:", expectedBalance.HumanString())
-		t.Log("walletBalance  :", walletBalance.HumanString())
-		if expectedBalance.Cmp(walletBalance) > 0 {
-			t.Log("Under reported by:", expectedBalance.Sub(walletBalance).HumanString())
-		} else {
-			t.Log("Over reported by:", walletBalance.Sub(expectedBalance).HumanString())
-		}
 		t.Fatal(err)
 	}
 
@@ -1214,22 +1203,13 @@ func TestRenterSpendingReporting(t *testing.T) {
 	// Check to confirm reported spending is still accurate with the renewed contracts
 	// and reflected in the wallet balance
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		_, _, err = checkBalanceVsSpending(r, initialBalance)
+		err = checkBalanceVsSpending(r, initialBalance)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
-		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
-		t.Log("ExpectedBalance:", expectedBalance.HumanString())
-		t.Log("walletBalance  :", walletBalance.HumanString())
-		if expectedBalance.Cmp(walletBalance) > 0 {
-			t.Log("Under reported by:", expectedBalance.Sub(walletBalance).HumanString())
-		} else {
-			t.Log("Over reported by:", walletBalance.Sub(expectedBalance).HumanString())
-		}
 		t.Fatal(err)
 	}
 
@@ -1311,22 +1291,13 @@ func TestRenterSpendingReporting(t *testing.T) {
 	// Check to confirm reported spending is still accurate with the renewed contracts
 	// and a new period and reflected in the wallet balance
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		_, _, err = checkBalanceVsSpending(r, initialBalance)
+		err = checkBalanceVsSpending(r, initialBalance)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
-		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
-		t.Log("ExpectedBalance:", expectedBalance.HumanString())
-		t.Log("walletBalance:", walletBalance.HumanString())
-		if expectedBalance.Cmp(walletBalance) > 0 {
-			t.Log("Under Reported by:", expectedBalance.Sub(walletBalance).HumanString())
-		} else {
-			t.Log("Over Reported by:", walletBalance.Sub(expectedBalance).HumanString())
-		}
 		t.Fatal(err)
 	}
 
@@ -1388,22 +1359,13 @@ func TestRenterSpendingReporting(t *testing.T) {
 	// Check to confirm reported spending is still accurate with the renewed contracts
 	// and a new period and reflected in the wallet balance
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		_, _, err = checkBalanceVsSpending(r, initialBalance)
+		err = checkBalanceVsSpending(r, initialBalance)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
-		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
-		t.Log("ExpectedBalance:", expectedBalance.HumanString())
-		t.Log("walletBalance:", walletBalance.HumanString())
-		if expectedBalance.Cmp(walletBalance) > 0 {
-			t.Log("Under Reported by:", expectedBalance.Sub(walletBalance).HumanString())
-		} else {
-			t.Log("Over Reported by:", walletBalance.Sub(expectedBalance).HumanString())
-		}
 		t.Fatal(err)
 	}
 
@@ -1453,48 +1415,53 @@ func TestRenterSpendingReporting(t *testing.T) {
 	// Check to confirm reported spending is still accurate with the renewed contracts
 	// and reflected in the wallet balance
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		_, _, err = checkBalanceVsSpending(r, initialBalance)
+		err = checkBalanceVsSpending(r, initialBalance)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		expectedBalance, walletBalance, err = checkBalanceVsSpending(r, initialBalance)
-		t.Log("Actual difference:", initialBalance.Sub(walletBalance).HumanString())
-		t.Log("ExpectedBalance:", expectedBalance.HumanString())
-		t.Log("walletBalance  :", walletBalance.HumanString())
-		if expectedBalance.Cmp(walletBalance) > 0 {
-			t.Log("Under reported by:", expectedBalance.Sub(walletBalance).HumanString())
-		} else {
-			t.Log("Over reported by:", walletBalance.Sub(expectedBalance).HumanString())
-		}
 		t.Fatal(err)
 	}
 }
 
 // checkBalanceVsSpending checks the renters confirmed siacoin balance in their
 // wallet against their reported spending
-func checkBalanceVsSpending(r *siatest.TestNode, initialBalance types.Currency) (expectedBalance, walletBalance types.Currency, err error) {
+func checkBalanceVsSpending(r *siatest.TestNode, initialBalance types.Currency) error {
 	// Getting initial financial metrics
 	// Setting variables to easier reference
 	rg, err := r.RenterGet()
 	if err != nil {
-		return types.ZeroCurrency, types.ZeroCurrency, err
+		return err
 	}
 	fm := rg.FinancialMetrics
 
 	// Check balance after allowance is set
 	wg, err := r.WalletGet()
 	if err != nil {
-		return types.ZeroCurrency, types.ZeroCurrency, err
+		return err
 	}
-	expectedBalance = initialBalance.Sub(fm.TotalAllocated).Sub(fm.WithheldFunds).Sub(fm.PreviousSpending)
+	expectedBalance := initialBalance.Sub(fm.TotalAllocated).Sub(fm.WithheldFunds).Sub(fm.PreviousSpending)
 	if expectedBalance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		return expectedBalance, wg.ConfirmedSiacoinBalance,
-			errors.New("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance")
+		details := fmt.Sprintf(`Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance
+		Expected Balance:   %v
+		Wallet Balance:     %v
+		Actual difference:  %v
+		ExpectedBalance:    %v
+		walletBalance:      %v
+		`, expectedBalance.HumanString(), wg.ConfirmedSiacoinBalance.HumanString(), initialBalance.Sub(wg.ConfirmedSiacoinBalance).HumanString(),
+			expectedBalance.HumanString(), wg.ConfirmedSiacoinBalance.HumanString())
+		var diff string
+		if expectedBalance.Cmp(wg.ConfirmedSiacoinBalance) > 0 {
+			diff = fmt.Sprintf("Under reported by:  %v\n", expectedBalance.Sub(wg.ConfirmedSiacoinBalance).HumanString())
+		} else {
+			diff = fmt.Sprintf("Over reported by:   %v\n", wg.ConfirmedSiacoinBalance.Sub(expectedBalance).HumanString())
+		}
+		err := details + diff
+		return errors.New(err)
 	}
-	return types.ZeroCurrency, types.ZeroCurrency, nil
+	return nil
 }
 
 // checkContracts confirms that contracts are renewed as expected
@@ -1547,10 +1514,12 @@ func checkRenewedContracts(renewedContracts []api.RenterContract) error {
 	for _, c := range renewedContracts {
 		if c.GoodForRenew {
 			if c.UploadSpending.Cmp(types.ZeroCurrency) != 0 && c.GoodForUpload {
-				return errors.New("Upload spending on renewed contract not equal to zero")
+				err := fmt.Sprintf("Upload spending on renewed contract equal to %v, expected zero", c.UploadSpending.HumanString())
+				return errors.New(err)
 			}
 			if c.DownloadSpending.Cmp(types.ZeroCurrency) != 0 {
-				return errors.New("Download spending on renewed contract not equal to zero")
+				err := fmt.Sprintf("Download spending on renewed contract equal to %v, expected zero", c.DownloadSpending.HumanString())
+				return errors.New(err)
 			}
 		}
 	}
@@ -1581,7 +1550,11 @@ func checkContractVsReportedSpending(r *siatest.TestNode, WindowSize types.Block
 
 	// Check that renter financial metrics add up to allowance
 	if total.Cmp(allowance.Funds) != 0 {
-		return errors.New("Combined Total of reported spending and unspent funds not equal to allowance")
+		err := fmt.Sprintf(`Combined Total of reported spending and unspent funds not equal to allowance:
+			total:     %v
+			allowance: %v
+			`, total.HumanString(), allowance.Funds.HumanString())
+		return errors.New(err)
 	}
 
 	// Check renter financial metrics against contract spending
@@ -1627,35 +1600,67 @@ func checkContractVsReportedSpending(r *siatest.TestNode, WindowSize types.Block
 
 	// Compare contract fees
 	if fm.ContractFees.Cmp(spending.ContractFees) != 0 {
-		return errors.New("Financial Metrics Contract Fees not equal to Renter Contract Fees")
+		err := fmt.Sprintf(`Fees not equal:
+			Financial Metrics Fees: %v
+			Contract Fees:          %v
+			`, fm.ContractFees.HumanString(), spending.ContractFees.HumanString())
+		return errors.New(err)
 	}
 	// Compare Total Allocated
 	if fm.TotalAllocated.Cmp(spending.TotalAllocated) != 0 {
-		return errors.New("Financial Metrics Total Allocated not equal to Renter Total Allocated")
+		err := fmt.Sprintf(`Total Allocated not equal:
+			Financial Metrics TA: %v
+			Contract TA:          %v
+			`, fm.TotalAllocated.HumanString(), spending.TotalAllocated.HumanString())
+		return errors.New(err)
 	}
 	// Compare Upload Spending
 	if fm.UploadSpending.Cmp(spending.UploadSpending) != 0 {
-		return errors.New("Financial Metrics Upload Spending not equal to Renter Upload Spending")
+		err := fmt.Sprintf(`Upload spending not equal:
+			Financial Metrics US: %v
+			Contract US:          %v
+			`, fm.UploadSpending.HumanString(), spending.UploadSpending.HumanString())
+		return errors.New(err)
 	}
 	// Compare Download Spending
 	if fm.DownloadSpending.Cmp(spending.DownloadSpending) != 0 {
-		return errors.New("Financial Metrics Download Spending not equal to Renter Download Spending")
+		err := fmt.Sprintf(`Download spending not equal:
+			Financial Metrics DS: %v
+			Contract DS:          %v
+			`, fm.DownloadSpending.HumanString(), spending.DownloadSpending.HumanString())
+		return errors.New(err)
 	}
 	// Compare Storage Spending
 	if fm.StorageSpending.Cmp(spending.StorageSpending) != 0 {
-		return errors.New("Financial Metrics Storage Spending not equal to Renter Storage Spending")
+		err := fmt.Sprintf(`Storage spending not equal:
+			Financial Metrics SS: %v
+			Contract SS:          %v
+			`, fm.StorageSpending.HumanString(), spending.StorageSpending.HumanString())
+		return errors.New(err)
 	}
 	// Compare Withheld Funds
 	if fm.WithheldFunds.Cmp(spending.WithheldFunds) != 0 {
-		return errors.New("Financial Metrics Withheld Funds not equal to Renter Withheld Funds")
+		err := fmt.Sprintf(`Withheld Funds not equal:
+			Financial Metrics WF: %v
+			Contract WF:          %v
+			`, fm.WithheldFunds.HumanString(), spending.WithheldFunds.HumanString())
+		return errors.New(err)
 	}
 	// Compare Release Block
 	if fm.ReleaseBlock != spending.ReleaseBlock {
-		return errors.New("Financial Metrics Release Block not equal to Renter Release Block")
+		err := fmt.Sprintf(`Release Block not equal:
+			Financial Metrics RB: %v
+			Contract RB:          %v
+			`, fm.ReleaseBlock, spending.ReleaseBlock)
+		return errors.New(err)
 	}
 	// Compare Previous Spending
 	if fm.PreviousSpending.Cmp(spending.PreviousSpending) != 0 {
-		return errors.New("Financial Metrics Previous Spending not equal to Renter Previous Spending")
+		err := fmt.Sprintf(`Previous spending not equal:
+			Financial Metrics PS: %v
+			Contract PS:          %v
+			`, fm.PreviousSpending.HumanString(), spending.PreviousSpending.HumanString())
+		return errors.New(err)
 	}
 
 	return nil
