@@ -5,6 +5,7 @@ package encoding
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -55,12 +56,74 @@ type (
 	SiaUnmarshaler interface {
 		UnmarshalSia(io.Reader) error
 	}
-
-	// An Encoder writes objects to an output stream.
-	Encoder struct {
-		w io.Writer
-	}
 )
+
+// An Encoder writes objects to an output stream. It also provides helper
+// methods for writing custom SiaMarshaler implementations. All of its methods
+// become no-ops after the Encoder encounters a Write error.
+type Encoder struct {
+	w   io.Writer
+	buf [8]byte
+	err error
+}
+
+// Write implements the io.Writer interface.
+func (e *Encoder) Write(p []byte) (int, error) {
+	if e.err != nil {
+		return 0, e.err
+	}
+	var n int
+	n, e.err = e.w.Write(p)
+	if n != len(p) && e.err == nil {
+		e.err = io.ErrShortWrite
+	}
+	return n, e.err
+}
+
+// WriteByte implements the io.ByteWriter interface.
+func (e *Encoder) WriteByte(b byte) error {
+	if e.err != nil {
+		return e.err
+	}
+	e.buf[0] = b
+	e.Write(e.buf[:1])
+	return e.err
+}
+
+// WriteBool writes b to the underlying io.Writer.
+func (e *Encoder) WriteBool(b bool) error {
+	if b {
+		return e.WriteByte(1)
+	}
+	return e.WriteByte(0)
+}
+
+// WriteUint64 writes a uint64 value to the underlying io.Writer.
+func (e *Encoder) WriteUint64(u uint64) error {
+	if e.err != nil {
+		return e.err
+	}
+	binary.LittleEndian.PutUint64(e.buf[:8], u)
+	e.Write(e.buf[:8])
+	return e.err
+}
+
+// WriteInt writes an int value to the underlying io.Writer.
+func (e *Encoder) WriteInt(i int) error {
+	return e.WriteUint64(uint64(i))
+}
+
+// WritePrefix writes p to the underlying io.Writer, prefixed by its length.
+func (e *Encoder) WritePrefix(p []byte) error {
+	e.WriteInt(len(p))
+	e.Write(p)
+	return e.err
+}
+
+// Err returns the first non-nil error encountered by e.
+func (e *Encoder) Err() error {
+	return e.err
+}
 
 // Encode writes the encoding of v to the stream. For encoding details, see
 // the package docstring.
@@ -78,18 +141,12 @@ func (e *Encoder) EncodeAll(vs ...interface{}) error {
 	return nil
 }
 
-// write catches instances where short writes do not return an error.
-func (e *Encoder) write(p []byte) error {
-	n, err := e.w.Write(p)
-	if n != len(p) && err == nil {
-		return io.ErrShortWrite
-	}
-	return err
-}
-
 // Encode writes the encoding of val to the stream. For encoding details, see
 // the package docstring.
 func (e *Encoder) encode(val reflect.Value) error {
+	if e.err != nil {
+		return e.err
+	}
 	// check for MarshalSia interface first
 	if val.CanInterface() {
 		if m, ok := val.Interface().(SiaMarshaler); ok {
@@ -107,20 +164,16 @@ func (e *Encoder) encode(val reflect.Value) error {
 			return e.encode(val.Elem())
 		}
 	case reflect.Bool:
-		if val.Bool() {
-			return e.write([]byte{1})
-		}
-
-		return e.write([]byte{0})
+		return e.WriteBool(val.Bool())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return e.write(EncInt64(val.Int()))
+		return e.WriteUint64(uint64(val.Int()))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return WriteUint64(e.w, val.Uint())
+		return e.WriteUint64(val.Uint())
 	case reflect.String:
-		return WritePrefix(e.w, []byte(val.String()))
+		return e.WritePrefix([]byte(val.String()))
 	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
-		if err := WriteInt(e.w, val.Len()); err != nil {
+		if err := e.WriteInt(val.Len()); err != nil {
 			return err
 		}
 		if val.Len() == 0 {
@@ -132,12 +185,14 @@ func (e *Encoder) encode(val reflect.Value) error {
 		if val.Type().Elem().Kind() == reflect.Uint8 {
 			// if the array is addressable, we can optimize a bit here
 			if val.CanAddr() {
-				return e.write(val.Slice(0, val.Len()).Bytes())
+				_, err := e.Write(val.Slice(0, val.Len()).Bytes())
+				return err
 			}
 			// otherwise we have to copy into a newly allocated slice
 			slice := reflect.MakeSlice(reflect.SliceOf(val.Type().Elem()), val.Len(), val.Len())
 			reflect.Copy(slice, val)
-			return e.write(slice.Bytes())
+			_, err := e.Write(slice.Bytes())
+			return err
 		}
 		// normal slices/arrays are encoded by sequentially encoding their elements
 		for i := 0; i < val.Len(); i++ {
@@ -160,9 +215,12 @@ func (e *Encoder) encode(val reflect.Value) error {
 	panic("could not marshal type " + val.Type().String())
 }
 
-// NewEncoder returns a new encoder that writes to w.
+// NewEncoder converts w to an Encoder.
 func NewEncoder(w io.Writer) *Encoder {
-	return &Encoder{w}
+	if e, ok := w.(*Encoder); ok {
+		return e
+	}
+	return &Encoder{w: w}
 }
 
 // Marshal returns the encoding of v. For encoding details, see the package
@@ -197,22 +255,101 @@ func WriteFile(filename string, v interface{}) error {
 	return nil
 }
 
-// A Decoder reads and decodes values from an input stream.
+// A Decoder reads and decodes values from an input stream. It also provides
+// helper methods for writing custom SiaUnmarshaler implementations. These
+// methods do not return errors, but instead set the value of d.Err(). Once
+// d.Err() is set, future operations become no-ops.
 type Decoder struct {
-	r io.Reader
-	n int
+	r   io.Reader
+	buf [8]byte
+	err error
+	n   int // total number of bytes read
 }
 
-// Read implements the io.Reader interface. It also keeps track of the total
-// number of bytes decoded, and panics if that number exceeds a global
-// maximum.
+// Read implements the io.Reader interface.
 func (d *Decoder) Read(p []byte) (int, error) {
-	n, err := d.r.Read(p)
-	// enforce an absolute maximum size limit
-	if d.n += n; d.n > MaxObjectSize {
-		panic(ErrObjectTooLarge(d.n))
+	if d.err != nil {
+		return 0, d.err
 	}
-	return n, err
+	var n int
+	n, d.err = d.r.Read(p)
+	d.n += n
+	if d.n > MaxObjectSize {
+		d.err = ErrObjectTooLarge(d.n)
+	}
+	return n, d.err
+}
+
+// ReadFull is shorthand for io.ReadFull(d, p).
+func (d *Decoder) ReadFull(p []byte) {
+	if d.err != nil {
+		return
+	}
+	n, err := io.ReadFull(d.r, p)
+	if err != nil {
+		d.err = err
+	}
+	d.n += n
+	if d.n > MaxObjectSize {
+		d.err = ErrObjectTooLarge(d.n)
+	}
+}
+
+// ReadPrefix reads a length-prefix, allocates a byte slice with that length,
+// reads into the byte slice, and returns it. If the length prefix exceeds
+// encoding.MaxSliceSize, ReadPrefix returns nil and sets d.Err().
+func (d *Decoder) ReadPrefix() []byte {
+	n := d.NextPrefix(1) // if too large, n == 0
+	if buf, ok := d.r.(*bytes.Buffer); ok {
+		b := buf.Next(int(n))
+		d.n += len(b)
+		if len(b) < int(n) && d.err == nil {
+			d.err = io.ErrUnexpectedEOF
+		}
+		return b
+	}
+
+	b := make([]byte, n)
+	d.ReadFull(b)
+	if d.err != nil {
+		return nil
+	}
+	return b
+}
+
+// NextUint64 reads the next 8 bytes and returns them as a uint64.
+func (d *Decoder) NextUint64() uint64 {
+	d.ReadFull(d.buf[:8])
+	if d.err != nil {
+		return 0
+	}
+	return DecUint64(d.buf[:])
+}
+
+// NextBool reads the next byte and returns it as a bool.
+func (d *Decoder) NextBool() bool {
+	d.ReadFull(d.buf[:1])
+	if d.buf[0] > 1 && d.err == nil {
+		d.err = errors.New("boolean value was not 0 or 1")
+	}
+	return d.buf[0] == 1
+}
+
+// NextPrefix is like NextUint64, but performs sanity checks on the prefix.
+// Specifically, if the prefix multiplied by elemSize exceeds MaxSliceSize,
+// NextPrefix returns 0 and sets d.Err().
+func (d *Decoder) NextPrefix(elemSize uintptr) uint64 {
+	n := d.NextUint64()
+	if n > 1<<31-1 || n*uint64(elemSize) > MaxSliceSize {
+		d.err = ErrSliceTooLarge{Len: n, ElemSize: uint64(elemSize)}
+		return 0
+	}
+	return n
+}
+
+// Err returns the first non-nil error encountered by d.
+func (d *Decoder) Err() error {
+	return d.err
 }
 
 // Decode reads the next encoded value from its input stream and stores it in
@@ -250,26 +387,6 @@ func (d *Decoder) DecodeAll(vs ...interface{}) error {
 	return nil
 }
 
-// readN reads n bytes and panics if the read fails.
-func (d *Decoder) readN(n int) []byte {
-	if buf, ok := d.r.(*bytes.Buffer); ok {
-		b := buf.Next(n)
-		if len(b) != n {
-			panic(io.ErrUnexpectedEOF)
-		}
-		if d.n += n; d.n > MaxObjectSize {
-			panic(ErrObjectTooLarge(d.n))
-		}
-		return b
-	}
-	b := make([]byte, n)
-	_, err := io.ReadFull(d, b)
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
 // decode reads the next encoded value from its input stream and stores it in
 // val. The decoding rules are the inverse of those specified in the package
 // docstring.
@@ -287,11 +404,10 @@ func (d *Decoder) decode(val reflect.Value) {
 
 	switch val.Kind() {
 	case reflect.Ptr:
-		var valid bool
-		d.decode(reflect.ValueOf(&valid).Elem())
-		// nil pointer, nothing to decode
+		valid := d.NextBool()
 		if !valid {
-			return
+			// nil pointer, nothing to decode
+			break
 		}
 		// make sure we aren't decoding into nil
 		if val.IsNil() {
@@ -299,31 +415,19 @@ func (d *Decoder) decode(val reflect.Value) {
 		}
 		d.decode(val.Elem())
 	case reflect.Bool:
-		b := d.readN(1)
-		if b[0] > 1 {
-			panic("boolean value was not 0 or 1")
-		}
-		val.SetBool(b[0] == 1)
+		val.SetBool(d.NextBool())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		val.SetInt(DecInt64(d.readN(8)))
+		val.SetInt(int64(d.NextUint64()))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		val.SetUint(DecUint64(d.readN(8)))
+		val.SetUint(d.NextUint64())
 	case reflect.String:
-		strLen := DecUint64(d.readN(8))
-		if strLen > MaxSliceSize {
-			panic("string is too large")
-		}
-		val.SetString(string(d.readN(int(strLen))))
+		val.SetString(string(d.ReadPrefix()))
 	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
-		sliceLen := DecUint64(d.readN(8))
-		// sanity-check the sliceLen, otherwise you can crash a peer by making
-		// them allocate a massive slice
-		if sliceLen > 1<<31-1 || sliceLen*uint64(val.Type().Elem().Size()) > MaxSliceSize {
-			panic(ErrSliceTooLarge{Len: sliceLen, ElemSize: uint64(val.Type().Elem().Size())})
-		} else if sliceLen == 0 {
-			return
+		sliceLen := d.NextPrefix(val.Type().Elem().Size())
+		if sliceLen == 0 {
+			break
 		}
 		val.Set(reflect.MakeSlice(val.Type(), int(sliceLen), int(sliceLen)))
 		fallthrough
@@ -331,31 +435,32 @@ func (d *Decoder) decode(val reflect.Value) {
 		// special case for byte arrays (e.g. hashes)
 		if val.Type().Elem().Kind() == reflect.Uint8 {
 			// convert val to a slice and read into it directly
-			b := val.Slice(0, val.Len())
-			_, err := io.ReadFull(d, b.Bytes())
-			if err != nil {
-				panic(err)
-			}
-			return
+			d.ReadFull(val.Slice(0, val.Len()).Bytes())
+			break
 		}
 		// arrays are unmarshalled by sequentially unmarshalling their elements
 		for i := 0; i < val.Len(); i++ {
 			d.decode(val.Index(i))
 		}
-		return
 	case reflect.Struct:
 		for i := 0; i < val.NumField(); i++ {
 			d.decode(val.Field(i))
 		}
-		return
 	default:
 		panic("unknown type")
 	}
+
+	if d.err != nil {
+		panic(d.err)
+	}
 }
 
-// NewDecoder returns a new decoder that reads from r.
+// NewDecoder converts r to a Decoder.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r, 0}
+	if d, ok := r.(*Decoder); ok {
+		return d
+	}
+	return &Decoder{r: r}
 }
 
 // Unmarshal decodes the encoded value b and stores it in v, which must be a
