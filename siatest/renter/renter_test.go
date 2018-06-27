@@ -61,7 +61,6 @@ func TestRenter(t *testing.T) {
 		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
-		{"TestRenterOldContracts", testRenterOldContracts},
 	}
 	// Run subtests
 	for _, subtest := range subTests {
@@ -2090,8 +2089,29 @@ func TestRenterResetAllowance(t *testing.T) {
 	}
 }
 
-// testRenterOldContracts tests the API endpoint for old contracts
-func testRenterOldContracts(t *testing.T, tg *siatest.TestGroup) {
+// TestRenterOldContracts tests the API endpoint for old contracts
+func TestRenterOldContracts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create a group for testing.
+	groupParams := siatest.GroupParams{
+		Hosts:   2,
+		Renters: 1,
+		Miners:  1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	// Get renter and current contracts
 	r := tg.Renters()[0]
 	rc, err := r.RenterContractsGet()
@@ -2109,19 +2129,8 @@ func testRenterOldContracts(t *testing.T, tg *siatest.TestGroup) {
 
 	// Renew contracts
 	// Mine blocks to force contract renewal
-	m := tg.Miners()[0]
-	cg, _ := r.ConsensusGet()
-	blockHeight := cg.Height
-	endHeight := rc.Contracts[0].EndHeight
-	rg, err := r.RenterGet()
-	if err != nil {
-		t.Fatal("Failed to get renter:", err)
-	}
-	rw := rg.Settings.Allowance.RenewWindow
-	for i := 0; i < int(endHeight-rw-blockHeight); i++ {
-		if err = m.MineBlock(); err != nil {
-			t.Fatal("Error mining block:", err)
-		}
+	if err = renewContractsByRenewWindow(r, tg); err != nil {
+		t.Fatal(err)
 	}
 	// Waiting for nodes to sync
 	if err = tg.Sync(); err != nil {
@@ -2137,7 +2146,7 @@ func testRenterOldContracts(t *testing.T, tg *siatest.TestGroup) {
 		}
 		// Check OldContracts against recorded old contracts
 		if len(oldContracts) != len(rc.OldContracts) {
-			return errors.New("number of old contracts don't match")
+			return errors.New(fmt.Sprintf("Number of old contracts don't match, expected %v got %v", len(oldContracts), len(rc.OldContracts)))
 		}
 
 		// Create Maps for comparison
@@ -2156,7 +2165,6 @@ func testRenterOldContracts(t *testing.T, tg *siatest.TestGroup) {
 		return nil
 	})
 	if err != nil {
-		t.Logf("Number of contracts, expected %v got %v", len(oldContracts), len(rc.OldContracts))
 		t.Fatal(err)
 	}
 
