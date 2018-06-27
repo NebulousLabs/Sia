@@ -355,12 +355,11 @@ func testDownloadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnce
 		t.Fatal(err)
 	}
 
-	// Create a group with a single renter and two hosts using the dependencies
+	// Create a group with a single renter and five hosts using the dependencies
 	// for the renter.
 	renterTemplate := node.Renter(testDir + "/renter")
 	renterTemplate.ContractSetDeps = deps
-	tg, err := siatest.NewGroup(renterTemplate, node.Host(testDir+"/host1"),
-		node.Host(testDir+"/host2"), siatest.Miner(testDir+"/miner"))
+	tg, err := siatest.NewGroup(renterTemplate, siatest.Miner(testDir+"/miner"))
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -370,9 +369,14 @@ func testDownloadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnce
 		}
 	}()
 
+	// Add a few hosts to the group.
+	if err := tg.AddNodeN(node.HostTemplate, 5); err != nil {
+		t.Fatal(err)
+	}
+
 	// Upload a file that's 1 chunk large.
 	renter := tg.Renters()[0]
-	dataPieces := uint64(1)
+	dataPieces := uint64(len(tg.Hosts())) - 1
 	parityPieces := uint64(1)
 	chunkSize := siatest.ChunkSize(uint64(dataPieces))
 	_, remoteFile, err := renter.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
@@ -430,12 +434,11 @@ func testUploadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnceOn
 		t.Fatal(err)
 	}
 
-	// Create a group with a single renter and two hosts using the dependencies
+	// Create a group with a single renter and five hosts using the dependencies
 	// for the renter.
 	renterTemplate := node.Renter(testDir + "/renter")
 	renterTemplate.ContractSetDeps = deps
-	tg, err := siatest.NewGroup(renterTemplate, node.Host(testDir+"/host1"),
-		node.Host(testDir+"/host2"), siatest.Miner(testDir+"/miner"))
+	tg, err := siatest.NewGroup(renterTemplate, siatest.Miner(testDir+"/miner"))
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -445,9 +448,14 @@ func testUploadInterrupted(t *testing.T, deps *siatest.DependencyInterruptOnceOn
 		}
 	}()
 
+	// Add a few hosts to the group.
+	if err := tg.AddNodeN(node.HostTemplate, 5); err != nil {
+		t.Fatal(err)
+	}
+
 	// Set the bandwidth limit to 1 chunk per second.
 	renter := tg.Renters()[0]
-	dataPieces := uint64(1)
+	dataPieces := uint64(len(tg.Hosts())) - 1
 	parityPieces := uint64(1)
 	chunkSize := siatest.ChunkSize(uint64(dataPieces))
 	if err := renter.RenterPostRateLimit(int64(chunkSize), int64(chunkSize)); err != nil {
