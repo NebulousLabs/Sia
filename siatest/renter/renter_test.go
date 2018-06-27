@@ -2103,7 +2103,23 @@ func testRenterOldContracts(t *testing.T, tg *siatest.TestGroup) {
 	}
 
 	// Renew contracts
-	if err = renewContractsByRenewWindow(r, tg); err != nil {
+	// Mine blocks to force contract renewal
+	m := tg.Miners()[0]
+	cg, _ := r.ConsensusGet()
+	blockHeight := cg.Height
+	endHeight := rc.Contracts[0].EndHeight
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal("Failed to get renter:", err)
+	}
+	rw := rg.Settings.Allowance.RenewWindow
+	for i := 0; i < int(endHeight-rw-blockHeight); i++ {
+		if err = m.MineBlock(); err != nil {
+			t.Fatal("Error mining block:", err)
+		}
+	}
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
 		t.Fatal(err)
 	}
 
