@@ -163,7 +163,7 @@ func Ed25519PublicKey(pk crypto.PublicKey) SiaPublicKey {
 // protected by having random public keys next to them.
 func (uc UnlockConditions) UnlockHash() UnlockHash {
 	var buf bytes.Buffer
-	e := encoder(&buf)
+	e := encoding.NewEncoder(&buf)
 	tree := crypto.NewTree()
 	e.WriteUint64(uint64(uc.Timelock))
 	tree.Push(buf.Bytes())
