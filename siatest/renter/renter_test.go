@@ -3,6 +3,7 @@ package renter
 import (
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -15,6 +16,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/node"
+	"github.com/NebulousLabs/Sia/node/api"
+	"github.com/NebulousLabs/Sia/node/api/client"
 	"github.com/NebulousLabs/Sia/siatest"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -28,6 +31,7 @@ func TestRenter(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a group for the subtests
 	groupParams := siatest.GroupParams{
@@ -319,6 +323,7 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 // with a dependency that interrupts the download before sending the signed
 // revision to the host.
 func TestDownloadInterruptedBeforeSendingRevision(t *testing.T) {
+	t.Parallel()
 	testDownloadInterrupted(t, newDependencyInterruptDownloadBeforeSendingRevision())
 }
 
@@ -326,6 +331,7 @@ func TestDownloadInterruptedBeforeSendingRevision(t *testing.T) {
 // with a dependency that interrupts the download after sending the signed
 // revision to the host.
 func TestDownloadInterruptedAfterSendingRevision(t *testing.T) {
+	t.Parallel()
 	testDownloadInterrupted(t, newDependencyInterruptDownloadAfterSendingRevision())
 }
 
@@ -333,6 +339,7 @@ func TestDownloadInterruptedAfterSendingRevision(t *testing.T) {
 // dependency that interrupts the upload before sending the signed revision to
 // the host.
 func TestUploadInterruptedBeforeSendingRevision(t *testing.T) {
+	t.Parallel()
 	testUploadInterrupted(t, newDependencyInterruptUploadBeforeSendingRevision())
 }
 
@@ -340,6 +347,7 @@ func TestUploadInterruptedBeforeSendingRevision(t *testing.T) {
 // dependency that interrupts the upload after sending the signed revision to
 // the host.
 func TestUploadInterruptedAfterSendingRevision(t *testing.T) {
+	t.Parallel()
 	testUploadInterrupted(t, newDependencyInterruptUploadAfterSendingRevision())
 }
 
@@ -589,6 +597,7 @@ func TestRenewFailing(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	renterDir, err := siatest.TestDir(filepath.Join(t.Name(), "renter"))
 	if err != nil {
 		t.Fatal(err)
@@ -735,6 +744,7 @@ func TestRenterPersistData(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Get test directory
 	testdir, err := siatest.TestDir(t.Name())
@@ -882,15 +892,149 @@ func testRenterDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
 	}
 }
 
-// TestRenterSpendingReporting checks the accuracy for the reported
-// spending
-func TestRenterSpendingReporting(t *testing.T) {
-	// Skipping Test until it can be fixed
-	t.Skip("TODO: Test currently broken")
-
+// TestRenterContractEndHeight makes sure that the endheight of renewed
+// contracts is set properly
+func TestRenterContractEndHeight(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
+
+	// Create a group for the subtests
+	groupParams := siatest.GroupParams{
+		Hosts:   2,
+		Renters: 1,
+		Miners:  1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Get Renter
+	r := tg.Renters()[0]
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal("Could not get renter:", err)
+	}
+
+	// Record the start period at the beginning of test
+	currentPeriodStart := rg.CurrentPeriod
+	period := rg.Settings.Allowance.Period
+	renewWindow := rg.Settings.Allowance.RenewWindow
+	numRenewals := 0
+
+	// Get contracts
+	rc, err := r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Could not get renter contracts:", err)
+	}
+
+	// Confirm Contracts were created as expected
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err = r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get contracts")
+		}
+		if err = checkContracts(len(tg.Hosts()), numRenewals, rc.OldContracts, rc.Contracts); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Confirm contract end heights were set properly
+	for _, c := range rc.Contracts {
+		if c.EndHeight != currentPeriodStart+period {
+			t.Log("Endheight:", c.EndHeight)
+			t.Log("Allowance Period:", period)
+			t.Log("Current Period:", currentPeriodStart)
+			t.Fatal("Contract endheight not set to Current period + Allowance Period")
+		}
+	}
+
+	// Mine blocks to force contract renewal
+	if err = renewContractsByRenewWindow(r, tg); err != nil {
+		t.Fatal(err)
+	}
+	numRenewals++
+
+	// Confirm Contracts were renewed as expected, all original
+	// contracts should have been renewed if GoodForRenew = true
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err = r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get contracts")
+		}
+		if err = checkContracts(len(tg.Hosts()), numRenewals, rc.OldContracts, rc.Contracts); err != nil {
+			return err
+		}
+		if err = checkRenewedContracts(rc.Contracts); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Confirm contract end heights were set properly
+	// End height should be the end of the next period as
+	// the contracts are renewed due to reaching the renew
+	// window
+	rc, err = r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Could not get renter contracts:", err)
+	}
+	for _, c := range rc.Contracts {
+		if c.EndHeight != currentPeriodStart+(2*period)-renewWindow && c.GoodForRenew {
+			t.Log("Endheight:", c.EndHeight)
+			t.Log("Allowance Period:", period)
+			t.Log("Renew Window:", renewWindow)
+			t.Log("Current Period:", currentPeriodStart)
+			t.Fatal("Contract endheight not set to Current period + 2 * Allowance Period - Renew Window")
+		}
+	}
+
+	// Capturing end height to compare against renewed contracts
+	endHeight := rc.Contracts[0].EndHeight
+
+	// Renew contracts by running out of funds
+	startingUploadSpend, err := renewContractsBySpending(r, tg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Confirm contract end heights were set properly
+	// End height should not have changed since the renewal
+	// was due to running out of funds
+	rc, err = r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Could not get renter contracts:", err)
+	}
+	for _, c := range rc.Contracts {
+		if c.EndHeight != endHeight && c.GoodForRenew && c.UploadSpending.Cmp(startingUploadSpend) <= 0 {
+			t.Log("Allowance Period:", period)
+			t.Log("Current Period:", currentPeriodStart)
+			t.Fatalf("Contract endheight Changed, EH was %v, expected %v\n", c.EndHeight, endHeight)
+		}
+	}
+}
+
+// TestRenterSpendingReporting checks the accuracy for the reported
+// spending
+func TestRenterSpendingReporting(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
 
 	// Create a testgroup, creating without renter so the renter's
 	// initial balance can be obtained
@@ -919,6 +1063,18 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Get largest WindowSize from Hosts
+	var windowSize types.BlockHeight
+	for _, h := range tg.Hosts() {
+		hg, err := h.HostGet()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if hg.ExternalSettings.WindowSize >= windowSize {
+			windowSize = hg.ExternalSettings.WindowSize
+		}
+	}
+
 	// Get renter's initial siacoin balance
 	r := tg.Renters()[0]
 	wg, err := r.WalletGet()
@@ -931,31 +1087,34 @@ func TestRenterSpendingReporting(t *testing.T) {
 	if err = tg.SetRenterAllowance(r, siatest.DefaultAllowance); err != nil {
 		t.Fatal("Failed to set renter allowance:", err)
 	}
+	numRenewals := 0
 
-	// Get initial Contracts to check for contract renewal later
-	rc, err := r.RenterContractsGet()
+	// Confirm Contracts were created as expected
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err := r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get contracts")
+		}
+		if err = checkContracts(len(tg.Hosts()), numRenewals, rc.OldContracts, rc.Contracts); err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		t.Fatal("Could not get contracts:", err)
+		t.Fatal(err)
 	}
-	initialContracts := rc.Contracts
 
-	// Getting initial financial metrics
-	// Setting variables to easier reference
-	rg, err := r.RenterGet()
+	// Check that the funds allocated when setting the allowance
+	// are reflected correctly in the wallet balance
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		err = checkBalanceVsSpending(r, initialBalance)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
-	}
-	fm := rg.FinancialMetrics
-
-	// Check balance after allowance is set
-	wg, err = r.WalletGet()
-	if err != nil {
-		t.Fatal("Failed to get wallet:", err)
-	}
-	balanceAfterSetAllowance := initialBalance.Sub(fm.TotalAllocated)
-	if balanceAfterSetAllowance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		t.Fatalf("Renter Reported Spending does not equal wallet confirmed balance, \n%v != \n%v",
-			balanceAfterSetAllowance, wg.ConfirmedSiacoinBalance)
+		t.Fatal(err)
 	}
 
 	// Upload and download files to show spending
@@ -977,21 +1136,53 @@ func TestRenterSpendingReporting(t *testing.T) {
 		}
 	}
 
-	// Capture total spending for initial period
-	rg, err = r.RenterGet()
+	// Get initial Contracts to check for contract renewal later
+	rc, err := r.RenterContractsGet()
 	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
+		t.Fatal("Could not get contracts:", err)
 	}
-	fm = rg.FinancialMetrics
-	totalSpentInitialPeriod := fm.ContractFees.Add(fm.UploadSpending).
-		Add(fm.DownloadSpending).Add(fm.StorageSpending)
+
+	// Check to confirm upload and download spending was captured correctly
+	// and reflected in the wallet balance
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		err = checkBalanceVsSpending(r, initialBalance)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Mine blocks to force contract renewal
-	m := tg.Miners()[0]
-	for i := 0; i < int(rg.Settings.Allowance.Period+types.MaturityDelay); i++ {
-		if err = m.MineBlock(); err != nil {
-			t.Fatal("Error mining block:", err)
+	if err = renewContractsByRenewWindow(r, tg); err != nil {
+		t.Fatal(err)
+	}
+	numRenewals++
+
+	// Confirm Contracts were renewed as expected
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err = r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get contracts")
 		}
+		if err = checkContracts(len(tg.Hosts()), numRenewals, rc.OldContracts, rc.Contracts); err != nil {
+			return err
+		}
+		if err = checkRenewedContracts(rc.Contracts); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine Block to confirm contracts and spending into blockchain
+	m := tg.Miners()[0]
+	if err = m.MineBlock(); err != nil {
+		t.Fatal("Error mining block:", err)
 	}
 
 	// Waiting for nodes to sync
@@ -999,79 +1190,402 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Get renewed renter contracts
+	// Check contract spending against reported spending
 	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal("Could not get contracts:", err)
 	}
-	renewedContracts := rc.Contracts
+	if err = checkContractVsReportedSpending(r, windowSize, rc.OldContracts, rc.Contracts); err != nil {
+		t.Fatal(err)
+	}
 
+	// Check to confirm reported spending is still accurate with the renewed contracts
+	// and reflected in the wallet balance
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		err = checkBalanceVsSpending(r, initialBalance)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Record current Wallet Balance
+	wg, err = r.WalletGet()
+	if err != nil {
+		t.Fatal("Failed to get wallet:", err)
+	}
+	initialPeriodEndBalance := wg.ConfirmedSiacoinBalance
+
+	// Mine blocks to force contract renewal and new period
+	cg, _ := r.ConsensusGet()
+	blockHeight := cg.Height
+	endHeight := rc.Contracts[0].EndHeight
+	rg, err := r.RenterGet()
+	if err != nil {
+		t.Fatal("Failed to get renter:", err)
+	}
+	rw := rg.Settings.Allowance.RenewWindow
+	for i := 0; i < int(endHeight-rw-blockHeight+types.MaturityDelay); i++ {
+		if err = m.MineBlock(); err != nil {
+			t.Fatal("Error mining block:", err)
+		}
+	}
+	numRenewals++
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check if Unspent unallocated funds were released after allowance period
+	// was exceeded
+	wg, err = r.WalletGet()
+	if err != nil {
+		t.Fatal("Failed to get wallet:", err)
+	}
+	if initialPeriodEndBalance.Cmp(wg.ConfirmedSiacoinBalance) > 0 {
+		t.Fatal("Unspent Unallocated funds not released after contract renewal and maturity delay")
+	}
+
+	// Confirm Contracts were renewed as expected
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err = r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "Could not get contracts")
+		}
+		if err = checkContracts(len(tg.Hosts()), numRenewals, rc.OldContracts, rc.Contracts); err != nil {
+			return err
+		}
+		if err = checkRenewedContracts(rc.Contracts); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine Block to confirm contracts and spending on blockchain
+	if err = m.MineBlock(); err != nil {
+		t.Fatal("Error mining block:", err)
+	}
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check contract spending against reported spending
+	rc, err = r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Could not get contracts:", err)
+	}
+	if err = checkContractVsReportedSpending(r, windowSize, rc.OldContracts, rc.Contracts); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check to confirm reported spending is still accurate with the renewed contracts
+	// and a new period and reflected in the wallet balance
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		err = checkBalanceVsSpending(r, initialBalance)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Renew contracts by running out of funds
+	_, err = renewContractsBySpending(r, tg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	numRenewals++
+
+	// Mine Block to confirm contracts and spending on blockchain
+	if err = m.MineBlock(); err != nil {
+		t.Fatal("Error mining block:", err)
+	}
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Confirm Contracts were renewed as expected
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err = r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "Could not get contracts")
+		}
+		if err = checkContracts(len(tg.Hosts()), numRenewals, rc.OldContracts, rc.Contracts); err != nil {
+			return err
+		}
+		if err = checkRenewedContracts(rc.Contracts); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine Block to confirm contracts and spending on blockchain
+	if err = m.MineBlock(); err != nil {
+		t.Fatal("Error mining block:", err)
+	}
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check contract spending against reported spending
+	rc, err = r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Could not get contracts:", err)
+	}
+
+	if err = checkContractVsReportedSpending(r, windowSize, rc.OldContracts, rc.Contracts); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check to confirm reported spending is still accurate with the renewed contracts
+	// and a new period and reflected in the wallet balance
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		err = checkBalanceVsSpending(r, initialBalance)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine blocks to force contract renewal
+	if err = renewContractsByRenewWindow(r, tg); err != nil {
+		t.Fatal(err)
+	}
+	numRenewals++
+
+	// Confirm Contracts were renewed as expected
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err = r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get contracts")
+		}
+		if err = checkContracts(len(tg.Hosts()), numRenewals, rc.OldContracts, rc.Contracts); err != nil {
+			return err
+		}
+		if err = checkRenewedContracts(rc.Contracts); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine Block to confirm contracts and spending into blockchain
+	if err = m.MineBlock(); err != nil {
+		t.Fatal("Error mining block:", err)
+	}
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check contract spending against reported spending
+	rc, err = r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Could not get contracts:", err)
+	}
+	if err = checkContractVsReportedSpending(r, windowSize, rc.OldContracts, rc.Contracts); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check to confirm reported spending is still accurate with the renewed contracts
+	// and reflected in the wallet balance
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		err = checkBalanceVsSpending(r, initialBalance)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkBalanceVsSpending checks the renters confirmed siacoin balance in their
+// wallet against their reported spending
+func checkBalanceVsSpending(r *siatest.TestNode, initialBalance types.Currency) error {
+	// Getting initial financial metrics
+	// Setting variables to easier reference
+	rg, err := r.RenterGet()
+	if err != nil {
+		return err
+	}
+	fm := rg.FinancialMetrics
+
+	// Check balance after allowance is set
+	wg, err := r.WalletGet()
+	if err != nil {
+		return err
+	}
+	expectedBalance := initialBalance.Sub(fm.TotalAllocated).Sub(fm.WithheldFunds).Sub(fm.PreviousSpending)
+	if expectedBalance.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
+		details := fmt.Sprintf(`Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance
+		Expected Balance:   %v
+		Wallet Balance:     %v
+		Actual difference:  %v
+		ExpectedBalance:    %v
+		walletBalance:      %v
+		`, expectedBalance.HumanString(), wg.ConfirmedSiacoinBalance.HumanString(), initialBalance.Sub(wg.ConfirmedSiacoinBalance).HumanString(),
+			expectedBalance.HumanString(), wg.ConfirmedSiacoinBalance.HumanString())
+		var diff string
+		if expectedBalance.Cmp(wg.ConfirmedSiacoinBalance) > 0 {
+			diff = fmt.Sprintf("Under reported by:  %v\n", expectedBalance.Sub(wg.ConfirmedSiacoinBalance).HumanString())
+		} else {
+			diff = fmt.Sprintf("Over reported by:   %v\n", wg.ConfirmedSiacoinBalance.Sub(expectedBalance).HumanString())
+		}
+		err := details + diff
+		return errors.New(err)
+	}
+	return nil
+}
+
+// checkContracts confirms that contracts are renewed as expected
+func checkContracts(numHosts, numRenewals int, oldContracts, renewedContracts []api.RenterContract) error {
+	if len(renewedContracts) != numHosts {
+		err := fmt.Sprintf("Incorrect number of Active contracts: have %v expected %v", len(renewedContracts), numHosts)
+		return errors.New(err)
+	}
+	if len(oldContracts) == 0 && numRenewals == 0 {
+		return nil
+	}
 	// Confirm contracts were renewed, this will also mean there are old contracts
-	// Verify there are the same number of initialContracts as renewedContracts
-	if len(initialContracts) != len(renewedContracts) {
-		t.Fatal("Initial and renewed contracts are not the same length")
+	// Verify there are not more renewedContracts than there are oldContracts
+	// This would mean contracts are not getting archived
+	if len(oldContracts) < len(renewedContracts) {
+		return errors.New("Too many renewed contracts")
+	}
+	if len(oldContracts) != numHosts*numRenewals {
+		err := fmt.Sprintf("Incorrect number of Old contracts: have %v expected %v", len(oldContracts), numHosts*numRenewals)
+		return errors.New(err)
 	}
 
 	// Create Maps for comparison
 	initialContractIDMap := make(map[types.FileContractID]struct{})
 	initialContractKeyMap := make(map[crypto.Hash]struct{})
-	for _, c := range initialContracts {
+	for _, c := range oldContracts {
 		initialContractIDMap[c.ID] = struct{}{}
 		initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)] = struct{}{}
 	}
-	for _, c := range renewedContracts {
-		// Verify that all the contracts were renewed
-		if _, ok := initialContractIDMap[c.ID]; ok {
-			t.Fatal("ID from renewedContracts found in initialContracts")
-		}
-		// Verifying that Renewed Contracts have the same HostPublicKey
-		// as an initial contract
-		if _, ok := initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)]; !ok {
-			t.Fatal("Host Public Key from renewedContracts not found in initialContracts")
-		}
-		// Confirm Renewed contract has storage spending
-		// Confirm Renewed contract no upload or download spending
-		if c.StorageSpending.Cmp(types.ZeroCurrency) < 1 {
-			t.Fatal("Storage Spending on renewed contract not greater than Zero")
-		}
-		if c.UploadSpending.Cmp(types.ZeroCurrency) != 0 {
-			t.Fatal("Upload spending on renewed contract not equal to zero, upload spending =",
-				c.UploadSpending)
-		}
-		if c.DownloadSpending.Cmp(types.ZeroCurrency) != 0 {
-			t.Fatal("Download spending on renewed contract not equal to zero, upload spending =",
-				c.DownloadSpending)
-		}
 
+	for _, c := range renewedContracts {
+		// Verify that all the contracts marked as GoodForRenew
+		// were renewed
+		if c.GoodForRenew {
+			if _, ok := initialContractIDMap[c.ID]; ok {
+				return errors.New("ID from renewedContracts found in oldContracts")
+			}
+			// Verifying that Renewed Contracts have the same HostPublicKey
+			// as an initial contract
+			if _, ok := initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)]; !ok {
+				return errors.New("Host Public Key from renewedContracts not found in oldContracts")
+			}
+		}
 	}
+	return nil
+}
+
+// checkRenewedContracts confirms that renewed contracts have zero upload and download spending
+func checkRenewedContracts(renewedContracts []api.RenterContract) error {
+	for _, c := range renewedContracts {
+		if c.GoodForRenew {
+			if c.UploadSpending.Cmp(types.ZeroCurrency) != 0 && c.GoodForUpload {
+				err := fmt.Sprintf("Upload spending on renewed contract equal to %v, expected zero", c.UploadSpending.HumanString())
+				return errors.New(err)
+			}
+			if c.DownloadSpending.Cmp(types.ZeroCurrency) != 0 {
+				err := fmt.Sprintf("Download spending on renewed contract equal to %v, expected zero", c.DownloadSpending.HumanString())
+				return errors.New(err)
+			}
+		}
+	}
+	return nil
+}
+
+// checkContractVsReportedSpending confirms that the spending recorded in
+// the renter's contracts matches the reported spending for the renter
+func checkContractVsReportedSpending(r *siatest.TestNode, WindowSize types.BlockHeight, oldContracts, renewedContracts []api.RenterContract) error {
+	// Get Current BlockHeight
+	cg, err := r.ConsensusGet()
+	if err != nil {
+		return err
+	}
+
 	// Getting financial metrics after uploads, downloads, and
 	// contract renewal
-	rg, err = r.RenterGet()
+	rg, err := r.RenterGet()
 	if err != nil {
-		t.Fatal("Failed to get RenterGet:", err)
+		return err
 	}
 
-	fm = rg.FinancialMetrics
+	fm := rg.FinancialMetrics
 	totalSpent := fm.ContractFees.Add(fm.UploadSpending).
 		Add(fm.DownloadSpending).Add(fm.StorageSpending)
 	total := totalSpent.Add(fm.Unspent)
 	allowance := rg.Settings.Allowance
 
-	wg, err = r.WalletGet()
-	if err != nil {
-		t.Fatal("Failed to get wallet:", err)
-	}
-
 	// Check that renter financial metrics add up to allowance
 	if total.Cmp(allowance.Funds) != 0 {
-		t.Fatalf("Combined Total of reported spending and unspent funds not equal to allowance, \n%v != \n%v",
-			total, allowance.Funds)
+		err := fmt.Sprintf(`Combined Total of reported spending and unspent funds not equal to allowance:
+			total:     %v
+			allowance: %v
+			`, total.HumanString(), allowance.Funds.HumanString())
+		return errors.New(err)
 	}
 
 	// Check renter financial metrics against contract spending
 	var spending modules.ContractorSpending
-	for _, contract := range initialContracts {
+	for _, contract := range oldContracts {
 		if contract.StartHeight >= rg.CurrentPeriod {
+			// Calculate ContractFees
+			spending.ContractFees = spending.ContractFees.Add(contract.Fees)
+			// Calculate TotalAllocated
+			spending.TotalAllocated = spending.TotalAllocated.Add(contract.TotalCost)
+			// Calculate Spending
+			spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
+			spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
+			spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
+		} else if contract.EndHeight+WindowSize+types.MaturityDelay > cg.Height {
+			// Calculated funds that are being withheld in contracts
+			spending.WithheldFunds = spending.WithheldFunds.Add(contract.RenterFunds)
+			// Record the largest window size for worst case when reporting the spending
+			if WindowSize >= spending.ReleaseBlock {
+				spending.ReleaseBlock = WindowSize
+			}
+			// Calculate Previous spending
+			spending.PreviousSpending = spending.PreviousSpending.Add(contract.Fees).
+				Add(contract.DownloadSpending).Add(contract.UploadSpending).Add(contract.StorageSpending)
+		} else {
+			// Calculate Previous spending
+			spending.PreviousSpending = spending.PreviousSpending.Add(contract.Fees).
+				Add(contract.DownloadSpending).Add(contract.UploadSpending).Add(contract.StorageSpending)
+		}
+	}
+	for _, contract := range renewedContracts {
+		if contract.GoodForRenew {
 			// Calculate ContractFees
 			spending.ContractFees = spending.ContractFees.Add(contract.Fees)
 			// Calculate TotalAllocated
@@ -1082,43 +1596,159 @@ func TestRenterSpendingReporting(t *testing.T) {
 			spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
 		}
 	}
-	for _, contract := range renewedContracts {
-		// Calculate ContractFees
-		spending.ContractFees = spending.ContractFees.Add(contract.Fees)
-		// Calculate TotalAllocated
-		spending.TotalAllocated = spending.TotalAllocated.Add(contract.TotalCost)
-		// Calculate Spending
-		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
-		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
-		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
-	}
 
 	// Compare contract fees
 	if fm.ContractFees.Cmp(spending.ContractFees) != 0 {
-		t.Fatalf("Financial Metrics Contract Fees not equal to Renter Contract Fees, \n%v != \n%v",
-			fm.ContractFees, spending.ContractFees)
+		err := fmt.Sprintf(`Fees not equal:
+			Financial Metrics Fees: %v
+			Contract Fees:          %v
+			`, fm.ContractFees.HumanString(), spending.ContractFees.HumanString())
+		return errors.New(err)
 	}
 	// Compare Total Allocated
 	if fm.TotalAllocated.Cmp(spending.TotalAllocated) != 0 {
-		t.Fatalf("Financial Metrics Total Allocated not equal to Renter Total Allocated, \n%v != \n%v",
-			fm.TotalAllocated, spending.TotalAllocated)
+		err := fmt.Sprintf(`Total Allocated not equal:
+			Financial Metrics TA: %v
+			Contract TA:          %v
+			`, fm.TotalAllocated.HumanString(), spending.TotalAllocated.HumanString())
+		return errors.New(err)
 	}
-	// Compare Spending
-	allSpending := spending.ContractFees.Add(spending.UploadSpending).
-		Add(spending.DownloadSpending).Add(spending.StorageSpending)
-	if totalSpent.Cmp(allSpending) != 0 {
-		t.Fatalf("Financial Metrics Spending not equal to Renter Spending, \n%v != \n%v",
-			totalSpent, allSpending)
+	// Compare Upload Spending
+	if fm.UploadSpending.Cmp(spending.UploadSpending) != 0 {
+		err := fmt.Sprintf(`Upload spending not equal:
+			Financial Metrics US: %v
+			Contract US:          %v
+			`, fm.UploadSpending.HumanString(), spending.UploadSpending.HumanString())
+		return errors.New(err)
+	}
+	// Compare Download Spending
+	if fm.DownloadSpending.Cmp(spending.DownloadSpending) != 0 {
+		err := fmt.Sprintf(`Download spending not equal:
+			Financial Metrics DS: %v
+			Contract DS:          %v
+			`, fm.DownloadSpending.HumanString(), spending.DownloadSpending.HumanString())
+		return errors.New(err)
+	}
+	// Compare Storage Spending
+	if fm.StorageSpending.Cmp(spending.StorageSpending) != 0 {
+		err := fmt.Sprintf(`Storage spending not equal:
+			Financial Metrics SS: %v
+			Contract SS:          %v
+			`, fm.StorageSpending.HumanString(), spending.StorageSpending.HumanString())
+		return errors.New(err)
+	}
+	// Compare Withheld Funds
+	if fm.WithheldFunds.Cmp(spending.WithheldFunds) != 0 {
+		err := fmt.Sprintf(`Withheld Funds not equal:
+			Financial Metrics WF: %v
+			Contract WF:          %v
+			`, fm.WithheldFunds.HumanString(), spending.WithheldFunds.HumanString())
+		return errors.New(err)
+	}
+	// Compare Release Block
+	if fm.ReleaseBlock != spending.ReleaseBlock {
+		err := fmt.Sprintf(`Release Block not equal:
+			Financial Metrics RB: %v
+			Contract RB:          %v
+			`, fm.ReleaseBlock, spending.ReleaseBlock)
+		return errors.New(err)
+	}
+	// Compare Previous Spending
+	if fm.PreviousSpending.Cmp(spending.PreviousSpending) != 0 {
+		err := fmt.Sprintf(`Previous spending not equal:
+			Financial Metrics PS: %v
+			Contract PS:          %v
+			`, fm.PreviousSpending.HumanString(), spending.PreviousSpending.HumanString())
+		return errors.New(err)
 	}
 
-	// Check balance after spending, TotalAllocated is spending
-	// and unspentAllocated
-	balanceAfterRenewal := initialBalance.Sub(fm.TotalAllocated).Sub(totalSpentInitialPeriod)
-	if balanceAfterRenewal.Cmp(wg.ConfirmedSiacoinBalance) != 0 {
-		fmt.Println("Difference:", balanceAfterRenewal.Sub(wg.ConfirmedSiacoinBalance).HumanString())
-		t.Fatalf("Initial balance minus Renter Reported Spending does not equal wallet Confirmed Siacoin Balance, \n%v != \n%v",
-			balanceAfterRenewal, wg.ConfirmedSiacoinBalance)
+	return nil
+}
+
+// renewContractByRenewWindow mines blocks to force contract renewal
+func renewContractsByRenewWindow(renter *siatest.TestNode, tg *siatest.TestGroup) error {
+	rg, err := renter.RenterGet()
+	if err != nil {
+		return errors.AddContext(err, "failed to get RenterGet")
 	}
+	m := tg.Miners()[0]
+	for i := 0; i < int(rg.Settings.Allowance.Period-rg.Settings.Allowance.RenewWindow); i++ {
+		if err = m.MineBlock(); err != nil {
+			return errors.AddContext(err, "error mining block")
+		}
+	}
+
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// renewContractsBySpending uploads files until the contracts renew
+// due to running out of funds
+func renewContractsBySpending(renter *siatest.TestNode, tg *siatest.TestGroup) (startingUploadSpend types.Currency, err error) {
+	// Renew contracts by running out of funds
+	// Set upload price to max price
+	maxStoragePrice := types.SiacoinPrecision.Mul64(30e3).Div(modules.BlockBytesPerMonthTerabyte) // 30k SC / TB / Month
+	maxUploadPrice := maxStoragePrice.Mul64(3 * 4320)
+	hosts := tg.Hosts()
+	for _, h := range hosts {
+		err := h.HostModifySettingPost(client.HostParamMinUploadBandwidthPrice, maxUploadPrice)
+		if err != nil {
+			return types.ZeroCurrency, errors.AddContext(err, "could not set Host Upload Price")
+		}
+	}
+
+	// Waiting for nodes to sync
+	m := tg.Miners()[0]
+	if err := m.MineBlock(); err != nil {
+		return types.ZeroCurrency, errors.AddContext(err, "error mining block")
+	}
+	if err := tg.Sync(); err != nil {
+		return types.ZeroCurrency, err
+	}
+
+	// Set upload parameters
+	dataPieces := uint64(1)
+	parityPieces := uint64(1)
+	chunkSize := siatest.ChunkSize(1)
+
+	// Upload once to show upload spending
+	_, _, err = renter.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
+	if err != nil {
+		return types.ZeroCurrency, errors.AddContext(err, "failed to upload a file for testing")
+	}
+
+	// Get current upload spend, previously contracts had zero upload spend
+	rc, err := renter.RenterContractsGet()
+	if err != nil {
+		return types.ZeroCurrency, errors.AddContext(err, "could not get renter contracts")
+	}
+	startingUploadSpend = rc.Contracts[0].UploadSpending
+	numberOldContracts := len(rc.OldContracts)
+
+	// Upload files to force contract renewal due to running out of funds
+LOOP:
+	for len(rc.OldContracts) == numberOldContracts {
+		// To protect against contracts not renewing during uploads
+		for _, c := range rc.Contracts {
+			percentRemaining, _ := big.NewRat(0, 1).SetFrac(c.RenterFunds.Big(), c.TotalCost.Big()).Float64()
+			if percentRemaining < float64(0.03) {
+				break LOOP
+			}
+		}
+		_, _, err = renter.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
+		if err != nil {
+			return types.ZeroCurrency, errors.AddContext(err, "failed to upload a file for testing")
+		}
+
+		rc, err = renter.RenterContractsGet()
+		if err != nil {
+			return types.ZeroCurrency, errors.AddContext(err, "could not get contracts")
+		}
+	}
+	return startingUploadSpend, nil
 }
 
 // TestRedundancyReporting verifies that redundancy reporting is accurate if
@@ -1127,6 +1757,7 @@ func TestRedundancyReporting(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a group for testing.
 	groupParams := siatest.GroupParams{
@@ -1230,6 +1861,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a group for testing.
 	groupParams := siatest.GroupParams{
@@ -1372,6 +2004,7 @@ func TestRenterResetAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a group for testing.
 	groupParams := siatest.GroupParams{
@@ -1454,4 +2087,85 @@ func TestRenterResetAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// TestRenterOldContracts tests the API endpoint for old contracts
+func TestRenterOldContracts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create a group for testing.
+	groupParams := siatest.GroupParams{
+		Hosts:   2,
+		Renters: 1,
+		Miners:  1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Get renter and current contracts
+	r := tg.Renters()[0]
+	rc, err := r.RenterContractsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Record old contracts and current contracts that are good for renew
+	oldContracts := rc.OldContracts
+	for _, c := range rc.Contracts {
+		if c.GoodForRenew {
+			oldContracts = append(oldContracts, c)
+		}
+	}
+
+	// Renew contracts
+	// Mine blocks to force contract renewal
+	if err = renewContractsByRenewWindow(r, tg); err != nil {
+		t.Fatal(err)
+	}
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Confirm Contracts were renewed as expected, all original
+	// contracts should have been renewed if GoodForRenew = true
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rc, err = r.RenterContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get contracts")
+		}
+		// Check OldContracts against recorded old contracts
+		if len(oldContracts) != len(rc.OldContracts) {
+			return errors.New(fmt.Sprintf("Number of old contracts don't match, expected %v got %v", len(oldContracts), len(rc.OldContracts)))
+		}
+
+		// Create Maps for comparison
+		initialContractIDMap := make(map[types.FileContractID]struct{})
+		for _, c := range oldContracts {
+			initialContractIDMap[c.ID] = struct{}{}
+		}
+
+		for _, c := range rc.OldContracts {
+			// Verify that all the contracts marked as GoodForRenew
+			// were renewed
+			if _, ok := initialContractIDMap[c.ID]; !ok {
+				return errors.New("ID from rc.OldContracts not found in oldContracts")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 }

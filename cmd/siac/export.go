@@ -35,7 +35,8 @@ func renterexportcontracttxnscmd(destination string) {
 		die("Could not retrieve contracts:", err)
 	}
 	var contractTxns []types.Transaction
-	for _, c := range cs.Contracts {
+	contracts := append(cs.Contracts, cs.OldContracts...)
+	for _, c := range contracts {
 		contractTxns = append(contractTxns, c.LastTransaction)
 	}
 	destination = abs(destination)

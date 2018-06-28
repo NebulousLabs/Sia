@@ -271,8 +271,8 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 // dropping contracts which are no longer worthwhile, and adding contracts if
 // there are not enough.
 //
-// Between each network call, the thread checks whether a maintenance iterrupt
-// signal is being sent. If so, maintannce returns, yielding to whatever thread
+// Between each network call, the thread checks whether a maintenance interrupt
+// signal is being sent. If so, maintenance returns, yielding to whatever thread
 // issued the interrupt.
 func (c *Contractor) threadedContractMaintenance() {
 	// Threading protection.
@@ -351,7 +351,8 @@ func (c *Contractor) threadedContractMaintenance() {
 	blockHeight := c.blockHeight
 	c.mu.RUnlock()
 
-	// Grab the end height that should be used for the contracts.
+	// Grab the end height that should be used for the contracts created
+	// in the current period.
 	endHeight = currentPeriod + allowance.Period
 
 	// Determine how many funds have been used already in this billing
@@ -416,16 +417,37 @@ func (c *Contractor) threadedContractMaintenance() {
 			// cycle. This is calculated by starting with the total cost and
 			// subtracting out all of the fees, and then all of the unused
 			// money that was allocated (the RenterFunds).
-			renewAmount := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee).Sub(contract.RenterFunds)
+			//
+			// In order to accurately fund contracts based on variable spending,
+			// the cost per block is calculated based on the total spent
+			// over the length of time that the contract was active before
+			// renewal.
+			oldContractSpent := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee).Sub(contract.RenterFunds)
+			oldContractLength := blockHeight - contract.StartHeight
+			if oldContractLength == 0 {
+				oldContractLength = types.BlockHeight(1)
+			}
+			spentPerBlock := oldContractSpent.Div64(uint64(oldContractLength))
+			renewAmount := spentPerBlock.Mul64(uint64(allowance.Period))
 
 			// Get an estimate for how much the fees will cost.
-			//
-			// TODO: Look up this host in the hostdb to figure out what the
-			// actual fees will be.
-			estimatedFees := contract.ContractFee.Add(contract.TxnFee).Add(contract.SiafundFee)
+			// Txn Fee
+			_, maxTxnFee := c.tpool.FeeEstimation()
+
+			// SiafundFee
+			siafundFee := types.Tax(blockHeight, renewAmount)
+
+			// Contract Fee
+			host, ok := c.hdb.Host(contract.HostPublicKey)
+			if !ok {
+				c.log.Println("Could not find contract host in hostdb")
+				return
+			}
+
+			estimatedFees := host.ContractPrice.Add(maxTxnFee).Add(siafundFee)
 			renewAmount = renewAmount.Add(estimatedFees)
 
-			// Determine if there is enough funds available to suppliement
+			// Determine if there is enough funds available to supplement
 			// with a 33% bonus, and if there is, add a 33% bonus.
 			moneyBuffer := renewAmount.Div64(3)
 			if moneyBuffer.Cmp(fundsAvailable) < 0 {
@@ -462,7 +484,11 @@ func (c *Contractor) threadedContractMaintenance() {
 				// This contract does need to be refreshed. Make sure there
 				// are enough funds available to perform the refresh, and
 				// then execute.
-				refreshAmount := contract.TotalCost.Mul64(2)
+				oldDuration := blockHeight - contract.StartHeight
+				newDuration := endHeight - blockHeight
+				spendPerBlock := contract.TotalCost.Div64(uint64(oldDuration))
+				refreshAmount := spendPerBlock.Mul64(uint64(newDuration))
+
 				if refreshAmount.Cmp(fundsAvailable) < 0 {
 					renewSet = append(renewSet, renewal{
 						id:     contract.ID,
@@ -534,6 +560,10 @@ func (c *Contractor) threadedContractMaintenance() {
 				c.staticContracts.Return(oldContract)
 				return
 			}
+
+			// Calculate endHeight for renewed contracts
+			endHeight = currentPeriod + allowance.Period
+
 			// Perform the actual renew. If the renew fails, return the
 			// contract. If the renew fails we check how often it has failed
 			// before. Once it has failed for a certain number of blocks in a

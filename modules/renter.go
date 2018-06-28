@@ -296,6 +296,16 @@ type ContractorSpending struct {
 	// ContractSpendingDeprecated was renamed to TotalAllocated and always has the
 	// same value as TotalAllocated.
 	ContractSpendingDeprecated types.Currency `json:"contractspending"`
+	// WithheldFunds are the funds from the previous period that are tied up
+	// in contracts and have not been released yet
+	WithheldFunds types.Currency `json:"withheldfunds"`
+	// ReleaseBlock is the block at which the WithheldFunds should be
+	// released to the renter, based on worst case.
+	// Contract End Height + Host Window Size + Maturity Delay
+	ReleaseBlock types.BlockHeight `json:"releaseblock"`
+	// PreviousSpending is the total spend funds from old contracts
+	// that are not included in the current period spending
+	PreviousSpending types.Currency `json:"previousspending"`
 }
 
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
@@ -311,8 +321,11 @@ type Renter interface {
 	// Close closes the Renter.
 	Close() error
 
-	// Contracts returns the contracts formed by the renter.
+	// Contracts returns the active contracts formed by the renter.
 	Contracts() []RenterContract
+
+	// OldContracts returns the old contracts formed by the renter.
+	OldContracts() []RenterContract
 
 	// ContractUtility provides the contract utility for a given host key.
 	ContractUtility(pk types.SiaPublicKey) (ContractUtility, bool)

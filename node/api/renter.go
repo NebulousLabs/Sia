@@ -115,7 +115,8 @@ type (
 
 	// RenterContracts contains the renter's contracts.
 	RenterContracts struct {
-		Contracts []RenterContract `json:"contracts"`
+		Contracts    []RenterContract `json:"contracts"`
+		OldContracts []RenterContract `json:"oldcontracts"`
 	}
 
 	// RenterDownloadQueue contains the renter's download queue.
@@ -314,8 +315,50 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			UploadSpending:            c.UploadSpending,
 		})
 	}
+	oldContracts := []RenterContract{}
+	for _, c := range api.renter.OldContracts() {
+		var size uint64
+		if len(c.Transaction.FileContractRevisions) != 0 {
+			size = c.Transaction.FileContractRevisions[0].NewFileSize
+		}
+
+		// Fetch host address
+		var netAddress modules.NetAddress
+		hdbe, exists := api.renter.Host(c.HostPublicKey)
+		if exists {
+			netAddress = hdbe.NetAddress
+		}
+
+		// Fetch utilities for contract
+		var goodForUpload bool
+		var goodForRenew bool
+		if utility, ok := api.renter.ContractUtility(c.HostPublicKey); ok {
+			goodForUpload = utility.GoodForUpload
+			goodForRenew = utility.GoodForRenew
+		}
+
+		oldContracts = append(oldContracts, RenterContract{
+			DownloadSpending:          c.DownloadSpending,
+			EndHeight:                 c.EndHeight,
+			Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
+			GoodForUpload:             goodForUpload,
+			GoodForRenew:              goodForRenew,
+			HostPublicKey:             c.HostPublicKey,
+			ID:                        c.ID,
+			LastTransaction:           c.Transaction,
+			NetAddress:                netAddress,
+			RenterFunds:               c.RenterFunds,
+			Size:                      size,
+			StartHeight:               c.StartHeight,
+			StorageSpending:           c.StorageSpending,
+			StorageSpendingDeprecated: c.StorageSpending,
+			TotalCost:                 c.TotalCost,
+			UploadSpending:            c.UploadSpending,
+		})
+	}
 	WriteJSON(w, RenterContracts{
-		Contracts: contracts,
+		Contracts:    contracts,
+		OldContracts: oldContracts,
 	})
 }
 
