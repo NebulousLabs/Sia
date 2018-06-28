@@ -138,15 +138,17 @@ func main() {
 	root.AddCommand(bashcomplCmd)
 	root.AddCommand(mangenCmd)
 
+	// initialize client
+	root.PersistentFlags().StringVarP(&httpClient.Address, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
+	root.PersistentFlags().StringVarP(&httpClient.Password, "apipassword", "", "", "the password for the API's http authentication")
+	root.PersistentFlags().StringVarP(&httpClient.UserAgent, "useragent", "", "Sia-Agent", "the useragent used by siac to connect to the daemon's API")
+
 	// Check if the api password environment variable is set.
 	apiPassword := os.Getenv("SIA_API_PASSWORD")
 	if apiPassword != "" {
+		httpClient.Password = apiPassword
 		fmt.Println("Using SIA_API_PASSWORD environment variable")
 	}
-	// initialize client
-	root.PersistentFlags().StringVarP(&httpClient.Address, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
-	root.PersistentFlags().StringVarP(&httpClient.Password, "apipassword", "", apiPassword, "the password for the API's http authentication")
-	root.PersistentFlags().StringVarP(&httpClient.UserAgent, "useragent", "", "Sia-Agent", "the useragent used by siac to connect to the daemon's API")
 
 	// run
 	if err := root.Execute(); err != nil {
