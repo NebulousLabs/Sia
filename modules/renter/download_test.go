@@ -16,6 +16,11 @@ func TestClearDownloads(t *testing.T) {
 	}
 	defer rt.Close()
 
+	// Test clearing empty download history
+	if err := rt.renter.ClearDownloadHistory(time.Time{}, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+
 	// Check Clearing individual download from history
 	// doesn't exist - before
 	length, err := clearDownloadHistory(rt, 1, 1)
