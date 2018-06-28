@@ -534,11 +534,13 @@ func renterfilesdeletecmd(path string) {
 // Downloads a path from the Sia network to the local specified destination.
 func renterfilesdownloadcmd(path, destination string) {
 	destination = abs(destination)
+	var err error
 	done := make(chan struct{})
-	go downloadprogress(done, path)
-
-	err := httpClient.RenterDownloadFullGet(path, destination, false)
-	close(done)
+	go func() {
+		err = httpClient.RenterDownloadFullGet(path, destination, renterDownloadAsync)
+		close(done)
+	}()
+	downloadprogress(done, path)
 	if err != nil {
 		die("Could not download file:", err)
 	}
@@ -574,7 +576,6 @@ func downloadprogress(done chan struct{}, siapath string) {
 			fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
 		}
 	}
-
 }
 
 // bySiaPath implements sort.Interface for [] modules.FileInfo based on the
