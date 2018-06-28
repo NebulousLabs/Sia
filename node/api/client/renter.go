@@ -71,7 +71,7 @@ func (c *Client) RenterClearDownloadsBeforePost(before time.Time) (err error) {
 
 // RenterClearDownloadsRangePost requests the /renter/downloads/clear resource
 // with both before and after timestamps provided
-func (c *Client) RenterClearDownloadsRangePost(before, after time.Time) (err error) {
+func (c *Client) RenterClearDownloadsRangePost(after, before time.Time) (err error) {
 	values := url.Values{}
 	values.Set("before", strconv.FormatInt(before.UnixNano(), 10))
 	values.Set("after", strconv.FormatInt(after.UnixNano(), 10))

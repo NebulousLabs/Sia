@@ -385,7 +385,7 @@ func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, req *http.Req
 		afterTime = time.Unix(0, afterInt)
 	}
 
-	err := api.renter.ClearDownloadHistory(beforeTime, afterTime)
+	err := api.renter.ClearDownloadHistory(afterTime, beforeTime)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return

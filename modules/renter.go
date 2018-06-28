@@ -352,7 +352,7 @@ type Renter interface {
 
 	// ClearDownloadHistory clears the download history of the renter
 	// inclusive for before and after times.
-	ClearDownloadHistory(before, after time.Time) error
+	ClearDownloadHistory(after, before time.Time) error
 
 	// DownloadHistory lists all the files that have been scheduled for download.
 	DownloadHistory() []DownloadInfo

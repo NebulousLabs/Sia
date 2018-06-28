@@ -523,7 +523,7 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 
 // ClearDownloadHistory clears the renter's download history inclusive
 // of the provided before and after timestamps
-func (r *Renter) ClearDownloadHistory(before, after time.Time) error {
+func (r *Renter) ClearDownloadHistory(after, before time.Time) error {
 	if err := r.tg.Add(); err != nil {
 		return err
 	}
