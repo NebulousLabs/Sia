@@ -96,34 +96,34 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 	}
 
 	// Calculate needed spending to be reported from old contracts
-	for _, old := range c.oldContracts {
-		host, exist := c.hdb.Host(old.HostPublicKey)
-		if old.StartHeight >= c.currentPeriod {
+	for _, contract := range c.oldContracts {
+		host, exist := c.hdb.Host(contract.HostPublicKey)
+		if contract.StartHeight >= c.currentPeriod {
 			// Calculate spending from contracts that were renewed during the current period
 			// Calculate ContractFees
-			spending.ContractFees = spending.ContractFees.Add(old.ContractFee)
-			spending.ContractFees = spending.ContractFees.Add(old.TxnFee)
-			spending.ContractFees = spending.ContractFees.Add(old.SiafundFee)
+			spending.ContractFees = spending.ContractFees.Add(contract.ContractFee)
+			spending.ContractFees = spending.ContractFees.Add(contract.TxnFee)
+			spending.ContractFees = spending.ContractFees.Add(contract.SiafundFee)
 			// Calculate TotalAllocated
-			spending.TotalAllocated = spending.TotalAllocated.Add(old.TotalCost)
+			spending.TotalAllocated = spending.TotalAllocated.Add(contract.TotalCost)
 			// Calculate Spending
-			spending.DownloadSpending = spending.DownloadSpending.Add(old.DownloadSpending)
-			spending.UploadSpending = spending.UploadSpending.Add(old.UploadSpending)
-			spending.StorageSpending = spending.StorageSpending.Add(old.StorageSpending)
-		} else if exist && old.EndHeight+host.WindowSize+types.MaturityDelay > c.blockHeight {
+			spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
+			spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
+			spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
+		} else if exist && contract.EndHeight+host.WindowSize+types.MaturityDelay > c.blockHeight {
 			// Calculate funds that are being withheld in contracts
-			spending.WithheldFunds = spending.WithheldFunds.Add(old.RenterFunds)
+			spending.WithheldFunds = spending.WithheldFunds.Add(contract.RenterFunds)
 			// Record the largest window size for worst case when reporting the spending
-			if host.WindowSize >= spending.ReleaseBlock {
-				spending.ReleaseBlock = host.WindowSize
+			if contract.EndHeight+host.WindowSize+types.MaturityDelay >= spending.ReleaseBlock {
+				spending.ReleaseBlock = contract.EndHeight + host.WindowSize + types.MaturityDelay
 			}
 			// Calculate Previous spending
-			spending.PreviousSpending = spending.PreviousSpending.Add(old.ContractFee).Add(old.TxnFee).
-				Add(old.SiafundFee).Add(old.DownloadSpending).Add(old.UploadSpending).Add(old.StorageSpending)
+			spending.PreviousSpending = spending.PreviousSpending.Add(contract.ContractFee).Add(contract.TxnFee).
+				Add(contract.SiafundFee).Add(contract.DownloadSpending).Add(contract.UploadSpending).Add(contract.StorageSpending)
 		} else {
 			// Calculate Previous spending
-			spending.PreviousSpending = spending.PreviousSpending.Add(old.ContractFee).Add(old.TxnFee).
-				Add(old.SiafundFee).Add(old.DownloadSpending).Add(old.UploadSpending).Add(old.StorageSpending)
+			spending.PreviousSpending = spending.PreviousSpending.Add(contract.ContractFee).Add(contract.TxnFee).
+				Add(contract.SiafundFee).Add(contract.DownloadSpending).Add(contract.UploadSpending).Add(contract.StorageSpending)
 		}
 	}
 
@@ -159,9 +159,9 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 	return c.staticContracts.ViewAll()
 }
 
-// OldContracts returns the contracts formed by the contractor that have
+// ExpiredContracts returns the contracts formed by the contractor that have
 // expired
-func (c *Contractor) OldContracts() []modules.RenterContract {
+func (c *Contractor) ExpiredContracts() []modules.RenterContract {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	contracts := make([]modules.RenterContract, 0, len(c.oldContracts))

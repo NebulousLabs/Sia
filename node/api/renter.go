@@ -115,8 +115,8 @@ type (
 
 	// RenterContracts contains the renter's contracts.
 	RenterContracts struct {
-		Contracts    []RenterContract `json:"contracts"`
-		OldContracts []RenterContract `json:"oldcontracts"`
+		Contracts        []RenterContract `json:"contracts"`
+		ExpiredContracts []RenterContract `json:"expiredcontracts"`
 	}
 
 	// RenterDownloadQueue contains the renter's download queue.
@@ -316,8 +316,8 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			UploadSpending:            c.UploadSpending,
 		})
 	}
-	oldContracts := []RenterContract{}
-	for _, c := range api.renter.OldContracts() {
+	expiredContracts := []RenterContract{}
+	for _, c := range api.renter.ExpiredContracts() {
 		var size uint64
 		if len(c.Transaction.FileContractRevisions) != 0 {
 			size = c.Transaction.FileContractRevisions[0].NewFileSize
@@ -338,7 +338,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			goodForRenew = utility.GoodForRenew
 		}
 
-		oldContracts = append(oldContracts, RenterContract{
+		expiredContracts = append(expiredContracts, RenterContract{
 			DownloadSpending:          c.DownloadSpending,
 			EndHeight:                 c.EndHeight,
 			Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
@@ -358,8 +358,8 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 		})
 	}
 	WriteJSON(w, RenterContracts{
-		Contracts:    contracts,
-		OldContracts: oldContracts,
+		Contracts:        contracts,
+		ExpiredContracts: expiredContracts,
 	})
 }
 

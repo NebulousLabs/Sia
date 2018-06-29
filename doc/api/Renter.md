@@ -148,12 +148,73 @@ standard success or error response. See
 
 #### /renter/contracts [GET]
 
-returns active contracts. Expired contracts are not included.
+returns active contracts and expired contracts.
 
 ###### JSON Response
 ```javascript
 {
   "contracts": [
+    {
+      // Amount of contract funds that have been spent on downloads.
+      "downloadspending": "1234", // hastings
+
+      // Block height that the file contract ends on.
+      "endheight": 50000, // block height
+
+      // Fees paid in order to form the file contract.
+      "fees": "1234", // hastings
+
+      // Public key of the host the contract was formed with.
+      "hostpublickey": {
+        "algorithm": "ed25519",
+        "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+      },
+
+      // ID of the file contract.
+      "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
+      // A signed transaction containing the most recent contract revision.
+      "lasttransaction": {},
+
+      // Address of the host the file contract was formed with.
+      "netaddress": "12.34.56.78:9",
+
+      // Remaining funds left for the renter to spend on uploads & downloads.
+      "renterfunds": "1234", // hastings
+
+      // Size of the file contract, which is typically equal to the number of
+      // bytes that have been uploaded to the host.
+      "size": 8192, // bytes
+
+      // Block height that the file contract began on.
+      "startheight": 50000, // block height
+
+      // DEPRECATED: This is the exact same value as StorageSpending, but it has
+      // incorrect capitalization. This was fixed in 1.3.2, but this field is kept
+      // to preserve backwards compatibility on clients who depend on the
+      // incorrect capitalization. This field will be removed in the future, so
+      // clients should switch to the StorageSpending field (above) with the
+      // correct lowercase name.
+      "StorageSpending": 0,
+
+      // Amount of contract funds that have been spent on storage.
+      "storagespending": "1234", // hastings
+
+      // Total cost to the wallet of forming the file contract.
+      // This includes both the fees and the funds allocated in the contract.
+      "totalcost": "1234", // hastings
+
+      // Amount of contract funds that have been spent on uploads.
+      "uploadspending": "1234" // hastings
+
+      // Signals if contract is good for uploading data
+      "goodforupload": true,
+
+      // Signals if contract is good for a renewal
+      "goodforrenew": false,
+    }
+  ],
+  "expiredcontracts": [
     {
       // Amount of contract funds that have been spent on downloads.
       "downloadspending": "1234", // hastings

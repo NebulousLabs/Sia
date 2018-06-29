@@ -113,8 +113,8 @@ type hostContractor interface {
 	// Contracts returns the active contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
-	// Contracts returns the old contracts formed by the contractor.
-	OldContracts() []modules.RenterContract
+	// Expired Contracts returns the Expired contracts formed by the contractor.
+	ExpiredContracts() []modules.RenterContract
 
 	// ContractByPublicKey returns the contract associated with the host key.
 	ContractByPublicKey(types.SiaPublicKey) (modules.RenterContract, bool)
@@ -391,8 +391,10 @@ func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreak
 // Contracts returns an array of host contractor's active contracts
 func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
 
-// OldContracts returns an array of host contractor's old contracts
-func (r *Renter) OldContracts() []modules.RenterContract { return r.hostContractor.OldContracts() }
+// ExpiredContracts returns an array of host contractor's expired contracts
+func (r *Renter) ExpiredContracts() []modules.RenterContract {
+	return r.hostContractor.ExpiredContracts()
+}
 
 // CurrentPeriod returns the host contractor's current period
 func (r *Renter) CurrentPeriod() types.BlockHeight { return r.hostContractor.CurrentPeriod() }

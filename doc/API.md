@@ -935,7 +935,7 @@ standard success or error response. See
 
 #### /renter/contracts [GET]
 
-returns active contracts. Expired contracts are not included.
+returns active contracts and expired contracts.
 
 ###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-1)
 ```javascript
@@ -962,7 +962,30 @@ returns active contracts. Expired contracts are not included.
       "goodforupload": true,
       "goodforrenew": false,
     }
-  ]
+  ],
+  "expiredcontracts": [
+    {
+      "downloadspending": "1234", // hastings
+      "endheight": 50000, // block height
+      "fees": "1234", // hastings
+      "hostpublickey": {
+        "algorithm": "ed25519",
+        "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+      },
+      "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "lasttransaction": {},
+      "netaddress": "12.34.56.78:9",
+      "renterfunds": "1234", // hastings
+      "size": 8192, // bytes
+      "startheight": 50000, // block height
+      "StorageSpending": "1234",
+      "storagespending": "1234", // hastings
+      "totalcost": "1234", // hastings
+      "uploadspending": "1234" // hastings
+      "goodforupload": true,
+      "goodforrenew": false,
+    }
+  ],
 }
 ```
 

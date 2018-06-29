@@ -325,8 +325,8 @@ type Renter interface {
 	// Contracts returns the active contracts formed by the renter.
 	Contracts() []RenterContract
 
-	// OldContracts returns the old contracts formed by the renter.
-	OldContracts() []RenterContract
+	// ExpiredContracts returns the expired contracts formed by the renter.
+	ExpiredContracts() []RenterContract
 
 	// ContractUtility provides the contract utility for a given host key.
 	ContractUtility(pk types.SiaPublicKey) (ContractUtility, bool)
