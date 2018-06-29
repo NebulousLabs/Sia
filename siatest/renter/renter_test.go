@@ -34,7 +34,6 @@ func TestRenter(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 
 	// Create a group for the subtests
 	groupParams := siatest.GroupParams{
@@ -323,11 +322,13 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 	}
 }
 
+// The following four tests can not be run in parallel as it causes a panic
+// of `too many files open
+
 // TestDownloadInterruptedBeforeSendingRevision runs testDownloadInterrupted
 // with a dependency that interrupts the download before sending the signed
 // revision to the host.
 func TestDownloadInterruptedBeforeSendingRevision(t *testing.T) {
-	t.Parallel()
 	testDownloadInterrupted(t, newDependencyInterruptDownloadBeforeSendingRevision())
 }
 
@@ -335,7 +336,6 @@ func TestDownloadInterruptedBeforeSendingRevision(t *testing.T) {
 // with a dependency that interrupts the download after sending the signed
 // revision to the host.
 func TestDownloadInterruptedAfterSendingRevision(t *testing.T) {
-	t.Parallel()
 	testDownloadInterrupted(t, newDependencyInterruptDownloadAfterSendingRevision())
 }
 
@@ -343,7 +343,6 @@ func TestDownloadInterruptedAfterSendingRevision(t *testing.T) {
 // dependency that interrupts the upload before sending the signed revision to
 // the host.
 func TestUploadInterruptedBeforeSendingRevision(t *testing.T) {
-	t.Parallel()
 	testUploadInterrupted(t, newDependencyInterruptUploadBeforeSendingRevision())
 }
 
@@ -351,7 +350,6 @@ func TestUploadInterruptedBeforeSendingRevision(t *testing.T) {
 // dependency that interrupts the upload after sending the signed revision to
 // the host.
 func TestUploadInterruptedAfterSendingRevision(t *testing.T) {
-	t.Parallel()
 	testUploadInterrupted(t, newDependencyInterruptUploadAfterSendingRevision())
 }
 
