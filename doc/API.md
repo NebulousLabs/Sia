@@ -909,7 +909,7 @@ returns the current settings along with metrics on the renter's spending.
     "uploadspending":   "5678", // hastings
     "unspent":          "1234"  // hastings
   },
-  "currentperiod": "200"
+  "currentperiod": 200
 }
 ```
 
