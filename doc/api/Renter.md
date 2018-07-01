@@ -102,7 +102,7 @@ returns the current settings along with metrics on the renter's spending.
     "unspent": "1234" // hastings
   },
   // Height at which the current allowance period began.
-  "currentperiod": "200"
+  "currentperiod": 200
 }
 ```
 
