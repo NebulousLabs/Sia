@@ -133,6 +133,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/errors"
 )
@@ -541,23 +542,17 @@ func (r *Renter) ClearDownloadHistory(after, before time.Time) error {
 	}
 
 	// Timestamp validation
-	if before.Before(after) && !before.IsZero() {
+	if before.Before(after) {
 		return errors.New("before timestamp can not be newer then after timestamp")
 	}
 
 	// Clear download history if both before and after timestamps are zero values
-	if before.IsZero() && after.IsZero() {
+	if before.Equal(types.EndOfTime) && after.IsZero() {
 		r.downloadHistory = r.downloadHistory[:0]
 		return nil
 	}
 
 	// Find and return downloads that are not within the given range
-	if after.IsZero() {
-		after = r.downloadHistory[0].staticStartTime
-	}
-	if before.IsZero() {
-		before = r.downloadHistory[len(r.downloadHistory)-1].staticStartTime
-	}
 	withinTimespan := func(t time.Time) bool {
 		return (t.After(after) || t.Equal(after)) && (t.Before(before) || t.Equal(before))
 	}

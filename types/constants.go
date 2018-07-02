@@ -7,7 +7,9 @@ package types
 // sane, plus we have no coverage for them.
 
 import (
+	"math"
 	"math/big"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 )
@@ -19,6 +21,11 @@ var (
 	// BlockSizeLimit is the maximum size of a binary-encoded Block
 	// that is permitted by the consensus rules.
 	BlockSizeLimit = uint64(2e6)
+
+	// EndOfTime is value to be used when a date in the future is needed for
+	// validation
+	EndOfTime = time.Unix(0, math.MaxInt64)
+
 	// ExtremeFutureThreshold is a temporal limit beyond which Blocks are
 	// discarded by the consensus rules. When incoming Blocks are processed, their
 	// Timestamp is allowed to exceed the processor's current time by a small amount.
@@ -125,7 +132,7 @@ var (
 )
 
 var (
-	// TaxHardforkHeight is the height at which the tax hardfork occured.
+	// TaxHardforkHeight is the height at which the tax hardfork occurred.
 	TaxHardforkHeight = build.Select(build.Var{
 		Dev:      BlockHeight(10),
 		Standard: BlockHeight(21e3),

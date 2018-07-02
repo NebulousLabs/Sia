@@ -3,6 +3,8 @@ package renter
 import (
 	"testing"
 	"time"
+
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestClearDownloads tests all the edge cases of the ClearDownloadHistory Method
@@ -264,7 +266,8 @@ func clearDownloadHistory(rt *renterTester, after, before int) (int, error) {
 	rt.renter.downloadHistoryMu.Unlock()
 
 	// clear download history
-	var beforeTime, afterTime time.Time
+	var afterTime time.Time
+	beforeTime := types.EndOfTime
 	if before != 0 {
 		beforeTime = time.Unix(int64(before), 0)
 	}

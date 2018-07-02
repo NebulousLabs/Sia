@@ -365,8 +365,8 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 
 // renterClearDownloadsHandler handles the API call to request to clear the download queue.
 func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	var beforeTime, afterTime time.Time
-
+	var afterTime time.Time
+	beforeTime := types.EndOfTime
 	beforeStr, afterStr := req.FormValue("before"), req.FormValue("after")
 	if beforeStr != "" {
 		beforeInt, err := strconv.ParseInt(beforeStr, 10, 64)
