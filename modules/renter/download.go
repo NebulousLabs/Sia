@@ -476,8 +476,8 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 }
 
 // DownloadHistory returns the list of downloads that have been performed. Will
-// include downloads that have not yet completed. Downloads will be roughly, but
-// not precisely, sorted according to start time.
+// include downloads that have not yet completed. Downloads will be roughly,
+// but not precisely, sorted according to start time.
 //
 // TODO: Currently the DownloadHistory only contains downloads from this
 // session, does not contain downloads that were executed for the purposes of
@@ -521,8 +521,12 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 	return downloads
 }
 
-// ClearDownloadHistory clears the renter's download history inclusive
-// of the provided before and after timestamps
+// ClearDownloadHistory clears the renter's download history inclusive of the
+// provided before and after timestamps
+//
+// TODO: This function can be improved by implementing a binary search, the
+// trick will be making the binary search be just as readable while handling
+// all the edge cases
 func (r *Renter) ClearDownloadHistory(after, before time.Time) error {
 	if err := r.tg.Add(); err != nil {
 		return err
