@@ -379,7 +379,7 @@ func (s byValue) Less(i, j int) bool {
 // rentercontractscmd is the handler for the comand `siac renter contracts`.
 // It lists the Renter's contracts.
 func rentercontractscmd() {
-	rc, err := httpClient.RenterContractsGet()
+	rc, err := httpClient.RenterContractsGet(renterAllContracts)
 	if err != nil {
 		die("Could not get contracts:", err)
 	}
@@ -477,7 +477,8 @@ func rentercontractscmd() {
 // rentercontractsviewcmd is the handler for the command `siac renter contracts <id>`.
 // It lists details of a specific contract.
 func rentercontractsviewcmd(cid string) {
-	rc, err := httpClient.RenterContractsGet()
+	getAllContracts := true
+	rc, err := httpClient.RenterContractsGet(getAllContracts)
 	if err != nil {
 		die("Could not get contract details: ", err)
 	}

@@ -274,7 +274,15 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 }
 
 // renterContractsHandler handles the API call to request the Renter's contracts.
-func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// Parse the expired parameter.
+	expiredparam := req.FormValue("expired")
+	expiredresp, err := scanBool(expiredparam)
+	if err != nil {
+		return
+	}
+
+	// Get active contracts
 	contracts := []RenterContract{}
 	for _, c := range api.renter.Contracts() {
 		var size uint64
@@ -316,46 +324,50 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			UploadSpending:            c.UploadSpending,
 		})
 	}
+
+	// Get expired contracts
 	expiredContracts := []RenterContract{}
-	for _, c := range api.renter.ExpiredContracts() {
-		var size uint64
-		if len(c.Transaction.FileContractRevisions) != 0 {
-			size = c.Transaction.FileContractRevisions[0].NewFileSize
-		}
+	if expiredresp {
+		for _, c := range api.renter.ExpiredContracts() {
+			var size uint64
+			if len(c.Transaction.FileContractRevisions) != 0 {
+				size = c.Transaction.FileContractRevisions[0].NewFileSize
+			}
 
-		// Fetch host address
-		var netAddress modules.NetAddress
-		hdbe, exists := api.renter.Host(c.HostPublicKey)
-		if exists {
-			netAddress = hdbe.NetAddress
-		}
+			// Fetch host address
+			var netAddress modules.NetAddress
+			hdbe, exists := api.renter.Host(c.HostPublicKey)
+			if exists {
+				netAddress = hdbe.NetAddress
+			}
 
-		// Fetch utilities for contract
-		var goodForUpload bool
-		var goodForRenew bool
-		if utility, ok := api.renter.ContractUtility(c.HostPublicKey); ok {
-			goodForUpload = utility.GoodForUpload
-			goodForRenew = utility.GoodForRenew
-		}
+			// Fetch utilities for contract
+			var goodForUpload bool
+			var goodForRenew bool
+			if utility, ok := api.renter.ContractUtility(c.HostPublicKey); ok {
+				goodForUpload = utility.GoodForUpload
+				goodForRenew = utility.GoodForRenew
+			}
 
-		expiredContracts = append(expiredContracts, RenterContract{
-			DownloadSpending:          c.DownloadSpending,
-			EndHeight:                 c.EndHeight,
-			Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
-			GoodForUpload:             goodForUpload,
-			GoodForRenew:              goodForRenew,
-			HostPublicKey:             c.HostPublicKey,
-			ID:                        c.ID,
-			LastTransaction:           c.Transaction,
-			NetAddress:                netAddress,
-			RenterFunds:               c.RenterFunds,
-			Size:                      size,
-			StartHeight:               c.StartHeight,
-			StorageSpending:           c.StorageSpending,
-			StorageSpendingDeprecated: c.StorageSpending,
-			TotalCost:                 c.TotalCost,
-			UploadSpending:            c.UploadSpending,
-		})
+			expiredContracts = append(expiredContracts, RenterContract{
+				DownloadSpending:          c.DownloadSpending,
+				EndHeight:                 c.EndHeight,
+				Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
+				GoodForUpload:             goodForUpload,
+				GoodForRenew:              goodForRenew,
+				HostPublicKey:             c.HostPublicKey,
+				ID:                        c.ID,
+				LastTransaction:           c.Transaction,
+				NetAddress:                netAddress,
+				RenterFunds:               c.RenterFunds,
+				Size:                      size,
+				StartHeight:               c.StartHeight,
+				StorageSpending:           c.StorageSpending,
+				StorageSpendingDeprecated: c.StorageSpending,
+				TotalCost:                 c.TotalCost,
+				UploadSpending:            c.UploadSpending,
+			})
+		}
 	}
 	WriteJSON(w, RenterContracts{
 		Contracts:        contracts,

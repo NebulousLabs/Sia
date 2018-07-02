@@ -148,7 +148,12 @@ standard success or error response. See
 
 #### /renter/contracts [GET]
 
-returns active contracts and expired contracts.
+returns active contracts and expired contracts if requested.
+
+###### Contract Parameters
+```
+expired    // true or false - Optional
+```
 
 ###### JSON Response
 ```javascript

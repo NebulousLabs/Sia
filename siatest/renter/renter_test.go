@@ -633,7 +633,7 @@ func TestRenewFailing(t *testing.T) {
 	renter := tg.Renters()[0]
 
 	// All the contracts of the renter should be goodForRenew.
-	rcg, err := renter.RenterContractsGet()
+	rcg, err := renter.RenterContractsGet(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -687,7 +687,7 @@ func TestRenewFailing(t *testing.T) {
 	}
 
 	// contracts should still be goodForRenew.
-	rcg, err = renter.RenterContractsGet()
+	rcg, err = renter.RenterContractsGet(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -710,7 +710,7 @@ func TestRenewFailing(t *testing.T) {
 	replaced := false
 	err = build.Retry(int(rcg.Contracts[0].EndHeight-blockHeight), 5*time.Second, func() error {
 		// contract should be !goodForRenew now.
-		rcg, err = renter.RenterContractsGet()
+		rcg, err = renter.RenterContractsGet(false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -931,15 +931,9 @@ func TestRenterContractEndHeight(t *testing.T) {
 	renewWindow := rg.Settings.Allowance.RenewWindow
 	numRenewals := 0
 
-	// Get contracts
-	rc, err := r.RenterContractsGet()
-	if err != nil {
-		t.Fatal("Could not get renter contracts:", err)
-	}
-
 	// Confirm Contracts were created as expected
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err = r.RenterContractsGet()
+		rc, err := r.RenterContractsGet(true)
 		if err != nil {
 			return errors.AddContext(err, "could not get contracts")
 		}
@@ -950,6 +944,11 @@ func TestRenterContractEndHeight(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	rc, err := r.RenterContractsGet(true)
+	if err != nil {
+		t.Fatal(err, "could not get contracts")
 	}
 
 	// Confirm contract end heights were set properly
@@ -971,7 +970,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 	// Confirm Contracts were renewed as expected, all original
 	// contracts should have been renewed if GoodForRenew = true
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err = r.RenterContractsGet()
+		rc, err = r.RenterContractsGet(true)
 		if err != nil {
 			return errors.AddContext(err, "could not get contracts")
 		}
@@ -991,7 +990,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 	// End height should be the end of the next period as
 	// the contracts are renewed due to reaching the renew
 	// window
-	rc, err = r.RenterContractsGet()
+	rc, err = r.RenterContractsGet(true)
 	if err != nil {
 		t.Fatal("Could not get renter contracts:", err)
 	}
@@ -1017,7 +1016,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 	// Confirm contract end heights were set properly
 	// End height should not have changed since the renewal
 	// was due to running out of funds
-	rc, err = r.RenterContractsGet()
+	rc, err = r.RenterContractsGet(true)
 	if err != nil {
 		t.Fatal("Could not get renter contracts:", err)
 	}
@@ -1093,7 +1092,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Confirm Contracts were created as expected
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err := r.RenterContractsGet()
+		rc, err := r.RenterContractsGet(true)
 		if err != nil {
 			return errors.AddContext(err, "could not get contracts")
 		}
@@ -1139,7 +1138,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Get initial Contracts to check for contract renewal later
-	rc, err := r.RenterContractsGet()
+	rc, err := r.RenterContractsGet(true)
 	if err != nil {
 		t.Fatal("Could not get contracts:", err)
 	}
@@ -1165,7 +1164,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Confirm Contracts were renewed as expected
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err = r.RenterContractsGet()
+		rc, err = r.RenterContractsGet(true)
 		if err != nil {
 			return errors.AddContext(err, "could not get contracts")
 		}
@@ -1193,7 +1192,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Check contract spending against reported spending
-	rc, err = r.RenterContractsGet()
+	rc, err = r.RenterContractsGet(true)
 	if err != nil {
 		t.Fatal("Could not get contracts:", err)
 	}
@@ -1254,7 +1253,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Confirm Contracts were renewed as expected
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err = r.RenterContractsGet()
+		rc, err = r.RenterContractsGet(true)
 		if err != nil {
 			return errors.AddContext(err, "Could not get contracts")
 		}
@@ -1281,7 +1280,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Check contract spending against reported spending
-	rc, err = r.RenterContractsGet()
+	rc, err = r.RenterContractsGet(true)
 	if err != nil {
 		t.Fatal("Could not get contracts:", err)
 	}
@@ -1321,7 +1320,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Confirm Contracts were renewed as expected
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err = r.RenterContractsGet()
+		rc, err = r.RenterContractsGet(true)
 		if err != nil {
 			return errors.AddContext(err, "Could not get contracts")
 		}
@@ -1348,7 +1347,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Check contract spending against reported spending
-	rc, err = r.RenterContractsGet()
+	rc, err = r.RenterContractsGet(true)
 	if err != nil {
 		t.Fatal("Could not get contracts:", err)
 	}
@@ -1378,7 +1377,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Confirm Contracts were renewed as expected
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err = r.RenterContractsGet()
+		rc, err = r.RenterContractsGet(true)
 		if err != nil {
 			return errors.AddContext(err, "could not get contracts")
 		}
@@ -1405,7 +1404,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Check contract spending against reported spending
-	rc, err = r.RenterContractsGet()
+	rc, err = r.RenterContractsGet(true)
 	if err != nil {
 		t.Fatal("Could not get contracts:", err)
 	}
@@ -1723,7 +1722,7 @@ func renewContractsBySpending(renter *siatest.TestNode, tg *siatest.TestGroup) (
 	}
 
 	// Get current upload spend, previously contracts had zero upload spend
-	rc, err := renter.RenterContractsGet()
+	rc, err := renter.RenterContractsGet(true)
 	if err != nil {
 		return types.ZeroCurrency, errors.AddContext(err, "could not get renter contracts")
 	}
@@ -1745,7 +1744,7 @@ LOOP:
 			return types.ZeroCurrency, errors.AddContext(err, "failed to upload a file for testing")
 		}
 
-		rc, err = renter.RenterContractsGet()
+		rc, err = renter.RenterContractsGet(true)
 		if err != nil {
 			return types.ZeroCurrency, errors.AddContext(err, "could not get contracts")
 		}
@@ -1899,7 +1898,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 	// Give it some time to mark the contracts as !goodForUpload and
 	// !goodForRenew.
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err := renter.RenterContractsGet()
+		rc, err := renter.RenterContractsGet(false)
 		if err != nil {
 			return err
 		}
@@ -1965,7 +1964,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 
 	// All contracts should be archived.
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err := renter.RenterContractsGet()
+		rc, err := renter.RenterContractsGet(false)
 		if err != nil {
 			return err
 		}
@@ -2033,7 +2032,7 @@ func TestRenterResetAllowance(t *testing.T) {
 	// Give it some time to mark the contracts as !goodForUpload and
 	// !goodForRenew.
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err := renter.RenterContractsGet()
+		rc, err := renter.RenterContractsGet(false)
 		if err != nil {
 			return err
 		}
@@ -2068,7 +2067,7 @@ func TestRenterResetAllowance(t *testing.T) {
 	// Give it some time to mark the contracts as goodForUpload and
 	// goodForRenew again.
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err := renter.RenterContractsGet()
+		rc, err := renter.RenterContractsGet(false)
 		if err != nil {
 			return err
 		}
@@ -2116,7 +2115,7 @@ func TestRenterExpiredContracts(t *testing.T) {
 
 	// Get renter and current contracts
 	r := tg.Renters()[0]
-	rc, err := r.RenterContractsGet()
+	rc, err := r.RenterContractsGet(true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2142,7 +2141,7 @@ func TestRenterExpiredContracts(t *testing.T) {
 	// Confirm Contracts were renewed as expected, all original
 	// contracts should have been renewed if GoodForRenew = true
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err = r.RenterContractsGet()
+		rc, err = r.RenterContractsGet(true)
 		if err != nil {
 			return errors.AddContext(err, "could not get contracts")
 		}

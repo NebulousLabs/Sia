@@ -12,8 +12,9 @@ import (
 )
 
 // RenterContractsGet requests the /renter/contracts resource
-func (c *Client) RenterContractsGet() (rc api.RenterContracts, err error) {
-	err = c.get("/renter/contracts", &rc)
+func (c *Client) RenterContractsGet(expired bool) (rc api.RenterContracts, err error) {
+	query := fmt.Sprintf("?expired=%v", expired)
+	err = c.get("/renter/contracts"+query, &rc)
 	return
 }
 
