@@ -402,12 +402,13 @@ func rentercontractscmd() {
 			totalFees = totalFees.Add(c.Fees)
 		}
 		fmt.Printf(`Active Contract Summary:
-		"Number of Contracts:  %v
-		"Total stored:         %9s
-		"Total Remaining:      %v
-		"Total Spent:          %v
-		"Total Fees:           %v
-		`, len(rc.Contracts), filesizeUnits(int64(totalStored)), currencyUnits(totalRemaining), currencyUnits(totalSpent), currencyUnits(totalFees))
+			Number of Contracts:  %v
+			Total stored:         %9s
+			Total Remaining:      %v
+			Total Spent:          %v
+			Total Fees:           %v
+			
+			`, len(rc.Contracts), filesizeUnits(int64(totalStored)), currencyUnits(totalRemaining), currencyUnits(totalSpent), currencyUnits(totalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
 		for _, c := range rc.Contracts {
@@ -444,11 +445,12 @@ func rentercontractscmd() {
 		}
 		fmt.Printf(`
 		Expired Contract Summary:
-		"Number of Contracts:  %v
-		"Total stored:         %9s
-		"Total Remaining:      %v
-		"Total Spent:          %v
-		"Total Fees:           %v
+		Number of Contracts:  %v
+		Total stored:         %9s
+		Total Remaining:      %v
+		Total Spent:          %v
+		Total Fees:           %v
+		
 		`, len(rc.ExpiredContracts), filesizeUnits(int64(totalStored)), currencyUnits(totalWithheld), currencyUnits(totalSpent), currencyUnits(totalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "Host\tWithheld Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")

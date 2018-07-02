@@ -63,11 +63,11 @@ returns the current settings along with metrics on the renter's spending.
       // Is always nonzero.
       "renewwindow": 3024 // blocks
     }, 
-    // MaxUploadSpeed by defaul is unlimited but can be set by the user to 
+    // MaxUploadSpeed by default is unlimited but can be set by the user to 
     // manage bandwidth
     "maxuploadspeed":     1234, // bytes per second
 
-    // MaxDownloadSpeed by defaul is unlimited but can be set by the user to 
+    // MaxDownloadSpeed by default is unlimited but can be set by the user to 
     // manage bandwidth
     "maxdownloadspeed":   1234, // bytes per second
 
