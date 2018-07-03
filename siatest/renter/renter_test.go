@@ -74,6 +74,157 @@ func TestRenter(t *testing.T) {
 	}
 }
 
+// testClearDownloadHistory makes sure that the download history is
+// properly cleared when called through the API
+func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	r := tg.Renters()[0]
+
+	rdg, err := r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	numDownloads := 10
+	if len(rdg.Downloads) < numDownloads {
+		remainingDownloads := numDownloads - len(rdg.Downloads)
+		rf, err := r.RenterFilesGet()
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Check if the renter has any files
+		// Upload a file if none
+		if len(rf.Files) == 0 {
+			dataPieces := uint64(1)
+			parityPieces := uint64(1)
+			fileSize := 100 + siatest.Fuzz()
+			_, _, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+			if err != nil {
+				t.Fatal("Failed to upload a file for testing: ", err)
+			}
+			rf, err = r.RenterFilesGet()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Download files to build download history
+		dest := filepath.Join(siatest.SiaTestingDir, strconv.Itoa(fastrand.Intn(math.MaxInt32)))
+		for i := 0; i < remainingDownloads; i++ {
+			err = r.RenterDownloadGet(rf.Files[0].SiaPath, dest, 0, rf.Files[0].Filesize, false)
+			if err != nil {
+				t.Fatal("Could not Download file:", err)
+			}
+		}
+		rdg, err = r.RenterDownloadsGet()
+		if err != nil {
+			t.Fatal("Could not get download history:", err)
+		}
+		// Confirm download history is not empty
+		if len(rdg.Downloads) != numDownloads {
+			t.Fatalf("Not all downloads added to download history: only %v downloads added, expected %v", len(rdg.Downloads), numDownloads)
+		}
+	}
+	numDownloads = len(rdg.Downloads)
+
+	// Check removing one download from history
+	// Remove First Download
+	timestamp := rdg.Downloads[0].StartTime
+	err = r.RenterClearDownloadsRangePost(timestamp, timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to remove download from history:", err)
+	}
+	numDownloads--
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	if len(rdg.Downloads) != numDownloads {
+		t.Fatalf("Download history not reduced: history has %v downloads, expected %v", len(rdg.Downloads), numDownloads)
+	}
+	i := sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Equal(timestamp) })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Specified download not removed from history")
+	}
+	// Remove Last Download
+	timestamp = rdg.Downloads[len(rdg.Downloads)-1].StartTime
+	err = r.RenterClearDownloadsRangePost(timestamp, timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to remove download from history:", err)
+	}
+	numDownloads--
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	if len(rdg.Downloads) != numDownloads {
+		t.Fatalf("Download history not reduced: history has %v downloads, expected %v", len(rdg.Downloads), numDownloads)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Equal(timestamp) })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Specified download not removed from history")
+	}
+
+	// Check Clear Before
+	timestamp = rdg.Downloads[len(rdg.Downloads)-2].StartTime
+	err = r.RenterClearDownloadsBeforePost(timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to clear download history before timestamp:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Before(timestamp) })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Download found that was before given time")
+	}
+
+	// Check Clear After
+	timestamp = rdg.Downloads[1].StartTime
+	err = r.RenterClearDownloadsAfterPost(timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to clear download history after timestamp:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.After(timestamp) })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Download found that was after given time")
+	}
+
+	// Check clear range
+	before := rdg.Downloads[1].StartTime
+	after := rdg.Downloads[len(rdg.Downloads)-1].StartTime
+	err = r.RenterClearDownloadsRangePost(after, before)
+	if err != nil {
+		t.Fatal("Error in API endpoint to remove range of downloads from history:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool {
+		return rdg.Downloads[i].StartTime.Before(before) && rdg.Downloads[i].StartTime.After(after)
+	})
+	if i < len(rdg.Downloads) {
+		t.Fatal("Not all downloads from range removed from history")
+	}
+
+	// Check clearing download history
+	err = r.RenterClearAllDownloadsPost()
+	if err != nil {
+		t.Fatal("Error in API endpoint to clear download history:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	if len(rdg.Downloads) != 0 {
+		t.Fatalf("Download history not cleared: history has %v downloads, expected 0", len(rdg.Downloads))
+	}
+}
+
 // testDownloadAfterRenew makes sure that we can still download a file
 // after the contract period has ended.
 func testDownloadAfterRenew(t *testing.T, tg *siatest.TestGroup) {
@@ -1905,6 +2056,51 @@ func checkBalanceVsSpending(r *siatest.TestNode, initialBalance types.Currency) 
 	return nil
 }
 
+// checkContracts confirms that contracts are renewed as expected
+func checkContracts(numHosts, numRenewals int, oldContracts, renewedContracts []api.RenterContract) error {
+	if len(renewedContracts) != numHosts {
+		err := fmt.Sprintf("Incorrect number of Active contracts: have %v expected %v", len(renewedContracts), numHosts)
+		return errors.New(err)
+	}
+	if len(oldContracts) == 0 && numRenewals == 0 {
+		return nil
+	}
+	// Confirm contracts were renewed, this will also mean there are old contracts
+	// Verify there are not more renewedContracts than there are oldContracts
+	// This would mean contracts are not getting archived
+	if len(oldContracts) < len(renewedContracts) {
+		return errors.New("Too many renewed contracts")
+	}
+	if len(oldContracts) != numHosts*numRenewals {
+		err := fmt.Sprintf("Incorrect number of Old contracts: have %v expected %v", len(oldContracts), numHosts*numRenewals)
+		return errors.New(err)
+	}
+
+	// Create Maps for comparison
+	initialContractIDMap := make(map[types.FileContractID]struct{})
+	initialContractKeyMap := make(map[crypto.Hash]struct{})
+	for _, c := range oldContracts {
+		initialContractIDMap[c.ID] = struct{}{}
+		initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)] = struct{}{}
+	}
+
+	for _, c := range renewedContracts {
+		// Verify that all the contracts marked as GoodForRenew
+		// were renewed
+		if c.GoodForRenew {
+			if _, ok := initialContractIDMap[c.ID]; ok {
+				return errors.New("ID from renewedContracts found in oldContracts")
+			}
+			// Verifying that Renewed Contracts have the same HostPublicKey
+			// as an initial contract
+			if _, ok := initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)]; !ok {
+				return errors.New("Host Public Key from renewedContracts not found in oldContracts")
+			}
+		}
+	}
+	return nil
+}
+
 // checkContractVsReportedSpending confirms that the spending recorded in the
 // renter's contracts matches the reported spending for the renter
 func checkContractVsReportedSpending(r *siatest.TestNode, WindowSize types.BlockHeight, oldContracts, renewedContracts []api.RenterContract) error {
@@ -2045,51 +2241,6 @@ func checkContractVsReportedSpending(r *siatest.TestNode, WindowSize types.Block
 	return nil
 }
 
-// checkContracts confirms that contracts are renewed as expected
-func checkContracts(numHosts, numRenewals int, oldContracts, renewedContracts []api.RenterContract) error {
-	if len(renewedContracts) != numHosts {
-		err := fmt.Sprintf("Incorrect number of Active contracts: have %v expected %v", len(renewedContracts), numHosts)
-		return errors.New(err)
-	}
-	if len(oldContracts) == 0 && numRenewals == 0 {
-		return nil
-	}
-	// Confirm contracts were renewed, this will also mean there are old contracts
-	// Verify there are not more renewedContracts than there are oldContracts
-	// This would mean contracts are not getting archived
-	if len(oldContracts) < len(renewedContracts) {
-		return errors.New("Too many renewed contracts")
-	}
-	if len(oldContracts) != numHosts*numRenewals {
-		err := fmt.Sprintf("Incorrect number of Old contracts: have %v expected %v", len(oldContracts), numHosts*numRenewals)
-		return errors.New(err)
-	}
-
-	// Create Maps for comparison
-	initialContractIDMap := make(map[types.FileContractID]struct{})
-	initialContractKeyMap := make(map[crypto.Hash]struct{})
-	for _, c := range oldContracts {
-		initialContractIDMap[c.ID] = struct{}{}
-		initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)] = struct{}{}
-	}
-
-	for _, c := range renewedContracts {
-		// Verify that all the contracts marked as GoodForRenew
-		// were renewed
-		if c.GoodForRenew {
-			if _, ok := initialContractIDMap[c.ID]; ok {
-				return errors.New("ID from renewedContracts found in oldContracts")
-			}
-			// Verifying that Renewed Contracts have the same HostPublicKey
-			// as an initial contract
-			if _, ok := initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)]; !ok {
-				return errors.New("Host Public Key from renewedContracts not found in oldContracts")
-			}
-		}
-	}
-	return nil
-}
-
 // checkRenewedContracts confirms that renewed contracts have zero upload and
 // download spending
 func checkRenewedContracts(renewedContracts []api.RenterContract) error {
@@ -2192,155 +2343,4 @@ LOOP:
 		}
 	}
 	return startingUploadSpend, nil
-}
-
-// testClearDownloadHistory makes sure that the download history is
-// properly cleared when called through the API
-func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
-	// Grab the first of the group's renters
-	r := tg.Renters()[0]
-
-	rdg, err := r.RenterDownloadsGet()
-	if err != nil {
-		t.Fatal("Could not get download history:", err)
-	}
-	numDownloads := 10
-	if len(rdg.Downloads) < numDownloads {
-		remainingDownloads := numDownloads - len(rdg.Downloads)
-		rf, err := r.RenterFilesGet()
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Check if the renter has any files
-		// Upload a file if none
-		if len(rf.Files) == 0 {
-			dataPieces := uint64(1)
-			parityPieces := uint64(1)
-			fileSize := 100 + siatest.Fuzz()
-			_, _, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
-			if err != nil {
-				t.Fatal("Failed to upload a file for testing: ", err)
-			}
-			rf, err = r.RenterFilesGet()
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-		// Download files to build download history
-		dest := filepath.Join(siatest.SiaTestingDir, strconv.Itoa(fastrand.Intn(math.MaxInt32)))
-		for i := 0; i < remainingDownloads; i++ {
-			err = r.RenterDownloadGet(rf.Files[0].SiaPath, dest, 0, rf.Files[0].Filesize, false)
-			if err != nil {
-				t.Fatal("Could not Download file:", err)
-			}
-		}
-		rdg, err = r.RenterDownloadsGet()
-		if err != nil {
-			t.Fatal("Could not get download history:", err)
-		}
-		// Confirm download history is not empty
-		if len(rdg.Downloads) != numDownloads {
-			t.Fatalf("Not all downloads added to download history: only %v downloads added, expected %v", len(rdg.Downloads), numDownloads)
-		}
-	}
-	numDownloads = len(rdg.Downloads)
-
-	// Check removing one download from history
-	// Remove First Download
-	timestamp := rdg.Downloads[0].StartTime
-	err = r.RenterClearDownloadsRangePost(timestamp, timestamp)
-	if err != nil {
-		t.Fatal("Error in API endpoint to remove download from history:", err)
-	}
-	numDownloads--
-	rdg, err = r.RenterDownloadsGet()
-	if err != nil {
-		t.Fatal("Could not get download history:", err)
-	}
-	if len(rdg.Downloads) != numDownloads {
-		t.Fatalf("Download history not reduced: history has %v downloads, expected %v", len(rdg.Downloads), numDownloads)
-	}
-	i := sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Equal(timestamp) })
-	if i < len(rdg.Downloads) {
-		t.Fatal("Specified download not removed from history")
-	}
-	// Remove Last Download
-	timestamp = rdg.Downloads[len(rdg.Downloads)-1].StartTime
-	err = r.RenterClearDownloadsRangePost(timestamp, timestamp)
-	if err != nil {
-		t.Fatal("Error in API endpoint to remove download from history:", err)
-	}
-	numDownloads--
-	rdg, err = r.RenterDownloadsGet()
-	if err != nil {
-		t.Fatal("Could not get download history:", err)
-	}
-	if len(rdg.Downloads) != numDownloads {
-		t.Fatalf("Download history not reduced: history has %v downloads, expected %v", len(rdg.Downloads), numDownloads)
-	}
-	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Equal(timestamp) })
-	if i < len(rdg.Downloads) {
-		t.Fatal("Specified download not removed from history")
-	}
-
-	// Check Clear Before
-	timestamp = rdg.Downloads[len(rdg.Downloads)-2].StartTime
-	err = r.RenterClearDownloadsBeforePost(timestamp)
-	if err != nil {
-		t.Fatal("Error in API endpoint to clear download history before timestamp:", err)
-	}
-	rdg, err = r.RenterDownloadsGet()
-	if err != nil {
-		t.Fatal("Could not get download history:", err)
-	}
-	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Before(timestamp) })
-	if i < len(rdg.Downloads) {
-		t.Fatal("Download found that was before given time")
-	}
-
-	// Check Clear After
-	timestamp = rdg.Downloads[1].StartTime
-	err = r.RenterClearDownloadsAfterPost(timestamp)
-	if err != nil {
-		t.Fatal("Error in API endpoint to clear download history after timestamp:", err)
-	}
-	rdg, err = r.RenterDownloadsGet()
-	if err != nil {
-		t.Fatal("Could not get download history:", err)
-	}
-	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.After(timestamp) })
-	if i < len(rdg.Downloads) {
-		t.Fatal("Download found that was after given time")
-	}
-
-	// Check clear range
-	before := rdg.Downloads[1].StartTime
-	after := rdg.Downloads[len(rdg.Downloads)-1].StartTime
-	err = r.RenterClearDownloadsRangePost(after, before)
-	if err != nil {
-		t.Fatal("Error in API endpoint to remove range of downloads from history:", err)
-	}
-	rdg, err = r.RenterDownloadsGet()
-	if err != nil {
-		t.Fatal("Could not get download history:", err)
-	}
-	i = sort.Search(len(rdg.Downloads), func(i int) bool {
-		return rdg.Downloads[i].StartTime.Before(before) && rdg.Downloads[i].StartTime.After(after)
-	})
-	if i < len(rdg.Downloads) {
-		t.Fatal("Not all downloads from range removed from history")
-	}
-
-	// Check clearing download history
-	err = r.RenterClearAllDownloadsPost()
-	if err != nil {
-		t.Fatal("Error in API endpoint to clear download history:", err)
-	}
-	rdg, err = r.RenterDownloadsGet()
-	if err != nil {
-		t.Fatal("Could not get download history:", err)
-	}
-	if len(rdg.Downloads) != 0 {
-		t.Fatalf("Download history not cleared: history has %v downloads, expected 0", len(rdg.Downloads))
-	}
 }
