@@ -13,12 +13,12 @@ import (
 type (
 	// Metadata is the metadata of a SiaFile and is JSON encoded.
 	Metadata struct {
-		version   [16]byte          // version of the sia file format used
-		fileSize  int64             // total size of the file
-		masterKey crypto.TwofishKey // masterkey used to encrypt pieces
-		pieceSize uint64            // size of a single piece of the file
-		localPath string            // file to the local copy of the file used for repairing
-		siaPath   string            // the path of the file on the Sia network
+		staticVersion   [16]byte          // version of the sia file format used
+		staticFileSize  int64             // total size of the file
+		staticMasterKey crypto.TwofishKey // masterkey used to encrypt pieces
+		staticPieceSize uint64            // size of a single piece of the file
+		localPath       string            // file to the local copy of the file used for repairing
+		siaPath         string            // the path of the file on the Sia network
 
 		// The following fields are the usual unix timestamps of files.
 		modTime    time.Time // time of last content modification
@@ -31,10 +31,10 @@ type (
 		uid  int         // id of the user who owns the file
 		gid  int         // id of the group that owns the file
 
-		// chunkMetadataSize is the amount of space allocated within the
+		// staticChunkMetadataSize is the amount of space allocated within the
 		// siafile for the metadata of a single chunk. It allows us to do
 		// random access operations on the file in constant time.
-		chunkMetadataSize uint64
+		staticChunkMetadataSize uint64
 
 		// The following fields are the offsets for data that is written to disk
 		// after the pubKeyTable. We reserve a generous amount of space for the
@@ -54,9 +54,7 @@ type (
 
 // ChunkSize returns the size of a single chunk of the file.
 func (sf *SiaFile) ChunkSize(chunkIndex uint64) uint64 {
-	sf.mu.RLock()
-	defer sf.mu.RUnlock()
-	return sf.chunkSize(chunkIndex)
+	return sf.staticChunkSize(chunkIndex)
 }
 
 // Delete removes the file from disk and marks it as deleted. Once the file is
@@ -108,28 +106,24 @@ func (sf *SiaFile) HostPublicKeys() []types.SiaPublicKey {
 func (sf *SiaFile) LocalPath() string {
 	sf.mu.RLock()
 	defer sf.mu.RUnlock()
-	return sf.metadata.localPath
+	return sf.staticMetadata.localPath
 }
 
 // MasterKey returns the masterkey used to encrypt the file.
 func (sf *SiaFile) MasterKey() crypto.TwofishKey {
-	sf.mu.RLock()
-	defer sf.mu.RUnlock()
-	return sf.metadata.masterKey
+	return sf.staticMetadata.staticMasterKey
 }
 
 // Mode returns the FileMode of the SiaFile.
 func (sf *SiaFile) Mode() os.FileMode {
 	sf.mu.RLock()
 	defer sf.mu.RUnlock()
-	return sf.metadata.mode
+	return sf.staticMetadata.mode
 }
 
 // PieceSize returns the size of a single piece of the file.
 func (sf *SiaFile) PieceSize() uint64 {
-	sf.mu.RLock()
-	defer sf.mu.RUnlock()
-	return sf.metadata.pieceSize
+	return sf.staticMetadata.staticPieceSize
 }
 
 // Rename changes the name of the file to a new one.
@@ -138,7 +132,7 @@ func (sf *SiaFile) PieceSize() uint64 {
 func (sf *SiaFile) Rename(newName string) error {
 	sf.mu.Lock()
 	defer sf.mu.Unlock()
-	sf.metadata.siaPath = newName
+	sf.staticMetadata.siaPath = newName
 	return nil
 }
 
@@ -146,7 +140,7 @@ func (sf *SiaFile) Rename(newName string) error {
 func (sf *SiaFile) SetMode(mode os.FileMode) {
 	sf.mu.Lock()
 	defer sf.mu.Unlock()
-	sf.metadata.mode = mode
+	sf.staticMetadata.mode = mode
 }
 
 // SetLocalPath changes the local path of the file which is used to repair
@@ -154,21 +148,19 @@ func (sf *SiaFile) SetMode(mode os.FileMode) {
 func (sf *SiaFile) SetLocalPath(path string) {
 	sf.mu.Lock()
 	defer sf.mu.Unlock()
-	sf.metadata.localPath = path
+	sf.staticMetadata.localPath = path
 }
 
 // SiaPath returns the file's sia path.
 func (sf *SiaFile) SiaPath() string {
 	sf.mu.RLock()
 	defer sf.mu.RUnlock()
-	return sf.metadata.siaPath
+	return sf.staticMetadata.siaPath
 }
 
 // Size returns the file's size.
 func (sf *SiaFile) Size() uint64 {
-	sf.mu.RLock()
-	defer sf.mu.RUnlock()
-	return uint64(sf.metadata.fileSize)
+	return uint64(sf.staticMetadata.staticFileSize)
 }
 
 // UploadedBytes indicates how many bytes of the file have been uploaded via
@@ -178,7 +170,7 @@ func (sf *SiaFile) UploadedBytes() uint64 {
 	sf.mu.RLock()
 	defer sf.mu.RUnlock()
 	var uploaded uint64
-	for _, chunk := range sf.chunks {
+	for _, chunk := range sf.staticChunks {
 		for _, pieceSet := range chunk.pieces {
 			// Note: we need to multiply by SectorSize here instead of
 			// f.pieceSize because the actual bytes uploaded include overhead
@@ -202,6 +194,6 @@ func (sf *SiaFile) UploadProgress() float64 {
 }
 
 // ChunkSize returns the size of a single chunk of the file.
-func (sf *SiaFile) chunkSize(chunkIndex uint64) uint64 {
-	return sf.metadata.pieceSize * uint64(sf.chunks[chunkIndex].erasureCode.MinPieces())
+func (sf *SiaFile) staticChunkSize(chunkIndex uint64) uint64 {
+	return sf.staticMetadata.staticPieceSize * uint64(sf.staticChunks[chunkIndex].staticErasureCode.MinPieces())
 }
