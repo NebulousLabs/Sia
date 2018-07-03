@@ -30,8 +30,7 @@ var (
 // renterexportcontracttxnscmd is the handler for the command `siac renter export contract-txns`.
 // Exports the current contract set to JSON.
 func renterexportcontracttxnscmd(destination string) {
-	getAllContracts := false
-	cs, err := httpClient.RenterContractsGet(getAllContracts)
+	cs, err := httpClient.RenterActiveContractsGet()
 	if err != nil {
 		die("Could not retrieve contracts:", err)
 	}
