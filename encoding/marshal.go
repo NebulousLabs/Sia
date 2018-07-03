@@ -113,8 +113,8 @@ func (e *Encoder) WriteInt(i int) error {
 	return e.WriteUint64(uint64(i))
 }
 
-// WritePrefix writes p to the underlying io.Writer, prefixed by its length.
-func (e *Encoder) WritePrefix(p []byte) error {
+// WritePrefixedBytes writes p to the underlying io.Writer, prefixed by its length.
+func (e *Encoder) WritePrefixedBytes(p []byte) error {
 	e.WriteInt(len(p))
 	e.Write(p)
 	return e.err
@@ -170,7 +170,7 @@ func (e *Encoder) encode(val reflect.Value) error {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return e.WriteUint64(val.Uint())
 	case reflect.String:
-		return e.WritePrefix([]byte(val.String()))
+		return e.WritePrefixedBytes([]byte(val.String()))
 	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
 		if err := e.WriteInt(val.Len()); err != nil {
@@ -295,10 +295,10 @@ func (d *Decoder) ReadFull(p []byte) {
 	}
 }
 
-// ReadPrefix reads a length-prefix, allocates a byte slice with that length,
+// ReadPrefixedBytes reads a length-prefix, allocates a byte slice with that length,
 // reads into the byte slice, and returns it. If the length prefix exceeds
-// encoding.MaxSliceSize, ReadPrefix returns nil and sets d.Err().
-func (d *Decoder) ReadPrefix() []byte {
+// encoding.MaxSliceSize, ReadPrefixedBytes returns nil and sets d.Err().
+func (d *Decoder) ReadPrefixedBytes() []byte {
 	n := d.NextPrefix(1) // if too large, n == 0
 	if buf, ok := d.r.(*bytes.Buffer); ok {
 		b := buf.Next(int(n))
@@ -421,7 +421,7 @@ func (d *Decoder) decode(val reflect.Value) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		val.SetUint(d.NextUint64())
 	case reflect.String:
-		val.SetString(string(d.ReadPrefix()))
+		val.SetString(string(d.ReadPrefixedBytes()))
 	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.

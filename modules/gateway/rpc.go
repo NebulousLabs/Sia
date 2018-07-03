@@ -242,7 +242,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) 
 	// only encode obj once, instead of using WriteObject
 	enc := encoding.Marshal(obj)
 	fn := func(conn modules.PeerConn) error {
-		return encoding.WritePrefix(conn, enc)
+		return encoding.WritePrefixedBytes(conn, enc)
 	}
 
 	var wg sync.WaitGroup

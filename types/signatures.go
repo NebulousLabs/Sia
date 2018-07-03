@@ -214,7 +214,7 @@ func (t Transaction) SigHash(i int) (hash crypto.Hash) {
 			t.MinerFees[minerFee].MarshalSia(h)
 		}
 		for _, arbData := range cf.ArbitraryData {
-			encoding.WritePrefix(h, t.ArbitraryData[arbData])
+			encoding.WritePrefixedBytes(h, t.ArbitraryData[arbData])
 		}
 	}
 

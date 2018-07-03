@@ -51,23 +51,23 @@ type (
 )
 
 func (t test5) MarshalSia(w io.Writer) error {
-	return NewEncoder(w).WritePrefix([]byte(t.s))
+	return NewEncoder(w).WritePrefixedBytes([]byte(t.s))
 }
 
 func (t *test5) UnmarshalSia(r io.Reader) error {
 	d := NewDecoder(r)
-	t.s = string(d.ReadPrefix())
+	t.s = string(d.ReadPrefixedBytes())
 	return d.Err()
 }
 
 // same as above methods, but with a pointer receiver
 func (t *test6) MarshalSia(w io.Writer) error {
-	return NewEncoder(w).WritePrefix([]byte(t.s))
+	return NewEncoder(w).WritePrefixedBytes([]byte(t.s))
 }
 
 func (t *test6) UnmarshalSia(r io.Reader) error {
 	d := NewDecoder(r)
-	t.s = string(d.ReadPrefix())
+	t.s = string(d.ReadPrefixedBytes())
 	return d.Err()
 }
 

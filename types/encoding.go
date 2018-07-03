@@ -276,7 +276,7 @@ zeros:
 func (c *Currency) UnmarshalSia(r io.Reader) error {
 	d := encoding.NewDecoder(r)
 	var dec Currency
-	dec.i.SetBytes(d.ReadPrefix())
+	dec.i.SetBytes(d.ReadPrefixedBytes())
 	*c = dec
 	return d.Err()
 }
@@ -591,7 +591,7 @@ func (sfoid *SiafundOutputID) UnmarshalJSON(b []byte) error {
 func (spk SiaPublicKey) MarshalSia(w io.Writer) error {
 	e := encoding.NewEncoder(w)
 	e.Write(spk.Algorithm[:])
-	e.WritePrefix(spk.Key)
+	e.WritePrefixedBytes(spk.Key)
 	return e.Err()
 }
 
@@ -599,7 +599,7 @@ func (spk SiaPublicKey) MarshalSia(w io.Writer) error {
 func (spk *SiaPublicKey) UnmarshalSia(r io.Reader) error {
 	d := encoding.NewDecoder(r)
 	d.ReadFull(spk.Algorithm[:])
-	spk.Key = d.ReadPrefix()
+	spk.Key = d.ReadPrefixedBytes()
 	return d.Err()
 }
 
@@ -742,7 +742,7 @@ func (t Transaction) marshalSiaNoSignatures(w io.Writer) {
 	}
 	e.WriteInt(len((t.ArbitraryData)))
 	for i := range t.ArbitraryData {
-		e.WritePrefix(t.ArbitraryData[i])
+		e.WritePrefixedBytes(t.ArbitraryData[i])
 	}
 }
 
@@ -848,7 +848,7 @@ func (t *Transaction) UnmarshalSia(r io.Reader) error {
 	}
 	t.ArbitraryData = make([][]byte, d.NextPrefix(unsafe.Sizeof([]byte{})))
 	for i := range t.ArbitraryData {
-		t.ArbitraryData[i] = d.ReadPrefix()
+		t.ArbitraryData[i] = d.ReadPrefixedBytes()
 	}
 	t.TransactionSignatures = make([]TransactionSignature, d.NextPrefix(unsafe.Sizeof(TransactionSignature{})))
 	for i := range t.TransactionSignatures {
@@ -879,7 +879,7 @@ func (ts TransactionSignature) MarshalSia(w io.Writer) error {
 	e.WriteUint64(ts.PublicKeyIndex)
 	e.WriteUint64(uint64(ts.Timelock))
 	ts.CoveredFields.MarshalSia(e)
-	e.WritePrefix(ts.Signature)
+	e.WritePrefixedBytes(ts.Signature)
 	return e.Err()
 }
 
@@ -890,7 +890,7 @@ func (ts *TransactionSignature) UnmarshalSia(r io.Reader) error {
 	ts.PublicKeyIndex = d.NextUint64()
 	ts.Timelock = BlockHeight(d.NextUint64())
 	ts.CoveredFields.UnmarshalSia(d)
-	ts.Signature = d.ReadPrefix()
+	ts.Signature = d.ReadPrefixedBytes()
 	return d.Err()
 }
 
