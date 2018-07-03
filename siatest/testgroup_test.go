@@ -134,6 +134,9 @@ func TestAddNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(nodes) != 1 {
+		t.Fatalf("More nodes returned than expected; expected 1 got %v", len(nodes))
+	}
 	renter := nodes[0]
 	for _, oldRenter := range oldRenters {
 		if oldRenter.primarySeed == renter.primarySeed {
