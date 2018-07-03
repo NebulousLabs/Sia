@@ -564,14 +564,14 @@ func renterfilesdownloadcmd(path, destination string) {
 
 	// If the download is async, report success.
 	if renterDownloadAsync {
-		fmt.Printf("\nQueued Download '%s' to %s.\n", path, abs(destination))
+		fmt.Printf("Queued Download '%s' to %s.\n", path, abs(destination))
 		return
 	}
 
 	// If the download is blocking, display progress as the file downloads.
 	err = downloadprogress(path)
 	if err != nil {
-		die("Download could not be completed:", err)
+		die("\nDownload could not be completed:", err)
 	}
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
 }
