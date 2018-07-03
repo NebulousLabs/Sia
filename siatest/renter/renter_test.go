@@ -3,10 +3,13 @@ package renter
 import (
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -31,7 +34,6 @@ func TestRenter(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 
 	// Create a group for the subtests
 	groupParams := siatest.GroupParams{
@@ -61,6 +63,7 @@ func TestRenter(t *testing.T) {
 		{"TestRenterDownloadAfterRenew", testRenterDownloadAfterRenew},
 		{"TestRenterLocalRepair", testRenterLocalRepair},
 		{"TestRenterRemoteRepair", testRenterRemoteRepair},
+		{"TestClearDownloadHistory", testClearDownloadHistory},
 	}
 	// Run subtests
 	for _, subtest := range subTests {
@@ -319,11 +322,13 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 	}
 }
 
+// The following four tests can not be run in parallel as it causes a panic
+// of `too many files open
+
 // TestDownloadInterruptedBeforeSendingRevision runs testDownloadInterrupted
 // with a dependency that interrupts the download before sending the signed
 // revision to the host.
 func TestDownloadInterruptedBeforeSendingRevision(t *testing.T) {
-	t.Parallel()
 	testDownloadInterrupted(t, newDependencyInterruptDownloadBeforeSendingRevision())
 }
 
@@ -331,7 +336,6 @@ func TestDownloadInterruptedBeforeSendingRevision(t *testing.T) {
 // with a dependency that interrupts the download after sending the signed
 // revision to the host.
 func TestDownloadInterruptedAfterSendingRevision(t *testing.T) {
-	t.Parallel()
 	testDownloadInterrupted(t, newDependencyInterruptDownloadAfterSendingRevision())
 }
 
@@ -339,7 +343,6 @@ func TestDownloadInterruptedAfterSendingRevision(t *testing.T) {
 // dependency that interrupts the upload before sending the signed revision to
 // the host.
 func TestUploadInterruptedBeforeSendingRevision(t *testing.T) {
-	t.Parallel()
 	testUploadInterrupted(t, newDependencyInterruptUploadBeforeSendingRevision())
 }
 
@@ -347,7 +350,6 @@ func TestUploadInterruptedBeforeSendingRevision(t *testing.T) {
 // dependency that interrupts the upload after sending the signed revision to
 // the host.
 func TestUploadInterruptedAfterSendingRevision(t *testing.T) {
-	t.Parallel()
 	testUploadInterrupted(t, newDependencyInterruptUploadAfterSendingRevision())
 }
 
@@ -2167,5 +2169,155 @@ func TestRenterOldContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
 
+// testClearDownloadHistory makes sure that the download history is
+// properly cleared when called through the API
+func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	r := tg.Renters()[0]
+
+	rdg, err := r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	numDownloads := 10
+	if len(rdg.Downloads) < numDownloads {
+		remainingDownloads := numDownloads - len(rdg.Downloads)
+		rf, err := r.RenterFilesGet()
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Check if the renter has any files
+		// Upload a file if none
+		if len(rf.Files) == 0 {
+			dataPieces := uint64(1)
+			parityPieces := uint64(1)
+			fileSize := 100 + siatest.Fuzz()
+			_, _, err := r.UploadNewFileBlocking(fileSize, dataPieces, parityPieces)
+			if err != nil {
+				t.Fatal("Failed to upload a file for testing: ", err)
+			}
+			rf, err = r.RenterFilesGet()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Download files to build download history
+		dest := filepath.Join(siatest.SiaTestingDir, strconv.Itoa(fastrand.Intn(math.MaxInt32)))
+		for i := 0; i < remainingDownloads; i++ {
+			err = r.RenterDownloadGet(rf.Files[0].SiaPath, dest, 0, rf.Files[0].Filesize, false)
+			if err != nil {
+				t.Fatal("Could not Download file:", err)
+			}
+		}
+		rdg, err = r.RenterDownloadsGet()
+		if err != nil {
+			t.Fatal("Could not get download history:", err)
+		}
+		// Confirm download history is not empty
+		if len(rdg.Downloads) != numDownloads {
+			t.Fatalf("Not all downloads added to download history: only %v downloads added, expected %v", len(rdg.Downloads), numDownloads)
+		}
+	}
+	numDownloads = len(rdg.Downloads)
+
+	// Check removing one download from history
+	// Remove First Download
+	timestamp := rdg.Downloads[0].StartTime
+	err = r.RenterClearDownloadsRangePost(timestamp, timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to remove download from history:", err)
+	}
+	numDownloads--
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	if len(rdg.Downloads) != numDownloads {
+		t.Fatalf("Download history not reduced: history has %v downloads, expected %v", len(rdg.Downloads), numDownloads)
+	}
+	i := sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Equal(timestamp) })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Specified download not removed from history")
+	}
+	// Remove Last Download
+	timestamp = rdg.Downloads[len(rdg.Downloads)-1].StartTime
+	err = r.RenterClearDownloadsRangePost(timestamp, timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to remove download from history:", err)
+	}
+	numDownloads--
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	if len(rdg.Downloads) != numDownloads {
+		t.Fatalf("Download history not reduced: history has %v downloads, expected %v", len(rdg.Downloads), numDownloads)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Equal(timestamp) })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Specified download not removed from history")
+	}
+
+	// Check Clear Before
+	timestamp = rdg.Downloads[len(rdg.Downloads)-2].StartTime
+	err = r.RenterClearDownloadsBeforePost(timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to clear download history before timestamp:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.Before(timestamp) })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Download found that was before given time")
+	}
+
+	// Check Clear After
+	timestamp = rdg.Downloads[1].StartTime
+	err = r.RenterClearDownloadsAfterPost(timestamp)
+	if err != nil {
+		t.Fatal("Error in API endpoint to clear download history after timestamp:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool { return rdg.Downloads[i].StartTime.After(timestamp) })
+	if i < len(rdg.Downloads) {
+		t.Fatal("Download found that was after given time")
+	}
+
+	// Check clear range
+	before := rdg.Downloads[1].StartTime
+	after := rdg.Downloads[len(rdg.Downloads)-1].StartTime
+	err = r.RenterClearDownloadsRangePost(after, before)
+	if err != nil {
+		t.Fatal("Error in API endpoint to remove range of downloads from history:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	i = sort.Search(len(rdg.Downloads), func(i int) bool {
+		return rdg.Downloads[i].StartTime.Before(before) && rdg.Downloads[i].StartTime.After(after)
+	})
+	if i < len(rdg.Downloads) {
+		t.Fatal("Not all downloads from range removed from history")
+	}
+
+	// Check clearing download history
+	err = r.RenterClearAllDownloadsPost()
+	if err != nil {
+		t.Fatal("Error in API endpoint to clear download history:", err)
+	}
+	rdg, err = r.RenterDownloadsGet()
+	if err != nil {
+		t.Fatal("Could not get download history:", err)
+	}
+	if len(rdg.Downloads) != 0 {
+		t.Fatalf("Download history not cleared: history has %v downloads, expected 0", len(rdg.Downloads))
+	}
 }
