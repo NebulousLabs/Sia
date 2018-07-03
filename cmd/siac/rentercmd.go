@@ -580,7 +580,7 @@ func renterfilesdownloadcmd(path, destination string) {
 // user, and return an error when the download is finished.
 func downloadprogress(siapath string) error {
 	// If the download does not appear after a long time, give up.
-	tries := 0
+	var tryTime time.Duration
 
 	for range time.Tick(OutputRefreshRate) {
 		// Get the list of downloads.
@@ -601,8 +601,8 @@ func downloadprogress(siapath string) error {
 		// If the download has not appeared in the queue yet, either continue or
 		// give up.
 		if !found {
-			tries++
-			if tries > 25 {
+			tryTime += OutputRefreshRate
+			if tryTime > time.Minute {
 				return errors.New("Unable to find download in queue")
 			}
 			continue
