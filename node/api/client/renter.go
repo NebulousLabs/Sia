@@ -11,9 +11,34 @@ import (
 	"github.com/NebulousLabs/Sia/node/api"
 )
 
-// RenterContractsGet requests the /renter/contracts resource
-func (c *Client) RenterContractsGet(expired bool) (rc api.RenterContracts, err error) {
-	query := fmt.Sprintf("?expired=%v", expired)
+// RenterContractsGet requests the /renter/contracts resource and returns all
+// contracts
+func (c *Client) RenterContractsGet() (rc api.RenterContracts, err error) {
+	query := fmt.Sprintf("?all=%v", true)
+	err = c.get("/renter/contracts"+query, &rc)
+	return
+}
+
+// RenterActiveContractsGet requests the /renter/contracts resource and returns
+// the active contracts
+func (c *Client) RenterActiveContractsGet() (rc api.RenterContracts, err error) {
+	query := fmt.Sprintf("?active=%v", true)
+	err = c.get("/renter/contracts"+query, &rc)
+	return
+}
+
+// RenterInactiveContractsGet requests the /renter/contracts resource and returns
+// the inactive contracts
+func (c *Client) RenterInactiveContractsGet() (rc api.RenterContracts, err error) {
+	query := fmt.Sprintf("?inactive=%v", true)
+	err = c.get("/renter/contracts"+query, &rc)
+	return
+}
+
+// RenterExpiredContractsGet requests the /renter/contracts resource and returns
+// the expired contracts
+func (c *Client) RenterExpiredContractsGet() (rc api.RenterContracts, err error) {
+	query := fmt.Sprintf("?expired=%v", true)
 	err = c.get("/renter/contracts"+query, &rc)
 	return
 }

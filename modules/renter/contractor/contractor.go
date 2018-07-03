@@ -159,9 +159,9 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 	return c.staticContracts.ViewAll()
 }
 
-// ExpiredContracts returns the contracts formed by the contractor that have
+// OldContracts returns the contracts formed by the contractor that have
 // expired
-func (c *Contractor) ExpiredContracts() []modules.RenterContract {
+func (c *Contractor) OldContracts() []modules.RenterContract {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	contracts := make([]modules.RenterContract, 0, len(c.oldContracts))

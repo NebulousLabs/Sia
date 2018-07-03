@@ -115,8 +115,7 @@ type (
 
 	// RenterContracts contains the renter's contracts.
 	RenterContracts struct {
-		Contracts        []RenterContract `json:"contracts"`
-		ExpiredContracts []RenterContract `json:"expiredcontracts"`
+		Contracts []RenterContract `json:"contracts"`
 	}
 
 	// RenterDownloadQueue contains the renter's download queue.
@@ -275,12 +274,26 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 
 // renterContractsHandler handles the API call to request the Renter's contracts.
 func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// Parse the expired parameter.
-	expiredparam := req.FormValue("expired")
-	expiredresp, err := scanBool(expiredparam)
+	// Parse flags
+	active, err := scanBool(req.FormValue("active"))
 	if err != nil {
 		return
 	}
+	inactive, err := scanBool(req.FormValue("inactive"))
+	if err != nil {
+		return
+	}
+	expired, err := scanBool(req.FormValue("expired"))
+	if err != nil {
+		return
+	}
+	all, err := scanBool(req.FormValue("all"))
+	if err != nil {
+		return
+	}
+
+	// Get current period for reference
+	currentPeriod := api.renter.CurrentPeriod()
 
 	// Get active contracts
 	contracts := []RenterContract{}
@@ -304,8 +317,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 			goodForUpload = utility.GoodForUpload
 			goodForRenew = utility.GoodForRenew
 		}
-
-		contracts = append(contracts, RenterContract{
+		contract := RenterContract{
 			DownloadSpending:          c.DownloadSpending,
 			EndHeight:                 c.EndHeight,
 			Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
@@ -322,13 +334,19 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 			StorageSpendingDeprecated: c.StorageSpending,
 			TotalCost:                 c.TotalCost,
 			UploadSpending:            c.UploadSpending,
-		})
+		}
+		if active && goodForRenew && goodForUpload && c.StartHeight >= currentPeriod {
+			contracts = append(contracts, contract)
+		} else if inactive && (!goodForRenew || !goodForUpload) && c.StartHeight >= currentPeriod {
+			contracts = append(contracts, contract)
+		} else if all {
+			contracts = append(contracts, contract)
+		}
 	}
 
 	// Get expired contracts
-	expiredContracts := []RenterContract{}
-	if expiredresp {
-		for _, c := range api.renter.ExpiredContracts() {
+	if expired || all || inactive {
+		for _, c := range api.renter.OldContracts() {
 			var size uint64
 			if len(c.Transaction.FileContractRevisions) != 0 {
 				size = c.Transaction.FileContractRevisions[0].NewFileSize
@@ -349,7 +367,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 				goodForRenew = utility.GoodForRenew
 			}
 
-			expiredContracts = append(expiredContracts, RenterContract{
+			contract := RenterContract{
 				DownloadSpending:          c.DownloadSpending,
 				EndHeight:                 c.EndHeight,
 				Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
@@ -366,12 +384,19 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 				StorageSpendingDeprecated: c.StorageSpending,
 				TotalCost:                 c.TotalCost,
 				UploadSpending:            c.UploadSpending,
-			})
+			}
+			if expired && c.EndHeight <= currentPeriod {
+				contracts = append(contracts, contract)
+			} else if inactive && (!goodForRenew || !goodForUpload) && c.StartHeight >= currentPeriod {
+				contracts = append(contracts, contract)
+			} else if all {
+				contracts = append(contracts, contract)
+			}
 		}
 	}
+
 	WriteJSON(w, RenterContracts{
-		Contracts:        contracts,
-		ExpiredContracts: expiredContracts,
+		Contracts: contracts,
 	})
 }
 

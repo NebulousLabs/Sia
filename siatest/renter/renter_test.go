@@ -633,7 +633,7 @@ func TestRenewFailing(t *testing.T) {
 	renter := tg.Renters()[0]
 
 	// All the contracts of the renter should be goodForRenew.
-	rcg, err := renter.RenterContractsGet(false)
+	rcg, err := renter.RenterActiveContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -687,7 +687,7 @@ func TestRenewFailing(t *testing.T) {
 	}
 
 	// contracts should still be goodForRenew.
-	rcg, err = renter.RenterContractsGet(false)
+	rcg, err = renter.RenterActiveContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -710,7 +710,7 @@ func TestRenewFailing(t *testing.T) {
 	replaced := false
 	err = build.Retry(int(rcg.Contracts[0].EndHeight-blockHeight), 5*time.Second, func() error {
 		// contract should be !goodForRenew now.
-		rcg, err = renter.RenterContractsGet(false)
+		rcg, err = renter.RenterActiveContractsGet()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1898,7 +1898,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 	// Give it some time to mark the contracts as !goodForUpload and
 	// !goodForRenew.
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err := renter.RenterContractsGet(false)
+		rc, err := renter.RenterActiveContractsGet()
 		if err != nil {
 			return err
 		}
@@ -1964,7 +1964,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 
 	// All contracts should be archived.
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err := renter.RenterContractsGet(false)
+		rc, err := renter.RenterActiveContractsGet()
 		if err != nil {
 			return err
 		}
@@ -2032,7 +2032,7 @@ func TestRenterResetAllowance(t *testing.T) {
 	// Give it some time to mark the contracts as !goodForUpload and
 	// !goodForRenew.
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err := renter.RenterContractsGet(false)
+		rc, err := renter.RenterActiveContractsGet()
 		if err != nil {
 			return err
 		}
@@ -2067,7 +2067,7 @@ func TestRenterResetAllowance(t *testing.T) {
 	// Give it some time to mark the contracts as goodForUpload and
 	// goodForRenew again.
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err := renter.RenterContractsGet(false)
+		rc, err := renter.RenterActiveContractsGet()
 		if err != nil {
 			return err
 		}

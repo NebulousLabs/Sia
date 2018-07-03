@@ -322,11 +322,11 @@ type Renter interface {
 	// Close closes the Renter.
 	Close() error
 
-	// Contracts returns the active contracts formed by the renter.
+	// Contracts returns the staticContracts of the renter's hostContractor.
 	Contracts() []RenterContract
 
-	// ExpiredContracts returns the expired contracts formed by the renter.
-	ExpiredContracts() []RenterContract
+	// OldContracts returns the oldContracts of the renter's hostContractor.
+	OldContracts() []RenterContract
 
 	// ContractUtility provides the contract utility for a given host key.
 	ContractUtility(pk types.SiaPublicKey) (ContractUtility, bool)
