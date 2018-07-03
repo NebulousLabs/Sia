@@ -195,8 +195,8 @@ func (tb *transactionBuilder) FundSiacoinsForOutputs(outputs []types.SiacoinOutp
 			ParentID:         scoid,
 			UnlockConditions: tb.wallet.keys[sco.UnlockHash].UnlockConditions,
 		}
-		tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, sci)
 		tb.siacoinInputs = append(tb.siacoinInputs, len(tb.transaction.SiacoinInputs))
+		tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, sci)
 		spentScoids = append(spentScoids, scoid)
 
 		// Add the output to the total fund
