@@ -614,3 +614,28 @@ func (tg *TestGroup) Renters() []*TestNode {
 func (tg *TestGroup) Miners() []*TestNode {
 	return mapToSlice(tg.miners)
 }
+
+// FindNewNode finds a newly added node to the test group, this return the first
+// new node found so should be used after adding a single node
+func (tg *TestGroup) FindNewNode(oldNodes, newNodes []*TestNode) (*TestNode, error) {
+	// Check for new nodes
+	if len(newNodes) == 0 {
+		return new(TestNode), errors.New("no nodes to check against")
+	}
+
+	// Check for first node condition
+	if len(oldNodes) == 0 {
+		return newNodes[0], nil
+	}
+
+	old := make(map[*TestNode]struct{})
+	for _, node := range oldNodes {
+		old[node] = struct{}{}
+	}
+	for _, node := range newNodes {
+		if _, exists := old[node]; !exists {
+			return node, nil
+		}
+	}
+	return new(TestNode), errors.New("No new node found")
+}
