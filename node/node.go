@@ -90,7 +90,7 @@ type NodeParams struct {
 	SkipHostDiscovery bool
 
 	// The high level directory where all the persistence gets stored for the
-	// moudles.
+	// modules.
 	Dir string
 }
 
@@ -107,7 +107,7 @@ type Node struct {
 	Wallet          modules.Wallet
 
 	// The high level directory where all the persistence gets stored for the
-	// moudles.
+	// modules.
 	Dir string
 }
 

@@ -406,7 +406,7 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 }
 
 // AddNodeN adds n nodes of a given template to the group.
-func (tg *TestGroup) AddNodeN(np node.NodeParams, n int) error {
+func (tg *TestGroup) AddNodeN(np node.NodeParams, n int) ([]*TestNode, error) {
 	nps := make([]node.NodeParams, n)
 	for i := 0; i < n; i++ {
 		nps[i] = np
@@ -415,10 +415,12 @@ func (tg *TestGroup) AddNodeN(np node.NodeParams, n int) error {
 }
 
 // AddNodes creates a node and adds it to the group.
-func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
+func (tg *TestGroup) AddNodes(nps ...node.NodeParams) ([]*TestNode, error) {
+	nodes := []*TestNode{}
 	newNodes := make(map[*TestNode]struct{})
 	newHosts := make(map[*TestNode]struct{})
 	newRenters := make(map[*TestNode]struct{})
+	newMiners := make(map[*TestNode]struct{})
 	for _, np := range nps {
 		// Create the nodes and add them to the group.
 		if np.Dir == "" {
@@ -426,10 +428,11 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 		}
 		node, err := NewCleanNode(np)
 		if err != nil {
-			return build.ExtendErr("failed to create host", err)
+			return nodes, build.ExtendErr("failed to create host", err)
 		}
 		// Add node to nodes
 		tg.nodes[node] = struct{}{}
+		newNodes[node] = struct{}{}
 		// Add node to hosts
 		if np.Host != nil || np.CreateHost {
 			tg.hosts[node] = struct{}{}
@@ -443,11 +446,16 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 		// Add node to miners
 		if np.Miner != nil || np.CreateMiner {
 			tg.miners[node] = struct{}{}
+			newMiners[node] = struct{}{}
 		}
-		newNodes[node] = struct{}{}
 	}
 
-	return tg.setupNodes(newHosts, newNodes, newRenters)
+	nodes = append(nodes, mapToSlice(newNodes)...)
+	nodes = append(nodes, mapToSlice(newHosts)...)
+	nodes = append(nodes, mapToSlice(newRenters)...)
+	nodes = append(nodes, mapToSlice(newMiners)...)
+
+	return nodes, tg.setupNodes(newHosts, newNodes, newRenters)
 }
 
 // setupNodes does the set up required for creating a test group
@@ -613,29 +621,4 @@ func (tg *TestGroup) Renters() []*TestNode {
 // Miners returns all the miners of the group
 func (tg *TestGroup) Miners() []*TestNode {
 	return mapToSlice(tg.miners)
-}
-
-// FindNewNode finds a newly added node to the test group, this return the first
-// new node found so should be used after adding a single node
-func (tg *TestGroup) FindNewNode(oldNodes, newNodes []*TestNode) (*TestNode, error) {
-	// Check for new nodes
-	if len(newNodes) == 0 {
-		return new(TestNode), errors.New("no nodes to check against")
-	}
-
-	// Check for first node condition
-	if len(oldNodes) == 0 {
-		return newNodes[0], nil
-	}
-
-	old := make(map[*TestNode]struct{})
-	for _, node := range oldNodes {
-		old[node] = struct{}{}
-	}
-	for _, node := range newNodes {
-		if _, exists := old[node]; !exists {
-			return node, nil
-		}
-	}
-	return new(TestNode), errors.New("No new node found")
 }

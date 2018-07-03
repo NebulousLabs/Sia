@@ -100,8 +100,8 @@ func TestNewGroupNoRenterHost(t *testing.T) {
 	}()
 }
 
-// TestFindNewNode tests FindNewNode to confirm the correct node is found
-func TestFindNewNode(t *testing.T) {
+// TestAddNewNode tests that the added node is returned when AddNodes is called
+func TestAddNewNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -130,16 +130,11 @@ func TestFindNewNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	renterTemplate := node.Renter(testDir + "/renter")
-	if err = tg.AddNodes(renterTemplate); err != nil {
-		t.Fatal(err)
-	}
-
-	// Upload a file that's 1 chunk large.
-	renter, err := tg.FindNewNode(oldRenters, tg.Renters())
+	nodes, err := tg.AddNodes(renterTemplate)
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	renter := nodes[0]
 	for _, oldRenter := range oldRenters {
 		if oldRenter.primarySeed == renter.primarySeed {
 			t.Fatal("Returned renter is not the new renter")

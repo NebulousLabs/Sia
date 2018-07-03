@@ -199,7 +199,8 @@ func testRenterLocalRepair(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal("Failed to download file", err)
 	}
 	// Bring up a new host and check if redundancy increments again.
-	if err := tg.AddNodes(node.HostTemplate); err != nil {
+	_, err = tg.AddNodes(node.HostTemplate)
+	if err != nil {
 		t.Fatal("Failed to create a new host", err)
 	}
 	if err := renter.WaitForUploadRedundancy(remoteFile, fi.Redundancy); err != nil {
@@ -259,7 +260,8 @@ func testRenterRemoteRepair(t *testing.T, tg *siatest.TestGroup) {
 		t.Fatal("Failed to download file", err)
 	}
 	// Bring up new parity hosts and check if redundancy increments again.
-	if err := tg.AddNodeN(node.HostTemplate, int(parityPieces)); err != nil {
+	_, err = tg.AddNodeN(node.HostTemplate, int(parityPieces))
+	if err != nil {
 		t.Fatal("Failed to create a new host", err)
 	}
 	// When doing remote repair the redundancy might not reach 100%.
@@ -507,7 +509,6 @@ func testUploadInterruptedAfterSendingRevision(t *testing.T, tg *siatest.TestGro
 
 // testDownloadInterrupted interrupts a download using the provided dependencies.
 func testDownloadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.DependencyInterruptOnceOnKeyword) {
-	oldRenters := tg.Renters()
 	// Add Renter
 	testDir, err := siatest.TestDir(t.Name())
 	if err != nil {
@@ -515,15 +516,13 @@ func testDownloadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.
 	}
 	renterTemplate := node.Renter(testDir + "/renter")
 	renterTemplate.ContractorDeps = deps
-	if err = tg.AddNodes(renterTemplate); err != nil {
-		t.Fatal(err)
-	}
-
-	// Upload a file that's 1 chunk large.
-	renter, err := tg.FindNewNode(oldRenters, tg.Renters())
+	nodes, err := tg.AddNodes(renterTemplate)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Set the bandwidth limit to 1 chunk per second.
+	renter := nodes[0]
 	dataPieces := uint64(len(tg.Hosts())) - 1
 	parityPieces := uint64(1)
 	chunkSize := siatest.ChunkSize(uint64(dataPieces))
@@ -573,7 +572,6 @@ func testDownloadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.
 // testUploadInterrupted let's the upload fail using the provided dependencies
 // and makes sure that this doesn't corrupt the contract.
 func testUploadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.DependencyInterruptOnceOnKeyword) {
-	oldRenters := tg.Renters()
 	// Add Renter
 	testDir, err := siatest.TestDir(t.Name())
 	if err != nil {
@@ -581,15 +579,13 @@ func testUploadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.De
 	}
 	renterTemplate := node.Renter(testDir + "/renter")
 	renterTemplate.ContractorDeps = deps
-	if err = tg.AddNodes(renterTemplate); err != nil {
+	nodes, err := tg.AddNodes(renterTemplate)
+	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set the bandwidth limit to 1 chunk per second.
-	renter, err := tg.FindNewNode(oldRenters, tg.Renters())
-	if err != nil {
-		t.Fatal(err)
-	}
+	renter := nodes[0]
 	dataPieces := uint64(len(tg.Hosts())) - 1
 	parityPieces := uint64(1)
 	chunkSize := siatest.ChunkSize(uint64(dataPieces))
@@ -679,10 +675,11 @@ func TestRenewFailing(t *testing.T) {
 	renterParams.Allowance.Hosts = uint64(len(tg.Hosts()) - 1)
 	renterParams.Allowance.Period = 100
 	renterParams.Allowance.RenewWindow = 50
-	if err = tg.AddNodes(renterParams); err != nil {
+	nodes, err := tg.AddNodes(renterParams)
+	if err != nil {
 		t.Fatal(err)
 	}
-	renter := tg.Renters()[0]
+	renter := nodes[0]
 
 	// All the contracts of the renter should be goodForRenew.
 	rcg, err := renter.RenterContractsGet()
@@ -1083,9 +1080,11 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 	renterParams := node.Renter(renterDir)
 	renterParams.SkipSetAllowance = true
-	if err = tg.AddNodes(renterParams); err != nil {
+	nodes, err := tg.AddNodes(renterParams)
+	if err != nil {
 		t.Fatal(err)
 	}
+	r := nodes[0]
 
 	// Get largest WindowSize from Hosts
 	var windowSize types.BlockHeight
@@ -1100,7 +1099,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Get renter's initial siacoin balance
-	r := tg.Renters()[0]
 	wg, err := r.WalletGet()
 	if err != nil {
 		t.Fatal("Failed to get wallet:", err)
