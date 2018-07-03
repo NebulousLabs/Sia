@@ -1,7 +1,6 @@
 package siatest
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -35,11 +34,9 @@ func (d *DependencyInterruptOnceOnKeyword) Disrupt(s string) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.f && s == d.str {
-		fmt.Println("True")
 		d.f = false
 		return true
 	}
-	fmt.Println("False")
 	return false
 }
 

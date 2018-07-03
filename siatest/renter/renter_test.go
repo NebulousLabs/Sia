@@ -447,8 +447,7 @@ func TestRenterInterrupt(t *testing.T) {
 
 	// Create a group for the subtests
 	groupParams := siatest.GroupParams{
-		Hosts: 5,
-		// Renters: 1,
+		Hosts:  5,
 		Miners: 1,
 	}
 	tg, err := siatest.NewGroupFromTemplate(groupParams)
@@ -479,13 +478,6 @@ func TestRenterInterrupt(t *testing.T) {
 	}
 }
 
-// testDownloadInterruptedBeforeSendingRevision runs testDownloadInterrupted
-// with a dependency that interrupts the download before sending the signed
-// revision to the host.
-func testDownloadInterruptedBeforeSendingRevision(t *testing.T, tg *siatest.TestGroup) {
-	testDownloadInterrupted(t, tg, newDependencyInterruptDownloadBeforeSendingRevision())
-}
-
 // testDownloadInterruptedAfterSendingRevision runs testDownloadInterrupted with
 // a dependency that interrupts the download after sending the signed revision
 // to the host.
@@ -493,11 +485,11 @@ func testDownloadInterruptedAfterSendingRevision(t *testing.T, tg *siatest.TestG
 	testDownloadInterrupted(t, tg, newDependencyInterruptDownloadAfterSendingRevision())
 }
 
-// testUploadInterruptedBeforeSendingRevision runs testUploadInterrupted with a
-// dependency that interrupts the upload before sending the signed revision to
-// the host.
-func testUploadInterruptedBeforeSendingRevision(t *testing.T, tg *siatest.TestGroup) {
-	testUploadInterrupted(t, tg, newDependencyInterruptUploadBeforeSendingRevision())
+// testDownloadInterruptedBeforeSendingRevision runs testDownloadInterrupted
+// with a dependency that interrupts the download before sending the signed
+// revision to the host.
+func testDownloadInterruptedBeforeSendingRevision(t *testing.T, tg *siatest.TestGroup) {
+	testDownloadInterrupted(t, tg, newDependencyInterruptDownloadBeforeSendingRevision())
 }
 
 // testUploadInterruptedAfterSendingRevision runs testUploadInterrupted with a
@@ -505,6 +497,13 @@ func testUploadInterruptedBeforeSendingRevision(t *testing.T, tg *siatest.TestGr
 // the host.
 func testUploadInterruptedAfterSendingRevision(t *testing.T, tg *siatest.TestGroup) {
 	testUploadInterrupted(t, tg, newDependencyInterruptUploadAfterSendingRevision())
+}
+
+// testUploadInterruptedBeforeSendingRevision runs testUploadInterrupted with a
+// dependency that interrupts the upload before sending the signed revision to
+// the host.
+func testUploadInterruptedBeforeSendingRevision(t *testing.T, tg *siatest.TestGroup) {
+	testUploadInterrupted(t, tg, newDependencyInterruptUploadBeforeSendingRevision())
 }
 
 // testDownloadInterrupted interrupts a download using the provided dependencies.
@@ -515,7 +514,7 @@ func testDownloadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.
 		t.Fatal(err)
 	}
 	renterTemplate := node.Renter(testDir + "/renter")
-	renterTemplate.ContractorDeps = deps
+	renterTemplate.ContractSetDeps = deps
 	nodes, err := tg.AddNodes(renterTemplate)
 	if err != nil {
 		t.Fatal(err)
@@ -555,7 +554,6 @@ func testDownloadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.
 	// Try downloading the file 5 times.
 	for i := 0; i < 5; i++ {
 		if _, err := renter.DownloadByStream(remoteFile); err == nil {
-			fmt.Println(i)
 			t.Fatal("Download shouldn't succeed since it was interrupted")
 		}
 	}
@@ -578,7 +576,7 @@ func testUploadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.De
 		t.Fatal(err)
 	}
 	renterTemplate := node.Renter(testDir + "/renter")
-	renterTemplate.ContractorDeps = deps
+	renterTemplate.ContractSetDeps = deps
 	nodes, err := tg.AddNodes(renterTemplate)
 	if err != nil {
 		t.Fatal(err)
