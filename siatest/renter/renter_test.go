@@ -933,11 +933,19 @@ func TestRenterContractEndHeight(t *testing.T) {
 
 	// Confirm Contracts were created as expected
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err := r.RenterContractsGet(true)
+		rcActive, err := r.RenterActiveContractsGet()
 		if err != nil {
-			return errors.AddContext(err, "could not get contracts")
+			return errors.AddContext(err, "could not get active contracts")
 		}
-		if err = checkContracts(len(tg.Hosts()), numRenewals, rc.ExpiredContracts, rc.Contracts); err != nil {
+		rcInactive, err := r.RenterInactiveContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get Inactive contracts")
+		}
+		rcExpired, err := r.RenterExpiredContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get expired contracts")
+		}
+		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
 			return err
 		}
 		return nil
@@ -946,13 +954,13 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rc, err := r.RenterContractsGet(true)
+	rcActive, err := r.RenterActiveContractsGet()
 	if err != nil {
-		t.Fatal(err, "could not get contracts")
+		t.Fatal(err, "could not get active contracts")
 	}
 
 	// Confirm contract end heights were set properly
-	for _, c := range rc.Contracts {
+	for _, c := range rcActive.Contracts {
 		if c.EndHeight != currentPeriodStart+period {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", period)
@@ -967,17 +975,25 @@ func TestRenterContractEndHeight(t *testing.T) {
 	}
 	numRenewals++
 
-	// Confirm Contracts were renewed as expected, all original
-	// contracts should have been renewed if GoodForRenew = true
+	// Confirm Contracts were renewed as expected, all original contracts should
+	// have been renewed if GoodForRenew = true
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err = r.RenterContractsGet(true)
+		rcActive, err := r.RenterActiveContractsGet()
 		if err != nil {
-			return errors.AddContext(err, "could not get contracts")
+			return errors.AddContext(err, "could not get active contracts")
 		}
-		if err = checkContracts(len(tg.Hosts()), numRenewals, rc.ExpiredContracts, rc.Contracts); err != nil {
+		rcInactive, err := r.RenterInactiveContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get Inactive contracts")
+		}
+		rcExpired, err := r.RenterExpiredContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get expired contracts")
+		}
+		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
 			return err
 		}
-		if err = checkRenewedContracts(rc.Contracts); err != nil {
+		if err = checkRenewedContracts(rcActive.Contracts); err != nil {
 			return err
 		}
 		return nil
@@ -986,15 +1002,14 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Confirm contract end heights were set properly
-	// End height should be the end of the next period as
-	// the contracts are renewed due to reaching the renew
-	// window
-	rc, err = r.RenterContractsGet(true)
+	// Confirm contract end heights were set properly End height should be the
+	// end of the next period as the contracts are renewed due to reaching the
+	// renew window
+	rcActive, err = r.RenterActiveContractsGet()
 	if err != nil {
 		t.Fatal("Could not get renter contracts:", err)
 	}
-	for _, c := range rc.Contracts {
+	for _, c := range rcActive.Contracts {
 		if c.EndHeight != currentPeriodStart+(2*period)-renewWindow && c.GoodForRenew {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", period)
@@ -1005,7 +1020,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 	}
 
 	// Capturing end height to compare against renewed contracts
-	endHeight := rc.Contracts[0].EndHeight
+	endHeight := rcActive.Contracts[0].EndHeight
 
 	// Renew contracts by running out of funds
 	startingUploadSpend, err := renewContractsBySpending(r, tg)
@@ -1016,11 +1031,11 @@ func TestRenterContractEndHeight(t *testing.T) {
 	// Confirm contract end heights were set properly
 	// End height should not have changed since the renewal
 	// was due to running out of funds
-	rc, err = r.RenterContractsGet(true)
+	rcActive, err = r.RenterActiveContractsGet()
 	if err != nil {
 		t.Fatal("Could not get renter contracts:", err)
 	}
-	for _, c := range rc.Contracts {
+	for _, c := range rcActive.Contracts {
 		if c.EndHeight != endHeight && c.GoodForRenew && c.UploadSpending.Cmp(startingUploadSpend) <= 0 {
 			t.Log("Allowance Period:", period)
 			t.Log("Current Period:", currentPeriodStart)
@@ -2090,8 +2105,8 @@ func TestRenterResetAllowance(t *testing.T) {
 	}
 }
 
-// TestRenterExpiredContracts tests the API endpoint for old contracts
-func TestRenterExpiredContracts(t *testing.T) {
+// TestRenterContractsEndpoint tests the API endpoint for old contracts
+func TestRenterContractsEndpoint(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -2113,19 +2128,52 @@ func TestRenterExpiredContracts(t *testing.T) {
 		}
 	}()
 
-	// Get renter and current contracts
+	// Get Renter
 	r := tg.Renters()[0]
-	rc, err := r.RenterContractsGet(true)
+
+	// Renter should only have active contracts
+	rcAll, err := RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Record old contracts and current contracts that are good for renew
-	expiredContracts := rc.ExpiredContracts
-	for _, c := range rc.Contracts {
-		if c.GoodForRenew {
-			expiredContracts = append(expiredContracts, c)
+	rcActive, err := RenterActiveContractsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rcAll.Contracts) != len(rcActive.Contracts) {
+		t.Fatalf("Expected the same number for active and all contracts: %v for active and %v for all", len(rcActive), len(rcAll))
+	}
+	// Create Maps for comparison
+	ContractIDMap := make(map[types.FileContractID]struct{})
+	for _, c := range rcAll.Contracts {
+		ContractIDMap[c.ID] = struct{}{}
+	}
+	// Verify rcActive and rcAll have the same contracts
+	for _, c := range rcActive.Contracts {
+		if _, ok := ContractIDMap[c.ID]; !ok {
+			t.Fatal("ID from rcActive found in rcAll")
 		}
+	}
+	rcInactive, err := RenterInactiveContractsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rcInactive.Contracts) != 0 {
+		t.Fatal("Expected zero inactive contracts, got", len(rcInactive.Contracts))
+	}
+	rcExpired, err := RenterExpiredContractsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rcExpired.Contracts) != 0 {
+		t.Fatal("Expected zero expired contracts, got", len(rcExpired.Contracts))
+	}
+
+	// Record original Contracts and create Maps for comparison
+	originalContracts := rcActive.Contracts
+	originalContractIDMap := make(map[types.FileContractID]struct{})
+	for _, c := range originalContracts {
+		originalContractIDMap[c.ID] = struct{}{}
 	}
 
 	// Renew contracts
@@ -2133,36 +2181,133 @@ func TestRenterExpiredContracts(t *testing.T) {
 	if err = renewContractsByRenewWindow(r, tg); err != nil {
 		t.Fatal(err)
 	}
+	numRenewals := 1
 	// Waiting for nodes to sync
 	if err = tg.Sync(); err != nil {
 		t.Fatal(err)
 	}
 
-	// Confirm Contracts were renewed as expected, all original
-	// contracts should have been renewed if GoodForRenew = true
+	// Confirm contracts were renewed as expected, there should be no inactive
+	// contracts, there should be the same number of active and expired
+	// contracts, and the expired contracts should be the same contracts as the
+	// original active contracts.
 	err = build.Retry(600, 100*time.Millisecond, func() error {
-		rc, err = r.RenterContractsGet(true)
+		// Check active and expired contracts
+		rcActive, err = r.RenterActiveContractsGet()
 		if err != nil {
-			return errors.AddContext(err, "could not get contracts")
+			return errors.AddContext(err, "could not get active contracts")
 		}
-		// Check ExpiredContracts against recorded old contracts
-		if len(expiredContracts) != len(rc.ExpiredContracts) {
-			return errors.New(fmt.Sprintf("Number of old contracts don't match, expected %v got %v", len(expiredContracts), len(rc.ExpiredContracts)))
+		rcExpired, err = r.RenterExpiredContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get expired contracts")
 		}
-
-		// Create Maps for comparison
-		initialContractIDMap := make(map[types.FileContractID]struct{})
-		for _, c := range expiredContracts {
-			initialContractIDMap[c.ID] = struct{}{}
+		if len(rcActive.Contracts) != len(rcExpired.Contracts) {
+			return errors.New(fmt.Sprintf("Expected the same number of active and expired contracts; got %v active and %v expired", len(rcActive.Contracts), len(rcExpired.Contracts)))
 		}
-
-		for _, c := range rc.ExpiredContracts {
-			// Verify that all the contracts marked as GoodForRenew
-			// were renewed
-			if _, ok := initialContractIDMap[c.ID]; !ok {
-				return errors.New("ID from rc.ExpiredContracts not found in expiredContracts")
+		if len(originalContracts) != len(rcExpired.Contracts) {
+			return errors.New(fmt.Sprintf("Didn't get expected number of expired contracts, expected %v got %v", len(originalContracts), len(rcExpired.Contracts)))
+		}
+		for _, c := range rcExpired.Contracts {
+			if _, ok := originalContractIDMap[c.ID]; !ok {
+				return errors.New("ID from rcExpired not found in originalContracts")
 			}
 		}
+
+		// Check inactive contracts
+		rcInactive, err = r.RenterInactiveContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get inactive contracts")
+		}
+		if len(rcInactive.Contracts) != 0 {
+			return errors.New(fmt.Sprintf("Expected zero inactive contracts, got %v", len(rcInactive.Contracts)))
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Record current active and expired contracts
+	rcActive, err = r.RenterActiveContractsGet()
+	activeContacts := rcActive.Contracts
+	if err != nil {
+		t.Fatal(err)
+	}
+	activeContractIDMap := make(map[types.FileContractID]struct{})
+	for _, c := range activeContracts {
+		activeContractIDMap[c.ID] = struct{}{}
+	}
+	rcExpired, err = r.RenterExpiredContractsGet()
+	expiredContracts := rcExpired.Contracts
+	if err != nil {
+		t.Fatal(err)
+	}
+	expiredContractIDMap := make(map[types.FileContractID]struct{})
+	for _, c := range expiredContracts {
+		expiredContractIDMap[c.ID] = struct{}{}
+	}
+
+	// Renew contracts by spending
+	_, err = renewContractsBySpending(r, tg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	numRenewals++
+	// Waiting for nodes to sync
+	if err = tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Confirm contracts were renewed as expected.  Active, inactive, and
+	// expired all have the same number of contracts. Active contracts prior to
+	// renewal should now be the inactive contracts Expired contracts should not
+	// have changed.
+	err = build.Retry(600, 100*time.Millisecond, func() error {
+		rcActive, err = r.RenterActiveContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get active contracts")
+		}
+		rcInactive, err = r.RenterInactiveContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get inactive contracts")
+		}
+		rcExpired, err = r.RenterExpiredContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "could not get expired contracts")
+		}
+
+		// Check for the same number of contracts
+		if len(rcActive.Contracts) != len(rcExpired.Contracts) || len(rcActive.Contracts) != len(rcInactive.Contracts) {
+			err = fmt.Sprintf(`
+				Expected the same number of contracts, instead got:
+				Active:   %v
+				Inactive: %v
+				Expired:  %v
+				`, len(rcActive.Contracts), len(rcInactive.Contracts), len(rcExpired.Contracts))
+			return errors.New(err)
+		}
+
+		// Confirm active and inactive contracts
+		if len(activeContacts) != len(rcInactive.Contracts) {
+			return errors.New(fmt.Sprintf("Didn't get expected number of inactive contracts, expected %v got %v", len(activeContacts), len(rcInactive.Contracts)))
+		}
+		for _, c := range rcInactive.Contracts {
+			if _, ok := activeContractIDMap[c.ID]; !ok {
+				return errors.New("ID from rcInactive not found in activeContacts")
+			}
+		}
+
+		// Confirm expired contracts
+		if len(expiredContracts) != len(rcExpired.Contracts) {
+			return errors.New(fmt.Sprintf("Didn't get expected number of expired contracts, expected %v got %v", len(expiredContracts), len(rcExpired.Contracts)))
+		}
+		for _, c := range rcExpired.Contracts {
+			if _, ok := expiredContractIDMap[c.ID]; !ok {
+				return errors.New("ID from rcExpired not found in expiredContracts")
+			}
+		}
+
 		return nil
 	})
 	if err != nil {

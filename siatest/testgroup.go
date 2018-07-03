@@ -375,7 +375,7 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 			numRetries++
 			contracts := uint64(0)
 			// Get the renter's contracts.
-			rc, err := renter.RenterContractsGet(false)
+			rc, err := renter.RenterActiveContractsGet()
 			if err != nil {
 				return err
 			}
