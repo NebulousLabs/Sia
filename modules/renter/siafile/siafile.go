@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"os"
 	"sync"
 
@@ -216,8 +217,8 @@ func (sf *SiaFile) Redundancy(offlineMap map[string]bool, goodForRenewMap map[st
 		return -1
 	}
 
-	minPiecesRenew := ^uint64(0)
-	minPiecesNoRenew := ^uint64(0)
+	minRedundancy := math.MaxFloat64
+	minRedundancyNoRenew := math.MaxFloat64
 	for _, chunk := range sf.staticChunks {
 		// Loop over chunks and remember how many unique pieces of the chunk
 		// were goodForRenew and how many were not.
@@ -254,13 +255,13 @@ func (sf *SiaFile) Redundancy(offlineMap map[string]bool, goodForRenewMap map[st
 				numPiecesNoRenew++
 			}
 		}
-		// Remember the smallest number of goodForRenew pieces encountered.
-		if numPiecesRenew < minPiecesRenew {
-			minPiecesRenew = numPiecesRenew
+		redundancy := float64(numPiecesRenew) / float64(chunk.staticErasureCode.MinPieces())
+		if redundancy < minRedundancy {
+			minRedundancy = redundancy
 		}
-		// Remember the smallest number of !goodForRenew pieces encountered.
-		if numPiecesNoRenew < minPiecesNoRenew {
-			minPiecesNoRenew = numPiecesNoRenew
+		redundancyNoRenew := float64(numPiecesNoRenew) / float64(chunk.staticErasureCode.MinPieces())
+		if redundancyNoRenew < minRedundancyNoRenew {
+			minRedundancyNoRenew = redundancyNoRenew
 		}
 	}
 
@@ -269,12 +270,10 @@ func (sf *SiaFile) Redundancy(offlineMap map[string]bool, goodForRenewMap map[st
 	// a better user experience. If the renter operates correctly, redundancy
 	// should never go above numPieces / minPieces and redundancyNoRenew should
 	// never go below 1.
-	redundancy := float64(minPiecesRenew) / float64(sf.staticChunks[0].staticErasureCode.MinPieces())          // TODO this shouldn't be chunks[0]
-	redundancyNoRenew := float64(minPiecesNoRenew) / float64(sf.staticChunks[0].staticErasureCode.MinPieces()) //TODO this shouldn't be chunks[0]
-	if redundancy < 1 {
-		return redundancyNoRenew
+	if minRedundancy < 1 {
+		return minRedundancyNoRenew
 	}
-	return redundancy
+	return minRedundancy
 }
 
 // UID returns a unique identifier for this file.
