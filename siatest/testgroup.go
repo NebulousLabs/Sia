@@ -406,7 +406,7 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 }
 
 // AddNodeN adds n nodes of a given template to the group.
-func (tg *TestGroup) AddNodeN(np node.NodeParams, n int) error {
+func (tg *TestGroup) AddNodeN(np node.NodeParams, n int) ([]*TestNode, error) {
 	nps := make([]node.NodeParams, n)
 	for i := 0; i < n; i++ {
 		nps[i] = np
@@ -415,7 +415,7 @@ func (tg *TestGroup) AddNodeN(np node.NodeParams, n int) error {
 }
 
 // AddNodes creates a node and adds it to the group.
-func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
+func (tg *TestGroup) AddNodes(nps ...node.NodeParams) ([]*TestNode, error) {
 	newNodes := make(map[*TestNode]struct{})
 	newHosts := make(map[*TestNode]struct{})
 	newRenters := make(map[*TestNode]struct{})
@@ -426,7 +426,7 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 		}
 		node, err := NewCleanNode(np)
 		if err != nil {
-			return build.ExtendErr("failed to create host", err)
+			return mapToSlice(newNodes), build.ExtendErr("failed to create host", err)
 		}
 		// Add node to nodes
 		tg.nodes[node] = struct{}{}
@@ -447,7 +447,7 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 		newNodes[node] = struct{}{}
 	}
 
-	return tg.setupNodes(newHosts, newNodes, newRenters)
+	return mapToSlice(newNodes), tg.setupNodes(newHosts, newNodes, newRenters)
 }
 
 // setupNodes does the set up required for creating a test group
