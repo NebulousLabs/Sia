@@ -25,6 +25,7 @@ Index
 | [/renter](#renter-post)                                                         | POST      |
 | [/renter/contracts](#rentercontracts-get)                                       | GET       |
 | [/renter/downloads](#renterdownloads-get)                                       | GET       |
+| [/renter/downloads/clear](#renterdownloadsclear-post)                           | POST      |
 | [/renter/files](#renterfiles-get)                                               | GET       |
 | [/renter/file/*___siapath___](#renterfile___siapath___-get)                     | GET       |
 | [/renter/prices](#renter-prices-get)                                            | GET       |
@@ -274,10 +275,28 @@ lists all files in the download queue.
       // will eventually include data transferred during contract + payment
       // negotiation, as well as data from failed piece downloads.
       "totaldatatransfered": 10321,
-    }   
+    }
   ]
 }
 ```
+#### /renter/downloads/clear [POST]
+
+Clears the download history of the renter for a range of unix time stamps.  Both
+parameters are optional, if no parameters are provided, the entire download
+history will be cleared.  To clear a single download, provide the timestamp for
+the download as both parameters.  Providing only the before parameter will clear
+all downloads older than the timestamp.  Conversely, providing only the after
+parameter will clear all downloads newer than the timestamp.
+
+###### Timestamp Parameters [(with comments)]
+```
+before  // Optional - unix timestamp found in the download history
+after   // Optional - unix timestamp found in the download history
+```
+
+###### Response
+standard success or error response. See
+[API.md#standard-responses](/doc/API.md#standard-responses).
 
 #### /renter/files [GET]
 

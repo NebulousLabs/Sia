@@ -8,6 +8,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 const (
@@ -118,7 +119,7 @@ func (b Block) ID() BlockID {
 func (b Block) MerkleRoot() crypto.Hash {
 	tree := crypto.NewTree()
 	var buf bytes.Buffer
-	e := encoder(&buf)
+	e := encoding.NewEncoder(&buf)
 	for _, payout := range b.MinerPayouts {
 		payout.MarshalSia(e)
 		tree.Push(buf.Bytes())

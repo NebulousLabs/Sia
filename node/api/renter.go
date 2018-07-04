@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -164,6 +164,7 @@ type (
 		Error                string    `json:"error"`                // Will be the empty string unless there was an error.
 		Received             uint64    `json:"received"`             // Amount of data confirmed and decoded.
 		StartTime            time.Time `json:"starttime"`            // The time when the download was started.
+		StartTimeUnix        int64     `json:"starttimeunix"`        // The time when the download was started in unix format.
 		TotalDataTransferred uint64    `json:"totaldatatransferred"` // The total amount of data transferred, including negotiation, overdrive etc.
 	}
 )
@@ -362,6 +363,36 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 	})
 }
 
+// renterClearDownloadsHandler handles the API call to request to clear the download queue.
+func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var afterTime time.Time
+	beforeTime := types.EndOfTime
+	beforeStr, afterStr := req.FormValue("before"), req.FormValue("after")
+	if beforeStr != "" {
+		beforeInt, err := strconv.ParseInt(beforeStr, 10, 64)
+		if err != nil {
+			WriteError(w, Error{"parsing integer value for parameter `before` failed: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		beforeTime = time.Unix(0, beforeInt)
+	}
+	if afterStr != "" {
+		afterInt, err := strconv.ParseInt(afterStr, 10, 64)
+		if err != nil {
+			WriteError(w, Error{"parsing integer value for parameter `after` failed: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		afterTime = time.Unix(0, afterInt)
+	}
+
+	err := api.renter.ClearDownloadHistory(afterTime, beforeTime)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteSuccess(w)
+}
+
 // renterDownloadsHandler handles the API call to request the download queue.
 func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	var downloads []DownloadInfo
@@ -379,11 +410,10 @@ func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _
 			Error:                di.Error,
 			Received:             di.Received,
 			StartTime:            di.StartTime,
+			StartTimeUnix:        di.StartTimeUnix,
 			TotalDataTransferred: di.TotalDataTransferred,
 		})
 	}
-	// sort the downloads by newest first
-	sort.Slice(downloads, func(i, j int) bool { return downloads[i].StartTime.After(downloads[j].StartTime) })
 	WriteJSON(w, RenterDownloadQueue{
 		Downloads: downloads,
 	})
