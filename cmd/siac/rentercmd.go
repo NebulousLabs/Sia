@@ -9,6 +9,11 @@ package main
 // you want is earlier instead of later in the queue, but it's still overhead
 // that we should replace by using an API endpoint that allows you to ask for
 // the desired download immediately instead of having to search through a list.
+//
+// The desired download should be specified by a unique ID instead of by a path,
+// since a download to the same path can appear multiple times in the download
+// history. This will need to be a new return value of the download call in the
+// API.
 
 // TODO: Currently the download command always displays speeds in terms of Mbps.
 // This should probably be switched to some sort of human readable bandwidth
