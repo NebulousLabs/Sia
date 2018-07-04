@@ -335,9 +335,9 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 			TotalCost:                 c.TotalCost,
 			UploadSpending:            c.UploadSpending,
 		}
-		if active && goodForRenew && goodForUpload && c.StartHeight >= currentPeriod {
+		if active && goodForRenew && goodForUpload && c.EndHeight > currentPeriod {
 			contracts = append(contracts, contract)
-		} else if inactive && (!goodForRenew || !goodForUpload) && c.StartHeight >= currentPeriod {
+		} else if inactive && (!goodForRenew || !goodForUpload) && c.EndHeight > currentPeriod {
 			contracts = append(contracts, contract)
 		} else if all {
 			contracts = append(contracts, contract)
@@ -385,9 +385,9 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 				TotalCost:                 c.TotalCost,
 				UploadSpending:            c.UploadSpending,
 			}
-			if expired && c.EndHeight <= currentPeriod {
+			if expired && (c.EndHeight <= currentPeriod || currentPeriod == 0) {
 				contracts = append(contracts, contract)
-			} else if inactive && (!goodForRenew || !goodForUpload) && c.StartHeight >= currentPeriod {
+			} else if inactive && c.EndHeight > currentPeriod {
 				contracts = append(contracts, contract)
 			} else if all {
 				contracts = append(contracts, contract)
