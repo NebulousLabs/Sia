@@ -3,7 +3,6 @@ package siatest
 import (
 	"os"
 	"path/filepath"
-	"testing"
 )
 
 var (
@@ -26,8 +25,8 @@ func TestDir(dirs ...string) string {
 
 // siatestTestDir creates a testing directory for tests within the siatest
 // module.
-func siatestTestDir(t *testing.T) string {
-	path := TestDir("siatest", t.Name())
+func siatestTestDir(testName string) string {
+	path := TestDir("siatest", testName)
 	if err := os.MkdirAll(path, 0777); err != nil {
 		panic(err)
 	}
