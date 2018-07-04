@@ -44,14 +44,13 @@ func TestIntegrationTransactions(t *testing.T) {
 	if len(txns) != int(types.MaturityDelay+1) {
 		t.Error("unexpected transaction history length")
 	}
-	// Two transactions added to unconfirmed pool - 1 to fund the exact output,
-	// and 1 to hold the exact output.
+	// One transaction added to unconfirmed pool,
 	utxns, err := wt.wallet.UnconfirmedTransactions()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(utxns) != 2 {
-		t.Error("was expecting 4 unconfirmed transactions")
+	if len(utxns) != 1 {
+		t.Error("was expecting 3 unconfirmed transactions")
 	}
 
 	b, _ := wt.miner.FindBlock()
@@ -59,14 +58,14 @@ func TestIntegrationTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A confirmed transaction was added for the miner payout, and the 2
-	// transactions that were previously unconfirmed.
+	// A confirmed transaction was added for the miner payout, and the 1
+	// transaction that was previously unconfirmed.
 	txns, err = wt.wallet.Transactions(0, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(txns) != int(types.MaturityDelay+2+2) {
-		t.Errorf("unexpected transaction history length: expected %v, got %v", types.MaturityDelay+2+2, len(txns))
+	if len(txns) != int(types.MaturityDelay+2+1) {
+		t.Errorf("unexpected transaction history length: expected %v, got %v", types.MaturityDelay+2+1, len(txns))
 	}
 
 	// Try getting a partial history for just the previous block.
@@ -74,10 +73,10 @@ func TestIntegrationTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The partial should include one transaction for a block, and 2 for the
+	// The partial should include one transaction for a block, and 1 for the
 	// send that occurred.
-	if len(txns) != 3 {
-		t.Errorf("unexpected transaction history length: expected %v, got %v", 3, len(txns))
+	if len(txns) != 2 {
+		t.Errorf("unexpected transaction history length: expected %v, got %v", 2, len(txns))
 	}
 }
 
@@ -168,22 +167,28 @@ func TestIntegrationTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// sendTxns[0] is the set-up transaction, sendTxns[1] contains the sentValue output
-	txn, exists, err := wt.wallet.Transaction(sendTxns[1].ID())
+	// figure out what our miner is going to be
+	_, tpoolFee := wt.wallet.tpool.FeeEstimation()
+	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
+
+	// sendTxns[0] contains the sentValue output
+	txn, exists, err := wt.wallet.Transaction(sendTxns[0].ID())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !exists {
 		t.Fatal("unable to query transaction")
 	}
-	if txn.TransactionID != sendTxns[1].ID() {
+	if txn.TransactionID != sendTxns[0].ID() {
 		t.Error("wrong transaction was fetched")
-	} else if len(txn.Inputs) != 1 || len(txn.Outputs) != 2 {
-		t.Error("expected 1 input and 2 outputs, got", len(txn.Inputs), len(txn.Outputs))
+	} else if len(txn.Inputs) != 1 || len(txn.Outputs) != 3 {
+		t.Error("expected 1 input and 3 outputs, got", len(txn.Inputs), len(txn.Outputs))
 	} else if !txn.Outputs[0].Value.Equals(sentValue) {
 		t.Errorf("expected first output to equal %v, got %v", sentValue, txn.Outputs[0].Value)
-	} else if exp := txn.Inputs[0].Value.Sub(sentValue); !txn.Outputs[1].Value.Equals(exp) {
-		t.Errorf("expected first output to equal %v, got %v", exp, txn.Outputs[1].Value)
+	} else if exp := txn.Inputs[0].Value.Sub(sentValue).Sub(tpoolFee); !txn.Outputs[1].Value.Equals(exp) {
+		t.Errorf("expected second output to equal %v, got %v", exp, txn.Outputs[1].Value)
+	} else if !txn.Outputs[2].Value.Equals(tpoolFee) {
+		t.Errorf("expected third output to equal %v, got %v", tpoolFee, txn.Outputs[2].Value)
 	}
 
 	// test sending siafunds

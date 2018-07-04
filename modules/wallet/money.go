@@ -138,13 +138,11 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 			txnBuilder.Drop()
 		}
 	}()
-	err = txnBuilder.FundSiacoins(amount.Add(tpoolFee))
+	err = txnBuilder.FundSiacoinsForOutputs([]types.SiacoinOutput{output}, tpoolFee)
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
 		return nil, build.ExtendErr("unable to fund transaction", err)
 	}
-	txnBuilder.AddMinerFee(tpoolFee)
-	txnBuilder.AddSiacoinOutput(output)
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
