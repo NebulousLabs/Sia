@@ -569,7 +569,7 @@ func renterfilesdownloadcmd(path, destination string) {
 	}
 
 	// If the download is blocking, display progress as the file downloads.
-	err = downloadprogress(path)
+	err = downloadprogress(path, destination)
 	if err != nil {
 		die("\nDownload could not be completed:", err)
 	}
@@ -578,10 +578,8 @@ func renterfilesdownloadcmd(path, destination string) {
 
 // downloadprogress will display the progress of the provided download to the
 // user, and return an error when the download is finished.
-func downloadprogress(siapath string) error {
-	// If the download does not appear after a long time, give up.
-	var tryTime time.Duration
-
+func downloadprogress(siapath, destination string) error {
+	start := time.Now()
 	for range time.Tick(OutputRefreshRate) {
 		// Get the list of downloads.
 		queue, err := httpClient.RenterDownloadsGet()
@@ -593,7 +591,7 @@ func downloadprogress(siapath string) error {
 		var d api.DownloadInfo
 		found := false
 		for _, d = range queue.Downloads {
-			if d.SiaPath == siapath {
+			if d.SiaPath == siapath && d.Destination == destination {
 				found = true
 				break
 			}
@@ -601,8 +599,7 @@ func downloadprogress(siapath string) error {
 		// If the download has not appeared in the queue yet, either continue or
 		// give up.
 		if !found {
-			tryTime += OutputRefreshRate
-			if tryTime > time.Minute {
+			if time.Since(start) > RenterDownloadTimeout {
 				return errors.New("Unable to find download in queue")
 			}
 			continue
