@@ -120,7 +120,7 @@ func (tn *TestNode) DownloadInfo(lf *LocalFile, rf *RemoteFile) (*api.DownloadIn
 	}
 	// Received data can't be larger than transferred data
 	if di.Received > di.TotalDataTransferred {
-		err = errors.AddContext(err, "received > TotalDataTransfered")
+		err = errors.AddContext(err, "received > TotalDataTransferred")
 	}
 	// If the download is completed, the amount of received data has to equal
 	// the amount of requested data.

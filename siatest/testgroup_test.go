@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/node"
 )
 
 // TestCreateTestGroup tests the behavior of NewGroup.
@@ -97,4 +98,49 @@ func TestNewGroupNoRenterHost(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+}
+
+// TestAddNewNode tests that the added node is returned when AddNodes is called
+func TestAddNewNode(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a group
+	groupParams := GroupParams{
+		Renters: 2,
+		Miners:  1,
+	}
+	tg, err := NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Record current nodes
+	oldRenters := tg.Renters()
+
+	// Test adding a node
+	testDir, err := TestDir(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	renterTemplate := node.Renter(testDir + "/renter")
+	nodes, err := tg.AddNodes(renterTemplate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 1 {
+		t.Fatalf("More nodes returned than expected; expected 1 got %v", len(nodes))
+	}
+	renter := nodes[0]
+	for _, oldRenter := range oldRenters {
+		if oldRenter.primarySeed == renter.primarySeed {
+			t.Fatal("Returned renter is not the new renter")
+		}
+	}
 }

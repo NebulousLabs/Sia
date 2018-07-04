@@ -15,8 +15,10 @@ var (
 	// Flags.
 	hostContractOutputType string // output type for host contracts
 	hostVerbose            bool   // display additional host info
-	initForce              bool   // destroy and reencrypt the wallet on init if it already exists
+	initForce              bool   // destroy and re-encrypt the wallet on init if it already exists
 	initPassword           bool   // supply a custom password when creating a wallet
+	renterAllContracts     bool   // Show all active and expired contracts
+	renterDownloadAsync    bool   // Downloads files asynchronously
 	renterListVerbose      bool   // Show additional info about uploaded files.
 	renterShowHistory      bool   // Show download history in addition to download queue.
 )
@@ -124,7 +126,9 @@ func main() {
 	renterAllowanceCmd.AddCommand(renterAllowanceCancelCmd)
 
 	renterCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
+	renterContractsCmd.Flags().BoolVarP(&renterAllContracts, "all", "A", false, "Show all expired contracts in addition to active contracts")
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
+	renterFilesDownloadCmd.Flags().BoolVarP(&renterDownloadAsync, "async", "A", false, "Download file asynchronously")
 	renterFilesListCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 	renterExportCmd.AddCommand(renterExportContractTxnsCmd)
 
@@ -136,15 +140,17 @@ func main() {
 	root.AddCommand(bashcomplCmd)
 	root.AddCommand(mangenCmd)
 
+	// initialize client
+	root.PersistentFlags().StringVarP(&httpClient.Address, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
+	root.PersistentFlags().StringVarP(&httpClient.Password, "apipassword", "", "", "the password for the API's http authentication")
+	root.PersistentFlags().StringVarP(&httpClient.UserAgent, "useragent", "", "Sia-Agent", "the useragent used by siac to connect to the daemon's API")
+
 	// Check if the api password environment variable is set.
 	apiPassword := os.Getenv("SIA_API_PASSWORD")
 	if apiPassword != "" {
+		httpClient.Password = apiPassword
 		fmt.Println("Using SIA_API_PASSWORD environment variable")
 	}
-	// initialize client
-	root.PersistentFlags().StringVarP(&httpClient.Address, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
-	root.PersistentFlags().StringVarP(&httpClient.Password, "apipassword", "", apiPassword, "the password for the API's http authentication")
-	root.PersistentFlags().StringVarP(&httpClient.UserAgent, "useragent", "", "Sia-Agent", "the useragent used by siac to connect to the daemon's API")
 
 	// run
 	if err := root.Execute(); err != nil {

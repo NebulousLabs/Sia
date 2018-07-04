@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node/api"
@@ -40,6 +41,41 @@ func (c *Client) RenterDownloadFullGet(siaPath, destination string, async bool) 
 	query := fmt.Sprintf("%s?destination=%s&httpresp=false&async=%v",
 		siaPath, destination, async)
 	err = c.get("/renter/download/"+query, nil)
+	return
+}
+
+// RenterClearAllDownloadsPost requests the /renter/downloads/clear resource
+// with no parameters
+func (c *Client) RenterClearAllDownloadsPost() (err error) {
+	err = c.post("/renter/downloads/clear", "", nil)
+	return
+}
+
+// RenterClearDownloadsAfterPost requests the /renter/downloads/clear resource
+// with only the after timestamp provided
+func (c *Client) RenterClearDownloadsAfterPost(after time.Time) (err error) {
+	values := url.Values{}
+	values.Set("after", strconv.FormatInt(after.UnixNano(), 10))
+	err = c.post("/renter/downloads/clear", values.Encode(), nil)
+	return
+}
+
+// RenterClearDownloadsBeforePost requests the /renter/downloads/clear resource
+// with only the before timestamp provided
+func (c *Client) RenterClearDownloadsBeforePost(before time.Time) (err error) {
+	values := url.Values{}
+	values.Set("before", strconv.FormatInt(before.UnixNano(), 10))
+	err = c.post("/renter/downloads/clear", values.Encode(), nil)
+	return
+}
+
+// RenterClearDownloadsRangePost requests the /renter/downloads/clear resource
+// with both before and after timestamps provided
+func (c *Client) RenterClearDownloadsRangePost(after, before time.Time) (err error) {
+	values := url.Values{}
+	values.Set("before", strconv.FormatInt(before.UnixNano(), 10))
+	values.Set("after", strconv.FormatInt(after.UnixNano(), 10))
+	err = c.post("/renter/downloads/clear", values.Encode(), nil)
 	return
 }
 

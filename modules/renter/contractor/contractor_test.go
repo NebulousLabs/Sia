@@ -2,9 +2,7 @@ package contractor
 
 import (
 	"errors"
-	"fmt"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -114,69 +112,6 @@ func (stubHostDB) PublicKey() (spk types.SiaPublicKey)                          
 func (stubHostDB) RandomHosts(int, []types.SiaPublicKey) (hs []modules.HostDBEntry, _ error) { return }
 func (stubHostDB) ScoreBreakdown(modules.HostDBEntry) modules.HostScoreBreakdown {
 	return modules.HostScoreBreakdown{}
-}
-
-// TestAllowancePeriodTracking verifies that the contractor tracks its current
-// period correctly as renewals occur.
-func TestAllowancePeriodTracking(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	_, c, m, err := newTestingTrio(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// set an allowance
-	c.mu.Lock()
-	initialHeight := c.blockHeight
-	c.mu.Unlock()
-	testAllowance := modules.Allowance{
-		Funds:       types.SiacoinPrecision.Mul64(5000),
-		RenewWindow: 10,
-		Hosts:       1,
-		Period:      20,
-	}
-	err = c.SetAllowance(testAllowance)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = build.Retry(50, 100*time.Millisecond, func() error {
-		if len(c.Contracts()) != 1 {
-			return errors.New("allowance forming seems to have failed")
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err)
-	}
-	if c.CurrentPeriod() != initialHeight {
-		t.Fatal("expected current period to start at", initialHeight, "got", c.CurrentPeriod())
-	}
-	// mine until one before the renew window, current period should stay
-	// constant
-	for i := types.BlockHeight(0); i < testAllowance.RenewWindow-1; i++ {
-		_, err = m.AddBlock()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	if c.CurrentPeriod() != initialHeight {
-		t.Fatal("current period should not have incremented, wanted", initialHeight, "got", c.CurrentPeriod())
-	}
-	// mine another another block. current period should increment.
-	_, err = m.AddBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.mu.Lock()
-	height := c.blockHeight
-	c.mu.Unlock()
-	if c.CurrentPeriod() != height {
-		t.Fatal("unexpected period", c.CurrentPeriod(), "wanted", height)
-	}
 }
 
 // TestAllowanceSpending verifies that the contractor will not spend more or
@@ -318,35 +253,6 @@ func TestAllowanceSpending(t *testing.T) {
 	if expectedFees.Cmp(reportedSpending.ContractFees) != 0 {
 		t.Fatalf("expected %v reported fees but was %v",
 			expectedFees.HumanString(), reportedSpending.ContractFees.HumanString())
-	}
-
-	// enter a new period. PeriodSpending should reset.
-	c.mu.Lock()
-	renewHeight := c.blockHeight + c.allowance.RenewWindow
-	blocksToMine := renewHeight - c.blockHeight
-	c.mu.Unlock()
-	for i := types.BlockHeight(0); i < blocksToMine; i++ {
-		_, err = m.AddBlock()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Retry to give the threadedMaintenance some time to finish
-	var newReportedSpending modules.ContractorSpending
-	err = build.Retry(100, 100*time.Millisecond, func() error {
-		newReportedSpending = c.PeriodSpending()
-		if reflect.DeepEqual(newReportedSpending, reportedSpending) {
-			return errors.New("reported spending was identical after entering a renew period")
-		}
-		if newReportedSpending.Unspent.Cmp(reportedSpending.Unspent) <= 0 {
-			return fmt.Errorf("expected newReportedSpending to have more unspent: %v <= %v",
-				newReportedSpending.Unspent.HumanString(), reportedSpending.Unspent.HumanString())
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 

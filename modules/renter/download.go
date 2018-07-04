@@ -133,6 +133,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/errors"
 )
@@ -476,8 +477,8 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 }
 
 // DownloadHistory returns the list of downloads that have been performed. Will
-// include downloads that have not yet completed. Downloads will be roughly, but
-// not precisely, sorted according to start time.
+// include downloads that have not yet completed. Downloads will be roughly,
+// but not precisely, sorted according to start time.
 //
 // TODO: Currently the DownloadHistory only contains downloads from this
 // session, does not contain downloads that were executed for the purposes of
@@ -505,6 +506,7 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 			EndTime:              d.endTime,
 			Received:             atomic.LoadUint64(&d.atomicDataReceived),
 			StartTime:            d.staticStartTime,
+			StartTimeUnix:        d.staticStartTime.UnixNano(),
 			TotalDataTransferred: atomic.LoadUint64(&d.atomicTotalDataTransferred),
 		}
 		// Release download lock before calling d.Err(), which will acquire the
@@ -518,4 +520,48 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 		}
 	}
 	return downloads
+}
+
+// ClearDownloadHistory clears the renter's download history inclusive of the
+// provided before and after timestamps
+//
+// TODO: This function can be improved by implementing a binary search, the
+// trick will be making the binary search be just as readable while handling
+// all the edge cases
+func (r *Renter) ClearDownloadHistory(after, before time.Time) error {
+	if err := r.tg.Add(); err != nil {
+		return err
+	}
+	defer r.tg.Done()
+	r.downloadHistoryMu.Lock()
+	defer r.downloadHistoryMu.Unlock()
+
+	// Check to confirm there are downloads to clear
+	if len(r.downloadHistory) == 0 {
+		return nil
+	}
+
+	// Timestamp validation
+	if before.Before(after) {
+		return errors.New("before timestamp can not be newer then after timestamp")
+	}
+
+	// Clear download history if both before and after timestamps are zero values
+	if before.Equal(types.EndOfTime) && after.IsZero() {
+		r.downloadHistory = r.downloadHistory[:0]
+		return nil
+	}
+
+	// Find and return downloads that are not within the given range
+	withinTimespan := func(t time.Time) bool {
+		return (t.After(after) || t.Equal(after)) && (t.Before(before) || t.Equal(before))
+	}
+	filtered := r.downloadHistory[:0]
+	for _, d := range r.downloadHistory {
+		if !withinTimespan(d.staticStartTime) {
+			filtered = append(filtered, d)
+		}
+	}
+	r.downloadHistory = filtered
+	return nil
 }

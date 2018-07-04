@@ -110,8 +110,11 @@ type hostContractor interface {
 	// Close closes the hostContractor.
 	Close() error
 
-	// Contracts returns the contracts formed by the contractor.
+	// Contracts returns the active contracts formed by the contractor.
 	Contracts() []modules.RenterContract
+
+	// Contracts returns the old contracts formed by the contractor.
+	OldContracts() []modules.RenterContract
 
 	// ContractByPublicKey returns the contract associated with the host key.
 	ContractByPublicKey(types.SiaPublicKey) (modules.RenterContract, bool)
@@ -186,7 +189,7 @@ type Renter struct {
 	// accessed in isolation.
 	//
 	// TODO: Currently the download history doesn't include repair-initiated
-	// downloads, and instead only contains user-initiated downlods.
+	// downloads, and instead only contains user-initiated downloads.
 	downloadHistory   []*download
 	downloadHistoryMu sync.Mutex
 
@@ -303,7 +306,7 @@ func (r *Renter) setBandwidthLimits(downloadSpeed int64, uploadSpeed int64) erro
 		return errors.New("download/upload rate limit can't be below 0")
 	}
 
-	// Check for sentinal "no limits" value.
+	// Check for sentinel "no limits" value.
 	if downloadSpeed == 0 && uploadSpeed == 0 {
 		r.hostContractor.SetRateLimits(0, 0, 0)
 	} else {
@@ -321,7 +324,7 @@ func (r *Renter) setBandwidthLimits(downloadSpeed int64, uploadSpeed int64) erro
 // (like the allowance) to succeed, but then if the bandwidth limits for example
 // are bad, then the allowance will update but the bandwidth will not update.
 func (r *Renter) SetSettings(s modules.RenterSettings) error {
-	// Early input valudation.
+	// Early input validation.
 	if s.MaxDownloadSpeed < 0 || s.MaxUploadSpeed < 0 {
 		return errors.New("bandwidth limits cannot be negative")
 	}
@@ -385,8 +388,11 @@ func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreak
 	return r.hostDB.EstimateHostScore(e)
 }
 
-// Contracts returns an array of host contractor's contracts
+// Contracts returns an array of host contractor's active contracts
 func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
+
+// OldContracts returns an array of host contractor's old contracts
+func (r *Renter) OldContracts() []modules.RenterContract { return r.hostContractor.OldContracts() }
 
 // CurrentPeriod returns the host contractor's current period
 func (r *Renter) CurrentPeriod() types.BlockHeight { return r.hostContractor.CurrentPeriod() }
@@ -504,10 +510,10 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 		return nil, err
 	}
 
-	// Set the bandwidth limits, sincce the contractor doesn't persist them.
+	// Set the bandwidth limits, since the contractor doesn't persist them.
 	//
 	// TODO: Reconsider the way that the bandwidth limits are allocated to the
-	// renter module, becaause really it seems they only impact the contractor.
+	// renter module, because really it seems they only impact the contractor.
 	// The renter itself doesn't actually do any uploading or downloading.
 	err := r.setBandwidthLimits(r.persist.MaxDownloadSpeed, r.persist.MaxUploadSpeed)
 	if err != nil {
