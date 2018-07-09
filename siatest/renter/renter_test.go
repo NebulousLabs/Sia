@@ -925,7 +925,7 @@ func TestRenewFailing(t *testing.T) {
 	renter := tg.Renters()[0]
 
 	// All the contracts of the renter should be goodForRenew.
-	rcg, err := renter.RenterActiveContractsGet()
+	rcg, err := renter.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -979,7 +979,7 @@ func TestRenewFailing(t *testing.T) {
 	}
 
 	// contracts should still be goodForRenew.
-	rcg, err = renter.RenterActiveContractsGet()
+	rcg, err = renter.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -998,17 +998,30 @@ func TestRenewFailing(t *testing.T) {
 
 	// We should be within the second half of the renew window now. We keep
 	// mining blocks until the host with the locked wallet has been replaced.
-	// This should happen before we reach the endHeight of the contracts.
+	// This should happen before we reach the endHeight of the contracts. This
+	// means we should have 2 active contracts and 2 inactive contracts.  One of
+	// the inactive contracts will be !goodForRenew due to the host
 	replaced := false
 	err = build.Retry(int(rcg.Contracts[0].EndHeight-blockHeight), 5*time.Second, func() error {
 		// contract should be !goodForRenew now.
-		rcg, err = renter.RenterActiveContractsGet()
+		rcActive, err := renter.RenterActiveContractsGet()
 		if err != nil {
 			t.Fatal(err)
 		}
+		rcInactive, err := renter.RenterInactiveContractsGet()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rcActive.Contracts) != 2 {
+			return fmt.Errorf("Expected 2 active contracts, got %v", len(rcActive.Contracts))
+		}
+		if len(rcInactive.Contracts) != 2 {
+			return fmt.Errorf("Expected 2 inactive contracts, got %v", len(rcInactive.Contracts))
+		}
+
 		notGoodForRenew := 0
 		goodForRenew := 0
-		for _, c := range rcg.Contracts {
+		for _, c := range rcInactive.Contracts {
 			if !c.GoodForRenew {
 				notGoodForRenew++
 			} else {
@@ -1019,7 +1032,7 @@ func TestRenewFailing(t *testing.T) {
 			return err
 		}
 		if !replaced && notGoodForRenew != 1 && goodForRenew != 1 {
-			return fmt.Errorf("there should be exactly 1 contract that is !goodForRenew but was %v",
+			return fmt.Errorf("there should be exactly 1 inactive contract that is !goodForRenew but was %v",
 				notGoodForRenew)
 		}
 		replaced = true

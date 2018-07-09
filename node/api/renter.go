@@ -387,7 +387,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 			}
 			if expired && (c.EndHeight <= currentPeriod || currentPeriod == 0) {
 				contracts = append(contracts, contract)
-			} else if inactive && c.EndHeight > currentPeriod {
+			} else if inactive && c.EndHeight > currentPeriod && currentPeriod != 0 {
 				contracts = append(contracts, contract)
 			} else if all {
 				contracts = append(contracts, contract)
