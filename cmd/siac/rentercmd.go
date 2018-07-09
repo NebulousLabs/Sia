@@ -1,5 +1,28 @@
 package main
 
+// TODO: If you run siac from a non-existant directory, the abs() function does
+// not handle this very gracefully.
+
+// TODO: Currently the download command will, every iteration, go through every
+// single download in the download queue until it finds the right one. This
+// doesn't end up hurting too much because it's very likely that the download
+// you want is earlier instead of later in the queue, but it's still overhead
+// that we should replace by using an API endpoint that allows you to ask for
+// the desired download immediately instead of having to search through a list.
+//
+// The desired download should be specified by a unique ID instead of by a path,
+// since a download to the same path can appear multiple times in the download
+// history. This will need to be a new return value of the download call in the
+// API.
+
+// TODO: Currently the download command always displays speeds in terms of Mbps.
+// This should probably be switched to some sort of human readable bandwidth
+// display, so that it adjusts units as appropriate.
+
+// TODO: Currently, the download command displays speed based on the total
+// download time of the file, instead of using a rolling average over the last
+// few minutes. We should change the download speed to use a rolling average.
+
 import (
 	"fmt"
 	"os"
@@ -10,6 +33,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/NebulousLabs/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -584,48 +608,76 @@ func renterfilesdeletecmd(path string) {
 // Downloads a path from the Sia network to the local specified destination.
 func renterfilesdownloadcmd(path, destination string) {
 	destination = abs(destination)
-	var err error
-	done := make(chan struct{})
-	go func() {
-		err = httpClient.RenterDownloadFullGet(path, destination, renterDownloadAsync)
-		close(done)
-	}()
-	downloadprogress(done, path)
+
+	// Queue the download. An error will be returned if the queueing failed, but
+	// the call will return before the download has completed. The call is made
+	// as an async call.
+	err := httpClient.RenterDownloadFullGet(path, destination, true)
 	if err != nil {
-		die("Could not download file:", err)
+		die("Download could not be started:", err)
+	}
+
+	// If the download is async, report success.
+	if renterDownloadAsync {
+		fmt.Printf("Queued Download '%s' to %s.\n", path, abs(destination))
+		return
+	}
+
+	// If the download is blocking, display progress as the file downloads.
+	err = downloadprogress(path, destination)
+	if err != nil {
+		die("\nDownload could not be completed:", err)
 	}
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
 }
 
-func downloadprogress(done chan struct{}, siapath string) {
-	time.Sleep(time.Second) // give download time to initialize
-	for {
-		select {
-		case <-done:
-			return
-
-		case <-time.Tick(time.Second):
-			// get download progress of file
-			queue, err := httpClient.RenterDownloadsGet()
-			if err != nil {
-				continue // benign
-			}
-			var d api.DownloadInfo
-			for _, d = range queue.Downloads {
-				if d.SiaPath == siapath {
-					break
-				}
-			}
-			if d.Filesize == 0 {
-				continue // file hasn't appeared in queue yet
-			}
-			pct := 100 * float64(d.Received) / float64(d.Filesize)
-			elapsed := time.Since(d.StartTime)
-			elapsed -= elapsed % time.Second // round to nearest second
-			mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
-			fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
+// downloadprogress will display the progress of the provided download to the
+// user, and return an error when the download is finished.
+func downloadprogress(siapath, destination string) error {
+	start := time.Now()
+	for range time.Tick(OutputRefreshRate) {
+		// Get the list of downloads.
+		queue, err := httpClient.RenterDownloadsGet()
+		if err != nil {
+			continue // benign
 		}
+
+		// Search for the download in the list of downloads.
+		var d api.DownloadInfo
+		found := false
+		for _, d = range queue.Downloads {
+			if d.SiaPath == siapath && d.Destination == destination {
+				found = true
+				break
+			}
+		}
+		// If the download has not appeared in the queue yet, either continue or
+		// give up.
+		if !found {
+			if time.Since(start) > RenterDownloadTimeout {
+				return errors.New("Unable to find download in queue")
+			}
+			continue
+		}
+
+		// Check whether the file has completed or otherwise errored out.
+		if d.Error != "" {
+			return errors.New(d.Error)
+		}
+		if d.Completed {
+			return nil
+		}
+
+		// Update the progress for the user.
+		pct := 100 * float64(d.Received) / float64(d.Filesize)
+		elapsed := time.Since(d.StartTime)
+		elapsed -= elapsed % time.Second // round to nearest second
+		mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
+		fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
 	}
+
+	// This code is unreachable, but the complier requires this to be here.
+	return errors.New("ERROR: download progress reached code that should not be reachable.")
 }
 
 // bySiaPath implements sort.Interface for [] modules.FileInfo based on the

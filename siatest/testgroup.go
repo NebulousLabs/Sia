@@ -419,6 +419,7 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) ([]*TestNode, error) {
 	newNodes := make(map[*TestNode]struct{})
 	newHosts := make(map[*TestNode]struct{})
 	newRenters := make(map[*TestNode]struct{})
+	newMiners := make(map[*TestNode]struct{})
 	for _, np := range nps {
 		// Create the nodes and add them to the group.
 		if np.Dir == "" {
@@ -430,6 +431,7 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) ([]*TestNode, error) {
 		}
 		// Add node to nodes
 		tg.nodes[node] = struct{}{}
+		newNodes[node] = struct{}{}
 		// Add node to hosts
 		if np.Host != nil || np.CreateHost {
 			tg.hosts[node] = struct{}{}
@@ -443,8 +445,8 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) ([]*TestNode, error) {
 		// Add node to miners
 		if np.Miner != nil || np.CreateMiner {
 			tg.miners[node] = struct{}{}
+			newMiners[node] = struct{}{}
 		}
-		newNodes[node] = struct{}{}
 	}
 
 	return mapToSlice(newNodes), tg.setupNodes(newHosts, newNodes, newRenters)
