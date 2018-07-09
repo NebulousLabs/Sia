@@ -292,8 +292,8 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 		return
 	}
 
-	// Get current period for reference
-	currentPeriod := api.renter.CurrentPeriod()
+	// Get current block height for reference
+	blockHeight := api.cs.Height()
 
 	// Get active contracts
 	contracts := []RenterContract{}
@@ -335,9 +335,9 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 			TotalCost:                 c.TotalCost,
 			UploadSpending:            c.UploadSpending,
 		}
-		if active && goodForRenew && goodForUpload && c.EndHeight > currentPeriod {
+		if active && goodForRenew && goodForUpload {
 			contracts = append(contracts, contract)
-		} else if inactive && (!goodForRenew || !goodForUpload) && c.EndHeight > currentPeriod {
+		} else if inactive && (!goodForRenew || !goodForUpload) {
 			contracts = append(contracts, contract)
 		} else if all {
 			contracts = append(contracts, contract)
@@ -385,9 +385,9 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 				TotalCost:                 c.TotalCost,
 				UploadSpending:            c.UploadSpending,
 			}
-			if expired && (c.EndHeight <= currentPeriod || currentPeriod == 0) {
+			if expired && c.EndHeight < blockHeight {
 				contracts = append(contracts, contract)
-			} else if inactive && c.EndHeight > currentPeriod && currentPeriod != 0 {
+			} else if inactive && c.EndHeight >= blockHeight {
 				contracts = append(contracts, contract)
 			} else if all {
 				contracts = append(contracts, contract)
