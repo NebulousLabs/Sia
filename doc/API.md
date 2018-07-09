@@ -935,10 +935,18 @@ standard success or error response. See
 
 #### /renter/contracts [GET]
 
-returns active contracts and expired contracts if requested.
+returns all, active, inactive, or expired contracts.  Active contracts are
+contracts that the Renter is currently using to store, upload, and download.
+Inactive contracts are contracts where the end height of the contract is greater
+than the current block height but the contract is either !goodForUpload,
+!goodForRenew, or was renewed due to running out of funds.  Expired contracts
+are contracts with an end height less than the current block height.
 
 ###### Contract Parameters [(with comments)](/doc/api/Renter.md#contract-parameters)
 ```
+all        // true or false - Optional
+active     // true or false - Optional
+inactive   // true or false - Optional
 expired    // true or false - Optional
 ```
 
@@ -946,29 +954,6 @@ expired    // true or false - Optional
 ```javascript
 {
   "contracts": [
-    {
-      "downloadspending": "1234", // hastings
-      "endheight": 50000, // block height
-      "fees": "1234", // hastings
-      "hostpublickey": {
-        "algorithm": "ed25519",
-        "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
-      },
-      "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-      "lasttransaction": {},
-      "netaddress": "12.34.56.78:9",
-      "renterfunds": "1234", // hastings
-      "size": 8192, // bytes
-      "startheight": 50000, // block height
-      "StorageSpending": "1234",
-      "storagespending": "1234", // hastings
-      "totalcost": "1234", // hastings
-      "uploadspending": "1234" // hastings
-      "goodforupload": true,
-      "goodforrenew": false,
-    }
-  ],
-  "expiredcontracts": [
     {
       "downloadspending": "1234", // hastings
       "endheight": 50000, // block height

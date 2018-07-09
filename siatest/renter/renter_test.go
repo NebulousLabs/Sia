@@ -2636,6 +2636,9 @@ func renewContractsByRenewWindow(renter *siatest.TestNode, tg *siatest.TestGroup
 
 // renewContractsBySpending uploads files until the contracts renew due to
 // running out of funds
+//
+// NOTE: this function only guarantee that one contract will be renewed due to
+// spending
 func renewContractsBySpending(renter *siatest.TestNode, tg *siatest.TestGroup) (startingUploadSpend types.Currency, err error) {
 	// Renew contracts by running out of funds
 	// Set upload price to max price
