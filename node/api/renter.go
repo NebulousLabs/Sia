@@ -272,7 +272,17 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 	WriteSuccess(w)
 }
 
-// renterContractsHandler handles the API call to request the Renter's contracts.
+// renterContractsHandler handles the API call to request the Renter's
+// contracts.
+//
+// Active contracts are contracts that the renter is actively using to store
+// data and can upload, download, and renew
+//
+// Inactive contracts are contracts that are not currently being used by the
+// renter because they are either !goodForUpload or !goodForRenew, but have
+// endheights that are in the future so could potentially become active again
+//
+// Expired contracts are contracts who's endheights are in the past
 func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Parse flags
 	active, err := scanBool(req.FormValue("active"))
