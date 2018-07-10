@@ -1383,7 +1383,7 @@ func TestRenterContractsEndpoint(t *testing.T) {
 	}
 	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
-		t.Fatal("Failed to get files")
+		t.Fatal("Failed to create group: ", err)
 	}
 	defer func() {
 		if err := tg.Close(); err != nil {
@@ -1727,8 +1727,8 @@ func TestRenterPersistData(t *testing.T) {
 	}
 }
 
-// TestRenterCancelAllowance tests that setting an empty allowance causes
-// uploads, downloads, and renewals to cease.
+// TestRenterResetAllowance tests that resetting the allowance after the
+// allowance was cancelled will trigger the correct contract formation.
 func TestRenterResetAllowance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -1852,10 +1852,11 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 	renterParams := node.Renter(renterDir)
 	renterParams.SkipSetAllowance = true
-	_, err = tg.AddNodes(renterParams)
+	nodes, err := tg.AddNodes(renterParams)
 	if err != nil {
 		t.Fatal(err)
 	}
+	r := nodes[0]
 
 	// Get largest WindowSize from Hosts
 	var windowSize types.BlockHeight
@@ -1870,7 +1871,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Get renter's initial siacoin balance
-	r := tg.Renters()[0]
 	wg, err := r.WalletGet()
 	if err != nil {
 		t.Fatal("Failed to get wallet:", err)
@@ -2250,6 +2250,8 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// The following are helper functions for the renter tests
 
 // checkBalanceVsSpending checks the renters confirmed siacoin balance in their
 // wallet against their reported spending

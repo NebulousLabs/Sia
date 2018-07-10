@@ -110,10 +110,10 @@ type hostContractor interface {
 	// Close closes the hostContractor.
 	Close() error
 
-	// Contracts returns the active contracts formed by the contractor.
+	// Contracts returns the staticContracts of the renter's hostContractor.
 	Contracts() []modules.RenterContract
 
-	// OldContracts returns the Expired contracts formed by the contractor.
+	// OldContracts returns the oldContracts of the renter's hostContractor.
 	OldContracts() []modules.RenterContract
 
 	// ContractByPublicKey returns the contract associated with the host key.
@@ -388,10 +388,10 @@ func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreak
 	return r.hostDB.EstimateHostScore(e)
 }
 
-// Contracts returns an array of host contractor's active contracts
+// Contracts returns an array of host contractor's staticContracts
 func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
 
-// OldContracts returns an array of host contractor's expired contracts
+// OldContracts returns an array of host contractor's oldContracts
 func (r *Renter) OldContracts() []modules.RenterContract {
 	return r.hostContractor.OldContracts()
 }

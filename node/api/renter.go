@@ -282,8 +282,8 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 // data and can upload, download, and renew
 //
 // Inactive contracts are contracts that are not currently being used by the
-// renter because they are either !goodForUpload or !goodForRenew, but have
-// endheights that are in the future so could potentially become active again
+// renter because they are !goodForRenew, but have endheights that are in the
+// future so could potentially become active again
 //
 // Expired contracts are contracts who's endheights are in the past
 func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {

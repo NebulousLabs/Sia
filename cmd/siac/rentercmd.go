@@ -491,22 +491,22 @@ func rentercontractscmd() {
 	}
 
 	if renterAllContracts {
-		rc, err := httpClient.RenterExpiredContractsGet()
+		rce, err := httpClient.RenterExpiredContractsGet()
 		if err != nil {
 			die("Could not get expired contracts:", err)
 		}
-		if len(rc.ActiveContracts) == 0 && len(rc.InactiveContracts) == 0 && len(rc.ExpiredContracts) == 0 {
+		if len(rc.ActiveContracts) == 0 && len(rc.InactiveContracts) == 0 && len(rce.ExpiredContracts) == 0 {
 			fmt.Println("No contracts have been formed.")
 			return
 		}
-		if len(rc.ExpiredContracts) == 0 {
+		if len(rce.ExpiredContracts) == 0 {
 			fmt.Println("No expired contracts")
 			return
 		}
-		sort.Sort(byValue(rc.ExpiredContracts))
+		sort.Sort(byValue(rce.ExpiredContracts))
 		var expiredTotalStored uint64
 		var expiredTotalWithheld, expiredTotalSpent, expiredTotalFees types.Currency
-		for _, c := range rc.ExpiredContracts {
+		for _, c := range rce.ExpiredContracts {
 			expiredTotalStored += c.Size
 			expiredTotalWithheld = expiredTotalWithheld.Add(c.RenterFunds)
 			expiredTotalSpent = expiredTotalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
@@ -520,10 +520,10 @@ func rentercontractscmd() {
 		Total Spent:          %v
 		Total Fees:           %v
 		
-		`, len(rc.ExpiredContracts), filesizeUnits(int64(expiredTotalStored)), currencyUnits(expiredTotalWithheld), currencyUnits(expiredTotalSpent), currencyUnits(expiredTotalFees))
+		`, len(rce.ExpiredContracts), filesizeUnits(int64(expiredTotalStored)), currencyUnits(expiredTotalWithheld), currencyUnits(expiredTotalSpent), currencyUnits(expiredTotalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "Host\tWithheld Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
-		for _, c := range rc.ExpiredContracts {
+		for _, c := range rce.ExpiredContracts {
 			address := c.NetAddress
 			if address == "" {
 				address = "Host Removed"
@@ -546,12 +546,19 @@ func rentercontractscmd() {
 // rentercontractsviewcmd is the handler for the command `siac renter contracts <id>`.
 // It lists details of a specific contract.
 func rentercontractsviewcmd(cid string) {
-	rc, err := httpClient.RenterContractsGet()
+	rc, err := httpClient.RenterInactiveContractsGet()
 	if err != nil {
 		die("Could not get contract details: ", err)
 	}
+	rce, err := httpClient.RenterExpiredContractsGet()
+	if err != nil {
+		die("Could not get expired contract details: ", err)
+	}
 
-	for _, rc := range rc.Contracts {
+	contracts := append(rc.ActiveContracts, rc.InactiveContracts...)
+	contracts = append(contracts, rce.ExpiredContracts...)
+
+	for _, rc := range contracts {
 		if rc.ID.String() == cid {
 			hostInfo, err := httpClient.HostDbHostsGet(rc.HostPublicKey)
 			if err != nil {
