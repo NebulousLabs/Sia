@@ -411,12 +411,12 @@ func rentercontractscmd() {
 	if err != nil {
 		die("Could not get inactive contracts:", err)
 	}
-	if len(rcActive.Contracts) == 0 && len(rcActive.Contracts) == 0 && !renterAllContracts {
+	if len(rcActive.Contracts) == 0 && len(rcInactive.Contracts) == 0 && !renterAllContracts {
 		fmt.Println("No contracts in the current period.")
 		return
 	}
 
-	if len(rcActive.Contracts) != 0 && len(rcActive.Contracts) != 0 {
+	if len(rcActive.Contracts) != 0 && len(rcInactive.Contracts) != 0 {
 		// Display Active Contracts
 		fmt.Println("Contracts in the Current Period")
 		sort.Sort(byValue(rcActive.Contracts))
@@ -456,10 +456,10 @@ func rentercontractscmd() {
 		}
 
 		// Display Inactive Contracts
-		sort.Sort(byValue(rcActive.Contracts))
+		sort.Sort(byValue(rcInactive.Contracts))
 		var inactiveTotalStored uint64
 		var inactiveTotalRemaining, inactiveTotalSpent, inactiveTotalFees types.Currency
-		for _, c := range rcActive.Contracts {
+		for _, c := range rcInactive.Contracts {
 			inactiveTotalStored += c.Size
 			inactiveTotalRemaining = inactiveTotalRemaining.Add(c.RenterFunds)
 			inactiveTotalSpent = inactiveTotalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
@@ -475,7 +475,7 @@ func rentercontractscmd() {
 			`, len(rcInactive.Contracts), filesizeUnits(int64(inactiveTotalStored)), currencyUnits(inactiveTotalRemaining), currencyUnits(inactiveTotalSpent), currencyUnits(inactiveTotalFees))
 		w = tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
-		for _, c := range rcActive.Contracts {
+		for _, c := range rcInactive.Contracts {
 			address := c.NetAddress
 			if address == "" {
 				address = "Host Removed"
