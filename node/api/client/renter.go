@@ -11,19 +11,10 @@ import (
 	"github.com/NebulousLabs/Sia/node/api"
 )
 
-// RenterContractsGet requests the /renter/contracts resource and returns all
-// contracts
+// RenterContractsGet requests the /renter/contracts resource and returns
+// Contracts and ActiveContracts
 func (c *Client) RenterContractsGet() (rc api.RenterContracts, err error) {
-	query := fmt.Sprintf("?all=%v", true)
-	err = c.get("/renter/contracts"+query, &rc)
-	return
-}
-
-// RenterActiveContractsGet requests the /renter/contracts resource and returns
-// the active contracts
-func (c *Client) RenterActiveContractsGet() (rc api.RenterContracts, err error) {
-	query := fmt.Sprintf("?active=%v", true)
-	err = c.get("/renter/contracts"+query, &rc)
+	err = c.get("/renter/contracts", &rc)
 	return
 }
 

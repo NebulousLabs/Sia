@@ -115,7 +115,10 @@ type (
 
 	// RenterContracts contains the renter's contracts.
 	RenterContracts struct {
-		Contracts []RenterContract `json:"contracts"`
+		Contracts         []RenterContract `json:"contracts"`
+		ActiveContracts   []RenterContract `json:"activecontracts"`
+		InactiveContracts []RenterContract `json:"inactivecontracts"`
+		ExpiredContracts  []RenterContract `json:"expiredcontracts"`
 	}
 
 	// RenterDownloadQueue contains the renter's download queue.
@@ -285,19 +288,11 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 // Expired contracts are contracts who's endheights are in the past
 func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Parse flags
-	active, err := scanBool(req.FormValue("active"))
-	if err != nil {
-		return
-	}
 	inactive, err := scanBool(req.FormValue("inactive"))
 	if err != nil {
 		return
 	}
 	expired, err := scanBool(req.FormValue("expired"))
-	if err != nil {
-		return
-	}
-	all, err := scanBool(req.FormValue("all"))
 	if err != nil {
 		return
 	}
@@ -307,6 +302,9 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 
 	// Get active contracts
 	contracts := []RenterContract{}
+	activeContracts := []RenterContract{}
+	inactiveContracts := []RenterContract{}
+	expiredContracts := []RenterContract{}
 	for _, c := range api.renter.Contracts() {
 		var size uint64
 		if len(c.Transaction.FileContractRevisions) != 0 {
@@ -345,17 +343,16 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 			TotalCost:                 c.TotalCost,
 			UploadSpending:            c.UploadSpending,
 		}
-		if active && goodForRenew && goodForUpload {
-			contracts = append(contracts, contract)
-		} else if inactive && (!goodForRenew || !goodForUpload) {
-			contracts = append(contracts, contract)
-		} else if all {
-			contracts = append(contracts, contract)
+		if goodForRenew {
+			activeContracts = append(activeContracts, contract)
+		} else if inactive && !goodForRenew {
+			inactiveContracts = append(inactiveContracts, contract)
 		}
+		contracts = append(contracts, contract)
 	}
 
 	// Get expired contracts
-	if expired || all || inactive {
+	if expired || inactive {
 		for _, c := range api.renter.OldContracts() {
 			var size uint64
 			if len(c.Transaction.FileContractRevisions) != 0 {
@@ -396,17 +393,18 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 				UploadSpending:            c.UploadSpending,
 			}
 			if expired && c.EndHeight < blockHeight {
-				contracts = append(contracts, contract)
+				expiredContracts = append(expiredContracts, contract)
 			} else if inactive && c.EndHeight >= blockHeight {
-				contracts = append(contracts, contract)
-			} else if all {
-				contracts = append(contracts, contract)
+				inactiveContracts = append(inactiveContracts, contract)
 			}
 		}
 	}
 
 	WriteJSON(w, RenterContracts{
-		Contracts: contracts,
+		Contracts:         contracts,
+		ActiveContracts:   activeContracts,
+		InactiveContracts: inactiveContracts,
+		ExpiredContracts:  expiredContracts,
 	})
 }
 
