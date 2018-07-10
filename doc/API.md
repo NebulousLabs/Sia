@@ -935,17 +935,16 @@ standard success or error response. See
 
 #### /renter/contracts [GET]
 
-returns all, active, inactive, or expired contracts.  Active contracts are
-contracts that the Renter is currently using to store, upload, and download.
-Inactive contracts are contracts where the end height of the contract is greater
-than the current block height but the contract is either !goodForUpload,
-!goodForRenew, or was renewed due to running out of funds.  Expired contracts
-are contracts with an end height less than the current block height.
+returns the renter's contracts.  Active contracts are contracts that the Renter
+is currently using to store, upload, and download data, and are returned by
+default. Inactive contracts are contracts that are in the current period but are
+marked as not good for renew, these contracts have the potential to become
+active again but currently are not storing data.  Expired contracts are
+contracts not in the current period, where not more data is being stored and
+excess funds have been released to the renter.
 
 ###### Contract Parameters [(with comments)](/doc/api/Renter.md#contract-parameters)
 ```
-all        // true or false - Optional
-active     // true or false - Optional
 inactive   // true or false - Optional
 expired    // true or false - Optional
 ```
@@ -953,7 +952,7 @@ expired    // true or false - Optional
 ###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-1)
 ```javascript
 {
-  "contracts": [
+  "activecontracts": [
     {
       "downloadspending": "1234", // hastings
       "endheight": 50000, // block height
@@ -976,6 +975,8 @@ expired    // true or false - Optional
       "goodforrenew": false,
     }
   ],
+  "inactivecontracts": [],
+  "expiredcontracts": [],
 }
 ```
 
