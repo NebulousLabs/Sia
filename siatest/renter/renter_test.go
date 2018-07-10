@@ -1016,7 +1016,7 @@ func TestRenewFailing(t *testing.T) {
 	replaced := false
 	err = build.Retry(int(rcg.Contracts[0].EndHeight-blockHeight), 5*time.Second, func() error {
 		// contract should be !goodForRenew now.
-		rcActive, err := renter.RenterActiveContractsGet()
+		rc, err := renter.RenterContractsGet()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1024,16 +1024,16 @@ func TestRenewFailing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(rcActive.Contracts) != 2 {
-			return fmt.Errorf("Expected 2 active contracts, got %v", len(rcActive.Contracts))
+		if len(rc.ActiveContracts) != 2 {
+			return fmt.Errorf("Expected 2 active contracts, got %v", len(rc.ActiveContracts))
 		}
-		if len(rcInactive.Contracts) != 2 {
-			return fmt.Errorf("Expected 2 inactive contracts, got %v", len(rcInactive.Contracts))
+		if len(rcInactive.InactiveContracts) != 2 {
+			return fmt.Errorf("Expected 2 inactive contracts, got %v", len(rcInactive.InactiveContracts))
 		}
 
 		notGoodForRenew := 0
 		goodForRenew := 0
-		for _, c := range rcInactive.Contracts {
+		for _, c := range rcInactive.InactiveContracts {
 			if !c.GoodForRenew {
 				notGoodForRenew++
 			} else {
@@ -1100,7 +1100,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 	// Give it some time to mark the contracts as !goodForUpload and
 	// !goodForRenew.
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := renter.RenterActiveContractsGet()
+		rc, err := renter.RenterContractsGet()
 		if err != nil {
 			return err
 		}
@@ -1109,13 +1109,13 @@ func TestRenterCancelAllowance(t *testing.T) {
 			return err
 		}
 		// Should now have 2 inactive contracts.
-		if len(rcActive.Contracts) != 0 {
-			return fmt.Errorf("expected 0 active contracts, got %v", len(rcActive.Contracts))
+		if len(rc.ActiveContracts) != 0 {
+			return fmt.Errorf("expected 0 active contracts, got %v", len(rc.ActiveContracts))
 		}
-		if len(rcInactive.Contracts) != groupParams.Hosts {
-			return fmt.Errorf("expected %v inactive contracts, got %v", groupParams.Hosts, len(rcInactive.Contracts))
+		if len(rcInactive.InactiveContracts) != groupParams.Hosts {
+			return fmt.Errorf("expected %v inactive contracts, got %v", groupParams.Hosts, len(rcInactive.InactiveContracts))
 		}
-		for _, c := range rcInactive.Contracts {
+		for _, c := range rcInactive.InactiveContracts {
 			if c.GoodForUpload {
 				return errors.New("contract shouldn't be goodForUpload")
 			}
@@ -1173,7 +1173,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 
 	// All contracts should be archived.
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := renter.RenterActiveContractsGet()
+		rc, err := renter.RenterContractsGet()
 		if err != nil {
 			return err
 		}
@@ -1186,14 +1186,14 @@ func TestRenterCancelAllowance(t *testing.T) {
 			return err
 		}
 		// Should now have 2 expired contracts.
-		if len(rcActive.Contracts) != 0 {
-			return fmt.Errorf("expected 0 active contracts, got %v", len(rcActive.Contracts))
+		if len(rc.ActiveContracts) != 0 {
+			return fmt.Errorf("expected 0 active contracts, got %v", len(rc.ActiveContracts))
 		}
-		if len(rcInactive.Contracts) != 0 {
-			return fmt.Errorf("expected 0 inactive contracts, got %v", len(rcInactive.Contracts))
+		if len(rcInactive.InactiveContracts) != 0 {
+			return fmt.Errorf("expected 0 inactive contracts, got %v", len(rcInactive.InactiveContracts))
 		}
-		if len(rcExpired.Contracts) != groupParams.Hosts {
-			return fmt.Errorf("expected %v expired contracts, got %v", groupParams.Hosts, len(rcInactive.Contracts))
+		if len(rcExpired.ExpiredContracts) != groupParams.Hosts {
+			return fmt.Errorf("expected %v expired contracts, got %v", groupParams.Hosts, len(rcInactive.InactiveContracts))
 		}
 		return nil
 	})
@@ -1262,26 +1262,26 @@ func TestRenterContractEndHeight(t *testing.T) {
 	// Confirm Contracts were created as expected.  There should be 2 active
 	// contracts and no inactive or expired contracts
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := r.RenterActiveContractsGet()
+		rc, err := r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
-		if len(rcActive.Contracts) != len(tg.Hosts()) {
-			return fmt.Errorf("Expected %v active contracts, got %v", len(tg.Hosts()), len(rcActive.Contracts))
+		if len(rc.ActiveContracts) != len(tg.Hosts()) {
+			return fmt.Errorf("Expected %v active contracts, got %v", len(tg.Hosts()), len(rc.ActiveContracts))
 		}
 		rcInactive, err := r.RenterInactiveContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get Inactive contracts")
 		}
-		if len(rcInactive.Contracts) != 0 {
-			return fmt.Errorf("Expected 0 inactive contracts, got %v", len(rcInactive.Contracts))
+		if len(rcInactive.InactiveContracts) != 0 {
+			return fmt.Errorf("Expected 0 inactive contracts, got %v", len(rcInactive.InactiveContracts))
 		}
 		rcExpired, err := r.RenterExpiredContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get expired contracts")
 		}
-		if len(rcExpired.Contracts) != 0 {
-			return fmt.Errorf("Expected 0 expired contracts, got %v", len(rcExpired.Contracts))
+		if len(rcExpired.ExpiredContracts) != 0 {
+			return fmt.Errorf("Expected 0 expired contracts, got %v", len(rcExpired.ExpiredContracts))
 		}
 		return nil
 	})
@@ -1289,13 +1289,13 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rcActive, err := r.RenterActiveContractsGet()
+	rc, err := r.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err, "could not get active contracts")
 	}
 
 	// Confirm contract end heights were set properly
-	for _, c := range rcActive.Contracts {
+	for _, c := range rc.ActiveContracts {
 		if c.EndHeight != currentPeriodStart+period {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", period)
@@ -1314,7 +1314,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 	// have been renewed if GoodForRenew = true.  There should be 2 active and
 	// inactive contracts, and 0 expired contracts
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := r.RenterActiveContractsGet()
+		rc, err := r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
@@ -1326,14 +1326,14 @@ func TestRenterContractEndHeight(t *testing.T) {
 		if err != nil {
 			return errors.AddContext(err, "could not get expired contracts")
 		}
-		if len(rcExpired.Contracts) != 0 {
-			return fmt.Errorf("Expected 0 expired contracts, got %v", len(rcExpired.Contracts))
+		if len(rcExpired.ExpiredContracts) != 0 {
+			return fmt.Errorf("Expected 0 expired contracts, got %v", len(rcExpired.ExpiredContracts))
 		}
 		// checkContracts will confirm correct number of inactive and active contracts
-		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
+		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.InactiveContracts, rcExpired.ExpiredContracts...), rc.ActiveContracts); err != nil {
 			return err
 		}
-		if err = checkRenewedContracts(rcActive.Contracts); err != nil {
+		if err = checkRenewedContracts(rc.ActiveContracts); err != nil {
 			return err
 		}
 		return nil
@@ -1345,11 +1345,11 @@ func TestRenterContractEndHeight(t *testing.T) {
 	// Confirm contract end heights were set properly End height should be the
 	// end of the next period as the contracts are renewed due to reaching the
 	// renew window
-	rcActive, err = r.RenterActiveContractsGet()
+	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal("Could not get renter contracts:", err)
 	}
-	for _, c := range rcActive.Contracts {
+	for _, c := range rc.ActiveContracts {
 		if c.EndHeight != currentPeriodStart+(2*period)-renewWindow && c.GoodForRenew {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", period)
@@ -1360,7 +1360,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 	}
 
 	// Capturing end height to compare against renewed contracts
-	endHeight := rcActive.Contracts[0].EndHeight
+	endHeight := rc.ActiveContracts[0].EndHeight
 
 	// Renew contracts by running out of funds
 	startingUploadSpend, err := renewContractsBySpending(r, tg)
@@ -1371,11 +1371,11 @@ func TestRenterContractEndHeight(t *testing.T) {
 	// Confirm contract end heights were set properly
 	// End height should not have changed since the renewal
 	// was due to running out of funds
-	rcActive, err = r.RenterActiveContractsGet()
+	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal("Could not get renter contracts:", err)
 	}
-	for _, c := range rcActive.Contracts {
+	for _, c := range rc.ActiveContracts {
 		if c.EndHeight != endHeight && c.GoodForRenew && c.UploadSpending.Cmp(startingUploadSpend) <= 0 {
 			t.Log("Allowance Period:", period)
 			t.Log("Current Period:", currentPeriodStart)
@@ -1411,45 +1411,30 @@ func TestRenterContractsEndpoint(t *testing.T) {
 	r := tg.Renters()[0]
 
 	// Renter should only have active contracts
-	rcAll, err := r.RenterContractsGet()
+	rc, err := r.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
-	rcActive, err := r.RenterActiveContractsGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(rcAll.Contracts) != len(rcActive.Contracts) {
-		t.Fatalf("Expected the same number for active and all contracts: %v for active and %v for all", len(rcActive.Contracts), len(rcAll.Contracts))
-	}
-	// Create Maps for comparison
-	ContractIDMap := make(map[types.FileContractID]struct{})
-	for _, c := range rcAll.Contracts {
-		ContractIDMap[c.ID] = struct{}{}
-	}
-	// Verify rcActive and rcAll have the same contracts
-	for _, c := range rcActive.Contracts {
-		if _, ok := ContractIDMap[c.ID]; !ok {
-			t.Fatal("ID from rcActive not found in rcAll")
-		}
+	if len(tg.Hosts()) != len(rc.ActiveContracts) {
+		t.Fatalf("Expected the same number for active contracts as hosts: %v active and %v expected", len(rc.ActiveContracts), len(tg.Hosts()))
 	}
 	rcInactive, err := r.RenterInactiveContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rcInactive.Contracts) != 0 {
-		t.Fatal("Expected zero inactive contracts, got", len(rcInactive.Contracts))
+	if len(rcInactive.InactiveContracts) != 0 {
+		t.Fatal("Expected zero inactive contracts, got", len(rcInactive.InactiveContracts))
 	}
 	rcExpired, err := r.RenterExpiredContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rcExpired.Contracts) != 0 {
-		t.Fatal("Expected zero expired contracts, got", len(rcExpired.Contracts))
+	if len(rcExpired.ExpiredContracts) != 0 {
+		t.Fatal("Expected zero expired contracts, got", len(rcExpired.ExpiredContracts))
 	}
 
 	// Record original Contracts and create Maps for comparison
-	originalContracts := rcActive.Contracts
+	originalContracts := rc.ActiveContracts
 	originalContractIDMap := make(map[types.FileContractID]struct{})
 	for _, c := range originalContracts {
 		originalContractIDMap[c.ID] = struct{}{}
@@ -1473,7 +1458,7 @@ func TestRenterContractsEndpoint(t *testing.T) {
 	// original active contracts.
 	err = build.Retry(200, 100*time.Millisecond, func() error {
 		// Check active and expired contracts
-		rcActive, err = r.RenterActiveContractsGet()
+		rc, err = r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
@@ -1481,13 +1466,13 @@ func TestRenterContractsEndpoint(t *testing.T) {
 		if err != nil {
 			return errors.AddContext(err, "could not get inactive contracts")
 		}
-		if len(rcActive.Contracts) != len(rcInactive.Contracts) {
-			return fmt.Errorf("Expected the same number of active and inactive contracts; got %v active and %v inactive", len(rcActive.Contracts), len(rcInactive.Contracts))
+		if len(rc.ActiveContracts) != len(rcInactive.InactiveContracts) {
+			return fmt.Errorf("Expected the same number of active and inactive contracts; got %v active and %v inactive", len(rc.ActiveContracts), len(rcInactive.InactiveContracts))
 		}
-		if len(originalContracts) != len(rcInactive.Contracts) {
-			return fmt.Errorf("Didn't get expected number of inactive contracts, expected %v got %v", len(originalContracts), len(rcInactive.Contracts))
+		if len(originalContracts) != len(rcInactive.InactiveContracts) {
+			return fmt.Errorf("Didn't get expected number of inactive contracts, expected %v got %v", len(originalContracts), len(rcInactive.InactiveContracts))
 		}
-		for _, c := range rcInactive.Contracts {
+		for _, c := range rcInactive.InactiveContracts {
 			if _, ok := originalContractIDMap[c.ID]; !ok {
 				return errors.New("ID from rcInactive not found in originalContracts")
 			}
@@ -1498,8 +1483,8 @@ func TestRenterContractsEndpoint(t *testing.T) {
 		if err != nil {
 			return errors.AddContext(err, "could not get expired contracts")
 		}
-		if len(rcExpired.Contracts) != 0 {
-			return fmt.Errorf("Expected zero expired contracts, got %v", len(rcExpired.Contracts))
+		if len(rcExpired.ExpiredContracts) != 0 {
+			return fmt.Errorf("Expected zero expired contracts, got %v", len(rcExpired.ExpiredContracts))
 		}
 
 		return nil
@@ -1510,7 +1495,7 @@ func TestRenterContractsEndpoint(t *testing.T) {
 
 	// Record inactive contracts
 	rcInactive, err = r.RenterInactiveContractsGet()
-	inactiveContracts := rcInactive.Contracts
+	inactiveContracts := rcInactive.InactiveContracts
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1539,19 +1524,19 @@ func TestRenterContractsEndpoint(t *testing.T) {
 	// Confirm contracts, the expired contracts should now be the same contracts
 	// as the previous inactive contracts.
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err = r.RenterActiveContractsGet()
+		rc, err = r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
-		if len(rcActive.Contracts) != len(tg.Hosts()) {
+		if len(rc.ActiveContracts) != len(tg.Hosts()) {
 			return errors.New("Waiting for active contracts to form")
 		}
 		rcExpired, err = r.RenterExpiredContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get expired contracts")
 		}
-		if len(rcExpired.Contracts) != len(inactiveContracts) {
-			return fmt.Errorf("Expected the same number of expired and inactive contracts; got %v expired and %v inactive", len(rcExpired.Contracts), len(inactiveContracts))
+		if len(rcExpired.ExpiredContracts) != len(inactiveContracts) {
+			return fmt.Errorf("Expected the same number of expired and inactive contracts; got %v expired and %v inactive", len(rcExpired.ExpiredContracts), len(inactiveContracts))
 		}
 		for _, c := range inactiveContracts {
 			if _, ok := inactiveContractIDMap[c.ID]; !ok {
@@ -1566,11 +1551,11 @@ func TestRenterContractsEndpoint(t *testing.T) {
 
 	// Record current active and expired contracts
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err = r.RenterActiveContractsGet()
+		rc, err = r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
-		if len(rcActive.Contracts) != len(tg.Hosts()) {
+		if len(rc.ActiveContracts) != len(tg.Hosts()) {
 			return errors.New("Waiting for active contracts to form")
 		}
 		return nil
@@ -1578,13 +1563,13 @@ func TestRenterContractsEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rcActive, err = r.RenterActiveContractsGet()
-	activeContracts := rcActive.Contracts
+	rc, err = r.RenterContractsGet()
+	activeContracts := rc.ActiveContracts
 	if err != nil {
 		t.Fatal(err)
 	}
 	rcExpired, err = r.RenterExpiredContractsGet()
-	expiredContracts := rcExpired.Contracts
+	expiredContracts := rcExpired.ExpiredContracts
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1607,11 +1592,11 @@ func TestRenterContractsEndpoint(t *testing.T) {
 	// Confirm contracts were renewed as expected.  Active contracts prior to
 	// renewal should now be in the inactive contracts
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err = r.RenterActiveContractsGet()
+		rc, err = r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
-		if len(rcActive.Contracts) != len(tg.Hosts()) {
+		if len(rc.ActiveContracts) != len(tg.Hosts()) {
 			return errors.New("Waiting for active contracts to form")
 		}
 		rcInactive, err = r.RenterInactiveContractsGet()
@@ -1625,7 +1610,7 @@ func TestRenterContractsEndpoint(t *testing.T) {
 
 		// Confirm active and inactive contracts
 		inactiveContractIDMap := make(map[types.FileContractID]struct{})
-		for _, c := range rcInactive.Contracts {
+		for _, c := range rcInactive.InactiveContracts {
 			inactiveContractIDMap[c.ID] = struct{}{}
 		}
 		for _, c := range activeContracts {
@@ -1635,10 +1620,10 @@ func TestRenterContractsEndpoint(t *testing.T) {
 		}
 
 		// Confirm expired contracts
-		if len(expiredContracts) != len(rcExpired.Contracts) {
-			return fmt.Errorf("Didn't get expected number of expired contracts, expected %v got %v", len(expiredContracts), len(rcExpired.Contracts))
+		if len(expiredContracts) != len(rcExpired.ExpiredContracts) {
+			return fmt.Errorf("Didn't get expected number of expired contracts, expected %v got %v", len(expiredContracts), len(rcExpired.ExpiredContracts))
 		}
-		for _, c := range rcExpired.Contracts {
+		for _, c := range rcExpired.ExpiredContracts {
 			if _, ok := expiredContractIDMap[c.ID]; !ok {
 				return errors.New("ID from rcExpired not found in expiredContracts")
 			}
@@ -1808,7 +1793,7 @@ func TestRenterResetAllowance(t *testing.T) {
 	// Give it some time to mark the contracts as !goodForUpload and
 	// !goodForRenew.
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := renter.RenterActiveContractsGet()
+		rc, err := renter.RenterContractsGet()
 		if err != nil {
 			return err
 		}
@@ -1817,13 +1802,13 @@ func TestRenterResetAllowance(t *testing.T) {
 			return err
 		}
 		// Should now have 2 inactive contracts.
-		if len(rcActive.Contracts) != 0 {
-			return fmt.Errorf("expected 0 active contracts, got %v", len(rcActive.Contracts))
+		if len(rc.ActiveContracts) != 0 {
+			return fmt.Errorf("expected 0 active contracts, got %v", len(rc.ActiveContracts))
 		}
-		if len(rcInactive.Contracts) != groupParams.Hosts {
-			return fmt.Errorf("expected %v inactive contracts, got %v", groupParams.Hosts, len(rcInactive.Contracts))
+		if len(rcInactive.InactiveContracts) != groupParams.Hosts {
+			return fmt.Errorf("expected %v inactive contracts, got %v", groupParams.Hosts, len(rcInactive.InactiveContracts))
 		}
-		for _, c := range rcInactive.Contracts {
+		for _, c := range rcInactive.InactiveContracts {
 			if c.GoodForUpload {
 				return errors.New("contract shouldn't be goodForUpload")
 			}
@@ -1850,15 +1835,15 @@ func TestRenterResetAllowance(t *testing.T) {
 	// Give it some time to mark the contracts as goodForUpload and
 	// goodForRenew again.
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := renter.RenterActiveContractsGet()
+		rc, err := renter.RenterContractsGet()
 		if err != nil {
 			return err
 		}
 		// Should now have 2 active contracts.
-		if len(rcActive.Contracts) != groupParams.Hosts {
-			return fmt.Errorf("expected %v active contracts, got %v", groupParams.Hosts, len(rcActive.Contracts))
+		if len(rc.ActiveContracts) != groupParams.Hosts {
+			return fmt.Errorf("expected %v active contracts, got %v", groupParams.Hosts, len(rc.ActiveContracts))
 		}
-		for _, c := range rcActive.Contracts {
+		for _, c := range rc.ActiveContracts {
 			if !c.GoodForUpload {
 				return errors.New("contract should be goodForUpload")
 			}
@@ -1937,7 +1922,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Confirm Contracts were created as expected
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := r.RenterActiveContractsGet()
+		rc, err := r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
@@ -1949,7 +1934,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 		if err != nil {
 			return errors.AddContext(err, "could not get expired contracts")
 		}
-		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
+		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.InactiveContracts, rcExpired.ExpiredContracts...), rc.ActiveContracts); err != nil {
 			return err
 		}
 		return nil
@@ -2011,7 +1996,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Confirm Contracts were renewed as expected
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := r.RenterActiveContractsGet()
+		rc, err := r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
@@ -2023,10 +2008,10 @@ func TestRenterSpendingReporting(t *testing.T) {
 		if err != nil {
 			return errors.AddContext(err, "could not get expired contracts")
 		}
-		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
+		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.InactiveContracts, rcExpired.ExpiredContracts...), rc.ActiveContracts); err != nil {
 			return err
 		}
-		if err = checkRenewedContracts(rcActive.Contracts); err != nil {
+		if err = checkRenewedContracts(rc.ActiveContracts); err != nil {
 			return err
 		}
 		return nil
@@ -2047,7 +2032,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Check contract spending against reported spending
-	rcActive, err := r.RenterActiveContractsGet()
+	rc, err := r.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2059,7 +2044,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = checkContractVsReportedSpending(r, windowSize, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
+	if err = checkContractVsReportedSpending(r, windowSize, append(rcInactive.InactiveContracts, rcExpired.ExpiredContracts...), rc.ActiveContracts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2089,7 +2074,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 		t.Fatal("Failed to get consensus:", err)
 	}
 	blockHeight := cg.Height
-	endHeight := rcActive.Contracts[0].EndHeight
+	endHeight := rc.ActiveContracts[0].EndHeight
 	rg, err := r.RenterGet()
 	if err != nil {
 		t.Fatal("Failed to get renter:", err)
@@ -2119,7 +2104,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Confirm Contracts were renewed as expected
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := r.RenterActiveContractsGet()
+		rc, err := r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
@@ -2131,10 +2116,10 @@ func TestRenterSpendingReporting(t *testing.T) {
 		if err != nil {
 			return errors.AddContext(err, "could not get expired contracts")
 		}
-		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
+		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.InactiveContracts, rcExpired.ExpiredContracts...), rc.ActiveContracts); err != nil {
 			return err
 		}
-		if err = checkRenewedContracts(rcActive.Contracts); err != nil {
+		if err = checkRenewedContracts(rc.ActiveContracts); err != nil {
 			return err
 		}
 		return nil
@@ -2154,7 +2139,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Check contract spending against reported spending
-	rcActive, err = r.RenterActiveContractsGet()
+	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2166,7 +2151,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = checkContractVsReportedSpending(r, windowSize, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
+	if err = checkContractVsReportedSpending(r, windowSize, append(rcInactive.InactiveContracts, rcExpired.ExpiredContracts...), rc.ActiveContracts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2202,7 +2187,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Confirm Contracts were renewed as expected
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := r.RenterActiveContractsGet()
+		rc, err := r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
@@ -2214,10 +2199,10 @@ func TestRenterSpendingReporting(t *testing.T) {
 		if err != nil {
 			return errors.AddContext(err, "could not get expired contracts")
 		}
-		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
+		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.InactiveContracts, rcExpired.ExpiredContracts...), rc.ActiveContracts); err != nil {
 			return err
 		}
-		if err = checkRenewedContracts(rcActive.Contracts); err != nil {
+		if err = checkRenewedContracts(rc.ActiveContracts); err != nil {
 			return err
 		}
 		return nil
@@ -2237,7 +2222,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Check contract spending against reported spending
-	rcActive, err = r.RenterActiveContractsGet()
+	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2249,7 +2234,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = checkContractVsReportedSpending(r, windowSize, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
+	if err = checkContractVsReportedSpending(r, windowSize, append(rcInactive.InactiveContracts, rcExpired.ExpiredContracts...), rc.ActiveContracts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2274,7 +2259,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 
 	// Confirm Contracts were renewed as expected
 	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rcActive, err := r.RenterActiveContractsGet()
+		rc, err := r.RenterContractsGet()
 		if err != nil {
 			return errors.AddContext(err, "could not get active contracts")
 		}
@@ -2286,10 +2271,10 @@ func TestRenterSpendingReporting(t *testing.T) {
 		if err != nil {
 			return errors.AddContext(err, "could not get expired contracts")
 		}
-		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
+		if err = checkContracts(len(tg.Hosts()), numRenewals, append(rcInactive.InactiveContracts, rcExpired.ExpiredContracts...), rc.ActiveContracts); err != nil {
 			return err
 		}
-		if err = checkRenewedContracts(rcActive.Contracts); err != nil {
+		if err = checkRenewedContracts(rc.ActiveContracts); err != nil {
 			return err
 		}
 		return nil
@@ -2309,7 +2294,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 
 	// Check contract spending against reported spending
-	rcActive, err = r.RenterActiveContractsGet()
+	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2321,7 +2306,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = checkContractVsReportedSpending(r, windowSize, append(rcInactive.Contracts, rcExpired.Contracts...), rcActive.Contracts); err != nil {
+	if err = checkContractVsReportedSpending(r, windowSize, append(rcInactive.InactiveContracts, rcExpired.ExpiredContracts...), rc.ActiveContracts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2630,11 +2615,11 @@ func renewContractsBySpending(renter *siatest.TestNode, tg *siatest.TestGroup) (
 	}
 
 	// Get current upload spend, previously contracts had zero upload spend
-	rcActive, err := renter.RenterActiveContractsGet()
+	rc, err := renter.RenterContractsGet()
 	if err != nil {
 		return types.ZeroCurrency, errors.AddContext(err, "could not get renter active contracts")
 	}
-	startingUploadSpend = rcActive.Contracts[0].UploadSpending
+	startingUploadSpend = rc.ActiveContracts[0].UploadSpending
 
 	// Upload files to force contract renewal due to running out of funds
 	//
@@ -2643,7 +2628,7 @@ func renewContractsBySpending(renter *siatest.TestNode, tg *siatest.TestGroup) (
 LOOP:
 	for {
 		// To protect against contracts not renewing during uploads
-		for _, c := range rcActive.Contracts {
+		for _, c := range rc.ActiveContracts {
 			percentRemaining, _ := big.NewRat(0, 1).SetFrac(c.RenterFunds.Big(), c.TotalCost.Big()).Float64()
 			if percentRemaining < float64(0.03) {
 				break LOOP
@@ -2654,7 +2639,7 @@ LOOP:
 			return types.ZeroCurrency, errors.AddContext(err, "failed to upload a file for testing")
 		}
 
-		rcActive, err = renter.RenterActiveContractsGet()
+		rc, err = renter.RenterContractsGet()
 		if err != nil {
 			return types.ZeroCurrency, errors.AddContext(err, "could not get renter active contracts")
 		}
