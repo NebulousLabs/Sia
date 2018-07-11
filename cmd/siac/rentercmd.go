@@ -424,12 +424,13 @@ func rentercontractscmd() {
 			activeTotalSpent = activeTotalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
 			activeTotalFees = activeTotalFees.Add(c.Fees)
 		}
-		fmt.Printf(`Active Contract Summary:
-			Number of Contracts:  %v
-			Total stored:         %9s
-			Total Remaining:      %v
-			Total Spent:          %v
-			Total Fees:           %v
+		fmt.Printf(`
+Active Contract Summary:
+Number of Contracts:  %v
+Total stored:         %9s
+Total Remaining:      %v
+Total Spent:          %v
+Total Fees:           %v
 			
 			`, len(rc.ActiveContracts), filesizeUnits(int64(activeTotalStored)), currencyUnits(activeTotalRemaining), currencyUnits(activeTotalSpent), currencyUnits(activeTotalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
@@ -450,6 +451,7 @@ func rentercontractscmd() {
 				c.GoodForUpload,
 				c.GoodForRenew)
 		}
+		w.Flush()
 
 		// Display Inactive Contracts
 		sort.Sort(byValue(rc.InactiveContracts))
@@ -461,12 +463,13 @@ func rentercontractscmd() {
 			inactiveTotalSpent = inactiveTotalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
 			inactiveTotalFees = inactiveTotalFees.Add(c.Fees)
 		}
-		fmt.Printf(`Inactive Contract Summary:
-			Number of Contracts:  %v
-			Total stored:         %9s
-			Total Remaining:      %v
-			Total Spent:          %v
-			Total Fees:           %v
+		fmt.Printf(`
+Inactive Contract Summary:
+Number of Contracts:  %v
+Total stored:         %9s
+Total Remaining:      %v
+Total Spent:          %v
+Total Fees:           %v
 			
 			`, len(rc.InactiveContracts), filesizeUnits(int64(inactiveTotalStored)), currencyUnits(inactiveTotalRemaining), currencyUnits(inactiveTotalSpent), currencyUnits(inactiveTotalFees))
 		w = tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
@@ -513,12 +516,12 @@ func rentercontractscmd() {
 			expiredTotalFees = expiredTotalFees.Add(c.Fees)
 		}
 		fmt.Printf(`
-		Expired Contract Summary:
-		Number of Contracts:  %v
-		Total stored:         %9s
-		Total Remaining:      %v
-		Total Spent:          %v
-		Total Fees:           %v
+Expired Contract Summary:
+Number of Contracts:  %v
+Total stored:         %9s
+Total Remaining:      %v
+Total Spent:          %v
+Total Fees:           %v
 		
 		`, len(rce.ExpiredContracts), filesizeUnits(int64(expiredTotalStored)), currencyUnits(expiredTotalWithheld), currencyUnits(expiredTotalSpent), currencyUnits(expiredTotalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
