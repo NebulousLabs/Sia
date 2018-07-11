@@ -2533,7 +2533,7 @@ func renewContractsBySpending(renter *siatest.TestNode, tg *siatest.TestGroup) (
 	// Upload once to show upload spending
 	_, _, err = renter.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
 	if err != nil {
-		return types.ZeroCurrency, errors.AddContext(err, "failed to upload a file for testing")
+		return types.ZeroCurrency, errors.AddContext(err, "failed to upload first file in renewContractsBySpending")
 	}
 
 	// Get current upload spend, previously contracts had zero upload spend
@@ -2555,7 +2555,9 @@ LOOP:
 		}
 		_, _, err = renter.UploadNewFileBlocking(int(chunkSize), dataPieces, parityPieces)
 		if err != nil {
-			return types.ZeroCurrency, errors.AddContext(err, "failed to upload a file for testing")
+			pr, _ := big.NewRat(0, 1).SetFrac(rc.ActiveContracts[0].RenterFunds.Big(), rc.ActiveContracts[0].TotalCost.Big()).Float64()
+			s := fmt.Sprintf("failed to upload file in renewContractsBySpending loop, percentRemaining: %v", pr)
+			return types.ZeroCurrency, errors.AddContext(err, s)
 		}
 
 		rc, err = renter.RenterContractsGet()
