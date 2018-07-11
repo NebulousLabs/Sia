@@ -69,7 +69,6 @@ type (
 
 	// Piece represents a single piece of a chunk on disk
 	Piece struct {
-		KeyNonce   [4]byte            // nonce used for encrypting the piece
 		HostPubKey types.SiaPublicKey // public key of the host
 		MerkleRoot crypto.Hash        // merkle root of the piece
 	}
@@ -270,7 +269,9 @@ func (sf *SiaFile) Redundancy(offlineMap map[string]bool, goodForRenewMap map[st
 	// a better user experience. If the renter operates correctly, redundancy
 	// should never go above numPieces / minPieces and redundancyNoRenew should
 	// never go below 1.
-	if minRedundancy < 1 {
+	if minRedundancy < 1 && minRedundancyNoRenew >= 1 {
+		return 1
+	} else if minRedundancy < 1 {
 		return minRedundancyNoRenew
 	}
 	return minRedundancy

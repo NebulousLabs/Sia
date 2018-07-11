@@ -13,12 +13,15 @@ import (
 type (
 	// Metadata is the metadata of a SiaFile and is JSON encoded.
 	Metadata struct {
-		staticVersion   [16]byte          // version of the sia file format used
-		staticFileSize  int64             // total size of the file
-		staticMasterKey crypto.TwofishKey // masterkey used to encrypt pieces
-		staticPieceSize uint64            // size of a single piece of the file
-		localPath       string            // file to the local copy of the file used for repairing
-		siaPath         string            // the path of the file on the Sia network
+		staticVersion   [16]byte // version of the sia file format used
+		staticFileSize  int64    // total size of the file
+		staticPieceSize uint64   // size of a single piece of the file
+		localPath       string   // file to the local copy of the file used for repairing
+		siaPath         string   // the path of the file on the Sia network
+
+		// fields for encryption
+		staticMasterKey  crypto.TwofishKey // masterkey used to encrypt pieces
+		staticSharingKey crypto.TwofishKey // key used to encrypt shared pieces
 
 		// The following fields are the usual unix timestamps of files.
 		modTime    time.Time // time of last content modification

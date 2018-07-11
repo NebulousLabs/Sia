@@ -173,9 +173,9 @@ func (r *Renter) buildUnfinishedChunks(f *siafile.SiaFile, hosts map[string]stru
 		pks[string(pk.Key)] = pk
 	}
 
-	// Iterate through the pieces of the file and mark which hosts are already
-	// in use for the chunk. As you delete hosts from the 'unusedHosts' map,
-	// also increment the 'piecesCompleted' value.
+	// Iterate through the pieces of all chunks of the file and mark which
+	// hosts are already in use for a particular chunk. As you delete hosts
+	// from the 'unusedHosts' map, also increment the 'piecesCompleted' value.
 	for chunkIndex := uint64(0); chunkIndex < f.NumChunks(); chunkIndex++ {
 		pieces, err := f.Pieces(chunkIndex)
 		if err != nil {
@@ -208,10 +208,13 @@ func (r *Renter) buildUnfinishedChunks(f *siafile.SiaFile, hosts map[string]stru
 					newUnfinishedChunks[chunkIndex].piecesCompleted++
 					delete(newUnfinishedChunks[chunkIndex].unusedHosts, pk.String())
 				} else if exists {
-					// This host has a piece, but it is the same piece another host
-					// has. We should still remove the host from the unusedHosts
-					// since one host having multiple pieces of a chunk might lead
-					// to unexpected issues.
+					// This host has a piece, but it is the same piece another
+					// host has. We should still remove the host from the
+					// unusedHosts since one host having multiple pieces of a
+					// chunk might lead to unexpected issues. e.g. if a host
+					// has multiple pieces and another host with redundant
+					// pieces goes offline, we end up with false redundancy
+					// reporting.
 					delete(newUnfinishedChunks[chunkIndex].unusedHosts, pk.String())
 				}
 			}

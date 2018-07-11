@@ -28,7 +28,7 @@ var (
 	errUploadDirectory = errors.New("cannot upload directory")
 )
 
-// newFile is a helper to more easily create a new Siafile for testing.
+// newFile is a helper to more easily create a new Siafile.
 func newFile(name string, rsc modules.ErasureCoder, pieceSize, fileSize uint64, mode os.FileMode, source string) *siafile.SiaFile {
 	numChunks := 1
 	chunkSize := pieceSize * uint64(rsc.MinPieces())
