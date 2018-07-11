@@ -37,14 +37,13 @@ func TestContractUncommittedTxn(t *testing.T) {
 		},
 	}
 	initialRoots := []crypto.Hash{{1}}
-	id := initialHeader.ID()
-	_, err = cs.managedInsertContract(initialHeader, initialRoots)
+	c, err := cs.managedInsertContract(initialHeader, initialRoots)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// apply an update to the contract, but don't commit it
-	sc := cs.mustAcquire(t, id)
+	sc := cs.mustAcquire(t, c.ID)
 	revisedHeader := contractHeader{
 		Transaction: types.Transaction{
 			FileContractRevisions: []types.FileContractRevision{{
@@ -88,7 +87,7 @@ func TestContractUncommittedTxn(t *testing.T) {
 		t.Fatal(err)
 	}
 	// the uncommitted transaction should be stored in the contract
-	sc = cs.mustAcquire(t, id)
+	sc = cs.mustAcquire(t, c.ID)
 	if len(sc.unappliedTxns) != 1 {
 		t.Fatal("expected 1 unappliedTxn, got", len(sc.unappliedTxns))
 	} else if !bytes.Equal(sc.unappliedTxns[0].Updates[0].Instructions, walTxn.Updates[0].Instructions) {

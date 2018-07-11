@@ -423,7 +423,8 @@ func (cs *ContractSet) managedInsertContract(h contractHeader, roots []crypto.Ha
 		wal:         cs.wal,
 	}
 	cs.mu.Lock()
-	cs.contracts[h.ID()] = sc
+	cs.contracts[sc.header.ID()] = sc
+	cs.pubKeys[string(h.HostPublicKey().Key)] = sc.header.ID()
 	cs.mu.Unlock()
 	return sc.Metadata(), nil
 }
@@ -479,13 +480,15 @@ func (cs *ContractSet) loadSafeContract(filename string, walTxns []*writeaheadlo
 		}
 	}
 	// add to set
-	cs.contracts[header.ID()] = &SafeContract{
+	sc := &SafeContract{
 		header:        header,
 		merkleRoots:   merkleRoots,
 		unappliedTxns: unappliedTxns,
 		headerFile:    headerSection,
 		wal:           cs.wal,
 	}
+	cs.contracts[sc.header.ID()] = sc
+	cs.pubKeys[string(header.HostPublicKey().Key)] = sc.header.ID()
 	return nil
 }
 

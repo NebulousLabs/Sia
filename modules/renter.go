@@ -7,7 +7,18 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
+
+// ErrHostFault is an error that is usually extended to indicate that an error
+// is the host's fault.
+var ErrHostFault = errors.New("host has returned an error")
+
+// IsHostsFault indicates if a returned error is the host's fault.
+func IsHostsFault(err error) bool {
+	return errors.Contains(err, ErrHostFault)
+}
 
 const (
 	// RenterDir is the name of the directory that is used to store the
@@ -54,6 +65,7 @@ type Allowance struct {
 type ContractUtility struct {
 	GoodForUpload bool
 	GoodForRenew  bool
+	Locked        bool // Locked utilities can only be set to false.
 }
 
 // DownloadInfo provides information about a file that has been requested for
@@ -70,6 +82,7 @@ type DownloadInfo struct {
 	Error                string    `json:"error"`                // Will be the empty string unless there was an error.
 	Received             uint64    `json:"received"`             // Amount of data confirmed and decoded.
 	StartTime            time.Time `json:"starttime"`            // The time when the download was started.
+	StartTimeUnix        int64     `json:"starttimeunix"`        // The time when the download was started in unix format.
 	TotalDataTransferred uint64    `json:"totaldatatransferred"` // Total amount of data transferred, including negotiation, etc.
 }
 
@@ -284,6 +297,16 @@ type ContractorSpending struct {
 	// ContractSpendingDeprecated was renamed to TotalAllocated and always has the
 	// same value as TotalAllocated.
 	ContractSpendingDeprecated types.Currency `json:"contractspending"`
+	// WithheldFunds are the funds from the previous period that are tied up
+	// in contracts and have not been released yet
+	WithheldFunds types.Currency `json:"withheldfunds"`
+	// ReleaseBlock is the block at which the WithheldFunds should be
+	// released to the renter, based on worst case.
+	// Contract End Height + Host Window Size + Maturity Delay
+	ReleaseBlock types.BlockHeight `json:"releaseblock"`
+	// PreviousSpending is the total spend funds from old contracts
+	// that are not included in the current period spending
+	PreviousSpending types.Currency `json:"previousspending"`
 }
 
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
@@ -299,11 +322,14 @@ type Renter interface {
 	// Close closes the Renter.
 	Close() error
 
-	// Contracts returns the contracts formed by the renter.
+	// Contracts returns the active contracts formed by the renter.
 	Contracts() []RenterContract
 
-	// ContractUtility provides the contract utility for a given id
-	ContractUtility(id types.FileContractID) (ContractUtility, bool)
+	// OldContracts returns the old contracts formed by the renter.
+	OldContracts() []RenterContract
+
+	// ContractUtility provides the contract utility for a given host key.
+	ContractUtility(pk types.SiaPublicKey) (ContractUtility, bool)
 
 	// CurrentPeriod returns the height at which the current allowance period
 	// began.
@@ -324,6 +350,10 @@ type Renter interface {
 	// blocking, including downloads of `offset` and `length` type.
 	DownloadAsync(params RenterDownloadParameters) error
 
+	// ClearDownloadHistory clears the download history of the renter
+	// inclusive for before and after times.
+	ClearDownloadHistory(after, before time.Time) error
+
 	// DownloadHistory lists all the files that have been scheduled for download.
 	DownloadHistory() []DownloadInfo
 
@@ -335,6 +365,10 @@ type Renter interface {
 
 	// Host provides the DB entry and score breakdown for the requested host.
 	Host(pk types.SiaPublicKey) (HostDBEntry, bool)
+
+	// InitialScanComplete returns a boolean indicating if the initial scan of the
+	// hostdb is completed.
+	InitialScanComplete() (bool, error)
 
 	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
 	// contain multiple files. The paths of the added files are returned.

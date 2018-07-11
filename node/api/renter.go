@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -115,7 +115,8 @@ type (
 
 	// RenterContracts contains the renter's contracts.
 	RenterContracts struct {
-		Contracts []RenterContract `json:"contracts"`
+		Contracts    []RenterContract `json:"contracts"`
+		OldContracts []RenterContract `json:"oldcontracts"`
 	}
 
 	// RenterDownloadQueue contains the renter's download queue.
@@ -163,6 +164,7 @@ type (
 		Error                string    `json:"error"`                // Will be the empty string unless there was an error.
 		Received             uint64    `json:"received"`             // Amount of data confirmed and decoded.
 		StartTime            time.Time `json:"starttime"`            // The time when the download was started.
+		StartTimeUnix        int64     `json:"starttimeunix"`        // The time when the download was started in unix format.
 		TotalDataTransferred uint64    `json:"totaldatatransferred"` // The total amount of data transferred, including negotiation, overdrive etc.
 	}
 )
@@ -290,7 +292,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 		// Fetch utilities for contract
 		var goodForUpload bool
 		var goodForRenew bool
-		if utility, ok := api.renter.ContractUtility(c.ID); ok {
+		if utility, ok := api.renter.ContractUtility(c.HostPublicKey); ok {
 			goodForUpload = utility.GoodForUpload
 			goodForRenew = utility.GoodForRenew
 		}
@@ -314,9 +316,81 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			UploadSpending:            c.UploadSpending,
 		})
 	}
+	oldContracts := []RenterContract{}
+	for _, c := range api.renter.OldContracts() {
+		var size uint64
+		if len(c.Transaction.FileContractRevisions) != 0 {
+			size = c.Transaction.FileContractRevisions[0].NewFileSize
+		}
+
+		// Fetch host address
+		var netAddress modules.NetAddress
+		hdbe, exists := api.renter.Host(c.HostPublicKey)
+		if exists {
+			netAddress = hdbe.NetAddress
+		}
+
+		// Fetch utilities for contract
+		var goodForUpload bool
+		var goodForRenew bool
+		if utility, ok := api.renter.ContractUtility(c.HostPublicKey); ok {
+			goodForUpload = utility.GoodForUpload
+			goodForRenew = utility.GoodForRenew
+		}
+
+		oldContracts = append(oldContracts, RenterContract{
+			DownloadSpending:          c.DownloadSpending,
+			EndHeight:                 c.EndHeight,
+			Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
+			GoodForUpload:             goodForUpload,
+			GoodForRenew:              goodForRenew,
+			HostPublicKey:             c.HostPublicKey,
+			ID:                        c.ID,
+			LastTransaction:           c.Transaction,
+			NetAddress:                netAddress,
+			RenterFunds:               c.RenterFunds,
+			Size:                      size,
+			StartHeight:               c.StartHeight,
+			StorageSpending:           c.StorageSpending,
+			StorageSpendingDeprecated: c.StorageSpending,
+			TotalCost:                 c.TotalCost,
+			UploadSpending:            c.UploadSpending,
+		})
+	}
 	WriteJSON(w, RenterContracts{
-		Contracts: contracts,
+		Contracts:    contracts,
+		OldContracts: oldContracts,
 	})
+}
+
+// renterClearDownloadsHandler handles the API call to request to clear the download queue.
+func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var afterTime time.Time
+	beforeTime := types.EndOfTime
+	beforeStr, afterStr := req.FormValue("before"), req.FormValue("after")
+	if beforeStr != "" {
+		beforeInt, err := strconv.ParseInt(beforeStr, 10, 64)
+		if err != nil {
+			WriteError(w, Error{"parsing integer value for parameter `before` failed: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		beforeTime = time.Unix(0, beforeInt)
+	}
+	if afterStr != "" {
+		afterInt, err := strconv.ParseInt(afterStr, 10, 64)
+		if err != nil {
+			WriteError(w, Error{"parsing integer value for parameter `after` failed: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		afterTime = time.Unix(0, afterInt)
+	}
+
+	err := api.renter.ClearDownloadHistory(afterTime, beforeTime)
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteSuccess(w)
 }
 
 // renterDownloadsHandler handles the API call to request the download queue.
@@ -336,11 +410,10 @@ func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _
 			Error:                di.Error,
 			Received:             di.Received,
 			StartTime:            di.StartTime,
+			StartTimeUnix:        di.StartTimeUnix,
 			TotalDataTransferred: di.TotalDataTransferred,
 		})
 	}
-	// sort the downloads by newest first
-	sort.Slice(downloads, func(i, j int) bool { return downloads[i].StartTime.After(downloads[j].StartTime) })
 	WriteJSON(w, RenterDownloadQueue{
 		Downloads: downloads,
 	})
@@ -575,7 +648,7 @@ func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps
 	if req.FormValue("datapieces") != "" || req.FormValue("paritypieces") != "" {
 		// Check that both values have been supplied.
 		if req.FormValue("datapieces") == "" || req.FormValue("paritypieces") == "" {
-			WriteError(w, Error{"must provide both the datapieces paramaeter and the paritypieces parameter if specifying erasure coding parameters"}, http.StatusBadRequest)
+			WriteError(w, Error{"must provide both the datapieces parameter and the paritypieces parameter if specifying erasure coding parameters"}, http.StatusBadRequest)
 			return
 		}
 

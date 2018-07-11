@@ -15,8 +15,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb/hosttree"
 	"github.com/NebulousLabs/Sia/persist"
-	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/threadgroup"
 )
 
 var (
@@ -38,7 +38,7 @@ type HostDB struct {
 	log        *persist.Logger
 	mu         sync.RWMutex
 	persistDir string
-	tg         siasync.ThreadGroup
+	tg         threadgroup.ThreadGroup
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -99,12 +99,17 @@ func NewCustomHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir stri
 		return nil, err
 	}
 	hdb.log = logger
-	hdb.tg.AfterStop(func() {
+	err = hdb.tg.AfterStop(func() error {
 		if err := hdb.log.Close(); err != nil {
 			// Resort to println as the logger is in an uncertain state.
 			fmt.Println("Failed to close the hostdb logger:", err)
+			return err
 		}
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	// The host tree is used to manage hosts and query them at random.
 	hdb.hostTree = hosttree.New(hdb.calculateHostWeight)
@@ -116,14 +121,19 @@ func NewCustomHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir stri
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	hdb.tg.AfterStop(func() {
+	err = hdb.tg.AfterStop(func() error {
 		hdb.mu.Lock()
 		err := hdb.saveSync()
 		hdb.mu.Unlock()
 		if err != nil {
 			hdb.log.Println("Unable to save the hostdb:", err)
+			return err
 		}
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	// Loading is complete, establish the save loop.
 	go hdb.threadedSaveLoop()
@@ -158,9 +168,13 @@ func NewCustomHostDB(g modules.Gateway, cs modules.ConsensusSet, persistDir stri
 	if err != nil {
 		return nil, errors.New("hostdb subscription failed: " + err.Error())
 	}
-	hdb.tg.OnStop(func() {
+	err = hdb.tg.OnStop(func() error {
 		cs.Unsubscribe(hdb)
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	// Spawn the scan loop during production, but allow it to be disrupted
 	// during testing. Primary reason is so that we can fill the hostdb with
@@ -228,6 +242,19 @@ func (hdb *HostDB) Host(spk types.SiaPublicKey) (modules.HostDBEntry, bool) {
 	updateHostHistoricInteractions(&host, hdb.blockHeight)
 	hdb.mu.RUnlock()
 	return host, exists
+}
+
+// InitialScanComplete returns a boolean indicating if the initial scan of the
+// hostdb is completed.
+func (hdb *HostDB) InitialScanComplete() (complete bool, err error) {
+	if err = hdb.tg.Add(); err != nil {
+		return
+	}
+	defer hdb.tg.Done()
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+	complete = hdb.initialScanComplete
+	return
 }
 
 // RandomHosts implements the HostDB interface's RandomHosts() method. It takes

@@ -1,7 +1,6 @@
 package proto
 
 import (
-	"errors"
 	"net"
 	"sync"
 	"time"
@@ -10,6 +9,8 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
 
 // A Downloader retrieves sectors by calling the download RPC on a host.
@@ -82,6 +83,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	defer func() {
 		if err != nil {
 			hd.hdb.IncrementFailedInteractions(contract.HostPublicKey())
+			err = errors.Extend(err, modules.ErrHostFault)
 		} else if err == nil {
 			hd.hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}
@@ -173,6 +175,7 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 		// A revision mismatch might not be the host's fault.
 		if err != nil && !IsRevisionMismatch(err) {
 			hdb.IncrementFailedInteractions(contract.HostPublicKey())
+			err = errors.Extend(err, modules.ErrHostFault)
 		} else if err == nil {
 			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}

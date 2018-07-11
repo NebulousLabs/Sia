@@ -35,7 +35,25 @@ type (
 		Entry          ExtendedHostDBEntry        `json:"entry"`
 		ScoreBreakdown modules.HostScoreBreakdown `json:"scorebreakdown"`
 	}
+
+	// HostdbGet holds information about the hostdb.
+	HostdbGet struct {
+		InitialScanComplete bool `json:"initialscancomplete"`
+	}
 )
+
+// hostdbHandler handles the API call asking for the list of active
+// hosts.
+func (api *API) hostdbHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	isc, err := api.renter.InitialScanComplete()
+	if err != nil {
+		WriteError(w, Error{"Failed to get initial scan status" + err.Error()}, http.StatusInternalServerError)
+		return
+	}
+	WriteJSON(w, HostdbGet{
+		InitialScanComplete: isc,
+	})
+}
 
 // hostdbActiveHandler handles the API call asking for the list of active
 // hosts.

@@ -251,6 +251,11 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 	if fc.WindowEnd < fc.WindowStart+externalSettings.WindowSize {
 		return errSmallWindow
 	}
+	// WindowStart must not be more than settings.MaxDuration blocks into the
+	// future.
+	if fc.WindowStart > blockHeight+externalSettings.MaxDuration {
+		return errLongDuration
+	}
 
 	// ValidProofOutputs shoud have 2 outputs (renter + host) and missed
 	// outputs should have 3 (renter + host + void)

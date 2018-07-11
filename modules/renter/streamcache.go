@@ -76,6 +76,11 @@ func (sc *streamCache) Add(cacheID string, data []byte) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
+	// Check to make sure chuck has not already been added
+	if _, ok := sc.streamMap[cacheID]; ok {
+		return
+	}
+
 	// pruning cache to cacheSize - 1 to make room to add the new chunk
 	sc.pruneCache(sc.cacheSize - 1)
 
@@ -105,7 +110,7 @@ func (sc *streamCache) pruneCache(size uint64) {
 
 	// Sanity check to confirm the Map and Heap where both pruned
 	if len(sc.streamHeap) != len(sc.streamMap) {
-		build.Critical("streamHeap and streamMap are not the same length")
+		build.Critical("streamHeap and streamMap are not the same length,", len(sc.streamHeap), "and", len(sc.streamMap))
 	}
 }
 
@@ -113,7 +118,7 @@ func (sc *streamCache) pruneCache(size uint64) {
 // successful it will write the data to the destination and stop the download
 // if it was the last missing chunk. The function returns true if the chunk was
 // in the cache.
-// Using the entire unfisihedDownloadChunk as the argument as there are seven different fields
+// Using the entire unfinishedDownloadChunk as the argument as there are seven different fields
 // used from unfinishedDownloadChunk and it allows using udc.fail()
 //
 // TODO: in the future we might need cache invalidation. At the
@@ -161,20 +166,26 @@ func (sc *streamCache) Retrieve(udc *unfinishedDownloadChunk) bool {
 // the default value set during the initialization of the streamCache.
 // It will also prune the cache to ensure the cache is always
 // less than or equal to whatever the cacheSize is set to
-func (sc *streamCache) SetStreamingCacheSize(cacheSize uint64) {
+func (sc *streamCache) SetStreamingCacheSize(cacheSize uint64) error {
+	if cacheSize == 0 {
+		return errors.New("cache size cannot be zero")
+	}
+
 	sc.mu.Lock()
-	defer sc.mu.Unlock()
 	sc.cacheSize = cacheSize
 	sc.pruneCache(sc.cacheSize)
+	sc.mu.Unlock()
+	return nil
 }
 
-// newStreamCache creates a new streamCache
-func newStreamCache() *streamCache {
-	streamHeap := make(streamHeap, 0, defaultStreamCacheSize)
+// initStreamCache initializes the streaming cache of the renter.
+func newStreamCache(cacheSize uint64) *streamCache {
+	streamHeap := make(streamHeap, 0, cacheSize)
 	heap.Init(&streamHeap)
+
 	return &streamCache{
 		streamMap:  make(map[string]*chunkData),
 		streamHeap: streamHeap,
-		cacheSize:  defaultStreamCacheSize,
+		cacheSize:  cacheSize,
 	}
 }

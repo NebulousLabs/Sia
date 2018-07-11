@@ -35,6 +35,7 @@ func TestContractSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	header1 := contractHeader{Transaction: types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{{
 			ParentID:             types.FileContractID{1},

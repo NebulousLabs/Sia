@@ -142,7 +142,7 @@ By default the wallet encryption / unlock password is the same as the generated 
 'amount' can be specified in units, e.g. 1.23KS. Run 'wallet --help' for a list of units.
 If no unit is supplied, hastings will be assumed.
 
-A miner fee of 10 SC is levied on all transactions.`,
+A dynamic transaction fee is applied depending on the size of the transaction and how busy the network is.`,
 		Run: wrap(walletsendsiacoinscmd),
 	}
 
@@ -526,7 +526,7 @@ func walletsigncmd(txnJSON, toSignJSON string) {
 // wallettransactionscmd lists all of the transactions related to the wallet,
 // providing a net flow of siacoins and siafunds for each.
 func wallettransactionscmd() {
-	wtg, err := httpClient.WalletTransactionsGet(0, math.MaxUint64)
+	wtg, err := httpClient.WalletTransactionsGet(0, math.MaxInt64)
 	if err != nil {
 		die("Could not fetch transaction history:", err)
 	}

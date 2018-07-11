@@ -9,7 +9,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/errors"
 )
@@ -42,14 +41,14 @@ type unfinishedDownloadChunk struct {
 	masterKey   crypto.TwofishKey
 
 	// Fetch + Write instructions - read only or otherwise thread safe.
-	staticChunkIndex  uint64                                     // Required for deriving the encryption keys for each piece.
-	staticCacheID     string                                     // Used to uniquely identify a chunk in the chunk cache.
-	staticChunkMap    map[types.FileContractID]downloadPieceInfo // Maps from file contract ids to the info for the piece associated with that contract
+	staticChunkIndex  uint64                       // Required for deriving the encryption keys for each piece.
+	staticCacheID     string                       // Used to uniquely identify a chunk in the chunk cache.
+	staticChunkMap    map[string]downloadPieceInfo // Maps from host PubKey to the info for the piece associated with that host
 	staticChunkSize   uint64
 	staticFetchLength uint64 // Length within the logical chunk to fetch.
 	staticFetchOffset uint64 // Offset within the logical chunk that is being downloaded.
 	staticPieceSize   uint64
-	staticWriteOffset int64 // Offet within the writer to write the completed data.
+	staticWriteOffset int64 // Offset within the writer to write the completed data.
 
 	// Fetch + Write instructions - read only or otherwise thread safe.
 	staticLatencyTarget time.Duration
@@ -155,7 +154,7 @@ func (udc *unfinishedDownloadChunk) returnMemory() {
 	if udc.piecesCompleted >= udc.erasureCode.MinPieces() {
 		// udc.piecesRegistered is guaranteed to be at most equal to the number
 		// of overdrive pieces, meaning it will be equal to or less than
-		// initalMemory.
+		// initialMemory.
 		maxMemory = uint64(udc.piecesCompleted+udc.piecesRegistered) * udc.staticPieceSize
 	}
 	// If the chunk recovery has completed, the maximum number of pieces is the

@@ -18,11 +18,13 @@ package renter
 
 import (
 	"container/heap"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // uploadHeap contains a priority-sorted heap of all the chunks being uploaded
@@ -62,7 +64,7 @@ func (uch *uploadChunkHeap) Pop() interface{} {
 	return x
 }
 
-// managedAddChunkToUploadHeap will add a chunk to the upload heap.
+// managedPush will add a chunk to the upload heap.
 func (uh *uploadHeap) managedPush(uuc *unfinishedUploadChunk) {
 	// Create the unique chunk id.
 	ucid := uploadChunkID{
@@ -106,7 +108,7 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	defer f.mu.Unlock()
 
 	// If the file is not being tracked, don't repair it.
-	trackedFile, exists := r.tracking[f.name]
+	trackedFile, exists := r.persist.Tracking[f.name]
 	if !exists {
 		return nil
 	}
@@ -166,8 +168,9 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 	// map, also increment the 'piecesCompleted' value.
 	saveFile := false
 	for fcid, fileContract := range f.contracts {
-		recentContract, exists := r.hostContractor.ContractByID(fcid)
-		contractUtility, exists2 := r.hostContractor.ContractUtility(fcid)
+		pk := r.hostContractor.ResolveIDToPubKey(fcid)
+		recentContract, exists := r.hostContractor.ContractByPublicKey(pk)
+		contractUtility, exists2 := r.hostContractor.ContractUtility(pk)
 		if exists != exists2 {
 			build.Critical("got a contract without utility or vice versa which shouldn't happen",
 				exists, exists2)
@@ -234,14 +237,38 @@ func (r *Renter) buildUnfinishedChunks(f *file, hosts map[string]struct{}) []*un
 func (r *Renter) managedBuildChunkHeap(hosts map[string]struct{}) {
 	// Loop through the whole set of files and get a list of chunks to add to
 	// the heap.
-	id := r.mu.Lock()
+	id := r.mu.RLock()
+	goodForRenew := make(map[types.FileContractID]bool)
+	offline := make(map[types.FileContractID]bool)
 	for _, file := range r.files {
+		file.mu.RLock()
+		for cid := range file.contracts {
+			resolvedID := r.hostContractor.ResolveIDToPubKey(cid)
+			cu, ok := r.hostContractor.ContractUtility(resolvedID)
+			goodForRenew[cid] = ok && cu.GoodForRenew
+			offline[cid] = r.hostContractor.IsOffline(resolvedID)
+		}
+		file.mu.RUnlock()
+
 		unfinishedUploadChunks := r.buildUnfinishedChunks(file, hosts)
 		for i := 0; i < len(unfinishedUploadChunks); i++ {
 			r.uploadHeap.managedPush(unfinishedUploadChunks[i])
 		}
 	}
-	r.mu.Unlock(id)
+	for _, file := range r.files {
+		file.mu.RLock()
+		// check for local file
+		tf, exists := r.persist.Tracking[file.name]
+		if exists {
+			// Check if local file is missing and redundancy is less than 1
+			// log warning to renter log
+			if _, err := os.Stat(tf.RepairPath); os.IsNotExist(err) && file.redundancy(offline, goodForRenew) < 1 {
+				r.log.Println("File not found on disk and possibly unrecoverable:", tf.RepairPath)
+			}
+		}
+		file.mu.RUnlock()
+	}
+	r.mu.RUnlock(id)
 }
 
 // managedPrepareNextChunk takes the next chunk from the chunk heap and prepares
@@ -361,7 +388,7 @@ func (r *Renter) threadedUploadLoop() {
 		case <-rebuildHeapSignal:
 			// Time to check the filesystem health again.
 		case <-r.tg.StopChan():
-			// Thre renter has shut down.
+			// The renter has shut down.
 			return
 		}
 	}

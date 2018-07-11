@@ -80,7 +80,7 @@ func ReadSignedObject(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey)
 		return err
 	}
 	// read the encoded object
-	encObj, err := encoding.ReadPrefix(r, maxLen)
+	encObj, err := encoding.ReadPrefixedBytes(r, maxLen)
 	if err != nil {
 		return err
 	}

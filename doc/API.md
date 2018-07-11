@@ -656,12 +656,27 @@ Host DB
 
 | Route                                                   | HTTP verb |
 | ------------------------------------------------------- | --------- |
+| [/hostdb](#hostdb-get-example)                          | GET       |
 | [/hostdb/active](#hostdbactive-get-example)             | GET       |
 | [/hostdb/all](#hostdball-get-example)                   | GET       |
 | [/hostdb/hosts/:___pubkey___](#hostdbhostspubkey-get-example) | GET       |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [HostDB.md](/doc/api/HostDB.md).
+
+#### /hostdb [GET] [(example)](/doc/api/HostDB.md#hostdb-get)
+
+shows some general information about the state of the hostdb.
+
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response)
+
+Either the following JSON struct or an error response. See [#standard-responses](#standard-responses).
+
+```javascript
+{
+    "initialscancomplete": false
+}
+```
 
 #### /hostdb/active [GET] [(example)](/doc/api/HostDB.md#active-hosts)
 
@@ -672,7 +687,7 @@ lists all of the active hosts known to the renter, sorted by preference.
 numhosts // Optional
 ```
 
-###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response)
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-1)
 ```javascript
 {
   "hosts": [
@@ -702,7 +717,7 @@ numhosts // Optional
 lists all of the hosts known to the renter. Hosts are not guaranteed to be in
 any particular order, and the order may change in subsequent calls.
 
-###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-1)
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-2)
 ```javascript
 {
   "hosts": [
@@ -740,7 +755,7 @@ overall.
 :pubkey
 ```
 
-###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-2)
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-3)
 ```javascript
 {
   "entry": {
@@ -854,6 +869,7 @@ Renter
 | [/renter](#renter-post)                                                   | POST      |
 | [/renter/contracts](#rentercontracts-get)                                 | GET       |
 | [/renter/downloads](#renterdownloads-get)                                 | GET       |
+| [/renter/downloads/clear](#renterdownloadsclear-post)                     | POST      |
 | [/renter/prices](#renterprices-get)                                       | GET       |
 | [/renter/files](#renterfiles-get)                                         | GET       |
 | [/renter/file/*___siapath___](#renterfile___siapath___-get)               | GET       |
@@ -894,7 +910,7 @@ returns the current settings along with metrics on the renter's spending.
     "uploadspending":   "5678", // hastings
     "unspent":          "1234"  // hastings
   },
-  "currentperiod": "200"
+  "currentperiod": 200
 }
 ```
 
@@ -904,13 +920,13 @@ modify settings that control the renter's behavior.
 
 ###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters)
 ```
-funds // hastings
+funds             // hastings
 hosts
-period      // block height
-renewwindow // block height
-maxdownloadspeed  // bytes per second, not persisted and will be reset by a shutdown
-maxuploadspeed  // bytes per second, not persisted and will be reset by a shutdown
-streamcachesize // number of data chunks cached when streaming, not persisted and will be reset by a shutdown
+period            // block height
+renewwindow       // block height
+maxdownloadspeed  // bytes per second
+maxuploadspeed    // bytes per second
+streamcachesize   // number of data chunks cached when streaming
 ```
 
 ###### Response
@@ -975,6 +991,25 @@ lists all files in the download queue.
   ]
 }
 ```
+
+#### /renter/downloads/clear [POST]
+
+Clears the download history of the renter for a range of unix time stamps.  Both
+parameters are optional, if no parameters are provided, the entire download
+history will be cleared.  To clear a single download, provide the timestamp for
+the download as both parameters.  Providing only the before parameter will clear
+all downloads older than the timestamp.  Conversely, providing only the after
+parameter will clear all downloads newer than the timestamp.
+
+###### Timestamp Parameters [(with comments)](/doc/api/Renter.md#timestamp-parameters)
+```
+before   // Optional
+after    // Optional
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /renter/files [GET]
 

@@ -16,12 +16,12 @@ type badWriter struct{}
 
 func (bw *badWriter) Write([]byte) (int, error) { return 0, nil }
 
-func TestReadPrefix(t *testing.T) {
+func TestReadPrefixedBytes(t *testing.T) {
 	b := new(bytes.Buffer)
 
 	// standard
 	b.Write(append(EncUint64(3), "foo"...))
-	data, err := ReadPrefix(b, 3)
+	data, err := ReadPrefixedBytes(b, 3)
 	if err != nil {
 		t.Error(err)
 	} else if string(data) != "foo" {
@@ -30,35 +30,35 @@ func TestReadPrefix(t *testing.T) {
 
 	// 0-length
 	b.Write(EncUint64(0))
-	_, err = ReadPrefix(b, 0)
+	_, err = ReadPrefixedBytes(b, 0)
 	if err != nil {
 		t.Error(err)
 	}
 
 	// empty
 	b.Write([]byte{})
-	_, err = ReadPrefix(b, 3)
+	_, err = ReadPrefixedBytes(b, 3)
 	if err != io.EOF {
 		t.Error("expected EOF, got", err)
 	}
 
 	// less than 8 bytes
 	b.Write([]byte{1, 2, 3})
-	_, err = ReadPrefix(b, 3)
+	_, err = ReadPrefixedBytes(b, 3)
 	if err != io.ErrUnexpectedEOF {
 		t.Error("expected unexpected EOF, got", err)
 	}
 
 	// exceed maxLen
 	b.Write(EncUint64(4))
-	_, err = ReadPrefix(b, 3)
+	_, err = ReadPrefixedBytes(b, 3)
 	if err == nil || err.Error() != "length 4 exceeds maxLen of 3" {
 		t.Error("expected maxLen error, got", err)
 	}
 
 	// no data after length prefix
 	b.Write(EncUint64(3))
-	_, err = ReadPrefix(b, 3)
+	_, err = ReadPrefixedBytes(b, 3)
 	if err != io.EOF {
 		t.Error("expected EOF, got", err)
 	}
@@ -94,21 +94,21 @@ func TestReadObject(t *testing.T) {
 	}
 }
 
-func TestWritePrefix(t *testing.T) {
+func TestWritePrefixedBytes(t *testing.T) {
 	b := new(bytes.Buffer)
 
 	// standard
-	err := WritePrefix(b, []byte("foo"))
+	err := WritePrefixedBytes(b, []byte("foo"))
 	expected := append(EncUint64(3), "foo"...)
 	if err != nil {
 		t.Error(err)
 	} else if !bytes.Equal(b.Bytes(), expected) {
-		t.Errorf("WritePrefix wrote wrong data: expected %v, got %v", b.Bytes(), expected)
+		t.Errorf("WritePrefixedBytes wrote wrong data: expected %v, got %v", b.Bytes(), expected)
 	}
 
 	// badWriter (returns nil error, but doesn't write anything)
 	bw := new(badWriter)
-	err = WritePrefix(bw, []byte("foo"))
+	err = WritePrefixedBytes(bw, []byte("foo"))
 	if err != io.ErrShortWrite {
 		t.Error("expected ErrShortWrite, got", err)
 	}
@@ -123,7 +123,7 @@ func TestWriteObject(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	} else if !bytes.Equal(b.Bytes(), expected) {
-		t.Errorf("WritePrefix wrote wrong data: expected %v, got %v", b.Bytes(), expected)
+		t.Errorf("WritePrefixedBytes wrote wrong data: expected %v, got %v", b.Bytes(), expected)
 	}
 
 	// badWriter
@@ -134,16 +134,16 @@ func TestWriteObject(t *testing.T) {
 	}
 }
 
-func TestReadWritePrefix(t *testing.T) {
+func TestReadWritePrefixedBytes(t *testing.T) {
 	b := new(bytes.Buffer)
 
-	// WritePrefix -> ReadPrefix
+	// WritePrefixedBytes -> ReadPrefixedBytes
 	data := []byte("foo")
-	err := WritePrefix(b, data)
+	err := WritePrefixedBytes(b, data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rdata, err := ReadPrefix(b, 100)
+	rdata, err := ReadPrefixedBytes(b, 100)
 	if err != nil {
 		t.Error(err)
 	} else if !bytes.Equal(rdata, data) {

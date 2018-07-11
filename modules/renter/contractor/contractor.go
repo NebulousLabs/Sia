@@ -55,25 +55,16 @@ type Contractor struct {
 	currentPeriod types.BlockHeight
 	lastChange    modules.ConsensusChangeID
 
-	downloaders     map[types.FileContractID]*hostDownloader
-	editors         map[types.FileContractID]*hostEditor
-	numFailedRenews map[types.FileContractID]types.BlockHeight
-	renewing        map[types.FileContractID]bool // prevent revising during renewal
-	revising        map[types.FileContractID]bool // prevent overlapping revisions
+	downloaders         map[types.FileContractID]*hostDownloader
+	editors             map[types.FileContractID]*hostEditor
+	numFailedRenews     map[types.FileContractID]types.BlockHeight
+	pubKeysToContractID map[string]types.FileContractID
+	contractIDToPubKey  map[types.FileContractID]types.SiaPublicKey
+	renewing            map[types.FileContractID]bool // prevent revising during renewal
+	revising            map[types.FileContractID]bool // prevent overlapping revisions
 
 	staticContracts *proto.ContractSet
 	oldContracts    map[types.FileContractID]modules.RenterContract
-	renewedIDs      map[types.FileContractID]types.FileContractID
-}
-
-// readlockResolveID returns the ID of the most recent renewal of id.
-func (c *Contractor) readlockResolveID(id types.FileContractID) types.FileContractID {
-	newID, exists := c.renewedIDs[id]
-	for exists {
-		id = newID
-		newID, exists = c.renewedIDs[id]
-	}
-	return id
 }
 
 // Allowance returns the current allowance.
@@ -102,14 +93,40 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 		spending.DownloadSpending = spending.DownloadSpending.Add(contract.DownloadSpending)
 		spending.UploadSpending = spending.UploadSpending.Add(contract.UploadSpending)
 		spending.StorageSpending = spending.StorageSpending.Add(contract.StorageSpending)
-		// TODO: fix PreviousContracts
-		// for _, pre := range contract.PreviousContracts {
-		// 	spending.ContractSpending = spending.ContractSpending.Add(pre.TotalCost)
-		// 	spending.DownloadSpending = spending.DownloadSpending.Add(pre.DownloadSpending)
-		// 	spending.UploadSpending = spending.UploadSpending.Add(pre.UploadSpending)
-		// 	spending.StorageSpending = spending.StorageSpending.Add(pre.StorageSpending)
-		// }
 	}
+
+	// Calculate needed spending to be reported from old contracts
+	for _, old := range c.oldContracts {
+		host, exist := c.hdb.Host(old.HostPublicKey)
+		if old.StartHeight >= c.currentPeriod {
+			// Calculate spending from contracts that were renewed during the current period
+			// Calculate ContractFees
+			spending.ContractFees = spending.ContractFees.Add(old.ContractFee)
+			spending.ContractFees = spending.ContractFees.Add(old.TxnFee)
+			spending.ContractFees = spending.ContractFees.Add(old.SiafundFee)
+			// Calculate TotalAllocated
+			spending.TotalAllocated = spending.TotalAllocated.Add(old.TotalCost)
+			// Calculate Spending
+			spending.DownloadSpending = spending.DownloadSpending.Add(old.DownloadSpending)
+			spending.UploadSpending = spending.UploadSpending.Add(old.UploadSpending)
+			spending.StorageSpending = spending.StorageSpending.Add(old.StorageSpending)
+		} else if exist && old.EndHeight+host.WindowSize+types.MaturityDelay > c.blockHeight {
+			// Calculate funds that are being withheld in contracts
+			spending.WithheldFunds = spending.WithheldFunds.Add(old.RenterFunds)
+			// Record the largest window size for worst case when reporting the spending
+			if host.WindowSize >= spending.ReleaseBlock {
+				spending.ReleaseBlock = host.WindowSize
+			}
+			// Calculate Previous spending
+			spending.PreviousSpending = spending.PreviousSpending.Add(old.ContractFee).Add(old.TxnFee).
+				Add(old.SiafundFee).Add(old.DownloadSpending).Add(old.UploadSpending).Add(old.StorageSpending)
+		} else {
+			// Calculate Previous spending
+			spending.PreviousSpending = spending.PreviousSpending.Add(old.ContractFee).Add(old.TxnFee).
+				Add(old.SiafundFee).Add(old.DownloadSpending).Add(old.UploadSpending).Add(old.StorageSpending)
+		}
+	}
+
 	// Calculate amount of spent money to get unspent money.
 	allSpending := spending.ContractFees
 	allSpending = allSpending.Add(spending.DownloadSpending)
@@ -122,12 +139,17 @@ func (c *Contractor) PeriodSpending() modules.ContractorSpending {
 	return spending
 }
 
-// ContractByID returns the contract with the id specified, if it exists. The
-// contract will be resolved if possible to the most recent child contract.
-func (c *Contractor) ContractByID(id types.FileContractID) (modules.RenterContract, bool) {
+// ContractByPublicKey returns the contract with the key specified, if it
+// exists. The contract will be resolved if possible to the most recent child
+// contract.
+func (c *Contractor) ContractByPublicKey(pk types.SiaPublicKey) (modules.RenterContract, bool) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.staticContracts.View(c.readlockResolveID(id))
+	id, ok := c.pubKeysToContractID[string(pk.Key)]
+	c.mu.RUnlock()
+	if !ok {
+		return modules.RenterContract{}, false
+	}
+	return c.staticContracts.View(id)
 }
 
 // Contracts returns the contracts formed by the contractor in the current
@@ -137,8 +159,26 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 	return c.staticContracts.ViewAll()
 }
 
+// OldContracts returns the contracts formed by the contractor that have
+// expired
+func (c *Contractor) OldContracts() []modules.RenterContract {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	contracts := make([]modules.RenterContract, 0, len(c.oldContracts))
+	for _, c := range c.oldContracts {
+		contracts = append(contracts, c)
+	}
+	return contracts
+}
+
 // ContractUtility returns the utility fields for the given contract.
-func (c *Contractor) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
+func (c *Contractor) ContractUtility(pk types.SiaPublicKey) (modules.ContractUtility, bool) {
+	c.mu.RLock()
+	id, ok := c.pubKeysToContractID[string(pk.Key)]
+	c.mu.RUnlock()
+	if !ok {
+		return modules.ContractUtility{}, false
+	}
 	return c.managedContractUtility(id)
 }
 
@@ -150,12 +190,15 @@ func (c *Contractor) CurrentPeriod() types.BlockHeight {
 	return c.currentPeriod
 }
 
-// ResolveID returns the ID of the most recent renewal of id.
-func (c *Contractor) ResolveID(id types.FileContractID) types.FileContractID {
+// ResolveIDToPubKey returns the ID of the most recent renewal of id.
+func (c *Contractor) ResolveIDToPubKey(id types.FileContractID) types.SiaPublicKey {
 	c.mu.RLock()
-	newID := c.readlockResolveID(id)
-	c.mu.RUnlock()
-	return newID
+	defer c.mu.RUnlock()
+	pk, exists := c.contractIDToPubKey[id]
+	if !exists {
+		panic("renewed should never miss an id")
+	}
+	return pk
 }
 
 // RateLimits sets the bandwidth limits for connections created by the
@@ -228,13 +271,14 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 
 		interruptMaintenance: make(chan struct{}),
 
-		staticContracts: contractSet,
-		downloaders:     make(map[types.FileContractID]*hostDownloader),
-		editors:         make(map[types.FileContractID]*hostEditor),
-		oldContracts:    make(map[types.FileContractID]modules.RenterContract),
-		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
-		renewing:        make(map[types.FileContractID]bool),
-		revising:        make(map[types.FileContractID]bool),
+		staticContracts:     contractSet,
+		downloaders:         make(map[types.FileContractID]*hostDownloader),
+		editors:             make(map[types.FileContractID]*hostEditor),
+		oldContracts:        make(map[types.FileContractID]modules.RenterContract),
+		contractIDToPubKey:  make(map[types.FileContractID]types.SiaPublicKey),
+		pubKeysToContractID: make(map[string]types.FileContractID),
+		renewing:            make(map[types.FileContractID]bool),
+		revising:            make(map[types.FileContractID]bool),
 	}
 
 	// Close the contract set and logger upon shutdown.
@@ -277,5 +321,16 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 	if err != nil {
 		return nil, err
 	}
+
+	// Initialize the contractIDToPubKey map
+	for _, contract := range c.oldContracts {
+		c.contractIDToPubKey[contract.ID] = contract.HostPublicKey
+		c.pubKeysToContractID[string(contract.HostPublicKey.Key)] = contract.ID
+	}
+	for _, contract := range c.staticContracts.ViewAll() {
+		c.contractIDToPubKey[contract.ID] = contract.HostPublicKey
+		c.pubKeysToContractID[string(contract.HostPublicKey.Key)] = contract.ID
+	}
+
 	return c, nil
 }

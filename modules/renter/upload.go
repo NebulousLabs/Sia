@@ -87,7 +87,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Add file to renter.
 	lockID = r.mu.Lock()
 	r.files[up.SiaPath] = f
-	r.tracking[up.SiaPath] = trackedFile{
+	r.persist.Tracking[up.SiaPath] = trackedFile{
 		RepairPath: up.Source,
 	}
 	r.saveSync()

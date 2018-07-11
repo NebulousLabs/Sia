@@ -30,9 +30,6 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 
 // managedContractUtility returns the ContractUtility for a contract with a given id.
 func (c *Contractor) managedContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
-	c.mu.RLock()
-	id = c.readlockResolveID(id)
-	c.mu.RUnlock()
 	rc, exists := c.staticContracts.View(id)
 	if !exists {
 		return modules.ContractUtility{}, false
@@ -66,7 +63,7 @@ func (c *Contractor) managedInterruptContractMaintenance() {
 }
 
 // managedMarkContractsUtility checks every active contract in the contractor and
-// figures out whether the contract is useful for uploading, and whehter the
+// figures out whether the contract is useful for uploading, and whether the
 // contract should be renewed.
 func (c *Contractor) managedMarkContractsUtility() error {
 	// Pull a new set of hosts from the hostdb that could be used as a new set
@@ -99,9 +96,12 @@ func (c *Contractor) managedMarkContractsUtility() error {
 	// Update utility fields for each contract.
 	for _, contract := range c.staticContracts.ViewAll() {
 		utility := func() (u modules.ContractUtility) {
-			// Start the contract in good standing.
-			u.GoodForUpload = true
-			u.GoodForRenew = true
+			// Start the contract in good standing if the utility wasn't
+			// locked.
+			if !u.Locked {
+				u.GoodForUpload = true
+				u.GoodForRenew = true
+			}
 
 			host, exists := c.hdb.Host(contract.HostPublicKey)
 			// Contract has no utility if the host is not in the database.
@@ -122,21 +122,12 @@ func (c *Contractor) managedMarkContractsUtility() error {
 				u.GoodForRenew = false
 				return
 			}
-			// Contract has no utility if renew has already completed. (grab some
-			// extra values while we have the mutex)
+			// Contract should not be used for uploading if the time has come to
+			// renew the contract.
 			c.mu.RLock()
 			blockHeight := c.blockHeight
 			renewWindow := c.allowance.RenewWindow
-			_, renewedPreviously := c.renewedIDs[contract.ID]
 			c.mu.RUnlock()
-			if renewedPreviously {
-				u.GoodForUpload = false
-				u.GoodForRenew = false
-				return
-			}
-
-			// Contract should not be used for uploading if the time has come to
-			// renew the contract.
 			if blockHeight+renewWindow >= contract.EndHeight {
 				u.GoodForUpload = false
 				return
@@ -193,6 +184,18 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 		txnBuilder.Drop()
 		return modules.RenterContract{}, err
 	}
+
+	// Add a mapping from the contract's id to the public key of the host.
+	c.mu.Lock()
+	c.contractIDToPubKey[contract.ID] = contract.HostPublicKey
+	_, exists := c.pubKeysToContractID[string(contract.HostPublicKey.Key)]
+	if exists {
+		c.mu.Unlock()
+		txnBuilder.Drop()
+		return modules.RenterContract{}, fmt.Errorf("We already have a contract with host %v", contract.HostPublicKey)
+	}
+	c.pubKeysToContractID[string(contract.HostPublicKey.Key)] = contract.ID
+	c.mu.Unlock()
 
 	contractValue := contract.RenterFunds
 	c.log.Printf("Formed contract %v with %v for %v", contract.ID, host.NetAddress, contractValue.HumanString())
@@ -252,6 +255,14 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 		return modules.RenterContract{}, err
 	}
 
+	// Add a mapping from the contract's id to the public key of the host. This
+	// will destroy the previous mapping from pubKey to contract id but other
+	// modules are only interested in the most recent contract anyway.
+	c.mu.Lock()
+	c.contractIDToPubKey[newContract.ID] = newContract.HostPublicKey
+	c.pubKeysToContractID[string(newContract.HostPublicKey.Key)] = newContract.ID
+	c.mu.Unlock()
+
 	return newContract, nil
 }
 
@@ -260,8 +271,8 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 // dropping contracts which are no longer worthwhile, and adding contracts if
 // there are not enough.
 //
-// Between each network call, the thread checks whether a maintenance iterrupt
-// signal is being sent. If so, maintannce returns, yielding to whatever thread
+// Between each network call, the thread checks whether a maintenance interrupt
+// signal is being sent. If so, maintenance returns, yielding to whatever thread
 // issued the interrupt.
 func (c *Contractor) threadedContractMaintenance() {
 	// Threading protection.
@@ -271,8 +282,23 @@ func (c *Contractor) threadedContractMaintenance() {
 	}
 	defer c.tg.Done()
 
-	// Archive contracts that need to be archived before doing additional maintenance.
+	// Archive contracts that need to be archived before doing additional
+	// maintenance.
 	c.managedArchiveContracts()
+
+	// Prune unknown public keys from the contractor"s map.
+	allContracts := c.staticContracts.ViewAll()
+	pks := make(map[string]struct{})
+	for _, c := range allContracts {
+		pks[string(c.HostPublicKey.Key)] = struct{}{}
+	}
+	c.mu.Lock()
+	for pk := range c.pubKeysToContractID {
+		if _, exists := pks[pk]; !exists {
+			delete(c.pubKeysToContractID, pk)
+		}
+	}
+	c.mu.Unlock()
 
 	// Nothing to do if there are no hosts.
 	c.mu.RLock()
@@ -318,7 +344,6 @@ func (c *Contractor) threadedContractMaintenance() {
 	var endHeight types.BlockHeight
 	var fundsAvailable types.Currency
 	var renewSet []renewal
-	refreshSet := make(map[types.FileContractID]struct{})
 
 	c.mu.RLock()
 	currentPeriod := c.currentPeriod
@@ -326,7 +351,8 @@ func (c *Contractor) threadedContractMaintenance() {
 	blockHeight := c.blockHeight
 	c.mu.RUnlock()
 
-	// Grab the end height that should be used for the contracts.
+	// Grab the end height that should be used for the contracts created
+	// in the current period.
 	endHeight = currentPeriod + allowance.Period
 
 	// Determine how many funds have been used already in this billing
@@ -337,7 +363,6 @@ func (c *Contractor) threadedContractMaintenance() {
 	for _, contract := range c.staticContracts.ViewAll() {
 		// Calculate the cost of the contract line.
 		contractLineCost := contract.TotalCost
-		// TODO: add previous contracts here
 
 		// Check if the contract is expiring. The funds in the contract are
 		// handled differently based on this information.
@@ -392,17 +417,37 @@ func (c *Contractor) threadedContractMaintenance() {
 			// cycle. This is calculated by starting with the total cost and
 			// subtracting out all of the fees, and then all of the unused
 			// money that was allocated (the RenterFunds).
-			renewAmount := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee).Sub(contract.RenterFunds)
-			// TODO: add previous contracts here
+			//
+			// In order to accurately fund contracts based on variable spending,
+			// the cost per block is calculated based on the total spent
+			// over the length of time that the contract was active before
+			// renewal.
+			oldContractSpent := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee).Sub(contract.RenterFunds)
+			oldContractLength := blockHeight - contract.StartHeight
+			if oldContractLength == 0 {
+				oldContractLength = types.BlockHeight(1)
+			}
+			spentPerBlock := oldContractSpent.Div64(uint64(oldContractLength))
+			renewAmount := spentPerBlock.Mul64(uint64(allowance.Period))
 
 			// Get an estimate for how much the fees will cost.
-			//
-			// TODO: Look up this host in the hostdb to figure out what the
-			// actual fees will be.
-			estimatedFees := contract.ContractFee.Add(contract.TxnFee).Add(contract.SiafundFee)
+			// Txn Fee
+			_, maxTxnFee := c.tpool.FeeEstimation()
+
+			// SiafundFee
+			siafundFee := types.Tax(blockHeight, renewAmount)
+
+			// Contract Fee
+			host, ok := c.hdb.Host(contract.HostPublicKey)
+			if !ok {
+				c.log.Println("Could not find contract host in hostdb")
+				return
+			}
+
+			estimatedFees := host.ContractPrice.Add(maxTxnFee).Add(siafundFee)
 			renewAmount = renewAmount.Add(estimatedFees)
 
-			// Determine if there is enough funds available to suppliement
+			// Determine if there is enough funds available to supplement
 			// with a 33% bonus, and if there is, add a 33% bonus.
 			moneyBuffer := renewAmount.Div64(3)
 			if moneyBuffer.Cmp(fundsAvailable) < 0 {
@@ -439,9 +484,12 @@ func (c *Contractor) threadedContractMaintenance() {
 				// This contract does need to be refreshed. Make sure there
 				// are enough funds available to perform the refresh, and
 				// then execute.
-				refreshAmount := contract.TotalCost.Mul64(2)
+				oldDuration := blockHeight - contract.StartHeight
+				newDuration := endHeight - blockHeight
+				spendPerBlock := contract.TotalCost.Div64(uint64(oldDuration))
+				refreshAmount := spendPerBlock.Mul64(uint64(newDuration))
+
 				if refreshAmount.Cmp(fundsAvailable) < 0 {
-					refreshSet[contract.ID] = struct{}{}
 					renewSet = append(renewSet, renewal{
 						id:     contract.ID,
 						amount: refreshAmount,
@@ -512,6 +560,10 @@ func (c *Contractor) threadedContractMaintenance() {
 				c.staticContracts.Return(oldContract)
 				return
 			}
+
+			// Calculate endHeight for renewed contracts
+			endHeight = currentPeriod + allowance.Period
+
 			// Perform the actual renew. If the renew fails, return the
 			// contract. If the renew fails we check how often it has failed
 			// before. Once it has failed for a certain number of blocks in a
@@ -519,10 +571,13 @@ func (c *Contractor) threadedContractMaintenance() {
 			// on renewing it and set goodForRenew to false.
 			newContract, errRenew := c.managedRenew(oldContract, amount, endHeight)
 			if errRenew != nil {
-				// Increment the number of failed renews for the contract.
-				c.mu.Lock()
-				c.numFailedRenews[oldContract.Metadata().ID]++
-				c.mu.Unlock()
+				// Increment the number of failed renews for the contract if it
+				// was the host's fault.
+				if modules.IsHostsFault(errRenew) {
+					c.mu.Lock()
+					c.numFailedRenews[oldContract.Metadata().ID]++
+					c.mu.Unlock()
+				}
 
 				// Check if contract has to be replaced.
 				md := oldContract.Metadata()
@@ -533,11 +588,14 @@ func (c *Contractor) threadedContractMaintenance() {
 				replace := numRenews >= consecutiveRenewalsBeforeReplacement
 				if failedBefore && secondHalfOfWindow && replace {
 					oldUtility.GoodForRenew = false
+					oldUtility.GoodForUpload = false
+					oldUtility.Locked = true
 					err := oldContract.UpdateUtility(oldUtility)
 					if err != nil {
 						c.log.Println("WARN: failed to mark contract as !goodForRenew:", err)
 					}
-					c.log.Printf("WARN: failed to renew %v, marked as bad: %v\n", id, errRenew)
+					c.log.Printf("WARN: failed to renew %v, marked as bad: %v\n",
+						oldContract.Metadata().HostPublicKey, errRenew)
 					c.staticContracts.Return(oldContract)
 					return
 				}
@@ -545,7 +603,7 @@ func (c *Contractor) threadedContractMaintenance() {
 				// Seems like it doesn't have to be replaced yet. Log the
 				// failure and number of renews that have failed so far.
 				c.log.Printf("WARN: failed to renew contract %v [%v]: %v\n",
-					id, numRenews, errRenew)
+					oldContract.Metadata().HostPublicKey, numRenews, errRenew)
 				c.staticContracts.Return(oldContract)
 				return
 			}
@@ -567,12 +625,6 @@ func (c *Contractor) threadedContractMaintenance() {
 				c.log.Println("Failed to update the contract utilities", err)
 				return
 			}
-			// If the contract is a mid-cycle renew, add the contract line to
-			// the new contract. The contract line is not included/extended if
-			// we are just renewing because the contract is expiring.
-			if _, exists := refreshSet[id]; exists {
-				// TODO: update PreviousContracts
-			}
 
 			// Lock the contractor as we update it to use the new contract
 			// instead of the old contract.
@@ -582,8 +634,6 @@ func (c *Contractor) threadedContractMaintenance() {
 			c.staticContracts.Delete(oldContract)
 			// Store the contract in the record of historic contracts.
 			c.oldContracts[id] = oldContract.Metadata()
-			// Add a mapping from the old contract to the new contract.
-			c.renewedIDs[id] = newContract.ID
 			// Save the contractor.
 			err = c.saveSync()
 			if err != nil {
