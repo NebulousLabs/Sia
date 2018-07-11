@@ -74,7 +74,29 @@ func (key TwofishKey) DecryptBytes(ct Ciphertext) ([]byte, error) {
 	}
 
 	// Decrypt the data.
-	return aead.Open(nil, ct[:aead.NonceSize()], ct[aead.NonceSize():], nil)
+	nonce := ct[:aead.NonceSize()]
+	ciphertext := ct[aead.NonceSize():]
+	return aead.Open(nil, nonce, ciphertext, nil)
+}
+
+// DecryptBytesInPlace decrypts the ciphertext created by EncryptBytes. The
+// nonce is expected to be the first 12 bytes of the ciphertext.
+// DecryptBytesInPlace reuses the memory of ct to be able to operate in-place.
+// This means that ct can't be reused after calling DecryptBytesInPlace.
+func (key TwofishKey) DecryptBytesInPlace(ct Ciphertext) ([]byte, error) {
+	// Create the cipher.
+	// NOTE: NewGCM only returns an error if twofishCipher.BlockSize != 16.
+	aead, _ := cipher.NewGCM(key.NewCipher())
+
+	// Check for a nonce.
+	if len(ct) < aead.NonceSize() {
+		return nil, ErrInsufficientLen
+	}
+
+	// Decrypt the data.
+	nonce := ct[:aead.NonceSize()]
+	ciphertext := ct[aead.NonceSize():]
+	return aead.Open(ciphertext[:0], nonce, ciphertext, nil)
 }
 
 // NewWriter returns a writer that encrypts or decrypts its input stream.
