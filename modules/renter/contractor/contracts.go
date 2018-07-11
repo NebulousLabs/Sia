@@ -202,6 +202,23 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	return contract, nil
 }
 
+// managedPrunePubkeyMap will delete any pubkeys in the pubKeysToContractID map
+// that no longer map to an active contract.
+func (c *Contractor) managedPrunePubkeyMap() {
+	allContracts := c.staticContracts.ViewAll()
+	pks := make(map[string]struct{})
+	for _, c := range allContracts {
+		pks[string(c.HostPublicKey.Key)] = struct{}{}
+	}
+	c.mu.Lock()
+	for pk := range c.pubKeysToContractID {
+		if _, exists := pks[pk]; !exists {
+			delete(c.pubKeysToContractID, pk)
+		}
+	}
+	c.mu.Unlock()
+}
+
 // managedRenew negotiates a new contract for data already stored with a host.
 // It returns the new contract. This is a blocking call that performs network
 // I/O.
@@ -283,22 +300,9 @@ func (c *Contractor) threadedContractMaintenance() {
 	defer c.tg.Done()
 
 	// Archive contracts that need to be archived before doing additional
-	// maintenance.
+	// maintenance, and then prune the pubkey map.
 	c.managedArchiveContracts()
-
-	// Prune unknown public keys from the contractor"s map.
-	allContracts := c.staticContracts.ViewAll()
-	pks := make(map[string]struct{})
-	for _, c := range allContracts {
-		pks[string(c.HostPublicKey.Key)] = struct{}{}
-	}
-	c.mu.Lock()
-	for pk := range c.pubKeysToContractID {
-		if _, exists := pks[pk]; !exists {
-			delete(c.pubKeysToContractID, pk)
-		}
-	}
-	c.mu.Unlock()
+	c.managedPrunePubkeyMap()
 
 	// Nothing to do if there are no hosts.
 	c.mu.RLock()
@@ -307,6 +311,7 @@ func (c *Contractor) threadedContractMaintenance() {
 	if wantedHosts <= 0 {
 		return
 	}
+
 	// Only one instance of this thread should be running at a time. Under
 	// normal conditions, fine to return early if another thread is already
 	// doing maintenance. The next block will trigger another round. Under
