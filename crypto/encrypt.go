@@ -61,6 +61,35 @@ func (key TwofishKey) EncryptBytes(plaintext []byte) Ciphertext {
 	return aead.Seal(nonce, nonce, plaintext, nil)
 }
 
+// EncryptBytesInPlace encrypts a []byte using the key. EncryptBytesInPlace
+// uses GCM and prepends the nonce (12 bytes) to the ciphertext. Since it
+// reuses the memory of plaintext, the input slice can't be reused after
+// calling EncryptBytesInPlace.
+func (key TwofishKey) EncryptBytesInPlace(plaintext []byte) Ciphertext {
+	// Create the cipher.
+	// NOTE: NewGCM only returns an error if twofishCipher.BlockSize != 16.
+	aead, _ := cipher.NewGCM(key.NewCipher())
+
+	// Resize the plaintext slice and free up some space at the beginning of
+	// the slice.
+	if !(cap(plaintext)-len(plaintext) >= aead.NonceSize()) {
+		panic("capacity of plaintext too small for in-place encryption")
+	}
+	plaintext = plaintext[:len(plaintext)+aead.NonceSize()]
+	copy(plaintext[aead.NonceSize():], plaintext)
+
+	// Split up the plaintext slice into the nonce part and the plaintext part.
+	nonce := plaintext[:aead.NonceSize()]
+	plaintext = plaintext[aead.NonceSize():]
+
+	// Create a random nonce.
+	fastrand.Read(nonce)
+
+	// Encrypt the data. No authenticated data is provided, as EncryptBytes is
+	// meant for file encryption.
+	return aead.Seal(nonce, nonce, plaintext, nil)
+}
+
 // DecryptBytes decrypts the ciphertext created by EncryptBytes. The nonce is
 // expected to be the first 12 bytes of the ciphertext.
 func (key TwofishKey) DecryptBytes(ct Ciphertext) ([]byte, error) {

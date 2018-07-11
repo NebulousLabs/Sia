@@ -109,7 +109,7 @@ func (w *worker) managedUpload(uc *unfinishedUploadChunk, pieceIndex uint64) {
 	// Encrypt the piece before uploading it.
 	key := deriveKey(uc.renterFile.masterKey, uc.index, pieceIndex)
 	if !uc.encryptedChunkData[pieceIndex] {
-		uc.physicalChunkData[pieceIndex] = key.EncryptBytes(uc.physicalChunkData[pieceIndex])
+		uc.physicalChunkData[pieceIndex] = key.EncryptBytesInPlace(uc.physicalChunkData[pieceIndex])
 		uc.encryptedChunkData[pieceIndex] = true
 	}
 

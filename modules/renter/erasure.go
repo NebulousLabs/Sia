@@ -49,7 +49,9 @@ func (rs *rsCode) EncodeShards(pieces [][]byte) ([][]byte, error) {
 	}
 	// Add the parity shards to pieces.
 	for len(pieces) < rs.NumPieces() {
-		pieces = append(pieces, make([]byte, pieceSize))
+		// Allocate a capacity of modules.SectorSize to allow for in-place
+		// encryption later on.
+		pieces = append(pieces, make([]byte, pieceSize, modules.SectorSize))
 	}
 	err := rs.enc.Encode(pieces)
 	if err != nil {

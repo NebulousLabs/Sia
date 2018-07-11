@@ -20,6 +20,8 @@ import (
 	"errors"
 	"io"
 	"sync"
+
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // downloadDestination is a wrapper for the different types of writing that we
@@ -48,7 +50,9 @@ func NewDownloadDestinationBuffer(length uint64) downloadDestinationBuffer {
 	}
 	buf := make([][]byte, 0, length/pieceSize)
 	for length > 0 {
-		buf = append(buf, make([]byte, pieceSize))
+		// The allocated shards have a modules.SectorSize capacity to allow
+		// in-place encryption later on.
+		buf = append(buf, make([]byte, pieceSize, modules.SectorSize))
 		length -= pieceSize
 	}
 	return buf
