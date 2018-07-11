@@ -1381,7 +1381,7 @@ func TestRenterOldContracts(t *testing.T) {
 		}
 		// Check OldContracts against recorded old contracts
 		if len(oldContracts) != len(rc.OldContracts) {
-			return errors.New(fmt.Sprintf("Number of old contracts don't match, expected %v got %v", len(oldContracts), len(rc.OldContracts)))
+			return fmt.Errorf("Number of old contracts don't match, expected %v got %v", len(oldContracts), len(rc.OldContracts))
 		}
 
 		// Create Maps for comparison

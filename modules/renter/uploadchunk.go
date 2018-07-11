@@ -42,8 +42,9 @@ type unfinishedUploadChunk struct {
 	// The logical data is the data that is presented to the user when the user
 	// requests the chunk. The physical data is all of the pieces that get
 	// stored across the network.
-	logicalChunkData  [][]byte
-	physicalChunkData [][]byte
+	logicalChunkData   [][]byte
+	physicalChunkData  [][]byte
+	encryptedChunkData []bool
 
 	// Worker synchronization fields. The mutex only protects these fields.
 	//
@@ -223,6 +224,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 	// number of times we need to return memory.
 	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.EncodeShards(chunk.logicalChunkData)
 	chunk.logicalChunkData = nil
+	chunk.encryptedChunkData = make([]bool, len(chunk.physicalChunkData))
 	r.memoryManager.Return(erasureCodingMemory)
 	chunk.memoryReleased += erasureCodingMemory
 	if err != nil {
@@ -249,10 +251,6 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 	for i := 0; i < len(chunk.pieceUsage); i++ {
 		if chunk.pieceUsage[i] {
 			chunk.physicalChunkData[i] = nil
-		} else {
-			// Encrypt the piece.
-			key := deriveKey(chunk.renterFile.masterKey, chunk.index, uint64(i))
-			chunk.physicalChunkData[i] = key.EncryptBytes(chunk.physicalChunkData[i])
 		}
 	}
 	// Return the released memory.

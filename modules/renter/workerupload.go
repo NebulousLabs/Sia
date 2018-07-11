@@ -106,6 +106,13 @@ func (w *worker) managedUpload(uc *unfinishedUploadChunk, pieceIndex uint64) {
 	}
 	defer e.Close()
 
+	// Encrypt the piece before uploading it.
+	key := deriveKey(uc.renterFile.masterKey, uc.index, pieceIndex)
+	if !uc.encryptedChunkData[pieceIndex] {
+		uc.physicalChunkData[pieceIndex] = key.EncryptBytes(uc.physicalChunkData[pieceIndex])
+		uc.encryptedChunkData[pieceIndex] = true
+	}
+
 	// Perform the upload, and update the failure stats based on the success of
 	// the upload attempt.
 	root, err := e.Upload(uc.physicalChunkData[pieceIndex])
