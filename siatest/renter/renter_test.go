@@ -1291,7 +1291,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rc, err := r.RenterContractsGet()
+	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
