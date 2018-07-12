@@ -43,6 +43,13 @@ var (
 		Run:   wrap(walletbalancecmd),
 	}
 
+	walletBroadcastCmd = &cobra.Command{
+		Use:   "broadcast [txn]",
+		Short: "Broadcast a transaction",
+		Long:  "Broadcast a transaction to connected peers. The transaction must be valid.",
+		Run:   wrap(walletbroadcastcmd),
+	}
+
 	walletChangepasswordCmd = &cobra.Command{
 		Use:   "change-password",
 		Short: "Change the wallet password",
@@ -465,6 +472,29 @@ Estimated Fee:       %v / KB
 		fees.Maximum.Mul64(1e3).HumanString())
 }
 
+// walletbroadcastcmd broadcasts a transaction.
+func walletbroadcastcmd(txnStr string) {
+	var txn types.Transaction
+	var err error
+	if walletRawTxn {
+		var txnBytes []byte
+		txnBytes, err = base64.StdEncoding.DecodeString(txnStr)
+		if err == nil {
+			err = encoding.Unmarshal(txnBytes, &txn)
+		}
+	} else {
+		err = json.Unmarshal([]byte(txnStr), &txn)
+	}
+	if err != nil {
+		die("Could not decode transaction:", err)
+	}
+	err = httpClient.TransactionPoolRawPost(txn, nil)
+	if err != nil {
+		die("Could not broadcast transaction:", err)
+	}
+	fmt.Println("Transaction broadcast successfully")
+}
+
 // walletsweepcmd sweeps coins and funds from a seed.
 func walletsweepcmd() {
 	seed, err := passwordPrompt("Seed: ")
@@ -515,7 +545,7 @@ func walletsigncmd(txnJSON, toSignJSON string) {
 		}
 	}
 
-	if walletSignRaw {
+	if walletRawTxn {
 		base64.NewEncoder(base64.StdEncoding, os.Stdout).Write(encoding.Marshal(txn))
 	} else {
 		json.NewEncoder(os.Stdout).Encode(txn)
