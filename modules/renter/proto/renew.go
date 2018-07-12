@@ -48,7 +48,8 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	// Calculate the payouts for the renter, host, and whole contract.
 	renterPayout := funding.Sub(host.ContractPrice).Sub(txnFee).Sub(basePrice) // renter payout is pre-tax
 	maxStorageSize := renterPayout.Div(host.StoragePrice)
-	hostCollateral := maxStorageSize.Mul(host.Collateral).Add(baseCollateral)
+	maxCollateral := maxStorageSize.Mul(host.Collateral) // max collateral the renter can afford with renterPayout
+	hostCollateral := maxCollateral.Add(baseCollateral)
 	if hostCollateral.Cmp(host.MaxCollateral) > 0 {
 		hostCollateral = host.MaxCollateral
 	}
