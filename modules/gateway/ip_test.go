@@ -70,7 +70,7 @@ func TestIPFromPeers(t *testing.T) {
 	}
 
 	// Discover ip using the peers
-	host, err := g1.managedIPFromPeers()
+	host, err := g1.managedIPFromPeers(nil)
 	if err != nil {
 		t.Fatal("failed to get ip", err)
 	}

@@ -24,15 +24,13 @@ func (g *Gateway) discoverPeerIP(conn modules.PeerConn) error {
 // managedIPFromPeers asks the peers the node is connected to for the node's
 // public ip address. If not enough peers are available we wait a bit and try
 // again. In the worst case managedIPFromPeers will fail after a few minutes.
-func (g *Gateway) managedIPFromPeers() (string, error) {
-	// Stop after timeoutIPDiscovery time.
-	timeout := time.After(timeoutIPDiscovery)
+func (g *Gateway) managedIPFromPeers(cancel <-chan struct{}) (string, error) {
 	for {
 		// Check for shutdown signal or timeout.
 		select {
 		case <-g.peerTG.StopChan():
 			return "", errors.New("interrupted by shutdown")
-		case <-timeout:
+		case <-cancel:
 			return "", errors.New("failed to discover ip in time")
 		default:
 		}
