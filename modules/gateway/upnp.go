@@ -46,17 +46,13 @@ func myExternalIP() (string, error) {
 // discovering the address failed or if it is invalid, an error is returned.
 func (g *Gateway) managedLearnHostname(cancel <-chan struct{}) (modules.NetAddress, error) {
 	// create ctx to cancel upnp discovery during shutdown
-	ctx, ctxCancel := context.WithCancel(context.Background())
+	ctx, ctxCancel := context.WithTimeout(context.Background(), timeoutIPDiscovery)
 	defer ctxCancel()
 	go func() {
-		timer := time.NewTimer(timeoutIPDiscovery)
-		defer timer.Stop()
 		select {
-		case <-g.threads.StopChan():
-			ctxCancel()
-		case <-timer.C:
-			ctxCancel()
 		case <-cancel:
+			ctxCancel()
+		case <-g.threads.StopChan():
 			ctxCancel()
 		case <-ctx.Done():
 		}
