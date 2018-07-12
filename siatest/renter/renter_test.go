@@ -1528,7 +1528,7 @@ func TestRenterContractsEndpoint(t *testing.T) {
 			return err
 		}
 		if len(rc.ActiveContracts) != len(tg.Hosts()) {
-			return errors.New("Waiting for active contracts to form")
+			return fmt.Errorf("Number of old contracts don't match, expected %v got %v", len(tg.Hosts()), len(rc.ActiveContracts))
 		}
 		return nil
 	})

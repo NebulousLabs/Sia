@@ -62,11 +62,15 @@ func newTestingWallet(testdir string, cs modules.ConsensusSet, tp modules.Transa
 
 // newTestingHost is a helper function that creates a ready-to-use host.
 func newTestingHost(testdir string, cs modules.ConsensusSet, tp modules.TransactionPool) (modules.Host, error) {
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		return nil, err
+	}
 	w, err := newTestingWallet(testdir, cs, tp)
 	if err != nil {
 		return nil, err
 	}
-	h, err := host.New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
+	h, err := host.New(cs, g, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		return nil, err
 	}

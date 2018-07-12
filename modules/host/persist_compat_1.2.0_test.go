@@ -44,7 +44,7 @@ func loadExistingHostWithNewDeps(modulesDir, hostDir string) (modules.Host, erro
 	}
 
 	// Create the host.
-	h, err := newHost(modules.ProdDependencies, cs, tp, w, "localhost:0", hostDir)
+	h, err := newHost(modules.ProdDependencies, cs, g, tp, w, "localhost:0", hostDir)
 	if err != nil {
 		return nil, err
 	}

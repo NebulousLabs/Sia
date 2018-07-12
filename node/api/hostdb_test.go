@@ -280,7 +280,7 @@ func assembleHostPort(key crypto.TwofishKey, hostHostname string, testdir string
 	if err != nil {
 		return nil, err
 	}
-	h, err := host.New(cs, tp, w, hostHostname, filepath.Join(testdir, modules.HostDir))
+	h, err := host.New(cs, g, tp, w, hostHostname, filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		return nil, err
 	}
