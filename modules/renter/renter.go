@@ -110,6 +110,9 @@ type hostContractor interface {
 	// Close closes the hostContractor.
 	Close() error
 
+	// CancelContract cancels the Renter's contract
+	CancelContract(id types.FileContractID) error
+
 	// Contracts returns the active contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
@@ -386,6 +389,11 @@ func (r *Renter) ScoreBreakdown(e modules.HostDBEntry) modules.HostScoreBreakdow
 // EstimateHostScore returns the estimated host score
 func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreakdown {
 	return r.hostDB.EstimateHostScore(e)
+}
+
+// CancelContract cancels a renter's contract by ID by setting goodForRenew and goodForUpload to false
+func (r *Renter) CancelContract(id types.FileContractID) error {
+	return r.hostContractor.CancelContract(id)
 }
 
 // Contracts returns an array of host contractor's active contracts

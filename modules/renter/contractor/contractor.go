@@ -152,6 +152,16 @@ func (c *Contractor) ContractByPublicKey(pk types.SiaPublicKey) (modules.RenterC
 	return c.staticContracts.View(id)
 }
 
+// CancelContract cancels the Contractor's contract by marking it !GoodForRenew
+// and !GoodForUpload
+func (c *Contractor) CancelContract(id types.FileContractID) error {
+	u := modules.ContractUtility{
+		GoodForRenew:  false,
+		GoodForUpload: false,
+	}
+	return c.managedUpdateContractUtility(id, u)
+}
+
 // Contracts returns the contracts formed by the contractor in the current
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
