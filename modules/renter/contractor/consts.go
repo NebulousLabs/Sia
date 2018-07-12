@@ -35,8 +35,16 @@ var (
 var (
 	maxCollateral    = types.SiacoinPrecision.Mul64(1e3) // 1k SC
 	maxDownloadPrice = maxStoragePrice.Mul64(3 * 4320)
-	maxStoragePrice  = types.SiacoinPrecision.Mul64(30e3).Div(modules.BlockBytesPerMonthTerabyte) // 30k SC / TB / Month
-	maxUploadPrice   = maxStoragePrice.Mul64(3 * 4320)                                            // 3 months of storage
+	maxStoragePrice  = build.Select(build.Var{
+		Dev:      types.SiacoinPrecision.Mul64(30e4).Div(modules.BlockBytesPerMonthTerabyte), // 1 order of magnitude greater
+		Standard: types.SiacoinPrecision.Mul64(30e3).Div(modules.BlockBytesPerMonthTerabyte), // 30k SC / TB / Month
+		Testing:  types.SiacoinPrecision.Mul64(30e5).Div(modules.BlockBytesPerMonthTerabyte), // 2 orders of magnitude greater
+	}).(types.Currency)
+	maxUploadPrice = build.Select(build.Var{
+		Dev:      maxStoragePrice.Mul64(30 * 4320),  // 1 order of magnitude greater
+		Standard: maxStoragePrice.Mul64(3 * 4320),   // 3 months of storage
+		Testing:  maxStoragePrice.Mul64(300 * 4320), // 2 orders of magnitude greater
+	}).(types.Currency)
 
 	// scoreLeeway defines the factor by which a host can miss the goal score
 	// for a set of hosts. To determine the goal score, a new set of hosts is
