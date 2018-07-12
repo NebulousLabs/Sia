@@ -28,8 +28,8 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	var basePrice, baseCollateral types.Currency
 	if endHeight+host.WindowSize > lastRev.NewWindowEnd {
 		timeExtension := uint64((endHeight + host.WindowSize) - lastRev.NewWindowEnd)
-		basePrice = host.StoragePrice.Mul64(lastRev.NewFileSize).Mul64(timeExtension)    // cost of data already covered by contract, i.e. lastrevision.Filesize
-		baseCollateral = host.Collateral.Mul64(lastRev.NewFileSize).Mul64(timeExtension) // same but collateral
+		basePrice = host.StoragePrice.Mul64(lastRev.NewFileSize).Mul64(timeExtension)    // cost of already uploaded data.
+		baseCollateral = host.Collateral.Mul64(lastRev.NewFileSize).Mul64(timeExtension) // collateral for already uploaded data.
 	}
 
 	// Calculate the anticipated transaction fee.
@@ -48,7 +48,7 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	// Calculate the payouts for the renter, host, and whole contract.
 	renterPayout := funding.Sub(host.ContractPrice).Sub(txnFee).Sub(basePrice) // renter payout is pre-tax
 	maxStorageSize := renterPayout.Div(host.StoragePrice)
-	hostCollateral := maxStorageSize.Mul(host.Collateral)
+	hostCollateral := maxStorageSize.Mul(host.Collateral).Add(baseCollateral)
 	if hostCollateral.Cmp(host.MaxCollateral) > 0 {
 		hostCollateral = host.MaxCollateral
 	}
@@ -60,8 +60,6 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	// check for negative currency
 	if types.PostTax(startHeight, totalPayout).Cmp(hostPayout) < 0 {
 		return modules.RenterContract{}, errors.New("insufficient funds to pay both siafund fee and also host payout")
-	} else if hostCollateral.Cmp(baseCollateral) < 0 {
-		return modules.RenterContract{}, errors.New("new collateral smaller than base collateral")
 	}
 
 	// create file contract
