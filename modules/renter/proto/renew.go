@@ -28,8 +28,8 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	var basePrice, baseCollateral types.Currency
 	if endHeight+host.WindowSize > lastRev.NewWindowEnd {
 		timeExtension := uint64((endHeight + host.WindowSize) - lastRev.NewWindowEnd)
-		basePrice = host.StoragePrice.Mul64(lastRev.NewFileSize).Mul64(timeExtension)    // cost of already uploaded data.
-		baseCollateral = host.Collateral.Mul64(lastRev.NewFileSize).Mul64(timeExtension) // collateral for already uploaded data.
+		basePrice = host.StoragePrice.Mul64(lastRev.NewFileSize).Mul64(timeExtension)    // cost of already uploaded data that needs to be covered by the renewed contract.
+		baseCollateral = host.Collateral.Mul64(lastRev.NewFileSize).Mul64(timeExtension) // same as basePrice.
 	}
 
 	// Calculate the anticipated transaction fee.
