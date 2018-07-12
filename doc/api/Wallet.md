@@ -514,8 +514,8 @@ specified.
 
   // inputs to sign; a mapping from OutputID to UnlockHash
   "tosign": {
-    "3689bd3489679aabcde02e01345abcde": "138950f0129d74acd4eade3453b45678",
-    "132cee478a9bb98bdd23cf05376cdf2a": "7cbcd123578234ce0f12fe01a68ba9bf"
+    "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "abcdef0123456789abcdef0123456789abcd1234567890ef0123456789abcdef"
   }
 }
 ```

@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/wallet"
@@ -167,7 +168,7 @@ Run 'wallet send --help' to see a list of available units.`,
 		Long: `Sign the specified inputs of a transaction. If siad is running with an
 unlocked wallet, the /wallet/sign API call will be used. Otherwise, sign will
 prompt for the wallet seed, and the signing key(s) will be regenerated.`,
-		Run: wrap(walletsigncmd),
+		Run: walletsigncmd,
 	}
 
 	walletSweepCmd = &cobra.Command{
@@ -510,17 +511,24 @@ func walletsweepcmd() {
 }
 
 // walletsigncmd signs a transaction.
-func walletsigncmd(txnJSON, toSignJSON string) {
+func walletsigncmd(cmd *cobra.Command, args []string) {
+	if len(args) < 1 || len(args) > 2 {
+		cmd.UsageFunc()(cmd)
+		os.Exit(exitCodeUsage)
+	}
+
 	var txn types.Transaction
-	err := json.Unmarshal([]byte(txnJSON), &txn)
+	err := json.Unmarshal([]byte(args[0]), &txn)
 	if err != nil {
 		die("Invalid transaction:", err)
 	}
 
-	var toSign map[types.OutputID]types.UnlockHash
-	err = json.Unmarshal([]byte(toSignJSON), &toSign)
-	if err != nil {
-		die("Invalid transaction:", err)
+	var toSign []crypto.Hash
+	if len(args) == 2 {
+		err = json.Unmarshal([]byte(args[1]), &toSign)
+		if err != nil {
+			die("Invalid transaction:", err)
+		}
 	}
 
 	// try API first

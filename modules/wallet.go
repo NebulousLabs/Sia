@@ -431,11 +431,10 @@ type (
 		// SpendableOutputs returns the outputs spendable by the wallet.
 		SpendableOutputs() []SpendableOutput
 
-		// SignTransaction signs txn using secret keys known to the wallet. toSign
-		// maps the ParentID of each unsigned input to the UnlockHash of that input's
-		// desired UnlockConditions. SignTransaction fills in the UnlockConditions for
-		// each such input and adds a corresponding signature.
-		SignTransaction(txn *types.Transaction, toSign map[types.OutputID]types.UnlockHash) error
+		// SignTransaction signs txn using secret keys known to the wallet.
+		// The transaction should be complete with the exception of the
+		// Signature fields of each TransactionSignature referenced by toSign.
+		SignTransaction(txn *types.Transaction, toSign []crypto.Hash) error
 	}
 
 	// WalletSettings control the behavior of the Wallet.
