@@ -186,6 +186,12 @@ func (g *Gateway) Close() error {
 	return g.saveSync()
 }
 
+// DiscoverAddress discovers and returns the current public IP address of the
+// gateway. Contrary to Address, DiscoverAddress is blocking and might take multiple minutes to return
+func (g *Gateway) DiscoverAddress(cancel <-chan struct{}) (modules.NetAddress, error) {
+	return g.managedLearnHostname(cancel)
+}
+
 // New returns an initialized Gateway.
 func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 	// Create the directory if it doesn't exist.

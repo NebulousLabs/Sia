@@ -165,6 +165,10 @@ type (
 		// Disconnect terminates a connection to a peer.
 		Disconnect(NetAddress) error
 
+		// DiscoverAddress discovers and returns the current public IP address of the
+		// gateway. Contrary to Address, DiscoverAddress is blocking and might take multiple minutes to return
+		DiscoverAddress(cancel <-chan struct{}) (NetAddress, error)
+
 		// Address returns the Gateway's address.
 		Address() NetAddress
 
