@@ -29,7 +29,7 @@ func (c *Client) TransactionPoolFeeGet() (tfg api.TpoolFeeGET, err error) {
 
 // TransactionPoolRawPost uses the /tpool/raw endpoint to send a raw
 // transaction to the transaction pool.
-func (c *Client) TransactionPoolRawPost(txn types.Transaction, parents types.Transaction) (err error) {
+func (c *Client) TransactionPoolRawPost(txn types.Transaction, parents []types.Transaction) (err error) {
 	values := url.Values{}
 	values.Set("transaction", string(encoding.Marshal(txn)))
 	values.Set("parents", string(encoding.Marshal(parents)))
