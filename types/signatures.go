@@ -382,19 +382,12 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		case SignatureEd25519:
 			// Decode the public key and signature.
 			var edPK crypto.PublicKey
-			err := encoding.Unmarshal([]byte(publicKey.Key), &edPK)
-			if err != nil {
-				return err
-			}
-			var edSig [crypto.SignatureSize]byte
-			err = encoding.Unmarshal([]byte(sig.Signature), &edSig)
-			if err != nil {
-				return err
-			}
-			cryptoSig := crypto.Signature(edSig)
+			copy(edPK[:], publicKey.Key)
+			var edSig crypto.Signature
+			copy(edSig[:], sig.Signature)
 
 			sigHash := t.SigHash(i)
-			err = crypto.VerifyHash(sigHash, edPK, cryptoSig)
+			err = crypto.VerifyHash(sigHash, edPK, edSig)
 			if err != nil {
 				return err
 			}
