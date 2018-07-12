@@ -403,38 +403,78 @@ func (s byValue) Less(i, j int) bool {
 // rentercontractscmd is the handler for the comand `siac renter contracts`.
 // It lists the Renter's contracts.
 func rentercontractscmd() {
-	rc, err := httpClient.RenterContractsGet()
+	rc, err := httpClient.RenterInactiveContractsGet()
 	if err != nil {
 		die("Could not get contracts:", err)
 	}
-	if len(rc.Contracts) == 0 && len(rc.OldContracts) == 0 {
-		fmt.Println("No contracts have been formed.")
+	if len(rc.ActiveContracts) == 0 && len(rc.InactiveContracts) == 0 && !renterAllContracts {
+		fmt.Println("No contracts in the current period.")
 		return
 	}
-	if len(rc.Contracts) == 0 && !renterAllContracts {
-		fmt.Println("No active contracts.")
-		return
-	}
-	if len(rc.Contracts) != 0 {
-		sort.Sort(byValue(rc.Contracts))
-		var totalStored uint64
-		var totalRemaining, totalSpent, totalFees types.Currency
-		for _, c := range rc.Contracts {
-			totalStored += c.Size
-			totalRemaining = totalRemaining.Add(c.RenterFunds)
-			totalSpent = totalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
-			totalFees = totalFees.Add(c.Fees)
+
+	if len(rc.ActiveContracts) != 0 && len(rc.InactiveContracts) != 0 {
+		// Display Active Contracts
+		fmt.Println("Contracts in the Current Period")
+		sort.Sort(byValue(rc.ActiveContracts))
+		var activeTotalStored uint64
+		var activeTotalRemaining, activeTotalSpent, activeTotalFees types.Currency
+		for _, c := range rc.ActiveContracts {
+			activeTotalStored += c.Size
+			activeTotalRemaining = activeTotalRemaining.Add(c.RenterFunds)
+			activeTotalSpent = activeTotalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
+			activeTotalFees = activeTotalFees.Add(c.Fees)
 		}
-		fmt.Printf(`Active Contract Summary:
-		"Number of Contracts:  %v
-		"Total stored:         %9s
-		"Total Remaining:      %v
-		"Total Spent:          %v
-		"Total Fees:           %v
-		`, len(rc.Contracts), filesizeUnits(int64(totalStored)), currencyUnits(totalRemaining), currencyUnits(totalSpent), currencyUnits(totalFees))
+		fmt.Printf(`
+Active Contract Summary:
+Number of Contracts:  %v
+Total stored:         %9s
+Total Remaining:      %v
+Total Spent:          %v
+Total Fees:           %v
+
+`, len(rc.ActiveContracts), filesizeUnits(int64(activeTotalStored)), currencyUnits(activeTotalRemaining), currencyUnits(activeTotalSpent), currencyUnits(activeTotalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
-		for _, c := range rc.Contracts {
+		for _, c := range rc.ActiveContracts {
+			address := c.NetAddress
+			if address == "" {
+				address = "Host Removed"
+			}
+			fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\t%v\t%v\n",
+				address,
+				currencyUnits(c.RenterFunds),
+				currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
+				currencyUnits(c.Fees),
+				filesizeUnits(int64(c.Size)),
+				c.EndHeight,
+				c.ID,
+				c.GoodForUpload,
+				c.GoodForRenew)
+		}
+		w.Flush()
+
+		// Display Inactive Contracts
+		sort.Sort(byValue(rc.InactiveContracts))
+		var inactiveTotalStored uint64
+		var inactiveTotalRemaining, inactiveTotalSpent, inactiveTotalFees types.Currency
+		for _, c := range rc.InactiveContracts {
+			inactiveTotalStored += c.Size
+			inactiveTotalRemaining = inactiveTotalRemaining.Add(c.RenterFunds)
+			inactiveTotalSpent = inactiveTotalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
+			inactiveTotalFees = inactiveTotalFees.Add(c.Fees)
+		}
+		fmt.Printf(`
+Inactive Contract Summary:
+Number of Contracts:  %v
+Total stored:         %9s
+Total Remaining:      %v
+Total Spent:          %v
+Total Fees:           %v
+			
+`, len(rc.InactiveContracts), filesizeUnits(int64(inactiveTotalStored)), currencyUnits(inactiveTotalRemaining), currencyUnits(inactiveTotalSpent), currencyUnits(inactiveTotalFees))
+		w = tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
+		for _, c := range rc.InactiveContracts {
 			address := c.NetAddress
 			if address == "" {
 				address = "Host Removed"
@@ -452,31 +492,41 @@ func rentercontractscmd() {
 		}
 		w.Flush()
 	}
+
 	if renterAllContracts {
-		if len(rc.OldContracts) == 0 {
+		rce, err := httpClient.RenterExpiredContractsGet()
+		if err != nil {
+			die("Could not get expired contracts:", err)
+		}
+		if len(rc.ActiveContracts) == 0 && len(rc.InactiveContracts) == 0 && len(rce.ExpiredContracts) == 0 {
+			fmt.Println("No contracts have been formed.")
+			return
+		}
+		if len(rce.ExpiredContracts) == 0 {
 			fmt.Println("No expired contracts")
 			return
 		}
-		sort.Sort(byValue(rc.OldContracts))
-		var totalStored uint64
-		var totalWithheld, totalSpent, totalFees types.Currency
-		for _, c := range rc.OldContracts {
-			totalStored += c.Size
-			totalWithheld = totalWithheld.Add(c.RenterFunds)
-			totalSpent = totalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
-			totalFees = totalFees.Add(c.Fees)
+		sort.Sort(byValue(rce.ExpiredContracts))
+		var expiredTotalStored uint64
+		var expiredTotalWithheld, expiredTotalSpent, expiredTotalFees types.Currency
+		for _, c := range rce.ExpiredContracts {
+			expiredTotalStored += c.Size
+			expiredTotalWithheld = expiredTotalWithheld.Add(c.RenterFunds)
+			expiredTotalSpent = expiredTotalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
+			expiredTotalFees = expiredTotalFees.Add(c.Fees)
 		}
 		fmt.Printf(`
-		Expired Contract Summary:
-		"Number of Contracts:  %v
-		"Total stored:         %9s
-		"Total Remaining:      %v
-		"Total Spent:          %v
-		"Total Fees:           %v
-		`, len(rc.OldContracts), filesizeUnits(int64(totalStored)), currencyUnits(totalWithheld), currencyUnits(totalSpent), currencyUnits(totalFees))
+Expired Contract Summary:
+Number of Contracts:  %v
+Total stored:         %9s
+Total Remaining:      %v
+Total Spent:          %v
+Total Fees:           %v
+		
+`, len(rce.ExpiredContracts), filesizeUnits(int64(expiredTotalStored)), currencyUnits(expiredTotalWithheld), currencyUnits(expiredTotalSpent), currencyUnits(expiredTotalFees))
 		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "Host\tWithheld Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
-		for _, c := range rc.OldContracts {
+		for _, c := range rce.ExpiredContracts {
 			address := c.NetAddress
 			if address == "" {
 				address = "Host Removed"
@@ -499,11 +549,17 @@ func rentercontractscmd() {
 // rentercontractsviewcmd is the handler for the command `siac renter contracts <id>`.
 // It lists details of a specific contract.
 func rentercontractsviewcmd(cid string) {
-	rc, err := httpClient.RenterContractsGet()
+	rc, err := httpClient.RenterInactiveContractsGet()
 	if err != nil {
 		die("Could not get contract details: ", err)
 	}
-	contracts := append(rc.Contracts, rc.OldContracts...)
+	rce, err := httpClient.RenterExpiredContractsGet()
+	if err != nil {
+		die("Could not get expired contract details: ", err)
+	}
+
+	contracts := append(rc.ActiveContracts, rc.InactiveContracts...)
+	contracts = append(contracts, rce.ExpiredContracts...)
 
 	for _, rc := range contracts {
 		if rc.ID.String() == cid {

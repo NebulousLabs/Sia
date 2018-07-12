@@ -360,10 +360,10 @@ func (c *Contractor) threadedContractMaintenance() {
 	// in the current period.
 	endHeight = currentPeriod + allowance.Period
 
-	// Determine how many funds have been used already in this billing
-	// cycle, and how many funds are remaining. We have to calculate these
-	// numbers separately to avoid underflow, and then re-join them later to
-	// get the full picture for how many funds are available.
+	// Determine how many funds have been used already in this billing cycle,
+	// and how many funds are remaining. We have to calculate these numbers
+	// separately to avoid underflow, and then re-join them later to get the
+	// full picture for how many funds are available.
 	var fundsUsed types.Currency
 	for _, contract := range c.staticContracts.ViewAll() {
 		// Calculate the cost of the contract line.
@@ -372,33 +372,33 @@ func (c *Contractor) threadedContractMaintenance() {
 		// Check if the contract is expiring. The funds in the contract are
 		// handled differently based on this information.
 		if blockHeight+allowance.RenewWindow >= contract.EndHeight {
-			// The contract is expiring. Some of the funds are locked down
-			// to renew the contract, and then the remaining funds can be
-			// allocated to 'availableFunds'.
+			// The contract is expiring. Some of the funds are locked down to
+			// renew the contract, and then the remaining funds can be allocated
+			// to 'availableFunds'.
 			fundsUsed = fundsUsed.Add(contractLineCost).Sub(contract.RenterFunds)
 			fundsAvailable = fundsAvailable.Add(contract.RenterFunds)
 		} else {
-			// The contract is not expiring. None of the funds in the
-			// contract are available to renew or form contracts.
+			// The contract is not expiring. None of the funds in the contract
+			// are available to renew or form contracts.
 			fundsUsed = fundsUsed.Add(contractLineCost)
 		}
 	}
 
-	// Add any unspent funds from the allowance to the available funds. If
-	// the allowance has been decreased, it's possible that we actually need
-	// to reduce the number of funds available to compensate.
+	// Add any unspent funds from the allowance to the available funds. If the
+	// allowance has been decreased, it's possible that we actually need to
+	// reduce the number of funds available to compensate.
 	if fundsAvailable.Add(allowance.Funds).Cmp(fundsUsed) > 0 {
 		fundsAvailable = fundsAvailable.Add(allowance.Funds).Sub(fundsUsed)
 	} else {
-		// Figure out how much we need to remove from fundsAvailable to
-		// clear the allowance.
+		// Figure out how much we need to remove from fundsAvailable to clear
+		// the allowance.
 		overspend := fundsUsed.Sub(allowance.Funds).Sub(fundsAvailable)
 		if fundsAvailable.Cmp(overspend) > 0 {
 			// We still have some funds available.
 			fundsAvailable = fundsAvailable.Sub(overspend)
 		} else {
-			// The overspend exceeds the available funds, set available
-			// funds to zero.
+			// The overspend exceeds the available funds, set available funds to
+			// zero.
 			fundsAvailable = types.ZeroCurrency
 		}
 	}
@@ -411,22 +411,21 @@ func (c *Contractor) threadedContractMaintenance() {
 			continue
 		}
 		if blockHeight+allowance.RenewWindow >= contract.EndHeight {
-			// This contract needs to be renewed because it is going to
-			// expire soon. First step is to calculate how much money should
-			// be used in the renewal, based on how much of the contract
-			// funds (including previous contracts this billing cycle due to
-			// financial resets) were spent throughout this billing cycle.
+			// This contract needs to be renewed because it is going to expire
+			// soon. First step is to calculate how much money should be used in
+			// the renewal, based on how much of the contract funds (including
+			// previous contracts this billing cycle due to financial resets)
+			// were spent throughout this billing cycle.
 			//
-			// The amount we care about is the total amount that was spent
-			// on uploading, downloading, and storage throughout the billing
-			// cycle. This is calculated by starting with the total cost and
-			// subtracting out all of the fees, and then all of the unused
-			// money that was allocated (the RenterFunds).
+			// The amount we care about is the total amount that was spent on
+			// uploading, downloading, and storage throughout the billing cycle.
+			// This is calculated by starting with the total cost and
+			// subtracting out all of the fees, and then all of the unused money
+			// that was allocated (the RenterFunds).
 			//
 			// In order to accurately fund contracts based on variable spending,
-			// the cost per block is calculated based on the total spent
-			// over the length of time that the contract was active before
-			// renewal.
+			// the cost per block is calculated based on the total spent over
+			// the length of time that the contract was active before renewal.
 			oldContractSpent := contract.TotalCost.Sub(contract.ContractFee).Sub(contract.TxnFee).Sub(contract.SiafundFee).Sub(contract.RenterFunds)
 			oldContractLength := blockHeight - contract.StartHeight
 			if oldContractLength == 0 {
@@ -435,8 +434,7 @@ func (c *Contractor) threadedContractMaintenance() {
 			spentPerBlock := oldContractSpent.Div64(uint64(oldContractLength))
 			renewAmount := spentPerBlock.Mul64(uint64(allowance.Period))
 
-			// Get an estimate for how much the fees will cost.
-			// Txn Fee
+			// Get an estimate for how much the fees will cost. Txn Fee
 			_, maxTxnFee := c.tpool.FeeEstimation()
 
 			// SiafundFee
@@ -452,8 +450,8 @@ func (c *Contractor) threadedContractMaintenance() {
 			estimatedFees := host.ContractPrice.Add(maxTxnFee).Add(siafundFee)
 			renewAmount = renewAmount.Add(estimatedFees)
 
-			// Determine if there is enough funds available to supplement
-			// with a 33% bonus, and if there is, add a 33% bonus.
+			// Determine if there is enough funds available to supplement with a
+			// 33% bonus, and if there is, add a 33% bonus.
 			moneyBuffer := renewAmount.Div64(3)
 			if moneyBuffer.Cmp(fundsAvailable) < 0 {
 				renewAmount = renewAmount.Add(moneyBuffer)
@@ -462,8 +460,8 @@ func (c *Contractor) threadedContractMaintenance() {
 				c.log.Println("WARN: performing a limited renew due to low allowance")
 			}
 
-			// The contract needs to be renewed because it is going to
-			// expire soon, and we need to refresh the time.
+			// The contract needs to be renewed because it is going to expire
+			// soon, and we need to refresh the time.
 			renewSet = append(renewSet, renewal{
 				id:     contract.ID,
 				amount: renewAmount,
@@ -474,8 +472,8 @@ func (c *Contractor) threadedContractMaintenance() {
 			host, _ := c.hdb.Host(contract.HostPublicKey)
 
 			// Skip this host if its prices are too high.
-			// managedMarkContractsUtility should make this redundant, but
-			// this is here for extra safety.
+			// managedMarkContractsUtility should make this redundant, but this
+			// is here for extra safety.
 			if host.StoragePrice.Cmp(maxStoragePrice) > 0 || host.UploadBandwidthPrice.Cmp(maxUploadPrice) > 0 {
 				continue
 			}
@@ -486,9 +484,9 @@ func (c *Contractor) threadedContractMaintenance() {
 			sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
 			percentRemaining, _ := big.NewRat(0, 1).SetFrac(contract.RenterFunds.Big(), contract.TotalCost.Big()).Float64()
 			if contract.RenterFunds.Cmp(sectorPrice.Mul64(3)) < 0 || percentRemaining < minContractFundRenewalThreshold {
-				// This contract does need to be refreshed. Make sure there
-				// are enough funds available to perform the refresh, and
-				// then execute.
+				// This contract does need to be refreshed. Make sure there are
+				// enough funds available to perform the refresh, and then
+				// execute.
 				oldDuration := blockHeight - contract.StartHeight
 				newDuration := endHeight - blockHeight
 				spendPerBlock := contract.TotalCost.Div64(uint64(oldDuration))
