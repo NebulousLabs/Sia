@@ -12,12 +12,12 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// RenterCancelContractPost uses the /renter/cancel/contract endpoint to cancel
+// RenterContractCancelPost uses the /renter/contract/cancel endpoint to cancel
 // a contract
-func (c *Client) RenterCancelContractPost(id types.FileContractID) error {
+func (c *Client) RenterContractCancelPost(id types.FileContractID) error {
 	values := url.Values{}
 	values.Set("id", id.String())
-	err := c.post("/renter/cancel/contract", values.Encode(), nil)
+	err := c.post("/renter/contract/cancel", values.Encode(), nil)
 	return err
 }
 

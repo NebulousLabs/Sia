@@ -57,7 +57,6 @@ func TestRenter(t *testing.T) {
 		name string
 		test func(*testing.T, *siatest.TestGroup)
 	}{
-		{"TestCancelContract", testCancelContract},
 		{"TestClearDownloadHistory", testClearDownloadHistory},
 		{"TestDownloadAfterRenew", testDownloadAfterRenew},
 		{"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
@@ -72,54 +71,6 @@ func TestRenter(t *testing.T) {
 		t.Run(subtest.name, func(t *testing.T) {
 			subtest.test(t, tg)
 		})
-	}
-}
-
-// testCancelContract tests the RenterCancelContract Endpoint
-func testCancelContract(t *testing.T, tg *siatest.TestGroup) {
-	// Grab the first of the group's renters
-	r := tg.Renters()[0]
-
-	// Grab contracts
-	rc, err := r.RenterContractsGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Grab contract to cancel
-	contract := rc.ActiveContracts[0]
-
-	// Cancel Contract
-	if err := r.RenterCancelContractPost(contract.ID); err != nil {
-		t.Fatal(err)
-	}
-
-	// Mine block to trigger threadedContractMaintenance
-	m := tg.Miners()[0]
-	if err := m.MineBlock(); err != nil {
-		t.Fatal(err)
-	}
-	tg.Sync()
-
-	// Check that Contract is now in inactive contracts and no longer in Active contracts
-	rc, err = r.RenterInactiveContractsGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, c := range rc.ActiveContracts {
-		if c.ID == contract.ID {
-			t.Fatal("Contract not cancelled, contract found in Active Contracts")
-		}
-	}
-	i := 1
-	for _, c := range rc.InactiveContracts {
-		if c.ID == contract.ID {
-			break
-		}
-		if i == len(rc.InactiveContracts) {
-			t.Fatal("Contract not found in Inactive Contracts")
-		}
-		i++
 	}
 }
 
@@ -1260,6 +1211,98 @@ func TestRenterCancelAllowance(t *testing.T) {
 	})
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+// TestRenterCancelContract tests the RenterCancelContract Endpoint
+func TestRenterCancelContract(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create a group for testing.
+	groupParams := siatest.GroupParams{
+		Hosts:   2,
+		Renters: 1,
+		Miners:  1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Grab the first of the group's renters
+	r := tg.Renters()[0]
+
+	// Grab contracts
+	rc, err := r.RenterContractsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Grab contract to cancel
+	contract := rc.ActiveContracts[0]
+
+	// Cancel Contract
+	if err := r.RenterContractCancelPost(contract.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a new host so new contract can be formed
+	hostDir, err := siatest.TestDir(filepath.Join(t.Name(), "host"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostParams := node.Host(hostDir)
+	_, err = tg.AddNodes(hostParams)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine block to trigger threadedContractMaintenance
+	m := tg.Miners()[0]
+	if err := m.MineBlock(); err != nil {
+		t.Fatal(err)
+	}
+	if err := tg.Sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = build.Retry(200, 100*time.Millisecond, func() error {
+		// Check that Contract is now in inactive contracts and no longer in Active contracts
+		rc, err = r.RenterInactiveContractsGet()
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Confirm Renter has the expected number of contracts, meaning canceled contract should have been replaced.
+		if len(rc.ActiveContracts) != len(tg.Hosts())-1 {
+			return fmt.Errorf("Canceled contract was not replaced, only %v active contracts, expected %v", len(rc.ActiveContracts), len(tg.Hosts()))
+		}
+		for _, c := range rc.ActiveContracts {
+			if c.ID == contract.ID {
+				return errors.New("Contract not cancelled, contract found in Active Contracts")
+			}
+		}
+		i := 1
+		for _, c := range rc.InactiveContracts {
+			if c.ID == contract.ID {
+				break
+			}
+			if i == len(rc.InactiveContracts) {
+				return errors.New("Contract not found in Inactive Contracts")
+			}
+			i++
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

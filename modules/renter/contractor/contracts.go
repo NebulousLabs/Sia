@@ -96,6 +96,11 @@ func (c *Contractor) managedMarkContractsUtility() error {
 	// Update utility fields for each contract.
 	for _, contract := range c.staticContracts.ViewAll() {
 		utility := func() (u modules.ContractUtility) {
+			// Record current utility of the contract
+			u.GoodForRenew = contract.Utility.GoodForRenew
+			u.GoodForUpload = contract.Utility.GoodForUpload
+			u.Locked = contract.Utility.Locked
+
 			// Start the contract in good standing if the utility wasn't
 			// locked.
 			if !u.Locked {
