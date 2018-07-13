@@ -125,6 +125,17 @@ func testClearDownloadHistory(t *testing.T, tg *siatest.TestGroup) {
 	}
 	numDownloads = len(rdg.Downloads)
 
+	// Make sure that we can also individually grab all the downloads.
+	for _, di := range rdg.Downloads {
+		d, err := r.RenterDownloadByUID(di.UID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(d, di) {
+			t.Fatal("download infos are not equal")
+		}
+	}
+
 	// Check removing one download from history
 	// Remove First Download
 	timestamp := rdg.Downloads[0].StartTime
