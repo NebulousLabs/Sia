@@ -34,7 +34,7 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 		return
 	}
 	defer d.Close()
-	data, err := d.Sector(udc.staticChunkMap[string(w.contract.HostPublicKey.Key)].root)
+	pieceData, err := d.Sector(udc.staticChunkMap[string(w.contract.HostPublicKey.Key)].root)
 	if err != nil {
 		w.renter.log.Debugln("worker failed to download sector:", err)
 		udc.managedUnregisterWorker(w)
@@ -47,6 +47,18 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 	// actually payload data.
 	atomic.AddUint64(&udc.download.atomicTotalDataTransferred, udc.staticPieceSize)
 
+	// Decrypt the piece. This might introduce some overhead for downloads with
+	// a large overdrive. It shouldn't be a bottleneck though since bandwidth
+	// is usually a lot more scarce than CPU processing power.
+	pieceIndex := udc.staticChunkMap[string(w.contract.HostPublicKey.Key)].index
+	key := deriveKey(udc.masterKey, udc.staticChunkIndex, pieceIndex)
+	decryptedPiece, err := key.DecryptBytesInPlace(pieceData)
+	if err != nil {
+		w.renter.log.Debugln("worker failed to decrypt piece:", err)
+		udc.managedUnregisterWorker(w)
+		return
+	}
+
 	// Mark the piece as completed. Perform chunk recovery if we newly have
 	// enough pieces to do so. Chunk recovery is an expensive operation that
 	// should be performed in a separate thread as to not block the worker.
@@ -54,7 +66,7 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 	udc.piecesCompleted++
 	udc.piecesRegistered--
 	if udc.piecesCompleted <= udc.erasureCode.MinPieces() {
-		udc.physicalChunkData[udc.staticChunkMap[string(w.contract.HostPublicKey.Key)].index] = data
+		udc.physicalChunkData[pieceIndex] = decryptedPiece
 	}
 	if udc.piecesCompleted == udc.erasureCode.MinPieces() {
 		go udc.threadedRecoverLogicalData()
