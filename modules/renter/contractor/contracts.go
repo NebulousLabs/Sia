@@ -353,11 +353,10 @@ func (c *Contractor) threadedContractMaintenance() {
 	c.mu.RLock()
 	allowance := c.allowance
 	blockHeight := c.blockHeight
-	c.mu.RUnlock()
-
 	// Grab the end height that should be used for the contracts created
 	// in the current period.
 	endHeight = c.contractEndHeight()
+	c.mu.RUnlock()
 
 	// Determine how many funds have been used already in this billing cycle,
 	// and how many funds are remaining. We have to calculate these numbers
@@ -564,7 +563,9 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 
 			// Calculate endHeight for renewed contracts
+			c.mu.RLock()
 			endHeight = c.contractEndHeight()
+			c.mu.RUnlock()
 
 			// Perform the actual renew. If the renew fails, return the
 			// contract. If the renew fails we check how often it has failed
