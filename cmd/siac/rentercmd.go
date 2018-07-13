@@ -641,6 +641,9 @@ func renterfilesdownloadcmd(path, destination string) {
 // user, and return an error when the download is finished.
 func downloadprogress(siapath, destination string) error {
 	start := time.Now()
+
+	measurements := []uint64{0}                                  // first measurement is 0 bytes
+	numMeasurements := int(60 * time.Second / OutputRefreshRate) // 4 Ticks/second = 240 measurements / min
 	for range time.Tick(OutputRefreshRate) {
 		// Get the list of downloads.
 		queue, err := httpClient.RenterDownloadsGet()
@@ -674,11 +677,28 @@ func downloadprogress(siapath, destination string) error {
 			return nil
 		}
 
-		// Update the progress for the user.
+		// Add the current progress to the measurements.
+		measurements = append(measurements, d.Received)
+
+		// Shrink the measurements to only contain measurements from the last
+		// 60 seconds.
+		if len(measurements) > numMeasurements {
+			measurements = measurements[len(measurements)-numMeasurements:]
+		}
+
+		// Compute the progress and timespan between the first and last
+		// measurement to get the speed.
+		received := float64(measurements[len(measurements)-1] - measurements[0])
+		timespan := time.Duration(float64(time.Minute) * float64(len(measurements)) / float64(numMeasurements))
+		mbps := (received * 8 / 1e6) / timespan.Seconds()
+
+		// Compuate the percentage of completion and time elapsed since the
+		// start of the download.
 		pct := 100 * float64(d.Received) / float64(d.Filesize)
 		elapsed := time.Since(d.StartTime)
 		elapsed -= elapsed % time.Second // round to nearest second
-		mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
+
+		// Update the progress for the user.
 		fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
 	}
 
