@@ -115,8 +115,10 @@ type (
 
 	// RenterContracts contains the renter's contracts.
 	RenterContracts struct {
-		Contracts    []RenterContract `json:"contracts"`
-		OldContracts []RenterContract `json:"oldcontracts"`
+		Contracts         []RenterContract `json:"contracts"`
+		ActiveContracts   []RenterContract `json:"activecontracts"`
+		InactiveContracts []RenterContract `json:"inactivecontracts"`
+		ExpiredContracts  []RenterContract `json:"expiredcontracts"`
 	}
 
 	// RenterDownloadQueue contains the renter's download queue.
@@ -285,7 +287,36 @@ func (api *API) renterContractClearHandler(w http.ResponseWriter, req *http.Requ
 
 // renterContractsHandler handles the API call to request the Renter's contracts.
 func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+// renterContractsHandler handles the API call to request the Renter's
+// contracts.
+//
+// Active contracts are contracts that the renter is actively using to store
+// data and can upload, download, and renew
+//
+// Inactive contracts are contracts that are not currently being used by the
+// renter because they are !goodForRenew, but have endheights that are in the
+// future so could potentially become active again
+//
+// Expired contracts are contracts who's endheights are in the past
+func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// Parse flags
+	inactive, err := scanBool(req.FormValue("inactive"))
+	if err != nil {
+		return
+	}
+	expired, err := scanBool(req.FormValue("expired"))
+	if err != nil {
+		return
+	}
+
+	// Get current block height for reference
+	blockHeight := api.cs.Height()
+
+	// Get active contracts
 	contracts := []RenterContract{}
+	activeContracts := []RenterContract{}
+	inactiveContracts := []RenterContract{}
+	expiredContracts := []RenterContract{}
 	for _, c := range api.renter.Contracts() {
 		var size uint64
 		if len(c.Transaction.FileContractRevisions) != 0 {
@@ -306,8 +337,7 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			goodForUpload = utility.GoodForUpload
 			goodForRenew = utility.GoodForRenew
 		}
-
-		contracts = append(contracts, RenterContract{
+		contract := RenterContract{
 			DownloadSpending:          c.DownloadSpending,
 			EndHeight:                 c.EndHeight,
 			Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
@@ -324,52 +354,69 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			StorageSpendingDeprecated: c.StorageSpending,
 			TotalCost:                 c.TotalCost,
 			UploadSpending:            c.UploadSpending,
-		})
+		}
+		if goodForRenew {
+			activeContracts = append(activeContracts, contract)
+		} else if inactive && !goodForRenew {
+			inactiveContracts = append(inactiveContracts, contract)
+		}
+		contracts = append(contracts, contract)
 	}
-	oldContracts := []RenterContract{}
-	for _, c := range api.renter.OldContracts() {
-		var size uint64
-		if len(c.Transaction.FileContractRevisions) != 0 {
-			size = c.Transaction.FileContractRevisions[0].NewFileSize
-		}
 
-		// Fetch host address
-		var netAddress modules.NetAddress
-		hdbe, exists := api.renter.Host(c.HostPublicKey)
-		if exists {
-			netAddress = hdbe.NetAddress
-		}
+	// Get expired contracts
+	if expired || inactive {
+		for _, c := range api.renter.OldContracts() {
+			var size uint64
+			if len(c.Transaction.FileContractRevisions) != 0 {
+				size = c.Transaction.FileContractRevisions[0].NewFileSize
+			}
 
-		// Fetch utilities for contract
-		var goodForUpload bool
-		var goodForRenew bool
-		if utility, ok := api.renter.ContractUtility(c.HostPublicKey); ok {
-			goodForUpload = utility.GoodForUpload
-			goodForRenew = utility.GoodForRenew
-		}
+			// Fetch host address
+			var netAddress modules.NetAddress
+			hdbe, exists := api.renter.Host(c.HostPublicKey)
+			if exists {
+				netAddress = hdbe.NetAddress
+			}
 
-		oldContracts = append(oldContracts, RenterContract{
-			DownloadSpending:          c.DownloadSpending,
-			EndHeight:                 c.EndHeight,
-			Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
-			GoodForUpload:             goodForUpload,
-			GoodForRenew:              goodForRenew,
-			HostPublicKey:             c.HostPublicKey,
-			ID:                        c.ID,
-			LastTransaction:           c.Transaction,
-			NetAddress:                netAddress,
-			RenterFunds:               c.RenterFunds,
-			Size:                      size,
-			StartHeight:               c.StartHeight,
-			StorageSpending:           c.StorageSpending,
-			StorageSpendingDeprecated: c.StorageSpending,
-			TotalCost:                 c.TotalCost,
-			UploadSpending:            c.UploadSpending,
-		})
+			// Fetch utilities for contract
+			var goodForUpload bool
+			var goodForRenew bool
+			if utility, ok := api.renter.ContractUtility(c.HostPublicKey); ok {
+				goodForUpload = utility.GoodForUpload
+				goodForRenew = utility.GoodForRenew
+			}
+
+			contract := RenterContract{
+				DownloadSpending:          c.DownloadSpending,
+				EndHeight:                 c.EndHeight,
+				Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
+				GoodForUpload:             goodForUpload,
+				GoodForRenew:              goodForRenew,
+				HostPublicKey:             c.HostPublicKey,
+				ID:                        c.ID,
+				LastTransaction:           c.Transaction,
+				NetAddress:                netAddress,
+				RenterFunds:               c.RenterFunds,
+				Size:                      size,
+				StartHeight:               c.StartHeight,
+				StorageSpending:           c.StorageSpending,
+				StorageSpendingDeprecated: c.StorageSpending,
+				TotalCost:                 c.TotalCost,
+				UploadSpending:            c.UploadSpending,
+			}
+			if expired && c.EndHeight < blockHeight {
+				expiredContracts = append(expiredContracts, contract)
+			} else if inactive && c.EndHeight >= blockHeight {
+				inactiveContracts = append(inactiveContracts, contract)
+			}
+		}
 	}
+
 	WriteJSON(w, RenterContracts{
-		Contracts:    contracts,
-		OldContracts: oldContracts,
+		Contracts:         contracts,
+		ActiveContracts:   activeContracts,
+		InactiveContracts: inactiveContracts,
+		ExpiredContracts:  expiredContracts,
 	})
 }
 
