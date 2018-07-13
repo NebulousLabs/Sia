@@ -541,8 +541,8 @@ func (c *Contractor) threadedContractMaintenance() {
 		return
 	}
 
-	// Create the renewSet and refreshSet, each a list of contracts that need to
-	// be renewed, paired with the amount of money to use in each renewal.
+	// Create the renewSet and refreshSet. Each is a list of contracts that need
+	// to be renewed, paired with the amount of money to use in each renewal.
 	//
 	// The renewSet is specifically contracts which are being renewed because
 	// they are about to expire. And the refreshSet is contracts that are being
