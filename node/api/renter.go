@@ -277,16 +277,17 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 
 // renterContractClearHandler handles the API call to cancel a specific Renter contract.
 func (api *API) renterContractClearHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	id := req.FormValue("ID")
-	// The hash types should have a method to load hash from string.  Check
-	// siacoin hash.  If filecontract hash doesn't have the method yet, copy it
-	// from the other structs that do.
-	fid := types.FileContractID(id)
-	api.renter.CancelContract(fid)
+	var fcid types.FileContractID
+	if err := fcid.LoadString(req.FormValue("ID")); err != nil {
+		return
+	}
+	err := api.renter.CancelContract(fcid)
+	if err != nil {
+		return
+	}
+	WriteSuccess(w)
 }
 
-// renterContractsHandler handles the API call to request the Renter's contracts.
-func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 // renterContractsHandler handles the API call to request the Renter's
 // contracts.
 //
