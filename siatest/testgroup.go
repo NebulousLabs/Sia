@@ -380,7 +380,7 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 				return err
 			}
 			// Count number of contracts
-			for _, c := range rc.Contracts {
+			for _, c := range rc.ActiveContracts {
 				if _, exists := hostMap[string(c.HostPublicKey.Key)]; exists {
 					contracts++
 				}
