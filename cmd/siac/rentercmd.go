@@ -640,7 +640,7 @@ func renterfilesdownloadcmd(path, destination string) {
 // bandwidthUnit takes bps (bits per second) as an argument and converts
 // them into a more human-readable string with a unit.
 func bandwidthUnit(bps uint64) string {
-	units := []string{"Bps", "Kbps", "Mbps", "Gbps", "Tbps", "Ebps"}
+	units := []string{"Bps", "Kbps", "Mbps", "Gbps", "Tbps", "Pbps", "Ebps", "Zbps", "Ybps"}
 	mag := uint64(1)
 	unit := ""
 	for _, unit = range units {
