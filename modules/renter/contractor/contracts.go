@@ -113,8 +113,9 @@ func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.Re
 	estimatedCost = estimatedCost.Add(estimatedCost.Div64(3))
 
 	// Check for a sane minimum. The contractor should not be forming contracts
-	// with less than 20% / (num contracts) of the value of the allowance.
-	minimum := allowance.Funds.Div64(5).Div64(allowance.Hosts)
+	// with less than 'fileContractMinimumFunding / (num contracts)' of the
+	// value of the allowance.
+	minimum := allowance.Funds.MulFloat(fileContractMinimumFunding).Div64(allowance.Hosts)
 	if estimatedCost.Cmp(minimum) < 0 {
 		estimatedCost = minimum
 	}

@@ -8,6 +8,22 @@ import (
 
 // Constants related to contract formation parameters.
 var (
+	// consecutiveRenewalsBeforeReplacement is the number of times a contract
+	// attempt to be renewed before it is marked as !goodForRenew.
+	consecutiveRenewalsBeforeReplacement = build.Select(build.Var{
+		Dev:      types.BlockHeight(12),
+		Standard: types.BlockHeight(12), // ~2h
+		Testing:  types.BlockHeight(12),
+	}).(types.BlockHeight)
+
+	// fileContractMinimumFunding is the lowest percentage of an allowace (on a
+	// per-contract basis) that is allowed to go into funding a contract. If the
+	// allowance is 100 SC per contract (5,000 SC total for 50 contracts, or
+	// 2,000 SC total for 20 contracts, etc.), then the minimum amount of funds
+	// that a contract would be allowed to have is fileContractMinimumFunding *
+	// 100SC.
+	fileContractMinimumFunding = float64(0.15)
+
 	// minContractFundRenewalThreshold defines the ratio of remaining funds to
 	// total contract cost below which the contractor will prematurely renew a
 	// contract.
@@ -20,14 +36,6 @@ var (
 		Standard: 10,
 		Testing:  1,
 	}).(int)
-
-	// consecutiveRenewalsBeforeReplacement is the number of times a contract
-	// attempt to be renewed before it is marked as !goodForRenew.
-	consecutiveRenewalsBeforeReplacement = build.Select(build.Var{
-		Dev:      types.BlockHeight(12),
-		Standard: types.BlockHeight(12), // ~2h
-		Testing:  types.BlockHeight(12),
-	}).(types.BlockHeight)
 )
 
 // Constants related to the safety values for when the contractor is forming
