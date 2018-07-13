@@ -58,7 +58,7 @@ func (c *Contractor) managedContractUtility(id types.FileContractID) (modules.Co
 // to be extended to support adding up all the parent spending too. These
 // spending estimates will apply to uploading and downloading, but not to
 // storage or fees or contract price.
-func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.RenterContract, allowancePeriod types.BlockHeight, blockHeight types.BlockHeight) (types.Currency, error) {
+func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.RenterContract, blockHeight types.BlockHeight, allowance modules.Allowance) (types.Currency, error) {
 	// Fetch the host pricing to use in the estimate.
 	host, exists := c.hdb.Host(contract.HostPublicKey)
 	if !exists {
@@ -68,7 +68,7 @@ func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.Re
 	// Estimate the amount of money that's going to be needed for existing
 	// storage.
 	dataStored := contract.Transaction.FileContractRevisions[0].NewFileSize
-	maintenanceCost := types.NewCurrency64(dataStored).Mul64(uint64(allowancePeriod)).Mul(host.StoragePrice)
+	maintenanceCost := types.NewCurrency64(dataStored).Mul64(uint64(allowance.Period)).Mul(host.StoragePrice)
 
 	// Estimate the amount of money that's going to be needed for new storage
 	// based on the amount of new storage added in the previous period. Account
@@ -86,7 +86,7 @@ func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.Re
 	}
 	// The estimated cost for new upload spending is the previous upload
 	// bandwidth plus the implied storage cost for all of the new data.
-	newUploadsCost := prevUploadSpending.Add(prevUploadDataEstimate.Mul64(uint64(allowancePeriod)).Mul(host.StoragePrice))
+	newUploadsCost := prevUploadSpending.Add(prevUploadDataEstimate.Mul64(uint64(allowance.Period)).Mul(host.StoragePrice))
 
 	// Estimate the amount of money that's going to be spent on downloads.
 	newDownloadsCost := contract.DownloadSpending
@@ -110,7 +110,15 @@ func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.Re
 	// Add them all up and then return the estimate plus 33% for error margin
 	// and just general volatility of usage pattern.
 	estimatedCost := afterSiafundFeesEstimate.Add(txnFees)
-	return estimatedCost.Add(estimatedCost.Div64(3)), nil
+	estimatedCost = estimatedCost.Add(estimatedCost.Div64(3))
+
+	// Check for a sane minimum. The contractor should not be forming contracts
+	// with less than 20% / (num contracts) of the value of the allowance.
+	minimum := allowance.Funds.Div64(5).Div64(allowance.Hosts)
+	if estimatedCost.Cmp(minimum) < 0 {
+		estimatedCost = minimum
+	}
+	return estimatedCost, nil
 }
 
 // managedInterruptContractMaintenance will issue an interrupt signal to any
@@ -572,7 +580,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		// much money was spend on the contract throughout this billing cycle
 		// (which is now ending).
 		if blockHeight+allowance.RenewWindow >= contract.EndHeight {
-			renewAmount, err := c.managedEstimateRenewFundingRequirements(contract, allowance.Period, blockHeight)
+			renewAmount, err := c.managedEstimateRenewFundingRequirements(contract, blockHeight, allowance)
 			if err != nil {
 				continue
 			}
