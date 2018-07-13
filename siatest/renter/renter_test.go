@@ -57,6 +57,7 @@ func TestRenter(t *testing.T) {
 		name string
 		test func(*testing.T, *siatest.TestGroup)
 	}{
+		{"TestCancelContract", testCancelContract},
 		{"TestClearDownloadHistory", testClearDownloadHistory},
 		{"TestDownloadAfterRenew", testDownloadAfterRenew},
 		{"TestDownloadMultipleLargeSectors", testDownloadMultipleLargeSectors},
@@ -71,6 +72,54 @@ func TestRenter(t *testing.T) {
 		t.Run(subtest.name, func(t *testing.T) {
 			subtest.test(t, tg)
 		})
+	}
+}
+
+// testCancelContract tests the RenterCancelContract Endpoint
+func testCancelContract(t *testing.T, tg *siatest.TestGroup) {
+	// Grab the first of the group's renters
+	r := tg.Renters()[0]
+
+	// Grab contracts
+	rc, err := r.RenterContractsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Grab contract to cancel
+	contract := rc.ActiveContracts[0]
+
+	// Cancel Contract
+	if err := r.RenterCancelContractPost(contract.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine block to trigger threadedContractMaintenance
+	m := tg.Miners()[0]
+	if err := m.MineBlock(); err != nil {
+		t.Fatal(err)
+	}
+	tg.Sync()
+
+	// Check that Contract is now in inactive contracts and no longer in Active contracts
+	rc, err = r.RenterInactiveContractsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range rc.ActiveContracts {
+		if c.ID == contract.ID {
+			t.Fatal("Contract not cancelled, contract found in Active Contracts")
+		}
+	}
+	i := 1
+	for _, c := range rc.InactiveContracts {
+		if c.ID == contract.ID {
+			break
+		}
+		if i == len(rc.InactiveContracts) {
+			t.Fatal("Contract not found in Inactive Contracts")
+		}
+		i++
 	}
 }
 

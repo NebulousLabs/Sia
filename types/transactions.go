@@ -149,11 +149,6 @@ type (
 	UnlockHash crypto.Hash
 )
 
-// LoadString loads a FileContractID from a string
-func (fcid *FileContractID) LoadString(str string) error {
-	return (*crypto.Hash)(fcid).LoadString(str)
-}
-
 // ID returns the id of a transaction, which is taken by marshalling all of the
 // fields except for the signatures and taking the hash of the result.
 func (t Transaction) ID() TransactionID {
