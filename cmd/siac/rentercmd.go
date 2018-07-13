@@ -648,7 +648,7 @@ func bandwidthUnit(bps uint64) string {
 			break
 		} else if unit != units[len(units)-1] {
 			// don't want to perform this multiply on the last iter; that
-			// would give us 1.235 ebps instead of 1235 ebps
+			// would give us 1.235 Ybps instead of 1235 Ybps
 			mag *= 1e3
 		}
 
