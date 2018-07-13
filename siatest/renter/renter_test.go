@@ -2501,10 +2501,19 @@ func checkRenewedContracts(renewedContracts []api.RenterContract) error {
 func renewContractsByRenewWindow(renter *siatest.TestNode, tg *siatest.TestGroup) error {
 	rg, err := renter.RenterGet()
 	if err != nil {
-		return errors.AddContext(err, "failed to get RenterGet")
+		return err
 	}
+	cg, err := renter.ConsensusGet()
+	if err != nil {
+		return err
+	}
+	rc, err := renter.RenterContractsGet()
+	if err != nil {
+		return err
+	}
+	blocksToMine := rc.ActiveContracts[0].EndHeight - rg.Settings.Allowance.RenewWindow - cg.Height
 	m := tg.Miners()[0]
-	for i := 0; i < int(rg.Settings.Allowance.Period-rg.Settings.Allowance.RenewWindow); i++ {
+	for i := 0; i < int(blocksToMine); i++ {
 		if err = m.MineBlock(); err != nil {
 			return err
 		}
