@@ -27,14 +27,8 @@ var uptimeWindow = func() time.Duration {
 
 // IsOffline indicates whether a contract's host should be considered offline,
 // based on its scan metrics.
-func (c *Contractor) IsOffline(id types.FileContractID) bool {
-	contract, ok := c.staticContracts.View(id)
-	if !ok {
-		// No contract, assume offline.
-		return true
-	}
-	// See if there is a host that corresponds to this contract.
-	host, ok := c.hdb.Host(contract.HostPublicKey)
+func (c *Contractor) IsOffline(pk types.SiaPublicKey) bool {
+	host, ok := c.hdb.Host(pk)
 	if !ok {
 		// No host, assume offline.
 		return true
@@ -50,7 +44,14 @@ func isOffline(host modules.HostDBEntry) bool {
 		// No scan history, assume offline.
 		return true
 	}
-	// Return 'true' if the most recent scan of the host failed, false
-	// otherwise.
-	return !host.ScanHistory[len(host.ScanHistory)-1].Success
+	// If we only have one scan in the history we return false if it was
+	// successful.
+	if len(host.ScanHistory) == 1 {
+		return !host.ScanHistory[0].Success
+	}
+	// Otherwise we use the last 2 scans. This way a short connectivity problem
+	// won't mark the host as offline.
+	success1 := host.ScanHistory[len(host.ScanHistory)-1].Success
+	success2 := host.ScanHistory[len(host.ScanHistory)-2].Success
+	return !(success1 || success2)
 }

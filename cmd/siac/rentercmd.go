@@ -1,18 +1,44 @@
 package main
 
+// TODO: If you run siac from a non-existant directory, the abs() function does
+// not handle this very gracefully.
+
+// TODO: Currently the download command will, every iteration, go through every
+// single download in the download queue until it finds the right one. This
+// doesn't end up hurting too much because it's very likely that the download
+// you want is earlier instead of later in the queue, but it's still overhead
+// that we should replace by using an API endpoint that allows you to ask for
+// the desired download immediately instead of having to search through a list.
+//
+// The desired download should be specified by a unique ID instead of by a path,
+// since a download to the same path can appear multiple times in the download
+// history. This will need to be a new return value of the download call in the
+// API.
+
+// TODO: Currently the download command always displays speeds in terms of Mbps.
+// This should probably be switched to some sort of human readable bandwidth
+// display, so that it adjusts units as appropriate.
+
+// TODO: Currently, the download command displays speed based on the total
+// download time of the file, instead of using a rolling average over the last
+// few minutes. We should change the download speed to use a rolling average.
+
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 	"time"
 
+	"github.com/NebulousLabs/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/node/api"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -157,11 +183,20 @@ func rentercmd() {
 	fm := rg.FinancialMetrics
 	totalSpent := fm.ContractFees.Add(fm.UploadSpending).
 		Add(fm.DownloadSpending).Add(fm.StorageSpending)
-	unspentAllocated := fm.TotalAllocated.Sub(totalSpent)
-	unspentUnallocated := fm.Unspent.Sub(unspentAllocated)
+	// Calculate unspent allocated
+	unspentAllocated := types.ZeroCurrency
+	if fm.TotalAllocated.Cmp(totalSpent) >= 0 {
+		unspentAllocated = fm.TotalAllocated.Sub(totalSpent)
+	}
+	// Calculate unspent unallocated
+	unspentUnallocated := types.ZeroCurrency
+	if fm.Unspent.Cmp(unspentAllocated) >= 0 {
+		unspentUnallocated = fm.Unspent.Sub(unspentAllocated)
+	}
 
 	fmt.Printf(`Renter info:
 	Allowance:         %v
+	Period Spending:
 	  Spent Funds:     %v
 	    Storage:       %v
 	    Upload:        %v
@@ -170,12 +205,17 @@ func rentercmd() {
 	  Unspent Funds:   %v
 	    Allocated:     %v
 	    Unallocated:   %v
+	Previous Spending:
+	  Withheld Funds:  %v
+	  Release Block:   %v
+	  Spent Funds:	   %v
 
 `, currencyUnits(rg.Settings.Allowance.Funds), currencyUnits(totalSpent),
 		currencyUnits(fm.StorageSpending), currencyUnits(fm.UploadSpending),
 		currencyUnits(fm.DownloadSpending), currencyUnits(fm.ContractFees),
 		currencyUnits(fm.Unspent), currencyUnits(unspentAllocated),
-		currencyUnits(unspentUnallocated))
+		currencyUnits(unspentUnallocated), currencyUnits(fm.WithheldFunds),
+		fm.ReleaseBlock, currencyUnits(fm.PreviousSpending))
 
 	// also list files
 	renterfileslistcmd()
@@ -272,6 +312,21 @@ func renterallowancecmd() {
 
 // renterallowancecancelcmd cancels the current allowance.
 func renterallowancecancelcmd() {
+	fmt.Println(`Canceling your allowance will disable uploading new files,
+repairing existing files, and renewing existing files. All files will cease
+to be accessible after a short period of time.`)
+again:
+	fmt.Print("Do you want to continue? [y/n] ")
+	var resp string
+	fmt.Scanln(&resp)
+	switch strings.ToLower(resp) {
+	case "y", "yes":
+		// continue below
+	case "n", "no":
+		return
+	default:
+		goto again
+	}
 	err := httpClient.RenterCancelAllowance()
 	if err != nil {
 		die("error canceling allowance:", err)
@@ -348,42 +403,165 @@ func (s byValue) Less(i, j int) bool {
 // rentercontractscmd is the handler for the comand `siac renter contracts`.
 // It lists the Renter's contracts.
 func rentercontractscmd() {
-	rc, err := httpClient.RenterContractsGet()
+	rc, err := httpClient.RenterInactiveContractsGet()
 	if err != nil {
 		die("Could not get contracts:", err)
 	}
-	if len(rc.Contracts) == 0 {
-		fmt.Println("No contracts have been formed.")
+	if len(rc.ActiveContracts) == 0 && len(rc.InactiveContracts) == 0 && !renterAllContracts {
+		fmt.Println("No contracts in the current period.")
 		return
 	}
-	sort.Sort(byValue(rc.Contracts))
-	fmt.Println("Contracts:")
-	w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
-	for _, c := range rc.Contracts {
-		fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\t%v\t%v\n",
-			c.NetAddress,
-			currencyUnits(c.RenterFunds),
-			currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
-			currencyUnits(c.Fees),
-			filesizeUnits(int64(c.Size)),
-			c.EndHeight,
-			c.ID,
-			c.GoodForUpload,
-			c.GoodForRenew)
+
+	if len(rc.ActiveContracts) != 0 && len(rc.InactiveContracts) != 0 {
+		// Display Active Contracts
+		fmt.Println("Contracts in the Current Period")
+		sort.Sort(byValue(rc.ActiveContracts))
+		var activeTotalStored uint64
+		var activeTotalRemaining, activeTotalSpent, activeTotalFees types.Currency
+		for _, c := range rc.ActiveContracts {
+			activeTotalStored += c.Size
+			activeTotalRemaining = activeTotalRemaining.Add(c.RenterFunds)
+			activeTotalSpent = activeTotalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
+			activeTotalFees = activeTotalFees.Add(c.Fees)
+		}
+		fmt.Printf(`
+Active Contract Summary:
+Number of Contracts:  %v
+Total stored:         %9s
+Total Remaining:      %v
+Total Spent:          %v
+Total Fees:           %v
+
+`, len(rc.ActiveContracts), filesizeUnits(int64(activeTotalStored)), currencyUnits(activeTotalRemaining), currencyUnits(activeTotalSpent), currencyUnits(activeTotalFees))
+		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
+		for _, c := range rc.ActiveContracts {
+			address := c.NetAddress
+			if address == "" {
+				address = "Host Removed"
+			}
+			fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\t%v\t%v\n",
+				address,
+				currencyUnits(c.RenterFunds),
+				currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
+				currencyUnits(c.Fees),
+				filesizeUnits(int64(c.Size)),
+				c.EndHeight,
+				c.ID,
+				c.GoodForUpload,
+				c.GoodForRenew)
+		}
+		w.Flush()
+
+		// Display Inactive Contracts
+		sort.Sort(byValue(rc.InactiveContracts))
+		var inactiveTotalStored uint64
+		var inactiveTotalRemaining, inactiveTotalSpent, inactiveTotalFees types.Currency
+		for _, c := range rc.InactiveContracts {
+			inactiveTotalStored += c.Size
+			inactiveTotalRemaining = inactiveTotalRemaining.Add(c.RenterFunds)
+			inactiveTotalSpent = inactiveTotalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
+			inactiveTotalFees = inactiveTotalFees.Add(c.Fees)
+		}
+		fmt.Printf(`
+Inactive Contract Summary:
+Number of Contracts:  %v
+Total stored:         %9s
+Total Remaining:      %v
+Total Spent:          %v
+Total Fees:           %v
+			
+`, len(rc.InactiveContracts), filesizeUnits(int64(inactiveTotalStored)), currencyUnits(inactiveTotalRemaining), currencyUnits(inactiveTotalSpent), currencyUnits(inactiveTotalFees))
+		w = tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "Host\tRemaining Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
+		for _, c := range rc.InactiveContracts {
+			address := c.NetAddress
+			if address == "" {
+				address = "Host Removed"
+			}
+			fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\t%v\t%v\n",
+				address,
+				currencyUnits(c.RenterFunds),
+				currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
+				currencyUnits(c.Fees),
+				filesizeUnits(int64(c.Size)),
+				c.EndHeight,
+				c.ID,
+				c.GoodForUpload,
+				c.GoodForRenew)
+		}
+		w.Flush()
 	}
-	w.Flush()
+
+	if renterAllContracts {
+		rce, err := httpClient.RenterExpiredContractsGet()
+		if err != nil {
+			die("Could not get expired contracts:", err)
+		}
+		if len(rc.ActiveContracts) == 0 && len(rc.InactiveContracts) == 0 && len(rce.ExpiredContracts) == 0 {
+			fmt.Println("No contracts have been formed.")
+			return
+		}
+		if len(rce.ExpiredContracts) == 0 {
+			fmt.Println("No expired contracts")
+			return
+		}
+		sort.Sort(byValue(rce.ExpiredContracts))
+		var expiredTotalStored uint64
+		var expiredTotalWithheld, expiredTotalSpent, expiredTotalFees types.Currency
+		for _, c := range rce.ExpiredContracts {
+			expiredTotalStored += c.Size
+			expiredTotalWithheld = expiredTotalWithheld.Add(c.RenterFunds)
+			expiredTotalSpent = expiredTotalSpent.Add(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees))
+			expiredTotalFees = expiredTotalFees.Add(c.Fees)
+		}
+		fmt.Printf(`
+Expired Contract Summary:
+Number of Contracts:  %v
+Total stored:         %9s
+Total Remaining:      %v
+Total Spent:          %v
+Total Fees:           %v
+		
+`, len(rce.ExpiredContracts), filesizeUnits(int64(expiredTotalStored)), currencyUnits(expiredTotalWithheld), currencyUnits(expiredTotalSpent), currencyUnits(expiredTotalFees))
+		w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "Host\tWithheld Funds\tSpent Funds\tSpent Fees\tData\tEnd Height\tID\tGoodForUpload\tGoodForRenew")
+		for _, c := range rce.ExpiredContracts {
+			address := c.NetAddress
+			if address == "" {
+				address = "Host Removed"
+			}
+			fmt.Fprintf(w, "%v\t%8s\t%8s\t%8s\t%v\t%v\t%v\t%v\t%v\n",
+				address,
+				currencyUnits(c.RenterFunds),
+				currencyUnits(c.TotalCost.Sub(c.RenterFunds).Sub(c.Fees)),
+				currencyUnits(c.Fees),
+				filesizeUnits(int64(c.Size)),
+				c.EndHeight,
+				c.ID,
+				c.GoodForUpload,
+				c.GoodForRenew)
+		}
+		w.Flush()
+	}
 }
 
 // rentercontractsviewcmd is the handler for the command `siac renter contracts <id>`.
 // It lists details of a specific contract.
 func rentercontractsviewcmd(cid string) {
-	rc, err := httpClient.RenterContractsGet()
+	rc, err := httpClient.RenterInactiveContractsGet()
 	if err != nil {
 		die("Could not get contract details: ", err)
 	}
+	rce, err := httpClient.RenterExpiredContractsGet()
+	if err != nil {
+		die("Could not get expired contract details: ", err)
+	}
 
-	for _, rc := range rc.Contracts {
+	contracts := append(rc.ActiveContracts, rc.InactiveContracts...)
+	contracts = append(contracts, rce.ExpiredContracts...)
+
+	for _, rc := range contracts {
 		if rc.ID.String() == cid {
 			hostInfo, err := httpClient.HostDbHostsGet(rc.HostPublicKey)
 			if err != nil {
@@ -436,47 +614,76 @@ func renterfilesdeletecmd(path string) {
 // Downloads a path from the Sia network to the local specified destination.
 func renterfilesdownloadcmd(path, destination string) {
 	destination = abs(destination)
-	done := make(chan struct{})
-	go downloadprogress(done, path)
 
-	err := httpClient.RenterDownloadFullGet(path, destination, false)
-	close(done)
+	// Queue the download. An error will be returned if the queueing failed, but
+	// the call will return before the download has completed. The call is made
+	// as an async call.
+	err := httpClient.RenterDownloadFullGet(path, destination, true)
 	if err != nil {
-		die("Could not download file:", err)
+		die("Download could not be started:", err)
+	}
+
+	// If the download is async, report success.
+	if renterDownloadAsync {
+		fmt.Printf("Queued Download '%s' to %s.\n", path, abs(destination))
+		return
+	}
+
+	// If the download is blocking, display progress as the file downloads.
+	err = downloadprogress(path, destination)
+	if err != nil {
+		die("\nDownload could not be completed:", err)
 	}
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
 }
 
-func downloadprogress(done chan struct{}, siapath string) {
-	time.Sleep(time.Second) // give download time to initialize
-	for {
-		select {
-		case <-done:
-			return
-
-		case <-time.Tick(time.Second):
-			// get download progress of file
-			queue, err := httpClient.RenterDownloadsGet()
-			if err != nil {
-				continue // benign
-			}
-			var d api.DownloadInfo
-			for _, d = range queue.Downloads {
-				if d.SiaPath == siapath {
-					break
-				}
-			}
-			if d.Filesize == 0 {
-				continue // file hasn't appeared in queue yet
-			}
-			pct := 100 * float64(d.Received) / float64(d.Filesize)
-			elapsed := time.Since(d.StartTime)
-			elapsed -= elapsed % time.Second // round to nearest second
-			mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
-			fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
+// downloadprogress will display the progress of the provided download to the
+// user, and return an error when the download is finished.
+func downloadprogress(siapath, destination string) error {
+	start := time.Now()
+	for range time.Tick(OutputRefreshRate) {
+		// Get the list of downloads.
+		queue, err := httpClient.RenterDownloadsGet()
+		if err != nil {
+			continue // benign
 		}
+
+		// Search for the download in the list of downloads.
+		var d api.DownloadInfo
+		found := false
+		for _, d = range queue.Downloads {
+			if d.SiaPath == siapath && d.Destination == destination {
+				found = true
+				break
+			}
+		}
+		// If the download has not appeared in the queue yet, either continue or
+		// give up.
+		if !found {
+			if time.Since(start) > RenterDownloadTimeout {
+				return errors.New("Unable to find download in queue")
+			}
+			continue
+		}
+
+		// Check whether the file has completed or otherwise errored out.
+		if d.Error != "" {
+			return errors.New(d.Error)
+		}
+		if d.Completed {
+			return nil
+		}
+
+		// Update the progress for the user.
+		pct := 100 * float64(d.Received) / float64(d.Filesize)
+		elapsed := time.Since(d.StartTime)
+		elapsed -= elapsed % time.Second // round to nearest second
+		mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
+		fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
 	}
 
+	// This code is unreachable, but the complier requires this to be here.
+	return errors.New("ERROR: download progress reached code that should not be reachable.")
 }
 
 // bySiaPath implements sort.Interface for [] modules.FileInfo based on the
@@ -500,9 +707,14 @@ func renterfileslistcmd() {
 		return
 	}
 	fmt.Println("Tracking", len(rf.Files), "files:")
+	var totalStored uint64
+	for _, file := range rf.Files {
+		totalStored += file.Filesize
+	}
+	fmt.Printf("Total uploaded: %9s\n", filesizeUnits(int64(totalStored)))
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	if renterListVerbose {
-		fmt.Fprintln(w, "File size\tAvailable\tUploaded\tProgress\tRedundancy\tRenewing\tSia path")
+		fmt.Fprintln(w, "File size\tAvailable\tUploaded\tProgress\tRedundancy\tRenewing\tOn Disk\tRecoverable\tSia path")
 	}
 	sort.Sort(bySiaPath(rf.Files))
 	for _, file := range rf.Files {
@@ -515,10 +727,13 @@ func renterfileslistcmd() {
 				redundancyStr = "-"
 			}
 			uploadProgressStr := fmt.Sprintf("%.2f%%", file.UploadProgress)
+			_, err := os.Stat(file.LocalPath)
+			onDiskStr := yesNo(!os.IsNotExist(err))
+			recoverableStr := yesNo(!(file.Redundancy < 1))
 			if file.UploadProgress == -1 {
 				uploadProgressStr = "-"
 			}
-			fmt.Fprintf(w, "\t%s\t%9s\t%8s\t%10s\t%s", availableStr, filesizeUnits(int64(file.UploadedBytes)), uploadProgressStr, redundancyStr, renewingStr)
+			fmt.Fprintf(w, "\t%s\t%9s\t%8s\t%10s\t%s\t%s\t%s", availableStr, filesizeUnits(int64(file.UploadedBytes)), uploadProgressStr, redundancyStr, renewingStr, onDiskStr, recoverableStr)
 		}
 		fmt.Fprintf(w, "\t%s", file.SiaPath)
 		if !renterListVerbose && !file.Available {

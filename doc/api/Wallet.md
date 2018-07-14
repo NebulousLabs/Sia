@@ -630,8 +630,8 @@ returns a list of transactions related to the wallet.
 startheight // block height
 
 // Height of of the block where the transaction history should end. If
-// 'endheight' is greater than the current height, all transactions up to and
-// including the most recent block will be provided.
+// 'endheight' is greater than the current height, or if it is '-1', all
+// transactions up to and including the most recent block will be provided.
 endheight // block height
 ```
 

@@ -76,7 +76,7 @@ func (w *worker) managedNextUploadChunk() (nextChunk *unfinishedUploadChunk, pie
 func (w *worker) managedQueueUploadChunk(uc *unfinishedUploadChunk) {
 	// Check that the worker is allowed to be uploading before grabbing the
 	// worker lock.
-	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
+	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.HostPublicKey)
 	goodForUpload := exists && utility.GoodForUpload
 	w.mu.Lock()
 	if !goodForUpload || w.uploadTerminated || w.onUploadCooldown() {
@@ -98,7 +98,7 @@ func (w *worker) managedQueueUploadChunk(uc *unfinishedUploadChunk) {
 // managedUpload will perform some upload work.
 func (w *worker) managedUpload(uc *unfinishedUploadChunk, pieceIndex uint64) {
 	// Open an editing connection to the host.
-	e, err := w.renter.hostContractor.Editor(w.contract.ID, w.renter.tg.StopChan())
+	e, err := w.renter.hostContractor.Editor(w.contract.HostPublicKey, w.renter.tg.StopChan())
 	if err != nil {
 		w.renter.log.Debugln("Worker failed to acquire an editor:", err)
 		w.managedUploadFailed(uc, pieceIndex)
@@ -167,7 +167,7 @@ func (w *worker) onUploadCooldown() bool {
 // managedProcessUploadChunk will process a chunk from the worker chunk queue.
 func (w *worker) managedProcessUploadChunk(uc *unfinishedUploadChunk) (nextChunk *unfinishedUploadChunk, pieceIndex uint64) {
 	// Determine the usability value of this worker.
-	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.ID)
+	utility, exists := w.renter.hostContractor.ContractUtility(w.contract.HostPublicKey)
 	goodForUpload := exists && utility.GoodForUpload
 	w.mu.Lock()
 	onCooldown := w.onUploadCooldown()

@@ -82,8 +82,15 @@ type NodeParams struct {
 	RenterDeps      modules.Dependencies
 	WalletDeps      modules.Dependencies
 
+	// Custom settings for modules
+	Allowance modules.Allowance
+
+	// The following fields are used to skip parts of the node set up
+	SkipSetAllowance  bool
+	SkipHostDiscovery bool
+
 	// The high level directory where all the persistence gets stored for the
-	// moudles.
+	// modules.
 	Dir string
 }
 
@@ -100,7 +107,7 @@ type Node struct {
 	Wallet          modules.Wallet
 
 	// The high level directory where all the persistence gets stored for the
-	// moudles.
+	// modules.
 	Dir string
 }
 

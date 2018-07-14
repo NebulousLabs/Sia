@@ -11,7 +11,9 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+
 	"github.com/NebulousLabs/fastrand"
 )
 
@@ -191,6 +193,18 @@ func TestRenterSaveLoad(t *testing.T) {
 	}
 	defer rt.Close()
 
+	// Check that the default values got set correctly.
+	settings := rt.renter.Settings()
+	if settings.MaxDownloadSpeed != DefaultMaxDownloadSpeed {
+		t.Error("default max download speed not set at init")
+	}
+	if settings.MaxUploadSpeed != DefaultMaxUploadSpeed {
+		t.Error("default max upload speed not set at init")
+	}
+	if settings.StreamCacheSize != DefaultStreamCacheSize {
+		t.Error("default stream cache size not set at init")
+	}
+
 	// Create and save some files
 	var f1, f2, f3 *file
 	f1 = newTestingFile()
@@ -207,16 +221,28 @@ func TestRenterSaveLoad(t *testing.T) {
 	rt.renter.saveFile(f2)
 	rt.renter.saveFile(f3)
 
+	// Update the settings of the renter to have a new stream cache size and
+	// download speed.
+	newDownSpeed := int64(300e3)
+	newUpSpeed := int64(500e3)
+	newCacheSize := uint64(3)
+	settings.MaxDownloadSpeed = newDownSpeed
+	settings.MaxUploadSpeed = newUpSpeed
+	settings.StreamCacheSize = newCacheSize
+	rt.renter.SetSettings(settings)
+
 	err = rt.renter.saveSync() // save metadata
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rt.renter.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// load should now load the files into memory.
-	id := rt.renter.mu.Lock()
-	err = rt.renter.load()
-	rt.renter.mu.Unlock(id)
-	if err != nil && !os.IsNotExist(err) {
+	rt.renter, err = New(rt.gateway, rt.cs, rt.wallet, rt.tpool, filepath.Join(rt.dir, modules.RenterDir))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -228,6 +254,17 @@ func TestRenterSaveLoad(t *testing.T) {
 	}
 	if err := equalFiles(f3, rt.renter.files[f3.name]); err != nil {
 		t.Fatal(err)
+	}
+
+	newSettings := rt.renter.Settings()
+	if newSettings.MaxDownloadSpeed != newDownSpeed {
+		t.Error("download settings not being persisted correctly")
+	}
+	if newSettings.MaxUploadSpeed != newUpSpeed {
+		t.Error("upload settings not being persisted correctly")
+	}
+	if newSettings.StreamCacheSize != newCacheSize {
+		t.Error("cache settings not being persisted correctly")
 	}
 }
 
@@ -258,13 +295,16 @@ func TestRenterPaths(t *testing.T) {
 	rt.renter.saveFile(f2)
 	rt.renter.saveFile(f3)
 
-	// Load the files into the renter.
-	id := rt.renter.mu.Lock()
-	err = rt.renter.load()
-	rt.renter.mu.Unlock(id)
-	if err != nil && !os.IsNotExist(err) {
+	// Restart the renter to re-do the init cycle.
+	err = rt.renter.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
+	rt.renter, err = New(rt.gateway, rt.cs, rt.wallet, rt.tpool, filepath.Join(rt.dir, modules.RenterDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Check that the files were loaded properly.
 	if err := equalFiles(f1, rt.renter.files[f1.name]); err != nil {
 		t.Fatal(err)

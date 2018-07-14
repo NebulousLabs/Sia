@@ -1,8 +1,8 @@
 package siatest
 
 import (
-	"fmt"
 	"math"
+	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -37,12 +37,12 @@ type (
 )
 
 var (
-	// defaultAllowance is the allowance used for the group's renters
-	defaultAllowance = modules.Allowance{
+	// DefaultAllowance is the allowance used for the group's renters
+	DefaultAllowance = modules.Allowance{
 		Funds:       types.SiacoinPrecision.Mul64(1e3),
 		Hosts:       5,
 		Period:      50,
-		RenewWindow: 10,
+		RenewWindow: 24,
 	}
 )
 
@@ -81,10 +81,6 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 		}
 	}
 
-	// Fully connect nodes
-	if err := fullyConnectNodes(nodes); err != nil {
-		return nil, errors.AddContext(err, "failed to fully connect nodes")
-	}
 	// Get a miner and mine some blocks to generate coins
 	if len(tg.miners) == 0 {
 		return nil, errors.New("cannot fund group without miners")
@@ -95,39 +91,8 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 			return nil, errors.AddContext(err, "failed to mine block for funding")
 		}
 	}
-	// Fund nodes
-	if err := fundNodes(miner, tg.nodes); err != nil {
-		return nil, errors.AddContext(err, "failed to fund nodes")
-	}
-	// Add storage to hosts
-	if err := addStorageFolderToHosts(tg.hosts); err != nil {
-		return nil, errors.AddContext(err, "failed to add storage to nodes")
-	}
-	// Announce hosts
-	if err := announceHosts(tg.hosts); err != nil {
-		return nil, errors.AddContext(err, "failed to announce hosts")
-	}
-	// Mine a block to get the announcements confirmed
-	if err := miner.MineBlock(); err != nil {
-		return nil, errors.AddContext(err, "failed to mine host announcements")
-	}
-	// Block until all hosts show up as active in the renters' hostdbs
-	if err := hostsInRenterDBCheck(miner, tg.renters, tg.hosts); err != nil {
-		return nil, build.ExtendErr("renter database check failed", err)
-	}
-	// Set renter allowances
-	if err := setRenterAllowances(tg.renters); err != nil {
-		return nil, errors.AddContext(err, "failed to set renter allowance")
-	}
-	// Wait for all the renters to form contracts
-	if err := waitForContracts(miner, tg.renters, tg.hosts); err != nil {
-		return nil, errors.AddContext(err, "renters failed to form contracts")
-	}
-	// Make sure all nodes are synced
-	if err := synchronizationCheck(miner, tg.nodes); err != nil {
-		return nil, errors.AddContext(err, "synchronization check failed")
-	}
-	return tg, nil
+	// Fully connect nodes
+	return tg, tg.setupNodes(tg.hosts, tg.nodes, tg.renters)
 }
 
 // NewGroupFromTemplate will create hosts, renters and miners according to the
@@ -264,9 +229,12 @@ func fundNodes(miner *TestNode, nodes map[*TestNode]struct{}) error {
 // database.
 func hostsInRenterDBCheck(miner *TestNode, renters map[*TestNode]struct{}, hosts map[*TestNode]struct{}) error {
 	for renter := range renters {
+		if renter.params.SkipHostDiscovery {
+			continue
+		}
 		for host := range hosts {
 			numRetries := 0
-			err := Retry(100, 100*time.Millisecond, func() error {
+			err := Retry(600, 100*time.Millisecond, func() error {
 				numRetries++
 				if renter == host {
 					// We don't care if the renter is also a host.
@@ -311,7 +279,15 @@ func randomDir() string {
 // setRenterAllowances sets the allowance of each renter
 func setRenterAllowances(renters map[*TestNode]struct{}) error {
 	for renter := range renters {
-		if err := renter.RenterPostAllowance(defaultAllowance); err != nil {
+		// Set allowance
+		if renter.params.SkipSetAllowance {
+			continue
+		}
+		allowance := DefaultAllowance
+		if !reflect.DeepEqual(renter.params.Allowance, modules.Allowance{}) {
+			allowance = renter.params.Allowance
+		}
+		if err := renter.RenterPostAllowance(allowance); err != nil {
 			return err
 		}
 	}
@@ -319,40 +295,46 @@ func setRenterAllowances(renters map[*TestNode]struct{}) error {
 }
 
 // synchronizationCheck makes sure that all the nodes are synced and follow the
-func synchronizationCheck(miner *TestNode, nodes map[*TestNode]struct{}) error {
-	mcg, err := miner.ConsensusGet()
+func synchronizationCheck(nodes map[*TestNode]struct{}) error {
+	// Get node with longest chain.
+	var longestChainNode *TestNode
+	var longestChain types.BlockHeight
+	for n := range nodes {
+		ncg, err := n.ConsensusGet()
+		if err != nil {
+			return err
+		}
+		if ncg.Height > longestChain {
+			longestChain = ncg.Height
+			longestChainNode = n
+		}
+	}
+	lcg, err := longestChainNode.ConsensusGet()
 	if err != nil {
 		return err
 	}
-	// Loop until all the blocks have the same CurrentBlock. If we need to mine
-	// a new block in between we need to repeat the check until no block was
-	// mined.
-	for node := range nodes {
+	// Loop until all the blocks have the same CurrentBlock.
+	for n := range nodes {
 		err := Retry(600, 100*time.Millisecond, func() error {
-			ncg, err := node.ConsensusGet()
+			ncg, err := n.ConsensusGet()
 			if err != nil {
 				return err
 			}
 			// If the CurrentBlock's match we are done.
-			if mcg.CurrentBlock == ncg.CurrentBlock {
+			if lcg.CurrentBlock == ncg.CurrentBlock {
 				return nil
 			}
 			// If the miner's height is greater than the node's we need to
 			// wait a bit longer for them to sync.
-			if mcg.Height > ncg.Height {
-				gwgMiner, errMiner := miner.GatewayGet()
-				gwgNode, errNode := node.GatewayGet()
-				return errors.Compose(fmt.Errorf("the node didn't catch up to the miner's height %v %v but have %v and %v peers respectively",
-					mcg.Height, ncg.Height, len(gwgNode.Peers), len(gwgMiner.Peers)), errMiner, errNode)
+			if lcg.Height != ncg.Height {
+				return errors.New("blockHeight doesn't match")
 			}
 			// If the miner's height is smaller than the node's we need a
 			// bit longer for them to sync.
-			if mcg.Height < ncg.Height {
-				return errors.New("the miner didn't catch up to the node's height")
+			if lcg.CurrentBlock != ncg.CurrentBlock {
+				return errors.New("ids don't match")
 			}
-			// If the miner's height is equal to the node's but still
-			// doesn't match, it needs to mine a block.
-			return errors.New("the node's current block's id does not equal the miner's")
+			return nil
 		})
 		if err != nil {
 			return err
@@ -364,10 +346,6 @@ func synchronizationCheck(miner *TestNode, nodes map[*TestNode]struct{}) error {
 // waitForContracts waits until the renters have formed contracts with the
 // hosts in the group.
 func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map[*TestNode]struct{}) error {
-	expectedContracts := defaultAllowance.Hosts
-	if uint64(len(hosts)) < expectedContracts {
-		expectedContracts = uint64(len(hosts))
-	}
 	// Create a map for easier public key lookups.
 	hostMap := make(map[string]struct{})
 	for host := range hosts {
@@ -381,7 +359,19 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 	// from the hosts map.
 	for renter := range renters {
 		numRetries := 0
-		err := Retry(1000, 100, func() error {
+		// Get expected number of contracts for this renter.
+		rg, err := renter.RenterGet()
+		if err != nil {
+			return err
+		}
+		// If there are less hosts in the group than we need we need to adjust
+		// our expectations.
+		expectedContracts := rg.Settings.Allowance.Hosts
+		if uint64(len(hosts)) < expectedContracts {
+			expectedContracts = uint64(len(hosts))
+		}
+		// Check if number of contracts is sufficient.
+		err = Retry(1000, 100, func() error {
 			numRetries++
 			contracts := uint64(0)
 			// Get the renter's contracts.
@@ -390,7 +380,7 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 				return err
 			}
 			// Count number of contracts
-			for _, c := range rc.Contracts {
+			for _, c := range rc.ActiveContracts {
 				if _, exists := hostMap[string(c.HostPublicKey.Key)]; exists {
 					contracts++
 				}
@@ -410,11 +400,13 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 			return err
 		}
 	}
-	return nil
+	// Mine of 1 final block to ensure contracts are mined and show
+	// up in a block
+	return miner.MineBlock()
 }
 
 // AddNodeN adds n nodes of a given template to the group.
-func (tg *TestGroup) AddNodeN(np node.NodeParams, n int) error {
+func (tg *TestGroup) AddNodeN(np node.NodeParams, n int) ([]*TestNode, error) {
 	nps := make([]node.NodeParams, n)
 	for i := 0; i < n; i++ {
 		nps[i] = np
@@ -423,9 +415,11 @@ func (tg *TestGroup) AddNodeN(np node.NodeParams, n int) error {
 }
 
 // AddNodes creates a node and adds it to the group.
-func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
+func (tg *TestGroup) AddNodes(nps ...node.NodeParams) ([]*TestNode, error) {
 	newNodes := make(map[*TestNode]struct{})
 	newHosts := make(map[*TestNode]struct{})
+	newRenters := make(map[*TestNode]struct{})
+	newMiners := make(map[*TestNode]struct{})
 	for _, np := range nps {
 		// Create the nodes and add them to the group.
 		if np.Dir == "" {
@@ -433,10 +427,11 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 		}
 		node, err := NewCleanNode(np)
 		if err != nil {
-			return build.ExtendErr("failed to create host", err)
+			return mapToSlice(newNodes), build.ExtendErr("failed to create host", err)
 		}
 		// Add node to nodes
 		tg.nodes[node] = struct{}{}
+		newNodes[node] = struct{}{}
 		// Add node to hosts
 		if np.Host != nil || np.CreateHost {
 			tg.hosts[node] = struct{}{}
@@ -445,34 +440,53 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 		// Add node to renters
 		if np.Renter != nil || np.CreateRenter {
 			tg.renters[node] = struct{}{}
+			newRenters[node] = struct{}{}
 		}
 		// Add node to miners
 		if np.Miner != nil || np.CreateMiner {
 			tg.miners[node] = struct{}{}
+			newMiners[node] = struct{}{}
 		}
-		newNodes[node] = struct{}{}
 	}
 
-	// Fully connect nodes.
+	return mapToSlice(newNodes), tg.setupNodes(newHosts, newNodes, newRenters)
+}
+
+// setupNodes does the set up required for creating a test group
+// and add nodes to a group
+func (tg *TestGroup) setupNodes(setHosts, setNodes, setRenters map[*TestNode]struct{}) error {
+	// Find richest miner.
+	var miner *TestNode
+	var balance types.Currency
+	for m := range tg.miners {
+		wg, err := m.WalletGet()
+		if err != nil {
+			return errors.New("failed to find richest miner")
+		}
+		if wg.ConfirmedSiacoinBalance.Cmp(balance) > 0 {
+			miner = m
+			balance = wg.ConfirmedSiacoinBalance
+		}
+	}
+	// Get all the nodes.
 	nodes := mapToSlice(tg.nodes)
 	if err := fullyConnectNodes(nodes); err != nil {
 		return build.ExtendErr("failed to fully connect nodes", err)
 	}
 	// Make sure the new nodes are synced.
-	miner := mapToSlice(tg.miners)[0]
-	if err := synchronizationCheck(miner, tg.nodes); err != nil {
-		return build.ExtendErr("synchronization check failed", err)
+	if err := synchronizationCheck(tg.nodes); err != nil {
+		return build.ExtendErr("synchronization check 1 failed", err)
 	}
 	// Fund nodes.
-	if err := fundNodes(miner, newNodes); err != nil {
+	if err := fundNodes(miner, setNodes); err != nil {
 		return build.ExtendErr("failed to fund new hosts", err)
 	}
 	// Add storage to host
-	if err := addStorageFolderToHosts(newHosts); err != nil {
+	if err := addStorageFolderToHosts(setHosts); err != nil {
 		return build.ExtendErr("failed to add storage to hosts", err)
 	}
 	// Announce host
-	if err := announceHosts(newHosts); err != nil {
+	if err := announceHosts(setHosts); err != nil {
 		return build.ExtendErr("failed to announce hosts", err)
 	}
 	// Mine a block to get the announcements confirmed
@@ -483,14 +497,43 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) error {
 	if err := hostsInRenterDBCheck(miner, tg.renters, tg.hosts); err != nil {
 		return build.ExtendErr("renter database check failed", err)
 	}
+	// Set renter allowances
+	if err := setRenterAllowances(setRenters); err != nil {
+		return build.ExtendErr("failed to set renter allowance", err)
+	}
 	// Wait for all the renters to form contracts if the haven't got enough
 	// contracts already.
 	if err := waitForContracts(miner, tg.renters, tg.hosts); err != nil {
 		return build.ExtendErr("renters failed to form contracts", err)
 	}
 	// Make sure all nodes are synced
-	if err := synchronizationCheck(miner, tg.nodes); err != nil {
-		return build.ExtendErr("synchronization check failed", err)
+	if err := synchronizationCheck(tg.nodes); err != nil {
+		return build.ExtendErr("synchronization check 2 failed", err)
+	}
+	return nil
+}
+
+// SetRenterAllowance finished the setup for the renter test node
+func (tg *TestGroup) SetRenterAllowance(renter *TestNode, allowance modules.Allowance) error {
+	if _, ok := tg.renters[renter]; !ok {
+		return errors.New("Can not set allowance for renter not in test group")
+	}
+	miner := mapToSlice(tg.miners)[0]
+	r := make(map[*TestNode]struct{})
+	r[renter] = struct{}{}
+	// Set renter allowances
+	renter.params.SkipSetAllowance = false
+	if err := setRenterAllowances(r); err != nil {
+		return build.ExtendErr("failed to set renter allowance", err)
+	}
+	// Wait for all the renters to form contracts if the haven't got enough
+	// contracts already.
+	if err := waitForContracts(miner, r, tg.hosts); err != nil {
+		return build.ExtendErr("renters failed to form contracts", err)
+	}
+	// Make sure all nodes are synced
+	if err := synchronizationCheck(tg.nodes); err != nil {
+		return build.ExtendErr("synchronization check 2 failed", err)
 	}
 	return nil
 }
@@ -523,7 +566,35 @@ func (tg *TestGroup) RemoveNode(tn *TestNode) error {
 	delete(tg.miners, tn)
 
 	// Close node.
-	return tn.Close()
+	return tn.StopNode()
+}
+
+// StartNode starts a node from the group that has previously been stopped.
+func (tg *TestGroup) StartNode(tn *TestNode) error {
+	if _, exists := tg.nodes[tn]; !exists {
+		return errors.New("cannot start node that's not part of the group")
+	}
+	err := tn.StartNode()
+	if err != nil {
+		return err
+	}
+	if err := fullyConnectNodes(tg.Nodes()); err != nil {
+		return err
+	}
+	return synchronizationCheck(tg.nodes)
+}
+
+// StopNode stops a node of a group.
+func (tg *TestGroup) StopNode(tn *TestNode) error {
+	if _, exists := tg.nodes[tn]; !exists {
+		return errors.New("cannot stop node that's not part of the group")
+	}
+	return tn.StopNode()
+}
+
+// Sync syncs the node of the test group
+func (tg *TestGroup) Sync() error {
+	return synchronizationCheck(tg.nodes)
 }
 
 // Nodes returns all the nodes of the group

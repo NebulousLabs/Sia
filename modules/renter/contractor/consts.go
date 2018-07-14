@@ -20,6 +20,14 @@ var (
 		Standard: 10,
 		Testing:  1,
 	}).(int)
+
+	// consecutiveRenewalsBeforeReplacement is the number of times a contract
+	// attempt to be renewed before it is marked as !goodForRenew.
+	consecutiveRenewalsBeforeReplacement = build.Select(build.Var{
+		Dev:      types.BlockHeight(12),
+		Standard: types.BlockHeight(12), // ~2h
+		Testing:  types.BlockHeight(12),
+	}).(types.BlockHeight)
 )
 
 // Constants related to the safety values for when the contractor is forming

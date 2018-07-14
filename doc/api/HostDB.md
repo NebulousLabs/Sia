@@ -20,9 +20,24 @@ Index
 
 | Request                                                 | HTTP Verb | Examples                      |
 | ------------------------------------------------------- | --------- | ----------------------------- |
+| [/hostdb](#hostdb-get-example)                          | GET       | [HostDB Get](#hostdb-get)     |
 | [/hostdb/active](#hostdbactive-get-example)             | GET       | [Active hosts](#active-hosts) |
 | [/hostdb/all](#hostdball-get-example)                   | GET       | [All hosts](#all-hosts)       |
 | [/hostdb/hosts/___:pubkey___](#hostdbhosts-get-example) | GET       | [Hosts](#hosts)               |
+
+#### /hostdb [GET] [(example)](#hostdb-get)
+
+shows some general information about the state of the hostdb.
+
+###### JSON Response 
+
+Either the following JSON struct or an error response. See [#standard-responses](#standard-responses).
+
+```javascript
+{
+    "initialscancomplete": false // indicates if all known hosts have been scanned at least once.
+}
+```
 
 #### /hostdb/active [GET] [(example)](#active-hosts)
 
@@ -310,6 +325,25 @@ overall.
 
 Examples
 --------
+
+#### HostDB Get
+
+###### Request
+```
+/hostdb
+```
+
+###### Expected Response Code
+```
+200 OK
+```
+
+###### Example JSON Response
+```javascript
+{
+    "initialscancomplete": false
+}
+```
 
 #### Active hosts
 

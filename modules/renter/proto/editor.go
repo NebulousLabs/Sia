@@ -1,7 +1,6 @@
 package proto
 
 import (
-	"errors"
 	"net"
 	"sync"
 	"time"
@@ -11,6 +10,8 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/ratelimit"
 )
 
@@ -30,9 +31,10 @@ type Editor struct {
 	contractSet *ContractSet
 	conn        net.Conn
 	closeChan   chan struct{}
-	once        sync.Once
-	host        modules.HostDBEntry
+	deps        modules.Dependencies
 	hdb         hostDB
+	host        modules.HostDBEntry
+	once        sync.Once
 
 	height types.BlockHeight
 }
@@ -106,6 +108,7 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		// Increase Successful/Failed interactions accordingly
 		if err != nil {
 			he.hdb.IncrementFailedInteractions(he.host.PublicKey)
+			err = errors.Extend(err, modules.ErrHostFault)
 		} else {
 			he.hdb.IncrementSuccessfulInteractions(he.host.PublicKey)
 		}
@@ -134,8 +137,14 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		return modules.RenterContract{}, crypto.Hash{}, err
 	}
 
+	// Disrupt here before sending the signed revision to the host.
+	if he.deps.Disrupt("InterruptUploadBeforeSendingRevision") {
+		return modules.RenterContract{}, crypto.Hash{},
+			errors.New("InterruptUploadBeforeSendingRevision disrupt")
+	}
+
 	// send revision to host and exchange signatures
-	extendDeadline(he.conn, 2*time.Minute)
+	extendDeadline(he.conn, connTimeout)
 	signedTxn, err := negotiateRevision(he.conn, rev, contract.SecretKey)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
@@ -143,6 +152,12 @@ func (he *Editor) Upload(data []byte) (_ modules.RenterContract, _ crypto.Hash, 
 		he.conn.Close()
 	} else if err != nil {
 		return modules.RenterContract{}, crypto.Hash{}, err
+	}
+
+	// Disrupt here before updating the contract.
+	if he.deps.Disrupt("InterruptUploadAfterSendingRevision") {
+		return modules.RenterContract{}, crypto.Hash{},
+			errors.New("InterruptUploadAfterSendingRevision disrupt")
 	}
 
 	// update contract
@@ -169,6 +184,7 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		// a revision mismatch is not necessarily the host's fault
 		if err != nil && !IsRevisionMismatch(err) {
 			hdb.IncrementFailedInteractions(contract.HostPublicKey())
+			err = errors.Extend(err, modules.ErrHostFault)
 		} else if err == nil {
 			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}
@@ -204,6 +220,7 @@ func (cs *ContractSet) NewEditor(host modules.HostDBEntry, id types.FileContract
 		contractSet: cs,
 		conn:        conn,
 		closeChan:   closeChan,
+		deps:        cs.deps,
 	}, nil
 }
 

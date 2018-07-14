@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -242,7 +241,6 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 	chainExtended := false
 	changes := make([]changeEntry, 0, len(blocks))
 	setErr := cs.db.Update(func(tx *bolt.Tx) error {
-		cs.log.Printf("accept: starting block processing loop (%v blocks, height %v)", len(blocks), blockHeight(tx))
 		for i := 0; i < len(blocks); i++ {
 			// Start by checking the header of the block.
 			parent, err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, blocks[i], blockIDs[i])
@@ -258,7 +256,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 				return err
 			}
 
-			// Try adding the block to consnesus.
+			// Try adding the block to consensus.
 			changeEntry, err := cs.addBlockToTree(tx, blocks[i], parent)
 			if err == nil {
 				changes = append(changes, changeEntry)
@@ -270,7 +268,6 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 				for _, b := range changeEntry.RevertedBlocks {
 					reverted = append(reverted, b.String()[:6])
 				}
-				cs.log.Printf("accept: added change %v, applying blocks %v, reverting blocks %v (height now %v)", changeEntry.ID(), applied, reverted, blockHeight(tx))
 			}
 			if err == modules.ErrNonExtendingBlock {
 				err = nil
@@ -278,15 +275,15 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			if err != nil {
 				return err
 			}
-			// Sanity check - If reverted blocks is zero, applied blocks should also
-			// be zero.
-			if build.DEBUG && len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
-				panic("after adding a change entry, there are no applied blocks but there are reverted blocks")
+			// Sanity check - we should never apply fewer blocks than we revert.
+			if len(changeEntry.AppliedBlocks) < len(changeEntry.RevertedBlocks) {
+				err := errors.New("after adding a change entry, there are more reverted blocks than applied ones")
+				cs.log.Severe(err)
+				return err
 			}
 		}
 		return nil
 	})
-	cs.log.Printf("accept: finished block processing loop")
 	if _, ok := setErr.(bolt.MmapError); ok {
 		cs.log.Println("ERROR: Bolt mmap failed:", setErr)
 		fmt.Println("Blockchain database has run out of disk space!")

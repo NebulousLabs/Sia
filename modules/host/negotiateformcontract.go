@@ -42,13 +42,9 @@ func (h *Host) managedAddCollateral(settings modules.HostExternalSettings, txnSe
 	if err != nil {
 		return
 	}
-	defer func() {
-		if err != nil {
-			builder.Drop()
-		}
-	}()
 	err = builder.FundSiacoins(hostPortion)
 	if err != nil {
+		builder.Drop()
 		return nil, nil, nil, nil, extendErr("could not add collateral: ", ErrorInternal(err.Error()))
 	}
 
@@ -242,9 +238,9 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	if fc.WindowEnd < fc.WindowStart+eSettings.WindowSize {
 		return errSmallWindow
 	}
-	// WindowEnd must not be more than settings.MaxDuration blocks into the
+	// WindowStart must not be more than settings.MaxDuration blocks into the
 	// future.
-	if fc.WindowEnd > blockHeight+eSettings.MaxDuration {
+	if fc.WindowStart > blockHeight+eSettings.MaxDuration {
 		return errLongDuration
 	}
 

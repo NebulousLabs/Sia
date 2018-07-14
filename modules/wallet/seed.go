@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"errors"
 	"runtime"
 	"sync"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/errors"
 	"github.com/NebulousLabs/fastrand"
 	"github.com/coreos/bbolt"
 )
@@ -200,7 +200,7 @@ func (w *Wallet) NextAddresses(n uint64) ([]types.UnlockConditions, error) {
 	// time.
 	w.mu.Lock()
 	ucs, err := w.nextPrimarySeedAddresses(w.dbTx, n)
-	w.syncDB() // ensure durability of reported address
+	err = errors.Compose(err, w.syncDB())
 	w.mu.Unlock()
 	if err != nil {
 		return []types.UnlockConditions{}, err

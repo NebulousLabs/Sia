@@ -45,7 +45,9 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 	defer w.mu.Unlock()
 
 	// ensure durability of reported balance
-	w.syncDB()
+	if err = w.syncDB(); err != nil {
+		return
+	}
 
 	dbForEachSiacoinOutput(w.dbTx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
 		if sco.Value.Cmp(dustThreshold) > 0 {

@@ -237,7 +237,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	}
 
 	// revise the contract
-	editor, err := c.Editor(contract.ID, nil)
+	editor, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +280,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 
 	// revise the contract
-	editor, err := c.Editor(contract.ID, nil)
+	editor, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +295,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 
 	// download the data
-	downloader, err := c.Downloader(contract.ID, nil)
+	downloader, err := c.Downloader(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// revise the contract
-	editor, err := c.Editor(contract.ID, nil)
+	editor, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +360,10 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	oldContract, _ := c.staticContracts.Acquire(contract.ID)
+	oldContract, ok := c.staticContracts.Acquire(contract.ID)
+	if !ok {
+		t.Fatal("failed to acquire contract")
+	}
 	contract, err = c.managedRenew(oldContract, types.SiacoinPrecision.Mul64(50), c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
@@ -373,7 +376,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// download the renewed contract
-	downloader, err := c.Downloader(contract.ID, nil)
+	downloader, err := c.Downloader(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +408,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// revise the contract
-	editor, err = c.Editor(contract.ID, nil)
+	editor, err = c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -450,13 +453,13 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	}
 
 	// create a downloader
-	d1, err := c.Downloader(contract.ID, nil)
+	d1, err := c.Downloader(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// create another downloader
-	d2, err := c.Downloader(contract.ID, nil)
+	d2, err := c.Downloader(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,7 +481,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	}
 
 	// create another downloader
-	d3, err := c.Downloader(contract.ID, nil)
+	d3, err := c.Downloader(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -500,7 +503,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	}
 
 	// create another downloader
-	d4, err := c.Downloader(contract.ID, nil)
+	d4, err := c.Downloader(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -541,13 +544,13 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	}
 
 	// create an editor
-	d1, err := c.Editor(contract.ID, nil)
+	d1, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// create another editor
-	d2, err := c.Editor(contract.ID, nil)
+	d2, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -569,7 +572,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	}
 
 	// create another editor
-	d3, err := c.Editor(contract.ID, nil)
+	d3, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -591,7 +594,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	}
 
 	// create another editor
-	d4, err := c.Editor(contract.ID, nil)
+	d4, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

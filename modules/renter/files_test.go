@@ -109,6 +109,7 @@ func TestFileRedundancy(t *testing.T) {
 	neverOffline := make(map[types.FileContractID]bool)
 	goodForRenew := make(map[types.FileContractID]bool)
 	for i := 0; i < 5; i++ {
+		neverOffline[types.FileContractID{byte(i)}] = false
 		goodForRenew[types.FileContractID{byte(i)}] = true
 	}
 
@@ -181,7 +182,8 @@ func TestFileRedundancy(t *testing.T) {
 			for iPiece := uint64(0); iPiece < uint64(f.erasureCode.MinPieces()); iPiece++ {
 				fc.Pieces = append(fc.Pieces, pieceData{
 					Chunk: iChunk,
-					Piece: iPiece,
+					// add 1 since the same piece can't count towards redundancy twice.
+					Piece: iPiece + 1,
 				})
 			}
 		}
@@ -206,6 +208,9 @@ func TestFileRedundancy(t *testing.T) {
 		}
 		f.contracts[fc.ID] = fc
 		specificOffline := make(map[types.FileContractID]bool)
+		for fcid := range goodForRenew {
+			specificOffline[fcid] = false
+		}
 		specificOffline[fc.ID] = true
 		if r := f.redundancy(specificOffline, goodForRenew); r != expectedR {
 			t.Errorf("expected redundancy to ignore offline file contracts, wanted %f got %f", expectedR, r)
@@ -261,7 +266,7 @@ func TestRenterFileListLocalPath(t *testing.T) {
 	f := newTestingFile()
 	f.name = "testname"
 	rt.renter.files["test"] = f
-	rt.renter.tracking[f.name] = trackedFile{
+	rt.renter.persist.Tracking[f.name] = trackedFile{
 		RepairPath: "TestPath",
 	}
 	rt.renter.mu.Unlock(id)
@@ -437,13 +442,13 @@ func TestRenterRenameFile(t *testing.T) {
 	}
 
 	// Renaming should also update the tracking set
-	rt.renter.tracking["1"] = trackedFile{"foo"}
+	rt.renter.persist.Tracking["1"] = trackedFile{"foo"}
 	err = rt.renter.RenameFile("1", "1b")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, oldexists := rt.renter.tracking["1"]
-	_, newexists := rt.renter.tracking["1b"]
+	_, oldexists := rt.renter.persist.Tracking["1"]
+	_, newexists := rt.renter.persist.Tracking["1b"]
 	if oldexists || !newexists {
 		t.Error("renaming should have updated the entry in the tracking set")
 	}

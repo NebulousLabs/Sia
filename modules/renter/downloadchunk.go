@@ -9,17 +9,9 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/errors"
 )
-
-// cacheData contatins the data and the timestamp for the unfinished
-// download chunks
-type cacheData struct {
-	data       []byte
-	lastAccess time.Time
-}
 
 // downloadPieceInfo contains all the information required to download and
 // recover a piece of a chunk from a host. It is a value in a map where the key
@@ -49,14 +41,14 @@ type unfinishedDownloadChunk struct {
 	masterKey   crypto.TwofishKey
 
 	// Fetch + Write instructions - read only or otherwise thread safe.
-	staticChunkIndex  uint64                                     // Required for deriving the encryption keys for each piece.
-	staticCacheID     string                                     // Used to uniquely identify a chunk in the chunk cache.
-	staticChunkMap    map[types.FileContractID]downloadPieceInfo // Maps from file contract ids to the info for the piece associated with that contract
+	staticChunkIndex  uint64                       // Required for deriving the encryption keys for each piece.
+	staticCacheID     string                       // Used to uniquely identify a chunk in the chunk cache.
+	staticChunkMap    map[string]downloadPieceInfo // Maps from host PubKey to the info for the piece associated with that host
 	staticChunkSize   uint64
 	staticFetchLength uint64 // Length within the logical chunk to fetch.
 	staticFetchOffset uint64 // Offset within the logical chunk that is being downloaded.
 	staticPieceSize   uint64
-	staticWriteOffset int64 // Offet within the writer to write the completed data.
+	staticWriteOffset int64 // Offset within the writer to write the completed data.
 
 	// Fetch + Write instructions - read only or otherwise thread safe.
 	staticLatencyTarget time.Duration
@@ -82,8 +74,7 @@ type unfinishedDownloadChunk struct {
 	mu       sync.Mutex
 
 	// Caching related fields
-	chunkCache map[string]*cacheData
-	cacheMu    *sync.Mutex
+	staticStreamCache *streamCache
 }
 
 // fail will set the chunk status to failed. The physical chunk memory will be
@@ -163,7 +154,7 @@ func (udc *unfinishedDownloadChunk) returnMemory() {
 	if udc.piecesCompleted >= udc.erasureCode.MinPieces() {
 		// udc.piecesRegistered is guaranteed to be at most equal to the number
 		// of overdrive pieces, meaning it will be equal to or less than
-		// initalMemory.
+		// initialMemory.
 		maxMemory = uint64(udc.piecesCompleted+udc.piecesRegistered) * udc.staticPieceSize
 	}
 	// If the chunk recovery has completed, the maximum number of pieces is the
@@ -186,26 +177,6 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	// succeeds or fails.
 	defer udc.managedCleanUp()
 
-	// Decrypt the chunk pieces. This doesn't need to happen under a lock,
-	// because any thread potentially writing to the physicalChunkData array is
-	// going to be stopped by the fact that the chunk is complete.
-	for i := range udc.physicalChunkData {
-		// Skip empty pieces.
-		if udc.physicalChunkData[i] == nil {
-			continue
-		}
-
-		key := deriveKey(udc.masterKey, udc.staticChunkIndex, uint64(i))
-		decryptedPiece, err := key.DecryptBytes(udc.physicalChunkData[i])
-		if err != nil {
-			udc.mu.Lock()
-			udc.fail(err)
-			udc.mu.Unlock()
-			return errors.AddContext(err, "unable to decrypt chunk")
-		}
-		udc.physicalChunkData[i] = decryptedPiece
-	}
-
 	// Recover the pieces into the logical chunk data.
 	//
 	// TODO: Might be some way to recover into the downloadDestination instead
@@ -227,7 +198,12 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	recoveredData := recoverWriter.Bytes()
 
 	// Add the chunk to the cache.
-	udc.addChunkToCache(recoveredData)
+	if udc.download.staticDestinationType == destinationTypeSeekStream {
+		// We only cache streaming chunks since browsers and media players tend
+		// to only request a few kib at once when streaming data. That way we can
+		// prevent scheduling the same chunk for download over and over.
+		udc.staticStreamCache.Add(udc.staticCacheID, recoveredData)
+	}
 
 	// Write the bytes to the requested output.
 	start := udc.staticFetchOffset

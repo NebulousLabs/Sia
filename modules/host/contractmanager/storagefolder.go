@@ -82,6 +82,14 @@ var (
 // sectors are being stored in the folder. What sectors are being stored is
 // managed by the contract manager's sectorLocations map.
 type storageFolder struct {
+	// mu needs to be RLocked to safetly write new sectors into the storage
+	// folder. mu needs to be Locked when the folder is being added, removed,
+	// or resized.
+	//
+	// NOTE: this field must come first in the struct to ensure proper
+	// alignment.
+	mu sync.TryRWMutex
+
 	// Progress statistics that can be reported to the user. Typically for long
 	// running actions like adding or resizing a storage folder.
 	atomicProgressNumerator   uint64
@@ -112,11 +120,6 @@ type storageFolder struct {
 	// usage field.
 	availableSectors map[sectorID]uint32
 	sectors          uint64
-
-	// mu needs to be RLocked to safetly write new sectors into the storage
-	// folder. mu needs to be Locked when the folder is being added, removed,
-	// or resized.
-	mu sync.TryRWMutex
 
 	// An open file handle is kept so that writes can easily be made to the
 	// storage folder without needing to grab a new file handle. This also

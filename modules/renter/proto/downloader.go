@@ -1,7 +1,6 @@
 package proto
 
 import (
-	"errors"
 	"net"
 	"sync"
 	"time"
@@ -10,18 +9,21 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
 
 // A Downloader retrieves sectors by calling the download RPC on a host.
 // Downloaders are NOT thread- safe; calls to Sector must be serialized.
 type Downloader struct {
+	closeChan   chan struct{}
+	conn        net.Conn
 	contractID  types.FileContractID
 	contractSet *ContractSet
-	host        modules.HostDBEntry
-	conn        net.Conn
-	closeChan   chan struct{}
-	once        sync.Once
+	deps        modules.Dependencies
 	hdb         hostDB
+	host        modules.HostDBEntry
+	once        sync.Once
 }
 
 // Sector retrieves the sector with the specified Merkle root, and revises
@@ -81,13 +83,20 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 	defer func() {
 		if err != nil {
 			hd.hdb.IncrementFailedInteractions(contract.HostPublicKey())
+			err = errors.Extend(err, modules.ErrHostFault)
 		} else if err == nil {
 			hd.hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}
 	}()
 
+	// Disrupt before sending the signed revision to the host.
+	if hd.deps.Disrupt("InterruptDownloadBeforeSendingRevision") {
+		return modules.RenterContract{}, nil,
+			errors.New("InterruptDownloadBeforeSendingRevision disrupt")
+	}
+
 	// send the revision to the host for approval
-	extendDeadline(hd.conn, 2*time.Minute) // TODO: Constant.
+	extendDeadline(hd.conn, connTimeout)
 	signedTxn, err := negotiateRevision(hd.conn, rev, contract.SecretKey)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
@@ -96,6 +105,12 @@ func (hd *Downloader) Sector(root crypto.Hash) (_ modules.RenterContract, _ []by
 		defer hd.conn.Close()
 	} else if err != nil {
 		return modules.RenterContract{}, nil, err
+	}
+
+	// Disrupt after sending the signed revision to the host.
+	if hd.deps.Disrupt("InterruptDownloadAfterSendingRevision") {
+		return modules.RenterContract{}, nil,
+			errors.New("InterruptDownloadAfterSendingRevision disrupt")
 	}
 
 	// read sector data, completing one iteration of the download loop
@@ -160,6 +175,7 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 		// A revision mismatch might not be the host's fault.
 		if err != nil && !IsRevisionMismatch(err) {
 			hdb.IncrementFailedInteractions(contract.HostPublicKey())
+			err = errors.Extend(err, modules.ErrHostFault)
 		} else if err == nil {
 			hdb.IncrementSuccessfulInteractions(contract.HostPublicKey())
 		}
@@ -193,6 +209,7 @@ func (cs *ContractSet) NewDownloader(host modules.HostDBEntry, id types.FileCont
 		host:        host,
 		conn:        conn,
 		closeChan:   closeChan,
+		deps:        cs.deps,
 		hdb:         hdb,
 	}, nil
 }

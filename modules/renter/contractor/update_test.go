@@ -13,7 +13,7 @@ import (
 	"github.com/NebulousLabs/fastrand"
 )
 
-// TestIntegrationAutoRenew tests that contracts are automatically renwed at
+// TestIntegrationAutoRenew tests that contracts are automatically renewed at
 // the expected block height.
 func TestIntegrationAutoRenew(t *testing.T) {
 	if testing.Short() {
@@ -49,7 +49,7 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	contract := c.Contracts()[0]
 
 	// revise the contract
-	editor, err := c.Editor(contract.ID, nil)
+	editor, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,8 +79,9 @@ func TestIntegrationAutoRenew(t *testing.T) {
 
 	// check renewed contract
 	contract = c.Contracts()[0]
-	if contract.EndHeight != c.blockHeight+c.allowance.Period {
-		t.Fatal("wrong window start:", contract.EndHeight)
+	endHeight := c.CurrentPeriod() + c.allowance.Period
+	if contract.EndHeight != endHeight {
+		t.Fatalf("Wrong end height, expected %v got %v\n", endHeight, contract.EndHeight)
 	}
 }
 
@@ -120,7 +121,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	contract := c.Contracts()[0]
 
 	// revise the contract
-	editor, err := c.Editor(contract.ID, nil)
+	editor, err := c.Editor(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,9 +147,10 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 
 	// check renewed contract
 	contract = c.Contracts()[0]
+	endHeight := c.CurrentPeriod() + c.allowance.Period
 	c.mu.Lock()
-	if contract.EndHeight != c.blockHeight+c.allowance.Period {
-		t.Error("wrong window start:", contract.EndHeight)
+	if contract.EndHeight != endHeight {
+		t.Fatalf("Wrong end height, expected %v got %v\n", endHeight, contract.EndHeight)
 	}
 	c.mu.Unlock()
 
@@ -160,7 +162,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 	editor.Close()
 
 	// create a downloader
-	downloader, err := c.Downloader(contract.ID, nil)
+	downloader, err := c.Downloader(contract.HostPublicKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

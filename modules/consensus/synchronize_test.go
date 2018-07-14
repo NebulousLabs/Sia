@@ -205,12 +205,12 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 	}
 
 	// Setup consensus sets.
-	cst1, err := blankConsensusSetTester(t.Name() + "1")
+	cst1, err := blankConsensusSetTester(t.Name()+"1", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst1.Close()
-	cst2, err := blankConsensusSetTester(t.Name() + "2")
+	cst2, err := blankConsensusSetTester(t.Name()+"2", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -433,12 +433,12 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 
 	for i, tt := range tests {
 		// Create the "remote" peer.
-		remoteCST, err := blankConsensusSetTester(filepath.Join(t.Name()+" - remote", strconv.Itoa(i)))
+		remoteCST, err := blankConsensusSetTester(filepath.Join(t.Name()+" - remote", strconv.Itoa(i)), modules.ProdDependencies)
 		if err != nil {
 			t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 		}
 		// Create the "local" peer.
-		localCST, err := blankConsensusSetTester(filepath.Join(t.Name()+" - local", strconv.Itoa(i)))
+		localCST, err := blankConsensusSetTester(filepath.Join(t.Name()+" - local", strconv.Itoa(i)), modules.ProdDependencies)
 		if err != nil {
 			t.Fatalf("test #%d, %v: %v", i, tt.msg, err)
 		}
@@ -533,7 +533,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 	}
 
 	// Create the "remote" peer.
-	cst, err := blankConsensusSetTester(t.Name() + "- remote")
+	cst, err := blankConsensusSetTester(t.Name()+"- remote", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -695,7 +695,7 @@ func TestSendBlk(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := blankConsensusSetTester(t.Name())
+	cst, err := blankConsensusSetTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -786,7 +786,7 @@ func TestThreadedReceiveBlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := blankConsensusSetTester(t.Name())
+	cst, err := blankConsensusSetTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -907,12 +907,12 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst1, err := blankConsensusSetTester(t.Name() + "1")
+	cst1, err := blankConsensusSetTester(t.Name()+"1", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst1.Close()
-	cst2, err := blankConsensusSetTester(t.Name() + "2")
+	cst2, err := blankConsensusSetTester(t.Name()+"2", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1006,7 +1006,7 @@ func TestRelayHeader(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := blankConsensusSetTester(t.Name())
+	cst, err := blankConsensusSetTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1113,12 +1113,12 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 		t.SkipNow()
 	}
 	// Setup consensus sets.
-	cst1, err := blankConsensusSetTester(t.Name() + "1")
+	cst1, err := blankConsensusSetTester(t.Name()+"1", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst1.Close()
-	cst2, err := blankConsensusSetTester(t.Name() + "2")
+	cst2, err := blankConsensusSetTester(t.Name()+"2", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1169,17 +1169,17 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst1, err := blankConsensusSetTester(t.Name() + "1")
+	cst1, err := blankConsensusSetTester(t.Name()+"1", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst1.Close()
-	cst2, err := blankConsensusSetTester(t.Name() + "2")
+	cst2, err := blankConsensusSetTester(t.Name()+"2", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst2.Close()
-	cst3, err := blankConsensusSetTester(t.Name() + "3")
+	cst3, err := blankConsensusSetTester(t.Name()+"3", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1365,7 +1365,7 @@ func TestThreadedReceiveBlocksStalls(t *testing.T) {
 		t.SkipNow()
 	}
 
-	cst, err := blankConsensusSetTester(t.Name())
+	cst, err := blankConsensusSetTester(t.Name(), modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1484,12 +1484,12 @@ func TestIntegrationSendBlocksStalls(t *testing.T) {
 		t.SkipNow()
 	}
 
-	cstLocal, err := blankConsensusSetTester(t.Name() + "- local")
+	cstLocal, err := blankConsensusSetTester(t.Name()+"- local", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cstLocal.Close()
-	cstRemote, err := blankConsensusSetTester(t.Name() + "- remote")
+	cstRemote, err := blankConsensusSetTester(t.Name()+"- remote", modules.ProdDependencies)
 	if err != nil {
 		t.Fatal(err)
 	}

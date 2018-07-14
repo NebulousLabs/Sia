@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -112,19 +113,19 @@ func announceAllHosts(sts []*serverTester) error {
 	// Block until every node has completed the scan of every other node, so
 	// that each node has a full hostdb.
 	for _, st := range sts {
-		var ah HostdbActiveGET
-		for i := 0; i < 100; i++ {
+		err := build.Retry(600, 100*time.Millisecond, func() error {
+			var ah HostdbActiveGET
 			err = st.getAPI("/hostdb/active", &ah)
 			if err != nil {
 				return err
 			}
-			if len(ah.Hosts) >= len(sts) {
-				break
+			if len(ah.Hosts) < len(sts) {
+				return errors.New("one of the nodes hostdbs was unable to find at least one host announcement")
 			}
-			time.Sleep(time.Millisecond * 100)
-		}
-		if len(ah.Hosts) < len(sts) {
-			return errors.New("one of the nodes hostdbs was unable to find at least one host announcement")
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -148,7 +149,7 @@ func fullyConnectNodes(sts []*serverTester) error {
 		for _, stb := range sts[i+1:] {
 			// Try connecting to the other node until both have the other in
 			// their peer list.
-			err = retry(100, time.Millisecond*100, func() error {
+			err = build.Retry(100, time.Millisecond*100, func() error {
 				// NOTE: this check depends on string-matching an error in the
 				// gateway. If that error changes at all, this string will need to
 				// be updated.

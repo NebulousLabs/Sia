@@ -25,12 +25,6 @@ const (
 	// connect to itself, this number can be reduced.
 	maxLocalOutboundPeers = 3
 
-	// minAcceptableVersion is the version below which the gateway will refuse to
-	// connect to peers and reject connection attempts.
-	//
-	// Reject peers < v1.3.0 due to hardfork.
-	minAcceptableVersion = "1.3.0"
-
 	// saveFrequency defines how often the gateway saves its persistence.
 	saveFrequency = time.Minute * 2
 

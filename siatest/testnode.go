@@ -1,20 +1,51 @@
 package siatest
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/node"
 	"github.com/NebulousLabs/Sia/node/api/client"
 	"github.com/NebulousLabs/Sia/node/api/server"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/errors"
 )
 
 // TestNode is a helper struct for testing that contains a server and a client
 // as embedded fields.
 type TestNode struct {
-	server.Server
+	*server.Server
 	client.Client
+	params      node.NodeParams
 	primarySeed string
+}
+
+// RestartNode restarts a TestNode
+func (tn *TestNode) RestartNode() error {
+	err := tn.StopNode()
+	if err != nil {
+		return errors.AddContext(err, "Could not stop node")
+	}
+	err = tn.StartNode()
+	if err != nil {
+		return errors.AddContext(err, "Could not start node")
+	}
+	return nil
+}
+
+// StartNode starts a TestNode from an active group
+func (tn *TestNode) StartNode() error {
+	// Create server
+	s, err := server.New(":0", tn.UserAgent, tn.Password, tn.params)
+	if err != nil {
+		return err
+	}
+	tn.Server = s
+	tn.Client.Address = s.APIAddress()
+	return tn.WalletUnlockPost(tn.primarySeed)
+}
+
+// StopNode stops a TestNode
+func (tn *TestNode) StopNode() error {
+	return errors.AddContext(tn.Close(), "failed to stop node")
 }
 
 // NewNode creates a new funded TestNode
@@ -55,7 +86,7 @@ func NewCleanNode(nodeParams node.NodeParams) (*TestNode, error) {
 	c.Password = password
 
 	// Create TestNode
-	tn := &TestNode{*s, *c, ""}
+	tn := &TestNode{s, *c, nodeParams, ""}
 
 	// Init wallet
 	wip, err := tn.WalletInitPost("", false)

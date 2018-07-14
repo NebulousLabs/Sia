@@ -104,7 +104,7 @@ package renter
 // That's going to need to be changed to a partial sector. This is probably
 // going to result in downloading that's 64-byte aligned instead of perfectly
 // byte-aligned. Further, the encryption and erasure coding may also have
-// alignment requirements which interefere with how the call to Sector can work.
+// alignment requirements which interfere with how the call to Sector can work.
 // So you need to make sure that in 'managedDownload' you download at least
 // enough data to fit the alignment requirements of all 3 steps (download from
 // host, encryption, erasure coding). After the logical data has been recovered,
@@ -382,22 +382,22 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 
 	// For each chunk, assemble a mapping from the contract id to the index of
 	// the piece within the chunk that the contract is responsible for.
-	chunkMaps := make([]map[types.FileContractID]downloadPieceInfo, maxChunk-minChunk+1)
+	chunkMaps := make([]map[string]downloadPieceInfo, maxChunk-minChunk+1)
 	for i := range chunkMaps {
-		chunkMaps[i] = make(map[types.FileContractID]downloadPieceInfo)
+		chunkMaps[i] = make(map[string]downloadPieceInfo)
 	}
 	params.file.mu.Lock()
 	for id, contract := range params.file.contracts {
-		resolvedID := r.hostContractor.ResolveID(id)
+		resolvedKey := r.hostContractor.ResolveIDToPubKey(id)
 		for _, piece := range contract.Pieces {
 			if piece.Chunk >= minChunk && piece.Chunk <= maxChunk {
 				// Sanity check - the same worker should not have two pieces for
 				// the same chunk.
-				_, exists := chunkMaps[piece.Chunk-minChunk][resolvedID]
+				_, exists := chunkMaps[piece.Chunk-minChunk][string(resolvedKey.Key)]
 				if exists {
 					r.log.Println("ERROR: Worker has multiple pieces uploaded for the same chunk.")
 				}
-				chunkMaps[piece.Chunk-minChunk][resolvedID] = downloadPieceInfo{
+				chunkMaps[piece.Chunk-minChunk][string(resolvedKey.Key)] = downloadPieceInfo{
 					index: piece.Piece,
 					root:  piece.MerkleRoot,
 				}
@@ -437,9 +437,8 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 			physicalChunkData: make([][]byte, params.file.erasureCode.NumPieces()),
 			pieceUsage:        make([]bool, params.file.erasureCode.NumPieces()),
 
-			download:   d,
-			chunkCache: r.chunkCache,
-			cacheMu:    r.cmu,
+			download:          d,
+			staticStreamCache: r.staticStreamCache,
 		}
 
 		// Set the fetchOffset - the offset within the chunk that we start
@@ -478,8 +477,8 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 }
 
 // DownloadHistory returns the list of downloads that have been performed. Will
-// include downloads that have not yet completed. Downloads will be roughly, but
-// not precisely, sorted according to start time.
+// include downloads that have not yet completed. Downloads will be roughly,
+// but not precisely, sorted according to start time.
 //
 // TODO: Currently the DownloadHistory only contains downloads from this
 // session, does not contain downloads that were executed for the purposes of
@@ -507,6 +506,7 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 			EndTime:              d.endTime,
 			Received:             atomic.LoadUint64(&d.atomicDataReceived),
 			StartTime:            d.staticStartTime,
+			StartTimeUnix:        d.staticStartTime.UnixNano(),
 			TotalDataTransferred: atomic.LoadUint64(&d.atomicTotalDataTransferred),
 		}
 		// Release download lock before calling d.Err(), which will acquire the
@@ -520,4 +520,48 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 		}
 	}
 	return downloads
+}
+
+// ClearDownloadHistory clears the renter's download history inclusive of the
+// provided before and after timestamps
+//
+// TODO: This function can be improved by implementing a binary search, the
+// trick will be making the binary search be just as readable while handling
+// all the edge cases
+func (r *Renter) ClearDownloadHistory(after, before time.Time) error {
+	if err := r.tg.Add(); err != nil {
+		return err
+	}
+	defer r.tg.Done()
+	r.downloadHistoryMu.Lock()
+	defer r.downloadHistoryMu.Unlock()
+
+	// Check to confirm there are downloads to clear
+	if len(r.downloadHistory) == 0 {
+		return nil
+	}
+
+	// Timestamp validation
+	if before.Before(after) {
+		return errors.New("before timestamp can not be newer then after timestamp")
+	}
+
+	// Clear download history if both before and after timestamps are zero values
+	if before.Equal(types.EndOfTime) && after.IsZero() {
+		r.downloadHistory = r.downloadHistory[:0]
+		return nil
+	}
+
+	// Find and return downloads that are not within the given range
+	withinTimespan := func(t time.Time) bool {
+		return (t.After(after) || t.Equal(after)) && (t.Before(before) || t.Equal(before))
+	}
+	filtered := r.downloadHistory[:0]
+	for _, d := range r.downloadHistory {
+		if !withinTimespan(d.staticStartTime) {
+			filtered = append(filtered, d)
+		}
+	}
+	r.downloadHistory = filtered
+	return nil
 }
