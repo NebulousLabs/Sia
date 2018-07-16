@@ -931,7 +931,7 @@ func TestRenewFailing(t *testing.T) {
 	renterParams.Allowance = siatest.DefaultAllowance
 	renterParams.Allowance.Hosts = uint64(len(tg.Hosts()) - 1)
 	renterParams.Allowance.Period = 100
-	renterParams.Allowance.RenewWindow = 50
+	renterParams.Allowance.RenewWindow = 40
 	nodes, err := tg.AddNodes(renterParams)
 	if err != nil {
 		t.Fatal(err)
@@ -1222,6 +1222,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	// fdsfds
 	t.Parallel()
 
 	// Create a group for the subtests
@@ -1670,9 +1671,9 @@ func TestRenterPersistData(t *testing.T) {
 	}()
 
 	// Set renter allowance to finish renter set up
-	// Currently /renter POST endpoint errors if the allowance
-	// is not previously set or passed in as an argument
-	err = r.RenterPostAllowance(siatest.DefaultAllowance)
+	a := siatest.DefaultAllowance
+	a.RenewWindow = 10
+	err = r.RenterPostAllowance(a)
 	if err != nil {
 		t.Fatal(err)
 	}

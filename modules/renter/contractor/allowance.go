@@ -65,6 +65,9 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	// set the current period to the blockheight if the existing allowance is
 	// empty
 	if reflect.DeepEqual(c.allowance, modules.Allowance{}) {
+		if a.RenewWindow >= c.blockHeight {
+			return errors.New("unable to set allowance, Renew Window can't be greater than the Block Height")
+		}
 		c.currentPeriod = c.blockHeight - a.RenewWindow
 	}
 	c.allowance = a
