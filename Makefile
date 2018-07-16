@@ -83,6 +83,10 @@ release:
 release-race:
 	go install -race -tags='netgo' -a -ldflags='-s -w $(ldflags)' $(pkgs)
 
+# deploy builds release binaries for every platform.
+deploy:
+	./deploy.sh
+
 # clean removes all directories that get automatically created during
 # development.
 clean:
