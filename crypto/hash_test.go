@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NebulousLabs/fastrand"
+	"gitlab.com/NebulousLabs/fastrand"
 )
 
 type (

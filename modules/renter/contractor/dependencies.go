@@ -3,9 +3,9 @@ package contractor
 import (
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/persist"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 // These interfaces define the HostDB's dependencies. Using the smallest

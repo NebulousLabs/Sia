@@ -3,10 +3,10 @@ package wallet
 import (
 	"fmt"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/persist"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 const scanMultiplier = 4 // how many more keys to generate after each scan iteration

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/persist"
+	"gitlab.com/NebulousLabs/Sia/persist"
 )
 
 // There's a global lock on cpu and memory profiling, because I'm not sure what

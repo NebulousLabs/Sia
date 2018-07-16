@@ -47,10 +47,10 @@ To build Sia on your machine, enter the following on the command line:
 ```bash
 # Download Sia and its dependencies
 # Binaries will be installed in $GOPATH/bin
-$ go get -u github.com/NebulousLabs/Sia/...
+$ go get -u gitlab.com/NebulousLabs/Sia/...
 
 # Switch to directory containing Sia source code
-$ cd $GOPATH/src/github.com/NebulousLabs/Sia
+$ cd $GOPATH/src/gitlab.com/NebulousLabs/Sia
 
 # You have three Sia builds to choose from.
 # To build the standard release binary:
@@ -102,11 +102,11 @@ has a 'forked' copy of the original repo at
 `https://github.com/<your GitHub username>/Sia`.
 
 When you installed Sia using `go get`, the go tool put the Sia source code in 
-$GOPATH/src/github.com/NebulousLabs/Sia. Change to that directory and set up
+$GOPATH/src/gitlab.com/NebulousLabs/Sia. Change to that directory and set up
 your fork as a git [remote][remote]:
 
 ```bash
-$ cd $GOPATH/src/github.com/NebulousLabs/Sia
+$ cd $GOPATH/src/gitlab.com/NebulousLabs/Sia
 # Add your fork as a remote.  Name it whatever is convenient,
 # e.g your GitHub username
 $ git remote add <remote name> https://github.com/<username>/Sia.git
@@ -126,7 +126,7 @@ repository's master branch.
 To create and checkout a new branch:
 ```bash
 # If you're not already in the right directory:
-$ cd $GOPATH/src/github.com/NebulousLabs/Sia
+$ cd $GOPATH/src/gitlab.com/NebulousLabs/Sia
 # Make sure you're on branch master
 $ git checkout master
 # Create and checkout a new branch
@@ -256,13 +256,13 @@ Feel free to ask for help on the #core-dev channel on [discord][discord].
 [install-go]: https://golang.org/doc/install
 [signup]: https://github.com/join?source=header-home
 [effective]: https://golang.org/doc/effective_go.html
-[sia]: https://github.com/NebulousLabs/Sia
+[sia]: https://gitlab.com/NebulousLabs/Sia
 [branch]: http://blog.scottlowe.org/2015/01/27/using-fork-branch-git-workflow/
-[developers.md]: https://github.com/NebulousLabs/Sia/blob/master/doc/Developers.md
+[developers.md]: https://gitlab.com/NebulousLabs/Sia/blob/master/doc/Developers.md
 [gofmt]: https://golang.org/cmd/gofmt/
 [nutshell]: https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell
 [discord]: https://discord.gg/sia
 [install-git]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
-[test-doc]: https://github.com/NebulousLabs/Sia/blob/master/doc/Testing.md
+[test-doc]: https://gitlab.com/NebulousLabs/Sia/blob/master/doc/Testing.md
 [stashing]: https://git-scm.com/book/en/v2/Git-Tools-Stashing-and-Cleaning
 [remote]: https://git-scm.com/book/en/v2/Git-Basics-Working-with-Remotes

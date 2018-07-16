@@ -103,10 +103,10 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
-	siasync "github.com/NebulousLabs/Sia/sync"
-	"github.com/NebulousLabs/fastrand"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/persist"
+	siasync "gitlab.com/NebulousLabs/Sia/sync"
+	"gitlab.com/NebulousLabs/fastrand"
 )
 
 var (

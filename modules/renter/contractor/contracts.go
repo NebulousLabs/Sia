@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/modules/renter/proto"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 var (

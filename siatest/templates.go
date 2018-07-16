@@ -1,6 +1,6 @@
 package siatest
 
-import "github.com/NebulousLabs/Sia/node"
+import "gitlab.com/NebulousLabs/Sia/node"
 
 var (
 	// MinerTemplate is a template for a Sia node that has a functioning

@@ -3,8 +3,8 @@ package wallet
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 // TestUpdate tests that the wallet processes consensus updates properly.

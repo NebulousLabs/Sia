@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 var (

@@ -1,9 +1,9 @@
 package hostdb
 
 import (
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 // findHostAnnouncements returns a list of the host announcements found within

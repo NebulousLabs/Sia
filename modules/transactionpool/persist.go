@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/persist"
+	"gitlab.com/NebulousLabs/Sia/types"
 
-	"github.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/errors"
 	"github.com/coreos/bbolt"
 )
 

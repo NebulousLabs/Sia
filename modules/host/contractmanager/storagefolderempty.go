@@ -5,7 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/build"
 )
 
 var (

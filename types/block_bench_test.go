@@ -4,7 +4,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/encoding"
+	"gitlab.com/NebulousLabs/Sia/encoding"
 )
 
 // BenchmarkEncodeEmptyBlock benchmarks encoding an empty block.

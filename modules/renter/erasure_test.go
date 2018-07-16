@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/NebulousLabs/fastrand"
+	"gitlab.com/NebulousLabs/fastrand"
 )
 
 // TestRSEncode tests the rsCode type.
