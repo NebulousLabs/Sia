@@ -285,11 +285,14 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters) (*download,
 	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
 		return nil, errors.New("destination must be an absolute path")
 	}
-	if p.Offset == file.size {
+	if p.Offset == file.size && file.size != 0 {
 		return nil, errors.New("offset equals filesize")
 	}
 	// Sentinel: if length == 0, download the entire file.
 	if p.Length == 0 {
+		if p.Offset > file.size {
+			return nil, errors.New("offset cannot be greater than file size")
+		}
 		p.Length = file.size - p.Offset
 	}
 	// Check whether offset and length is valid.
