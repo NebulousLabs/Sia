@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/modules"
 
-	"github.com/NebulousLabs/go-upnp"
+	"gitlab.com/NebulousLabs/go-upnp"
 )
 
 // managedLearnHostname discovers the external IP of the Host. If the host's

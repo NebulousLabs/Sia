@@ -4,8 +4,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 // TestSendSiacoins probes the SendSiacoins method of the wallet.

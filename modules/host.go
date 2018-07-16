@@ -1,7 +1,7 @@
 package modules
 
 import (
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 const (

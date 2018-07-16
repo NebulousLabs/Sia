@@ -5,9 +5,9 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/types"
 
-	"github.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/errors"
 	"github.com/coreos/bbolt"
 )
 

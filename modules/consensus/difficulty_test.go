@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/types"
 
 	"github.com/coreos/bbolt"
 )

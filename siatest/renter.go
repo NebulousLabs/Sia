@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/node/api"
+	"gitlab.com/NebulousLabs/Sia/crypto"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/node/api"
 
-	"github.com/NebulousLabs/errors"
-	"github.com/NebulousLabs/fastrand"
+	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/fastrand"
 )
 
 // DownloadToDisk downloads a previously uploaded file. The file will be downloaded

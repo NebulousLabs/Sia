@@ -3,9 +3,9 @@ package crypto
 import (
 	"bytes"
 
-	"github.com/NebulousLabs/Sia/encoding"
+	"gitlab.com/NebulousLabs/Sia/encoding"
 
-	"github.com/NebulousLabs/merkletree"
+	"gitlab.com/NebulousLabs/merkletree"
 )
 
 const (

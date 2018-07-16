@@ -3,7 +3,7 @@ package siatest
 import (
 	"sync"
 
-	"github.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/modules"
 )
 
 type (

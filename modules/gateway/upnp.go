@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NebulousLabs/go-upnp"
+	"gitlab.com/NebulousLabs/go-upnp"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/modules"
 )
 
 // myExternalIP discovers the gateway's external IP by querying a centralized

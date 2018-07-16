@@ -3,8 +3,8 @@ BUILD_TIME=$(shell date)
 GIT_REVISION=$(shell git rev-parse --short HEAD)
 GIT_DIRTY=$(shell git diff-index --quiet HEAD -- || echo "✗-")
 
-ldflags= -X github.com/NebulousLabs/Sia/build.GitRevision=${GIT_DIRTY}${GIT_REVISION} \
--X "github.com/NebulousLabs/Sia/build.BuildTime=${BUILD_TIME}"
+ldflags= -X gitlab.com/NebulousLabs/Sia/build.GitRevision=${GIT_DIRTY}${GIT_REVISION} \
+-X "gitlab.com/NebulousLabs/Sia/build.BuildTime=${BUILD_TIME}"
 
 # all will build and install release binaries
 all: release
@@ -13,19 +13,19 @@ all: release
 # Sia.
 dependencies:
 	# Consensus Dependencies
-	go get -u github.com/NebulousLabs/demotemutex
-	go get -u github.com/NebulousLabs/fastrand
-	go get -u github.com/NebulousLabs/merkletree
-	go get -u github.com/NebulousLabs/bolt
+	go get -u gitlab.com/NebulousLabs/demotemutex
+	go get -u gitlab.com/NebulousLabs/fastrand
+	go get -u gitlab.com/NebulousLabs/merkletree
+	go get -u gitlab.com/NebulousLabs/bolt
 	go get -u golang.org/x/crypto/blake2b
 	go get -u golang.org/x/crypto/ed25519
 	# Module + Daemon Dependencies
-	go get -u github.com/NebulousLabs/entropy-mnemonics
-	go get -u github.com/NebulousLabs/errors
-	go get -u github.com/NebulousLabs/go-upnp
-	go get -u github.com/NebulousLabs/ratelimit
-	go get -u github.com/NebulousLabs/threadgroup
-	go get -u github.com/NebulousLabs/writeaheadlog
+	go get -u gitlab.com/NebulousLabs/entropy-mnemonics
+	go get -u gitlab.com/NebulousLabs/errors
+	go get -u gitlab.com/NebulousLabs/go-upnp
+	go get -u gitlab.com/NebulousLabs/ratelimit
+	go get -u gitlab.com/NebulousLabs/threadgroup
+	go get -u gitlab.com/NebulousLabs/writeaheadlog
 	go get -u github.com/klauspost/reedsolomon
 	go get -u github.com/julienschmidt/httprouter
 	go get -u github.com/inconshreveable/go-update
@@ -38,7 +38,7 @@ dependencies:
 	go install -race std
 	go get -u github.com/client9/misspell/cmd/misspell
 	go get -u github.com/golang/lint/golint
-	go get -u github.com/NebulousLabs/glyphcheck
+	go get -u gitlab.com/NebulousLabs/glyphcheck
 
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.

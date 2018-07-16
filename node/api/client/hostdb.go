@@ -1,8 +1,8 @@
 package client
 
 import (
-	"github.com/NebulousLabs/Sia/node/api"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/node/api"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 // HostDbGet requests the /hostdb endpoint's resources.
