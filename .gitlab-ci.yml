@@ -6,7 +6,9 @@ stages:
  
 before_script:
   - make dependencies
-  - ln -s $CI_PROJECT_DIR $GOPATH/src/gitlab.com/NebulousLabs/Sia
+  - cp -R $CI_PROJECT_DIR $GOPATH/src/gitlab.com/NebulousLabs/Sia
+  - cd $GOPATH/src/gitlab.com/NebulousLabs/Sia
+  - ls
 
 lint:
   stage: lint
