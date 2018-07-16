@@ -8,8 +8,8 @@ import (
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/types"
 
-	"gitlab.com/NebulousLabs/errors"
 	"github.com/coreos/bbolt"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 // database.go contains objects related to the layout of the transaction pool's

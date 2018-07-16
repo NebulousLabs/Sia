@@ -4,13 +4,13 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/coreos/bbolt"
 	"gitlab.com/NebulousLabs/Sia/crypto"
 	"gitlab.com/NebulousLabs/Sia/encoding"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/fastrand"
-	"github.com/coreos/bbolt"
 )
 
 var (
