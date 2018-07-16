@@ -8,7 +8,6 @@ before_script:
   - make dependencies
   - cp -R $CI_PROJECT_DIR $GOPATH/src/gitlab.com/NebulousLabs/Sia
   - cd $GOPATH/src/gitlab.com/NebulousLabs/Sia
-  - ls
 
 lint:
   stage: lint
@@ -33,7 +32,7 @@ unit-tests:
     - make test-long run=. pkgs="./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer \
                                  ./modules/gateway ./modules/host ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor       \
                                  ./modules/renter/hostdb ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/miner ./modules/wallet   \
-                                 ./modules/transactionpool ./persist ./sync ./types
+                                 ./modules/transactionpool ./persist ./sync ./types"
 
 integration-tests:
   stage: test
