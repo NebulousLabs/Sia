@@ -48,9 +48,6 @@ integration-tests:
 
 deploy:
   stage: deploy
-  only:
-    refs:
-      - master
   artifacts:
     name: "Binaries"
     paths:
