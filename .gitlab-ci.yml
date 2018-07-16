@@ -1,0 +1,32 @@
+image: golang:1.10
+
+stages:
+  - lint
+  - test
+ 
+before_script:
+  - make dependencies
+
+lint:
+  stage: lint
+  script: 
+    - go get -u github.com/alecthomas/gometalinter
+    - gometalinter --install
+    - gometalinter --disable-all --enable=errcheck --enable=vet --enable=gofmt ./...
+
+legacy-tests:
+  stage: test
+  script: make test-long pkgs="./node ./node/api ./node/api/server" run=.
+
+unit-tests:
+  stage: test
+  script: 
+    - make test-long run=. pkgs="./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer \
+                                 ./modules/gateway ./modules/host ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor       \
+                                 ./modules/renter/hostdb ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/miner ./modules/wallet   \
+                                 ./modules/transactionpool ./persist ./sync ./types
+
+integration-tests:
+  stage: test
+  script: 
+    - make test-long run=. pkgs="./siatest ./siatest/consensus ./siatest/renter ./siatest/wallet"
