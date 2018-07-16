@@ -323,15 +323,27 @@ func (r *Renter) FileList() []modules.FileInfo {
 		if exists {
 			localPath = tf.RepairPath
 		}
+		// Check for 0byte files
+		//
+		// TODO - once tiny files are stored in the metadata this code should be
+		// able to be cleaned up.
+		var redundancy, uploadProgress float64
+		if f.size == 0 {
+			redundancy = 3.00
+			uploadProgress = 100
+		} else {
+			redundancy = f.redundancy(offline, goodForRenew)
+			uploadProgress = f.uploadProgress()
+		}
 		fileList = append(fileList, modules.FileInfo{
 			SiaPath:        f.name,
 			LocalPath:      localPath,
 			Filesize:       f.size,
 			Renewing:       renewing,
 			Available:      f.available(offline),
-			Redundancy:     f.redundancy(offline, goodForRenew),
+			Redundancy:     redundancy,
 			UploadedBytes:  f.uploadedBytes(),
-			UploadProgress: f.uploadProgress(),
+			UploadProgress: uploadProgress,
 			Expiration:     f.expiration(),
 		})
 		f.mu.RUnlock()
