@@ -25,7 +25,7 @@ var (
 // contractEndHeight returns the height at which the Contractor's contracts
 // end. If there are no contracts, it returns zero.
 func (c *Contractor) contractEndHeight() types.BlockHeight {
-	return c.currentPeriod + c.allowance.Period
+	return c.currentPeriod + c.allowance.Period + c.allowance.RenewWindow
 }
 
 // managedContractUtility returns the ContractUtility for a contract with a given id.
@@ -351,14 +351,12 @@ func (c *Contractor) threadedContractMaintenance() {
 	var renewSet []renewal
 
 	c.mu.RLock()
-	currentPeriod := c.currentPeriod
 	allowance := c.allowance
 	blockHeight := c.blockHeight
-	c.mu.RUnlock()
-
 	// Grab the end height that should be used for the contracts created
 	// in the current period.
-	endHeight = currentPeriod + allowance.Period
+	endHeight = c.contractEndHeight()
+	c.mu.RUnlock()
 
 	// Determine how many funds have been used already in this billing cycle,
 	// and how many funds are remaining. We have to calculate these numbers
@@ -565,7 +563,9 @@ func (c *Contractor) threadedContractMaintenance() {
 			}
 
 			// Calculate endHeight for renewed contracts
-			endHeight = currentPeriod + allowance.Period
+			c.mu.RLock()
+			endHeight = c.contractEndHeight()
+			c.mu.RUnlock()
 
 			// Perform the actual renew. If the renew fails, return the
 			// contract. If the renew fails we check how often it has failed
