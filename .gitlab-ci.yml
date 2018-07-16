@@ -13,7 +13,7 @@ lint:
   script: 
     - go get -u github.com/alecthomas/gometalinter
     - gometalinter --install
-    - gometalinter --skip=vendor --disable-all --enable=vet --enable=gofmt ./...
+    - gometalinter --vendor --disable-all --enable=vet --enable=gofmt ./...
 
 legacy-tests:
   stage: test
