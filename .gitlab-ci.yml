@@ -17,10 +17,16 @@ lint:
 
 legacy-tests:
   stage: test
+  artifacts:
+    paths:
+      - /tmp/SiaTesting
   script: make test-long pkgs="./node ./node/api ./node/api/server" run=.
 
 unit-tests:
   stage: test
+  artifacts:
+    paths:
+      - /tmp/SiaTesting
   script: 
     - make test-long run=. pkgs="./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer \
                                  ./modules/gateway ./modules/host ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor       \
@@ -29,5 +35,8 @@ unit-tests:
 
 integration-tests:
   stage: test
+  artifacts:
+    paths:
+      - /tmp/SiaTesting
   script: 
     - make test-long run=. pkgs="./siatest ./siatest/consensus ./siatest/renter ./siatest/wallet"
