@@ -13,8 +13,8 @@ import (
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/types"
 
-	"gitlab.com/NebulousLabs/entropy-mnemonics"
 	"github.com/julienschmidt/httprouter"
+	"gitlab.com/NebulousLabs/entropy-mnemonics"
 )
 
 type (

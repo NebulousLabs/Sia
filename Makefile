@@ -83,6 +83,10 @@ release:
 release-race:
 	go install -race -tags='netgo' -a -ldflags='-s -w $(ldflags)' $(pkgs)
 
+# deploy builds release binaries for every platform.
+deploy:
+	./deploy.sh
+
 # clean removes all directories that get automatically created during
 # development.
 clean:
@@ -93,7 +97,7 @@ test:
 test-v:
 	go test -race -v -short -tags='debug testing netgo' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint
-	go test -v -race -tags='testing debug netgo' -timeout=500s $(pkgs) -run=$(run)
+	go test -v -race -tags='testing debug netgo' -timeout=1200s $(pkgs) -run=$(run)
 test-vlong: clean fmt vet lint
 	go test -v -race -tags='testing debug vlong netgo' -timeout=5000s $(pkgs) -run=$(run)
 test-cpu:

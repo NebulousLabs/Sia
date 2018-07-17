@@ -5,8 +5,8 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"gitlab.com/NebulousLabs/Sia/modules"
 	"github.com/spf13/cobra"
+	"gitlab.com/NebulousLabs/Sia/modules"
 )
 
 var (

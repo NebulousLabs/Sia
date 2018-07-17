@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/build"
 	"github.com/julienschmidt/httprouter"
+	"gitlab.com/NebulousLabs/Sia/build"
 )
 
 // buildHttpRoutes sets up and returns an * httprouter.Router.

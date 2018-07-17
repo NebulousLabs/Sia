@@ -3,8 +3,8 @@ package gateway
 import (
 	"net"
 
-	"gitlab.com/NebulousLabs/Sia/build"
 	"github.com/xtaci/smux"
+	"gitlab.com/NebulousLabs/Sia/build"
 )
 
 // A streamSession is a multiplexed transport that can accept or initiate
