@@ -2285,6 +2285,7 @@ func TestZeroByteFile(t *testing.T) {
 	// Test uploading 0 byte file
 	dataPieces := uint64(1)
 	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+	redundancy := float64((dataPieces + parityPieces) / dataPieces)
 	_, zeroRF, err := r.UploadNewFile(zeroByteFile, dataPieces, parityPieces)
 	if err != nil {
 		t.Fatal(err)
@@ -2298,8 +2299,8 @@ func TestZeroByteFile(t *testing.T) {
 		t.Fatalf("Expected 1 file, got %v", len(rf.Files))
 	}
 	// Check redundancy and upload progress
-	if rf.Files[0].Redundancy != 3 {
-		t.Fatalf("Expected redundancy to be 3, got %v", rf.Files[0].Redundancy)
+	if rf.Files[0].Redundancy != redundancy {
+		t.Fatalf("Expected redundancy to be %v, got %v", redundancy, rf.Files[0].Redundancy)
 	}
 	if rf.Files[0].UploadProgress != 100 {
 		t.Fatalf("Expected upload progress to be 100, got %v", rf.Files[0].UploadProgress)

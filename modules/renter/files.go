@@ -329,7 +329,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 		// able to be cleaned up.
 		var redundancy, uploadProgress float64
 		if f.size == 0 {
-			redundancy = 3.00
+			redundancy = float64(f.erasureCode.NumPieces()) / float64(f.erasureCode.MinPieces())
 			uploadProgress = 100
 		} else {
 			redundancy = f.redundancy(offline, goodForRenew)
