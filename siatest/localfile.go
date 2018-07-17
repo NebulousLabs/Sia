@@ -17,6 +17,7 @@ type (
 	// network.
 	LocalFile struct {
 		path     string
+		size     int
 		checksum crypto.Hash
 	}
 )
@@ -30,6 +31,7 @@ func NewFile(size int) (*LocalFile, error) {
 	err := ioutil.WriteFile(path, bytes, 0600)
 	return &LocalFile{
 		path:     path,
+		size:     size,
 		checksum: crypto.HashBytes(bytes),
 	}, err
 }
@@ -43,6 +45,9 @@ func (lf *LocalFile) Delete() error {
 // on disk
 func (lf *LocalFile) checkIntegrity() error {
 	data, err := ioutil.ReadFile(lf.path)
+	if lf.size == 0 {
+		data = fastrand.Bytes(lf.size)
+	}
 	if err != nil {
 		return errors.AddContext(err, "failed to read file from disk")
 	}
