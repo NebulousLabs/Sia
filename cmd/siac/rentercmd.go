@@ -3,26 +3,6 @@ package main
 // TODO: If you run siac from a non-existant directory, the abs() function does
 // not handle this very gracefully.
 
-// TODO: Currently the download command will, every iteration, go through every
-// single download in the download queue until it finds the right one. This
-// doesn't end up hurting too much because it's very likely that the download
-// you want is earlier instead of later in the queue, but it's still overhead
-// that we should replace by using an API endpoint that allows you to ask for
-// the desired download immediately instead of having to search through a list.
-//
-// The desired download should be specified by a unique ID instead of by a path,
-// since a download to the same path can appear multiple times in the download
-// history. This will need to be a new return value of the download call in the
-// API.
-
-// TODO: Currently the download command always displays speeds in terms of Mbps.
-// This should probably be switched to some sort of human readable bandwidth
-// display, so that it adjusts units as appropriate.
-
-// TODO: Currently, the download command displays speed based on the total
-// download time of the file, instead of using a rolling average over the last
-// few minutes. We should change the download speed to use a rolling average.
-
 import (
 	"fmt"
 	"os"
