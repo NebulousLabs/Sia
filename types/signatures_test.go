@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/crypto"
+	"gitlab.com/NebulousLabs/Sia/crypto"
 )
 
 // TestEd25519PublicKey tests the Ed25519PublicKey function.

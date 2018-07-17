@@ -7,10 +7,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/crypto"
+	"gitlab.com/NebulousLabs/Sia/modules"
 
-	"github.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 // downloadPieceInfo contains all the information required to download and
@@ -176,26 +176,6 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	// Ensure cleanup occurs after the data is recovered, whether recovery
 	// succeeds or fails.
 	defer udc.managedCleanUp()
-
-	// Decrypt the chunk pieces. This doesn't need to happen under a lock,
-	// because any thread potentially writing to the physicalChunkData array is
-	// going to be stopped by the fact that the chunk is complete.
-	for i := range udc.physicalChunkData {
-		// Skip empty pieces.
-		if udc.physicalChunkData[i] == nil {
-			continue
-		}
-
-		key := deriveKey(udc.masterKey, udc.staticChunkIndex, uint64(i))
-		decryptedPiece, err := key.DecryptBytes(udc.physicalChunkData[i])
-		if err != nil {
-			udc.mu.Lock()
-			udc.fail(err)
-			udc.mu.Unlock()
-			return errors.AddContext(err, "unable to decrypt chunk")
-		}
-		udc.physicalChunkData[i] = decryptedPiece
-	}
 
 	// Recover the pieces into the logical chunk data.
 	//

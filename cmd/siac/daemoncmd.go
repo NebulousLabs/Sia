@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/spf13/cobra"
+	"gitlab.com/NebulousLabs/Sia/build"
 )
 
 var (

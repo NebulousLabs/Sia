@@ -1,0 +1,60 @@
+image: golang:1.10
+
+stages:
+  - lint
+  - test
+  - deploy
+ 
+before_script:
+  - make dependencies
+  - cp -R $CI_PROJECT_DIR $GOPATH/src/gitlab.com/NebulousLabs/Sia
+  - cd $GOPATH/src/gitlab.com/NebulousLabs/Sia
+
+after_script:
+  - cp -R /tmp/SiaTesting $CI_PROJECT_DIR/SiaTesting
+
+lint:
+  stage: lint
+  script: 
+    - go get -u github.com/alecthomas/gometalinter
+    - gometalinter --install
+    - gometalinter --vendor --disable-all --enable=vet --enable=gofmt ./...
+
+legacy-tests:
+  stage: test
+  artifacts:
+    name: "SiaTesting-$CI_JOB_NAME"
+    paths:
+      - $CI_PROJECT_DIR/SiaTesting
+  script: make test-long pkgs="./node ./node/api ./node/api/server" run=.
+
+package-tests:
+  stage: test
+  artifacts:
+    name: "SiaTesting-$CI_JOB_NAME"
+    paths:
+      - $CI_PROJECT_DIR/SiaTesting
+  script: 
+    - make test-long run=. pkgs="./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer ./modules/gateway ./modules/host ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/miner ./modules/wallet ./modules/transactionpool ./persist ./sync ./types"
+
+integration-tests:
+  stage: test
+  artifacts:
+    name: "SiaTesting-$CI_JOB_NAME"
+    paths:
+      - $CI_PROJECT_DIR/SiaTesting
+  script:
+    - make test-long run=. pkgs="./siatest ./siatest/consensus ./siatest/renter ./siatest/wallet"
+
+deploy:
+  stage: deploy
+  only:
+    refs:
+      - master
+  artifacts:
+    name: "Binaries"
+    paths:
+      - $CI_PROJECT_DIR/artifacts
+  script: 
+    - make deploy
+    - cp -R ./artifacts $CI_PROJECT_DIR/artifacts

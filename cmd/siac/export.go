@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/types"
 
 	"github.com/spf13/cobra"
 )
@@ -35,8 +35,7 @@ func renterexportcontracttxnscmd(destination string) {
 		die("Could not retrieve contracts:", err)
 	}
 	var contractTxns []types.Transaction
-	contracts := append(cs.Contracts, cs.OldContracts...)
-	for _, c := range contracts {
+	for _, c := range cs.Contracts {
 		contractTxns = append(contractTxns, c.LastTransaction)
 	}
 	destination = abs(destination)

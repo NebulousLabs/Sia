@@ -7,13 +7,30 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/node/api"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/node/api"
 )
 
-// RenterContractsGet requests the /renter/contracts resource
+// RenterContractsGet requests the /renter/contracts resource and returns
+// Contracts and ActiveContracts
 func (c *Client) RenterContractsGet() (rc api.RenterContracts, err error) {
 	err = c.get("/renter/contracts", &rc)
+	return
+}
+
+// RenterInactiveContractsGet requests the /renter/contracts resource with the
+// inactive flag set to true
+func (c *Client) RenterInactiveContractsGet() (rc api.RenterContracts, err error) {
+	query := fmt.Sprintf("?inactive=%v", true)
+	err = c.get("/renter/contracts"+query, &rc)
+	return
+}
+
+// RenterExpiredContractsGet requests the /renter/contracts resource with the
+// expired flag set to true
+func (c *Client) RenterExpiredContractsGet() (rc api.RenterContracts, err error) {
+	query := fmt.Sprintf("?expired=%v", true)
+	err = c.get("/renter/contracts"+query, &rc)
 	return
 }
 

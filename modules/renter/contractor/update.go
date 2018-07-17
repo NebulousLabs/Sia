@@ -1,8 +1,8 @@
 package contractor
 
 import (
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 // managedArchiveContracts will figure out which contracts are no longer needed

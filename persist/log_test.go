@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/build"
 )
 
 // TestLogger checks that the basic functions of the file logger work as

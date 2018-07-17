@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/profile"
-	mnemonics "github.com/NebulousLabs/entropy-mnemonics"
+	"gitlab.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/crypto"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/profile"
+	mnemonics "gitlab.com/NebulousLabs/entropy-mnemonics"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"

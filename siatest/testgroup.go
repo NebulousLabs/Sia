@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/node"
-	"github.com/NebulousLabs/Sia/node/api/client"
-	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/types"
-	"github.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/node"
+	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/Sia/persist"
+	"gitlab.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 type (
@@ -409,7 +409,7 @@ func waitForContracts(miner *TestNode, renters map[*TestNode]struct{}, hosts map
 				return err
 			}
 			// Count number of contracts
-			for _, c := range rc.Contracts {
+			for _, c := range rc.ActiveContracts {
 				if _, exists := hostMap[string(c.HostPublicKey.Key)]; exists {
 					contracts++
 				}

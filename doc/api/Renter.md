@@ -63,11 +63,11 @@ returns the current settings along with metrics on the renter's spending.
       // Is always nonzero.
       "renewwindow": 3024 // blocks
     }, 
-    // MaxUploadSpeed by defaul is unlimited but can be set by the user to 
+    // MaxUploadSpeed by default is unlimited but can be set by the user to 
     // manage bandwidth
     "maxuploadspeed":     1234, // bytes per second
 
-    // MaxDownloadSpeed by defaul is unlimited but can be set by the user to 
+    // MaxDownloadSpeed by default is unlimited but can be set by the user to 
     // manage bandwidth
     "maxdownloadspeed":   1234, // bytes per second
 
@@ -148,12 +148,24 @@ standard success or error response. See
 
 #### /renter/contracts [GET]
 
-returns active contracts. Expired contracts are not included.
+returns the renter's contracts.  Active contracts are contracts that the Renter
+is currently using to store, upload, and download data, and are returned by
+default. Inactive contracts are contracts that are in the current period but are
+marked as not good for renew, these contracts have the potential to become
+active again but currently are not storing data.  Expired contracts are
+contracts not in the current period, where not more data is being stored and
+excess funds have been released to the renter.
+
+###### Contract Parameters
+```
+inactive   // true or false - Optional
+expired    // true or false - Optional
+```
 
 ###### JSON Response
 ```javascript
 {
-  "contracts": [
+  "activecontracts": [
     {
       // Amount of contract funds that have been spent on downloads.
       "downloadspending": "1234", // hastings
@@ -213,7 +225,9 @@ returns active contracts. Expired contracts are not included.
       // Signals if contract is good for a renewal
       "goodforrenew": false,
     }
-  ]
+  ],
+  "inactivecontracts": [],
+  "expiredcontracts": [],
 }
 ```
 
