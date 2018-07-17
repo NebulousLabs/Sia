@@ -275,6 +275,9 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	}
 
 	// Construct contract header.
+	oldContract.headerMu.Lock()
+	id := contract.ID()
+	oldContract.headerMu.Unlock()
 	header := contractHeader{
 		Transaction:     revisionTxn,
 		SecretKey:       ourSK,
@@ -288,6 +291,7 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 			GoodForUpload: true,
 			GoodForRenew:  true,
 		},
+		RenewedFromContractID: id,
 	}
 
 	// Get old roots
@@ -301,7 +305,10 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
-	meta.RenewedFromContractID = contract.ID()
+	// Link oldContract
+	oldContract.headerMu.Lock()
+	oldContract.header.RenewedToContractID = meta.ID
+	oldContract.headerMu.Unlock()
 
 	return meta, nil
 }

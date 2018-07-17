@@ -52,15 +52,17 @@ type contractHeader struct {
 	SecretKey crypto.SecretKey
 
 	// Same as modules.RenterContract.
-	StartHeight      types.BlockHeight
-	DownloadSpending types.Currency
-	StorageSpending  types.Currency
-	UploadSpending   types.Currency
-	TotalCost        types.Currency
-	ContractFee      types.Currency
-	TxnFee           types.Currency
-	SiafundFee       types.Currency
-	Utility          modules.ContractUtility
+	StartHeight           types.BlockHeight
+	DownloadSpending      types.Currency
+	StorageSpending       types.Currency
+	UploadSpending        types.Currency
+	TotalCost             types.Currency
+	ContractFee           types.Currency
+	TxnFee                types.Currency
+	SiafundFee            types.Currency
+	Utility               modules.ContractUtility
+	RenewedFromContractID types.FileContractID
+	RenewedToContractID   types.FileContractID
 }
 
 // v132ContractHeader is a contractHeader without the Utility field. This field
@@ -144,20 +146,22 @@ func (c *SafeContract) Metadata() modules.RenterContract {
 	defer c.headerMu.Unlock()
 	h := c.header
 	return modules.RenterContract{
-		ID:               h.ID(),
-		Transaction:      h.copyTransaction(),
-		HostPublicKey:    h.HostPublicKey(),
-		StartHeight:      h.StartHeight,
-		EndHeight:        h.EndHeight(),
-		RenterFunds:      h.RenterFunds(),
-		DownloadSpending: h.DownloadSpending,
-		StorageSpending:  h.StorageSpending,
-		UploadSpending:   h.UploadSpending,
-		TotalCost:        h.TotalCost,
-		ContractFee:      h.ContractFee,
-		TxnFee:           h.TxnFee,
-		SiafundFee:       h.SiafundFee,
-		Utility:          h.Utility,
+		ID:                    h.ID(),
+		Transaction:           h.copyTransaction(),
+		HostPublicKey:         h.HostPublicKey(),
+		StartHeight:           h.StartHeight,
+		EndHeight:             h.EndHeight(),
+		RenterFunds:           h.RenterFunds(),
+		DownloadSpending:      h.DownloadSpending,
+		StorageSpending:       h.StorageSpending,
+		UploadSpending:        h.UploadSpending,
+		TotalCost:             h.TotalCost,
+		ContractFee:           h.ContractFee,
+		TxnFee:                h.TxnFee,
+		SiafundFee:            h.SiafundFee,
+		Utility:               h.Utility,
+		RenewedFromContractID: h.RenewedFromContractID,
+		RenewedToContractID:   h.RenewedToContractID,
 	}
 }
 
