@@ -301,5 +301,7 @@ func (cs *ContractSet) Renew(oldContract *SafeContract, params ContractParams, t
 	if err != nil {
 		return modules.RenterContract{}, err
 	}
+	meta.RenewedFromContractID = contract.ID()
+
 	return meta, nil
 }

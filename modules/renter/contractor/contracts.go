@@ -628,6 +628,13 @@ func (c *Contractor) threadedContractMaintenance() {
 				c.log.Println("Failed to update the contract utilities", err)
 				return
 			}
+			// Link old contract to new contract
+			linkOld, ok := c.staticContracts.View(id)
+			if !ok {
+				c.log.Println("Failed to View old contract to link to renewed contract")
+				return
+			}
+			linkOld.RenewedToContractID = newContract.ID
 
 			// Lock the contractor as we update it to use the new contract
 			// instead of the old contract.
