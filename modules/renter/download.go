@@ -383,7 +383,7 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	minChunk := params.offset / params.file.staticChunkSize()
 	maxChunk := (params.offset + params.length - 1) / params.file.staticChunkSize()
 	// Protect maxChunk underflow on tiny files
-	if params.file.size <= 4096 {
+	if params.file.size < 4096 {
 		maxChunk = 0
 	}
 
