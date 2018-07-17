@@ -2251,6 +2251,80 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 }
 
+// TestZeroByteFile tests uploading and downloading a 0 and 1 byte file
+func TestZeroByteFile(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create a testgroup, creating without renter so the renter's
+	// initial balance can be obtained
+	groupParams := siatest.GroupParams{
+		Hosts:   2,
+		Miners:  1,
+		Renters: 1,
+	}
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	if err != nil {
+		t.Fatal("Failed to create group: ", err)
+	}
+	defer func() {
+		if err := tg.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Grab renter
+	r := tg.Renters()[0]
+
+	// Create 0 and 1 byte file
+	zeroByteFile := 0
+	oneByteFile := 1
+
+	// Test uploading 0 byte file
+	dataPieces := uint64(1)
+	parityPieces := uint64(len(tg.Hosts())) - dataPieces
+	redundancy := float64((dataPieces + parityPieces) / dataPieces)
+	_, zeroRF, err := r.UploadNewFile(zeroByteFile, dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Get renter files, should only be 0 byte file
+	rf, err := r.RenterFilesGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rf.Files) != 1 {
+		t.Fatalf("Expected 1 file, got %v", len(rf.Files))
+	}
+	// Check redundancy and upload progress
+	if rf.Files[0].Redundancy != redundancy {
+		t.Fatalf("Expected redundancy to be %v, got %v", redundancy, rf.Files[0].Redundancy)
+	}
+	if rf.Files[0].UploadProgress != 100 {
+		t.Fatalf("Expected upload progress to be 100, got %v", rf.Files[0].UploadProgress)
+	}
+
+	// Test uploading 1 byte file
+	_, oneRF, err := r.UploadNewFileBlocking(oneByteFile, dataPieces, parityPieces)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test downloading 0 byte file
+	_, err = r.DownloadToDisk(zeroRF, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test downloading 1 byte file
+	_, err = r.DownloadToDisk(oneRF, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 // The following are helper functions for the renter tests
 
 // checkBalanceVsSpending checks the renters confirmed siacoin balance in their

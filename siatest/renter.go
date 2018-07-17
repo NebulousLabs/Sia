@@ -32,6 +32,7 @@ func (tn *TestNode) DownloadToDisk(rf *RemoteFile, async bool) (*LocalFile, erro
 	// Create the TestFile
 	lf := &LocalFile{
 		path:     dest,
+		size:     int(fi.Filesize),
 		checksum: rf.checksum,
 	}
 	// If we download the file asynchronously we are done

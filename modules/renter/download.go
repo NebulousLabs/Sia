@@ -285,11 +285,14 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters) (*download,
 	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
 		return nil, errors.New("destination must be an absolute path")
 	}
-	if p.Offset == file.size {
+	if p.Offset == file.size && file.size != 0 {
 		return nil, errors.New("offset equals filesize")
 	}
 	// Sentinel: if length == 0, download the entire file.
 	if p.Length == 0 {
+		if p.Offset > file.size {
+			return nil, errors.New("offset cannot be greater than file size")
+		}
 		p.Length = file.size - p.Offset
 	}
 	// Check whether offset and length is valid.
@@ -346,8 +349,8 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	if params.file == nil {
 		return nil, errors.New("no file provided when requesting download")
 	}
-	if params.length <= 0 {
-		return nil, errors.New("download length must be a positive whole number")
+	if params.length < 0 {
+		return nil, errors.New("download length must be zero or a positive whole number")
 	}
 	if params.offset < 0 {
 		return nil, errors.New("download offset cannot be a negative number")
@@ -379,6 +382,10 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	// Determine which chunks to download.
 	minChunk := params.offset / params.file.staticChunkSize()
 	maxChunk := (params.offset + params.length - 1) / params.file.staticChunkSize()
+	// Protect maxChunk underflow on tiny files
+	if params.file.size < 4096 {
+		maxChunk = 0
+	}
 
 	// For each chunk, assemble a mapping from the contract id to the index of
 	// the piece within the chunk that the contract is responsible for.
