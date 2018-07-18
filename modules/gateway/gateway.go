@@ -186,10 +186,11 @@ func (g *Gateway) Close() error {
 	return g.saveSync()
 }
 
-// DiscoverAddress discovers and returns the current public IP address
-// of the gateway. Contrary to Address, DiscoverAddress is blocking and
-// might take multiple minutes to return. A channel to cancel the
-// discovery can be supplied optionally.
+// DiscoverAddress discovers and returns the current public IP address of the
+// gateway. Contrary to Address, DiscoverAddress is blocking and might take
+// multiple minutes to return. A channel to cancel the discovery can be
+// supplied optionally. If nil is supplied, a reasonable timeout will be used
+// by default.
 func (g *Gateway) DiscoverAddress(cancel <-chan struct{}) (modules.NetAddress, error) {
 	return g.managedLearnHostname(cancel)
 }

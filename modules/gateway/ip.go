@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"net"
 	"time"
 
@@ -25,6 +26,21 @@ func (g *Gateway) discoverPeerIP(conn modules.PeerConn) error {
 // public ip address. If not enough peers are available we wait a bit and try
 // again. In the worst case managedIPFromPeers will fail after a few minutes.
 func (g *Gateway) managedIPFromPeers(cancel <-chan struct{}) (string, error) {
+	// Choose default if cancel is nil.
+	if cancel == nil {
+		ctx, ctxCancel := context.WithTimeout(context.Background(), timeoutIPDiscovery)
+		defer ctxCancel()
+		go func() {
+			select {
+			case <-cancel:
+				ctxCancel()
+			case <-g.threads.StopChan():
+				ctxCancel()
+			case <-ctx.Done():
+			}
+		}()
+		cancel = ctx.Done()
+	}
 	for {
 		// Check for shutdown signal or timeout.
 		select {

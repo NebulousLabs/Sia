@@ -65,11 +65,11 @@ func (g *Gateway) managedLearnHostname(cancel <-chan struct{}) (modules.NetAddre
 	if err == nil {
 		host, err = d.ExternalIP()
 	}
-	if !build.DEBUG && err != nil {
-		host, err = myExternalIP()
-	}
 	if err != nil {
 		host, err = g.managedIPFromPeers(ctx.Done())
+	}
+	if !build.DEBUG && err != nil {
+		host, err = myExternalIP()
 	}
 	if err != nil {
 		return "", errors.AddContext(err, "failed to discover external IP")
