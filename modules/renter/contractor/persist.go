@@ -30,6 +30,9 @@ func (c *Contractor) persistData() contractorPersist {
 		LastChange:    c.lastChange,
 	}
 	for _, contract := range c.oldContracts {
+		// TODO assuming same issue with the API not holding on to the values
+		contract.RenewedFromContractID = c.renewedFrom[contract.ID]
+		contract.RenewedToContractID = c.renewedTo[contract.ID]
 		data.OldContracts = append(data.OldContracts, contract)
 	}
 	return data

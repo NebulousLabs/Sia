@@ -166,8 +166,8 @@ func (c *Contractor) Contracts() []modules.RenterContract {
 	for _, contract := range contracts {
 		// TODO: c.renewedFrom[contract.ID] and c.renewedTo[contract.ID] return
 		// values but the contract does not hold on to the values
-		contract.RenewedFromContractID, _ = c.renewedFrom[contract.ID]
-		contract.RenewedToContractID, _ = c.renewedTo[contract.ID]
+		contract.RenewedFromContractID = c.renewedFrom[contract.ID]
+		contract.RenewedToContractID = c.renewedTo[contract.ID]
 	}
 	return contracts
 }
