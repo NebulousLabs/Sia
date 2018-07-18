@@ -641,8 +641,19 @@ func bandwidthUnit(bps uint64) string {
 func downloadprogress(siapath, destination string) error {
 	start := time.Now()
 
-	measurements := []uint64{0}                                  // first measurement is 0 bytes
-	numMeasurements := int(60 * time.Second / OutputRefreshRate) // 4 Ticks/second = 240 measurements / min
+	// helper type used for measurements.
+	type measurement struct {
+		progress uint64
+		time     time.Time
+	}
+
+	measurements := []measurement{
+		// first measurement
+		{
+			progress: 0,
+			time:     time.Now(),
+		},
+	}
 	for range time.Tick(OutputRefreshRate) {
 		// Get the list of downloads.
 		queue, err := httpClient.RenterDownloadsGet()
@@ -677,18 +688,21 @@ func downloadprogress(siapath, destination string) error {
 		}
 
 		// Add the current progress to the measurements.
-		measurements = append(measurements, d.Received)
+		measurements = append(measurements, measurement{
+			progress: d.Received,
+			time:     time.Now(),
+		})
 
-		// Shrink the measurements to only contain measurements from the last
-		// 60 seconds.
-		if len(measurements) > numMeasurements {
-			measurements = measurements[len(measurements)-numMeasurements:]
+		// Shrink the measurements to only contain measurements from within the
+		// SpeedEstimationWindow.
+		for len(measurements) > 2 && measurements[len(measurements)-1].time.Sub(measurements[0].time) > SpeedEstimationWindow {
+			measurements = measurements[1:]
 		}
 
 		// Compute the progress and timespan between the first and last
 		// measurement to get the speed.
-		received := float64(measurements[len(measurements)-1] - measurements[0])
-		timespan := time.Duration(float64(time.Minute) * float64(len(measurements)) / float64(numMeasurements))
+		received := float64(measurements[len(measurements)-1].progress - measurements[0].progress)
+		timespan := measurements[len(measurements)-1].time.Sub(measurements[0].time)
 		speed := bandwidthUnit(uint64((received * 8) / timespan.Seconds()))
 
 		// Compuate the percentage of completion and time elapsed since the

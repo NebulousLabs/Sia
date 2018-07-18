@@ -12,4 +12,8 @@ const (
 	// RenterDownloadTimeout is the amount of time that needs to elapse before
 	// the download command gives up on finding a download in the download list.
 	RenterDownloadTimeout = time.Minute
+
+	// SpeedEstimationWindow is the size of the window which we use to
+	// determine download speeds.
+	SpeedEstimationWindow = 60 * time.Second
 )
