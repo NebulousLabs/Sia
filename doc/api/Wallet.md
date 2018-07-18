@@ -286,7 +286,7 @@ choice for the dictionary is going to be 'english'. The underlying seed is the
 same no matter what dictionary is used for the encoding. The encoding also
 contains a small checksum of the seed, to help catch simple mistakes when
 copying. The library
-[entropy-mnemonics](https://github.com/NebulousLabs/entropy-mnemonics) is used
+[entropy-mnemonics](https://gitlab.com/NebulousLabs/entropy-mnemonics) is used
 when encoding.
 
 ###### Query String Parameters
@@ -541,7 +541,7 @@ gets the transaction associated with a specific transaction id.
     // transaction (the rest of the fields in this object) are usually what is
     // desired.
     "transaction": {
-      // See types.Transaction in https://github.com/NebulousLabs/Sia/blob/master/types/transactions.go
+      // See types.Transaction in https://gitlab.com/NebulousLabs/Sia/blob/master/types/transactions.go
     },
 
     // ID of the transaction from which the wallet transaction was derived.

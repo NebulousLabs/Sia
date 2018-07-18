@@ -33,12 +33,12 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/NebulousLabs/errors"
 	"github.com/spf13/cobra"
+	"gitlab.com/NebulousLabs/errors"
 
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/node/api"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/node/api"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 var (

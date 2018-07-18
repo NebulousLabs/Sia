@@ -9,7 +9,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/NebulousLabs/fastrand"
+	"gitlab.com/NebulousLabs/fastrand"
 
 	"golang.org/x/crypto/twofish"
 )
