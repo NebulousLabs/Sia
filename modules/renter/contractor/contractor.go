@@ -65,6 +65,12 @@ type Contractor struct {
 
 	staticContracts *proto.ContractSet
 	oldContracts    map[types.FileContractID]modules.RenterContract
+
+	// renewedFrom links the new contract's ID to the old contract's ID
+	renewedFrom map[types.FileContractID]types.FileContractID
+
+	// renewedTo links the old contract's ID to the new contract's ID
+	renewedTo map[types.FileContractID]types.FileContractID
 }
 
 // Allowance returns the current allowance.
@@ -156,7 +162,14 @@ func (c *Contractor) ContractByPublicKey(pk types.SiaPublicKey) (modules.RenterC
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
 func (c *Contractor) Contracts() []modules.RenterContract {
-	return c.staticContracts.ViewAll()
+	contracts := c.staticContracts.ViewAll()
+	for _, contract := range contracts {
+		// TODO: c.renewedFrom[contract.ID] and c.renewedTo[contract.ID] return
+		// values but the contract does not hold on to the values
+		contract.RenewedFromContractID, _ = c.renewedFrom[contract.ID]
+		contract.RenewedToContractID, _ = c.renewedTo[contract.ID]
+	}
+	return contracts
 }
 
 // OldContracts returns the contracts formed by the contractor that have
@@ -165,8 +178,13 @@ func (c *Contractor) OldContracts() []modules.RenterContract {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	contracts := make([]modules.RenterContract, 0, len(c.oldContracts))
-	for _, c := range c.oldContracts {
-		contracts = append(contracts, c)
+	// fmt.Println("OldContracts")
+	for _, contract := range c.oldContracts {
+		// TODO: c.renewedFrom[contract.ID] and c.renewedTo[contract.ID] return
+		// values but the contract does not hold on to the values
+		contract.RenewedFromContractID = c.renewedFrom[contract.ID]
+		contract.RenewedToContractID = c.renewedTo[contract.ID]
+		contracts = append(contracts, contract)
 	}
 	return contracts
 }
@@ -279,6 +297,9 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 		pubKeysToContractID: make(map[string]types.FileContractID),
 		renewing:            make(map[types.FileContractID]bool),
 		revising:            make(map[types.FileContractID]bool),
+
+		renewedFrom: make(map[types.FileContractID]types.FileContractID),
+		renewedTo:   make(map[types.FileContractID]types.FileContractID),
 	}
 
 	// Close the contract set and logger upon shutdown.

@@ -61,9 +61,6 @@ type contractHeader struct {
 	TxnFee           types.Currency
 	SiafundFee       types.Currency
 	Utility          modules.ContractUtility
-
-	RenewedFromContractID types.FileContractID
-	RenewedToContractID   types.FileContractID
 }
 
 // v132ContractHeader is a contractHeader without the Utility field. This field
@@ -161,9 +158,6 @@ func (c *SafeContract) Metadata() modules.RenterContract {
 		TxnFee:           h.TxnFee,
 		SiafundFee:       h.SiafundFee,
 		Utility:          h.Utility,
-
-		RenewedFromContractID: h.RenewedFromContractID,
-		RenewedToContractID:   h.RenewedToContractID,
 	}
 }
 
