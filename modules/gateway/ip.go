@@ -30,6 +30,7 @@ func (g *Gateway) managedIPFromPeers(cancel <-chan struct{}) (string, error) {
 	if cancel == nil {
 		ctx, ctxCancel := context.WithTimeout(context.Background(), timeoutIPDiscovery)
 		defer ctxCancel()
+		cancel = ctx.Done()
 		go func() {
 			select {
 			case <-cancel:
@@ -39,7 +40,6 @@ func (g *Gateway) managedIPFromPeers(cancel <-chan struct{}) (string, error) {
 			case <-ctx.Done():
 			}
 		}()
-		cancel = ctx.Done()
 	}
 	for {
 		// Check for shutdown signal or timeout.
