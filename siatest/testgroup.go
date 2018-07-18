@@ -1,9 +1,10 @@
 package siatest
 
 import (
+	"fmt"
 	"math"
+	"path/filepath"
 	"reflect"
-	"strconv"
 	"sync"
 	"time"
 
@@ -11,9 +12,9 @@ import (
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/Sia/persist"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/fastrand"
 )
 
 type (
@@ -48,13 +49,15 @@ var (
 
 // NewGroup creates a group of TestNodes from node params. All the nodes will
 // be connected, synced and funded. Hosts nodes are also announced.
-func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
+func NewGroup(groupDir string, nodeParams ...node.NodeParams) (*TestGroup, error) {
 	// Create and init group
 	tg := &TestGroup{
 		nodes:   make(map[*TestNode]struct{}),
 		hosts:   make(map[*TestNode]struct{}),
 		renters: make(map[*TestNode]struct{}),
 		miners:  make(map[*TestNode]struct{}),
+
+		dir: groupDir,
 	}
 
 	// Create node and add it to the correct groups
@@ -97,21 +100,24 @@ func NewGroup(nodeParams ...node.NodeParams) (*TestGroup, error) {
 
 // NewGroupFromTemplate will create hosts, renters and miners according to the
 // settings in groupParams.
-func NewGroupFromTemplate(groupParams GroupParams) (*TestGroup, error) {
+func NewGroupFromTemplate(groupDir string, groupParams GroupParams) (*TestGroup, error) {
 	var params []node.NodeParams
 	// Create host params
 	for i := 0; i < groupParams.Hosts; i++ {
-		params = append(params, node.Host(randomDir()))
+		params = append(params, node.HostTemplate)
+		randomNodeDir(groupDir, &params[len(params)-1])
 	}
 	// Create renter params
 	for i := 0; i < groupParams.Renters; i++ {
-		params = append(params, node.Renter(randomDir()))
+		params = append(params, node.RenterTemplate)
+		randomNodeDir(groupDir, &params[len(params)-1])
 	}
 	// Create miner params
 	for i := 0; i < groupParams.Miners; i++ {
-		params = append(params, Miner(randomDir()))
+		params = append(params, MinerTemplate)
+		randomNodeDir(groupDir, &params[len(params)-1])
 	}
-	return NewGroup(params...)
+	return NewGroup(groupDir, params...)
 }
 
 // addStorageFolderToHosts adds a single storage folder to each host.
@@ -267,13 +273,36 @@ func mapToSlice(m map[*TestNode]struct{}) []*TestNode {
 	return tns
 }
 
-// randomDir is a helper functions that returns a random directory path
-func randomDir() string {
-	dir, err := TestDir(strconv.Itoa(fastrand.Intn(math.MaxInt32)))
-	if err != nil {
-		panic(errors.AddContext(err, "failed to create testing directory"))
+// randomNodeDir generates a random directory for the provided node params if
+// Dir wasn't set using the provided parentDir and a randomized suffix.
+func randomNodeDir(parentDir string, nodeParams *node.NodeParams) {
+	if nodeParams.Dir != "" {
+		return
 	}
-	return dir
+	nodeDir := ""
+	if nodeParams.Gateway != nil || nodeParams.CreateGateway {
+		nodeDir += "g"
+	}
+	if nodeParams.ConsensusSet != nil || nodeParams.CreateConsensusSet {
+		nodeDir += "c"
+	}
+	if nodeParams.TransactionPool != nil || nodeParams.CreateTransactionPool {
+		nodeDir += "t"
+	}
+	if nodeParams.Wallet != nil || nodeParams.CreateWallet {
+		nodeDir += "w"
+	}
+	if nodeParams.Renter != nil || nodeParams.CreateRenter {
+		nodeDir += "r"
+	}
+	if nodeParams.Host != nil || nodeParams.CreateHost {
+		nodeDir += "h"
+	}
+	if nodeParams.Miner != nil || nodeParams.CreateMiner {
+		nodeDir += "m"
+	}
+	nodeDir += fmt.Sprintf("-%s", persist.RandomSuffix())
+	nodeParams.Dir = filepath.Join(parentDir, nodeDir)
 }
 
 // setRenterAllowances sets the allowance of each renter
@@ -422,9 +451,7 @@ func (tg *TestGroup) AddNodes(nps ...node.NodeParams) ([]*TestNode, error) {
 	newMiners := make(map[*TestNode]struct{})
 	for _, np := range nps {
 		// Create the nodes and add them to the group.
-		if np.Dir == "" {
-			np.Dir = randomDir()
-		}
+		randomNodeDir(tg.dir, &np)
 		node, err := NewCleanNode(np)
 		if err != nil {
 			return mapToSlice(newNodes), build.ExtendErr("failed to create host", err)
