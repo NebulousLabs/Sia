@@ -1361,7 +1361,9 @@ func TestRenterContractEndHeight(t *testing.T) {
 	}
 }
 
-// TestRenterContractRenewal tests that contracts get linked correctly when renewed
+// TestRenterContractRenewal tests that contracts get linked correctly when
+// renewed
+
 func TestRenterContractRenewal(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -1374,7 +1376,8 @@ func TestRenterContractRenewal(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	testDir := renterTestDir(t.Name())
+	tg, err := siatest.NewGroupFromTemplate(testDir, groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -2464,14 +2467,24 @@ func checkContracts(numHosts, numRenewals int, oldContracts, renewedContracts []
 	}
 
 	// Create Maps for comparison
+	nilID := types.FileContractID(crypto.Hash{})
 	initialContractIDMap := make(map[types.FileContractID]struct{})
 	initialContractKeyMap := make(map[crypto.Hash]struct{})
 	for _, c := range oldContracts {
+		if c.RenewedToContractID == nilID {
+			return fmt.Errorf("old contract RenewedToContractID incorrect, expected contract ID, got nil ID")
+		}
 		initialContractIDMap[c.ID] = struct{}{}
 		initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)] = struct{}{}
 	}
 
 	for _, c := range renewedContracts {
+		if c.RenewedToContractID != nilID {
+			return fmt.Errorf("renewed contract RenewedToContractID incorrect, expected nil ID, got %v", c.RenewedToContractID)
+		}
+		if c.RenewedFromContractID == nilID {
+			return fmt.Errorf("renewed contract RenewedFromContractID incorrect, expected contract ID got nil ID")
+		}
 		// Verify that all the contracts marked as GoodForRenew
 		// were renewed
 		if _, ok := initialContractIDMap[c.ID]; ok {
