@@ -1520,9 +1520,8 @@ func TestRenterContractsEndpoint(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		// Check OldContracts against recorded old contracts
-		if len(oldContracts) != len(rc.OldContracts) {
-			return fmt.Errorf("Number of old contracts don't match, expected %v got %v", len(oldContracts), len(rc.OldContracts))
+		if len(rc.ActiveContracts) != len(tg.Hosts()) {
+			return fmt.Errorf("waiting for active contracts to form")
 		}
 		return nil
 	})

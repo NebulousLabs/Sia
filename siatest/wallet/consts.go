@@ -3,7 +3,7 @@ package wallet
 import (
 	"os"
 
-	"github.com/NebulousLabs/Sia/siatest"
+	"gitlab.com/NebulousLabs/Sia/siatest"
 )
 
 // walletTestDir creates a temporary testing directory for a wallet test. This

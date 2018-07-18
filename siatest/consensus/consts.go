@@ -3,7 +3,7 @@ package consensus
 import (
 	"os"
 
-	"github.com/NebulousLabs/Sia/siatest"
+	"gitlab.com/NebulousLabs/Sia/siatest"
 )
 
 // consensusTestDir creates a temporary testing directory for a consensus. This
