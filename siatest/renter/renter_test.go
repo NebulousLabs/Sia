@@ -2252,7 +2252,8 @@ func TestZeroByteFile(t *testing.T) {
 		Miners:  1,
 		Renters: 1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(groupParams)
+	testDir := renterTestDir(t.Name())
+	tg, err := siatest.NewGroupFromTemplate(testDir, groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
