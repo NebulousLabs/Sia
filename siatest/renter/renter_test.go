@@ -662,7 +662,7 @@ func testUploadInterruptedBeforeSendingRevision(t *testing.T, tg *siatest.TestGr
 // testDownloadInterrupted interrupts a download using the provided dependencies.
 func testDownloadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.DependencyInterruptOnceOnKeyword) {
 	// Add Renter
-	testDir := siatest.TestDir(t.Name())
+	testDir := renterTestDir(t.Name())
 	renterTemplate := node.Renter(testDir + "/renter")
 	renterTemplate.ContractSetDeps = deps
 	nodes, err := tg.AddNodes(renterTemplate)
@@ -721,7 +721,7 @@ func testDownloadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.
 // and makes sure that this doesn't corrupt the contract.
 func testUploadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.DependencyInterruptOnceOnKeyword) {
 	// Add Renter
-	testDir := siatest.TestDir(t.Name())
+	testDir := renterTestDir(t.Name())
 	renterTemplate := node.Renter(testDir + "/renter")
 	renterTemplate.ContractSetDeps = deps
 	nodes, err := tg.AddNodes(renterTemplate)
@@ -1604,7 +1604,7 @@ func TestRenterPersistData(t *testing.T) {
 	t.Parallel()
 
 	// Get test directory
-	testDir := siatest.TestDir(t.Name())
+	testDir := renterTestDir(t.Name())
 
 	// Copying legacy file to test directory
 	renterDir := filepath.Join(testDir, "renter")
