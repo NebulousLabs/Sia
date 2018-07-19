@@ -201,10 +201,10 @@ func rentercmd() {
 		fmt.Printf("\n    No previous spending.\n\n")
 	} else {
 		fmt.Printf(`
-  Previous Spending: %v
+   %v
     Withheld Funds:  %v
     Release Block:   %v
-\n`, currencyUnits(fm.PreviousSpending), currencyUnits(fm.WithheldFunds), fm.ReleaseBlock)
+`, currencyUnits(fm.PreviousSpending), currencyUnits(fm.WithheldFunds), fm.ReleaseBlock)
 	}
 
 	// also list files
