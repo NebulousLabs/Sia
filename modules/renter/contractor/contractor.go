@@ -63,14 +63,12 @@ type Contractor struct {
 	renewing            map[types.FileContractID]bool // prevent revising during renewal
 	revising            map[types.FileContractID]bool // prevent overlapping revisions
 
+	// renewedFrom links the new contract's ID to the old contract's ID
+	// renewedTo links the old contract's ID to the new contract's ID
 	staticContracts *proto.ContractSet
 	oldContracts    map[types.FileContractID]modules.RenterContract
-
-	// renewedFrom links the new contract's ID to the old contract's ID
-	renewedFrom map[types.FileContractID]types.FileContractID
-
-	// renewedTo links the old contract's ID to the new contract's ID
-	renewedTo map[types.FileContractID]types.FileContractID
+	renewedFrom     map[types.FileContractID]types.FileContractID
+	renewedTo       map[types.FileContractID]types.FileContractID
 }
 
 // Allowance returns the current allowance.
@@ -285,9 +283,8 @@ func NewCustomContractor(cs consensusSet, w wallet, tp transactionPool, hdb host
 		pubKeysToContractID: make(map[string]types.FileContractID),
 		renewing:            make(map[types.FileContractID]bool),
 		revising:            make(map[types.FileContractID]bool),
-
-		renewedFrom: make(map[types.FileContractID]types.FileContractID),
-		renewedTo:   make(map[types.FileContractID]types.FileContractID),
+		renewedFrom:         make(map[types.FileContractID]types.FileContractID),
+		renewedTo:           make(map[types.FileContractID]types.FileContractID),
 	}
 
 	// Close the contract set and logger upon shutdown.
