@@ -637,6 +637,9 @@ func (c *Contractor) threadedContractMaintenance() {
 			c.staticContracts.Delete(oldContract)
 			// Store the contract in the record of historic contracts.
 			c.oldContracts[id] = oldContract.Metadata()
+			// Link Contracts
+			c.renewedFrom[newContract.ID] = id
+			c.renewedTo[id] = newContract.ID
 			// Save the contractor.
 			err = c.saveSync()
 			if err != nil {
