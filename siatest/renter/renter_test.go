@@ -2374,7 +2374,6 @@ func checkContracts(numHosts, numRenewals int, oldContracts, renewedContracts []
 	}
 
 	// Create Maps for comparison
-	nilID := types.FileContractID(crypto.Hash{})
 	initialContractIDMap := make(map[types.FileContractID]struct{})
 	initialContractKeyMap := make(map[crypto.Hash]struct{})
 	for _, c := range oldContracts {

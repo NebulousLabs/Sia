@@ -14,13 +14,13 @@ import (
 
 // contractorPersist defines what Contractor data persists across sessions.
 type contractorPersist struct {
-	Allowance     modules.Allowance                             `json:"allowance"`
-	BlockHeight   types.BlockHeight                             `json:"blockheight"`
-	CurrentPeriod types.BlockHeight                             `json:"currentperiod"`
-	LastChange    modules.ConsensusChangeID                     `json:"lastchange"`
-	OldContracts  []modules.RenterContract                      `json:"oldcontracts"`
-	RenewedFrom   map[types.FileContractID]types.FileContractID `json:"renewedfrom"`
-	RenewedTo     map[types.FileContractID]types.FileContractID `json:"renewedto"`
+	Allowance     modules.Allowance               `json:"allowance"`
+	BlockHeight   types.BlockHeight               `json:"blockheight"`
+	CurrentPeriod types.BlockHeight               `json:"currentperiod"`
+	LastChange    modules.ConsensusChangeID       `json:"lastchange"`
+	OldContracts  []modules.RenterContract        `json:"oldcontracts"`
+	RenewedFrom   map[string]types.FileContractID `json:"renewedfrom"`
+	RenewedTo     map[string]types.FileContractID `json:"renewedto"`
 }
 
 // persistData returns the data in the Contractor that will be saved to disk.
@@ -30,8 +30,14 @@ func (c *Contractor) persistData() contractorPersist {
 		BlockHeight:   c.blockHeight,
 		CurrentPeriod: c.currentPeriod,
 		LastChange:    c.lastChange,
-		RenewedFrom:   c.renewedFrom,
-		RenewedTo:     c.renewedTo,
+		RenewedFrom:   make(map[string]types.FileContractID),
+		RenewedTo:     make(map[string]types.FileContractID),
+	}
+	for k, v := range c.renewedFrom {
+		data.RenewedFrom[k.String()] = v
+	}
+	for k, v := range c.renewedTo {
+		data.RenewedTo[k.String()] = v
 	}
 	for _, contract := range c.oldContracts {
 		data.OldContracts = append(data.OldContracts, contract)
@@ -50,8 +56,19 @@ func (c *Contractor) load() error {
 	c.blockHeight = data.BlockHeight
 	c.currentPeriod = data.CurrentPeriod
 	c.lastChange = data.LastChange
-	c.renewedFrom = data.RenewedFrom
-	c.renewedTo = data.RenewedTo
+	var fcid types.FileContractID
+	for k, v := range data.RenewedFrom {
+		if err := fcid.LoadString(k); err != nil {
+			return err
+		}
+		c.renewedFrom[fcid] = v
+	}
+	for k, v := range data.RenewedTo {
+		if err := fcid.LoadString(k); err != nil {
+			return err
+		}
+		c.renewedTo[fcid] = v
+	}
 	for _, contract := range data.OldContracts {
 		c.oldContracts[contract.ID] = contract
 	}
