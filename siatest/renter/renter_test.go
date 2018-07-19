@@ -1361,99 +1361,6 @@ func TestRenterContractEndHeight(t *testing.T) {
 	}
 }
 
-// TestRenterContractRenewal tests that contracts get linked correctly when
-// renewed
-
-func TestRenterContractRenewal(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	// Create a group for testing.
-	groupParams := siatest.GroupParams{
-		Hosts:   1,
-		Renters: 1,
-		Miners:  1,
-	}
-	testDir := renterTestDir(t.Name())
-	tg, err := siatest.NewGroupFromTemplate(testDir, groupParams)
-	if err != nil {
-		t.Fatal("Failed to create group: ", err)
-	}
-	defer func() {
-		if err := tg.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	// Get renter
-	r := tg.Renters()[0]
-
-	// Verify contracts created as expected
-	rc, err := r.RenterContractsGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(rc.ActiveContracts) != len(tg.Hosts()) {
-		t.Fatalf("Did not get expected number of contracts, got %v expected %v", len(rc.ActiveContracts), len(tg.Hosts()))
-	}
-	// RenewedFrom and RenewedTo should be nil values
-	nilID := types.FileContractID(crypto.Hash{})
-	if rc.ActiveContracts[0].RenewedFromContractID != nilID {
-		t.Fatalf("RenewedFromContractID not expected value, got %v expected %v", rc.ActiveContracts[0].RenewedFromContractID, crypto.Hash{})
-	}
-	if rc.ActiveContracts[0].RenewedToContractID != nilID {
-		t.Fatalf("RenewedToContractID not expected value, got %v expected %v", rc.ActiveContracts[0].RenewedToContractID, crypto.Hash{})
-	}
-
-	// Renew Contracts
-	err = renewContractsByRenewWindow(r, tg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Confirm Contracts renewed as expected
-	err = build.Retry(200, 100*time.Millisecond, func() error {
-		rc, err = r.RenterInactiveContractsGet()
-		if err != nil {
-			return err
-		}
-		if len(rc.ActiveContracts) != len(tg.Hosts()) {
-			return fmt.Errorf("Did not get expected number of active contracts, got %v expected %v", len(rc.ActiveContracts), len(tg.Hosts()))
-		}
-		if len(rc.InactiveContracts) != len(tg.Hosts()) {
-			return fmt.Errorf("Did not get expected number of inactive contracts, got %v expected %v", len(rc.InactiveContracts), len(tg.Hosts()))
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Get contracts
-	rc, err = r.RenterInactiveContractsGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Active contract RenewedTo should be nil value
-	if rc.ActiveContracts[0].RenewedToContractID != nilID {
-		t.Fatalf("Active contract RenewedToContractID not expected value, got %v expected %v", rc.ActiveContracts[0].RenewedToContractID, crypto.Hash{})
-	}
-	// Active contract RenewedFrom should be the Inactive contract ID
-	if rc.ActiveContracts[0].RenewedFromContractID != rc.InactiveContracts[0].ID {
-		t.Fatalf("Active contract RenewedFromContractID not expected value, got %v expected %v", rc.ActiveContracts[0].RenewedFromContractID, rc.InactiveContracts[0].ID)
-	}
-	// Inactive contract RenewedTo should be the Active contract ID
-	if rc.ActiveContracts[0].ID != rc.InactiveContracts[0].RenewedToContractID {
-		t.Fatalf("Inactive contract RenewedToContractID not expected value, got %v expected %v", rc.InactiveContracts[0].RenewedToContractID, rc.ActiveContracts[0].ID)
-	}
-	// Inactive contract RenewedFrom should still be nil value
-	if rc.InactiveContracts[0].RenewedFromContractID != nilID {
-		t.Fatalf("Inactive contract RenewedFromContractID not expected value, got %v expected %v", rc.InactiveContracts[0].RenewedFromContractID, crypto.Hash{})
-	}
-}
-
 // TestRenterContractsEndpoint tests the API endpoint for old contracts
 func TestRenterContractsEndpoint(t *testing.T) {
 	if testing.Short() {
@@ -2471,20 +2378,11 @@ func checkContracts(numHosts, numRenewals int, oldContracts, renewedContracts []
 	initialContractIDMap := make(map[types.FileContractID]struct{})
 	initialContractKeyMap := make(map[crypto.Hash]struct{})
 	for _, c := range oldContracts {
-		if c.RenewedToContractID == nilID {
-			return fmt.Errorf("old contract RenewedToContractID incorrect, expected contract ID, got nil ID")
-		}
 		initialContractIDMap[c.ID] = struct{}{}
 		initialContractKeyMap[crypto.HashBytes(c.HostPublicKey.Key)] = struct{}{}
 	}
 
 	for _, c := range renewedContracts {
-		if c.RenewedToContractID != nilID {
-			return fmt.Errorf("renewed contract RenewedToContractID incorrect, expected nil ID, got %v", c.RenewedToContractID)
-		}
-		if c.RenewedFromContractID == nilID {
-			return fmt.Errorf("renewed contract RenewedFromContractID incorrect, expected contract ID got nil ID")
-		}
 		// Verify that all the contracts marked as GoodForRenew
 		// were renewed
 		if _, ok := initialContractIDMap[c.ID]; ok {

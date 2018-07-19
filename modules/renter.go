@@ -274,12 +274,6 @@ type RenterContract struct {
 	ContractFee types.Currency
 	TxnFee      types.Currency
 	SiafundFee  types.Currency
-
-	// RenewedFromConctractID is the ID for the contract that was renewed to
-	// create the current contract. RenewedToContractID is the ID of the
-	// contract that was created by the renewal of the current contract
-	RenewedFromContractID types.FileContractID
-	RenewedToContractID   types.FileContractID
 }
 
 // ContractorSpending contains the metrics about how much the Contractor has

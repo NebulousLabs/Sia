@@ -162,14 +162,7 @@ func (c *Contractor) ContractByPublicKey(pk types.SiaPublicKey) (modules.RenterC
 // allowance period. Only contracts formed with currently online hosts are
 // returned.
 func (c *Contractor) Contracts() []modules.RenterContract {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	contracts := c.staticContracts.ViewAll()
-	for i := 0; i < len(contracts); i++ {
-		contracts[i].RenewedFromContractID = c.renewedFrom[contracts[i].ID]
-		contracts[i].RenewedToContractID = c.renewedTo[contracts[i].ID]
-	}
-	return contracts
+	return c.staticContracts.ViewAll()
 }
 
 // OldContracts returns the contracts formed by the contractor that have
@@ -178,10 +171,8 @@ func (c *Contractor) OldContracts() []modules.RenterContract {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	contracts := make([]modules.RenterContract, 0, len(c.oldContracts))
-	for _, contract := range c.oldContracts {
-		contract.RenewedFromContractID = c.renewedFrom[contract.ID]
-		contract.RenewedToContractID = c.renewedTo[contract.ID]
-		contracts = append(contracts, contract)
+	for _, c := range c.oldContracts {
+		contracts = append(contracts, c)
 	}
 	return contracts
 }

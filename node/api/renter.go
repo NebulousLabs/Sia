@@ -111,11 +111,6 @@ type (
 		GoodForUpload bool `json:"goodforupload"`
 		// Signals if contract is good for a renewal
 		GoodForRenew bool `json:"goodforrenew"`
-		// RenewedFromConctractID is the ID for the contract that was renewed to
-		// create the current contract. RenewedToContractID is the ID of the
-		// contract that was created by the renewal of the current contract
-		RenewedFromContractID types.FileContractID `json:"renewedfromcontractid"`
-		RenewedToContractID   types.FileContractID `json:"renewedtocontractid"`
 	}
 
 	// RenterContracts contains the renter's contracts.
@@ -347,8 +342,6 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 			StorageSpendingDeprecated: c.StorageSpending,
 			TotalCost:                 c.TotalCost,
 			UploadSpending:            c.UploadSpending,
-			RenewedFromContractID:     c.RenewedFromContractID,
-			RenewedToContractID:       c.RenewedToContractID,
 		}
 		if goodForRenew {
 			activeContracts = append(activeContracts, contract)
@@ -398,8 +391,6 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, req *http.Request,
 				StorageSpendingDeprecated: c.StorageSpending,
 				TotalCost:                 c.TotalCost,
 				UploadSpending:            c.UploadSpending,
-				RenewedFromContractID:     c.RenewedFromContractID,
-				RenewedToContractID:       c.RenewedToContractID,
 			}
 			if expired && c.EndHeight < blockHeight {
 				expiredContracts = append(expiredContracts, contract)

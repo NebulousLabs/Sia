@@ -30,8 +30,6 @@ func (c *Contractor) persistData() contractorPersist {
 		LastChange:    c.lastChange,
 	}
 	for _, contract := range c.oldContracts {
-		contract.RenewedFromContractID = c.renewedFrom[contract.ID]
-		contract.RenewedToContractID = c.renewedTo[contract.ID]
 		data.OldContracts = append(data.OldContracts, contract)
 	}
 	return data
