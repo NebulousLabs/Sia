@@ -647,13 +647,11 @@ func downloadprogress(siapath, destination string) error {
 		time     time.Time
 	}
 
-	measurements := []measurement{
-		// first measurement
-		{
-			progress: 0,
-			time:     time.Now(),
-		},
-	}
+	// initialize measurementswith a first measurement of 0 progress.
+	measurements := []measurement{{
+		progress: 0,
+		time:     time.Now(),
+	}}
 	for range time.Tick(OutputRefreshRate) {
 		// Get the list of downloads.
 		queue, err := httpClient.RenterDownloadsGet()
