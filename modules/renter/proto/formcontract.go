@@ -11,12 +11,6 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
-const (
-	// estTxnSize is the estimated size of an encoded file contract
-	// transaction set.
-	estTxnSize = 2048
-)
-
 // FormContract forms a contract with a host and submits the contract
 // transaction to tpool. The contract is added to the ContractSet and its
 // metadata is returned.
@@ -37,7 +31,7 @@ func (cs *ContractSet) FormContract(params ContractParams, txnBuilder transactio
 
 	// Calculate the anticipated transaction fee.
 	_, maxFee := tpool.FeeEstimation()
-	txnFee := maxFee.Mul64(estTxnSize)
+	txnFee := maxFee.Mul64(modules.EstimatedFileContractTransactionSetSize)
 
 	// Underflow check.
 	if funding.Cmp(host.ContractPrice.Add(txnFee)) <= 0 {
