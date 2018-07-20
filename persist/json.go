@@ -1,5 +1,12 @@
 package persist
 
+// NOTE: The safe json files include a checksum that is allowed to be manually
+// overwritten by the user. This temporarily exposes the user to corruption, not
+// just from a json file that has the wrong values, but if the disk fails right
+// after the user has manually modified their json file, there are edge cases
+// where because of the manual checksum, the saver will not be able to detect
+// corruption.
+
 import (
 	"bytes"
 	"encoding/json"
