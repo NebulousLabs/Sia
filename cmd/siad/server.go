@@ -551,7 +551,7 @@ func (srv *Server) loadModules() error {
 	if strings.Contains(srv.config.Siad.Modules, "h") {
 		i++
 		fmt.Printf("(%d/%d) Loading host...\n", i, len(srv.config.Siad.Modules))
-		h, err = host.New(cs, tpool, w, srv.config.Siad.HostAddr, filepath.Join(srv.config.Siad.SiaDir, modules.HostDir))
+		h, err = host.New(cs, g, tpool, w, srv.config.Siad.HostAddr, filepath.Join(srv.config.Siad.SiaDir, modules.HostDir))
 		if err != nil {
 			return err
 		}
