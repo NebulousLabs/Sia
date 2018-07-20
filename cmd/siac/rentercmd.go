@@ -200,7 +200,7 @@ func rentercmd() {
 	if fm.PreviousSpending.IsZero() && fm.WithheldFunds.IsZero() {
 		fmt.Printf("\n    No previous spending.\n\n")
 	} else {
-		fmt.Printf(`   %v
+		fmt.Printf(` %v
     Withheld Funds:  %v
     Release Block:   %v
 
