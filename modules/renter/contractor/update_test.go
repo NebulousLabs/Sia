@@ -79,7 +79,7 @@ func TestIntegrationAutoRenew(t *testing.T) {
 
 	// check renewed contract
 	contract = c.Contracts()[0]
-	endHeight := c.CurrentPeriod() + c.allowance.Period
+	endHeight := c.contractEndHeight()
 	if contract.EndHeight != endHeight {
 		t.Fatalf("Wrong end height, expected %v got %v\n", endHeight, contract.EndHeight)
 	}
@@ -147,7 +147,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 
 	// check renewed contract
 	contract = c.Contracts()[0]
-	endHeight := c.CurrentPeriod() + c.allowance.Period
+	endHeight := c.contractEndHeight()
 	c.mu.Lock()
 	if contract.EndHeight != endHeight {
 		t.Fatalf("Wrong end height, expected %v got %v\n", endHeight, contract.EndHeight)
