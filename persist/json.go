@@ -9,7 +9,78 @@ import (
 
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/crypto"
+
+	"gitlab.com/NebulousLabs/errors"
 )
+
+// verifyChecksum will disregard the metadata of the saved file, and just verify
+// that the checksum matches the data below the checksum to be certain that the
+// file is correct.
+func verifyChecksum(filename string) bool {
+	// Open the file.
+	file, err := os.Open(filename)
+	if os.IsNotExist(err) {
+		// No file at all means that everything is okay. This is a condition we
+		// are going to hit the first time that we ever save a file.
+		return true
+	}
+	if err != nil {
+		// An error opening the file means that the checksum verification has
+		// failed, we don't have confidence that this a a good file.
+		return false
+	}
+	defer file.Close()
+
+	// Read the metadata from the file. This is not covered by the checksum but
+	// we have to read it anyway to get to the checksum.
+	var header, version string
+	dec := json.NewDecoder(file)
+	if err := dec.Decode(&header); err != nil {
+		return false
+	}
+	if err := dec.Decode(&version); err != nil {
+		return false
+	}
+
+	// Read everything else.
+	remainingBytes, err := ioutil.ReadAll(dec.Buffered())
+	if err != nil {
+		return false
+	}
+	// The buffer may or may not have read the rest of the file, read the rest
+	// of the file to be certain.
+	remainingBytesExtra, err := ioutil.ReadAll(file)
+	if err != nil {
+		return false
+	}
+	remainingBytes = append(remainingBytes, remainingBytesExtra...)
+
+	// Determine whether the leading bytes contain a checksum. A proper checksum
+	// will be 67 bytes (quote, 64 byte checksum, quote, newline). A manual
+	// checksum will be the characters "manual\n" (9 characters). If neither
+	// decode correctly, it is assumed that there is no checksum at all.
+	var checksum crypto.Hash
+	err = json.Unmarshal(remainingBytes[:67], &checksum)
+	if err == nil {
+		// The checksum was read successfully. Return 'true' if the checksum
+		// matches the remaining data, and false otherwise.
+		return checksum == crypto.HashBytes(remainingBytes[68:])
+	}
+
+	// The checksum was not read correctly, check if the next few bytes are
+	// the "manual" checksum.
+	var manualChecksum string
+	err = json.Unmarshal(remainingBytes[:8], &manualChecksum)
+	if err == nil && manualChecksum == "manual" {
+		return true
+	}
+
+	// The checksum could not be decoded. Older versions of the file did not
+	// have a checksum, but the remaining data would still need to be valid
+	// JSON. If we are this far, it means that either the file is corrupt, or it
+	// is an old file where all remaining bytes should be valid json.
+	return json.Valid(remainingBytes)
+}
 
 // readJSON will try to read a persisted json object from a file.
 func readJSON(meta Metadata, object interface{}, filename string) error {
@@ -58,15 +129,20 @@ func readJSON(meta Metadata, object interface{}, filename string) error {
 	// decode correctly, it is assumed that there is no checksum at all.
 	var checksum crypto.Hash
 	err = json.Unmarshal(remainingBytes[:67], &checksum)
-	if err == nil && checksum == crypto.HashBytes(remainingBytes[68:]) {
-		// Checksum is proper, and matches the data. Update the data portion to
-		// exclude the checksum.
+	if err == nil {
+		if checksum != crypto.HashBytes(remainingBytes[68:]) {
+			return errors.New("loading a file with a bad checksum")
+		}
 		remainingBytes = remainingBytes[68:]
 	} else {
-		// Cryptographic checksum failed, try interpreting a manual checksum.
+		// Unable to decode a cryptographic checksum, try looking for the manual
+		// checksum.
 		var manualChecksum string
 		err := json.Unmarshal(remainingBytes[:8], &manualChecksum)
 		if err == nil && manualChecksum == "manual" {
+			if manualChecksum != "manual" {
+				return errors.New("loading a file with a bad checksum")
+			}
 			// Manual checksum is proper. Update the remaining data to exclude
 			// the manual checksum.
 			remainingBytes = remainingBytes[9:]
@@ -183,10 +259,19 @@ func SaveJSON(meta Metadata, object interface{}, filename string) error {
 		return build.ExtendErr("unable to encode checksum", err)
 	}
 	buf.Write(objBytes)
+	data := buf.Bytes()
 
 	// Write out the data to the temp file, with a sync.
-	data := buf.Bytes()
 	err = func() (err error) {
+		// Verify the checksum of the real file. If the real file does not have
+		// a valid checksum, we do not want to risk overwriting the temp file,
+		// which may be the only good version of the persistence remaining.
+		// We'll skip writing the temp file to make sure it stays intact, and go
+		// straight to over-writing the real file.
+		if !verifyChecksum(filename) {
+			return nil
+		}
+
 		file, err := os.OpenFile(filename+tempSuffix, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0600)
 		if err != nil {
 			return build.ExtendErr("unable to open temp file", err)
