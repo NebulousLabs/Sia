@@ -2599,7 +2599,7 @@ func renewContractsByRenewWindow(renter *siatest.TestNode, tg *siatest.TestGroup
 func renewContractsBySpending(renter *siatest.TestNode, tg *siatest.TestGroup) (startingUploadSpend types.Currency, err error) {
 	// Renew contracts by running out of funds
 	// Set upload price to max price
-	maxStoragePrice := types.SiacoinPrecision.Mul64(30e5).Div(modules.BlockBytesPerMonthTerabyte) // 30k SC / TB / Month
+	maxStoragePrice := types.SiacoinPrecision.Mul64(3e6).Div(modules.BlockBytesPerMonthTerabyte) // 30k SC / TB / Month
 	maxUploadPrice := maxStoragePrice.Mul64(30 * 4320)
 	hosts := tg.Hosts()
 	for _, h := range hosts {
