@@ -452,7 +452,9 @@ func testSingleFileGet(t *testing.T, tg *siatest.TestGroup) {
 		if err != nil {
 			t.Fatal("Failed to request single file", err)
 		}
-		if file != f {
+		if !reflect.DeepEqual(f, file) {
+			t.Log(f)
+			t.Log(file)
 			t.Fatal("Single file queries does not match file previously requested.")
 		}
 	}
@@ -1244,6 +1246,25 @@ func TestRenterContractEndHeight(t *testing.T) {
 	renewWindow := rg.Settings.Allowance.RenewWindow
 	numRenewals := 0
 
+	// Check if the current period was set in the past
+	cg, err := r.ConsensusGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if currentPeriodStart > cg.Height-renewWindow {
+		t.Fatalf(`Current period not set in the past as expected.
+		CP: %v
+		BH: %v
+		RW: %v
+		`, currentPeriodStart, cg.Height, renewWindow)
+	}
+
+	// Get contracts
+	rc, err := r.RenterContractsGet()
+	if err != nil {
+		t.Fatal("Could not get renter contracts:", err)
+	}
+
 	// Confirm Contracts were created as expected.  There should be 2 active
 	// contracts and no inactive or expired contracts
 	err = build.Retry(200, 100*time.Millisecond, func() error {
@@ -1270,18 +1291,19 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rc, err := r.RenterContractsGet()
+	rc, err = r.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Confirm contract end heights were set properly
 	for _, c := range rc.ActiveContracts {
-		if c.EndHeight != currentPeriodStart+period {
+		if c.EndHeight != currentPeriodStart+period+renewWindow {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", period)
+			t.Log("Renew Window:", renewWindow)
 			t.Log("Current Period:", currentPeriodStart)
-			t.Fatal("Contract endheight not set to Current period + Allowance Period")
+			t.Fatal("Contract endheight not set to Current period + Allowance Period + Renew Window")
 		}
 	}
 
@@ -1327,12 +1349,12 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range rc.ActiveContracts {
-		if c.EndHeight != currentPeriodStart+(2*period)-renewWindow && c.GoodForRenew {
+		if c.EndHeight != currentPeriodStart+(2*period)+renewWindow && c.GoodForRenew {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", period)
 			t.Log("Renew Window:", renewWindow)
 			t.Log("Current Period:", currentPeriodStart)
-			t.Fatal("Contract endheight not set to Current period + 2 * Allowance Period - Renew Window")
+			t.Fatal("Contract endheight not set to Current period + 2 * Allowance Period + Renew Window")
 		}
 	}
 
@@ -2547,10 +2569,19 @@ func checkRenewedContracts(renewedContracts []api.RenterContract) error {
 func renewContractsByRenewWindow(renter *siatest.TestNode, tg *siatest.TestGroup) error {
 	rg, err := renter.RenterGet()
 	if err != nil {
-		return errors.AddContext(err, "failed to get RenterGet")
+		return err
 	}
+	cg, err := renter.ConsensusGet()
+	if err != nil {
+		return err
+	}
+	rc, err := renter.RenterContractsGet()
+	if err != nil {
+		return err
+	}
+	blocksToMine := rc.ActiveContracts[0].EndHeight - rg.Settings.Allowance.RenewWindow - cg.Height
 	m := tg.Miners()[0]
-	for i := 0; i < int(rg.Settings.Allowance.Period-rg.Settings.Allowance.RenewWindow); i++ {
+	for i := 0; i < int(blocksToMine); i++ {
 		if err = m.MineBlock(); err != nil {
 			return err
 		}

@@ -34,7 +34,7 @@ type (
 // contractEndHeight returns the height at which the Contractor's contracts
 // end. If there are no contracts, it returns zero.
 func (c *Contractor) contractEndHeight() types.BlockHeight {
-	return c.currentPeriod + c.allowance.Period
+	return c.currentPeriod + c.allowance.Period + c.allowance.RenewWindow
 }
 
 // managedContractUtility returns the ContractUtility for a contract with a given id.
@@ -586,9 +586,9 @@ func (c *Contractor) threadedContractMaintenance() {
 	// from the contractor, build those up under a lock so that the rest of the
 	// function can execute without lock contention.
 	c.mu.RLock()
-	currentPeriod := c.currentPeriod
 	allowance := c.allowance
 	blockHeight := c.blockHeight
+	currentPeriod := c.currentPeriod
 	c.mu.RUnlock()
 	endHeight := currentPeriod + allowance.Period
 
