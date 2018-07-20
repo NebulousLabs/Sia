@@ -50,14 +50,6 @@ func (c *Contractor) managedContractUtility(id types.FileContractID) (modules.Co
 // contract is going to need in the next billing cycle by looking at how much
 // storage is in the contract and what the historic usage pattern of the
 // contract has been.
-//
-// TODO: This looks at the spending metrics of the contract being renewed, but
-// if the contract itself is a refresh of a contract that ran out of funds,
-// these estimates may be off because they do not include the spending from the
-// same-period parent contracts of this contract. This estimator function needs
-// to be extended to support adding up all the parent spending too. These
-// spending estimates will apply to uploading and downloading, but not to
-// storage or fees or contract price.
 func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.RenterContract, blockHeight types.BlockHeight, allowance modules.Allowance) (types.Currency, error) {
 	// Fetch the host pricing to use in the estimate.
 	host, exists := c.hdb.Host(contract.HostPublicKey)
@@ -70,14 +62,45 @@ func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.Re
 	dataStored := contract.Transaction.FileContractRevisions[0].NewFileSize
 	maintenanceCost := types.NewCurrency64(dataStored).Mul64(uint64(allowance.Period)).Mul(host.StoragePrice)
 
+	// For the upload and download estimates, we're going to need to know the
+	// amount of money that was spent on upload and download by this contract
+	// line in this period. That's going to require iterating over the history
+	// within the contractor.
+	prevUploadSpending := contract.UploadSpending
+	prevDownloadSpending := contract.DownloadSpending
+	c.mu.Lock()
+	currentID := contract.ID
+	for {
+		// If there is no previous contract, nothing to do.
+		var exists bool
+		currentID, exists = c.renewedFrom[currentID]
+		if !exists {
+			break
+		}
+
+		// If the contract is not in oldContracts, that's probably a bug, but
+		// nothing to do otherwise.
+		currentContract, exists := c.oldContracts[currentID]
+		if !exists {
+			c.log.Println("WARN: A known previous contract is not found in c.oldContracts")
+			break
+		}
+
+		// If the contract did not start in the current period, then it is not
+		// relevant, and none of the previous contracts will be relevant either.
+		if currentContract.StartHeight < c.currentPeriod {
+			break
+		}
+
+		// Add the upload and download spending.
+		prevUploadSpending = prevUploadSpending.Add(currentContract.UploadSpending)
+		prevDownloadSpending = prevDownloadSpending.Add(currentContract.DownloadSpending)
+	}
+	c.mu.Unlock()
+
 	// Estimate the amount of money that's going to be needed for new storage
 	// based on the amount of new storage added in the previous period. Account
 	// for both the storage price as well as the upload price.
-	//
-	// TODO: We are currently using a very crude method to estimate the amount
-	// of data uploaded, the host could have easily changed prices partway
-	// through the contract, which would cause this estimate to fail.
-	prevUploadSpending := contract.UploadSpending
 	prevUploadDataEstimate := contract.UploadSpending.Div(host.UploadBandwidthPrice)
 	// Sanity check - the host may have changed prices, make sure we aren't
 	// assuming an unreasonable amount of data.
@@ -89,7 +112,7 @@ func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.Re
 	newUploadsCost := prevUploadSpending.Add(prevUploadDataEstimate.Mul64(uint64(allowance.Period)).Mul(host.StoragePrice))
 
 	// Estimate the amount of money that's going to be spent on downloads.
-	newDownloadsCost := contract.DownloadSpending
+	newDownloadsCost := prevDownloadSpending
 
 	// We will also need to pay the host contract price.
 	contractPrice := host.ContractPrice
