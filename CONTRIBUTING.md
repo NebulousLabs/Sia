@@ -96,10 +96,10 @@ $ git config --global credential.helper "cache --timeout=[seconds]"
 
 ### Fork the Sia repository
 
-While logged into your Github account, navigate to the [Sia repository][sia] 
+While logged into your GitLab account, navigate to the [Sia repository][sia] 
 and click the 'Fork' button in the upper righthand corner.  Your account now 
 has a 'forked' copy of the original repo at 
-`https://github.com/<your GitHub username>/Sia`.
+`https://gitlab.com/<your GitLab username>/Sia`.
 
 When you installed Sia using `go get`, the go tool put the Sia source code in 
 $GOPATH/src/gitlab.com/NebulousLabs/Sia. Change to that directory and set up
@@ -108,10 +108,10 @@ your fork as a git [remote][remote]:
 ```bash
 $ cd $GOPATH/src/gitlab.com/NebulousLabs/Sia
 # Add your fork as a remote.  Name it whatever is convenient,
-# e.g your GitHub username
-$ git remote add <remote name> https://github.com/<username>/Sia.git
+# e.g your GitLab username
+$ git remote add <remote name> https://gitlab.com/<username>/Sia.git
 # Or if you use an SSH key, create the remote with the following
-$ git remote add <remote name> git@github.com:<username>/Sia.git
+$ git remote add <remote name> git@gitlab.com:<username>/Sia.git
 ```
 
 <a name="write"/>
@@ -167,7 +167,7 @@ Be sure to follow the conventions detailed in
 satisfy these best practices.
 
 Once you've finished making changes, stage and commit your changes then update 
-your fork on Github:
+your fork on GitLab:
 
 ```bash
 # Make sure the code is up to date with the original repo:
@@ -186,7 +186,7 @@ $ git status
 # Commit your changes. If you just run `commit`,  a text editor will pop up for 
 # you to enter a description of your changes.
 $ git commit -m "Add new tests for CommitSync method"
-# Push the changes to your fork on GitHub, which you should have set up as a 
+# Push the changes to your fork on GitLab, which you should have set up as a 
 # remote already.
 $ git push <fork remote> <branch>
 ```
@@ -195,7 +195,7 @@ $ git push <fork remote> <branch>
 ### Submit your code for review
 
 Once you've tested your new code and pushed changes to your fork, navigate to 
-your fork at `https://github.com/<username>/Sia` in your browser.  
+your fork at `https://gitlab.com/<username>/Sia` in your browser.  
 Switch to the branch you've made changes on by selecting it from the list on 
 the upper left.  Then click 'New pull request' on the upper right.
 
@@ -209,7 +209,7 @@ Here's a sample code review comment:
 If you want to tweak code for which you've already submitted a pull request,
 push the updated code to your fork with `git push -f <fork remote> <branch>` and
 summarize the changes you've made in a comment on the pull request page on 
-GitHub.
+GitLab.
 
 Once we have accepted your changes and merged them into the original repo, you 
 have some cleanup to do:
@@ -229,7 +229,7 @@ $ git push <fork remote> master
 
 ### More Git resources
 
-  * [How to into git (and Github)][luke] by Luke Champine
+  * [How to into git (and GitHub)][luke] by Luke Champine
   * [Official resources for learning Git][git]
 
 <a name="where-to-start"/>

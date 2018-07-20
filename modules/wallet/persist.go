@@ -124,6 +124,27 @@ func (w *Wallet) initPersist() error {
 	if err != nil {
 		return err
 	}
+
+	// begin the initial transaction
+	w.dbTx, err = w.db.Begin(true)
+	if err != nil {
+		w.log.Critical("ERROR: failed to start database update:", err)
+	}
+
+	// COMPATv131 we need to create the bucketProcessedTxnIndex if it doesn't exist
+	if w.dbTx.Bucket(bucketProcessedTransactions).Stats().KeyN > 0 &&
+		w.dbTx.Bucket(bucketProcessedTxnIndex).Stats().KeyN == 0 {
+		err = initProcessedTxnIndex(w.dbTx)
+		if err != nil {
+			return err
+		}
+		// Save changes to disk
+		if err = w.syncDB(); err != nil {
+			return err
+		}
+	}
+
+	// ensure that the final db transaction is committed when the wallet closes
 	err = w.tg.AfterStop(func() error {
 		var err error
 		if w.dbRollback {
@@ -143,6 +164,8 @@ func (w *Wallet) initPersist() error {
 	if err != nil {
 		return err
 	}
+
+	// spawn a goroutine to commit the db transaction at regular intervals
 	go w.threadedDBUpdate()
 	return nil
 }

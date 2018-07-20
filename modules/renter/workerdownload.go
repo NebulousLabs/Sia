@@ -66,6 +66,7 @@ func (w *worker) managedDownload(udc *unfinishedDownloadChunk) {
 	udc.piecesCompleted++
 	udc.piecesRegistered--
 	if udc.piecesCompleted <= udc.erasureCode.MinPieces() {
+		atomic.AddUint64(&udc.download.atomicDataReceived, udc.staticFetchLength/uint64(udc.erasureCode.MinPieces()))
 		udc.physicalChunkData[pieceIndex] = decryptedPiece
 	}
 	if udc.piecesCompleted == udc.erasureCode.MinPieces() {

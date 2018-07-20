@@ -34,7 +34,7 @@ func TestHostPersistCompat100(t *testing.T) {
 		t.Log(filepath.Abs(source))
 		t.Fatal(err)
 	}
-	h, err := New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	h, err := New(ht.cs, ht.gateway, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}

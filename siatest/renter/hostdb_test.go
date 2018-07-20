@@ -19,11 +19,7 @@ func TestInitialScanComplete(t *testing.T) {
 	}
 
 	// Get a directory for testing.
-	testDir, err := siatest.TestDir(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	testDir = filepath.Join(testDir, t.Name())
+	testDir := renterTestDir(t.Name())
 
 	// Create a group. The renter should block the scanning thread using a
 	// dependency.
@@ -33,7 +29,7 @@ func TestInitialScanComplete(t *testing.T) {
 	renterTemplate.SkipHostDiscovery = true
 	renterTemplate.HostDBDeps = deps
 
-	tg, err := siatest.NewGroup(renterTemplate, node.Host(filepath.Join(testDir, "host")),
+	tg, err := siatest.NewGroup(testDir, renterTemplate, node.Host(filepath.Join(testDir, "host")),
 		siatest.Miner(filepath.Join(testDir, "miner")))
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
