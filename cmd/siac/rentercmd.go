@@ -200,10 +200,10 @@ func rentercmd() {
 	if fm.PreviousSpending.IsZero() && fm.WithheldFunds.IsZero() {
 		fmt.Printf("\n    No previous spending.\n\n")
 	} else {
-		fmt.Printf(`
-   %v
+		fmt.Printf(`   %v
     Withheld Funds:  %v
     Release Block:   %v
+
 `, currencyUnits(fm.PreviousSpending), currencyUnits(fm.WithheldFunds), fm.ReleaseBlock)
 	}
 
@@ -745,19 +745,19 @@ func renterfileslistcmd() {
 		fmt.Println("No files have been uploaded.")
 		return
 	}
-	fmt.Println("Tracking", len(rf.Files), "files:")
+	fmt.Print("Tracking ", len(rf.Files), " files:")
 	var totalStored uint64
 	for _, file := range rf.Files {
 		totalStored += file.Filesize
 	}
-	fmt.Printf("Total uploaded: %9s\n", filesizeUnits(int64(totalStored)))
+	fmt.Printf(" %9s\n", filesizeUnits(int64(totalStored)))
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	if renterListVerbose {
-		fmt.Fprintln(w, "File size\tAvailable\tUploaded\tProgress\tRedundancy\tRenewing\tOn Disk\tRecoverable\tSia path")
+		fmt.Fprintln(w, "  File size\tAvailable\tUploaded\tProgress\tRedundancy\tRenewing\tOn Disk\tRecoverable\tSia path")
 	}
 	sort.Sort(bySiaPath(rf.Files))
 	for _, file := range rf.Files {
-		fmt.Fprintf(w, "%9s", filesizeUnits(int64(file.Filesize)))
+		fmt.Fprintf(w, "  %9s", filesizeUnits(int64(file.Filesize)))
 		if renterListVerbose {
 			availableStr := yesNo(file.Available)
 			renewingStr := yesNo(file.Renewing)
