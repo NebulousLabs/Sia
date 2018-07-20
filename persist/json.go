@@ -9,8 +9,6 @@ import (
 
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/crypto"
-
-	"gitlab.com/NebulousLabs/errors"
 )
 
 // readJSON will try to read a persisted json object from a file.
@@ -197,18 +195,6 @@ func SaveJSON(meta Metadata, object interface{}, filename string) error {
 			err = build.ComposeErrors(err, file.Close())
 		}()
 
-		// If the data is greater than the file, we truncate it first to make
-		// sure we don't run out of disk space mid-write.
-		fi, err := file.Stat()
-		if err != nil {
-			return errors.AddContext(err, "failed to get FileInfo")
-		}
-		if int64(len(data)) > fi.Size() {
-			if err := file.Truncate(int64(len(data))); err != nil {
-				return errors.AddContext(err, "failed to reserve space for file")
-			}
-		}
-
 		// Write and sync.
 		_, err = file.Write(data)
 		if err != nil {
@@ -233,18 +219,6 @@ func SaveJSON(meta Metadata, object interface{}, filename string) error {
 		defer func() {
 			err = build.ComposeErrors(err, file.Close())
 		}()
-
-		// If the data is greater than the file, we truncate it first to make
-		// sure we don't run out of disk space mid-write.
-		fi, err := file.Stat()
-		if err != nil {
-			return errors.AddContext(err, "failed to get FileInfo")
-		}
-		if int64(len(data)) > fi.Size() {
-			if err := file.Truncate(int64(len(data))); err != nil {
-				return errors.AddContext(err, "failed to reserve space for file")
-			}
-		}
 
 		// Write and sync.
 		_, err = file.Write(data)
