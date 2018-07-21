@@ -101,7 +101,7 @@ func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.Re
 	// Estimate the amount of money that's going to be needed for new storage
 	// based on the amount of new storage added in the previous period. Account
 	// for both the storage price as well as the upload price.
-	prevUploadDataEstimate := contract.UploadSpending.Div(host.UploadBandwidthPrice)
+	prevUploadDataEstimate := prevUploadSpending.Div(host.UploadBandwidthPrice)
 	// Sanity check - the host may have changed prices, make sure we aren't
 	// assuming an unreasonable amount of data.
 	if types.NewCurrency64(dataStored).Cmp(prevUploadDataEstimate) < 0 {
@@ -393,7 +393,7 @@ func (c *Contractor) managedRenew(sc *proto.SafeContract, contractFunding types.
 
 // managedRenewContract will use the renew instructions to renew a contract,
 // returning the amount of money that was put into the contract for renewal.
-func (c *Contractor) managedRenewContract(renewInstructions fileContractRenewal, currentPeriod types.BlockHeight, allowance modules.Allowance, blockHeight types.BlockHeight) (fundsSpent types.Currency, err error) {
+func (c *Contractor) managedRenewContract(renewInstructions fileContractRenewal, currentPeriod types.BlockHeight, allowance modules.Allowance, blockHeight, endHeight types.BlockHeight) (fundsSpent types.Currency, err error) {
 	// Pull the variables out of the renewal.
 	id := renewInstructions.id
 	amount := renewInstructions.amount
@@ -435,9 +435,6 @@ func (c *Contractor) managedRenewContract(renewInstructions fileContractRenewal,
 		c.staticContracts.Return(oldContract)
 		return types.ZeroCurrency, errors.New("contract is marked not good for renew")
 	}
-
-	// Calculate endHeight for renewed contracts
-	endHeight := currentPeriod + allowance.Period
 
 	// Perform the actual renew. If the renew fails, return the
 	// contract. If the renew fails we check how often it has failed
@@ -589,8 +586,8 @@ func (c *Contractor) threadedContractMaintenance() {
 	allowance := c.allowance
 	blockHeight := c.blockHeight
 	currentPeriod := c.currentPeriod
+	endHeight := c.contractEndHeight()
 	c.mu.RUnlock()
-	endHeight := currentPeriod + allowance.Period
 
 	// Iterate through the contracts again, figuring out which contracts to
 	// renew and how much extra funds to renew them with.
@@ -695,7 +692,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		// Renew one contract. The error is ignored because the renew function
 		// already will have logged the error, and in the event of an error,
 		// 'fundsSpent' will return '0'.
-		fundsSpent, _ := c.managedRenewContract(renewal, currentPeriod, allowance, blockHeight)
+		fundsSpent, _ := c.managedRenewContract(renewal, currentPeriod, allowance, blockHeight, endHeight)
 		fundsRemaining = fundsRemaining.Sub(fundsSpent)
 
 		// Return here if an interrupt or kill signal has been sent.
@@ -716,7 +713,7 @@ func (c *Contractor) threadedContractMaintenance() {
 		// Renew one contract. The error is ignored because the renew function
 		// already will have logged the error, and in the event of an error,
 		// 'fundsSpent' will return '0'.
-		fundsSpent, _ := c.managedRenewContract(renewal, currentPeriod, allowance, blockHeight)
+		fundsSpent, _ := c.managedRenewContract(renewal, currentPeriod, allowance, blockHeight, endHeight)
 		fundsRemaining = fundsRemaining.Sub(fundsSpent)
 
 		// Return here if an interrupt or kill signal has been sent.
