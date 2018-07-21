@@ -70,7 +70,7 @@ func (c *Contractor) managedEstimateRenewFundingRequirements(contract modules.Re
 	prevDownloadSpending := contract.DownloadSpending
 	c.mu.Lock()
 	currentID := contract.ID
-	for {
+	for i := 0; i < 10e3; i++ { // prevent an infinite loop if there's an [impossible] contract cycle
 		// If there is no previous contract, nothing to do.
 		var exists bool
 		currentID, exists = c.renewedFrom[currentID]
