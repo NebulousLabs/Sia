@@ -254,10 +254,10 @@ func (c *Contractor) managedMarkContractsUtility() error {
 
 // managedNewContract negotiates an initial file contract with the specified
 // host, saves it, and returns it.
-func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFunding types.Currency, endHeight types.BlockHeight) (modules.RenterContract, error) {
+func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFunding types.Currency, endHeight types.BlockHeight) (types.Currency, modules.RenterContract, error) {
 	// reject hosts that are too expensive
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
-		return modules.RenterContract{}, errTooExpensive
+		return types.ZeroCurrency, modules.RenterContract{}, errTooExpensive
 	}
 	// cap host.MaxCollateral
 	if host.MaxCollateral.Cmp(maxCollateral) > 0 {
@@ -267,7 +267,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	// get an address to use for negotiation
 	uc, err := c.wallet.NextAddress()
 	if err != nil {
-		return modules.RenterContract{}, err
+		return types.ZeroCurrency, modules.RenterContract{}, err
 	}
 
 	// create contract params
@@ -281,16 +281,15 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	}
 	c.mu.RUnlock()
 
-	// create transaction builder
+	// create transaction builder and trigger contract formation.
 	txnBuilder, err := c.wallet.StartTransaction()
 	if err != nil {
-		return modules.RenterContract{}, err
+		return types.ZeroCurrency, modules.RenterContract{}, err
 	}
-
 	contract, err := c.staticContracts.FormContract(params, txnBuilder, c.tpool, c.hdb, c.tg.StopChan())
 	if err != nil {
 		txnBuilder.Drop()
-		return modules.RenterContract{}, err
+		return types.ZeroCurrency, modules.RenterContract{}, err
 	}
 
 	// Add a mapping from the contract's id to the public key of the host.
@@ -300,14 +299,17 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, contractFundin
 	if exists {
 		c.mu.Unlock()
 		txnBuilder.Drop()
-		return modules.RenterContract{}, fmt.Errorf("We already have a contract with host %v", contract.HostPublicKey)
+		// We need to return a funding value because money was spent on this
+		// host, even though the full process could not be completed.
+		c.log.Println("WARN: Attempted to form a new contract with a host that we already have a contrat with.")
+		return contractFunding, modules.RenterContract{}, fmt.Errorf("We already have a contract with host %v", contract.HostPublicKey)
 	}
 	c.pubKeysToContractID[string(contract.HostPublicKey.Key)] = contract.ID
 	c.mu.Unlock()
 
 	contractValue := contract.RenterFunds
 	c.log.Printf("Formed contract %v with %v for %v", contract.ID, host.NetAddress, contractValue.HumanString())
-	return contract, nil
+	return contractFunding, contract, nil
 }
 
 // managedPrunePubkeyMap will delete any pubkeys in the pubKeysToContractID map
@@ -767,11 +769,12 @@ func (c *Contractor) threadedContractMaintenance() {
 		}
 
 		// Attempt forming a contract with this host.
-		newContract, err := c.managedNewContract(host, initialContractFunds, endHeight)
+		fundsSpent, newContract, err := c.managedNewContract(host, initialContractFunds, endHeight)
 		if err != nil {
 			c.log.Printf("Attempted to form a contract with %v, but negotiation failed: %v\n", host.NetAddress, err)
 			continue
 		}
+		fundsRemaining = fundsRemaining.Sub(fundsSpent)
 
 		// Add this contract to the contractor and save.
 		err = c.managedUpdateContractUtility(newContract.ID, modules.ContractUtility{
