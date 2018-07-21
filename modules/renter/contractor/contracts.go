@@ -1,5 +1,10 @@
 package contractor
 
+import (
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/types"
+)
+
 // contractEndHeight returns the height at which the Contractor's contracts
 // end. If there are no contracts, it returns zero.
 func (c *Contractor) contractEndHeight() types.BlockHeight {
