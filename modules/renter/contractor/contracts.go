@@ -565,6 +565,16 @@ func (c *Contractor) threadedContractMaintenance() {
 		return
 	}
 
+	// The rest of this function needs to know a few of the stateful variables
+	// from the contractor, build those up under a lock so that the rest of the
+	// function can execute without lock contention.
+	c.mu.Lock()
+	allowance := c.allowance
+	blockHeight := c.blockHeight
+	currentPeriod := c.currentPeriod
+	endHeight := c.contractEndHeight()
+	c.mu.Unlock()
+
 	// Create the renewSet and refreshSet. Each is a list of contracts that need
 	// to be renewed, paired with the amount of money to use in each renewal.
 	//
@@ -578,16 +588,6 @@ func (c *Contractor) threadedContractMaintenance() {
 	// data in the long term rather than renew a contract.
 	var renewSet []fileContractRenewal
 	var refreshSet []fileContractRenewal
-
-	// The rest of this function needs to know a few of the stateful variables
-	// from the contractor, build those up under a lock so that the rest of the
-	// function can execute without lock contention.
-	c.mu.RLock()
-	allowance := c.allowance
-	blockHeight := c.blockHeight
-	currentPeriod := c.currentPeriod
-	endHeight := c.contractEndHeight()
-	c.mu.RUnlock()
 
 	// Iterate through the contracts again, figuring out which contracts to
 	// renew and how much extra funds to renew them with.
