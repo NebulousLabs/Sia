@@ -45,8 +45,8 @@ var (
 	maxDownloadPrice = maxStoragePrice.Mul64(3 * 4320)
 	maxStoragePrice  = build.Select(build.Var{
 		Dev:      types.SiacoinPrecision.Mul64(300e3).Div(modules.BlockBytesPerMonthTerabyte), // 1 order of magnitude greater
-		Standard: types.SiacoinPrecision.Mul64(30e3).Div(modules.BlockBytesPerMonthTerabyte), // 30k SC / TB / Month
-		Testing:  types.SiacoinPrecision.Mul64(3e6).Div(modules.BlockBytesPerMonthTerabyte), // 2 orders of magnitude greater
+		Standard: types.SiacoinPrecision.Mul64(30e3).Div(modules.BlockBytesPerMonthTerabyte),  // 30k SC / TB / Month
+		Testing:  types.SiacoinPrecision.Mul64(3e6).Div(modules.BlockBytesPerMonthTerabyte),   // 2 orders of magnitude greater
 	}).(types.Currency)
 	maxUploadPrice = build.Select(build.Var{
 		Dev:      maxStoragePrice.Mul64(30 * 4320),  // 1 order of magnitude greater
