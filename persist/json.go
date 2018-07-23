@@ -65,11 +65,11 @@ func readJSON(meta Metadata, object interface{}, filename string) error {
 	} else {
 		// Cryptographic checksum failed, try interpreting a manual checksum.
 		var manualChecksum string
-		err := json.Unmarshal(remainingBytes[:8], &manualChecksum)
+		err := json.Unmarshal(remainingBytes[:9], &manualChecksum)
 		if err == nil && manualChecksum == "manual" {
 			// Manual checksum is proper. Update the remaining data to exclude
 			// the manual checksum.
-			remainingBytes = remainingBytes[9:]
+			remainingBytes = remainingBytes[10:]
 		}
 	}
 
